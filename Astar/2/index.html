@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Multi-Point Line</title>
+	<style>
+        canvas { border: 1px solid black; }
+        #debug { margin-top: 20px; font-family: Arial, sans-serif; }
+    </style>
+</head>
+
+<body>
+	<script src="Wayfinding.js"></script>
+	<canvas style="outline: 1px solid red;" id="myCanvas" width="1500" height="1200"></canvas>
+	<div id="debug"></div>
+
+	<script>
+
+		function getRandomRectangles(numRectangles, minWidth, maxWidth, minHeight, maxHeight, canvasWidth, canvasHeight) {
+			const blockedRectangles = [];
+			for (let i = 0; i < numRectangles; i++) {
+				const randomX = Math.floor(Math.random() * (canvasWidth - maxWidth));
+				const randomY = Math.floor(Math.random() * (canvasHeight - maxHeight));
+				const randomWidth = Math.floor(Math.random() * (maxWidth - minWidth)) + minWidth;
+				const randomHeight = Math.floor(Math.random() * (maxHeight - minHeight)) + minHeight;
+				blockedRectangles.push({ x: randomX, y: randomY, width: randomWidth, height: randomHeight });
+			}
+			return blockedRectangles;
+		}
+
+		const canvas = document.getElementById("myCanvas");
+		const ctx = canvas.getContext("2d");
+		const debugDiv = document.getElementById("debug");
+
+		const gridWidth = canvas.width;
+		const gridHeight = canvas.height;
+		const tileSize = 32; // Reduced tile size for finer granularity
+		const characterSize = 100; // Smaller than the tile size
+		const start = { x: 50, y: 50 };
+		const end = { x: canvas.width - 50, y: canvas.height - 50 };
+
+		const blockedRectangles = getRandomRectangles(12, 50, 100, 50, 100, gridWidth, gridHeight);
+
+		const astar = new AStar(gridWidth, gridHeight, tileSize, blockedRectangles, characterSize);
+
+		function drawGrid() {
+			ctx.strokeStyle = "#ddd";
+			for (let x = 0; x < gridWidth; x += tileSize) {
+				ctx.beginPath();
+				ctx.moveTo(x, 0);
+				ctx.lineTo(x, gridHeight);
+				ctx.stroke();
+			}
+			for (let y = 0; y < gridHeight; y += tileSize) {
+				ctx.beginPath();
+				ctx.moveTo(0, y);
+				ctx.lineTo(gridWidth, y);
+				ctx.stroke();
+			}
+		}
+
+		function drawScene() {
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			drawGrid();
+
+			// Draw blocked rectangles
+			ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+			blockedRectangles.forEach(rect => {
+				ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+			});
+
+			// Draw start and end points
+			ctx.fillStyle = "green";
+			ctx.fillRect(start.x - characterSize / 2, start.y - characterSize / 2, characterSize, characterSize);
+			ctx.fillStyle = "blue";
+			ctx.fillRect(end.x - characterSize / 2, end.y - characterSize / 2, characterSize, characterSize);
+
+			// Visualize walkable and non-walkable areas
+			for (let x = 0; x < gridWidth; x += tileSize) {
+				for (let y = 0; y < gridHeight; y += tileSize) {
+					if (!astar.isWalkable(Math.floor(x / tileSize), Math.floor(y / tileSize))) {
+						ctx.fillStyle = "rgba(255, 0, 0, 0.2)";
+						ctx.fillRect(x, y, tileSize, tileSize);
+					}
+				}
+			}
+		}
+
+		drawScene();
+
+		const path = astar.findPath(start, end);
+
+		if (path && path.length > 0) {
+			console.log("Path found:", path);
+			debugDiv.innerHTML += "<p>Path found!</p>";
+
+			// Draw the path
+			ctx.beginPath();
+			ctx.moveTo(path[0].x, path[0].y);
+			for (let i = 1; i < path.length; i++) {
+				ctx.lineTo(path[i].x, path[i].y);
+			}
+			ctx.strokeStyle = "purple";
+			ctx.lineWidth = 3;
+			ctx.stroke();
+		} else {
+			console.log("No path found.");
+			debugDiv.innerHTML += "<p>No path found. Possible reasons:</p>";
+			debugDiv.innerHTML += "<ul>";
+			debugDiv.innerHTML += "<li>Start or end point might be in a non-walkable area</li>";
+			debugDiv.innerHTML += "<li>There might be no valid path between start and end</li>";
+			debugDiv.innerHTML += "<li>The character size might be too large for the available spaces</li>";
+			debugDiv.innerHTML += "</ul>";
+
+			if (!astar.isWalkable(Math.floor(start.x / tileSize), Math.floor(start.y / tileSize))) {
+				debugDiv.innerHTML += "<p>Start point is in a non-walkable area!</p>";
+			}
+			if (!astar.isWalkable(Math.floor(end.x / tileSize), Math.floor(end.y / tileSize))) {
+				debugDiv.innerHTML += "<p>End point is in a non-walkable area!</p>";
+			}
+		}
+	</script>
+</body>
+
+</html>

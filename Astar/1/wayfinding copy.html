@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Multi-Point Line</title>
+</head>
+
+<body>
+	<script src="Wayfinding.js"></script>
+	<canvas style="outline: 1px solid red;" id="myCanvas" width="1500" height="1200"></canvas>
+
+	<script>
+
+		function getRandomRectangles(numRectangles, minWidth, maxWidth, minHeight, maxHeight, start, end) {
+			const blockedRectangles = [];
+
+			for (let i = 0; i < numRectangles; i++) {
+				const randomX = Math.floor(Math.random() * 1200);
+				const randomY = Math.floor(Math.random() * 1000);
+				const randomWidth = Math.floor(Math.random() * (maxWidth - minWidth)) + minWidth;
+				const randomHeight = Math.floor(Math.random() * (maxHeight - minHeight)) + minHeight;
+
+				const newRectangle = { x: randomX, y: randomY, width: randomWidth, height: randomHeight };
+
+
+				blockedRectangles.push(newRectangle);
+			}
+
+			return blockedRectangles;
+		}
+
+
+
+		// Example usage:
+		const gridWidth = 1000;
+		const gridHeight = 1200;
+		const tileSize = 64;
+		var blockedRectangles = [
+			{ x: 80, y: 200, width: 700, height: 100 },
+			{ x: 50, y: 450, width: 50, height: 125 },
+			{ x: 260, y: 450, width: 500, height: 125 },
+			// Add more non-grid-aligned blocked rectangles here
+		];
+		const start = { x: 0, y: 300 };
+		const end = { x: 876, y: 300 };
+
+		blockedRectangles = getRandomRectangles(22, 50, 100, 50, 100, start, end);
+
+		const astar = new AStar(gridWidth, gridHeight, tileSize, blockedRectangles);
+
+		const offsetLine = 32;
+
+		var points = astar.findPath(start, end);
+
+		if (points != null && points.length > 0) {
+
+			points = astar.simplifyPoints2(points, start, end);
+
+			console.log("Path found:", points);
+
+
+
+
+
+			// Get the canvas element and its context
+			var canvas = document.getElementById("myCanvas");
+			var ctx = canvas.getContext("2d");
+
+			ctx.fillStyle = "pink";
+			ctx.fillRect(start.x, start.y, tileSize, tileSize);
+			ctx.fillRect(end.x, end.y, tileSize, tileSize);
+
+			// Start drawing the path
+			ctx.beginPath();
+
+			// Move the pen to the first point
+			ctx.moveTo(points[0].x+offsetLine, points[0].y+offsetLine);
+
+			// Loop through the remaining points and draw lines
+			for (var i = 1; i < points.length; i++) {
+				ctx.lineTo(points[i].x+offsetLine, points[i].y+offsetLine);
+			}
+
+			// Set the line color and width
+			ctx.strokeStyle = "blue";
+			ctx.lineWidth = 3;
+
+			// Draw the path
+			ctx.stroke();
+
+			// Set the fill color for the blocked rectangles
+			ctx.fillStyle = "red";
+
+			// Loop through the blockedRectangles array and draw each rectangle
+			blockedRectangles.forEach(function (rectangle) {
+				ctx.fillRect(rectangle.x, rectangle.y, rectangle.width, rectangle.height);
+			});
+
+
+
+
+		} else {
+			console.log("No path found.");
+		}
+
+
+
+
+
+	</script>
+</body>
+
+</html>
