@@ -118,11 +118,57 @@ body {
   background-color: lightgrey;
   border-radius: var(--border-radius);
   padding: var(--padding);
-  width: 600px;
   margin: 0 auto;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  width: 100%;
+}
+
+.hand-controls {
+  background-color: rgb(245, 245, 245);
+  border-radius: var(--border-radius);
+  padding: var(--padding);
+  margin: 0 auto;
+  display: flex;
+  gap: 10px;
+  position: absolute;
+  flex-direction: column;
+  transform: translate(-100%, 0);
+  width: -moz-fit-content;
+  width: fit-content;
+}
+.hand-controls input[type=radio] {
+  display: none;
+}
+.hand-controls label {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: var(--border-radius);
+  padding: calc(var(--padding) * 2);
+  border-style: solid;
+  border-width: var(--border-width);
+  border-top-color: lightgrey;
+  border-left-color: lightgrey;
+  border-right-color: white;
+  border-bottom-color: white;
+  color: grey;
+  font-size: 80%;
+  background-color: rgb(245, 245, 245);
+  transition: border-color 0.15s;
+}
+.hand-controls label:hover {
+  outline: 4px solid green;
+}
+.hand-controls input[type=radio]:checked + label:not(:active) {
+  border-top-color: white;
+  border-left-color: white;
+  border-right-color: lightgrey;
+  border-bottom-color: lightgrey;
+  color: black;
 }
 
 .item {
@@ -150,7 +196,6 @@ body {
   position: absolute;
   top: 0;
   right: 0;
-  content: attr(data-zindex);
   background-color: white;
   border-radius: 5px;
   padding: 2px;
@@ -165,6 +210,9 @@ body {
   border-radius: 20px;
   width: 600px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 .container-wrapper.styled {
   padding: 20px;
@@ -343,7 +391,6 @@ body {
   scale: 1.25;
 }
 .container-wrapper > .controls {
-  margin-top: var(--padding);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -426,6 +473,26 @@ body {
 .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .hitbox {
   display: none;
 }
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper {
+  display: flex;
+  gap: var(--border-width);
+  align-items: center;
+  left: 50%;
+  top: 10px;
+  transform: translate(-50%, 100%);
+  position: absolute;
+  transition: opacity 0.5s;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery {
+  --icon-scale: 2;
+  width: 13px;
+  height: 8px;
+  scale: var(--icon-scale);
+  image-rendering: pixelated;
+  background-position: -26px 0;
+  filter: drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.1254901961));
+  background-image: url(../images/icons/battery.png);
+}
 .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper {
   display: flex;
   gap: var(--border-width);
@@ -456,6 +523,9 @@ body {
   background-color: #3269c4;
   color: white;
   outline-color: white;
+}
+.myteContainer .myteWrapper > .interactive-myte:not(.duplicate) > .inner-wrapper > .above-wrapper {
+  display: none;
 }
 .myteContainer .myteWrapper > .interactive-myte:not(.duplicate) > .inner-wrapper > .name-wrapper {
   display: none;

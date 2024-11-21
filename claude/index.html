@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Myte Pet System</title>
+    <style>
+
+    </style>
+	<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <!-- Custom cursor -->
+    <div id="customCursor" class="ignore"></div>
+
+    <!-- Debug panels -->
+    <div class="section debugMenu ignore"></div>
+    <div class="section queueMenu ignore"></div>
+
+    <!-- Main container -->
+    <div class="container-wrapper styled">
+        <div id="container-1" class="section container">
+            <!-- Crosshair for debug -->
+            <div class="crosshair ignore debug">
+                <div class="horizontal"></div>
+                <div class="vertical"></div>
+            </div>
+
+            <!-- Canvas layers -->
+            <div class="canvas">
+                <div class="layer background"></div>
+                <div class="layer controls">
+                    <div class="ignore dot cursor-dot debug"></div>
+                </div>
+                <div class="layer foreground">
+                    <!-- Myte 1 -->
+					<div class="myteContainer">
+						<div id="myteWrapper-1" class="myteWrapper snail">
+							<div class="home-name">
+								<div class="name tooltip">Lentil's Home</div>
+							</div>
+							<div class="home-wrapper"></div>
+							<div id="myte-lentil" 
+								 class="interactive-myte" 
+								 data-myte-name="Lentil" 
+								 draggable="false">
+                                <div class="inner-wrapper">
+                                    <div class="sprite"></div>
+                                    <div class="selectbox"></div>
+                                    <div class="collidebox"></div>
+                                    <div class="hitbox"></div>
+                                    <div class="name-wrapper">
+                                        <span class="before">x</span>
+                                        <div class="name tooltip">Lentil</div>
+                                    </div>
+                                    <div class="above-wrapper">
+                                        <div class="battery"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Myte 2 -->
+                    <div class="myteContainer">
+                        <div id="myteWrapper-2" class="myteWrapper snail">
+                            <div class="home-name">
+                                <div class="name tooltip">Pookie's Home</div>
+                            </div>
+                            <div class="home-wrapper"></div>
+                            <div id="myte-pookie" class="interactive-myte" data-myte-name="Pookie" draggable="false">
+                                <div class="inner-wrapper">
+                                    <div class="sprite"></div>
+                                    <div class="selectbox"></div>
+                                    <div class="collidebox"></div>
+                                    <div class="hitbox"></div>
+                                    <div class="name-wrapper">
+                                        <span class="before">x</span>
+                                        <div class="name tooltip">Pookie</div>
+                                    </div>
+                                    <div class="above-wrapper">Hello</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div id="controls">
+            <button id="cycleFollowGoal" class="myte">Follow Mode: NORMAL</button>
+            <button id="cycleGoal" class="myte">Goal: FOLLOW</button>
+            <button id="skipQueue" class="myte">Skip Queue</button>
+            <button id="toggleDebug">Debug: OFF</button>
+            <button id="cycleCamera">Camera: DRAG_TO_PAN</button>
+            <button id="cycleContainerLimit">Limit: OFF</button>
+        </div>
+    </div>
+
+    <!-- Inventory -->
+    <div id="inventory"></div>
+
+    <!-- Scripts -->
+    <script src="js/Utility.js"></script>
+    <script src="js/Vector2.js"></script>
+    <script src="js/EventManager.js"></script>
+    <script src="js/MyteMovement.js"></script>
+    <script src="js/MyteAnimation.js"></script>
+    <script src="js/MyteAI.js"></script>
+    <script src="js/MyteQueue.js"></script>
+    <script src="js/Myte.js"></script>
+
+    <script src="js/CameraSystem.js"></script>
+
+	<script src="js/ResourceManager.js"></script>
+
+	<script src="js/DebugManager.js"></script>
+    <script src="js/WorldObjectManager.js"></script>
+    <script src="js/UIManager.js"></script>
+    <script src="js/ContainerManager.js"></script>
+    <script src="js/Core.js"></script>
+</body>
+</html>

@@ -128,11 +128,83 @@ body {
 	background-color: lightgrey;
 	border-radius: var(--border-radius);
 	padding: var(--padding);
-	width: 600px;
 	margin: 0 auto;
 	display: flex;
 	flex-wrap: wrap;
 	gap: 10px;
+	width: 100%;
+
+
+}
+
+.hand-controls {
+	background-color: rgb(245, 245, 245);
+	border-radius: var(--border-radius);
+	padding: var(--padding);
+	margin: 0 auto;
+	display: flex;
+	gap: 10px;
+
+    position: absolute;
+    flex-direction: column;
+    transform: translate(-100%, 0);
+    width: fit-content;
+
+
+	input[type="radio"] {
+		display: none;
+	}
+
+	label {
+
+
+		width: 80px;
+		height: 80px;
+
+		display: flex;
+		justify-content: center;
+		align-items: center;
+
+		border-radius: var(--border-radius);
+		padding: calc(var(--padding) * 2);
+		border-style: solid;
+		border-width: var(--border-width);
+	
+
+	
+		border-top-color: lightgrey;
+		border-left-color: lightgrey;
+		border-right-color: white;
+		border-bottom-color: white;
+
+		color: grey;
+		font-size: 80%;
+
+
+		background-color: rgb(245, 245, 245);
+
+		transition: border-color .15s;
+
+
+	}
+
+	label:hover {
+		outline: 4px solid green;
+	}
+
+
+	input[type="radio"]:checked + label:not(:active) {
+		border-top-color: white;
+		border-left-color: white;
+		border-right-color: lightgrey;
+		border-bottom-color: lightgrey;
+
+		color: black;
+		
+
+		
+	}
+
 }
 
 .item {
@@ -163,7 +235,7 @@ body {
 		top: 0;
 		right: 0;
 
-		content: attr(data-zindex);
+		// content: attr(data-zindex);
 	  
 		background-color: white;
 		border-radius: 5px;
@@ -182,6 +254,10 @@ body {
 	width: 600px;
 
 	margin: 0 auto;
+
+	display: flex;
+	flex-direction:column;
+	gap: 20px;
 
 
 	&.styled {
@@ -421,7 +497,7 @@ body {
 	}
 
 	>.controls {
-		margin-top: var(--padding);
+
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -531,6 +607,35 @@ body {
 				>.hitbox {
 					display: none;
 				}
+
+				>.above-wrapper {
+					display: flex;
+					gap: var(--border-width);
+					align-items: center;
+					left: 50%;
+					top: 10px;
+					transform: translate(-50%, 100%);
+					position: absolute;
+					transition: opacity .5s;
+
+					>.battery {
+
+						--icon-scale: 2;
+
+						width: 13px;
+						height: 8px;
+						scale: var(--icon-scale);
+						image-rendering: pixelated;
+
+						background-position: calc(-13px * 2) 0;
+
+						filter: drop-shadow(1px 1px 0px #00000020);
+
+
+						background-image: url(../images/icons/battery.png);
+					}
+
+				}
 		
 				>.name-wrapper {
 					display: flex;
@@ -581,6 +686,9 @@ body {
 			// hide name when at home
 			&:not(.duplicate) {
 				>.inner-wrapper {
+					>.above-wrapper {
+						display: none;
+					}
 					>.name-wrapper {
 						display: none;
 					}

@@ -1,64 +1,3 @@
-
-
-/**
- * CollisionHandler class
- * - Responsibilities:
- *   - Check for collisions with other elements
- *   - Handle collision responses
- * - Methods to include:
- *   - checkCollisions()
- *   - handleCollision()
- */
-
-/**
- * StateManager class
- * - Responsibilities:
- *   - Manage state transitions
- *   - Update current state
- * - Methods to include:
- *   - setNewState()
- *   - update_frame()
- */
-
-/**
- * AnimationController class
- * - Responsibilities:
- *   - Manage animations and expressions
- * - Methods to include:
- *   - do_expression()
- *   - updateAnimation()
- */
-
-/**
- * HealthManager class
- * - Responsibilities:
- *   - Manage health and damage
- * - Methods to include:
- *   - do_touch_damage()
- *   - updateHealth()
- */
-
-/**
- * UIController class
- * - Responsibilities:
- *   - Manage UI elements (target dot, sprite positioning)
- * - Methods to include:
- *   - createTargetDot()
- *   - update_target_dot()
- *   - setSpritePosition()
- */
-
-/**
- * QueueManager class
- * - Responsibilities:
- *   - Manage action queue
- * - Methods to include:
- *   - addIdle()
- *   - addMoveToElement()
- *   - addRunLaps()
- *   - doCurrentAction()
- */
-
 class MyteInputHandler {
 
 	/**
@@ -176,6 +115,8 @@ class Myte {
 		this.runAway_angle_distance = 300;
 
 		this.movementController = new MovementController(this);
+
+		this.inputHandler = new MyteInputHandler(this);
 
 	}
 
@@ -888,10 +829,6 @@ class Myte {
 		this.stateMachine.setState(newState);
 	}
 
-	update_frame() {
-		this.setNewState();
-		this.stateMachine.update();
-	}
 
 
     move_drag() {
@@ -1281,14 +1218,27 @@ class Myte {
 		}
 	}
 
-	update(time) {
+	update_frame() {
+		if (!this.isActive) return;
+		this.setNewState();
+		this.stateMachine.update();
+	}
+
+
+	update(deltaTime) {
+		if (!this.isActive) return;
+
+
 		// personal target dot
 		this.update_target_dot();
 
-
-
 		// movement logic
 		this.do_movement_logic();
+
+		// update frame
+		if (deltaTime >= this.parent.core.config.frameInterval) {
+			this.update_frame();
+		}
 
 	}
 }
