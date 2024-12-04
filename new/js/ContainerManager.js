@@ -26,20 +26,32 @@ class ContainerManager {
 		// Setup the canvas
 		this.canvas = this.element.querySelector('.canvas');
 
-		this.userInterface = new UserInterface(this);
+		this.ui = new UserInterface(this);
 		this.mapObjects = new MapObjects(this);
+
+        this.pathfinding = new PathFindingSystem(32);
+        
+
+		this.myteThumbnails = null;
+
 
 
 		const itemsArray = [
-			{ name: "Acorn", quantity: 1, type: "food acorn" },
-			{ name: "Turnip", quantity: 5, type: "food turnip" },
-			{ name: "Apple", quantity: 3, type: "food apple" }
+			{ name: "Acorn", quantity: 1, type: "FOOD" },
+			{ name: "Turnip", quantity: 5, type: "FOOD" },
+			{ name: "Apple", quantity: 3, type: "FOOD" }
 		];
 
 		this.inventory = new Inventory(this, document.getElementById('inventory'));
 		this.inventory.loadItems(itemsArray);
 
+        // Add this to track ongoing interactions
+        this.activeInteractions = new Map();
+
+
 	}
+
+
 
 
 
@@ -101,17 +113,77 @@ class ContainerManager {
 
 		this.camera = new Camera(this, this.canvas, this.element);
 
-
-
 		// add map objects
 		this.mapObjects.init();
-		this.userInterface.init();
-		
+		this.ui.init();
+		this.pathfinding.init();
+
+
+		this.initActiveMytes();
 
 		// Start the animation loop
 		// window.requestAnimationFrame(this.update.bind(this));
 
 	}
+
+
+	createThumbnail(myte) {
+        const thumbnail = document.createElement('div');
+        thumbnail.classList.add('myte-thumbnail');
+
+		if(myte === this.activeMyte){
+			thumbnail.classList.add('active');
+		}
+		
+		thumbnail.setAttribute('data-myte-id', myte.id);
+        
+        // Create sprite container
+        const spriteContainer = document.createElement('div');
+        spriteContainer.className = 'myte-sprite';
+        
+        const spriteInner = document.createElement('div');
+        spriteInner.className = 'myte-sprite-inner';
+        spriteContainer.appendChild(spriteInner);
+
+        // Create name element
+        const name = document.createElement('span');
+        name.className = 'myte-name';
+        name.textContent = myte.name;
+
+        // Build thumbnail
+        thumbnail.appendChild(spriteContainer);
+        thumbnail.appendChild(name);
+
+
+        // Add click handler
+        thumbnail.addEventListener('click', () => {
+            if (myte !== this.activeMyte) {
+                this.setActiveMyte(myte);
+            }
+        });
+
+        return thumbnail;
+    }
+
+    initActiveMytes() {
+		// find #all_mytes
+		const listContainer = document.getElementById('all_mytes');
+
+        // Add thumbnails
+        if (this.mytes && this.mytes.length > 0) {
+            this.mytes.forEach(myte => {
+                listContainer.appendChild(this.createThumbnail(myte));
+            });
+        } else {
+            const emptyState = document.createElement('div');
+			emptyState.className = 'empty';
+            emptyState.textContent = 'No Mytes found';
+            listContainer.appendChild(emptyState);
+        }
+
+    }
+
+
 
     /********************************************
      * events - press down events
@@ -125,9 +197,11 @@ class ContainerManager {
 
     // to stop tracking when the mouse button is released
     stop_tracking_mouse_hold = () => {
-        console.log("Held down mouse for " + this.getPressDuration() + "ms");
-        this.isMousePressed = false;
-        this.pressStartTime = 0;
+		if(this.getPressDuration() > 0){
+			console.log("Held down mouse for " + this.getPressDuration() + "ms");
+			this.isMousePressed = false;
+			this.pressStartTime = 0;
+		}
     }
 
     // to get the duration the mouse button has been pressed (in milliseconds)
@@ -242,6 +316,7 @@ class ContainerManager {
 			this.activeMyte.duplicate.classList.remove('active');
 		}
 
+
 		// set active myte
 		this.activeMyte = myte;
 
@@ -252,15 +327,50 @@ class ContainerManager {
 		}
 
 		// set other mytes to free roam
+		
 		this.mytes.forEach(myte => {
 			if(myte != this.activeMyte){
 				myte.setMode(MOVE_TYPES.FREEROAM);
 			}	
 		});
 
-		this.userInterface.updateButtons();
+		
+		if(!myte.isActive){
+			myte.start();
+		}
+
+		
+
+		// mytes list
+		const listContainer = document.getElementById('all_mytes');
+		listContainer.querySelectorAll('.myte-thumbnail').forEach(thumbnail => {
+			thumbnail.classList.remove('active');
+		});
+		listContainer.querySelector(`[data-myte-id="${myte.id}"]`).classList.add('active');
+
+
+		this.ui.updateButtons();
 
 	}
+
+    // Add these helper methods
+    startInteraction(myte1, myte2, interactionType) {
+        const interactionId = `${myte1.id}-${myte2.id}`;
+        if (this.activeInteractions.has(interactionId)) return false;
+
+        this.activeInteractions.set(interactionId, {
+            mytes: [myte1, myte2],
+            type: interactionType,
+            startTime: Date.now()
+        });
+        return true;
+    }
+
+    endInteraction(myte1, myte2) {
+        const interactionId = `${myte1.id}-${myte2.id}`;
+        this.activeInteractions.delete(interactionId);
+    }
+
 
 	draw_target_dot() {
 		/********************************************

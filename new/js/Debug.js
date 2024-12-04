@@ -17,7 +17,7 @@ class Debug {
             { label: "User Active", value: this.parent.isActive },
 			{ label: "Local Mouse", value: `${this.parent.getLocalMouse().x.toFixed(2)}px, ${this.parent.getLocalMouse().y.toFixed(2)}px` },
             { label: "Mouse", value: `${this.parent.mousePosX.toFixed(2)}px, ${this.parent.mousePosY.toFixed(2)}px` },
-            { label: "Cursor", value: this.parent.userInterface.cursorManager.currentState },
+            // { label: "Cursor", value: this.parent.userInterface.cursorManager.currentState },
         ];
 
         let myteMessages = [];
@@ -25,6 +25,7 @@ class Debug {
         if(activeMyte){
             myteMessages =[
                 { label: "Myte Active", value: activeMyte.isActive },
+                { label: "Mood", value: `${this.parent.activeMyte.mood.toFixed(1)} (${this.parent.activeMyte.getMoodStatus()})` },
                 { label: "At Target", value: activeMyte.is_at_target() },
                 { label: "Goal", value: activeMyte.get_move_type(activeMyte.goal) },
                 { label: "Previous Goal", value: activeMyte.get_move_type(activeMyte.previousGoal) },
@@ -81,7 +82,10 @@ class Debug {
         // target
         if (item.element) {
             messages.push(`to ${item.element.tagName}` + (item.target && item.target[0] ? `(${item.target[0].x.toFixed(2)}px, ${item.target[0].y.toFixed(2)}px)` : '') + `<br>`);
+        }
 
+        if (item.targetObject) {
+            messages.push(`to Object (${item.targetObject.constructor.name})` + `<br>`);
         }
 
         // expression
@@ -115,6 +119,9 @@ class Debug {
     }
 
     update() {
+
+
+
         if (this.debug) {
             this.updateDebug();
         }

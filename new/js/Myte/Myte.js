@@ -1,3 +1,5 @@
+
+
 class MyteInputHandler {
 
 	/**
@@ -37,6 +39,18 @@ class MovementController {
 	}
 }
 
+/*
+class Snail extends Myte {
+
+	constructor(id, parent, element) {
+		super(id, parent, element);
+		this.species = "snail";
+
+
+	}
+}
+	*/
+
 class Myte {
 
 	constructor(id, parent, element) {
@@ -48,6 +62,7 @@ class Myte {
 		this.parent = parent;
 		this.element = element;
 		this.isActive = false;
+		this.isPaused = false;
 
 		this.direction = DIRECTION.SOUTH;
 		this.diagonalMovement = false;
@@ -60,7 +75,7 @@ class Myte {
 		this.dropTarget;
 
 		// speed
-		this.speed = .5;
+		this.speed = 1;
 		this.velocity = 0;
 
 		// positions
@@ -118,7 +133,55 @@ class Myte {
 
 		this.inputHandler = new MyteInputHandler(this);
 
+        // Add these new properties
+        this.pathFindingSystem = new PathFindingSystem(this);
+
+		this.commandSystem = new CommandSystem(this);
+
+        // Add mood properties
+        this.mood = 100; // Start at neutral mood
+        this.minMood = 0;
+        this.maxMood = 100;
+        this.moodDecayRate = 0.005; // How much mood decreases per update
+
 	}
+
+    updateMood(amount) {
+        // Add the amount (positive or negative)
+        this.mood = Math.max(this.minMood, Math.min(this.maxMood, this.mood + amount));
+        
+        // Log mood change if debugging is enabled
+        if (IS_DEBUG) {
+            if(amount >= 0)console.log(`Mood ${amount >= 0 ? 'increased' : 'decreased'} by ${Math.abs(amount)}. New mood: ${this.mood}`);
+        }
+
+        // Could trigger different animations or behaviors based on mood
+        this.handleMoodEffects();
+    }
+
+    handleMoodEffects() {
+        // React based on mood thresholds
+        if (this.mood <= 20) {
+            // Very unhappy - might cry or move slower
+            if (Math.random() < 0.1) {
+                // this.queue.addExpression('cry');
+            }
+        } else if (this.mood >= 80) {
+            // Very happy - might jump or move faster
+            if (Math.random() < 0.1) {
+                // this.queue.addExpression('jump');
+            }
+        }
+    }
+
+    // Helper method to get mood status
+    getMoodStatus() {
+        if (this.mood >= 80) return 'very happy';
+        if (this.mood >= 60) return 'happy';
+        if (this.mood >= 40) return 'neutral';
+        if (this.mood >= 20) return 'unhappy';
+        return 'very unhappy';
+    }
 
 	update_target_dot() {
 		this.targetDot.style.left = (this.targetX + this.getRect().width / 2) + 'px';
@@ -151,7 +214,7 @@ class Myte {
 
 		// add functions
 		this.queue = new MyteQueue(this);
-		this.stateMachine = new StateMachine(this, DEFAULT_STATE);
+		this.stateMachine = new StateMachine(this, DEFAULT_STATE, 'snail');
 
 		// temp - make it a snail
 		this.stateMachine.setSnail();
@@ -169,19 +232,23 @@ class Myte {
         /********************************************
          * MAKE MYTE DRAGGABLE
         ********************************************/
-        this.duplicate.addEventListener("mousedown", this.handle_drag_start);
-        this.duplicate.addEventListener("touchstart", this.handle_drag_start);
+        this.sprite.addEventListener("mousedown", this.handle_drag_start);
+        this.sprite.addEventListener("touchstart", this.handle_drag_start);
 
         /********************************************
          * CLICK EVENTS
         ********************************************/
+
+		// clicking home
 		this.dropTarget.addEventListener("click", (event) => {
 			if(this.isActive){
 				//return home
-				this.setMode(MOVE_TYPES.GOHOME);
+				// this.setMode(MOVE_TYPES.GOHOME);
 			}
 		});
 
+
+		// click inactive myte at home
 		this.element.addEventListener("click", (event) => {
 			event.stopPropagation();
 
@@ -192,6 +259,7 @@ class Myte {
 		});
 			
 
+		// Switch active myte
 		this.duplicate.addEventListener("click", (event) => {
 			event.stopPropagation();
 		
@@ -207,8 +275,11 @@ class Myte {
 			}
 		});
 
+
 		// for dragging - we dont want to allow it for a few seconds
 		this.setStartTime();
+
+		this.commandSystem.init();
 		
 
 	}
@@ -244,10 +315,12 @@ class Myte {
 		console.log('target dot hide at stop');
 		this.targetDot.classList.add('hidden');
 
+		this.commandSystem.updateCommandsVisibility();
+
 		// set next as active
 		this.parent.setNextMyteAsActive(this);
 		if(this.parent.activeMyte == null){
-			this.parent.userInterface.disableButtons();
+			this.parent.ui.disableButtons();
 		}
 	}
 
@@ -268,8 +341,10 @@ class Myte {
 		// set start time - we need this to disable dragging for a few seconds at start
 		this.setStartTime();
 
-		if(this.parent.userInterface.isActive == false){
-			this.parent.userInterface.enableButtons();
+		this.commandSystem.updateCommandsVisibility();
+
+		if(this.parent.ui.isActive == false){
+			this.parent.ui.enableButtons();
 		}
 		
 	}
@@ -282,7 +357,7 @@ class Myte {
 
         this.followGoal = newGoal;
 
-		this.parent.userInterface.updateFollowMode(document.getElementById("cycleFollowGoal"));
+		this.parent.ui.updateFollowMode(document.getElementById("cycleFollowGoal"));
 
         if (this.followGoal == MOVE_FOLLOW_TYPES.NORMAL) {
             this.runAway = false;
@@ -317,7 +392,7 @@ class Myte {
 
 
 
-		this.parent.userInterface.updateGoal(document.getElementById("cycleGoal"));
+		this.parent.ui.updateGoal(document.getElementById("cycleGoal"));
 
         if (this.goal == MOVE_TYPES.FOLLOW) {
             this.atOriginal = false;
@@ -465,6 +540,11 @@ class Myte {
 	getRect() {
 		return this.parent.getRect(this.duplicate);
 	}
+
+	getOffsetRect() {
+		return this.parent.getLocalOffset(this.duplicate);
+	}
+
 
 	reset() {
 		this.velocity = 0; // Reset velocity to zero once it stops falling
@@ -761,9 +841,8 @@ class Myte {
 		// default
 		let newState = 'idle_' + this.direction;
 	
-		// Handle movement
+		// Handle basic movement
 		if (this.is_moving() && !this.isDragging) {
-
 			newState = 'moving_' + this.direction; // this.getDirection();
 		}
 	
@@ -873,7 +952,7 @@ class Myte {
 	
 		if (random < 0.1 && this.startTime > 10000) {
 			// idle
-			this.queue.addIdle(500);
+			// this.queue.addIdle(500);
 	
 		} else if (random < 0.3) {
 			// jump
@@ -891,7 +970,7 @@ class Myte {
 			}
 	
 			// take a rest after moving
-			this.queue.addIdle(500);
+			// this.queue.addIdle(500);
 	
 		} else if (random < 0.7) {
 			// get random mapObject
@@ -914,25 +993,25 @@ class Myte {
 			}
 	
 			// take a longer rest after moving
-			this.queue.addIdle(1000);
+			// this.queue.addIdle(1000);
 		}
 	}
 	
 
 	getRandomNearbyObject(range, returnClosest = false) {
 		const nearbyObjects = this.parent.mapObjects.objects.filter(obj => {
-			const distanceX = Math.abs(this.posX - obj.position.x);
-			const distanceY = Math.abs(this.posY - obj.position.y);
+			const distanceX = Math.abs(this.posX - obj.posX);
+			const distanceY = Math.abs(this.posY - obj.posY);
 			return obj !== this && obj.active && distanceX <= range && distanceY <= range;
 		});
 		
 		if (nearbyObjects.length > 0) {
 			if (returnClosest) {
 				let closestObject = nearbyObjects[0];
-				let closestDistance = Math.hypot(this.posX - closestObject.position.x, this.posY - closestObject.position.y);
+				let closestDistance = Math.hypot(this.posX - closestObject.posX, this.posY - closestObject.posY);
 	
 				nearbyObjects.forEach(obj => {
-					const distance = Math.hypot(this.posX - obj.position.x, this.posY - obj.position.y);
+					const distance = Math.hypot(this.posX - obj.posX, this.posY - obj.posY);
 					if (distance < closestDistance) {
 						closestDistance = distance;
 						closestObject = obj;
@@ -1229,6 +1308,10 @@ class Myte {
 		if (!this.isActive) return;
 
 
+
+		this.commandSystem.updateCommandsVisibility();
+
+
 		// personal target dot
 		this.update_target_dot();
 
@@ -1237,6 +1320,7 @@ class Myte {
 
 		// update frame
 		if (deltaTime >= this.parent.core.config.frameInterval) {
+			this.updateMood(-this.moodDecayRate);
 			this.update_frame();
 		}
 

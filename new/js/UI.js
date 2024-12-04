@@ -110,7 +110,7 @@ class UserInterface {
         this.parent = parent;
         this.debug = new Debug(parent);
         this.isActive = false;
-        this.cursorManager = new CursorManager(parent);
+        // this.cursorManager = new CursorManager(parent);
     }
 
     /********************************************
@@ -248,7 +248,7 @@ class UserInterface {
     update() {
         this.debug.update();
 
-        this.cursorManager.update();
+        // this.cursorManager.update();
 
     }
 }

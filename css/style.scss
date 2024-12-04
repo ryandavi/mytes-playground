@@ -31,7 +31,7 @@ body {
 }
 
 * {
-	cursor: none!important;
+	// cursor: none!important;
 }
 
 html,
@@ -133,8 +133,94 @@ body {
 	flex-wrap: wrap;
 	gap: 10px;
 	width: 100%;
+}
 
+.allMytes {
 
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+    
+    .myte-title {
+        font-size: 1.2em;
+        font-weight: 600;
+        margin-bottom: 15px;
+        color: #333;
+    }
+    
+    .myte-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap);
+    }
+    
+    .myte-thumbnail {
+        display: flex;
+        align-items: center;
+        gap: var(--gap);
+        padding: var(--padding);
+        border-radius: var(--border-radius);
+        background: rgb(245, 245, 245);
+        cursor: pointer;
+        
+        border-style: solid;
+        border-width: var(--border-width);
+        border-top-color: white;
+        border-left-color: white;
+        border-right-color: lightgrey;
+        border-bottom-color: lightgrey;
+        
+        &:hover {
+            background: #e5e5e5;
+        }
+        
+        &.active {
+            background: #e1ecff;
+            border-top-color: lightgrey;
+            border-left-color: lightgrey;
+            border-right-color: white;
+            border-bottom-color: white;
+            
+            .myte-name {
+                color: #3269c4;
+                font-weight: 600;
+            }
+        }
+        
+        .myte-sprite {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: white;
+            position: relative;
+            overflow: hidden;
+            
+            &-inner {
+                position: absolute;
+                width: 192px;
+                height: 192px;
+                background: url('../images/snail/spritesheet.png');
+                background-position: 0px 576px;
+                transform: scale(0.25);
+                transform-origin: top left;
+                image-rendering: pixelated;
+            }
+        }
+        
+        .myte-name {
+            font-size: 1em;
+            color: #333;
+        }
+        
+        .active-badge {
+            margin-left: auto;
+            background: #3269c4;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+    }
 }
 
 .hand-controls {
@@ -226,6 +312,10 @@ body {
 	}
 	&.cherries {	
 		background-position: -160px 0px;
+	}
+
+	&.music_box {
+		background-position: 0px -64px;
 	}
 
 	&:after {
@@ -608,6 +698,18 @@ body {
 					display: none;
 				}
 
+				>.commands {
+					display: flex;
+					gap: 5px;
+					flex-wrap: wrap;
+					order: 0;
+					> button {
+						flex: 1 0 calc(50% - 2.5px);
+						padding: 10px;
+					}
+
+				}
+
 				>.above-wrapper {
 					display: flex;
 					gap: var(--border-width);
@@ -617,6 +719,10 @@ body {
 					transform: translate(-50%, 100%);
 					position: absolute;
 					transition: opacity .5s;
+
+					flex-direction: column;
+
+
 
 					>.battery {
 

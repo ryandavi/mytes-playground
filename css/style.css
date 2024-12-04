@@ -20,10 +20,6 @@ body {
   overflow-x: hidden;
 }
 
-* {
-  cursor: none !important;
-}
-
 html,
 body {
   width: 100%;
@@ -125,6 +121,82 @@ body {
   width: 100%;
 }
 
+.allMytes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.allMytes .myte-title {
+  font-size: 1.2em;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #333;
+}
+.allMytes .myte-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.allMytes .myte-thumbnail {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: var(--padding);
+  border-radius: var(--border-radius);
+  background: rgb(245, 245, 245);
+  cursor: pointer;
+  border-style: solid;
+  border-width: var(--border-width);
+  border-top-color: white;
+  border-left-color: white;
+  border-right-color: lightgrey;
+  border-bottom-color: lightgrey;
+}
+.allMytes .myte-thumbnail:hover {
+  background: #e5e5e5;
+}
+.allMytes .myte-thumbnail.active {
+  background: #e1ecff;
+  border-top-color: lightgrey;
+  border-left-color: lightgrey;
+  border-right-color: white;
+  border-bottom-color: white;
+}
+.allMytes .myte-thumbnail.active .myte-name {
+  color: #3269c4;
+  font-weight: 600;
+}
+.allMytes .myte-thumbnail .myte-sprite {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: white;
+  position: relative;
+  overflow: hidden;
+}
+.allMytes .myte-thumbnail .myte-sprite-inner {
+  position: absolute;
+  width: 192px;
+  height: 192px;
+  background: url("../images/snail/spritesheet.png");
+  background-position: 0px 576px;
+  transform: scale(0.25);
+  transform-origin: top left;
+  image-rendering: pixelated;
+}
+.allMytes .myte-thumbnail .myte-name {
+  font-size: 1em;
+  color: #333;
+}
+.allMytes .myte-thumbnail .active-badge {
+  margin-left: auto;
+  background: #3269c4;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+}
+
 .hand-controls {
   background-color: rgb(245, 245, 245);
   border-radius: var(--border-radius);
@@ -190,6 +262,9 @@ body {
 }
 .item.cherries {
   background-position: -160px 0px;
+}
+.item.music_box {
+  background-position: 0px -64px;
 }
 .item:after {
   content: attr(data-quantity);
@@ -473,6 +548,16 @@ body {
 .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .hitbox {
   display: none;
 }
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .commands {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  order: 0;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .commands > button {
+  flex: 1 0 calc(50% - 2.5px);
+  padding: 10px;
+}
 .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper {
   display: flex;
   gap: var(--border-width);
@@ -482,6 +567,7 @@ body {
   transform: translate(-50%, 100%);
   position: absolute;
   transition: opacity 0.5s;
+  flex-direction: column;
 }
 .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery {
   --icon-scale: 2;

@@ -13,7 +13,7 @@
 	&nbsp;&nbsp; <textarea>hi</textarea>
 	<br><br><br><br>
 	<br><br><br><br>
-	<section class="debugMenu ignore">At Rest</section>
+	<section class="debugMenu ignore">Not Initialized</section>
 	<section class="queueMenu ignore"></section>
 	<div class="container-wrapper styled">
 		<div class="hand-controls" id="hand-controls">
@@ -45,6 +45,8 @@
 							</div>
 							<div class="home-wrapper">
 							</div>
+
+							<!-- MYTE START-->
 							<div id="myte-pookie" class="interactive-myte" data-myte-name="Lentil" draggable="false">
 								<div class="inner-wrapper">
 									<div class="sprite"></div>
@@ -55,11 +57,22 @@
 										<span class="before">x</span>
 										<div class="name tooltip">Lentil</div>
 									</div>
+
+
+									<div class="commands">
+
+									</div>
+
+
 									<div class="above-wrapper">
 										<div class="battery"></div>
+
+
 									</div>
 								</div>
 							</div>
+							<!-- MYTE END-->
+
 						</div>
 					</div>
 					<div class="myteContainer">
@@ -68,6 +81,8 @@
 								<div class="name tooltip">Pookie's Home</div>
 							</div>
 							<div class="home-wrapper"></div>
+
+							<!-- MYTE START-->
 							<div id="myte-pookie2" class="interactive-myte" data-myte-name="Pookie" draggable="false">
 								<div class="inner-wrapper">
 									<div class="sprite"></div>
@@ -78,9 +93,22 @@
 										<span class="before">x</span>
 										<div class="name tooltip">Pookie</div>
 									</div>
-									<div class="above-wrapper"> Hello </div>
+
+
+									<div class="commands">
+
+									</div>
+
+									<div class="above-wrapper">
+										<div class="battery"></div>
+
+
+
+									</div>
 								</div>
 							</div>
+							<!-- MYTE END-->
+
 						</div>
 					</div>
 					<input class="collider">
@@ -101,8 +129,11 @@
 				</div>
 			</div>
 		</section>
-		<div class="inventory" id="inventory">
-		</div>
+
+		<div class="allMytes" id="all_mytes"></div>
+
+		<div class="inventory" id="inventory"></div>
+
 		<div class="controls" id="controls">
 			<button id="cycleGoal" class="myte" disabled>Loading...</button>
 			<button id="cycleFollowGoal" class="myte" disabled>Loading...</button>
@@ -165,11 +196,15 @@
 	<script src="js/ContainerManager.js"></script>
 	<script src="js/Debug.js"></script>
 	<script src="js/Camera.js"></script>
-	<script src="js/Myte.js"></script>
-	<script src="js/MyteQueue.js"></script>
-	<script src="js/MapObjects.js"></script>
-	<script src="js/StateMachine.js"></script>
 
+	<script src="js/Myte/Myte.js"></script>
+	<script src="js/Myte/MyteQueue.js"></script>
+	<script src="js/Myte/StateMachine.js"></script>
+	<script src="js/Myte/MytePathfinding.js"></script>
+	<script src="js/Myte/MyteCommand.js"></script>
+
+	<script src="js/MapObjects.js"></script>
+	
     <script src="js/ResourceManager.js"></script>
     <script src="js/EventManager.js"></script>
     <script src="js/Core.js"></script>

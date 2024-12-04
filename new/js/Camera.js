@@ -46,7 +46,7 @@ class Camera {
 	setMode(i) {
 		this.previousFollowMode = this.followMode;
 		this.followMode = i;
-		this.parent.userInterface.updateCycleCamera(document.getElementById("cycleCamera"));
+		this.parent.ui.updateCycleCamera(document.getElementById("cycleCamera"));
 	}
 
 	setToPreviousMode(){

@@ -19,6 +19,7 @@ class MyteCore {
         this.resourceManager = new ResourceManager();
         this.lastFrameTime = 0;
         this.isInitialized = false;
+
     }
 
     async init() {
