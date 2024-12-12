@@ -115,12 +115,10 @@ class Debug {
             return "in progress";
         }
         const percentage = Math.round(100 - (item.current_duration / item.duration * 100));
-        return `(${percentage}%)`;
+        return `(${percentage}% ` + item.current_duration + `)`;
     }
 
     update() {
-
-
 
         if (this.debug) {
             this.updateDebug();

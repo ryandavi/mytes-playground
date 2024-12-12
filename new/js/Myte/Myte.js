@@ -961,6 +961,7 @@ class Myte {
 		} else if (random < 0.5) {
 			// move to random element
 			console.log("random move");
+			
 			let e = Utility.findClosestElementToMouse(this.parent.mousePosX, this.parent.mousePosY, inWhere, 3, 250, true);
 			
 			if (e) {
@@ -1126,12 +1127,14 @@ class Myte {
             }
 
 		}else if (this.goal == MOVE_TYPES.FREEROAM) {
+
+			
             /********************************************
              * FREE ROAM - CHOOSE ITS OWN MOVEMENTS
             ********************************************/
             if (this.queue.isEmpty()) {
                 // no current queue item - do random roaming
-                this.doFreeRoamLogic();
+                // this.doFreeRoamLogic();
 				if(!this.queue.isDoingAction){
 					this.queue.prepCurrentAction();
 				}

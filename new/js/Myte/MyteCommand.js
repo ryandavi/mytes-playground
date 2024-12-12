@@ -11,7 +11,7 @@ class CommandSystem {
                 action: (targetMyte) => {
                     const activeMyte = this.myte.parent.activeMyte;
                     if (!activeMyte) return;
-                    activeMyte.queue.addInteraction(targetMyte, 'kiss');
+                    
                 }
             },
             'dance': {
@@ -28,8 +28,8 @@ class CommandSystem {
                 icon: '🤲',
                 action: (targetMyte) => {
                     const activeMyte = this.myte.parent.activeMyte;
-                    if (!activeMyte || activeMyte.interactionSystem.carriedEntity) return;
-					activeMyte.queue.addInteraction(targetMyte, 'pickup');
+                    if (!activeMyte) return;
+					activeMyte.queue.addPickupMyte(targetMyte);
                 }
             },
             'follow': {

@@ -1,12 +1,4 @@
 
-class QueueItem {
-    constructor({ action = null, current_duration = -1, total_time = 0 } = {}) {
-        this.action = action;
-        this.current_duration = current_duration;
-        this.total_time = total_time;
-    }
-}
-
 class MyteQueue {
     constructor(myte) {
         this.myte = myte;
@@ -14,36 +6,12 @@ class MyteQueue {
         this.isDoingAction = false;
         this.max_total_time = 1500;
     }
-
-    addInteraction(targetMyte, interactionType) {
-        const interaction = this.myte.interactionAnimations[interactionType];
-        if (!interaction) return false;
-
-        // Add movement to get in position
-        this.add({
-            action: 'move_to_myte',
-            targetMyte: targetMyte,
-            interactionType: interactionType
-        });
-
-        // Add the interaction animation
-        this.add({
-            action: 'do_interaction',
-            targetMyte: targetMyte,
-            interactionType: interactionType,
-            animation: interaction.animation,
-            duration: interaction.duration
-        });
-
-        return true;
-    }
-
     // Basic queue operations
     add(action) {
         this.queue.push(action);
     }
 
-    // Previously: addToBeginning(x)
+
     addToBeginning(action) {
         this.queue.unshift(action);
     }
@@ -295,9 +263,9 @@ class MyteQueue {
         switch (current.action) {
 
             case 'move_to_myte':
-                // move to myte
+            // move to myte
             case 'do_interaction':
-                // do interaction
+            // do interaction
             case "idle":
                 return true;
             case "move":
@@ -382,7 +350,7 @@ class MyteQueue {
 
 
 
-    addFollowObject(element){
+    addFollowObject(element) {
         this.add(this.createAction("follow_object", {
             targetObject: element
         }));
@@ -508,137 +476,208 @@ class MyteQueue {
             }
         }
 
-        if (current.action === "carry") {
-            // when they're carrying they don't do anything
+        switch (current.action) {
+            case "carry":
+                // When carrying another myte, we just update its position to match ours
 
 
-        }else if (current.action === "being_carried") {
-            // when they're being carried it doesn't do anything
-
-        }else if (current.action === "carry_pickup") {
-            // transitional animation
-
-        }else if (current.action === "being_picked_up_for_carry") {
-            // transitional animation
-
-        }else if (current.action === "go_to_object") {
-
-            let horizontal = (current.targetObject.direction == DIRECTION.LEFT) ? "right" : (current.targetObject.direction == DIRECTION.RIGHT) ? "left" : "center";
-
-            let vertical = (current.targetObject.direction == DIRECTION.NORTH) ? "bottom" : (current.targetObject.direction == DIRECTION.SOUTH) ? "top" : "bottom";
-
-
-            let targetPos = this.calculatePosition(
-                this.myte.getRect(), 
-                current.targetObject.getOffsetRect(), 
-                horizontal, 
-                vertical, 
-                false,
-                true
-            );
-
-            // move toward it
-            this.myte.setTarget(targetPos.x, targetPos.y);
-            this.myte.move_toward_target();
-
-
-        }else if (current.action === "follow_object") {
-
-
-            let horizontal = (current.targetObject.direction == DIRECTION.LEFT) ? "right" : (current.targetObject.direction == DIRECTION.RIGHT) ? "left" : "center";
-
-            let vertical = (current.targetObject.direction == DIRECTION.NORTH) ? "bottom" : (current.targetObject.direction == DIRECTION.SOUTH) ? "top" : "bottom";
-
-
-            let targetPos = this.calculatePosition(
-                this.myte.getRect(), 
-                current.targetObject.getOffsetRect(), 
-                horizontal, 
-                vertical, 
-                false,
-                true
-            );
-
-            // set target and move toward it
-            this.myte.setTarget(targetPos.x, targetPos.y);
-            this.myte.move_toward_target();
-
-            
-            if (this.myte.is_at_target()) {
-                this.removeCurrentAction();
-            }
-            
-            
-            return;
-        }else if (current.action === "move_with_pathfinding") {
-            // Check if we're stuck
-            if (this.checkIfStuck(current)) {
-                console.log("Myte is stuck, attempting new path");
-                if (!this.attemptNewPath(current)) {
-                    // If we can't find a new path, give up
-                    console.log("Unable to find new path, giving up");
-                    this.removeCurrentAction();
-                    this.addExpressionToBeginning("surprise");
-                    return;
-                }
-            }
-
-            if (this.myte.is_at_target()) {
-                // Move to next point in path
-                current.currentPathIndex++;
-
-                // If we've reached the end of the path
-                if (current.currentPathIndex >= current.path.length) {
-                    // Double check we're actually at the final destination
-                    const finalDistance = Math.hypot(
-                        this.myte.posX - current.originalTarget.x,
-                        this.myte.posY - current.originalTarget.y
+                if (current.targetObject) {
+                    const offset = { x: 0, y: -32 }; // Offset for carried myte
+                    current.targetObject.setPosition(
+                        this.myte.posX + offset.x,
+                        this.myte.posY + offset.y
                     );
-
-                    if (finalDistance < 5) {
-                        if (current.mapObject) {
-                            current.mapObject.remove();
-                        }
-                        this.removeCurrentAction();
-                        return;
-                    } else {
-                        this.myte.setTarget(current.originalTarget.x, current.originalTarget.y);
-                    }
-                } else {
-                    // Set next waypoint as target
-                    const nextPoint = current.path[current.currentPathIndex];
-                    this.myte.setTarget(nextPoint.x, nextPoint.y);
+                    current.targetObject.setSpritePosition(
+                        this.myte.posX + offset.x,
+                        this.myte.posY + offset.y
+                    );
                 }
-            }
+                
 
-            // Move toward current waypoint
-            this.myte.move_toward_target();
-            return;
-        }
+                this.myte.updateTargetToFollowMouse();
+
+                this.myte.move_toward_target();
 
 
-        // if we're at target
-        if (!this.isMovementAction(current.action) || this.myte.is_at_target()) {
-            if (current.duration) {
-                if (current.current_duration == -1) {
+                break;
+
+            case "being_carried":
+                // When being carried, do nothing - position is managed by carrier
+                break;
+
+            case "carry_pickup":
+            
+                // Transitional animation for picking up
+                if (current.duration && current.current_duration === -1) {
                     current.current_duration = current.duration;
-
-                    // set direction when we set the duration
-                    if (current.direction) {
-                        this.myte.setDirection(current.direction);
-                    }
+                    
                 }
                 current.current_duration--;
-                if (current.current_duration > 0) return false;
-            }
 
-            if (this.canCompleteCurrentAction()) {
-                this.removeCurrentAction();
-            }
+                if (current.current_duration <= 0) {
+                    // Start the actual carry action
+                    this.add(this.createAction("carry", {
+                        targetObject: current.targetObject,
+                        duration: -1 // Indefinite duration
+                    }));
 
-        } else if (current.target) {
-            this.myte.move_toward_target();
+                    // Add being_carried to target's queue
+                    current.targetObject.queue.clear(); // Clear target's current actions
+                    current.targetObject.queue.addToBeginning(
+                        this.createAction("being_carried", {
+                            carrierMyte: this.myte,
+                            duration: -1
+                        })
+                    );
+                    this.removeCurrentAction();
+                }
+                break;
+
+            case "carry_putdown":
+                // Transitional animation for putting down
+                if (current.duration && current.current_duration === -1) {
+                    current.current_duration = current.duration;
+                }
+                current.current_duration--;
+
+                if (current.current_duration <= 0) {
+                    // Find carried myte and clear its queue
+                    const carriedMyte = this.myte.queue.getCurrentAction()?.targetObject;
+                    if (carriedMyte) {
+                        carriedMyte.queue.clear();
+                    }
+                    this.removeCurrentAction();
+                }
+                break;
+
+            case "go_to_object":
+
+
+                let horizontal2 = (current.targetObject.direction == DIRECTION.LEFT) ? "right" : (current.targetObject.direction == DIRECTION.RIGHT) ? "left" : "center";
+
+                let vertical2 = (current.targetObject.direction == DIRECTION.NORTH) ? "bottom" : (current.targetObject.direction == DIRECTION.SOUTH) ? "top" : "bottom";
+
+
+                let targetPos2 = this.calculatePosition(
+                    this.myte.getRect(),
+                    current.targetObject.getOffsetRect(),
+                    horizontal2,
+                    vertical2,
+                    false,
+                    true
+                );
+
+                // move toward it
+                this.myte.setTarget(targetPos2.x, targetPos2.y);
+                this.myte.move_toward_target();
+
+                if (this.myte.is_at_target()) {
+                    this.removeCurrentAction();
+                }
+
+
+                break;
+
+            case "follow_object":
+                let horizontal = (current.targetObject.direction == DIRECTION.LEFT) ? "right" : (current.targetObject.direction == DIRECTION.RIGHT) ? "left" : "center";
+
+                let vertical = (current.targetObject.direction == DIRECTION.NORTH) ? "bottom" : (current.targetObject.direction == DIRECTION.SOUTH) ? "top" : "bottom";
+
+
+                let targetPos = this.calculatePosition(
+                    this.myte.getRect(),
+                    current.targetObject.getOffsetRect(),
+                    horizontal,
+                    vertical,
+                    false,
+                    true
+                );
+
+                // set target and move toward it
+                this.myte.setTarget(targetPos.x, targetPos.y);
+                this.myte.move_toward_target();
+
+
+
+
+
+                break;
+
+            case "move_with_pathfinding":
+                // Check if we're stuck
+                if (this.checkIfStuck(current)) {
+                    console.log("Myte is stuck, attempting new path");
+                    if (!this.attemptNewPath(current)) {
+                        // If we can't find a new path, give up
+                        console.log("Unable to find new path, giving up");
+                        this.removeCurrentAction();
+                        this.addExpressionToBeginning("surprise");
+                        return;
+                    }
+                }
+
+                if (this.myte.is_at_target()) {
+                    // Move to next point in path
+                    current.currentPathIndex++;
+
+                    // If we've reached the end of the path
+                    if (current.currentPathIndex >= current.path.length) {
+                        // Double check we're actually at the final destination
+                        const finalDistance = Math.hypot(
+                            this.myte.posX - current.originalTarget.x,
+                            this.myte.posY - current.originalTarget.y
+                        );
+
+                        if (finalDistance < 5) {
+                            if (current.mapObject) {
+                                current.mapObject.remove();
+                            }
+                            this.removeCurrentAction();
+                            return;
+                        } else {
+                            this.myte.setTarget(current.originalTarget.x, current.originalTarget.y);
+                        }
+                    } else {
+                        // Set next waypoint as target
+                        const nextPoint = current.path[current.currentPathIndex];
+                        this.myte.setTarget(nextPoint.x, nextPoint.y);
+                    }
+                }
+
+                // Move toward current waypoint
+                this.myte.move_toward_target();
+
+                break;
+
+            default:
+                // if we're at target
+                if (!this.isMovementAction(current.action) || this.myte.is_at_target()) {
+                    if (current.duration) {
+                        if (current.current_duration == -1) {
+                            current.current_duration = current.duration;
+
+                            // set direction when we set the duration
+                            if (current.direction) {
+                                this.myte.setDirection(current.direction);
+                            }
+                        }
+                        current.current_duration--;
+                        if (current.current_duration > 0) return false;
+                    }
+
+                    if (this.canCompleteCurrentAction()) {
+                        this.removeCurrentAction();
+                    }
+
+                } else if (current.target) {
+                    this.myte.move_toward_target();
+                }
+                break;
         }
+
+
+
+
     }
 
 
@@ -664,4 +703,47 @@ class MyteQueue {
     getCurrentAction() {
         return this.isEmpty() ? null : this.queue[0];
     }
+
+    // Add these helper methods to MyteQueue
+
+    addPickupMyte(targetObject) {
+        if (!targetObject || targetObject.queue.isBeingCarried()) return false;
+
+        this.add(this.createAction("go_to_object", {
+            targetObject: targetObject
+        }));
+
+
+        // Add pickup animation
+        this.add(this.createAction("carry_pickup", {
+            targetObject: targetObject,
+            duration: 500 // Half second pickup animation
+        }));
+
+        return true;
+    }
+
+    addPutdownMyte() {
+        const currentAction = this.getCurrentAction();
+        if (currentAction?.action !== "carry" || !currentAction.targetObject) return false;
+
+        // Add putdown animation
+        this.add(this.createAction("carry_putdown", {
+            duration: 500 // Half second putdown animation
+        }));
+
+        return true;
+    }
+
+    isBeingCarried() {
+        const current = this.getCurrentAction();
+        return current?.action === "being_carried";
+    }
+
+    isCarrying() {
+        const current = this.getCurrentAction();
+        return current?.action === "carry";
+    }
+
+
 }
