@@ -223,6 +223,27 @@ body {
     }
 }
 
+.action-controls {
+	position: absolute;
+    flex-direction: column;
+
+    width: fit-content;
+	right: 0;
+	max-height: 500px;
+	background-color: rgb(245, 245, 245);
+	border-radius: var(--border-radius);
+	padding: var(--padding);
+
+	transform: translate(100%, 0);
+
+	>ul.action-list {
+		list-style-type: none;
+		padding: 0;
+		margin: 0;
+	}
+}
+
+
 .hand-controls {
 	background-color: rgb(245, 245, 245);
 	border-radius: var(--border-radius);
@@ -269,13 +290,13 @@ body {
 
 		background-color: rgb(245, 245, 245);
 
-		transition: border-color .15s;
 
 
+		cursor: pointer;
 	}
 
 	label:hover {
-		outline: 4px solid green;
+		outline: 4px solid rgba(0, 128, 0, 0.33);
 	}
 
 
@@ -286,9 +307,9 @@ body {
 		border-bottom-color: lightgrey;
 
 		color: black;
-		
 
-		
+		outline: 4px solid green;
+
 	}
 
 }
@@ -348,6 +369,8 @@ body {
 	display: flex;
 	flex-direction:column;
 	gap: 20px;
+
+	position: relative;
 
 
 	&.styled {

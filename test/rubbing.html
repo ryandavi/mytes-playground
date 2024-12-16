@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Interactive Pet Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        .instruction {
+            color: #34495e;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+            line-height: 1.4;
+        }
+
+        .interactive-area {
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.2s ease;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .interactive-area:active {
+            transform: scale(0.98);
+        }
+
+        .pet-face {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 80px;
+            line-height: 1;
+        }
+
+        .feedback {
+            margin-top: 20px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .feedback.visible {
+            opacity: 1;
+        }
+
+        .feedback.success {
+            background-color: #a8e6cf;
+            color: #1b4332;
+        }
+
+        .feedback.warning {
+            background-color: #ffd3b6;
+            color: #7c3c21;
+        }
+
+        .feedback.error {
+            background-color: #ffaaa5;
+            color: #6b2b25;
+        }
+
+        .status {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .cooldown-timer {
+            margin-top: 10px;
+            font-size: 0.8em;
+            color: #888;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+
+            .interactive-area {
+                width: 150px;
+                height: 150px;
+            }
+
+            .pet-face {
+                font-size: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Virtual Pet Interaction</h1>
+        <p class="instruction">
+            Rub the circle gently to make your pet happy! <br>
+            Aim for 5-20 rubs, but don't overdo it!
+        </p>
+        
+        <div id="interactiveArea" class="interactive-area">
+            <div class="pet-face">😊</div>
+        </div>
+        
+        <div id="feedback" class="feedback"></div>
+        <div id="status" class="status"></div>
+        <div id="cooldownTimer" class="cooldown-timer"></div>
+    </div>
+
+    <script>
+        class TouchInteractionDetector {
+            constructor(element, options = {}) {
+                this.element = element;
+                
+                this.config = {
+                    rubThreshold: options.rubThreshold || 4,
+                    minRubs: options.minRubs || 5,
+                    maxRubs: options.maxRubs || 20,
+                    cooldownPeriod: options.cooldownPeriod || 5000,
+                    feedbackCallback: options.feedbackCallback || console.log
+                };
+
+                this.isInteracting = false;
+                this.lastX = 0;
+                this.lastY = 0;
+                this.lastTimestamp = 0;
+                this.lastInteractionTime = 0;
+                this.interactionCount = 0;
+                this.velocity = 0;
+
+                this.handleStart = this.handleStart.bind(this);
+                this.handleMove = this.handleMove.bind(this);
+                this.handleEnd = this.handleEnd.bind(this);
+
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                this.element.addEventListener('touchstart', this.handleStart, { passive: false });
+                document.addEventListener('touchmove', this.handleMove, { passive: false });
+                document.addEventListener('touchend', this.handleEnd);
+
+                this.element.addEventListener('mousedown', this.handleStart);
+                document.addEventListener('mousemove', this.handleMove);
+                document.addEventListener('mouseup', this.handleEnd);
+            }
+
+            handleStart(event) {
+                event.preventDefault();
+                const { clientX, clientY } = event.touches ? event.touches[0] : event;
+                const rect = this.element.getBoundingClientRect();
+
+                this.isInteracting = true;
+                this.lastX = clientX - rect.left;
+                this.lastY = clientY - rect.top;
+                this.lastTimestamp = Date.now();
+            }
+
+            handleMove(event) {
+                if (!this.isInteracting) return;
+
+                const { clientX, clientY } = event.touches ? event.touches[0] : event;
+                const rect = this.element.getBoundingClientRect();
+                const currentX = clientX - rect.left;
+                const currentY = clientY - rect.top;
+
+                const deltaTime = Date.now() - this.lastTimestamp;
+                const distance = Math.sqrt(
+                    Math.pow(currentX - this.lastX, 2) + 
+                    Math.pow(currentY - this.lastY, 2)
+                );
+
+                this.velocity = distance / deltaTime;
+
+                if (this.isValidRub()) {
+                    this.handleRub();
+                }
+
+                this.lastX = currentX;
+                this.lastY = currentY;
+                this.lastTimestamp = Date.now();
+            }
+
+            handleEnd() {
+                if (!this.isInteracting) return;
+                
+                this.isInteracting = false;
+                
+                if (this.interactionCount >= this.config.minRubs) {
+                    if (this.interactionCount > this.config.maxRubs) {
+                        this.provideFeedback('overstimulated');
+                    } else {
+                        this.provideFeedback('success');
+                    }
+                    this.lastInteractionTime = Date.now();
+                } else if (this.interactionCount > 0) {
+                    this.provideFeedback('insufficient');
+                }
+
+                this.interactionCount = 0;
+                this.velocity = 0;
+            }
+
+            isValidRub() {
+                return this.velocity > this.config.rubThreshold;
+            }
+
+            canInteract() {
+                return Date.now() - this.lastInteractionTime >= this.config.cooldownPeriod;
+            }
+
+            handleRub() {
+                if (!this.canInteract() && this.interactionCount === 0) {
+                    this.provideFeedback('cooldown');
+                    return;
+                }
+
+                this.interactionCount++;
+                const face = document.querySelector('.pet-face');
+                
+                if (this.interactionCount > this.config.maxRubs) {
+                    face.textContent = '😫';
+                    this.provideFeedback('tooMuch');
+                } else if (this.interactionCount >= this.config.minRubs) {
+                    face.textContent = '🥰';
+                    this.provideFeedback('goodProgress');
+                } else {
+                    face.textContent = '😊';
+                }
+            }
+
+            provideFeedback(type) {
+                const messages = {
+                    cooldown: `Please wait ${this.config.cooldownPeriod/1000} seconds before trying again`,
+                    insufficient: `Not enough rubs (${this.interactionCount}/${this.config.minRubs})`,
+                    success: `Success! Perfect number of rubs: ${this.interactionCount}`,
+                    overstimulated: `Too many rubs (${this.interactionCount} > ${this.config.maxRubs})`,
+                    tooMuch: 'That\'s too much!',
+                    goodProgress: `Good progress: ${this.interactionCount} rubs`
+                };
+
+                this.config.feedbackCallback({
+                    type,
+                    message: messages[type],
+                    count: this.interactionCount
+                });
+            }
+        }
+
+        // Initialize the interaction detector
+        const interactiveArea = document.getElementById('interactiveArea');
+        const feedbackElement = document.getElementById('feedback');
+        const statusElement = document.getElementById('status');
+        const cooldownTimer = document.getElementById('cooldownTimer');
+
+        const detector = new TouchInteractionDetector(interactiveArea, {
+            rubThreshold: 3,
+            minRubs: 3,
+            maxRubs: 20,
+            cooldownPeriod: 5000,
+            feedbackCallback: (feedback) => {
+                feedbackElement.textContent = feedback.message;
+                feedbackElement.className = 'feedback visible';
+                
+                switch(feedback.type) {
+                    case 'success':
+                        feedbackElement.classList.add('success');
+                        break;
+                    case 'overstimulated':
+                    case 'tooMuch':
+                        feedbackElement.classList.add('error');
+                        break;
+                    default:
+                        feedbackElement.classList.add('warning');
+                }
+
+                setTimeout(() => {
+                    feedbackElement.classList.remove('visible');
+                }, 2000);
+
+                if (feedback.type === 'success' || feedback.type === 'overstimulated') {
+                    let timeLeft = Math.ceil(detector.config.cooldownPeriod / 1000);
+                    const countdownInterval = setInterval(() => {
+                        timeLeft--;
+                        cooldownTimer.textContent = `Cooldown: ${timeLeft}s`;
+                        if (timeLeft <= 0) {
+                            clearInterval(countdownInterval);
+                            cooldownTimer.textContent = '';
+                            document.querySelector('.pet-face').textContent = '😊';
+                        }
+                    }, 1000);
+                }
+
+                statusElement.textContent = `Rubs: ${feedback.count}`;
+            }
+        });
+    </script>
+</body>
+</html>

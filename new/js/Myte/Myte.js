@@ -1,23 +1,4 @@
 
-
-class MyteInputHandler {
-
-	/**
-	 * InputHandler  class
-	 * - Responsibilities:
-	 *   - Handle user input (mouse events, drag and drop)
-	 * - Methods to include:
-	 *   - handle_drag_start()
-	 *   - handle_drag_move()
-	 *   - handle_drag_end()
-	 *   - move_drag()
-	 */
-
-	constructor(myte) {
-		this.myte = myte;
-	}
-}
-
 class MovementController {
 
 	/**
@@ -38,18 +19,6 @@ class MovementController {
 		this.myte = myte;
 	}
 }
-
-/*
-class Snail extends Myte {
-
-	constructor(id, parent, element) {
-		super(id, parent, element);
-		this.species = "snail";
-
-
-	}
-}
-	*/
 
 class Myte {
 
@@ -137,6 +106,8 @@ class Myte {
         this.pathFindingSystem = new PathFindingSystem(this);
 
 		this.commandSystem = new CommandSystem(this);
+
+		this.touchHandler;
 
         // Add mood properties
         this.mood = 100; // Start at neutral mood
@@ -227,6 +198,8 @@ class Myte {
 		this.setPosition(offsetX, offsetY);
 		this.setSpritePosition(this.posX, this.posY);
 
+		// input
+		this.inputHandler = new MyteInputHandler(this);
 
 
         /********************************************
@@ -262,17 +235,22 @@ class Myte {
 		// Switch active myte
 		this.duplicate.addEventListener("click", (event) => {
 			event.stopPropagation();
-		
-			if (this.isActiveMyte){
-				// if it's active, and not dragging, go home
-				if(this.isActive && !this.isDragging && this.parent.getPressDuration() < 100) {
-					this.setMode(MOVE_TYPES.GOHOME);
-					console.log("home from click this");
+
+			if(this.parent.ui.isTool(UIToolModes.SELECT)){
+
+				if (this.isActiveMyte){
+					// if it's active, and not dragging, go home
+					if(this.isActive && !this.isDragging && this.parent.getPressDuration() < 100) {
+						this.setMode(MOVE_TYPES.GOHOME);
+						console.log("home from click this");
+					}
+				} else {
+					// set active myte if its not actvie on click
+					this.parent.setActiveMyte(this);
 				}
-			} else {
-				// set active myte if its not actvie on click
-				this.parent.setActiveMyte(this);
+
 			}
+
 		});
 
 
@@ -280,6 +258,7 @@ class Myte {
 		this.setStartTime();
 
 		this.commandSystem.init();
+		
 		
 
 	}
@@ -461,20 +440,22 @@ class Myte {
     ********************************************/
     handle_drag_start = (event) => {
 
-		if(this.isActiveMyte && this.isActive && this.canDrag()){
-			this.isDragging = true;
-			this.parent.camera.setMode(CAMERA_FOLLOW_MODES.CHARACTER);
-			this.reset();
-	
-			// add drag listeners
-			document.addEventListener("mousemove", this.handle_drag_move);
-			document.addEventListener("touchmove", this.handle_drag_move);
-			document.addEventListener("scroll", this.handle_drag_move);
-			document.addEventListener("mouseup", this.handle_drag_end);
-			document.addEventListener("touchend", this.handle_drag_end);
+		if(this.parent.ui.isTool(UIToolModes.DRAG)){
+			if(this.isActiveMyte && this.isActive && this.canDrag()){
+				this.isDragging = true;
+				this.parent.camera.setMode(CAMERA_FOLLOW_MODES.CHARACTER);
+				this.reset();
+		
+				// add drag listeners
+				document.addEventListener("mousemove", this.handle_drag_move);
+				document.addEventListener("touchmove", this.handle_drag_move);
+				document.addEventListener("scroll", this.handle_drag_move);
+				document.addEventListener("mouseup", this.handle_drag_end);
+				document.addEventListener("touchend", this.handle_drag_end);
 
-			// hide target dot
-			this.targetDot.classList.add('hidden');
+				// hide target dot
+				this.targetDot.classList.add('hidden');
+			}
 		}
     }
 
@@ -837,78 +818,6 @@ class Myte {
 
 
 
-	setNewState() {
-		// default
-		let newState = 'idle_' + this.direction;
-	
-		// Handle basic movement
-		if (this.is_moving() && !this.isDragging) {
-			newState = 'moving_' + this.direction; // this.getDirection();
-		}
-	
-		// Handle gravity effects
-		if (this.isGravity) {
-			if (this.isFalling) {
-				newState = 'falling';
-			} else if (this.isJumping) {
-				newState = 'jumping';
-			}
-		}
-	
-		// Handle expressions
-		if (this.is_doing_action('do_expression')) {
-			const currentAction = this.queue.getCurrentAction();
-			if (this.stateMachine.currentFrameIndex === -1) {
-				this.queue.removeCurrentAction();
-			} else {
-				newState = currentAction.action_type;
-			}
-		}
-	
-		// Handle slide down action
-		if (this.is_doing_action('slide_down') && this.queue.getCurrentAction().current_target_index > 0) {
-			newState = 'slide_down';
-		}
-	
-		// Handle dragging
-		if (this.isDragging) {
-			if (this.stateMachine.currentState !== 'pickup' && this.stateMachine.currentState !== 'dragging') {
-				newState = 'pickup';
-			} else if (this.stateMachine.currentState === 'pickup' && this.stateMachine.currentFrameIndex === -1) {
-				newState = 'dragging';
-			} else {
-				newState = this.stateMachine.currentState;
-			}
-		}
-		
-		// handle dropping
-		if(!this.isDragging && (this.stateMachine.currentState == 'dropping' || this.stateMachine.currentState == 'dragging' || this.stateMachine.currentState == 'pickup')) {
-
-			if(this.isGravity && this.isFalling){
-				// if gravity is enabled and the character is falling
-				newState = 'falling';
-			}else{
-				// if gravity is not enabled, transition to dropping
-				newState = 'dropping';
-				// Check if dropping animation has completed
-				if (this.stateMachine.currentState === 'dropping' && this.stateMachine.isAnimationComplete()) {
-					newState = 'idle';  // Or any other appropriate state after dropping
-				}
-			}
-
-		}
-	
-		// Ensure idle state is respected when explicitly set
-		if (this.is_doing_action('idle')) {
-			newState = 'idle';
-		}
-
-
-		// Set the new state
-		this.stateMachine.setState(newState);
-	}
-
-
 
     move_drag() {
         // this.do_drag_swinging();
@@ -1095,105 +1004,74 @@ class Myte {
         this.reset();
     }
 
-
 	do_movement_logic() {
-        if (this.isDragging) {
-            return;
-        }
-
+		if (this.isDragging) {
+			return;
+		}
+	
 		if (this.goal == MOVE_TYPES.GRAVITY) {
-            /********************************************
-             * GRAVITY
-            ********************************************/
-            if (!this.queue.isEmpty()) {
-                // if we have a queue item, do it
-                this.queue.doCurrentAction();
-            } else {
-
-                // Jumping
-                if (!this.isCurrentlyJumping()) {
-                    // Simulate a jump (randomly)
-                    if (Math.random() < 0.01) { // Adjust the probability of jumping
-
-						// Check if the mouse is in the container and above character
-						if(this.parent.isMouseInContainer() && this.parent.getLocalMouse().y < this.posY){
-							this.do_jump();
-						}
-                        
-                    }
-                }
-
-                this.move_gravity();
-            }
-
-		}else if (this.goal == MOVE_TYPES.FREEROAM) {
-
-			
-            /********************************************
-             * FREE ROAM - CHOOSE ITS OWN MOVEMENTS
-            ********************************************/
-            if (this.queue.isEmpty()) {
-                // no current queue item - do random roaming
-                // this.doFreeRoamLogic();
-				if(!this.queue.isDoingAction){
-					this.queue.prepCurrentAction();
+			if (!this.queue.isEmpty()) {
+				this.queue.update();
+			} else {
+				// Handle random jumping when appropriate
+				if (!this.isCurrentlyJumping()) {
+					if (Math.random() < 0.01 && 
+						this.parent.isMouseInContainer() && 
+						this.parent.getLocalMouse().y < this.posY) {
+						this.do_jump();
+					}
 				}
-            }else{
-				var current_queue = this.queue.getCurrentAction();
-				if (current_queue !== null) {
-					this.queue.doCurrentAction();
-				}
+				this.move_gravity();
 			}
-
-
-		} else if (this.goal == MOVE_TYPES.FOLLOW){
-            /********************************************
-             * FOLLOW USER MOUSE
-            ********************************************/
+		}
+		else if (this.goal == MOVE_TYPES.FREEROAM) {
 			if (this.queue.isEmpty()) {
+				// Add new random actions to the queue when empty
+				//this.doFreeRoamLogic();
+
 				this.updateTargetToFollowMouse();
 				this.move_toward_target();
 
-			} else {
-
-				if(!this.queue.isDoingAction){
-					this.queue.prepCurrentAction();
-				}
-
-				this.queue.doCurrentAction();
 			}
-        } else if (this.goal == MOVE_TYPES.GOHOME) {
-            /********************************************
-             * NO MODE - it should be at its home
-            ********************************************/
-            if (this.atOriginal == false) {
-                // if it's not at original position, do_current_queue_element it back
-                this.move_toward_target();
-
-                if (this.is_at_target()) {
-                    this.stop();
-                }
-            }
-        } else if (this.goal == MOVE_TYPES.QUEUE_ONLY) {
-			// do nothing
-            if (this.queue.isEmpty()) {
-				this.watchCursor();
-            }else{
-				if(!this.queue.isDoingAction){
-					this.queue.prepCurrentAction();
-				}
-				
-                // if we have a queue item, do it
-                this.queue.doCurrentAction();
-			}
-
-		}else{
-			// do nothing
+			this.queue.update();
 		}
+		else if (this.goal == MOVE_TYPES.FOLLOW) {
+			if (this.queue.isEmpty()) {
+				// If no other actions, follow the mouse
+				this.updateTargetToFollowMouse();
+				this.move_toward_target();
 
-	}
-
+				
+			}
+			this.queue.update();
+		}
+		else if (this.goal == MOVE_TYPES.GOHOME) {
+			if (this.atOriginal == false) {
+				if (this.queue.isEmpty()) {
+					// Add a move action to return home if not already moving
+					const rect = this.parent.getLocalOffset(this.element);
+					this.queue.add('move', {
+						target: [{
+							x: rect.left,
+							y: rect.top
+						}]
+					});
+				}
+				this.queue.update();
 	
+				if (this.is_at_target()) {
+					this.stop();
+				}
+			}
+		}
+		else if (this.goal == MOVE_TYPES.QUEUE_ONLY) {
+			if (this.queue.isEmpty()) {
+				this.watchCursor();
+			} else {
+				this.queue.update();
+			}
+		}
+	}
 
 	watchCursor() {
 		const mouse = this.parent.getLocalMouse(this);
@@ -1300,9 +1178,16 @@ class Myte {
 		}
 	}
 
+
+	dispose() {
+		// ... existing dispose code ...
+		if (this.rubbingDetector) {
+			this.rubbingDetector.dispose();
+		}
+	}
+
 	update_frame() {
 		if (!this.isActive) return;
-		this.setNewState();
 		this.stateMachine.update();
 	}
 
@@ -1310,10 +1195,7 @@ class Myte {
 	update(deltaTime) {
 		if (!this.isActive) return;
 
-
-
 		this.commandSystem.updateCommandsVisibility();
-
 
 		// personal target dot
 		this.update_target_dot();

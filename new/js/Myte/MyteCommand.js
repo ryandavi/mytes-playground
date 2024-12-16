@@ -1,4 +1,3 @@
-// Add to MyteInteraction.js
 class CommandSystem {
     constructor(myte) {
         this.myte = myte;
@@ -7,37 +6,51 @@ class CommandSystem {
         // Define command configurations
         this.commandConfigs = {
             'kiss': {
-                icon: '💋',
+                icon: '♥️',  // Using a heart instead of 💋 which might not display correctly
+                label: 'Kiss',
                 action: (targetMyte) => {
                     const activeMyte = this.myte.parent.activeMyte;
                     if (!activeMyte) return;
-                    
+                    activeMyte.queue.addJump();
                 }
             },
             'dance': {
-                icon: '💃',
+                icon: '🎵',  // Using musical note instead of 💃 which might not display correctly
+                label: 'Dance',
                 action: (targetMyte) => {
                     const activeMyte = this.myte.parent.activeMyte;
-                    targetMyte.queue.addExpression('dance', 2000);
+                    // targetMyte.queue.addSpin();
                     if (activeMyte) {
-                        activeMyte.queue.addExpression('dance', 2000);
+                        targetMyte.queue.addRunAway(activeMyte);
                     }
                 }
             },
             'carry': {
-                icon: '🤲',
+                icon: '👆',  // Using pointer instead of 🤲 which might not display correctly
+                label: 'Carry',
+                alternateName: 'Put Down',
                 action: (targetMyte) => {
                     const activeMyte = this.myte.parent.activeMyte;
                     if (!activeMyte) return;
-					activeMyte.queue.addPickupMyte(targetMyte);
+                    if (targetMyte.queue.isBeingCarried()) {
+                        activeMyte.queue.addPutDownMyte(targetMyte);
+                    } else {
+                        activeMyte.queue.addPickupMyte(targetMyte);
+                    }
                 }
             },
             'follow': {
-                icon: '👣',
+                icon: '👉',  // Using pointer instead of 👣 which might not display correctly
+                label: 'Follow',
+                alternateName: 'Stop Following',
                 action: (targetMyte) => {
                     const activeMyte = this.myte.parent.activeMyte;
                     if (!activeMyte) return;
-					activeMyte.queue.addFollowObject(targetMyte);
+                    if (targetMyte.queue.getCurrentAction()?.action === 'follow_object') {
+                        targetMyte.queue.clear();
+                    } else {
+                        activeMyte.queue.addFollowObject(targetMyte);
+                    }
                 }
             }
         };
@@ -58,15 +71,32 @@ class CommandSystem {
         Object.entries(this.commandConfigs).forEach(([commandName, config]) => {
             const button = document.createElement('button');
             button.dataset.command = commandName;
-            button.innerHTML = `${config.icon} ${commandName}`;
+            
+            // Set initial button text based on state
+            this.updateButtonText(button, commandName);
+            
             button.className = 'command-button';
             this.commandButtons.appendChild(button);
         });
     }
 
-    init() {
+    updateButtonText(button, commandName) {
+        const config = this.commandConfigs[commandName];
+        let label = config.label;
 
-		this.commandButtons = this.myte.duplicate.querySelector('.commands');
+        // Change button text based on state
+        if (commandName === 'carry' && this.myte.queue.isBeingCarried()) {
+            label = config.alternateName;
+        } else if (commandName === 'follow' && 
+                  this.myte.queue.getCurrentAction()?.action === 'follow_object') {
+            label = config.alternateName;
+        }
+
+        button.innerHTML = `${config.icon} ${label}`;
+    }
+
+    init() {
+        this.commandButtons = this.myte.duplicate.querySelector('.commands');
         this.createCommandButtons();
         this.updateCommandsVisibility();
 
@@ -80,6 +110,7 @@ class CommandSystem {
                 const commandName = button.dataset.command;
                 if (this.commandConfigs[commandName]) {
                     this.commandConfigs[commandName].action(this.myte);
+                    this.updateButtonText(button, commandName);
                 }
             });
         }
@@ -89,5 +120,13 @@ class CommandSystem {
         if (!this.commandButtons) return;
         const shouldShow = this.myte.isActive && !this.myte.isActiveMyte;
         this.commandButtons.style.display = shouldShow ? 'flex' : 'none';
+
+        // Update all button texts
+        if (shouldShow) {
+            this.commandButtons.querySelectorAll('button').forEach(button => {
+                const commandName = button.dataset.command;
+                this.updateButtonText(button, commandName);
+            });
+        }
     }
 }

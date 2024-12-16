@@ -2,6 +2,7 @@
 
 <head>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+	<meta charset="UTF-8">
 </head>
 
 <body class="debug">
@@ -16,7 +17,9 @@
 	<section class="debugMenu ignore">Not Initialized</section>
 	<section class="queueMenu ignore"></section>
 	<div class="container-wrapper styled">
-		<div class="hand-controls" id="hand-controls">
+
+		<!-- HAND CONTROLS -->
+		<div class="hand-controls ignore" id="hand-controls">
 			<input type="radio" name="hand" value="left" id="hand-select" checked>
 			<label class="button" for="hand-select">Select</label>
 			<input type="radio" name="hand" value="left" id="hand-drag">
@@ -24,6 +27,9 @@
 			<input type="radio" name="hand" value="right" id="hand-pet">
 			<label for="hand-pet">Pet</label>
 		</div>
+		<!-- END HAND CONTROLS -->
+
+		<!-- CANVAS -->
 		<section class="container" id="container-1">
 			<div class="crosshair ignore debug">
 				<div class="horizontal"></div>
@@ -129,6 +135,17 @@
 				</div>
 			</div>
 		</section>
+		<!-- END CANVAS -->
+
+		<!-- ACTION CONTROLS-->
+		<div class="action-controls ignore" id="action-controls">
+			<div class="selected">Selected Myte: <span>Pookie</span></div>
+			<ul class="action-list">
+				<li><button>Test</button>
+			</ul>
+		</div>
+		<!-- END ACTION CONTROLS -->
+
 
 		<div class="allMytes" id="all_mytes"></div>
 
@@ -202,6 +219,7 @@
 	<script src="js/Myte/StateMachine.js"></script>
 	<script src="js/Myte/MytePathfinding.js"></script>
 	<script src="js/Myte/MyteCommand.js"></script>
+	<script src="js/Myte/MyteInputHandler.js"></script>
 
 	<script src="js/MapObjects.js"></script>
 	

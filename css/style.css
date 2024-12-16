@@ -197,6 +197,24 @@ body {
   font-size: 0.8em;
 }
 
+.action-controls {
+  position: absolute;
+  flex-direction: column;
+  width: -moz-fit-content;
+  width: fit-content;
+  right: 0;
+  max-height: 500px;
+  background-color: rgb(245, 245, 245);
+  border-radius: var(--border-radius);
+  padding: var(--padding);
+  transform: translate(100%, 0);
+}
+.action-controls > ul.action-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
 .hand-controls {
   background-color: rgb(245, 245, 245);
   border-radius: var(--border-radius);
@@ -230,10 +248,10 @@ body {
   color: grey;
   font-size: 80%;
   background-color: rgb(245, 245, 245);
-  transition: border-color 0.15s;
+  cursor: pointer;
 }
 .hand-controls label:hover {
-  outline: 4px solid green;
+  outline: 4px solid rgba(0, 128, 0, 0.33);
 }
 .hand-controls input[type=radio]:checked + label:not(:active) {
   border-top-color: white;
@@ -241,6 +259,7 @@ body {
   border-right-color: lightgrey;
   border-bottom-color: lightgrey;
   color: black;
+  outline: 4px solid green;
 }
 
 .item {
@@ -288,6 +307,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  position: relative;
 }
 .container-wrapper.styled {
   padding: 20px;

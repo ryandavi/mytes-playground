@@ -32,9 +32,9 @@ class Debug {
                 { label: "Follow Goal", value: activeMyte.get_move_follow_type(activeMyte.followGoal) },
                 { label: "Speed", value: activeMyte.get_speed() },
                 { label: "Is Moving", value: activeMyte.is_moving() },
-                { label: "State", value: activeMyte.stateMachine.currentState },
+                { label: "State", value: activeMyte.stateMachine.stateController.currentState },
 
-                { label: "Transition", value: activeMyte.stateMachine.isTransitioning },
+                { label: "Transition", value: activeMyte.stateMachine.stateController.isTransitioning },
 
                 
                 { label: "Direction", value: activeMyte.direction },
@@ -77,45 +77,52 @@ class Debug {
     }
 
     formatQueueItem(item, index) {
-        const messages = [item.action];
-
-        // target
-        if (item.element) {
-            messages.push(`to ${item.element.tagName}` + (item.target && item.target[0] ? `(${item.target[0].x.toFixed(2)}px, ${item.target[0].y.toFixed(2)}px)` : '') + `<br>`);
+        // Get action type name from constructor
+        const actionType = item.constructor.name.replace('Action', '');
+        const messages = [actionType];
+    
+        // Handle element targets
+        if (item.options.element) {
+            messages.push(`to ${item.options.element.tagName}` + 
+                (item.target ? `(${item.target.x.toFixed(2)}px, ${item.target.y.toFixed(2)}px)` : '') + 
+                '<br>'
+            );
         }
-
-        if (item.targetObject) {
-            messages.push(`to Object (${item.targetObject.constructor.name})` + `<br>`);
+    
+        // Handle object targets
+        if (item.options.targetObject) {
+            messages.push(`to Object (${item.options.targetObject.constructor.name})<br>`);
         }
-
-        // expression
-        if (item.action === "do_expression") {
-            messages.push(`- ${item.action_type}`);
+    
+        // Handle expressions
+        if (item instanceof ExpressionAction) {
+            messages.push(`- ${item.type}`);
         }
-
-        // repeat
-        if (item.repeat) {
-            messages.push(`- ${item.repeat}x`);
+    
+        // Handle repeats
+        if (item.options.repeat) {
+            messages.push(`- ${item.options.repeat}x`);
         }
-
-        // duration
-        if (index === 0 && item.current_duration !== undefined) {
-            messages.push(this.formatItemDuration(item));
+    
+        // Handle duration for current action
+        if (index === 0 && item.options.current_duration !== undefined) {
+            messages.push(this.formatItemDuration(item.options));
         }
-
-        if ("total_time" in item) {
-            messages.push(`- ${item.total_time}ms`);
+    
+        // Handle total time
+        if (item.options.total_time !== undefined) {
+            messages.push(`- ${item.options.total_time}ms`);
         }
-
+    
         return this.generateDebugMessage(`#${index + 1}`, messages.join(" "));
     }
-
-    formatItemDuration(item) {
-        if (item.current_duration === -1) {
+    
+    formatItemDuration(options) {
+        if (options.current_duration === -1) {
             return "in progress";
         }
-        const percentage = Math.round(100 - (item.current_duration / item.duration * 100));
-        return `(${percentage}% ` + item.current_duration + `)`;
+        const percentage = Math.round(100 - (options.current_duration / options.duration * 100));
+        return `(${percentage}% ${options.current_duration})`;
     }
 
     update() {

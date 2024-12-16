@@ -5,6 +5,7 @@ class ContainerManager {
 		this.mytes = [];
 
 		this.element = document.getElementById(elementId);
+		this.containerWrapper = this.element.closest('.container-wrapper');
 
 		// mouse position
 		this.mousePosX = 0;
@@ -28,11 +29,9 @@ class ContainerManager {
 
 		this.ui = new UserInterface(this);
 		this.mapObjects = new MapObjects(this);
-
         this.pathfinding = new PathFindingSystem(32);
-        
-
 		this.myteThumbnails = null;
+
 
 
 

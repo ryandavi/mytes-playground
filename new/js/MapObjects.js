@@ -208,7 +208,7 @@ class MapObject {
         
         if (parent.activeMyte) {
             this.select();
-            parent.activeMyte.queue.addMoveToElement(this.element, 300, this);
+            parent.activeMyte.queue.addEatElement(this.element);
             return true;
         }
         return false;

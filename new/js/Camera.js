@@ -204,8 +204,6 @@ class Camera {
 	drag(e) {
 		if (this.isDragging && this.followMode === CAMERA_FOLLOW_MODES.DRAG_TO_PAN) {
 
-			console.log(1);
-
 			const dx = e.clientX - this.dragStartX;
 			const dy = e.clientY - this.dragStartY;
 			let newX = this.dragStartCameraX + dx;

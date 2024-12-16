@@ -104,20 +104,119 @@ class CursorManager {
 
 }
 
+// State machine for the fetch game stages
+const UIToolModes = {
+    SELECT: 'select',
+    DRAG: 'drag',
+    PET: 'pet'
+};
 
 class UserInterface {
     constructor(parent) {
         this.parent = parent;
         this.debug = new Debug(parent);
         this.isActive = false;
+
+        // Tool mode handling
+        this.currentToolMode = UIToolModes.SELECT;
+        this.handControls = this.parent.containerWrapper.querySelector('#hand-controls');
+
+        console.log( this.parent.element);
+        
+        // Initialize cursor manager
         // this.cursorManager = new CursorManager(parent);
     }
 
-    /********************************************
-     * modes
-     ********************************************/
     init() {
-        // Function to toggle the follow goal variable
+        // Initialize hand controls
+        this.initializeHandControls();
+
+        // Original button initialization
+        this.initializeButtons();
+    }
+
+    initializeHandControls() {
+        if (!this.handControls) {
+            console.error('Hand controls element not found');
+            return;
+        }
+
+        // Add event listeners to all radio inputs in hand-controls
+        const radioInputs = this.handControls.querySelectorAll('input[type="radio"]');
+        
+        radioInputs.forEach(input => {
+            input.addEventListener('change', (event) => {
+                const toolId = event.target.id;
+                
+                // Map the tool ID to the corresponding mode
+                switch (toolId) {
+                    case 'hand-select':
+                        this.setToolMode(UIToolModes.SELECT);
+                        break;
+                    case 'hand-drag':
+                        this.setToolMode(UIToolModes.DRAG);
+                        break;
+                    case 'hand-pet':
+                        this.setToolMode(UIToolModes.PET);
+                        break;
+                }
+            });
+        });
+
+        // Set initial mode
+        this.setToolMode(UIToolModes.SELECT);
+    }
+
+    setToolMode(mode) {
+        if (this.currentToolMode === mode) return;
+
+        this.currentToolMode = mode;
+        this.updateMyteBehavior();
+    }
+
+    isTool(mode){
+        return this.currentToolMode === mode;
+    }
+
+
+    updateMyteBehavior() {
+        const activeMyte = this.parent.activeMyte;
+        if (!activeMyte) return;
+
+        switch (this.currentToolMode) {
+            case UIToolModes.SELECT:
+                //activeMyte.checkForCollisions = true;
+                break;
+
+            case UIToolModes.DRAG:
+                //activeMyte.checkForCollisions = false;
+                break;
+
+            case UIToolModes.PET:
+                //activeMyte.checkForCollisions = true;
+                //this.setupPettingBehavior(activeMyte);
+                break;
+        }
+    }
+
+    setupPettingBehavior(myte) {
+        if (myte.duplicate) {
+            const newElement = myte.duplicate.cloneNode(true);
+            myte.duplicate.parentNode.replaceChild(newElement, myte.duplicate);
+            myte.duplicate = newElement;
+            
+            myte.duplicate.addEventListener('click', () => {
+                if (this.currentToolMode === UIToolModes.PET) {
+                    myte.queue.addExpression('happy');
+                    myte.updateMood(10);
+                }
+            });
+        }
+    }
+
+    // Original button initialization method
+    initializeButtons() {
+        // Follow goal button
         document.getElementById("cycleFollowGoal").addEventListener("click", () => {
             const activeMyte = this.parent.activeMyte;
             if (activeMyte.isActive) {
@@ -126,21 +225,17 @@ class UserInterface {
             }
         });
 
-        /// this.updateFollowMode(document.getElementById("cycleFollowGoal"));
-
-        // Function to cycle through the goals variable
-        document.getElementById("cycleGoal").addEventListener("click", (event) => {
+        // Goal cycle button
+        document.getElementById("cycleGoal").addEventListener("click", () => {
             const activeMyte = this.parent.activeMyte;
             if (activeMyte.isActive) {
                 let next = Utility.getNextKey(activeMyte.goal, MOVE_TYPES);
                 activeMyte.setMode(next);
-    
             }
         });
 
-
-        // Function to toggle the runAway variable
-        document.getElementById("skipQueue").addEventListener("click", (event) => {
+        // Skip queue button
+        document.getElementById("skipQueue").addEventListener("click", () => {
             const activeMyte = this.parent.activeMyte;
             if (activeMyte.isActive) {
                 activeMyte.queue.removeCurrentAction();
@@ -148,35 +243,31 @@ class UserInterface {
             }
         });
 
-        // Function to cycle through the goals variable
-        document.getElementById("cycleCamera").addEventListener("click", (event) => {
-
+        // Camera cycle button
+        document.getElementById("cycleCamera").addEventListener("click", () => {
             let camera = this.parent.camera;
-            console.log(camera.followMode);
             let next = Utility.getNextKey(camera.followMode, CAMERA_FOLLOW_MODES);
             camera.setMode(next);
         });
-
         this.updateCycleCamera(document.getElementById("cycleCamera"));
 
-        // Add a click event listener to the toggleDebug button
+        // Debug toggle
         document.getElementById('toggleDebug').addEventListener("click", (event) => {
-            // Toggle the 'debug' class on the body element
             document.body.classList.toggle('debug');
             this.updateDebug(event.target);
         });
 
-
-        document.getElementById('cycleContainerLimit') .addEventListener("click", (event) => {
-            if(this.parent.activeMyte) this.parent.activeMyte.limitToContainer = !this.parent.activeMyte.limitToContainer;
-
+        // Container limit toggle
+        document.getElementById('cycleContainerLimit').addEventListener("click", (event) => {
+            if(this.parent.activeMyte) {
+                this.parent.activeMyte.limitToContainer = !this.parent.activeMyte.limitToContainer;
+            }
             this.updateContainerLimit(event.target);
         });
-
         this.updateContainerLimit(document.getElementById('cycleContainerLimit'));
     }
 
-
+    // Keep all your existing update methods
     updateFollowMode(button) {
         let modeKey = this.parent.activeMyte ? Utility.get_key_by_value(MOVE_FOLLOW_TYPES, this.parent.activeMyte.followGoal) : "None";
         button.innerText = "Follow Mode: " + modeKey;
@@ -192,32 +283,26 @@ class UserInterface {
     }
 
     updateContainerLimit(button) {
-
-        if(this.parent.activeMyte){
-
-            // no scroll if its not limited
-            if(this.parent.activeMyte.limitToContainer == false){
+        if(this.parent.activeMyte) {
+            if(this.parent.activeMyte.limitToContainer == false) {
                 this.parent.camera.isScrollable.x = false;
                 this.parent.camera.isScrollable.y = false;
                 this.parent.element.closest('.container').classList.add('noScroll');
                 this.parent.camera.reset();
-            }else{
+            } else {
                 this.parent.camera.isScrollable.x = true;
                 this.parent.camera.isScrollable.y = true;
                 this.parent.element.closest('.container').classList.remove('noScroll');
             }
 
-
             button.innerText = "Limit: " + (this.parent.activeMyte.limitToContainer ? "ON" : "OFF");
-        }else{
+        } else {
             button.innerText = "Limit: None";
         }
     }
 
     updateCycleCamera(button) {
         let modeKey = Utility.get_key_by_value(CAMERA_FOLLOW_MODES, this.parent.camera.followMode);
-
-        // Update the button text with the key
         button.innerText = "Camera: " + modeKey;
     }
 
@@ -235,20 +320,16 @@ class UserInterface {
         });
     }
 
-    updateButtons(){
-
+    updateButtons() {
         this.updateFollowMode(document.getElementById("cycleFollowGoal"));
         this.updateGoal(document.getElementById("cycleGoal"));
         this.updateDebug(document.getElementById('toggleDebug'));
         this.updateCycleCamera(document.getElementById("cycleCamera"));
         this.updateContainerLimit(document.getElementById('cycleContainerLimit'));
-
     }
 
     update() {
         this.debug.update();
-
         // this.cursorManager.update();
-
     }
 }
