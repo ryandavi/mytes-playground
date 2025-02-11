@@ -13,10 +13,24 @@ class Debug {
 
     updateDebug() {
 
+        const timeData = this.parent.timeManager.getTimeData();
+
         let debugMessages = [
             { label: "User Active", value: this.parent.isActive },
 			{ label: "Local Mouse", value: `${this.parent.getLocalMouse().x.toFixed(2)}px, ${this.parent.getLocalMouse().y.toFixed(2)}px` },
             { label: "Mouse", value: `${this.parent.mousePosX.toFixed(2)}px, ${this.parent.mousePosY.toFixed(2)}px` },
+
+
+            // Time information
+            { label: "Time", value: timeData.formattedTime },
+            { label: "Date", value: timeData.formattedDate },
+
+            { label: "Time of Day", value: timeData.timeOfDay },
+            { label: "Light Level", value: timeData.lightLevel.toFixed(2) },
+            { label: "Moon Phase", value: timeData.moonPhase },
+            { label: "Moon Illumination", value: timeData.moonIllumination.toFixed(2) },
+            { label: "Moon Growth Multiplier", value: timeData.moonGrowthMultiplier.toFixed(2) }
+
             // { label: "Cursor", value: this.parent.userInterface.cursorManager.currentState },
         ];
 
@@ -25,6 +39,7 @@ class Debug {
         if(activeMyte){
             myteMessages =[
                 { label: "Myte Active", value: activeMyte.isActive },
+                {label: "Z-index", value: activeMyte.duplicate.style.zIndex},
                 { label: "Mood", value: `${this.parent.activeMyte.mood.toFixed(1)} (${this.parent.activeMyte.getMoodStatus()})` },
                 { label: "At Target", value: activeMyte.is_at_target() },
                 { label: "Goal", value: activeMyte.get_move_type(activeMyte.goal) },

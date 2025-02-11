@@ -95,7 +95,7 @@ class Inventory {
 						let mouse = this.parent.getLocalMouse();
 
 						const mapObject = new MapItem(type, mouse.x - this.offsetX, mouse.y - this.offsetY, 64, 64);
-						this.parent.mapObjects.objects.push(mapObject);
+						this.parent.mapArea.objects.push(mapObject);
 
 						mapObject.render(layerForeground, this.parent);
 

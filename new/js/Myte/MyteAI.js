@@ -193,7 +193,9 @@ class CharacterAI2 {
 				[this.states.RESTING]: 0.05,
 				[this.states.WORKING]: 0.4
 			}
-		};		
+		};
+
+        this.maxValue = 100;		
 
         this.energy = 100;
         this.social = 50;
@@ -203,9 +205,9 @@ class CharacterAI2 {
 
     updateState() {
         // Update internal states
-        this.energy = Math.max(0, Math.min(100, this.energy - 1));
-        this.social = Math.max(0, Math.min(100, this.social - 0.5));
-        this.workEthic = Math.max(0, Math.min(100, this.workEthic - 0.2));
+        this.energy = Math.max(0, Math.min(this.maxValue, this.energy - 1));
+        this.social = Math.max(0, Math.min(this.maxValue, this.social - 0.5));
+        this.workEthic = Math.max(0, Math.min(this.maxValue, this.workEthic - 0.2));
 
         // Adjust probabilities based on internal states
         if (this.energy < 30) {

@@ -1,0 +1,123 @@
+.layer {
+
+
+	// Dropped Item styles
+	.dropped-item {
+		position: absolute;
+		width: 16px;
+		height: 16px;
+		transition: transform 0.05s linear;
+		pointer-events: none;
+		outline: 3px solid red;
+
+		// Collection animation
+		&.collected {
+			animation: collect 0.5s ease-out forwards;
+		}
+
+		// Item variants
+		&.coin {
+			border-radius: 50%;
+			&.gold {
+				background-color: yellow;
+				// background-image: url('../images/MapObjects/music_box.png');
+			}
+		}
+
+		&.health {
+			&.potion {
+				background-color: green;
+				// background-image: url('../images/MapObjects/music_box.png');
+			}
+		}
+
+		&.equipment {
+			&.sword {
+				background-color: red;
+				// background-image: url('../images/MapObjects/music_box.png');
+			}
+		}
+	}
+
+
+
+	.mapObject {
+		// Treasure Chest styles
+		&.crop-plant {
+			position: absolute;
+			width: 16px;
+			height: 16px;
+
+
+			--n: 2;
+			background-size:calc(192px * var(--n)) calc(32px * var(--n));
+			image-rendering: pixelated;
+
+			background: {
+				image: url('../images/chest_spritesheet.png');
+				repeat: no-repeat;
+			}
+
+		}
+
+		&.treasure-chest {
+			position: absolute;
+			width: 16px;
+			height: 16px;
+
+
+			--n: 2;
+			background-size:calc(192px * var(--n)) calc(32px * var(--n));
+			image-rendering: pixelated;
+
+			background: {
+				image: url('../images/chest_spritesheet.png');
+				repeat: no-repeat;
+			}
+
+			transition: transform 0.2s ease-out;
+
+			&:hover {
+				transform: scale(1.1);
+			}
+		}
+	}
+}
+
+
+.light-object[data-state="on"] {
+	/* Add glow effect when on */
+	filter: drop-shadow(0 0 5px rgba(255, 200, 100, 0.5));
+}
+
+.light-object[data-state="off"] {
+	/* Darker appearance when off */
+	filter: brightness(0.7);
+}
+
+.fountain {
+    position: relative;
+    transition: filter 0.3s ease;
+}
+
+.fountain[data-active="true"] {
+    filter: drop-shadow(0 0 5px rgba(100, 200, 255, 0.3));
+}
+
+.fountain[data-active="false"] {
+    filter: brightness(0.8);
+}
+
+
+// Animation keyframes
+@keyframes collect {
+	0% {
+		transform: scale(1) translateY(0);
+		opacity: 1;
+	}
+
+	100% {
+		transform: scale(0) translateY(-20px);
+		opacity: 0;
+	}
+}

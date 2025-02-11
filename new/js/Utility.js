@@ -73,6 +73,15 @@ class Utility {
 		return element.matches(this.ignore_elements_selector);
 	}
 	
+	static isNotIgnored(element) {
+		while (element) {
+			if (element.classList && element.classList.contains('ignore')) {
+				return false; // Found an ignored element
+			}
+			element = element.parentElement; // Move up the DOM tree
+		}
+		return true; // No ignored element found in the ancestry
+	}
 
     /********************************************
      * find elements - functions

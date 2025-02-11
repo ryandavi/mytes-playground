@@ -983,7 +983,7 @@ class Myte {
 	
 
 	getRandomNearbyObject(range, returnClosest = false) {
-		const nearbyObjects = this.parent.mapObjects.objects.filter(obj => {
+		const nearbyObjects = this.parent.mapArea.objects.filter(obj => {
 			const distanceX = Math.abs(this.posX - obj.position.x);
 			const distanceY = Math.abs(this.posY - obj.position.y);
 			return obj !== this && obj.active && distanceX <= range && distanceY <= range;

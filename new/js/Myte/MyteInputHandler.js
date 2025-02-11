@@ -2,389 +2,225 @@ class MyteInputHandler {
 	constructor(myte) {
 		this.myte = myte;
 		this.touchHandler = new MyteTouchHandler(myte);
-		this.rubbingDetector = new MyteRubbingHandler(myte);
+		this.rubbingHandler = new MyteRubbingHandler(myte);
+		this.clickHandler = new MyteClickHandler(myte);
 	}
 }
 
+class MyteClickHandler {
+    constructor(myte) {
+        this.myte = myte;
+        
+        // Configuration
+        this.config = {
+            doubleClickTimeout: 300,
+            longPressTimeout: 500
+        };
 
-class MyteTouchHandler {
-	constructor(myte) {
-		this.myte = myte;
+        // State tracking
+        this.lastClickTime = 0;
+        this.longPressTimer = null;
+        this.isPressed = false;
 
-		// Touch state tracking
-		this.activeTouches = new Map();
-		this.touchStartTime = 0;
-		this.lastTapTime = 0;
-		this.initialTouchPos = null;
-		this.lastPinchDistance = 0;
-		this.initialPinchDistance = 0;
-		this.lastScale = 1;
-
-		// Mobile-specific state
-		this.isScrolling = false;
-		this.lastScrollY = window.scrollY;
-		this.scrollThreshold = 10;
-		this.preventScrollTimeout = null;
-
-		// Configuration
-		this.config = {
-			tapThreshold: 200,
-			doubleTapThreshold: 300,
-			dragThreshold: 15, // Increased for mobile
-			swipeThreshold: 50,
-			longPressThreshold: 500,
-			minDistanceForCommand: 100,
-			pinchThreshold: 0.2, // 20% change in pinch distance
-			touchTimeout: 100, // ms to wait before allowing touch events
-			scrollLockDelay: 300, // ms to prevent scrolling after touch start
-			velocityTrackingInterval: 100, // ms between velocity measurements
-			maxTapMovement: 10, // maximum pixel movement allowed for a tap
-		};
-
-		// State flags
-		this.isDragging = false;
-		this.isLongPressing = false;
-		this.isPinching = false;
-		this.isEnabled = false;
-		this.longPressTimer = null;
-		this.lastGesture = null;
-		this.touchVelocity = { x: 0, y: 0 };
-		this.lastTouchMoveTime = 0;
-
-		// Velocity tracking
-		this.velocityTracker = {
-			positions: [],
-			maxPoints: 5,
-			lastUpdate: 0
-		};
-
-		// Touch surface boundaries
-		this.boundaries = {
-			top: 0,
-			right: window.innerWidth,
-			bottom: window.innerHeight,
-			left: 0
-		};
-
-		// Bind methods
-		this.bindMethods();
-
-		// Initialize
-		this.initTouchEvents();
-		this.enableTouchAfterDelay();
-	}
-
-	bindMethods() {
-		this.handleTouchStart = this.handleTouchStart.bind(this);
-		this.handleTouchMove = this.handleTouchMove.bind(this);
-		this.handleTouchEnd = this.handleTouchEnd.bind(this);
-		this.handleTouchCancel = this.handleTouchCancel.bind(this);
-		this.handleOrientationChange = this.handleOrientationChange.bind(this);
-		this.handleResize = this.handleResize.bind(this);
-		this.handleScroll = this.handleScroll.bind(this);
-	}
-
-	initTouchEvents() {
-		const options = {
-			passive: false, // Need to be able to preventDefault for certain gestures
-			capture: true  // Capture phase to handle events before they bubble
-		};
-
-		// Touch events
-		this.myte.sprite.addEventListener('touchstart', this.handleTouchStart, options);
-		document.addEventListener('touchmove', this.handleTouchMove, options);
-		document.addEventListener('touchend', this.handleTouchEnd, options);
-		document.addEventListener('touchcancel', this.handleTouchCancel, options);
-
-		// Mobile-specific events
-		window.addEventListener('orientationchange', this.handleOrientationChange);
-		window.addEventListener('resize', this.handleResize);
-		window.addEventListener('scroll', this.handleScroll, { passive: true });
-
-		// Prevent unwanted mobile behaviors
-		this.myte.sprite.addEventListener('contextmenu', (e) => e.preventDefault());
-		this.myte.sprite.addEventListener('selectstart', (e) => e.preventDefault());
-	}
-
-	enableTouchAfterDelay() {
-		setTimeout(() => {
-			this.isEnabled = true;
-			this.updateBoundaries();
-		}, this.config.touchTimeout);
-	}
-
-	updateBoundaries() {
-		const rect = this.myte.parent.getContainerRect();
-		this.boundaries = {
-			top: rect.top,
-			right: rect.right,
-			bottom: rect.bottom,
-			left: rect.left
-		};
-	}
-
-	// Add the missing method
-	handleTouchCancel(event) {
-		// Handle the touch cancel event similarly to touch end
-		if (!this.isEnabled) return;
-
-		const touches = Array.from(event.changedTouches);
-		touches.forEach(touch => {
-			this.activeTouches.delete(touch.identifier);
-		});
-
-		// Clean up all ongoing gestures
-		this.endAllGestures();
-
-		// Reset scroll prevention
-		if (this.preventScrollTimeout) {
-			clearTimeout(this.preventScrollTimeout);
-			this.preventScrollTimeout = null;
-		}
-		this.isScrolling = false;
-	}
-
-	handleTouchStart(event) {
-		if (!this.isEnabled) return;
-
-		// Prevent default only for specific elements where we don't want native behavior
-		if (event.target.classList.contains('no-native-touch')) {
-			event.preventDefault();
-		}
-
-		this.touchStartTime = Date.now();
-
-		// Store touch points
-		Array.from(event.changedTouches).forEach(touch => {
-			const touchInfo = {
-				startX: touch.clientX,
-				startY: touch.clientY,
-				currentX: touch.clientX,
-				currentY: touch.clientY,
-				startTime: this.touchStartTime,
-				scrollStartY: window.scrollY
-			};
-			this.activeTouches.set(touch.identifier, touchInfo);
-		});
-
-		// Handle multi-touch gestures
-		if (this.activeTouches.size === 2) {
-			this.handlePinchStart(Array.from(this.activeTouches.values()));
-		} else if (this.activeTouches.size === 1) {
-			const touch = this.activeTouches.values().next().value;
-			this.initialTouchPos = { x: touch.startX, y: touch.startY };
-			this.startLongPressDetection();
-
-			// Temporarily prevent scrolling
-			this.preventScrollTimeout = setTimeout(() => {
-				this.isScrolling = false;
-			}, this.config.scrollLockDelay);
-		}
-
-		// Reset velocity tracker
-		this.velocityTracker.positions = [];
-		this.velocityTracker.lastUpdate = Date.now();
-
-		if (this.canStartDrag()) {
-			this.prepareDrag();
-		}
-	}
-
-	handleTouchMove(event) {
-		if (!this.isEnabled) return;
-
-		const currentTime = Date.now();
-		const touches = Array.from(event.changedTouches);
-
-		// Update touch positions and track velocity
-		touches.forEach(touch => {
-			const touchInfo = this.activeTouches.get(touch.identifier);
-			if (touchInfo) {
-				// Calculate velocity
-				const deltaTime = currentTime - this.velocityTracker.lastUpdate;
-				if (deltaTime >= this.config.velocityTrackingInterval) {
-					const deltaX = touch.clientX - touchInfo.currentX;
-					const deltaY = touch.clientY - touchInfo.currentY;
-					this.touchVelocity = {
-						x: deltaX / deltaTime,
-						y: deltaY / deltaTime
-					};
-					this.velocityTracker.lastUpdate = currentTime;
-				}
-
-				// Update current position
-				touchInfo.currentX = touch.clientX;
-				touchInfo.currentY = touch.clientY;
-				this.activeTouches.set(touch.identifier, touchInfo);
-			}
-		});
-
-		// Handle different gesture types
-		if (this.activeTouches.size === 2) {
-			this.handlePinchMove(Array.from(this.activeTouches.values()));
-			event.preventDefault(); // Prevent zooming
-		} else if (this.activeTouches.size === 1) {
-			const touch = this.activeTouches.values().next().value;
-			const deltaY = touch.currentY - touch.startY;
-
-			// Determine if this should be a scroll or drag
-			if (!this.isDragging && !this.isScrolling) {
-				if (Math.abs(deltaY) > this.config.dragThreshold) {
-					this.isScrolling = true;
-					return; // Allow native scrolling
-				} else if (this.shouldStartDrag(touch)) {
-					this.startDragging();
-					event.preventDefault();
-				}
-			}
-
-			if (this.isDragging) {
-				this.updateDragPosition(touch);
-				event.preventDefault();
-			}
-		}
-	}
-
-	handleTouchEnd(event) {
-		if (!this.isEnabled) return;
-
-		const touches = Array.from(event.changedTouches);
-		touches.forEach(touch => {
-			const touchInfo = this.activeTouches.get(touch.identifier);
-			if (touchInfo) {
-				const duration = Date.now() - touchInfo.startTime;
-				const deltaX = touch.clientX - touchInfo.startX;
-				const deltaY = touch.clientY - touchInfo.startY;
-				const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-				// Handle different gesture completions
-				if (!this.isDragging && !this.isScrolling && distance < this.config.maxTapMovement) {
-					if (duration < this.config.tapThreshold) {
-						this.handleTap(touch);
-					} else if (this.isLongPressing) {
-						this.handleLongPressEnd(touch);
-					}
-				} else if (distance > this.config.swipeThreshold) {
-					this.handleSwipe(deltaX, deltaY, duration, this.touchVelocity);
-				}
-
-				this.activeTouches.delete(touch.identifier);
-			}
-		});
-
-		// Clean up
-		if (this.activeTouches.size === 0) {
-			this.endAllGestures();
-		}
-
-		// Reset scroll prevention
-		if (this.preventScrollTimeout) {
-			clearTimeout(this.preventScrollTimeout);
-			this.preventScrollTimeout = null;
-		}
-		this.isScrolling = false;
-	}
-
-	handlePinchStart(touches) {
-		if (touches.length !== 2) return;
-
-		const distance = this.getPinchDistance(touches[0], touches[1]);
-		this.initialPinchDistance = distance;
-		this.lastPinchDistance = distance;
-		this.isPinching = true;
-	}
-
-	handlePinchMove(touches) {
-		if (!this.isPinching || touches.length !== 2) return;
-
-		const currentDistance = this.getPinchDistance(touches[0], touches[1]);
-		const scale = currentDistance / this.initialPinchDistance;
-		const deltaScale = scale - this.lastScale;
-
-		if (Math.abs(deltaScale) > this.config.pinchThreshold) {
-			// Handle pinch zoom
-			if (this.myte.parent.camera) {
-				this.myte.parent.camera.handlePinch(scale);
-			}
-			this.lastScale = scale;
-		}
-
-		this.lastPinchDistance = currentDistance;
-	}
-
-	getPinchDistance(touch1, touch2) {
-		const dx = touch1.currentX - touch2.currentX;
-		const dy = touch1.currentY - touch2.currentY;
-		return Math.sqrt(dx * dx + dy * dy);
-	}
-
-	handleOrientationChange() {
-		// Wait for orientation change to complete
-		setTimeout(() => {
-			this.updateBoundaries();
-			// Update any orientation-dependent state
-			if (this.isDragging) {
-				this.adjustDragForOrientation();
-			}
-		}, 100);
-	}
-
-	handleResize() {
-		this.updateBoundaries();
-	}
-
-	handleScroll(event) {
-		this.lastScrollY = window.scrollY;
-
-		// Cancel any active gestures if scrolling occurs
-		if (this.isLongPressing) {
-			this.cancelLongPress();
-		}
-	}
-
-	adjustDragForOrientation() {
-		if (!this.isDragging) return;
-
-		const touch = this.activeTouches.values().next().value;
-		if (touch) {
-			// Ensure drag position is valid in new orientation
-			this.updateDragPosition(touch);
-		}
-	}
-
-	endAllGestures() {
-		this.endDragging();
-		this.cancelLongPress();
-		this.isPinching = false;
-		this.lastScale = 1;
-		this.velocityTracker.positions = [];
-	}
+        // Bind methods
+        this.handleClick = this.handleClick.bind(this);
+        this.handleDoubleClick = this.handleDoubleClick.bind(this);
+        this.handleLongPress = this.handleLongPress.bind(this);
+        this.handlePressStart = this.handlePressStart.bind(this);
+        this.handlePressEnd = this.handlePressEnd.bind(this);
+        this.handleRightClick = this.handleRightClick.bind(this);
 
 
 
-	dispose() {
-		// Remove all event listeners
-		this.myte.sprite.removeEventListener('touchstart', this.handleTouchStart);
-		document.removeEventListener('touchmove', this.handleTouchMove);
-		document.removeEventListener('touchend', this.handleTouchEnd);
-		document.removeEventListener('touchcancel', this.handleTouchCancel);
-		window.removeEventListener('orientationchange', this.handleOrientationChange);
-		window.removeEventListener('resize', this.handleResize);
-		window.removeEventListener('scroll', this.handleScroll);
 
-		// Clear all timers and states
-		this.cancelLongPress();
-		if (this.preventScrollTimeout) {
-			clearTimeout(this.preventScrollTimeout);
-		}
+        this.initializeEventListeners();
+    }
 
-		// Reset all state
-		this.activeTouches.clear();
-		this.isDragging = false;
-		this.isLongPressing = false;
-		this.isPinching = false;
-		this.isEnabled = false;
-	}
+    initializeEventListeners() {
+        // Click events for inactive myte
+        this.myte.element.addEventListener('click', (event) => {
+            if (!this.myte.isActive) {
+                this.handleInactiveMyteClick(event);
+            }
+        });
+
+        // Click events for active myte
+        this.myte.duplicate.addEventListener('click', (event) => {
+            if (this.myte.isActive) {
+                this.handleActiveMyteClick(event);
+            }
+        });
+
+        // Double click events
+        this.myte.duplicate.addEventListener('mousedown', this.handlePressStart);
+        document.addEventListener('mouseup', this.handlePressEnd);
+
+        // Home click events
+        this.myte.dropTarget.addEventListener('click', (event) => {
+            this.handleHomeClick(event);
+        });
+
+        this.myte.duplicate.addEventListener('contextmenu', (event) => {
+            this.handleRightClick(event);
+        });
+
+    }
+
+    handleRightClick(event) {
+        event.preventDefault();
+        return false;
+    }
+
+    handleInactiveMyteClick(event) {
+        event.stopPropagation();
+        if (!this.myte.isActive) {
+            this.myte.start();
+            this.myte.parent.setActiveMyte(this.myte);
+        }
+    }
+
+    handleActiveMyteClick(event) {
+        event.stopPropagation();
+        
+        if (this.myte.parent.ui.isTool(UIToolModes.SELECT)) {
+
+			this.myte.parent.ui.setSelected(this.myte);
+
+            if (this.myte.isActiveMyte) {
+                if (this.myte.isActive && !this.myte.isDragging && 
+                    this.myte.parent.getPressDuration() < 100) {
+                    // Handle click on active myte
+                    this.handleClick(event);
+                }
+            } else {
+                // this.myte.parent.setActiveMyte(this.myte);
+            }
+        }
+    }
+
+    handleHomeClick(event) {
+        if (this.myte.isActive) {
+            // Handle click on myte's home area
+            this.myte.queue.clear();
+            this.myte.setMode(MOVE_TYPES.GOHOME);
+        }
+    }
+
+    handleClick(event) {
+        const currentTime = Date.now();
+        const timeSinceLastClick = currentTime - this.lastClickTime;
+
+        if (timeSinceLastClick < this.config.doubleClickTimeout) {
+            this.handleDoubleClick(event);
+        }
+
+        this.lastClickTime = currentTime;
+    }
+
+    handleDoubleClick(event) {
+        // Handle double click behavior
+        // For example, make the myte do a special animation
+        this.myte.queue.addExpression('surprise');
+        this.myte.queue.addExpression('dance');
+    }
+
+    handlePressStart(event) {
+        this.isPressed = true;
+        this.longPressTimer = setTimeout(() => {
+            if (this.isPressed) {
+                this.handleLongPress(event);
+            }
+        }, this.config.longPressTimeout);
+    }
+
+    handlePressEnd() {
+        this.isPressed = false;
+        if (this.longPressTimer) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+        }
+    }
+
+    handleLongPress(event) {
+
+        if (this.myte.isActiveMyte) {
+            // this.myte.queue.addExpression('idle');
+        }
+    }
+
+    dispose() {
+        // Clean up event listeners
+        this.myte.element.removeEventListener('click', this.handleInactiveMyteClick);
+        this.myte.duplicate.removeEventListener('click', this.handleActiveMyteClick);
+        this.myte.duplicate.removeEventListener('mousedown', this.handlePressStart);
+        document.removeEventListener('mouseup', this.handlePressEnd);
+        this.myte.dropTarget.removeEventListener('click', this.handleHomeClick);
+
+        if (this.longPressTimer) {
+            clearTimeout(this.longPressTimer);
+        }
+    }
+}
+
+
+class MyteTouchHandler extends DragHandler {
+    constructor(myte) {
+        super({
+            element: myte.sprite,
+            parent: myte,
+            canDrag: () => {
+                return myte.parent.ui.isTool(UIToolModes.DRAG) && 
+                       myte.isActive && 
+                       myte.canDrag();
+            },
+            onDragStart: () => {
+                myte.isDragging = true;
+                myte.parent.camera.setMode(CAMERA_FOLLOW_MODES.CHARACTER);
+                myte.reset();
+                myte.targetDot.classList.add('hidden');
+                myte.duplicate.classList.add('dragging');
+                myte.dropTarget.classList.add("valid-drop-target");
+            },
+            onDragUpdate: (position) => {
+                const containerRect = myte.parent.getContainerRect();
+                const newX = (position.x - myte.parent.camera.posX) - containerRect.left - (192/2);
+                const newY = (position.y - myte.parent.camera.posY) - containerRect.top - (192/2);
+
+                // Move myte
+                myte.setTarget(newX, newY, myte.limitTocontainer);
+                myte.setPosition(newX, newY, myte.limitTocontainer);
+                myte.setSpritePosition(newX, newY, myte.limitTocontainer);
+
+                // Update drop target
+                const dropTargetRect = myte.parent.getRect(myte.dropTarget);
+                if (Utility.is_coord_touching_element(position.x, position.y, dropTargetRect)) {
+                    myte.dropTarget.classList.add("on-target");
+                } else {
+                    myte.dropTarget.classList.remove("on-target");
+                }
+            },
+            onDragEnd: () => {
+                myte.queue.clear();
+                myte.parent.camera.setToPreviousMode();
+                if (myte.goal == MOVE_TYPES.GOHOME) {
+                    myte.setMode(myte.previousGoal);
+                }
+                myte.isDragging = false;
+                myte.duplicate.classList.remove('dragging');
+
+                // Check if dropped on target
+                if (myte.dropTarget.classList.contains("on-target")) {
+                    myte.stop();
+                }
+
+                // Reset drop target states
+                myte.dropTarget.classList.remove('valid-drop-target', 'on-target');
+                myte.targetDot.classList.remove('hidden');
+            }
+        });
+
+        this.myte = myte;
+    }
 }
 
 class MyteRubbingHandler {
@@ -409,7 +245,7 @@ class MyteRubbingHandler {
 			maxRubs: 25,             // Maximum effective rubs
 			rubbingThreshold: 2,     // Minimum velocity for a valid rub
 			minTimeBetweenRubs: 5000, // Cooldown between rub sessions (ms)
-			directionThreshold: 30,   // Pixels needed to determine direction
+			directionThreshold: 20,   // Pixels needed to determine direction
 			moodBoostPerRub: 5,      // How much each rub increases mood
 			moodPenaltyOverrub: -2,  // Mood penalty for rubbing too much
 			validRubTimeout: 1000,    // Time window for connected rubs (ms)
@@ -440,6 +276,8 @@ class MyteRubbingHandler {
 
 	handleStart(event) {
 		// event.preventDefault();
+
+		if(!this.myte.parent.ui.isTool(UIToolModes.PET)) return;
 
 		// Don't start if we're in cooldown
 		if (!this.canRub()) return;
@@ -515,6 +353,7 @@ class MyteRubbingHandler {
 		// If we had valid rubs, start the cooldown
 		if (this.rubCounter >= this.config.minRubs) {
 			this.lastRubTimestamp = Date.now();
+			this.myte.queue.clear();
 
 			// Add expression based on how good the rub was
 			if (this.rubCounter <= this.config.maxRubs) {

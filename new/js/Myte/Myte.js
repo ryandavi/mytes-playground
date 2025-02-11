@@ -1,24 +1,4 @@
 
-class MovementController {
-
-	/**
-	 * MovementController 
-	 * - Responsibilities:
-	 *   - Handle different movement types (follow, free roam, gravity, go home)
-	 *   - Update position and target
-	 *   - Implement movement logic (move_toward_target, move_gravity, etc.)
-	 * - Methods to include:
-	 *   - do_movement_logic()
-	 *   - move_toward_target()
-	 *   - move_gravity()
-	 *   - updateTargetToFollowMouse()
-	 *   - doFreeRoamLogic()
-	 */
-
-	constructor(myte) {
-		this.myte = myte;
-	}
-}
 
 class Myte {
 
@@ -42,6 +22,9 @@ class Myte {
 		this.sprite;
 		this.targetDot;
 		this.dropTarget;
+
+		this.dialogue;
+		this.battery = null;
 
 		// speed
 		this.speed = 1;
@@ -77,8 +60,8 @@ class Myte {
 		this.limitToContainer = false;
 
 		this.size = {
-			width: 96,
-			height: 96
+			width: 192,
+			height: 192
 		};
 
 		this.followRadius = {
@@ -98,16 +81,13 @@ class Myte {
 		
 		this.runAway_angle_distance = 300;
 
-		this.movementController = new MovementController(this);
-
-		this.inputHandler = new MyteInputHandler(this);
+		this.inputHandler;
 
         // Add these new properties
         this.pathFindingSystem = new PathFindingSystem(this);
 
-		this.commandSystem = new CommandSystem(this);
+		// this.commandSystem = new CommandSystem(this);
 
-		this.touchHandler;
 
         // Add mood properties
         this.mood = 100; // Start at neutral mood
@@ -116,6 +96,142 @@ class Myte {
         this.moodDecayRate = 0.005; // How much mood decreases per update
 
 	}
+
+	init() {
+		/********************************************
+		 * duplicated element
+		********************************************/
+		this.initInteractiveMyte();
+
+		// create dots
+		this.createTargetDot();
+
+		// add functions
+		this.queue = new MyteQueue(this);
+		this.stateMachine = new StateMachine(this, DEFAULT_STATE, 'snail');
+		this.inputHandler = new MyteInputHandler(this);
+
+		this.dialogue = new MyteDialogue(this);
+
+		// Regular speech with arrow
+		this.dialogue.showMessage("Hello!");
+
+		// Thought bubble
+		this.dialogue.showMessage("Hmm...", "thought");
+
+		// Emoji display
+		this.dialogue.showMessage("😊", "emoji");
+
+		// Alert message
+		this.dialogue.showMessage("Watch out!", "alert");
+
+		// Question
+		this.dialogue.showMessage("What's that?", "question");
+
+		// Whisper
+		this.dialogue.showMessage("*whispers*", "whisper");
+
+
+		// temp - make it a snail
+		this.stateMachine.setSnail();
+
+		// position
+		let rect = this.parent.getOffset(this.element);
+		const offsetX = rect.x - this.parent.getContainerRect().x;
+		const offsetY = rect.y - this.parent.getContainerRect().y;
+		this.setTarget(offsetX, offsetY);
+		this.setPosition(offsetX, offsetY);
+		this.setSpritePosition(this.posX, this.posY);
+
+        /********************************************
+         * CLICK EVENTS
+        ********************************************/
+
+		// for dragging - we dont want to allow it for a few seconds
+		this.setStartTime();
+
+		// this.commandSystem.init();
+	}
+
+	initInteractiveMyte(){
+		// clone myte
+		this.duplicate = this.element.cloneNode(true);
+		this.duplicate.classList.add("freemode"); // free mode is when it can fly around
+		this.duplicate.classList.add("duplicate"); // free mode is when it can fly around
+		this.duplicate.id = "duplicate-" + this.duplicate.id;
+
+		// add duplicate
+		this.element.parentNode.insertBefore(this.duplicate, this.element.nextSibling); // insert new
+
+		// elements
+		this.collider = this.duplicate.querySelector('.collidebox');
+		this.sprite = this.duplicate.querySelector('.sprite');
+		this.dropTarget = this.element.closest(".myteWrapper");
+
+
+		// original element
+		this.duplicate.classList.add("deactivated"); // hide the original element
+	}
+	
+	setStartTime(){
+		this.startTime = Date.now();
+	}
+
+	canDrag(){
+		return Date.now() - this.startTime > 1000;
+	}
+
+	stop(){
+		console.log('stop inside stop func');
+		this.isActive = false;
+
+        var rect = this.parent.getLocalOffset(this.element);
+        this.posX = rect.left;
+        this.posY = rect.top;
+		this.setSpritePosition(this.posX, this.posY);
+
+		
+		this.atOriginal = true;
+		// this.duplicate.remove();
+		this.element.classList.remove("deactivated");
+		this.duplicate.classList.remove("active");
+		this.duplicate.classList.add('deactivated');
+		this.element.closest('.myteContainer').classList.remove('empty');
+
+		// target dot
+		console.log('target dot hide at stop');
+		this.targetDot.classList.add('hidden');
+
+		// set next as active
+		this.parent.setNextMyteAsActive(this);
+		if(this.parent.activeMyte == null){
+			this.parent.ui.disableButtons();
+		}
+	}
+
+	start() {
+		this.isActive = true;
+
+		this.element.classList.add("deactivated"); // hide the original element
+		this.element.closest('.myteContainer').classList.add('empty');
+		this.duplicate.classList.remove("deactivated"); // show the duplicate element
+
+		// show dot
+		this.targetDot.classList.remove('hidden');
+
+		// modes
+		this.setMode();
+		this.setFollowMode();
+
+		// set start time - we need this to disable dragging for a few seconds at start
+		this.setStartTime();
+
+		if(this.parent.ui.isActive == false){
+			this.parent.ui.enableButtons();
+		}
+		
+	}
+
 
     updateMood(amount) {
         // Add the amount (positive or negative)
@@ -160,173 +276,7 @@ class Myte {
 
 	}
 
-	init() {
-		/********************************************
-		 * duplicated element
-		********************************************/
-		this.duplicate = this.element.cloneNode(true);
-		this.duplicate.classList.add("freemode"); // free mode is when it can fly around
-		this.duplicate.classList.add("duplicate"); // free mode is when it can fly around
-		this.duplicate.id = "duplicate-" + this.duplicate.id;
 
-		// add it
-		this.element.parentNode.insertBefore(this.duplicate, this.element.nextSibling); // insert new
-
-		// elements
-		this.collider = this.duplicate.querySelector('.collidebox');
-		this.sprite = this.duplicate.querySelector('.sprite');
-		this.dropTarget = this.element.closest(".myteWrapper");
-
-		this.duplicate.classList.add("deactivated"); // hide the original element
-		
-
-		// create dots
-		this.createTargetDot();
-
-		// add functions
-		this.queue = new MyteQueue(this);
-		this.stateMachine = new StateMachine(this, DEFAULT_STATE, 'snail');
-
-		// temp - make it a snail
-		this.stateMachine.setSnail();
-
-		// position
-		let rect = this.parent.getOffset(this.element);
-		const offsetX = rect.x - this.parent.getContainerRect().x;
-		const offsetY = rect.y - this.parent.getContainerRect().y;
-		this.setTarget(offsetX, offsetY);
-		this.setPosition(offsetX, offsetY);
-		this.setSpritePosition(this.posX, this.posY);
-
-		// input
-		this.inputHandler = new MyteInputHandler(this);
-
-
-        /********************************************
-         * MAKE MYTE DRAGGABLE
-        ********************************************/
-        this.sprite.addEventListener("mousedown", this.handle_drag_start);
-        this.sprite.addEventListener("touchstart", this.handle_drag_start);
-
-        /********************************************
-         * CLICK EVENTS
-        ********************************************/
-
-		// clicking home
-		this.dropTarget.addEventListener("click", (event) => {
-			if(this.isActive){
-				//return home
-				// this.setMode(MOVE_TYPES.GOHOME);
-			}
-		});
-
-
-		// click inactive myte at home
-		this.element.addEventListener("click", (event) => {
-			event.stopPropagation();
-
-			if(!this.isActive){
-				this.start();
-				this.parent.setActiveMyte(this);
-			}
-		});
-			
-
-		// Switch active myte
-		this.duplicate.addEventListener("click", (event) => {
-			event.stopPropagation();
-
-			if(this.parent.ui.isTool(UIToolModes.SELECT)){
-
-				if (this.isActiveMyte){
-					// if it's active, and not dragging, go home
-					if(this.isActive && !this.isDragging && this.parent.getPressDuration() < 100) {
-						this.setMode(MOVE_TYPES.GOHOME);
-						console.log("home from click this");
-					}
-				} else {
-					// set active myte if its not actvie on click
-					this.parent.setActiveMyte(this);
-				}
-
-			}
-
-		});
-
-
-		// for dragging - we dont want to allow it for a few seconds
-		this.setStartTime();
-
-		this.commandSystem.init();
-		
-		
-
-	}
-
-
-	
-	setStartTime(){
-		this.startTime = Date.now();
-	}
-
-	canDrag(){
-		return Date.now() - this.startTime > 1000;
-	}
-
-	stop(){
-		console.log('stop inside stop func');
-		this.isActive = false;
-
-        var rect = this.parent.getLocalOffset(this.element);
-        this.posX = rect.left;
-        this.posY = rect.top;
-		this.setSpritePosition(this.posX, this.posY);
-
-		
-		this.atOriginal = true;
-		// this.duplicate.remove();
-		this.element.classList.remove("deactivated");
-		this.duplicate.classList.remove("active");
-		this.duplicate.classList.add('deactivated');
-		this.element.closest('.myteContainer').classList.remove('empty');
-
-		// target dot
-		console.log('target dot hide at stop');
-		this.targetDot.classList.add('hidden');
-
-		this.commandSystem.updateCommandsVisibility();
-
-		// set next as active
-		this.parent.setNextMyteAsActive(this);
-		if(this.parent.activeMyte == null){
-			this.parent.ui.disableButtons();
-		}
-	}
-
-	start() {
-		this.isActive = true;
-
-		this.element.classList.add("deactivated"); // hide the original element
-		this.element.closest('.myteContainer').classList.add('empty');
-		this.duplicate.classList.remove("deactivated"); // show the duplicate element
-
-		// show dot
-		this.targetDot.classList.remove('hidden');
-
-		// modes
-		this.setMode();
-		this.setFollowMode();
-
-		// set start time - we need this to disable dragging for a few seconds at start
-		this.setStartTime();
-
-		this.commandSystem.updateCommandsVisibility();
-
-		if(this.parent.ui.isActive == false){
-			this.parent.ui.enableButtons();
-		}
-		
-	}
 
     setFollowMode(newGoal = null) {
 
@@ -431,73 +381,6 @@ class Myte {
      * events - hover
     ********************************************/
 
-    do_hover_event = () => {
-        return;
-    }
-
-    /********************************************
-     * events - drag
-    ********************************************/
-    handle_drag_start = (event) => {
-
-		if(this.parent.ui.isTool(UIToolModes.DRAG)){
-			if(this.isActiveMyte && this.isActive && this.canDrag()){
-				this.isDragging = true;
-				this.parent.camera.setMode(CAMERA_FOLLOW_MODES.CHARACTER);
-				this.reset();
-		
-				// add drag listeners
-				document.addEventListener("mousemove", this.handle_drag_move);
-				document.addEventListener("touchmove", this.handle_drag_move);
-				document.addEventListener("scroll", this.handle_drag_move);
-				document.addEventListener("mouseup", this.handle_drag_end);
-				document.addEventListener("touchend", this.handle_drag_end);
-
-				// hide target dot
-				this.targetDot.classList.add('hidden');
-			}
-		}
-    }
-
-    handle_drag_move = () => {
-        this.move_drag();
-    }
-
-    handle_drag_end = () => {
-        this.queue.clear();
-
-		this.parent.camera.setToPreviousMode();
-
-        this.isDragging = false;
-        this.sprite.style.transform = '';
-        this.duplicate.classList.remove("dragging");
-
-        if (this.goal == MOVE_TYPES.GOHOME) this.setMode(this.previousGoal);
-
-		this.dropTarget.classList.remove("valid-drop-target");
-		this.dropTarget.classList.remove("on-target");
-
-		// remove drag listeners
-        document.removeEventListener("mousemove", this.handle_drag_move);
-        document.removeEventListener("touchmove", this.handle_drag_move);
-		document.removeEventListener("scroll", this.handle_drag_move);
-        document.removeEventListener("mouseup", this.handle_drag_end);
-        document.removeEventListener("touchend", this.handle_drag_end);
-
-		// target dot
-		console.log('show target dot drag end')
-		this.targetDot.classList.remove('hidden');
-
-        if (this.dropTarget.classList.contains("on-target")) {
-            // place it into drop target slot
-            console.log('deactivate');
-			this.stop();
-        }
-
-
-    }
-
-
 	createTargetDot() {
 		// Create the target element
 		const element = document.createElement('div');
@@ -510,7 +393,7 @@ class Myte {
 			foregroundLayer.appendChild(element);
 		}
 
-		
+		// give it the name of the myte
 		element.dataset.name = this.name;
 
 		// Store the element in this
@@ -732,12 +615,16 @@ class Myte {
 		}
 	}
 
-	setZIndex(y){
-		let offset = -(192/2);
+
+	getZIndex(y){
+		let offset = 0; // -(192/2);
 		let extra = this.isCurrentlyJumping() ? this.velocity : 0;
 
-		this.duplicate.style.zIndex = this.parent.getZIndex(y, extra+this.size.height-offset);
+		return this.parent.getZIndex(y, extra+this.size.height-offset);
+	}
 
+	setZIndex(y){
+		this.duplicate.style.zIndex = this.getZIndex(y);	
 	}
 
 	setTarget(x = null, y = null, limit = false) {
@@ -815,12 +702,7 @@ class Myte {
 	}
 
 	
-
-
-
-
     move_drag() {
-        // this.do_drag_swinging();
 
         var rect = this.getRect();
 
@@ -909,7 +791,7 @@ class Myte {
 	
 
 	getRandomNearbyObject(range, returnClosest = false) {
-		const nearbyObjects = this.parent.mapObjects.objects.filter(obj => {
+		const nearbyObjects = this.parent.mapArea.objects.filter(obj => {
 			const distanceX = Math.abs(this.posX - obj.posX);
 			const distanceY = Math.abs(this.posY - obj.posY);
 			return obj !== this && obj.active && distanceX <= range && distanceY <= range;
@@ -1194,9 +1076,6 @@ class Myte {
 
 	update(deltaTime) {
 		if (!this.isActive) return;
-
-		this.commandSystem.updateCommandsVisibility();
-
 		// personal target dot
 		this.update_target_dot();
 

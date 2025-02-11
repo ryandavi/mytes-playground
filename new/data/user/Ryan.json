@@ -1,0 +1,56 @@
+{
+	"username": "player123",
+	"userId": "uid123",
+	"lastLogin": "2024-12-20T10:00:00.000Z",
+	"dateCreated": "2024-12-01T00:00:00.000Z",
+	"preferences": {
+		"soundEnabled": true,
+		"musicEnabled": true,
+		"cameraMode": "follow",
+		"containerLimit": true,
+		"theme": "light"
+	},
+	"stats": {
+		"totalPlayTime": 3600000,
+		"mytesHatched": 5,
+		"itemsCollected": 20,
+		"achievementsUnlocked": 3
+	},
+	"achievements": [
+		[
+			"first_myte",
+			{
+				"unlockedDate": "2024-12-01T00:00:00.000Z",
+				"claimed": true
+			}
+		],
+		[
+			"collector",
+			{
+				"unlockedDate": "2024-12-15T00:00:00.000Z",
+				"claimed": false
+			}
+		]
+	],
+	"currency": {
+		"coins": 1000,
+		"gems": 50
+	},
+	"inventory": [
+		{
+			"name": "Acorn",
+			"quantity": 5,
+			"type": "FOOD"
+		},
+		{
+			"name": "Turnip",
+			"quantity": 13,
+			"type": "FOOD"
+		},
+		{
+			"name": "Apple",
+			"quantity": 3,
+			"type": "FOOD"
+		}
+	]
+}

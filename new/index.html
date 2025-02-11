@@ -3,6 +3,8 @@
 <head>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 	<meta charset="UTF-8">
+	<link rel="stylesheet" href="../css/style.css">
+	<link rel="stylesheet" href="../css/map.css">
 </head>
 
 <body class="debug">
@@ -16,7 +18,26 @@
 	<br><br><br><br>
 	<section class="debugMenu ignore">Not Initialized</section>
 	<section class="queueMenu ignore"></section>
+
+
 	<div class="container-wrapper styled">
+
+		<div class="ignore header">
+			<div class="logo"><img src="../images/logo.svg"></div>
+			<div class="active-pet" id="hud-active-pet">
+				<div class="name">Name</div>
+				<div class="mood">Mood</div>
+				<div class="energy">Energy</div>
+			</div>
+
+			<div class="date-time">
+				<div class="username">8:16 pm</div>
+			</div>
+
+			<div class="user">
+				<div class="username">Ryan</div>
+			</div>
+		</div>
 
 		<!-- HAND CONTROLS -->
 		<div class="hand-controls ignore" id="hand-controls">
@@ -37,6 +58,7 @@
 			</div>
 			<div class="canvas">
 				<!-- map objects -->
+
 				<div class="layer background"></div>
 				<!-- map objects -->
 				<div class="layer controls">
@@ -49,8 +71,8 @@
 							<div class="home-name">
 								<div class="name tooltip">Lentil's Home</div>
 							</div>
-							<div class="home-wrapper">
-							</div>
+
+							<div class="home-wrapper"></div>
 
 							<!-- MYTE START-->
 							<div id="myte-pookie" class="interactive-myte" data-myte-name="Lentil" draggable="false">
@@ -59,21 +81,20 @@
 									<div class="selectbox"></div>
 									<div class="collidebox"></div>
 									<div class="hitbox"></div>
+
 									<div class="name-wrapper">
 										<span class="before">x</span>
 										<div class="name tooltip">Lentil</div>
 									</div>
 
+									<div class="commands"></div>
 
-									<div class="commands">
-
+									<div class="dialogue">
+										<span class="text">Hiii</span>
 									</div>
-
 
 									<div class="above-wrapper">
 										<div class="battery"></div>
-
-
 									</div>
 								</div>
 							</div>
@@ -100,16 +121,14 @@
 										<div class="name tooltip">Pookie</div>
 									</div>
 
+									<div class="commands"></div>
 
-									<div class="commands">
-
+									<div class="dialogue">
+										<span class="text">Hiii</span>
 									</div>
 
 									<div class="above-wrapper">
 										<div class="battery"></div>
-
-
-
 									</div>
 								</div>
 							</div>
@@ -133,24 +152,39 @@
 					<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
 					<textarea class="collider">DOWNNN</textarea>
 				</div>
+
+				<div class="layer effects"></div>
 			</div>
 		</section>
 		<!-- END CANVAS -->
 
 		<!-- ACTION CONTROLS-->
-		<div class="action-controls ignore" id="action-controls">
-			<div class="selected">Selected Myte: <span>Pookie</span></div>
-			<ul class="action-list">
-				<li><button>Test</button>
-			</ul>
+		<div class="sidebar right">
+			<div class="action-controls ignore" id="action-controls">
+				<div class="selected-info">
+					<div class="interaction-type">
+						<span class="type">Not Selected</span>
+					</div>
+					<div class="target-info">
+						<span class="type">-</span>
+						<span class="name">None</span>
+					</div>
+				</div>
+				<div class="action-groups">
+				</div>
+			</div>
 		</div>
 		<!-- END ACTION CONTROLS -->
 
-
+		<!-- MYTES -->
 		<div class="allMytes" id="all_mytes"></div>
+		<!-- END MYTES -->
 
+		<!-- INVENTORY -->
 		<div class="inventory" id="inventory"></div>
+		<!-- END INVENTORY -->
 
+		<!-- CONTROLS -->
 		<div class="controls" id="controls">
 			<button id="cycleGoal" class="myte" disabled>Loading...</button>
 			<button id="cycleFollowGoal" class="myte" disabled>Loading...</button>
@@ -159,6 +193,7 @@
 			<button id="cycleCamera">Loading...</button>
 			<button id="cycleContainerLimit" class="myte" disabled>Loading...</button>
 		</div>
+		<!-- END CONTROLS -->
 	</div>
 	</div>
 	<br><br><br><br><br><br> <br><br><br>
@@ -207,26 +242,50 @@
 	<div style="margin: 30px; padding: 30px;">hi</div>
 
     <!-- Scripts -->
-	<script src="js/Inventory.js"></script>
 	<script src="js/Utility.js"></script>
-	<script src="js/UI.js"></script>
-	<script src="js/ContainerManager.js"></script>
 	<script src="js/Debug.js"></script>
-	<script src="js/Camera.js"></script>
+	<script src="js/BaseInputHandler.js"></script>
+	<script src="js/BaseDragHandler.js"></script>
+    <script src="js/ResourceManager.js"></script>
+    <script src="js/EventManager.js"></script>
+    <script src="js/Core.js"></script>
+	<script src="js/GameTime.js"></script>
 
+	<!-- USER -->
+	<script src="js/User/User.js"></script>
+	<script src="js/User/Inventory.js"></script>
+
+	<!-- CONTAINER -->
+	<script src="js/Container/UI.js"></script>
+	<script src="js/Container/ContainerManager.js"></script>
+	<script src="js/Container/ContainerInputManager.js"></script>
+	<script src="js/Container/ParticleSystem.js"></script>
+
+	<!-- MYTE -->
 	<script src="js/Myte/Myte.js"></script>
-	<script src="js/Myte/MyteQueue.js"></script>
 	<script src="js/Myte/StateMachine.js"></script>
 	<script src="js/Myte/MytePathfinding.js"></script>
 	<script src="js/Myte/MyteCommand.js"></script>
 	<script src="js/Myte/MyteInputHandler.js"></script>
+	<script src="js/Myte/MyteDialogue.js"></script>
 
-	<script src="js/MapObjects.js"></script>
+	<!-- QUEUE -->
+	<script src="js/Myte/Queue/MyteQueue.js"></script>
+	<script src="js/Myte/Queue/Actions/BaseActions.js"></script>
+	<script src="js/Myte/Queue/Actions/CarryActions.js"></script>
+	<script src="js/Myte/Queue/Actions/EmotiveActions.js"></script>
+	<script src="js/Myte/Queue/Actions/InteractionActions.js"></script>
+	<script src="js/Myte/Queue/Actions/MovementActions.js"></script>
+	<script src="js/Myte/Queue/Actions/ReactiveActions.js"></script>
+
+	<!-- MAP -->
+	<script src="js/Map/Camera.js"></script>
+	<script src="js/Map/MapArea.js"></script>
+	<script src="js/Map/MapObjects/BaseMapObject.js"></script>
+	<script src="js/Map/MapObjects/GrowingPlantObject.js"></script>
 	
-    <script src="js/ResourceManager.js"></script>
-    <script src="js/EventManager.js"></script>
-    <script src="js/Core.js"></script>
 
-    <link rel="stylesheet" href="../css/style.css">
+
+    
 </body>
 </html>

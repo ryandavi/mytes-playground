@@ -44,9 +44,9 @@ class Utility {
 	static numToReturn = 3; // Number of closest elements to return
 	static maxDistance = 200; // Maximum distance to include an element
 
-	static clickable_element_tags = ['textarea', 'input', 'select', 'img']; 	// elements you can click
+	static clickable_element_tags = ['textarea', 'input', 'img']; 	// elements you can click
 
-	static top_only_tags = ['button', 'textarea', 'input', 'select', 'iframe', 'canvas']; // tags they sit on top of
+	static top_only_tags = ['button', 'textarea', 'input', 'iframe', 'canvas']; // tags they sit on top of
 
 	static isClickableElement(x) {
 		if (x.tagName) x = x.tagName;
@@ -73,6 +73,16 @@ class Utility {
 		return element.matches(this.ignore_elements_selector);
 	}
 	
+	static isNotIgnored(element) {
+		while (element) {
+			if (element.classList && element.classList.contains('ignore')) {
+				return false; // Found an ignored element
+			}
+			element = element.parentElement; // Move up the DOM tree
+		}
+		return true; // No ignored element found in the ancestry
+	}
+
 
     /********************************************
      * find elements - functions

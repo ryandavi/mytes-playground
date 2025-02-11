@@ -231,7 +231,7 @@ class StateMachine {
 			[StateTypes.IDLE]: {
 				check: () => true,
 				getState: (context) => context.is_doing_action('idle') ?
-					'idle' : 'idle_' + context.direction
+					'idle' : 'idle_S' //  + context.direction
 			},
 			[StateTypes.BEING_CARRIED]: {
 				check: (context) => context.is_doing_action('being_carried'),

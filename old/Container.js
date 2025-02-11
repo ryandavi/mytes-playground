@@ -32,7 +32,7 @@ class Container {
 		this.canvas = this.element.querySelector('.canvas');
 
 		this.userInterface = new UserInterface(this);
-		this.mapObjects = new MapObjects(this);
+		this.mapArea = new MapObjects(this);
 
 
 		const itemsArray = [
@@ -109,7 +109,7 @@ class Container {
 
 
 		// add map objects
-		this.mapObjects.init();
+		this.mapArea.init();
 		this.userInterface.init();
 		
 
