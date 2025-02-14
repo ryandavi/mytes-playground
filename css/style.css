@@ -1095,7 +1095,8 @@ body.debug .target.dot,
 body.debug .debugMenu,
 body.debug .cursor-dot.dot,
 body.debug .crosshair,
-body.debug .queueMenu {
+body.debug .queueMenu,
+body.debug .zone {
   visibility: visible !important;
 }
 body.debug .interactive-myte .sprite {
@@ -1160,43 +1161,16 @@ body.debug .mapObject > div.interact:hover {
   white-space: nowrap;
 }
 
-.debugMenu {
-  margin-left: 10px;
-  line-height: 1em;
-  font-size: 90%;
-  position: fixed;
-  display: inline-block;
-  height: -moz-fit-content;
-  height: fit-content;
-  left: 0;
-  top: 50%;
-  transform: translate(0%, -50%);
-  background-color: white;
-  visibility: hidden;
-  z-index: 1000;
+@keyframes highlight {
+  from {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+  to {
+    background-color: transparent;
+  }
 }
-
-.queueMenu {
-  margin-right: 10pxvar(--border-width);
-  line-height: 1em;
-  font-size: 90%;
-  position: fixed;
-  display: inline-block;
-  height: -moz-fit-content;
-  height: fit-content;
-  right: 0;
-  top: 50%;
-  transform: translate(0%, -50%);
-  background-color: white;
-  visibility: hidden;
-  z-index: 1000;
-}
-.queueMenu > div.debug {
-  padding: var(--padding);
-  border-radius: var(--border-width);
-}
-.queueMenu > :first-child {
-  background-color: rgb(245, 245, 245);
+.debug-value-changed {
+  animation: highlight 0.5s ease-out;
 }
 
 .item-old {

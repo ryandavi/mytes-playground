@@ -1,15 +1,39 @@
 
 // Run away from a target object or Myte
 class RunAwayAction extends MyteAction {
+    static metadata = {
+        id: 'run_away',
+        label: 'Run Away',
+        category: 'reactive',
+        priority: 5,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: -1,
+        description: 'Run away from a scary object or Myte',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: -5,
+        defaultOptions: {
+            panicDistance: 400,
+            runDistance: 350
+        }
+    };
+
 	constructor(myte, options) {
 		super(myte, {
 			targetObject: options.targetObject,
-			panicDistance: options.panicDistance || 400,
-			runDistance: options.runDistance || 350,
-			duration: options.duration || -1, // -1 means run indefinitely
+			panicDistance: options.panicDistance || RunAwayAction.metadata.defaultOptions.panicDistance,
+			runDistance: options.runDistance || RunAwayAction.metadata.defaultOptions.runDistance,
+			duration: options.duration || RunAwayAction.metadata.defaultDuration, // -1 means run indefinitely
 			...options
 		});
 	}
+
+    static canPerform(selected, active) {
+        return selected instanceof Myte && 
+               selected !== active &&
+               !active?.queue.isCarrying();
+    }
 
 	update() {
 		const target = this.options.targetObject;
@@ -65,17 +89,43 @@ class RunAwayAction extends MyteAction {
 
 // Hide behind an object
 class HideAction extends MyteAction {
-	constructor(myte, options) {
-		super(myte, {
-			hideTarget: options.hideTarget, // Object to hide behind
-			scaryObject: options.scaryObject, // Object to hide from
-			peekInterval: options.peekInterval || 2000,
-			duration: options.duration || 5000,
-			...options
-		});
-		this.peekTimer = this.options.peekInterval;
-		this.isPeeking = false;
-	}
+
+    static metadata = {
+        id: 'hide',
+        label: 'Hide',
+        category: 'reactive',
+        priority: 4,
+        isMovementAction: true,
+        isInterruptible: false,
+        defaultDuration: 5000,
+        description: 'Hide behind an object from something scary',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: -2,
+        defaultOptions: {
+            peekInterval: 2000
+        }
+    };
+    constructor(myte, options) {
+        // Use metadata for defaults
+        const defaultOptions = {
+            ...HideAction.metadata.defaultOptions,
+            duration: options.duration || HideAction.metadata.defaultDuration,
+            hideTarget: options.hideTarget,
+            scaryObject: options.scaryObject,
+            ...options
+        };
+        super(myte, defaultOptions);
+        
+        this.peekTimer = this.options.peekInterval;
+        this.isPeeking = false;
+    }
+
+    static canPerform(selected, active) {
+        return selected && 
+               !(selected instanceof Myte) && 
+               !active?.queue.isCarrying();
+    }
 
 	update() {
 		const hideTarget = this.options.hideTarget;

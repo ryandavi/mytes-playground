@@ -242,7 +242,7 @@ class GameTime {
 		const season = this.getCurrentSeason();
 		const year = this.getCurrentYear();
 
-		return `${dayOfWeek}, day ${day} of ${season}, year ${year} (${this.totalElapsedSeconds}s)`;
+		return `${dayOfWeek}, day ${day} of ${season}, year ${year}`;
 	}
 
 	getTimeData() {
@@ -261,7 +261,9 @@ class GameTime {
 			formattedTime: this.getFormattedTime(),
 			formattedDate: this.getFormattedDate(),
 			seasonProgress: this.getCurrentDay() / this.config.daysPerSeason,
-			dayProgress: (this.getCurrentHour() * 60 + this.getCurrentMinute()) / (24 * 60)
+			dayProgress: (this.getCurrentHour() * 60 + this.getCurrentMinute()) / (24 * 60),
+			totalDays: this._getTotalGameDays(),
+			totalElapsedSeconds: this.totalElapsedSeconds
 		};
 	}
 

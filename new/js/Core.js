@@ -13,6 +13,20 @@ class MyteCore {
         this.config = {
             fps: 8,
             frameInterval: 1000 / 8,
+
+            // Logic/physics update rate (20 ticks per second like Minecraft)
+            tickRate: 20,
+            tickInterval: 1000 / 20, // 50ms between ticks
+            
+            // Default animation frame rate
+            defaultAnimationFPS: 8,
+            defaultFrameInterval: 1000 / 8,
+            
+            // Performance monitoring
+            targetFPS: 60,
+            fpsUpdateInterval: 1000, // Update FPS counter every second
+            
+            // Other config...
             inactiveTimeout: 8000,
             defaultState: "idle",
             defaultMode: MOVE_TYPES.FOLLOW,
@@ -24,9 +38,16 @@ class MyteCore {
         this.eventManager = new EventManager(this);
         this.resourceManager = new ResourceManager();
         
-        // Timing
+        // Timing state
+        this.lastTickTime = 0;
         this.lastFrameTime = 0;
+        this.tickAccumulator = 0;
         this.isInitialized = false;
+
+        // Performance monitoring
+        this.frameCount = 0;
+        this.lastFPSUpdate = 0;
+        this.currentFPS = 0;
 
 
     }
@@ -141,27 +162,68 @@ class MyteCore {
         }
     }
 
+
+    updateFPSCounter(timestamp) {
+        this.frameCount++;
+
+        if (timestamp - this.lastFPSUpdate >= this.config.fpsUpdateInterval) {
+            this.currentFPS = Math.round(
+                (this.frameCount * 1000) / (timestamp - this.lastFPSUpdate)
+            );
+            
+            // Optionally adjust visual quality based on performance
+            this.adjustPerformance();
+
+            // Reset counters
+            this.frameCount = 0;
+            this.lastFPSUpdate = timestamp;
+        }
+    }
+
+    adjustPerformance() {
+        // If FPS is consistently low, we could:
+        // 1. Reduce particle effects
+        // 2. Simplify animations
+        // 3. Reduce visual effects
+        if (this.currentFPS < 30) {
+            // Example: Reduce animation complexity
+            this.config.defaultAnimationFPS = 6;
+        } else {
+            // Restore default settings
+            this.config.defaultAnimationFPS = 8;
+        }
+    }
+
     startUpdateLoop() {
         const updateFrame = (timestamp) => {
             if (!this.isInitialized) return;
 
-            // Update timing
+            // Calculate time since last frame
             const deltaTime = timestamp - this.lastFrameTime;
-            
-            // Update all containers
-            this.containers.forEach(container => {
-                container.update(deltaTime);
-            });
+            // this.lastFrameTime = timestamp;
 
-            // Update user stats
-            if (this.user) {
-                this.user.updatePlayTime(deltaTime);
+            // Update FPS counter
+            this.updateFPSCounter(timestamp);
+
+            // Accumulate time for fixed update steps
+            this.tickAccumulator += deltaTime;
+
+
+            // Run fixed update steps
+            while (this.tickAccumulator >= this.config.tickInterval) {
+                this.tickUpdate(this.config.tickInterval);
+                this.tickAccumulator -= this.config.tickInterval;
             }
+
+            // Run variable-rate updates
+            this.update(deltaTime);
+
 
             // Update last frame time
             if (deltaTime >= this.config.frameInterval) {
                 this.lastFrameTime = timestamp;
             }
+
             
             // Request next frame
             requestAnimationFrame(updateFrame);
@@ -170,6 +232,27 @@ class MyteCore {
         // Start the update loop
         requestAnimationFrame(updateFrame);
     }
+
+
+    tickUpdate(tickDelta) {
+        // Update physics, AI, and other logic that needs fixed time steps
+        this.containers.forEach(container => {
+            container.tickUpdate(tickDelta);
+        });
+
+        // Update user stats
+        if (this.user) {
+            this.user.updatePlayTime(tickDelta);
+        }
+    }
+
+    update(deltaTime) {
+        // Update animations and visual elements
+        this.containers.forEach(container => {
+            container.update(deltaTime);
+        });
+    }
+
 
     dispose() {
         // Save user data before disposing

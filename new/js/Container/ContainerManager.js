@@ -12,7 +12,8 @@ class ContainerManager {
         // Systems and managers
         this.inputHandler = new ContainerInputManager(this);
         this.ui = new UserInterface(this);
-        this.mapArea = new MapArea(this);
+        this.gameMap = new GameMap(this);
+
         this.pathfinding = new PathFindingSystem(32);
 
         this.timeManager = new GameTime();  // Add time manager here
@@ -26,25 +27,38 @@ class ContainerManager {
     }
 
 
-    init() {
+
+// ContainerManager.js - Modified init() method
+async init() {
+    try {
+        // Load map data
+        const response = await fetch('data/maps/home.json');
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const mapData = await response.json();
+
+        // Initialize game map with the loaded data
+        this.gameMap = new GameMap(this, mapData);
+        await this.gameMap.initialize();
+
+        // Initialize other components that depend on the map
         this.setupMytes();
         this.inputHandler.init();
         this.camera = new Camera(this, this.canvas, this.element);
         
-        // Prevent right-click menu on container
-        this.element.addEventListener('contextmenu', (event) => {
-            event.preventDefault();
-            return false;
-        });
-
-        // Initialize subsystems
-        this.mapArea.init();
+        // Initialize UI and other subsystems
         this.ui.init();
         this.pathfinding.init();
 
-		this.core.user.setInventory(this.inventory);
+        // Set up inventory
+        this.core.user.setInventory(this.inventory);
 
+        return true;
+    } catch (error) {
+        console.error('Error initializing container:', error);
+
+        return false;
     }
+}
 
     // Input state accessors that delegate to inputHandler
     getLocalMouse(element = null) {
@@ -307,9 +321,14 @@ class ContainerManager {
 
         if (this.camera) this.camera.update();
         if (this.ui) this.ui.update();
-        if (this.mapArea) this.mapArea.update();
+        if (this.gameMap) this.gameMap.update();
         if (this.particleSystem) this.particleSystem.update(); // Add this line
     }
+
+    tickUpdate(tickDelta) {
+
+    }
+
 
     dispose() {
         this.mytes.forEach(myte => myte.dispose());
@@ -326,9 +345,9 @@ class ContainerManager {
             this.ui = null;
         }
 
-        if (this.mapArea) {
-            this.mapArea.dispose();
-            this.mapArea = null;
+        if (this.gameMap) {
+            this.gameMap.dispose();
+            this.gameMap = null;
         }
 
         if (this.inputHandler) {

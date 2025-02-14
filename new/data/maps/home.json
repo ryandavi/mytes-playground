@@ -1,0 +1,70 @@
+{
+    "id": "home",
+    "name": "Your Home",
+    "description": "A cozy place for your Mytes",
+    "dimensions": {
+        "width": 500,
+        "height": 500
+    },
+    "background": {
+        "type": "color",
+        "value": "#f0f0f0"
+    },
+    "spawns": {
+        "myte": { "x": 100, "y": 100 },
+        "items": [
+            { "x": 200, "y": 200 },
+            { "x": 300, "y": 300 }
+        ]
+    },
+    "zones": [
+        {
+            "id": "rest_area",
+            "type": "REST",
+            "bounds": {
+                "x": 50,
+                "y": 50,
+                "width": 200,
+                "height": 200
+            },
+            "properties": {
+                "visible": true,
+                "strength": 1.2
+            }
+        },
+        {
+            "id": "play_area",
+            "type": "PLAY",
+            "bounds": {
+                "x": 400,
+                "y": 50,
+                "width": 300,
+                "height": 300
+            },
+            "properties": {
+                "visible": true,
+                "strength": 1.0
+            }
+        }
+    ],
+    "objects": [
+        {
+            "type": "GRASS",
+            "variant": "grass_1",
+            "x": 100,
+            "y": 150
+        },
+        {
+            "type": "GRASS",
+            "variant": "grass_2",
+            "x": 300,
+            "y": 250
+        },
+        {
+            "type": "MUSIC_BOX",
+            "variant": "music_box",
+            "x": 450,
+            "y": 100
+        }
+    ]
+}

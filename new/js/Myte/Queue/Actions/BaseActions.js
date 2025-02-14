@@ -1,51 +1,89 @@
 // Base Action class that all actions inherit from
 class MyteAction {
+    static metadata = {
+        id: null,
+        label: null,
+        category: 'default',
+        priority: 0,
+        isMovementAction: false,
+        isInterruptible: false,
+        defaultDuration: 0,
+        description: null,
+        requiresTarget: false,
+        affectsMood: false,
+        moodEffect: 0
+    };
+
     constructor(myte, options = {}) {
         this.myte = myte;
         this.options = {
-            duration: options.duration || 200,
+            duration: options.duration || this.constructor.metadata.defaultDuration,
             current_duration: -1,
             total_time: 0,
+            userInitiated: false,
             ...options
         };
+
+        // Apply mood effects if configured
+        if (this.constructor.metadata.affectsMood) {
+            this.myte.updateMood(this.constructor.metadata.moodEffect);
+        }
     }
 
     start() {
-        // Override in child classes
         if (this.options.duration > 0) {
             if (this.options.current_duration === -1) {
                 this.options.current_duration = this.options.duration;
             }
         }
-
     }
 
     update() {
-        // Override in child classes
-        return true; // Return true when action is complete
+        return true;
     }
 
     complete() {
-        // Override in child classes if needed
-
-        if(this.options.onComplete) this.options.onComplete();
-
+        if (this.options.onComplete) this.options.onComplete();
         return true;
     }
 
     isMovementAction() {
-        return false;
+        return this.constructor.metadata.isMovementAction;
     }
 
     isInterruptible() {
-        return false;
+        return this.constructor.metadata.isInterruptible;
+    }
+
+    static canPerform(selected, active) {
+        return true;
     }
 }
 
 // Action for basic movement
 class MoveAction extends MyteAction {
+    static metadata = {
+        id: 'move',
+        label: 'Move To',
+        category: 'movement',
+        priority: 1,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Move to a specific location',
+        requiresTarget: true,
+        affectsMood: false
+    };
+
+    static canPerform(selected, active) {
+        return active && !active.queue.isCarrying();
+    }
+
     constructor(myte, options) {
         super(myte, options);
+        if (!options.target?.[0]) {
+            throw new Error('MoveAction requires a target position');
+        }
         this.target = options.target[0];
     }
 
@@ -62,16 +100,31 @@ class MoveAction extends MyteAction {
         this.myte.move_toward_target();
         return false;
     }
-
-    isMovementAction() {
-        return true;
-    }
 }
 
 // New base class for actions that need positioning
 class PositionableAction extends MyteAction {
+
+    static metadata = {
+        id: 'positionable',
+        label: 'Position',
+        category: 'movement',
+        priority: 1,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Base class for position-based actions',
+        requiresTarget: true,
+        affectsMood: false
+    };
+
     constructor(myte, options) {
         super(myte, options);
+        
+        // Validate target if required
+        if (this.constructor.metadata.requiresTarget && !options.target) {
+            throw new Error(`${this.constructor.name} requires a target`);
+        }
     }
 
     getCanvasBounds() {
@@ -182,6 +235,23 @@ class PositionableAction extends MyteAction {
 
 // Action for idle state
 class IdleAction extends MyteAction {
+    static metadata = {
+        id: 'idle',
+        label: 'Idle',
+        category: 'state',
+        priority: 0,
+        isMovementAction: false,
+        isInterruptible: true,
+        defaultDuration: 200,
+        description: 'Stay in place for a moment',
+        requiresTarget: false,
+        affectsMood: false
+    };
+
+    static canPerform(selected, active) {
+        return active && selected === active;
+    }
+
     update() {
         if (this.options.current_duration === -1) {
             this.options.current_duration = this.options.duration;
@@ -193,6 +263,24 @@ class IdleAction extends MyteAction {
 
 // Action for expressing emotions/animations
 class ExpressionAction extends MyteAction {
+    static metadata = {
+        id: 'expression',
+        label: 'Express',
+        category: 'state',
+        priority: 2,
+        isMovementAction: false,
+        isInterruptible: false,
+        defaultDuration: 50,
+        description: 'Show an emotion or expression',
+        requiresTarget: false,
+        affectsMood: true,
+        moodEffect: 5
+    };
+
+    static canPerform(selected, active) {
+        return active && selected === active;
+    }
+
     constructor(myte, options) {
         super(myte, options);
         this.type = options.action_type;

@@ -5,6 +5,7 @@
 	<meta charset="UTF-8">
 	<link rel="stylesheet" href="../css/style.css">
 	<link rel="stylesheet" href="../css/map.css">
+	<link rel="stylesheet" href="../css/ui.css">
 </head>
 
 <body class="debug">
@@ -102,6 +103,10 @@
 
 						</div>
 					</div>
+
+					<!-- Myte 2 -->
+
+					<!--
 					<div class="myteContainer">
 						<div id="myteWrapper-2" class="myteWrapper snail">
 							<div class="home-name">
@@ -109,7 +114,7 @@
 							</div>
 							<div class="home-wrapper"></div>
 
-							<!-- MYTE START-->
+
 							<div id="myte-pookie2" class="interactive-myte" data-myte-name="Pookie" draggable="false">
 								<div class="inner-wrapper">
 									<div class="sprite"></div>
@@ -132,10 +137,11 @@
 									</div>
 								</div>
 							</div>
-							<!-- MYTE END-->
-
 						</div>
 					</div>
+					-->
+
+
 					<input class="collider">
 					<h2> hi </h2> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br><br>
 					<div id="item_1" class="item-old food" draggable="true"></div>
@@ -243,7 +249,6 @@
 
     <!-- Scripts -->
 	<script src="js/Utility.js"></script>
-	<script src="js/Debug.js"></script>
 	<script src="js/BaseInputHandler.js"></script>
 	<script src="js/BaseDragHandler.js"></script>
     <script src="js/ResourceManager.js"></script>
@@ -256,7 +261,6 @@
 	<script src="js/User/Inventory.js"></script>
 
 	<!-- CONTAINER -->
-	<script src="js/Container/UI.js"></script>
 	<script src="js/Container/ContainerManager.js"></script>
 	<script src="js/Container/ContainerInputManager.js"></script>
 	<script src="js/Container/ParticleSystem.js"></script>
@@ -280,12 +284,16 @@
 
 	<!-- MAP -->
 	<script src="js/Map/Camera.js"></script>
-	<script src="js/Map/MapArea.js"></script>
+	<script src="js/Map/GameMapLoader.js"></script>
+	<script src="js/Map/GameMap.js"></script>
+	<script src="js/Map/GameZone.js"></script>
 	<script src="js/Map/MapObjects/BaseMapObject.js"></script>
 	<script src="js/Map/MapObjects/GrowingPlantObject.js"></script>
 	
-
-
+	<!-- UI -->
+	<script src="js/UI/UI.js"></script>
+	<script src="js/UI/DebugUI.js"></script>
+	<script src="js/UI/QueueUI.js"></script>
     
 </body>
 </html>

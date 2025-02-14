@@ -98,11 +98,21 @@ class MyteQueue {
         return true;
     }
 
-    add(actionType, options = {}) {
-        const ActionClass = this.actionTypes[actionType];
+    add(actionId, options = {}) {
+        const ActionClass = ActionManager.actions.get(actionId);
         if (!ActionClass) {
-            console.error(`Unknown action type: ${actionType}`);
+            console.error(`Unknown action type: ${actionId}`);
             return;
+        }
+
+        // Use metadata for default duration if not specified
+        if (!options.duration) {
+            options.duration = ActionClass.metadata.defaultDuration;
+        }
+
+        // Handle mood effects
+        if (ActionClass.metadata.affectsMood) {
+            this.myte.updateMood(ActionClass.metadata.moodEffect);
         }
 
         const action = new ActionClass(this.myte, options);

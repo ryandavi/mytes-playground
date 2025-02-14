@@ -1,0 +1,227 @@
+.debugMenu {
+
+	--debug-color-system: rgba(255, 235, 235, 0.95);
+	--debug-color-input: rgba(235, 255, 235, 0.95);
+	--debug-color-time: rgba(235, 235, 255, 0.95);
+	--debug-color-map: rgba(255, 255, 235, 0.95);
+	--debug-color-camera: rgba(255, 235, 255, 0.95);
+	--debug-color-myte: rgba(235, 255, 255, 0.95);
+
+	margin-left: 10px;
+	line-height: 1em;
+	font-size: 90%;
+	position: fixed;
+	display: inline-block;
+	height: fit-content;
+	left: 0;
+	top: 50%;
+	transform: translate(0%, -50%);
+	background-color: white;
+	visibility: hidden;
+	z-index: 1000;
+
+	.debug-group {
+		padding: var(--padding);
+		border-radius: var(--border-width);
+
+		+ .debug-group {
+			margin-top: 4px;
+		}
+
+		h3 {
+			font-size: 0.9em;
+			margin: 0 0 4px 0;
+			padding-bottom: 2px;
+			border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+		}
+
+		&.system {
+			background-color: var(--debug-color-system);
+		}
+
+		&.input {
+			background-color: var(--debug-color-input);
+		}
+
+		&.time {
+			background-color: var(--debug-color-time);
+		}
+
+		&.map {
+			background-color: var(--debug-color-map);
+		}
+
+		&.camera {
+			background-color: var(--debug-color-camera);
+		}
+
+		&.myte {
+			background-color: var(--debug-color-myte);
+		}
+	}
+}
+
+
+
+.queueMenu {
+	visibility: hidden;
+    margin-right: 10px;
+    position: fixed;
+    display: none;
+    height: fit-content;
+    right: 0;
+    top: 50%;
+    transform: translate(0%, -50%);
+    background-color: white;
+    z-index: 1000;
+    width: 300px;
+    padding: 8px;
+
+	font-size: 0.9em;
+
+	&:not(:empty) {
+        display: inline-block;
+    }
+
+    .queue-item {
+        background-color: rgba(255, 255, 255, 0.95);
+        border-radius: 4px;
+        transition: background-color 0.2s;
+
+		padding: var(--padding);
+		border-radius: var(--border-width);
+
+		+ .queue-item {
+			margin-top: 4px;
+		}
+		
+
+        .content {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            width: 100%;
+
+            .number {
+                min-width: 2em;
+                font-weight: 500;
+                color: #666;
+            }
+
+            .information {
+                flex-grow: 1;
+
+
+                .title {
+                    display: flex;
+                    gap: 4px;
+                    align-items: center;
+					
+                    .name {
+                        font-weight: 500;
+                    }
+
+                    .controls {
+                        display: flex;
+                        gap: 2px;
+                        margin-left: auto;
+
+                        button {
+                            cursor: pointer;
+                            border: none;
+                            background: none;
+                            padding: 2px;
+                            font-size: 0.8em;
+                            line-height: 1;
+
+                            &.skip {
+                                color: #3498db;
+                            }
+
+                            &.remove {
+                                color: #e74c3c;
+                            }
+                        }
+                    }
+                }
+
+                .description {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+					font-size: 0.8em;
+
+                    .arrow {
+                        opacity: 0.5;
+                    }
+
+                    .target {
+                        opacity: 0.7;
+                    }
+
+                    .repeats {
+                        background: rgba(0, 0, 0, 0.05);
+                        padding: 0 4px;
+                        border-radius: 2px;
+                    }
+
+                    .status {
+                        margin-left: auto;
+                        opacity: 0.7;
+                    }
+                }
+            }
+
+            .progress {
+                height: 3px;
+                background: rgba(0, 0, 0, 0.05);
+                margin-top: 4px;
+                border-radius: 1px;
+                overflow: hidden;
+                flex: 0 0 100%;
+                display: none;
+
+                .bar {
+                    height: 100%;
+                    width: 0;
+                    transition: width 0.1s linear;
+                    background: rgba(0, 128, 0, 0.2);
+                }
+            }
+        }
+
+        &.current {
+            background-color: rgba(235, 255, 235, 0.95);
+
+            .content {
+                font-weight: 500;
+            }
+
+            .progress {
+                background: rgba(0, 0, 0, 0.05);
+
+                .bar {
+                    background: rgba(0, 128, 0, 0.2);
+                }
+            }
+        }
+
+		/*
+        &.movement {
+            border-left: 3px solid #3498db;
+        }
+
+        &.expression {
+            border-left: 3px solid #e74c3c;
+        }
+
+        &.interaction {
+            border-left: 3px solid #2ecc71;
+        }
+
+        &.other {
+            border-left: 3px solid #95a5a6;
+        }
+		*/
+    }
+}

@@ -1,3 +1,20 @@
+.layer .zone {
+  outline: 1px dashed red;
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+  border-radius: 3px;
+  visibility: hidden;
+}
+.layer .zone > .name {
+  font-size: 70%;
+  color: white;
+  background-color: red;
+  border-radius: 5px;
+  padding: 2px 5px;
+  opacity: 0.75;
+  align-self: flex-start; /* Prevent stretching */
+}
 .layer .dropped-item {
   position: absolute;
   width: 16px;

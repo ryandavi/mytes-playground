@@ -202,6 +202,7 @@ class UserInterface {
                             selected !== active && // Only if not selecting self
                             !active?.queue.isCarrying(),
                         action: (selected, active) => active.queue.add('go_to_object', {
+                            userInitiated: true,
                             targetObject: selected
                         })
                     },

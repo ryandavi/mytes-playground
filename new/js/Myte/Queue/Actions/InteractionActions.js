@@ -1,63 +1,107 @@
 // Object interactions
-// Action for going to an object/Myte
+// Going to an object action
 class GoToObjectAction extends PositionableAction {
-	constructor(myte, options) {
-		super(myte, options);
-		this.targetObject = options.targetObject;
-	}
+    static metadata = {
+        id: 'go_to_object',
+        label: 'Go To',
+        category: 'interactions',
+        priority: 1,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Move to a specific object or Myte',
+        requiresTarget: true,
+        affectsMood: false,
+        defaultOptions: {
+            vertical: 'bottom',
+            insideHorizontal: false,
+            insideVertical: true
+        }
+    };
+
+    static canPerform(selected, active) {
+        return active && selected && !active.queue.isCarrying();
+    }
+
+    constructor(myte, options) {
+        super(myte, {
+            ...GoToObjectAction.metadata.defaultOptions,
+            duration: GoToObjectAction.metadata.defaultDuration,
+            ...options
+        });
+        this.targetObject = options.targetObject;
+    }
 
     update() {
         const targetRect = this.getTargetRect(this.targetObject);
         const myteRect = this.myte.getRect();
-
-        // Calculate initial position
         let horizontal = this.getClosestSideHorizontal(targetRect, myteRect);
-        let targetPos = this.calculatePosition(myteRect, targetRect, horizontal, 'bottom', false, true);
+        let targetPos = this.calculatePosition(
+            myteRect, 
+            targetRect, 
+            horizontal, 
+            this.options.vertical, 
+            this.options.insideHorizontal, 
+            this.options.insideVertical
+        );
 
-        // Adjust for boundaries
         const adjusted = this.adjustPositionToBounds(targetPos, myteRect, targetRect);
         targetPos = adjusted.position;
 
-        // Set target and move toward it
         this.myte.setTarget(targetPos.x, targetPos.y);
         this.myte.move_toward_target();
 
         return this.myte.is_at_target();
     }
-
-	isMovementAction() {
-		return true;
-	}
 }
 
 // Inspect object action with curiosity animation
+// Inspect object action
 class InspectAction extends PositionableAction {
-	constructor(myte, options) {
-		super(myte, {
-			target: options.target,
-			duration: options.duration || 3000,
-			...options
-		});
-		this.inspectPoints = this.generateInspectPoints();
-		this.currentPoint = 0;
-		this.pointDuration = 500;
-		this.pointTimer = this.pointDuration;
-	}
+    static metadata = {
+        id: 'inspect',
+        label: 'Inspect',
+        category: 'interactions',
+        priority: 2,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 3000,
+        description: 'Curiously inspect an object from different angles',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: 2,
+        defaultOptions: {
+            pointDuration: 500,
+            numPoints: 4,
+            expressionType: 'curious',
+            expressionDuration: 300
+        }
+    };
+
+    static canPerform(selected, active) {
+        return active && selected instanceof MapObject && !active.queue.isCarrying();
+    }
+
+    constructor(myte, options) {
+        super(myte, {
+            ...InspectAction.metadata.defaultOptions,
+            duration: InspectAction.metadata.defaultDuration,
+            ...options
+        });
+        
+        this.inspectPoints = this.generateInspectPoints();
+        this.currentPoint = 0;
+        this.pointTimer = this.options.pointDuration;
+    }
 
     generateInspectPoints() {
-
-		let targetRect = this.getTargetRect(this.options.target);
-
+        let targetRect = this.getTargetRect(this.options.target);
         const points = [];
-        const numPoints = 4;
         const myteRect = this.myte.getRect();
 
-        // Generate points around the target using proper positioning
-        for (let i = 0; i < numPoints; i++) {
-            const angle = (i / numPoints) * Math.PI * 2;
+        for (let i = 0; i < this.options.numPoints; i++) {
             const horizontal = i % 2 === 0 ? 'left' : 'right';
-            const vertical = i < numPoints/2 ? 'top' : 'bottom';
-            
+            const vertical = i < this.options.numPoints/2 ? 'top' : 'bottom';
             const pos = this.calculatePosition(myteRect, targetRect, horizontal, vertical, false, false);
             points.push(pos);
         }
@@ -68,8 +112,11 @@ class InspectAction extends PositionableAction {
         this.pointTimer -= 16;
         if (this.pointTimer <= 0) {
             this.currentPoint = (this.currentPoint + 1) % this.inspectPoints.length;
-            this.pointTimer = this.pointDuration;
-            // this.myte.queue.addExpression("curious", 300);
+            this.pointTimer = this.options.pointDuration;
+            this.myte.queue.addExpression(
+                this.options.expressionType,
+                this.options.expressionDuration
+            );
         }
 
         const point = this.inspectPoints[this.currentPoint];
@@ -79,136 +126,187 @@ class InspectAction extends PositionableAction {
         this.options.current_duration--;
         return this.options.current_duration <= 0;
     }
-
-	isMovementAction() {
-		return true;
-	}
 }
 
 
+// Eat element action
 class EatElementAction extends MyteAction {
-	constructor(myte, options) {
-		super(myte, options);
-		this.target = options.target[0];
-	}
+    static metadata = {
+        id: 'eat_element',
+        label: 'Eat',
+        category: 'interactions',
+        priority: 2,
+        isMovementAction: false,
+        isInterruptible: false,
+        defaultDuration: 0,
+        description: 'Consume an edible object',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: 5
+    };
 
-	start() {
-		super.start();
-		this.myte.setTarget(this.target.x, this.target.y);
-		this.myte.reset();
-	}
+    static canPerform(selected, active) {
+        return active && selected instanceof MapObject && !active.queue.isCarrying();
+    }
 
-	update() {
-		if (this.myte.is_at_target()) {
-			return true;
-		}
-		this.myte.move_toward_target();
-		return false;
-	}
+    constructor(myte, options) {
+        super(myte, {
+            duration: EatElementAction.metadata.defaultDuration,
+            ...options
+        });
+        this.target = options.target[0];
+    }
 
-	complete() {
-		super.complete();
-		if (this.options.mapObject) {
-			this.options.mapObject.remove();
-		}
-	}
+    start() {
+        super.start();
+        this.myte.setTarget(this.target.x, this.target.y);
+        this.myte.reset();
+    }
 
-	isMovementAction() {
-		return false;
-	}
+    update() {
+        if (this.myte.is_at_target()) {
+            return true;
+        }
+        this.myte.move_toward_target();
+        return false;
+    }
+
+    complete() {
+        super.complete();
+        if (this.options.mapObject) {
+            this.options.mapObject.remove();
+        }
+    }
 }
 
-// Show affection to another Myte
+// Show affection action
 class ShowAffectionAction extends MyteAction {
-	constructor(myte, options) {
-		super(myte, {
-			duration: options.duration || 1500,
-			targetMyte: options.targetMyte,
-			...options
-		});
-		this.heartEmitter = null;
-		this.emitDelay = 200;
-		this.emitTimer = 0;
-	}
+    static metadata = {
+        id: 'show_affection',
+        label: 'Show Affection',
+        category: 'interactions',
+        priority: 3,
+        isMovementAction: false,
+        isInterruptible: false,
+        defaultDuration: 1500,
+        description: 'Show affection to another Myte',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: 8,
+        defaultOptions: {
+            emitDelay: 200,
+            expressionType: 'heart',
+            expressionDuration: 300,
+            expressionRepeat: 3
+        }
+    };
 
-	start() {
-		super.start();
-		// Create heart particles if we had a particle system
-		this.myte.queue.addExpression("heart", 300, 3);
-	}
+    static canPerform(selected, active) {
+        return selected instanceof Myte && 
+               selected !== active &&
+               !active?.queue.isCarrying();
+    }
 
-	update() {
-		// Emit hearts periodically
-		this.emitTimer -= 16;
-		if (this.emitTimer <= 0) {
-			// Could emit heart particles here
-			this.emitTimer = this.emitDelay;
-		}
+    constructor(myte, options) {
+        super(myte, {
+            ...ShowAffectionAction.metadata.defaultOptions,
+            duration: ShowAffectionAction.metadata.defaultDuration,
+            ...options
+        });
+        this.heartEmitter = null;
+        this.emitTimer = 0;
+    }
 
-		this.options.current_duration--;
-		return this.options.current_duration <= 0;
-	}
+    start() {
+        super.start();
+        this.myte.queue.addExpression(
+            this.options.expressionType,
+            this.options.expressionDuration,
+            this.options.expressionRepeat
+        );
+    }
 
-	complete() {
-		super.complete();
-		// Cleanup any particle effects
-	}
+    update() {
+        this.emitTimer -= 16;
+        if (this.emitTimer <= 0) {
+            this.emitTimer = this.options.emitDelay;
+        }
+
+        this.options.current_duration--;
+        return this.options.current_duration <= 0;
+    }
 }
-// Play tag with another Myte
+
+// Play tag action
 class PlayTagAction extends PositionableAction {
-	constructor(myte, options) {
-		super(myte, {
-			duration: options.duration || 5000,
-			targetMyte: options.targetMyte,
-			catchDistance: options.catchDistance || 30,
-			...options
-		});
-		this.isIt = options.isIt || true;
-	}
+    static metadata = {
+        id: 'play_tag',
+        label: 'Play Tag',
+        category: 'play',
+        priority: 4,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 5000,
+        description: 'Play tag with another Myte',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: 10,
+        defaultOptions: {
+            catchDistance: 30,
+            runDistance: 100,
+            isIt: true
+        }
+    };
 
-	update() {
-		const target = this.options.targetMyte;
-		if (!target) return true;
+    static canPerform(selected, active) {
+        return selected instanceof Myte && 
+               selected !== active &&
+               !active?.queue.isCarrying();
+    }
 
-		const dx = target.posX - this.myte.posX;
-		const dy = target.posY - this.myte.posY;
-		const distance = Math.sqrt(dx * dx + dy * dy);
+    constructor(myte, options) {
+        super(myte, {
+            ...PlayTagAction.metadata.defaultOptions,
+            duration: PlayTagAction.metadata.defaultDuration,
+            ...options
+        });
+        this.isIt = this.options.isIt;
+    }
 
-		if (this.isIt) {
-			// Chase target
-			this.myte.setTarget(target.posX, target.posY);
-			this.myte.move_toward_target();
+    update() {
+        const target = this.options.targetMyte;
+        if (!target) return true;
 
-			// Tag target if close enough
-			if (distance < this.options.catchDistance) {
-				this.isIt = false;
-				target.queue.add('play_tag', {
-					targetMyte: this.myte,
-					isIt: true,
-					duration: this.options.current_duration
-				});
-				return true;
-			}
-		} else {
-			// Run away
-			const angle = Math.atan2(dy, dx) + Math.PI;
-			const runDistance = 100;
-			this.myte.setTarget(
-				this.myte.posX + Math.cos(angle) * runDistance,
-				this.myte.posY + Math.sin(angle) * runDistance
-			);
-			this.myte.move_toward_target();
-		}
+        const dx = target.posX - this.myte.posX;
+        const dy = target.posY - this.myte.posY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
 
-		this.options.current_duration--;
-		return this.options.current_duration <= 0;
-	}
+        if (this.isIt) {
+            this.myte.setTarget(target.posX, target.posY);
+            this.myte.move_toward_target();
 
-	isMovementAction() {
-		return true;
-	}
+            if (distance < this.options.catchDistance) {
+                this.isIt = false;
+                target.queue.add('play_tag', {
+                    targetMyte: this.myte,
+                    isIt: true,
+                    duration: this.options.current_duration
+                });
+                return true;
+            }
+        } else {
+            const angle = Math.atan2(dy, dx) + Math.PI;
+            this.myte.setTarget(
+                this.myte.posX + Math.cos(angle) * this.options.runDistance,
+                this.myte.posY + Math.sin(angle) * this.options.runDistance
+            );
+            this.myte.move_toward_target();
+        }
+
+        this.options.current_duration--;
+        return this.options.current_duration <= 0;
+    }
 }
-
 // State machine for the fetch game stages
 const FetchStates = {
 	PICKUP: 'pickup',
@@ -219,26 +317,54 @@ const FetchStates = {
 
 // Action to play fetch with throwable objects
 class PlayFetchAction extends MyteAction {
-	constructor(myte, options) {
-		super(myte, {
-			throwable: options.throwable, // The object to throw
-			throwStrength: options.throwStrength || 10,
-			maxThrowDistance: options.maxThrowDistance || 300,
-			fetchState: FetchStates.PICKUP,
-			...options
-		});
+    static metadata = {
+        id: 'play_fetch',
+        label: 'Play Fetch',
+        category: 'play',
+        priority: 4,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Play fetch with a throwable object',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: 8,
+        defaultOptions: {
+            throwStrength: 10,
+            maxThrowDistance: 300,
+            fetchState: FetchStates.PICKUP,
+            arcHeight: 100,
+            pickupDistance: 10,
+            catchDistance: 10,
+            throwableOffset: { x: 0, y: -20 },
+            expressionType: 'excited',
+            expressionDuration: 500,
+            happyDuration: 500
+        }
+    };
 
-		this.throwPosition = null;
-		this.throwTarget = null;
-		this.throwProgress = 0;
-		this.arcHeight = 100; // Height of throw arc
-	}
+    static canPerform(selected, active) {
+        return active && selected instanceof MapObject && !active.queue.isCarrying();
+    }
 
-	start() {
-		super.start();
-		// Start with excitement expression
-		this.myte.queue.addExpression("excited", 500);
-	}
+    constructor(myte, options) {
+        super(myte, {
+            ...PlayFetchAction.metadata.defaultOptions,
+            ...options
+        });
+
+        this.throwPosition = null;
+        this.throwTarget = null;
+        this.throwProgress = 0;
+    }
+
+    start() {
+        super.start();
+        this.myte.queue.addExpression(
+            this.options.expressionType,
+            this.options.expressionDuration
+        );
+    }
 
 	update() {
 		switch (this.options.fetchState) {

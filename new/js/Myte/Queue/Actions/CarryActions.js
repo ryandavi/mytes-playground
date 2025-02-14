@@ -1,5 +1,19 @@
 // Action for picking up another Myte
 class CarryPickupAction extends MyteAction {
+    static metadata = {
+        id: 'carry_pickup',
+        label: 'Pick Up',
+        category: 'interactions',
+        priority: 2,
+        isMovementAction: true,
+        isInterruptible: false,
+        defaultDuration: 100,
+        description: 'Pick up another Myte',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: 2
+    };
+
     constructor(myte, options) {
         super(myte, options);
         this.targetObject = options.targetObject;
@@ -51,6 +65,19 @@ class CarryPickupAction extends MyteAction {
 
 // Action for carrying another Myte
 class CarryAction extends MyteAction {
+
+    static metadata = {
+        id: 'carry',
+        label: 'Carry',
+        category: 'interactions',
+        priority: 2,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: -1,
+        description: 'Carry another Myte around',
+        requiresTarget: true,
+        affectsMood: false
+    };
     constructor(myte, options) {
         super(myte, options);
         this.targetObject = options.targetObject;
@@ -85,6 +112,21 @@ class CarryAction extends MyteAction {
 
 // Action for being carried
 class BeingCarriedAction extends MyteAction {
+
+    static metadata = {
+        id: 'being_carried',
+        label: 'Being Carried',
+        category: 'passive',
+        priority: 1,
+        isMovementAction: false,
+        isInterruptible: false,
+        defaultDuration: -1,
+        description: 'Being carried by another Myte',
+        requiresTarget: false,
+        affectsMood: true,
+        moodEffect: 1
+    };
+
     update() {
         return false; // Continue until interrupted
     }
@@ -92,6 +134,20 @@ class BeingCarriedAction extends MyteAction {
 
 // Action for putting down a carried Myte
 class CarryPutdownAction extends MyteAction {
+
+    static metadata = {
+        id: 'carry_putdown',
+        label: 'Put Down',
+        category: 'interactions',
+        priority: 2,
+        isMovementAction: true,
+        isInterruptible: false,
+        defaultDuration: 100,
+        description: 'Put down a carried Myte',
+        requiresTarget: true,
+        affectsMood: false
+    };
+
     constructor(myte, options) {
         super(myte, options);
         this.targetObject = options.targetObject;
