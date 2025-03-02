@@ -14,26 +14,39 @@ class MyteAction {
         moodEffect: 0
     };
 
+
     constructor(myte, options = {}) {
         this.myte = myte;
-        this.options = {
-            duration: options.duration || this.constructor.metadata.defaultDuration,
-            current_duration: -1,
-            total_time: 0,
-            userInitiated: false,
-            ...options
-        };
+        this.duration = 0;
+        this.current_duration = -1;
+        this.total_time = 0;
+        this.userInitiated = false;
+        this.onComplete = null;
+
+        // Apply options and then apply defaults
+        Object.assign(this, options, {
+            duration: options.duration ?? this.constructor.metadata.defaultDuration,
+        });
 
         // Apply mood effects if configured
         if (this.constructor.metadata.affectsMood) {
-            this.myte.updateMood(this.constructor.metadata.moodEffect);
+            this.myte.stats.updateMood(this.constructor.metadata.moodEffect);
         }
     }
 
+    static getRequiredOptions(selected, active) {
+        // Return specific options needed for this action
+        return {};
+    }
+
+    static canPerform(selected, active) {
+        return false;
+    }
+
     start() {
-        if (this.options.duration > 0) {
-            if (this.options.current_duration === -1) {
-                this.options.current_duration = this.options.duration;
+        if (this.duration > 0) {
+            if (this.current_duration === -1) {
+                this.current_duration = this.duration;
             }
         }
     }
@@ -43,24 +56,12 @@ class MyteAction {
     }
 
     complete() {
-        if (this.options.onComplete) this.options.onComplete();
+        if (this.onComplete) this.onComplete();
         return true;
     }
 
-    isMovementAction() {
-        return this.constructor.metadata.isMovementAction;
-    }
-
-    isInterruptible() {
-        return this.constructor.metadata.isInterruptible;
-    }
-
-    static canPerform(selected, active) {
-        return true;
-    }
 }
 
-// Action for basic movement
 class MoveAction extends MyteAction {
     static metadata = {
         id: 'move',
@@ -76,29 +77,260 @@ class MoveAction extends MyteAction {
     };
 
     static canPerform(selected, active) {
-        return active && !active.queue.isCarrying();
+        return true; // active && !active.queue?.isCarrying();
     }
 
     constructor(myte, options) {
         super(myte, options);
-        if (!options.target?.[0]) {
-            throw new Error('MoveAction requires a target position');
+
+        if (!options?.target?.length) {
+            throw new Error('MoveAction requires at least one target position');
         }
-        this.target = options.target[0];
+
+        this.targets = options.target;
+        this.targetIndex = 0;
     }
 
     start() {
         super.start();
-        this.myte.setTarget(this.target.x, this.target.y);
+        this.setNextTarget();
         this.myte.reset();
     }
 
     update() {
         if (this.myte.is_at_target()) {
-            return true;
+            this.targetIndex++;
+            return !this.setNextTarget();
         }
         this.myte.move_toward_target();
         return false;
+    }
+
+    setNextTarget() {
+        if (this.targets[this.targetIndex]) {
+            const { x, y } = this.targets[this.targetIndex];
+            this.myte.setTarget(x, y);
+            return true;
+        }
+        return false;
+    }
+}
+
+class AStarMoveAction extends MyteAction {
+
+    static metadata = {
+        id: 'astar-move',
+        label: 'Move To (Astar)',
+        category: 'movement',
+        priority: 1,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Move to a specific location',
+        requiresTarget: true,
+        affectsMood: false
+    };
+
+    constructor(myte, options) {
+        super(myte, options);
+
+        // Target position (final destination)
+        this.finalTarget = options.target ? options.target[0] : null;
+
+        // Path properties
+        this.path = null;
+        this.currentPathIndex = 0;
+        this.currentTarget = null;
+
+        // Pathfinding properties
+        this.pathfinder = this.myte.parent.pathfinding;
+        this.maxPathRetries = options.maxPathRetries || 3;
+        this.pathRetries = 0;
+
+        // Movement tolerance
+        this.reachTargetTolerance = options.reachTargetTolerance || 5;
+
+        // Whether to recalculate path when straying too far
+        this.recalculateOnDeviation = options.recalculateOnDeviation !== false;
+        this.maxDeviationDistance = options.maxDeviationDistance || 50;
+
+        // Debug settings
+        this.debugMode = options.debugMode || false;
+    }
+
+    static canPerform(selected, active) {
+        return true; // active && !active.queue?.isCarrying();
+    }
+
+    start() {
+        super.start();
+
+        // If no target provided, cancel the action
+        if (!this.finalTarget) {
+            console.error("AStarMoveAction: No target provided");
+            return false;
+        }
+
+        // Calculate initial path and check validity
+        if (!this.calculatePath()) {
+            console.warn("AStarMoveAction: No valid path found");
+            return false;
+        }
+
+        // Set the first target point
+        this.updateCurrentTarget();
+
+        return true;
+    }
+
+    update() {
+        // If we don't have a path yet, attempt to calculate one
+        if (!this.path || this.path.length === 0) {
+            if (this.pathRetries >= this.maxPathRetries) {
+                console.warn("AStarMoveAction: Max path retries reached, cancelling action");
+                this.clearPathVisualization();
+                return true; // End the action
+            }
+
+            this.pathRetries++;
+            if (!this.calculatePath()) {
+                this.clearPathVisualization();
+                return true; // End the action if no path found
+            }
+        }
+
+        // Check if we've reached the current target point
+        if (this.hasReachedCurrentTarget()) {
+            // Move to the next point in the path
+            this.currentPathIndex++;
+
+            // If we've reached the end of the path, we're done
+            if (this.currentPathIndex >= this.path.length) {
+                return true; // Action complete
+            }
+
+            // Update to the next target
+            this.updateCurrentTarget();
+        }
+
+        // Check if we've deviated too far from the path
+        if (this.recalculateOnDeviation && this.hasDeviatedFromPath()) {
+            this.calculatePath();
+        }
+
+        // Move toward the current target
+        this.moveTowardCurrentTarget();
+
+        return false; // Action not complete yet
+    }
+
+    calculatePath() {
+        // Get current position and final target
+        const startX = this.myte.posX;
+        const startY = this.myte.posY;
+        const endX = this.finalTarget.x;
+        const endY = this.finalTarget.y;
+
+        // Calculate path using A* pathfinding
+        this.path = this.pathfinder.findPath(
+            startX, startY,
+            endX, endY,
+            this.myte.size.width, this.myte.size.height
+        );
+
+        // Reset the path index
+        this.currentPathIndex = 0;
+
+        // Check if a valid path was found
+        if (!this.path || this.path.length === 0) {
+            console.warn(`AStarMoveAction: Failed to find path from (${startX},${startY}) to (${endX},${endY})`);
+            return false;
+        }
+
+        // Visualize the path if in debug mode
+        this.visualizePath();
+
+        return true;
+    }
+
+    visualizePath() {
+        // Only visualize if debug mode is on and we have a valid path
+        if (this.debugMode && this.path && this.path.length > 0) {
+            const debugLayer = this.myte.parent.parent.layers.debug;
+            if (debugLayer) {
+                // Clear previous path visualization first
+                debugLayer.querySelectorAll('.path-node').forEach(node => node.remove());
+                // Visualize the new path
+                this.pathfinder.visualizePath(debugLayer, this.path);
+            }
+        }
+    }
+
+    updateCurrentTarget() {
+        if (this.path && this.currentPathIndex < this.path.length) {
+            this.currentTarget = this.path[this.currentPathIndex];
+            this.myte.setTarget(this.currentTarget.x, this.currentTarget.y);
+        }
+    }
+
+    hasReachedCurrentTarget() {
+        if (!this.currentTarget) return false;
+
+        const dx = this.myte.posX - this.currentTarget.x;
+        const dy = this.myte.posY - this.currentTarget.y;
+        const distanceSquared = dx * dx + dy * dy;
+
+        return distanceSquared <= (this.reachTargetTolerance * this.reachTargetTolerance);
+    }
+
+    hasDeviatedFromPath() {
+        if (!this.path || this.currentPathIndex >= this.path.length) return false;
+
+        // Find the nearest point on the remaining path
+        let minDistance = Number.MAX_VALUE;
+        let nearestPointIndex = this.currentPathIndex;
+
+        // Check distance to each upcoming point in the path
+        for (let i = this.currentPathIndex; i < this.path.length; i++) {
+            const pathPoint = this.path[i];
+            const dx = this.myte.posX - pathPoint.x;
+            const dy = this.myte.posY - pathPoint.y;
+            const distanceSquared = dx * dx + dy * dy;
+
+            if (distanceSquared < minDistance) {
+                minDistance = distanceSquared;
+                nearestPointIndex = i;
+            }
+        }
+
+        // If we're too far from the path, we need to recalculate
+        return Math.sqrt(minDistance) > this.maxDeviationDistance;
+    }
+
+    moveTowardCurrentTarget() {
+        if (!this.currentTarget) return;
+
+        // Standard move toward target
+        this.myte.move_toward_target();
+    }
+
+    complete() {
+        // Clean up path visualization
+        this.clearPathVisualization();
+        return true;
+    }
+
+    clearPathVisualization() {
+        if (this.debugMode) {
+            const debugLayer = this.myte.parent.parent.layers.debug;
+            if (debugLayer) {
+                debugLayer.querySelectorAll('.path-node').forEach(node => node.remove());
+            }
+        }
+    }
+
+    isMovementAction() {
+        return true;
     }
 }
 
@@ -120,11 +352,15 @@ class PositionableAction extends MyteAction {
 
     constructor(myte, options) {
         super(myte, options);
-        
+
         // Validate target if required
         if (this.constructor.metadata.requiresTarget && !options.target) {
             throw new Error(`${this.constructor.name} requires a target`);
         }
+    }
+
+    static canPerform(selected, active) {
+        return false;
     }
 
     getCanvasBounds() {
@@ -171,18 +407,21 @@ class PositionableAction extends MyteAction {
         };
     }
 
-    getTargetRect(targetObject) {
-        if (targetObject instanceof Myte) {
-            return targetObject.getOffsetRect();
-        } else if (targetObject instanceof MapObject) {
-            return this.myte.parent.getLocalOffset(targetObject.element);
+    getRect(target) {
+
+        if (target instanceof Myte) {
+            return target.getOffsetRect();
+        } else if (target instanceof MapObject) {
+            return this.myte.parent.getLocalOffset(target.element);
+        } else if (target instanceof Element) {
+            return this.myte.parent.getLocalOffset(target);
         } else {
-            return this.myte.parent.getLocalOffset(targetObject);
+            return this.myte.parent.getLocalOffset(target);
         }
     }
 
     getClosestSideHorizontal(destination_rect, myte_rect) {
-        return this.myte.posX + (myte_rect.width/2) < destination_rect.x + (destination_rect.height / 2) ? 'left' : 'right';
+        return this.myte.posX + (myte_rect.width / 2) < destination_rect.x + (destination_rect.height / 2) ? 'left' : 'right';
     }
 
     getClosestSideVertical(destination_rect, myte_rect) {
@@ -201,12 +440,14 @@ class PositionableAction extends MyteAction {
         }
     }
     calculatePosition(myteRect, destinationRect, horizontal = "center", vertical = "middle", insideHorizontal = false, insideVertical = false) {
-        const myteOffset = {
+        // this is so it appears to be within
+        let myteOffset = {
             left: (insideHorizontal ? -1 : 1) * 35,
             right: (insideHorizontal ? -1 : 1) * 35,
             top: (insideVertical ? -1 : 1) * 35,
             bottom: (insideVertical ? 1 : -1) * 35
         };
+
 
         const positions = {
             left: destinationRect.x - (insideHorizontal ? 0 : myteRect.width) + myteOffset.left,
@@ -217,14 +458,6 @@ class PositionableAction extends MyteAction {
             middle: destinationRect.y + (destinationRect.height / 2) - (myteRect.height / 2),
             bottom: destinationRect.y + destinationRect.height - (insideVertical ? myteRect.height : 0) + myteOffset.bottom
         };
-
-        // Handle special case where horizontal value should be assigned to y
-        if (!positions[horizontal] && typeof horizontal === 'number') {
-            return {
-                x: positions.center,
-                y: horizontal
-            };
-        }
 
         return {
             x: positions[horizontal] || positions.center,
@@ -253,11 +486,11 @@ class IdleAction extends MyteAction {
     }
 
     update() {
-        if (this.options.current_duration === -1) {
-            this.options.current_duration = this.options.duration;
+        if (this.current_duration === -1) {
+            this.current_duration = this.duration;
         }
-        this.options.current_duration--;
-        return this.options.current_duration <= 0;
+        this.current_duration--;
+        return this.current_duration <= 0;
     }
 }
 
@@ -284,19 +517,19 @@ class ExpressionAction extends MyteAction {
     constructor(myte, options) {
         super(myte, options);
         this.type = options.action_type;
-        this.options.repeat = options.repeat || 1;
+        this.repeat = options.repeat || 1;
     }
 
     update() {
-        this.options.current_duration--;
+        this.current_duration--;
 
-        if (this.options.current_duration <= 0) {
-            this.options.repeat--;
-            if (this.options.repeat <= 0) {
+        if (this.current_duration <= 0) {
+            this.repeat--;
+            if (this.repeat <= 0) {
                 // complete
                 return true;
             }
-            this.options.current_duration = this.options.duration;
+            this.current_duration = this.duration;
         }
         return false;
     }

@@ -2,37 +2,45 @@ class GameMap {
     constructor(parent, mapData = null) {
         this.parent = parent;
         this.mapData = mapData;
-        
+
         // Core properties
         this.name = mapData?.name || 'Default Map';
         this.dimensions = mapData?.dimensions || {
             width: 1000,
             height: 1000
         };
-        
+
         // Layer management
         this.layers = {
             background: parent.canvas.querySelector('.layer.background'),
             objects: parent.canvas.querySelector('.layer.foreground'),
-            overlay: parent.canvas.querySelector('.layer.overlay')
+            overlay: parent.canvas.querySelector('.layer.overlay'),
+            debug: parent.canvas.querySelector('.layer.debug')
         };
+
+        // Systems
+        this.zoneManager = new ZoneManager(this);
+        this.gridSystem = new GridSystem(this);
 
         // Map elements
         this.objects = [];
         this.zones = new Map();
         this.spawnPoints = new Map();
-        
-        // Systems
-        this.zoneManager = new ZoneManager(this);
-        this.pathfinding = new PathFindingSystem(32);
+
     }
 
     async initialize() {
         try {
+
+            // Set canvas dimensions
+            this.parent.canvas.style.width = `${this.dimensions.width}px`;
+            this.parent.canvas.style.height = `${this.dimensions.height}px`;
+
+
             // Set dimensions
             if (this.layers.objects) {
-                this.layers.objects.style.width = `${this.dimensions.width}px`;
-                this.layers.objects.style.height = `${this.dimensions.height}px`;
+                // this.layers.objects.style.width = `${this.dimensions.width}px`;
+                // this.layers.objects.style.height = `${this.dimensions.height}px`;
             }
 
             // Initialize background
@@ -46,6 +54,8 @@ class GameMap {
                     this.zoneManager.addZone(zoneData);
                 });
             }
+
+
 
             // Load spawn points
             if (this.mapData?.spawns) {
@@ -66,8 +76,64 @@ class GameMap {
                 this.addRandomObjects(5, ['MUSIC_BOX']);
             }
 
-            // Initialize pathfinding
-            this.pathfinding.init();
+            
+
+            // Create a ball
+            const ball = MapObjectFactory.create('BALL', 'red_ball', 100, 100);
+
+            // Create a patrol guard with a specific path
+            const guard = MapObjectFactory.create('PATROL_GUARD', 'guard', 200, 200, {
+                patrolPoints: [
+                    { x: 200, y: 200 },
+                    { x: 400, y: 200 },
+                    { x: 400, y: 400 },
+                    { x: 200, y: 400 }
+                ]
+            });
+
+            // Create a butterfly
+            const butterfly = MapObjectFactory.create('BUTTERFLY', 'blue_butterfly', 300, 300);
+
+            // Create a crop
+            const tomato = MapObjectFactory.create('CROP', 'tomato', 250, 250);
+
+            this.gridSystem.addObject(tomato);
+
+            // Create a chest
+            const chest = MapObjectFactory.create('TREASURE_CHEST', 'wooden_chest', 200, 200, {
+                items: [
+                    { type: 'COIN', variant: 'gold' },
+                    { type: 'HEALTH', variant: 'potion' }
+                ]
+            });
+
+            // Create a golden chest
+            const goldenChest = this.addObject('TREASURE_CHEST', 'golden_chest', 400, 300, {
+                items: [
+                    { type: 'COIN', variant: 'gold' },
+                    { type: 'COIN', variant: 'gold' },
+                    { type: 'EQUIPMENT', variant: 'sword' },
+                    { type: 'COIN', variant: 'gold' },
+                    { type: 'COIN', variant: 'gold' },
+                    { type: 'EQUIPMENT', variant: 'sword' }
+                ]
+            });
+
+            // Add objects to the map
+            this.add(butterfly);
+            this.add(ball);
+            this.add(guard);
+            this.add(goldenChest);
+            this.add(tomato);
+            this.add(chest);
+
+
+            // Then to find a path:
+            const path = this.gridSystem.pathfinder.findPath(192/2, 192/2, 500, 500, 192, 192);
+            if (path) {
+                console.log('Path found:', path);
+                this.gridSystem.pathfinder.visualizePath(this.layers.debug, path);
+            }
 
             return true;
         } catch (error) {
@@ -99,21 +165,26 @@ class GameMap {
         }
     }
 
-    addObject(type, variant, x, y, properties = {}) {
-        const object = MapObjectFactory.create(type, variant, x, y);
+    add(object, properties = {}) {
         if (object) {
             // Apply any custom properties
             Object.assign(object, properties);
-            
+
             // Add to objects array
             this.objects.push(object);
-            
+
             // Render in the objects layer
             if (this.layers.objects) {
                 object.render(this.layers.objects, this.parent);
             }
         }
         return object;
+    }
+
+
+    addObject(type, variant, x, y, properties = {}) {
+        const object = MapObjectFactory.create(type, variant, x, y);
+        return this.add(object, properties);
     }
 
     addRandomObjects(count, types = ['GRASS']) {
@@ -127,7 +198,7 @@ class GameMap {
             const type = types[Math.floor(Math.random() * types.length)];
             const config = MAP_OBJECT_TYPES[type];
             const variant = config.variants[Math.floor(Math.random() * config.variants.length)];
-            
+
             const x = Math.floor(Math.random() * maxX);
             const y = Math.floor(Math.random() * maxY);
 
@@ -161,7 +232,7 @@ class GameMap {
 
     isPositionValid(x, y) {
         // Check boundaries
-        if (x < 0 || x > this.dimensions.width || 
+        if (x < 0 || x > this.dimensions.width ||
             y < 0 || y > this.dimensions.height) {
             return false;
         }
@@ -170,18 +241,24 @@ class GameMap {
         const nearbyObjects = this.getObjectsInRadius(x, y, 50);
         return !nearbyObjects.some(obj => !obj.config.walkable);
     }
-
-    findPath(startX, startY, endX, endY) {
-        return this.pathfinding.findPath(startX, startY, endX, endY);
-    }
-
     removeInactiveObjects() {
         this.objects = this.objects.filter(obj => obj.active);
     }
 
     update(deltaTime) {
         // Update all active objects
+
         this.objects.forEach(object => {
+            if (object.update) {
+                object.update(this.parent);
+            }
+        });
+
+        // Update culling based on camera
+        this.gridSystem.updateCulling(this.parent.camera);
+
+        // Only update visible objects
+        this.gridSystem.activeObjects.forEach(object => {
             if (object.update) {
                 object.update(deltaTime);
             }

@@ -36,7 +36,7 @@ class RunAwayAction extends MyteAction {
     }
 
 	update() {
-		const target = this.options.targetObject;
+		const target = this.targetObject;
 		if (!target) return true;
 
 		// Calculate distance to target
@@ -45,13 +45,13 @@ class RunAwayAction extends MyteAction {
 		const distance = Math.sqrt(dx * dx + dy * dy);
 
 		// Only run if within panic distance
-		if (distance < this.options.panicDistance) {
+		if (distance < this.panicDistance) {
 			// Calculate angle away from target
 			const angle = Math.atan2(dy, dx) + Math.PI;
 
 			// Set target point away from scary object
-			const runX = this.myte.posX + Math.cos(angle) * this.options.runDistance;
-			const runY = this.myte.posY + Math.sin(angle) * this.options.runDistance;
+			const runX = this.myte.posX + Math.cos(angle) * this.runDistance;
+			const runY = this.myte.posY + Math.sin(angle) * this.runDistance;
 
 			// Ensure we don't run off screen
 			const boundedX = Math.max(0, Math.min(runX, this.myte.parent.getMaxDimensions().width));
@@ -70,21 +70,14 @@ class RunAwayAction extends MyteAction {
 		this.myte.move_toward_target();
 
 		// Check duration if set
-		if (this.options.duration > 0) {
-			this.options.current_duration--;
-			return this.options.current_duration <= 0;
+		if (this.duration > 0) {
+			this.current_duration--;
+			return this.current_duration <= 0;
 		}
 
 		return false; // Continue running indefinitely if no duration set
 	}
 
-	isMovementAction() {
-		return false;
-	}
-
-	isInterruptible() {
-		return true;
-	}
 }
 
 // Hide behind an object
@@ -117,7 +110,7 @@ class HideAction extends MyteAction {
         };
         super(myte, defaultOptions);
         
-        this.peekTimer = this.options.peekInterval;
+        this.peekTimer = this.peekInterval;
         this.isPeeking = false;
     }
 
@@ -128,8 +121,8 @@ class HideAction extends MyteAction {
     }
 
 	update() {
-		const hideTarget = this.options.hideTarget;
-		const scaryObject = this.options.scaryObject;
+		const hideTarget = this.hideTarget;
+		const scaryObject = this.scaryObject;
 
 		if (!hideTarget || !scaryObject) return true;
 
@@ -150,18 +143,15 @@ class HideAction extends MyteAction {
 		this.peekTimer -= 16;
 		if (this.peekTimer <= 0) {
 			this.isPeeking = !this.isPeeking;
-			this.peekTimer = this.options.peekInterval;
+			this.peekTimer = this.peekInterval;
 
 			if (this.isPeeking) {
 				this.myte.queue.addExpression("peek", 500);
 			}
 		}
 
-		this.options.current_duration--;
-		return this.options.current_duration <= 0;
+		this.current_duration--;
+		return this.current_duration <= 0;
 	}
 
-	isMovementAction() {
-		return true;
-	}
 }

@@ -1,0 +1,170 @@
+{
+	"BASE_ACTION_CONFIG": {
+	  "isMovementAction": false,
+	  "isInterruptible": false,
+	  "defaultDuration": 200,
+	  "requiresTarget": false,
+	  "affectsMood": false,
+	  "category": "basic",
+	  "priority": 0,
+	  "cooldown": 0,
+	  "energyCost": 0,
+	  "defaultOptions": {}
+	},
+  
+	"ACTIONS": {
+	  "GO_TO_OBJECT": {
+		"extends": "BASE_ACTION_CONFIG",
+		"id": "go_to_object",
+		"label": "Go To",
+		"category": "interactions",
+		"priority": 1,
+		"isMovementAction": true,
+		"isInterruptible": true,
+		"defaultDuration": 0,
+		"description": "Move to a specific object or Myte",
+		"requiresTarget": true,
+		"affectsMood": false,
+		"defaultOptions": {
+		  "targetPosition": {
+			"vertical": "bottom",
+			"insideHorizontal": false,
+			"insideVertical": true
+		  }
+		}
+	  },
+  
+	  "FOLLOW_OBJECT": {
+		"extends": "BASE_ACTION_CONFIG",
+		"id": "follow_object",
+		"label": "Follow",
+		"category": "interactions",
+		"priority": 2,
+		"isMovementAction": true,
+		"isInterruptible": true,
+		"defaultDuration": -1,
+		"description": "Continuously follow a target",
+		"requiresTarget": true,
+		"affectsMood": false,
+		"defaultOptions": {
+		  "followDistance": 50,
+		  "updateFrequency": 100
+		}
+	  },
+  
+	  "DANCE": {
+		"extends": "BASE_ACTION_CONFIG",
+		"id": "dance",
+		"label": "Dance",
+		"category": "expressions",
+		"priority": 3,
+		"isMovementAction": true,
+		"defaultDuration": 2000,
+		"description": "Perform a dance animation",
+		"affectsMood": true,
+		"moodEffect": 10,
+		"defaultOptions": {
+		  "danceSteps": [
+			{ "x": 0, "y": -20 },
+			{ "x": 20, "y": 0 },
+			{ "x": 0, "y": 20 },
+			{ "x": -20, "y": 0 }
+		  ],
+		  "stepDuration": 250
+		}
+	  },
+  
+	  "CARRY": {
+		"extends": "BASE_ACTION_CONFIG",
+		"id": "carry",
+		"label": "Carry",
+		"category": "interactions",
+		"priority": 4,
+		"isMovementAction": true,
+		"isInterruptible": true,
+		"defaultDuration": -1,
+		"description": "Pick up and carry another Myte",
+		"requiresTarget": true,
+		"affectsMood": true,
+		"moodEffect": 5,
+		"defaultOptions": {
+		  "carryOffset": { "x": 0, "y": -45 }
+		}
+	  },
+  
+	  "SLEEP": {
+		"extends": "BASE_ACTION_CONFIG",
+		"id": "sleep",
+		"label": "Sleep",
+		"category": "state",
+		"priority": 2,
+		"defaultDuration": 5000,
+		"description": "Take a nap to recover energy",
+		"affectsMood": true,
+		"moodEffect": 15,
+		"energyRecovery": 30,
+		"defaultOptions": {
+		  "bobHeight": 5,
+		  "bobFrequency": 0.05,
+		  "zEffectInterval": 1000
+		}
+	  },
+  
+	  "INSPECT": {
+		"extends": "BASE_ACTION_CONFIG",
+		"id": "inspect",
+		"label": "Inspect",
+		"category": "interactions",
+		"priority": 2,
+		"isMovementAction": true,
+		"defaultDuration": 3000,
+		"description": "Carefully examine an object",
+		"requiresTarget": true,
+		"affectsMood": true,
+		"moodEffect": 5,
+		"defaultOptions": {
+		  "inspectRadius": 40,
+		  "inspectPoints": 4,
+		  "pointDuration": 500
+		}
+	  },
+  
+	  "RUN_AWAY": {
+		"extends": "BASE_ACTION_CONFIG",
+		"id": "run_away",
+		"label": "Run Away",
+		"category": "reactive",
+		"priority": 5,
+		"isMovementAction": true,
+		"isInterruptible": true,
+		"defaultDuration": -1,
+		"description": "Flee from a scary object or Myte",
+		"requiresTarget": true,
+		"affectsMood": true,
+		"moodEffect": -10,
+		"defaultOptions": {
+		  "panicDistance": 400,
+		  "runDistance": 350,
+		  "panicExpressionChance": 0.02
+		}
+	  },
+  
+	  "PLAY_TAG": {
+		"extends": "BASE_ACTION_CONFIG",
+		"id": "play_tag",
+		"label": "Play Tag",
+		"category": "play",
+		"priority": 3,
+		"isMovementAction": true,
+		"defaultDuration": 5000,
+		"description": "Play a game of tag with another Myte",
+		"requiresTarget": true,
+		"affectsMood": true,
+		"moodEffect": 20,
+		"defaultOptions": {
+		  "catchDistance": 30,
+		  "tagCooldown": 1000
+		}
+	  }
+	}
+  }

@@ -216,7 +216,7 @@ class StateMachine {
 			},
 			[StateTypes.SLIDE_DOWN]: {
 				check: (context) => context.is_doing_action('slide_down') &&
-					context.queue.getCurrentAction().current_target_index > 0,
+					context.queue.getCurrentAction().currentTargetIndex > 0,
 				getState: () => 'slide_down'
 			},
 

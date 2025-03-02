@@ -8,57 +8,55 @@ class ContainerManager {
         this.canvas = this.element.querySelector('.canvas');
         this.activeMyte = null;
         this.camera = null;
-        
+
         // Systems and managers
         this.inputHandler = new ContainerInputManager(this);
         this.ui = new UserInterface(this);
-        this.gameMap = new GameMap(this);
-
-        this.pathfinding = new PathFindingSystem(32);
-
         this.timeManager = new GameTime();  // Add time manager here
 
+        // map
+        this.gameMap;
         this.particleSystem = new ParticleSystem(this); // Add this line
-		
-        this.inventory = new Inventory(this, document.getElementById('inventory'));
 
-		console.log(this.core.user.items);
+        // inventory
+        this.inventory = new Inventory(this, document.getElementById('inventory'));
         this.inventory.loadItems(this.core.user.items);
     }
 
 
 
-// ContainerManager.js - Modified init() method
-async init() {
-    try {
-        // Load map data
-        const response = await fetch('data/maps/home.json');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const mapData = await response.json();
+    // ContainerManager.js - Modified init() method
+    async init() {
+        try {
+            // Load map data
+            const response = await fetch('data/maps/home.json');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const mapData = await response.json();
 
-        // Initialize game map with the loaded data
-        this.gameMap = new GameMap(this, mapData);
-        await this.gameMap.initialize();
 
-        // Initialize other components that depend on the map
-        this.setupMytes();
-        this.inputHandler.init();
-        this.camera = new Camera(this, this.canvas, this.element);
-        
-        // Initialize UI and other subsystems
-        this.ui.init();
-        this.pathfinding.init();
 
-        // Set up inventory
-        this.core.user.setInventory(this.inventory);
+            // Initialize other components that depend on the map
+            this.setupMytes();
+            this.inputHandler.init();
+            this.camera = new Camera(this, this.canvas, this.element);
 
-        return true;
-    } catch (error) {
-        console.error('Error initializing container:', error);
+            // Initialize game map with the loaded data
+            this.gameMap = new GameMap(this, mapData);
+            await this.gameMap.initialize();
 
-        return false;
+            // Initialize UI and other subsystems
+            this.ui.init();
+
+            // Set up inventory
+            this.core.user.setInventory(this.inventory);
+
+            return true;
+        } catch (error) {
+            console.error('Error initializing container:', error);
+
+            return false;
+        }
     }
-}
 
     // Input state accessors that delegate to inputHandler
     getLocalMouse(element = null) {
@@ -134,13 +132,13 @@ async init() {
         let rect = el.getBoundingClientRect();
         var _x = window.scrollX;
         var _y = window.scrollY;
-        
+
         while (el && !isNaN(el.offsetLeft) && !isNaN(el.offsetTop)) {
             _x += el.offsetLeft - el.scrollLeft;
             _y += el.offsetTop - el.scrollTop;
             el = el.offsetParent;
         }
-        
+
         return {
             top: _y,
             left: _x,
@@ -174,14 +172,14 @@ async init() {
 
     getCanvasRect() {
         let rect = this.getRect(this.canvas);
-        var dimensions = Utility.findLargestChildDimensions(this.canvas);
+        // var dimensions = Utility.findLargestChildDimensions(this.canvas);
 
-        return {
+        return rect; /* {
             left: rect.left,
             top: rect.top,
             width: dimensions.width,
             height: dimensions.height
-        };
+        }; */
     }
 
     getVisibleElements() {
@@ -263,7 +261,7 @@ async init() {
         if (next === null) {
             this.camera.setMode(CAMERA_FOLLOW_MODES.CURSOR_EDGE);
         }
-        
+
         this.setActiveMyte(next);
     }
 
@@ -296,7 +294,7 @@ async init() {
         listContainer.querySelectorAll('.myte-thumbnail').forEach(thumbnail => {
             thumbnail.classList.remove('active');
         });
-        
+
         if (myte) {
             listContainer.querySelector(`[data-myte-id="${myte.id}"]`).classList.add('active');
         }
@@ -326,9 +324,7 @@ async init() {
     }
 
     tickUpdate(tickDelta) {
-
     }
-
 
     dispose() {
         this.mytes.forEach(myte => myte.dispose());

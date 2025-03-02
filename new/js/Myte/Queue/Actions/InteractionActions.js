@@ -13,44 +13,54 @@ class GoToObjectAction extends PositionableAction {
         requiresTarget: true,
         affectsMood: false,
         defaultOptions: {
-            vertical: 'bottom',
-            insideHorizontal: false,
-            insideVertical: true
+			targetPosition: {
+				vertical: 'bottom',
+				insideHorizontal: false,
+				insideVertical: true
+			}
         }
     };
+
+	targetPos = null;
+
+    constructor(myte, options) {
+        super(myte, {
+            ...GoToObjectAction.metadata.defaultOptions,
+            ...options
+        });
+    }
 
     static canPerform(selected, active) {
         return active && selected && !active.queue.isCarrying();
     }
 
-    constructor(myte, options) {
-        super(myte, {
-            ...GoToObjectAction.metadata.defaultOptions,
-            duration: GoToObjectAction.metadata.defaultDuration,
-            ...options
-        });
-        this.targetObject = options.targetObject;
-    }
+	static getRequiredOptions(selected, active) {
+		return {
+			target: selected
+		};
+	}
 
-    update() {
-        const targetRect = this.getTargetRect(this.targetObject);
+
+	start(){
+		const targetRect = this.getRect(this.target);
         const myteRect = this.myte.getRect();
         let horizontal = this.getClosestSideHorizontal(targetRect, myteRect);
         let targetPos = this.calculatePosition(
             myteRect, 
             targetRect, 
             horizontal, 
-            this.options.vertical, 
-            this.options.insideHorizontal, 
-            this.options.insideVertical
+            this.targetPosition.vertical, 
+            this.targetPosition.insideHorizontal, 
+            this.targetPosition.insideVertical
         );
 
         const adjusted = this.adjustPositionToBounds(targetPos, myteRect, targetRect);
-        targetPos = adjusted.position;
+        this.targetPos = adjusted.position;
+	}
 
-        this.myte.setTarget(targetPos.x, targetPos.y);
+    update() {
+        this.myte.setTarget(this.targetPos.x, this.targetPos.y);
         this.myte.move_toward_target();
-
         return this.myte.is_at_target();
     }
 }
@@ -91,17 +101,17 @@ class InspectAction extends PositionableAction {
         
         this.inspectPoints = this.generateInspectPoints();
         this.currentPoint = 0;
-        this.pointTimer = this.options.pointDuration;
+        this.pointTimer = this.pointDuration;
     }
 
     generateInspectPoints() {
-        let targetRect = this.getTargetRect(this.options.target);
+        let targetRect = this.getRect(this.target);
         const points = [];
         const myteRect = this.myte.getRect();
 
-        for (let i = 0; i < this.options.numPoints; i++) {
+        for (let i = 0; i < this.numPoints; i++) {
             const horizontal = i % 2 === 0 ? 'left' : 'right';
-            const vertical = i < this.options.numPoints/2 ? 'top' : 'bottom';
+            const vertical = i < this.numPoints/2 ? 'top' : 'bottom';
             const pos = this.calculatePosition(myteRect, targetRect, horizontal, vertical, false, false);
             points.push(pos);
         }
@@ -112,25 +122,28 @@ class InspectAction extends PositionableAction {
         this.pointTimer -= 16;
         if (this.pointTimer <= 0) {
             this.currentPoint = (this.currentPoint + 1) % this.inspectPoints.length;
-            this.pointTimer = this.options.pointDuration;
+            this.pointTimer = this.pointDuration;
+
+			/*
             this.myte.queue.addExpression(
-                this.options.expressionType,
-                this.options.expressionDuration
+                this.expressionType,
+                this.expressionDuration
             );
+			*/
         }
 
         const point = this.inspectPoints[this.currentPoint];
         this.myte.setTarget(point.x, point.y);
         this.myte.move_toward_target();
 
-        this.options.current_duration--;
-        return this.options.current_duration <= 0;
+        this.current_duration--;
+        return this.current_duration <= 0;
     }
 }
 
 
 // Eat element action
-class EatElementAction extends MyteAction {
+class EatElementAction extends GoToObjectAction {
     static metadata = {
         id: 'eat_element',
         label: 'Eat',
@@ -142,39 +155,24 @@ class EatElementAction extends MyteAction {
         description: 'Consume an edible object',
         requiresTarget: true,
         affectsMood: true,
-        moodEffect: 5
+        moodEffect: 5,
+        defaultOptions: {
+			targetPosition: {
+				vertical: 'bottom',
+				insideHorizontal: false,
+				insideVertical: true
+			}
+        }
     };
 
     static canPerform(selected, active) {
         return active && selected instanceof MapObject && !active.queue.isCarrying();
     }
 
-    constructor(myte, options) {
-        super(myte, {
-            duration: EatElementAction.metadata.defaultDuration,
-            ...options
-        });
-        this.target = options.target[0];
-    }
-
-    start() {
-        super.start();
-        this.myte.setTarget(this.target.x, this.target.y);
-        this.myte.reset();
-    }
-
-    update() {
-        if (this.myte.is_at_target()) {
-            return true;
-        }
-        this.myte.move_toward_target();
-        return false;
-    }
-
     complete() {
         super.complete();
-        if (this.options.mapObject) {
-            this.options.mapObject.remove();
+        if (this.mapObject) {
+            this.mapObject.remove();
         }
     }
 }
@@ -220,20 +218,20 @@ class ShowAffectionAction extends MyteAction {
     start() {
         super.start();
         this.myte.queue.addExpression(
-            this.options.expressionType,
-            this.options.expressionDuration,
-            this.options.expressionRepeat
+            this.expressionType,
+            this.expressionDuration,
+            this.expressionRepeat
         );
     }
 
     update() {
         this.emitTimer -= 16;
         if (this.emitTimer <= 0) {
-            this.emitTimer = this.options.emitDelay;
+            this.emitTimer = this.emitDelay;
         }
 
-        this.options.current_duration--;
-        return this.options.current_duration <= 0;
+        this.current_duration--;
+        return this.current_duration <= 0;
     }
 }
 
@@ -270,11 +268,11 @@ class PlayTagAction extends PositionableAction {
             duration: PlayTagAction.metadata.defaultDuration,
             ...options
         });
-        this.isIt = this.options.isIt;
+        this.isIt = this.isIt;
     }
 
     update() {
-        const target = this.options.targetMyte;
+        const target = this.targetMyte;
         if (!target) return true;
 
         const dx = target.posX - this.myte.posX;
@@ -285,26 +283,26 @@ class PlayTagAction extends PositionableAction {
             this.myte.setTarget(target.posX, target.posY);
             this.myte.move_toward_target();
 
-            if (distance < this.options.catchDistance) {
+            if (distance < this.catchDistance) {
                 this.isIt = false;
                 target.queue.add('play_tag', {
                     targetMyte: this.myte,
                     isIt: true,
-                    duration: this.options.current_duration
+                    duration: this.current_duration
                 });
                 return true;
             }
         } else {
             const angle = Math.atan2(dy, dx) + Math.PI;
             this.myte.setTarget(
-                this.myte.posX + Math.cos(angle) * this.options.runDistance,
-                this.myte.posY + Math.sin(angle) * this.options.runDistance
+                this.myte.posX + Math.cos(angle) * this.runDistance,
+                this.myte.posY + Math.sin(angle) * this.runDistance
             );
             this.myte.move_toward_target();
         }
 
-        this.options.current_duration--;
-        return this.options.current_duration <= 0;
+        this.current_duration--;
+        return this.current_duration <= 0;
     }
 }
 // State machine for the fetch game stages
@@ -361,13 +359,13 @@ class PlayFetchAction extends MyteAction {
     start() {
         super.start();
         this.myte.queue.addExpression(
-            this.options.expressionType,
-            this.options.expressionDuration
+            this.expressionType,
+            this.expressionDuration
         );
     }
 
 	update() {
-		switch (this.options.fetchState) {
+		switch (this.fetchState) {
 			case FetchStates.PICKUP:
 				return this.handlePickup();
 			case FetchStates.THROW:
@@ -382,15 +380,15 @@ class PlayFetchAction extends MyteAction {
 	}
 
 	handlePickup() {
-		if (!this.options.throwable) return true;
+		if (!this.throwable) return true;
 
 		// Move to throwable
-		const dx = this.options.throwable.posX - this.myte.posX;
-		const dy = this.options.throwable.posY - this.myte.posY;
+		const dx = this.throwable.posX - this.myte.posX;
+		const dy = this.throwable.posY - this.myte.posY;
 		const distance = Math.sqrt(dx * dx + dy * dy);
 
 		if (distance > 10) {
-			this.myte.setTarget(this.options.throwable.posX, this.options.throwable.posY);
+			this.myte.setTarget(this.throwable.posX, this.throwable.posY);
 			this.myte.move_toward_target();
 			return false;
 		}
@@ -403,22 +401,22 @@ class PlayFetchAction extends MyteAction {
 
 		// Calculate throw target based on mouse position or random direction
 		const angle = Math.random() * Math.PI * 2;
-		const throwDistance = Math.random() * this.options.maxThrowDistance;
+		const throwDistance = Math.random() * this.maxThrowDistance;
 		this.throwTarget = {
 			x: this.throwPosition.x + Math.cos(angle) * throwDistance,
 			y: this.throwPosition.y + Math.sin(angle) * throwDistance
 		};
 
 		this.throwProgress = 0;
-		this.options.fetchState = FetchStates.THROW;
+		this.fetchState = FetchStates.THROW;
 		return false;
 	}
 
 	handleThrow() {
-		this.throwProgress += this.options.throwStrength / 100;
+		this.throwProgress += this.throwStrength / 100;
 
 		if (this.throwProgress >= 1) {
-			this.options.fetchState = FetchStates.CHASE;
+			this.fetchState = FetchStates.CHASE;
 			return false;
 		}
 
@@ -428,16 +426,16 @@ class PlayFetchAction extends MyteAction {
 			- Math.sin(this.throwProgress * Math.PI) * this.arcHeight;
 
 		// Update throwable position
-		if (this.options.throwable) {
-			this.options.throwable.setPosition(x, y);
-			this.options.throwable.setSpritePosition(x, y);
+		if (this.throwable) {
+			this.throwable.setPosition(x, y);
+			this.throwable.setSpritePosition(x, y);
 		}
 
 		return false;
 	}
 
 	handleChase() {
-		if (!this.options.throwable) return true;
+		if (!this.throwable) return true;
 
 		// Chase the thrown object
 		this.myte.setTarget(this.throwTarget.x, this.throwTarget.y);
@@ -452,7 +450,7 @@ class PlayFetchAction extends MyteAction {
 		if (distance < 10) {
 			// Show happy expression
 			this.myte.queue.addExpression("happy", 500);
-			this.options.fetchState = FetchStates.RETURN;
+			this.fetchState = FetchStates.RETURN;
 		}
 
 		return false;
@@ -464,13 +462,13 @@ class PlayFetchAction extends MyteAction {
 		this.myte.move_toward_target();
 
 		// Move throwable with Myte
-		if (this.options.throwable) {
+		if (this.throwable) {
 			const offset = { x: 0, y: -20 };
-			this.options.throwable.setPosition(
+			this.throwable.setPosition(
 				this.myte.posX + offset.x,
 				this.myte.posY + offset.y
 			);
-			this.options.throwable.setSpritePosition(
+			this.throwable.setSpritePosition(
 				this.myte.posX + offset.x,
 				this.myte.posY + offset.y
 			);
@@ -480,13 +478,10 @@ class PlayFetchAction extends MyteAction {
 		if (this.myte.is_at_target()) {
 			// Start over
 			this.throwProgress = 0;
-			this.options.fetchState = FetchStates.THROW;
+			this.fetchState = FetchStates.THROW;
 		}
 
 		return false;
 	}
 
-	isMovementAction() {
-		return true;
-	}
 }

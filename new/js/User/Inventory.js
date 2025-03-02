@@ -315,7 +315,7 @@ class Inventory {
         });
 
         // Apply mood boost
-        myte.updateMood(itemConfig.moodBoost);
+        myte.stats.updateMood(itemConfig.moodBoost);
 
         // Emit particles or other visual effects if system exists
         if (this.parent.particleSystem) {

@@ -5,9 +5,10 @@
   --debug-color-map: rgba(255, 255, 235, 0.95);
   --debug-color-camera: rgba(255, 235, 255, 0.95);
   --debug-color-myte: rgba(235, 255, 255, 0.95);
+  --debug-color-myte-stats: rgba(235, 255, 241, 0.95);
   margin-left: 10px;
   line-height: 1em;
-  font-size: 90%;
+  font-size: 0.8em;
   position: fixed;
   display: inline-block;
   height: -moz-fit-content;
@@ -27,7 +28,6 @@
   margin-top: 4px;
 }
 .debugMenu .debug-group h3 {
-  font-size: 0.9em;
   margin: 0 0 4px 0;
   padding-bottom: 2px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
@@ -50,6 +50,9 @@
 .debugMenu .debug-group.myte {
   background-color: var(--debug-color-myte);
 }
+.debugMenu .debug-group.myte.stats {
+  background-color: var(--debug-color-myte-stats);
+}
 
 .queueMenu {
   visibility: hidden;
@@ -61,17 +64,15 @@
   right: 0;
   top: 50%;
   transform: translate(0%, -50%);
-  background-color: white;
   z-index: 1000;
   width: 300px;
-  padding: 8px;
   font-size: 0.9em;
 }
 .queueMenu:not(:empty) {
   display: inline-block;
 }
 .queueMenu .queue-item {
-  background-color: rgba(255, 255, 255, 0.95);
+  background-color: rgb(255, 255, 255);
   border-radius: 4px;
   transition: background-color 0.2s;
   padding: var(--padding);
@@ -175,7 +176,7 @@
   background: rgba(0, 128, 0, 0.2);
 }
 .queueMenu .queue-item.current {
-  background-color: rgba(235, 255, 235, 0.95);
+  background-color: rgb(235, 255, 235);
 }
 .queueMenu .queue-item.current .content {
   font-weight: 500;

@@ -8,36 +8,36 @@ const BASE_OBJECT_CONFIG = {
         width: 64,
         height: 64
     },
-    
+
     // Physics & Collision
-    walkable: true,           // Can be walked over
+    walkable: false,           // Can be walked over
     collision: false,         // Has collision detection
     collisionRadius: 32,      // Collision detection radius
-    
+
     // Interaction
     interactionType: null,    // Type of interaction (mood_boost, dance, consume, etc)
     interactionRadius: 400,   // Distance for interaction
     interactionCooldown: 5000,// Time between interactions
-    
+
     // State
     canToggle: false,        // Can be turned on/off
     default: 'default',      // Default state
     states: ['default'],     // Possible states
-    
+
     // Animation
     animates: false,         // Has animations
     frameRate: 100,          // MS between frames
-    
+
     // Effects
     particleEffects: false,  // Emits particles
     lightEmission: false,    // Emits light
     soundEffects: false,     // Makes sounds
-    
+
     // Gameplay
     lootable: false,        // Can drop items
     consumable: false,      // Can be consumed
     storable: false,        // Can be stored in inventory
-    
+
     // Persistence
     saveable: false,        // State persists between sessions
     respawns: false,        // Respawns after removal
@@ -274,7 +274,7 @@ const MAP_OBJECT_TYPES = {
         ...BASE_OBJECT_CONFIG,
         variants: ['blue_moon', 'evening_star', 'night_whisper'],
         default: 'closed',
-        
+
         dayNightConfig: {
             openTime: '18:00',    // 6 PM
             closeTime: '06:00',   // 6 AM
@@ -312,13 +312,13 @@ const MAP_OBJECT_TYPES = {
         }
     },
 
-    CROP_PLANT: {
+    CROP: {
         ...BASE_OBJECT_CONFIG,
         variants: ['tomato', 'carrot', 'wheat', 'berry'],
         category: 'crop',
         interactionType: 'tend',
         renderType: 'animated',
-        walkable: true,
+        walkable: false,
         collision: false,
         scale: 1,
         renderPriority: 2,
@@ -357,29 +357,29 @@ const MAP_OBJECT_TYPES = {
             default: 'seed',
             animations: {
                 // Growth stages
-                seed: { 
-                    loop: false, 
-                    frames: [0] 
+                seed: {
+                    loop: false,
+                    frames: [0]
                 },
-                sprout: { 
-                    loop: true, 
-                    frames: [1] 
+                sprout: {
+                    loop: true,
+                    frames: [1]
                 },
-                growing: { 
-                    loop: true, 
-                    frames: [2] 
+                growing: {
+                    loop: true,
+                    frames: [2]
                 },
-                flowering: { 
-                    loop: true, 
-                    frames: [3] 
+                flowering: {
+                    loop: true,
+                    frames: [3]
                 },
-                mature: { 
-                    loop: true, 
-                    frames: [4] 
+                mature: {
+                    loop: true,
+                    frames: [4]
                 },
-                harvest: { 
-                    loop: false, 
-                    frames: [4] 
+                harvest: {
+                    loop: false,
+                    frames: [4]
                 }
             }
         }
@@ -454,40 +454,54 @@ const MAP_OBJECT_TYPES = {
                 dormant: { loop: false, frames: [15] }
             }
         }
+    },
+
+    BALL: {
+        category: 'moving',
+        variants: ['red_ball', 'blue_ball'],
+        renderType: 'single',
+        walkable: true,
+        collision: false,
+        scale: 1,
+        renderPriority: 2,
+        speed: 3,
+        friction: 0.95,
+        triggerRadius: 192/2,
+        pushForce: 5
+    },
+
+    PATROL_GUARD: {
+        category: 'moving',
+        variants: ['guard'],
+        renderType: 'animated',
+        walkable: false,
+        collision: true,
+        scale: 1,
+        renderPriority: 2,
+        speed: 2,
+        waitTime: 1000
+    },
+
+    BUTTERFLY: {
+        category: 'moving',
+        variants: ['blue_butterfly', 'yellow_butterfly'],
+        renderType: 'animated',
+        walkable: true,
+        collision: false,
+        scale: 1,
+        renderPriority: 3,
+        speed: 1.5,
+        wanderRadius: 100,
+        flutterAmplitude: 20,
+        flutterFrequency: 0.1
     }
+
 };
-
-// Factory for creating specific types of map objects
-class MapObjectFactory {
-    static create(type, variant, x, y) {
-        const config = MAP_OBJECT_TYPES[type];
-        if (!config) {
-            console.error(`Unknown object type: ${type}`);
-            return null;
-        }
-
-        console.log(config.category);
-
-        // Create specific type of object based on category
-        switch (config.category) {
-            case 'nature':
-                return new NatureObject(type, variant, x, y, config);
-            case 'crop':
-                return new CropPlant(type, variant, x, y, config);
-            case 'item':
-                return new ItemObject(type, variant, x, y, config);
-            case 'container':  // Add this case
-                return new TreasureChest(type, variant, x, y, config);
-            default:
-                return new MapObject(type, variant, x, y, config);
-        }
-    }
-}
 
 // Base MapObject class
 class MapObject {
 
-    constructor(type, variant, posX, posY, config) {
+    constructor(type, variant, posX, posY, config, options = {}) {
         this.type = type;
         this.variant = variant;
         this.config = config;
@@ -613,11 +627,7 @@ class MapObject {
         if (!this.active) return false;
 
         if (parent.activeMyte) {
-            // this.select();
-            // parent.activeMyte.queue.addEatElement(this.element);
-
             parent.ui.setSelected(this);
-
             return true;
         }
         return false;
@@ -636,18 +646,13 @@ class MapObject {
         this.active = false;
     }
 
-
-    getOffsetRect() {
-        // return this.parent.getLocalOffset(this.duplicate);
-    }
-
     update() {
 
     }
 
 }
 
-class DroppedItem {
+class DroppedMapItem {
     constructor(type, variant, startX, startY) {
         this.type = type;
         this.variant = variant;
@@ -823,10 +828,8 @@ class DroppedItem {
 
 }
 
-
-
 class AnimatedMapObject extends MapObject {
-    constructor(type, variant, posX, posY, config) {
+    constructor(type, variant, posX, posY, config, options = {}) {
         super(type, variant, posX, posY, config);
         this.currentAnimation = null;
         this.lastFrameTime = 0;
@@ -916,13 +919,15 @@ class AnimatedMapObject extends MapObject {
     }
 }
 
-class TreasureChest extends AnimatedMapObject {
-    constructor(type, variant, posX, posY, config) {
+class TreasureChestMapObject extends AnimatedMapObject {
+    constructor(type, variant, posX, posY, config, options = {}) {
         super(type, variant, posX, posY, config);
         this.state = config.spriteConfig.default;
         this.items = [];
         this.droppedItems = [];
         this.canClose = config.canClose || false;
+
+        this.addItems(options.items || []);
     }
 
     addItems(items) {
@@ -977,13 +982,13 @@ class TreasureChest extends AnimatedMapObject {
 
             if (distance <= this.config.interactionRadius) {
                 myte.queue.add('go_to_object', {
-                    targetObject: this,
+                    target: this,
                     onComplete: () => this.open(parent)
                 });
                 return true;
             }
 
-            myte.queue.add('go_to_object', { targetObject: this });
+            myte.queue.add('go_to_object', { target: this });
             return true;
         }
         else if (this.state === 'opened' && this.canClose) {
@@ -994,13 +999,13 @@ class TreasureChest extends AnimatedMapObject {
 
             if (distance <= this.config.interactionRadius) {
                 myte.queue.add('go_to_object', {
-                    targetObject: this,
+                    target: this,
                     onComplete: () => this.close(parent)
                 });
                 return true;
             }
 
-            myte.queue.add('go_to_object', { targetObject: this });
+            myte.queue.add('go_to_object', { target: this });
             return true;
         }
 
@@ -1023,7 +1028,7 @@ class TreasureChest extends AnimatedMapObject {
                 ? -Math.PI / 2
                 : -Math.PI / 2 - spreadAngle / 2 + (spreadAngle * index / (this.items.length - 1));
 
-            const droppedItem = new DroppedItem(
+            const droppedItem = new DroppedMapItem(
                 item.type,
                 item.variant,
                 spawnPoint.x,
@@ -1060,8 +1065,8 @@ class TreasureChest extends AnimatedMapObject {
     }
 }
 
-class LightObject extends AnimatedMapObject {
-    constructor(type, variant, posX, posY, config) {
+class LightMapObject extends AnimatedMapObject {
+    constructor(type, variant, posX, posY, config, options = {}) {
         super(type, variant, posX, posY, config);
         this.state = config.default || 'off';
     }
@@ -1083,7 +1088,7 @@ class LightObject extends AnimatedMapObject {
         }
 
         myte.queue.add('go_to_object', {
-            targetObject: this,
+            target: this,
             onComplete: () => this.playAnimation('flicker', () => action.method(parent))
         });
         return true;
@@ -1114,7 +1119,7 @@ class LightObject extends AnimatedMapObject {
 
         // Apply effects
         if (this.state === 'on' && parent.activeMyte) {
-            parent.activeMyte.updateMood(5);
+            parent.activeMyte.stats.updateMood(5);
         }
     }
 
@@ -1126,8 +1131,8 @@ class LightObject extends AnimatedMapObject {
     }
 }
 
-class Fountain extends AnimatedMapObject {
-    constructor(type, variant, posX, posY, config) {
+class FountainMapObject extends AnimatedMapObject {
+    constructor(type, variant, posX, posY, config, options = {}) {
         super(type, variant, posX, posY, config);
         this.state = config.default || 'on';
 
@@ -1157,7 +1162,7 @@ class Fountain extends AnimatedMapObject {
         }
 
         myte.queue.add('go_to_object', {
-            targetObject: this,
+            target: this,
             onComplete: () => action.method(parent)
         });
         return true;
@@ -1192,7 +1197,7 @@ class Fountain extends AnimatedMapObject {
         const lastBoost = this.lastBoostTimes.get(myte.id) || 0;
 
         if (now - lastBoost >= this.boostCooldown) {
-            myte.updateMood(this.moodBoostAmount);
+            myte.stats.updateMood(this.moodBoostAmount);
             this.lastBoostTimes.set(myte.id, now);
 
             // Occasional happiness expression
@@ -1232,10 +1237,9 @@ class Fountain extends AnimatedMapObject {
     }
 }
 
-
 // Specific implementations for different categories
-class NatureObject extends MapObject {
-    constructor(type, variant, posX, posY, config) {
+class NatureMapObject extends MapObject {
+    constructor(type, variant, posX, posY, config, options = {}) {
         super(type, variant, posX, posY, config);
         this.growthStage = 0;
         this.maxGrowthStage = 3;
@@ -1265,8 +1269,8 @@ class NatureObject extends MapObject {
     }
 }
 
-class ItemObject extends MapObject {
-    constructor(type, variant, posX, posY, config) {
+class ItemMapObject extends MapObject {
+    constructor(type, variant, posX, posY, config, options = {}) {
         super(type, variant, posX, posY, config);
         this.quantity = 1;
         this.durability = 100;
@@ -1289,47 +1293,3 @@ class ItemObject extends MapObject {
         }
     }
 }
-
-class PortalObject extends MapObject {
-    constructor(type, variant, posX, posY, config) {
-        super(type, variant, posX, posY, config);
-        this.destination = null;
-    }
-}
-
-// Add this to your development environment
-class HotReload {
-    static async reloadModule(path) {
-        // Remove from cache if exists
-        const existingScript = document.querySelector(`script[src*="${path}"]`);
-        if (existingScript) {
-            existingScript.remove();
-        }
-
-        // Create new script with timestamp to bypass cache
-        const script = document.createElement('script');
-        script.src = `${path}?t=${Date.now()}`;
-        script.type = 'module';
-        document.head.appendChild(script);
-
-        // Return a promise that resolves when the script loads
-        return new Promise((resolve, reject) => {
-            script.onload = resolve;
-            script.onerror = reject;
-        });
-    }
-}
-
-// Add a keyboard shortcut to reload specific files
-document.addEventListener('keydown', async (e) => {
-    // Ctrl + R to reload AnimatedMapObject.js
-    if (e.ctrlKey && e.key === 'r') {
-        e.preventDefault();
-        try {
-            await HotReload.reloadModule('./AnimatedMapObject.js');
-            console.log('Module reloaded successfully');
-        } catch (error) {
-            console.error('Failed to reload module:', error);
-        }
-    }
-});

@@ -32,6 +32,28 @@ class MyteDialogue {
         // Add transition end listener
         this.handleTransitionEnd = this.handleTransitionEnd.bind(this);
         this.dialogue.addEventListener('transitionend', this.handleTransitionEnd);
+
+		/*
+		// Regular speech with arrow
+		this.showMessage("Hello!");
+
+		// Thought bubble
+		this.showMessage("Hmm...", "thought");
+
+		// Emoji display
+		this.showMessage("😊", "emoji");
+
+		// Alert message
+		this.showMessage("Watch out!", "alert");
+
+		// Question
+		this.showMessage("What's that?", "question");
+
+		// Whisper
+		this.showMessage("*whispers*", "whisper");
+		*/
+
+
     }
 
     // Show a new dialogue message

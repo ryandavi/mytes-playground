@@ -153,7 +153,7 @@ class Zone {
 
     applyContinuousRestEffects(myte) {
         // Slowly recover mood while in rest zone
-        myte.updateMood(0.1 * this.properties.strength);
+        myte.stats.updateMood(0.1 * this.properties.strength);
     }
 
     applyPlayZoneEffects(myte) {
@@ -205,13 +205,13 @@ class Zone {
         const safeY = myte.posY + Math.sin(angle) * safeDistance;
         
         myte.setTarget(safeX, safeY);
-        myte.updateMood(-5); // Decrease mood in danger zone
+        myte.stats.updateMood(-5); // Decrease mood in danger zone
     }
 
     applyBoostZoneEffects(myte) {
         // Generic boost zone that can be configured via properties
         if (this.properties.moodBoost) {
-            myte.updateMood(this.properties.moodBoost * this.properties.strength);
+            myte.stats.updateMood(this.properties.moodBoost * this.properties.strength);
         }
         if (this.properties.speedBoost) {
             myte.speed *= (1 + this.properties.speedBoost * this.properties.strength);
@@ -221,7 +221,7 @@ class Zone {
     applyContinuousBoostEffects(myte) {
         // Continue applying any boost effects
         if (this.properties.continuousMoodBoost) {
-            myte.updateMood(this.properties.continuousMoodBoost * this.properties.strength);
+            myte.stats.updateMood(this.properties.continuousMoodBoost * this.properties.strength);
         }
     }
 }

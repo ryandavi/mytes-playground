@@ -5,8 +5,10 @@ class Myte {
 	constructor(id, parent, element) {
 		this.id = id;
 		this.species = "snail";
-		this.health = 100;
 		this.name = element.dataset.myteName;
+
+
+		this.stats = null;
 
 		this.parent = parent;
 		this.element = element;
@@ -83,18 +85,6 @@ class Myte {
 
 		this.inputHandler;
 
-        // Add these new properties
-        this.pathFindingSystem = new PathFindingSystem(this);
-
-		// this.commandSystem = new CommandSystem(this);
-
-
-        // Add mood properties
-        this.mood = 100; // Start at neutral mood
-        this.minMood = 0;
-        this.maxMood = 100;
-        this.moodDecayRate = 0.005; // How much mood decreases per update
-
 	}
 
 	init() {
@@ -112,25 +102,7 @@ class Myte {
 		this.inputHandler = new MyteInputHandler(this);
 
 		this.dialogue = new MyteDialogue(this);
-
-		// Regular speech with arrow
-		this.dialogue.showMessage("Hello!");
-
-		// Thought bubble
-		this.dialogue.showMessage("Hmm...", "thought");
-
-		// Emoji display
-		this.dialogue.showMessage("😊", "emoji");
-
-		// Alert message
-		this.dialogue.showMessage("Watch out!", "alert");
-
-		// Question
-		this.dialogue.showMessage("What's that?", "question");
-
-		// Whisper
-		this.dialogue.showMessage("*whispers*", "whisper");
-
+		this.stats = new MyteStats(this);
 
 		// temp - make it a snail
 		this.stateMachine.setSnail();
@@ -149,8 +121,6 @@ class Myte {
 
 		// for dragging - we dont want to allow it for a few seconds
 		this.setStartTime();
-
-		// this.commandSystem.init();
 	}
 
 	initInteractiveMyte(){
@@ -232,51 +202,11 @@ class Myte {
 		
 	}
 
-
-    updateMood(amount) {
-        // Add the amount (positive or negative)
-        this.mood = Math.max(this.minMood, Math.min(this.maxMood, this.mood + amount));
-        
-        // Log mood change if debugging is enabled
-        if (IS_DEBUG) {
-            if(amount >= 0)console.log(`Mood ${amount >= 0 ? 'increased' : 'decreased'} by ${Math.abs(amount)}. New mood: ${this.mood}`);
-        }
-
-        // Could trigger different animations or behaviors based on mood
-        this.handleMoodEffects();
-    }
-
-    handleMoodEffects() {
-        // React based on mood thresholds
-        if (this.mood <= 20) {
-            // Very unhappy - might cry or move slower
-            if (Math.random() < 0.1) {
-                // this.queue.addExpression('cry');
-            }
-        } else if (this.mood >= 80) {
-            // Very happy - might jump or move faster
-            if (Math.random() < 0.1) {
-                // this.queue.addExpression('jump');
-            }
-        }
-    }
-
-    // Helper method to get mood status
-    getMoodStatus() {
-        if (this.mood >= 80) return 'very happy';
-        if (this.mood >= 60) return 'happy';
-        if (this.mood >= 40) return 'neutral';
-        if (this.mood >= 20) return 'unhappy';
-        return 'very unhappy';
-    }
-
 	update_target_dot() {
 		this.targetDot.style.left = (this.targetX + this.getRect().width / 2) + 'px';
 		this.targetDot.style.top = (this.targetY + this.getRect().height / 2) + 'px';
 
 	}
-
-
 
     setFollowMode(newGoal = null) {
 
@@ -423,7 +353,7 @@ class Myte {
 		var dy = this.targetY - this.posY;
 		var distance = Math.sqrt(dx * dx + dy * dy);
 
-		if (distance > 0) { // this.get_speed();
+		if (distance > 0) {
 			return true;
 		}
 
@@ -435,7 +365,7 @@ class Myte {
 		var dx = this.targetX - this.posX;
 		var dy = this.targetY - this.posY;
 		var distance = Math.sqrt(dx * dx + dy * dy);
-		return distance <= 0.5; // this.get_speed();
+		return distance <= 0.5;
 	}
 
 	setDirection(direction){
@@ -464,9 +394,6 @@ class Myte {
 		}
 	}
 
-	get_speed() {
-		return this.speed;
-	}
 	snap_position_to_target(doXAxis = true, doYAxis = true) {
 		if (doXAxis) this.posX = this.targetX;
 		if (doYAxis) this.posY = this.targetY;
@@ -504,8 +431,8 @@ class Myte {
 		let extraY = 0;
 
 		if (distance !== 0) {
-			extraX = (dx / distance) * this.get_speed();
-			extraY = (dy / distance) * this.get_speed();
+			extraX = (dx / distance) * this.stats.getSpeed();
+			extraY = (dy / distance) * this.stats.getSpeed();
 
 			tempPosX += extraX;
 			tempPosY += extraY;
@@ -563,7 +490,7 @@ class Myte {
 		}
 
 		// If the distance is small enough, snap to the original position
-		if (distance < this.get_speed()) {
+		if (distance < this.stats.getSpeed()) {
 			this.snap_position_to_target(doXAxis, doYAxis);
 		}
 
@@ -865,12 +792,6 @@ class Myte {
         return (this.isJumping || this.isFalling);
     }
 
-    do_touch_damage(i = 0) {
-        this.health -= i;
-        this.queue.addExpression("fall"); 
-        this.queue.addIdle(50);
-    }
-
     do_jump() {
         this.velocity = -this.jumpHeight; // Adjust jump velocity as needed
         this.isJumping = true;
@@ -1084,7 +1005,7 @@ class Myte {
 
 		// update frame
 		if (deltaTime >= this.parent.core.config.frameInterval) {
-			this.updateMood(-this.moodDecayRate);
+			this.stats.update(deltaTime);
 			this.update_frame();
 		}
 

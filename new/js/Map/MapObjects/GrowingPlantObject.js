@@ -1,5 +1,5 @@
-class GrowingPlant extends AnimatedMapObject {
-    constructor(type, variant, posX, posY, config) {
+class GrowingPlantMapObject extends AnimatedMapObject {
+    constructor(type, variant, posX, posY, config, options = {}) {
         super(type, variant, posX, posY, config);
         
         // Growth state
@@ -134,8 +134,8 @@ class GrowingPlant extends AnimatedMapObject {
     }
 }
 
-class BreedingFlower extends GrowingPlant {
-    constructor(type, variant, posX, posY, config) {
+class BreedingFlowerMapObject extends GrowingPlantMapObject {
+    constructor(type, variant, posX, posY, config, options = {}) {
         super(type, variant, posX, posY, config);
         
         // State flags
@@ -169,7 +169,7 @@ class BreedingFlower extends GrowingPlant {
         if (!this.pollinationRadius || !this.parent?.mapArea) return [];
         
         return this.parent.mapArea.getObjectsInRadius(this.posX, this.posY, this.pollinationRadius)
-            .filter(obj => obj instanceof BreedingFlower && 
+            .filter(obj => obj instanceof BreedingFlowerMapObject && 
                          obj !== this && 
                          obj.growthStage === 'mature');
     }
@@ -292,8 +292,8 @@ class BreedingFlower extends GrowingPlant {
     }
 }
 
-class NightBloomingFlower extends BreedingFlower {
-    constructor(type, variant, posX, posY, config) {
+class NightBloomMapObject extends BreedingFlowerMapObject {
+    constructor(type, variant, posX, posY, config, options = {}) {
         super(type, variant, posX, posY, config);
         
         this.bloomState = 'closed';
@@ -354,8 +354,8 @@ class NightBloomingFlower extends BreedingFlower {
     }
 }
 
-class CropPlant extends GrowingPlant {
-    constructor(type, variant, posX, posY, config) {
+class CropPlantMapObject extends GrowingPlantMapObject {
+    constructor(type, variant, posX, posY, config, options = {}) {
         super(type, variant, posX, posY, config);
         
         this.harvestable = false;
@@ -426,7 +426,7 @@ class CropPlant extends GrowingPlant {
                 const harvest = this.harvest();
                 if (harvest && parent.inventory) {
                     parent.inventory.addItem(harvest.type, harvest.quantity, harvest.variant);
-                    myte.updateMood(5);
+                    myte.stats.updateMood(5);
                 }
                 return true;
             } else {

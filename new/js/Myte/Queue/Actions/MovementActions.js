@@ -45,7 +45,7 @@ class FollowObjectAction extends PositionableAction {
     };
 
     static canPerform(selected, active) {
-        return active && selected && selected !== active && !active?.queue.isCarrying();
+        return active && selected && selected !== active && selected instanceof Myte && !active?.queue.isCarrying();
     }
 
     constructor(myte, options) {
@@ -54,13 +54,13 @@ class FollowObjectAction extends PositionableAction {
             duration: FollowObjectAction.metadata.defaultDuration,
             ...options
         });
-        this.targetObject = options.targetObject;
+        this.target = options.target;
     }
 
     update() {
-        if (!this.targetObject) return true;
+        if (!this.target) return true;
 
-        let targetRect = this.targetObject.getOffsetRect();
+        let targetRect = this.target.getOffsetRect();
         const myteRect = this.myte.getRect();
         const canvasWidth = this.myte.parent.getCanvasRect().width;
 
@@ -69,9 +69,9 @@ class FollowObjectAction extends PositionableAction {
             myteRect, 
             targetRect, 
             horizontal, 
-            this.options.vertical, 
-            this.options.insideHorizontal, 
-            this.options.insideVertical
+            this.vertical, 
+            this.insideHorizontal, 
+            this.insideVertical
         );
 
         if (targetPos.x + myteRect.width > canvasWidth || targetPos.x < 0) {
@@ -80,9 +80,9 @@ class FollowObjectAction extends PositionableAction {
                 myteRect, 
                 targetRect, 
                 horizontal, 
-                this.options.vertical, 
-                this.options.insideHorizontal, 
-                this.options.insideVertical
+                this.vertical, 
+                this.insideHorizontal, 
+                this.insideVertical
             );
         }
 
@@ -94,7 +94,7 @@ class FollowObjectAction extends PositionableAction {
 }
 
 // Run laps action
-class RunLapsAction extends MyteAction {
+class RunLapsAction extends PositionableAction {
     static metadata = {
         id: 'run_laps',
         label: 'Run Laps',
@@ -108,44 +108,87 @@ class RunLapsAction extends MyteAction {
         affectsMood: true,
         moodEffect: 5,
         defaultOptions: {
-            repeat: 1,
-            current_target_index: 0
+            repeat: 5,
+            currentTargetIndex: 0,
+			targetPosition: {
+				vertical: 'top',
+				insideHorizontal: true,
+				insideVertical: true
+			}
         }
     };
-
-    static canPerform(selected, active) {
-        return active && selected && !active?.queue.isCarrying();
-    }
 
     constructor(myte, options) {
         super(myte, {
             ...RunLapsAction.metadata.defaultOptions,
-            duration: RunLapsAction.metadata.defaultDuration,
             ...options
         });
-        this.targets = options.target;
-        this.currentTargetIndex = this.options.current_target_index;
+    }
+
+
+    static canPerform(selected, active) {
+        return active && selected && selected instanceof Element && !active?.queue.isCarrying();
     }
 
     start() {
         super.start();
+    
+        const targetRect = this.getRect(this.target); 
+        const myteRect = this.myte.getRect(); 
+
+        // Create all four points for the lap
+        const targetPoints = [
+
+
+            // Top left - bottom aligned to bottom of object
+            this.calculatePosition(myteRect, targetRect, 'left', 'bottom', true, true),
+            // Top right - bottom aligned to bottom of object
+            this.calculatePosition(myteRect, targetRect, 'right', 'bottom', true, true),
+
+            // Bottom right - bottom aligned to top of object
+            this.calculatePosition(myteRect, targetRect, 'right', 'top', true, false),
+            // Bottom left - bottom aligned to top of object
+            this.calculatePosition(myteRect, targetRect, 'left', 'top', true, false)
+
+
+
+        ];
+
+        console.log('Lap target points:', targetPoints); // D
+
+        this.targetPoints = targetPoints;
+    
+        // Convert and adjust all points
+        /*
+        this.targetPoints = targetPoints.map(pos => 
+            this.adjustPositionToBounds(pos, myteRect, targetRect).position
+        );
+        */
+    
+        console.log('Lap target points:', this.targetPoints); // Debug log
+    
+        // Set initial target
         this.myte.setTarget(
-            this.targets[this.currentTargetIndex].x,
-            this.targets[this.currentTargetIndex].y
+            this.targetPoints[this.currentTargetIndex].x,
+            this.targetPoints[this.currentTargetIndex].y
         );
         this.myte.reset();
     }
-
+    
     update() {
         if (this.myte.is_at_target()) {
-            this.currentTargetIndex = (this.currentTargetIndex + 1) % this.targets.length;
+            this.currentTargetIndex = (this.currentTargetIndex + 1) % this.targetPoints.length;
+            console.log('Moving to point:', this.currentTargetIndex, this.targetPoints[this.currentTargetIndex]); // Debug log
+            
             if (this.currentTargetIndex === 0) {
-                this.options.repeat--;
-                if (this.options.repeat <= 0) return true;
+                this.repeat--;
+                console.log('Completed lap, remaining repeats:', this.repeat); // Debug log
+                if (this.repeat <= 0) return true;
             }
+            
             this.myte.setTarget(
-                this.targets[this.currentTargetIndex].x,
-                this.targets[this.currentTargetIndex].y
+                this.targetPoints[this.currentTargetIndex].x,
+                this.targetPoints[this.currentTargetIndex].y
             );
         }
         this.myte.move_toward_target();
@@ -191,16 +234,16 @@ class CircleAction extends MyteAction {
     }
 
     update() {
-        this.angle += this.options.speed;
+        this.angle += this.speed;
 
-        const newX = this.options.centerX + Math.cos(this.angle) * this.options.radius;
-        const newY = this.options.centerY + Math.sin(this.angle) * this.options.radius;
+        const newX = this.centerX + Math.cos(this.angle) * this.radius;
+        const newY = this.centerY + Math.sin(this.angle) * this.radius;
 
         this.myte.setTarget(newX, newY);
         this.myte.move_toward_target();
 
-        this.options.current_duration--;
-        return this.options.current_duration <= 0;
+        this.current_duration--;
+        return this.current_duration <= 0;
     }
 }
 
@@ -243,15 +286,15 @@ class ZigzagAction extends MyteAction {
     update() {
         this.distance += 1;
 
-        const zigzag = Math.sin(this.distance * this.options.frequency) * this.options.amplitude;
-        const newX = this.startX + this.distance * this.options.direction.x - zigzag * this.options.direction.y;
-        const newY = this.startY + this.distance * this.options.direction.y + zigzag * this.options.direction.x;
+        const zigzag = Math.sin(this.distance * this.frequency) * this.amplitude;
+        const newX = this.startX + this.distance * this.direction.x - zigzag * this.direction.y;
+        const newY = this.startY + this.distance * this.direction.y + zigzag * this.direction.x;
 
         this.myte.setTarget(newX, newY);
         this.myte.move_toward_target();
 
-        this.options.current_duration--;
-        return this.options.current_duration <= 0;
+        this.current_duration--;
+        return this.current_duration <= 0;
     }
 }
 
@@ -288,14 +331,14 @@ class JumpAction extends MyteAction {
             ...options
         });
         
-        this.gravity = this.options.gravity;
-        this.velocity = this.options.initialVelocity;
+        this.gravity = this.gravity;
+        this.velocity = this.initialVelocity;
     }
 
     start() {
         super.start();
         this.groundY = this.myte.posY;
-        this.maxHeight = this.groundY - this.options.height;
+        this.maxHeight = this.groundY - this.height;
     }
 
     update() {
@@ -304,9 +347,9 @@ class JumpAction extends MyteAction {
 
         if (this.myte.posY >= this.groundY) {
             this.myte.posY = this.groundY;
-            this.velocity = -this.velocity * this.options.bounceReduction;
+            this.velocity = -this.velocity * this.bounceReduction;
 
-            if (Math.abs(this.velocity) < this.options.minBounceVelocity) {
+            if (Math.abs(this.velocity) < this.minBounceVelocity) {
                 return true;
             }
         }

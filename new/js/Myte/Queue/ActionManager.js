@@ -9,6 +9,38 @@ class ActionManager {
         this.actions.set(ActionClass.metadata.id, ActionClass);
     }
 
+    static getActionRequirements(actionId, selected, active) {
+        const ActionClass = this.actions.get(actionId);
+        if (!ActionClass) return null;
+
+        // Each action class can define what data it needs based on the target
+
+        /*
+        if (ActionClass.getRequiredOptions) {
+            return ActionClass.getRequiredOptions(selected, active);
+        }
+        */
+
+        // Default handling based on metadata
+        const metadata = ActionClass.metadata;
+        const options = { /* userInitiated: true */ };
+
+        if (metadata.requiresTarget) {
+            if (selected instanceof Myte) {
+                options.target = selected;
+            } else if (selected instanceof MapObject) {
+                options.target = selected;
+            } else {
+                options.target = selected;
+            }
+        }
+
+        return {
+            ...(metadata.defaultOptions || {}),
+            ...options
+        };
+    }
+
     static registerActions(actionClasses) {
         actionClasses.forEach(ActionClass => this.registerAction(ActionClass));
     }
@@ -30,7 +62,14 @@ class ActionManager {
 
     static getActionsByCategory(selected, active) {
         const actions = this.getAvailableActions(selected, active);
-        return _.groupBy(actions, 'category');
+        return actions.reduce((groups, action) => {
+            const category = action.category;
+            if (!groups[category]) {
+                groups[category] = [];
+            }
+            groups[category].push(action);
+            return groups;
+        }, {});
     }
 
     static getMovementActions() {
@@ -58,6 +97,7 @@ class ActionManager {
 ActionManager.registerActions([
     // Base actions
     MoveAction,
+    AStarMoveAction,
     IdleAction,
     ExpressionAction,
 

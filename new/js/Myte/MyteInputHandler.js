@@ -381,10 +381,10 @@ class MyteRubbingHandler {
 	updateMyteMood() {
 		if (this.rubCounter <= this.config.maxRubs) {
 			// Good rubs increase mood
-			this.myte.updateMood(this.config.moodBoostPerRub);
+			this.myte.stats.updateMood(this.config.moodBoostPerRub);
 		} else {
 			// Too much rubbing decreases mood
-			this.myte.updateMood(this.config.moodPenaltyOverrub);
+			this.myte.stats.updateMood(this.config.moodPenaltyOverrub);
 		}
 	}
 

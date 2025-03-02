@@ -159,228 +159,6 @@ class UserInterface {
         this.handControls = this.parent.containerWrapper.querySelector('#hand-controls');
         this.actionControls = this.parent.containerWrapper.querySelector('#action-controls');
 
-        this.actionGroups = {
-            carrying: {
-                title: 'Active Actions',
-                priority: 1,
-                actions: [
-                    {
-                        id: 'carry_putdown',
-                        label: 'Put Down',
-                        condition: (selected, active) => active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.addPutDownMyte()
-                    }
-                ]
-            },
-            interactions: {
-                title: 'Interactions',
-                priority: 2,
-                actions: [
-                    {
-                        id: 'carry',
-                        label: 'Pick Up',
-                        condition: (selected, active) => 
-                            selected instanceof Myte && 
-                            selected !== active && 
-                            !selected.queue.isBeingCarried() &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.addPickupMyte(selected)
-                    },
-                    {
-                        id: 'follow_object',
-                        label: 'Follow',
-                        condition: (selected, active) => 
-                            selected instanceof Myte && 
-                            selected !== active &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.addFollowObject(selected)
-                    },
-                    {
-                        id: 'go_to_object',
-                        label: 'Go To',
-                        condition: (selected, active) => 
-                            selected !== active && // Only if not selecting self
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('go_to_object', {
-                            userInitiated: true,
-                            targetObject: selected
-                        })
-                    },
-                    {
-                        id: 'eat_element',
-                        label: 'Eat',
-                        condition: (selected, active) => 
-                            selected instanceof MapObject && 
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('eat_element', { element: selected })
-                    },
-                    {
-                        id: 'inspect',
-                        label: 'Inspect',
-                        condition: (selected, active) => 
-                            selected instanceof MapObject && // Only if selecting a MapObject
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('inspect', { target: selected })
-                    },
-                ]
-            },
-            play: {
-                title: 'Play',
-                priority: 3,
-                actions: [
-                    /*
-                    {
-                        id: 'play_tag',
-                        label: 'Play Tag',
-                        condition: (selected, active) => 
-                            selected instanceof Myte && 
-                            selected !== active &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('play_tag', { targetMyte: selected })
-                    },
-                    */
-                    {
-                        id: 'show_affection',
-                        label: 'Show Affection',
-                        condition: (selected, active) => 
-                            selected instanceof Myte && 
-                            selected !== active &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('show_affection', { targetMyte: selected })
-                    },
-                    {
-                        id: 'spin',
-                        label: 'Spin',
-                        condition: (selected, active) => 
-                            selected == active &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('spin')
-                    },
-                    {
-                        id: 'dance',
-                        label: 'Dance',
-                        condition: (selected, active) => 
-                            selected == active &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('dance')
-                    }
-                ]
-            },
-            movement: {
-                title: 'Movement',
-                priority: 4,
-                actions: [
-                    {
-                        id: 'run_laps',
-                        label: 'Run Laps On',
-                        condition: (selected, active) => 
-                            !(selected instanceof Myte) && 
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('run_laps', { element: selected })
-                    },
-                    {
-                        id: 'circle',
-                        label: 'Circle Around',
-                        condition: (selected, active) => 
-                            !(selected instanceof Myte) && 
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => {
-                            const rect = selected.getBoundingClientRect();
-                            active.queue.add('circle', { 
-                                centerX: rect.x + rect.width/2, 
-                                centerY: rect.y + rect.height/2 
-                            });
-                        }
-                    },
-                    {
-                        id: 'zigzag',
-                        label: 'Zigzag',
-                        condition: (selected, active) => 
-                            selected == active &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('zigzag')
-                    },
-                    {
-                        id: 'jump',
-                        label: 'Jump',
-                        condition: (selected, active) => 
-                            selected == active &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('jump')
-                    },
-                    {
-                        id: 'follow_mouse',
-                        label: 'Follow Mouse',
-                        condition: (selected, active) => 
-                            selected == active &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('follow_mouse')
-                    }
-                ]
-            },
-            reactive: {
-                title: 'Reactive',
-                priority: 5,
-                actions: [
-                    {
-                        id: 'run_away',
-                        label: 'Run Away From',
-                        condition: (selected, active) => 
-                            selected instanceof Myte && 
-                            selected !== active &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('run_away', { targetObject: selected })
-                    },
-                    {
-                        id: 'hide',
-                        label: 'Hide',
-                        condition: (selected, active) => 
-                            !(selected instanceof Myte) && 
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('hide', { hideTarget: selected })
-                    }
-                ]
-            },
-            state: {
-                title: 'State',
-                priority: 6,
-                actions: [
-                    {
-                        id: 'sleep',
-                        label: 'Sleep',
-                        condition: (selected, active) => 
-                            selected == active &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('sleep')
-                    },
-                    {
-                        id: 'simpleSleep',
-                        label: 'Simple Sleep',
-                        condition: (selected, active) => 
-                            selected == active &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('simpleSleep')
-                    },
-                    {
-                        id: 'idle',
-                        label: 'Idle',
-                        condition: (selected, active) => 
-                            selected == active &&
-                            !active?.queue.isCarrying(),
-                        action: (selected, active) => active.queue.add('idle')
-                    },
-                    {
-                        id: 'active_myte',
-                        label: 'Set as Active Myte',
-                        condition: (selected, active) => 
-                            selected != active &&
-                            (selected instanceof Myte),
-                        action: (selected) => selected.parent.setActiveMyte(selected)
-                    }
-                ]
-            }
-        };
-        
         // Initialize cursor manager
         // this.cursorManager = new CursorManager(parent);
     }
@@ -485,20 +263,35 @@ class UserInterface {
 
     }
 
-    updateHud(){
+    // Update HUD to show mood from metadata
+    updateHud() {
         const activePet = document.querySelector('#hud-active-pet');
+        const activeMyte = this.parent.activeMyte;
 
-        if(this.parent.activeMyte === null){
+        if (!activeMyte) {
             activePet.classList.remove('visible');
-        }else{
-            if (!activePet.classList.contains('visible')) {
-                activePet.classList.add('visible');
-            } 
-            activePet.querySelector('.name').textContent = this.parent.activeMyte.name;
-            activePet.querySelector('.mood').textContent = 'Happy';
-            activePet.querySelector('.energy').textContent = 'Full';
+            return;
         }
 
+        if (!activePet.classList.contains('visible')) {
+            activePet.classList.add('visible');
+        }
+
+        activePet.querySelector('.name').textContent = activeMyte.name;
+        activePet.querySelector('.mood').textContent = activeMyte.stats.getMoodStatus();
+        activePet.querySelector('.energy').textContent = 'Full';
+
+        // Add stats from current action if any
+        const currentAction = activeMyte.queue.getCurrentAction();
+        if (currentAction) {
+            const actionMetadata = currentAction.constructor.metadata;
+            if (actionMetadata.affectsMood) {
+                const moodEffect = document.createElement('div');
+                moodEffect.className = 'mood-effect';
+                moodEffect.textContent = `Mood ${actionMetadata.moodEffect > 0 ? '+' : ''}${actionMetadata.moodEffect}`;
+                activePet.appendChild(moodEffect);
+            }
+        }
     }
 
     setSelected(obj) {
@@ -558,52 +351,75 @@ class UserInterface {
         this.actionControls.classList.remove('visible');
     }
 
-    updateActions() {
-        const selectedInfo = this.actionControls.querySelector('.selected-info');
-        if (!selectedInfo) return;
-    
-        const interactionType = selectedInfo.querySelector('.interaction-type .type');
-        const targetType = selectedInfo.querySelector('.target-info .type');
-        const targetName = selectedInfo.querySelector('.target-info .name');
-    
-        // Remove all state classes first
-        selectedInfo.classList.remove('self-selected', 'myte-interaction', 'map-interaction', 'element-interaction');
-        this.emptyActionList();
-    
-        if (this.selectedObject) {
-            if (this.selectedObject === this.parent.activeMyte) {
-                // Selected self
-                interactionType.textContent = "Selected Self";
-                selectedInfo.classList.add('self-selected');
-                targetType.textContent = "Myte";
-            } else {
-                interactionType.textContent = "Interacting with";
-                
-                if (this.selectedObject instanceof Myte) {
-                    selectedInfo.classList.add('myte-interaction');
-                    targetType.textContent = "Myte";
-                    targetName.textContent = this.selectedObject.name
-                } else if (this.selectedObject instanceof MapObject) {
-                    selectedInfo.classList.add('map-interaction');
-                    targetType.textContent = "Object";
-                    targetName.textContent = this.selectedObject.type
-                } else {
-                    selectedInfo.classList.add('element-interaction');
-                    targetType.textContent = "Element";
-                    targetName.textContent = this.selectedObject.tagName;
-                }
-            }
-    
-            targetName.textContent = targetName.textContent || "Unknown";
-            selectedInfo.classList.add('visible');
-            this.updateActionList();
-        } else {
-            interactionType.textContent = "Not Selected";
-            targetType.textContent = "-";
-            targetName.textContent = "None";
-            selectedInfo.classList.remove('visible');
-        }
+
+    // Helper method to get category titles
+    getCategoryTitle(category) {
+        const titles = {
+            movement: 'Movement',
+            state: 'State',
+            interactions: 'Interactions',
+            play: 'Play',
+            reactive: 'Reactive',
+            carrying: 'Active Actions'
+        };
+        return titles[category] || category;
     }
+
+updateActions() {
+
+
+    const selectedInfo = this.actionControls.querySelector('.selected-info');
+    if (!selectedInfo) return;
+
+    const interactionType = selectedInfo.querySelector('.interaction-type .type');
+    const targetType = selectedInfo.querySelector('.target-info .type');
+    const targetName = selectedInfo.querySelector('.target-info .name');
+
+    // Remove all state classes first
+    selectedInfo.classList.remove('self-selected', 'myte-interaction', 'map-interaction', 'element-interaction');
+    this.emptyActionList();
+
+    if (this.selectedObject) {
+        // Determine interaction type based on selected object
+        if (this.selectedObject === this.parent.activeMyte) {
+            interactionType.textContent = "Selected Self";
+            selectedInfo.classList.add('self-selected');
+            targetType.textContent = "Myte";
+            targetName.textContent = this.selectedObject.name;
+        } else {
+            interactionType.textContent = "Interacting with";
+            
+            // Set target type and name based on object type
+            if (this.selectedObject instanceof Myte) {
+                selectedInfo.classList.add('myte-interaction');
+                targetType.textContent = "Myte";
+                targetName.textContent = this.selectedObject.name;
+            } else if (this.selectedObject instanceof MapObject) {
+                selectedInfo.classList.add('map-interaction');
+                targetType.textContent = "Object";
+                targetName.textContent = this.selectedObject.type;
+            } else if (this.selectedObject instanceof Element) {
+                selectedInfo.classList.add('element-interaction');
+                targetType.textContent = "Element";
+                targetName.textContent = this.selectedObject.tagName;
+            } else {
+                selectedInfo.classList.add('element-interaction');
+                targetType.textContent = "Element";
+                targetName.textContent = this.selectedObject.tagName;
+            }
+        }
+
+        selectedInfo.classList.add('visible');
+        this.updateActionList();
+    } else {
+        interactionType.textContent = "Not Selected";
+        targetType.textContent = "-";
+        targetName.textContent = "None";
+        selectedInfo.classList.remove('visible');
+    }
+
+
+}
 
     emptyActionList() {
         const actionGroups = this.actionControls.querySelector('.action-groups');
@@ -614,53 +430,50 @@ class UserInterface {
     updateActionList() {
         const actionGroups = this.actionControls.querySelector('.action-groups');
         const activeMyte = this.parent.activeMyte;
+    
+        // Get actions grouped by category from ActionManager
+        const groupedActions = ActionManager.getActionsByCategory(this.selectedObject, activeMyte);
+    
+        // Create elements for each group
+        Object.entries(groupedActions).forEach(([category, actions]) => {
+            const groupElement = document.createElement('div');
+            groupElement.className = `action-group ${category}`;
+    
+            const title = document.createElement('h3');
+            title.textContent = this.getCategoryTitle(category);
+            groupElement.appendChild(title);
+    
+            const actionList = document.createElement('ul');
+            actions.forEach(action => {
+                const li = document.createElement('li');
+                const button = document.createElement('button');
+                button.textContent = action.label;
+                if (action.description) {
+                    button.title = action.description;
+                }
         
-    
-        // Check what entries we're getting
-        const entries = Object.entries(this.actionGroups);
-    
-        // Check what survives the sort
-        const sorted = entries.sort(([, a], [, b]) => a.priority - b.priority);
-    
-        // Check what survives the filter
-        const filtered = sorted.filter(([, group]) => {
-            const someResult = group.actions.some(action => {
-                const conditionResult = action.condition(this.selectedObject, activeMyte);
-                return conditionResult;
-            });
-            return someResult;
-        });
-    
-        // Continue with the rest of the code...
-        filtered.forEach(([groupId, group]) => {
-            const availableActions = group.actions.filter(action => 
-                action.condition(this.selectedObject, activeMyte)
-            );
-    
-            if (availableActions.length > 0) {
-                const groupElement = document.createElement('div');
-                groupElement.className = `action-group ${groupId}`;
-    
-                const title = document.createElement('h3');
-                title.textContent = group.title;
-                groupElement.appendChild(title);
-    
-                const actionList = document.createElement('ul');
-                availableActions.forEach(action => {
-                    const li = document.createElement('li');
-                    const button = document.createElement('button');
-                    button.textContent = action.label;
-                    button.addEventListener('click', () => {
-                        action.action(this.selectedObject, activeMyte);
-                        this.updateActions();
-                    });
-                    li.appendChild(button);
-                    actionList.appendChild(li);
+                // click event for actions
+                button.addEventListener('click', () => {
+                    const options = ActionManager.getActionRequirements(
+                        action.id, 
+                        this.selectedObject, 
+                        activeMyte
+                    );
+
+                    console.log(options);
+                    
+                    if (options) {
+                        activeMyte.queue.add(action.id, options);
+                        // this.updateActions();
+                    }
                 });
+        
+                li.appendChild(button);
+                actionList.appendChild(li);
+            });
     
-                groupElement.appendChild(actionList);
-                actionGroups.appendChild(groupElement);
-            }
+            groupElement.appendChild(actionList);
+            actionGroups.appendChild(groupElement);
         });
     
         if (actionGroups.children.length > 0) {
@@ -679,7 +492,7 @@ class UserInterface {
             myte.duplicate.addEventListener('click', () => {
                 if (this.currentToolMode === UIToolModes.PET) {
                     myte.queue.addExpression('happy');
-                    myte.updateMood(10);
+                    myte.stats.updateMood(10);
                 }
             });
         }

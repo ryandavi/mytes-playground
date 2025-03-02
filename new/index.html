@@ -44,8 +44,10 @@
 		<div class="hand-controls ignore" id="hand-controls">
 			<input type="radio" name="hand" value="left" id="hand-select" checked>
 			<label class="button" for="hand-select">Select</label>
+			
 			<input type="radio" name="hand" value="left" id="hand-drag">
 			<label for="hand-drag">Drag</label>
+
 			<input type="radio" name="hand" value="right" id="hand-pet">
 			<label for="hand-pet">Pet</label>
 		</div>
@@ -59,6 +61,8 @@
 			</div>
 			<div class="canvas">
 				<!-- map objects -->
+
+				<div class="layer debug"></div>
 
 				<div class="layer background"></div>
 				<!-- map objects -->
@@ -267,8 +271,8 @@
 
 	<!-- MYTE -->
 	<script src="js/Myte/Myte.js"></script>
+	<script src="js/Myte/MyteStats.js"></script>
 	<script src="js/Myte/StateMachine.js"></script>
-	<script src="js/Myte/MytePathfinding.js"></script>
 	<script src="js/Myte/MyteCommand.js"></script>
 	<script src="js/Myte/MyteInputHandler.js"></script>
 	<script src="js/Myte/MyteDialogue.js"></script>
@@ -281,6 +285,7 @@
 	<script src="js/Myte/Queue/Actions/InteractionActions.js"></script>
 	<script src="js/Myte/Queue/Actions/MovementActions.js"></script>
 	<script src="js/Myte/Queue/Actions/ReactiveActions.js"></script>
+	<script src="js/Myte/Queue/ActionManager.js"></script>
 
 	<!-- MAP -->
 	<script src="js/Map/Camera.js"></script>
@@ -289,6 +294,10 @@
 	<script src="js/Map/GameZone.js"></script>
 	<script src="js/Map/MapObjects/BaseMapObject.js"></script>
 	<script src="js/Map/MapObjects/GrowingPlantObject.js"></script>
+	<script src="js/Map/MapObjects/MovingMapObject.js"></script>
+	<script src="js/Map/MapObjectManager.js"></script>
+	<script src="js/Map/Grid/GameMapGrid.js"></script>
+	<script src="js/Map/Grid/GameMapGridAstar.js"></script>
 	
 	<!-- UI -->
 	<script src="js/UI/UI.js"></script>

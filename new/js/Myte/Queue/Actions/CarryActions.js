@@ -16,20 +16,27 @@ class CarryPickupAction extends MyteAction {
 
     constructor(myte, options) {
         super(myte, options);
-        this.targetObject = options.targetObject;
+        this.target = options.target;
         this.startPosition = {
-            x: this.targetObject.posX,
-            y: this.targetObject.posY
+            x: this.target.posX,
+            y: this.target.posY
         };
         this.CARRY_OFFSET = 45;
     }
 
+    static canPerform(selected, active) {
+        return selected instanceof Myte && 
+        selected !== active && 
+        !selected.queue.isBeingCarried() &&
+        !active?.queue.isCarrying();
+    }
+
     update() {
-        if (this.options.current_duration === -1) {
-            this.options.current_duration = this.options.duration;
+        if (this.current_duration === -1) {
+            this.current_duration = this.duration;
         }
 
-        const progress = 1 - (this.options.current_duration / this.options.duration);
+        const progress = 1 - (this.current_duration / this.duration);
         const easedProgress = 1 - Math.pow(1 - progress, 3);
 
         const currentPos = {
@@ -37,29 +44,29 @@ class CarryPickupAction extends MyteAction {
             y: this.startPosition.y + ((this.myte.posY - this.CARRY_OFFSET) - this.startPosition.y) * easedProgress
         };
 
-        if (this.targetObject) {
-            this.targetObject.setPosition(currentPos.x, currentPos.y);
-            this.targetObject.setSpritePosition(currentPos.x, currentPos.y);
+        if (this.target) {
+            this.target.setPosition(currentPos.x, currentPos.y);
+            this.target.setSpritePosition(currentPos.x, currentPos.y);
         }
 
-        this.options.current_duration--;
+        this.current_duration--;
 
-        if (this.options.current_duration <= 0) {
+        if (this.current_duration <= 0) {
             // Start the carry action
             this.myte.queue.add('carry', {
-                targetObject: this.targetObject,
+                target: this.target,
                 duration: -1
             });
 
             // Add being_carried to target's queue
-            this.targetObject.queue.clear();
-            this.targetObject.queue.add('being_carried', {
+            this.target.queue.clear();
+            this.target.queue.add('being_carried', {
                 carrierMyte: this.myte,
                 duration: -1
             });
         }
 
-        return this.options.current_duration <= 0;
+        return this.current_duration <= 0;
     }
 }
 
@@ -80,9 +87,14 @@ class CarryAction extends MyteAction {
     };
     constructor(myte, options) {
         super(myte, options);
-        this.targetObject = options.targetObject;
+        this.target = options.target;
         this.CARRY_OFFSET = 45;
     }
+
+    static canPerform(selected, active) {
+        return active?.queue.isCarrying();
+    }
+
 
     update() {
 
@@ -90,13 +102,13 @@ class CarryAction extends MyteAction {
         this.myte.updateTargetToFollowMouse();
         this.myte.move_toward_target();
 
-        if (this.targetObject) {
+        if (this.target) {
             const offset = { x: 0, y: -this.CARRY_OFFSET };
-            this.targetObject.setPosition(
+            this.target.setPosition(
                 this.myte.posX + offset.x,
                 this.myte.posY + offset.y
             );
-            this.targetObject.setSpritePosition(
+            this.target.setSpritePosition(
                 this.myte.posX + offset.x,
                 this.myte.posY + offset.y
             );
@@ -105,9 +117,6 @@ class CarryAction extends MyteAction {
         return false; // Carry action continues until interrupted
     }
 
-    isMovementAction() {
-        return true;
-    }
 }
 
 // Action for being carried
@@ -126,6 +135,13 @@ class BeingCarriedAction extends MyteAction {
         affectsMood: true,
         moodEffect: 1
     };
+
+    static canPerform(selected, active) {
+        return selected instanceof Myte && 
+        selected !== active && 
+        !selected.queue.isBeingCarried() &&
+        !active?.queue.isCarrying();
+    }
 
     update() {
         return false; // Continue until interrupted
@@ -150,20 +166,24 @@ class CarryPutdownAction extends MyteAction {
 
     constructor(myte, options) {
         super(myte, options);
-        this.targetObject = options.targetObject;
+        this.target = options.target;
         this.startPosition = {
-            x: this.targetObject.posX,
-            y: this.targetObject.posY
+            x: this.target.posX,
+            y: this.target.posY
         };
         this.CARRY_OFFSET = 45;
     }
 
+    static canPerform(selected, active) {
+        return active?.queue.isCarrying();
+    }
+
     update() {
-        if (this.options.current_duration === -1) {
-            this.options.current_duration = this.options.duration;
+        if (this.current_duration === -1) {
+            this.current_duration = this.duration;
         }
 
-        const progress = 1 - (this.options.current_duration / this.options.duration);
+        const progress = 1 - (this.current_duration / this.duration);
         const easedProgress = 1 - Math.pow(1 - progress, 3);
 
         const currentPos = {
@@ -171,21 +191,21 @@ class CarryPutdownAction extends MyteAction {
             y: this.startPosition.y + ((this.myte.posY + this.CARRY_OFFSET) - this.startPosition.y) * easedProgress
         };
 
-        if (this.targetObject) {
-            this.targetObject.setPosition(currentPos.x, currentPos.y);
-            this.targetObject.setSpritePosition(currentPos.x, currentPos.y);
+        if (this.target) {
+            this.target.setPosition(currentPos.x, currentPos.y);
+            this.target.setSpritePosition(currentPos.x, currentPos.y);
         }
 
-        this.options.current_duration--;
+        this.current_duration--;
 
-        if (this.options.current_duration <= 0) {
+        if (this.current_duration <= 0) {
             // Clear carried Myte's queue
-            const carriedMyte = this.targetObject;
+            const carriedMyte = this.target;
             if (carriedMyte) {
                 carriedMyte.queue.clear();
             }
         }
 
-        return this.options.current_duration <= 0;
+        return this.current_duration <= 0;
     }
 }

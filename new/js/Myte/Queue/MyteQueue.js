@@ -63,15 +63,15 @@ class MyteQueue {
         });
     }
 
-    addPickupMyte(targetObject) {
-        if (!targetObject || targetObject.queue.isBeingCarried()) return false;
+    addPickupMyte(target) {
+        if (!target || target.queue.isBeingCarried()) return false;
 
         this.add("go_to_object", {
-            targetObject: targetObject
+            target: target
         });
 
         this.add("carry_pickup", {
-            targetObject: targetObject,
+            target: target,
             duration: 100
         });
 
@@ -80,18 +80,18 @@ class MyteQueue {
 
     addFollowObject(element) {
         this.add("follow_object", {
-            targetObject: element
+            target: element
         });
     }
 
     addPutDownMyte() {
         const currentAction = this.getCurrentAction();
-        if (!(currentAction instanceof CarryAction) || !currentAction.targetObject) return false;
+        if (!(currentAction instanceof CarryAction) || !currentAction.target) return false;
 
         this.clear();
 
         this.add("carry_putdown", {
-            targetObject: currentAction.targetObject,
+            target: currentAction.target,
             duration: 100
         });
 
@@ -112,7 +112,7 @@ class MyteQueue {
 
         // Handle mood effects
         if (ActionClass.metadata.affectsMood) {
-            this.myte.updateMood(ActionClass.metadata.moodEffect);
+            this.myte.stats.updateMood(ActionClass.metadata.moodEffect);
         }
 
         const action = new ActionClass(this.myte, options);
@@ -231,8 +231,8 @@ class MyteQueue {
     }
 
     // Add convenience methods to MyteQueue:
-    addRunAway(targetObject, duration = -1) {
-        this.add('run_away', { targetObject, duration });
+    addRunAway(target, duration = -1) {
+        this.add('run_away', { target, duration });
     }
 
     addHide(hideTarget, scaryObject, duration = 5000) {
@@ -256,8 +256,8 @@ class MyteQueue {
 
     addCarry(targetMyte) {
         if (!targetMyte.queue.isBeingCarried()) {
-            this.add('pickup', { targetObject: targetMyte });
-            this.add('carry', { targetObject: targetMyte });
+            this.add('pickup', { target: targetMyte });
+            this.add('carry', { target: targetMyte });
         }
     }
 

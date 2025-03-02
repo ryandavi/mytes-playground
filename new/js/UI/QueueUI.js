@@ -7,36 +7,6 @@ class QueueUI {
         this.allowControls = true;
     }
 
-    categorizeAction(action) {
-        if (action instanceof MoveAction || 
-            action instanceof FollowMouseAction || 
-            action instanceof RunLapsAction || 
-            action instanceof CircleAction ||
-            action instanceof ZigzagAction) {
-            return 'movement';
-        }
-        
-        if (action instanceof ExpressionAction ||
-            action instanceof DanceAction ||
-            action instanceof JumpAction ||
-            action instanceof SpinAction ||
-            action instanceof ShowAffectionAction) {
-            return 'expression';
-        }
-        
-        if (action instanceof CarryPickupAction || 
-            action instanceof CarryPutdownAction ||
-            action instanceof CarryAction ||
-            action instanceof BeingCarriedAction ||
-            action instanceof EatElementAction ||
-            action instanceof RunAwayAction ||
-            action instanceof HideAction) {
-            return 'interaction';
-        }
-
-        return 'other';
-    }
-
     createQueueItem(item) {
         const element = document.createElement('div');
         element.className = 'queue-item';
@@ -90,7 +60,7 @@ class QueueUI {
 		content.appendChild(information);
 
         // Progress bar
-		if(item.options.duration && item.options.duration > 0){
+		if(item.duration && item.duration > 0){
 			const progress = document.createElement('div');
 			progress.className = 'progress';
 			const bar = document.createElement('div');
@@ -109,14 +79,12 @@ class QueueUI {
     updateQueueItem(element, item, index) {
         const key = `queue-${index}`;
         const currentValue = JSON.stringify({
-            type: item.constructor.name,
             target: item.target,
-            options: item.options
+            repeat: item.repeat
         });
         
         if (this.previousValues.get(key) !== currentValue) {
-            const category = this.categorizeAction(item);
-            element.className = `queue-item ${category}${index === 0 ? ' current' : ''}`;
+            element.className = `queue-item ${item.constructor.metadata.category}${index === 0 ? ' current' : ''}`;
 
             const content = element.querySelector('.content');
             const number = content.querySelector('.number');
@@ -133,7 +101,7 @@ class QueueUI {
             description.innerHTML = '';
 
             // Add target information
-            if (item.options.targetObject || item.options.element) {
+            if (item.target || item.element) {
                 const arrow = document.createElement('span');
                 arrow.className = 'arrow';
                 arrow.textContent = '→';
@@ -141,10 +109,10 @@ class QueueUI {
 
                 const target = document.createElement('span');
                 target.className = 'target';
-                if (item.options.targetObject) {
-                    target.textContent = item.options.targetObject.constructor.name;
-                } else if (item.options.element) {
-                    target.textContent = `${item.options.element.tagName}${item.target ? ` (${item.target.x.toFixed(0)}, ${item.target.y.toFixed(0)})` : ''}`;
+                if (item.target) {
+                    target.textContent = item.target.constructor.name;
+                } else if (item.element) {
+                    target.textContent = `${item.element.tagName}${item.target ? ` (${item.target.x.toFixed(0)}, ${item.target.y.toFixed(0)})` : ''}`;
                 }
                 description.appendChild(target);
             }
@@ -158,10 +126,10 @@ class QueueUI {
             }
 
             // Add repeats
-            if (item.options.repeat && item.options.repeat > 1) {
+            if (item.repeat && item.repeat > 1) {
                 const repeats = document.createElement('span');
                 repeats.className = 'repeats';
-                repeats.textContent = `×${item.options.repeat}`;
+                repeats.textContent = `×${item.repeat}`;
                 description.appendChild(repeats);
             }
 
@@ -169,8 +137,8 @@ class QueueUI {
 			if(index == 0){
 				const status = document.createElement('span');
 				status.className = 'status';
-				status.textContent = item.options.duration && item.options.duration > 0 ? 
-				`${this.calculateProgress(item.options)}%`:
+				status.textContent = item.duration && item.duration > 0 ? 
+				`${this.calculateProgress(item)}%`:
 					'in progress'
 				description.appendChild(status);
 			}
@@ -202,10 +170,10 @@ class QueueUI {
 		// Update progress bar
 		const progress = element.querySelector('.progress');
 		if (progress) {  // Check if progress element exists
-			if (index === 0 && item.options.duration && item.options.duration > 0) {
+			if (index === 0 && item.duration && item.duration > 0) {
 				progress.style.display = 'block';
 				const bar = progress.querySelector('.bar');
-				const percentage = this.calculateProgress(item.options);
+				const percentage = this.calculateProgress(item);
 				bar.style.width = `${percentage}%`;
 			} else {
 				progress.style.display = 'none';
@@ -213,9 +181,9 @@ class QueueUI {
 		}
     }
 
-    calculateProgress(options) {
-        if (options.current_duration === -1) return 0;
-        return Math.round(100 - (options.current_duration / options.duration * 100));
+    calculateProgress(item) {
+        if (item.current_duration === -1) return 0;
+        return Math.round(100 - (item.current_duration / item.duration * 100));
     }
 
     update() {

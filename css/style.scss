@@ -132,7 +132,7 @@ body {
 .container-wrapper {
 	background-color: rgb(245, 245, 245);
 	border-radius: 20px;
-	width: 600px;
+	width: 635px;
 
 	margin: 0 auto;
 
@@ -247,28 +247,19 @@ body {
 
 	}
 
-
 	>.container {
 		height: 500px;
 		user-select: none;
 		position: relative;
 
 		-webkit-touch-callout: none;
-		/* Prevent callout to copy image, etc */
 		-webkit-user-select: none;
-		/* Prevent text selection */
 		-khtml-user-select: none;
-		/* Prevent text selection */
 		-moz-user-select: none;
-		/* Prevent text selection */
 		-ms-user-select: none;
-		/* Prevent text selection */
 		user-select: none;
-		/* Prevent text selection */
 		touch-action: none;
-		/* Prevent default touch actions */
 		-webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-		/* Remove tap highlight */
 
 		&.noScroll {
 			>.canvas {
@@ -295,203 +286,9 @@ body {
 			}
 		}
 
-		>.crosshair {
-			position: absolute;
-			top: 0;
-			left: 0;
-			width: 100%;
-			height: 100%;
-			z-index: 10000;
-			pointer-events: none;
-			visibility: hidden;
-
-			.horizontal,
-			.vertical {
-				position: absolute;
-				background-color: red;
-				pointer-events: none;
-				opacity: .25;
-			}
-
-			.horizontal {
-				width: 100%;
-				height: 1px;
-				top: 50%;
-				transform: translateY(-50%);
-			}
-
-			.vertical {
-				height: 100%;
-				width: 1px;
-				left: 50%;
-				transform: translateX(-50%);
-			}
-		}
-
-
-		>.canvas {
-			width: 100%;
-			height: 100%;
-
-			>.layer {
-				padding: 15px;
-				min-width: 100%;
-				min-height: 100%;
-
-				>.mapObject {
-					position: absolute;
-					pointer-events: none;
-
-					&.selected {
-						outline: 2px dashed green;
-						border-radius: 5px;
-					}
-
-
-					>div.interact {
-						pointer-events: all;
-					}
-
-					>* {
-						position: absolute;
-						top: 0;
-						left: 0;
-						width: 100%;
-						height: 100%;
-						image-rendering: pixelated;
-					}
-
-					>.front {
-						animation-delay: inherit;
-						transform-origin: bottom;
-						animation: sway 5s ease-in-out infinite;
-					}
-				}
-			}
-
-			>.background {
-				position: absolute;
-				top: 0px;
-				left: 0px;
-				width: 800px;
-				height: 2000px;
-				min-height: 100%;
-				min-width: 100%;
-				z-index: 0;
-				// background-color: #63b02e;
-
-				background-image: url("data:image/svg+xml,<svg id='patternId' width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'><defs><pattern id='a' patternUnits='userSpaceOnUse' width='20' height='20' patternTransform='scale(2) rotate(0)'><rect x='0' y='0' width='100%' height='100%' fill='hsla(0,0%,100%,1)'/><path d='M3.25 10h13.5M10 3.25v13.5'  stroke-linecap='square' stroke-width='1' stroke='hsla(259, 0%, 92%, 1)' fill='none'/></pattern></defs><rect width='800%' height='800%' transform='translate(0,0)' fill='url(%23a)'/></svg>");
-			}
-
-			>.foreground {
-				z-index: 1;
-				position: absolute;
-				top: 0;
-				left: 0;
-				// min-height:100%;
-				// min-width:100%;
-			}
-
-			>.effects {
-				z-index: 2;
-				position: absolute;
-				top: 0;
-				left: 0;
-				pointer-events: none;
-				user-select: none;
-				// min-height:100%;
-				// min-width:100%;
-			}
-
-
-		}
-
-		.interactableObjectLayer {
-			transition: opacity 1s;
-
-			pointer-events: none;
-
-			height: 100%;
-			width: 100%;
-			position: absolute;
-			top: 0;
-			left: 0;
-			z-index: 3;
-
-			&.deactivated {
-				opacity: 0;
-			}
-
-			.particle {
-				position: absolute;
-				z-index: 0;
-				pointer-events: auto;
-
-				&.footprint {
-					width: 16px;
-					height: 8px;
-					background-color: #333;
-					border-radius: 50%;
-					opacity: .2;
-					transition: opacity 1s;
-				}
-			}
-
-
-			.interactableObject {
-				position: absolute;
-				z-index: 0;
-				cursor: pointer;
-				box-shadow: var(--border-width) var(--border-width) 0px 0px rgba(0, 0, 0, 0.05);
-
-				pointer-events: auto;
-
-				&.coin {
-					width: 20px;
-					height: 30px;
-					background-color: rgb(255, 227, 70);
-					border-radius: var(--border-radius);
-
-					animation-name: floating;
-					animation-duration: 3s;
-					animation-iteration-count: infinite;
-					animation-timing-function: ease-in-out;
-
-					border-top: var(--border-width) solid white;
-					border-left: var(--border-width) solid white;
-					border-right: var(--border-width) solid #ffca00;
-					border-bottom: var(--border-width) solid #ffca00;
-
-					outline: var(--border-width) solid #cfcfcf;
-
-					transition: color .2s, scale .2s;
-					/* Animation */
-
-					&.interacted {
-						scale: 1.15;
-						background-color: rgb(255, 169, 70);
-						border-bottom-color: rgb(255, 137, 27);
-						border-right-color: rgb(255, 137, 27);
-
-						&:hover {
-							scale: inherit;
-						}
-					}
-
-					&:hover {
-						scale: 1.25;
-					}
-				}
-			}
-		}
-
-
-
-
 	}
 
 	>.controls {
-
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1424,13 +1221,13 @@ body {
 
 
 body.debug {
-
 	.target.dot,
 	.debugMenu,
 	.cursor-dot.dot,
 	.crosshair,
 	.queueMenu,
-	.zone {
+	.zone,
+	.layer.debug {
 		visibility: visible !important;
 	}
 
@@ -1517,8 +1314,6 @@ body.debug {
 
 	}
 }
-
-
 
 // Animation for updates
 @keyframes highlight {

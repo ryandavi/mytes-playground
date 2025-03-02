@@ -30,7 +30,7 @@ class DanceAction extends MyteAction {
             { x: -20, y: 0 }
         ];
         this.currentStep = 0;
-        this.stepDuration = this.options.stepDuration;
+        this.stepDuration = this.stepDuration;
         this.stepTimer = this.stepDuration;
     }
 
@@ -42,7 +42,7 @@ class DanceAction extends MyteAction {
         super.start();
         this.baseX = this.myte.posX;
         this.baseY = this.myte.posY;
-        this.options.current_duration = this.options.duration;
+        this.current_duration = this.duration;
     }
 
     update() {
@@ -61,8 +61,8 @@ class DanceAction extends MyteAction {
 
         this.myte.move_toward_target();
 
-        this.options.current_duration--;
-        return this.options.current_duration <= 0;
+        this.current_duration--;
+        return this.current_duration <= 0;
     }
 
     complete(){
@@ -91,10 +91,6 @@ class SleepAction extends MyteAction {
         }
     };
 
-    static canPerform(selected, active) {
-        return selected === active && !active?.queue.isCarrying();
-    }
-
     constructor(myte, options) {
         super(myte, {
             ...SleepAction.metadata.defaultOptions,
@@ -102,8 +98,12 @@ class SleepAction extends MyteAction {
             ...options
         });
         this.bobPhase = 0;
-        this.zTimer = this.options.zInterval;
+        this.zTimer = this.zInterval;
         this.startY = myte.posY;
+    }
+
+    static canPerform(selected, active) {
+        return selected === active && !active?.queue.isCarrying();
     }
 
     start() {
@@ -113,17 +113,17 @@ class SleepAction extends MyteAction {
 
     update() {
         this.bobPhase += 0.05;
-        const newY = this.startY + Math.sin(this.bobPhase) * this.options.bobHeight;
+        const newY = this.startY + Math.sin(this.bobPhase) * this.bobHeight;
         this.myte.setPosition(null, newY);
         this.myte.setSpritePosition(null, newY);
 
         this.zTimer -= 16;
         if (this.zTimer <= 0) {
-            this.zTimer = this.options.zInterval;
+            this.zTimer = this.zInterval;
         }
 
-        this.options.current_duration--;
-        return this.options.current_duration <= 0;
+        this.current_duration--;
+        return this.current_duration <= 0;
     }
 }
 
@@ -166,7 +166,7 @@ class SpinAction extends MyteAction {
             DIRECTION.WEST
         ];
         this.currentDirectionIndex = 0;
-        this.frameDelay = this.options.frameDelay;
+        this.frameDelay = this.frameDelay;
         this.frameTimer = this.frameDelay;
     }
 
@@ -178,8 +178,8 @@ class SpinAction extends MyteAction {
             this.frameTimer = this.frameDelay;
         }
 
-        this.options.current_duration--;
-        return this.options.current_duration <= 0;
+        this.current_duration--;
+        return this.current_duration <= 0;
     }
 }
 
@@ -202,10 +202,6 @@ class SimpleSleepAction extends MyteAction {
         }
     };
 
-    static canPerform(selected, active) {
-        return selected === active && !active?.queue.isCarrying();
-    }
-
     constructor(myte, options) {
         super(myte, {
             ...SimpleSleepAction.metadata.defaultOptions,
@@ -213,7 +209,11 @@ class SimpleSleepAction extends MyteAction {
             ...options
         });
         this.zPosition = 0;
-        this.zSpeed = this.options.zSpeed;
+        this.zSpeed = this.zSpeed;
+    }
+
+    static canPerform(selected, active) {
+        return selected === active && !active?.queue.isCarrying();
     }
 
     start() {
@@ -230,7 +230,7 @@ class SimpleSleepAction extends MyteAction {
 
         this.myte.setPosition(null, this.baseY - (Math.sin(this.zPosition * Math.PI) * 10));
 
-        this.options.current_duration--;
-        return this.options.current_duration <= 0;
+        this.current_duration--;
+        return this.current_duration <= 0;
     }
 }

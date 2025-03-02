@@ -1,132 +1,333 @@
-.layer {
+.container-wrapper {
+	>.container {
 
-	.zone {
-		outline: 1px dashed red;
-		display: flex;
-		justify-content: center;
-		padding: 10px;
-		border-radius: 3px;
-		visibility: hidden;
+		>.crosshair {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			z-index: 10000;
+			pointer-events: none;
+			visibility: hidden;
 
-
-		>.name {
-			font-size: 70%;
-			color: white;
-			background-color: red;
-			border-radius: 5px;
-			padding: 2px 5px;
-			opacity: .75;
-			align-self: flex-start; /* Prevent stretching */
-		}
-	}
-
-
-	// Dropped Item styles
-	.dropped-item {
-		position: absolute;
-		width: 16px;
-		height: 16px;
-		transition: transform 0.05s linear;
-		pointer-events: none;
-		outline: 3px solid red;
-
-		// Collection animation
-		&.collected {
-			animation: collect 0.5s ease-out forwards;
-		}
-
-		// Item variants
-		&.coin {
-			border-radius: 50%;
-			&.gold {
-				background-color: yellow;
-				// background-image: url('../images/MapObjects/music_box.png');
-			}
-		}
-
-		&.health {
-			&.potion {
-				background-color: green;
-				// background-image: url('../images/MapObjects/music_box.png');
-			}
-		}
-
-		&.equipment {
-			&.sword {
+			.horizontal,
+			.vertical {
+				position: absolute;
 				background-color: red;
-				// background-image: url('../images/MapObjects/music_box.png');
+				pointer-events: none;
+				opacity: .25;
+			}
+
+			.horizontal {
+				width: 100%;
+				height: 1px;
+				top: 50%;
+				transform: translateY(-50%);
+			}
+
+			.vertical {
+				height: 100%;
+				width: 1px;
+				left: 50%;
+				transform: translateX(-50%);
+			}
+		}
+
+		>.canvas {
+			width: 100%;
+			height: 100%;
+
+			>.layer {
+				min-width: 100%;
+				min-height: 100%;
+				position: absolute;
+				top: 0;
+				left: 0;
+
+				&.background {
+
+					width: 800px;
+					height: 2000px;
+					z-index: 0;
+					// background-color: #63b02e;
+
+					background-image: url("data:image/svg+xml,<svg id='patternId' width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'><defs><pattern id='a' patternUnits='userSpaceOnUse' width='20' height='20' patternTransform='scale(2) rotate(0)'><rect x='0' y='0' width='100%' height='100%' fill='hsla(0,0%,100%,1)'/><path d='M3.25 10h13.5M10 3.25v13.5'  stroke-linecap='square' stroke-width='1' stroke='hsla(259, 0%, 92%, 1)' fill='none'/></pattern></defs><rect width='800%' height='800%' transform='translate(0,0)' fill='url(%23a)'/></svg>");
+				}
+
+				&.debug {
+					z-index: 100;
+					pointer-events: none;
+					user-select: none;
+					width: 100%;
+					height: 100%;
+					visibility: hidden;
+
+					.grid-cell {
+						position: absolute;
+						pointer-events: none;
+						user-select: none;
+						outline: 1px solid rgba(255, 255, 255, 1);
+
+						&.walkable {
+							background-color: rgba(0, 255, 0, 0.2);
+						}
+
+						&.unwalkable {
+							background-color: rgba(255, 0, 0, 0.1);
+						}
+					}
+
+
+					.path-node {
+						position: absolute;
+						width: 8px;
+						height: 8px;
+						border-radius: 50%;
+						pointer-events: none;
+						user-select: none;
+						opacity: .7;
+						z-index: 1000;
+
+						transform: translate(-50%, -50%);
+
+						&:after {
+							position: absolute;
+							font-size: 70%;
+							color: white;
+							border-radius: 5px;
+							padding: 2px 5px;
+							opacity: 0.75;
+							left: 100%;
+							top: 50%;
+							margin-left: 10px;
+							transform: translate(0%, -50%);
+							white-space: nowrap;
+							text-transform: uppercase;
+							background-color: black;
+						}
+
+
+						&.start {
+							background-color: #00ff00;
+							outline: 2px solid black;
+
+							&:after {
+								content: "start";
+							}
+						}
+
+						&.middle {
+							background-color: #0000ff;
+							outline: 2px solid black;
+
+							&:after {
+								content: "middle point";
+							}
+						}
+
+
+						&.end {
+							background-color: #ff0000;
+							outline: 2px solid black;
+
+							&:after {
+								content: "end";
+							}
+						}
+					}
+				}
+
+				&.foreground {
+					z-index: 1;
+					padding: 15px;
+					width: 500px;
+					height: 500px;
+					min-width: unset;
+					min-height: unset;
+				}
+
+				&.effects {
+					z-index: 2;
+					pointer-events: none;
+					user-select: none;
+				}
+
+				>.zone {
+					outline: 1px dashed red;
+					background-color: rgba(255, 0, 0, 0.089);
+					display: flex;
+					justify-content: center;
+					padding: 10px;
+					border-radius: 3px;
+					visibility: hidden;
+
+					>.name {
+						font-size: 70%;
+						color: white;
+						background-color: red;
+						border-radius: 5px;
+						padding: 2px 5px;
+						opacity: .75;
+						align-self: flex-start;
+						/* Prevent stretching */
+					}
+				}
+
+				>.dropped-item {
+					position: absolute;
+					width: 16px;
+					height: 16px;
+					transition: transform 0.05s linear;
+					pointer-events: none;
+					outline: 3px solid red;
+
+					// Collection animation
+					&.collected {
+						animation: collect 0.5s ease-out forwards;
+					}
+
+					// Item variants
+					&.coin {
+						border-radius: 50%;
+
+						&.gold {
+							background-color: yellow;
+							// background-image: url('../images/MapObjects/music_box.png');
+						}
+					}
+
+					&.health {
+						&.potion {
+							background-color: green;
+							// background-image: url('../images/MapObjects/music_box.png');
+						}
+					}
+
+					&.equipment {
+						&.sword {
+							background-color: red;
+							// background-image: url('../images/MapObjects/music_box.png');
+						}
+					}
+				}
+
+				>.mapObject {
+					position: absolute;
+					pointer-events: none;
+
+					&.selected {
+						outline: 2px dashed green;
+						border-radius: 5px;
+					}
+
+
+					> .interact {
+						pointer-events: all;
+					}
+
+					> * {
+						position: absolute;
+						top: 0;
+						left: 0;
+						width: 100%;
+						height: 100%;
+						image-rendering: pixelated;
+					}
+
+					>.front {
+						animation-delay: inherit;
+						transform-origin: bottom;
+						animation: sway 5s ease-in-out infinite;
+					}
+
+					// crop plant
+					&.crop-plant {
+						position: absolute;
+						width: 16px;
+						height: 16px;
+
+
+						--n: 2;
+						background-size: calc(192px * var(--n)) calc(32px * var(--n));
+						image-rendering: pixelated;
+
+						background: {
+							image: url('../images/chest_spritesheet.png');
+							repeat: no-repeat;
+						}
+
+					}
+
+					// butterfly
+					&.blue_butterfly,
+					&.guard {
+						position: absolute;
+						width: 64px;
+						height: 64px;
+
+						image-rendering: pixelated;
+
+						background: {
+							image: url('../images/MapObjects/butterfly.png');
+							repeat: no-repeat;
+						}
+
+					}
+
+					// treasure chest
+					&.treasure-chest {
+						position: absolute;
+						width: 16px;
+						height: 16px;
+
+
+						--n: 2;
+						background-size: calc(192px * var(--n)) calc(32px * var(--n));
+						image-rendering: pixelated;
+
+						background: {
+							image: url('../images/chest_spritesheet.png');
+							repeat: no-repeat;
+						}
+					}
+
+					// light object
+					&.light-object {
+						&[data-state="on"] {
+							/* Add glow effect when on */
+							filter: drop-shadow(0 0 5px rgba(255, 200, 100, 0.5));
+						}
+
+						&[data-state="off"] {
+							/* Darker appearance when off */
+							filter: brightness(0.7);
+						}
+					}
+
+					// fountain
+					&.fountain {
+						position: relative;
+						transition: filter 0.3s ease;
+
+						&[data-active="true"] {
+							filter: drop-shadow(0 0 5px rgba(100, 200, 255, 0.3));
+						}
+
+						&[data-active="false"] {
+							filter: brightness(0.8);
+						}
+					}
+
+
+				}
+
 			}
 		}
 	}
-
-
-
-	.mapObject {
-		// Treasure Chest styles
-		&.crop-plant {
-			position: absolute;
-			width: 16px;
-			height: 16px;
-
-
-			--n: 2;
-			background-size:calc(192px * var(--n)) calc(32px * var(--n));
-			image-rendering: pixelated;
-
-			background: {
-				image: url('../images/chest_spritesheet.png');
-				repeat: no-repeat;
-			}
-
-		}
-
-		&.treasure-chest {
-			position: absolute;
-			width: 16px;
-			height: 16px;
-
-
-			--n: 2;
-			background-size:calc(192px * var(--n)) calc(32px * var(--n));
-			image-rendering: pixelated;
-
-			background: {
-				image: url('../images/chest_spritesheet.png');
-				repeat: no-repeat;
-			}
-
-			transition: transform 0.2s ease-out;
-
-			&:hover {
-				transform: scale(1.1);
-			}
-		}
-	}
 }
 
 
-.light-object[data-state="on"] {
-	/* Add glow effect when on */
-	filter: drop-shadow(0 0 5px rgba(255, 200, 100, 0.5));
-}
-
-.light-object[data-state="off"] {
-	/* Darker appearance when off */
-	filter: brightness(0.7);
-}
-
-.fountain {
-    position: relative;
-    transition: filter 0.3s ease;
-}
-
-.fountain[data-active="true"] {
-    filter: drop-shadow(0 0 5px rgba(100, 200, 255, 0.3));
-}
-
-.fountain[data-active="false"] {
-    filter: brightness(0.8);
-}
 
 
 // Animation keyframes

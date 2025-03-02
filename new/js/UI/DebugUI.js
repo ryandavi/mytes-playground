@@ -122,8 +122,6 @@ class Debug {
         return messages;
     }
 
-
-
     getCameraMessages() {
         if (!this.cameraEnabled || !this.camera) return [];
         
@@ -138,6 +136,8 @@ class Debug {
         const activeMyte = this.parent.activeMyte;
         if (!activeMyte) return [];
 
+
+
         return [
             // State & Behavior
             { label: "State", value: activeMyte.stateMachine.stateController.currentState },
@@ -147,9 +147,7 @@ class Debug {
             
             // Status
             { label: "Active", value: activeMyte.isActive },
-            { label: "Mood", value: `${activeMyte.mood.toFixed(1)} (${activeMyte.getMoodStatus()})` },
-            { label: "Speed", value: activeMyte.get_speed() },
-            
+
             // Movement
             { label: "Position", value: `${activeMyte.posX.toFixed(2)}px, ${activeMyte.posY.toFixed(2)}px` },
             { label: "Target", value: `${activeMyte.targetX.toFixed(2)}px, ${activeMyte.targetY.toFixed(2)}px` },
@@ -168,11 +166,29 @@ class Debug {
         ];
     }
 
+    getMyteStats(){
+        const activeMyte = this.parent.activeMyte;
+        if (!activeMyte) return [];
+
+        let status = activeMyte.stats.getStatus();
+        return [
+            { label: "Mood", value: `${activeMyte.stats.mood.toFixed(1)} (${activeMyte.stats.getMoodStatus()})` },
+            { label: "Speed", value: activeMyte.stats.getSpeed() },
+
+            {label: "Health", value: status.health},
+            {label: "Energy", value: status.energy.current},
+            
+            {label: "Level", value: status.level},
+            {label: "Experience", value: status.experience},
+            {label: "Personality", value: status.personality.description}
+        ];
+
+
+    }
+
     getActiveEntitiesCount() {
         return this.parent.mytes?.filter(myte => myte.isActive).length || 0;
     }
-
-
 
     getMemoryUsage() {
         if (window.performance && window.performance.memory) {
@@ -189,7 +205,8 @@ class Debug {
             { name: "Time", messages: this.getTimeMessages() },
             { name: "Map", messages: this.getMapMessages() },
             { name: "Camera", messages: this.getCameraMessages() },
-            { name: "Myte", messages: this.getMyteMessages() }
+            { name: "Myte", messages: this.getMyteMessages() },
+            { name: "Myte Stats", messages: this.getMyteStats() }
         ];
 
         this.debug.innerHTML = debugGroups

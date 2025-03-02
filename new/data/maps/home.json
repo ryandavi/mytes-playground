@@ -3,8 +3,8 @@
     "name": "Your Home",
     "description": "A cozy place for your Mytes",
     "dimensions": {
-        "width": 500,
-        "height": 500
+        "width": 800,
+        "height": 2000
     },
     "background": {
         "type": "color",
