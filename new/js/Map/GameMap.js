@@ -33,18 +33,19 @@ class GameMap {
         try {
 
             // Set canvas dimensions
-            this.parent.canvas.style.width = `${this.dimensions.width}px`;
-            this.parent.canvas.style.height = `${this.dimensions.height}px`;
+            // this.parent.canvas.style.width = `${this.dimensions.width}px`;
+            // this.parent.canvas.style.height = `${this.dimensions.height}px`;
 
 
             // Set dimensions
             if (this.layers.objects) {
-                // this.layers.objects.style.width = `${this.dimensions.width}px`;
-                // this.layers.objects.style.height = `${this.dimensions.height}px`;
+                //this.layers.objects.style.width = `${this.dimensions.width}px`;
+                //this.layers.objects.style.height = `${this.dimensions.height}px`;
             }
 
             // Initialize background
             if (this.mapData?.background) {
+                console.log(this.mapData.background);
                 this.setBackground(this.mapData.background);
             }
 
@@ -79,10 +80,11 @@ class GameMap {
             
 
             // Create a ball
-            const ball = MapObjectFactory.create('BALL', 'red_ball', 100, 100);
+            this.addObject('BALL', 'red_ball', 100, 100);
 
             // Create a patrol guard with a specific path
-            const guard = MapObjectFactory.create('PATROL_GUARD', 'guard', 200, 200, {
+            /*
+            const guard = this.addObject('PATROL_GUARD', 'guard', 200, 200, {
                 patrolPoints: [
                     { x: 200, y: 200 },
                     { x: 400, y: 200 },
@@ -90,17 +92,21 @@ class GameMap {
                     { x: 200, y: 400 }
                 ]
             });
+            */
 
             // Create a butterfly
-            const butterfly = MapObjectFactory.create('BUTTERFLY', 'blue_butterfly', 300, 300);
+            this.addObject('BUTTERFLY', 'green', 300, 300);
+            this.addObject('BUTTERFLY', 'small', 100, 100);
+            this.addObject('BUTTERFLY', 'purple', 400, 300);
+            this.addObject('BUTTERFLY', 'blue', 400, 300);
 
             // Create a crop
-            const tomato = MapObjectFactory.create('CROP', 'tomato', 250, 250);
+            this.addObject('CROP', 'tomato', 250, 250);
 
-            this.gridSystem.addObject(tomato);
+
 
             // Create a chest
-            const chest = MapObjectFactory.create('TREASURE_CHEST', 'wooden_chest', 200, 200, {
+            this.addObject('TREASURE_CHEST', 'wooden_chest', 200, 200, {
                 items: [
                     { type: 'COIN', variant: 'gold' },
                     { type: 'HEALTH', variant: 'potion' }
@@ -108,7 +114,7 @@ class GameMap {
             });
 
             // Create a golden chest
-            const goldenChest = this.addObject('TREASURE_CHEST', 'golden_chest', 400, 300, {
+            this.addObject('TREASURE_CHEST', 'golden_chest', 400, 300, {
                 items: [
                     { type: 'COIN', variant: 'gold' },
                     { type: 'COIN', variant: 'gold' },
@@ -119,13 +125,7 @@ class GameMap {
                 ]
             });
 
-            // Add objects to the map
-            this.add(butterfly);
-            this.add(ball);
-            this.add(guard);
-            this.add(goldenChest);
-            this.add(tomato);
-            this.add(chest);
+
 
 
             // Then to find a path:
@@ -134,6 +134,7 @@ class GameMap {
                 console.log('Path found:', path);
                 this.gridSystem.pathfinder.visualizePath(this.layers.debug, path);
             }
+
 
             return true;
         } catch (error) {
@@ -145,11 +146,13 @@ class GameMap {
     setBackground(background) {
         if (!this.layers.background) return;
 
-        if (background.type === 'color') {
-            this.layers.background.style.backgroundColor = background.value;
-        } else if (background.type === 'image') {
+        if (background.color) {
+            this.layers.background.style.backgroundColor = background.color;
+        }
+		
+		if (background.url) {
             this.layers.background.style.backgroundImage = `url(${background.url})`;
-            this.layers.background.style.backgroundSize = 'cover';
+            this.layers.background.style.backgroundSize = 'fill';
         }
     }
 
@@ -173,6 +176,9 @@ class GameMap {
             // Add to objects array
             this.objects.push(object);
 
+            // Add to grid system
+            this.gridSystem.addObject(object);
+
             // Render in the objects layer
             if (this.layers.objects) {
                 object.render(this.layers.objects, this.parent);
@@ -182,9 +188,30 @@ class GameMap {
     }
 
 
-    addObject(type, variant, x, y, properties = {}) {
-        const object = MapObjectFactory.create(type, variant, x, y);
-        return this.add(object, properties);
+
+    addObject(type, variant, x, y, options = {}) {
+
+
+
+
+
+
+        
+        const object = MapObjectFactory.create(type, variant, x, y, options );
+
+        // snap it
+        let newposition = this.gridSystem.snapToGridOptimal(
+            x, 
+            y,
+            object.size.width, 
+            object.size.height,
+            this.gridSystem.config.cellSize);
+
+            object.posX = newposition.x;
+            object.posY = newposition.y;
+
+
+        return this.add(object, options);
     }
 
     addRandomObjects(count, types = ['GRASS']) {
@@ -245,6 +272,10 @@ class GameMap {
         this.objects = this.objects.filter(obj => obj.active);
     }
 
+
+
+
+
     update(deltaTime) {
         // Update all active objects
 
@@ -256,6 +287,8 @@ class GameMap {
 
         // Update culling based on camera
         this.gridSystem.updateCulling(this.parent.camera);
+
+
 
         // Only update visible objects
         this.gridSystem.activeObjects.forEach(object => {

@@ -1,15 +1,16 @@
 {
-    "id": "home",
-    "name": "Your Home",
-    "description": "A cozy place for your Mytes",
+    "id": "bliss",
+    "name": "Bliss",
+    "description": "A green rolling hills and daytime sky with cirrus clouds",
     "dimensions": {
         "width": 800,
         "height": 2000
     },
     "environment": {
-        "location": "interior"
+        "location": "exterior"
     },
     "background": {
+        "url": "../images/MapBackgrounds/bliss.gif",
         "color": "#f0f0f0"
     },
     "spawns": {

@@ -10,7 +10,7 @@ class GridSystem {
             mainGridSize: config.mainGridSize || 64, // Larger grid size (64x64)
             width: parent.dimensions.width|| 2000,  // Total width of the map
             height: parent.dimensions.height || 2000, // Total height of the map
-            cullingPadding: config.cullingPadding || 32 // 128 // Extra padding around viewport for culling
+            cullingPadding: config.cullingPadding || 64 // 128 // Extra padding around viewport for culling
         };
 
         this.lastCameraPos = { x: 0, y: 0 }; // Add this line to track position
@@ -63,6 +63,162 @@ class GridSystem {
         };
     }
 
+
+    snapToGridNearest(x, y, width, height, gridSize, useCenter = true) {
+        // If we're using the center point for decision making
+        if (useCenter) {
+            const centerX = x + (width / 2);
+            const centerY = y + (height / 2);
+            
+            // Find the nearest grid cell based on the center point
+            const gridX = Math.round(centerX / gridSize) * gridSize;
+            const gridY = Math.round(centerY / gridSize) * gridSize;
+            
+            // Adjust back to top-left corner
+            return {
+                x: gridX - (width / 2),
+                y: gridY - (height / 2)
+            };
+        } 
+        // Using the top-left corner and finding the nearest grid
+        else {
+            // Calculate the nearest grid position for the top-left corner
+            const gridX = Math.round(x / gridSize) * gridSize;
+            const gridY = Math.round(y / gridSize) * gridSize;
+            
+            return { x: gridX, y: gridY };
+        }
+    }
+    
+    snapToGridOptimal(x, y, width, height, gridSize) {
+        // Calculate how many grid cells the object spans
+        const cellsWide = Math.ceil(width / gridSize);
+        const cellsHigh = Math.ceil(height / gridSize);
+        
+        // If the object fits within one cell or is smaller than a cell
+        if (cellsWide <= 1 && cellsHigh <= 1) {
+            return snapToGridNearest(x, y, width, height, gridSize);
+        }
+        
+        // For objects spanning multiple cells, find the best alignment
+        
+        // Calculate remainder of width/height compared to grid
+        const widthRemainder = width % gridSize;
+        const heightRemainder = height % gridSize;
+        
+        // Calculate the offset to center the object in the grid cells it occupies
+        const offsetX = widthRemainder > 0 ? (gridSize - widthRemainder) / 2 : 0;
+        const offsetY = heightRemainder > 0 ? (gridSize - heightRemainder) / 2 : 0;
+        
+        // Find nearest grid lines for the top-left corner
+        const gridX = Math.round(x / gridSize) * gridSize;
+        const gridY = Math.round(y / gridSize) * gridSize;
+        
+        return {
+            x: gridX + offsetX,
+            y: gridY + offsetY
+        };
+    }
+    
+    snapToGridWithCollision(x, y, width, height, gridSize, gridSystem) {
+        // First get the optimal position without collision checking
+        let snapped = snapToGridOptimal(x, y, width, height, gridSize);
+        
+        // Now check if this position overlaps with any unwalkable cells
+        const startGridX = Math.floor(snapped.x / gridSize);
+        const startGridY = Math.floor(snapped.y / gridSize);
+        const endGridX = Math.ceil((snapped.x + width) / gridSize);
+        const endGridY = Math.ceil((snapped.y + height) / gridSize);
+        
+        let hasCollision = false;
+        
+        // Check if any of the grid cells the object would occupy are unwalkable
+        for (let gridX = startGridX; gridX < endGridX; gridX++) {
+            for (let gridY = startGridY; gridY < endGridY; gridY++) {
+                // Skip out of bounds cells
+                if (gridX < 0 || gridX >= gridSystem.gridWidth || 
+                    gridY < 0 || gridY >= gridSystem.gridHeight) {
+                    continue;
+                }
+                
+                if (!gridSystem.grid[gridX][gridY].walkable) {
+                    hasCollision = true;
+                    break;
+                }
+            }
+            if (hasCollision) break;
+        }
+        
+        // If there's a collision, try to find the nearest valid position
+        if (hasCollision) {
+            // This is a simplified approach - you might want to implement
+            // a more sophisticated algorithm to find the best valid position
+            const searchRadius = 1;
+            
+            // Try positions in a small radius around the original snapped position
+            for (let offsetX = -searchRadius; offsetX <= searchRadius; offsetX++) {
+                for (let offsetY = -searchRadius; offsetY <= searchRadius; offsetY++) {
+                    if (offsetX === 0 && offsetY === 0) continue; // Skip the original position
+                    
+                    const testX = snapped.x + offsetX * gridSize;
+                    const testY = snapped.y + offsetY * gridSize;
+                    
+                    // Check if this position is valid
+                    let testValid = true;
+                    const testStartGridX = Math.floor(testX / gridSize);
+                    const testStartGridY = Math.floor(testY / gridSize);
+                    const testEndGridX = Math.ceil((testX + width) / gridSize);
+                    const testEndGridY = Math.ceil((testY + height) / gridSize);
+                    
+                    // Check all grid cells this position would occupy
+                    checkValidity:
+                    for (let gridX = testStartGridX; gridX < testEndGridX; gridX++) {
+                        for (let gridY = testStartGridY; gridY < testEndGridY; gridY++) {
+                            // Skip out of bounds cells
+                            if (gridX < 0 || gridX >= gridSystem.gridWidth || 
+                                gridY < 0 || gridY >= gridSystem.gridHeight) {
+                                continue;
+                            }
+                            
+                            if (!gridSystem.grid[gridX][gridY].walkable) {
+                                testValid = false;
+                                break checkValidity;
+                            }
+                        }
+                    }
+                    
+                    if (testValid) {
+                        return { x: testX, y: testY };
+                    }
+                }
+            }
+            
+            // If no valid position found in the search radius, just return the original
+            // snapped position (or you could implement more complex fallback behavior)
+        }
+        
+        return snapped;
+    }
+
+
+    // Add this method to GridSystem
+    getPotentialColliders(entity) {
+        // Get all cells that the entity overlaps
+        const cells = this.getObjectCells(entity);
+        
+        // Collect all unique objects from these cells (except the entity itself)
+        const potentialColliders = new Set();
+        cells.forEach(cell => {
+            cell.objects.forEach(obj => {
+                if (obj !== entity && !obj.config.walkable) {
+                    potentialColliders.add(obj);
+                }
+            });
+        });
+        
+        return Array.from(potentialColliders);
+    }
+
     // Get all cells that an object occupies
     getObjectCells(obj) {
         const startGrid = this.worldToGrid(obj.posX, obj.posY);
@@ -72,8 +228,8 @@ class GridSystem {
         );
 
         const cells = new Set();
-        for (let x = startGrid.x; x <= endGrid.x; x++) {
-            for (let y = startGrid.y; y <= endGrid.y; y++) {
+        for (let x = startGrid.x; x < endGrid.x; x++) {
+            for (let y = startGrid.y; y < endGrid.y; y++) {
                 if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
                     cells.add(this.grid[x][y]);
                 }
@@ -154,7 +310,7 @@ class GridSystem {
 
     // Update culling based on camera viewport
     updateCulling(camera) {
-        
+
         // Check if camera has moved
         const moveThreshold = 0;
         // Check if camera has moved more than the threshold
@@ -206,6 +362,7 @@ class GridSystem {
         this.debugMode = true;
         this.parent.layers.debug = container;
         this.createDebugGrid();
+
     }
 
     disableDebug() {

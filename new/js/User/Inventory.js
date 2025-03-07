@@ -56,12 +56,13 @@ class Inventory {
     }
 
     // Item Management Methods
-    createItemElement({ name, quantity, type, description = '' }) {
+    createItemElement({ name, quantity, type, variant, description = '' }) {
         const itemElement = document.createElement('div');
         itemElement.className = `item ${type.toLowerCase()}`;
         itemElement.dataset.name = name;
         itemElement.dataset.quantity = quantity;
         itemElement.dataset.type = type;
+        itemElement.dataset.variant = variant;
         itemElement.draggable = true;
 
         if (description) {
@@ -236,13 +237,13 @@ class Inventory {
         const layerForeground = container.querySelector('.layer.foreground');
         if (!layerForeground) return;
 
-        const { name, quantity, type } = this.state.draggedItem.dataset;
+        const { name, quantity, variant, type } = this.state.draggedItem.dataset;
         const mouse = this.parent.getLocalMouse();
 
         // Create object in world
-        const object = this.parent.mapArea.addObject(
-            'FOOD',
+        const object = this.parent.gameMap.addObject(
             type,
+            variant,
             mouse.x - this.config.dragOffsetX,
             mouse.y - this.config.dragOffsetY
         );

@@ -6,6 +6,7 @@
 	<link rel="stylesheet" href="../css/style.css">
 	<link rel="stylesheet" href="../css/map.css">
 	<link rel="stylesheet" href="../css/ui.css">
+	<link rel="stylesheet" href="../css/myte.css">
 </head>
 
 <body class="debug">
@@ -20,97 +21,193 @@
 	<section class="debugMenu ignore">Not Initialized</section>
 	<section class="queueMenu ignore"></section>
 
-
-	<div class="container-wrapper styled">
-
-		<div class="ignore header">
-			<div class="logo"><img src="../images/logo.svg"></div>
-			<div class="active-pet" id="hud-active-pet">
-				<div class="name">Name</div>
-				<div class="mood">Mood</div>
-				<div class="energy">Energy</div>
-			</div>
-
-			<div class="date-time">
-				<div class="username">8:16 pm</div>
-			</div>
-
-			<div class="user">
-				<div class="username">Ryan</div>
-			</div>
-		</div>
-
-		<!-- HAND CONTROLS -->
-		<div class="hand-controls ignore" id="hand-controls">
-			<input type="radio" name="hand" value="left" id="hand-select" checked>
-			<label class="button" for="hand-select">Select</label>
-			
-			<input type="radio" name="hand" value="left" id="hand-drag">
-			<label for="hand-drag">Drag</label>
-
-			<input type="radio" name="hand" value="right" id="hand-pet">
-			<label for="hand-pet">Pet</label>
-		</div>
-		<!-- END HAND CONTROLS -->
-
-		<!-- CANVAS -->
-		<section class="container" id="container-1">
-			<div class="crosshair ignore debug">
-				<div class="horizontal"></div>
-				<div class="vertical"></div>
-			</div>
-			<div class="canvas">
-				<!-- map objects -->
-
-				<div class="layer debug"></div>
-
-				<div class="layer background"></div>
-				<!-- map objects -->
-				<div class="layer controls">
-					<div class="ignore dot cursor-dot debug"></div>
+	<!-- CONTAINER WRAPPER WRAPPER-->
+	<div class="container-wrapper-wrapper">
+		<!-- LOADING SCREEN -->
+		<div class="loading-screen" id="loading-screen">
+			<div class="mytes-loading-window">
+				<div class="mytes-title-bar">
+					<div class="mytes-title-icon">📂</div>
+					<div class="mytes-title-text">Loading Mytes...</div>
+					<div class="mytes-close-button">✕</div>
 				</div>
-				<!-- mytes only go here-->
-				<div class="layer foreground">
-					<div class="myteContainer">
-						<div id="myteWrapper-1" class="myteWrapper snail">
-							<div class="home-name">
-								<div class="name tooltip">Lentil's Home</div>
-							</div>
-
-							<div class="home-wrapper"></div>
-
-							<!-- MYTE START-->
-							<div id="myte-pookie" class="interactive-myte" data-myte-name="Lentil" draggable="false">
-								<div class="inner-wrapper">
-									<div class="sprite"></div>
-									<div class="selectbox"></div>
-									<div class="collidebox"></div>
-									<div class="hitbox"></div>
-
-									<div class="name-wrapper">
-										<span class="before">x</span>
-										<div class="name tooltip">Lentil</div>
-									</div>
-
-									<div class="commands"></div>
-
-									<div class="dialogue">
-										<span class="text">Hiii</span>
-									</div>
-
-									<div class="above-wrapper">
-										<div class="battery"></div>
-									</div>
-								</div>
-							</div>
-							<!-- MYTE END-->
-
+				<div class="mytes-content">
+					<div class="mytes-message"> Please wait while your Mytes are being prepared. This won't take long!
+					</div>
+					<div class="loading-icon"></div>
+					<div class="mytes-progress-container">
+						<div class="mytes-progress">
+							<div class="mytes-progress-blocks"></div>
 						</div>
 					</div>
+					<div class="mytes-status" id="loading-text">Loading essential files...</div>
+					<div class="mytes-buttons">
+						<div class="mytes-button" id="loading-skip-button">Skip Loading</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- END LOADING SCREEN -->
 
-					<!-- Myte 2 -->
+		<!-- MAIN SCREEN -->
+		<div class="container-wrapper styled">
 
-					<!--
+			<!-- HEADER-->
+			<div class="ignore header">
+				<div class="logo"><img src="../images/logo.svg"></div>
+				<div class="active-pet" id="hud-active-pet">
+					<div class="name">Name</div>
+					<div class="mood">Mood</div>
+					<div class="energy">Energy</div>
+				</div>
+				<div class="date-time">
+					<div class="username">8:16 pm</div>
+				</div>
+				<div class="user">
+					<div class="username">Ryan</div>
+				</div>
+			</div>
+			<!-- END HEADER -->
+
+			<!-- HAND CONTROLS -->
+			<div class="hand-controls ignore" id="hand-controls">
+				<!-- RADIO BUTTONS -->
+				<input type="radio" name="hand" value="left" id="hand-select" checked>
+				<label class="button" for="hand-select">
+					<svg id="hand_pointer_icon" class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10.5 12">
+						<path id="Pointer"
+							d="m8.44,7.59h-2.46l1.06,2.22c.22.47.02,1.03-.44,1.25-.47.22-1.03.02-1.25-.44l-1.09-2.29-1.76,2.07c-.11.13-.27.2-.43.2-.07,0-.13-.01-.19-.03-.22-.08-.37-.29-.37-.53V1.41c0-.22.13-.42.33-.51.2-.09.44-.06.6.09l6.38,5.63c.18.15.24.4.15.62-.08.22-.29.36-.53.36Z" />
+					</svg>
+					<span class="text"><u>S</u>elect</span>
+				</label>
+				<input type="radio" name="hand" value="left" id="hand-drag">
+				<label for="hand-drag">
+					<svg id="hand_grab_icon" class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10.5 12">
+						<path id="Grab"
+							d="m10.12,3.38v2.82c0,1.17-.6,2.2-1.5,2.8v3H2.62v-3l-1.25-.91c-.63-.46-1-1.2-1-1.97v-1.62c0-.34.16-.67.42-.88l.7-.56v1.07c0,.21.17.38.38.38s.38-.17.38-.38V1.12c0-.62.5-1.12,1.12-1.12s1.08.46,1.12,1.05c.2-.18.46-.3.76-.3.62,0,1.12.5,1.12,1.12v.13c.2-.3.55-.5.94-.5.55,0,1.01.4,1.1.92.17-.1.37-.17.58-.17.62,0,1.12.5,1.12,1.12Z" />
+					</svg>
+					<span class="text"><u>D</u>rag</span>
+				</label>
+				<input type="radio" name="hand" value="right" id="hand-pet">
+				<label for="hand-pet">
+					<svg id="hand_pet_icon" class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10.5 12">
+						<path id="Paw"
+							d="m1.12,5.63c-.62,0-1.12-.5-1.12-1.12s.5-1.12,1.12-1.12,1.12.5,1.12,1.12-.5,1.12-1.12,1.12Zm8.62,3.38c0,1.24-1.01,2.25-2.25,2.25-1.21.04-1.69-.75-2.25-.75s-1.04.79-2.25.75c-1.24,0-2.25-1-2.25-2.25,0-.84.46-1.57,1.14-1.95.64-.36,1.1-1.43,1.58-2.29.37-.67,1.08-1.01,1.78-1.01s1.42.33,1.78,1.01c.47.85.96,1.95,1.57,2.29.68.38,1.14,1.11,1.14,1.95ZM2.25,1.88c0-.62.5-1.12,1.12-1.12s1.12.5,1.12,1.12-.5,1.13-1.12,1.13-1.12-.5-1.12-1.13Zm3.75,0c0-.62.5-1.12,1.12-1.12s1.12.5,1.12,1.12-.5,1.13-1.12,1.13-1.12-.5-1.12-1.13Zm4.5,2.63c0,.62-.5,1.12-1.12,1.12s-1.12-.5-1.12-1.12.5-1.12,1.12-1.12,1.12.5,1.12,1.12Z" />
+					</svg>
+					<span class="text"><u>P</u>et</span>
+				</label>
+				<!-- RADIO BUTTONS-->
+
+				<!-- BUTTONS -->
+				<button id="sound-toggle" class="hand-control-btn" title="Toggle Sound">
+					<i class="icon-sound-on"></i>
+					<i class="icon-sound-off"></i>
+				</button>
+				<!-- END BUTTONS -->
+			</div>
+			<!-- END HAND CONTROLS -->
+
+			<!-- SOUND SETTINGS -->
+			<div id="sound-settings-panel" class="modal-window settings-panel hidden">
+				<div class="header panel-header">
+					<span class="icon">:)</span>
+					<h3 class="title">Sound Settings</h3>
+					<button class="close-btn">&times;</button>
+				</div>
+				<div class="content panel-content">
+					<div class="setting-group">
+						<div class="setting-row">
+							<label for="master-volume">Master Volume</label>
+							<input type="range" id="master-volume" min="0" max="100" value="0">
+						</div>
+						<div class="setting-row">
+							<label for="ui-volume">UI Volume</label>
+							<input type="range" id="ui-volume" min="0" max="100" value="0">
+						</div>
+						<div class="setting-row">
+							<label for="ambient-volume">Ambient Volume</label>
+							<input type="range" id="ambient-volume" min="0" max="100" value="0">
+						</div>
+						<div class="setting-row">
+							<label for="sfx-volume">SFX Volume</label>
+							<input type="range" id="sfx-volume" min="0" max="100" value="0">
+						</div>
+						<div class="setting-row">
+							<label for="music-volume">Music Volume</label>
+							<input type="range" id="music-volume" min="0" max="100" value="0">
+						</div>
+					</div>
+					<div class="setting-group">
+						<div class="setting-row">
+							<div class="checkbox-wrapper">
+								<input type="checkbox" id="sound-enabled" checked>
+								<label for="sound-enabled">Sound Effects</label>
+							</div>
+						</div>
+						<div class="setting-row">
+							<div class="checkbox-wrapper">
+								<input type="checkbox" id="music-enabled" checked>
+								<label for="music-enabled">Background Music</label>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- END SOUND SETTINGS -->
+
+			<!-- CANVAS CONTAINER -->
+			<section class="container" id="container-1">
+				<!-- CROSSHAIR -->
+				<div class="crosshair ignore debug">
+					<div class="horizontal"></div>
+					<div class="vertical"></div>
+				</div>
+				<!-- END CROSSHAIR -->
+
+				<!-- CANVAS -->
+				<div class="canvas">
+					<!-- map objects -->
+					<div class="layer debug"></div>
+					<div class="layer background"></div>
+					<!-- map objects -->
+					<div class="layer controls">
+						<div class="ignore dot cursor-dot debug"></div>
+					</div>
+					<div class="layer foreground">
+						<!-- MYTE CONTAINER -->
+						<div class="myteContainer">
+							<div id="myteWrapper-1" class="myteWrapper snail">
+								<!-- HOME -->
+								<div class="home-name">
+									<div class="name tooltip">Lentil's Slot</div>
+								</div>
+								<div class="home-wrapper"></div>
+								<!-- END HOME -->
+								<!-- MYTE START-->
+								<div id="myte-pookie" class="interactive-myte" data-myte-name="Lentil"
+									draggable="false">
+									<div class="inner-wrapper">
+										<div class="sprite"></div>
+										<div class="selectbox"></div>
+										<div class="name-wrapper">
+											<span class="before">x</span>
+											<div class="name tooltip">Lentil</div>
+										</div>
+										<div class="commands"></div>
+										<div class="dialogue">
+											<span class="text">Hiii</span>
+										</div>
+										<div class="above-wrapper">
+											<div class="battery"></div>
+										</div>
+									</div>
+								</div>
+								<!-- MYTE END-->
+							</div>
+						</div>
+						<!-- END MYTE CONTAINER -->
+						<!-- Myte 2 -->
+						<!--
 					<div class="myteContainer">
 						<div id="myteWrapper-2" class="myteWrapper snail">
 							<div class="home-name">
@@ -144,68 +241,59 @@
 						</div>
 					</div>
 					-->
-
-
-					<input class="collider">
-					<h2> hi </h2> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br><br>
-					<div id="item_1" class="item-old food" draggable="true"></div>
-					<div id="item_2" class="item-old food" draggable="true"></div>
-					<div id="item_3" class="item-old food" draggable="true"></div>
-					<div id="item_4" class="item-old food" draggable="true"></div>
-					<div id="item_5" class="item-old food" draggable="true"></div>
-					<div id="item_6" class="item-old food" draggable="true"></div>
-					<div id="item_7" class="item-old food" draggable="true"></div>
-					<div id="item_8" class="item-old food" draggable="true"></div>
-					<div id="item_9" class="item-old food" draggable="true"></div>
-					&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-					&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <textarea class="collider">hi</textarea>
-					<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
-					<textarea class="collider">DOWNNN</textarea>
-				</div>
-
-				<div class="layer effects"></div>
-			</div>
-		</section>
-		<!-- END CANVAS -->
-
-		<!-- ACTION CONTROLS-->
-		<div class="sidebar right">
-			<div class="action-controls ignore" id="action-controls">
-				<div class="selected-info">
-					<div class="interaction-type">
-						<span class="type">Not Selected</span>
+						<input class="collider">
+						<h2> hi </h2> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br><br>
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <textarea class="collider">hi</textarea>
+						<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+						<textarea class="collider">DOWNNN</textarea>
 					</div>
-					<div class="target-info">
-						<span class="type">-</span>
-						<span class="name">None</span>
+					<div class="layer effects"></div>
+				</div>
+				<!-- END CANVAS -->
+			</section>
+			<!-- END CANVAS CONTAINER -->
+
+			<!-- ACTION CONTROLS MENU -->
+			<div class="sidebar right">
+				<div class="action-controls ignore" id="action-controls">
+					<div class="selected-info">
+						<div class="interaction-type">
+							<span class="type">Not Selected</span>
+						</div>
+						<div class="target-info">
+							<span class="type">-</span>
+							<span class="name">None</span>
+						</div>
+					</div>
+					<div class="action-groups">
 					</div>
 				</div>
-				<div class="action-groups">
-				</div>
 			</div>
+			<!-- END ACTION CONTROLS MENU -->
+
+			<!-- ALL MYTES -->
+			<div class="allMytes" id="all_mytes"></div>
+			<!-- END MYTES -->
+
+			<!-- INVENTORY -->
+			<div class="inventory" id="inventory"></div>
+			<!-- END INVENTORY -->
+
+			<!-- CONTROLS -->
+			<div class="controls" id="controls">
+				<button id="cycleGoal" class="myte" disabled>Loading...</button>
+				<button id="cycleFollowGoal" class="myte" disabled>Loading...</button>
+				<button id="skipQueue" class="myte" disabled>Skip Queue</button>
+				<button id="toggleDebug">Toggle Debug</button>
+				<button id="cycleCamera">Loading...</button>
+				<button id="cycleContainerLimit" class="myte" disabled>Loading...</button>
+			</div>
+			<!-- END CONTROLS -->
 		</div>
-		<!-- END ACTION CONTROLS -->
-
-		<!-- MYTES -->
-		<div class="allMytes" id="all_mytes"></div>
-		<!-- END MYTES -->
-
-		<!-- INVENTORY -->
-		<div class="inventory" id="inventory"></div>
-		<!-- END INVENTORY -->
-
-		<!-- CONTROLS -->
-		<div class="controls" id="controls">
-			<button id="cycleGoal" class="myte" disabled>Loading...</button>
-			<button id="cycleFollowGoal" class="myte" disabled>Loading...</button>
-			<button id="skipQueue" class="myte" disabled>Skip Queue</button>
-			<button id="toggleDebug">Toggle Debug</button>
-			<button id="cycleCamera">Loading...</button>
-			<button id="cycleContainerLimit" class="myte" disabled>Loading...</button>
-		</div>
-		<!-- END CONTROLS -->
 	</div>
-	</div>
+	<!-- END CONTAINER WRAPPER WRAPPER -->
+	
 	<br><br><br><br><br><br> <br><br><br>
 	<img style="margin: 0 auto; max-width:500px; height: auto; display: block;" id="poo"
 		src="https://pbs.twimg.com/media/F5ye8eWWwAASpoG?format=jpg&name=large">
@@ -245,38 +333,44 @@
 		<!-- Submit Button -->
 		<input type="submit" value="Submit">
 	</form>
+
 	<div style="margin: 30px; padding: 30px;">hi</div>
 	<div style="margin: 30px; padding: 30px;">hi</div>
 	<div style="margin: 30px; padding: 30px;">hi</div>
 	<textarea>hi</textarea>
 	<div style="margin: 30px; padding: 30px;">hi</div>
 
-    <!-- Scripts -->
+
+	<!-- EXTERNAL -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+	<!-- CORE -->
 	<script src="js/Utility.js"></script>
 	<script src="js/BaseInputHandler.js"></script>
 	<script src="js/BaseDragHandler.js"></script>
-    <script src="js/ResourceManager.js"></script>
-    <script src="js/EventManager.js"></script>
-    <script src="js/Core.js"></script>
+	<script src="js/ResourceManager.js"></script>
+	<script src="js/SoundManager.js"></script>
+	<script src="js/EventManager.js"></script>
+	<script src="js/LoadingManager.js"></script>
+	<script src="js/Core.js"></script>
 	<script src="js/GameTime.js"></script>
-
 	<!-- USER -->
 	<script src="js/User/User.js"></script>
 	<script src="js/User/Inventory.js"></script>
-
 	<!-- CONTAINER -->
 	<script src="js/Container/ContainerManager.js"></script>
 	<script src="js/Container/ContainerInputManager.js"></script>
 	<script src="js/Container/ParticleSystem.js"></script>
-
 	<!-- MYTE -->
 	<script src="js/Myte/Myte.js"></script>
 	<script src="js/Myte/MyteStats.js"></script>
 	<script src="js/Myte/StateMachine.js"></script>
 	<script src="js/Myte/MyteCommand.js"></script>
-	<script src="js/Myte/MyteInputHandler.js"></script>
+	<script src="js/Myte/Input/MyteInputHandler.js"></script>
+	<script src="js/Myte/Input/MyteTouchHandler.js"></script>
+	<script src="js/Myte/Input/MyteClickHandler.js"></script>
+	<script src="js/Myte/Input/MyteRubbingHandler.js"></script>
 	<script src="js/Myte/MyteDialogue.js"></script>
-
+	<script src="js/Myte/MyteSpeech.js"></script>
 	<!-- QUEUE -->
 	<script src="js/Myte/Queue/MyteQueue.js"></script>
 	<script src="js/Myte/Queue/Actions/BaseActions.js"></script>
@@ -286,23 +380,26 @@
 	<script src="js/Myte/Queue/Actions/MovementActions.js"></script>
 	<script src="js/Myte/Queue/Actions/ReactiveActions.js"></script>
 	<script src="js/Myte/Queue/ActionManager.js"></script>
-
 	<!-- MAP -->
 	<script src="js/Map/Camera.js"></script>
 	<script src="js/Map/GameMapLoader.js"></script>
 	<script src="js/Map/GameMap.js"></script>
 	<script src="js/Map/GameZone.js"></script>
+	<!-- MAP OBJECTS -->
+	<script src="js/Map/MapObjects/AnimationController.js"></script>
 	<script src="js/Map/MapObjects/BaseMapObject.js"></script>
+	<script src="js/Map/MapObjects/AnimatedMapObject.js"></script>
 	<script src="js/Map/MapObjects/GrowingPlantObject.js"></script>
 	<script src="js/Map/MapObjects/MovingMapObject.js"></script>
-	<script src="js/Map/MapObjectManager.js"></script>
+	<script src="js/Map/MapObjects/MapObjectManager.js"></script>
+	<!-- MAP GRID -->
 	<script src="js/Map/Grid/GameMapGrid.js"></script>
 	<script src="js/Map/Grid/GameMapGridAstar.js"></script>
-	
 	<!-- UI -->
 	<script src="js/UI/UI.js"></script>
 	<script src="js/UI/DebugUI.js"></script>
 	<script src="js/UI/QueueUI.js"></script>
-    
+	<script src="js/UI/SoundUI.js"></script>
 </body>
+
 </html>

@@ -8,7 +8,7 @@ class MyteCore {
         // User management
         this.user = null;
         this.defaultUserDataPath = 'data/user/Ryan.json'; // Path to default user data
-        
+
         // System configuration
         this.config = {
             fps: 8,
@@ -17,73 +17,187 @@ class MyteCore {
             // Logic/physics update rate (20 ticks per second like Minecraft)
             tickRate: 20,
             tickInterval: 1000 / 20, // 50ms between ticks
-            
+
             // Default animation frame rate
             defaultAnimationFPS: 8,
             defaultFrameInterval: 1000 / 8,
-            
+
             // Performance monitoring
             targetFPS: 60,
             fpsUpdateInterval: 1000, // Update FPS counter every second
-            
+
             // Other config...
             inactiveTimeout: 8000,
             defaultState: "idle",
             defaultMode: MOVE_TYPES.FOLLOW,
             defaultFollowMode: MOVE_FOLLOW_TYPES.NORMAL
         };
-        
+
         // Core systems
         this.containers = new Map();
         this.eventManager = new EventManager(this);
         this.resourceManager = new ResourceManager();
-        
+        this.resourceManager.core = this; // Add reference to core
+
+        // Add Loading Manager
+        this.loadingManager = new LoadingManager();
+
+        // Add to your MyteCore constructor:
+        this.soundManager = new SoundManager(
+            this, {
+            soundEnabled: this.config.sound?.enabled !== false,
+            musicEnabled: this.config.sound?.musicEnabled !== false,
+            // masterVolume: this.config.sound?.masterVolume || 0.7,
+            // sfxVolume: this.config.sound?.sfxVolume || 0.1,
+            // musicVolume: this.config.sound?.musicVolume || 0.2,
+            // uiVolume: this.config.sound?.uiVolume || 0.6
+        });
+
         // Timing state
         this.lastTickTime = 0;
         this.lastFrameTime = 0;
         this.tickAccumulator = 0;
         this.isInitialized = false;
 
+        this.ambientSoundCounter = 0;
+        this.ambientSoundUpdateFrequency = 1000; // Update every 200 ticks (10 seconds at 20 ticks/sec)
+
         // Performance monitoring
         this.frameCount = 0;
         this.lastFPSUpdate = 0;
         this.currentFPS = 0;
-
-
     }
 
     async init() {
         try {
+            // Initialize loading screen
+            this.loadingManager = new LoadingManager();
+            this.loadingManager.initialize();
+
             // Load essential resources first
+            this.loadingManager.setMessage("Loading essential resources...");
             await this.resourceManager.preloadEssentialResources();
-            
+            this.loadingManager.updateStageProgress('resources', 0.3); // Essential resources are ~30% of all resources
+
             // Initialize user system
+            this.loadingManager.setMessage("Loading user data...");
             await this.initializeUser();
-            
+            this.loadingManager.updateStageProgress('core', 0.5); // User initialization is ~50% of core setup
+
             // Initialize containers
+            this.loadingManager.setMessage("Setting up game environment...");
             const container = await this.createContainer('container-1');
             if (!container) {
                 throw new Error('Failed to create main container');
             }
 
-            container.init();
-            
+
+
+
+            // This call starts container initialization
+            // The container will manage its own part of the loading progress
+            await container.init();
+            this.loadingManager.updateStageProgress('core', .75); // Core is now fully initialized
+
+            this.loadingManager.setMessage("Initializing audio...");
+            await this.initializeAudio();
+            this.loadingManager.updateStageProgress('core', 1);
+
+
             // Load remaining resources in the background
-            this.resourceManager.loadResources().then(() => {
-                console.log('All resources loaded');
-            }).catch(error => {
-                console.warn('Some resources failed to load:', error);
-            });
+            this.loadingManager.setMessage("Loading graphics and audio...");
+            this.resourceManager.loadResources()
+                .then(() => {
+                    console.log('All resources loaded');
+                    this.loadingManager.updateStageProgress('resources', 1.0);
+
+                    // Don't mark complete yet - let the container finish first
+                    if (this.loadingManager.stages.container.progress >= 0.95) {
+                        this.loadingManager.completeLoading();
+                    }
+                })
+                .catch(error => {
+                    console.warn('Some resources failed to load:', error);
+                    // Still mark resources as complete for UX purposes
+                    this.loadingManager.updateStageProgress('resources', 1.0);
+                });
 
             // Start update loop
             this.isInitialized = true;
             this.startUpdateLoop();
-            
+
         } catch (error) {
             console.error('Failed to initialize MyteCore:', error);
+            if (this.loadingManager) {
+                this.loadingManager.setMessage("Error loading game: " + error.message);
+            }
             throw error;
         }
     }
+
+    // Add this method to your MyteCore class:
+    async initializeAudio() {
+        try {
+            // Just prepare the audio system (actual initialization will happen with user interaction)
+            console.log('Audio system prepared, waiting for user interaction');
+            this.setupAudioUnlockListeners();
+            return true;
+        } catch (error) {
+            console.warn('Audio preparation failed:', error);
+            return false;
+        }
+    }
+
+    getFirstContainer(){
+        let firstEntry = this.containers.entries().next().value;
+        let containerManager = firstEntry?.[1];
+        return containerManager;
+
+    }
+
+    // Add this method to your MyteCore class:
+    setupAudioUnlockListeners() {
+        // These events will unlock audio on first user interaction
+        const unlockEvents = ['click', 'touchstart', 'keydown'];
+
+        const unlockAudio = async () => {
+            if (!this.soundManager.initialized) {
+                try {
+                    await this.soundManager.init();
+                    console.log('Audio unlocked by user interaction');
+
+                    // Add a small delay before playing sounds
+                    setTimeout(() => {
+                        // Play startup sound
+                        //this.soundManager.playUISound('select');
+
+                        // Speak text with the character's voice
+                        this.soundManager.speakAnimalText("Hi my name is baby!", {
+                            species: "bird",
+                            speed: 1.6,
+                            pitch: 1.3
+                        });
+
+                        // Add another delay before playing music
+                        setTimeout(() => {
+                            // Start appropriate background music based on time
+                            this.soundManager.startAllSounds();
+                            
+                            // }
+                        }, 300);
+                    }, 100);
+                } catch (error) {
+                    console.error('Failed to initialize audio after user interaction:', error);
+                }
+            }
+        };
+
+        // Add event listeners
+        unlockEvents.forEach(event => {
+            document.addEventListener(event, unlockAudio);
+        });
+    }
+
 
     async initializeUser() {
         // Create new user instance
@@ -170,7 +284,7 @@ class MyteCore {
             this.currentFPS = Math.round(
                 (this.frameCount * 1000) / (timestamp - this.lastFPSUpdate)
             );
-            
+
             // Optionally adjust visual quality based on performance
             this.adjustPerformance();
 
@@ -224,7 +338,7 @@ class MyteCore {
                 this.lastFrameTime = timestamp;
             }
 
-            
+
             // Request next frame
             requestAnimationFrame(updateFrame);
         };
@@ -244,6 +358,22 @@ class MyteCore {
         if (this.user) {
             this.user.updatePlayTime(tickDelta);
         }
+
+        // Only update ambient sounds occasionally
+        this.ambientSoundCounter++;
+        if (this.ambientSoundCounter >= this.ambientSoundUpdateFrequency) {
+            this.ambientSoundCounter = 0;
+
+
+            let firstContainer = this.getFirstContainer();
+                
+            if (this.soundManager?.initialized && firstContainer) {
+                const timeData = firstContainer.timeManager.getTimeData();
+                // this.soundManager.updateSounds(timeData);
+            }
+
+        }
+
     }
 
     update(deltaTime) {
@@ -258,6 +388,11 @@ class MyteCore {
         // Save user data before disposing
         if (this.user) {
             this.user.saveUserData();
+        }
+
+        if (this.soundManager) {
+            this.soundManager.dispose();
+            this.soundManager = null;
         }
 
         this.isInitialized = false;

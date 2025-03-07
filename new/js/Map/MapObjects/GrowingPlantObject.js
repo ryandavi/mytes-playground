@@ -368,6 +368,10 @@ class CropPlantMapObject extends GrowingPlantMapObject {
         this.minYield = harvestConfig.yield?.min || 1;
         this.maxYield = harvestConfig.yield?.max || 1;
         this.qualityChance = harvestConfig.yield?.qualityChance || 0;
+
+        console.log(config, options);
+
+
     }
 
     onGrowthStageComplete(stage) {

@@ -158,7 +158,7 @@ class Debug {
             // Physics
             { label: "Falling", value: activeMyte.isFalling },
             { label: "Jumping", value: activeMyte.isJumping },
-            { label: "Velocity", value: activeMyte.velocity.toFixed(3) },
+            { label: "Velocity", value: activeMyte.physics.velocity.toFixed(3) },
             
             // UI & Rendering
             { label: "Z-Index", value: activeMyte.duplicate.style.zIndex },
@@ -198,6 +198,57 @@ class Debug {
         return 'N/A';
     }
 
+    drawDebugColliders() {
+
+
+        
+        // Clear previous collider visuals
+        const oldColliders = this.parent.gameMap.layers.debug.querySelectorAll('.debug-collider');
+        oldColliders.forEach(c => c.remove());
+
+
+		// Myte
+        this.parent.mytes.forEach(myte => {
+            const myteCollider = document.createElement('div');
+            myteCollider.classList.add('debug-collider', 'myte-collider');
+            const bounds = myte.parent.getColliderBounds(myte);
+            myteCollider.style.left = `${bounds.left}px`;
+            myteCollider.style.top = `${bounds.top}px`;
+            myteCollider.style.width = `${bounds.right - bounds.left}px`;
+            myteCollider.style.height = `${bounds.bottom - bounds.top}px`;
+            this.parent.gameMap.layers.debug.appendChild(myteCollider);
+        });
+        
+        // Draw colliders for all visible objects
+        this.parent.gameMap.gridSystem.activeObjects.forEach(obj => {
+
+
+            const collider = document.createElement('div');
+            collider.classList.add('debug-collider', 'object-collider');
+
+            if(obj.config.walkable){
+                collider.classList.add('walkable-object');
+            }
+            
+            const bounds = this.parent.getColliderBounds(obj);
+            collider.style.position = 'absolute';
+            collider.style.left = `${bounds.left}px`;
+            collider.style.top = `${bounds.top}px`;
+            collider.style.width = `${bounds.right - bounds.left}px`;
+            collider.style.height = `${bounds.bottom - bounds.top}px`;
+            
+            // Color based on object type
+            if (obj instanceof Myte) {
+                collider.classList.add('myte-collider');
+            } else {
+
+                collider.classList.add('object-collider');
+            }
+            
+            this.parent.gameMap.layers.debug.appendChild(collider);
+        });
+    }
+
     updateDebug() {
         const debugGroups = [
             { name: "System", messages: this.getSystemMessages() },
@@ -209,6 +260,8 @@ class Debug {
             { name: "Myte Stats", messages: this.getMyteStats() }
         ];
 
+        this.drawDebugColliders();
+
         this.debug.innerHTML = debugGroups
             .filter(group => group.messages.length > 0)
             .map(group => this.generateDebugGroup(group.name, group.messages))
@@ -219,6 +272,7 @@ class Debug {
         if (this.debug) {
             this.updateDebug();
         }
+
 
         this.queueUI.update();
 

@@ -168,13 +168,28 @@ class AStarPathfinder {
     
     // Check if an entity of current size can fit at a grid position
     canFitEntityAt(x, y) {
-        // Check every cell the entity would occupy
+        // Create a temporary entity representation at the given position
+        const entityBounds = {
+            posX: x * this.gridSystem.config.cellSize,
+            posY: y * this.gridSystem.config.cellSize,
+            collider: {
+                width: this.entityWidth,
+                height: this.entityHeight,
+                offsetX: 0,
+                offsetY: 0
+            },
+            size: {
+                width: this.entityWidth,
+                height: this.entityHeight
+            }
+        };
+        
+        // Check grid cells for walkability
         for (let dx = -this.entityRadius.x; dx <= this.entityRadius.x; dx++) {
             for (let dy = -this.entityRadius.y; dy <= this.entityRadius.y; dy++) {
                 const checkX = x + dx;
                 const checkY = y + dy;
                 
-                // If any occupied cell is unwalkable, entity can't fit
                 if (checkX < 0 || checkX >= this.gridSystem.gridWidth ||
                     checkY < 0 || checkY >= this.gridSystem.gridHeight ||
                     !this.gridSystem.grid[checkX][checkY].walkable) {
@@ -182,6 +197,15 @@ class AStarPathfinder {
                 }
             }
         }
+        
+        // Check collision with objects in the grid cells
+        const potentialColliders = this.gridSystem.getPotentialColliders(entityBounds);
+        for (const collider of potentialColliders) {
+            if (this.gridSystem.parent.parent.checkCollision(entityBounds, collider)) {
+                return false;
+            }
+        }
+        
         return true;
     }
 

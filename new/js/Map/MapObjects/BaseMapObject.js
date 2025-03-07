@@ -8,6 +8,15 @@ const BASE_OBJECT_CONFIG = {
         width: 64,
         height: 64
     },
+    
+    collider: {
+        type: 'box',
+        width: 64 * .8,
+        height: 64 * .6,
+
+        offsetX: 64 * .1, // the remaining of the width divided by two (if centering)
+        offsetY: 64 * .3 // from the top
+    },
 
     // Physics & Collision
     walkable: false,           // Can be walked over
@@ -386,6 +395,7 @@ const MAP_OBJECT_TYPES = {
     },
 
     BREEDING_FLOWER: {
+        ...BASE_OBJECT_CONFIG,
         variants: ['rose', 'tulip', 'lily', 'orchid'],
 
 
@@ -457,7 +467,12 @@ const MAP_OBJECT_TYPES = {
     },
 
     BALL: {
+        ...BASE_OBJECT_CONFIG,
         category: 'moving',
+        size: {
+            width: 64,
+            height: 64
+        },
         variants: ['red_ball', 'blue_ball'],
         renderType: 'single',
         walkable: true,
@@ -467,10 +482,25 @@ const MAP_OBJECT_TYPES = {
         speed: 3,
         friction: 0.95,
         triggerRadius: 192/2,
-        pushForce: 5
+        pushForce: 5,
+
+        // render
+        renderType: 'sprite',
+
+
+        // interaction
+        interactionType: 'open',
+
+
+
+
+
+
+
     },
 
     PATROL_GUARD: {
+        ...BASE_OBJECT_CONFIG,
         category: 'moving',
         variants: ['guard'],
         renderType: 'animated',
@@ -483,6 +513,7 @@ const MAP_OBJECT_TYPES = {
     },
 
     BUTTERFLY: {
+        ...BASE_OBJECT_CONFIG,
         category: 'moving',
         variants: ['blue_butterfly', 'yellow_butterfly'],
         renderType: 'animated',
@@ -512,6 +543,7 @@ class MapObject {
             width: 64 * (config.scale || 1),
             height: 64 * (config.scale || 1)
         };
+
         this.active = true;
         this.element = null;
         this.interactionState = {
@@ -519,6 +551,14 @@ class MapObject {
             cooldown: 5000,
             activeInteractions: new Set()
         };
+
+
+        this.collider = config.collider || {};
+
+    
+
+
+
     }
 
     intersects(other) {
@@ -618,9 +658,9 @@ class MapObject {
     }
 
     renderSingleObject(container) {
-        const div = document.createElement('div');
-        div.classList.add('item', this.variant);
-        container.appendChild(div);
+        //const div = document.createElement('div');
+        // div.classList.add('item', this.variant);
+        // container.appendChild(div);
     }
 
     press(parent) {
@@ -828,415 +868,6 @@ class DroppedMapItem {
 
 }
 
-class AnimatedMapObject extends MapObject {
-    constructor(type, variant, posX, posY, config, options = {}) {
-        super(type, variant, posX, posY, config);
-        this.currentAnimation = null;
-        this.lastFrameTime = 0;
-        this.frameIndex = 0;
-    }
-
-    playAnimation(animationName, onComplete) {
-        const animation = this.config.spriteConfig?.animations?.[animationName];
-        if (!animation) return;
-
-        // Don't restart the same animation
-        if (this.currentAnimation?.name === animationName) return;
-
-        this.currentAnimation = {
-            name: animationName,
-            frames: animation.frames,
-            loop: animation.loop,
-            onComplete: onComplete
-        };
-
-        // Set initial frame immediately
-        this.frameIndex = animation.frames[0];
-        this.updateSpriteFrame();
-
-        // If single frame animation, call onComplete immediately
-        if (animation.frames.length === 1) {
-            if (onComplete) onComplete();
-            // Keep current frame if it's meant to loop
-            if (!animation.loop) {
-                this.currentAnimation = null;
-            }
-        } else {
-            this.lastFrameTime = Date.now();
-        }
-    }
-
-    updateAnimation() {
-        if (!this.currentAnimation || this.currentAnimation.frames.length === 1) return;
-
-        const now = Date.now();
-        if (now - this.lastFrameTime > 100) { // frameDelay hardcoded to 100ms
-            const currentFrameIndex = this.currentAnimation.frames.indexOf(this.frameIndex);
-            const nextFrameIndex = (currentFrameIndex + 1) % this.currentAnimation.frames.length;
-
-            this.frameIndex = this.currentAnimation.frames[nextFrameIndex];
-            this.lastFrameTime = now;
-            this.updateSpriteFrame();
-
-            // Handle animation completion
-            if (nextFrameIndex === 0) {
-                if (this.currentAnimation.onComplete) {
-                    this.currentAnimation.onComplete();
-                }
-                if (!this.currentAnimation.loop) {
-                    this.currentAnimation = null;
-                }
-            }
-        }
-    }
-
-    updateSpriteFrame() {
-        if (!this.element || !this.config.spriteConfig) return;
-
-        const { frameWidth, scale = 1 } = this.config.spriteConfig;
-        this.element.style.backgroundPosition = `${-this.frameIndex * frameWidth * scale}px 0px`;
-    }
-
-    render(container, parent) {
-        const element = super.render(container, parent);
-
-        if (this.config.renderType === 'animated' || this.config.renderType === 'sprite') {
-            const { frameWidth, scale = 1 } = this.config.spriteConfig;
-            element.style.width = `${frameWidth * scale}px`;
-            element.style.height = `${(this.config.spriteConfig.frameHeight || frameWidth) * scale}px`;
-
-            // Start default animation if specified
-            const defaultAnimation = this.config.spriteConfig.default ? this.config.spriteConfig.default : 'idle';
-            this.playAnimation(defaultAnimation);
-        }
-
-        return element;
-    }
-
-    update() {
-        super.update();
-        this.updateAnimation();
-    }
-}
-
-class TreasureChestMapObject extends AnimatedMapObject {
-    constructor(type, variant, posX, posY, config, options = {}) {
-        super(type, variant, posX, posY, config);
-        this.state = config.spriteConfig.default;
-        this.items = [];
-        this.droppedItems = [];
-        this.canClose = config.canClose || false;
-
-        this.addItems(options.items || []);
-    }
-
-    addItems(items) {
-        this.items = items;
-    }
-
-    open(parent) {
-        if (this.state !== 'closed') return;
-
-        this.state = 'opening';
-        this.element.classList.remove('closed');
-        this.element.classList.add('opening');
-
-        this.playAnimation('opening', () => {
-            this.state = 'opened';
-            this.element.classList.remove('opening');
-            this.element.classList.add('opened');
-            this.playAnimation('opened');
-            this.spawnItems(parent);
-        });
-    }
-
-    close(parent) {
-        if (this.state !== 'opened' || !this.canClose) return;
-
-        this.state = 'closing';
-        this.element.classList.remove('opened');
-        this.element.classList.add('closing');
-
-        this.playAnimation('closing', () => {
-            this.state = 'closed';
-            this.element.classList.remove('closing');
-            this.element.classList.add('closed');
-            this.playAnimation('closed');
-        });
-    }
-
-    press(parent) {
-        if (!this.active || !parent.activeMyte) return false;
-
-        const myte = parent.activeMyte;
-        const dx = this.posX - myte.posX;
-        const dy = this.posY - myte.posY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        // Handle different states
-        if (this.state === 'closed') {
-            if (this.config.interactionRadius === -1) {
-                this.open(parent);
-                return true;
-            }
-
-            if (distance <= this.config.interactionRadius) {
-                myte.queue.add('go_to_object', {
-                    target: this,
-                    onComplete: () => this.open(parent)
-                });
-                return true;
-            }
-
-            myte.queue.add('go_to_object', { target: this });
-            return true;
-        }
-        else if (this.state === 'opened' && this.canClose) {
-            if (this.config.interactionRadius === -1) {
-                this.close(parent);
-                return true;
-            }
-
-            if (distance <= this.config.interactionRadius) {
-                myte.queue.add('go_to_object', {
-                    target: this,
-                    onComplete: () => this.close(parent)
-                });
-                return true;
-            }
-
-            myte.queue.add('go_to_object', { target: this });
-            return true;
-        }
-
-        return false;
-    }
-
-    spawnItems(parent) {
-        if (!this.items.length) return;
-
-        const spawnPoint = {
-            x: this.posX + this.size.width / 2,
-            y: this.posY + this.size.height / 2
-        };
-
-        const spreadAngle = Math.PI / 6;
-        const baseVelocity = 5;
-
-        this.items.forEach((item, index) => {
-            const angle = this.items.length === 1
-                ? -Math.PI / 2
-                : -Math.PI / 2 - spreadAngle / 2 + (spreadAngle * index / (this.items.length - 1));
-
-            const droppedItem = new DroppedMapItem(
-                item.type,
-                item.variant,
-                spawnPoint.x,
-                spawnPoint.y
-            );
-
-            droppedItem.velocityX = Math.cos(angle) * baseVelocity;
-            droppedItem.velocityY = Math.sin(angle) * baseVelocity;
-            droppedItem.velocityZ = baseVelocity;
-
-            parent.canvas.querySelector('.layer.foreground').appendChild(droppedItem.element);
-            this.droppedItems.push(droppedItem);
-        });
-
-        // Clear items after spawning
-        this.items = [];
-    }
-
-    update(parent) {
-        super.update();
-        this.droppedItems = this.droppedItems.filter(item => {
-            if (!item.collected) {
-                item.update(parent.activeMyte);
-                return true;
-            }
-            return false;
-        });
-    }
-
-    render(container, parent) {
-        const element = super.render(container, parent);
-        element.classList.add('treasure-chest', this.state);
-        return element;
-    }
-}
-
-class LightMapObject extends AnimatedMapObject {
-    constructor(type, variant, posX, posY, config, options = {}) {
-        super(type, variant, posX, posY, config);
-        this.state = config.default || 'off';
-    }
-
-    getNextAction() {
-        return {
-            method: this.toggleLight.bind(this),
-            allowed: true
-        };
-    }
-
-    handleInteraction(parent, action) {
-        const myte = parent.activeMyte;
-        const distance = Math.hypot(this.posX - myte.posX, this.posY - myte.posY);
-
-        if (distance <= this.config.interactionRadius) {
-            this.playAnimation('flicker', () => action.method(parent));
-            return true;
-        }
-
-        myte.queue.add('go_to_object', {
-            target: this,
-            onComplete: () => this.playAnimation('flicker', () => action.method(parent))
-        });
-        return true;
-    }
-
-    press(parent) {
-        if (!this.active || !parent.activeMyte) return false;
-
-        const action = this.getNextAction();
-        return this.handleInteraction(parent, action);
-    }
-
-    toggleLight(parent) {
-        const newState = this.state === 'off' ? 'on' : 'off';
-        const animationSequence = {
-            'off': ['turnOn', 'idle'],
-            'on': ['turnOff', 'off']
-        };
-
-        this.state = newState;
-        this.element.setAttribute('data-state', this.state);
-
-        // Play animation sequence
-        const [firstAnim, secondAnim] = animationSequence[this.state];
-        this.playAnimation(firstAnim, () => {
-            this.playAnimation(secondAnim);
-        });
-
-        // Apply effects
-        if (this.state === 'on' && parent.activeMyte) {
-            parent.activeMyte.stats.updateMood(5);
-        }
-    }
-
-    render(container, parent) {
-        const element = super.render(container, parent);
-        element.classList.add('light-object');
-        element.setAttribute('data-state', this.state);
-        return element;
-    }
-}
-
-class FountainMapObject extends AnimatedMapObject {
-    constructor(type, variant, posX, posY, config, options = {}) {
-        super(type, variant, posX, posY, config);
-        this.state = config.default || 'on';
-
-        // Fountain configuration
-        this.moodBoostRadius = config.moodBoostRadius || 150;
-        this.moodBoostAmount = config.moodBoostAmount || 0.1;
-        this.boostCooldown = config.boostCooldown || 1000;
-
-        // Boost tracking with Map for better performance
-        this.lastBoostTimes = new Map();
-    }
-
-    getNextAction() {
-        return {
-            method: this.toggle.bind(this),
-            allowed: true
-        };
-    }
-
-    handleInteraction(parent, action) {
-        const myte = parent.activeMyte;
-        const distance = Math.hypot(this.posX - myte.posX, this.posY - myte.posY);
-
-        if (distance <= this.config.interactionRadius) {
-            action.method(parent);
-            return true;
-        }
-
-        myte.queue.add('go_to_object', {
-            target: this,
-            onComplete: () => action.method(parent)
-        });
-        return true;
-    }
-
-    press(parent) {
-        if (!this.active || !parent.activeMyte) return false;
-
-        const action = this.getNextAction();
-        return this.handleInteraction(parent, action);
-    }
-
-    toggle(parent) {
-        const newState = this.state === 'on' ? 'off' : 'on';
-        const animationSequence = {
-            'off': ['turnOn', 'idle'],
-            'on': ['turnOff', 'off']
-        };
-
-        this.state = newState;
-        this.element.setAttribute('data-state', this.state);
-
-        // Play animation sequence
-        const [firstAnim, secondAnim] = animationSequence[this.state];
-        this.playAnimation(firstAnim, () => {
-            this.playAnimation(secondAnim);
-        });
-    }
-
-    applyMoodBoost(myte) {
-        const now = Date.now();
-        const lastBoost = this.lastBoostTimes.get(myte.id) || 0;
-
-        if (now - lastBoost >= this.boostCooldown) {
-            myte.stats.updateMood(this.moodBoostAmount);
-            this.lastBoostTimes.set(myte.id, now);
-
-            // Occasional happiness expression
-            if (Math.random() < 0.1) {
-                myte.queue.addExpression('happy');
-            }
-        }
-    }
-
-    checkNearbyMytes(parent) {
-        if (this.state !== 'on' || !parent.mytes) return;
-
-        parent.mytes.forEach(myte => {
-            if (!myte.isActive) return;
-
-            const distance = Math.hypot(
-                this.posX - myte.posX,
-                this.posY - myte.posY
-            );
-
-            if (distance <= this.moodBoostRadius) {
-                this.applyMoodBoost(myte);
-            }
-        });
-    }
-
-    render(container, parent) {
-        const element = super.render(container, parent);
-        element.classList.add('fountain');
-        element.setAttribute('data-state', this.state);
-        return element;
-    }
-
-    update(parent) {
-        super.update(parent);
-        this.checkNearbyMytes(parent);
-    }
-}
-
 // Specific implementations for different categories
 class NatureMapObject extends MapObject {
     constructor(type, variant, posX, posY, config, options = {}) {
@@ -1285,6 +916,16 @@ class ItemMapObject extends MapObject {
             this.remove();
             return false;
         }
+    }
+
+    render(container, parent) {
+        // call parent
+        super.render(container, parent);
+
+        // add div element with class "item" to this.element
+        const div = document.createElement('div');
+        div.classList.add('item', this.type, this.variant);
+        this.element.appendChild(div);
     }
 
     updateDisplay() {

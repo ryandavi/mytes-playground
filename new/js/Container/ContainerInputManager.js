@@ -1,61 +1,61 @@
 class ContainerInputManager extends BaseInputHandler {
     constructor(containerManager) {
+        // Create shortcuts using the tool config
+        const shortcuts = {};
+
+        console.log(containerManager);
+        
+        // Add shortcuts from tool config
+        Object.entries(containerManager.ui.toolConfig).forEach(([mode, config]) => {
+            if (config.shortcut) {
+                shortcuts[config.shortcut] = () => containerManager.ui.changeToolMode(mode);
+            }
+        });
+        
+        // Add escape shortcut
+        shortcuts['escape'] = () => this.handleEscape();
+        shortcuts['m'] = () => containerManager.ui.sound.toggleSounds();
+        
         super({
             owner: containerManager,
             element: containerManager.element,
-            shortcuts: {
-                's': () => this.setToolMode('SELECT'),
-                'd': () => this.setToolMode('DRAG'),
-                'p': () => this.setToolMode('PET'),
-                'escape': () => this.handleEscape()
-            }
+            shortcuts: shortcuts
         });
 
-        this.container = containerManager;
+        this.parent = containerManager;
     }
 
+
+
+    // Keep all your other methods unchanged
     handleClick(event) {
         super.handleClick(event);
 
         // Handle element click for active Myte
-        if (this.container.activeMyte && 
-            this.container.activeMyte.isActive && 
-            this.container.ui.isTool(UIToolModes.SELECT) &&
+        if (this.parent.activeMyte && 
+            this.parent.activeMyte.isActive && 
+            this.parent.ui.isTool(UIToolModes.SELECT) &&
             Utility.isNotIgnored(event.target) && 
             Utility.isClickableElement(event.target)) {
-            this.container.ui.setSelected(event.target);
+            this.parent.ui.setSelected(event.target);
         }
     }
 
     handleEscape() {
-        this.container.ui.setSelected(null);
+        this.parent.ui.setSelected(null);
         
-        if (this.container.activeMyte?.queue.isCarrying()) {
-            this.container.activeMyte.queue.addPutDownMyte();
-        }
-    }
-
-    setToolMode(mode) {
-        const toolMappings = {
-            'SELECT': 'hand-select',
-            'DRAG': 'hand-drag',
-            'PET': 'hand-pet'
-        };
-
-        const radioInput = document.getElementById(toolMappings[mode]);
-        if (radioInput) {
-            radioInput.checked = true;
-            radioInput.dispatchEvent(new Event('change'));
+        if (this.parent.activeMyte?.queue.isCarrying()) {
+            this.parent.activeMyte.queue.addPutDownMyte();
         }
     }
     
-    // Get mouse position relative to container with camera offset
+    // Keep your existing getLocalMouse and getContainerMouse methods
     getLocalMouse(element = null) {
         const mousePos = this.getMousePosition();
-        const containerRect = this.container.getContainerRect();
-        const cameraOffset = this.container.camera ? {
-            x: this.container.camera.posX,
-            y: this.container.camera.posY
+        const containerRect = this.parent.getContainerRect();
+        const cameraOffset = this.parent.camera ? {
+            x: this.parent.camera.posX,
+            y: this.parent.camera.posY
         } : { x: 0, y: 0 };
 
         return {
@@ -68,21 +68,12 @@ class ContainerInputManager extends BaseInputHandler {
         };
     }
 
-    // Get mouse position relative to container without camera offset
     getContainerMouse(element = null) {
         const mousePos = this.getMousePosition();
-        const containerRect = this.container.getContainerRect();
+        const containerRect = this.parent.getContainerRect();
         return {
             x: mousePos.x - (element ? (element.getRect().width / 2) : 0) - containerRect.left,
             y: mousePos.y - (element ? (element.getRect().height / 2) : 0) - containerRect.top
         };
     }
-
-
-
-
-
-
-
-
 }

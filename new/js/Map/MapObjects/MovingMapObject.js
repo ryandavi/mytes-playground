@@ -89,7 +89,7 @@ class MovingMapObject extends MapObject {
 }
 
 // A ball that moves when mytes get near it
-class BallMapObject extends MovingMapObject {
+class BallOldMapObject extends MovingMapObject {
 	constructor(type, variant, posX, posY, config, options = {}) {
 		super(type, variant, posX, posY, {
 			...config,
@@ -220,93 +220,3 @@ class PatrolGuardMapObject extends MovingMapObject {
 	}
 }
 
-// A butterfly that moves in a natural, fluttering pattern
-class ButterflyMapObject extends MovingMapObject {
-	constructor(type, variant, posX, posY, config, options = {}) {
-		super(type, variant, posX, posY, {
-			...config,
-			speed: 1
-		});
-
-		// Butterfly-specific movement parameters
-		this.wanderRadius = config.wanderRadius || 100;
-		this.wanderPoint = { x: posX, y: posY };
-		this.flutterAmplitude = config.flutterAmplitude || 20;
-		this.flutterFrequency = config.flutterFrequency || 0.1;
-		this.time = 0;
-
-		this.boundaryPadding = 20; // Minimum distance from container edges
-		this.maxAttempts = 5;
-
-		// State
-		this.state = 'wander'; // wander, rest
-		this.restDuration = 3000;
-		this.lastRestTime = 0;
-	}
-
-	update() {
-		const currentTime = Date.now();
-		this.time += 0.016; // Assuming 60fps
-
-		switch (this.state) {
-			case 'wander':
-				// Generate new wander point if we've reached the current one
-				if (this.reachedTarget) {
-					// Try to find a valid wander point within bounds
-					let attempts = 0;
-					let foundValid = false;
-
-					while (!foundValid && attempts < this.maxAttempts) {
-						const angle = Math.random() * Math.PI * 2;
-						const newX = this.posX + Math.cos(angle) * this.wanderRadius;
-						const newY = this.posY + Math.sin(angle) * this.wanderRadius;
-
-						// Check if point is within bounds with some padding
-						if (newX >= this.bounds.left + this.boundaryPadding &&
-							newX <= this.bounds.right - this.size.width - this.boundaryPadding &&
-							newY >= this.bounds.top + this.boundaryPadding &&
-							newY <= this.bounds.bottom - this.size.height - this.boundaryPadding) {
-
-							this.wanderPoint = { x: newX, y: newY };
-							foundValid = true;
-						}
-						attempts++;
-					}
-
-					// If no valid point found, move away from bounds
-					if (!foundValid) {
-						const centerX = (this.bounds.left + this.bounds.right) / 2;
-						const centerY = (this.bounds.top + this.bounds.bottom) / 2;
-						const angle = Math.atan2(centerY - this.posY, centerX - this.posX);
-						this.wanderPoint = {
-							x: this.posX + Math.cos(angle) * this.wanderRadius * 0.5,
-							y: this.posY + Math.sin(angle) * this.wanderRadius * 0.5
-						};
-					}
-
-					// Occasionally decide to rest
-					if (Math.random() < 0.1) {
-						this.state = 'rest';
-						this.lastRestTime = currentTime;
-						break;
-					}
-				}
-
-
-				this.moveToward(
-					this.wanderPoint.x,
-					this.wanderPoint.y
-				);
-				break;
-
-			case 'rest':
-				// Rest for a while, then go back to wandering
-				if (currentTime - this.lastRestTime > this.restDuration) {
-					this.state = 'wander';
-				}
-				break;
-		}
-
-		super.update();
-	}
-}

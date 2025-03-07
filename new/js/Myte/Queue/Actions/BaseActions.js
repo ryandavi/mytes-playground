@@ -77,7 +77,7 @@ class MoveAction extends MyteAction {
     };
 
     static canPerform(selected, active) {
-        return true; // active && !active.queue?.isCarrying();
+        return false; // active && !active.queue?.isCarrying();
     }
 
     constructor(myte, options) {
@@ -93,6 +93,25 @@ class MoveAction extends MyteAction {
 
     start() {
         super.start();
+        
+        // If we have complex collisions, use A* pathfinding
+        if (this.myte.checkForCollisions && this.myte.parent.gameMap) {
+            const path = this.myte.parent.gameMap.gridSystem.pathfinder.findPath(
+                this.myte.posX, 
+                this.myte.posY,
+                this.targets[this.targetIndex].x,
+                this.targets[this.targetIndex].y,
+                this.myte.collider.width,
+                this.myte.collider.height
+            );
+            
+            if (path) {
+                // Replace direct target with path waypoints
+                this.targets = path;
+                this.targetIndex = 0;
+            }
+        }
+        
         this.setNextTarget();
         this.myte.reset();
     }

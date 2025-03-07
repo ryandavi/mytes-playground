@@ -40,17 +40,20 @@
 		{
 			"name": "Acorn",
 			"quantity": 5,
-			"type": "FOOD"
+			"type": "food",
+			"variant": "acorn"
 		},
 		{
 			"name": "Turnip",
 			"quantity": 13,
-			"type": "FOOD"
+			"type": "food",
+			"variant": "yellow_turnip"
 		},
 		{
 			"name": "Apple",
 			"quantity": 3,
-			"type": "FOOD"
+			"type": "food",
+			"variant": "red_apple"
 		}
 	]
 }

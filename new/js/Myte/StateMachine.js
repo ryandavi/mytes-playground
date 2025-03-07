@@ -37,7 +37,8 @@ const BaseSpriteSets = {
 	kiss_expression: [[1, 4]],
 	jumping: [[0, 4]],
 	falling: [[1, 4]],
-	slide_down: [[0, 3]]
+	slide_down: [[0, 3]],
+	land: [[1, 4]], 
 };
 
 const SnailSpriteSets = {
@@ -75,7 +76,8 @@ const SnailSpriteSets = {
 	surprise_expression: [[0, 3]],
 	jumping: [[7, 4]],
 	falling: [[7, 4]],
-	slide_down: [[0, 3]]
+	slide_down: [[0, 3]],
+	land: [[0, 3]], // Again, use an appropriate frame for landing
 };
 
 class SpriteAnimator {
@@ -113,7 +115,8 @@ class SpriteAnimator {
 }
 
 class StateController {
-	constructor(states, priorities, stateConfig) {
+	constructor(parent, states, priorities, stateConfig) {
+		this.parent = parent;
 		this.states = states;
 		this.priorities = priorities;
 		this.stateConfig = stateConfig;
@@ -169,6 +172,15 @@ class StateController {
 
 		this.previousState = this.currentState;
 		this.currentState = newState;
+
+		const stateConfig = this.stateConfig[newState];
+		if (stateConfig.sound) {
+			console.log("play sound ", stateConfig.sound)
+			this.parent.parent.playSound(stateConfig.sound);
+		}
+
+
+
 		return true;
 	}
 
@@ -194,6 +206,7 @@ class StateMachine {
 		);
 
 		this.stateController = new StateController(
+			this,
 			this.loadStateRules(),
 			this.loadStatePriorities(),
 			this.loadStateConfig()
@@ -210,9 +223,19 @@ class StateMachine {
 				getState: (context) => this.getDraggingState()
 			},
 			[StateTypes.GRAVITY]: {
-				check: (context) => context.isGravity &&
-					(context.isFalling || context.isJumping),
-				getState: (context) => context.isFalling ? 'falling' : 'jumping'
+				check: (context) => {
+					// We need to check if we're in a gravity-affected state
+					return context.isGravity && (context.isFalling || context.isJumping || 
+						   // The key addition: detect when we've just landed
+						   (context.stateController?.currentState === 'falling' && !context.isFalling));
+				},
+				getState: (context) => {
+					// If we were falling but no longer are, we must have landed
+					if (context.stateController?.currentState === 'falling' && !context.isFalling) {
+						return 'land';
+					}
+					return context.isFalling ? 'falling' : 'jumping';
+				}
 			},
 			[StateTypes.SLIDE_DOWN]: {
 				check: (context) => context.is_doing_action('slide_down') &&
@@ -372,16 +395,29 @@ class StateMachine {
 			'dropping': {
 				spriteSet: ['dropping'],
 				repeat: false,
-				onTransitionEnd: 'idle'  // Add this line
+				onTransitionEnd: 'land'  // Add this line
 			},
+
+			'land': {
+				spriteSet: ['land'],
+				repeat: false,
+				sound: 'land',
+				// onTransitionEnd: 'idle'  // Add this line
+			},
+
 			'jumping': {
 				spriteSet: ['jumping'],
-				repeat: true
+				repeat: true,
+				sound: 'jump'
 			},
+
 			'falling': {
 				spriteSet: ['falling'],
-				repeat: true
+				repeat: true,
+				onTransitionEnd: 'land'  // Add this line
+
 			},
+			
 			'slide_down': {
 				spriteSet: ['slide_down'],
 				repeat: true
@@ -454,7 +490,8 @@ class StateMachine {
 			direction: this.parent.direction,
 			is_doing_action: (action) => this.parent.is_doing_action(action),
 			is_moving: () => this.parent.is_moving(),
-			queue: this.parent.queue
+			queue: this.parent.queue,
+			stateController: this.stateController // Add this line
 		};
 
 		// Determine and set new state

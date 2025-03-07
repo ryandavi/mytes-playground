@@ -146,9 +146,36 @@ class UserInterface {
     constructor(parent) {
         this.parent = parent;
         this.debug = new Debug(parent);
+
+        this.sound = new SoundUI(this);
         this.isActive = false;
 
         this.selectedObject = null;
+
+        this.toolConfig = {
+            [UIToolModes.SELECT]: {
+                id: 'hand-select',
+                icon: 'pointer-icon', // Optional, for future use
+                label: 'Select',      // Optional, for future use
+                cursor: 'pointer',    // Optional, for future cursor styles
+                shortcut: 's'         // Optional, for keyboard shortcuts
+            },
+            [UIToolModes.DRAG]: {
+                id: 'hand-drag',
+                icon: 'move-icon',
+                label: 'Drag',
+                cursor: 'grab',
+                shortcut: 'd'
+            },
+            [UIToolModes.PET]: {
+                id: 'hand-pet',
+                icon: 'pet-icon',
+                label: 'Pet',
+                cursor: 'pointer',
+                shortcut: 'p'
+            }
+            // Add new tools here in the future
+        };
 
         // this.handControlDragHandler = new WindowDragHandler(this.parent.containerWrapper.querySelector('#hand-controls'));
 
@@ -172,6 +199,10 @@ class UserInterface {
 
         // Initialize active mytes
         this.initActiveMytes();
+
+        // Initialize sound settings
+        this.sound.initSoundSettings();
+
     }
 
     initializeHandControls() {
@@ -330,6 +361,9 @@ class UserInterface {
     setToolMode(mode) {
         if (this.currentToolMode === mode) return;
 
+
+        this.parent.core.soundManager.playUISound('click');
+
         // Set mode
         this.currentToolMode = mode;
 
@@ -338,6 +372,35 @@ class UserInterface {
         
         // unset selected
         this.setSelected(null);
+    }
+
+    // Modified method to use the centralized config
+    changeToolMode(mode) {
+        const toolConfig = this.toolConfig[mode];
+        
+        if (!toolConfig || !toolConfig.id) {
+            console.warn(`Invalid tool mode: ${mode}`);
+            return false;
+        }
+        
+        const radioButton = document.getElementById(toolConfig.id);
+        
+        if (radioButton) {
+            // Check the radio button
+            radioButton.checked = true;
+            
+            // Dispatch a change event to trigger any listeners
+            radioButton.dispatchEvent(new Event('change'));
+            
+            // Update current tool mode
+            this.currentToolMode = mode;
+            console.log("change");
+            
+            return true;
+        }
+        
+        console.warn(`Could not find radio button for tool: ${toolConfig.id}`);
+        return false;
     }
 
     isTool(mode){
@@ -616,4 +679,27 @@ updateActions() {
         this.debug.update();
         // this.cursorManager.update();
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
 }

@@ -35,6 +35,9 @@ class MapObjectFactory {
 
 	// Create method now uses the registry
 	static create(type, variant, x, y, options = {}) {
+
+		type = type.toUpperCase();
+
 		const config = MAP_OBJECT_TYPES[type];
 
 		if (!config) {
@@ -43,6 +46,8 @@ class MapObjectFactory {
 		}
 
 		const Constructor = this.registry.getConstructor(type);
+
+
 		return new Constructor(type, variant, x, y, config, options);
 	}
 }
@@ -58,8 +63,8 @@ MapObjectFactory.registry
 .register('GROWING_PLANT', GrowingPlantMapObject)
 .register('NIGHT_BLOOM', NightBloomMapObject)
 
-.register('ITEM', MapObject)
-.register('FOOD', MapObject)
+.register('ITEM', ItemMapObject)
+.register('FOOD', ItemMapObject)
 .register('DROPPED_ITEM', DroppedMapItem)
 
 .register('CROP', CropPlantMapObject)

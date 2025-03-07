@@ -10,8 +10,8 @@ class ContainerManager {
         this.camera = null;
 
         // Systems and managers
-        this.inputHandler = new ContainerInputManager(this);
         this.ui = new UserInterface(this);
+        this.inputHandler = new ContainerInputManager(this);
         this.timeManager = new GameTime();  // Add time manager here
 
         // map
@@ -24,35 +24,161 @@ class ContainerManager {
     }
 
 
-
-    // ContainerManager.js - Modified init() method
     async init() {
         try {
+            // Update loading status
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Loading map data...");
+                this.core.loadingManager.updateStageProgress('container', 0.1); // 10% progress
+            }
+
             // Load map data
-            const response = await fetch('data/maps/home.json');
+            const response = await fetch(`data/maps/home.json?nocache=${new Date().getTime()}`);
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const mapData = await response.json();
 
-
+            // Update loading progress
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Setting up environment...");
+                this.core.loadingManager.updateStageProgress('container', 0.25); // 25% progress
+            }
 
             // Initialize other components that depend on the map
             this.setupMytes();
+
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Initializing Mytes...");
+                this.core.loadingManager.updateStageProgress('container', 0.4); // 40% progress
+            }
+
             this.inputHandler.init();
             this.camera = new Camera(this, this.canvas, this.element);
+
+            // Update loading progress
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Building world...");
+                this.core.loadingManager.updateStageProgress('container', 0.6); // 60% progress
+            }
 
             // Initialize game map with the loaded data
             this.gameMap = new GameMap(this, mapData);
             await this.gameMap.initialize();
 
+            // Update loading progress more incrementally
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Preparing interface...");
+                this.core.loadingManager.updateStageProgress('container', 0.75); // 75% progress
+            }
+
             // Initialize UI and other subsystems
             this.ui.init();
+
+            // Update with another intermediate step
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Setting up inventory...");
+                this.core.loadingManager.updateStageProgress('container', 0.85); // 85% progress
+            }
 
             // Set up inventory
             this.core.user.setInventory(this.inventory);
 
+            // Final loading update - container is fully loaded
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Activating Mytes...");
+                this.core.loadingManager.updateStageProgress('container', 1.0); // 100% progress
+
+                // Wait a short moment to let UI catch up
+                setTimeout(() => {
+                    // Check if all other systems are ready before completing
+                    if (this.core.loadingManager.stages.resources.progress >= 0.95 &&
+                        this.core.loadingManager.stages.core.progress >= 0.95) {
+                        // Only complete loading if everything else is done
+                        this.core.loadingManager.completeLoading();
+                    }
+                }, 200);
+            }
+
             return true;
         } catch (error) {
             console.error('Error initializing container:', error);
+
+            // Show error in loading screen
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Error: " + error.message);
+            }
+
+            return false;
+        }
+    }
+
+    // Add this method to ContainerManager for map transitions
+    async loadMap(mapId) {
+        // Show loading screen
+        if (this.core && this.core.loadingManager) {
+            this.core.loadingManager.show();
+            this.core.loadingManager.setMessage(`Loading ${mapId}...`);
+            this.core.loadingManager.updateProgress(10);
+        }
+
+        try {
+            // Clean up current map if it exists
+            if (this.gameMap) {
+                // Update loading progress
+                if (this.core && this.core.loadingManager) {
+                    this.core.loadingManager.setMessage("Cleaning up current map...");
+                    this.core.loadingManager.updateProgress(30);
+                }
+
+                this.gameMap.dispose();
+            }
+
+            // Load new map data
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Loading map data...");
+                this.core.loadingManager.updateProgress(50);
+            }
+
+            const response = await fetch(`data/maps/${mapId}.json`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const mapData = await response.json();
+
+            // Initialize new map
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Initializing map...");
+                this.core.loadingManager.updateProgress(70);
+            }
+
+            this.gameMap = new GameMap(this, mapData);
+            await this.gameMap.initialize();
+
+            // Place Mytes in new map
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Placing creatures...");
+                this.core.loadingManager.updateProgress(90);
+            }
+
+            this.mytes.forEach(myte => {
+                const spawnPoint = this.gameMap.getSpawnPoint('myte');
+                myte.setPosition(spawnPoint.x, spawnPoint.y);
+            });
+
+            // Reset camera
+            this.camera.reset();
+
+            // Complete loading
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage(`Welcome to ${mapId}!`);
+                this.core.loadingManager.updateProgress(100);
+            }
+
+            return true;
+        } catch (error) {
+            console.error(`Error loading map ${mapId}:`, error);
+
+            // Show error in loading screen
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Error loading map: " + error.message);
+            }
 
             return false;
         }
@@ -172,14 +298,14 @@ class ContainerManager {
 
     getCanvasRect() {
         let rect = this.getRect(this.canvas);
-        // var dimensions = Utility.findLargestChildDimensions(this.canvas);
+        var dimensions = Utility.findLargestChildDimensions(this.canvas);
 
-        return rect; /* {
+        return {
             left: rect.left,
             top: rect.top,
             width: dimensions.width,
             height: dimensions.height
-        }; */
+        };
     }
 
     getVisibleElements() {
@@ -264,6 +390,158 @@ class ContainerManager {
 
         this.setActiveMyte(next);
     }
+
+    // Add to ContainerManager class
+    checkCollision(entityA, entityB) {
+        // Handle different collider types
+        if (entityA.collider?.type === 'circle' && entityB.collider?.type === 'circle') {
+            return this.checkCircleCollision(entityA, entityB);
+        } else if (entityA.collider?.type === 'circle' || entityB.collider?.type === 'circle') {
+            return this.checkCircleBoxCollision(
+                entityA.collider?.type === 'circle' ? entityA : entityB,
+                entityA.collider?.type === 'circle' ? entityB : entityA
+            );
+        } else {
+            // Default to box collision
+            return this.checkBoxCollision(entityA, entityB);
+        }
+    }
+
+    handleCollision(entityA, entityB) {
+        // Notify both entities of the collision
+        if (entityA.onCollision) entityA.onCollision(entityB);
+        if (entityB.onCollision) entityB.onCollision(entityA);
+
+        // Emit event for other systems
+        this.core.eventManager.emit('collision', {
+            entityA,
+            entityB
+        });
+    }
+
+    getColliderBounds(entity) {
+        return {
+            left: entity.posX + (entity.collider?.offsetX || 0),
+            top: entity.posY + (entity.collider?.offsetY || 0),
+            right: entity.posX + (entity.collider?.offsetX || 0) + (entity.collider?.width || entity.size.width),
+            bottom: entity.posY + (entity.collider?.offsetY || 0) + (entity.collider?.height || entity.size.height)
+        };
+    }
+
+
+    // Box-to-box collision check
+    checkBoxCollision(entityA, entityB) {
+        const boundsA = this.getColliderBounds(entityA);
+        const boundsB = this.getColliderBounds(entityB);
+
+        return !(
+            boundsA.right < boundsB.left ||
+            boundsA.left > boundsB.right ||
+            boundsA.bottom < boundsB.top ||
+            boundsA.top > boundsB.bottom
+        );
+    }
+
+    // Circle-to-circle collision check
+    checkCircleCollision(entityA, entityB) {
+        // Get circle centers
+        const centerA = {
+            x: entityA.posX + (entityA.collider.offsetX || 0) + (entityA.collider.width / 2),
+            y: entityA.posY + (entityA.collider.offsetY || 0) + (entityA.collider.width / 2)
+        };
+
+        const centerB = {
+            x: entityB.posX + (entityB.collider.offsetX || 0) + (entityB.collider.width / 2),
+            y: entityB.posY + (entityB.collider.offsetY || 0) + (entityB.collider.width / 2)
+        };
+
+        // Get radii
+        const radiusA = entityA.collider.width / 2;
+        const radiusB = entityB.collider.width / 2;
+
+        // Check distance between centers versus sum of radii
+        const dx = centerA.x - centerB.x;
+        const dy = centerA.y - centerB.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        return distance < (radiusA + radiusB);
+    }
+
+    // Circle-to-box collision check
+    checkCircleBoxCollision(circleEntity, boxEntity) {
+        // Get circle center and radius
+        const center = {
+            x: circleEntity.posX + (circleEntity.collider.offsetX || 0) + (circleEntity.collider.width / 2),
+            y: circleEntity.posY + (circleEntity.collider.offsetY || 0) + (circleEntity.collider.width / 2)
+        };
+        const radius = circleEntity.collider.width / 2;
+
+        // Get box bounds
+        const box = this.getColliderBounds(boxEntity);
+
+        // Find closest point on box to circle center
+        const closestX = Math.max(box.left, Math.min(center.x, box.right));
+        const closestY = Math.max(box.top, Math.min(center.y, box.bottom));
+
+        // Calculate distance between closest point and circle center
+        const dx = closestX - center.x;
+        const dy = closestY - center.y;
+        const distanceSquared = dx * dx + dy * dy;
+
+        return distanceSquared <= (radius * radius);
+    }
+
+    // Add to checkBoxCollision
+    checkBoxCollision(entityA, entityB, options = {}) {
+        const boundsA = this.getColliderBounds(entityA);
+        const boundsB = this.getColliderBounds(entityB);
+
+        // Basic collision check
+        const isColliding = !(
+            boundsA.right < boundsB.left ||
+            boundsA.left > boundsB.right ||
+            boundsA.bottom < boundsB.top ||
+            boundsA.top > boundsB.bottom
+        );
+
+        // Handle one-way platforms
+        if (isColliding && entityB.config?.oneWayPlatform) {
+            // Only collide if entityA is above entityB and moving downward
+            const isAbove = entityA.posY + entityA.size.height <= entityB.posY + 5; // Small tolerance
+            const isMovingDown = entityA.velocity > 0;
+
+            return isAbove && isMovingDown;
+        }
+
+        return isColliding;
+    }
+
+
+    // Add to checkBoxCollision
+    checkBoxCollision(entityA, entityB, options = {}) {
+        const boundsA = this.getColliderBounds(entityA);
+        const boundsB = this.getColliderBounds(entityB);
+
+        // Basic collision check
+        const isColliding = !(
+            boundsA.right < boundsB.left ||
+            boundsA.left > boundsB.right ||
+            boundsA.bottom < boundsB.top ||
+            boundsA.top > boundsB.bottom
+        );
+
+        // Handle one-way platforms
+        if (isColliding && entityB.config?.oneWayPlatform) {
+            // Only collide if entityA is above entityB and moving downward
+            const isAbove = entityA.posY + entityA.size.height <= entityB.posY + 5; // Small tolerance
+            const isMovingDown = entityA.velocity > 0;
+
+            return isAbove && isMovingDown;
+        }
+
+        return isColliding;
+    }
+
 
     setActiveMyte(myte) {
         if (this.activeMyte && myte !== null) {

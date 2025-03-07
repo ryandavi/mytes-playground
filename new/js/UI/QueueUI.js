@@ -76,15 +76,34 @@ class QueueUI {
         return element;
     }
 
+    // Helper function to safely get an identifier for a target object
+    getTargetIdentifier(target) {
+        if (!target) return null;
+        
+        // For map objects, use type and variant
+        if (target.type && target.variant) {
+            return `${target.type}-${target.variant}-${target.posX?.toFixed(0) || 0}-${target.posY?.toFixed(0) || 0}`;
+        }
+        
+        // For other objects, use a class name or some other identifier
+        return target.constructor?.name || 'Unknown';
+    }
+
     updateQueueItem(element, item, index) {
         const key = `queue-${index}`;
-        const currentValue = JSON.stringify({
-            target: item.target,
-            repeat: item.repeat
-        });
+        
+        // Instead of stringifying the whole item (which may have circular references),
+        // create a simple object with just the properties we care about for comparison
+        const targetId = this.getTargetIdentifier(item.target);
+        const simplifiedValue = {
+            targetId: targetId,
+            repeat: item.repeat,
+            name: item.constructor.name
+        };
+        const currentValue = JSON.stringify(simplifiedValue);
         
         if (this.previousValues.get(key) !== currentValue) {
-            element.className = `queue-item ${item.constructor.metadata.category}${index === 0 ? ' current' : ''}`;
+            element.className = `queue-item ${item.constructor.metadata?.category || ''}${index === 0 ? ' current' : ''}`;
 
             const content = element.querySelector('.content');
             const number = content.querySelector('.number');
@@ -112,13 +131,13 @@ class QueueUI {
                 if (item.target) {
                     target.textContent = item.target.constructor.name;
                 } else if (item.element) {
-                    target.textContent = `${item.element.tagName}${item.target ? ` (${item.target.x.toFixed(0)}, ${item.target.y.toFixed(0)})` : ''}`;
+                    target.textContent = `${item.element.tagName}${item.target ? ` (${item.target.x?.toFixed(0) || 0}, ${item.target.y?.toFixed(0) || 0})` : ''}`;
                 }
                 description.appendChild(target);
             }
 
             // Add expression type
-            if (item instanceof ExpressionAction) {
+            if (item.constructor.name === 'ExpressionAction') {
                 const type = document.createElement('span');
                 type.className = 'target';
                 type.textContent = `[${item.type}]`;
@@ -143,7 +162,6 @@ class QueueUI {
 				description.appendChild(status);
 			}
             
-
             this.previousValues.set(key, currentValue);
         }
 

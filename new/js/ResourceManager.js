@@ -4,6 +4,7 @@ class ResourceManager {
         this.sounds = new Map();
         this.loadingPromises = [];
         this.isLoaded = false;
+        this.core = null; // Will be set by MyteCore
 
         // Define configurations as static properties
         this.spriteConfigs = {
@@ -41,52 +42,133 @@ class ResourceManager {
         ];
     }
 
-    async loadResources() {
-        try {
-            // Load sprites
-            for (const [key, path] of Object.entries(this.spriteConfigs)) {
-                this.loadingPromises.push(
-                    this.loadSprite(key, path)
-                );
-            }
 
-            // Load cursor
-            for (const [key, path] of Object.entries(this.cursorConfigs)) {
-                this.loadingPromises.push(
-                    this.loadSprite(`cursor_${key}`, path)
-                );
-            }
+// Only showing the updated methods for ResourceManager.js
 
-            // Wait for all resources to load
-            await Promise.all(this.loadingPromises);
-            this.isLoaded = true;
-            console.log('All resources loaded successfully');
-            
-        } catch (error) {
-            console.error('Error loading resources:', error);
-            throw error;
+async preloadEssentialResources() {
+    try {
+        if (this.core && this.core.loadingManager) {
+            this.core.loadingManager.setMessage("Loading essential assets...");
         }
-    }
+        
+        const loadingPromises = this.essentialResources.map(id => {
+            // Check if it's a sprite or cursor
+            if (this.spriteConfigs[id]) {
+                return this.loadSprite(id, this.spriteConfigs[id]);
+            } else if (this.cursorConfigs[id]) {
+                return this.loadSprite(`cursor_${id}`, this.cursorConfigs[id]);
+            }
+            return Promise.resolve(); // Skip if not found
+        });
 
-    async preloadEssentialResources() {
-        try {
-            const loadingPromises = this.essentialResources.map(id => {
-                // Check if it's a sprite or cursor
-                if (this.spriteConfigs[id]) {
-                    return this.loadSprite(id, this.spriteConfigs[id]);
-                } else if (this.cursorConfigs[id]) {
-                    return this.loadSprite(`cursor_${id}`, this.cursorConfigs[id]);
+        // Track loading progress
+        const totalEssentials = loadingPromises.length;
+        let loadedEssentials = 0;
+        
+        const trackingPromises = loadingPromises.map(promise => {
+            return promise.then(result => {
+                loadedEssentials++;
+                
+                // Update loading manager if available
+                if (this.core && this.core.loadingManager) {
+                    this.core.loadingManager.updateStageProgress(
+                        'resources', 
+                        loadedEssentials / totalEssentials * 0.3 // Essential resources are ~30% of all resources
+                    );
                 }
-                return Promise.resolve(); // Skip if not found
+                
+                return result;
             });
+        });
 
-            await Promise.all(loadingPromises);
-            console.log('Essential resources loaded successfully');
-        } catch (error) {
-            console.error('Error loading essential resources:', error);
-            throw error;
-        }
+        await Promise.all(trackingPromises);
+        console.log('Essential resources loaded successfully');
+    } catch (error) {
+        console.error('Error loading essential resources:', error);
+        throw error;
     }
+}
+
+async loadResources() {
+    try {
+        // Load sprites
+        const spritesToLoad = [...Object.entries(this.spriteConfigs), 
+                              ...Object.entries(this.cursorConfigs).map(([key, path]) => 
+                                  [`cursor_${key}`, path])];
+        
+        // Filter out essential resources which are already loaded
+        const nonEssentialResources = spritesToLoad.filter(([id]) => 
+            !this.essentialResources.includes(id.replace('cursor_', '')) && 
+            !this.sprites.has(id));
+        
+        // If there are very few resources to load (or none), accelerate the progress
+        if (nonEssentialResources.length < 5) {
+            console.log('Few resources to load, accelerating progress');
+            
+            // Update loading manager to reflect quick load
+            if (this.core && this.core.loadingManager) {
+                // Start at 30% (essentials) and quickly move to 75%
+                this.core.loadingManager.updateStageProgress('resources', 0.75);
+                
+                // After a shorter delay, mark as complete
+                setTimeout(() => {
+                    this.core.loadingManager.updateStageProgress('resources', 1.0);
+                    
+                    // Check if we can complete loading now
+                    if (this.core.loadingManager.stages.container.progress >= 0.95) {
+                        this.core.loadingManager.completeLoading();
+                    }
+                }, 100); // Much shorter delay (100ms instead of 300ms)
+            }
+        }
+        
+        this.loadingPromises = nonEssentialResources.map(([id, path]) => 
+            this.loadSprite(id, path));
+
+        // Track loading progress
+        const totalResources = Math.max(1, this.loadingPromises.length); // Avoid division by zero
+        let loadedResources = 0;
+        
+        // Start from 30% progress (essentials already loaded)
+        const initialProgress = 0.3;
+        const remainingProgress = 0.7;
+        
+        // Create a wrapper for each promise to track progress
+        const trackingPromises = this.loadingPromises.map(promise => {
+            return promise.then(result => {
+                loadedResources++;
+                
+                // Update loading manager if available
+                if (this.core && this.core.loadingManager) {
+                    const progress = initialProgress + 
+                        (loadedResources / totalResources) * remainingProgress;
+                    
+                    this.core.loadingManager.updateStageProgress('resources', progress);
+                }
+                
+                return result;
+            });
+        });
+
+        // Wait for all resources to load
+        await Promise.all(trackingPromises);
+        this.isLoaded = true;
+        console.log('All resources loaded successfully');
+        
+        // Ensure we mark as complete even if there were no resources to load
+        if (this.core && this.core.loadingManager && nonEssentialResources.length === 0) {
+            this.core.loadingManager.updateStageProgress('resources', 1.0);
+        }
+        
+    } catch (error) {
+        console.error('Error loading resources:', error);
+        // In case of error, still mark resources as loaded to let the game continue
+        if (this.core && this.core.loadingManager) {
+            this.core.loadingManager.updateStageProgress('resources', 1.0);
+        }
+        throw error;
+    }
+}
 
     loadSprite(id, url) {
         return new Promise((resolve, reject) => {
