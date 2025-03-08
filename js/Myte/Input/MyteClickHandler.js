@@ -5,11 +5,12 @@ class MyteClickHandler {
 		// Configuration
 		this.config = {
 			doubleClickTimeout: 300,
+			
 			longPressTimeout: 500,
-			dragThreshold: 20, // Distance in pixels before considering it a drag
+			dragThreshold: 10, // Distance in pixels before considering it a drag
 			dragTimeThreshold: 300, // Time in ms before considering it a drag
 
-			maxYForPickup: 300,
+			maxYForPickup: 500,
 			maxXForPickup: 300
 
 		};

@@ -112,35 +112,6 @@ const UIToolModes = {
 };
 
 
-class WindowDragHandler extends DragHandler {
-    constructor(windowElement) {
-        super({
-            element: windowElement,
-            onDragStart: () => {
-                windowElement.classList.add('dragging');
-            },
-            onDragUpdate: (position) => {
-
-                // Apply new position
-                windowElement.style.left = `${position.x}px`;
-                windowElement.style.top = `${position.y}px`;
-                
-                // Temporarily remove the transform during drag
-                windowElement.style.transform = 'none';
-            },
-            onDragEnd: () => {
-                windowElement.classList.remove('dragging');
-            }
-        });
-
-        this.windowElement = windowElement;
-        this.initialRect = null;
-        this.mouseOffsetX = 0;
-        this.mouseOffsetY = 0;
-        this.initialLeft = 0;
-        this.initialTop = 0;
-    }
-}
 
 class UserInterface {
     constructor(parent) {
@@ -176,10 +147,6 @@ class UserInterface {
             }
             // Add new tools here in the future
         };
-
-        // this.handControlDragHandler = new WindowDragHandler(this.parent.containerWrapper.querySelector('#hand-controls'));
-
-        // this.actionControlDragHandler = new WindowDragHandler(this.parent.containerWrapper.querySelector('.sidebar'));
 
         // Tool mode handling
         this.currentToolMode = UIToolModes.SELECT;

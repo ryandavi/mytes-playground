@@ -4,7 +4,7 @@ class MyteStats {
 
         // Basic stats
         this.health = 100;
-        this.speed = 1;
+        this.speed = 1.5;
         this.level = 1;
         this.experience = 0;
 

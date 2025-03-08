@@ -1,1 +1,466 @@
-/*# sourceMappingURL=myte.css.map */
+.myteContainer {
+  text-align: center;
+  margin: 20px;
+}
+.myteContainer .myteWrapper {
+  --myte-size: 64px;
+  display: inline-block;
+  cursor: pointer;
+}
+.myteContainer .myteWrapper.snail {
+  --myte-size: 192px;
+}
+.myteContainer .myteWrapper.snail > .interactive-myte > .inner-wrapper {
+  position: fixed;
+  width: inherit;
+  height: inherit;
+}
+.myteContainer .myteWrapper.snail > .interactive-myte > .inner-wrapper > .sprite {
+  background: url(../images/snail/spritesheet.png);
+}
+.myteContainer .myteWrapper > .interactive-myte {
+  width: var(--myte-size);
+  height: var(--myte-size);
+  color: white;
+  margin: 0 auto;
+  position: relative;
+  z-index: 100000;
+}
+.myteContainer .myteWrapper > .interactive-myte.selected .sprite {
+  outline: 2px dashed green;
+  border-radius: 5px;
+}
+.myteContainer .myteWrapper > .interactive-myte.duplicate.deactivated {
+  display: none;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .sprite {
+  width: inherit;
+  height: inherit;
+  image-rendering: pixelated;
+  background: url(../images/character/spritesheet.png);
+  transform-origin: center;
+  transition: filter 0.2s ease-out, transform 0.2s ease-out;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper {
+  display: flex;
+  gap: var(--border-width);
+  align-items: center;
+  left: 50%;
+  top: 10px;
+  transform: translate(-50%, 100%);
+  position: absolute;
+  transition: opacity 0.5s;
+  flex-direction: column;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper {
+  display: flex;
+  gap: var(--border-width);
+  align-items: center;
+  width: -moz-fit-content;
+  width: fit-content;
+  left: 50%;
+  transform: translate(-50%, -115%);
+  position: relative;
+  transition: opacity 0.5s;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper:before {
+  content: "x";
+  position: absolute;
+  left: -var(--border-width);
+  transform: translate(-100%, 0%);
+  color: red;
+  visibility: hidden;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper.bottom {
+  top: 25%;
+  transform: translate(50%, 0%);
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper > .before {
+  display: none;
+}
+.myteContainer .myteWrapper > .interactive-myte.active > .inner-wrapper > .name-wrapper > .name {
+  background-color: #3269c4;
+  color: white;
+  outline-color: white;
+}
+.myteContainer .myteWrapper > .interactive-myte:not(.duplicate) > .inner-wrapper > .above-wrapper {
+  display: none;
+}
+.myteContainer .myteWrapper > .interactive-myte:not(.duplicate) > .inner-wrapper > .name-wrapper {
+  display: none;
+}
+.myteContainer .myteWrapper > .interactive-myte.dragging {
+  pointer-events: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+  cursor: grab;
+  z-index: 100000 !important;
+}
+.myteContainer .myteWrapper > .interactive-myte.dragging > .inner-wrapper > .sprite {
+  /*
+  animation-name: wiggle;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  transform-origin: 50% 50%;
+  animation-delay: -0.4s;
+  animation-duration: .5s;
+  */
+  animation-name: wiggle2;
+  animation-duration: 0.6s;
+  animation-iteration-count: infinite;
+  transform-origin: 50% 65%; /* Adjust to make it pivot from the bottom */
+  animation-timing-function: ease-in-out;
+  filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
+  will-change: transform; /* Performance optimization */
+}
+.myteContainer .myteWrapper > .interactive-myte.deactivated {
+  visibility: hidden;
+  opacity: 0;
+}
+.myteContainer .myteWrapper > .interactive-myte.freemode {
+  position: absolute;
+  cursor: grab;
+}
+.myteContainer .myteWrapper > .interactive-myte.freemode > .sprite {
+  position: fixed;
+}
+
+/* HOME RELATED */
+.myteContainer .myteWrapper > .home-wrapper {
+  border-radius: var(--border-radius);
+  transition: opacity, 0.15s, background-color 0.15s, box-shadow 0.15s, outline-width 0.15s, outline-color 0.5s;
+  width: var(--myte-size);
+  height: var(--myte-size);
+  position: absolute;
+  z-index: 100000;
+  border-style: solid;
+  border-width: var(--border-width);
+  border-top-color: white;
+  border-left-color: white;
+  border-right-color: lightgrey;
+  border-bottom-color: lightgrey;
+  background-color: rgb(245, 245, 245);
+  filter: drop-shadow(5px 5px 0px rgba(0, 0, 0, 0.062745098));
+}
+.myteContainer .myteWrapper > .home-name {
+  position: relative;
+  transform: translateX(-100%);
+  z-index: 1000000;
+  width: 192px;
+  height: 192px;
+  position: absolute;
+  transform: unset;
+  pointer-events: none;
+}
+.myteContainer .myteWrapper > .home-name > .name {
+  display: inline-block;
+  top: 10px;
+  position: relative;
+}
+.myteContainer .myteWrapper:hover > .home-wrapper {
+  outline: var(--border-width) solid darkgrey;
+}
+.myteContainer.empty .myteWrapper:hover > .home-wrapper {
+  outline: unset;
+}
+.myteContainer.empty .myteWrapper > .home-wrapper {
+  opacity: 0.75;
+  z-index: 0;
+  border-top-color: lightgrey;
+  border-left-color: lightgrey;
+  border-right-color: white;
+  border-bottom-color: white;
+  background-color: rgb(245, 245, 245);
+  filter: unset;
+  box-shadow: inset var(--border-width) var(--border-width) rgba(0, 0, 0, 0.0509803922);
+}
+.myteContainer.empty .myteWrapper.valid-drop-target > .home-wrapper {
+  z-index: 100000;
+  opacity: 1;
+  display: block;
+  outline: var(--border-width) solid var(--drop-target) !important;
+}
+.myteContainer.empty .myteWrapper.valid-drop-target.on-target > .home-wrapper {
+  outline-color: var(--on-target) !important;
+}
+
+/* DIALOGUE */
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue {
+  --dialogue-background-color: #ffffe1;
+  --dialogue-border-color: black;
+  --dialogue-border-width: 2px;
+  --dialogue-arrow-size: 7px;
+  --dialogue-bubble-size: 10px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  left: 50%;
+  top: 17.5%;
+  z-index: 1;
+  transform: translate(-50%, -100%);
+  position: absolute;
+  max-width: 100px;
+  border: var(--dialogue-border-width) solid var(--dialogue-border-color);
+  background-color: var(--dialogue-background-color);
+  padding: 4px 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: black;
+  border-radius: var(--dialogue-border-width);
+  filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.1254901961));
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.visible {
+  opacity: 1;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue::before {
+  content: "";
+  width: 0;
+  height: 0;
+  position: absolute;
+  border-left: var(--dialogue-arrow-size) solid transparent;
+  border-right: var(--dialogue-arrow-size) solid transparent;
+  border-top: var(--dialogue-arrow-size) solid var(--dialogue-background-color);
+  border-bottom: var(--dialogue-arrow-size) solid transparent;
+  bottom: calc(var(--dialogue-border-width) + 1px);
+  transform: translate(0%, 100%);
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue::after {
+  content: "";
+  width: 0;
+  height: 0;
+  position: absolute;
+  border-left: var(--dialogue-arrow-size) solid transparent;
+  border-right: var(--dialogue-arrow-size) solid transparent;
+  border-top: var(--dialogue-arrow-size) solid var(--dialogue-border-color);
+  border-bottom: var(--dialogue-arrow-size) solid transparent;
+  bottom: 0;
+  transform: translate(0%, 100%);
+  z-index: -1;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought {
+  --bubble-color: var(--dialogue-background-color);
+  border-radius: 20px;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::before, .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::after {
+  all: unset;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::before {
+  content: "";
+  position: absolute;
+  bottom: calc(-1 * var(--dialogue-bubble-size));
+  left: 40%;
+  width: var(--dialogue-bubble-size);
+  height: var(--dialogue-bubble-size);
+  background: var(--bubble-color);
+  border: var(--dialogue-border-width) solid var(--dialogue-border-color);
+  border-radius: 50%;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::after {
+  content: "";
+  position: absolute;
+  bottom: calc(-1.8 * var(--dialogue-bubble-size));
+  left: 35%;
+  width: calc(var(--dialogue-bubble-size) * 0.6);
+  height: calc(var(--dialogue-bubble-size) * 0.6);
+  background: var(--bubble-color);
+  border: var(--dialogue-border-width) solid var(--dialogue-border-color);
+  border-radius: 50%;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought.visible {
+  animation: thoughtBubblePop 0.5s ease-out;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji {
+  --emoji-padding: 5px;
+  border-radius: 50%;
+  padding: var(--emoji-padding);
+  min-width: calc(var(--emoji-padding) * 2 + 1em);
+  min-height: calc(var(--emoji-padding) * 2 + 1em);
+  font-size: 200%;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji::before, .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji::after {
+  content: none;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji .text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji.visible {
+  animation: emojiPop 0.4s ease-out;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.alert {
+  --dialogue-background-color: #ffe1e1;
+  --dialogue-border-color: #ff4444;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.alert.visible {
+  animation: alertShake 0.7s cubic-bezier(0.36, 0, 0.66, -0.56);
+  animation-fill-mode: forwards;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.question {
+  --dialogue-background-color: #e1f5ff;
+  --dialogue-border-color: #44aaff;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.whisper {
+  --dialogue-background-color: rgba(255, 255, 255, 0.9);
+  --dialogue-border-color: #cccccc;
+  font-size: 8px;
+  filter: blur(0px);
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.whisper.visible {
+  opacity: 0.8;
+  animation: whisperFloat 3s ease-out forwards;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.whisper .text {
+  font-style: italic;
+  letter-spacing: 0.5px;
+  color: #666;
+}
+@keyframes thoughtBubblePop {
+  0% {
+    transform: translate(-50%, -100%) scale(0);
+  }
+  70% {
+    transform: translate(-50%, -100%) scale(1.1);
+  }
+  100% {
+    transform: translate(-50%, -100%) scale(1);
+  }
+}
+@keyframes whisperFloat {
+  0% {
+    transform: translate(-50%, -90%) scale(0.8);
+    opacity: 0;
+    filter: blur(2px);
+  }
+  20% {
+    transform: translate(-50%, -95%) scale(0.9);
+    opacity: 0.4;
+    filter: blur(1px);
+  }
+  40% {
+    transform: translate(-50%, -100%) scale(0.95);
+    opacity: 0.6;
+    filter: blur(0px);
+  }
+  60% {
+    transform: translate(-50%, -98%) scale(1);
+    opacity: 0.7;
+  }
+  80% {
+    transform: translate(-50%, -100%) scale(1);
+    opacity: 0.8;
+  }
+  90% {
+    transform: translate(-50%, -99%) scale(1);
+  }
+  100% {
+    transform: translate(-50%, -100%) scale(1);
+    opacity: 0.8;
+  }
+}
+@keyframes emojiPop {
+  0% {
+    transform: translate(-50%, -100%) scale(0) rotate(-20deg);
+  }
+  60% {
+    transform: translate(-50%, -100%) scale(1.2) rotate(10deg);
+  }
+  100% {
+    transform: translate(-50%, -100%) scale(1) rotate(0deg);
+  }
+}
+@keyframes alertShake {
+  0% {
+    transform: translate(-50%, -100%) scale(1);
+  }
+  10% {
+    transform: translate(-50%, -100%) scale(1.5);
+  }
+  20%, 40%, 60% {
+    transform: translate(-52%, -100%) scale(1.5);
+  }
+  30%, 50%, 70% {
+    transform: translate(-48%, -100%) scale(1.5);
+  }
+  80% {
+    transform: translate(-50%, -100%) scale(1.5);
+  }
+  100% {
+    transform: translate(-50%, -100%) scale(1);
+  }
+}
+
+/* BATTERY */
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery {
+  --icon-scale: 2;
+  --battery-size: 13px;
+  width: var(--battery-size);
+  height: 8px;
+  scale: var(--icon-scale);
+  image-rendering: pixelated;
+  filter: drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.1254901961));
+  transition: scale 0.3s ease-in-out, top 0.3s ease-in-out, filter 0.3s ease-in-out, opacity 0.3s ease-in-out;
+  background-image: url(../images/icons/battery.png);
+  opacity: 0;
+  top: 12px;
+  position: relative;
+  /* Blink animation for low battery */
+  /* Pulse animation for critical battery */
+  /* Charging animation */
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.visible {
+  opacity: 1;
+  top: 0;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="3"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.full {
+  background-position: calc(var(--battery-size) * -3) 0;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="2"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.medium {
+  background-position: calc(var(--battery-size) * -2) 0;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="1"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.low {
+  background-position: calc(var(--battery-size) * -1) 0;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="0"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.empty {
+  --icon-scale: 2.5;
+  background-position: 0 0;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.blinking {
+  animation: battery-blink 0.5s infinite alternate;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.critical-pulse {
+  animation: battery-pulse 0.2s infinite alternate;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.charging {
+  animation: battery-charging 2s infinite;
+}
+@keyframes battery-blink {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.3;
+  }
+}
+@keyframes battery-pulse {
+  from {
+    opacity: 1;
+    filter: drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.1254901961));
+  }
+  to {
+    opacity: 0.3;
+    filter: drop-shadow(0px 0px 3% rgb(255, 0, 0));
+  }
+}
+@keyframes battery-charging {
+  0%, 100% {
+    filter: drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.1254901961));
+  }
+  50% {
+    filter: drop-shadow(0px 0px 3px rgba(0, 255, 0, 0.5));
+  }
+}/*# sourceMappingURL=myte.css.map */

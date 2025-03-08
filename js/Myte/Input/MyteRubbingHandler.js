@@ -20,7 +20,7 @@ class MyteRubbingHandler {
 			maxRubs: 25,             // Maximum effective rubs
 			rubbingThreshold: 2,     // Minimum velocity for a valid rub
 			minTimeBetweenRubs: 5000, // Cooldown between rub sessions (ms)
-			directionThreshold: 20,   // Pixels needed to determine direction
+			directionThreshold: 10,   // Pixels needed to determine direction
 			moodBoostPerRub: 5,      // How much each rub increases mood
 			moodPenaltyOverrub: -2,  // Mood penalty for rubbing too much
 			validRubTimeout: 1000,    // Time window for connected rubs (ms)
