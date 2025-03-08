@@ -45,7 +45,6 @@
 				top: 0;
 				left: 0;
 
-
 				&.background {
 
 					width: 800px;
@@ -53,7 +52,7 @@
 					z-index: 0;
 					// background-color: #63b02e;
 
-					// background-image: url("data:image/svg+xml,<svg id='patternId' width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'><defs><pattern id='a' patternUnits='userSpaceOnUse' width='20' height='20' patternTransform='scale(2) rotate(0)'><rect x='0' y='0' width='100%' height='100%' fill='hsla(0,0%,100%,1)'/><path d='M3.25 10h13.5M10 3.25v13.5'  stroke-linecap='square' stroke-width='1' stroke='hsla(259, 0%, 92%, 1)' fill='none'/></pattern></defs><rect width='800%' height='800%' transform='translate(0,0)' fill='url(%23a)'/></svg>");
+					background-image: url("data:image/svg+xml,<svg id='patternId' width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'><defs><pattern id='a' patternUnits='userSpaceOnUse' width='20' height='20' patternTransform='scale(2) rotate(0)'><rect x='0' y='0' width='100%' height='100%' fill='hsla(0,0%,100%,1)'/><path d='M3.25 10h13.5M10 3.25v13.5'  stroke-linecap='square' stroke-width='1' stroke='hsla(259, 0%, 92%, 1)' fill='none'/></pattern></defs><rect width='800%' height='800%' transform='translate(0,0)' fill='url(%23a)'/></svg>");
 				}
 
 				&.debug {
@@ -64,38 +63,14 @@
 					height: 100%;
 					visibility: hidden;
 
-					.debug-collider {
-						background-color: rgba(255, 0, 0, 0.2);
-						border: 1px solid rgba(255, 0, 0, 0.5);
-						pointer-events: none;
-						position: absolute;
-						user-select: none;
-						z-index: 9999;
-
-						&.myte-collider {
-							background-color: rgba(0, 255, 0, 0.2);
-							border-color: rgba(0, 255, 0, 0.5);
-						}
-
-						&.object-collider {
-							background-color: rgba(255, 0, 0, 0.2);
-							border-color: rgba(255, 0, 0, 0.5);
-						}
-
-						&.walkable-object {
-							background-color: rgba(0, 0, 255, 0.2);
-							border-color: rgba(0, 0, 255, 0.5);
-						}
-					}
-
 					.grid-cell {
 						position: absolute;
 						pointer-events: none;
 						user-select: none;
-						outline: 1px solid rgba(0, 0, 0, 0.05);
+						outline: 1px solid rgba(255, 255, 255, 1);
 
 						&.walkable {
-							background-color: rgba(0, 255, 0, 0.05);
+							background-color: rgba(0, 255, 0, 0.2);
 						}
 
 						&.unwalkable {
@@ -218,18 +193,21 @@
 
 						&.gold {
 							background-color: yellow;
+							// background-image: url('../images/MapObjects/music_box.png');
 						}
 					}
 
 					&.health {
 						&.potion {
 							background-color: green;
+							// background-image: url('../images/MapObjects/music_box.png');
 						}
 					}
 
 					&.equipment {
 						&.sword {
 							background-color: red;
+							// background-image: url('../images/MapObjects/music_box.png');
 						}
 					}
 				}
@@ -285,24 +263,13 @@
 					&.blue_butterfly,
 					&.guard {
 						position: absolute;
+						width: 64px;
+						height: 64px;
 
 						image-rendering: pixelated;
 
 						background: {
 							image: url('../images/MapObjects/butterfly.png');
-							repeat: no-repeat;
-						}
-
-					}
-
-					&.ball {
-						position: absolute;
-
-
-						image-rendering: pixelated;
-
-						background: {
-							image: url('../images/MapObjects/ball.gif');
 							repeat: no-repeat;
 						}
 
@@ -353,35 +320,6 @@
 					}
 
 
-					&.animated-map-object {
-						pointer-events: all;
-						position: absolute;
-						transition: transform 0.1s ease-out;
-
-						.sprite {
-							background-repeat: no-repeat;
-							height: 100%;
-							image-rendering: pixelated;
-							width: 100%;
-						}
-
-						&.butterfly {
-							&.blue {
-								filter: hue-rotate(156deg);
-							}
-
-							&.green {
-								filter: hue-rotate(60deg);
-							}
-
-							&.purple {
-								filter: hue-rotate(270deg);
-							}
-						}
-					}
-
-
-
 				}
 
 			}
@@ -405,3 +343,21 @@
 	}
 }
 
+
+.debug-collider {
+	pointer-events: none;
+	position: absolute;
+	z-index: 10000;
+
+	&.myte-collider {
+		outline: 1px solid rgba(100, 0, 0, .6);
+		background-color: rgba(255, 0, 0, 0.2)
+	}
+
+	&.object-collider {
+		outline: 1px solid rgb(0, 100, .6);
+		background-color: rgba(0, 255, 0, 0.2)
+	}
+
+
+}

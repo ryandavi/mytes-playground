@@ -1,0 +1,2978 @@
+*, ::before, ::after {
+	box-sizing: border-box;
+  }
+  
+  :root {
+  }
+  
+  body {
+	overflow-x: hidden;
+  }
+  
+  html, body {
+	width: 100%;
+	height: 100%;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	margin-left: 0px;
+	padding-top: 0px;
+	padding-right: 0px;
+	padding-bottom: 0px;
+	padding-left: 0px;
+  }
+  
+  body, input, textarea, button {
+	font-family: "Source Code Pro", system-ui;
+	font-optical-sizing: auto;
+	font-weight: 500;
+	font-style: normal;
+  }
+  
+  form {
+	max-width: fit-content;
+	margin-top: 0px;
+	margin-right: auto;
+	margin-bottom: 0px;
+	margin-left: auto;
+  }
+  
+  input[type="text"], input[type="submit"], input[type="button"], input[type="password"], textarea {
+	border-top-style: solid;
+	border-right-style: solid;
+	border-bottom-style: solid;
+	border-left-style: solid;
+	border-top-color: lightgrey;
+	border-left-color: lightgrey;
+	border-right-color: white;
+	border-bottom-color: white;
+	width: 70%;
+	max-width: 500px;
+  }
+  
+  input[type="range"] input[type="submit"], input[type="button"], button {
+	border-top-style: solid;
+	border-right-style: solid;
+	border-bottom-style: solid;
+	border-left-style: solid;
+	border-top-color: white;
+	border-left-color: white;
+	border-right-color: lightgrey;
+	border-bottom-color: lightgrey;
+	background-color: rgb(245, 245, 245);
+	text-shadow: rgb(58, 58, 58) 0px 0px;
+	color: transparent;
+  }
+  
+  input[type="range"] input[type="submit"]:not(:disabled), input[type="button"]:not(:disabled), button:not(:disabled) {
+	cursor: pointer;
+  }
+  
+  input[type="range"] input[type="submit"]:disabled, input[type="range"] input[type="submit"]:active, input[type="button"]:disabled, input[type="button"]:active, button:disabled, button:active {
+	border-top-color: lightgrey;
+	border-left-color: lightgrey;
+	border-right-color: white;
+	border-bottom-color: white;
+	text-shadow: rgb(34, 34, 34) 1px 1px;
+  }
+  
+  input[type="range"] input[type="submit"]:active:not(:disabled), input[type="button"]:active:not(:disabled), button:active:not(:disabled) {
+	outline-color: black;
+	outline-style: dotted;
+	outline-width: 1px;
+  }
+  
+  input[type="range"] input[type="submit"]:disabled, input[type="button"]:disabled, button:disabled {
+	text-shadow: lightgrey 1px 1px;
+  }
+  
+  textarea:focus, input:focus {
+	outline-color: black;
+	outline-style: dotted;
+	outline-width: 1px;
+  }
+  
+  body {
+	position: relative;
+  }
+  
+  .container-wrapper-wrapper {
+	width: fit-content;
+	margin-top: 0px;
+	margin-right: auto;
+	margin-bottom: 0px;
+	margin-left: auto;
+	position: relative;
+  }
+  
+  .container-wrapper {
+	background-color: rgb(245, 245, 245);
+	border-top-left-radius: 20px;
+	border-top-right-radius: 20px;
+	border-bottom-right-radius: 20px;
+	border-bottom-left-radius: 20px;
+	width: 635px;
+	margin-top: 0px;
+	margin-right: auto;
+	margin-bottom: 0px;
+	margin-left: auto;
+	display: flex;
+	flex-direction: column;
+	row-gap: 20px;
+	column-gap: 20px;
+	position: relative;
+  }
+  
+  .container-wrapper.styled {
+	padding-top: 20px;
+	padding-right: 20px;
+	padding-bottom: 20px;
+	padding-left: 20px;
+	box-shadow: var(--border-width) var(--border-width) 0px 0px rgba(0, 0, 0, 0.05), inset var(--border-width) var(--border-width) 0px 0px white, inset -var(--border-width) -var(--border-width) 0px 0px rgba(0, 0, 0, 0.05);
+  }
+  
+  .container-wrapper.styled > .container {
+	background-color: rgb(238, 238, 238);
+	box-shadow: inset var(--border-width) var(--border-width) 0px 0px rgba(0, 0, 0, 0.25);
+  }
+  
+  .container-wrapper.fullscreen {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	width: 100%;
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	box-shadow: unset;
+	border-top-left-radius: 0px;
+	border-top-right-radius: 0px;
+	border-bottom-right-radius: 0px;
+	border-bottom-left-radius: 0px;
+	border-top-width: 0px;
+	border-right-width: 0px;
+	border-bottom-width: 0px;
+	border-left-width: 0px;
+	border-top-style: initial;
+	border-right-style: initial;
+	border-bottom-style: initial;
+	border-left-style: initial;
+	border-top-color: initial;
+	border-right-color: initial;
+	border-bottom-color: initial;
+	border-left-color: initial;
+	border-image-source: initial;
+	border-image-slice: initial;
+	border-image-width: initial;
+	border-image-outset: initial;
+	border-image-repeat: initial;
+  }
+  
+  .container-wrapper.fullscreen > .hand-controls {
+	transform: unset;
+	position: unset;
+	flex-grow: 0;
+	flex-shrink: 0;
+	flex-basis: auto;
+	padding-top: 0px;
+	padding-right: 0px;
+	padding-bottom: 0px;
+	padding-left: 0px;
+  }
+  
+  .container-wrapper.fullscreen > .container {
+	flex-grow: 1;
+	flex-shrink: 1;
+	flex-basis: 0%;
+  }
+  
+  .container-wrapper.fullscreen > .sidebar {
+	flex-grow: 0;
+	flex-shrink: 0;
+	flex-basis: auto;
+  }
+  
+  .container-wrapper.fullscreen > .sidebar > .action-controls {
+	position: unset;
+	transform: unset;
+	display: block;
+	padding-top: 0px;
+	padding-right: 0px;
+	padding-bottom: 0px;
+	padding-left: 0px;
+  }
+  
+  .container-wrapper.fullscreen > .allMytes {
+	flex-grow: 1;
+	flex-shrink: 1;
+	flex-basis: 100%;
+  }
+  
+  .container-wrapper > .header {
+	flex-grow: 0;
+	flex-shrink: 0;
+	flex-basis: 100%;
+	display: flex;
+	row-gap: 20px;
+	column-gap: 20px;
+  }
+  
+  .container-wrapper > .header > .logo {
+	display: flex;
+	align-items: center;
+  }
+  
+  .container-wrapper > .header > .logo > img {
+	height: 1.2em;
+	top: 0.125em;
+	position: relative;
+  }
+  
+  .container-wrapper > .header > .active-pet {
+	row-gap: 10px;
+	column-gap: 10px;
+	display: none;
+  }
+  
+  .container-wrapper > .header > .active-pet.visible {
+	display: flex;
+  }
+  
+  .container-wrapper > .header > .username {
+	margin-left: auto;
+  }
+  
+  .container-wrapper > .header > .date-time {
+	margin-left: auto;
+  }
+  
+  .container-wrapper > .container {
+	height: 500px;
+	position: relative;
+	user-select: none;
+	touch-action: none;
+	-webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  }
+  
+  .container-wrapper > .container:not(.noScroll) {
+	overflow-x: hidden;
+	overflow-y: hidden;
+  }
+  
+  .container-wrapper > .container.valid-drop-target {
+  }
+  
+  .container-wrapper > .container.valid-drop-target.on-target {
+	outline-color: var(--on-target);
+  }
+  
+  .container-wrapper > .controls {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+  }
+  
+  .container-wrapper > .controls button {
+  }
+  
+  .container-wrapper > .inventory {
+	background-color: lightgrey;
+	margin-top: 0px;
+	margin-right: auto;
+	margin-bottom: 0px;
+	margin-left: auto;
+	display: flex;
+	flex-wrap: wrap;
+	row-gap: 10px;
+	column-gap: 10px;
+	width: 100%;
+	min-height: 96px;
+	overflow-y: scroll;
+	scrollbar-width: thin;
+  }
+  
+  .container-wrapper > .inventory > .item {
+	cursor: pointer;
+  }
+  
+  .container-wrapper > .allMytes {
+	display: flex;
+	flex-wrap: wrap;
+	row-gap: 10px;
+	column-gap: 10px;
+	min-height: 78px;
+  }
+  
+  .container-wrapper > .allMytes .myte-title {
+	font-size: 1.2em;
+	font-weight: 600;
+	margin-bottom: 15px;
+	color: rgb(51, 51, 51);
+  }
+  
+  .container-wrapper > .allMytes .myte-list {
+	display: flex;
+	flex-direction: column;
+  }
+  
+  .container-wrapper > .allMytes .myte-thumbnail {
+	display: flex;
+	align-items: center;
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgb(245, 245, 245);
+	cursor: pointer;
+	border-top-style: solid;
+	border-right-style: solid;
+	border-bottom-style: solid;
+	border-left-style: solid;
+	border-top-color: white;
+	border-left-color: white;
+	border-right-color: lightgrey;
+	border-bottom-color: lightgrey;
+  }
+  
+  .container-wrapper > .allMytes .myte-thumbnail:hover {
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgb(229, 229, 229);
+  }
+  
+  .container-wrapper > .allMytes .myte-thumbnail.active {
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgb(225, 236, 255);
+	border-top-color: lightgrey;
+	border-left-color: lightgrey;
+	border-right-color: white;
+	border-bottom-color: white;
+  }
+  
+  .container-wrapper > .allMytes .myte-thumbnail.active .myte-name {
+	color: rgb(50, 105, 196);
+	font-weight: 600;
+  }
+  
+  .container-wrapper > .allMytes .myte-thumbnail .myte-sprite {
+	width: 48px;
+	height: 48px;
+	border-top-left-radius: 50%;
+	border-top-right-radius: 50%;
+	border-bottom-right-radius: 50%;
+	border-bottom-left-radius: 50%;
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: white;
+	position: relative;
+	overflow-x: hidden;
+	overflow-y: hidden;
+  }
+  
+  .container-wrapper > .allMytes .myte-thumbnail .myte-sprite-inner {
+	position: absolute;
+	width: 192px;
+	height: 192px;
+	background-image: url("../images/snail/spritesheet.png");
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: initial;
+	background-position-x: 0px;
+	background-position-y: 576px;
+	transform: scale(0.25);
+	transform-origin: left top;
+	image-rendering: pixelated;
+  }
+  
+  .container-wrapper > .allMytes .myte-thumbnail .myte-name {
+	font-size: 1em;
+	color: rgb(51, 51, 51);
+  }
+  
+  .container-wrapper > .allMytes .myte-thumbnail .active-badge {
+	margin-left: auto;
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgb(50, 105, 196);
+	color: white;
+	padding-top: 4px;
+	padding-right: 8px;
+	padding-bottom: 4px;
+	padding-left: 8px;
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	border-bottom-right-radius: 4px;
+	border-bottom-left-radius: 4px;
+	font-size: 0.8em;
+  }
+  
+  .container-wrapper > .hand-controls {
+	background-color: rgb(245, 245, 245);
+	margin-top: 0px;
+	margin-right: auto;
+	margin-bottom: 0px;
+	margin-left: auto;
+	display: flex;
+	row-gap: 10px;
+	column-gap: 10px;
+	top: 0px;
+	z-index: 1000;
+	position: absolute;
+	flex-direction: column;
+	transform: translate(calc(-100% - 40px), 0px);
+	width: fit-content;
+	user-select: none;
+  }
+  
+  .container-wrapper > .hand-controls input[type="radio"] {
+	display: none;
+  }
+  
+  .container-wrapper > .hand-controls button.hand-control-btn, .container-wrapper > .hand-controls label {
+	width: 80px;
+	height: 80px;
+	justify-content: center;
+	align-items: center;
+	border-top-style: solid;
+	border-right-style: solid;
+	border-bottom-style: solid;
+	border-left-style: solid;
+	border-top-color: white;
+	border-left-color: white;
+	border-right-color: lightgrey;
+	border-bottom-color: lightgrey;
+	background-color: rgb(245, 245, 245);
+	display: flex;
+	flex-direction: column;
+	row-gap: 2px;
+	column-gap: 2px;
+	color: rgb(180, 180, 180);
+	cursor: pointer;
+  }
+  
+  .container-wrapper > .hand-controls button.hand-control-btn > .icon, .container-wrapper > .hand-controls label > .icon {
+	fill: grey;
+	max-width: 24px;
+	max-height: 24px;
+  }
+  
+  .container-wrapper > .hand-controls button.hand-control-btn > .text, .container-wrapper > .hand-controls label > .text {
+	font-size: 75%;
+  }
+  
+  .container-wrapper > .hand-controls .hand-control-btn#sound-toggle i {
+	font-style: normal;
+	font-size: 1.5em;
+  }
+  
+  .container-wrapper > .hand-controls .hand-control-btn#sound-toggle.muted .icon-sound-on {
+	display: none;
+  }
+  
+  .container-wrapper > .hand-controls .hand-control-btn#sound-toggle:not(.muted) .icon-sound-off {
+	display: none;
+  }
+  
+  .container-wrapper > .hand-controls .hand-control-btn#sound-toggle > .icon-sound-on::before {
+	content: "🔊";
+  }
+  
+  .container-wrapper > .hand-controls .hand-control-btn#sound-toggle > .icon-sound-off::before {
+	content: "🔇";
+  }
+  
+  .container-wrapper > .hand-controls button.hand-control-btn:hover, .container-wrapper > .hand-controls label:hover {
+	outline-color: rgba(0, 128, 0, 0.33);
+	outline-style: solid;
+	outline-width: 4px;
+  }
+  
+  .container-wrapper > .hand-controls input[type="radio"]:checked + label:not(:checked), .container-wrapper > .hand-controls input[type="radio"]:checked + label:not(:active) {
+	border-top-color: lightgrey;
+	border-left-color: lightgrey;
+	border-right-color: white;
+	border-bottom-color: white;
+	outline-color: green;
+	outline-style: solid;
+	outline-width: 4px;
+	color: black;
+  }
+  
+  .container-wrapper > .hand-controls input[type="radio"]:checked + label:not(:checked) > .icon, .container-wrapper > .hand-controls input[type="radio"]:checked + label:not(:active) > .icon {
+	fill: black;
+  }
+  
+  .container-wrapper > .sidebar {
+	width: 250px;
+	max-height: 500px;
+	position: absolute;
+	right: 0px;
+	top: 0px;
+	transform: translate(calc(100% + 20px), 0px);
+	display: flex;
+	overflow-x: hidden;
+	overflow-y: hidden;
+	background-color: rgb(245, 245, 245);
+  }
+  
+  .container-wrapper > .sidebar > .action-controls {
+	flex-direction: column;
+	display: none;
+	width: 100%;
+	max-width: 250px;
+  }
+  
+  .container-wrapper > .sidebar > .action-controls.visible {
+	display: flex;
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .selected-info {
+	padding-top: 0.75rem;
+	padding-right: 0.75rem;
+	padding-bottom: 0.75rem;
+	padding-left: 0.75rem;
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgb(245, 245, 245);
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	border-bottom-right-radius: 4px;
+	border-bottom-left-radius: 4px;
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .selected-info .interaction-type {
+	font-size: 0.8em;
+	text-transform: uppercase;
+	color: rgb(102, 102, 102);
+	margin-bottom: 0.25rem;
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .selected-info .target-info {
+	display: flex;
+	row-gap: 0.5rem;
+	column-gap: 0.5rem;
+	align-items: center;
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .selected-info .target-info .type {
+	font-size: 0.8em;
+	padding-top: 0.25rem;
+	padding-right: 0.5rem;
+	padding-bottom: 0.25rem;
+	padding-left: 0.5rem;
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgb(224, 224, 224);
+	border-top-left-radius: 3px;
+	border-top-right-radius: 3px;
+	border-bottom-right-radius: 3px;
+	border-bottom-left-radius: 3px;
+	color: rgb(85, 85, 85);
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .selected-info .target-info .name {
+	font-weight: 500;
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .selected-info.self-selected {
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgb(232, 240, 254);
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .selected-info.myte-interaction {
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgb(254, 246, 224);
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .selected-info.map-interaction {
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgb(230, 244, 234);
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .selected-info.element-interaction {
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgb(252, 232, 230);
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .action-groups {
+	overflow-y: auto;
+	scrollbar-width: thin;
+	height: 100%;
+	padding-top: 0px;
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .action-groups .action-group + .action-group {
+	margin-top: var(--padding);
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: rgb(238, 238, 238);
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .action-groups .action-group h3 {
+	font-size: 0.8em;
+	text-transform: uppercase;
+	color: rgb(102, 102, 102);
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0.5rem;
+	margin-left: 0px;
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .action-groups .action-group ul {
+	list-style-position: initial;
+	list-style-image: initial;
+	list-style-type: none;
+	padding-top: 0px;
+	padding-right: 0px;
+	padding-bottom: 0px;
+	padding-left: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	margin-left: 0px;
+	display: flex;
+	flex-direction: column;
+	row-gap: 0.5rem;
+	column-gap: 0.5rem;
+  }
+  
+  .container-wrapper > .sidebar > .action-controls > .action-groups .action-group button {
+	width: 100%;
+	padding-top: 0.5rem;
+	padding-right: 0.5rem;
+	padding-bottom: 0.5rem;
+	padding-left: 0.5rem;
+  }
+  
+  body.debug .target.dot, body.debug .debugMenu, body.debug .cursor-dot.dot, body.debug .crosshair, body.debug .queueMenu, body.debug .zone, body.debug .layer.debug {
+	visibility: visible;
+  }
+  
+  body.debug .interactive-myte .sprite {
+	outline-color: red;
+	outline-style: solid;
+	outline-width: 1px;
+  }
+  
+  body.debug .mapObject {
+	outline-color: green;
+	outline-style: solid;
+	outline-width: 1px;
+  }
+  
+  body.debug .mapObject:hover {
+	z-index: 100000;
+  }
+  
+  body.debug .mapObject:hover > img.back {
+	visibility: hidden;
+  }
+  
+  body.debug .mapObject > div.interact:hover {
+	background-color: rgb(255, 255, 225);
+	outline-color: black;
+	outline-style: solid;
+	outline-width: 2px;
+	border-top-left-radius: 2px;
+	border-top-right-radius: 2px;
+	border-bottom-right-radius: 2px;
+	border-bottom-left-radius: 2px;
+	color: black;
+	filter: drop-shadow(rgba(0, 0, 0, 0.125) 2px 2px 0px);
+  }
+  
+  .dot {
+	transform: translate(-100%, -100%);
+	width: 10px;
+	height: 10px;
+	position: absolute;
+	border-top-left-radius: 20px;
+	border-top-right-radius: 20px;
+	border-bottom-right-radius: 20px;
+	border-bottom-left-radius: 20px;
+	opacity: 0.5;
+	pointer-events: none;
+	top: -1000px;
+	left: -1000px;
+	outline-color: white;
+	outline-style: solid;
+	outline-width: 1px;
+	z-index: 1000000;
+	visibility: hidden;
+  }
+  
+  .dot.hidden {
+	visibility: hidden;
+  }
+  
+  .dot.cursor-dot {
+	background-color: blueviolet;
+  }
+  
+  .dot.target {
+	background-color: green;
+  }
+  
+  .dot.target::after {
+	position: absolute;
+	top: -2em;
+	left: 50%;
+	transform: translateX(-50%);
+	background-color: white;
+	padding-top: 2px;
+	padding-right: 5px;
+	padding-bottom: 2px;
+	padding-left: 5px;
+	border-top-left-radius: 5px;
+	border-top-right-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-bottom-left-radius: 5px;
+	font-size: 9px;
+	text-transform: uppercase;
+	content: attr(data-name) " target";
+	display: inline-block;
+	white-space-collapse: collapse;
+	text-wrap-mode: nowrap;
+  }
+  
+  .debug-value-changed {
+	animation-duration: 0.5s;
+	animation-timing-function: ease-out;
+	animation-delay: 0s;
+	animation-iteration-count: 1;
+	animation-direction: normal;
+	animation-fill-mode: none;
+	animation-play-state: running;
+	animation-name: highlight;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+  }
+  
+  .outOfViewportMarker {
+	width: 10px;
+	height: 10px;
+	position: fixed;
+	background-color: red;
+	transform: translate(-50%, 0%);
+	margin-top: 10px;
+	margin-right: 0px;
+	margin-bottom: 10px;
+	margin-left: 0px;
+	border-top-left-radius: 20px;
+	border-top-right-radius: 20px;
+	border-bottom-right-radius: 20px;
+	border-bottom-left-radius: 20px;
+	opacity: 0;
+	transition-behavior: normal;
+	transition-duration: 1s;
+	transition-timing-function: ease;
+	transition-delay: 0s;
+	transition-property: opacity;
+	visibility: hidden;
+  }
+  
+  .outOfViewportMarker.top {
+	top: 0%;
+	opacity: 1;
+	visibility: visible;
+  }
+  
+  .outOfViewportMarker.bottom {
+	bottom: 0%;
+	opacity: 1;
+	visibility: visible;
+  }
+  
+  .tooltip {
+	background-color: rgb(255, 255, 225);
+	padding-top: 2px;
+	padding-right: 2px;
+	padding-bottom: 2px;
+	padding-left: 2px;
+	outline-color: black;
+	outline-style: solid;
+	outline-width: 1px;
+	font-size: 9px;
+	text-transform: uppercase;
+	color: black;
+	border-top-left-radius: 1px;
+	border-top-right-radius: 1px;
+	border-bottom-right-radius: 1px;
+	border-bottom-left-radius: 1px;
+	filter: drop-shadow(rgba(0, 0, 0, 0.125) 2px 2px 0px);
+  }
+  
+  #customCursor {
+	position: fixed;
+	pointer-events: none;
+	z-index: 9999;
+	width: 32px;
+	height: 32px;
+	background-image: url("../images/cursor/hand2.png");
+	background-size: cover;
+	transform: translate(-50%, -50%);
+  }
+  
+  #customCursor.clicking {
+	background-image: url("../images/cursor/hand3.png");
+  }
+  
+  .dragging {
+	cursor: grabbing;
+	touch-action: none;
+	user-select: none;
+  }
+  
+  :root {
+  }
+  
+  #inventory {
+	padding-top: 16px;
+	padding-right: 16px;
+	padding-bottom: 16px;
+	padding-left: 16px;
+  }
+  
+  #inventory.empty {
+	opacity: 0.7;
+  }
+  
+  #inventory.empty::after {
+	content: "Empty Inventory";
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	color: rgba(255, 255, 255, 0.5);
+	font-size: 14px;
+	white-space-collapse: collapse;
+	text-wrap-mode: nowrap;
+  }
+  
+  #inventory.full {
+	box-shadow: rgba(255, 68, 68, 0.5) 0px 0px 10px;
+  }
+  
+  #inventory.full::after {
+	content: "Inventory Full";
+	position: absolute;
+	top: -20px;
+	left: 50%;
+	transform: translateX(-50%);
+	color: rgb(255, 68, 68);
+	font-size: 12px;
+	white-space-collapse: collapse;
+	text-wrap-mode: nowrap;
+  }
+  
+  .inventory-grid {
+	display: grid;
+	grid-template-columns: repeat(5, var(--item-size));
+	min-width: calc((var(--item-size) + var(--grid-gap)) * 5);
+	min-height: calc((var(--item-size) + var(--grid-gap)) * 3);
+  }
+  
+  .item {
+	width: 32px;
+	height: 32px;
+	background-image: url("../images/items/items.png");
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: initial;
+	image-rendering: pixelated;
+	zoom: 2;
+	position: relative;
+  }
+  
+  .item.acorn {
+	background-position-x: 0px;
+	background-position-y: 0px;
+  }
+  
+  .item.turnip {
+	background-position-x: -32px;
+	background-position-y: 0px;
+  }
+  
+  .item.apple {
+	background-position-x: -128px;
+	background-position-y: 0px;
+  }
+  
+  .item.cherries {
+	background-position-x: -160px;
+	background-position-y: 0px;
+  }
+  
+  .item.music_box {
+	background-position-x: 0px;
+	background-position-y: -64px;
+  }
+  
+  .item::after {
+	content: attr(data-quantity);
+	position: absolute;
+	top: 0px;
+	right: 0px;
+	background-color: white;
+	border-top-left-radius: 5px;
+	border-top-right-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-bottom-left-radius: 5px;
+	padding-top: 2px;
+	padding-right: 2px;
+	padding-bottom: 2px;
+	padding-left: 2px;
+	font-size: 6px;
+  }
+  
+  .item[data-quantity="1"]::after {
+	visibility: hidden;
+  }
+  
+  .item {
+	position: relative;
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(255, 255, 255, 0.1);
+	cursor: grab;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition-behavior: normal;
+	transition-duration: 0.2s;
+	transition-timing-function: ease;
+	transition-delay: 0s;
+	transition-property: all;
+  }
+  
+  .item:hover {
+	transform: translateY(-2px);
+	filter: brightness(1.2);
+  }
+  
+  .item:active {
+	cursor: grabbing;
+	transform: scale(0.95);
+  }
+  
+  .item.dragging {
+	opacity: 0.7;
+	pointer-events: none;
+  }
+  
+  .item.food {
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(240, 230, 140, 0.2);
+  }
+  
+  .item.food::before {
+	content: "🍎";
+	font-size: 24px;
+  }
+  
+  .item.toy {
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(135, 206, 235, 0.2);
+  }
+  
+  .item.toy::before {
+	content: "🎾";
+	font-size: 24px;
+  }
+  
+  .item.medicine {
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(152, 251, 152, 0.2);
+  }
+  
+  .item.medicine::before {
+	content: "💊";
+	font-size: 24px;
+  }
+  
+  .inventory-drop-indicator {
+	position: absolute;
+	width: var(--item-size);
+	height: var(--item-size);
+	border-top-width: 2px;
+	border-right-width: 2px;
+	border-bottom-width: 2px;
+	border-left-width: 2px;
+	border-top-style: dashed;
+	border-right-style: dashed;
+	border-bottom-style: dashed;
+	border-left-style: dashed;
+	border-top-color: white;
+	border-right-color: white;
+	border-bottom-color: white;
+	border-left-color: white;
+	border-image-source: initial;
+	border-image-slice: initial;
+	border-image-width: initial;
+	border-image-outset: initial;
+	border-image-repeat: initial;
+	border-top-left-radius: 50%;
+	border-top-right-radius: 50%;
+	border-bottom-right-radius: 50%;
+	border-bottom-left-radius: 50%;
+	pointer-events: none;
+	display: none;
+	z-index: 9999;
+	transform: translate(-50%, -50%);
+	animation-duration: 1s;
+	animation-timing-function: ease;
+	animation-delay: 0s;
+	animation-iteration-count: infinite;
+	animation-direction: normal;
+	animation-fill-mode: none;
+	animation-play-state: running;
+	animation-name: pulse;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+  }
+  
+  .consumption-effect {
+	position: absolute;
+	width: var(--item-size);
+	height: var(--item-size);
+	pointer-events: none;
+	animation-duration: 1s;
+	animation-timing-function: ease-out;
+	animation-delay: 0s;
+	animation-iteration-count: 1;
+	animation-direction: normal;
+	animation-fill-mode: forwards;
+	animation-play-state: running;
+	animation-name: consume;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+	outline-color: red;
+	outline-style: solid;
+	outline-width: 1px;
+  }
+  
+  .consumption-effect.food {
+	background-image: radial-gradient(circle, rgb(240, 230, 140), transparent);
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: initial;
+  }
+  
+  .consumption-effect.toy {
+	background-image: radial-gradient(circle, rgb(135, 206, 235), transparent);
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: initial;
+  }
+  
+  .consumption-effect.medicine {
+	background-image: radial-gradient(circle, rgb(152, 251, 152), transparent);
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: initial;
+  }
+  
+  .duplicate.droppable {
+	transition-behavior: normal;
+	transition-duration: 0.2s;
+	transition-timing-function: ease;
+	transition-delay: 0s;
+	transition-property: transform;
+  }
+  
+  .duplicate.drag-over {
+	transform: scale(1.1);
+	filter: brightness(1.1);
+	box-shadow: rgba(255, 255, 255, 0.5) 0px 0px 10px;
+  }
+  
+  .container.valid-drop-target::after {
+	content: "";
+	position: absolute;
+	top: 0px;
+	right: 0px;
+	bottom: 0px;
+	left: 0px;
+	border-top-width: 2px;
+	border-right-width: 2px;
+	border-bottom-width: 2px;
+	border-left-width: 2px;
+	border-top-style: dashed;
+	border-right-style: dashed;
+	border-bottom-style: dashed;
+	border-left-style: dashed;
+	border-top-color: rgba(255, 255, 255, 0.3);
+	border-right-color: rgba(255, 255, 255, 0.3);
+	border-bottom-color: rgba(255, 255, 255, 0.3);
+	border-left-color: rgba(255, 255, 255, 0.3);
+	border-image-source: initial;
+	border-image-slice: initial;
+	border-image-width: initial;
+	border-image-outset: initial;
+	border-image-repeat: initial;
+	pointer-events: none;
+  }
+  
+  .container.on-target::after {
+	border-top-color: rgba(255, 255, 255, 0.8);
+	border-right-color: rgba(255, 255, 255, 0.8);
+	border-bottom-color: rgba(255, 255, 255, 0.8);
+	border-left-color: rgba(255, 255, 255, 0.8);
+  }
+  
+  :root {
+  }
+  
+  .loading-screen {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	width: 100%;
+	height: 100%;
+	z-index: 5000;
+	display: flex;
+	justify-content: center;
+	align-items: flex-start;
+	transition-behavior: normal;
+	transition-duration: 0.5s;
+	transition-timing-function: ease-in-out;
+	transition-delay: 0s;
+	transition-property: opacity;
+	user-select: none;
+	background-color: rgb(195, 195, 195);
+  }
+  
+  .loading-screen.background {
+	justify-content: center;
+	align-items: center;
+  }
+  
+  .loading-screen.hidden {
+	opacity: 0;
+	pointer-events: none;
+  }
+  
+  .loading-screen .mytes-loading-window {
+	width: 100%;
+	max-width: 400px;
+	background-color: rgb(195, 195, 195);
+	border-top-color: rgb(255, 255, 255);
+	border-right-color: rgb(128, 128, 128);
+	border-bottom-color: rgb(128, 128, 128);
+	border-left-color: rgb(255, 255, 255);
+	box-shadow: var(--border-width) var(--border-width) 0px rgba(0, 0, 0, 0.1);
+	position: relative;
+	padding-top: 0px;
+	padding-right: 0px;
+	padding-bottom: 0px;
+	padding-left: 0px;
+	overflow-x: hidden;
+	overflow-y: hidden;
+	top: 5px;
+	transition-behavior: normal, normal;
+	transition-duration: 0.25s, 0.25s;
+	transition-timing-function: linear, linear;
+	transition-delay: 0s, 0s;
+	transition-property: top, opacity;
+	opacity: 0;
+  }
+  
+  .loading-screen .mytes-loading-window.visible {
+	top: 0px;
+	opacity: 1;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-title-bar {
+	background-color: rgb(0, 85, 234);
+	color: white;
+	display: flex;
+	align-items: center;
+	font-weight: bold;
+	font-size: 14px;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-title-bar .mytes-title-text {
+	flex-grow: 1;
+	font-weight: bold;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-title-bar .mytes-close-button {
+	width: 22px;
+	height: 22px;
+	background-color: rgb(195, 195, 195);
+	border-top-width: 2px;
+	border-right-width: 2px;
+	border-bottom-width: 2px;
+	border-left-width: 2px;
+	border-top-style: solid;
+	border-right-style: solid;
+	border-bottom-style: solid;
+	border-left-style: solid;
+	border-image-source: initial;
+	border-image-slice: initial;
+	border-image-width: initial;
+	border-image-outset: initial;
+	border-image-repeat: initial;
+	border-top-color: rgb(255, 255, 255);
+	border-right-color: rgb(128, 128, 128);
+	border-bottom-color: rgb(128, 128, 128);
+	border-left-color: rgb(255, 255, 255);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: bold;
+	text-decoration-line: none;
+	text-decoration-thickness: initial;
+	text-decoration-style: initial;
+	text-decoration-color: initial;
+	line-height: 1;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-content {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-content .mytes-message {
+	font-size: 13px;
+	min-height: 36px;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-content .loading-icon {
+	width: var(--size);
+	height: var(--size);
+	background-image: url("../images/snail/spritesheet.png");
+	background-position-x: 0px;
+	background-position-y: 0px;
+	background-size: var(--sprite-width) var(--sprite-height);
+	animation-duration: 1s;
+	animation-timing-function: steps(8);
+	animation-delay: 0s;
+	animation-iteration-count: infinite;
+	animation-direction: normal;
+	animation-fill-mode: none;
+	animation-play-state: running;
+	animation-name: loadingAnimation;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+	z-index: 100;
+	transform-origin: center bottom;
+	position: relative;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-content .mytes-progress-container {
+	border-top-width: 3px;
+	border-right-width: 3px;
+	border-bottom-width: 3px;
+	border-left-width: 3px;
+	border-top-style: solid;
+	border-right-style: solid;
+	border-bottom-style: solid;
+	border-left-style: solid;
+	border-image-source: initial;
+	border-image-slice: initial;
+	border-image-width: initial;
+	border-image-outset: initial;
+	border-image-repeat: initial;
+	border-top-color: rgb(128, 128, 128);
+	border-right-color: rgb(255, 255, 255);
+	border-bottom-color: rgb(255, 255, 255);
+	border-left-color: rgb(128, 128, 128);
+	padding-top: 3px;
+	padding-right: 3px;
+	padding-bottom: 3px;
+	padding-left: 3px;
+	background-color: white;
+	height: 22px;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-content .mytes-progress-container .mytes-progress {
+	height: 100%;
+	width: 0%;
+	background-color: rgb(0, 85, 234);
+	position: relative;
+	transition-behavior: normal;
+	transition-duration: 0.1s;
+	transition-timing-function: linear;
+	transition-delay: 0s;
+	transition-property: width;
+	border-top-left-radius: 2px;
+	border-top-right-radius: 2px;
+	border-bottom-right-radius: 2px;
+	border-bottom-left-radius: 2px;
+	overflow-x: hidden;
+	overflow-y: hidden;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-content .mytes-progress-container .mytes-progress .mytes-progress-blocks {
+	height: 100%;
+	width: 100%;
+	background-image: linear-gradient(to right, rgb(0, 85, 234) 10px, rgb(51, 139, 255) 10px, rgb(51, 139, 255) 20px, rgb(0, 85, 234) 20px);
+	background-size: 20px 100%;
+	background-repeat: repeat-x;
+	animation-duration: 0.8s;
+	animation-timing-function: linear;
+	animation-delay: 0s;
+	animation-iteration-count: infinite;
+	animation-direction: normal;
+	animation-fill-mode: none;
+	animation-play-state: running;
+	animation-name: block-move;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-content .mytes-status {
+	font-size: 13px;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-content .mytes-buttons {
+	display: flex;
+	justify-content: flex-end;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-content .mytes-buttons .mytes-button {
+	background-color: rgb(195, 195, 195);
+	display: none;
+	border-top-color: rgb(255, 255, 255);
+	border-right-color: rgb(128, 128, 128);
+	border-bottom-color: rgb(128, 128, 128);
+	border-left-color: rgb(255, 255, 255);
+	font-size: 13px;
+	min-width: 80px;
+	text-align: center;
+	cursor: pointer;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-content .mytes-buttons .mytes-button.visible {
+	display: block;
+  }
+  
+  .loading-screen .mytes-loading-window .mytes-content .mytes-buttons .mytes-button:active {
+	border-top-color: rgb(128, 128, 128);
+	border-right-color: rgb(255, 255, 255);
+	border-bottom-color: rgb(255, 255, 255);
+	border-left-color: rgb(128, 128, 128);
+  }
+  
+  :root {
+  }
+  
+  .settings-panel {
+	position: absolute;
+	top: 50px;
+	right: 20px;
+	box-shadow: var(--shadow);
+	width: var(--panel-width);
+	z-index: 1000;
+	transform: translateY(-10px);
+	opacity: 0;
+	pointer-events: none;
+  }
+  
+  .settings-panel.visible {
+	transform: translateY(0px);
+	opacity: 1;
+	pointer-events: all;
+  }
+  
+  .settings-panel .panel-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+  }
+  
+  .settings-panel .panel-header h3 {
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	margin-left: 0px;
+	font-size: 16px;
+  }
+  
+  .settings-panel .panel-header .close-btn {
+	background-image: none;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: initial;
+	border-top-width: initial;
+	border-right-width: initial;
+	border-bottom-width: initial;
+	border-left-width: initial;
+	border-top-style: none;
+	border-right-style: none;
+	border-bottom-style: none;
+	border-left-style: none;
+	border-top-color: initial;
+	border-right-color: initial;
+	border-bottom-color: initial;
+	border-left-color: initial;
+	border-image-source: initial;
+	border-image-slice: initial;
+	border-image-width: initial;
+	border-image-outset: initial;
+	border-image-repeat: initial;
+	font-size: 20px;
+	cursor: pointer;
+	padding-top: 4px;
+	padding-right: 4px;
+	padding-bottom: 4px;
+	padding-left: 4px;
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	border-bottom-right-radius: 4px;
+	border-bottom-left-radius: 4px;
+	line-height: 1;
+  }
+  
+  .settings-panel .panel-header .close-btn:hover {
+	background-color: rgb(245, 245, 245);
+  }
+  
+  .settings-panel .panel-content {
+	padding-top: 20px;
+	padding-right: 20px;
+	padding-bottom: 20px;
+	padding-left: 20px;
+  }
+  
+  .settings-panel .panel-content .setting-group + .setting-group {
+	margin-top: 30px;
+  }
+  
+  .settings-panel .panel-content .setting-row {
+  }
+  
+  .settings-panel .panel-content .setting-row + .setting-row {
+	margin-top: 20px;
+  }
+  
+  .settings-panel .panel-content .setting-row:last-child {
+	margin-bottom: 0px;
+  }
+  
+  .settings-panel .panel-content .setting-row label {
+	display: block;
+	margin-bottom: 8px;
+	font-size: 14px;
+	color: var(--text-color);
+	font-weight: 500;
+  }
+  
+  .settings-panel .panel-content .setting-row input[type="range"] {
+	width: 100%;
+	height: 6px;
+	appearance: none;
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgb(224, 224, 224);
+	border-top-left-radius: 3px;
+	border-top-right-radius: 3px;
+	border-bottom-right-radius: 3px;
+	border-bottom-left-radius: 3px;
+	outline-color: initial;
+	outline-style: none;
+	outline-width: initial;
+  }
+  
+  .settings-panel .panel-content .setting-row input[type="range"]::-webkit-slider-thumb {
+	appearance: none;
+	width: 16px;
+	height: 16px;
+	border-top-left-radius: 50%;
+	border-top-right-radius: 50%;
+	border-bottom-right-radius: 50%;
+	border-bottom-left-radius: 50%;
+	cursor: pointer;
+  }
+  
+  .settings-panel .panel-content .setting-row .checkbox-wrapper {
+	display: flex;
+	align-items: center;
+  }
+  
+  .settings-panel .panel-content .setting-row .checkbox-wrapper input[type="checkbox"] {
+	appearance: none;
+	width: 18px;
+	height: 18px;
+	border-top-width: 2px;
+	border-right-width: 2px;
+	border-bottom-width: 2px;
+	border-left-width: 2px;
+	border-top-style: solid;
+	border-right-style: solid;
+	border-bottom-style: solid;
+	border-left-style: solid;
+	border-top-color: rgb(204, 204, 204);
+	border-right-color: rgb(204, 204, 204);
+	border-bottom-color: rgb(204, 204, 204);
+	border-left-color: rgb(204, 204, 204);
+	border-image-source: initial;
+	border-image-slice: initial;
+	border-image-width: initial;
+	border-image-outset: initial;
+	border-image-repeat: initial;
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	border-bottom-right-radius: 4px;
+	border-bottom-left-radius: 4px;
+	outline-color: initial;
+	outline-style: none;
+	outline-width: initial;
+	cursor: pointer;
+	position: relative;
+  }
+  
+  .settings-panel .panel-content .setting-row .checkbox-wrapper input[type="checkbox"]:checked {
+	background-color: var(--primary-color);
+  }
+  
+  .settings-panel .panel-content .setting-row .checkbox-wrapper input[type="checkbox"]:checked::after {
+	content: "✓";
+	color: white;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	font-size: 12px;
+  }
+  
+  .settings-panel .panel-content .setting-row .checkbox-wrapper label {
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	margin-left: 8px;
+	display: inline;
+  }
+  
+  .container-wrapper > .container.noScroll > .canvas > .layer.background, .container-wrapper > .container.noScroll > .canvas > .layer.foreground, .container-wrapper > .container.noScroll > .canvas > .layer.debug, .container-wrapper > .container.noScroll > .canvas > .layer.loading, .container-wrapper > .container.noScroll > .canvas > .layer.effects {
+	width: 100%;
+	height: 100%;
+	overflow-x: hidden;
+	overflow-y: hidden;
+  }
+  
+  .container-wrapper > .container > .crosshair {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	width: 100%;
+	height: 100%;
+	z-index: 10000;
+	pointer-events: none;
+	visibility: hidden;
+  }
+  
+  .container-wrapper > .container > .crosshair .horizontal, .container-wrapper > .container > .crosshair .vertical {
+	position: absolute;
+	background-color: red;
+	pointer-events: none;
+	opacity: 0.25;
+  }
+  
+  .container-wrapper > .container > .crosshair .horizontal {
+	width: 100%;
+	height: 1px;
+	top: 50%;
+	transform: translateY(-50%);
+  }
+  
+  .container-wrapper > .container > .crosshair .vertical {
+	height: 100%;
+	width: 1px;
+	left: 50%;
+	transform: translateX(-50%);
+  }
+  
+  .container-wrapper > .container > .canvas {
+	width: 100%;
+	height: 100%;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer {
+	min-width: 100%;
+	min-height: 100%;
+	position: absolute;
+	top: 0px;
+	left: 0px;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.background {
+	width: 800px;
+	height: 2000px;
+	z-index: 0;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug {
+	z-index: 100;
+	pointer-events: none;
+	user-select: none;
+	width: 100%;
+	height: 100%;
+	visibility: hidden;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .debug-collider {
+	position: absolute;
+	border-top-width: 1px;
+	border-right-width: 1px;
+	border-bottom-width: 1px;
+	border-left-width: 1px;
+	border-top-style: solid;
+	border-right-style: solid;
+	border-bottom-style: solid;
+	border-left-style: solid;
+	border-top-color: rgba(255, 0, 0, 0.5);
+	border-right-color: rgba(255, 0, 0, 0.5);
+	border-bottom-color: rgba(255, 0, 0, 0.5);
+	border-left-color: rgba(255, 0, 0, 0.5);
+	border-image-source: initial;
+	border-image-slice: initial;
+	border-image-width: initial;
+	border-image-outset: initial;
+	border-image-repeat: initial;
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(255, 0, 0, 0.2);
+	pointer-events: none;
+	user-select: none;
+	z-index: 9999;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .debug-collider.myte-collider {
+	border-top-color: rgba(0, 255, 0, 0.5);
+	border-right-color: rgba(0, 255, 0, 0.5);
+	border-bottom-color: rgba(0, 255, 0, 0.5);
+	border-left-color: rgba(0, 255, 0, 0.5);
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(0, 255, 0, 0.2);
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .debug-collider.object-collider {
+	border-top-color: rgba(255, 0, 0, 0.5);
+	border-right-color: rgba(255, 0, 0, 0.5);
+	border-bottom-color: rgba(255, 0, 0, 0.5);
+	border-left-color: rgba(255, 0, 0, 0.5);
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(255, 0, 0, 0.2);
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .debug-collider.walkable-object {
+	border-top-color: rgba(0, 0, 255, 0.5);
+	border-right-color: rgba(0, 0, 255, 0.5);
+	border-bottom-color: rgba(0, 0, 255, 0.5);
+	border-left-color: rgba(0, 0, 255, 0.5);
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(0, 0, 255, 0.2);
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .grid-cell {
+	position: absolute;
+	pointer-events: none;
+	user-select: none;
+	outline-color: rgba(0, 0, 0, 0.05);
+	outline-style: solid;
+	outline-width: 1px;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .grid-cell.walkable {
+	background-color: rgba(0, 255, 0, 0.05);
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .grid-cell.unwalkable {
+	background-color: rgba(255, 0, 0, 0.1);
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .path-node {
+	position: absolute;
+	width: 8px;
+	height: 8px;
+	border-top-left-radius: 50%;
+	border-top-right-radius: 50%;
+	border-bottom-right-radius: 50%;
+	border-bottom-left-radius: 50%;
+	pointer-events: none;
+	user-select: none;
+	opacity: 0.7;
+	z-index: 1000;
+	transform: translate(-50%, -50%);
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .path-node::after {
+	position: absolute;
+	font-size: 70%;
+	color: white;
+	border-top-left-radius: 5px;
+	border-top-right-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-bottom-left-radius: 5px;
+	padding-top: 2px;
+	padding-right: 5px;
+	padding-bottom: 2px;
+	padding-left: 5px;
+	opacity: 0.75;
+	left: 100%;
+	top: 50%;
+	margin-left: 10px;
+	transform: translate(0%, -50%);
+	white-space-collapse: collapse;
+	text-wrap-mode: nowrap;
+	text-transform: uppercase;
+	background-color: black;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .path-node.start {
+	background-color: rgb(0, 255, 0);
+	outline-color: black;
+	outline-style: solid;
+	outline-width: 2px;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .path-node.start::after {
+	content: "start";
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .path-node.middle {
+	background-color: rgb(0, 0, 255);
+	outline-color: black;
+	outline-style: solid;
+	outline-width: 2px;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .path-node.middle::after {
+	content: "middle point";
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .path-node.end {
+	background-color: rgb(255, 0, 0);
+	outline-color: black;
+	outline-style: solid;
+	outline-width: 2px;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.debug .path-node.end::after {
+	content: "end";
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.foreground {
+	z-index: 1;
+	padding-top: 15px;
+	padding-right: 15px;
+	padding-bottom: 15px;
+	padding-left: 15px;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer.effects {
+	z-index: 2;
+	pointer-events: none;
+	user-select: none;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .zone {
+	outline-color: red;
+	outline-style: dashed;
+	outline-width: 1px;
+	background-color: rgba(255, 0, 0, 0.09);
+	display: flex;
+	justify-content: center;
+	padding-top: 10px;
+	padding-right: 10px;
+	padding-bottom: 10px;
+	padding-left: 10px;
+	border-top-left-radius: 3px;
+	border-top-right-radius: 3px;
+	border-bottom-right-radius: 3px;
+	border-bottom-left-radius: 3px;
+	visibility: hidden;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .zone > .name {
+	font-size: 70%;
+	color: white;
+	background-color: red;
+	border-top-left-radius: 5px;
+	border-top-right-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-bottom-left-radius: 5px;
+	padding-top: 2px;
+	padding-right: 5px;
+	padding-bottom: 2px;
+	padding-left: 5px;
+	opacity: 0.75;
+	align-self: flex-start;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .dropped-item {
+	position: absolute;
+	width: 16px;
+	height: 16px;
+	transition-behavior: normal;
+	transition-duration: 0.05s;
+	transition-timing-function: linear;
+	transition-delay: 0s;
+	transition-property: transform;
+	pointer-events: none;
+	outline-color: red;
+	outline-style: solid;
+	outline-width: 3px;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .dropped-item.collected {
+	animation-duration: 0.5s;
+	animation-timing-function: ease-out;
+	animation-delay: 0s;
+	animation-iteration-count: 1;
+	animation-direction: normal;
+	animation-fill-mode: forwards;
+	animation-play-state: running;
+	animation-name: collect;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .dropped-item.coin {
+	border-top-left-radius: 50%;
+	border-top-right-radius: 50%;
+	border-bottom-right-radius: 50%;
+	border-bottom-left-radius: 50%;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .dropped-item.coin.gold {
+	background-color: yellow;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .dropped-item.health.potion {
+	background-color: green;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .dropped-item.equipment.sword {
+	background-color: red;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject {
+	position: absolute;
+	pointer-events: none;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject.selected {
+	outline-color: green;
+	outline-style: dashed;
+	outline-width: 2px;
+	border-top-left-radius: 5px;
+	border-top-right-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-bottom-left-radius: 5px;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject > .interact {
+	pointer-events: all;
+	cursor: pointer;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject > * {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	width: 100%;
+	height: 100%;
+	image-rendering: pixelated;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject > .front {
+	transform-origin: center bottom;
+	animation-duration: 5s;
+	animation-timing-function: ease-in-out;
+	animation-delay: 0s;
+	animation-iteration-count: infinite;
+	animation-direction: normal;
+	animation-fill-mode: none;
+	animation-play-state: running;
+	animation-name: sway;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject.crop-plant {
+	position: absolute;
+	width: 16px;
+	height: 16px;
+	background-size: calc(192px * var(--n)) calc(32px * var(--n));
+	image-rendering: pixelated;
+	background-image: url("../images/chest_spritesheet.png");
+	background-repeat: no-repeat;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject.blue_butterfly, .container-wrapper > .container > .canvas > .layer > .mapObject.guard {
+	position: absolute;
+	width: 64px;
+	height: 64px;
+	image-rendering: pixelated;
+	background-image: url("../images/MapObjects/butterfly.png");
+	background-repeat: no-repeat;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject.treasure-chest {
+	position: absolute;
+	width: 16px;
+	height: 16px;
+	background-size: calc(192px * var(--n)) calc(32px * var(--n));
+	image-rendering: pixelated;
+	background-image: url("../images/chest_spritesheet.png");
+	background-repeat: no-repeat;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject.light-object[data-state="on"] {
+	filter: drop-shadow(rgba(255, 200, 100, 0.5) 0px 0px 5px);
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject.light-object[data-state="off"] {
+	filter: brightness(0.7);
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject.fountain {
+	position: relative;
+	transition-behavior: normal;
+	transition-duration: 0.3s;
+	transition-timing-function: ease;
+	transition-delay: 0s;
+	transition-property: filter;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject.fountain[data-active="true"] {
+	filter: drop-shadow(rgba(100, 200, 255, 0.3) 0px 0px 5px);
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .mapObject.fountain[data-active="false"] {
+	filter: brightness(0.8);
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .animated-map-object {
+	position: absolute;
+	pointer-events: all;
+	transition-behavior: normal;
+	transition-duration: 0.1s;
+	transition-timing-function: ease-out;
+	transition-delay: 0s;
+	transition-property: transform;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .animated-map-object .sprite {
+	width: 100%;
+	height: 100%;
+	background-repeat: no-repeat;
+	image-rendering: pixelated;
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .animated-map-object.butterfly.blue {
+	filter: hue-rotate(156deg);
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .animated-map-object.butterfly.green {
+	filter: hue-rotate(60deg);
+  }
+  
+  .container-wrapper > .container > .canvas > .layer > .animated-map-object.butterfly.purple {
+	filter: hue-rotate(270deg);
+  }
+  
+  .debugMenu {
+	margin-left: 10px;
+	line-height: 1em;
+	font-size: 0.8em;
+	position: fixed;
+	display: inline-block;
+	height: fit-content;
+	left: 0px;
+	top: 50%;
+	transform: translate(0%, -50%);
+	background-color: white;
+	visibility: hidden;
+	z-index: 1000;
+  }
+  
+  .debugMenu .debug-group {
+  }
+  
+  .debugMenu .debug-group + .debug-group {
+	margin-top: 4px;
+  }
+  
+  .debugMenu .debug-group h3 {
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 4px;
+	margin-left: 0px;
+	padding-bottom: 2px;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: rgba(0, 0, 0, 0.1);
+  }
+  
+  .debugMenu .debug-group.system {
+	background-color: var(--debug-color-system);
+  }
+  
+  .debugMenu .debug-group.input {
+	background-color: var(--debug-color-input);
+  }
+  
+  .debugMenu .debug-group.time {
+	background-color: var(--debug-color-time);
+  }
+  
+  .debugMenu .debug-group.map {
+	background-color: var(--debug-color-map);
+  }
+  
+  .debugMenu .debug-group.camera {
+	background-color: var(--debug-color-camera);
+  }
+  
+  .debugMenu .debug-group.myte {
+	background-color: var(--debug-color-myte);
+  }
+  
+  .debugMenu .debug-group.myte.stats {
+	background-color: var(--debug-color-myte-stats);
+  }
+  
+  .queueMenu {
+	visibility: hidden;
+	margin-right: 10px;
+	position: fixed;
+	display: none;
+	height: fit-content;
+	right: 0px;
+	top: 50%;
+	transform: translate(0%, -50%);
+	z-index: 1000;
+	width: 300px;
+	font-size: 0.9em;
+  }
+  
+  .queueMenu:not(:empty) {
+	display: inline-block;
+  }
+  
+  .queueMenu .queue-item {
+	background-color: rgb(255, 255, 255);
+	transition-behavior: normal;
+	transition-duration: 0.2s;
+	transition-timing-function: ease;
+	transition-delay: 0s;
+	transition-property: background-color;
+  }
+  
+  .queueMenu .queue-item + .queue-item {
+	margin-top: 4px;
+  }
+  
+  .queueMenu .queue-item .content {
+	display: flex;
+	row-gap: 4px;
+	column-gap: 4px;
+	flex-wrap: wrap;
+	width: 100%;
+  }
+  
+  .queueMenu .queue-item .content .number {
+	min-width: 2em;
+	font-weight: 500;
+	color: rgb(102, 102, 102);
+  }
+  
+  .queueMenu .queue-item .content .information {
+	flex-grow: 1;
+  }
+  
+  .queueMenu .queue-item .content .information .title {
+	display: flex;
+	row-gap: 4px;
+	column-gap: 4px;
+	align-items: center;
+  }
+  
+  .queueMenu .queue-item .content .information .title .name {
+	font-weight: 500;
+  }
+  
+  .queueMenu .queue-item .content .information .title .controls {
+	display: flex;
+	row-gap: 2px;
+	column-gap: 2px;
+	margin-left: auto;
+  }
+  
+  .queueMenu .queue-item .content .information .title .controls button {
+	cursor: pointer;
+	border-top-width: initial;
+	border-right-width: initial;
+	border-bottom-width: initial;
+	border-left-width: initial;
+	border-top-style: none;
+	border-right-style: none;
+	border-bottom-style: none;
+	border-left-style: none;
+	border-top-color: initial;
+	border-right-color: initial;
+	border-bottom-color: initial;
+	border-left-color: initial;
+	border-image-source: initial;
+	border-image-slice: initial;
+	border-image-width: initial;
+	border-image-outset: initial;
+	border-image-repeat: initial;
+	background-image: none;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: initial;
+	padding-top: 2px;
+	padding-right: 2px;
+	padding-bottom: 2px;
+	padding-left: 2px;
+	font-size: 0.8em;
+	line-height: 1;
+  }
+  
+  .queueMenu .queue-item .content .information .title .controls button.skip {
+	color: rgb(52, 152, 219);
+  }
+  
+  .queueMenu .queue-item .content .information .title .controls button.remove {
+	color: rgb(231, 76, 60);
+  }
+  
+  .queueMenu .queue-item .content .information .description {
+	display: flex;
+	align-items: center;
+	row-gap: 4px;
+	column-gap: 4px;
+	font-size: 0.8em;
+  }
+  
+  .queueMenu .queue-item .content .information .description .arrow {
+	opacity: 0.5;
+  }
+  
+  .queueMenu .queue-item .content .information .description .target {
+	opacity: 0.7;
+  }
+  
+  .queueMenu .queue-item .content .information .description .repeats {
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(0, 0, 0, 0.05);
+	padding-top: 0px;
+	padding-right: 4px;
+	padding-bottom: 0px;
+	padding-left: 4px;
+	border-top-left-radius: 2px;
+	border-top-right-radius: 2px;
+	border-bottom-right-radius: 2px;
+	border-bottom-left-radius: 2px;
+  }
+  
+  .queueMenu .queue-item .content .information .description .status {
+	margin-left: auto;
+	opacity: 0.7;
+  }
+  
+  .queueMenu .queue-item .content .progress {
+	height: 3px;
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(0, 0, 0, 0.05);
+	margin-top: 4px;
+	border-top-left-radius: 1px;
+	border-top-right-radius: 1px;
+	border-bottom-right-radius: 1px;
+	border-bottom-left-radius: 1px;
+	overflow-x: hidden;
+	overflow-y: hidden;
+	flex-grow: 0;
+	flex-shrink: 0;
+	flex-basis: 100%;
+	display: none;
+  }
+  
+  .queueMenu .queue-item .content .progress .bar {
+	height: 100%;
+	width: 0px;
+	transition-behavior: normal;
+	transition-duration: 0.1s;
+	transition-timing-function: linear;
+	transition-delay: 0s;
+	transition-property: width;
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(0, 128, 0, 0.2);
+  }
+  
+  .queueMenu .queue-item.current {
+	background-color: rgb(235, 255, 235);
+  }
+  
+  .queueMenu .queue-item.current .content {
+	font-weight: 500;
+  }
+  
+  .queueMenu .queue-item.current .progress {
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(0, 0, 0, 0.05);
+  }
+  
+  .queueMenu .queue-item.current .progress .bar {
+	background-image: initial;
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: rgba(0, 128, 0, 0.2);
+  }
+  
+  .myteContainer {
+	text-align: center;
+	margin-top: 20px;
+	margin-right: 20px;
+	margin-bottom: 20px;
+	margin-left: 20px;
+	pointer-events: all;
+  }
+  
+  .myteContainer .myteWrapper {
+	display: inline-block;
+	cursor: pointer;
+  }
+  
+  .myteContainer .myteWrapper.snail {
+  }
+  
+  .myteContainer .myteWrapper.snail > .interactive-myte > .inner-wrapper {
+	position: fixed;
+	width: inherit;
+	height: inherit;
+  }
+  
+  .myteContainer .myteWrapper.snail > .interactive-myte > .inner-wrapper > .sprite {
+	background-image: url("../images/snail/spritesheet.png");
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: initial;
+  }
+  
+  .myteContainer .myteWrapper.snail > .interactive-myte > .inner-wrapper > .selectbox {
+	background-color: pink;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	margin-left: 0px;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 65%;
+	height: 65%;
+	visibility: hidden;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte {
+	width: var(--myte-size);
+	height: var(--myte-size);
+	color: white;
+	margin-top: 0px;
+	margin-right: auto;
+	margin-bottom: 0px;
+	margin-left: auto;
+	position: relative;
+	z-index: 100000;
+	transition-behavior: normal;
+	transition-duration: 0.1s;
+	transition-timing-function: ease-in-out;
+	transition-delay: 0s;
+	transition-property: transform;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte.selected .sprite {
+	outline-color: green;
+	outline-style: dashed;
+	outline-width: 2px;
+	border-top-left-radius: 5px;
+	border-top-right-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-bottom-left-radius: 5px;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte.duplicate.deactivated {
+	display: none;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .sprite {
+	width: inherit;
+	height: inherit;
+	image-rendering: pixelated;
+	background-image: url("../images/character/spritesheet.png");
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: initial;
+	transform-origin: center center;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .commands {
+	display: flex;
+	row-gap: 5px;
+	column-gap: 5px;
+	flex-wrap: wrap;
+	order: 0;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .commands > button {
+	flex-grow: 1;
+	flex-shrink: 0;
+	flex-basis: calc(50% - 2.5px);
+	padding-top: 10px;
+	padding-right: 10px;
+	padding-bottom: 10px;
+	padding-left: 10px;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue {
+	display: flex;
+	align-items: center;
+	flex-direction: column;
+	justify-content: center;
+	left: 50%;
+	top: 17.5%;
+	z-index: 1;
+	transform: translate(-50%, -100%);
+	position: absolute;
+	max-width: 100px;
+	background-color: var(--dialogue-background-color);
+	padding-top: 4px;
+	padding-right: 6px;
+	padding-bottom: 4px;
+	padding-left: 6px;
+	font-size: 10px;
+	text-transform: uppercase;
+	color: black;
+	filter: drop-shadow(rgba(0, 0, 0, 0.125) 2px 2px 0px);
+	opacity: 0;
+	transition-behavior: normal;
+	transition-duration: 0.5s;
+	transition-timing-function: ease-in-out;
+	transition-delay: 0s;
+	transition-property: opacity;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.visible {
+	opacity: 1;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue::before {
+	content: "";
+	width: 0px;
+	height: 0px;
+	position: absolute;
+	bottom: calc(var(--dialogue-border-width) + 1px);
+	transform: translate(0%, 100%);
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue::after {
+	content: "";
+	width: 0px;
+	height: 0px;
+	position: absolute;
+	bottom: 0px;
+	transform: translate(0%, 100%);
+	z-index: -1;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought {
+	border-top-left-radius: 20px;
+	border-top-right-radius: 20px;
+	border-bottom-right-radius: 20px;
+	border-bottom-left-radius: 20px;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::before, .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::after {
+	all: unset;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::before {
+	content: "";
+	position: absolute;
+	bottom: calc(-1 * var(--dialogue-bubble-size));
+	left: 40%;
+	width: var(--dialogue-bubble-size);
+	height: var(--dialogue-bubble-size);
+	border-top-left-radius: 50%;
+	border-top-right-radius: 50%;
+	border-bottom-right-radius: 50%;
+	border-bottom-left-radius: 50%;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::after {
+	content: "";
+	position: absolute;
+	bottom: calc(-1.8 * var(--dialogue-bubble-size));
+	left: 35%;
+	width: calc(var(--dialogue-bubble-size) * 0.6);
+	height: calc(var(--dialogue-bubble-size) * 0.6);
+	border-top-left-radius: 50%;
+	border-top-right-radius: 50%;
+	border-bottom-right-radius: 50%;
+	border-bottom-left-radius: 50%;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought.visible {
+	animation-duration: 0.5s;
+	animation-timing-function: ease-out;
+	animation-delay: 0s;
+	animation-iteration-count: 1;
+	animation-direction: normal;
+	animation-fill-mode: none;
+	animation-play-state: running;
+	animation-name: thoughtBubblePop;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji {
+	border-top-left-radius: 50%;
+	border-top-right-radius: 50%;
+	border-bottom-right-radius: 50%;
+	border-bottom-left-radius: 50%;
+	min-width: calc(var(--emoji-padding) * 2 + 1em);
+	min-height: calc(var(--emoji-padding) * 2 + 1em);
+	font-size: 200%;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji::before, .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji::after {
+	content: none;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji .text {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji.visible {
+	animation-duration: 0.4s;
+	animation-timing-function: ease-out;
+	animation-delay: 0s;
+	animation-iteration-count: 1;
+	animation-direction: normal;
+	animation-fill-mode: none;
+	animation-play-state: running;
+	animation-name: emojiPop;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.alert {
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.alert.visible {
+	animation-duration: 0.7s;
+	animation-timing-function: cubic-bezier(0.36, 0, 0.66, -0.56);
+	animation-delay: 0s;
+	animation-iteration-count: 1;
+	animation-direction: normal;
+	animation-play-state: running;
+	animation-name: alertShake;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+	animation-fill-mode: forwards;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.question {
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.whisper {
+	font-size: 8px;
+	filter: blur(0px);
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.whisper.visible {
+	opacity: 0.8;
+	animation-duration: 3s;
+	animation-timing-function: ease-out;
+	animation-delay: 0s;
+	animation-iteration-count: 1;
+	animation-direction: normal;
+	animation-fill-mode: forwards;
+	animation-play-state: running;
+	animation-name: whisperFloat;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.whisper .text {
+	font-style: italic;
+	letter-spacing: 0.5px;
+	color: rgb(102, 102, 102);
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper {
+	display: flex;
+	align-items: center;
+	left: 50%;
+	top: 10px;
+	transform: translate(-50%, 100%);
+	position: absolute;
+	transition-behavior: normal;
+	transition-duration: 0.5s;
+	transition-timing-function: ease;
+	transition-delay: 0s;
+	transition-property: opacity;
+	flex-direction: column;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery {
+	width: 13px;
+	height: 8px;
+	scale: var(--icon-scale);
+	image-rendering: pixelated;
+	filter: drop-shadow(rgba(0, 0, 0, 0.125) 1px 1px 0px);
+	background-image: url("../images/icons/battery.png");
+	transition-behavior: normal, normal, normal;
+	transition-duration: 0.3s, 0.3s, 0.3s;
+	transition-timing-function: ease-in-out, cubic-bezier(0.25, 0.8, 0.25, 1), ease-in-out;
+	transition-delay: 0s, 0s, 0.05s;
+	transition-property: scale, top, opacity;
+	opacity: 0;
+	display: block;
+	position: relative;
+	top: 4px;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery.visible {
+	opacity: 1;
+	top: 0px;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery[data-level="3"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery.full {
+	background-position-x: -39px;
+	background-position-y: 0px;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery[data-level="2"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery.medium {
+	background-position-x: -26px;
+	background-position-y: 0px;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery[data-level="1"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery.low {
+	background-position-x: -13px;
+	background-position-y: 0px;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery[data-level="0"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery.empty {
+	background-position-x: 0px;
+	background-position-y: 0px;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery.blinking {
+	animation-duration: 0.5s;
+	animation-timing-function: ease;
+	animation-delay: 0s;
+	animation-iteration-count: infinite;
+	animation-direction: alternate;
+	animation-fill-mode: none;
+	animation-play-state: running;
+	animation-name: battery-blink;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery.critical-pulse {
+	animation-duration: 0.2s;
+	animation-timing-function: ease;
+	animation-delay: 0s;
+	animation-iteration-count: infinite;
+	animation-direction: alternate;
+	animation-fill-mode: none;
+	animation-play-state: running;
+	animation-name: battery-pulse;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper .battery.charging {
+	animation-duration: 2s;
+	animation-timing-function: ease;
+	animation-delay: 0s;
+	animation-iteration-count: infinite;
+	animation-direction: normal;
+	animation-fill-mode: none;
+	animation-play-state: running;
+	animation-name: battery-charging;
+	animation-timeline: auto;
+	animation-range-start: normal;
+	animation-range-end: normal;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper {
+	display: flex;
+	align-items: center;
+	width: fit-content;
+	left: 50%;
+	transform: translate(-50%, -115%);
+	position: relative;
+	transition-behavior: normal;
+	transition-duration: 0.5s;
+	transition-timing-function: ease;
+	transition-delay: 0s;
+	transition-property: opacity;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper::before {
+	content: "x";
+	position: absolute;
+	transform: translate(-100%, 0%);
+	color: red;
+	visibility: hidden;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper.bottom {
+	top: 25%;
+	transform: translate(50%, 0%);
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper > .before {
+	display: none;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte.active > .inner-wrapper > .name-wrapper > .name {
+	background-color: rgb(50, 105, 196);
+	color: white;
+	outline-color: white;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte:not(.duplicate) > .inner-wrapper > .above-wrapper {
+	display: none;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte:not(.duplicate) > .inner-wrapper > .name-wrapper {
+	display: none;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte.neko {
+	background-image: url("images/neko/spritesheet_transparent.png");
+	background-position-x: initial;
+	background-position-y: initial;
+	background-size: initial;
+	background-repeat: initial;
+	background-attachment: initial;
+	background-origin: initial;
+	background-clip: initial;
+	background-color: initial;
+	width: 32px;
+	height: 32px;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte.dragging {
+	pointer-events: none;
+	user-select: none;
+	cursor: grabbing;
+	transform: scale(1.075);
+	z-index: 1000;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte.deactivated {
+	visibility: hidden;
+	opacity: 0;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte.freemode {
+	position: absolute;
+	cursor: grab;
+  }
+  
+  .myteContainer .myteWrapper > .interactive-myte.freemode > .sprite {
+	position: fixed;
+  }
+  
+  .myteContainer .myteWrapper > .home-wrapper {
+	transition-behavior: normal, normal, normal, normal, normal, normal;
+	transition-duration: 0s, 0.15s, 0.15s, 0.15s, 0.15s, 0.5s;
+	transition-timing-function: ease, ease, ease, ease, ease, ease;
+	transition-delay: 0s, 0s, 0s, 0s, 0s, 0s;
+	transition-property: opacity, all, background-color, box-shadow, outline-width, outline-color;
+	width: var(--myte-size);
+	height: var(--myte-size);
+	position: absolute;
+	z-index: 100000;
+	border-top-style: solid;
+	border-right-style: solid;
+	border-bottom-style: solid;
+	border-left-style: solid;
+	border-top-color: white;
+	border-left-color: white;
+	border-right-color: lightgrey;
+	border-bottom-color: lightgrey;
+	background-color: rgb(245, 245, 245);
+	filter: drop-shadow(rgba(0, 0, 0, 0.063) 5px 5px 0px);
+  }
+  
+  .myteContainer .myteWrapper > .home-name {
+	z-index: 1000000;
+	width: 192px;
+	height: 192px;
+	position: absolute;
+	transform: unset;
+	pointer-events: none;
+  }
+  
+  .myteContainer .myteWrapper > .home-name > .name {
+	display: inline-block;
+	top: 10px;
+	position: relative;
+  }
+  
+  .myteContainer .myteWrapper:hover > .home-wrapper {
+  }
+  
+  .myteContainer.empty .myteWrapper:hover > .home-wrapper {
+	outline-color: unset;
+	outline-style: unset;
+	outline-width: unset;
+  }
+  
+  .myteContainer.empty .myteWrapper > .home-wrapper {
+	opacity: 0.75;
+	z-index: 0;
+	border-top-color: lightgrey;
+	border-left-color: lightgrey;
+	border-right-color: white;
+	border-bottom-color: white;
+	background-color: rgb(245, 245, 245);
+	filter: unset;
+	box-shadow: inset var(--border-width) var(--border-width) rgba(0, 0, 0, 0.0509803922);
+  }
+  
+  .myteContainer.empty .myteWrapper.valid-drop-target > .home-wrapper {
+	z-index: 100000;
+	opacity: 1;
+	display: block;
+  }
+  
+  .myteContainer.empty .myteWrapper.valid-drop-target.on-target > .home-wrapper {
+	outline-color: var(--on-target);
+  }
+  

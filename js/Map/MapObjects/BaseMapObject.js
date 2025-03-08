@@ -480,9 +480,9 @@ const MAP_OBJECT_TYPES = {
         scale: 1,
         renderPriority: 2,
         speed: 3,
-        friction: 0.95,
+        friction: 0.98, // This higher value means the ball will roll much farther before stopping
         triggerRadius: 192/2,
-        pushForce: 5,
+        pushForce: 5, // A higher pushForce means the ball will receive a stronger initial push - move further
 
         // render
         renderType: 'sprite',
@@ -645,7 +645,7 @@ class MapObject {
         ['back', 'front'].forEach(part => {
             const div = document.createElement('div');
             div.classList.add(part);
-            div.style.backgroundImage = `url('../images/MapObjects/${this.variant}_${part}.png')`;
+            div.style.backgroundImage = `url('images/MapObjects/${this.variant}_${part}.png')`;
             div.style.backgroundSize = 'cover';
 
             if (part === 'front') {

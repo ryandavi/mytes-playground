@@ -39,11 +39,8 @@ class Utility {
 	static findable_elements_selector = 'img, iframe, select, table, textarea, input, h1, h2, h3, h4, h5, h6';
 	static ignore_elements_selector = 'body, html, .ignore, .particle, .interactableObject, .interactive-myte, .myte, button, .myteWrapper, .container-wrapper, .container,#controls, .canvas, .canvas > .layer, #inventory';
 
-
-	
 	static numToReturn = 3; // Number of closest elements to return
 	static maxDistance = 200; // Maximum distance to include an element
-
 	static clickable_element_tags = ['textarea', 'input', 'select', 'img']; 	// elements you can click
 
 	static top_only_tags = ['button', 'textarea', 'input', 'select', 'iframe', 'canvas']; // tags they sit on top of

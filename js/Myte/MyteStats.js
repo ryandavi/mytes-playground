@@ -284,6 +284,7 @@ regenerateEnergy(delta) {
         // Show empty battery with critical pulse
         if (this.myte.battery) {
             this.myte.battery.classList.add('critical-pulse');
+            console.log("critical pulse")
             this.showBattery();
         }
 

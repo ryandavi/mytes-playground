@@ -8,26 +8,26 @@ class ResourceManager {
 
         // Define configurations as static properties
         this.spriteConfigs = {
-            'myte': '../images/snail/spritesheet.png',
-            'snail': '../images/snail/spritesheet.png',
-            'grass_1_back': '../images/MapObjects/grass_1_back.png',
-            'grass_1_front': '../images/MapObjects/grass_1_front.png',
-            'grass_2_back': '../images/MapObjects/grass_2_back.png',
-            'grass_2_front': '../images/MapObjects/grass_2_front.png',
-            'grass_3_back': '../images/MapObjects/grass_3_back.png',
-            'grass_3_front': '../images/MapObjects/grass_3_front.png'
+            'myte': 'images/snail/spritesheet.png',
+            'snail': 'images/snail/spritesheet.png',
+            'grass_1_back': 'images/MapObjects/grass_1_back.png',
+            'grass_1_front': 'images/MapObjects/grass_1_front.png',
+            'grass_2_back': 'images/MapObjects/grass_2_back.png',
+            'grass_2_front': 'images/MapObjects/grass_2_front.png',
+            'grass_3_back': 'images/MapObjects/grass_3_back.png',
+            'grass_3_front': 'images/MapObjects/grass_3_front.png'
         };
 
         this.cursorConfigs = {
-            'pointer': '../images/cursor/arrow.png',
-            'grab': '../images/cursor/arrow.png',
-            'grabbing': '../images/cursor/arrow.png',
-            'arrow_up': '../images/cursor/arrow.png',
-            'arrow_down': '../images/cursor/arrow.png',
-            'arrow_left': '../images/cursor/arrow.png',
-            'arrow_right': '../images/cursor/arrow.png',
-            'move': '../images/cursor/arrow.png',
-            'no': '../images/cursor/arrow.png',
+            'pointer': 'images/cursor/arrow.png',
+            'grab': 'images/cursor/arrow.png',
+            'grabbing': 'images/cursor/arrow.png',
+            'arrow_up': 'images/cursor/arrow.png',
+            'arrow_down': 'images/cursor/arrow.png',
+            'arrow_left': 'images/cursor/arrow.png',
+            'arrow_right': 'images/cursor/arrow.png',
+            'move': 'images/cursor/arrow.png',
+            'no': 'images/cursor/arrow.png',
         };
 
         // Define essential resources

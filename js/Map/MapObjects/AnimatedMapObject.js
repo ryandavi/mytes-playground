@@ -394,7 +394,7 @@ class ButterflyMapObject extends AnimatedMapObject {
                 frameWidth: 50,
                 frameHeight: 50,
                 scale: options.scale || 1,
-                spriteSheet: "../images/MapObjects/butterfly_small.gif",
+                spriteSheet: "images/MapObjects/butterfly_small.gif",
                 animations: {
                     // Direction animations with 2D frames [x, y]
                     "E": { frames: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]], loop: true }, // right
@@ -413,7 +413,7 @@ class ButterflyMapObject extends AnimatedMapObject {
                 frameWidth: 100,
                 frameHeight: 100,
                 scale: options.scale || 1,
-                spriteSheet: "../images/MapObjects/butterfly.gif",
+                spriteSheet: "images/MapObjects/butterfly.gif",
                 animations: {
                     // Direction animations with 2D frames [x, y]
                     "E": { frames: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]], loop: true }, // right
@@ -702,7 +702,7 @@ class BallMapObject extends AnimatedMapObject {
                 frameDelay: options.frameDelay || 50, // Faster animation for smoother rotation
                 animations: {
                     "idle": { 
-                        frames: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0]],
+                        frames: [[0, 0]], // , [1, 0], [2, 0], [3, 0], [4, 0], [5, 0]
                         loop: true 
                     },
                     "rotateX": { 
@@ -734,8 +734,12 @@ class BallMapObject extends AnimatedMapObject {
             }
         };
 
+
+
         // Call the AnimatedMapObject constructor
         super(type, variant, posX, posY, ballConfig, options);
+
+
 
         // Physics properties
         this.velocity = { x: 0, y: 0 };
@@ -744,18 +748,11 @@ class BallMapObject extends AnimatedMapObject {
         this.isMoving = false;
 
         // Interaction properties
-        this.triggerRadius = config.triggerRadius || 100;
         this.pushForce = config.pushForce || 5;
         this.lastPushTime = 0;
         this.pushCooldown = options.pushCooldown || 1500; // ms
 
-        // Collider for the ball object
-        this.collider = config.collider || {
-            type: 'circle',
-            radius: this.size.width / 2,
-            offsetX: this.size.width / 2,
-            offsetY: this.size.height / 2
-        };
+
         
         // Debug flag
         this.debug = true;
@@ -779,21 +776,22 @@ class BallMapObject extends AnimatedMapObject {
         const now = Date.now();
         if (now - this.lastPushTime < this.pushCooldown) return;
 
-        // Use collider centers for more accurate distance calculation
-        const ballCenter = this.getColliderCenter();
-        const myteCenter = this.getMyteColliderCenter(myte);
+        if(!myte.is_moving()) return;
 
-        // Calculate distance between collider centers
-        const dx = ballCenter.x - myteCenter.x;
-        const dy = ballCenter.y - myteCenter.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        // Check if Myte's collider collides with ball
+        let collides = myte.parent.checkCollision(myte, this);
 
-        // Check if Myte is within trigger radius of the ball's collider
-        const effectiveRadius = this.triggerRadius + 
-            (myte.collider ? Math.max(myte.collider.width, myte.collider.height) / 2 : myte.size.width / 4);
-
-        if (distance < effectiveRadius) {
+        if (collides) {
             // Calculate push direction and force
+
+            const ballCenter = this.getColliderCenter();
+            const myteCenter = this.getMyteColliderCenter(myte);
+    
+            // Calculate distance between collider centers
+            const dx = ballCenter.x - myteCenter.x;
+            const dy = ballCenter.y - myteCenter.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
             const pushX = (dx / distance) * this.pushForce;
             const pushY = (dy / distance) * this.pushForce;
 
@@ -817,7 +815,9 @@ class BallMapObject extends AnimatedMapObject {
             // Optional: Make the creature react
             myte.queue.addExpression('happy');
             
-
+            if (this.debug) {
+                console.log("Ball pushed! Velocity X:", this.velocity.x.toFixed(2), "Y:", this.velocity.y.toFixed(2));
+            }
         }
     }
     
@@ -826,25 +826,29 @@ class BallMapObject extends AnimatedMapObject {
         const absX = Math.abs(this.velocity.x);
         const absY = Math.abs(this.velocity.y);
         
-        // Make sure we have significant velocity before changing animation
-        if (absX < 0.1 && absY < 0.1) {
-            this.playAnimation('idle');
-            return;
-        }
-        
         // Horizontal movement is primary
         if (absX > absY) {
             // Moving right (positive X) = rotateY_reverse
             // Moving left (negative X) = rotateY
-            const animName = this.velocity.x > 0 ? 'rotateY_reverse' : 'rotateY';
+            if(this.animation && this.animation.paused){
+                // unpause current animation before getting new one
+                this.animation.paused = false;
+            }
+            const animName = this.velocity.x > 0 ? 'rotateZ_reverse' : 'rotateY';
             this.playAnimation(animName);
+            if (this.debug) console.log("Playing horizontal animation:", animName);
         } 
         // Vertical movement is primary
         else {
             // Moving down (positive Y) = rotateX
             // Moving up (negative Y) = rotateX_reverse
+            if(this.animation && this.animation.paused){
+                // unpause current animation before getting new one
+                this.animation.paused = false;
+            }
             const animName = this.velocity.y > 0 ? 'rotateX' : 'rotateX_reverse';
             this.playAnimation(animName);
+            if (this.debug) console.log("Playing vertical animation:", animName);
         }
     }
 
@@ -871,7 +875,7 @@ class BallMapObject extends AnimatedMapObject {
                 this.updateBallAnimation();
             }
             // Check if ball has effectively stopped
-            else if (Math.abs(this.velocity.x) < 0.01 && Math.abs(this.velocity.y) < 0.01) {
+            else if (Math.abs(this.velocity.x) < 0.3 && Math.abs(this.velocity.y) < 0.3) {
                 this.velocity.x = 0;
                 this.velocity.y = 0;
                 this.isMoving = false;
@@ -881,6 +885,7 @@ class BallMapObject extends AnimatedMapObject {
                     this.pauseAnimation();
                 }
                 
+                if (this.debug) console.log("Ball stopped, staying on last frame");
             }
             
             // Update element position
@@ -908,11 +913,13 @@ class BallMapObject extends AnimatedMapObject {
             this.velocity.x = Math.abs(this.velocity.x) * bounceMultiplier;
             // Update animation after bounce
             this.updateBallAnimation();
+            if (this.debug) console.log("Bounced left boundary");
         } else if (this.posX + this.size.width > bounds.right) {
             this.posX = bounds.right - this.size.width;
             this.velocity.x = -Math.abs(this.velocity.x) * bounceMultiplier;
             // Update animation after bounce
             this.updateBallAnimation();
+            if (this.debug) console.log("Bounced right boundary");
         }
         
         // Check and handle vertical boundaries
@@ -921,21 +928,25 @@ class BallMapObject extends AnimatedMapObject {
             this.velocity.y = Math.abs(this.velocity.y) * bounceMultiplier;
             // Update animation after bounce
             this.updateBallAnimation();
+            if (this.debug) console.log("Bounced top boundary");
         } else if (this.posY + this.size.height > bounds.bottom) {
             this.posY = bounds.bottom - this.size.height;
             this.velocity.y = -Math.abs(this.velocity.y) * bounceMultiplier;
             // Update animation after bounce
             this.updateBallAnimation();
+            if (this.debug) console.log("Bounced bottom boundary");
         }
     }
 
     // This method is explicitly overridden from the Animation Controller
     // to ensure our ball animation follows physical movement
     playAnimation(animationName, onComplete) {
-
+        if (this.debug) console.log("Ball playAnimation called with:", animationName);
+        
         // If we're playing idle but we already have an animation running,
         // skip it to preserve the last animation frame
         if (animationName === 'idle' && this.animation && this.animation.currentAnimation) {
+            if (this.debug) console.log("Skipping idle animation to preserve last frame");
             return;
         }
         
@@ -951,6 +962,7 @@ class BallMapObject extends AnimatedMapObject {
             // If the animation controller doesn't have a native pause,
             // we can just hold the current frame by stopping updates
             this.animation.paused = true;
+            if (this.debug) console.log("Animation paused at current frame");
         }
     }
 
@@ -977,6 +989,7 @@ class BallMapObject extends AnimatedMapObject {
                 right: mapDimensions.width,
                 bottom: mapDimensions.height
             };
+            console.log("Ball boundaries set:", this.bounds);
         }
     }
 
@@ -999,7 +1012,9 @@ class BallMapObject extends AnimatedMapObject {
         // Update element attributes for debugging
         if (this.element) {
             this.element.setAttribute('data-moving', this.isMoving);
-
+            this.element.setAttribute('data-velocity-x', this.velocity.x.toFixed(2));
+            this.element.setAttribute('data-velocity-y', this.velocity.y.toFixed(2));
+            
             // Update z-index if parent has getZIndex method
             if (parent && parent.getZIndex) {
                 this.element.style.zIndex = parent.getZIndex(this.posY, this.size.height);

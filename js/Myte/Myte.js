@@ -509,6 +509,9 @@ class Myte {
 		this.setDirection(this.getDirection());
 		this.setSpritePosition(this.posX, this.posY);
 	}
+
+
+	
 	setSpritePosition(x = null, y = null, limit = false) {
 
 		let setX = (x == null ? false : true);

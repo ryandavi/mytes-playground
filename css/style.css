@@ -111,6 +111,13 @@ body {
   position: relative;
 }
 
+.container-wrapper-wrapper {
+  margin: 0px auto;
+  position: relative;
+  width: -moz-fit-content;
+  width: fit-content;
+}
+
 .container-wrapper {
   background-color: rgb(245, 245, 245);
   border-radius: 20px;
@@ -322,150 +329,6 @@ body {
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 0.8em;
-}
-.container-wrapper > .hand-controls {
-  background-color: rgb(245, 245, 245);
-  border-radius: var(--border-radius);
-  padding: var(--padding);
-  margin: 0 auto;
-  display: flex;
-  gap: 10px;
-  top: 0;
-  z-index: 1000;
-  position: absolute;
-  flex-direction: column;
-  transform: translate(calc(-100% - 40px), 0);
-  width: -moz-fit-content;
-  width: fit-content;
-}
-.container-wrapper > .hand-controls input[type=radio] {
-  display: none;
-}
-.container-wrapper > .hand-controls label {
-  width: 80px;
-  height: 80px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border-radius: var(--border-radius);
-  padding: calc(var(--padding) * 2);
-  border-style: solid;
-  border-width: var(--border-width);
-  border-top-color: white;
-  border-left-color: white;
-  border-right-color: lightgrey;
-  border-bottom-color: lightgrey;
-  color: grey;
-  font-size: 80%;
-  background-color: rgb(245, 245, 245);
-  cursor: pointer;
-}
-.container-wrapper > .hand-controls label:hover {
-  outline: 4px solid rgba(0, 128, 0, 0.33);
-}
-.container-wrapper > .hand-controls input[type=radio]:checked + label:not(:active) {
-  border-top-color: lightgrey;
-  border-left-color: lightgrey;
-  border-right-color: white;
-  border-bottom-color: white;
-  color: black;
-  outline: 4px solid green;
-}
-.container-wrapper > .sidebar {
-  width: 250px;
-  max-height: 500px;
-  position: absolute;
-  right: 0;
-  top: 0;
-  transform: translate(calc(100% + 20px), 0);
-  display: flex;
-  overflow: hidden;
-  background-color: rgb(245, 245, 245);
-  border-radius: var(--border-radius);
-}
-.container-wrapper > .sidebar > .action-controls {
-  flex-direction: column;
-  width: -moz-fit-content;
-  width: fit-content;
-  display: none;
-  width: 100%;
-  max-width: 250px;
-}
-.container-wrapper > .sidebar > .action-controls.visible {
-  display: flex;
-}
-.container-wrapper > .sidebar > .action-controls > .selected-info {
-  padding: 0.75rem;
-  background: #f5f5f5;
-  border-radius: 4px;
-  margin: var(--padding);
-  /* Different states */
-}
-.container-wrapper > .sidebar > .action-controls > .selected-info .interaction-type {
-  font-size: 0.8em;
-  text-transform: uppercase;
-  color: #666;
-  margin-bottom: 0.25rem;
-}
-.container-wrapper > .sidebar > .action-controls > .selected-info .target-info {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-.container-wrapper > .sidebar > .action-controls > .selected-info .target-info .type {
-  font-size: 0.8em;
-  padding: 0.25rem 0.5rem;
-  background: #e0e0e0;
-  border-radius: 3px;
-  color: #555;
-}
-.container-wrapper > .sidebar > .action-controls > .selected-info .target-info .name {
-  font-weight: 500;
-}
-.container-wrapper > .sidebar > .action-controls > .selected-info.self-selected {
-  background: #e8f0fe;
-  /* Light blue for self-selection */
-}
-.container-wrapper > .sidebar > .action-controls > .selected-info.myte-interaction {
-  background: #fef6e0;
-  /* Light yellow for Myte interactions */
-}
-.container-wrapper > .sidebar > .action-controls > .selected-info.map-interaction {
-  background: #e6f4ea;
-  /* Light green for MapObject interactions */
-}
-.container-wrapper > .sidebar > .action-controls > .selected-info.element-interaction {
-  background: #fce8e6;
-  /* Light red for other elements */
-}
-.container-wrapper > .sidebar > .action-controls > .action-groups {
-  overflow-y: auto;
-  scrollbar-width: thin;
-  height: 100%;
-  padding: var(--padding);
-  padding-top: 0;
-}
-.container-wrapper > .sidebar > .action-controls > .action-groups .action-group + .action-group {
-  margin-top: var(--padding);
-  border-top: 1px solid #eee;
-}
-.container-wrapper > .sidebar > .action-controls > .action-groups .action-group h3 {
-  font-size: 0.8em;
-  text-transform: uppercase;
-  color: #666;
-  margin: 0 0 0.5rem 0;
-}
-.container-wrapper > .sidebar > .action-controls > .action-groups .action-group ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.container-wrapper > .sidebar > .action-controls > .action-groups .action-group button {
-  width: 100%;
-  padding: 0.5rem;
 }
 
 .myteContainer {
@@ -780,7 +643,67 @@ body {
   image-rendering: pixelated;
   background-position: -26px 0;
   filter: drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.1254901961));
+  transition: scale 0.3s ease-in-out, top 0.3s ease-in-out, filter 0.3s ease-in-out, opacity 0.3s ease-in-out;
   background-image: url(../images/icons/battery.png);
+  opacity: 0;
+  top: 12px;
+  position: relative;
+  /* Blink animation for low battery */
+  /* Pulse animation for critical battery */
+  /* Charging animation */
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.visible {
+  opacity: 1;
+  top: 0;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="3"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.full {
+  background-position: -39px 0px;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="2"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.medium {
+  background-position: -26px 0px;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="1"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.low {
+  --icon-scale: 2.5;
+  background-position: -13px 0px;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="0"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.empty {
+  --icon-scale: 2.5;
+  background-position: 0px 0px;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.blinking {
+  animation: battery-blink 0.5s infinite alternate;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.critical-pulse {
+  animation: battery-pulse 0.2s infinite alternate;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.charging {
+  animation: battery-charging 2s infinite;
+}
+@keyframes battery-blink {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.3;
+  }
+}
+@keyframes battery-pulse {
+  from {
+    opacity: 1;
+    filter: drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.1254901961));
+  }
+  to {
+    opacity: 0.3;
+    filter: drop-shadow(0px 0px 3% rgb(255, 0, 0));
+  }
+}
+@keyframes battery-charging {
+  0%, 100% {
+    filter: drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.1254901961));
+  }
+  50% {
+    filter: drop-shadow(0px 0px 3px rgba(0, 255, 0, 0.5));
+  }
 }
 .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper {
   display: flex;
