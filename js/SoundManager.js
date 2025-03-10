@@ -4,6 +4,12 @@ class SoundManager {
 
 		this.parent = parent;
 		// Check if we have browser audio support
+
+		if (typeof Tone == "undefined") {
+			console.warn("Tone.js is not loaded");
+			return;
+		}
+
 		this.hasAudioSupport = 'AudioContext' in window || 'webkitAudioContext' in window;
 		if (!this.hasAudioSupport) {
 			console.warn('Audio is not supported in this browser');
@@ -718,6 +724,94 @@ class SoundManager {
 					};
 				}
 			},
+
+
+			// UI sounds for battery and item interactions
+			"ui_battery_charging": {
+				type: "ui",
+				create: () => {
+				const synth = new Tone.Synth({
+					oscillator: { type: "sine" },
+					envelope: {
+					attack: 0.03,
+					decay: 0.2,
+					sustain: 0.2,
+					release: 0.4
+					}
+				}).toDestination();
+				// Gentle ascending sound
+				return {
+					synth,
+					notes: ["G4", "C5", "E5"],
+					durations: ["16n", "16n", "8n"]
+				};
+				}
+			},
+			
+			"ui_battery_empty": {
+				type: "ui",
+				create: () => {
+				const synth = new Tone.Synth({
+					oscillator: { type: "triangle" },
+					envelope: {
+					attack: 0.01,
+					decay: 0.1,
+					sustain: 0.05,
+					release: 0.3
+					}
+				}).toDestination();
+				// Short descending tone
+				return {
+					synth,
+					notes: ["C4", "G3"],
+					durations: ["16n", "8n"]
+				};
+				}
+			},
+			
+			"ui_pickup_item": {
+				type: "ui",
+				create: () => {
+				const synth = new Tone.Synth({
+					oscillator: { type: "sine" },
+					envelope: {
+					attack: 0.005,
+					decay: 0.15,
+					sustain: 0,
+					release: 0.1
+					}
+				}).toDestination();
+				// Quick cheerful up note
+				return {
+					synth,
+					notes: ["E5", "A5"],
+					durations: ["32n", "8n"]
+				};
+				}
+			},
+			
+			"ui_drop_item": {
+				type: "ui",
+				create: () => {
+				const synth = new Tone.Synth({
+					oscillator: { type: "triangle" },
+					envelope: {
+					attack: 0.001,
+					decay: 0.1,
+					sustain: 0,
+					release: 0.2
+					}
+				}).toDestination();
+				// Subtle, soft dropping sound
+				return {
+					synth,
+					notes: ["A5", "E5"],
+					durations: ["32n", "8n"]
+				};
+				}
+			},
+
+
 
 			// Myte Sounds
 			"myte_happy": {
@@ -1595,7 +1689,7 @@ class SoundManager {
 			if (hour >= 7 && hour <= 12) {
 				this.playAmbient("env_birds");
 			} else if (hour < 6 || hour >= 19) {
-				this.playAmbient("env_cricket");
+				// this.playAmbient("env_cricket");
 			}
 		}
 	}

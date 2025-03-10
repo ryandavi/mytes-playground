@@ -15,12 +15,15 @@ class GameMap {
             background: parent.canvas.querySelector('.layer.background'),
             objects: parent.canvas.querySelector('.layer.foreground'),
             overlay: parent.canvas.querySelector('.layer.overlay'),
-            debug: parent.canvas.querySelector('.layer.debug')
+            debug: parent.canvas.querySelector('.layer.debug'),
+            particles: parent.canvas.querySelector('.layer.particles')
         };
 
         // Systems
         this.zoneManager = new ZoneManager(this);
         this.gridSystem = new GridSystem(this);
+        // Create the extended particle system
+        this.particleSystem;
 
         // Map elements
         this.objects = [];
@@ -42,6 +45,21 @@ class GameMap {
                 //this.layers.objects.style.width = `${this.dimensions.width}px`;
                 //this.layers.objects.style.height = `${this.dimensions.height}px`;
             }
+
+
+            // Initialize particle system
+            this.particleSystem = new GameMapParticleSystem(this);
+            this.particleSystem.start();
+            
+
+
+
+
+
+
+
+
+
 
             // Initialize background
             if (this.mapData?.background) {
@@ -77,10 +95,11 @@ class GameMap {
                 this.addRandomObjects(5, ['MUSIC_BOX']);
             }
 
-            
 
             // Create a ball
             this.addObject('BALL', 'red_ball', 100, 100);
+
+            this.addObject('BALL', 'red_ball', 400, 400);
 
             // Create a patrol guard with a specific path
             /*
@@ -94,6 +113,11 @@ class GameMap {
             });
             */
 
+            /* this.particleSystem.createMapEffect('rain', null, {
+                intensity: 15
+            });
+            */
+
             // Create a butterfly
             this.addObject('BUTTERFLY', 'green', 300, 300);
             this.addObject('BUTTERFLY', 'small', 100, 100);
@@ -102,6 +126,8 @@ class GameMap {
 
             // Create a crop
             this.addObject('CROP', 'tomato', 250, 250);
+
+            this.addObject('BED', 'bed_long', 0, 0);
 
 
 
@@ -142,6 +168,9 @@ class GameMap {
             return false;
         }
     }
+
+
+
 
     setBackground(background) {
         if (!this.layers.background) return;
@@ -304,6 +333,7 @@ class GameMap {
             }
         });
 
+
         // Clean up inactive objects periodically
         if (Math.random() < 0.01) { // 1% chance each update
             this.removeInactiveObjects();
@@ -324,5 +354,11 @@ class GameMap {
 
         // Clean up spawn points
         this.spawnPoints.clear();
+
+        if (this.particleSystem) {  // Add these lines
+            this.particleSystem.dispose();
+            this.particleSystem = null;
+        }
+
     }
 }

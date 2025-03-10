@@ -73,5 +73,6 @@ MapObjectFactory.registry
 .register('BALL', BallMapObject)
 .register('PATROL_GUARD', PatrolGuardMapObject)
 .register('BUTTERFLY', ButterflyMapObject)
+.register('BED', BedMapObject)
 
 .setDefaultConstructor(MapObject);

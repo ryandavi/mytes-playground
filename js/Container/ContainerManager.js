@@ -16,7 +16,6 @@ class ContainerManager {
 
         // map
         this.gameMap;
-        this.particleSystem = new ParticleSystem(this); // Add this line
 
         // inventory
         this.inventory = new Inventory(this, document.getElementById('inventory'));
@@ -51,7 +50,7 @@ class ContainerManager {
                 this.core.loadingManager.updateStageProgress('container', 0.4); // 40% progress
             }
 
-            this.inputHandler.init();
+            //this.inputHandler.init();
             this.camera = new Camera(this, this.canvas, this.element);
 
             // Update loading progress
@@ -543,12 +542,27 @@ class ContainerManager {
     }
 
 
+
+
+
+
     setActiveMyte(myte) {
         if (this.activeMyte && myte !== null) {
             this.activeMyte.duplicate.classList.remove('active');
         }
 
         this.activeMyte = myte;
+
+
+
+        this.gameMap.particleSystem.createDustEmitter(myte, {
+            colors: ['#e8e8e8', '#d5d5d5', '#c8c8c8'],  // Light gray dust colors
+            size: 4,                                    // Starting size
+            sizeEnd: 7,                                 // Ending size
+            life: 35,                                   // How long particles last
+            count: 2                                    // Particles per emission
+          });
+
 
         if (myte !== null) {
             myte.duplicate.classList.add('active');
@@ -598,7 +612,6 @@ class ContainerManager {
         if (this.camera) this.camera.update();
         if (this.ui) this.ui.update();
         if (this.gameMap) this.gameMap.update();
-        if (this.particleSystem) this.particleSystem.update(); // Add this line
     }
 
     tickUpdate(tickDelta) {
@@ -629,10 +642,7 @@ class ContainerManager {
             this.inputHandler = null;
         }
 
-        if (this.particleSystem) {  // Add these lines
-            this.particleSystem.dispose();
-            this.particleSystem = null;
-        }
+
 
     }
 }

@@ -266,8 +266,9 @@ input[type="checkbox"]{
 			display: none;
 		}
 
+        // sidebar icons
         button.hand-control-btn,
-		label {
+		label.button {
 			width: 80px;
 			height: 80px;
 
@@ -293,28 +294,26 @@ input[type="checkbox"]{
 			cursor: pointer;
 
             &:hover {
-                
-                outline: 4px solid rgba(0, 128, 0, 0.33);
-                
+                outline: 4px solid rgba(0, 128, 0, 0.2);
             }
 		}
 
 
-        label>.icon {
-            fill: grey;
-            max-height: 24px;
-            max-width: 24px;
+        // Radio button icons
+        label.button {
+            >.icon {
+                fill: grey;
+                max-height: 24px;
+                max-width: 24px;
+            }
+            >.text {
+                font-size: 75%;
+            }
         }
 
-    
-        label>.text {
-            font-size: 75%;
-        }
-
-
-
-
-		input[type="radio"]:checked+label {
+        // Active
+        .hand-control-btn.active,
+		input[type="radio"]:checked+label.button {
 
             &:not(:checked),
             &:not(:active) {
@@ -323,39 +322,44 @@ input[type="checkbox"]{
                 border-right-color: white;
                 border-bottom-color: white;
                 color: black;
-                outline: 4px solid green;
 	    	}
 
             &:not(:checked)>.icon,
             &:not(:active)>.icon {
                 fill: black;
             }
-
-
         }
 
-        .hand-control-btn#sound-toggle {
+        // outline just for radio tools
+        input[type="radio"]:checked+label.button {
+            outline: 4px solid green;
+        }
+
+        // buttons
+        .hand-control-btn {
             i {
                 font-size: 1.5em;
                 font-style: normal;
             }
 
-            &.muted .icon-sound-on,
-            &:not(.muted) .icon-sound-off {
-                display: none;
-            }
-
-            > {
-                .icon-sound-on::before {
-                    content: "🔊";
+            // sound
+            &#sound-toggle {
+                &.muted .icon-sound-on,
+                &:not(.muted) .icon-sound-off {
+                    display: none;
                 }
-
-                .icon-sound-off::before {
-                    content: "🔇";
+    
+                > {
+                    .icon-sound-on::before {
+                        content: "🔊";
+                    }
+    
+                    .icon-sound-off::before {
+                        content: "🔇";
+                    }
                 }
             }
         }
-
 
 
 	}
@@ -496,9 +500,7 @@ input[type="checkbox"]{
     z-index: 1000;
     border-radius: var(--border-radius);
     overflow: hidden;
-    right: 20px;
-    top: 20px;
-    margin: 0 auto;
+
     background-color: #ece9d8;
     border: var(--border-width) solid #0631d6;
     border-top: 0;
@@ -512,17 +514,23 @@ input[type="checkbox"]{
     transform: translateY(5px);
     transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
 
+	pointer-events: none;
+
+	width: 400px;
+
+    &.floating {
+        position: fixed;
+    }
+	
+
 	&.visible {
 		pointer-events: all;
 		transform: translateY(0px);
         opacity: 1;
 	}
 
-    >.header{
-
+    >.modal-header{
         align-items: center;
-
-
         padding: 7.5px;
         background-color: #0166fb;
         flex: 1;
@@ -540,17 +548,13 @@ input[type="checkbox"]{
 		display: flex;
 		justify-content: space-between;
 
-		h3 {
+		h2.modal-title {
 			font-size: 16px;
 			margin: 0px;
+            margin: 0;
 		}
 
-
-        >.title {
-            margin: 0;
-        }
-
-        >.close-btn {
+        >.modal-close-btn {
             width: 30px;
             height: 30px;
             padding: 0;
@@ -563,32 +567,26 @@ input[type="checkbox"]{
 
     }
 
-    >.content {
+    >.modal-content {
         padding: var(--padding);
         padding-top: calc(var(--padding) + var(--border-width));
-    }
-}
 
 
+        .settings-group {
+            h3.settings-group-title {
+                margin: 0;
+                margin-bottom: 10px;
+            }
+
+            +.settings-group {
+                margin-top: 20px;
+            }
 
 
-.settings-panel {
-	pointer-events: none;
-	right: 20px;
-	top: 50px;
-	width: 400px;
-	
+        }
 
-
-	.panel-content {
-		
-
-		.setting-group+.setting-group {
-			margin-top: 20px;
-		}
-
-		.setting-row {
-			+.setting-row {
+		.setting-item {
+			+.setting-item {
 				margin-top: 10px;
 			}
 
@@ -616,9 +614,30 @@ input[type="checkbox"]{
 					margin-left: 8px;
 				}
 			}
+
+            &.dropdown {
+                label {
+                    margin-bottom: 8px;
+                }
+                select {
+                    width: 100%;
+                }
+            }
+
+
 		}
-	}
+
+
+    }
+
+    >.modal-footer {
+        padding: var(--padding);
+    }
 }
+
+
+
+
 
 
 input[type="range"] {

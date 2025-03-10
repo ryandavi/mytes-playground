@@ -30,10 +30,6 @@ body {
 
 }
 
-* {
-	// cursor: none!important;
-}
-
 html,
 body {
 	width: 100%;
@@ -47,7 +43,8 @@ body {
 body,
 input,
 textarea,
-button {
+button,
+select {
 	font-family: "Source Code Pro", system-ui;
 	font-optical-sizing: auto;
 	font-weight: 500;
@@ -59,6 +56,7 @@ form {
 	margin: 0 auto;
 }
 
+select,
 input,
 textarea {
 	padding: var(--padding);
@@ -408,9 +406,6 @@ body {
 		}
 	}
 
-
-
-
 }
 
 
@@ -455,9 +450,7 @@ body.debug {
 
 }
 
-.selected-object {
-	filter: drop-shadow(0px 0px 15px rgba(45, 255, 196, 0.9));
-}
+
 
 .dot {
 	transform: translate(-100%, -100%);
@@ -672,7 +665,9 @@ body.debug {
 	-webkit-user-select: none;
 }
 
-
+.draggable {
+	cursor: grab;
+}
 
 :root {
 	--item-size: 48px;
@@ -728,15 +723,6 @@ body.debug {
 }
 
 
-
-
-
-
-
-
-
-
-
 .item {
 	width: 32px;
 	height: 32px;
@@ -784,12 +770,6 @@ body.debug {
 		visibility: hidden;
 	}
 }
-
-
-
-
-
-
 
 .item {
 	position: relative;
@@ -845,7 +825,6 @@ body.debug {
 	}
 
 }
-
 
 .inventory-drop-indicator {
 	position: absolute;

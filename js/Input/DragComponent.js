@@ -1,0 +1,515 @@
+class DragComponent extends InputComponent {
+
+	getDefaultOptions() {
+		return {
+			...super.getDefaultOptions(),
+			dragThreshold: 5,                // Minimum pixels moved to start drag
+			dragTimeThreshold: 100,          // Minimum time in ms before a drag starts
+			preventDefaultsForDrag: true,    // Whether to prevent default touch behavior during drag
+			autoActivate: false,             // Whether to start dragging automatically on mousedown/touch
+			inertia: false,                  // Whether to enable inertia after drag
+			inertiaDeceleration: 0.95,       // Deceleration factor for inertia
+			maxInertiaSpeed: 20,             // Maximum inertia speed
+			limitToElement: null,            // Element to limit dragging within
+			limitToViewport: false,          // Whether to limit dragging within viewport
+			touchAction: 'none',             // CSS touch-action property during drag
+			dragOriginX: 0.5,                // Origin point for drag (0.5 = center)
+			dragOriginY: 0.5,                // Origin point for drag (0.5 = center)
+
+			// Callbacks
+			canDrag: null,                   // Function to check if dragging is allowed
+			onDragStart: null,               // Called when drag starts
+			onDragMove: null,                // Called during drag
+			onDragEnd: null                  // Called when drag ends
+		};
+	}
+
+	initialize() {
+		super.initialize();
+
+		// Dragging state
+		this.isDragging = false;
+		this.dragStartPosition = { x: 0, y: 0 };
+		this.currentPosition = { x: 0, y: 0 };
+		this.dragStartTime = 0;
+		this.lastPosition = { x: 0, y: 0 };
+		this.velocity = { x: 0, y: 0 };
+		this.touchId = null;
+		this.mouseDownReceived = false; // Track if mousedown was received
+
+		// For inertia animation
+		this.inertiaAnimationId = null;
+
+		// Debug: Add window-level handler for mouseup to ensure we catch all mouseup events
+		window.addEventListener('mouseup', this.windowMouseUpHandler);
+		window.addEventListener('touchend', this.windowTouchEndHandler);
+	}
+
+	/**
+	 * Global handler for mouseup to ensure we catch all mouseup events
+	 */
+	windowMouseUpHandler = (event) => {
+		if (this.isDragging) {
+			console.log('Window mouseup detected while dragging');
+			this.handleEnd({
+				position: {
+					x: event.pageX || 0,
+					y: event.pageY || 0,
+					clientX: event.clientX || 0,
+					clientY: event.clientY || 0
+				},
+				originalEvent: event
+			});
+		}
+	};
+
+	/**
+	 * Global handler for touchend to ensure we catch all touch end events
+	 */
+	windowTouchEndHandler = (event) => {
+		if (this.isDragging && event.changedTouches) {
+			console.log('Window touchend detected while dragging');
+			for (let i = 0; i < event.changedTouches.length; i++) {
+				const touch = event.changedTouches[i];
+				if (touch.identifier === this.touchId) {
+					this.handleEnd({
+						position: {
+							x: touch.pageX || 0,
+							y: touch.pageY || 0,
+							clientX: touch.clientX || 0,
+							clientY: touch.clientY || 0
+						},
+						touchId: touch.identifier,
+						originalEvent: event
+					});
+					break;
+				}
+			}
+		}
+	};
+
+	/**
+	 * Set up event subscriptions
+	 */
+	setupSubscriptions() {
+		// Mouse events
+		this.subscribe('mouse.down', this.handleStart);
+		this.subscribe('mouse.move', this.handleMove);
+		this.subscribe('mouse.up', this.handleEnd);
+
+		// Touch events
+		this.subscribe('touch.start', this.handleStart);
+		this.subscribe('touch.move', this.handleMove);
+		this.subscribe('touch.end', this.handleEnd);
+	}
+
+	/**
+	 * Handle drag start (mousedown/touchstart)
+	 */
+	handleStart = (event) => {
+		if (!this.active) return;
+
+		// Check if we can drag
+		if (this.options.canDrag && !this.options.canDrag(event)) {
+			return;
+		}
+	
+		// Check if the click actually occurred on this element
+		if (this.element) {
+			const elementRect = this.element.getBoundingClientRect();
+			const isInside = (
+				event.position.clientX >= elementRect.left &&
+				event.position.clientX <= elementRect.right &&
+				event.position.clientY >= elementRect.top &&
+				event.position.clientY <= elementRect.bottom
+			);
+			
+			if (!isInside) {
+				return; // Not clicking on this element, don't start drag
+			}
+		}
+	
+		// Rest of the function remains the same...
+		console.log('DragComponent: handleStart called');
+
+
+		// Store starting information
+		this.dragStartPosition = { ...event.position };
+		this.currentPosition = { ...event.position };
+		this.lastPosition = { ...event.position };
+		this.dragStartTime = Date.now();
+		this.velocity = { x: 0, y: 0 };
+		this.mouseDownReceived = true; // Flag that we received mousedown
+
+		// For touch events, store the touch identifier
+		if (event.touchId !== undefined) {
+			this.touchId = event.touchId;
+		} else {
+			this.touchId = null;
+		}
+
+		// If auto-activate is enabled, start dragging immediately
+		if (this.options.autoActivate) {
+			this.startDrag(event);
+		}
+	}
+
+	/**
+	 * Handle drag move
+	 */
+	handleMove = (event) => {
+		if (!this.active) return;
+
+		// If we haven't received a mousedown yet, ignore move events
+		if (!this.mouseDownReceived) {
+			return;
+		}
+
+		// If we haven't started dragging yet, check if we should
+		if (!this.isDragging) {
+			// For touch events, make sure it's the right touch
+			if (event.touchId !== undefined && event.touchId !== this.touchId) {
+				return;
+			}
+
+			// Check if we've moved enough to start dragging
+			const deltaX = event.position.x - this.dragStartPosition.x;
+			const deltaY = event.position.y - this.dragStartPosition.y;
+			const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+			const timeElapsed = Date.now() - this.dragStartTime;
+
+			console.log(`DragComponent: Move distance=${distance}, threshold=${this.options.dragThreshold}`);
+
+			// Start dragging if we've moved enough and enough time has passed
+			if (distance >= this.options.dragThreshold &&
+				timeElapsed >= this.options.dragTimeThreshold) {
+				console.log('DragComponent: Starting drag from move');
+				this.startDrag(event);
+			}
+
+			// If we're not dragging yet, don't continue processing the move
+			if (!this.isDragging) {
+				return;
+			}
+		}
+
+		// For touch events, make sure it's the right touch
+		if (event.touchId !== undefined && event.touchId !== this.touchId) {
+			return;
+		}
+
+		// Calculate velocity
+		const now = Date.now();
+		const dt = (now - this.dragStartTime) / 1000; // in seconds
+
+		if (dt > 0) {
+			this.velocity = {
+				x: (event.position.x - this.lastPosition.x) / dt,
+				y: (event.position.y - this.lastPosition.y) / dt
+			};
+		}
+
+		// Store current position
+		this.lastPosition = this.currentPosition;
+		this.currentPosition = { ...event.position };
+		this.dragStartTime = now;
+
+		// Apply movement constraints
+		const constrainedPosition = this.constrainPosition(this.currentPosition);
+
+		// Call move callback
+		if (this.options.onDragMove) {
+			this.options.onDragMove({
+				originalEvent: event.originalEvent,
+				position: constrainedPosition,
+				startPosition: this.dragStartPosition,
+				delta: {
+					x: constrainedPosition.x - this.dragStartPosition.x,
+					y: constrainedPosition.y - this.dragStartPosition.y
+				},
+				velocity: this.velocity
+			});
+		}
+
+		// Prevent default if needed
+		if (this.options.preventDefaultsForDrag && event.originalEvent && event.originalEvent.preventDefault) {
+			// event.originalEvent.preventDefault();
+		}
+	}
+
+	/**
+	 * Handle drag end
+	 */
+	handleEnd = (event) => {
+		if (!this.active) return;
+
+		console.log('DragComponent: handleEnd called, isDragging=', this.isDragging);
+
+		// Reset mousedown tracking regardless of whether we were dragging
+		this.mouseDownReceived = false;
+
+		// If we weren't dragging, nothing else to do
+		if (!this.isDragging) return;
+
+		// For touch events, make sure it's the right touch
+		if (event.touchId !== undefined && event.touchId !== this.touchId) {
+			return;
+		}
+
+		// Apply movement constraints
+		const constrainedPosition = this.constrainPosition(this.currentPosition);
+
+		// Call end callback
+		if (this.options.onDragEnd) {
+			console.log('DragComponent: Calling onDragEnd callback');
+			this.options.onDragEnd({
+				originalEvent: event.originalEvent,
+				position: constrainedPosition,
+				startPosition: this.dragStartPosition,
+				delta: {
+					x: constrainedPosition.x - this.dragStartPosition.x,
+					y: constrainedPosition.y - this.dragStartPosition.y
+				},
+				velocity: this.velocity
+			});
+		}
+
+		// Reset state
+		this.isDragging = false;
+		this.touchId = null;
+
+		// Reset element style if we modified it
+		if (this.element && this.options.touchAction) {
+			this.element.style.touchAction = '';
+		}
+
+		// Start inertia if enabled
+		if (this.options.inertia) {
+			this.startInertia();
+		}
+	}
+
+	/**
+	 * Start the drag operation
+	 */
+	startDrag(event) {
+		console.log('DragComponent: startDrag called');
+		this.isDragging = true;
+
+		// Set touch-action CSS for better touch handling
+		if (this.element && this.options.touchAction) {
+			this.element.style.touchAction = this.options.touchAction;
+		}
+
+		// Apply drag origin offset
+		if (this.element) {
+			const rect = this.element.getBoundingClientRect();
+			this.dragOffset = {
+				x: (event.position.x - rect.left) - (rect.width * this.options.dragOriginX),
+				y: (event.position.y - rect.top) - (rect.height * this.options.dragOriginY)
+			};
+		} else {
+			this.dragOffset = { x: 0, y: 0 };
+		}
+
+		// Call start callback
+		if (this.options.onDragStart) {
+			this.options.onDragStart({
+				originalEvent: event.originalEvent,
+				position: this.dragStartPosition,
+				offset: this.dragOffset
+			});
+		}
+	}
+
+	/**
+	 * Constrain a position to limits if set
+	 * @param {Object} position Position to constrain
+	 * @returns {Object} Constrained position
+	 */
+	constrainPosition(position) {
+		// Create a copy of the position
+		const constrained = { ...position };
+
+		// Apply limit to element
+		if (this.options.limitToElement && this.element) {
+			const rect = this.options.limitToElement.getBoundingClientRect();
+			const elemRect = this.element.getBoundingClientRect();
+
+			constrained.x = Math.max(
+				rect.left + this.dragOffset.x,
+				Math.min(rect.right - elemRect.width + this.dragOffset.x, constrained.x)
+			);
+
+			constrained.y = Math.max(
+				rect.top + this.dragOffset.y,
+				Math.min(rect.bottom - elemRect.height + this.dragOffset.y, constrained.y)
+			);
+		}
+
+		// Apply limit to viewport
+		if (this.options.limitToViewport && this.element) {
+			const elemRect = this.element.getBoundingClientRect();
+
+			constrained.x = Math.max(
+				this.dragOffset.x,
+				Math.min(window.innerWidth - elemRect.width + this.dragOffset.x, constrained.x)
+			);
+
+			constrained.y = Math.max(
+				this.dragOffset.y,
+				Math.min(window.innerHeight - elemRect.height + this.dragOffset.y, constrained.y)
+			);
+		}
+
+		return constrained;
+	}
+
+	/**
+	 * Start inertia animation
+	 */
+	startInertia() {
+		if (!this.options.inertia) return;
+
+		// Cancel any existing inertia
+		this.cancelInertia();
+
+		// Limit initial velocity
+		const speed = Math.sqrt(
+			this.velocity.x * this.velocity.x +
+			this.velocity.y * this.velocity.y
+		);
+
+		if (speed <= 0) return;
+
+		if (speed > this.options.maxInertiaSpeed) {
+			const scale = this.options.maxInertiaSpeed / speed;
+			this.velocity.x *= scale;
+			this.velocity.y *= scale;
+		}
+
+		// Start animation
+		this.inertiaAnimationId = requestAnimationFrame(this.updateInertia);
+	}
+
+	/**
+	 * Update inertia animation
+	 */
+	updateInertia = () => {
+		// Calculate new position
+		const newPosition = {
+			x: this.currentPosition.x + this.velocity.x,
+			y: this.currentPosition.y + this.velocity.y
+		};
+
+		// Apply constraints
+		const constrainedPosition = this.constrainPosition(newPosition);
+
+		// Update current position
+		this.currentPosition = constrainedPosition;
+
+		// Call move callback
+		if (this.options.onDragMove) {
+			this.options.onDragMove({
+				position: constrainedPosition,
+				startPosition: this.dragStartPosition,
+				delta: {
+					x: constrainedPosition.x - this.dragStartPosition.x,
+					y: constrainedPosition.y - this.dragStartPosition.y
+				},
+				velocity: this.velocity,
+				inertia: true
+			});
+		}
+
+		// Apply deceleration
+		this.velocity.x *= this.options.inertiaDeceleration;
+		this.velocity.y *= this.options.inertiaDeceleration;
+
+		// Stop if velocity is very low
+		const speed = Math.sqrt(
+			this.velocity.x * this.velocity.x +
+			this.velocity.y * this.velocity.y
+		);
+
+		if (speed < 0.1) {
+			this.cancelInertia();
+
+			// Call end callback
+			if (this.options.onDragEnd) {
+				this.options.onDragEnd({
+					position: constrainedPosition,
+					startPosition: this.dragStartPosition,
+					delta: {
+						x: constrainedPosition.x - this.dragStartPosition.x,
+						y: constrainedPosition.y - this.dragStartPosition.y
+					},
+					velocity: { x: 0, y: 0 },
+					inertia: true
+				});
+			}
+
+			return;
+		}
+
+		// Continue animation
+		this.inertiaAnimationId = requestAnimationFrame(this.updateInertia);
+	}
+
+	/**
+	 * Cancel inertia animation
+	 */
+	cancelInertia() {
+		if (this.inertiaAnimationId) {
+			cancelAnimationFrame(this.inertiaAnimationId);
+			this.inertiaAnimationId = null;
+		}
+	}
+
+	/**
+	 * Manually start a drag operation at the current mouse position
+	 */
+	startDragAtCurrentPosition() {
+		const mousePos = this.inputSystem.getMousePosition();
+		this.handleStart({
+			position: mousePos,
+			originalEvent: null
+		});
+		this.startDrag({
+			position: mousePos,
+			originalEvent: null
+		});
+	}
+
+	/**
+	 * Stop the current drag operation (can be called externally)
+	 */
+	stopDrag() {
+		if (this.isDragging) {
+			console.log('DragComponent: Externally stopping drag');
+			const mousePos = this.inputSystem.getMousePosition();
+			this.handleEnd({
+				position: mousePos,
+				originalEvent: null
+			});
+		}
+	}
+
+	/**
+	 * Clean up resources
+	 */
+	destroy() {
+		this.cancelInertia();
+
+		// Remove global handlers
+		window.removeEventListener('mouseup', this.windowMouseUpHandler);
+		window.removeEventListener('touchend', this.windowTouchEndHandler);
+
+		// Reset element style if needed
+		if (this.element && this.options.touchAction) {
+			this.element.style.touchAction = '';
+		}
+
+		super.destroy();
+	}
+}

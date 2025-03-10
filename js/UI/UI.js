@@ -119,6 +119,7 @@ class UserInterface {
         this.debug = new Debug(parent);
 
         this.sound = new SoundUI(this);
+        this.settings = new SettingsUI(this);
         this.isActive = false;
 
         this.selectedObject = null;
@@ -168,7 +169,9 @@ class UserInterface {
         this.initActiveMytes();
 
         // Initialize sound settings
-        this.sound.initSoundSettings();
+        this.sound.init();
+
+        this.settings.init();
 
     }
 
@@ -177,11 +180,12 @@ class UserInterface {
             console.error('Hand controls element not found');
             return;
         }
-
+    
         // Add event listeners to all radio inputs in hand-controls
         const radioInputs = this.handControls.querySelectorAll('input[type="radio"]');
         
         radioInputs.forEach(input => {
+            // Existing change event listener
             input.addEventListener('change', (event) => {
                 const toolId = event.target.id;
                 
@@ -198,8 +202,27 @@ class UserInterface {
                         break;
                 }
             });
+            
+            // Add context menu (right-click) event listener to the input itself
+            input.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
+                input.checked = true;
+                input.dispatchEvent(new Event('change'));
+                return false;
+            });
+            
+            // Also add to the label if it exists
+            const label = this.handControls.querySelector(`label[for="${input.id}"]`);
+            if (label) {
+                label.addEventListener('contextmenu', (event) => {
+                    event.preventDefault();
+                    input.checked = true;
+                    input.dispatchEvent(new Event('change'));
+                    return false;
+                });
+            }
         });
-
+    
         // Set initial mode
         this.setToolMode(UIToolModes.SELECT);
     }
@@ -328,8 +351,7 @@ class UserInterface {
     setToolMode(mode) {
         if (this.currentToolMode === mode) return;
 
-
-        this.parent.core.soundManager.playUISound('click');
+        this.playSound('hover');
 
         // Set mode
         this.currentToolMode = mode;
@@ -340,6 +362,12 @@ class UserInterface {
         // unset selected
         this.setSelected(null);
     }
+
+	playSound(sound) {
+		this.parent.core.soundManager.playUISound(sound);
+	}
+
+
 
     // Modified method to use the centralized config
     changeToolMode(mode) {

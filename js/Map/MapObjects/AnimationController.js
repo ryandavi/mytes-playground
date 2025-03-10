@@ -16,6 +16,7 @@ class AnimationController {
         
         // DOM elements
         this.element = null;
+        this.sprite = null;
     }
     
 
@@ -88,28 +89,29 @@ class AnimationController {
         if (Array.isArray(frame)) {
             // It's a 2D coordinate [x, y]
             const [x, y] = frame;
-            this.element.style.backgroundPosition = 
+            this.sprite.style.backgroundPosition = 
                 `${-x * frameWidth * scale}px ${-y * frameHeight * scale}px`;
         } else {
             // It's a 1D index (original format)
-            this.element.style.backgroundPosition = `${-frame * frameWidth * scale}px 0px`;
+            this.sprite.style.backgroundPosition = `${-frame * frameWidth * scale}px 0px`;
         }
     }
 
     setup(element) {
         this.element = element;
+
+        this.sprite = element.querySelector('.sprite') || this.element;
         
         // Set dimensions
         if (this.config.frameWidth && this.config.scale) {
-            element.style.width = `${this.config.frameWidth * this.config.scale}px`;
+            this.element.style.width = `${this.config.frameWidth * this.config.scale}px`;
             const height = this.config.frameHeight || this.config.frameWidth;
-            element.style.height = `${height * this.config.scale}px`;
+            this.element.style.height = `${height * this.config.scale}px`;
         }
         
         // Set up spritesheet background if provided
         if (this.config.spriteSheet) {
-            element.style.backgroundImage = `url(${this.config.spriteSheet})`;
-            element.style.backgroundRepeat = 'no-repeat';
+            this.sprite.style.backgroundImage = `url(${this.config.spriteSheet})`;
         }
     }
 }

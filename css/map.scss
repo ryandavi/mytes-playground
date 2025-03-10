@@ -1,3 +1,4 @@
+/* LAYERS */
 .container-wrapper {
 	>.container {
 
@@ -198,7 +199,16 @@
 						/* Prevent stretching */
 					}
 				}
+			}
+		}
+	}
+}
 
+/* MAP OBJECTS */
+.container-wrapper {
+	>.container {
+		>.canvas {
+			>.layer {
 				>.dropped-item {
 					position: absolute;
 					width: 16px;
@@ -238,90 +248,118 @@
 					position: absolute;
 					pointer-events: none;
 
-					&.selected {
-						outline: 2px dashed green;
-						border-radius: 5px;
+					.sway {
+						animation-delay: inherit;
+						transform-origin: bottom;
+						animation: sway 5s ease-in-out infinite;
 					}
 
-
-					> .interact {
-						pointer-events: all;
-					}
-
-					> * {
+					>.sprite {
 						position: absolute;
 						top: 0;
 						left: 0;
 						width: 100%;
 						height: 100%;
 						image-rendering: pixelated;
+
+						>.front, .back {
+							position: absolute;
+							top: 0;
+							left: 0;
+							width: 100%;
+							height: 100%;
+							image-rendering: pixelated;
+						}
+
 					}
 
-					>.front {
-						animation-delay: inherit;
-						transform-origin: bottom;
-						animation: sway 5s ease-in-out infinite;
+					&.interactable {
+						pointer-events: all;
+						cursor: pointer;
+					}
+
+					&.selected {
+						outline: 2px dashed green;
+						border-radius: 5px;
+					}
+
+					&.draggable {
+						cursor: grab;
+					}
+
+					&.dragging {
+						pointer-events: none;
+						user-select: none;
+						cursor: grab;
+						z-index: 100000 !important;
+
+						>.sprite {
+							animation-name: wiggle2;
+							animation-duration: 0.6s;
+							animation-iteration-count: infinite;
+							transform-origin: 50% 65%;
+							animation-timing-function: ease-in-out;
+							filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
+							will-change: transform;
+						}
 					}
 
 					// crop plant
 					&.crop-plant {
-						position: absolute;
-						width: 16px;
-						height: 16px;
 
 
-						--n: 2;
-						background-size: calc(192px * var(--n)) calc(32px * var(--n));
-						image-rendering: pixelated;
+						>.sprite {
+							// --n: 2;
+							// background-size: calc(192px * var(--n)) calc(32px * var(--n));
 
-						background: {
-							image: url('../images/chest_spritesheet.png');
-							repeat: no-repeat;
+							background: {
+								image: url('../images/MapObjects/crop_corn.gif');
+							}
 						}
 
+					}
+
+					// bed
+					&.bed_long {
+						>.sprite {
+							background: {
+								image: url('../images/MapObjects/bed_big_long.png');
+							}
+						}
 					}
 
 					// butterfly
 					&.blue_butterfly,
 					&.guard {
-						position: absolute;
 
-						image-rendering: pixelated;
-
-						background: {
-							image: url('../images/MapObjects/butterfly.png');
-							repeat: no-repeat;
+						>.sprite {
+							background: {
+								image: url('../images/MapObjects/butterfly.png');
+							}
 						}
 
 					}
 
 					&.ball {
-						position: absolute;
-
-
-						image-rendering: pixelated;
-
-						background: {
-							image: url('../images/MapObjects/ball.gif');
-							repeat: no-repeat;
+						>.sprite {
+								background: {
+								image: url('../images/MapObjects/ball.gif');
+							}
 						}
-
 					}
 
 					// treasure chest
 					&.treasure-chest {
-						position: absolute;
-						width: 16px;
-						height: 16px;
 
 
-						--n: 2;
-						background-size: calc(192px * var(--n)) calc(32px * var(--n));
-						image-rendering: pixelated;
+						>.sprite {
+							--n: 2;
+							background-size: calc(192px * var(--n)) calc(32px * var(--n));
+							image-rendering: pixelated;
 
-						background: {
-							image: url('../images/chest_spritesheet.png');
-							repeat: no-repeat;
+							background: {
+								image: url('../images/chest_spritesheet.png');
+							}
 						}
 					}
 
@@ -340,7 +378,6 @@
 
 					// fountain
 					&.fountain {
-						position: relative;
 						transition: filter 0.3s ease;
 
 						&[data-active="true"] {
@@ -352,19 +389,7 @@
 						}
 					}
 
-
 					&.animated-map-object {
-						pointer-events: all;
-						position: absolute;
-						transition: transform 0.1s ease-out;
-
-						.sprite {
-							background-repeat: no-repeat;
-							height: 100%;
-							image-rendering: pixelated;
-							width: 100%;
-						}
-
 						&.butterfly {
 							&.blue {
 								filter: hue-rotate(156deg);
@@ -379,14 +404,18 @@
 							}
 						}
 					}
-
-
-
 				}
-
 			}
 		}
 	}
+}
+
+
+.particle {
+	position: absolute;
+	pointer-events: none;
+	background-size: cover;
+	will-change: transform, opacity;
 }
 
 
@@ -404,4 +433,3 @@
 		opacity: 0;
 	}
 }
-

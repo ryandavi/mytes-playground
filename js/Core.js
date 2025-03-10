@@ -91,9 +91,6 @@ class MyteCore {
                 throw new Error('Failed to create main container');
             }
 
-
-
-
             // This call starts container initialization
             // The container will manage its own part of the loading progress
             await container.init();
@@ -172,11 +169,11 @@ class MyteCore {
                         //this.soundManager.playUISound('select');
 
                         // Speak text with the character's voice
-                        this.soundManager.speakAnimalText("Hi my name is baby!", {
+                        /* this.soundManager.speakAnimalText("Hi my name is baby!", {
                             species: "bird",
                             speed: 1.6,
                             pitch: 1.3
-                        });
+                        }); */
 
                         // Add another delay before playing music
                         setTimeout(() => {

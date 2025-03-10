@@ -57,6 +57,8 @@ class Debug {
             messages.push({ label: "Map Name", value: this.parent.gameMap.name });
             messages.push({ label: "Objects Count", value: this.parent.gameMap.objects.length || 0 });
             messages.push({ label: "Dimensions", value: `${this.parent.gameMap.dimensions.width}x${this.parent.gameMap.dimensions.height}px` });
+            messages.push({ label: "Particles", value: `${this.parent.gameMap.particleSystem.particles.length}` });
+            messages.push({ label: "Particle Emitters", value: `${this.parent.gameMap.particleSystem.emitters.length}` });
         }
 
         if (this.parent.gameMap?.zoneManager && this.parent.gameMap.zoneManager.zones.size > 0) {

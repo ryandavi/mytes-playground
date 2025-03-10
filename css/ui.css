@@ -217,7 +217,7 @@ input[type=checkbox] {
   display: none;
 }
 .container-wrapper > .hand-controls button.hand-control-btn,
-.container-wrapper > .hand-controls label {
+.container-wrapper > .hand-controls label.button {
   width: 80px;
   height: 80px;
   display: flex;
@@ -237,29 +237,35 @@ input[type=checkbox] {
   cursor: pointer;
 }
 .container-wrapper > .hand-controls button.hand-control-btn:hover,
-.container-wrapper > .hand-controls label:hover {
-  outline: 4px solid rgba(0, 128, 0, 0.33);
+.container-wrapper > .hand-controls label.button:hover {
+  outline: 4px solid rgba(0, 128, 0, 0.2);
 }
-.container-wrapper > .hand-controls label > .icon {
+.container-wrapper > .hand-controls label.button > .icon {
   fill: grey;
   max-height: 24px;
   max-width: 24px;
 }
-.container-wrapper > .hand-controls label > .text {
+.container-wrapper > .hand-controls label.button > .text {
   font-size: 75%;
 }
-.container-wrapper > .hand-controls input[type=radio]:checked + label:not(:checked), .container-wrapper > .hand-controls input[type=radio]:checked + label:not(:active) {
+.container-wrapper > .hand-controls .hand-control-btn.active:not(:checked), .container-wrapper > .hand-controls .hand-control-btn.active:not(:active),
+.container-wrapper > .hand-controls input[type=radio]:checked + label.button:not(:checked),
+.container-wrapper > .hand-controls input[type=radio]:checked + label.button:not(:active) {
   border-top-color: lightgrey;
   border-left-color: lightgrey;
   border-right-color: white;
   border-bottom-color: white;
   color: black;
-  outline: 4px solid green;
 }
-.container-wrapper > .hand-controls input[type=radio]:checked + label:not(:checked) > .icon, .container-wrapper > .hand-controls input[type=radio]:checked + label:not(:active) > .icon {
+.container-wrapper > .hand-controls .hand-control-btn.active:not(:checked) > .icon, .container-wrapper > .hand-controls .hand-control-btn.active:not(:active) > .icon,
+.container-wrapper > .hand-controls input[type=radio]:checked + label.button:not(:checked) > .icon,
+.container-wrapper > .hand-controls input[type=radio]:checked + label.button:not(:active) > .icon {
   fill: black;
 }
-.container-wrapper > .hand-controls .hand-control-btn#sound-toggle i {
+.container-wrapper > .hand-controls input[type=radio]:checked + label.button {
+  outline: 4px solid green;
+}
+.container-wrapper > .hand-controls .hand-control-btn i {
   font-size: 1.5em;
   font-style: normal;
 }
@@ -375,9 +381,6 @@ input[type=checkbox] {
   z-index: 1000;
   border-radius: var(--border-radius);
   overflow: hidden;
-  right: 20px;
-  top: 20px;
-  margin: 0 auto;
   background-color: #ece9d8;
   border: var(--border-width) solid #0631d6;
   border-top: 0;
@@ -386,13 +389,18 @@ input[type=checkbox] {
   opacity: 0;
   transform: translateY(5px);
   transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
+  pointer-events: none;
+  width: 400px;
+}
+.modal-window.floating {
+  position: fixed;
 }
 .modal-window.visible {
   pointer-events: all;
   transform: translateY(0px);
   opacity: 1;
 }
-.modal-window > .header {
+.modal-window > .modal-header {
   align-items: center;
   padding: 7.5px;
   background-color: #0166fb;
@@ -410,14 +418,12 @@ input[type=checkbox] {
   display: flex;
   justify-content: space-between;
 }
-.modal-window > .header h3 {
+.modal-window > .modal-header h2.modal-title {
   font-size: 16px;
   margin: 0px;
-}
-.modal-window > .header > .title {
   margin: 0;
 }
-.modal-window > .header > .close-btn {
+.modal-window > .modal-header > .modal-close-btn {
   width: 30px;
   height: 30px;
   padding: 0;
@@ -427,38 +433,44 @@ input[type=checkbox] {
   font-size: 30px;
   margin-left: auto;
 }
-.modal-window > .content {
+.modal-window > .modal-content {
   padding: var(--padding);
   padding-top: calc(var(--padding) + var(--border-width));
 }
-
-.settings-panel {
-  pointer-events: none;
-  right: 20px;
-  top: 50px;
-  width: 400px;
+.modal-window > .modal-content .settings-group h3.settings-group-title {
+  margin: 0;
+  margin-bottom: 10px;
 }
-.settings-panel .panel-content .setting-group + .setting-group {
+.modal-window > .modal-content .settings-group + .settings-group {
   margin-top: 20px;
 }
-.settings-panel .panel-content .setting-row + .setting-row {
+.modal-window > .modal-content .setting-item + .setting-item {
   margin-top: 10px;
 }
-.settings-panel .panel-content .setting-row:last-child {
+.modal-window > .modal-content .setting-item:last-child {
   margin-bottom: 0px;
 }
-.settings-panel .panel-content .setting-row label {
+.modal-window > .modal-content .setting-item label {
   display: block;
 }
-.settings-panel .panel-content .setting-row label + input {
+.modal-window > .modal-content .setting-item label + input {
   margin-top: 8px;
 }
-.settings-panel .panel-content .setting-row .checkbox-wrapper {
+.modal-window > .modal-content .setting-item .checkbox-wrapper {
   align-items: center;
   display: flex;
 }
-.settings-panel .panel-content .setting-row .checkbox-wrapper label {
+.modal-window > .modal-content .setting-item .checkbox-wrapper label {
   margin-left: 8px;
+}
+.modal-window > .modal-content .setting-item.dropdown label {
+  margin-bottom: 8px;
+}
+.modal-window > .modal-content .setting-item.dropdown select {
+  width: 100%;
+}
+.modal-window > .modal-footer {
+  padding: var(--padding);
 }
 
 input[type=range] {

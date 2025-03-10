@@ -481,7 +481,7 @@ class ButterflyMapObject extends AnimatedMapObject {
         this.bobPhase += this.bobFrequency;
         const bobOffset = Math.sin(this.bobPhase) * this.bobAmplitude;
         
-        this.element.style.transform = `translateY(${bobOffset}px)`;
+        this.animation.sprite.style.transform = `translateY(${bobOffset}px)`;
     }
     
     // Butterfly behavior states
@@ -630,14 +630,17 @@ class ButterflyMapObject extends AnimatedMapObject {
         }
     }
     
+    renderSprite(){
+
+    }
+
     render(container, parent) {
         const element = super.render(container, parent);
         element.classList.add('animated-map-object');
         
         // Explicitly set background image in case it wasn't set by the controller
-        element.style.backgroundImage = `url(${this.config.spriteConfig.spriteSheet})`;
-        element.style.backgroundRepeat = 'no-repeat';
-        
+        this.animation.sprite.style.backgroundImage = `url(${this.config.spriteConfig.spriteSheet})`;
+
         // Add data attributes for debugging
         element.setAttribute('data-idle', this.isIdle);
         element.setAttribute('data-hovering', this.isHovering);
@@ -758,6 +761,17 @@ class BallMapObject extends AnimatedMapObject {
         this.debug = true;
     }
 
+
+    canBeDragged() {
+        // First check the parent class conditions
+        if (!super.canBeDragged()) return false;
+        
+        // Don't allow dragging if the ball is moving
+        if (this.isMoving) return false;
+        
+        return true;
+    }
+
     getColliderCenter() {
         return {
             x: this.posX + this.collider.offsetX,
@@ -773,6 +787,9 @@ class BallMapObject extends AnimatedMapObject {
     }
 
     reactToNearbyCreature(myte) {
+
+        if (this.isDragging) return;
+
         const now = Date.now();
         if (now - this.lastPushTime < this.pushCooldown) return;
 
