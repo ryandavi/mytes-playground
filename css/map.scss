@@ -61,13 +61,10 @@
 
 
 				&.background {
-
 					width: 800px;
 					height: 2000px;
 					z-index: 0;
-					// background-color: #63b02e;
-
-					// background-image: url("data:image/svg+xml,<svg id='patternId' width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'><defs><pattern id='a' patternUnits='userSpaceOnUse' width='20' height='20' patternTransform='scale(2) rotate(0)'><rect x='0' y='0' width='100%' height='100%' fill='hsla(0,0%,100%,1)'/><path d='M3.25 10h13.5M10 3.25v13.5'  stroke-linecap='square' stroke-width='1' stroke='hsla(259, 0%, 92%, 1)' fill='none'/></pattern></defs><rect width='800%' height='800%' transform='translate(0,0)' fill='url(%23a)'/></svg>");
+					background-repeat: no-repeat;
 				}
 
 				&.debug {
@@ -99,21 +96,6 @@
 						&.walkable-object {
 							background-color: rgba(0, 0, 255, 0.2);
 							border-color: rgba(0, 0, 255, 0.5);
-						}
-					}
-
-					.grid-cell {
-						position: absolute;
-						pointer-events: none;
-						user-select: none;
-						outline: 1px solid rgba(0, 0, 0, 0.05);
-
-						&.walkable {
-							background-color: rgba(0, 255, 0, 0.05);
-						}
-
-						&.unwalkable {
-							background-color: rgba(255, 0, 0, 0.1);
 						}
 					}
 
@@ -419,46 +401,51 @@
 
 
 
-.grid-cursor-highlight {
-    background-color: rgba(0, 255, 255, 0.3);
-    border: 1px solid cyan;
-    pointer-events: none;
-    z-index: 1000;
-}
 
-.grid-coords {
-    position: absolute;
-    top: -20px;
-    left: 0;
-    color: cyan;
-    font-size: 10px;
-    white-space: nowrap;
-}
 
-.grid-facing-highlight {
-    background-color: rgba(255, 255, 0, 0.5);
-    border: 1px solid gold;
-    pointer-events: none;
-    z-index: 1000;
-}
 
-.grid-facing-highlight.unwalkable {
-    background-color: rgba(255, 0, 0, 0.3);
-    border: 1px solid red;
-}
+// Debug elements styling
+.debug {
+	&.cursor-tile {
+	  position: absolute;
+	  border: 2px solid yellow;
+	  background-color: rgba(255, 255, 0, 0.2);
 
-.drop-target {
-    border: 2px dashed white;
-    pointer-events: none;
-    z-index: 1000;
-}
+	  cursor: pointer;
 
-.drop-target.valid-drop {
-    background-color: rgba(0, 255, 0, 0.2);
-    border-color: lime;
-}
+	  >.coords {
+		font-size: 10px;
+		position: absolute;
+		top: -2em;
+		white-space: nowrap;
+		color: white;
+	  }
+	}
 
-.drop-target.invalid-drop {
-    background-color: rgba(255, 0, 0, 0.2);
-    border-color: red;
-}
+
+
+	
+	&.myte-front-tile {
+	  position: absolute;
+	  border: 2px solid red;
+	  background-color: rgba(255, 0, 0, 0.2);
+
+	}
+	
+	&.grid-cell {
+	  position: absolute;
+	  border: 1px solid rgba(100, 100, 255, 0.3);
+	  
+	  &.unwalkable {
+		background-color: rgba(255, 0, 0, 0.2);
+	  }
+	  
+	  &.tile-unwalkable {
+		background-color: rgba(255, 100, 0, 0.2);
+	  }
+	  
+	  &.object-unwalkable {
+		background-color: rgba(0, 0, 255, 0.2);
+	  }
+	}
+  }

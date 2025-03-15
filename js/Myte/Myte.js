@@ -113,9 +113,46 @@ class Myte {
 		this.runAway_angle_distance = 300;
 		this.inputHandler;
 
+
+
+
+
 	}
 
-
+	initParticleEffects() {
+		const particleSystem = this.parent.gameMap.particleSystem;
+		
+		// Add particle control methods to this Myte
+		particleSystem.addParticleMethodsToObject(this);
+		
+		// Add specific effect based on species
+		if (this.species === "snail") {
+			// Slime trail for snails
+			this.addTrailEffect({
+				colors: ['#a0e8c8', '#80d0b0'], // Greenish slime colors
+				size: 3,
+				sizeEnd: 4,
+				opacity: 0.7,
+				life: 60,
+				friction: 0.999,
+				gravity: 0,
+				count: 1,
+				interval: 100
+			});
+		} else {
+			// Dust for regular movement
+			this.addDustEffect({
+				colors: ['#e8e8e8', '#d5d5d5', '#c8c8c8'],
+				size: 4,
+				sizeEnd: 7,
+				life: 35,
+				count: 2,
+				interval: 150,
+				emitWhenMoving: true,
+				movementThreshold: 1.0
+			});
+		}
+	}
 
 	init() {
 		/********************************************
@@ -144,6 +181,13 @@ class Myte {
 		this.setTarget(offsetX, offsetY);
 		this.setPosition(offsetX, offsetY);
 		this.setSpritePosition(this.posX, this.posY);
+
+
+		console.log(this.parent.gameMap)
+		// Initialize particle effects if the game map has a particle system
+		if (this.parent && this.parent.gameMap && this.parent.gameMap.particleSystem) {
+			this.initParticleEffects();
+		}
 
 		/********************************************
 		 * CLICK EVENTS
@@ -1223,6 +1267,10 @@ class Myte {
 
 	do_jump() {
 
+
+
+
+
 		// Only allow jump if on solid ground OR within coyote time window
 		const canJump = this.isOnSolidGround ||
 			(this.leftGroundTime &&
@@ -1261,6 +1309,19 @@ class Myte {
 	do_land_from_fall() {
 
 		// this.playSound('land');
+
+		if (this.parent && this.parent.gameMap && this.parent.gameMap.particleSystem) {
+			this.parent.gameMap.particleSystem.createDustEmitter(this, {
+				colors: ['#e8e8e8', '#d5d5d5', '#c8c8c8'],
+				size: 6,
+				sizeEnd: 10,
+				life: 50,
+				count: 6,
+				interval: 50,
+				emitWhenMoving: false,
+				positionAtFeet: true
+			});
+		}
 
 
 		if (this.physics.velocity >= this.physics.minFallDamageVelocity) {
@@ -1473,7 +1534,10 @@ class Myte {
 		if (deltaTime >= this.parent.core.config.frameInterval) {
 			this.stats.update(deltaTime);
 			this.update_frame();
+			this.parent.gameMap.gridSystem.updateMyteFrontTile(this);
 		}
+
+		
 
 	}
 }

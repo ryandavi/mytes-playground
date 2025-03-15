@@ -1,5 +1,5 @@
 class MovingMapObject extends MapObject {
-	constructor(type, variant, posX, posY, config = {}) {
+	constructor(parent, type, variant, posX, posY, config = {}) {
 		super(type, variant, posX, posY, config);
 
 		// Movement properties

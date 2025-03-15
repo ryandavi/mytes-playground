@@ -275,19 +275,6 @@ class Debug {
             this.updateDebug();
         }
 
-    // Add cursor grid highlight
-    if (this.parent.gameMap?.gridSystem && this.parent.gameMap.layers.debug) {
-        // Highlight cursor position
-        const mousePos = this.parent.getLocalMouse();
-
-        this.parent.gameMap.gridSystem.highlightCursorGrid(mousePos.x, mousePos.y);
-        
-        // Highlight facing tiles if there's an active myte
-        if (this.parent.activeMyte) {
-            this.parent.gameMap.gridSystem.highlightFacingTiles(this.parent.activeMyte);
-        }
-    }
-
         this.queueUI.update();
 
     }

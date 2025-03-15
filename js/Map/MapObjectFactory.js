@@ -63,6 +63,7 @@ class MapObjectFactory {
         this.BASE_CONFIG = baseConfig || {};
         this.TYPE_CONFIGS = typeConfigs || {};
         this.CONFIG_LOADED = true;
+        this.parent = null;
     }
 
     static async loadConfig(configUrl) {
@@ -104,7 +105,7 @@ class MapObjectFactory {
         const Constructor = this.registry.getConstructor(type);
 
         // Create and return the instance
-        return new Constructor(type, variant, x, y, config, options);
+        return new Constructor(this.parent, type, variant, x, y, config, options);
     }
 
     static getTypeConfig(type) {

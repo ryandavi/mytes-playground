@@ -4,9 +4,12 @@ class TileMapLoader {
 		this.parent = parent;
 		this.tilesets = new Map(); // Store loaded tilesets
 		this.maps = new Map(); // Store loaded maps
-		this.tileCache = new Map(); // Cache for rendered tiles
-		this.wangSets = new Map(); // Store wang tile definitions
+		this.currentMapData = null; // Track current map data
+        
+        // Canvas elements for rendering
+        this.layerCanvases = new Map(); // Store canvases for each layer
 	}
+	
 	async loadTileMap(mapPath) {
 		try {
 			// Fetch the TMX file
@@ -70,8 +73,8 @@ class TileMapLoader {
 					const tileset = await this.loadTileset(tilesetPath, firstgid);
 					mapData.tilesets.push(tileset);
 				} else {
-					// Embedded tileset
-					const tileset = this.parseEmbeddedTileset(tilesetEl, firstgid);
+					// Embedded tileset - use the same loader with the element data
+					const tileset = await this.loadTileset(null, firstgid, tilesetEl);
 					mapData.tilesets.push(tileset);
 				}
 			}
@@ -86,10 +89,8 @@ class TileMapLoader {
 			// Parse object groups
 			const objectGroupElements = xmlDoc.querySelectorAll('objectgroup');
 			for (const groupEl of objectGroupElements) {
-
 				const objects = this.parseObjectGroup(groupEl, mapData);
 				mapData.objects.push(...objects);
-
 			}
 
 			// Create zones from object groups with specific names
@@ -100,6 +101,9 @@ class TileMapLoader {
 
 			// Convert to our game map format
 			const gameMapData = this.convertToGameMapFormat(mapData);
+            
+            // Save current map data for later reference
+            this.currentMapData = gameMapData;
 
 			// Cache the map
 			this.maps.set(mapData.id, gameMapData);
@@ -111,25 +115,21 @@ class TileMapLoader {
 		}
 	}
 
-
 	async applyToGameMap(gameMap, mapData) {
 		if (!gameMap || !mapData) return;
 
 		// Set dimensions
 		gameMap.dimensions = mapData.dimensions;
 
-		// Set background
-		if (mapData.background) {
+		// Set background from map
+		const bgUrl = await this.createMapBackgroundUrl(mapData);
+		if (bgUrl) {
+			gameMap.setBackground({
+				url: bgUrl,
+				color: mapData.background?.color || '#f0f0f0'
+			});
+		} else if (mapData.background) {
 			gameMap.setBackground(mapData.background);
-		} else {
-			// Create a background from the map
-			const bgUrl = await this.createMapBackgroundUrl(mapData);
-			if (bgUrl) {
-				gameMap.setBackground({
-					url: bgUrl,
-					color: mapData.background?.color || '#f0f0f0'
-				});
-			}
 		}
 
 		// Generate grid data for the GridSystem
@@ -140,7 +140,6 @@ class TileMapLoader {
 
 		// Update the grid system
 		if (gameMap.gridSystem) {
-			// Extend the existing grid system with the new grid data
 			gameMap.gridSystem.updateFromTileGrid(gridData);
 		}
 
@@ -160,11 +159,7 @@ class TileMapLoader {
 
 		// Add objects
 		if (mapData.objects) {
-
 			for (const objData of mapData.objects) {
-
-				console.log(mapData.objects);
-	
 				gameMap.addObject(
 					objData.type.toUpperCase(),
 					objData.variant,
@@ -176,10 +171,9 @@ class TileMapLoader {
 		}
 	}
 
-
-	async loadTileset(tilesetPath, firstgid) {
-		// Check if we've already loaded this tileset
-		if (this.tilesets.has(tilesetPath)) {
+	async loadTileset(tilesetPath, firstgid, tilesetEl = null) {
+		// Check if we've already loaded this external tileset
+		if (tilesetPath && this.tilesets.has(tilesetPath)) {
 			const existingTileset = this.tilesets.get(tilesetPath);
 			return {
 				...existingTileset,
@@ -188,122 +182,69 @@ class TileMapLoader {
 		}
 
 		try {
-			// Fetch the TSX file
-			const response = await fetch(tilesetPath);
-			if (!response.ok) throw new Error(`Failed to load tileset: ${response.status}`);
-			const text = await response.text();
+			let tilesetData;
+			
+			if (tilesetPath) {
+				// External tileset - fetch the TSX file
+				const response = await fetch(tilesetPath);
+				if (!response.ok) throw new Error(`Failed to load tileset: ${response.status}`);
+				const text = await response.text();
+				
+				// Parse the XML
+				const parser = new DOMParser();
+				const xmlDoc = parser.parseFromString(text, "text/xml");
+				tilesetData = xmlDoc.querySelector('tileset');
+			} else {
+				// Embedded tileset - use the provided element
+				tilesetData = tilesetEl;
+			}
 
-			// Parse the XML
-			const parser = new DOMParser();
-			const xmlDoc = parser.parseFromString(text, "text/xml");
+			if (!tilesetData) throw new Error('Invalid tileset data');
 
 			// Basic tileset info
-			const tilesetEl = xmlDoc.querySelector('tileset');
-			if (!tilesetEl) throw new Error('Invalid TSX file: missing tileset element');
-
 			const tileset = {
-				name: tilesetEl.getAttribute('name'),
-				tileWidth: parseInt(tilesetEl.getAttribute('tilewidth')),
-				tileHeight: parseInt(tilesetEl.getAttribute('tileheight')),
-				tileCount: parseInt(tilesetEl.getAttribute('tilecount')),
-				columns: parseInt(tilesetEl.getAttribute('columns')),
+				name: tilesetData.getAttribute('name'),
+				tileWidth: parseInt(tilesetData.getAttribute('tilewidth')),
+				tileHeight: parseInt(tilesetData.getAttribute('tileheight')),
+				tileCount: parseInt(tilesetData.getAttribute('tilecount')),
+				columns: parseInt(tilesetData.getAttribute('columns')),
 				firstgid,
 				tiles: {},
 				imageSource: '',
 				imageWidth: 0,
-				imageHeight: 0,
-				wangSets: []
+				imageHeight: 0
 			};
 
 			// Parse tileset image
-			const imageEl = tilesetEl.querySelector('image');
+			const imageEl = tilesetData.querySelector('image');
 			if (imageEl) {
-				tileset.imageSource = this.resolveTilesetPath(tilesetPath, imageEl.getAttribute('source'));
+				tileset.imageSource = tilesetPath ? 
+					this.resolveTilesetPath(tilesetPath, imageEl.getAttribute('source')) :
+					imageEl.getAttribute('source');
 				tileset.imageWidth = parseInt(imageEl.getAttribute('width'));
 				tileset.imageHeight = parseInt(imageEl.getAttribute('height'));
 			}
 
 			// Parse individual tile properties
-			const tileElements = tilesetEl.querySelectorAll('tile');
+			const tileElements = tilesetData.querySelectorAll('tile');
 			for (const tileEl of tileElements) {
 				const id = parseInt(tileEl.getAttribute('id'));
 				tileset.tiles[id] = {
 					id,
-					properties: this.parseProperties(tileEl.querySelector('properties')),
-					animation: this.parseAnimation(tileEl.querySelector('animation'))
+					properties: this.parseProperties(tileEl.querySelector('properties'))
 				};
-
-				// Parse collision data if present
-				const objectGroupEl = tileEl.querySelector('objectgroup');
-				if (objectGroupEl) {
-					tileset.tiles[id].collision = this.parseCollision(objectGroupEl);
-				}
 			}
 
-			// Parse Wang sets
-			const wangSetElements = tilesetEl.querySelectorAll('wangset');
-			for (const wangSetEl of wangSetElements) {
-				const wangSet = this.parseWangSet(wangSetEl, tileset);
-				tileset.wangSets.push(wangSet);
-				this.wangSets.set(wangSet.name, wangSet);
+			// Cache the tileset if it's external
+			if (tilesetPath) {
+				this.tilesets.set(tilesetPath, tileset);
 			}
-
-			// Cache the tileset
-			this.tilesets.set(tilesetPath, tileset);
 
 			return tileset;
 		} catch (error) {
 			console.error('Error loading tileset:', error);
 			throw error;
 		}
-	}
-
-	parseEmbeddedTileset(tilesetEl, firstgid) {
-		const tileset = {
-			name: tilesetEl.getAttribute('name'),
-			tileWidth: parseInt(tilesetEl.getAttribute('tilewidth')),
-			tileHeight: parseInt(tilesetEl.getAttribute('tileheight')),
-			tileCount: parseInt(tilesetEl.getAttribute('tilecount')),
-			columns: parseInt(tilesetEl.getAttribute('columns')),
-			firstgid,
-			tiles: {},
-			wangSets: []
-		};
-
-		// Parse image
-		const imageEl = tilesetEl.querySelector('image');
-		if (imageEl) {
-			tileset.imageSource = imageEl.getAttribute('source');
-			tileset.imageWidth = parseInt(imageEl.getAttribute('width'));
-			tileset.imageHeight = parseInt(imageEl.getAttribute('height'));
-		}
-
-		// Parse individual tile properties
-		const tileElements = tilesetEl.querySelectorAll('tile');
-		for (const tileEl of tileElements) {
-			const id = parseInt(tileEl.getAttribute('id'));
-			tileset.tiles[id] = {
-				id,
-				properties: this.parseProperties(tileEl.querySelector('properties')),
-				animation: this.parseAnimation(tileEl.querySelector('animation'))
-			};
-
-			// Parse collision data if present
-			const objectGroupEl = tileEl.querySelector('objectgroup');
-			if (objectGroupEl) {
-				tileset.tiles[id].collision = this.parseCollision(objectGroupEl);
-			}
-		}
-
-		// Parse Wang sets
-		const wangSetElements = tilesetEl.querySelectorAll('wangset');
-		for (const wangSetEl of wangSetElements) {
-			const wangSet = this.parseWangSet(wangSetEl, tileset);
-			tileset.wangSets.push(wangSet);
-			this.wangSets.set(wangSet.name, wangSet);
-		}
-
-		return tileset;
 	}
 
 	async parseLayer(layerEl, mapData) {
@@ -444,93 +385,6 @@ class TileMapLoader {
 		return Object.keys(properties).length > 0 ? properties : null;
 	}
 
-	parseAnimation(animationEl) {
-		if (!animationEl) return null;
-
-		const frames = [];
-		const frameElements = animationEl.querySelectorAll('frame');
-
-		for (const frameEl of frameElements) {
-			frames.push({
-				tileid: parseInt(frameEl.getAttribute('tileid')),
-				duration: parseInt(frameEl.getAttribute('duration'))
-			});
-		}
-
-		return frames.length > 0 ? frames : null;
-	}
-
-	parseCollision(objectGroupEl) {
-		const collisionObjects = [];
-		const objectElements = objectGroupEl.querySelectorAll('object');
-
-		for (const objectEl of objectElements) {
-			const x = parseFloat(objectEl.getAttribute('x'));
-			const y = parseFloat(objectEl.getAttribute('y'));
-			const width = parseFloat(objectEl.getAttribute('width') || '0');
-			const height = parseFloat(objectEl.getAttribute('height') || '0');
-
-			const collisionObj = {
-				x,
-				y,
-				width,
-				height
-			};
-
-			// Check for polygon/polyline
-			const polygonEl = objectEl.querySelector('polygon');
-			const polylineEl = objectEl.querySelector('polyline');
-
-			if (polygonEl) {
-				collisionObj.polygon = this.parsePoints(polygonEl.getAttribute('points'));
-			} else if (polylineEl) {
-				collisionObj.polyline = this.parsePoints(polylineEl.getAttribute('points'));
-			}
-
-			collisionObjects.push(collisionObj);
-		}
-
-		return collisionObjects;
-	}
-
-	parseWangSet(wangSetEl, tileset) {
-		const name = wangSetEl.getAttribute('name');
-		const type = wangSetEl.getAttribute('type'); // 'corner' or 'edge'
-
-		const wangSet = {
-			name,
-			type,
-			colors: [],
-			tiles: {}
-		};
-
-		// Parse Wang colors
-		const colorElements = wangSetEl.querySelectorAll('wangcolor');
-		for (const colorEl of colorElements) {
-			wangSet.colors.push({
-				name: colorEl.getAttribute('name'),
-				color: colorEl.getAttribute('color'),
-				tile: parseInt(colorEl.getAttribute('tile') || '-1'),
-				probability: parseFloat(colorEl.getAttribute('probability') || '1')
-			});
-		}
-
-		// Parse Wang tiles
-		const tileElements = wangSetEl.querySelectorAll('wangtile');
-		for (const tileEl of tileElements) {
-			const tileId = parseInt(tileEl.getAttribute('tileid'));
-			const wangId = tileEl.getAttribute('wangid').split(',').map(v => parseInt(v));
-
-			wangSet.tiles[tileId] = {
-				tileId,
-				wangId,
-				globalId: tileId + tileset.firstgid
-			};
-		}
-
-		return wangSet;
-	}
-
 	parsePoints(pointsStr) {
 		if (!pointsStr) return [];
 
@@ -588,13 +442,16 @@ class TileMapLoader {
 		}
 	}
 
+	// OPTIMIZED: Render map using canvas instead of DOM elements
 	renderMap(mapData, container) {
 		if (!mapData || !container) return null;
+
+		// Clear any existing layer canvases
+		this.clearLayerCanvases();
 
 		// Create layers container
 		const layersContainer = document.createElement('div');
 		layersContainer.className = 'layer tile-map';
-
 		container.appendChild(layersContainer);
 
 		const renderedLayers = {};
@@ -603,15 +460,24 @@ class TileMapLoader {
 		for (const layer of mapData.TileData.layers) {
 			if (!layer.visible) continue;
 
-			const layerElement = document.createElement('div');
-			layerElement.className = `tile-layer ${layer.name.toLowerCase().replace(/\s+/g, '-')}`;
-			layerElement.style.opacity = layer.opacity.toString();
+			// Create a canvas for this layer
+			const canvas = document.createElement('canvas');
+			canvas.width = mapData.dimensions.width;
+			canvas.height = mapData.dimensions.height;
+			canvas.className = `tile-layer ${layer.name.toLowerCase().replace(/\s+/g, '-')}`;
+			canvas.style.opacity = layer.opacity.toString();
+			canvas.style.position = 'absolute';
+			canvas.style.top = '0';
+			canvas.style.left = '0';
 
-			// Render tiles
-			this.renderTileLayer(layer, mapData.TileData, layerElement);
+			// Render tiles to canvas
+			this.renderTileLayerToCanvas(layer, mapData.TileData, canvas);
 
-			layersContainer.appendChild(layerElement);
-			renderedLayers[layer.name] = layerElement;
+			layersContainer.appendChild(canvas);
+			renderedLayers[layer.name] = canvas;
+			
+			// Store the canvas for later updates
+			this.layerCanvases.set(layer.name, canvas);
 		}
 
 		return {
@@ -620,45 +486,89 @@ class TileMapLoader {
 		};
 	}
 
-	renderTileLayer(layer, mapData, container) {
+	// Render tile layer to canvas instead of creating DOM elements
+	renderTileLayerToCanvas(layer, mapData, canvas) {
+		const ctx = canvas.getContext('2d');
 		const { tileWidth, tileHeight, width: mapWidth } = mapData;
 
-		layer.data.forEach((gid, index) => {
-			if (gid === 0) return; // Skip empty tiles
-
-			// Calculate tile position
-			const x = (index % mapWidth) * tileWidth;
-			const y = Math.floor(index / mapWidth) * tileHeight;
-
-			// Find tileset for this gid
-			const tilesetInfo = this.findTilesetForGid(gid, mapData.tilesets);
-			if (!tilesetInfo) return;
-
-			// Calculate tile position in the tileset image
-			const localId = gid - tilesetInfo.firstgid;
-			const tilesetColumns = tilesetInfo.columns;
-			const tilesetX = (localId % tilesetColumns) * tileWidth;
-			const tilesetY = Math.floor(localId / tilesetColumns) * tileHeight;
-
-			// Create tile element
-			const tileElement = document.createElement('div');
-			tileElement.className = 'tile';
-			tileElement.style.left = `${x}px`;
-			tileElement.style.top = `${y}px`;
-			tileElement.style.width = `${tileWidth}px`;
-			tileElement.style.height = `${tileHeight}px`;
-			tileElement.style.backgroundImage = `url(${tilesetInfo.imageSource})`;
-			tileElement.style.backgroundPosition = `-${tilesetX}px -${tilesetY}px`;
-
-			container.appendChild(tileElement);
-
-			// Add tile properties as data attributes
-			const tileProperties = this.getTileProperties(gid, mapData.tilesets);
-			if (tileProperties) {
-				for (const [key, value] of Object.entries(tileProperties)) {
-					tileElement.dataset[key] = value.toString();
+		// Create a promise to load all tileset images
+		const loadTilesetImages = async () => {
+			const tilesetImages = new Map();
+			
+			for (const tileset of mapData.tilesets) {
+				if (tileset.imageSource) {
+					// Check if image is already cached by ResourceManager
+					let img = this.parent.parent?.resourceManager?.getSprite(tileset.name);
+					
+					if (!img) {
+						// Load the image if not cached
+						img = await new Promise((resolve) => {
+							const image = new Image();
+							image.onload = () => resolve(image);
+							image.onerror = () => resolve(null);
+							image.src = tileset.imageSource;
+						});
+                        
+						// Cache it for future use if ResourceManager exists
+						if (this.parent.parent?.resourceManager && img) {
+							this.parent.parent.resourceManager.sprites.set(tileset.name, img);
+						}
+					}
+					
+					if (img) {
+						tilesetImages.set(tileset.name, img);
+					}
 				}
 			}
+			
+			return tilesetImages;
+		};
+
+		// Render tiles once images are loaded
+		loadTilesetImages().then(tilesetImages => {
+			// Clear canvas first
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			
+			// Only render the layer if the opacity is visible
+			if (layer.opacity <= 0) return;
+			
+			// Apply layer opacity
+			ctx.globalAlpha = layer.opacity;
+			
+			// Render each tile in the layer
+			layer.data.forEach((gid, index) => {
+				if (gid === 0) return; // Skip empty tiles
+				
+				// Calculate tile position
+				const x = (index % mapWidth) * tileWidth;
+				const y = Math.floor(index / mapWidth) * tileHeight;
+				
+				// Find tileset for this gid
+				const tilesetInfo = this.findTilesetForGid(gid, mapData.tilesets);
+				if (!tilesetInfo) return;
+				
+				// Get the image for this tileset
+				const tilesetImage = tilesetImages.get(tilesetInfo.name);
+				if (!tilesetImage) return;
+				
+				// Calculate tile position in the tileset image
+				const localId = gid - tilesetInfo.firstgid;
+				const tilesetColumns = tilesetInfo.columns;
+				const tilesetX = (localId % tilesetColumns) * tileWidth;
+				const tilesetY = Math.floor(localId / tilesetColumns) * tileHeight;
+				
+				// Draw the tile to canvas
+				ctx.drawImage(
+					tilesetImage,
+					tilesetX, tilesetY,
+					tileWidth, tileHeight,
+					x, y,
+					tileWidth, tileHeight
+				);
+			});
+			
+			// Reset global alpha
+			ctx.globalAlpha = 1;
 		});
 	}
 
@@ -686,110 +596,87 @@ class TileMapLoader {
 		return tileInfo?.properties || null;
 	}
 
-	createCollisionData(mapData, collisionLayerName = 'Collider') {
-		const collisionLayer = mapData.TileData.layers.find(l => l.name === collisionLayerName);
-		if (!collisionLayer) return [];
+	// Creating a background image from the map for the full view
+	async createMapBackgroundUrl(mapData) {
+		try {
+			const { tileWidth, tileHeight, width, height } = mapData.TileData;
+			const { layers, tilesets } = mapData.TileData;
 
-		const colliders = [];
-		const { tileWidth, tileHeight, width: mapWidth } = mapData.TileData;
+			// Create a canvas
+			const canvas = document.createElement('canvas');
+			canvas.width = width * tileWidth;
+			canvas.height = height * tileHeight;
 
-		collisionLayer.data.forEach((gid, index) => {
-			if (gid === 0) return; // Skip empty tiles
+			const ctx = canvas.getContext('2d');
 
-			// Calculate tile position
-			const x = (index % mapWidth) * tileWidth;
-			const y = Math.floor(index / mapWidth) * tileHeight;
-
-			// Create a collider for this tile
-			colliders.push({
-				x,
-				y,
-				width: tileWidth,
-				height: tileHeight,
-				tileId: gid,
-				properties: this.getTileProperties(gid, mapData.TileData.tilesets)
-			});
-		});
-
-		return this.optimizeColliders(colliders);
-	}
-
-	optimizeColliders(colliders) {
-		if (colliders.length <= 1) return colliders;
-
-		// First pass: merge horizontally adjacent colliders of the same height
-		const horizontallyMerged = this.mergeCollidersHorizontally(colliders);
-
-		// Second pass: merge vertically adjacent colliders of the same width
-		const fullyMerged = this.mergeCollidersVertically(horizontallyMerged);
-
-		return fullyMerged;
-	}
-
-	mergeCollidersHorizontally(colliders) {
-		// Sort colliders by y, then x
-		const sorted = [...colliders].sort((a, b) => {
-			if (a.y === b.y) return a.x - b.x;
-			return a.y - b.y;
-		});
-
-		const result = [];
-		let current = { ...sorted[0] };
-
-		for (let i = 1; i < sorted.length; i++) {
-			const next = sorted[i];
-
-			// If the next collider is horizontally adjacent and has the same height and y position
-			if (next.y === current.y &&
-				next.height === current.height &&
-				next.x === current.x + current.width) {
-				// Merge them
-				current.width += next.width;
-			} else {
-				// Add the current merged collider to the result and start a new one
-				result.push(current);
-				current = { ...next };
+			// Load all tileset images
+			const tilesetImages = {};
+			
+			for (const tileset of tilesets) {
+				if (tileset.imageSource) {
+					// First try to get from ResourceManager
+					let img = this.parent.parent?.resourceManager?.getSprite(tileset.name);
+					
+					if (!img) {
+						img = new Image();
+						img.src = tileset.imageSource;
+						await new Promise(resolve => {
+							img.onload = resolve;
+							img.onerror = resolve; // Continue even if image fails to load
+						});
+					}
+					
+					tilesetImages[tileset.name] = img;
+				}
 			}
-		}
 
-		// Add the last collider
-		result.push(current);
+			// Render visible, non-collision layers to the canvas
+			const visibleLayers = layers.filter(
+				layer => layer.visible // && layer.name !== 'Collider'
+			);
 
-		return result;
-	}
+			for (const layer of visibleLayers) {
+				if (layer.opacity < 1) {
+					ctx.globalAlpha = layer.opacity;
+				}
 
-	mergeCollidersVertically(colliders) {
-		// Sort colliders by x, then y
-		const sorted = [...colliders].sort((a, b) => {
-			if (a.x === b.x) return a.y - b.y;
-			return a.x - b.x;
-		});
+				// Render each tile
+				layer.data.forEach((gid, index) => {
+					if (gid === 0) return; // Skip empty tiles
 
-		const result = [];
-		let current = { ...sorted[0] };
+					// Calculate tile position
+					const x = (index % width) * tileWidth;
+					const y = Math.floor(index / width) * tileHeight;
 
-		for (let i = 1; i < sorted.length; i++) {
-			const next = sorted[i];
+					// Find tileset for this gid
+					const tileset = this.findTilesetForGid(gid, tilesets);
+					if (!tileset || !tilesetImages[tileset.name]) return;
 
-			// If the next collider is vertically adjacent and has the same width and x position
-			if (next.x === current.x &&
-				next.width === current.width &&
-				next.y === current.y + current.height) {
-				// Merge them
-				current.height += next.height;
-			} else {
-				// Add the current merged collider to the result and start a new one
-				result.push(current);
-				current = { ...next };
+					// Calculate position in the tileset image
+					const localId = gid - tileset.firstgid;
+					const tilesetColumns = tileset.columns;
+					const tilesetX = (localId % tilesetColumns) * tileWidth;
+					const tilesetY = Math.floor(localId / tilesetColumns) * tileHeight;
+
+					// Draw the tile
+					ctx.drawImage(
+						tilesetImages[tileset.name],
+						tilesetX, tilesetY, tileWidth, tileHeight,
+						x, y, tileWidth, tileHeight
+					);
+				});
+
+				// Reset global alpha
+				ctx.globalAlpha = 1;
 			}
+
+			return canvas.toDataURL('image/png');
+		} catch (e) {
+			console.error('Error creating map background:', e);
+			return null;
 		}
-
-		// Add the last collider
-		result.push(current);
-
-		return result;
 	}
-
+	
 	generateGridData(mapData, gridConfig = {}) {
 		const { tileWidth, tileHeight, width, height } = mapData.TileData;
 		const collisionLayerName = gridConfig.collisionLayer || 'Collider';
@@ -828,14 +715,10 @@ class TileMapLoader {
 					const index = y * width + x;
 					const gid = collisionLayer.data[index];
 
-					
-
 					if (gid !== 0) {
 						// This tile has collision, mark the corresponding grid cells as unwalkable
 						const tileX = x * tileWidth;
 						const tileY = y * tileHeight;
-
-						
 
 						// Mark grid cells covered by this tile
 						this.markGridCellsUnwalkable(grid, tileX, tileY, tileWidth, tileHeight, cellSize);
@@ -851,6 +734,7 @@ class TileMapLoader {
 			cellSize: cellSize
 		};
 	}
+	
 	markGridCellsUnwalkable(grid, tileX, tileY, tileWidth, tileHeight, cellSize) {
 		// Calculate the grid cell range this tile covers
 		const startGridX = Math.floor(tileX / cellSize);
@@ -868,93 +752,6 @@ class TileMapLoader {
 			}
 		}
 	}
-	createMapCanvas(mapData) {
-		const { tileWidth, tileHeight, width, height } = mapData.TileData;
-		const { layers, tilesets } = mapData.TileData;
-
-		// Create a canvas
-		const canvas = document.createElement('canvas');
-		canvas.width = width * tileWidth;
-		canvas.height = height * tileHeight;
-
-		const ctx = canvas.getContext('2d');
-
-		// Load all tileset images
-		const tilesetImages = {};
-		const loadTilesetImages = async () => {
-			for (const tileset of tilesets) {
-				if (tileset.imageSource) {
-					const img = new Image();
-					img.src = tileset.imageSource;
-					await new Promise(resolve => {
-						img.onload = resolve;
-						img.onerror = resolve; // Continue even if image fails to load
-					});
-					tilesetImages[tileset.name] = img;
-				}
-			}
-		};
-
-		// Render layers
-		const renderLayers = () => {
-			// Render only visible, non-collision layers
-			const visibleLayers = layers.filter(
-				layer => layer.visible && layer.name !== 'Collider'
-			);
-
-			for (const layer of visibleLayers) {
-				if (layer.opacity < 1) {
-					ctx.globalAlpha = layer.opacity;
-				}
-
-				// Render each tile
-				layer.data.forEach((gid, index) => {
-					if (gid === 0) return; // Skip empty tiles
-
-					// Calculate tile position
-					const x = (index % width) * tileWidth;
-					const y = Math.floor(index / width) * tileHeight;
-
-					// Find tileset for this gid
-					const tileset = this.findTilesetForGid(gid, tilesets);
-					if (!tileset || !tilesetImages[tileset.name]) return;
-
-					// Calculate position in the tileset image
-					const localId = gid - tileset.firstgid;
-					const tilesetColumns = tileset.columns;
-					const tilesetX = (localId % tilesetColumns) * tileWidth;
-					const tilesetY = Math.floor(localId / tilesetColumns) * tileHeight;
-
-					// Draw the tile
-					ctx.drawImage(
-						tilesetImages[tileset.name],
-						tilesetX, tilesetY, tileWidth, tileHeight,
-						x, y, tileWidth, tileHeight
-					);
-				});
-
-				// Reset global alpha
-				ctx.globalAlpha = 1;
-			}
-		};
-
-		// Return a promise that resolves with the canvas
-		return new Promise(async (resolve) => {
-			await loadTilesetImages();
-			renderLayers();
-			resolve(canvas);
-		});
-	}
-
-	async createMapBackgroundUrl(mapData) {
-		try {
-			const canvas = await this.createMapCanvas(mapData);
-			return canvas.toDataURL('image/png');
-		} catch (e) {
-			console.error('Error creating map background:', e);
-			return null;
-		}
-	}
 	
 	convertToGameMapFormat(TileMapData) {
 		// Create base map structure
@@ -969,7 +766,7 @@ class TileMapLoader {
 			},
 			spawns: TileMapData.spawns,
 			zones: TileMapData.zones || [],
-			objects: [], // Initialize with empty array instead of TileMapData.objects
+			objects: [], // Initialize with empty array
 			TileData: {
 				layers: TileMapData.layers,
 				tilesets: TileMapData.tilesets,
@@ -997,8 +794,39 @@ class TileMapLoader {
 	
 		return gameMapData;
 	}
-
-
-
-
+	
+	// Update existing layer canvases
+	updateLayerCanvas(layerName) {
+		const canvas = this.layerCanvases.get(layerName);
+		if (!canvas) return;
+		
+		// Get the current map data
+		const mapData = this.currentMapData;
+		if (!mapData) return;
+		
+		// Find the layer data
+		const layer = mapData.TileData.layers.find(l => l.name === layerName);
+		if (!layer) return;
+		
+		// Rerender the layer
+		this.renderTileLayerToCanvas(layer, mapData.TileData, canvas);
+	}
+	
+	// Clear all layer canvases
+	clearLayerCanvases() {
+		this.layerCanvases.forEach((canvas, layerName) => {
+			const ctx = canvas.getContext('2d');
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+		});
+	}
+	
+	// Dispose resources
+	dispose() {
+		// Clear canvases
+		this.clearLayerCanvases();
+		this.layerCanvases.clear();
+		
+		// Clear current map data
+		this.currentMapData = null;
+	}
 }

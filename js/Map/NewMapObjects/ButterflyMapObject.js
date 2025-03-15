@@ -1,8 +1,8 @@
 class ButterflyMapObject extends AnimatedMapObject {
-    constructor(type, variant, posX, posY, config = {}, options = {}) {
+    constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
 
         // Call parent constructor
-        super(type, variant, posX, posY, config, options);
+        super(parent, type, variant, posX, posY, config, options);
         
         // Movement properties
         this.velocity = { x: 0, y: 0 };
@@ -41,6 +41,15 @@ class ButterflyMapObject extends AnimatedMapObject {
         
         // Set initial random velocity
         this.initializeVelocity();
+
+        this.parent.particleSystem.addParticleMethodsToObject(this);
+        this.addDustEffect({
+            colors: ['#f0f0ff', '#e8e8ff', '#fffacd'],
+            size: 2,
+            sizeEnd: 4
+        });
+
+
     }
 
     

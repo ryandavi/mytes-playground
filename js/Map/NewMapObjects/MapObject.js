@@ -570,7 +570,7 @@ const TYPE_CONFIGS = {
 };
 
 class MapObject {
-	constructor(type, variant, posX, posY, config = {}) {
+	constructor(parent, type, variant, posX, posY, config = {}) {
 		// Store base identity properties
 		this.type = type;
 		this.variant = variant;
@@ -584,7 +584,7 @@ class MapObject {
 		// Core state
 		this.active = true;
 		this.element = null;
-		this.parent = null;
+		this.parent = parent;
 
 		// Set up size based on config
 		this.size = {
@@ -950,8 +950,6 @@ checkDropValidity(x, y) {
 
 	// Render the object to the container
 	render(container, parent) {
-		this.parent = parent;
-
 		const divElement = document.createElement('div');
 		divElement.classList.add('mapObject', this.variant);
 

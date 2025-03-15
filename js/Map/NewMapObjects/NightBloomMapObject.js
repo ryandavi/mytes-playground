@@ -1,6 +1,6 @@
 class NightBloomMapObject extends BreedingFlowerMapObject {
-    constructor(type, variant, posX, posY, config = {}, options = {}) {
-        super(type, variant, posX, posY, config, options);
+    constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
+        super(parent, type, variant, posX, posY, config, options);
         
         // Bloom state
         this.bloomState = 'closed';

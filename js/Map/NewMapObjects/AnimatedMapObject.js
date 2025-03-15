@@ -1,6 +1,6 @@
 class AnimatedMapObject extends MapObject {
-    constructor(type, variant, posX, posY, config = {}, options = {}) {
-        super(type, variant, posX, posY, config);
+    constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
+        super(parent, type, variant, posX, posY, config, options);
         
         const animConfig = {
             frameWidth: this.getConfig('spriteConfig.frameWidth', this.getConfig('size.width')),

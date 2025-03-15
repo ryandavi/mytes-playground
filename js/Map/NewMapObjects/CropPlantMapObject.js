@@ -1,6 +1,6 @@
 class CropPlantMapObject extends GrowingPlantMapObject {
-    constructor(type, variant, posX, posY, config = {}, options = {}) {
-        super(type, variant, posX, posY, config, options);
+    constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
+        super(parent, type, variant, posX, posY, config, options);
         
         // Harvesting state
         this.harvestable = false;

@@ -48,12 +48,9 @@ class ContainerManager {
             }
 
             // Initialize other components that depend on the map
-            this.setupMytes();
+            
 
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Initializing Mytes...");
-                this.core.loadingManager.updateStageProgress('container', 0.4); // 40% progress
-            }
+
 
             //this.inputHandler.init();
             this.camera = new Camera(this, this.canvas, this.element);
@@ -73,6 +70,13 @@ class ContainerManager {
                 this.core.loadingManager.setMessage("Preparing interface...");
                 this.core.loadingManager.updateStageProgress('container', 0.75); // 75% progress
             }
+
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage("Initializing Mytes...");
+                this.core.loadingManager.updateStageProgress('container', 0.4); // 40% progress
+            }
+
+            this.setupMytes();
 
             // Initialize UI and other subsystems
             this.ui.init();
@@ -557,16 +561,6 @@ class ContainerManager {
         }
 
         this.activeMyte = myte;
-
-
-
-        this.gameMap.particleSystem.createDustEmitter(myte, {
-            colors: ['#e8e8e8', '#d5d5d5', '#c8c8c8'],  // Light gray dust colors
-            size: 4,                                    // Starting size
-            sizeEnd: 7,                                 // Ending size
-            life: 35,                                   // How long particles last
-            count: 2                                    // Particles per emission
-          });
 
 
         if (myte !== null) {

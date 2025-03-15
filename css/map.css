@@ -53,6 +53,7 @@
   width: 800px;
   height: 2000px;
   z-index: 0;
+  background-repeat: no-repeat;
 }
 .container-wrapper > .container > .canvas > .layer.debug {
   z-index: 100;
@@ -85,20 +86,6 @@
 .container-wrapper > .container > .canvas > .layer.debug .debug-collider.walkable-object {
   background-color: rgba(0, 0, 255, 0.2);
   border-color: rgba(0, 0, 255, 0.5);
-}
-.container-wrapper > .container > .canvas > .layer.debug .grid-cell {
-  position: absolute;
-  pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
-  outline: 1px solid rgba(0, 0, 0, 0.05);
-}
-.container-wrapper > .container > .canvas > .layer.debug .grid-cell.walkable {
-  background-color: rgba(0, 255, 0, 0.05);
-}
-.container-wrapper > .container > .canvas > .layer.debug .grid-cell.unwalkable {
-  background-color: rgba(255, 0, 0, 0.1);
 }
 .container-wrapper > .container > .canvas > .layer.debug .path-node {
   position: absolute;
@@ -315,46 +302,34 @@
     opacity: 0;
   }
 }
-.grid-cursor-highlight {
-  background-color: rgba(0, 255, 255, 0.3);
-  border: 1px solid cyan;
-  pointer-events: none;
-  z-index: 1000;
-}
-
-.grid-coords {
+.debug.cursor-tile {
   position: absolute;
-  top: -20px;
-  left: 0;
-  color: cyan;
+  border: 2px solid yellow;
+  background-color: rgba(255, 255, 0, 0.2);
+  cursor: pointer;
+}
+.debug.cursor-tile > .coords {
   font-size: 10px;
+  position: absolute;
+  top: -2em;
   white-space: nowrap;
+  color: white;
 }
-
-.grid-facing-highlight {
-  background-color: rgba(255, 255, 0, 0.5);
-  border: 1px solid gold;
-  pointer-events: none;
-  z-index: 1000;
-}
-
-.grid-facing-highlight.unwalkable {
-  background-color: rgba(255, 0, 0, 0.3);
-  border: 1px solid red;
-}
-
-.drop-target {
-  border: 2px dashed white;
-  pointer-events: none;
-  z-index: 1000;
-}
-
-.drop-target.valid-drop {
-  background-color: rgba(0, 255, 0, 0.2);
-  border-color: lime;
-}
-
-.drop-target.invalid-drop {
+.debug.myte-front-tile {
+  position: absolute;
+  border: 2px solid red;
   background-color: rgba(255, 0, 0, 0.2);
-  border-color: red;
+}
+.debug.grid-cell {
+  position: absolute;
+  border: 1px solid rgba(100, 100, 255, 0.3);
+}
+.debug.grid-cell.unwalkable {
+  background-color: rgba(255, 0, 0, 0.2);
+}
+.debug.grid-cell.tile-unwalkable {
+  background-color: rgba(255, 100, 0, 0.2);
+}
+.debug.grid-cell.object-unwalkable {
+  background-color: rgba(0, 0, 255, 0.2);
 }/*# sourceMappingURL=map.css.map */

@@ -10,33 +10,308 @@ class GridSystem {
             mainGridSize: config.mainGridSize || 64, // Larger grid size (64x64)
             width: parent.dimensions.width || 2000,  // Total width of the map
             height: parent.dimensions.height || 2000, // Total height of the map
-            cullingPadding: config.cullingPadding || 64 // 128 // Extra padding around viewport for culling
+            cullingPadding: config.cullingPadding || 64, // Extra padding around viewport for culling
         };
 
-        this.lastCameraPos = { x: 0, y: 0 }; // Add this line to track position
+        this.lastCameraPos = { x: 0, y: 0 }; // Track position for optimization
 
         // Calculate grid dimensions
         this.gridWidth = Math.ceil(this.parent.dimensions.width / this.config.cellSize);
         this.gridHeight = Math.ceil(this.parent.dimensions.height / this.config.cellSize);
 
-        // Initialize grid cells
-        this.grid = Array(this.gridWidth).fill(null).map(() =>
-            Array(this.gridHeight).fill(null).map(() => ({
-                objects: new Set(),
-                walkable: true,
-                debugElement: null
+        // Initialize grid cells - using arrays instead of Set where possible for performance
+        this.grid = Array(this.gridWidth).fill(null).map((_, x) =>
+            Array(this.gridHeight).fill(null).map((_, y) => ({
+                objects: new Set(), // Still need Set for uniqueness
+                tileWalkable: true, // Base tile walkability (from map data)
+                objectWalkable: true, // Whether objects in this cell allow walking
+                walkable: true, // Combined walkability status
+                // Store cell position and dimensions
+                posX: x * this.config.cellSize,
+                posY: y * this.config.cellSize,
+                width: this.config.cellSize,
+                height: this.config.cellSize
             }))
         );
 
-        // Viewport tracking for culling
-        this.visibleCells = new Set();
-        this.activeObjects = new Set();
+        // Viewport tracking for culling - use arrays for better performance
+        this.visibleCells = [];
+        this.activeObjects = new Set(); // Need Set for uniqueness
 
-        // Debug mode
-        this.debugMode = true;
-        this.enableDebug(this.parent.layers.debug);
+        // OPTIMIZATION: Make debug mode off by default
+        this.debugMode = false;
+
+
+        this.debugElements = {
+            gridCells: [],
+            cursorTile: null,
+            myteFrontTile: null
+        };
+        this.debugInitialized = false;
+
+        this.toggleDebug();
+
+
+
 
     }
+
+
+
+    // New method to initialize debug DOM elements
+    initializeDebugDOM() {
+        if (this.debugInitialized) return;
+
+        console.log("Initializing debug DOM...");
+
+        // Create cursor tile indicator
+        const cursorTile = document.createElement('div');
+        cursorTile.className = 'debug cursor-tile';
+        cursorTile.style.width = `${this.config.cellSize}px`;
+        cursorTile.style.height = `${this.config.cellSize}px`;
+
+        // Add text element for coordinates
+        const cursorCoords = document.createElement('div');
+        cursorCoords.className = 'coords';
+        cursorCoords.innerText = '0, 0';
+        cursorTile.appendChild(cursorCoords);
+
+        this.parent.layers.debug.appendChild(cursorTile);
+        this.debugElements.cursorTile = cursorTile;
+
+        // Create myte front tile indicator
+        const myteFrontTile = document.createElement('div');
+        myteFrontTile.className = 'debug myte-front-tile';
+        myteFrontTile.style.width = `${this.config.cellSize}px`;
+        myteFrontTile.style.height = `${this.config.cellSize}px`;
+
+        this.parent.layers.debug.appendChild(myteFrontTile);
+        this.debugElements.myteFrontTile = myteFrontTile;
+
+        // Create grid cell elements (only for visible area)
+        this.createGridCellElements();
+
+        this.debugInitialized = true;
+
+        // Attach mouse move listener for cursor tile tracking
+        this.parent.parent.element.addEventListener('mousemove', this.handleMouseMove.bind(this));
+    }
+
+    // Create grid cell elements (only create what's visible)
+    createGridCellElements() {
+        // Clear existing grid cells
+        this.debugElements.gridCells.forEach(cell => cell.element.remove());
+        this.debugElements.gridCells = [];
+
+        // Get viewport bounds
+        const viewport = this.parent.parent.getContainerRect();
+        const visibleCellsX = Math.ceil(viewport.width / this.config.cellSize) + 1;
+        const visibleCellsY = Math.ceil(viewport.height / this.config.cellSize) + 1;
+
+        // Limit to a reasonable number to prevent performance issues
+        const maxCells = 1000; // Adjust based on performance testing
+        const totalCells = visibleCellsX * visibleCellsY;
+        const createAll = totalCells <= maxCells;
+
+        // Create cells for visible area only
+        for (let x = 0; x < (createAll ? this.gridWidth : visibleCellsX); x++) {
+            for (let y = 0; y < (createAll ? this.gridHeight : visibleCellsY); y++) {
+                const cellElement = document.createElement('div');
+                cellElement.className = 'debug grid-cell';
+                cellElement.style.width = `${this.config.cellSize - 1}px`;
+                cellElement.style.height = `${this.config.cellSize - 1}px`;
+                cellElement.style.left = `${x * this.config.cellSize}px`;
+                cellElement.style.top = `${y * this.config.cellSize}px`;
+
+                this.parent.layers.debug.appendChild(cellElement);
+
+                this.debugElements.gridCells.push({
+                    element: cellElement,
+                    gridX: x,
+                    gridY: y
+                });
+            }
+        }
+    }
+
+    // Update grid cell positions and visibility
+    updateGridDebug(camera) {
+        if (!this.debugMode || !this.debugInitialized) return;
+
+        // Update grid cells if not showing the entire grid
+        if (this.debugElements.gridCells.length < this.gridWidth * this.gridHeight) {
+            const viewport = this.parent.parent.getContainerRect();
+            const startX = Math.floor(-camera.posX / this.config.cellSize);
+            const startY = Math.floor(-camera.posY / this.config.cellSize);
+
+            this.debugElements.gridCells.forEach((cell, index) => {
+                const x = startX + (index % visibleCellsX);
+                const y = startY + Math.floor(index / visibleCellsX);
+
+                if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
+                    cell.element.style.left = `${x * this.config.cellSize}px`;
+                    cell.element.style.top = `${y * this.config.cellSize}px`;
+                    cell.gridX = x;
+                    cell.gridY = y;
+
+                    // Update cell class based on walkability
+                    this.updateCellClass(cell.element, x, y);
+
+                    cell.element.style.display = 'block';
+                } else {
+                    cell.element.style.display = 'none';
+                }
+            });
+        } else {
+            // Just update classes for full grid view
+            this.debugElements.gridCells.forEach(cell => {
+                const x = cell.gridX;
+                const y = cell.gridY;
+
+                if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
+                    this.updateCellClass(cell.element, x, y);
+                }
+            });
+        }
+    }
+
+    // Helper method to update cell class based on walkability
+    updateCellClass(cellElement, x, y) {
+        // First, remove any existing walkability classes
+        cellElement.classList.remove(
+            'unwalkable',
+            'tile-unwalkable',
+            'object-unwalkable'
+        );
+
+        const gridCell = this.grid[x][y];
+        if (!gridCell.walkable) {
+            cellElement.classList.add('unwalkable');
+        } else if (!gridCell.tileWalkable) {
+            cellElement.classList.add('tile-unwalkable');
+        } else if (!gridCell.objectWalkable) {
+            cellElement.classList.add('object-unwalkable');
+        }
+    }
+
+    // Handle mouse movement to update cursor tile
+    handleMouseMove(event) {
+        if (!this.debugMode || !this.debugInitialized) return;
+
+        // Get mouse position relative to container
+        const containerRect = this.parent.parent.element.getBoundingClientRect();
+        const mouseX = event.clientX - containerRect.left;
+        const mouseY = event.clientY - containerRect.top;
+
+        // Convert to world coordinates
+        const worldX = mouseX - this.parent.parent.camera.posX;
+        const worldY = mouseY - this.parent.parent.camera.posX;
+
+        // Get grid coordinates
+        const gridPos = this.worldToGrid(worldX, worldY);
+
+        // Update cursor tile position
+        if (gridPos.x >= 0 && gridPos.x < this.gridWidth && gridPos.y >= 0 && gridPos.y < this.gridHeight) {
+            const cell = this.grid[gridPos.x][gridPos.y];
+
+            this.debugElements.cursorTile.style.left = `${cell.posX}px`;
+            this.debugElements.cursorTile.style.top = `${cell.posY}px`;
+
+            // Update coordinates text
+            const coordsElement = this.debugElements.cursorTile.querySelector('.coords');
+            coordsElement.innerText = `${gridPos.x}, ${gridPos.y}`;
+
+            // Update color based on walkability
+            if (!cell.walkable) {
+                this.debugElements.cursorTile.style.borderColor = 'red';
+            } else {
+                this.debugElements.cursorTile.style.borderColor = 'yellow';
+            }
+        } else {
+            this.debugElements.cursorTile.style.display = 'none';
+        }
+    }
+
+    // Update the tile in front of a myte based on direction
+    updateMyteFrontTile(myte) {
+        if (!this.debugMode || !this.debugInitialized || !myte) return;
+
+        // Get myte's position and direction
+        const direction = myte.direction || 'down';
+        const myteCenter = {
+            x: myte.posX + myte.size.width / 2,
+            y: myte.posY + myte.size.height / 2
+        };
+
+        // Calculate front tile based on direction
+        let frontTileX = myteCenter.x;
+        let frontTileY = myteCenter.y;
+
+        const tileDistance = this.config.cellSize;
+
+        switch (direction) {
+            case 'up':
+                frontTileY -= tileDistance;
+                break;
+            case 'down':
+                frontTileY += tileDistance;
+                break;
+            case 'left':
+                frontTileX -= tileDistance;
+                break;
+            case 'right':
+                frontTileX += tileDistance;
+                break;
+        }
+
+        // Get grid position
+        const gridPos = this.worldToGrid(frontTileX, frontTileY);
+
+        // Update front tile indicator
+        if (gridPos.x >= 0 && gridPos.x < this.gridWidth && gridPos.y >= 0 && gridPos.y < this.gridHeight) {
+            const cell = this.grid[gridPos.x][gridPos.y];
+
+            this.debugElements.myteFrontTile.style.left = `${cell.posX}px`;
+            this.debugElements.myteFrontTile.style.top = `${cell.posY}px`;
+            this.debugElements.myteFrontTile.style.display = 'block';
+
+            // Update color based on walkability
+            if (!cell.walkable) {
+                this.debugElements.myteFrontTile.style.borderColor = 'darkred';
+                this.debugElements.myteFrontTile.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
+            } else {
+                this.debugElements.myteFrontTile.style.borderColor = 'red';
+                this.debugElements.myteFrontTile.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+            }
+        } else {
+            this.debugElements.myteFrontTile.style.display = 'none';
+        }
+    }
+
+    // Modify the existing toggleDebug method (if it exists) or create a new one
+    toggleDebug() {
+        this.debugMode = !this.debugMode;
+
+        console.log("Toggle debug");
+
+        if (this.debugMode) {
+            if (!this.debugInitialized) {
+                console.log("Initializing debug mode...1");
+                this.initializeDebugDOM();
+            }
+            this.parent.layers.debug.style.display = 'block';
+        } else if (this.parent.layers.debug) {
+            this.parent.layers.debug.style.display = 'none';
+        }
+
+        return this.debugMode;
+    }
+
+
+
+
+
+
 
     // Convert world coordinates to grid coordinates
     worldToGrid(x, y) {
@@ -54,160 +329,93 @@ class GridSystem {
         };
     }
 
-    // Snap world coordinates to grid
-    snapToGrid(x, y, useMainGrid = false) {
-        const gridSize = useMainGrid ? this.config.mainGridSize : this.config.cellSize;
-        return {
-            x: Math.floor(x / gridSize) * gridSize,
-            y: Math.floor(y / gridSize) * gridSize
-        };
-    }
+    // CONSOLIDATED: Unified grid snapping method
+    snapToGrid(x, y, width = 0, height = 0, gridSize = this.config.cellSize, options = {}) {
+        const useCenter = options.useCenter ?? true;
+        const useMainGrid = options.useMainGrid ?? false;
 
-    snapToGridNearest(x, y, width, height, gridSize, useCenter = true) {
-        // If we're using the center point for decision making
+        // If using main grid override the grid size
+        const effectiveGridSize = useMainGrid ? this.config.mainGridSize : gridSize;
+
+        // If width and height are not specified, use a simpler snapping logic
+        if (width === 0 && height === 0) {
+            return {
+                x: Math.floor(x / effectiveGridSize) * effectiveGridSize,
+                y: Math.floor(y / effectiveGridSize) * effectiveGridSize
+            };
+        }
+
+        // For objects with dimensions
+        // Calculate how many grid cells the object spans
+        const cellsWide = Math.ceil(width / effectiveGridSize);
+        const cellsHigh = Math.ceil(height / effectiveGridSize);
+
+        // If using center point for snapping decision
         if (useCenter) {
             const centerX = x + (width / 2);
             const centerY = y + (height / 2);
 
             // Find the nearest grid cell based on the center point
-            const gridX = Math.round(centerX / gridSize) * gridSize;
-            const gridY = Math.round(centerY / gridSize) * gridSize;
+            const gridX = Math.round(centerX / effectiveGridSize) * effectiveGridSize;
+            const gridY = Math.round(centerY / effectiveGridSize) * effectiveGridSize;
 
-            // Adjust back to top-left corner
+            // If the object is smaller than or equal to a cell
+            if (cellsWide <= 1 && cellsHigh <= 1) {
+                // Adjust back to top-left corner
+                return {
+                    x: gridX - (width / 2),
+                    y: gridY - (height / 2)
+                };
+            }
+
+            // For larger objects, we need to center it properly
+            const widthRemainder = width % effectiveGridSize;
+            const heightRemainder = height % effectiveGridSize;
+
+            // Calculate the offset to center the object in the grid cells it occupies
+            const offsetX = widthRemainder > 0 ? (effectiveGridSize - widthRemainder) / 2 : 0;
+            const offsetY = heightRemainder > 0 ? (effectiveGridSize - heightRemainder) / 2 : 0;
+
             return {
-                x: gridX - (width / 2),
-                y: gridY - (height / 2)
+                x: Math.floor(x / effectiveGridSize) * effectiveGridSize + offsetX,
+                y: Math.floor(y / effectiveGridSize) * effectiveGridSize + offsetY
             };
         }
-        // Using the top-left corner and finding the nearest grid
+        // Using the top-left corner
         else {
-            // Calculate the nearest grid position for the top-left corner
-            const gridX = Math.round(x / gridSize) * gridSize;
-            const gridY = Math.round(y / gridSize) * gridSize;
-
-            return { x: gridX, y: gridY };
+            // Find nearest grid position
+            return {
+                x: Math.round(x / effectiveGridSize) * effectiveGridSize,
+                y: Math.round(y / effectiveGridSize) * effectiveGridSize
+            };
         }
     }
 
-    snapToGridOptimal(x, y, width, height, gridSize) {
-        // Calculate how many grid cells the object spans
-        const cellsWide = Math.ceil(width / gridSize);
-        const cellsHigh = Math.ceil(height / gridSize);
-
-        // If the object fits within one cell or is smaller than a cell
-        if (cellsWide <= 1 && cellsHigh <= 1) {
-            return this.snapToGridNearest(x, y, width, height, gridSize);
-        }
-
-        // For objects spanning multiple cells, find the best alignment
-
-        // Calculate remainder of width/height compared to grid
-        const widthRemainder = width % gridSize;
-        const heightRemainder = height % gridSize;
-
-        // Calculate the offset to center the object in the grid cells it occupies
-        const offsetX = widthRemainder > 0 ? (gridSize - widthRemainder) / 2 : 0;
-        const offsetY = heightRemainder > 0 ? (gridSize - heightRemainder) / 2 : 0;
-
-        // Find nearest grid lines for the top-left corner
-        const gridX = Math.round(x / gridSize) * gridSize;
-        const gridY = Math.round(y / gridSize) * gridSize;
-
-        return {
-            x: gridX + offsetX,
-            y: gridY + offsetY
-        };
-    }
-
-    snapToGridWithCollision(x, y, width, height, gridSize, gridSystem) {
-        // First get the optimal position without collision checking
-        let snapped = snapToGridOptimal(x, y, width, height, gridSize);
-
-        // Now check if this position overlaps with any unwalkable cells
-        const startGridX = Math.floor(snapped.x / gridSize);
-        const startGridY = Math.floor(snapped.y / gridSize);
-        const endGridX = Math.ceil((snapped.x + width) / gridSize);
-        const endGridY = Math.ceil((snapped.y + height) / gridSize);
-
-        let hasCollision = false;
-
-        // Check if any of the grid cells the object would occupy are unwalkable
-        for (let gridX = startGridX; gridX < endGridX; gridX++) {
-            for (let gridY = startGridY; gridY < endGridY; gridY++) {
-                // Skip out of bounds cells
-                if (gridX < 0 || gridX >= gridSystem.gridWidth ||
-                    gridY < 0 || gridY >= gridSystem.gridHeight) {
-                    continue;
-                }
-
-                if (!gridSystem.grid[gridX][gridY].walkable) {
-                    hasCollision = true;
-                    break;
-                }
-            }
-            if (hasCollision) break;
-        }
-
-        // If there's a collision, try to find the nearest valid position
-        if (hasCollision) {
-            // This is a simplified approach - you might want to implement
-            // a more sophisticated algorithm to find the best valid position
-            const searchRadius = 1;
-
-            // Try positions in a small radius around the original snapped position
-            for (let offsetX = -searchRadius; offsetX <= searchRadius; offsetX++) {
-                for (let offsetY = -searchRadius; offsetY <= searchRadius; offsetY++) {
-                    if (offsetX === 0 && offsetY === 0) continue; // Skip the original position
-
-                    const testX = snapped.x + offsetX * gridSize;
-                    const testY = snapped.y + offsetY * gridSize;
-
-                    // Check if this position is valid
-                    let testValid = true;
-                    const testStartGridX = Math.floor(testX / gridSize);
-                    const testStartGridY = Math.floor(testY / gridSize);
-                    const testEndGridX = Math.ceil((testX + width) / gridSize);
-                    const testEndGridY = Math.ceil((testY + height) / gridSize);
-
-                    // Check all grid cells this position would occupy
-                    checkValidity:
-                    for (let gridX = testStartGridX; gridX < testEndGridX; gridX++) {
-                        for (let gridY = testStartGridY; gridY < testEndGridY; gridY++) {
-                            // Skip out of bounds cells
-                            if (gridX < 0 || gridX >= gridSystem.gridWidth ||
-                                gridY < 0 || gridY >= gridSystem.gridHeight) {
-                                continue;
-                            }
-
-                            if (!gridSystem.grid[gridX][gridY].walkable) {
-                                testValid = false;
-                                break checkValidity;
-                            }
-                        }
-                    }
-
-                    if (testValid) {
-                        return { x: testX, y: testY };
-                    }
-                }
-            }
-
-            // If no valid position found in the search radius, just return the original
-            // snapped position (or you could implement more complex fallback behavior)
-        }
-
-        return snapped;
-    }
-
-
-
+    // Get all potential colliders for an entity
     getPotentialColliders(entity) {
         // Get all cells that the entity overlaps
         const cells = this.getObjectCells(entity);
-
-        // Collect all unique objects from these cells (except the entity itself)
         const potentialColliders = new Set();
+
         cells.forEach(cell => {
+            // If the cell itself is not walkable due to tile data
+            if (!cell.tileWalkable) {
+                // Add the cell itself as a collider
+                potentialColliders.add({
+                    posX: cell.posX,
+                    posY: cell.posY,
+                    size: {
+                        width: cell.width,
+                        height: cell.height
+                    },
+                    config: {
+                        walkable: false
+                    },
+                    isTileCollider: true // Flag to identify as tile collider
+                });
+            }
+
+            // Add non-walkable objects from the cell
             cell.objects.forEach(obj => {
                 if (obj !== entity && !obj.config.walkable) {
                     potentialColliders.add(obj);
@@ -218,11 +426,7 @@ class GridSystem {
         return Array.from(potentialColliders);
     }
 
-
-
-
-
-    // Get all cells that an object occupies
+    // OPTIMIZATION: Improved boundary checking for object cells
     getObjectCells(obj) {
         const startGrid = this.worldToGrid(obj.posX, obj.posY);
         const endGrid = this.worldToGrid(
@@ -231,11 +435,9 @@ class GridSystem {
         );
 
         const cells = new Set();
-        for (let x = startGrid.x; x < endGrid.x; x++) {
-            for (let y = startGrid.y; y < endGrid.y; y++) {
-                if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
-                    cells.add(this.grid[x][y]);
-                }
+        for (let x = Math.max(0, startGrid.x); x <= Math.min(endGrid.x, this.gridWidth - 1); x++) {
+            for (let y = Math.max(0, startGrid.y); y <= Math.min(endGrid.y, this.gridHeight - 1); y++) {
+                cells.add(this.grid[x][y]);
             }
         }
         return cells;
@@ -244,66 +446,88 @@ class GridSystem {
     // Add object to grid
     addObject(obj) {
         const cells = this.getObjectCells(obj);
-
-        console.log(cells);
         cells.forEach(cell => {
             cell.objects.add(obj);
+
+            // Update object walkability
             if (!obj.config.walkable) {
-                cell.walkable = false;
+                cell.objectWalkable = false;
             }
+
+            // Update combined walkability
+            cell.walkable = cell.tileWalkable && cell.objectWalkable;
         });
     }
 
-    // Remove object from grid
+    // Remove object from grid - optimized to use pre-computed cells
     removeObject(obj) {
         const cells = this.getObjectCells(obj);
         cells.forEach(cell => {
             cell.objects.delete(obj);
-            // Recalculate walkable status
-            cell.walkable = Array.from(cell.objects).every(obj => obj.config.walkable);
+
+            // Only recalculate walkable if removing a non-walkable object
+            if (!obj.config.walkable) {
+                // Recalculate objectWalkable status - use Array.from only once
+                const objects = Array.from(cell.objects);
+                cell.objectWalkable = objects.every(o => o.config.walkable);
+
+                // Update combined walkability
+                cell.walkable = cell.tileWalkable && cell.objectWalkable;
+            }
         });
     }
 
-    // Update object's position in grid
+    // SIMPLIFIED: Update object's position in grid
     updateObjectPosition(obj, oldX, oldY) {
-        // Remove from old cells
-        const oldStartGrid = this.worldToGrid(oldX, oldY);
-        const oldEndGrid = this.worldToGrid(
-            oldX + obj.size.width,
-            oldY + obj.size.height
-        );
-
-        for (let x = oldStartGrid.x; x <= oldEndGrid.x; x++) {
-            for (let y = oldStartGrid.y; y <= oldEndGrid.y; y++) {
-                if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
-                    this.grid[x][y].objects.delete(obj);
-                }
-            }
+        // Skip if position hasn't changed significantly
+        if (Math.abs(oldX - obj.posX) < 1 && Math.abs(oldY - obj.posY) < 1) {
+            return;
         }
 
-        // Add to new cells
+        // Simple approach: remove from grid and re-add
+        this.removeObject(obj);
         this.addObject(obj);
-    }
-
-    // Get objects in a specific cell
-    getObjectsInCell(gridX, gridY) {
-        if (gridX >= 0 && gridX < this.gridWidth &&
-            gridY >= 0 && gridY < this.gridHeight) {
-            return Array.from(this.grid[gridX][gridY].objects);
-        }
-        return [];
     }
 
     // Get objects in an area
     getObjectsInArea(x, y, width, height) {
-        const startGrid = this.worldToGrid(x, y);
-        const endGrid = this.worldToGrid(x + width, y + height);
+        // OPTIMIZATION: Fast bounds checking
+        if (x >= this.parent.dimensions.width ||
+            y >= this.parent.dimensions.height ||
+            x + width <= 0 ||
+            y + height <= 0) {
+            return [];
+        }
+
+        const startGrid = this.worldToGrid(Math.max(0, x), Math.max(0, y));
+        const endGrid = this.worldToGrid(
+            Math.min(x + width, this.parent.dimensions.width - 1),
+            Math.min(y + height, this.parent.dimensions.height - 1)
+        );
 
         const objects = new Set();
         for (let gridX = startGrid.x; gridX <= endGrid.x; gridX++) {
             for (let gridY = startGrid.y; gridY <= endGrid.y; gridY++) {
                 if (gridX >= 0 && gridX < this.gridWidth &&
                     gridY >= 0 && gridY < this.gridHeight) {
+
+                    // If the cell isn't walkable due to tile data, add a virtual collider
+                    if (!this.grid[gridX][gridY].tileWalkable) {
+                        objects.add({
+                            posX: this.grid[gridX][gridY].posX,
+                            posY: this.grid[gridX][gridY].posY,
+                            size: {
+                                width: this.grid[gridX][gridY].width,
+                                height: this.grid[gridX][gridY].height
+                            },
+                            config: {
+                                walkable: false
+                            },
+                            isTileCollider: true
+                        });
+                    }
+
+                    // Add all regular objects
                     this.grid[gridX][gridY].objects.forEach(obj => objects.add(obj));
                 }
             }
@@ -311,12 +535,11 @@ class GridSystem {
         return Array.from(objects);
     }
 
-    // Update culling based on camera viewport
+    // OPTIMIZATION: Simplified culling system
     updateCulling(camera) {
+        // Only update culling if camera moved significantly
+        const moveThreshold = this.config.cellSize / 4; // 1/4 of a cell
 
-        // Check if camera has moved
-        const moveThreshold = 0;
-        // Check if camera has moved more than the threshold
         if (Math.abs(camera.posX - this.lastCameraPos.x) < moveThreshold &&
             Math.abs(camera.posY - this.lastCameraPos.y) < moveThreshold) {
             return; // Skip update if camera movement is below threshold
@@ -326,165 +549,48 @@ class GridSystem {
         this.lastCameraPos.x = camera.posX;
         this.lastCameraPos.y = camera.posY;
 
-        // Rest of your existing updateCulling code
+        // Get viewport bounds with padding
         const viewport = this.parent.parent.getContainerRect();
         const pad = this.config.cullingPadding;
 
         const bounds = {
-            left: -camera.posX - pad,
-            top: -camera.posY - pad,
-            right: -camera.posX + viewport.width + pad,
-            bottom: -camera.posY + viewport.height + pad
+            left: Math.max(0, -camera.posX - pad),
+            top: Math.max(0, -camera.posY - pad),
+            right: Math.min(this.parent.dimensions.width, -camera.posX + viewport.width + pad),
+            bottom: Math.min(this.parent.dimensions.height, -camera.posY + viewport.height + pad)
         };
 
         // Convert to grid coordinates
         const startGrid = this.worldToGrid(bounds.left, bounds.top);
         const endGrid = this.worldToGrid(bounds.right, bounds.bottom);
 
-        // Update visible cells
-        this.visibleCells.clear();
+        // Clear previously visible cells and active objects
+        this.visibleCells = [];
         this.activeObjects.clear();
 
+        // Gather visible cells and active objects
         for (let x = startGrid.x; x <= endGrid.x; x++) {
             for (let y = startGrid.y; y <= endGrid.y; y++) {
                 if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
                     const cell = this.grid[x][y];
-                    this.visibleCells.add(cell);
-                    cell.objects.forEach(obj => this.activeObjects.add(obj));
+                    this.visibleCells.push(cell);
+
+                    // Add objects to active set
+                    cell.objects.forEach(obj => {
+                        this.activeObjects.add(obj);
+                    });
                 }
             }
         }
 
-        if (this.debugMode) {
-            this.updateDebugVisuals();
-        }
-    }
 
-    // Add this method to GridSystem class
-    highlightCursorGrid(mouseX, mouseY) {
-        const gridPos = this.worldToGrid(mouseX, mouseY);
-
-        // Remove any previous cursor highlight
-        const oldHighlight = this.parent.layers.debug.querySelector('.grid-cursor-highlight');
-        if (oldHighlight) oldHighlight.remove();
-
-        // Create new highlight
-        const highlight = document.createElement('div');
-        highlight.className = 'grid-cell grid-cursor-highlight debug';
-
-        // Position at grid cell
-        const cellPos = this.gridToWorld(gridPos.x, gridPos.y);
-        highlight.style.left = `${gridPos.x * this.config.cellSize}px`;
-        highlight.style.top = `${gridPos.y * this.config.cellSize}px`;
-        highlight.style.width = `${this.config.cellSize}px`;
-        highlight.style.height = `${this.config.cellSize}px`;
-
-        // Add coordinates text
-        highlight.innerHTML = `<span class="grid-coords">${gridPos.x},${gridPos.y}</span>`;
-
-        this.parent.layers.debug.appendChild(highlight);
-        return gridPos;
-    }
-
-
-
-    // Add this method to GridSystem class
-    highlightFacingTiles(myte, count = 3) {
-        // Remove previous facing highlights
-        const oldHighlights = this.parent.layers.debug.querySelectorAll('.grid-facing-highlight');
-        oldHighlights.forEach(h => h.remove());
-
-        // Get direction vectors based on myte direction
-        let dx = 0, dy = 0;
-        switch (myte.direction) {
-            case 'N': dy = -1; break;
-            case 'S': dy = 1; break;
-            case 'E': dx = 1; break;
-            case 'W': dx = -1; break;
-            case 'NE': dx = 1; dy = -1; break;
-            case 'NW': dx = -1; dy = -1; break;
-            case 'SE': dx = 1; dy = 1; break;
-            case 'SW': dx = -1; dy = 1; break;
-            default: return; // No valid direction
+        if (this.debugMode && this.debugInitialized) {
+            this.updateGridDebug(camera);
         }
 
-        // Get myte's current grid position
-        const myteGridPos = this.worldToGrid(myte.posX + myte.size.width / 2, myte.posY + myte.size.height / 2);
-
-        // Highlight tiles in facing direction
-        for (let i = 1; i <= count; i++) {
-            const gridX = myteGridPos.x + (dx * i);
-            const gridY = myteGridPos.y + (dy * i);
-
-            // Skip if out of bounds
-            if (gridX < 0 || gridX >= this.gridWidth || gridY < 0 || gridY >= this.gridHeight) continue;
-
-            const highlight = document.createElement('div');
-            highlight.className = 'grid-cell grid-facing-highlight debug';
-
-            // More intense color for closer tiles
-            const opacity = 0.8 - ((i - 1) * 0.2);
-            highlight.style.opacity = opacity;
-
-            highlight.style.left = `${gridX * this.config.cellSize}px`;
-            highlight.style.top = `${gridY * this.config.cellSize}px`;
-            highlight.style.width = `${this.config.cellSize}px`;
-            highlight.style.height = `${this.config.cellSize}px`;
-
-            // Add walkable/unwalkable indicator
-            if (!this.grid[gridX][gridY].walkable) {
-                highlight.classList.add('unwalkable');
-            }
-
-            this.parent.layers.debug.appendChild(highlight);
-        }
     }
 
-
-
-    // Debug visualization methods
-    enableDebug(container) {
-        this.debugMode = true;
-        this.parent.layers.debug = container;
-        this.createDebugGrid();
-
-    }
-
-    disableDebug() {
-        this.debugMode = false;
-        if (this.parent.layers.debug) {
-            this.grid.forEach(row => {
-                row.forEach(cell => {
-                    if (cell.debugElement) {
-                        cell.debugElement.remove();
-                        cell.debugElement = null;
-                    }
-                });
-            });
-        }
-    }
-
-    createDebugGrid() {
-        if (!this.parent.layers.debug) return;
-
-        for (let x = 0; x < this.gridWidth; x++) {
-            for (let y = 0; y < this.gridHeight; y++) {
-                const cell = this.grid[x][y];
-                const element = document.createElement('div');
-                element.className = 'grid-cell debug';
-
-                element.style.left = `${x * this.config.cellSize}px`;
-                element.style.top = `${y * this.config.cellSize}px`;
-                element.style.width = `${this.config.cellSize}px`;
-                element.style.height = `${this.config.cellSize}px`;
-
-                this.parent.layers.debug.appendChild(element);
-                cell.debugElement = element;
-            }
-        }
-    }
-
-
+    // OPTIMIZATION: Efficient grid update from tile map data
     updateFromTileGrid(tileGridData) {
         if (!tileGridData || !tileGridData.grid) {
             console.warn('Invalid tile grid data provided');
@@ -493,12 +599,17 @@ class GridSystem {
 
         console.log('Updating grid system from tile data');
 
-        // Store the original objects temporarily
-        const objectsByCell = {};
-        for (let x = 0; x < this.gridWidth; x++) {
-            for (let y = 0; y < this.gridHeight; y++) {
+        // Store objects by their position for later restoration
+        const objectsByPosition = new Map();
+
+        // Only store objects from grid cells that will be affected
+        const dataWidth = Math.min(tileGridData.width, this.gridWidth);
+        const dataHeight = Math.min(tileGridData.height, this.gridHeight);
+
+        for (let x = 0; x < dataWidth; x++) {
+            for (let y = 0; y < dataHeight; y++) {
                 if (this.grid[x][y].objects.size > 0) {
-                    objectsByCell[`${x},${y}`] = Array.from(this.grid[x][y].objects);
+                    objectsByPosition.set(`${x},${y}`, Array.from(this.grid[x][y].objects));
                 }
             }
         }
@@ -508,70 +619,61 @@ class GridSystem {
             this.gridWidth = tileGridData.width;
             this.gridHeight = tileGridData.height;
 
-            // Rebuild the grid with new dimensions
-            this.grid = Array(this.gridWidth).fill(null).map(() =>
-                Array(this.gridHeight).fill(null).map(() => ({
+            // Create new grid with updated dimensions
+            this.grid = Array(this.gridWidth).fill(null).map((_, x) =>
+                Array(this.gridHeight).fill(null).map((_, y) => ({
                     objects: new Set(),
+                    tileWalkable: true,
+                    objectWalkable: true,
                     walkable: true,
-                    debugElement: null
+                    posX: x * this.config.cellSize,
+                    posY: y * this.config.cellSize,
+                    width: this.config.cellSize,
+                    height: this.config.cellSize
                 }))
             );
-
-            // Create new debug visualizations if needed
-            if (this.debugMode && this.parent.layers.debug) {
-                this.disableDebug();
-                this.enableDebug(this.parent.layers.debug);
-            }
         }
 
         // Update walkability from tile grid
-        for (let x = 0; x < this.gridWidth; x++) {
-            for (let y = 0; y < this.gridHeight; y++) {
+        for (let x = 0; x < dataWidth; x++) {
+            for (let y = 0; y < dataHeight; y++) {
                 if (x < tileGridData.grid.length && y < tileGridData.grid[x].length) {
-                    // Update walkability based on tile data
-                    this.grid[x][y].walkable = tileGridData.grid[x][y].walkable;
+                    // Update base tile walkability from tile data
+                    this.grid[x][y].tileWalkable = tileGridData.grid[x][y].walkable;
+
+                    // Update combined walkability
+                    this.grid[x][y].walkable = this.grid[x][y].tileWalkable && this.grid[x][y].objectWalkable;
                 }
             }
         }
 
-        // Restore objects to their cells
-        for (const key in objectsByCell) {
+        // Restore objects to their cells and update walkability
+        objectsByPosition.forEach((objects, key) => {
             const [x, y] = key.split(',').map(Number);
+
             if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
-                const objects = objectsByCell[key];
-                objects.forEach(obj => {
+                // Clear existing objects to avoid duplicates
+                this.grid[x][y].objects.clear();
+                this.grid[x][y].objectWalkable = true; // Reset object walkability
+
+                // Add each object back
+                for (const obj of objects) {
                     this.grid[x][y].objects.add(obj);
 
-                    // Update walkability based on objects
+                    // Update walkability for objects that affect it
                     if (!obj.config.walkable) {
-                        this.grid[x][y].walkable = false;
-                    }
-                });
-            }
-        }
-
-        // Update debug visualization if enabled
-        if (this.debugMode) {
-            this.updateDebugVisuals();
-        }
-
-        console.log(`Grid system updated from tile grid: ${this.gridWidth}x${this.gridHeight} cells`);
-    }
-
-
-    updateDebugVisuals() {
-        if (!this.debugMode) return;
-
-        this.grid.forEach(row => {
-            row.forEach(cell => {
-                if (cell.debugElement) {
-                    cell.debugElement.classList.remove('walkable', 'unwalkable');
-                    if (this.visibleCells.has(cell)) {
-                        cell.debugElement.classList.add(cell.walkable ? 'walkable' : 'unwalkable');
+                        this.grid[x][y].objectWalkable = false;
                     }
                 }
-            });
+
+                // Update combined walkability
+                this.grid[x][y].walkable = this.grid[x][y].tileWalkable && this.grid[x][y].objectWalkable;
+            }
         });
+
+        // Force culling update
+        this.lastCameraPos = { x: -9999, y: -9999 }; // Force update by using an invalid position
+
+        console.log(`Grid system updated: ${this.gridWidth}x${this.gridHeight} cells`);
     }
 }
-

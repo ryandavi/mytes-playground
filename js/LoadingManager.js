@@ -17,7 +17,7 @@ class LoadingManager {
         
         // Debug options
         this.debugOptions = {
-            skipLoading: false,         // Set to true to skip loading screen
+            skipLoading: true,         // Set to true to skip loading screen
             fastLoading: false,         // Set to true for accelerated loading
             logMessages: true,           // Show debug logs for messages
 			dontHide: false,

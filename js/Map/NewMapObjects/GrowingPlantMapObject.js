@@ -1,6 +1,6 @@
 class GrowingPlantMapObject extends AnimatedMapObject {
-    constructor(type, variant, posX, posY, config = {}, options = {}) {
-        super(type, variant, posX, posY, config, options);
+    constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
+        super(parent, type, variant, posX, posY, config, options);
         
         // Growth state
         this.growthStage = this.getConfig('defaultStage', 'seed');

@@ -1,5 +1,5 @@
 class PatrolGuardMapObject extends MovingMapObject {
-    constructor(type, variant, posX, posY, config = {}, options = {}) {
+    constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         // Check for required patrol points
         if (!options.patrolPoints || options.patrolPoints.length === 0) {
             console.warn('PatrolGuard requires patrol points. Using default position as fallback.');
@@ -7,7 +7,7 @@ class PatrolGuardMapObject extends MovingMapObject {
         }
         
         // Call parent constructor
-        super(type, variant, posX, posY, config, options);
+        super(parent, type, variant, posX, posY, config, options);
         
         // Patrol state
         this.currentPointIndex = 0;

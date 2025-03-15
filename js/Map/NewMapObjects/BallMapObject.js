@@ -1,9 +1,9 @@
 class BallMapObject extends AnimatedMapObject {
-    constructor(type, variant, posX, posY, config = {}, options = {}) {
+    constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         // Ensure we have proper configuration for animation
 
         // Call parent constructor
-        super(type, variant, posX, posY, config, options);
+        super(parent, type, variant, posX, posY, config, options);
 
         // Physics properties
         this.velocity = { x: 0, y: 0 };

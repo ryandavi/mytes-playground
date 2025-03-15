@@ -1,7 +1,7 @@
 
 class BaseMapObject {
 
-    constructor(type, variant, posX, posY) {
+    constructor(parent, type, variant, posX, posY) {
         this.type = type;
         this.variant = variant;
         this.posX = posX;
@@ -16,7 +16,7 @@ class BaseMapObject {
 }
 
 class DroppedMapItem {
-    constructor(type, variant, posX, posY) {
+    constructor(parent, type, variant, posX, posY) {
         // Store base identity properties
         this.type = type;
         this.variant = variant;
