@@ -727,7 +727,7 @@ class SoundManager {
 
 
 			// UI sounds for battery and item interactions
-			"ui_battery_charging": {
+			"myte_battery_charging": {
 				type: "ui",
 				create: () => {
 				const synth = new Tone.Synth({
@@ -748,7 +748,50 @@ class SoundManager {
 				}
 			},
 			
-			"ui_battery_empty": {
+"myte_battery_depleting": {
+  type: "ui",
+  create: () => {
+    const synth = new Tone.Synth({
+      oscillator: { type: "triangle" },
+      envelope: {
+        attack: 0.01,
+        decay: 0.2,
+        sustain: 0.1,
+        release: 0.3
+      }
+    }).toDestination();
+    // Gentle warning sound - not alarming but noticeable
+    return {
+      synth,
+      notes: ["A4", "F4"],
+      durations: ["16n", "8n"]
+    };
+  }
+},
+
+
+"myte_battery_full": {
+  type: "ui",
+  create: () => {
+    const synth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: "sine" },
+      envelope: {
+        attack: 0.02,
+        decay: 0.1,
+        sustain: 0.2,
+        release: 0.4
+      }
+    }).toDestination();
+    // Cheerful completion sound
+    return {
+      synth,
+      notes: ["C5", "E5", "G5", "C6"],
+      durations: ["16n", "16n", "16n", "8n"]
+    };
+  }
+},
+
+			"myte_battery_empty": {
 				type: "ui",
 				create: () => {
 				const synth = new Tone.Synth({
@@ -2135,6 +2178,29 @@ class SoundManager {
 	}
 
 	playMyteSound(action, options = {}) {
+
+
+		const soundId = `myte_${action.toLowerCase()}`;
+
+		// Prevent rapid UI sound triggering
+		const now = Date.now();
+		const lastPlayed = this.lastPlayTimes.get('myte_any') || 0;
+		if (now - lastPlayed < this.minTimeBetweenSounds * 2) {
+			return;
+		}
+		this.lastPlayTimes.set('myte_any', now);
+
+		if (this.synthPresets[soundId]) {
+			try {
+				this.play(soundId);
+			} catch (error) {
+				console.warn(`Error playing Myte sound ${soundId}:`, error.message);
+			}
+		}
+
+
+
+		return;
 		if (!this.initialized || !this.soundEnabled) return;
 
 		// Get species voice profile (or default if not found)

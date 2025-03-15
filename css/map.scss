@@ -46,6 +46,19 @@
 				top: 0;
 				left: 0;
 
+				&.tile-map {
+					>.tile-layer {
+						position: absolute;
+						top: 0;
+						left: 0;
+						width: 100%;
+						height: 100%;
+						>.tile {
+							position: absolute;
+						}
+					}
+				}
+
 
 				&.background {
 
@@ -167,10 +180,10 @@
 				&.foreground {
 					z-index: 1;
 					padding: 15px;
-					width: 500px;
-					height: 500px;
-					min-width: unset;
-					min-height: unset;
+					// width: auto;
+					// height: auto;
+					// min-width: auto;
+					// min-height: auto;
 				}
 
 				&.effects {
@@ -209,6 +222,131 @@
 	>.container {
 		>.canvas {
 			>.layer {
+
+
+				>.mapObject {
+					position: fixed;
+					pointer-events: none;
+
+					.sway {
+						animation-delay: inherit;
+						transform-origin: bottom;
+						animation: sway 5s ease-in-out infinite;
+					}
+
+					>.sprite {
+						position: absolute;
+						top: 0;
+						left: 0;
+						width: 100%;
+						height: 100%;
+						image-rendering: pixelated;
+						pointer-events: none;
+						user-select: none;
+
+						>.front, .back {
+							position: absolute;
+							top: 0;
+							left: 0;
+							width: 100%;
+							height: 100%;
+							image-rendering: pixelated;
+						}
+
+					}
+
+					&.interactive {
+						pointer-events: all;
+						cursor: pointer;
+					}
+
+					>.interactive-collider {
+						pointer-events: all;
+						outline: 1px solid red;
+						position: absolute;
+						top: 0;
+						left: 0;
+						width: 100%;
+						height: 100%;
+						image-rendering: pixelated;
+					}
+
+					&.selected {
+						outline: 2px dashed green;
+						border-radius: 5px;
+					}
+
+					&.draggable {
+						cursor: grab;
+					}
+
+					&.dragging {
+						pointer-events: none;
+						user-select: none;
+						cursor: grab;
+						z-index: 100000 !important;
+
+						>.sprite {
+							animation-name: wiggle2;
+							animation-duration: 0.6s;
+							animation-iteration-count: infinite;
+							transform-origin: 50% 65%;
+							animation-timing-function: ease-in-out;
+							filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
+							will-change: transform;
+						}
+					}
+
+
+					// light object
+					&.light-object {
+						&[data-state="on"] {
+							/* Add glow effect when on */
+							filter: drop-shadow(0 0 5px rgba(255, 200, 100, 0.5));
+						}
+
+						&[data-state="off"] {
+							/* Darker appearance when off */
+							filter: brightness(0.7);
+						}
+					}
+
+					// fountain
+					&.fountain {
+						transition: filter 0.3s ease;
+
+						&[data-active="true"] {
+							filter: drop-shadow(0 0 5px rgba(100, 200, 255, 0.3));
+						}
+
+						&[data-active="false"] {
+							filter: brightness(0.8);
+						}
+					}
+
+					&.animated-map-object {
+						&.butterfly {
+							&.blue {
+								> .sprite {
+									filter: hue-rotate(156deg);
+								}
+							}
+
+							&.green {
+								> .sprite {
+								filter: hue-rotate(60deg);
+								}
+							}
+
+							&.purple {
+								> .sprite {
+								filter: hue-rotate(270deg);
+								}
+							}
+						}
+					}
+				}
+
 				>.dropped-item {
 					position: absolute;
 					width: 16px;
@@ -244,167 +382,8 @@
 					}
 				}
 
-				>.mapObject {
-					position: absolute;
-					pointer-events: none;
-
-					.sway {
-						animation-delay: inherit;
-						transform-origin: bottom;
-						animation: sway 5s ease-in-out infinite;
-					}
-
-					>.sprite {
-						position: absolute;
-						top: 0;
-						left: 0;
-						width: 100%;
-						height: 100%;
-						image-rendering: pixelated;
-
-						>.front, .back {
-							position: absolute;
-							top: 0;
-							left: 0;
-							width: 100%;
-							height: 100%;
-							image-rendering: pixelated;
-						}
-
-					}
-
-					&.interactable {
-						pointer-events: all;
-						cursor: pointer;
-					}
-
-					&.selected {
-						outline: 2px dashed green;
-						border-radius: 5px;
-					}
-
-					&.draggable {
-						cursor: grab;
-					}
-
-					&.dragging {
-						pointer-events: none;
-						user-select: none;
-						cursor: grab;
-						z-index: 100000 !important;
-
-						>.sprite {
-							animation-name: wiggle2;
-							animation-duration: 0.6s;
-							animation-iteration-count: infinite;
-							transform-origin: 50% 65%;
-							animation-timing-function: ease-in-out;
-							filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
-							will-change: transform;
-						}
-					}
-
-					// crop plant
-					&.crop-plant {
 
 
-						>.sprite {
-							// --n: 2;
-							// background-size: calc(192px * var(--n)) calc(32px * var(--n));
-
-							background: {
-								image: url('../images/MapObjects/crop_corn.gif');
-							}
-						}
-
-					}
-
-					// bed
-					&.bed_long {
-						>.sprite {
-							background: {
-								image: url('../images/MapObjects/bed_big_long.png');
-							}
-						}
-					}
-
-					// butterfly
-					&.blue_butterfly,
-					&.guard {
-
-						>.sprite {
-							background: {
-								image: url('../images/MapObjects/butterfly.png');
-							}
-						}
-
-					}
-
-					&.ball {
-						>.sprite {
-								background: {
-								image: url('../images/MapObjects/ball.gif');
-							}
-						}
-					}
-
-					// treasure chest
-					&.treasure-chest {
-
-
-						>.sprite {
-							--n: 2;
-							background-size: calc(192px * var(--n)) calc(32px * var(--n));
-							image-rendering: pixelated;
-
-							background: {
-								image: url('../images/chest_spritesheet.png');
-							}
-						}
-					}
-
-					// light object
-					&.light-object {
-						&[data-state="on"] {
-							/* Add glow effect when on */
-							filter: drop-shadow(0 0 5px rgba(255, 200, 100, 0.5));
-						}
-
-						&[data-state="off"] {
-							/* Darker appearance when off */
-							filter: brightness(0.7);
-						}
-					}
-
-					// fountain
-					&.fountain {
-						transition: filter 0.3s ease;
-
-						&[data-active="true"] {
-							filter: drop-shadow(0 0 5px rgba(100, 200, 255, 0.3));
-						}
-
-						&[data-active="false"] {
-							filter: brightness(0.8);
-						}
-					}
-
-					&.animated-map-object {
-						&.butterfly {
-							&.blue {
-								filter: hue-rotate(156deg);
-							}
-
-							&.green {
-								filter: hue-rotate(60deg);
-							}
-
-							&.purple {
-								filter: hue-rotate(270deg);
-							}
-						}
-					}
-				}
 			}
 		}
 	}
@@ -418,9 +397,6 @@
 	will-change: transform, opacity;
 }
 
-
-
-
 // Animation keyframes
 @keyframes collect {
 	0% {
@@ -432,4 +408,57 @@
 		transform: scale(0) translateY(-20px);
 		opacity: 0;
 	}
+}
+
+
+
+
+
+
+
+
+
+
+.grid-cursor-highlight {
+    background-color: rgba(0, 255, 255, 0.3);
+    border: 1px solid cyan;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.grid-coords {
+    position: absolute;
+    top: -20px;
+    left: 0;
+    color: cyan;
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+.grid-facing-highlight {
+    background-color: rgba(255, 255, 0, 0.5);
+    border: 1px solid gold;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.grid-facing-highlight.unwalkable {
+    background-color: rgba(255, 0, 0, 0.3);
+    border: 1px solid red;
+}
+
+.drop-target {
+    border: 2px dashed white;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.drop-target.valid-drop {
+    background-color: rgba(0, 255, 0, 0.2);
+    border-color: lime;
+}
+
+.drop-target.invalid-drop {
+    background-color: rgba(255, 0, 0, 0.2);
+    border-color: red;
 }

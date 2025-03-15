@@ -30,31 +30,46 @@ class GameMap {
         this.zones = new Map();
         this.spawnPoints = new Map();
 
+
+
     }
+
 
     async initialize() {
         try {
 
-            // Set canvas dimensions
-            // this.parent.canvas.style.width = `${this.dimensions.width}px`;
-            // this.parent.canvas.style.height = `${this.dimensions.height}px`;
+            try {
+                // Ensure tileMapLoader exists
+                if (!this.tileMapLoader) {
+                    this.tileMapLoader = new TileMapLoader(this.parent);
+                }
+                
+                // Load map data
+                const mapData = await this.tileMapLoader.loadTileMap(`data/spritesheets/HouseNew.tmx`);
+                
+                // Get the proper container for the layers
+                const container = this.parent.canvas;
+                
+                // Render the map's tile layers
+                const renderedMap = this.tileMapLoader.renderMap(mapData, container);
 
 
-            // Set dimensions
-            if (this.layers.objects) {
-                //this.layers.objects.style.width = `${this.dimensions.width}px`;
-                //this.layers.objects.style.height = `${this.dimensions.height}px`;
+                
+                // Apply the map data to this GameMap instance
+                await this.tileMapLoader.applyToGameMap(this, mapData);
+                
+                console.log('Tile map successfully initialized');
+            } catch (error) {
+                console.error('Error initializing tile map:', error);
             }
+
+
+    
 
 
             // Initialize particle system
             this.particleSystem = new GameMapParticleSystem(this);
             this.particleSystem.start();
-            
-
-
-
-
 
 
 
@@ -74,8 +89,6 @@ class GameMap {
                 });
             }
 
-
-
             // Load spawn points
             if (this.mapData?.spawns) {
                 Object.entries(this.mapData.spawns).forEach(([key, value]) => {
@@ -92,14 +105,16 @@ class GameMap {
             if (!this.mapData?.objects) {
                 // this.addRandomObjects(100, ['GRASS']);
                 // this.addRandomObjects(20, ['FLOWER']);
-                this.addRandomObjects(5, ['MUSIC_BOX']);
+                // this.addRandomObjects(5, ['MUSIC_BOX']);
             }
 
 
-            // Create a ball
-            this.addObject('BALL', 'red_ball', 100, 100);
+            // this.addObject('DOOR', 'wooden_door', 400, 100, { direction: 'right' });
 
-            this.addObject('BALL', 'red_ball', 400, 400);
+            // Create a ball
+            // this.addObject('BALL', 'red_ball', 100, 100);
+
+            // this.addObject('BALL', 'red_ball', 400, 400);
 
             // Create a patrol guard with a specific path
             /*
@@ -119,19 +134,20 @@ class GameMap {
             */
 
             // Create a butterfly
-            this.addObject('BUTTERFLY', 'green', 300, 300);
+            //this.addObject('BUTTERFLY', 'green', 300, 300);
             this.addObject('BUTTERFLY', 'small', 100, 100);
             this.addObject('BUTTERFLY', 'purple', 400, 300);
             this.addObject('BUTTERFLY', 'blue', 400, 300);
 
             // Create a crop
-            this.addObject('CROP', 'tomato', 250, 250);
+            // this.addObject('CROP', 'tomato', 250, 250);
 
-            this.addObject('BED', 'bed_long', 0, 0);
+            // this.addObject('BED', 'bed_long', 0, 0);
 
 
 
             // Create a chest
+            /*
             this.addObject('TREASURE_CHEST', 'wooden_chest', 200, 200, {
                 items: [
                     { type: 'COIN', variant: 'gold' },
@@ -150,12 +166,13 @@ class GameMap {
                     { type: 'EQUIPMENT', variant: 'sword' }
                 ]
             });
+            */
 
 
 
 
             // Then to find a path:
-            const path = this.gridSystem.pathfinder.findPath(192/2, 192/2, 500, 500, 192, 192);
+            const path = this.gridSystem.pathfinder.findPath(192 / 2, 192 / 2, 500, 500, 192, 192);
             if (path) {
                 console.log('Path found:', path);
                 this.gridSystem.pathfinder.visualizePath(this.layers.debug, path);
@@ -178,8 +195,8 @@ class GameMap {
         if (background.color) {
             this.layers.background.style.backgroundColor = background.color;
         }
-		
-		if (background.url) {
+
+        if (background.url) {
             this.layers.background.style.backgroundImage = `url(${background.url})`;
             this.layers.background.style.backgroundSize = 'fill';
         }
@@ -219,26 +236,25 @@ class GameMap {
 
 
     addObject(type, variant, x, y, options = {}) {
+        // Create the object
+        const object = MapObjectFactory.create(type, variant, x, y, options);
 
+        // Check if object was created successfully
+        if (!object) {
+            console.error(`Failed to create object of type: ${type}, variant: ${variant}`);
+            return null;
+        }
 
-
-
-
-
-        
-        const object = MapObjectFactory.create(type, variant, x, y, options );
-
-        // snap it
+        // Snap it to grid
         let newposition = this.gridSystem.snapToGridOptimal(
-            x, 
+            x,
             y,
-            object.size.width, 
+            object.size.width,
             object.size.height,
             this.gridSystem.config.cellSize);
 
-            object.posX = newposition.x;
-            object.posY = newposition.y;
-
+        object.posX = newposition.x;
+        object.posY = newposition.y;
 
         return this.add(object, options);
     }

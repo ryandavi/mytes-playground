@@ -4,7 +4,8 @@ class SoundUI extends ModalWindow {
         super(parent, {
             id: 'sound-settings-panel',
             buttonId: 'sound-toggle',
-            closeOnOutsideClick: true,
+            closeOnOutsideClick: false,
+            draggable: true,
             position: 'top-right',
             closeButtonSelector: '.modal-close-btn'
         });

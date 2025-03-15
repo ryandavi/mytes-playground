@@ -27,7 +27,7 @@
 		>.interactive-myte {
 			width: var(--myte-size);
 			height: var(--myte-size);
-			color: white;
+			color: var(--button-light);
 			margin: 0 auto;
 
 			// so it's in front of the canvas elements
@@ -197,13 +197,13 @@
 
 			border-style: solid;
 			border-width: var(--border-width);
-			border-top-color: white;
-			border-left-color: white;
-			border-right-color: lightgrey;
-			border-bottom-color: lightgrey;
-			background-color: rgb(245, 245, 245);
+			border-top-color: var(--button-light);
+			border-left-color: var(--button-light);
+			border-right-color: var(--button-dark);
+			border-bottom-color: var(--button-dark);
+			background-color: var(--button-mid);
 
-			filter: drop-shadow(5px 5px 0px #00000010);
+			filter: var(--shadow);
 		}
 
 		>.home-name {
@@ -246,12 +246,12 @@
 				opacity: .75;
 				z-index: 0;
 
-				border-top-color: lightgrey;
-				border-left-color: lightgrey;
-				border-right-color: white;
-				border-bottom-color: white;
+				border-top-color: var(--button-dark);
+				border-left-color: var(--button-dark);
+				border-right-color: var(--button-light);
+				border-bottom-color: var(--button-light);
 
-				background-color: rgb(245, 245, 245);
+				background-color: var(--button-mid);
 
 				filter: unset;
 				box-shadow: inset var(--border-width) var(--border-width) #0000000d;
@@ -618,6 +618,16 @@
 						&.charging {
 							animation: battery-charging 2s infinite;
 						}
+
+						&.rapid-charging {
+							animation: rapid-pulse 0.8s infinite alternate;
+						}
+						
+						@keyframes rapid-pulse {
+							0% { opacity: 0.7; }
+							100% { opacity: 1; }
+						}
+
 
 						/* Blink animation for low battery */
 						@keyframes battery-blink {

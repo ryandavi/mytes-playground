@@ -154,6 +154,8 @@ class UserInterface {
         this.handControls = this.parent.containerWrapper.querySelector('#hand-controls');
         this.actionControls = this.parent.containerWrapper.querySelector('#action-controls');
 
+        this.fullscreenButton = this.parent.containerWrapper.querySelector('.fullscreen-btn');
+
         // Initialize cursor manager
         // this.cursorManager = new CursorManager(parent);
     }
@@ -227,9 +229,18 @@ class UserInterface {
         this.setToolMode(UIToolModes.SELECT);
     }
 
+    // toggle full screen
+    toggleFullscreen() {
+        // toggle class on container
+        this.parent.containerWrapper.classList.toggle('fullscreen');
+        this.fullscreenButton.classList.toggle('active');
+    }
+    
+
 	createThumbnail(myte) {
         const thumbnail = document.createElement('div');
         thumbnail.classList.add('myte-thumbnail');
+        thumbnail.classList.add('button');
 
 		if(myte === this.activeMyte){
 			thumbnail.classList.add('active');
@@ -240,6 +251,7 @@ class UserInterface {
         // Create sprite container
         const spriteContainer = document.createElement('div');
         spriteContainer.className = 'myte-sprite';
+
         
         const spriteInner = document.createElement('div');
         spriteInner.className = 'myte-sprite-inner';
@@ -558,6 +570,12 @@ updateActions() {
 
     // Original button initialization method
     initializeButtons() {
+        // fullscreen button
+        this.fullscreenButton.addEventListener("click", () => {
+            this.toggleFullscreen();
+        });
+
+
         // Follow goal button
         document.getElementById("cycleFollowGoal").addEventListener("click", () => {
             const activeMyte = this.parent.activeMyte;

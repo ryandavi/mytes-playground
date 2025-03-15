@@ -6,6 +6,9 @@ class ContainerManager {
         this.element = document.getElementById(elementId);
         this.containerWrapper = this.element.closest('.container-wrapper');
         this.canvas = this.element.querySelector('.canvas');
+
+
+
         this.activeMyte = null;
         this.camera = null;
 
@@ -20,7 +23,9 @@ class ContainerManager {
         // inventory
         this.inventory = new Inventory(this, document.getElementById('inventory'));
         this.inventory.loadItems(this.core.user.items);
+
     }
+
 
 
     async init() {

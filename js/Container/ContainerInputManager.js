@@ -1,6 +1,4 @@
-/**
- * Input manager for the container, handling global inputs and delegating to specific objects
- */
+
 class ContainerInputManager {
     /**
      * Create a new ContainerInputManager
@@ -83,6 +81,9 @@ class ContainerInputManager {
           }
         }
       });
+
+
+
     }
     
     /**
@@ -180,35 +181,30 @@ class ContainerInputManager {
       return this.inputSystem.getPressDuration();
     }
     
-
-/**
- * These methods should be added to the ContainerInputManager class
- */
-
-/**
- * Get mouse position relative to the container, ignoring camera offset
- * @param {Object} element Optional element for offset
- * @returns {Object} Container-relative coordinates {x, y}
- */
-getContainerMouse(element = null) {
-    const mousePos = this.inputSystem.getMousePosition();
-    const containerRect = this.container.getContainerRect();
-    
-    return {
-      x: mousePos.x - containerRect.left - 
-         (element ? (element.getRect().width / 2) : 0),
-      y: mousePos.y - containerRect.top - 
-         (element ? (element.getRect().height / 2) : 0)
-    };
-  }
-  
   /**
-   * Get mouse position in global/page coordinates
-   * @returns {Object} Mouse position {x, y}
+   * Get mouse position relative to the container, ignoring camera offset
+   * @param {Object} element Optional element for offset
+   * @returns {Object} Container-relative coordinates {x, y}
    */
-  getGlobalMouse() {
-    return this.inputSystem.getMousePosition();
-  }
+  getContainerMouse(element = null) {
+      const mousePos = this.inputSystem.getMousePosition();
+      const containerRect = this.container.getContainerRect();
+      
+      return {
+        x: mousePos.x - containerRect.left - 
+          (element ? (element.getRect().width / 2) : 0),
+        y: mousePos.y - containerRect.top - 
+          (element ? (element.getRect().height / 2) : 0)
+      };
+    }
+    
+    /**
+     * Get mouse position in global/page coordinates
+     * @returns {Object} Mouse position {x, y}
+     */
+    getGlobalMouse() {
+      return this.inputSystem.getMousePosition();
+    }
   
   /**
    * Get offset position relative to a specific element

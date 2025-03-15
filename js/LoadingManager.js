@@ -3,16 +3,21 @@ class LoadingManager {
     constructor() {
 		this.loadingScreen = document.getElementById('loading-screen');
 		if (this.loadingScreen) {
-			this.window = this.loadingScreen.querySelector('.mytes-loading-window');
-			this.progressBar = this.loadingScreen.querySelector('.mytes-progress');
-			this.loadingText = this.loadingScreen.querySelector('#loading-text');
+			this.window = this.loadingScreen.querySelector('#loading-modal');
+			this.progressBar = this.loadingScreen.querySelector('.loading-progress');
+			this.loadingText = this.loadingScreen.querySelector('.loading-status');
 			this.loadingIcon = this.loadingScreen.querySelector('.loading-icon');
+
+            this.skipIcon = this.loadingScreen.querySelector('.modal-close-btn');
+
+            this.progressContainer = this.loadingScreen.querySelector('.loading-progress-container')
+
 			this.isLoading = true;
 		}
         
         // Debug options
         this.debugOptions = {
-            skipLoading: true,         // Set to true to skip loading screen
+            skipLoading: false,         // Set to true to skip loading screen
             fastLoading: false,         // Set to true for accelerated loading
             logMessages: true,           // Show debug logs for messages
 			dontHide: false,
@@ -92,12 +97,12 @@ class LoadingManager {
         // Add skip button for debugging
         // Remove existing button if any
 		if(this.debugOptions.skipLoadingButton) {
-			const existingButton = document.getElementById('loading-skip-button');
-			if (existingButton) {
 
-				existingButton.classList.add('visible');
+			if (this.skipIcon) {
+
+				this.skipIcon.classList.add('visible');
 				// Add click event
-				existingButton.addEventListener('click', () => {
+				this.skipIcon.addEventListener('click', () => {
 					this.skipLoading();
 				});
 			}
@@ -172,7 +177,7 @@ class LoadingManager {
                     clearInterval(this.progressInterval);
                     this.progressInterval = null;
 
-					this.window.classList.remove('visible');
+
                     
                     setTimeout(() => this.hide(), this.settings.finalDelay);
                 }
@@ -239,9 +244,10 @@ class LoadingManager {
     
     hide() {
 
-		if(this.debugOptions.dontHide) return;
+		if(this.debugOptions.dontHide) return false;
 
         this.isLoading = false;
+
         if (this.loadingScreen) {
             this.loadingScreen.classList.add('hidden');
         }
@@ -266,6 +272,7 @@ class LoadingManager {
             const canvas = document.querySelector('.canvas');
             if (canvas) {
                 canvas.style.visibility = 'visible';
+                this.window.classList.remove('visible');
             }
         }, this.settings.hideDelay);
     }
@@ -286,12 +293,8 @@ class LoadingManager {
     positionLoadingIcon(percent) {
         if (!this.loadingIcon) return;
         
-        // Find the progress container to get its width
-        const container = document.querySelector('.mytes-progress-container');
-        if (!container) return;
-        
         // Calculate new position
-        const containerWidth = container.offsetWidth - this.loadingIcon.offsetWidth;
+        const containerWidth = this.progressContainer.offsetWidth - this.loadingIcon.offsetWidth;
         const position = (percent / 100) * containerWidth;
         
         // Apply new positioning

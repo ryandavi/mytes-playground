@@ -4,6 +4,8 @@ class MyteStats {
 
         // Basic stats
         this.health = 100;
+        this.minHealth = 0;
+        this.maxHealth = 100;
         this.speed = 1.5;
         this.level = 1;
         this.experience = 0;
@@ -20,7 +22,7 @@ class MyteStats {
         this.energy = 75;
         this.minEnergy = 0;
         this.maxEnergy = 100;
-        this.energyDecayRate = 0.001;
+        this.energyDecayRate = 0.0005;
         this.energyRegenRate = 0.005;
 
         // Battery display properties
@@ -36,8 +38,18 @@ class MyteStats {
             { name: 'full', threshold: 67 } // minimal threshold
         ];
 
-        // Initialize battery display
-        this.updateBatteryDisplay();
+
+
+        // Add this for rapid charging state
+        this.isRapidCharging = false;
+        this.rapidChargingThreshold = 0.01; // Energy increase per frame to consider "rapid"
+        this.lastEnergyChange = 0;
+        
+        // Add this to prevent repeated sound playing
+        this.lastBatterySound = null;
+        this.soundCooldown = 8000; // 2 seconds between same sounds
+        this.lastSoundTime = {};
+
 
         // Personality traits (-100 to 100)
         this.traits = {
@@ -83,7 +95,28 @@ class MyteStats {
                 expression: 'neutral'
             }
         };
+
+        // Initialize battery display
+        this.updateBatteryDisplay();
+
     }
+
+    updateHealth(amount){
+        this.health = Math.max(this.minHealth, Math.min(this.maxHealth, this.health + amount));
+    }
+
+    // Health management
+    applyDamage(amount) {
+        this.health = Math.max(this.minHealth, this.health - amount);
+        if (this.health <= this.minHealth) {
+            this.myte.queue.addExpression('faint');
+        }
+    }
+
+    heal(amount) {
+        this.health = Math.min(100, this.health + amount);
+    }
+
 
     // Generate random trait value between -100 and 100
     generateTraitValue() {
@@ -137,17 +170,6 @@ class MyteStats {
         return 'very unhappy';
     }
 
-    // Health management
-    applyDamage(amount) {
-        this.health = Math.max(0, this.health - amount);
-        if (this.health <= 0) {
-            this.myte.queue.addExpression('faint');
-        }
-    }
-
-    heal(amount) {
-        this.health = Math.min(100, this.health + amount);
-    }
 
     getSpeed() {
         let speedMultiplier = this.moods[this.currentMood].speedMultiplier;
@@ -175,131 +197,90 @@ class MyteStats {
         this.lastInteractionTime = Date.now();
     }
 
-    // Energy & Battery Management
-
-    // Show a recharging animation when energy is rapidly increasing
-    showBatteryRecharging() {
-        if (!this.myte.battery) return;
-
-        // Add charging class to show the animation
-        this.myte.battery.classList.add('charging');
-
-        // Show the battery regardless of level
-        this.showBattery();
-
-        // Remove the charging class after 3 seconds
-        setTimeout(() => {
-            this.myte.battery.classList.remove('charging');
-            // Recheck visibility rules
-            this.handleBatteryVisibility();
-        }, 3000);
-    }
-
-    // Add visual feedback when energy is critically low
-    showCriticalEnergyWarning() {
-        // Add expressions and dialogue to warn about low energy
-        if (this.energy < 10 && Math.random() < 0.1) {
-            // Maybe show dialogue
-            if (Math.random() < 0.3) {
-
-                /*
-                const messages = [
-                    "Tired...",
-                    "Need rest...",
-                    "Low energy...",
-                    "*yawn*"
-                ];
-                const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-                if (this.myte.dialogue) {
-                    this.myte.dialogue.showMessage(randomMessage, 2000);
-                }
-                    */
-            }
-        }
-    }
 
     useEnergy(amount) {
         const previousEnergy = this.energy;
         this.energy = Math.max(0, this.energy - amount);
-
+    
         // If energy just hit zero, show effects
         if (previousEnergy > 0 && this.energy <= 0) {
             this.onEnergyDepleted();
         }
-
+    
         // If energy crosses a threshold, update the display
         const previousThresholdIndex = this.getThresholdIndex(previousEnergy);
         const currentThresholdIndex = this.getThresholdIndex(this.energy);
-
+    
         if (previousThresholdIndex !== currentThresholdIndex) {
             this.updateBatteryDisplay();
-        }
-
-        // Check for critical energy warning
-        if (this.energy < 15) {
-            this.showCriticalEnergyWarning();
         }
 
         return this.energy > 0;
     }
 
-regenerateEnergy(delta) {
-    const previousEnergy = this.energy;
-    if (this.energy < this.maxEnergy) {
-        this.energy = Math.min(this.maxEnergy, this.energy + (this.energyRegenRate * delta));
-
-        // If energy crosses a threshold, update the display
-        const previousThresholdIndex = this.getThresholdIndex(previousEnergy);
-        const currentThresholdIndex = this.getThresholdIndex(this.energy);
-        
-        if (currentThresholdIndex > previousThresholdIndex) {
-            // Battery level improved to a higher threshold - show charging animation
-            if (this.myte.battery) {
+    regenerateEnergy(delta) {
+        const previousEnergy = this.energy;
+        if (this.energy < this.maxEnergy) {
+            // Store the energy change for rapid charging detection
+            const energyBefore = this.energy;
+            
+            this.energy = Math.min(this.maxEnergy, this.energy + (this.energyRegenRate * delta));
+            
+            // Calculate energy change rate
+            const energyChange = this.energy - energyBefore;
+            this.lastEnergyChange = energyChange / delta;
+            
+            // Detect rapid charging
+            this.isRapidCharging = this.lastEnergyChange > (this.rapidChargingThreshold * delta);
+            
+            // If rapid charging detected, show visual feedback (formerly showBatteryRecharging)
+            if (this.isRapidCharging && this.myte.battery) {
                 this.myte.battery.classList.add('charging');
                 this.showBattery();
-                
-                // Remove the charging class after 2 seconds
-                setTimeout(() => {
-                    this.myte.battery.classList.remove('charging');
-                    // Recheck visibility rules after animation ends
-                    this.handleBatteryVisibility();
-                }, 2000);
             }
+    
+            // If energy crosses a threshold, update the display
+            const previousThresholdIndex = this.getThresholdIndex(previousEnergy);
+            const currentThresholdIndex = this.getThresholdIndex(this.energy);
             
-            this.updateBatteryDisplay();
-        } else if (previousThresholdIndex !== currentThresholdIndex) {
-            // Other threshold changes
-            this.updateBatteryDisplay();
+            if (previousThresholdIndex !== currentThresholdIndex) {
+                this.updateBatteryDisplay();
+            }
+    
+            // If energy just reached full, show full animation
+            if (previousEnergy < this.maxEnergy && this.energy >= this.maxEnergy) {
+                this.onEnergyFull();
+            }
+        } else {
+            // Not charging when full
+            this.isRapidCharging = false;
         }
-
-        // If energy just reached full, show full animation
-        if (previousEnergy < this.maxEnergy && this.energy >= this.maxEnergy) {
-            this.onEnergyFull();
+        
+        // If no longer rapid charging, remove the class
+        if (!this.isRapidCharging && this.myte.battery && this.myte.battery.classList.contains('charging')) {
+            // Keep the animation for a moment before removing
+            setTimeout(() => {
+                this.myte.battery.classList.remove('charging');
+                // Recheck visibility rules after animation ends
+                this.handleBatteryVisibility();
+            }, 2000);
         }
     }
-}
 
     // Handle when energy is completely depleted
     onEnergyDepleted() {
         // Show empty battery with critical pulse
         if (this.myte.battery) {
             this.myte.battery.classList.add('critical-pulse');
-            console.log("critical pulse")
             this.showBattery();
         }
-
+    
+        // Play empty battery sound
+        this.playBatterySound(0); // 0 is the empty threshold index
+    
         // Slow down the myte
         this.applyExhaustionEffects();
 
-        // Show tired expression
-        this.myte.queue.addExpression('tired');
-
-        // Show dialogue
-        /*
-        if (this.myte.dialogue) {
-            this.myte.dialogue.showMessage("Exhausted...", 3000);
-        }
-        */
     }
 
     // Handle when energy is filled to maximum
@@ -309,14 +290,17 @@ regenerateEnergy(delta) {
             this.myte.battery.classList.add('charging');
             this.myte.battery.classList.remove('critical-pulse');
             this.showBattery();
-
+            
+            // Play full battery sound
+            this.playBatterySound(this.batteryThresholds.length - 1); // Full threshold index
+    
             // Remove charging effect after a moment
             setTimeout(() => {
                 this.myte.battery.classList.remove('charging');
                 this.hideBattery();
             }, 2000);
         }
-
+    
         // Improve mood slightly when fully recharged
         this.updateMood(5);
     }
@@ -336,7 +320,6 @@ regenerateEnergy(delta) {
     }
 
     // Battery Display Methods
-
     getThresholdIndex(energyValue) {
         const energyPercentage = (energyValue / this.maxEnergy) * 100;
     
@@ -354,33 +337,67 @@ regenerateEnergy(delta) {
     // Update battery display based on current energy
     updateBatteryDisplay() {
         if (!this.myte.battery) return;
-
+    
         // Calculate what battery level should be shown
         const currentThresholdIndex = this.getThresholdIndex(this.energy);
         const batteryStatus = this.batteryThresholds[currentThresholdIndex].name;
-
+    
         // Only update if the level has changed
         if (currentThresholdIndex !== this.batteryLevel) {
-
+            // Play appropriate sound once
+            this.playBatterySound(currentThresholdIndex);
             
             this.batteryLevel = currentThresholdIndex;
-
+    
             // Remove all battery level classes
             this.batteryThresholds.forEach(threshold => {
                 this.myte.battery.classList.remove(threshold.name);
             });
-
+    
             // Add current level class
             this.myte.battery.classList.add(batteryStatus);
-
+    
             // Update data attribute for position
             this.myte.battery.setAttribute('data-level', currentThresholdIndex);
-
+    
             // Show battery element
             this.showBattery();
-
+    
             // Handle visibility logic based on battery level
             this.handleBatteryVisibility();
+        }
+        
+        // If rapid charging is active, add visual indication
+        if (this.isRapidCharging) {
+            this.myte.battery.classList.add('rapid-charging');
+        } else {
+            this.myte.battery.classList.remove('rapid-charging');
+        }
+    }
+
+    playBatterySound(currentThresholdIndex) {
+        const now = Date.now();
+        let soundToPlay = null;
+        
+        // Determine which sound to play
+        if (this.energy <= 0) {
+            soundToPlay = 'battery_empty';
+        } else if (this.energy >= this.maxEnergy) {
+            soundToPlay = 'battery_full';
+        } else if (currentThresholdIndex < this.batteryLevel) {
+            soundToPlay = 'battery_depleting';
+        } else if (currentThresholdIndex > this.batteryLevel) {
+            soundToPlay = 'battery_charging';
+        }
+        
+        // Only play if we have a sound and it's not on cooldown
+        if (soundToPlay) {
+            const lastPlayed = this.lastSoundTime[soundToPlay] || 0;
+            if (now - lastPlayed > this.soundCooldown) {
+                this.myte.playSound(soundToPlay);
+                this.lastSoundTime[soundToPlay] = now;
+                this.lastBatterySound = soundToPlay;
+            }
         }
     }
 
@@ -405,12 +422,12 @@ regenerateEnergy(delta) {
             clearTimeout(this.batteryHideTimeout);
             this.batteryHideTimeout = null;
         }
-
+    
         const batteryStatus = this.batteryThresholds[this.batteryLevel].name;
-
+    
         // Update blinking class based on battery level
         this.myte.battery.classList.remove('blinking');
-
+    
         // Energy is depleted or low - show and possibly blink
         if (batteryStatus === 'empty') {
             this.showBattery();
@@ -419,29 +436,27 @@ regenerateEnergy(delta) {
         else if (batteryStatus === 'low') {
             this.showBattery();
             this.myte.battery.classList.add('blinking');
-
-            // Hide after 3 seconds
+    
+            // Hide after 5 seconds
             this.batteryHideTimeout = setTimeout(() => {
                 this.myte.battery.classList.remove('blinking');
                 this.batteryHideTimeout = null;
             }, 5000);
-
         }
         // Medium energy - show continuously
         else if (batteryStatus === 'medium') {
             this.showBattery();
-
+    
             // Hide after 6 seconds
             this.batteryHideTimeout = setTimeout(() => {
                 this.hideBattery();
                 this.batteryHideTimeout = null;
             }, 6000);
-
         }
         // Full energy - show temporarily then hide
         else if (batteryStatus === 'full') {
             this.showBattery();
-
+    
             // Hide after 3 seconds
             this.batteryHideTimeout = setTimeout(() => {
                 this.hideBattery();

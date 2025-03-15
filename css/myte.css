@@ -21,7 +21,7 @@
 .myteContainer .myteWrapper > .interactive-myte {
   width: var(--myte-size);
   height: var(--myte-size);
-  color: white;
+  color: var(--button-light);
   margin: 0 auto;
   position: relative;
   z-index: 100000;
@@ -136,12 +136,12 @@
   z-index: 100000;
   border-style: solid;
   border-width: var(--border-width);
-  border-top-color: white;
-  border-left-color: white;
-  border-right-color: lightgrey;
-  border-bottom-color: lightgrey;
-  background-color: rgb(245, 245, 245);
-  filter: drop-shadow(5px 5px 0px rgba(0, 0, 0, 0.062745098));
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-right-color: var(--button-dark);
+  border-bottom-color: var(--button-dark);
+  background-color: var(--button-mid);
+  filter: var(--shadow);
 }
 .myteContainer .myteWrapper > .home-name {
   position: relative;
@@ -167,11 +167,11 @@
 .myteContainer.empty .myteWrapper > .home-wrapper {
   opacity: 0.75;
   z-index: 0;
-  border-top-color: lightgrey;
-  border-left-color: lightgrey;
-  border-right-color: white;
-  border-bottom-color: white;
-  background-color: rgb(245, 245, 245);
+  border-top-color: var(--button-dark);
+  border-left-color: var(--button-dark);
+  border-right-color: var(--button-light);
+  border-bottom-color: var(--button-light);
+  background-color: var(--button-mid);
   filter: unset;
   box-shadow: inset var(--border-width) var(--border-width) rgba(0, 0, 0, 0.0509803922);
 }
@@ -437,6 +437,17 @@
 }
 .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.charging {
   animation: battery-charging 2s infinite;
+}
+.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.rapid-charging {
+  animation: rapid-pulse 0.8s infinite alternate;
+}
+@keyframes rapid-pulse {
+  0% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 @keyframes battery-blink {
   from {

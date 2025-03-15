@@ -3,7 +3,7 @@ class SettingsUI extends ModalWindow {
         super(parent, {
             id: 'game-settings-panel',
             buttonId: 'settings-toggle',
-            closeOnOutsideClick: true,
+            closeOnOutsideClick: false,
             // position: 'center',
             position: 'top-right',
             draggable: true,  // Make this modal draggable

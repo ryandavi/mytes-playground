@@ -108,7 +108,7 @@ class Myte {
 		// gravity-based
 		this.isJumping = false;
 		this.isFalling = false;
-		
+
 		this.startTime = null;
 		this.runAway_angle_distance = 300;
 		this.inputHandler;
@@ -166,9 +166,7 @@ class Myte {
 		// elements
 		this.sprite = this.duplicate.querySelector('.sprite');
 		this.dropTarget = this.element.closest(".myteWrapper");
-
 		this.battery = this.duplicate.querySelector('.battery');
-
 
 		// original element
 		this.duplicate.classList.add("deactivated"); // hide the original element
@@ -260,6 +258,10 @@ class Myte {
 		}
 	}
 
+	isIndependent(){
+		return this.isDragging == false;
+	}
+
 	setMode(newGoal = null) {
 
 
@@ -268,9 +270,7 @@ class Myte {
 			newGoal = this.goal;
 		}
 
-
 		if (newGoal != this.goal) {
-
 			// if the goal is actually changing
 			this.previousGoal = this.goal;
 			this.goal = newGoal;
@@ -278,7 +278,6 @@ class Myte {
 			this.unset_target();
 			this.queue.clear();
 		}
-
 
 
 		this.parent.ui.updateGoal(document.getElementById("cycleGoal"));
@@ -454,6 +453,8 @@ class Myte {
 		var distance2 = Math.sqrt(d.x * d.x + d.y * d.y);
 		return distance2.toFixed(2);
 	}
+
+
 	move_toward_target(doXAxis = true, doYAxis = true) {
 		var dx = this.targetX - this.posX;
 		var dy = this.targetY - this.posY;
@@ -511,7 +512,127 @@ class Myte {
 	}
 
 
+
+	move_toward_target_new(doXAxis = true, doYAxis = true) {
+		var dx = this.targetX - this.posX;
+		var dy = this.targetY - this.posY;
+		var distance = Math.sqrt(dx * dx + dy * dy);
 	
+		// Store original position
+		const originalX = this.posX;
+		const originalY = this.posY;
+	
+		if (distance !== 0) {
+			const moveX = (dx / distance) * this.stats.getSpeed();
+			const moveY = (dy / distance) * this.stats.getSpeed();
+			
+			let xBlocked = false;
+			let yBlocked = false;
+	
+			// Try to move on X axis
+			if (doXAxis) {
+				const newX = this.posX + moveX;
+				
+				if (this.canMoveToPosition(newX, this.posY)) {
+					this.posX = newX;
+					
+					if (this.checkForCollisions) {
+						const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
+						for (const collider of potentialColliders) {
+							if (this.parent.checkCollision(this, collider)) {
+								this.posX = originalX;
+								xBlocked = true;
+								break;
+							}
+						}
+					}
+				} else {
+					xBlocked = true;
+				}
+			}
+	
+			// Try to move on Y axis
+			if (doYAxis) {
+				const newY = this.posY + moveY;
+				
+				if (this.canMoveToPosition(this.posX, newY)) {
+					this.posY = newY;
+					
+					if (this.checkForCollisions) {
+						const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
+						for (const collider of potentialColliders) {
+							if (this.parent.checkCollision(this, collider)) {
+								this.posY = originalY;
+								yBlocked = true;
+								break;
+							}
+						}
+					}
+				} else {
+					yBlocked = true;
+				}
+			}
+			
+			// If both directions are blocked, try to slide along the wall
+			if (xBlocked && yBlocked && Math.abs(moveX) > 0.1 && Math.abs(moveY) > 0.1) {
+				// Try sliding horizontally if vertical movement is blocked
+				if (Math.abs(moveX) > Math.abs(moveY) * 0.5) {
+					const slideX = this.posX + moveX * 1.2; // Slightly increase slide speed for better feel
+					if (this.canMoveToPosition(slideX, originalY)) {
+						this.posX = slideX;
+					}
+				} 
+				// Try sliding vertically if horizontal movement is blocked
+				else if (Math.abs(moveY) > Math.abs(moveX) * 0.5) {
+					const slideY = this.posY + moveY * 1.2; // Slightly increase slide speed for better feel
+					if (this.canMoveToPosition(originalX, slideY)) {
+						this.posY = slideY;
+					}
+				}
+			}
+		}
+	
+		// If the distance is small enough, snap to the target
+		if (distance < this.stats.getSpeed()) {
+			this.snap_position_to_target(doXAxis, doYAxis);
+		}
+	
+		this.setDirection(this.getDirection());
+		this.setSpritePosition(this.posX, this.posY);
+	}
+	
+	// Add this helper method to check if a position is valid
+	canMoveToPosition(newX, newY) {
+		const gridSystem = this.parent.gameMap.gridSystem;
+		const cellSize = gridSystem.config.cellSize;
+		
+		// Get collider bounds at the new position
+		const left = newX + this.collider.offsetX;
+		const top = newY + this.collider.offsetY;
+		const right = left + this.collider.width;
+		const bottom = top + this.collider.height;
+		
+		// Convert to grid coordinates
+		const startGridX = Math.floor(left / cellSize);
+		const startGridY = Math.floor(top / cellSize);
+		const endGridX = Math.ceil(right / cellSize);
+		const endGridY = Math.ceil(bottom / cellSize);
+		
+		// Check each grid cell that the collider would overlap
+		for (let gridX = startGridX; gridX < endGridX; gridX++) {
+			for (let gridY = startGridY; gridY < endGridY; gridY++) {
+				// Check if this grid cell is within bounds and walkable
+				if (gridX < 0 || gridX >= gridSystem.gridWidth || 
+					gridY < 0 || gridY >= gridSystem.gridHeight ||
+					!gridSystem.grid[gridX][gridY].walkable) {
+					return false;
+				}
+			}
+		}
+		
+		return true;
+	}
+
 	setSpritePosition(x = null, y = null, limit = false) {
 
 		let setX = (x == null ? false : true);
@@ -819,13 +940,13 @@ class Myte {
 			didLand: false,
 			standingOn: null
 		};
-		
+
 		// Safety checks
 		if (!this.collider) {
 			console.warn('Myte missing collider, collision detection skipped');
 			return result;
 		}
-		
+
 		// Skip if collision checking is disabled
 		if (!this.checkForCollisions || !colliders || colliders.length === 0) {
 			return result;
@@ -837,43 +958,43 @@ class Myte {
 		// Check each collider for various collision types
 		for (const collider of colliders) {
 			// 1. Check for platform landing when falling
-// Platform landing when falling
-if (this.physics.velocity > 0) {
-    const verticalEntity = this.createCollisionEntity(this.posX, newY);
+			// Platform landing when falling
+			if (this.physics.velocity > 0) {
+				const verticalEntity = this.createCollisionEntity(this.posX, newY);
 
-    if (this.parent.checkCollision(verticalEntity, collider)) {
-        const colliderTop = this.getColliderTopEdge(collider);
-        // Position the Myte so its collider's bottom aligns with platform top
-        result.y = colliderTop - this.collider.height - this.collider.offsetY;
-        
-        result.hitPlatform = true;
-        result.standingOn = collider;
-        
-        if (wasFalling || wasJumping) {
-            result.didLand = true;
-        }
-        continue;
-    }
-}
+				if (this.parent.checkCollision(verticalEntity, collider)) {
+					const colliderTop = this.getColliderTopEdge(collider);
+					// Position the Myte so its collider's bottom aligns with platform top
+					result.y = colliderTop - this.collider.height - this.collider.offsetY;
 
-// 2. Check for ceiling collision when jumping upward
-if (this.physics.velocity < 0) {
-    // Create collision entity that correctly represents the Myte's collision area
-    const ceilingEntity = this.createCollisionEntity(newX, newY);
-    
-    if (this.parent.checkCollision(ceilingEntity, collider)) {
-        result.hitCeiling = true;
-        
-        // Calculate correct position considering collider offset
-        // The collider's top is at: newY + this.collider.offsetY
-        // We want this to be just below the obstacle's bottom
-        const colliderBottom = collider.posY + collider.size.height;
-        // Set the Myte's position so its collider top is at the obstacle bottom
-        result.y = colliderBottom - this.collider.offsetY;
-        
-        continue;
-    }
-}
+					result.hitPlatform = true;
+					result.standingOn = collider;
+
+					if (wasFalling || wasJumping) {
+						result.didLand = true;
+					}
+					continue;
+				}
+			}
+
+			// 2. Check for ceiling collision when jumping upward
+			if (this.physics.velocity < 0) {
+				// Create collision entity that correctly represents the Myte's collision area
+				const ceilingEntity = this.createCollisionEntity(newX, newY);
+
+				if (this.parent.checkCollision(ceilingEntity, collider)) {
+					result.hitCeiling = true;
+
+					// Calculate correct position considering collider offset
+					// The collider's top is at: newY + this.collider.offsetY
+					// We want this to be just below the obstacle's bottom
+					const colliderBottom = collider.posY + collider.size.height;
+					// Set the Myte's position so its collider top is at the obstacle bottom
+					result.y = colliderBottom - this.collider.offsetY;
+
+					continue;
+				}
+			}
 
 			// 3. Check for wall collision with step-up handling
 			if (newX !== this.posX && !result.hitWall) {
@@ -955,58 +1076,58 @@ if (this.physics.velocity < 0) {
 		// Get current dimensions and positions
 		const limit_ground = this.parent.getCanvasRect().height;
 		const limit_ceiling = 0;
-		
+
 		// Cache collider values to avoid repeated conditionals
 		const colliderOffsetY = this.collider.offsetY || 0;
 		const colliderHeight = this.collider.height;
-		
+
 		// Remember previous state
 		const wasJumping = this.isJumping;
 		const wasFalling = this.isFalling;
-		
+
 		// Calculate the POTENTIAL new position based on gravity
 		this.physics.velocity = this.applyGravity();
 		let newY = this.posY + this.physics.velocity;
-		
+
 		// Handle horizontal movement (with air control)
 		// This could be optimized further if expensive
 		this.updateTargetToFollowMouse(true, true);
 		const dx = this.targetX - this.posX;
 		const controlFactor = this.isOnSolidGround ? 1.0 : this.physics.airControl;
 		const moveDistance = this.stats.getSpeed() * controlFactor;
-		
+
 		// Calculate potential new horizontal position
 		let newX = this.posX;
 		if (Math.abs(dx) > 0.1) {
 			const directionX = dx > 0 ? 1 : -1;
 			newX = this.posX + directionX * Math.min(Math.abs(dx), moveDistance);
 		}
-		
+
 		// Check container bounds - ceiling and floor
 		const myteTop = newY + colliderOffsetY;
 		const myteBottom = myteTop + colliderHeight;
 		const isAtCeiling = newY < limit_ceiling && this.physics.velocity < 0; //  we were using myteTop here but it went over
 		const isAtGround = myteBottom >= limit_ground;
-		
+
 		// Handle ceiling collision with container
 		if (isAtCeiling) {
 			newY = limit_ceiling; // original -colliderOffsetY but it was going over; // Align top edge with container ceiling
 			this.physics.velocity = 0;
 		}
-		
+
 		// Handle floor collision with container
 		if (isAtGround) {
 			newY = limit_ground - colliderHeight - colliderOffsetY;
-			
+
 			// Only trigger landing if we were actually falling or jumping
 			if (wasFalling || wasJumping) {
 				this.do_land_from_fall();
 			}
 		}
-		
+
 		// Get all potential colliders ONCE
 		const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
-		
+
 		// For fast-moving objects, consider intermediate collision checks
 		// (This step is optional and depends on your game's needs)
 		if (Math.abs(this.physics.velocity) > 10 || Math.abs(newX - this.posX) > 10) {
@@ -1015,11 +1136,11 @@ if (this.physics.velocity < 0) {
 			// several intermediate positions
 			const midY = this.posY + (this.physics.velocity / 2);
 			const midCollisionResult = this.checkMovementCollision(
-				this.posX + (newX - this.posX) / 2, 
-				midY, 
+				this.posX + (newX - this.posX) / 2,
+				midY,
 				potentialColliders
 			);
-			
+
 			if (midCollisionResult.hitCeiling || midCollisionResult.hitPlatform) {
 				// Handle intermediate collision
 				newY = midCollisionResult.y;
@@ -1029,36 +1150,36 @@ if (this.physics.velocity < 0) {
 				}
 			}
 		}
-		
+
 		// Check collisions at final position
 		const collisionResult = this.checkMovementCollision(newX, newY, potentialColliders);
-		
+
 		// Apply the collision-adjusted positions
 		newX = collisionResult.x;
 		newY = collisionResult.y;
-		
+
 		// Consolidate velocity adjustments based on collision results
 		if (collisionResult.hitCeiling) {
 			this.physics.velocity = 0;
 		}
-		
+
 		// Handle landing from platform collision
 		if (collisionResult.didLand) {
 			this.do_land_from_fall();
 			// We've landed, so we're on solid ground
 			this.isOnSolidGround = true;
 		}
-		
+
 		// Handle being trapped between colliders if needed
 		const isTrapped = this.stuckFrames > 0;
 		const escapeResult = this.handleTrappedState(newX, newY, isTrapped);
 		newX = escapeResult.x;
 		newY = escapeResult.y;
-		
+
 		// Update state based on collision results and container bounds
 		// Use a single consolidated check for ground state
 		const isOnGround = isAtGround || collisionResult.hitPlatform;
-		
+
 		if (isOnGround) {
 			this.isJumping = false;
 			this.isFalling = false;
@@ -1068,22 +1189,22 @@ if (this.physics.velocity < 0) {
 			this.isFalling = this.physics.velocity > 0;
 			this.isJumping = this.physics.velocity < 0;
 			this.isOnSolidGround = false;
-			
+
 			// Track when we left the ground for coyote time
 			if (this.isOnSolidGround && this.leftGroundTime === undefined) {
 				this.leftGroundTime = Date.now();
 			}
 		}
-		
+
 		// FINALLY apply the new positions after all checks and adjustments
 		this.setPosition(newX, newY);
 		this.setSpritePosition(newX, newY);
-		
+
 		// Update character direction based on movement
 		if (Math.abs(dx) > 0.1) {
 			this.setDirection(dx > 0 ? DIRECTION.EAST : DIRECTION.WEST);
 		}
-		
+
 		// Reset coyote time if we're back on ground
 		if (this.isOnSolidGround) {
 			this.leftGroundTime = undefined;

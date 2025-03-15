@@ -69,7 +69,7 @@ class AnimationController {
                 if (this.currentAnimation.onComplete) {
                     this.currentAnimation.onComplete();
                 }
-                if (!this.currentAnimation.loop) {
+                if (!this.currentAnimation?.loop) {
                     this.currentAnimation = null;
                 }
             }
@@ -80,8 +80,13 @@ class AnimationController {
     updateFrame() {
         if (!this.element || !this.currentAnimation) return;
         
-        const { frameWidth, frameHeight = frameWidth, scale = 1 } = this.config;
+        let { frameWidth, frameHeight = frameWidth, scale = 1 } = this.config;
 
+        // for sprites that are larger than the object
+        if(this.host.getConfig('spriteConfig.spriteSheet.frameSize')){
+            frameWidth = this.host.getConfig('spriteConfig.spriteSheet.frameSize.width');
+            frameHeight = this.host.getConfig('spriteConfig.spriteSheet.frameSize.height');
+        }
 
         // Get the current frame (could be a number or an array [x,y])
         const frame = this.currentAnimation.frames[this.framePosition];
@@ -102,16 +107,17 @@ class AnimationController {
 
         this.sprite = element.querySelector('.sprite') || this.element;
         
+        
         // Set dimensions
         if (this.config.frameWidth && this.config.scale) {
-            this.element.style.width = `${this.config.frameWidth * this.config.scale}px`;
-            const height = this.config.frameHeight || this.config.frameWidth;
-            this.element.style.height = `${height * this.config.scale}px`;
+            // this.element.style.width = `${this.config.frameWidth * this.config.scale}px`;
+            // const height = this.config.frameHeight || this.config.frameWidth;
+            //this.element.style.height = `${height * this.config.scale}px`;
         }
         
         // Set up spritesheet background if provided
-        if (this.config.spriteSheet) {
-            this.sprite.style.backgroundImage = `url(${this.config.spriteSheet})`;
+        if (this.config.spriteSheet.url) {
+            // this.sprite.style.backgroundImage = `url(${this.config.spriteSheet.url})`;
         }
     }
 }

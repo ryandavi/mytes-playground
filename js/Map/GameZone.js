@@ -8,6 +8,13 @@ const ZONE_TYPES = {
     BOOST: 'boost'
 };
 
+// Add these constants at the top of your file
+const ZONE_THRESHOLD = {
+    TOUCHING: 'touching',  // Myte is just touching the zone (default)
+    HALFWAY: 'halfway',    // Myte is at least halfway in the zone
+    FULLY: 'fully'         // Myte is fully inside the zone
+};
+
 class Zone {
     constructor(data) {
         this.id = data.id;
@@ -19,6 +26,7 @@ class Zone {
             visible: false,
             strength: 1.0,
             cooldown: 0,
+            threshold: ZONE_THRESHOLD.HALFWAY, // Default threshold
             ...data.properties
         };
         
@@ -53,12 +61,29 @@ class Zone {
 
     }
 
-
-    intersectsRect(rect) {
-        return !(rect.right < this.bounds.x ||
-                rect.left > this.bounds.x + this.bounds.width ||
-                rect.bottom < this.bounds.y ||
-                rect.top > this.bounds.y + this.bounds.height);
+    // Add this method to your Zone class
+    getIntersectionLevel(myteRect) {
+        // Calculate intersection area
+        const overlapLeft = Math.max(this.bounds.x, myteRect.left);
+        const overlapRight = Math.min(this.bounds.x + this.bounds.width, myteRect.right);
+        const overlapTop = Math.max(this.bounds.y, myteRect.top);
+        const overlapBottom = Math.min(this.bounds.y + this.bounds.height, myteRect.bottom);
+        
+        if (overlapLeft >= overlapRight || overlapTop >= overlapBottom) {
+            return null; // No intersection
+        }
+        
+        const intersectionArea = (overlapRight - overlapLeft) * (overlapBottom - overlapTop);
+        const myteArea = myteRect.width * myteRect.height;
+        const intersectionRatio = intersectionArea / myteArea;
+        
+        if (intersectionRatio >= 0.95) { // Using 0.95 instead of 1.0 for floating-point tolerance
+            return ZONE_THRESHOLD.FULLY;
+        } else if (intersectionRatio >= 0.5) {
+            return ZONE_THRESHOLD.HALFWAY;
+        } else {
+            return ZONE_THRESHOLD.TOUCHING;
+        }
     }
 
     getMyteRect(myte) {
@@ -76,21 +101,48 @@ class Zone {
     // Check if a Myte has entered or left the zone
     update(myte) {
         const myteRect = this.getMyteRect(myte);
-        const isInZone = this.intersectsRect(myteRect);
+        const intersectionLevel = this.getIntersectionLevel(myteRect);
+        
+        // Check if the myte meets the threshold requirement for this zone
+        const meetsThreshold = this.doesMeetThreshold(intersectionLevel);
         const wasInZone = this.mytesInZone.has(myte.id);
-
-        if (isInZone && !wasInZone) {
+        
+        if (meetsThreshold && !wasInZone) {
+            // Myte just entered the zone and meets threshold
             this.onMyteEnter(myte);
             this.mytesInZone.add(myte.id);
-        } else if (!isInZone && wasInZone) {
+        } else if (!meetsThreshold && wasInZone) {
+            // Myte no longer meets threshold
             this.onMyteExit(myte);
             this.mytesInZone.delete(myte.id);
-        } else if (isInZone) {
+        } else if (meetsThreshold) {
+            // Myte stays in zone and still meets threshold
             this.onMyteStay(myte);
         }
     }
 
+    doesMeetThreshold(intersectionLevel) {
+        if (intersectionLevel === null) {
+            return false; // Not intersecting at all
+        }
+        
+        switch (this.properties.threshold) {
+            case ZONE_THRESHOLD.FULLY:
+                return intersectionLevel === ZONE_THRESHOLD.FULLY;
+                
+            case ZONE_THRESHOLD.HALFWAY:
+                return intersectionLevel === ZONE_THRESHOLD.HALFWAY || 
+                       intersectionLevel === ZONE_THRESHOLD.FULLY;
+                       
+            case ZONE_THRESHOLD.TOUCHING:
+            default:
+                return true; // Any intersection is fine for TOUCHING threshold
+        }
+    }
+
     onMyteEnter(myte) {
+
+        
         switch (this.type) {
             case ZONE_TYPES.REST:
                 this.applyRestZoneEffects(myte);
@@ -157,8 +209,10 @@ class Zone {
     }
 
     applyPlayZoneEffects(myte) {
+        
         // Make Myte more playful
         if (Math.random() < 0.2 && myte.queue.isEmpty()) {
+            console.log("IN PLAY ZONE");
             const actions = ['dance', 'spin', 'jump'];
             const randomAction = actions[Math.floor(Math.random() * actions.length)];
             myte.queue.add(randomAction);

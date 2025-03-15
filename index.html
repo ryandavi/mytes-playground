@@ -15,224 +15,224 @@
 	<br><br><br><br><br><br><br>
 	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-	&nbsp;&nbsp; <textarea>hi</textarea>
-	<br><br><br><br>
+	&nbsp;&nbsp; <br><br><br><br>
 	<br><br><br><br>
 	<section class="debugMenu ignore">Not Initialized</section>
 	<section class="queueMenu ignore"></section>
-	<!-- CONTAINER WRAPPER WRAPPER-->
-	<div class="container-wrapper-wrapper">
-		<!-- LOADING SCREEN -->
-		<div class="loading-screen" id="loading-screen">
-			<div class="mytes-loading-window">
-				<div class="mytes-title-bar">
-					<div class="mytes-title-icon">📂</div>
-					<div class="mytes-title-text">Loading Mytes...</div>
-					<div class="mytes-close-button">✕</div>
-				</div>
-				<div class="mytes-content">
-					<div class="mytes-message"> Please wait while your Mytes are being prepared. This won't take long!
-					</div>
-					<div class="loading-icon"></div>
-					<div class="mytes-progress-container">
-						<div class="mytes-progress">
-							<div class="mytes-progress-blocks"></div>
+	<!-- MAIN SCREEN -->
+	<div class="container-wrapper styled">
+		<!-- HEADER-->
+		<div class="ignore header">
+			<div class="logo"><img src="images/logo.svg"></div>
+			<div class="active-pet" id="hud-active-pet">
+				<div class="name">Name</div>
+				<div class="mood">Mood</div>
+				<div class="energy">Energy</div>
+			</div>
+			<div class="date-time">
+				<div class="username">8:16 pm</div>
+			</div>
+			<div class="user">
+				<div class="username">Ryan</div>
+			</div>
+			<button class="fullscreen-btn">⛶</button>
+		</div>
+		<!-- END HEADER -->
+		<!-- HAND CONTROLS -->
+		<div class="hand-controls ignore" id="hand-controls">
+			<!-- RADIO BUTTONS -->
+			<input type="radio" name="hand" value="left" id="hand-select" checked>
+			<label class="button" for="hand-select">
+				<svg id="hand_pointer_icon" class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10.5 12">
+					<path id="Pointer"
+						d="m8.44,7.59h-2.46l1.06,2.22c.22.47.02,1.03-.44,1.25-.47.22-1.03.02-1.25-.44l-1.09-2.29-1.76,2.07c-.11.13-.27.2-.43.2-.07,0-.13-.01-.19-.03-.22-.08-.37-.29-.37-.53V1.41c0-.22.13-.42.33-.51.2-.09.44-.06.6.09l6.38,5.63c.18.15.24.4.15.62-.08.22-.29.36-.53.36Z" />
+				</svg>
+				<span class="text"><u>S</u>elect</span>
+			</label>
+			<input type="radio" name="hand" value="left" id="hand-drag">
+			<label class="button" class="button" for="hand-drag">
+				<svg id="hand_grab_icon" class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10.5 12">
+					<path id="Grab"
+						d="m10.12,3.38v2.82c0,1.17-.6,2.2-1.5,2.8v3H2.62v-3l-1.25-.91c-.63-.46-1-1.2-1-1.97v-1.62c0-.34.16-.67.42-.88l.7-.56v1.07c0,.21.17.38.38.38s.38-.17.38-.38V1.12c0-.62.5-1.12,1.12-1.12s1.08.46,1.12,1.05c.2-.18.46-.3.76-.3.62,0,1.12.5,1.12,1.12v.13c.2-.3.55-.5.94-.5.55,0,1.01.4,1.1.92.17-.1.37-.17.58-.17.62,0,1.12.5,1.12,1.12Z" />
+				</svg>
+				<span class="text"><u>D</u>rag</span>
+			</label>
+			<input type="radio" name="hand" value="right" id="hand-pet">
+			<label class="button" for="hand-pet">
+				<svg id="hand_pet_icon" class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10.5 12">
+					<path id="Paw"
+						d="m1.12,5.63c-.62,0-1.12-.5-1.12-1.12s.5-1.12,1.12-1.12,1.12.5,1.12,1.12-.5,1.12-1.12,1.12Zm8.62,3.38c0,1.24-1.01,2.25-2.25,2.25-1.21.04-1.69-.75-2.25-.75s-1.04.79-2.25.75c-1.24,0-2.25-1-2.25-2.25,0-.84.46-1.57,1.14-1.95.64-.36,1.1-1.43,1.58-2.29.37-.67,1.08-1.01,1.78-1.01s1.42.33,1.78,1.01c.47.85.96,1.95,1.57,2.29.68.38,1.14,1.11,1.14,1.95ZM2.25,1.88c0-.62.5-1.12,1.12-1.12s1.12.5,1.12,1.12-.5,1.13-1.12,1.13-1.12-.5-1.12-1.13Zm3.75,0c0-.62.5-1.12,1.12-1.12s1.12.5,1.12,1.12-.5,1.13-1.12,1.13-1.12-.5-1.12-1.13Zm4.5,2.63c0,.62-.5,1.12-1.12,1.12s-1.12-.5-1.12-1.12.5-1.12,1.12-1.12,1.12.5,1.12,1.12Z" />
+				</svg>
+				<span class="text"><u>P</u>et</span>
+			</label>
+			<!-- RADIO BUTTONS-->
+			<button id="settings-toggle" class="hand-control-btn" title="Settings">
+				<i class="icon-settings">⚙️</i>
+			</button>
+			<!-- BUTTONS -->
+			<button id="sound-toggle" class="hand-control-btn" title="Toggle Sound">
+				<i class="icon-sound-on"></i>
+				<i class="icon-sound-off"></i>
+			</button>
+			<!-- END BUTTONS -->
+		</div>
+		<!-- END HAND CONTROLS -->
+		<!-- CANVAS CONTAINER -->
+		<section class="container" id="container-1">
+			<!-- CROSSHAIR -->
+			<div class="crosshair ignore debug">
+				<div class="horizontal"></div>
+				<div class="vertical"></div>
+			</div>
+			<!-- END CROSSHAIR -->
+
+			<!-- LOADING SCREEN -->
+			<div class="loading-screen" id="loading-screen">
+				<div id="loading-modal"class="modal-window">
+					<div class="modal-header">
+						<div class="modal-title">
+							<div class="icon">📂</div>
+							<div class="text">Loading Mytes...</div>
+						</div>
+						<div class="modal-controls">
+							<button class="modal-close-btn">&times;</button>
 						</div>
 					</div>
-					<div class="mytes-status" id="loading-text">Loading essential files...</div>
-					<div class="mytes-buttons">
-						<div class="mytes-button" id="loading-skip-button">Skip Loading</div>
-					</div>
-				</div>
-			</div>
-		</div>
-		<!-- END LOADING SCREEN -->
-		<!-- MAIN SCREEN -->
-		<div class="container-wrapper styled">
-			<!-- HEADER-->
-			<div class="ignore header">
-				<div class="logo"><img src="images/logo.svg"></div>
-				<div class="active-pet" id="hud-active-pet">
-					<div class="name">Name</div>
-					<div class="mood">Mood</div>
-					<div class="energy">Energy</div>
-				</div>
-				<div class="date-time">
-					<div class="username">8:16 pm</div>
-				</div>
-				<div class="user">
-					<div class="username">Ryan</div>
-				</div>
-			</div>
-			<!-- END HEADER -->
-			<!-- HAND CONTROLS -->
-			<div class="hand-controls ignore" id="hand-controls">
-				<!-- RADIO BUTTONS -->
-				<input type="radio" name="hand" value="left" id="hand-select" checked>
-				<label class="button" for="hand-select">
-					<svg id="hand_pointer_icon" class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10.5 12">
-						<path id="Pointer"
-							d="m8.44,7.59h-2.46l1.06,2.22c.22.47.02,1.03-.44,1.25-.47.22-1.03.02-1.25-.44l-1.09-2.29-1.76,2.07c-.11.13-.27.2-.43.2-.07,0-.13-.01-.19-.03-.22-.08-.37-.29-.37-.53V1.41c0-.22.13-.42.33-.51.2-.09.44-.06.6.09l6.38,5.63c.18.15.24.4.15.62-.08.22-.29.36-.53.36Z" />
-					</svg>
-					<span class="text"><u>S</u>elect</span>
-				</label>
-				<input type="radio" name="hand" value="left" id="hand-drag">
-				<label class="button" class="button" for="hand-drag">
-					<svg id="hand_grab_icon" class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10.5 12">
-						<path id="Grab"
-							d="m10.12,3.38v2.82c0,1.17-.6,2.2-1.5,2.8v3H2.62v-3l-1.25-.91c-.63-.46-1-1.2-1-1.97v-1.62c0-.34.16-.67.42-.88l.7-.56v1.07c0,.21.17.38.38.38s.38-.17.38-.38V1.12c0-.62.5-1.12,1.12-1.12s1.08.46,1.12,1.05c.2-.18.46-.3.76-.3.62,0,1.12.5,1.12,1.12v.13c.2-.3.55-.5.94-.5.55,0,1.01.4,1.1.92.17-.1.37-.17.58-.17.62,0,1.12.5,1.12,1.12Z" />
-					</svg>
-					<span class="text"><u>D</u>rag</span>
-				</label>
-				<input type="radio" name="hand" value="right" id="hand-pet">
-				<label class="button" for="hand-pet">
-					<svg id="hand_pet_icon" class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10.5 12">
-						<path id="Paw"
-							d="m1.12,5.63c-.62,0-1.12-.5-1.12-1.12s.5-1.12,1.12-1.12,1.12.5,1.12,1.12-.5,1.12-1.12,1.12Zm8.62,3.38c0,1.24-1.01,2.25-2.25,2.25-1.21.04-1.69-.75-2.25-.75s-1.04.79-2.25.75c-1.24,0-2.25-1-2.25-2.25,0-.84.46-1.57,1.14-1.95.64-.36,1.1-1.43,1.58-2.29.37-.67,1.08-1.01,1.78-1.01s1.42.33,1.78,1.01c.47.85.96,1.95,1.57,2.29.68.38,1.14,1.11,1.14,1.95ZM2.25,1.88c0-.62.5-1.12,1.12-1.12s1.12.5,1.12,1.12-.5,1.13-1.12,1.13-1.12-.5-1.12-1.13Zm3.75,0c0-.62.5-1.12,1.12-1.12s1.12.5,1.12,1.12-.5,1.13-1.12,1.13-1.12-.5-1.12-1.13Zm4.5,2.63c0,.62-.5,1.12-1.12,1.12s-1.12-.5-1.12-1.12.5-1.12,1.12-1.12,1.12.5,1.12,1.12Z" />
-					</svg>
-					<span class="text"><u>P</u>et</span>
-				</label>
-				<!-- RADIO BUTTONS-->
 
-				<button id="settings-toggle" class="hand-control-btn" title="Settings">
-					<i class="icon-settings">⚙️</i>
-				</button>
-
-				<!-- BUTTONS -->
-				<button id="sound-toggle" class="hand-control-btn" title="Toggle Sound">
-					<i class="icon-sound-on"></i>
-					<i class="icon-sound-off"></i>
-				</button>
-
-				
-				<!-- END BUTTONS -->
-			</div>
-			<!-- END HAND CONTROLS -->
-
-
-			<!-- CANVAS CONTAINER -->
-			<section class="container" id="container-1">
-				<!-- CROSSHAIR -->
-				<div class="crosshair ignore debug">
-					<div class="horizontal"></div>
-					<div class="vertical"></div>
-				</div>
-				<!-- END CROSSHAIR -->
-				<!-- CANVAS -->
-				<div class="canvas">
-					<!-- map objects -->
-					<div class="layer debug"></div>
-					<div class="layer background"></div>
-					<div class="layer particles"></div>
-					<!-- map objects -->
-					<div class="layer controls">
-						<div class="ignore dot cursor-dot debug"></div>
-					</div>
-					<div class="layer foreground">
-						<!-- MYTE CONTAINER -->
-						<div class="myteContainer">
-							<div id="myteWrapper-1" class="myteWrapper snail">
-								<!-- HOME -->
-								<div class="home-name">
-									<div class="name tooltip">Lentil's Slot</div>
-								</div>
-								<div class="home-wrapper"></div>
-								<!-- END HOME -->
-								<!-- MYTE START-->
-								<div id="myte-pookie" class="interactive-myte" data-myte-name="Lentil"
-									draggable="false">
-									<div class="inner-wrapper">
-										<div class="sprite"></div>
-										<div class="selectbox"></div>
-										<div class="name-wrapper">
-											<span class="before">x</span>
-											<div class="name tooltip">Lentil</div>
-										</div>
-										<div class="commands"></div>
-										<div class="dialogue">
-											<span class="text">Hiii</span>
-										</div>
-										<div class="above-wrapper">
-											<div class="battery"></div>
-										</div>
-									</div>
-								</div>
-								<!-- MYTE END-->
+					<div class="modal-content">
+						<div class="loading-message">
+							<p>Please wait while your Mytes are being prepared.</p>
+						</div>
+						<div class="loading-icon"></div>
+						<div class="loading-progress-container">
+							<div class="loading-progress">
+								<div class="loading-progress-blocks"></div>
 							</div>
 						</div>
-						<!-- END MYTE CONTAINER -->
-						<!-- Myte 2 -->
-						<!--
+						<div class="loading-status">Loading essential files...</div>
+					</div>
+
+					<!--
+					<div class="modal-footer">
+						<div class="button" id="loading-skip-button">Skip Loading</div>
+					</div>
+					-->
+
+				</div>
+			</div>
+			<!-- END LOADING SCREEN -->
+
+			<!-- CANVAS -->
+			<div class="canvas">
+				<!-- map objects -->
+				<div class="layer debug"></div>
+				<div class="layer background"></div>
+				<div class="layer particles"></div>
+				<!-- map objects -->
+				<div class="layer controls">
+					<div class="ignore dot cursor-dot debug"></div>
+				</div>
+				<div class="layer foreground">
+					<!-- MYTE CONTAINER -->
 					<div class="myteContainer">
-						<div id="myteWrapper-2" class="myteWrapper snail">
+						<div id="myteWrapper-1" class="myteWrapper snail">
+							<!-- HOME -->
 							<div class="home-name">
-								<div class="name tooltip">Pookie's Home</div>
+								<div class="name tooltip">Lentil's Slot</div>
 							</div>
 							<div class="home-wrapper"></div>
-
-
-							<div id="myte-pookie2" class="interactive-myte" data-myte-name="Pookie" draggable="false">
+							<!-- END HOME -->
+							<!-- MYTE START-->
+							<div id="myte-pookie" class="interactive-myte" data-myte-name="Lentil" draggable="false">
 								<div class="inner-wrapper">
 									<div class="sprite"></div>
 									<div class="selectbox"></div>
-									<div class="collidebox"></div>
-									<div class="hitbox"></div>
 									<div class="name-wrapper">
 										<span class="before">x</span>
-										<div class="name tooltip">Pookie</div>
+										<div class="name tooltip">Lentil</div>
 									</div>
-
 									<div class="commands"></div>
-
 									<div class="dialogue">
 										<span class="text">Hiii</span>
 									</div>
-
 									<div class="above-wrapper">
 										<div class="battery"></div>
 									</div>
 								</div>
 							</div>
+							<!-- MYTE END-->
 						</div>
 					</div>
-					-->
-						<input class="collider">
-						<h2> hi </h2> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br><br>
-						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <textarea class="collider">hi</textarea>
-						<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
-						<textarea class="collider">DOWNNN</textarea>
-					</div>
-					<div class="layer effects"></div>
+					<!-- END MYTE CONTAINER -->
+					<!-- Myte 2 -->
+					<!--
+							<div class="myteContainer">
+								<div id="myteWrapper-2" class="myteWrapper snail">
+									<div class="home-name">
+										<div class="name tooltip">Pookie's Home</div>
+									</div>
+									<div class="home-wrapper"></div>
+
+
+									<div id="myte-pookie2" class="interactive-myte" data-myte-name="Pookie" draggable="false">
+										<div class="inner-wrapper">
+											<div class="sprite"></div>
+											<div class="selectbox"></div>
+											<div class="collidebox"></div>
+											<div class="hitbox"></div>
+											<div class="name-wrapper">
+												<span class="before">x</span>
+												<div class="name tooltip">Pookie</div>
+											</div>
+
+											<div class="commands"></div>
+
+											<div class="dialogue">
+												<span class="text">Hiii</span>
+											</div>
+
+											<div class="above-wrapper">
+												<div class="battery"></div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						-->
 				</div>
-				<!-- END CANVAS -->
-			</section>
-			<!-- END CANVAS CONTAINER -->
-			<!-- ACTION CONTROLS MENU -->
-			<div class="sidebar right">
-				<div class="action-controls ignore" id="action-controls">
-					<div class="selected-info">
-						<div class="interaction-type">
-							<span class="type">Not Selected</span>
-						</div>
-						<div class="target-info">
-							<span class="type">-</span>
-							<span class="name">None</span>
-						</div>
+				<div class="layer effects"></div>
+			</div>
+			<!-- END CANVAS -->
+		</section>
+		<!-- END CANVAS CONTAINER -->
+		<!-- ACTION CONTROLS MENU -->
+		<div class="sidebar right">
+			<div class="action-controls ignore" id="action-controls">
+				<div class="selected-info">
+					<div class="interaction-type">
+						<span class="type">Not Selected</span>
 					</div>
-					<div class="action-groups">
+					<div class="target-info">
+						<span class="type">-</span>
+						<span class="name">None</span>
 					</div>
+				</div>
+				<div class="action-groups">
 				</div>
 			</div>
-			<!-- END ACTION CONTROLS MENU -->
-			<!-- ALL MYTES -->
-			<div class="allMytes" id="all_mytes"></div>
-			<!-- END MYTES -->
-			<!-- INVENTORY -->
-			<div class="inventory" id="inventory"></div>
-			<!-- END INVENTORY -->
+		</div>
+		<!-- END ACTION CONTROLS MENU -->
+		<div class="bottom">
+			<div class="left">
+				<!-- ALL MYTES -->
+				<div class="allMytes inset" id="all_mytes"></div>
+				<!-- END MYTES -->
+				<!-- INVENTORY -->
+				<div class="inventory inset" id="inventory"></div>
+				<!-- END INVENTORY -->
+			</div>
 			<!-- CONTROLS -->
-			<div class="controls" id="controls">
+			<div class="controls right" id="controls">
 				<button id="cycleGoal" class="myte" disabled>Loading...</button>
 				<button id="cycleFollowGoal" class="myte" disabled>Loading...</button>
 				<button id="skipQueue" class="myte" disabled>Skip Queue</button>
@@ -243,188 +243,149 @@
 			<!-- END CONTROLS -->
 		</div>
 	</div>
-	<!-- END CONTAINER WRAPPER WRAPPER -->
-	<br><br><br><br><br><br> <br><br><br>
-	<img style="margin: 0 auto; max-width:500px; height: auto; display: block;" id="poo"
-		src="https://pbs.twimg.com/media/F5ye8eWWwAASpoG?format=jpg&name=large">
-	<br><br><br> <br><br><br><br><br><br> <br><br><br><br><br><br>
-	<form>
-		<!-- Text Input -->
-		<label for="name">Name:</label>
-		<input type="text" id="name" name="name" required><br><br>
-		<!-- Email Input -->
-		<label for="email">Email:</label>
-		<input type="email" id="email" name="email" required><br><br>
-		<!-- Password Input -->
-		<label for="password">Password:</label>
-		<input type="password" id="password" name="password" required><br><br>
-		<!-- Radio Buttons -->
-		<label>Gender:</label>
-		<input type="radio" id="male" name="gender" value="male">
-		<label for="male">Male</label>
-		<input type="radio" id="female" name="gender" value="female">
-		<label for="female">Female</label><br><br>
-		<!-- Checkbox -->
-		<label for="subscribe">Subscribe to Newsletter:</label>
-		<input type="checkbox" id="subscribe" name="subscribe"><br><br>
-		<!-- Select Dropdown -->
-		<label for="country">Country:</label>
-		<select id="country" name="country">
-			<option value="usa">USA</option>
-			<option value="canada">Canada</option>
-			<option value="uk">UK</option>
-		</select><br><br>
-		<!-- Textarea -->
-		<label for="message">Message:</label><br>
-		<textarea id="message" name="message" rows="4" cols="50"></textarea><br><br>
-		<!-- File Input -->
-		<label for="file">Upload File:</label>
-		<input type="file" id="file" name="file"><br><br>
-		<!-- Submit Button -->
-		<input type="submit" value="Submit">
-	</form>
-	<div style="margin: 30px; padding: 30px;">hi</div>
-	<div style="margin: 30px; padding: 30px;">hi</div>
-	<div style="margin: 30px; padding: 30px;">hi</div>
-	<textarea>hi</textarea>
-	<div style="margin: 30px; padding: 30px;">hi</div>
-
-
-			<!-- SOUND SETTINGS -->
-			<div id="sound-settings-panel" class="modal-window">
-				<div class="modal-header">
-					<span class="icon">:)</span>
-					<h2 class="modal-title">Sound Settings</h3>
-					<button class="modal-close-btn">&times;</button>
+	<!-- SOUND SETTINGS -->
+	<div id="sound-settings-panel" class="modal-window">
+		<div class="modal-header">
+			<h2 class="modal-title">
+				<span class="icon">🔊</span>
+				<span class="text">Sounds Settings</span>
+			</h2>
+			<div class="modal-controls">
+				<button class="modal-minimize-btn">&#128469;</button>
+				<button class="modal-fullscreen-btn">&#x26F6;</button>
+				<button class="modal-close-btn">&times;</button>
+			</div>
+		</div>
+		<div class="modal-content">
+			<div class="settings-group">
+				<div class="setting-item">
+					<label for="master-volume">Master Volume</label>
+					<input type="range" id="master-volume" min="0" max="100" value="0">
 				</div>
-				<div class="modal-content">
-					<div class="settings-group">
-						<div class="setting-item">
-							<label for="master-volume">Master Volume</label>
-							<input type="range" id="master-volume" min="0" max="100" value="0">
-						</div>
-						<div class="setting-item">
-							<label for="ui-volume">UI Volume</label>
-							<input type="range" id="ui-volume" min="0" max="100" value="0">
-						</div>
-						<div class="setting-item">
-							<label for="ambient-volume">Ambient Volume</label>
-							<input type="range" id="ambient-volume" min="0" max="100" value="0">
-						</div>
-						<div class="setting-item">
-							<label for="sfx-volume">SFX Volume</label>
-							<input type="range" id="sfx-volume" min="0" max="100" value="0">
-						</div>
-						<div class="setting-item">
-							<label for="music-volume">Music Volume</label>
-							<input type="range" id="music-volume" min="0" max="100" value="0">
-						</div>
+				<div class="setting-item">
+					<label for="ui-volume">UI Volume</label>
+					<input type="range" id="ui-volume" min="0" max="100" value="0">
+				</div>
+				<div class="setting-item">
+					<label for="ambient-volume">Ambient Volume</label>
+					<input type="range" id="ambient-volume" min="0" max="100" value="0">
+				</div>
+				<div class="setting-item">
+					<label for="sfx-volume">SFX Volume</label>
+					<input type="range" id="sfx-volume" min="0" max="100" value="0">
+				</div>
+				<div class="setting-item">
+					<label for="music-volume">Music Volume</label>
+					<input type="range" id="music-volume" min="0" max="100" value="0">
+				</div>
+			</div>
+			<div class="settings-group">
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" id="sound-enabled" checked>
+						<label for="sound-enabled">Sound Effects</label>
 					</div>
-					<div class="settings-group">
-						<div class="setting-item">
-							<div class="checkbox-wrapper">
-								<input type="checkbox" id="sound-enabled" checked>
-								<label for="sound-enabled">Sound Effects</label>
-							</div>
-						</div>
-						<div class="setting-item">
-							<div class="checkbox-wrapper">
-								<input type="checkbox" id="music-enabled" checked>
-								<label for="music-enabled">Background Music</label>
-							</div>
-						</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" id="music-enabled" checked>
+						<label for="music-enabled">Background Music</label>
 					</div>
 				</div>
 			</div>
-			<!-- END SOUND SETTINGS -->
-
-			<!-- GAME SETTINGS PANEL -->
-			<div id="game-settings-panel" class="modal-window">
-				<div class="modal-header">
-					<span class="icon">:)</span>
-					<h2 class="modal-title">Game Settings</h2>
-					<button class="modal-close-btn">×</button>
+		</div>
+	</div>
+	<!-- END SOUND SETTINGS -->
+	<!-- GAME SETTINGS PANEL -->
+	<div id="game-settings-panel" class="modal-window">
+		<div class="modal-header">
+			<h2 class="modal-title">
+				<span class="icon">⚙️</span>
+				<span class="text">Game Settings</span>
+			</h2>
+			<div class="modal-controls">
+				<button class="modal-minimize-btn">&#128469;</button>
+				<button class="modal-fullscreen-btn">&#x26F6;</button>
+				<button class="modal-close-btn">&times;</button>
+			</div>
+		</div>
+		<div class="modal-content">
+			<!-- Graphics Settings -->
+			<div class="settings-group">
+				<h3 class="settings-group-title">Graphics</h3>
+				<div class="setting-item dropdown">
+					<label for="graphics-quality">Quality</label>
+					<select id="graphics-quality">
+						<option value="low">Low</option>
+						<option value="medium" selected>Medium</option>
+						<option value="high">High</option>
+						<option value="ultra">Ultra</option>
+					</select>
 				</div>
-				<div class="modal-content">
-					<!-- Graphics Settings -->
-					<div class="settings-group">
-						<h3 class="settings-group-title">Graphics</h3>
-						<div class="setting-item dropdown">
-							<label for="graphics-quality">Quality</label>
-							<select id="graphics-quality">
-								<option value="low">Low</option>
-								<option value="medium" selected>Medium</option>
-								<option value="high">High</option>
-								<option value="ultra">Ultra</option>
-							</select>
-						</div>
-						<div class="setting-item">
-							<div class="checkbox-wrapper">
-							<input type="checkbox" id="effects-toggle" checked>
-							<label for="effects-toggle">Special Effects</label>
-							</div>
-						</div>
-						<div class="setting-item">
-							<div class="checkbox-wrapper">
-							<input type="checkbox" id="animations-toggle" checked>
-							<label for="animations-toggle">Animations</label>
-							</div>
-						</div>
-					</div>
-					<!-- Gameplay Settings -->
-					<div class="settings-group">
-						<h3 class="settings-group-title">Gameplay</h3>
-						<div class="setting-item dropdown">
-							<label for="difficulty-select">Difficulty</label>
-							<select id="difficulty-select">
-								<option value="easy">Easy</option>
-								<option value="normal" selected>Normal</option>
-								<option value="hard">Hard</option>
-								<option value="nightmare">Nightmare</option>
-							</select>
-						</div>
-						<div class="setting-item">
-							<div class="checkbox-wrapper">
-							<input type="checkbox" id="tutorials-toggle" checked>
-							<label for="tutorials-toggle">Show Tutorials</label>
-							</div>
-						</div>
-						<div class="setting-item">
-							<div class="checkbox-wrapper">
-							<input type="checkbox" id="autosave-toggle" checked>
-							<label for="autosave-toggle">Auto-Save</label>
-							</div>
-							
-						</div>
-					</div>
-					<!-- Miscellaneous Settings -->
-					<div class="settings-group">
-						<h3 class="settings-group-title">Miscellaneous</h3>
-						<div class="setting-item dropdown">
-							<label for="language-select">Language</label>
-							<select id="language-select">
-								<option value="en" selected>English</option>
-								<option value="es">Spanish</option>
-								<option value="fr">French</option>
-								<option value="de">German</option>
-								<option value="ja">Japanese</option>
-							</select>
-						</div>
-						<div class="setting-item">
-							<div class="checkbox-wrapper">
-								<input type="checkbox" id="notifications-toggle" checked>
-								<label for="notifications-toggle">Notifications</label>
-							</div>
-						</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" id="effects-toggle" checked>
+						<label for="effects-toggle">Special Effects</label>
 					</div>
 				</div>
-				<div class="modal-footer">
-					<button id="restore-defaults">Restore Defaults</button>
-					<button id="save-settings">Save</button>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" id="animations-toggle" checked>
+						<label for="animations-toggle">Animations</label>
+					</div>
 				</div>
 			</div>
-
-
+			<!-- Gameplay Settings -->
+			<div class="settings-group">
+				<h3 class="settings-group-title">Gameplay</h3>
+				<div class="setting-item dropdown">
+					<label for="difficulty-select">Difficulty</label>
+					<select id="difficulty-select">
+						<option value="easy">Easy</option>
+						<option value="normal" selected>Normal</option>
+						<option value="hard">Hard</option>
+						<option value="nightmare">Nightmare</option>
+					</select>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" id="tutorials-toggle" checked>
+						<label for="tutorials-toggle">Show Tutorials</label>
+					</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" id="autosave-toggle" checked>
+						<label for="autosave-toggle">Auto-Save</label>
+					</div>
+				</div>
+			</div>
+			<!-- Miscellaneous Settings -->
+			<div class="settings-group">
+				<h3 class="settings-group-title">Miscellaneous</h3>
+				<div class="setting-item dropdown">
+					<label for="language-select">Language</label>
+					<select id="language-select">
+						<option value="en" selected>English</option>
+						<option value="es">Spanish</option>
+						<option value="fr">French</option>
+						<option value="de">German</option>
+						<option value="ja">Japanese</option>
+					</select>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" id="notifications-toggle" checked>
+						<label for="notifications-toggle">Notifications</label>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="modal-footer">
+			<button id="restore-defaults" class="secondary">Restore Defaults</button>
+			<button id="save-settings" class="primary">Save</button>
+		</div>
+	</div>
 	<!-- EXTERNAL -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
 	<!-- CORE -->
@@ -476,13 +437,28 @@
 	<script src="js/Map/GameMap.js"></script>
 	<script src="js/Map/GameZone.js"></script>
 	<script src="js/Map/GameMapParticleSystem.js"></script>
-	<!-- MAP OBJECTS -->
-	<script src="js/Map/MapObjects/AnimationController.js"></script>
-	<script src="js/Map/MapObjects/BaseMapObject.js"></script>
-	<script src="js/Map/MapObjects/AnimatedMapObject.js"></script>
-	<script src="js/Map/MapObjects/GrowingPlantObject.js"></script>
-	<script src="js/Map/MapObjects/MovingMapObject.js"></script>
-	<script src="js/Map/MapObjects/MapObjectManager.js"></script>
+	<script src="js/Map/TileMaps/TileMapLoader.js"></script>
+	<!-- BASE MAP OBJECTS-->
+	<script src="js/Map/NewMapObjects/MapObject.js"></script>
+	<script src="js/Map/NewMapObjects/DroppedMapItem.js"></script>
+	<!-- ANIMATED -->
+	<script src="js/Map/NewMapObjects/AnimationController.js"></script>
+	<script src="js/Map/NewMapObjects/AnimatedMapObject.js"></script>
+	<script src="js/Map/NewMapObjects/MovingMapObject.js"></script>
+	<script src="js/Map/NewMapObjects/BallMapObject.js"></script>
+	<script src="js/Map/NewMapObjects/ButterflyMapObject.js"></script>
+	<script src="js/Map/NewMapObjects/FountainMapObject.js"></script>
+	<script src="js/Map/NewMapObjects/LightMapObject.js"></script>
+	<script src="js/Map/NewMapObjects/TreasureChestMapObject.js"></script>
+	<script src="js/Map/NewMapObjects/PatrolGuardMapObject.js"></script>
+	<script src="js/Map/NewMapObjects/DoorMapObject.js"></script>
+	<!-- PLANTS-->
+	<script src="js/Map/NewMapObjects/GrowingPlantMapObject.js"></script>
+	<script src="js/Map/NewMapObjects/BreedingFlowerMapObject.js"></script>
+	<script src="js/Map/NewMapObjects/NightBloomMapObject.js"></script>
+	<script src="js/Map/NewMapObjects/CropPlantMapObject.js"></script>
+	<!-- MAP OBJECT FACTORY -->
+	<script src="js/Map/NewMapObjects/MapObjectFactory.js"></script>
 	<!-- MAP GRID -->
 	<script src="js/Map/Grid/GameMapGrid.js"></script>
 	<script src="js/Map/Grid/GameMapGridAstar.js"></script>

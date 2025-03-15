@@ -22,7 +22,7 @@
     "zones": [
         {
             "id": "rest_area",
-            "type": "REST",
+            "type": "rest",
             "bounds": {
                 "x": 50,
                 "y": 50,
@@ -36,7 +36,7 @@
         },
         {
             "id": "play_area",
-            "type": "PLAY",
+            "type": "play",
             "bounds": {
                 "x": 400,
                 "y": 50,
@@ -65,7 +65,7 @@
         {
             "type": "MUSIC_BOX",
             "variant": "music_box",
-            "x": 450,
+            "x": 1450,
             "y": 100
         }
     ]
