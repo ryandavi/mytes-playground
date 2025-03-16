@@ -43,11 +43,7 @@ class ButterflyMapObject extends AnimatedMapObject {
         this.initializeVelocity();
 
         this.parent.particleSystem.addParticleMethodsToObject(this);
-        this.addDustEffect({
-            colors: ['#f0f0ff', '#e8e8ff', '#fffacd'],
-            size: 2,
-            sizeEnd: 4
-        });
+        this.addEffect("SPARKLE_SPRITE");
 
 
     }

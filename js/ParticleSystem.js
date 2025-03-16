@@ -27,11 +27,16 @@ class Particle {
 		this.currentFrame = 0;
 		this.frameDelay = options.frameDelay || 5;
 		this.frameCount = 0;
-		this.angle = options.angle || 0;
-		this.rotationSpeed = options.rotationSpeed || 0;
+		this.angle = options.angle !== undefined ? options.angle : 0;
+		this.rotationSpeed = options.rotationSpeed !== undefined ? options.rotationSpeed : 0;
 		this.scaleX = options.scaleX || 1;
 		this.scaleY = options.scaleY || 1;
-		this.flipped = options.flipped || false;
+		this.flipped = options.flipped !== undefined ? options.flipped : false;
+		this.loop = options.loop !== undefined ? options.loop : true;
+
+
+
+		
 
 		// Behavior
 		this.behavior = options.behavior || 'default';
@@ -138,7 +143,15 @@ class Particle {
 			this.frameCount++;
 			if (this.frameCount >= this.frameDelay) {
 				this.frameCount = 0;
-				this.currentFrame = (this.currentFrame + 1) % this.spriteFrames.length;
+
+				//  Check for loop option
+				if (this.loop || this.currentFrame < this.spriteFrames.length - 1) {
+					this.currentFrame = (this.currentFrame + 1) % this.spriteFrames.length;
+				}
+				
+
+				
+				// this.currentFrame = (this.currentFrame + 1) % this.spriteFrames.length;
 			}
 		}
 

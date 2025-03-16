@@ -220,9 +220,6 @@ body {
   touch-action: none;
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 }
-.container-wrapper > .container:not(.noScroll) {
-  overflow: hidden;
-}
 .container-wrapper > .container.valid-drop-target {
   outline: var(--border-width) solid var(--drop-target) !important;
 }

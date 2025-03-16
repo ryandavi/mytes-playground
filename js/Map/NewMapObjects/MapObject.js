@@ -566,7 +566,95 @@ const TYPE_CONFIGS = {
 				closing: { frames: [[3, 0], [2, 0], [1, 0], [0, 0]], loop: false }
 			}
 		}
+	},
+
+
+
+
+	PORTAL: {
+		category: 'interactive',
+		variants: ['blue_portal', 'red_portal', 'ancient_portal', 'magic_circle'],
+		renderType: 'sprite',
+		collision: false,
+		walkable: true,
+		renderPriority: 2,
+		interactionType: 'teleport',
+		interactionRadius: 150,
+		canToggle: true,
+		default: 'active',
+		particleEffects: true,
+		lightEmission: true,
+		size: {
+			width: 128,
+			height: 128
+		},
+		
+		// Collider slightly smaller than visual
+		collider: {
+			width: 64,
+			height: 64,
+			offsetX: 32, // Center the collider
+			offsetY: 32
+		},
+		
+		// Interactive area larger than visual
+		interactiveCollider: {
+			width: 196,
+			height: 196,
+			offsetX: -34, // Extend beyond visual
+			offsetY: -34
+		},
+		
+		spriteConfig: {
+			default: 'idle',
+			spriteSheet: {
+				url: "images/MapObjects/portal.png",
+				size: {
+					width: 1024, // 8 frames x 128px
+					height: 512  // 4 animations x 128px
+				}
+			},
+			animations: {
+				idle: { frames: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0]], loop: true, frameRate: 10 },
+				activate: { frames: [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1]], loop: false, frameRate: 15 },
+				active: { frames: [[0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [5, 2], [6, 2], [7, 2]], loop: true, frameRate: 12 },
+				deactivate: { frames: [[0, 3], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3]], loop: false, frameRate: 15 }
+			}
+		},
+		
+		// Variant-specific configurations
+		variantConfigs: {
+			blue_portal: {
+				particleStartColor: '#00BFFF',
+				particleEndColor: '#0000FF'
+			},
+			red_portal: {
+				particleStartColor: '#FF4500',
+				particleEndColor: '#8B0000'
+			},
+			ancient_portal: {
+				particleStartColor: '#DAA520',
+				particleEndColor: '#8B4513'
+			},
+			magic_circle: {
+				size: {
+					width: 192,
+					height: 192
+				},
+				particleStartColor: '#9932CC',
+				particleEndColor: '#4B0082',
+				spriteConfig: {
+					url: "images/MapObjects/magic_circle.png"
+				}
+			}
+		}
 	}
+
+
+
+
+
+
 };
 
 class MapObject {

@@ -125,33 +125,10 @@ class Myte {
 		// Add particle control methods to this Myte
 		particleSystem.addParticleMethodsToObject(this);
 		
-		// Add specific effect based on species
-		if (this.species === "snail") {
-			// Slime trail for snails
-			this.addTrailEffect({
-				colors: ['#a0e8c8', '#80d0b0'], // Greenish slime colors
-				size: 3,
-				sizeEnd: 4,
-				opacity: 0.7,
-				life: 60,
-				friction: 0.999,
-				gravity: 0,
-				count: 1,
-				interval: 100
-			});
-		} else {
-			// Dust for regular movement
-			this.addDustEffect({
-				colors: ['#e8e8e8', '#d5d5d5', '#c8c8c8'],
-				size: 4,
-				sizeEnd: 7,
-				life: 35,
-				count: 2,
-				interval: 150,
-				emitWhenMoving: true,
-				movementThreshold: 1.0
-			});
-		}
+
+		// Dust for regular movement
+		// this.addEffect("SMOKE_SPRITE");
+		
 	}
 
 	init() {
@@ -1310,18 +1287,13 @@ class Myte {
 
 		// this.playSound('land');
 
-		if (this.parent && this.parent.gameMap && this.parent.gameMap.particleSystem) {
-			this.parent.gameMap.particleSystem.createDustEmitter(this, {
-				colors: ['#e8e8e8', '#d5d5d5', '#c8c8c8'],
-				size: 6,
-				sizeEnd: 10,
-				life: 50,
-				count: 6,
-				interval: 50,
-				emitWhenMoving: false,
-				positionAtFeet: true
-			});
-		}
+        this.addEffect("LANDING_DUST", {
+            count: 6,              // Override: create more particles for a bigger effect
+            positionAtFeet: true,  // Position at character's feet
+            emitWhenMoving: false, // Override: emit regardless of movement
+            oneTimeEmission: true,  // Important: emit just once instead of continuously
+			loop: false
+        });
 
 
 		if (this.physics.velocity >= this.physics.minFallDamageVelocity) {

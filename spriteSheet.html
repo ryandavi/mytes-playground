@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Particle Spritesheet Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            background-color: #444;
+            margin: 10px 0;
+            max-width: 100%;
+        }
+        .controls {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .download-btn {
+            background-color: #2196F3;
+        }
+        .download-btn:hover {
+            background-color: #0b7dda;
+        }
+        .option-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .option-group {
+            margin-right: 15px;
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .section {
+            margin-bottom: 30px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        #status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #f8f8f8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Simple Particle Spritesheet Generator</h1>
+        
+        <div class="section">
+            <h2>Dust Particles</h2>
+            <div class="controls">
+                <div class="option-row">
+                    <div class="option-group">
+                        <label for="dust-size">Frame Size:</label>
+                        <input type="number" id="dust-size" value="32" min="16" max="128">
+                    </div>
+                    <div class="option-group">
+                        <label for="dust-frames">Number of Frames:</label>
+                        <input type="number" id="dust-frames" value="8" min="4" max="16">
+                    </div>
+                    <div class="option-group">
+                        <label for="dust-color">Color:</label>
+                        <input type="color" id="dust-color" value="#e0e0e0">
+                    </div>
+                </div>
+                <button id="generate-dust">Generate Dust Spritesheet</button>
+                <button id="download-dust" class="download-btn">Download</button>
+            </div>
+            <canvas id="dust-canvas" width="256" height="32"></canvas>
+            <div id="status"></div>
+        </div>
+
+        <div class="section">
+            <h2>Glow Particles</h2>
+            <div class="controls">
+                <div class="option-row">
+                    <div class="option-group">
+                        <label for="glow-size">Frame Size:</label>
+                        <input type="number" id="glow-size" value="32" min="16" max="128">
+                    </div>
+                    <div class="option-group">
+                        <label for="glow-frames">Number of Frames:</label>
+                        <input type="number" id="glow-frames" value="8" min="4" max="16">
+                    </div>
+                    <div class="option-group">
+                        <label for="glow-color">Color:</label>
+                        <input type="color" id="glow-color" value="#ffff88">
+                    </div>
+                </div>
+                <button id="generate-glow">Generate Glow Spritesheet</button>
+                <button id="download-glow" class="download-btn">Download</button>
+            </div>
+            <canvas id="glow-canvas" width="256" height="32"></canvas>
+        </div>
+
+        <div class="section">
+            <h2>Smoke Particles</h2>
+            <div class="controls">
+                <div class="option-row">
+                    <div class="option-group">
+                        <label for="smoke-size">Frame Size:</label>
+                        <input type="number" id="smoke-size" value="64" min="32" max="128">
+                    </div>
+                    <div class="option-group">
+                        <label for="smoke-frames">Number of Frames:</label>
+                        <input type="number" id="smoke-frames" value="8" min="4" max="16">
+                    </div>
+                    <div class="option-group">
+                        <label for="smoke-color">Color:</label>
+                        <input type="color" id="smoke-color" value="#cccccc">
+                    </div>
+                </div>
+                <button id="generate-smoke">Generate Smoke Spritesheet</button>
+                <button id="download-smoke" class="download-btn">Download</button>
+            </div>
+            <canvas id="smoke-canvas" width="512" height="64"></canvas>
+        </div>
+
+        <div class="section">
+            <h2>Trail Particles</h2>
+            <div class="controls">
+                <div class="option-row">
+                    <div class="option-group">
+                        <label for="trail-size">Frame Size:</label>
+                        <input type="number" id="trail-size" value="32" min="16" max="128">
+                    </div>
+                    <div class="option-group">
+                        <label for="trail-frames">Number of Frames:</label>
+                        <input type="number" id="trail-frames" value="8" min="4" max="16">
+                    </div>
+                    <div class="option-group">
+                        <label for="trail-color1">Start Color:</label>
+                        <input type="color" id="trail-color1" value="#ffcc00">
+                    </div>
+                    <div class="option-group">
+                        <label for="trail-color2">End Color:</label>
+                        <input type="color" id="trail-color2" value="#ff6600">
+                    </div>
+                </div>
+                <button id="generate-trail">Generate Trail Spritesheet</button>
+                <button id="download-trail" class="download-btn">Download</button>
+            </div>
+            <canvas id="trail-canvas" width="256" height="32"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Wait for the DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up each particle type generator
+            setupGenerator('dust', generateDustSpritesheet);
+            setupGenerator('glow', generateGlowSpritesheet);
+            setupGenerator('smoke', generateSmokeSpritesheet);
+            setupGenerator('trail', generateTrailSpritesheet);
+            
+            // Generic setup function for all generators
+            function setupGenerator(type, generatorFunction) {
+                const generateBtn = document.getElementById(`generate-${type}`);
+                const downloadBtn = document.getElementById(`download-${type}`);
+                const canvas = document.getElementById(`${type}-canvas`);
+                
+                // Add click event for generation
+                generateBtn.addEventListener('click', function() {
+                    updateStatus(`Generating ${type} spritesheet...`);
+                    
+                    // Use setTimeout to ensure UI updates before heavy canvas work
+                    setTimeout(() => {
+                        try {
+                            generatorFunction();
+                            updateStatus(`${type} spritesheet generated successfully!`);
+                        } catch (error) {
+                            console.error('Generation error:', error);
+                            updateStatus(`Error generating ${type} spritesheet: ${error.message}`, true);
+                        }
+                    }, 50);
+                });
+                
+                // Add click event for downloading
+                downloadBtn.addEventListener('click', function() {
+                    downloadCanvas(canvas, `${type}-spritesheet.png`);
+                });
+                
+                // Generate default on load
+                setTimeout(() => {
+                    generateBtn.click();
+                }, 100);
+            }
+            
+            // Helper function to update status message
+            function updateStatus(message, isError = false) {
+                const statusElement = document.getElementById('status');
+                statusElement.textContent = message;
+                statusElement.style.backgroundColor = isError ? '#ffebee' : '#e8f5e9';
+                statusElement.style.color = isError ? '#c62828' : '#2e7d32';
+            }
+            
+            // Helper function to download canvas as PNG
+            function downloadCanvas(canvas, filename) {
+                try {
+                    const link = document.createElement('a');
+                    link.download = filename;
+                    link.href = canvas.toDataURL('image/png');
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    updateStatus(`Downloaded ${filename} successfully!`);
+                } catch (error) {
+                    console.error('Download error:', error);
+                    updateStatus(`Error downloading: ${error.message}`, true);
+                }
+            }
+            
+            // DUST SPRITESHEET GENERATOR
+            function generateDustSpritesheet() {
+                const size = parseInt(document.getElementById('dust-size').value);
+                const frames = parseInt(document.getElementById('dust-frames').value);
+                const color = document.getElementById('dust-color').value;
+                
+                const canvas = document.getElementById('dust-canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Update canvas size to match the spritesheet
+                canvas.width = size * frames;
+                canvas.height = size;
+                
+                // Clear the canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Generate each frame
+                for (let frame = 0; frame < frames; frame++) {
+                    // Calculate frame position
+                    const x = frame * size + size / 2;
+                    const y = size / 2;
+                    
+                    // Calculate frame progress (0 to 1)
+                    const progress = frame / (frames - 1);
+                    
+                    // Size starts small and gets larger
+                    const particleSize = size * 0.2 + (size * 0.3) * progress;
+                    
+                    // Opacity peaks in the middle, fades at start and end
+                    const opacity = Math.sin(progress * Math.PI);
+                    
+                    // Draw the particle
+                    ctx.save();
+                    ctx.globalAlpha = opacity;
+                    
+                    // Create radial gradient for soft edges
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, particleSize);
+                    gradient.addColorStop(0, color);
+                    gradient.addColorStop(0.7, color);
+                    gradient.addColorStop(1, `rgba(${hexToRgb(color)}, 0)`);
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(x, y, particleSize, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Add some detail with smaller particles
+                    for (let i = 0; i < 5; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const distance = particleSize * 0.7;
+                        const subSize = particleSize * 0.3;
+                        
+                        const px = x + Math.cos(angle) * distance;
+                        const py = y + Math.sin(angle) * distance;
+                        
+                        const subGradient = ctx.createRadialGradient(px, py, 0, px, py, subSize);
+                        subGradient.addColorStop(0, color);
+                        subGradient.addColorStop(1, `rgba(${hexToRgb(color)}, 0)`);
+                        
+                        ctx.fillStyle = subGradient;
+                        ctx.beginPath();
+                        ctx.arc(px, py, subSize, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    
+                    ctx.restore();
+                }
+            }
+            
+            // GLOW SPRITESHEET GENERATOR
+            function generateGlowSpritesheet() {
+                const size = parseInt(document.getElementById('glow-size').value);
+                const frames = parseInt(document.getElementById('glow-frames').value);
+                const color = document.getElementById('glow-color').value;
+                
+                const canvas = document.getElementById('glow-canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Update canvas size
+                canvas.width = size * frames;
+                canvas.height = size;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Generate each frame
+                for (let frame = 0; frame < frames; frame++) {
+                    const x = frame * size + size / 2;
+                    const y = size / 2;
+                    
+                    // Calculate frame progress and use it for pulsing effect
+                    const progress = frame / frames;
+                    const pulseScale = 0.8 + 0.2 * Math.sin(progress * Math.PI * 2);
+                    const particleSize = size * 0.35 * pulseScale;
+                    
+                    // Draw multiple layers with decreasing opacity for the glow effect
+                    for (let layer = 3; layer >= 0; layer--) {
+                        const layerSize = particleSize * (1 + layer * 0.5);
+                        const layerOpacity = (3 - layer) / 3 * 0.8;
+                        
+                        ctx.save();
+                        ctx.globalAlpha = layerOpacity;
+                        
+                        const gradient = ctx.createRadialGradient(x, y, 0, x, y, layerSize);
+                        gradient.addColorStop(0, color);
+                        gradient.addColorStop(0.5, shiftColor(color, 30));
+                        gradient.addColorStop(1, `rgba(${hexToRgb(color)}, 0)`);
+                        
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.arc(x, y, layerSize, 0, Math.PI * 2);
+                        ctx.fill();
+                        
+                        ctx.restore();
+                    }
+                    
+                    // Add a brighter core
+                    ctx.save();
+                    ctx.globalAlpha = 0.9;
+                    
+                    const coreGradient = ctx.createRadialGradient(x, y, 0, x, y, particleSize * 0.5);
+                    coreGradient.addColorStop(0, '#ffffff');
+                    coreGradient.addColorStop(0.5, color);
+                    coreGradient.addColorStop(1, shiftColor(color, -30));
+                    
+                    ctx.fillStyle = coreGradient;
+                    ctx.beginPath();
+                    ctx.arc(x, y, particleSize * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.restore();
+                }
+            }
+            
+            // SMOKE SPRITESHEET GENERATOR
+            function generateSmokeSpritesheet() {
+                const size = parseInt(document.getElementById('smoke-size').value);
+                const frames = parseInt(document.getElementById('smoke-frames').value);
+                const color = document.getElementById('smoke-color').value;
+                
+                const canvas = document.getElementById('smoke-canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Update canvas size
+                canvas.width = size * frames;
+                canvas.height = size;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Generate each frame
+                for (let frame = 0; frame < frames; frame++) {
+                    const x = frame * size + size / 2;
+                    const y = size / 2;
+                    
+                    // Smoke evolves over frames - getting larger and more diffuse
+                    const progress = frame / (frames - 1);
+                    const particleSize = size * (0.2 + progress * 0.4);
+                    const opacity = 0.9 - progress * 0.5;
+                    const turbulence = progress * 0.5;
+                    
+                    ctx.save();
+                    ctx.globalAlpha = opacity;
+                    
+                    // Create irregular smoke shape
+                    ctx.beginPath();
+                    const points = 12;
+                    const angleStep = (Math.PI * 2) / points;
+                    
+                    for (let i = 0; i <= points; i++) {
+                        const angle = i * angleStep;
+                        // Add random variation to create smoke-like effect
+                        const noise = (Math.random() - 0.5) * turbulence * particleSize;
+                        const radius = particleSize + noise;
+                        const px = x + Math.cos(angle) * radius;
+                        const py = y + Math.sin(angle) * radius;
+                        
+                        if (i === 0) {
+                            ctx.moveTo(px, py);
+                        } else {
+                            // Use curved lines for smoother appearance
+                            const cpx = x + Math.cos(angle - angleStep/2) * (radius * 0.9);
+                            const cpy = y + Math.sin(angle - angleStep/2) * (radius * 0.9);
+                            ctx.quadraticCurveTo(cpx, cpy, px, py);
+                        }
+                    }
+                    
+                    ctx.closePath();
+                    
+                    // Create gradient fill for the smoke
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, particleSize);
+                    gradient.addColorStop(0, color);
+                    gradient.addColorStop(0.7, `rgba(${hexToRgb(color)}, 0.7)`);
+                    gradient.addColorStop(1, `rgba(${hexToRgb(color)}, 0)`);
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fill();
+                    
+                    // Add some internal detail/texture
+                    for (let i = 0; i < 3; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const distance = particleSize * 0.3;
+                        const detailSize = particleSize * 0.2;
+                        
+                        const dx = x + Math.cos(angle) * distance;
+                        const dy = y + Math.sin(angle) * distance;
+                        
+                        ctx.globalAlpha = opacity * 0.3;
+                        ctx.beginPath();
+                        ctx.arc(dx, dy, detailSize, 0, Math.PI * 2);
+                        ctx.fillStyle = color;
+                        ctx.fill();
+                    }
+                    
+                    ctx.restore();
+                }
+            }
+            
+            // TRAIL SPRITESHEET GENERATOR
+            function generateTrailSpritesheet() {
+                const size = parseInt(document.getElementById('trail-size').value);
+                const frames = parseInt(document.getElementById('trail-frames').value);
+                const color1 = document.getElementById('trail-color1').value;
+                const color2 = document.getElementById('trail-color2').value;
+                
+                const canvas = document.getElementById('trail-canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Update canvas size
+                canvas.width = size * frames;
+                canvas.height = size;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Generate each frame
+                for (let frame = 0; frame < frames; frame++) {
+                    const x = frame * size + size / 2;
+                    const y = size / 2;
+                    
+                    // Trail effect parameters
+                    const progress = frame / (frames - 1);
+                    
+                    // Size decreases as trail fades
+                    const particleSize = size * 0.35 * (1 - progress * 0.5);
+                    
+                    // Stretch factor is higher at the beginning
+                    const stretch = 1 + (1 - progress) * 1.5;
+                    
+                    // Color transitions from color1 to color2
+                    const color = interpolateColor(color1, color2, progress);
+                    
+                    // Opacity decreases
+                    const opacity = 1 - progress * 0.7;
+                    
+                    ctx.save();
+                    ctx.globalAlpha = opacity;
+                    
+                    // Draw the stretched trail particle
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, particleSize * stretch);
+                    gradient.addColorStop(0, color);
+                    gradient.addColorStop(0.7, shiftColor(color, -20, 0.7));
+                    gradient.addColorStop(1, `rgba(${hexToRgb(color)}, 0)`);
+                    
+                    ctx.fillStyle = gradient;
+                    
+                    // Draw an ellipse for the stretched effect
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, particleSize, particleSize * stretch, Math.PI / 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Add a brighter core
+                    const coreGradient = ctx.createRadialGradient(x, y, 0, x, y, particleSize * 0.6);
+                    coreGradient.addColorStop(0, shiftColor(color, 50));
+                    coreGradient.addColorStop(1, color);
+                    
+                    ctx.fillStyle = coreGradient;
+                    ctx.beginPath();
+                    ctx.arc(x, y, particleSize * 0.6, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.restore();
+                }
+            }
+            
+            // UTILITY FUNCTIONS
+            
+            // Convert hex color to RGB
+            function hexToRgb(hex) {
+                // Remove # if present
+                hex = hex.replace('#', '');
+                
+                // Parse hex values
+                const r = parseInt(hex.substring(0, 2), 16);
+                const g = parseInt(hex.substring(2, 4), 16);
+                const b = parseInt(hex.substring(4, 6), 16);
+                
+                return `${r}, ${g}, ${b}`;
+            }
+            
+            // Shift a color lighter or darker
+            function shiftColor(hex, amount, alpha = 1) {
+                // Remove # if present
+                hex = hex.replace('#', '');
+                
+                // Parse hex values
+                let r = parseInt(hex.substring(0, 2), 16);
+                let g = parseInt(hex.substring(2, 4), 16);
+                let b = parseInt(hex.substring(4, 6), 16);
+                
+                // Shift the values
+                r = Math.max(0, Math.min(255, r + amount));
+                g = Math.max(0, Math.min(255, g + amount));
+                b = Math.max(0, Math.min(255, b + amount));
+                
+                if (alpha < 1) {
+                    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                } else {
+                    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+                }
+            }
+            
+            // Interpolate between two colors
+            function interpolateColor(color1, color2, factor) {
+                // Remove # if present
+                color1 = color1.replace('#', '');
+                color2 = color2.replace('#', '');
+                
+                // Parse hex values
+                const r1 = parseInt(color1.substring(0, 2), 16);
+                const g1 = parseInt(color1.substring(2, 4), 16);
+                const b1 = parseInt(color1.substring(4, 6), 16);
+                
+                const r2 = parseInt(color2.substring(0, 2), 16);
+                const g2 = parseInt(color2.substring(2, 4), 16);
+                const b2 = parseInt(color2.substring(4, 6), 16);
+                
+                // Interpolate
+                const r = Math.round(r1 + (r2 - r1) * factor);
+                const g = Math.round(g1 + (g2 - g1) * factor);
+                const b = Math.round(b1 + (b2 - b1) * factor);
+                
+                // Convert back to hex
+                return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+            }
+        });
+    </script>
+</body>
+</html>

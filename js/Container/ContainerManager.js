@@ -24,6 +24,8 @@ class ContainerManager {
         this.inventory = new Inventory(this, document.getElementById('inventory'));
         this.inventory.loadItems(this.core.user.items);
 
+        this.transitionManager = new MapTransitionManager(this);
+
     }
 
 

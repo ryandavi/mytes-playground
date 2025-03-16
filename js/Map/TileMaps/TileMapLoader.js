@@ -121,6 +121,11 @@ class TileMapLoader {
 		// Set dimensions
 		gameMap.dimensions = mapData.dimensions;
 
+		console.log('Tile map dimensions:', gameMap.dimensions);
+
+		// this.parent.layers.background.style.width = `${gameMap.dimensions.width}px`;
+		// this.parent.layers.background.style.height = `${gameMap.dimensions.height}px`;
+
 		// Set background from map
 		const bgUrl = await this.createMapBackgroundUrl(mapData);
 		if (bgUrl) {

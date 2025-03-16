@@ -43,7 +43,7 @@ class GameMap {
         try {
             // Initialize tile map if not already done
             if (!this.tileMapLoader) {
-                this.tileMapLoader = new TileMapLoader(this.parent);
+                this.tileMapLoader = new TileMapLoader(this);
             }
             
             // Load map data - OPTIMIZATION: Store the promise to avoid loading twice

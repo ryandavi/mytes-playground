@@ -271,9 +271,7 @@ body {
 		touch-action: none;
 		-webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 
-		&:not(.noScroll) {
-			overflow: hidden;
-		}
+
 
 		&.valid-drop-target {
 			outline: var(--border-width) solid var(--drop-target) !important;
