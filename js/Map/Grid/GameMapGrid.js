@@ -198,17 +198,13 @@ class GridSystem {
     handleMouseMove(event) {
         if (!this.debugMode || !this.debugInitialized) return;
 
-        // Get mouse position relative to container
-        const containerRect = this.parent.parent.element.getBoundingClientRect();
-        const mouseX = event.clientX - containerRect.left;
-        const mouseY = event.clientY - containerRect.top;
-
         // Convert to world coordinates
-        const worldX = mouseX - this.parent.parent.camera.posX;
-        const worldY = mouseY - this.parent.parent.camera.posX;
+        const mouse = this.parent.parent.getLocalMouse();
+
+        console.log(mouse);
 
         // Get grid coordinates
-        const gridPos = this.worldToGrid(worldX, worldY);
+        const gridPos = this.worldToGrid(mouse.x, mouse.y);
 
         // Update cursor tile position
         if (gridPos.x >= 0 && gridPos.x < this.gridWidth && gridPos.y >= 0 && gridPos.y < this.gridHeight) {
@@ -221,6 +217,10 @@ class GridSystem {
             const coordsElement = this.debugElements.cursorTile.querySelector('.coords');
             coordsElement.innerText = `${gridPos.x}, ${gridPos.y}`;
 
+            if(!this.debugElements.cursorTile.classList.contains('visible')){
+                this.debugElements.cursorTile.classList.add('visible');
+            }
+
             // Update color based on walkability
             if (!cell.walkable) {
                 this.debugElements.cursorTile.style.borderColor = 'red';
@@ -228,13 +228,16 @@ class GridSystem {
                 this.debugElements.cursorTile.style.borderColor = 'yellow';
             }
         } else {
-            this.debugElements.cursorTile.style.display = 'none';
+            this.debugElements.cursorTile.classList.remove('visible');
         }
     }
 
     // Update the tile in front of a myte based on direction
     updateMyteFrontTile(myte) {
+        
         if (!this.debugMode || !this.debugInitialized || !myte) return;
+
+
 
         // Get myte's position and direction
         const direction = myte.direction || 'down';
@@ -273,7 +276,11 @@ class GridSystem {
 
             this.debugElements.myteFrontTile.style.left = `${cell.posX}px`;
             this.debugElements.myteFrontTile.style.top = `${cell.posY}px`;
-            this.debugElements.myteFrontTile.style.display = 'block';
+
+
+            if(!this.debugElements.myteFrontTile.classList.contains('visible')){
+                this.debugElements.myteFrontTile.classList.add('visible');
+            }
 
             // Update color based on walkability
             if (!cell.walkable) {
@@ -284,7 +291,7 @@ class GridSystem {
                 this.debugElements.myteFrontTile.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
             }
         } else {
-            this.debugElements.myteFrontTile.style.display = 'none';
+            this.debugElements.myteFrontTile.classList.remove('visible');
         }
     }
 

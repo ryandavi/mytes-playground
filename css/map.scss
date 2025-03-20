@@ -1,31 +1,33 @@
 /* LAYERS */
 .container-wrapper {
 	>.container {
-
+		// overflow: hidden;
 
 		&:not(.noScroll) {
 			// overflow: hidden;
 
-            >.canvas {
+			>.canvas {
 
-                >.layer {
-                    overflow: hidden;
-                }
-            }
+				>.layer {
+					// overflow: hidden;
+				}
+			}
 
 		}
 
 
-        &.noScroll {
-            >.canvas {
+		&.noScroll {
 
-                >.layer {
-                    width: 100%;
-                    height: 100%;
-                    // overflow: hidden;
-                }
-            }
-        }
+			overflow: hidden;
+			>.canvas {
+
+				>.layer {
+					width: 100%;
+					height: 100%;
+					// overflow: hidden;
+				}
+			}
+		}
 
 
 		>.crosshair {
@@ -73,7 +75,7 @@
 				left: 0;
 
 
-				
+
 				&.tile-map {
 					>.tile-layer {
 						position: absolute;
@@ -81,6 +83,7 @@
 						left: 0;
 						width: 100%;
 						height: 100%;
+
 						>.tile {
 							position: absolute;
 						}
@@ -254,7 +257,8 @@
 						pointer-events: none;
 						user-select: none;
 
-						>.front, .back {
+						>.front,
+						.back {
 							position: absolute;
 							top: 0;
 							left: 0;
@@ -337,20 +341,20 @@
 					&.animated-map-object {
 						&.butterfly {
 							&.blue {
-								> .sprite {
+								>.sprite {
 									filter: hue-rotate(156deg);
 								}
 							}
 
 							&.green {
-								> .sprite {
-								filter: hue-rotate(60deg);
+								>.sprite {
+									filter: hue-rotate(60deg);
 								}
 							}
 
 							&.purple {
-								> .sprite {
-								filter: hue-rotate(270deg);
+								>.sprite {
+									filter: hue-rotate(270deg);
 								}
 							}
 						}
@@ -405,7 +409,7 @@
 	pointer-events: none;
 	background-size: cover;
 	will-change: transform, opacity;
-	  transform: translate(-50%, -50%);
+	transform: translate(-50%, -50%);
 }
 
 // Animation keyframes
@@ -436,45 +440,57 @@
 // Debug elements styling
 .debug {
 	&.cursor-tile {
-	  position: absolute;
-	  border: 2px solid yellow;
-	  background-color: rgba(255, 255, 0, 0.2);
-
-	  cursor: pointer;
-
-	  >.coords {
-		font-size: 10px;
 		position: absolute;
-		top: -2em;
-		white-space: nowrap;
-		color: white;
-	  }
+		border: 2px solid yellow;
+		background-color: rgba(255, 255, 0, 0.2);
+
+		visibility: hidden;
+
+		&.visible {
+			cursor: pointer;
+			visibility: visible;
+		}
+
+		>.coords {
+			font-size: 10px;
+			position: absolute;
+			top: -2em;
+			white-space: nowrap;
+			color: white;
+		}
 	}
-	
+
 	&.myte-front-tile {
-	  position: absolute;
-	  border: 2px solid red;
-	  background-color: rgba(255, 0, 0, 0.2);
+		position: absolute;
+		border: 2px solid red;
+		background-color: rgba(255, 0, 0, 0.2);
+
+		visibility: hidden;
+
+		&.visible {
+			cursor: pointer;
+			visibility: visible;
+		}
 
 	}
-	
+
 	&.grid-cell {
-	  position: absolute;
-	  border: 1px solid rgba(100, 100, 255, 0.3);
-	  
-	  &.unwalkable {
-		background-color: rgba(255, 0, 0, 0.2);
-	  }
-	  
-	  &.tile-unwalkable {
-		background-color: rgba(255, 100, 0, 0.2);
-	  }
-	  
-	  &.object-unwalkable {
-		background-color: rgba(0, 0, 255, 0.2);
-	  }
+		position: absolute;
+		border: 1px solid rgba(100, 100, 255, 0.3);
+
+		&.unwalkable {
+			background-color: rgba(255, 0, 0, 0.2);
+		}
+
+		&.tile-unwalkable {
+			background-color: rgba(255, 100, 0, 0.2);
+		}
+
+		&.object-unwalkable {
+			background-color: rgba(0, 0, 255, 0.2);
+		}
 	}
-  }
+}
 
 
 
@@ -494,102 +510,189 @@
 
 /* Portal styling */
 .mapObject.portal {
-    overflow: visible; /* Allow particles to extend outside bounds */
-    transform-origin: center;
+	overflow: visible;
+	/* Allow particles to extend outside bounds */
+	transform-origin: center;
 }
 
 .mapObject.portal.active {
-    animation: portal-pulse 4s infinite ease-in-out;
+	animation: portal-pulse 4s infinite ease-in-out;
 }
 
 .mapObject.portal.inactive {
-    opacity: 0.6;
-    filter: grayscale(70%);
+	opacity: 0.6;
+	filter: grayscale(70%);
 }
 
 /* Portal pulse animation */
 @keyframes portal-pulse {
-    0% { transform: scale(1); filter: brightness(1); }
-    50% { transform: scale(1.05); filter: brightness(1.2); }
-    100% { transform: scale(1); filter: brightness(1); }
+	0% {
+		transform: scale(1);
+		filter: brightness(1);
+	}
+
+	50% {
+		transform: scale(1.05);
+		filter: brightness(1.2);
+	}
+
+	100% {
+		transform: scale(1);
+		filter: brightness(1);
+	}
 }
 
 /* Portal variants */
 .mapObject.portal.blue_portal .sprite {
-    box-shadow: 0 0 20px rgba(0, 191, 255, 0.7);
+	box-shadow: 0 0 20px rgba(0, 191, 255, 0.7);
 }
 
 .mapObject.portal.red_portal .sprite {
-    box-shadow: 0 0 20px rgba(255, 69, 0, 0.7);
+	box-shadow: 0 0 20px rgba(255, 69, 0, 0.7);
 }
 
 .mapObject.portal.ancient_portal .sprite {
-    box-shadow: 0 0 20px rgba(218, 165, 32, 0.7);
+	box-shadow: 0 0 20px rgba(218, 165, 32, 0.7);
 }
 
 .mapObject.portal.magic_circle .sprite {
-    box-shadow: 0 0 20px rgba(153, 50, 204, 0.7);
+	box-shadow: 0 0 20px rgba(153, 50, 204, 0.7);
 }
 
 /* Map transition overlay */
 .map-transition-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: black;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.5s ease-in-out;
-    z-index: 10000;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background-color: black;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.5s ease-in-out;
+	z-index: 10000;
 }
 
 .map-transition-overlay.visible {
-    opacity: 1;
+	opacity: 1;
 }
 
 .map-transition-overlay.active {
-    pointer-events: auto;
+	pointer-events: auto;
 }
 
 .transition-message {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: white;
-    font-size: 24px;
-    font-family: sans-serif;
-    text-align: center;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	color: white;
+	font-size: 24px;
+	font-family: sans-serif;
+	text-align: center;
+	opacity: 0;
+	transition: opacity 0.3s ease-in-out;
 }
 
 .transition-message.visible {
-    opacity: 1;
+	opacity: 1;
 }
 
 /* Portal interaction hint */
 .mapObject.portal .interactive-collider {
-    border-radius: 50%;
-    background: radial-gradient(
-        circle, 
-        rgba(255, 255, 255, 0.1) 0%, 
-        rgba(255, 255, 255, 0.05) 50%, 
-        rgba(255, 255, 255, 0) 70%
-    );
-    animation: portal-hint 2s infinite ease-in-out;
-    opacity: 0;
-    transition: opacity 0.3s ease;
+	border-radius: 50%;
+	background: radial-gradient(circle,
+			rgba(255, 255, 255, 0.1) 0%,
+			rgba(255, 255, 255, 0.05) 50%,
+			rgba(255, 255, 255, 0) 70%);
+	animation: portal-hint 2s infinite ease-in-out;
+	opacity: 0;
+	transition: opacity 0.3s ease;
 }
 
 .mapObject.portal:hover .interactive-collider {
-    opacity: 1;
+	opacity: 1;
 }
 
 @keyframes portal-hint {
-    0% { transform: scale(0.9); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(0.9); }
+	0% {
+		transform: scale(0.9);
+	}
+
+	50% {
+		transform: scale(1.1);
+	}
+
+	100% {
+		transform: scale(0.9);
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+.map-transition-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background-color: black;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.5s ease-in-out;
+	z-index: 10000;
+
+	&.visible {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	.transition-message {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		color: white;
+		font-size: 24px;
+		text-align: center;
+		opacity: 0;
+		transition: opacity 0.3s ease-in-out;
+
+		&.visible {
+			opacity: 1;
+		}
+
+	}
+}
+
+.mapObject {
+	&.portal {
+		>.portal-window {
+			background-color: var(--button-mid);
+			border: var(--border-width) solid var(--header-dark);
+			border-top: 0;
+			border-radius: var(--border-radius);
+			filter: var(--shadow);
+			width: 100%;
+			height: 100%;
+
+			>.title {
+				color: white;
+				border-bottom: var(--border-width) solid var(--header-dark);
+				box-shadow: 0 var(--border-width) 0px 0px var(--header-light) inset, 0px var(--border-width) 0px 0px rgba(0, 0, 0, 0.1);
+				background-color: var(--header-mid);
+				padding: .25em;
+				font-size: .9em;
+			}
+		}
+	}
 }

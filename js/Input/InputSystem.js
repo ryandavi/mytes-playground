@@ -715,7 +715,7 @@ class InputSystem {
 	 * @returns {Object} Subscription handle with unsubscribe method
 	 */
 	on(eventType, callback, options = {}) {
-		console.log(`Subscribing to event: ${eventType}`, options);
+		// console.log(`Subscribing to event: ${eventType}`, options);
 	  const path = eventType.split('.');
 	  let target = this.listeners;
 	  

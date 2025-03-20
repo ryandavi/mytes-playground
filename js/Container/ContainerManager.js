@@ -7,8 +7,6 @@ class ContainerManager {
         this.containerWrapper = this.element.closest('.container-wrapper');
         this.canvas = this.element.querySelector('.canvas');
 
-
-
         this.activeMyte = null;
         this.camera = null;
 
@@ -26,11 +24,22 @@ class ContainerManager {
 
         this.transitionManager = new MapTransitionManager(this);
 
+        this.settings = {
+            limitMap: true,
+            defaultMyteCamera: CAMERA_FOLLOW_MODES.CHARACTER
+        }
+
     }
 
 
 
     async init() {
+
+        if(this.settings.limitMap) {
+            this.element.classList.add('noScroll');
+        }
+
+
         try {
             // Update loading status
             if (this.core && this.core.loadingManager) {
@@ -65,7 +74,13 @@ class ContainerManager {
 
             // Initialize game map with the loaded data
             this.gameMap = new GameMap(this, mapData);
-            await this.gameMap.initialize();
+            await this.gameMap.initialize('HouseNew');
+
+
+            // Initialize transition manager after game map is set up
+            if (!this.transitionManager) {
+                this.transitionManager = new MapTransitionManager(this);
+            }
 
             // Update loading progress more incrementally
             if (this.core && this.core.loadingManager) {
@@ -110,8 +125,6 @@ class ContainerManager {
 
             return true;
         } catch (error) {
-            console.error('Error initializing container:', error);
-
             // Show error in loading screen
             if (this.core && this.core.loadingManager) {
                 this.core.loadingManager.setMessage("Error: " + error.message);
@@ -121,78 +134,7 @@ class ContainerManager {
         }
     }
 
-    // Add this method to ContainerManager for map transitions
-    async loadMap(mapId) {
-        // Show loading screen
-        if (this.core && this.core.loadingManager) {
-            this.core.loadingManager.show();
-            this.core.loadingManager.setMessage(`Loading ${mapId}...`);
-            this.core.loadingManager.updateProgress(10);
-        }
 
-        try {
-            // Clean up current map if it exists
-            if (this.gameMap) {
-                // Update loading progress
-                if (this.core && this.core.loadingManager) {
-                    this.core.loadingManager.setMessage("Cleaning up current map...");
-                    this.core.loadingManager.updateProgress(30);
-                }
-
-                this.gameMap.dispose();
-            }
-
-            // Load new map data
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Loading map data...");
-                this.core.loadingManager.updateProgress(50);
-            }
-
-            const response = await fetch(`data/maps/${mapId}.json`);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const mapData = await response.json();
-
-            // Initialize new map
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Initializing map...");
-                this.core.loadingManager.updateProgress(70);
-            }
-
-            this.gameMap = new GameMap(this, mapData);
-            await this.gameMap.initialize();
-
-            // Place Mytes in new map
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Placing creatures...");
-                this.core.loadingManager.updateProgress(90);
-            }
-
-            this.mytes.forEach(myte => {
-                const spawnPoint = this.gameMap.getSpawnPoint('myte');
-                myte.setPosition(spawnPoint.x, spawnPoint.y);
-            });
-
-            // Reset camera
-            this.camera.reset();
-
-            // Complete loading
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage(`Welcome to ${mapId}!`);
-                this.core.loadingManager.updateProgress(100);
-            }
-
-            return true;
-        } catch (error) {
-            console.error(`Error loading map ${mapId}:`, error);
-
-            // Show error in loading screen
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Error loading map: " + error.message);
-            }
-
-            return false;
-        }
-    }
 
     // Input state accessors that delegate to inputHandler
     getLocalMouse(element = null) {
@@ -564,6 +506,8 @@ class ContainerManager {
 
         this.activeMyte = myte;
 
+        this.camera.setMode(this.settings.defaultMyteCamera);
+
 
         if (myte !== null) {
             myte.duplicate.classList.add('active');
@@ -618,6 +562,17 @@ class ContainerManager {
     tickUpdate(tickDelta) {
     }
 
+
+    async loadMap(mapId, options = {}) {
+        return this.transitionManager.startTransition({
+            targetMap: mapId,
+            targetSpawnPoint: options.spawnPoint || 'default',
+            duration: options.duration || 1000,
+            message: options.message || `Traveling to ${mapId}...`,
+            preserveCamera: options.preserveCamera !== false
+        });
+    }
+
     dispose() {
         this.mytes.forEach(myte => myte.dispose());
         this.mytes = [];
@@ -641,6 +596,11 @@ class ContainerManager {
         if (this.inputHandler) {
             this.inputHandler.dispose();
             this.inputHandler = null;
+        }
+
+        if (this.transitionManager) {
+            this.transitionManager.dispose();
+            this.transitionManager = null;
         }
 
 

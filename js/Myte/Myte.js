@@ -58,7 +58,6 @@ class Myte {
 
 		// bools
 		this.checkForCollisions = true;
-		this.limitToContainer = false;
 
 		this.size = {
 			width: 192,
@@ -113,11 +112,11 @@ class Myte {
 		this.runAway_angle_distance = 300;
 		this.inputHandler;
 
-
-
-
-
 	}
+
+	get limitToContainer() {
+        return this.parent.settings.limitMap;
+    }
 
 	initParticleEffects() {
 		const particleSystem = this.parent.gameMap.particleSystem;
@@ -130,6 +129,15 @@ class Myte {
 		// this.addEffect("SMOKE_SPRITE");
 		
 	}
+
+	pause() {
+		this.isPaused = true;
+	}
+
+	resume() {
+		this.isPaused = false;
+	}
+
 
 	init() {
 		/********************************************

@@ -40,60 +40,68 @@ class GameMap {
     }
 
     async initialize() {
-        try {
-            // Initialize tile map if not already done
-            if (!this.tileMapLoader) {
-                this.tileMapLoader = new TileMapLoader(this);
-            }
-            
-            // Load map data - OPTIMIZATION: Store the promise to avoid loading twice
-            let mapLoadPromise;
+        // load map
+        await this.loadMap('HouseNew');
+    }
+
+    async loadMap(mapId, options = {}){
+
             try {
-                // Load map data
-                mapLoadPromise = this.tileMapLoader.loadTileMap(`data/spritesheets/HouseNew.tmx`);
-                const mapData = await mapLoadPromise;
-                
-                // Apply the map data to this GameMap instance
-                await this.tileMapLoader.applyToGameMap(this, mapData);
-                
-                console.log('Tile map successfully initialized');
-            } catch (error) {
-                console.error('Error initializing tile map:', error);
-            }
-
-            // Initialize particle system
-            this.particleSystem = new GameMapParticleSystem(this);
-            this.particleSystem.start();
-
-            // Set background if defined in map data
-            if (this.mapData?.background) {
-                this.setBackground(this.mapData.background);
-            }
-
-            // Load predefined objects
-            if (this.mapData?.objects && this.mapData.objects.length > 0) {
-                await this.loadPredefinedObjects();
-            }
-
-            // DEMONSTRATION OBJECTS - Comment these out or make conditional for production
-            this.addObject('BUTTERFLY', 'small', 100, 100);
-            this.addObject('BUTTERFLY', 'purple', 400, 300);
-            this.addObject('BUTTERFLY', 'blue', 400, 300);
-
-            // Calculate initial pathfinding routes if needed
-            if (this.gridSystem && this.gridSystem.pathfinder) {
-                const path = this.gridSystem.pathfinder.findPath(192 / 2, 192 / 2, 500, 500, 192, 192);
-                if (path) {
-                    console.log('Path found:', path);
-                    this.gridSystem.pathfinder.visualizePath(this.layers.debug, path);
+                // Initialize tile map if not already done
+                if (!this.tileMapLoader) {
+                    this.tileMapLoader = new TileMapLoader(this);
                 }
+                
+                // Load map data - OPTIMIZATION: Store the promise to avoid loading twice
+                let mapLoadPromise;
+                try {
+                    // Load map data
+                    mapLoadPromise = this.tileMapLoader.loadTileMap(`data/spritesheets/${mapId}.tmx`);
+                    const mapData = await mapLoadPromise;
+                    
+                    // Apply the map data to this GameMap instance
+                    await this.tileMapLoader.applyToGameMap(this, mapData);
+                    
+                    console.log('Tile map successfully initialized');
+                } catch (error) {
+                    console.error('Error initializing tile map:', error);
+                }
+    
+                // Initialize particle system
+                this.particleSystem = new GameMapParticleSystem(this);
+                this.particleSystem.start();
+    
+                // Set background if defined in map data
+                if (this.mapData?.background) {
+                    this.setBackground(this.mapData.background);
+                }
+    
+                // Load predefined objects
+                if (this.mapData?.objects && this.mapData.objects.length > 0) {
+                    await this.loadPredefinedObjects();
+                }
+    
+                // DEMONSTRATION OBJECTS - Comment these out or make conditional for production
+                this.addObject('BUTTERFLY', 'small', 100, 100);
+                this.addObject('BUTTERFLY', 'purple', 400, 300);
+                this.addObject('BUTTERFLY', 'blue', 400, 300);
+    
+                // Calculate initial pathfinding routes if needed
+                if (this.gridSystem && this.gridSystem.pathfinder) {
+                    const path = this.gridSystem.pathfinder.findPath(192 / 2, 192 / 2, 500, 500, 192, 192);
+                    if (path) {
+                        console.log('Path found:', path);
+                        this.gridSystem.pathfinder.visualizePath(this.layers.debug, path);
+                    }
+                }
+    
+                return true;
+            } catch (error) {
+                console.error('Error initializing map:', error);
+                return false;
             }
 
-            return true;
-        } catch (error) {
-            console.error('Error initializing map:', error);
-            return false;
-        }
+    
     }
 
     setBackground(background) {

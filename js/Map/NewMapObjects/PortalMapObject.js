@@ -44,11 +44,11 @@ class PortalMapObject extends AnimatedMapObject {
         if (this.isAnimating || !this.isActive) return false;
         
         console.log(`Portal to ${this.targetMap} activated via interaction`);
-        
+
         // Activate the portal
-        if (interactor === this.parent.activeMyte) {
+        // if (interactor === this.parent.activeMyte) {
             this.beginTransition(interactor);
-        }
+        // }
         
         // Call parent press for basic interaction tracking
         super.press(interactor);
@@ -75,7 +75,6 @@ class PortalMapObject extends AnimatedMapObject {
     // Begin the map transition process
     beginTransition(myte) {
         if (this.isAnimating || !this.isActive || !this.targetMap) return;
-        
         this.isAnimating = true;
         
         // Disable portal during transition
@@ -85,11 +84,15 @@ class PortalMapObject extends AnimatedMapObject {
         if (this.hasAnimation('activate')) {
             this.playAnimation('activate');
         }
-        
+
+		let container = this.parent.parent;
+		let gameMap = this.parent;
+
         // Trigger the map transition
-        if (this.parent?.transitionManager) {
+        if (container.transitionManager) {
+			console.log("transition manager transition")
             // Use the transition manager if available
-            this.parent.transitionManager.startTransition({
+            container.transitionManager.startTransition({
                 targetMap: this.targetMap,
                 targetSpawnPoint: this.targetSpawnPoint,
                 duration: this.transitionDuration,
@@ -102,13 +105,16 @@ class PortalMapObject extends AnimatedMapObject {
             });
         } else {
             // Fallback to basic transition
-            this.parent.loadMap(this.targetMap).then(() => {
+			console.log("fallback transition to " + this.targetMap);
+
+
+            container.loadMap(this.targetMap).then(() => {
                 this.isAnimating = false;
                 this.isActive = true;
                 
                 // Position the myte at the target spawn point
-                if (myte && this.parent.gameMap) {
-                    const spawnPoint = this.parent.gameMap.getSpawnPoint(this.targetSpawnPoint);
+                if (myte && gameMap) {
+                    const spawnPoint = gameMap.getSpawnPoint(this.targetSpawnPoint);
                     myte.setPosition(spawnPoint.x, spawnPoint.y);
                 }
             });
@@ -121,6 +127,26 @@ class PortalMapObject extends AnimatedMapObject {
         
         // Add portal-specific class
         element.classList.add('portal', this.isActive ? 'active' : 'inactive');
+
+
+		// create element
+		const portal = document.createElement("div");
+		portal.className = "portal-window";
+		
+		const title = document.createElement("div");
+		title.className = "title";
+		title.textContent = "Outside";
+		
+		const content = document.createElement("div");
+		content.className = "content";
+		content.style.backgroundImage = "url(red.gif)";
+		
+		portal.appendChild(title);
+		portal.appendChild(content);
+		
+		element.appendChild(portal);
+		
+
         
         // Add target map hint for debugging
         if (this.targetMap) {

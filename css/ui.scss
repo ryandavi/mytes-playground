@@ -1,5 +1,3 @@
-
-
 // CONTAINER
 .container-wrapper {
     background-color: var(--button-mid);
@@ -123,101 +121,86 @@
         flex-direction: column;
         gap: 10px;
 
-        >.left {
+
+
+        >.allMytes {
+
             display: flex;
-            flex-direction: column;
+            flex-wrap: wrap;
             gap: 10px;
 
-            >.allMytes {
+            border-radius: var(--border-radius);
+            padding: var(--padding);
+            background-color: var(--button-mid);
+            border: var(--border-width) solid var(--button-dark);
+            border-bottom-color: var(--button-light);
+            border-right-color: var(--button-light);
 
+
+
+            .myte-list {
                 display: flex;
-                flex-wrap: wrap;
-                gap: 10px;
-
-                border-radius: var(--border-radius);
-                padding: var(--padding);
-                background-color: var(--button-mid);
-                border: var(--border-width) solid var(--button-dark);
-                border-bottom-color: var(--button-light);
-                border-right-color: var(--button-light);
-
-
-
-                .myte-list {
-                    display: flex;
-                    flex-direction: column;
-                    gap: var(--gap);
-                }
-
-                .myte-thumbnail {
-                    display: flex;
-                    align-items: center;
-                    gap: var(--gap);
-                    cursor: pointer;
-                    padding: 8px 12px;
-
-
-
-                    .myte-sprite {
-                        width: 48px;
-                        height: 48px;
-                        border-radius: 50%;
-                        background: white;
-                        position: relative;
-                        overflow: hidden;
-
-                        &-inner {
-                            position: absolute;
-                            width: 192px;
-                            height: 192px;
-                            background: url('../images/snail/spritesheet.png');
-                            background-position: 0px 0px;
-                            transform: scale(0.25);
-                            transform-origin: top left;
-                            image-rendering: pixelated;
-                        }
-                    }
-
-
-                }
+                flex-direction: column;
+                gap: var(--gap);
             }
 
-            >.inventory {
-
-                margin: 0 auto;
+            .myte-thumbnail {
                 display: flex;
-                flex-wrap: wrap;
-                gap: 10px;
-                width: 100%;
+                align-items: center;
+                gap: var(--gap);
+                cursor: pointer;
+                padding: 8px 12px;
 
 
-                border-radius: var(--border-radius);
-                padding: var(--padding);
-                background-color: var(--button-mid);
-                border: var(--border-width) solid var(--button-dark);
-                border-bottom-color: var(--button-light);
-                border-right-color: var(--button-light);
 
+                .myte-sprite {
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 50%;
+                    background: white;
+                    position: relative;
+                    overflow: hidden;
 
-                >.item {
-                    cursor: pointer;
+                    &-inner {
+                        position: absolute;
+                        width: 192px;
+                        height: 192px;
+                        background: url('../images/snail/spritesheet.png');
+                        background-position: 0px 0px;
+                        transform: scale(0.25);
+                        transform-origin: top left;
+                        image-rendering: pixelated;
+                    }
                 }
+
+
             }
         }
 
-        >.right.controls {
+        >.inventory {
+
+            margin: 0 auto;
             display: flex;
-            align-items: center;
-            justify-content: center;
             flex-wrap: wrap;
-            gap: var(--gap);
+            gap: 10px;
             width: 100%;
 
-            button {
-                flex: 0 1 calc(50% - calc(var(--gap) / 2));
-            }
 
+            border-radius: var(--border-radius);
+            padding: var(--padding);
+            background-color: var(--button-mid);
+            border: var(--border-width) solid var(--button-dark);
+            border-bottom-color: var(--button-light);
+            border-right-color: var(--button-light);
+
+
+            >.item {
+                cursor: pointer;
+            }
         }
+
+
+
 
     }
 
@@ -461,19 +444,20 @@
         border-radius: var(--border-radius-outer);
         padding: var(--padding);
         margin: 0 auto;
+
         display: flex;
         gap: var(--padding);
-        top: 0;
-        z-index: 1000;
-
-        position: absolute;
-        flex-direction: column;
-        transform: translate(calc(-100% - 40px), 0);
-        width: fit-content;
 
         border-bottom: var(--border-width) solid var(--button-dark);
         border-right: var(--border-width) solid var(--button-dark);
 
+        position: absolute;
+        top: 0;
+        z-index: 1000;
+
+        flex-direction: column;
+        transform: translate(calc(-100% - 40px), 0);
+        width: fit-content;
 
         input[type="radio"] {
             display: none;
@@ -484,15 +468,13 @@
         label.button {
             width: 60px;
             height: 60px;
+            padding: 0;
+            font-size: 80%;
 
             display: flex;
             justify-content: center;
             align-items: center;
             flex-direction: column;
-
-            padding: 0;
-
-            font-size: 80%;
 
             cursor: pointer;
 
@@ -500,11 +482,7 @@
                 background-color: var(--button-hover);
                 outline: 4px solid var(--button-active-border-color);
             }
-        }
 
-
-        // Radio button icons
-        label.button {
             >.icon {
                 fill: var(--button-icon-color);
                 max-height: 24px;
@@ -515,10 +493,12 @@
             >.text {
                 font-size: 85%;
             }
+
         }
 
+
         // Active
-        .hand-control-btn.active,
+        button.hand-control-btn.active,
         input[type="radio"]:checked+label.button {
 
             &:not(:checked),
@@ -544,11 +524,7 @@
         }
 
         // buttons
-        .hand-control-btn {
-            i {
-                font-size: 1.5em;
-                font-style: normal;
-            }
+        button.hand-control-btn {
 
             // sound
             &#sound-toggle {
@@ -558,18 +534,8 @@
                     display: none;
                 }
 
-                > {
-                    .icon-sound-on::before {
-                        content: "🔊";
-                    }
-
-                    .icon-sound-off::before {
-                        content: "🔇";
-                    }
-                }
             }
         }
-
 
     }
 }
@@ -704,34 +670,29 @@
 .modal-window {
     --modal-page-margin: 20px;
 
+    //positioning
     position: absolute;
-
-
+    pointer-events: none;
     z-index: 1000;
-    border-radius: var(--border-radius);
     overflow: hidden;
 
+    // sizing
+    display: flex;
+    flex-direction: column;
+    max-height: 500px;
+    width: 400px;
+
+    // style
     border: var(--border-width) solid var(--header-dark);
     border-top: 0;
-
-    box-shadow: var(--border-width) var(--border-width) 0px 0px rgba(0, 0, 0, 0.1);
-
+    border-radius: var(--border-radius);
     filter: var(--shadow);
-
-    pointer-events: none;
     background-color: var(--button-mid);
 
     // transition
     opacity: 0;
     transform: translateY(5px);
     transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
-
-    pointer-events: none;
-    width: 400px;
-
-    display: flex;
-    flex-direction: column;
-    max-height: 500px;
 
     &.floating {
         position: fixed;
@@ -797,14 +758,17 @@
     >.modal-header {
         align-items: center;
         padding: 7.5px;
-        background-color: var(--header-mid);
+
         flex: 1;
         gap: 15px;
-        color: white;
         position: relative;
         z-index: 1;
+
+        color: white;
         border-bottom: var(--border-width) solid var(--header-dark);
         box-shadow: 0 var(--border-width) 0px 0px var(--header-light) inset, 0px var(--border-width) 0px 0px rgba(0, 0, 0, 0.1);
+        background-color: var(--header-mid);
+
         display: flex;
         z-index: 2;
         padding-top: 11.5px;
@@ -894,66 +858,81 @@
     >.modal-content {
 
 
-.settings-group {
-    h3.settings-group-title {
-        margin: 0;
-        margin-bottom: 10px;
+        .settings-group {
+            h3.settings-group-title {
+                margin: 0;
+                margin-bottom: 10px;
+            }
+
+            +.settings-group {
+                margin-top: 20px;
+            }
+        }
+
+        .setting-item {
+            +.setting-item {
+                margin-top: 10px;
+            }
+
+            &:last-child {
+                margin-bottom: 0px;
+            }
+
+            label {
+                display: block;
+            }
+
+
+
+            label+input {
+                margin-top: 8px;
+            }
+
+            .checkbox-wrapper {
+                align-items: center;
+                display: flex;
+
+
+
+                label {
+                    margin-left: 8px;
+                }
+            }
+
+            &.dropdown {
+                label {
+                    margin-bottom: 8px;
+                }
+
+                select {
+                    width: 100%;
+                }
+            }
+
+        }
     }
-
-    +.settings-group {
-        margin-top: 20px;
-    }
-
-
 }
 
-.setting-item {
-    +.setting-item {
-        margin-top: 10px;
-    }
 
-    &:last-child {
-        margin-bottom: 0px;
-    }
+// DEBUG MENU
+.modal-window#game-debug-panel {
 
-    label {
-        display: block;
-    }
+    width: 500px;
 
-
-
-    label+input {
-        margin-top: 8px;
-    }
-
-    .checkbox-wrapper {
-        align-items: center;
+    .controls {
         display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: var(--gap);
+        width: 100%;
 
-
-
-        label {
-            margin-left: 8px;
-        }
-    }
-
-    &.dropdown {
-        label {
-            margin-bottom: 8px;
+        button {
+            flex: 0 1 calc(50% - calc(var(--gap) / 2));
         }
 
-        select {
-            width: 100%;
-        }
-    }
-
-
-}
     }
 }
-
-
-
 
 
 
@@ -997,6 +976,7 @@
             >.modal-controls {
                 .modal-close-btn {
                     visibility: hidden;
+
                     &.visible {
                         visibility: visible;
                     }
@@ -1021,7 +1001,8 @@
 
                 p {
                     margin: 0;
-                    + p {
+
+                    +p {
                         margin-top: .5em;
                     }
                 }
@@ -1183,21 +1164,180 @@
 
     .bottom {
         grid-area: bottom;
-        display: flex;
-        flex-direction: row;
 
+        flex: 1 0 50%;
         gap: 10px;
+        display: flex;
+        flex-direction: column;
 
-        >.left {
-            flex: 1 0 50%;
-            gap: 10px;
+        >.inventory {
             display: flex;
-            flex-direction: column;
-
-            >.inventory {
-                display: flex;
-                flex-grow: 1;
-            }
+            flex-grow: 1;
         }
+
     }
 }
+
+
+
+
+
+
+
+// TOAST
+
+/* Toast notification system */
+.toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column-reverse; /* New toasts appear at the bottom */
+    gap: 10px;
+    max-width: 350px;
+    max-height: 80vh;
+    overflow: hidden;
+    z-index: 9000;
+    pointer-events: none; /* Allow clicking through the container */
+    
+    /* Container for when in game */
+    .container-wrapper & {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+    }
+    
+    /* For mobile/smaller screens */
+    @media (max-width: 480px) {
+      left: 20px;
+      right: 20px;
+      max-width: none;
+    }
+  }
+  
+  .toast {
+    background-color: var(--button-mid);
+
+    
+    box-shadow: var(--shadow, 0 2px 4px rgba(0, 0, 0, 0.1));
+    padding: 12px;
+    margin: 0;
+    transition: transform 0.3s ease, 
+                opacity 0.3s ease, 
+                height 0.5s ease, 
+                max-height 0.5s ease, 
+                margin-top 0.3s ease,
+                padding 0.3s ease,
+                border-width 0.3s ease;
+    transform: translateX(120%);
+    opacity: 0;
+    overflow: hidden;
+    max-height: 200px;
+    width: 100%;
+    pointer-events: auto; /* Make the toast itself clickable */
+    display: flex;
+    flex-direction: column;
+    will-change: transform, opacity, height; /* Performance optimization */
+
+    cursor: pointer;
+
+
+    &.visible {
+      transform: translateX(0);
+      opacity: 1;
+
+      &:hover {
+        opacity: .9;
+        }
+    
+
+
+    }
+    
+    &.removing {
+      opacity: 0;
+      max-height: 0;
+      height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      margin-top: 0;
+      border-width: 0;
+    }
+    
+    /* Toast types */
+    &.info {
+      background-color: #e8f0fe;
+      border-left: 4px solid #4285f4;
+    }
+    
+    &.success {
+      background-color: #e6f4ea;
+      border-left: 4px solid #34a853;
+    }
+    
+    &.warning {
+      background-color: #fef6e0;
+      border-left: 4px solid #fbbc04;
+    }
+    
+    &.error {
+      background-color: #fce8e6;
+      border-left: 4px solid #ea4335;
+    }
+    
+    .toast-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    
+    .toast-title {
+      font-weight: 500;
+      margin: 0;
+      flex-grow: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .toast-content {
+      margin: 0;
+      word-break: break-word;
+    }
+    
+    .toast-progress {
+      height: 3px;
+      background-color: rgba(0, 0, 0, 0.1);
+      margin-top: 8px;
+      border-radius: 1px;
+      overflow: hidden;
+      
+      .toast-progress-bar {
+        height: 100%;
+        width: 100%;
+        background-color: rgba(0, 0, 0, 0.2);
+        transform-origin: left;
+        /* The animation will be set via JavaScript */
+      }
+    }
+    
+    .toast-close {
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+      
+      &:hover {
+        opacity: 1;
+      }
+    }
+  }

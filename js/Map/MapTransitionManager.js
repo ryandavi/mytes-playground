@@ -1,41 +1,22 @@
 class MapTransitionManager {
-    constructor(containerManager) {
-        this.containerManager = containerManager;
+    constructor(parent) {
+        this.parent = parent;
         this.isTransitioning = false;
         this.transitionConfig = null;
         
-        // Create transition overlay
-        this.overlay = document.createElement('div');
-        this.overlay.className = 'map-transition-overlay';
-        this.overlay.style.position = 'absolute';
-        this.overlay.style.top = '0';
-        this.overlay.style.left = '0';
-        this.overlay.style.width = '100%';
-        this.overlay.style.height = '100%';
-        this.overlay.style.backgroundColor = 'black';
-        this.overlay.style.opacity = '0';
-        this.overlay.style.pointerEvents = 'none';
-        this.overlay.style.transition = 'opacity 0.5s ease-in-out';
-        this.overlay.style.zIndex = '10000';
-        
-        // Add message display
-        this.messageElement = document.createElement('div');
-        this.messageElement.className = 'transition-message';
-        this.messageElement.style.position = 'absolute';
-        this.messageElement.style.top = '50%';
-        this.messageElement.style.left = '50%';
-        this.messageElement.style.transform = 'translate(-50%, -50%)';
-        this.messageElement.style.color = 'white';
-        this.messageElement.style.fontSize = '24px';
-        this.messageElement.style.fontFamily = 'sans-serif';
-        this.messageElement.style.textAlign = 'center';
-        this.messageElement.style.opacity = '0';
-        this.messageElement.style.transition = 'opacity 0.3s ease-in-out';
-        this.overlay.appendChild(this.messageElement);
+		// Create transition overlay
+		this.overlay = document.createElement('div');
+		this.overlay.className = 'map-transition-overlay';
+
+		// Create message display
+		this.messageElement = document.createElement('div');
+		this.messageElement.className = 'transition-message';
+
+		this.overlay.appendChild(this.messageElement);
         
         // Append to DOM when container is available
-        if (containerManager.element) {
-            containerManager.element.appendChild(this.overlay);
+        if (parent.element) {
+            parent.element.appendChild(this.overlay);
         }
     }
     
@@ -53,13 +34,13 @@ class MapTransitionManager {
      */
     startTransition(config) {
         if (this.isTransitioning) return false;
-        
+
         // Default configuration
         this.transitionConfig = {
             targetMap: config.targetMap,
             targetSpawnPoint: config.targetSpawnPoint || 'default',
             duration: config.duration || 1000,
-            myte: config.myte || this.containerManager.activeMyte,
+            myte: config.myte || this.parent.activeMyte,
             sourcePortal: config.sourcePortal || null,
             onComplete: config.onComplete || null,
             message: config.message || '',
@@ -69,16 +50,16 @@ class MapTransitionManager {
         this.isTransitioning = true;
         
         // Save camera position if needed
-        if (this.transitionConfig.preserveCamera && this.containerManager.camera) {
+        if (this.transitionConfig.preserveCamera && this.parent.camera) {
             this.savedCameraPosition = {
-                x: this.containerManager.camera.posX,
-                y: this.containerManager.camera.posY,
-                zoom: this.containerManager.camera.zoom
+                x: this.parent.camera.posX,
+                y: this.parent.camera.posY,
+                zoom: this.parent.camera.zoom
             };
         }
         
         // Freeze all mytes during transition
-        this.containerManager.mytes.forEach(myte => {
+        this.parent.mytes.forEach(myte => {
             myte.pause();
         });
         
@@ -87,9 +68,7 @@ class MapTransitionManager {
             this.showMessage(this.transitionConfig.message);
         }
         
-        // Fade in transition overlay
-        this.overlay.style.opacity = '1';
-        this.overlay.style.pointerEvents = 'auto';
+		this.overlay.classList.add('visible');
         
         // Begin map loading after fade completes
         setTimeout(() => this.loadTargetMap(), 500);
@@ -104,7 +83,7 @@ class MapTransitionManager {
             this.showMessage(`Loading ${this.transitionConfig.targetMap}...`);
             
             // Load the new map
-            const success = await this.containerManager.loadMap(this.transitionConfig.targetMap);
+            const success = await this.parent.gameMap.loadMap(this.transitionConfig.targetMap);
             
             if (!success) {
                 this.showMessage('Error loading map');
@@ -113,28 +92,27 @@ class MapTransitionManager {
             }
             
             // Position active myte at target spawn point
-            if (this.transitionConfig.myte && this.containerManager.gameMap) {
-                const spawnPoint = this.containerManager.gameMap.getSpawnPoint(
+            if (this.transitionConfig.myte && this.parent.gameMap) {
+                const spawnPoint = this.parent.gameMap.getSpawnPoint(
                     this.transitionConfig.targetSpawnPoint
                 );
                 
-                this.transitionConfig.myte.setPosition(spawnPoint.x, spawnPoint.y);
+                // this.transitionConfig.myte.setPosition(spawnPoint.x, spawnPoint.y);
             }
             
             // Restore camera position if needed
             if (this.transitionConfig.preserveCamera && 
                 this.savedCameraPosition && 
-                this.containerManager.camera) {
-                this.containerManager.camera.posX = this.savedCameraPosition.x;
-                this.containerManager.camera.posY = this.savedCameraPosition.y;
-                this.containerManager.camera.zoom = this.savedCameraPosition.zoom;
+                this.parent.camera) {
+                this.parent.camera.posX = this.savedCameraPosition.x;
+                this.parent.camera.posY = this.savedCameraPosition.y;
+                this.parent.camera.zoom = this.savedCameraPosition.zoom;
             }
             
             // Complete the transition
             setTimeout(() => this.finishTransition(true), 500);
             
         } catch (error) {
-            console.error('Error during map transition:', error);
             this.showMessage('Error: ' + error.message);
             setTimeout(() => this.finishTransition(false), 1000);
         }
@@ -143,13 +121,12 @@ class MapTransitionManager {
     // Finish the transition process
     finishTransition(success) {
         // Fade out overlay
-        this.overlay.style.opacity = '0';
-        this.overlay.style.pointerEvents = 'none';
+        this.overlay.classList.remove('visible');
         this.hideMessage();
         
         // Resume mytes after transition completes
         setTimeout(() => {
-            this.containerManager.mytes.forEach(myte => {
+            this.parent.mytes.forEach(myte => {
                 myte.resume();
             });
             
@@ -166,12 +143,12 @@ class MapTransitionManager {
     // Show a message during transition
     showMessage(message) {
         this.messageElement.textContent = message;
-        this.messageElement.style.opacity = '1';
+        this.messageElement.classList.add('visible');
     }
     
     // Hide the transition message
     hideMessage() {
-        this.messageElement.style.opacity = '0';
+        this.messageElement.classList.remove('visible');
     }
     
     // Clean up resources
@@ -182,6 +159,6 @@ class MapTransitionManager {
         
         this.overlay = null;
         this.messageElement = null;
-        this.containerManager = null;
+        this.parent = null;
     }
 }

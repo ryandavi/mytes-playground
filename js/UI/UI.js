@@ -90,12 +90,12 @@ class CursorManager {
         }
     }
 
-    update(){
-            
+    update() {
+
         const isClicking = this.parent.isClicking;
         const hasClickingClass = this.cursorElement.classList.contains('clicking');
-    
-        if(isClicking && !hasClickingClass) {
+
+        if (isClicking && !hasClickingClass) {
             this.cursorElement.classList.add('clicking');
         } else if (!isClicking && hasClickingClass) {
             this.cursorElement.classList.remove('clicking');
@@ -116,10 +116,11 @@ const UIToolModes = {
 class UserInterface {
     constructor(parent) {
         this.parent = parent;
-        this.debug = new Debug(parent);
+        this.debug = new DebugUI(parent);
 
-        this.sound = new SoundUI(this);
-        this.settings = new SettingsUI(this);
+        this.debugMenu = new DebugMenu(this);
+        this.sound = new SoundMenu(this);
+        this.settings = new SettingsMenu(this);
         this.isActive = false;
 
         this.selectedObject = null;
@@ -170,11 +171,6 @@ class UserInterface {
         // Initialize active mytes
         this.initActiveMytes();
 
-        // Initialize sound settings
-        this.sound.init();
-
-        this.settings.init();
-
     }
 
     initializeHandControls() {
@@ -182,15 +178,15 @@ class UserInterface {
             console.error('Hand controls element not found');
             return;
         }
-    
+
         // Add event listeners to all radio inputs in hand-controls
         const radioInputs = this.handControls.querySelectorAll('input[type="radio"]');
-        
+
         radioInputs.forEach(input => {
             // Existing change event listener
             input.addEventListener('change', (event) => {
                 const toolId = event.target.id;
-                
+
                 // Map the tool ID to the corresponding mode
                 switch (toolId) {
                     case 'hand-select':
@@ -204,7 +200,7 @@ class UserInterface {
                         break;
                 }
             });
-            
+
             // Add context menu (right-click) event listener to the input itself
             input.addEventListener('contextmenu', (event) => {
                 event.preventDefault();
@@ -212,7 +208,7 @@ class UserInterface {
                 input.dispatchEvent(new Event('change'));
                 return false;
             });
-            
+
             // Also add to the label if it exists
             const label = this.handControls.querySelector(`label[for="${input.id}"]`);
             if (label) {
@@ -224,7 +220,7 @@ class UserInterface {
                 });
             }
         });
-    
+
         // Set initial mode
         this.setToolMode(UIToolModes.SELECT);
     }
@@ -235,24 +231,24 @@ class UserInterface {
         this.parent.containerWrapper.classList.toggle('fullscreen');
         this.fullscreenButton.classList.toggle('active');
     }
-    
 
-	createThumbnail(myte) {
+
+    createThumbnail(myte) {
         const thumbnail = document.createElement('div');
         thumbnail.classList.add('myte-thumbnail');
         thumbnail.classList.add('button');
 
-		if(myte === this.activeMyte){
-			thumbnail.classList.add('active');
-		}
-		
-		thumbnail.setAttribute('data-myte-id', myte.id);
-        
+        if (myte === this.activeMyte) {
+            thumbnail.classList.add('active');
+        }
+
+        thumbnail.setAttribute('data-myte-id', myte.id);
+
         // Create sprite container
         const spriteContainer = document.createElement('div');
         spriteContainer.className = 'myte-sprite';
 
-        
+
         const spriteInner = document.createElement('div');
         spriteInner.className = 'myte-sprite-inner';
         spriteContainer.appendChild(spriteInner);
@@ -278,8 +274,8 @@ class UserInterface {
     }
 
     initActiveMytes() {
-		// find #all_mytes
-		const listContainer = document.getElementById('all_mytes');
+        // find #all_mytes
+        const listContainer = document.getElementById('all_mytes');
 
         // Add thumbnails
         if (this.parent.mytes && this.parent.mytes.length > 0) {
@@ -289,7 +285,7 @@ class UserInterface {
         } else {
             // No Mytes
             const emptyState = document.createElement('div');
-			emptyState.className = 'empty';
+            emptyState.className = 'empty';
             emptyState.textContent = 'No Mytes found';
             listContainer.appendChild(emptyState);
         }
@@ -329,34 +325,34 @@ class UserInterface {
 
     setSelected(obj) {
         const deselect = (object) => {
-            if (object instanceof Myte){
+            if (object instanceof Myte) {
                 object.duplicate.classList.remove('selected');
-            }else if (object instanceof MapObject){
+            } else if (object instanceof MapObject) {
                 object.element.classList.remove('selected');
-            }else{
+            } else {
                 object.classList.remove('selected');
             }
         };
-    
+
         const select = (object) => {
-            if (object instanceof Myte){
+            if (object instanceof Myte) {
                 object.duplicate.classList.add('selected');
-            }else if (object instanceof MapObject){
-                 object.element.classList.add('selected');
+            } else if (object instanceof MapObject) {
+                object.element.classList.add('selected');
             } else {
                 object.classList.add('selected');
             }
         };
-    
+
         // Deselect current object
         if (this.selectedObject) deselect(this.selectedObject);
-    
+
         // Toggle selection
         this.selectedObject = this.selectedObject === obj ? null : obj;
-    
+
         // Select new object
         if (this.selectedObject) select(this.selectedObject);
-    
+
         this.updateActions();
     }
 
@@ -370,53 +366,53 @@ class UserInterface {
 
         // update action list
         this.updateActions();
-        
+
         // unset selected
         this.setSelected(null);
     }
 
-	playSound(sound) {
-		this.parent.core.soundManager.playUISound(sound);
-	}
+    playSound(sound) {
+        this.parent.core.soundManager.playUISound(sound);
+    }
 
 
 
     // Modified method to use the centralized config
     changeToolMode(mode) {
         const toolConfig = this.toolConfig[mode];
-        
+
         if (!toolConfig || !toolConfig.id) {
             console.warn(`Invalid tool mode: ${mode}`);
             return false;
         }
-        
+
         const radioButton = document.getElementById(toolConfig.id);
-        
+
         if (radioButton) {
             // Check the radio button
             radioButton.checked = true;
-            
+
             // Dispatch a change event to trigger any listeners
             radioButton.dispatchEvent(new Event('change'));
-            
+
             // Update current tool mode
             this.currentToolMode = mode;
             console.log("change");
-            
+
             return true;
         }
-        
+
         console.warn(`Could not find radio button for tool: ${toolConfig.id}`);
         return false;
     }
 
-    isTool(mode){
+    isTool(mode) {
         return this.currentToolMode === mode;
     }
 
 
-    emptyActionList(){
-        const listElement = this.actionControls.querySelector('.action-list');    
+    emptyActionList() {
+        const listElement = this.actionControls.querySelector('.action-list');
         listElement.innerHTML = '';
         this.actionControls.classList.remove('visible');
     }
@@ -435,61 +431,59 @@ class UserInterface {
         return titles[category] || category;
     }
 
-updateActions() {
+    updateActions() {
 
 
-    const selectedInfo = this.actionControls.querySelector('.selected-info');
-    if (!selectedInfo) return;
+        const selectedInfo = this.actionControls.querySelector('.selected-info');
+        if (!selectedInfo) return;
 
-    const interactionType = selectedInfo.querySelector('.interaction-type .type');
-    const targetType = selectedInfo.querySelector('.target-info .type');
-    const targetName = selectedInfo.querySelector('.target-info .name');
+        const interactionType = selectedInfo.querySelector('.interaction-type .type');
+        const targetType = selectedInfo.querySelector('.target-info .type');
+        const targetName = selectedInfo.querySelector('.target-info .name');
 
-    // Remove all state classes first
-    selectedInfo.classList.remove('self-selected', 'myte-interaction', 'map-interaction', 'element-interaction');
-    this.emptyActionList();
+        // Remove all state classes first
+        selectedInfo.classList.remove('self-selected', 'myte-interaction', 'map-interaction', 'element-interaction');
+        this.emptyActionList();
 
-    if (this.selectedObject) {
-        // Determine interaction type based on selected object
-        if (this.selectedObject === this.parent.activeMyte) {
-            interactionType.textContent = "Selected Self";
-            selectedInfo.classList.add('self-selected');
-            targetType.textContent = "Myte";
-            targetName.textContent = this.selectedObject.name;
-        } else {
-            interactionType.textContent = "Interacting with";
-            
-            // Set target type and name based on object type
-            if (this.selectedObject instanceof Myte) {
-                selectedInfo.classList.add('myte-interaction');
+        if (this.selectedObject) {
+            // Determine interaction type based on selected object
+            if (this.selectedObject === this.parent.activeMyte) {
+                interactionType.textContent = "Selected Self";
+                selectedInfo.classList.add('self-selected');
                 targetType.textContent = "Myte";
                 targetName.textContent = this.selectedObject.name;
-            } else if (this.selectedObject instanceof MapObject) {
-                selectedInfo.classList.add('map-interaction');
-                targetType.textContent = "Object";
-                targetName.textContent = this.selectedObject.type;
-            } else if (this.selectedObject instanceof Element) {
-                selectedInfo.classList.add('element-interaction');
-                targetType.textContent = "Element";
-                targetName.textContent = this.selectedObject.tagName;
             } else {
-                selectedInfo.classList.add('element-interaction');
-                targetType.textContent = "Element";
-                targetName.textContent = this.selectedObject.tagName;
+                interactionType.textContent = "Interacting with";
+
+                // Set target type and name based on object type
+                if (this.selectedObject instanceof Myte) {
+                    selectedInfo.classList.add('myte-interaction');
+                    targetType.textContent = "Myte";
+                    targetName.textContent = this.selectedObject.name;
+                } else if (this.selectedObject instanceof MapObject) {
+                    selectedInfo.classList.add('map-interaction');
+                    targetType.textContent = "Object";
+                    targetName.textContent = this.selectedObject.type;
+                } else if (this.selectedObject instanceof Element) {
+                    selectedInfo.classList.add('element-interaction');
+                    targetType.textContent = "Element";
+                    targetName.textContent = this.selectedObject.tagName;
+                } else {
+                    selectedInfo.classList.add('element-interaction');
+                    targetType.textContent = "Element";
+                    targetName.textContent = this.selectedObject.tagName;
+                }
             }
+
+            selectedInfo.classList.add('visible');
+            this.updateActionList();
+        } else {
+            interactionType.textContent = "Not Selected";
+            targetType.textContent = "-";
+            targetName.textContent = "None";
+            selectedInfo.classList.remove('visible');
         }
-
-        selectedInfo.classList.add('visible');
-        this.updateActionList();
-    } else {
-        interactionType.textContent = "Not Selected";
-        targetType.textContent = "-";
-        targetName.textContent = "None";
-        selectedInfo.classList.remove('visible');
     }
-
-
-}
 
     emptyActionList() {
         const actionGroups = this.actionControls.querySelector('.action-groups');
@@ -500,19 +494,19 @@ updateActions() {
     updateActionList() {
         const actionGroups = this.actionControls.querySelector('.action-groups');
         const activeMyte = this.parent.activeMyte;
-    
+
         // Get actions grouped by category from ActionManager
         const groupedActions = ActionManager.getActionsByCategory(this.selectedObject, activeMyte);
-    
+
         // Create elements for each group
         Object.entries(groupedActions).forEach(([category, actions]) => {
             const groupElement = document.createElement('div');
             groupElement.className = `action-group ${category}`;
-    
+
             const title = document.createElement('h3');
             title.textContent = this.getCategoryTitle(category);
             groupElement.appendChild(title);
-    
+
             const actionList = document.createElement('ul');
             actions.forEach(action => {
                 const li = document.createElement('li');
@@ -521,50 +515,31 @@ updateActions() {
                 if (action.description) {
                     button.title = action.description;
                 }
-        
+
                 // click event for actions
                 button.addEventListener('click', () => {
                     const options = ActionManager.getActionRequirements(
-                        action.id, 
-                        this.selectedObject, 
+                        action.id,
+                        this.selectedObject,
                         activeMyte
                     );
 
-                    console.log(options);
-                    
                     if (options) {
                         activeMyte.queue.add(action.id, options);
                         // this.updateActions();
                     }
                 });
-        
+
                 li.appendChild(button);
                 actionList.appendChild(li);
             });
-    
+
             groupElement.appendChild(actionList);
             actionGroups.appendChild(groupElement);
         });
-    
+
         if (actionGroups.children.length > 0) {
             this.actionControls.classList.add('visible');
-        }
-    }
-
-
-
-    setupPettingBehavior(myte) {
-        if (myte.duplicate) {
-            const newElement = myte.duplicate.cloneNode(true);
-            myte.duplicate.parentNode.replaceChild(newElement, myte.duplicate);
-            myte.duplicate = newElement;
-            
-            myte.duplicate.addEventListener('click', () => {
-                if (this.currentToolMode === UIToolModes.PET) {
-                    myte.queue.addExpression('happy');
-                    myte.stats.updateMood(10);
-                }
-            });
         }
     }
 
@@ -619,11 +594,10 @@ updateActions() {
 
         // Container limit toggle
         document.getElementById('cycleContainerLimit').addEventListener("click", (event) => {
-            if(this.parent.activeMyte) {
-                this.parent.activeMyte.limitToContainer = !this.parent.activeMyte.limitToContainer;
-            }
+            this.parent.settings.limitMap = !this.parent.settings.limitMap;
             this.updateContainerLimit(event.target);
         });
+
         this.updateContainerLimit(document.getElementById('cycleContainerLimit'));
     }
 
@@ -643,22 +617,19 @@ updateActions() {
     }
 
     updateContainerLimit(button) {
-        if(this.parent.activeMyte) {
-            if(this.parent.activeMyte.limitToContainer == false) {
-                this.parent.camera.isScrollable.x = false;
-                this.parent.camera.isScrollable.y = false;
-                this.parent.element.closest('.container').classList.add('noScroll');
-                this.parent.camera.reset();
-            } else {
-                this.parent.camera.isScrollable.x = true;
-                this.parent.camera.isScrollable.y = true;
-                this.parent.element.closest('.container').classList.remove('noScroll');
-            }
-
-            button.innerText = "Limit: " + (this.parent.activeMyte.limitToContainer ? "ON" : "OFF");
+        if (this.parent.settings.limitMap) {
+            this.parent.camera.isScrollable.x = true;
+            this.parent.camera.isScrollable.y = true;
+            this.parent.element.closest('.container').classList.add('noScroll');
+            this.parent.camera.reset();
         } else {
-            button.innerText = "Limit: None";
+            this.parent.camera.isScrollable.x = false;
+            this.parent.camera.isScrollable.y = false;
+            this.parent.element.closest('.container').classList.remove('noScroll');
         }
+
+        button.innerText = "Limit: " + (this.parent.settings.limitMap ? "ON" : "OFF");
+
     }
 
     updateCycleCamera(button) {
@@ -714,5 +685,5 @@ updateActions() {
 
 
 
-    
+
 }

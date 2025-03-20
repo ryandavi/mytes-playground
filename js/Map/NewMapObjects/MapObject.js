@@ -622,17 +622,29 @@ const TYPE_CONFIGS = {
 			}
 		},
 		
+		// Particle system configuration
+		particleConfig: {
+			particleEffect: 'GLOW',
+			orbitalMotion: true,
+			orbitalSpeed: 0.02,
+			pulseEffect: true,
+			pulseFrequency: 0.05
+		},
+		
 		// Variant-specific configurations
 		variantConfigs: {
 			blue_portal: {
+				particleEffect: 'GLOW',
 				particleStartColor: '#00BFFF',
 				particleEndColor: '#0000FF'
 			},
 			red_portal: {
+				particleEffect: 'GLOW',
 				particleStartColor: '#FF4500',
 				particleEndColor: '#8B0000'
 			},
 			ancient_portal: {
+				particleEffect: 'SPARKLE',
 				particleStartColor: '#DAA520',
 				particleEndColor: '#8B4513'
 			},
@@ -641,6 +653,7 @@ const TYPE_CONFIGS = {
 					width: 192,
 					height: 192
 				},
+				particleEffect: 'SPARKLE_SPRITE',
 				particleStartColor: '#9932CC',
 				particleEndColor: '#4B0082',
 				spriteConfig: {
@@ -649,7 +662,6 @@ const TYPE_CONFIGS = {
 			}
 		}
 	}
-
 
 
 

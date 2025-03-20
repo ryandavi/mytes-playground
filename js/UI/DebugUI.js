@@ -1,4 +1,4 @@
-class Debug {
+class DebugUI {
     constructor(parent) {
         this.parent = parent;
         this.debug = document.querySelector(".debugMenu");

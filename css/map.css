@@ -1,5 +1,5 @@
 /* LAYERS */
-.container-wrapper > .container:not(.noScroll) > .canvas > .layer {
+.container-wrapper > .container.noScroll {
   overflow: hidden;
 }
 .container-wrapper > .container.noScroll > .canvas > .layer {
@@ -196,7 +196,8 @@
      -moz-user-select: none;
           user-select: none;
 }
-.container-wrapper > .container > .canvas > .layer > .mapObject > .sprite > .front, .container-wrapper > .container > .canvas > .layer > .mapObject > .sprite .back {
+.container-wrapper > .container > .canvas > .layer > .mapObject > .sprite > .front,
+.container-wrapper > .container > .canvas > .layer > .mapObject > .sprite .back {
   position: absolute;
   top: 0;
   left: 0;
@@ -314,7 +315,11 @@
   position: absolute;
   border: 2px solid yellow;
   background-color: rgba(255, 255, 0, 0.2);
+  visibility: hidden;
+}
+.debug.cursor-tile.visible {
   cursor: pointer;
+  visibility: visible;
 }
 .debug.cursor-tile > .coords {
   font-size: 10px;
@@ -327,6 +332,11 @@
   position: absolute;
   border: 2px solid red;
   background-color: rgba(255, 0, 0, 0.2);
+  visibility: hidden;
+}
+.debug.myte-front-tile.visible {
+  cursor: pointer;
+  visibility: visible;
 }
 .debug.grid-cell {
   position: absolute;
@@ -344,7 +354,8 @@
 
 /* Portal styling */
 .mapObject.portal {
-  overflow: visible; /* Allow particles to extend outside bounds */
+  overflow: visible;
+  /* Allow particles to extend outside bounds */
   transform-origin: center;
 }
 
@@ -451,4 +462,52 @@
   100% {
     transform: scale(0.9);
   }
+}
+.map-transition-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: black;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease-in-out;
+  z-index: 10000;
+}
+.map-transition-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.map-transition-overlay .transition-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 24px;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+.map-transition-overlay .transition-message.visible {
+  opacity: 1;
+}
+
+.mapObject.portal > .portal-window {
+  background-color: var(--button-mid);
+  border: var(--border-width) solid var(--header-dark);
+  border-top: 0;
+  border-radius: var(--border-radius);
+  filter: var(--shadow);
+  width: 100%;
+  height: 100%;
+}
+.mapObject.portal > .portal-window > .title {
+  color: white;
+  border-bottom: var(--border-width) solid var(--header-dark);
+  box-shadow: 0 var(--border-width) 0px 0px var(--header-light) inset, 0px var(--border-width) 0px 0px rgba(0, 0, 0, 0.1);
+  background-color: var(--header-mid);
+  padding: 0.25em;
+  font-size: 0.9em;
 }/*# sourceMappingURL=map.css.map */

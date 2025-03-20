@@ -1,4 +1,4 @@
-class SoundUI extends ModalWindow {
+class SoundMenu extends ModalWindow {
     constructor(parent) {
         // Call parent constructor with modal-specific options
         super(parent, {

@@ -1,4 +1,4 @@
-class SettingsUI extends ModalWindow {
+class SettingsMenu extends ModalWindow {
     constructor(parent) {
         super(parent, {
             id: 'game-settings-panel',
