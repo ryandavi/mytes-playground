@@ -200,9 +200,7 @@ class GridSystem {
 
         // Convert to world coordinates
         const mouse = this.parent.parent.getLocalMouse();
-
-        console.log(mouse);
-
+        
         // Get grid coordinates
         const gridPos = this.worldToGrid(mouse.x, mouse.y);
 

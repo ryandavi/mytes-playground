@@ -118,9 +118,8 @@ class UserInterface {
         this.parent = parent;
         this.debug = new DebugUI(parent);
 
-        this.debugMenu = new DebugMenu(this);
-        this.sound = new SoundMenu(this);
-        this.settings = new SettingsMenu(this);
+        
+
         this.isActive = false;
 
         this.selectedObject = null;
@@ -154,7 +153,6 @@ class UserInterface {
         this.currentToolMode = UIToolModes.SELECT;
         this.handControls = this.parent.containerWrapper.querySelector('#hand-controls');
         this.actionControls = this.parent.containerWrapper.querySelector('#action-controls');
-
         this.fullscreenButton = this.parent.containerWrapper.querySelector('.fullscreen-btn');
 
         // Initialize cursor manager
@@ -170,6 +168,10 @@ class UserInterface {
 
         // Initialize active mytes
         this.initActiveMytes();
+
+        this.soundMenu = new SoundMenu(this);
+        this.SettingsMenu = new SettingsMenu(this);
+        this.debugMenu = new DebugMenu(this);
 
     }
 
@@ -397,7 +399,6 @@ class UserInterface {
 
             // Update current tool mode
             this.currentToolMode = mode;
-            console.log("change");
 
             return true;
         }
@@ -550,114 +551,8 @@ class UserInterface {
             this.toggleFullscreen();
         });
 
-
-        // Follow goal button
-        document.getElementById("cycleFollowGoal").addEventListener("click", () => {
-            const activeMyte = this.parent.activeMyte;
-            if (activeMyte.isActive) {
-                let next = Utility.getNextKey(activeMyte.followGoal, MOVE_FOLLOW_TYPES);
-                activeMyte.setFollowMode(next);
-            }
-        });
-
-        // Goal cycle button
-        document.getElementById("cycleGoal").addEventListener("click", () => {
-            const activeMyte = this.parent.activeMyte;
-            if (activeMyte.isActive) {
-                let next = Utility.getNextKey(activeMyte.goal, MOVE_TYPES);
-                activeMyte.setMode(next);
-            }
-        });
-
-        // Skip queue button
-        document.getElementById("skipQueue").addEventListener("click", () => {
-            const activeMyte = this.parent.activeMyte;
-            if (activeMyte.isActive) {
-                activeMyte.queue.removeCurrentAction();
-                activeMyte.unset_target();
-            }
-        });
-
-        // Camera cycle button
-        document.getElementById("cycleCamera").addEventListener("click", () => {
-            let camera = this.parent.camera;
-            let next = Utility.getNextKey(camera.followMode, CAMERA_FOLLOW_MODES);
-            camera.setMode(next);
-        });
-        this.updateCycleCamera(document.getElementById("cycleCamera"));
-
-        // Debug toggle
-        document.getElementById('toggleDebug').addEventListener("click", (event) => {
-            document.body.classList.toggle('debug');
-            this.updateDebug(event.target);
-        });
-
-        // Container limit toggle
-        document.getElementById('cycleContainerLimit').addEventListener("click", (event) => {
-            this.parent.settings.limitMap = !this.parent.settings.limitMap;
-            this.updateContainerLimit(event.target);
-        });
-
-        this.updateContainerLimit(document.getElementById('cycleContainerLimit'));
     }
 
-    // Keep all your existing update methods
-    updateFollowMode(button) {
-        let modeKey = this.parent.activeMyte ? Utility.get_key_by_value(MOVE_FOLLOW_TYPES, this.parent.activeMyte.followGoal) : "None";
-        button.innerText = "Follow Mode: " + modeKey;
-    }
-
-    updateGoal(button) {
-        let modeKey = this.parent.activeMyte ? Utility.get_key_by_value(MOVE_TYPES, this.parent.activeMyte.goal) : "None";
-        button.innerText = "Goal: " + modeKey;
-    }
-
-    updateDebug(button) {
-        button.innerText = "Debug: " + (document.body.classList.contains('debug') ? "ON" : "OFF");
-    }
-
-    updateContainerLimit(button) {
-        if (this.parent.settings.limitMap) {
-            this.parent.camera.isScrollable.x = true;
-            this.parent.camera.isScrollable.y = true;
-            this.parent.element.closest('.container').classList.add('noScroll');
-            this.parent.camera.reset();
-        } else {
-            this.parent.camera.isScrollable.x = false;
-            this.parent.camera.isScrollable.y = false;
-            this.parent.element.closest('.container').classList.remove('noScroll');
-        }
-
-        button.innerText = "Limit: " + (this.parent.settings.limitMap ? "ON" : "OFF");
-
-    }
-
-    updateCycleCamera(button) {
-        let modeKey = Utility.get_key_by_value(CAMERA_FOLLOW_MODES, this.parent.camera.followMode);
-        button.innerText = "Camera: " + modeKey;
-    }
-
-    enableButtons() {
-        this.isActive = true;
-        document.querySelectorAll('#controls button.myte').forEach(button => {
-            button.disabled = false;
-        });
-    }
-
-    disableButtons() {
-        this.isActive = false;
-        document.querySelectorAll('#controls button.myte').forEach(button => {
-            button.disabled = true;
-        });
-    }
-
-    updateButtons() {
-        this.updateFollowMode(document.getElementById("cycleFollowGoal"));
-        this.updateGoal(document.getElementById("cycleGoal"));
-        this.updateDebug(document.getElementById('toggleDebug'));
-        this.updateCycleCamera(document.getElementById("cycleCamera"));
-        this.updateContainerLimit(document.getElementById('cycleContainerLimit'));
-    }
 
     update() {
         this.debug.update();

@@ -61,9 +61,7 @@ class Utility {
 
 		
 		if (typeof x === 'string') {
-			console.log(x);
 			return this.top_only_tags.includes(x.toLowerCase());
-			
 		}
 		return false;
 	}

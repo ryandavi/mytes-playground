@@ -537,7 +537,7 @@ class ContainerManager {
         }
 
         // Update UI
-        this.ui.updateButtons();
+        this.ui.debugMenu.updateButtons();
         this.ui.setSelected(null);
     }
 

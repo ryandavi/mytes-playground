@@ -232,7 +232,7 @@ class Myte {
 		// set next as active
 		this.parent.setNextMyteAsActive(this);
 		if (this.parent.activeMyte == null) {
-			this.parent.ui.disableButtons();
+			this.parent.ui.debugMenu.disableButtons();
 		}
 	}
 
@@ -253,9 +253,9 @@ class Myte {
 		// set start time - we need this to disable dragging for a few seconds at start
 		this.setStartTime();
 
-		if (this.parent.ui.isActive == false) {
-			this.parent.ui.enableButtons();
-		}
+
+		this.parent.ui.debugMenu.enableButtons();
+		
 
 	}
 
@@ -273,7 +273,7 @@ class Myte {
 
 		this.followGoal = newGoal;
 
-		this.parent.ui.updateFollowMode(document.getElementById("cycleFollowGoal"));
+		this.parent.ui.debugMenu.updateFollowMode(document.getElementById("cycleFollowGoal"));
 
 		if (this.followGoal == MOVE_FOLLOW_TYPES.NORMAL) {
 			this.runAway = false;
@@ -309,7 +309,7 @@ class Myte {
 		}
 
 
-		this.parent.ui.updateGoal(document.getElementById("cycleGoal"));
+		this.parent.ui.debugMenu.updateGoal(document.getElementById("cycleGoal"));
 
 		if (this.goal == MOVE_TYPES.FOLLOW) {
 			this.atOriginal = false;

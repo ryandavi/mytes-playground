@@ -46,7 +46,7 @@ class ContainerInputManager {
       // Sound toggle
       this.inputSystem.on('keyboard.down', (event) => {
         if (event.key === 'm') {
-          this.container.ui.sound.toggleSounds();
+          this.container.ui.soundMenu.toggleSounds();
         }
       });
       

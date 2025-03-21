@@ -221,7 +221,6 @@ class SoundMenu extends ModalWindow {
 
     updateMuteButtonState(soundManager) {
 
-        console.log(this.options);
         if (this.buttonElement) {
             // Show muted state if either sound or music is disabled
             const shouldBeMuted = !soundManager.soundEnabled && !soundManager.musicEnabled;
