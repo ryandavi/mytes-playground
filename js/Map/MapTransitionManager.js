@@ -28,68 +28,105 @@ class MapTransitionManager {
         this.container.element.appendChild(this.transitionElement);
     }
     
-    async startTransition(options = {}) {
-        const mapId = options.targetMap;
-        const spawnPoint = options.targetSpawnPoint || 'default';
-        const isInitialLoad = options.isInitialLoad || false;
-        
-        // For regular transitions (not initial load), disable inputs and show transition
-        if (!isInitialLoad) {
-            // Disable user controls during transition
-            if (this.container.inputHandler && this.container.inputHandler.disable) {
-                this.container.inputHandler.disable();
-            } else {
-                console.warn('InputHandler disable method not available');
-            }
-            
-            // Show transition screen AND wait for it to complete
-            await this.showTransition(options.message || `Loading Map`); // Traveling to ${mapId}...`);
+// Update the startTransition method in MapTransitionManager.js to pass isInitialLoad
+async startTransition(options = {}) {
+    const mapId = options.targetMap;
+    const spawnPoint = options.targetSpawnPoint || 'default';
+    const isInitialLoad = options.isInitialLoad || false;
+    const sourcePortal = options.sourcePortal || null;
+    
+    // For regular transitions (not initial load), disable inputs and show transition
+    if (!isInitialLoad) {
+        // Disable user controls during transition
+        if (this.container.inputHandler && this.container.inputHandler.disable) {
+            this.container.inputHandler.disable();
+        } else {
+            console.warn('InputHandler disable method not available');
         }
         
-        // Try to load map using the core's mapLoader
-        let newMap;
-        
-        if (this.core && this.core.mapLoader) {
-            // Core has a mapLoader, use it
-            if (isInitialLoad) {
-                // For initial load, use the regular load method to avoid nested loading screens
-                newMap = await this.core.mapLoader.loadMap(mapId, this.container);
-            } else {
-                // For transitions, use the transition method
-                newMap = await this.core.mapLoader.loadMapWithTransition(mapId, this.container, options);
-            }
+        // Show transition screen AND wait for it to complete
+        await this.showTransition(options.message || `Loading Map`);
+    }
+    
+    // Try to load map using the core's mapLoader
+    let newMap;
+    
+    if (this.core && this.core.mapLoader) {
+        // Core has a mapLoader, use it
+        if (isInitialLoad) {
+            // For initial load, use the regular load method to avoid nested loading screens
+            newMap = await this.core.mapLoader.loadMap(mapId, this.container, { isInitialLoad: true });
         } else {
-            // No core mapLoader, create map directly
-            console.warn('Core mapLoader not available, creating map directly');
-            newMap = new GameMap(this.container);
-            
-            try {
-                await newMap.initialize(mapId);
-            } catch (error) {
-                console.error('Error initializing map:', error);
+            // For transitions, use the transition method
+            newMap = await this.core.mapLoader.loadMapWithTransition(mapId, this.container, { 
+                ...options, 
+                isInitialLoad: false 
+            });
+        }
+    } else {
+        // No core mapLoader, create map directly
+        console.warn('Core mapLoader not available, creating map directly');
+        newMap = new GameMap(this.container);
+        
+        try {
+            const success = await newMap.initialize(mapId, { isInitialLoad });
+            if (!success) {
+                console.error(`[MapTransitionManager] Failed to initialize map: ${mapId}`);
                 newMap = null;
             }
+        } catch (error) {
+            console.error('[MapTransitionManager] Error initializing map:', error);
+            newMap = null;
+        }
+    }
+    
+    if (newMap) {
+        // Set up the new map environment
+        this.container.gameMap = newMap;
+        
+        // Reset camera if needed
+        if (!options.preserveCamera && this.container.camera) {
+            this.container.camera.reset();
         }
         
-        if (newMap) {
-            // Set up the new map environment
-            this.container.gameMap = newMap;
+        // Position mytes in the new map if they exist
+        if (this.container.mytes && this.container.mytes.length > 0) {
+            this.container.mytes.forEach(myte => {
+                const spawnLocation = this.container.gameMap.getSpawnPoint(spawnPoint);
+                myte.setPosition(spawnLocation.x, spawnLocation.y);
+            });
+        }
+        
+        // Hide transition screen if not initial load
+        if (!isInitialLoad) {
+            this.hideTransition();
             
-            // Reset camera if needed
-            if (!options.preserveCamera && this.container.camera) {
-                this.container.camera.reset();
+            // Re-enable user controls
+            if (this.container.inputHandler && this.container.inputHandler.enable) {
+                this.container.inputHandler.enable();
+            } else {
+                console.warn('InputHandler enable method not available');
+            }
+        }
+        
+        // Call onComplete callback if provided
+        if (typeof options.onComplete === 'function') {
+            options.onComplete(true);
+        }
+        
+        return true;
+    } else {
+        // Handle failed map loading
+        if (!isInitialLoad) {
+            this.messageElement.textContent = "Map not found!";
+            
+            // Show UI message if possible
+            if (this.container.ui && this.container.ui.showMessage) {
+                this.container.ui.showMessage(`Cannot find map "${mapId}"`);
             }
             
-            // Position mytes in the new map if they exist
-            if (this.container.mytes && this.container.mytes.length > 0) {
-                this.container.mytes.forEach(myte => {
-                    const spawnLocation = this.container.gameMap.getSpawnPoint(spawnPoint);
-                    myte.setPosition(spawnLocation.x, spawnLocation.y);
-                });
-            }
-            
-            // Hide transition screen if not initial load
-            if (!isInitialLoad) {
+            // Hide after delay
+            setTimeout(() => {
                 this.hideTransition();
                 
                 // Re-enable user controls
@@ -98,30 +135,45 @@ class MapTransitionManager {
                 } else {
                     console.warn('InputHandler enable method not available');
                 }
-            }
-            
-            return true;
+            }, 2000);
         } else {
-            // Handle failed map loading
-            if (!isInitialLoad) {
-                this.messageElement.textContent = "Error loading map!";
-                
-                // Hide after delay
-                setTimeout(() => {
-                    this.hideTransition();
-                    
-                    // Re-enable user controls
-                    if (this.container.inputHandler && this.container.inputHandler.enable) {
-                        this.container.inputHandler.enable();
-                    } else {
-                        console.warn('InputHandler enable method not available');
-                    }
-                }, 2000);
-            }
+            // For initial load failures, we need a fallback approach
+            console.error(`[MapTransitionManager] Initial map load failed for ${mapId}`);
             
-            return false;
+            // Try to load a known default map as a last resort
+            const fallbackMapId = 'House'; // Use a map that should always exist
+            
+            if (mapId !== fallbackMapId) {
+                console.log(`[MapTransitionManager] Trying fallback map: ${fallbackMapId}`);
+                return this.startTransition({
+                    ...options,
+                    targetMap: fallbackMapId,
+                    message: `Loading fallback map...`
+                });
+            } else {
+                // If even the fallback map failed, show critical error
+                console.error(`[MapTransitionManager] Critical error: Fallback map failed to load`);
+                
+                if (this.core && this.core.loadingManager) {
+                    this.core.loadingManager.setMessage(`Critical error: Could not load any map`);
+                }
+            }
         }
+        
+        // Call onComplete callback with failure if provided
+        if (typeof options.onComplete === 'function') {
+            options.onComplete(false);
+        }
+        
+        // If this transition came from a portal, re-enable it
+        if (sourcePortal) {
+            sourcePortal.isAnimating = false;
+            sourcePortal.isActive = true;
+        }
+        
+        return false;
     }
+}
     
     showTransition(message) {
         this.transitionStartTime = Date.now();

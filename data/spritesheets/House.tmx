@@ -131,7 +131,7 @@
   </object>
   <object id="65" name="Portal" x="544" y="192" width="128" height="128">
    <properties>
-    <property name="targetMap" value="OutsideTest"/>
+    <property name="targetMap" value="Outside"/>
    </properties>
   </object>
   <object id="66" name="Butterfly" x="352" y="224" width="64" height="64">

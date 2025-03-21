@@ -30,164 +30,167 @@ class ContainerManager {
         }
 
     }
-    async init() {
-        try {
-            console.log('[ContainerManager] Initializing');
-            
-            if(this.settings.limitMap) {
-                this.element.classList.add('noScroll');
-            }
-    
-            // Check for required DOM elements
-            if (!this.element) {
-                throw new Error('Container element is missing');
-            }
-            
-            if (!this.canvas) {
-                throw new Error('Canvas element is missing');
-            }
-    
-            // Update loading status
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Initializing game environment...");
-                this.core.loadingManager.updateStageProgress('container', 0.1);
-            }
-    
-            // Initialize camera
-            console.log('[ContainerManager] Initializing camera');
-            this.camera = new Camera(this, this.canvas, this.element);
-            
-            // Ensure the input handler is initialized
-            if (!this.inputHandler) {
-                console.log('[ContainerManager] Initializing input handler');
-                this.inputHandler = new ContainerInputManager(this);
-            }
-            
-            // Initialize transition manager
-            if (!this.transitionManager) {
-                console.log('[ContainerManager] Initializing transition manager');
-                this.transitionManager = new MapTransitionManager(this);
-            }
-            
-            // Check if core exists
-            if (!this.core) {
-                throw new Error('Core reference is missing');
-            }
-            
-            // Ensure the core has a mapLoader
-            if (!this.core.mapLoader) {
-                console.log("[ContainerManager] Creating a new GameMapLoader for core");
-                this.core.mapLoader = new GameMapLoader(this.core);
-                
-                // Initialize the mapLoader if needed
-                if (typeof this.core.mapLoader.init === 'function') {
-                    await this.core.mapLoader.init();
-                }
-            }
-            
-            // Update loading progress
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Loading initial map...");
-                this.core.loadingManager.updateStageProgress('container', 0.5);
-            }
-            
-            console.log('[ContainerManager] Starting initial map transition');
-            
-            // Get the right map ID
-            // Use the default or a dev map if configured
-            const initialMapId = this.core.config?.initialMap || 'House';
-            
-            // Log to see what map we're trying to load
-            console.log(`[ContainerManager] Loading initial map: ${initialMapId}`);
-            
-            // Load the initial map through the transition manager
-            const initialMapLoaded = await this.transitionManager.startTransition({
-                targetMap: initialMapId,
-                targetSpawnPoint: 'default',
-                message: `Welcome to ${initialMapId}!`,
-                preserveCamera: true,
-                isInitialLoad: true
-            });
-            
-            if (!initialMapLoaded) {
-                throw new Error(`Failed to load initial map: ${initialMapId}`);
-            }
-            
-            console.log('[ContainerManager] Initial map loaded successfully');
-            
-            // Set up inventory
-            console.log('[ContainerManager] Initializing inventory');
-            const inventoryElement = document.getElementById('inventory');
-            if (!inventoryElement) {
-                console.warn('[ContainerManager] Inventory element not found, creating placeholder');
-                // Create placeholder if not found to prevent errors
-                const placeholder = document.createElement('div');
-                placeholder.id = 'inventory';
-                document.body.appendChild(placeholder);
-                this.inventory = new Inventory(this, placeholder);
-            } else {
-                this.inventory = new Inventory(this, inventoryElement);
-            }
-            
-            this.inventory.loadItems(this.core.user?.items || []);
-            
-            if (this.core.user) {
-                this.core.user.setInventory(this.inventory);
-            }
-            
-            // Update loading progress
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Initializing Mytes...");
-                this.core.loadingManager.updateStageProgress('container', 0.8);
-            }
-            
-            // Set up mytes
-            console.log('[ContainerManager] Setting up Mytes');
-            this.setupMytes();
-            
-            // Initialize UI
-            console.log('[ContainerManager] Initializing UI');
-            if (this.ui) {
-                this.ui.init();
-            } else {
-                console.warn('[ContainerManager] UI not defined');
-            }
-            
-            // Final loading update
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.updateStageProgress('container', 1.0);
-                
-                // Check if other systems are ready before completing
-                if (this.core.loadingManager.stages.resources.progress >= 0.95 &&
-                    this.core.loadingManager.stages.core.progress >= 0.95) {
-                    this.core.loadingManager.completeLoading();
-                }
-            }
-            
-            console.log('[ContainerManager] Initialization completed successfully');
-            return true;
-        } catch (error) {
-            console.error("[ContainerManager] Error initializing container:", error);
-            
-            // Show error in loading screen
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Error: " + error.message);
-            }
-            
-            return false;
+// Update the init method in ContainerManager.js to set isInitialLoad flag
+async init() {
+    try {
+        console.log('[ContainerManager] Initializing');
+        
+        if(this.settings.limitMap) {
+            this.element.classList.add('noScroll');
         }
-    }
-    
-    // Simplified loadMap method that delegates to the transition manager
-    async loadMap(mapId, options = {}) {
-        return this.transitionManager.startTransition({
-            targetMap: mapId,
-            targetSpawnPoint: options.spawnPoint || 'default',
-            duration: options.duration || 1000,
-            message: options.message || `Traveling to ${mapId}...`,
-            preserveCamera: options.preserveCamera !== false
+
+        // Check for required DOM elements
+        if (!this.element) {
+            throw new Error('Container element is missing');
+        }
+        
+        if (!this.canvas) {
+            throw new Error('Canvas element is missing');
+        }
+
+        // Update loading status
+        if (this.core && this.core.loadingManager) {
+            this.core.loadingManager.setMessage("Initializing game environment...");
+            this.core.loadingManager.updateStageProgress('container', 0.1);
+        }
+
+        // Initialize camera
+        console.log('[ContainerManager] Initializing camera');
+        this.camera = new Camera(this, this.canvas, this.element);
+        
+        // Ensure the input handler is initialized
+        if (!this.inputHandler) {
+            console.log('[ContainerManager] Initializing input handler');
+            this.inputHandler = new ContainerInputManager(this);
+        }
+        
+        // Initialize transition manager
+        if (!this.transitionManager) {
+            console.log('[ContainerManager] Initializing transition manager');
+            this.transitionManager = new MapTransitionManager(this);
+        }
+        
+        // Check if core exists
+        if (!this.core) {
+            throw new Error('Core reference is missing');
+        }
+        
+        // Ensure the core has a mapLoader
+        if (!this.core.mapLoader) {
+            console.log("[ContainerManager] Creating a new GameMapLoader for core");
+            this.core.mapLoader = new GameMapLoader(this.core);
+            
+            // Initialize the mapLoader if needed
+            if (typeof this.core.mapLoader.init === 'function') {
+                await this.core.mapLoader.init();
+            }
+        }
+        
+        // Update loading progress
+        if (this.core && this.core.loadingManager) {
+            this.core.loadingManager.setMessage("Loading initial map...");
+            this.core.loadingManager.updateStageProgress('container', 0.5);
+        }
+        
+        console.log('[ContainerManager] Starting initial map transition');
+        
+        // Get the right map ID
+        // Use the default or a dev map if configured
+        const initialMapId = this.core.config?.initialMap || 'House';
+        
+        // Log to see what map we're trying to load
+        console.log(`[ContainerManager] Loading initial map: ${initialMapId}`);
+        
+        // Load the initial map through the transition manager
+        // Explicitly set isInitialLoad to true
+        const initialMapLoaded = await this.transitionManager.startTransition({
+            targetMap: initialMapId,
+            targetSpawnPoint: 'default',
+            message: `Welcome to ${initialMapId}!`,
+            preserveCamera: true,
+            isInitialLoad: true
         });
+        
+        if (!initialMapLoaded) {
+            throw new Error(`Failed to load initial map: ${initialMapId}`);
+        }
+        
+        console.log('[ContainerManager] Initial map loaded successfully');
+        
+        // Set up inventory
+        console.log('[ContainerManager] Initializing inventory');
+        const inventoryElement = document.getElementById('inventory');
+        if (!inventoryElement) {
+            console.warn('[ContainerManager] Inventory element not found, creating placeholder');
+            // Create placeholder if not found to prevent errors
+            const placeholder = document.createElement('div');
+            placeholder.id = 'inventory';
+            document.body.appendChild(placeholder);
+            this.inventory = new Inventory(this, placeholder);
+        } else {
+            this.inventory = new Inventory(this, inventoryElement);
+        }
+        
+        this.inventory.loadItems(this.core.user?.items || []);
+        
+        if (this.core.user) {
+            this.core.user.setInventory(this.inventory);
+        }
+        
+        // Update loading progress
+        if (this.core && this.core.loadingManager) {
+            this.core.loadingManager.setMessage("Initializing Mytes...");
+            this.core.loadingManager.updateStageProgress('container', 0.8);
+        }
+        
+        // Set up mytes
+        console.log('[ContainerManager] Setting up Mytes');
+        this.setupMytes();
+        
+        // Initialize UI
+        console.log('[ContainerManager] Initializing UI');
+        if (this.ui) {
+            this.ui.init();
+        } else {
+            console.warn('[ContainerManager] UI not defined');
+        }
+        
+        // Final loading update
+        if (this.core && this.core.loadingManager) {
+            this.core.loadingManager.updateStageProgress('container', 1.0);
+            
+            // Check if other systems are ready before completing
+            if (this.core.loadingManager.stages.resources.progress >= 0.95 &&
+                this.core.loadingManager.stages.core.progress >= 0.95) {
+                this.core.loadingManager.completeLoading();
+            }
+        }
+        
+        console.log('[ContainerManager] Initialization completed successfully');
+        return true;
+    } catch (error) {
+        console.error("[ContainerManager] Error initializing container:", error);
+        
+        // Show error in loading screen
+        if (this.core && this.core.loadingManager) {
+            this.core.loadingManager.setMessage("Error: " + error.message);
+        }
+        
+        return false;
     }
+}
+
+// Update the loadMap method to explicitly set isInitialLoad to false
+async loadMap(mapId, options = {}) {
+    return this.transitionManager.startTransition({
+        targetMap: mapId,
+        targetSpawnPoint: options.spawnPoint || 'default',
+        duration: options.duration || 1000,
+        message: options.message || `Traveling to ${mapId}...`,
+        preserveCamera: options.preserveCamera !== false,
+        isInitialLoad: false // Explicitly set to false for normal transitions
+    });
+}
 
 
     // Input state accessors that delegate to inputHandler
