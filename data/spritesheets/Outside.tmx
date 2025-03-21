@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="20" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="13">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="20" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="16">
  <properties>
   <property name="Description" value="Bliss"/>
   <property name="Location" value="outside"/>
@@ -131,7 +131,22 @@
   </object>
   <object id="11" name="Portal" x="224" y="416" width="192" height="192">
    <properties>
-    <property name="targetMap" value="HouseNew"/>
+    <property name="targetMap" value="House"/>
+   </properties>
+  </object>
+  <object id="13" name="Butterfly" x="544" y="448" width="64" height="64">
+   <properties>
+    <property name="variant" value="small"/>
+   </properties>
+  </object>
+  <object id="14" name="Butterfly" x="608" y="160" width="64" height="64">
+   <properties>
+    <property name="variant" value="yellow_butterfly"/>
+   </properties>
+  </object>
+  <object id="15" name="Butterfly" x="864" y="576" width="64" height="64">
+   <properties>
+    <property name="variant" value="blue_butterfly"/>
    </properties>
   </object>
  </objectgroup>

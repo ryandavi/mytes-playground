@@ -53,6 +53,11 @@ class Utility {
 		return false;
 	}
 	
+	static preventCache(url) {
+		const cacheBuster = `v=${Date.now()}`;
+		return `${url}${url.includes('?') ? '&' : '?'}${cacheBuster}`;
+	}
+
 	static isTopOnlyTag(x) {
 		if (x.tagName) x = x.tagName;
 

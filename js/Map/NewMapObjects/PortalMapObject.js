@@ -133,21 +133,23 @@ class PortalMapObject extends AnimatedMapObject {
 		const portal = document.createElement("div");
 		portal.className = "portal-window";
 		
+        // title
 		const title = document.createElement("div");
 		title.className = "title";
 		title.textContent = "Outside";
 		
+        // content
 		const content = document.createElement("div");
 		content.className = "content";
 		content.style.backgroundImage = "url(red.gif)";
 		
+        // combine
 		portal.appendChild(title);
 		portal.appendChild(content);
 		
+        // add to element
 		element.appendChild(portal);
 		
-
-        
         // Add target map hint for debugging
         if (this.targetMap) {
             element.dataset.targetMap = this.targetMap;

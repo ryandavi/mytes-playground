@@ -1,61 +1,67 @@
-// MapLoader.js
+// GameMapLoader with improved error handling
 class GameMapLoader {
-    constructor() {
+    constructor(core) {
+        this.core = core;
         this.maps = new Map();
         this.currentMap = null;
+        console.log(`[GameMapLoader] Initialized`);
     }
 
-    async loadMapData() {
-        try {
-            const response = await fetch('../data/maps/maps.json');
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const mapData = await response.json();
-            
-            // Store maps in the Map object
-            Object.entries(mapData.maps).forEach(([id, mapData]) => {
-                this.maps.set(id, mapData);
-            });
-
-            return true;
-        } catch (error) {
-            console.error('Error loading map data:', error);
-            return false;
-        }
+    // Optional initialization method
+    async init() {
+        console.log(`[GameMapLoader] Init called`);
+        return true;
     }
 
     async loadMap(mapId, container) {
-        const mapData = this.maps.get(mapId);
-        if (!mapData) {
-            console.error(`Map ${mapId} not found`);
+        try {
+            console.log(`[GameMapLoader] Loading map: ${mapId}`);
+            
+            // Check if container is valid
+            if (!container) {
+                throw new Error('Container is null or undefined');
+            }
+            
+            if (!container.canvas) {
+                throw new Error('Container canvas is null or undefined');
+            }
+            
+            // Create map instance
+            console.log(`[GameMapLoader] Creating new GameMap instance`);
+            const map = new GameMap(container);
+            
+            // Initialize with TMX file
+            console.log(`[GameMapLoader] Initializing map with id: ${mapId}`);
+            const success = await map.initialize(mapId);
+            
+            if (!success) {
+                console.error(`[GameMapLoader] Failed to initialize map: ${mapId}`);
+                return null;
+            }
+            
+            this.currentMap = map;
+            console.log(`[GameMapLoader] Map ${mapId} loaded successfully`);
+            return map;
+        } catch (error) {
+            console.error(`[GameMapLoader] Error loading map ${mapId}:`, error);
             return null;
         }
-
-        // Create map instance
-        const map = new GameMap(mapData, container);
-        await map.initialize();
-        
-        this.currentMap = map;
-        return map;
     }
 
-
-    async loadMapWithTransition(mapId, container) {
+    async loadMapWithTransition(mapId, container, options = {}) {
         // Show loading screen
         if (this.core && this.core.loadingManager) {
             this.core.loadingManager.show();
-            this.core.loadingManager.setMessage(`Traveling to ${mapId}...`);
-            this.core.loadingManager.updateProgress(10);
+            this.core.loadingManager.setMessage(options.message || `Traveling to ${mapId}...`);
+            this.core.loadingManager.updateStageProgress('container', 0.1); // 10% progress
         }
         
         try {
             // Prepare for map change
             if (this.currentMap) {
-                // Save current map state
-                // ...
-                
                 // Update progress
                 if (this.core && this.core.loadingManager) {
-                    this.core.loadingManager.updateProgress(30);
+                    this.core.loadingManager.updateStageProgress('container', 0.3); // 30% progress
                     this.core.loadingManager.setMessage(`Unloading current map...`);
                 }
                 
@@ -66,29 +72,20 @@ class GameMapLoader {
             
             // Update progress
             if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.updateProgress(50);
+                this.core.loadingManager.updateStageProgress('container', 0.5); // 50% progress
                 this.core.loadingManager.setMessage(`Loading ${mapId}...`);
             }
             
-            // Load the new map data
-            const mapData = this.maps.get(mapId);
-            if (!mapData) {
-                throw new Error(`Map ${mapId} not found`);
+            // Load the new map
+            const map = await this.loadMap(mapId, container);
+            
+            if (!map) {
+                throw new Error(`Failed to load map: ${mapId}`);
             }
             
             // Update progress
             if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.updateProgress(70);
-                this.core.loadingManager.setMessage(`Initializing ${mapId}...`);
-            }
-            
-            // Create map instance
-            const map = new GameMap(mapData, container);
-            await map.initialize();
-            
-            // Update progress
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.updateProgress(90);
+                this.core.loadingManager.updateStageProgress('container', 0.9); // 90% progress
                 this.core.loadingManager.setMessage(`Almost ready...`);
             }
             
@@ -97,8 +94,13 @@ class GameMapLoader {
             
             // Complete loading and hide loading screen
             if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.updateProgress(100);
+                this.core.loadingManager.updateStageProgress('container', 1.0); // 100% progress
                 this.core.loadingManager.setMessage(`Welcome to ${mapId}!`);
+                
+                // Wait a short moment before hiding
+                setTimeout(() => {
+                    this.core.loadingManager.hide();
+                }, 200);
             }
             
             return map;
@@ -113,37 +115,4 @@ class GameMapLoader {
             return null;
         }
     }
-    
-    async transitionToMap(mapId) {
-        // Disable user controls during transition
-        this.inputHandler.disable();
-        
-        // Load the new map with loading screen transition
-        const newMap = await this.parent.core.mapLoader.loadMapWithTransition(mapId, this);
-        
-        if (newMap) {
-            // Set up the new map environment
-            this.gameMap = newMap;
-            
-            // Reset camera and other systems
-            this.camera.reset();
-            
-            // Position mytes in the new map
-            this.mytes.forEach(myte => {
-                const spawnPoint = this.gameMap.getSpawnPoint('myte');
-                myte.setPosition(spawnPoint.x, spawnPoint.y);
-            });
-            
-            // Re-enable user controls after map is ready
-            this.inputHandler.enable();
-            
-            return true;
-        } else {
-            // Handle failed map loading
-            this.inputHandler.enable();
-            return false;
-        }
-    }
-
-
 }

@@ -51,51 +51,89 @@ class DebugUI {
         ];
     }
 
-    getMapMessages() {
-        const messages = [];
-        if (this.parent.gameMap) {
-            messages.push({ label: "Map Name", value: this.parent.gameMap.name });
-            messages.push({ label: "Objects Count", value: this.parent.gameMap.objects.length || 0 });
-            messages.push({ label: "Dimensions", value: `${this.parent.gameMap.dimensions.width}x${this.parent.gameMap.dimensions.height}px` });
-            messages.push({ label: "Particles", value: `${this.parent.gameMap.particleSystem.particles.length}` });
-            messages.push({ label: "Particle Emitters", value: `${this.parent.gameMap.particleSystem.emitters.length}` });
-        }
 
-        if (this.parent.gameMap?.zoneManager && this.parent.gameMap.zoneManager.zones.size > 0) {
-            messages.push(...this.getZoneDebugMessages()); // Spread the array into the main messages array
-        }
-
-
-
-        return messages;
-    }
-
-    getZoneDebugMessages() {
-        const messages = [];
-        const zoneManager = this.parent.gameMap.zoneManager;
+// Add defensive checks to getMapMessages
+getMapMessages() {
+    const messages = [];
+    
+    // Check if gameMap exists
+    if (this.parent && this.parent.gameMap) {
+        messages.push({ label: "Map Name", value: this.parent.gameMap.name || 'Unknown' });
+        messages.push({ label: "Objects Count", value: (this.parent.gameMap.objects && this.parent.gameMap.objects.length) || 0 });
         
-        // Add total zones count
-        messages.push({
-            label: "Total Zones",
-            value: zoneManager.zones.size
-        });
+        // Check if dimensions exist
+        if (this.parent.gameMap.dimensions) {
+            messages.push({ label: "Dimensions", value: `${this.parent.gameMap.dimensions.width}x${this.parent.gameMap.dimensions.height}px` });
+        }
+        
+        // Check if particleSystem exists
+        if (this.parent.gameMap.particleSystem) {
+            messages.push({ label: "Particles", value: `${this.parent.gameMap.particleSystem.particles?.length || 0}` });
+            messages.push({ label: "Particle Emitters", value: `${this.parent.gameMap.particleSystem.emitters?.length || 0}` });
+        }
+    }
+
+    // Check if zoneManager exists and has zones
+    if (this.parent && this.parent.gameMap && this.parent.gameMap.zoneManager && 
+        this.parent.gameMap.zoneManager.zones && this.parent.gameMap.zoneManager.zones.size > 0) {
+        messages.push(...this.getZoneDebugMessages());
+    }
+
+    return messages;
+}
+
+getZoneDebugMessages() {
+    const messages = [];
     
-        // Add information for each zone
-        zoneManager.zones.forEach((zone, zoneId) => {
-            const mytesInZone = Array.from(zone.mytesInZone)
-                .map(myteId => this.parent.mytes.find(m => m.id === myteId))
-                .filter(Boolean)
-                .map(myte => myte.name)
-                .join(', ');
-    
-            messages.push({
-                label: `Zone${zoneId} (${zone.type})`,
-                value: mytesInZone || 'Empty'
-            });
-        });
-    
+    // Check if zoneManager exists
+    if (!this.parent || !this.parent.gameMap || !this.parent.gameMap.zoneManager) {
         return messages;
     }
+    
+    const zoneManager = this.parent.gameMap.zoneManager;
+    
+    // Check if zones map exists
+    if (!zoneManager.zones) {
+        return messages;
+    }
+    
+    // Add total zones count
+    messages.push({
+        label: "Total Zones",
+        value: zoneManager.zones.size
+    });
+
+    // Add information for each zone
+    try {
+        zoneManager.zones.forEach((zone, zoneId) => {
+            // Skip if zone is invalid
+            if (!zone || !zone.mytesInZone) return;
+            
+            try {
+                const mytesInZone = Array.from(zone.mytesInZone)
+                    .map(myteId => this.parent.mytes?.find(m => m && m.id === myteId))
+                    .filter(Boolean)
+                    .map(myte => myte.name)
+                    .join(', ');
+            
+                messages.push({
+                    label: `Zone ${zoneId} (${zone.type || 'Unknown'})`,
+                    value: mytesInZone || 'Empty'
+                });
+            } catch (error) {
+                // Silently handle errors during transitions
+                messages.push({
+                    label: `Zone ${zoneId}`,
+                    value: 'Error'
+                });
+            }
+        });
+    } catch (error) {
+        // Silently handle errors during transitions
+    }
+
+    return messages;
+}
 
     getZoneDebugMessages() {
         const messages = [];
@@ -200,56 +238,79 @@ class DebugUI {
         return 'N/A';
     }
 
-    drawDebugColliders() {
+// Add defensive checks to drawDebugColliders method
+drawDebugColliders() {
+    // Check if game map exists
+    if (!this.parent || !this.parent.gameMap) return;
+    
+    // Check if debug layer exists
+    if (!this.parent.gameMap.layers || !this.parent.gameMap.layers.debug) return;
+    
+    // Clear previous collider visuals
+    const oldColliders = this.parent.gameMap.layers.debug.querySelectorAll('.debug-collider');
+    oldColliders.forEach(c => c.remove());
 
-
-        
-        // Clear previous collider visuals
-        const oldColliders = this.parent.gameMap.layers.debug.querySelectorAll('.debug-collider');
-        oldColliders.forEach(c => c.remove());
-
-
-		// Myte
+    // Check if mytes array exists
+    if (this.parent.mytes) {
+        // Draw myte colliders
         this.parent.mytes.forEach(myte => {
-            const myteCollider = document.createElement('div');
-            myteCollider.classList.add('debug-collider', 'myte-collider');
-            const bounds = myte.parent.getColliderBounds(myte);
-            myteCollider.style.left = `${bounds.left}px`;
-            myteCollider.style.top = `${bounds.top}px`;
-            myteCollider.style.width = `${bounds.right - bounds.left}px`;
-            myteCollider.style.height = `${bounds.bottom - bounds.top}px`;
-            this.parent.gameMap.layers.debug.appendChild(myteCollider);
-        });
-        
-        // Draw colliders for all visible objects
-        this.parent.gameMap.gridSystem.activeObjects.forEach(obj => {
-
-
-            const collider = document.createElement('div');
-            collider.classList.add('debug-collider', 'object-collider');
-
-            if(obj.config.walkable){
-                collider.classList.add('walkable-object');
+            if (!myte) return; // Skip if myte is null
+            
+            try {
+                const myteCollider = document.createElement('div');
+                myteCollider.classList.add('debug-collider', 'myte-collider');
+                const bounds = myte.parent.getColliderBounds(myte);
+                myteCollider.style.left = `${bounds.left}px`;
+                myteCollider.style.top = `${bounds.top}px`;
+                myteCollider.style.width = `${bounds.right - bounds.left}px`;
+                myteCollider.style.height = `${bounds.bottom - bounds.top}px`;
+                this.parent.gameMap.layers.debug.appendChild(myteCollider);
+            } catch (error) {
+                // Silently handle errors during transitions
             }
-            
-            const bounds = this.parent.getColliderBounds(obj);
-            collider.style.position = 'absolute';
-            collider.style.left = `${bounds.left}px`;
-            collider.style.top = `${bounds.top}px`;
-            collider.style.width = `${bounds.right - bounds.left}px`;
-            collider.style.height = `${bounds.bottom - bounds.top}px`;
-            
-            // Color based on object type
-            if (obj instanceof Myte) {
-                collider.classList.add('myte-collider');
-            } else {
-
-                collider.classList.add('object-collider');
-            }
-            
-            this.parent.gameMap.layers.debug.appendChild(collider);
         });
     }
+    
+    // Check if grid system and active objects exist
+    if (!this.parent.gameMap.gridSystem || !this.parent.gameMap.gridSystem.activeObjects) return;
+    
+    // Draw colliders for all visible objects
+    try {
+        this.parent.gameMap.gridSystem.activeObjects.forEach(obj => {
+            if (!obj) return; // Skip if object is null
+            
+            try {
+                const collider = document.createElement('div');
+                collider.classList.add('debug-collider', 'object-collider');
+
+                if (obj.config && obj.config.walkable) {
+                    collider.classList.add('walkable-object');
+                }
+                
+                const bounds = this.parent.getColliderBounds(obj);
+                collider.style.position = 'absolute';
+                collider.style.left = `${bounds.left}px`;
+                collider.style.top = `${bounds.top}px`;
+                collider.style.width = `${bounds.right - bounds.left}px`;
+                collider.style.height = `${bounds.bottom - bounds.top}px`;
+                
+                // Color based on object type
+                if (obj instanceof Myte) {
+                    collider.classList.add('myte-collider');
+                } else {
+                    collider.classList.add('object-collider');
+                }
+                
+                this.parent.gameMap.layers.debug.appendChild(collider);
+            } catch (error) {
+                // Silently handle errors during transitions
+            }
+        });
+    } catch (error) {
+        // Silently handle errors during transitions
+    }
+}
+
 
     updateDebug() {
         const debugGroups = [
@@ -271,11 +332,23 @@ class DebugUI {
     }
 
     update() {
+        // Check if debug element exists
         if (this.debug) {
-            this.updateDebug();
+            try {
+                this.updateDebug();
+            } catch (error) {
+                // Silently handle errors during transitions
+                console.warn('Debug UI update error:', error);
+            }
         }
-
-        this.queueUI.update();
-
+    
+        // Update queue UI with error handling
+        if (this.queueUI) {
+            try {
+                this.queueUI.update();
+            } catch (error) {
+                // Silently handle errors during transitions
+            }
+        }
     }
 }

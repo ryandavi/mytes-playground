@@ -1,164 +1,182 @@
 class MapTransitionManager {
-    constructor(parent) {
-        this.parent = parent;
-        this.isTransitioning = false;
-        this.transitionConfig = null;
+    constructor(container) {
+        this.container = container;
+        this.core = container.core;
+        this.transitionElement = document.querySelector('.map-transition');
+        this.messageElement = this.transitionElement?.querySelector('.transition-message');
         
-		// Create transition overlay
-		this.overlay = document.createElement('div');
-		this.overlay.className = 'map-transition-overlay';
-
-		// Create message display
-		this.messageElement = document.createElement('div');
-		this.messageElement.className = 'transition-message';
-
-		this.overlay.appendChild(this.messageElement);
+        console.log('[MapTransitionManager] Initializing');
         
-        // Append to DOM when container is available
-        if (parent.element) {
-            parent.element.appendChild(this.overlay);
+        this.minimumDisplayTime = 800;
+
+
+        // Create if not exists
+        if (!this.transitionElement) {
+            this.createTransitionElement();
         }
     }
     
-    /**
-     * Begin a map transition
-     * @param {Object} config - Transition configuration
-     * @param {string} config.targetMap - ID of the target map to load
-     * @param {string} [config.targetSpawnPoint='default'] - Spawn point name in the target map
-     * @param {number} [config.duration=1000] - Transition duration in milliseconds
-     * @param {Object} [config.myte=null] - The myte initiating the transition
-     * @param {Object} [config.sourcePortal=null] - The portal that initiated the transition
-     * @param {Function} [config.onComplete=null] - Callback after transition completes
-     * @param {string} [config.message=''] - Message to show during transition
-     * @param {boolean} [config.preserveCamera=true] - Whether to preserve camera position
-     */
-    startTransition(config) {
-        if (this.isTransitioning) return false;
-
-        // Default configuration
-        this.transitionConfig = {
-            targetMap: config.targetMap,
-            targetSpawnPoint: config.targetSpawnPoint || 'default',
-            duration: config.duration || 1000,
-            myte: config.myte || this.parent.activeMyte,
-            sourcePortal: config.sourcePortal || null,
-            onComplete: config.onComplete || null,
-            message: config.message || '',
-            preserveCamera: config.preserveCamera !== undefined ? config.preserveCamera : true
-        };
+    createTransitionElement() {
+        console.log('[MapTransitionManager] Creating transition element');
+        this.transitionElement = document.createElement('div');
+        this.transitionElement.className = 'map-transition';
         
-        this.isTransitioning = true;
+        this.messageElement = document.createElement('div');
+        this.messageElement.className = 'transition-message';
+        this.transitionElement.appendChild(this.messageElement);
         
-        // Save camera position if needed
-        if (this.transitionConfig.preserveCamera && this.parent.camera) {
-            this.savedCameraPosition = {
-                x: this.parent.camera.posX,
-                y: this.parent.camera.posY,
-                zoom: this.parent.camera.zoom
-            };
-        }
-        
-        // Freeze all mytes during transition
-        this.parent.mytes.forEach(myte => {
-            myte.pause();
-        });
-        
-        // Show transition message if provided
-        if (this.transitionConfig.message) {
-            this.showMessage(this.transitionConfig.message);
-        }
-        
-		this.overlay.classList.add('visible');
-        
-        // Begin map loading after fade completes
-        setTimeout(() => this.loadTargetMap(), 500);
-        
-        return true;
+        this.container.element.appendChild(this.transitionElement);
     }
     
-    // Load the target map
-    async loadTargetMap() {
-        try {
-            // Show loading message
-            this.showMessage(`Loading ${this.transitionConfig.targetMap}...`);
-            
-            // Load the new map
-            const success = await this.parent.gameMap.loadMap(this.transitionConfig.targetMap);
-            
-            if (!success) {
-                this.showMessage('Error loading map');
-                setTimeout(() => this.finishTransition(false), 1000);
-                return;
+    async startTransition(options = {}) {
+        const mapId = options.targetMap;
+        const spawnPoint = options.targetSpawnPoint || 'default';
+        const isInitialLoad = options.isInitialLoad || false;
+        
+        // For regular transitions (not initial load), disable inputs and show transition
+        if (!isInitialLoad) {
+            // Disable user controls during transition
+            if (this.container.inputHandler && this.container.inputHandler.disable) {
+                this.container.inputHandler.disable();
+            } else {
+                console.warn('InputHandler disable method not available');
             }
             
-            // Position active myte at target spawn point
-            if (this.transitionConfig.myte && this.parent.gameMap) {
-                const spawnPoint = this.parent.gameMap.getSpawnPoint(
-                    this.transitionConfig.targetSpawnPoint
-                );
+            // Show transition screen AND wait for it to complete
+            await this.showTransition(options.message || `Loading Map`); // Traveling to ${mapId}...`);
+        }
+        
+        // Try to load map using the core's mapLoader
+        let newMap;
+        
+        if (this.core && this.core.mapLoader) {
+            // Core has a mapLoader, use it
+            if (isInitialLoad) {
+                // For initial load, use the regular load method to avoid nested loading screens
+                newMap = await this.core.mapLoader.loadMap(mapId, this.container);
+            } else {
+                // For transitions, use the transition method
+                newMap = await this.core.mapLoader.loadMapWithTransition(mapId, this.container, options);
+            }
+        } else {
+            // No core mapLoader, create map directly
+            console.warn('Core mapLoader not available, creating map directly');
+            newMap = new GameMap(this.container);
+            
+            try {
+                await newMap.initialize(mapId);
+            } catch (error) {
+                console.error('Error initializing map:', error);
+                newMap = null;
+            }
+        }
+        
+        if (newMap) {
+            // Set up the new map environment
+            this.container.gameMap = newMap;
+            
+            // Reset camera if needed
+            if (!options.preserveCamera && this.container.camera) {
+                this.container.camera.reset();
+            }
+            
+            // Position mytes in the new map if they exist
+            if (this.container.mytes && this.container.mytes.length > 0) {
+                this.container.mytes.forEach(myte => {
+                    const spawnLocation = this.container.gameMap.getSpawnPoint(spawnPoint);
+                    myte.setPosition(spawnLocation.x, spawnLocation.y);
+                });
+            }
+            
+            // Hide transition screen if not initial load
+            if (!isInitialLoad) {
+                this.hideTransition();
                 
-                // this.transitionConfig.myte.setPosition(spawnPoint.x, spawnPoint.y);
+                // Re-enable user controls
+                if (this.container.inputHandler && this.container.inputHandler.enable) {
+                    this.container.inputHandler.enable();
+                } else {
+                    console.warn('InputHandler enable method not available');
+                }
             }
             
-            // Restore camera position if needed
-            if (this.transitionConfig.preserveCamera && 
-                this.savedCameraPosition && 
-                this.parent.camera) {
-                this.parent.camera.posX = this.savedCameraPosition.x;
-                this.parent.camera.posY = this.savedCameraPosition.y;
-                this.parent.camera.zoom = this.savedCameraPosition.zoom;
+            return true;
+        } else {
+            // Handle failed map loading
+            if (!isInitialLoad) {
+                this.messageElement.textContent = "Error loading map!";
+                
+                // Hide after delay
+                setTimeout(() => {
+                    this.hideTransition();
+                    
+                    // Re-enable user controls
+                    if (this.container.inputHandler && this.container.inputHandler.enable) {
+                        this.container.inputHandler.enable();
+                    } else {
+                        console.warn('InputHandler enable method not available');
+                    }
+                }, 2000);
             }
             
-            // Complete the transition
-            setTimeout(() => this.finishTransition(true), 500);
-            
-        } catch (error) {
-            this.showMessage('Error: ' + error.message);
-            setTimeout(() => this.finishTransition(false), 1000);
+            return false;
         }
     }
     
-    // Finish the transition process
-    finishTransition(success) {
-        // Fade out overlay
-        this.overlay.classList.remove('visible');
-        this.hideMessage();
+    showTransition(message) {
+        this.transitionStartTime = Date.now();
+        if (this.messageElement) {
+            this.messageElement.textContent = message;
+        }
         
-        // Resume mytes after transition completes
-        setTimeout(() => {
-            this.parent.mytes.forEach(myte => {
-                myte.resume();
-            });
+        // Show the transition element
+        this.transitionElement.classList.add('active');
+        
+        // Return a promise that resolves when the transition completes
+        return new Promise(resolve => {
+            // Listen for the transitionend event
+            const transitionEndHandler = () => {
+                this.transitionElement.removeEventListener('transitionend', transitionEndHandler);
+                resolve();
+            };
             
-            // Call completion callback if provided
-            if (this.transitionConfig.onComplete) {
-                this.transitionConfig.onComplete(success);
-            }
+            this.transitionElement.addEventListener('transitionend', transitionEndHandler);
             
-            this.isTransitioning = false;
-            this.transitionConfig = null;
-        }, 500);
+            // Fallback in case the transition event doesn't fire
+            // Get computed style to find actual transition duration
+            const computedStyle = window.getComputedStyle(this.transitionElement);
+            const transitionDuration = parseFloat(computedStyle.transitionDuration) * 1000;
+            
+            // Add a small buffer (50ms) to ensure the transition is complete
+            setTimeout(() => {
+                this.transitionElement.removeEventListener('transitionend', transitionEndHandler);
+                resolve();
+            }, transitionDuration + 50);
+        });
     }
     
-    // Show a message during transition
-    showMessage(message) {
-        this.messageElement.textContent = message;
-        this.messageElement.classList.add('visible');
+    // Updated hideTransition method with minimum display time
+    hideTransition() {
+
+        const timeShown = Date.now() - this.transitionStartTime;
+        
+        if (timeShown < this.minimumDisplayTime) {
+            // If it hasn't been shown long enough, delay hiding
+            setTimeout(() => {
+                this.transitionElement.classList.remove('active');
+            }, this.minimumDisplayTime - timeShown);
+        } else {
+            // If it's been shown long enough, hide immediately
+            this.transitionElement.classList.remove('active');
+        }
     }
     
-    // Hide the transition message
-    hideMessage() {
-        this.messageElement.classList.remove('visible');
-    }
-    
-    // Clean up resources
     dispose() {
-        if (this.overlay && this.overlay.parentNode) {
-            this.overlay.parentNode.removeChild(this.overlay);
+        console.log('[MapTransitionManager] Disposing');
+        if (this.transitionElement && this.transitionElement.parentNode) {
+            this.transitionElement.parentNode.removeChild(this.transitionElement);
         }
-        
-        this.overlay = null;
+        this.transitionElement = null;
         this.messageElement = null;
-        this.parent = null;
     }
 }

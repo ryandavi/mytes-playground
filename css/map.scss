@@ -19,6 +19,7 @@
 		&.noScroll {
 
 			overflow: hidden;
+
 			>.canvas {
 
 				>.layer {
@@ -507,172 +508,103 @@
 
 
 
-
 /* Portal styling */
-.mapObject.portal {
-	overflow: visible;
-	/* Allow particles to extend outside bounds */
-	transform-origin: center;
-}
+.mapObject {
+	&.portal {
+		overflow: visible; // Allow particles to extend outside bounds
+		transform-origin: center;
 
-.mapObject.portal.active {
-	animation: portal-pulse 4s infinite ease-in-out;
-}
+		&.active {
+			animation: portal-pulse 4s infinite ease-in-out;
+		}
 
-.mapObject.portal.inactive {
-	opacity: 0.6;
-	filter: grayscale(70%);
-}
+		&.inactive {
+			opacity: 0.6;
+			filter: grayscale(70%);
+		}
 
-/* Portal pulse animation */
-@keyframes portal-pulse {
-	0% {
-		transform: scale(1);
-		filter: brightness(1);
-	}
+		/* Portal variants */
+		&.blue_portal .sprite {
+			box-shadow: 0 0 20px rgba(0, 191, 255, 0.7);
+		}
 
-	50% {
-		transform: scale(1.05);
-		filter: brightness(1.2);
-	}
+		&.red_portal .sprite {
+			box-shadow: 0 0 20px rgba(255, 69, 0, 0.7);
+		}
 
-	100% {
-		transform: scale(1);
-		filter: brightness(1);
-	}
-}
+		&.ancient_portal .sprite {
+			box-shadow: 0 0 20px rgba(218, 165, 32, 0.7);
+		}
 
-/* Portal variants */
-.mapObject.portal.blue_portal .sprite {
-	box-shadow: 0 0 20px rgba(0, 191, 255, 0.7);
-}
+		&.magic_circle .sprite {
+			box-shadow: 0 0 20px rgba(153, 50, 204, 0.7);
+		}
 
-.mapObject.portal.red_portal .sprite {
-	box-shadow: 0 0 20px rgba(255, 69, 0, 0.7);
-}
+		/* Portal interaction hint */
+		.interactive-collider {
+			border-radius: 50%;
+			background: radial-gradient(circle,
+					rgba(255, 255, 255, 0.5) 0%,
+					rgba(255, 255, 255, 0.25) 50%,
+					rgba(255, 255, 255, 0) 70%);
+			animation: portal-hint 2s infinite ease-in-out;
+			opacity: 0;
+			transition: opacity 0.3s ease;
+		}
 
-.mapObject.portal.ancient_portal .sprite {
-	box-shadow: 0 0 20px rgba(218, 165, 32, 0.7);
-}
-
-.mapObject.portal.magic_circle .sprite {
-	box-shadow: 0 0 20px rgba(153, 50, 204, 0.7);
-}
-
-/* Map transition overlay */
-.map-transition-overlay {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	background-color: black;
-	opacity: 0;
-	pointer-events: none;
-	transition: opacity 0.5s ease-in-out;
-	z-index: 10000;
-}
-
-.map-transition-overlay.visible {
-	opacity: 1;
-}
-
-.map-transition-overlay.active {
-	pointer-events: auto;
-}
-
-.transition-message {
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%);
-	color: white;
-	font-size: 24px;
-	font-family: sans-serif;
-	text-align: center;
-	opacity: 0;
-	transition: opacity 0.3s ease-in-out;
-}
-
-.transition-message.visible {
-	opacity: 1;
-}
-
-/* Portal interaction hint */
-.mapObject.portal .interactive-collider {
-	border-radius: 50%;
-	background: radial-gradient(circle,
-			rgba(255, 255, 255, 0.1) 0%,
-			rgba(255, 255, 255, 0.05) 50%,
-			rgba(255, 255, 255, 0) 70%);
-	animation: portal-hint 2s infinite ease-in-out;
-	opacity: 0;
-	transition: opacity 0.3s ease;
-}
-
-.mapObject.portal:hover .interactive-collider {
-	opacity: 1;
-}
-
-@keyframes portal-hint {
-	0% {
-		transform: scale(0.9);
-	}
-
-	50% {
-		transform: scale(1.1);
-	}
-
-	100% {
-		transform: scale(0.9);
-	}
-}
-
-
-
-
-
-
-
-
-
-
-
-
-.map-transition-overlay {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	background-color: black;
-	opacity: 0;
-	pointer-events: none;
-	transition: opacity 0.5s ease-in-out;
-	z-index: 10000;
-
-	&.visible {
-		opacity: 1;
-		pointer-events: auto;
-	}
-
-	.transition-message {
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		color: white;
-		font-size: 24px;
-		text-align: center;
-		opacity: 0;
-		transition: opacity 0.3s ease-in-out;
-
-		&.visible {
+		&:hover .interactive-collider {
 			opacity: 1;
 		}
 
+		/* Portal pulse animation */
+		@keyframes portal-pulse {
+			0% {
+				transform: scale(1);
+				filter: brightness(1);
+			}
+
+			50% {
+				transform: scale(1.05);
+				filter: brightness(1.2);
+			}
+
+			100% {
+				transform: scale(1);
+				filter: brightness(1);
+			}
+		}
+
+		/* Portal interaction hint animation */
+		@keyframes portal-hint {
+			0% {
+				transform: scale(0.9);
+			}
+
+			50% {
+				transform: scale(1.1);
+			}
+
+			100% {
+				transform: scale(0.9);
+			}
+
+
+
+		}
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 .mapObject {
 	&.portal {
@@ -693,6 +625,101 @@
 				padding: .25em;
 				font-size: .9em;
 			}
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.map-transition {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 1000;
+	background-color: rgba(0, 0, 0, 1);
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	flex-direction: column;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.15s ease-in-out;
+
+	&.active {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	.transition-message {
+		color: white;
+		font-size: 24px;
+		font-weight: 600;
+		margin-bottom: 30px;
+		text-align: center;
+		text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+		animation: pulse 2s infinite;
+	}
+
+	.transition-loader {
+		width: 80px;
+		height: 80px;
+		border: 6px solid rgba(255, 255, 255, 0.3);
+		border-radius: 50%;
+		border-top-color: #fff;
+		animation: spin 1s linear infinite;
+	}
+}
+
+// Animations
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes pulse {
+
+	0%,
+	100% {
+		opacity: 1;
+	}
+
+	50% {
+		opacity: 0.7;
+	}
+}
+
+// Add responsive adjustments
+@media (max-width: 768px) {
+	.map-transition {
+		.transition-message {
+			font-size: 20px;
+		}
+
+		.transition-loader {
+			width: 60px;
+			height: 60px;
 		}
 	}
 }

@@ -12,26 +12,34 @@
         "": {
             "scaleInDock": 1
         },
+        "House.tmx": {
+            "scale": 1.2567708333333334,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 479.80107749689176,
+                "y": 479.8010774968918
+            }
+        },
         "HouseNew.tmx": {
             "expandedObjectLayers": [
                 7
             ],
-            "scale": 0.75,
+            "scale": 1.5,
             "selectedLayer": 3,
             "viewCenter": {
-                "x": 506.6666666666666,
-                "y": 556
+                "x": 407.3333333333333,
+                "y": 428
             }
         },
         "Outside.tmx": {
             "expandedObjectLayers": [
                 4
             ],
-            "scale": 1,
+            "scale": 1.5,
             "selectedLayer": 3,
             "viewCenter": {
-                "x": 427,
-                "y": 303
+                "x": 326.66666666666663,
+                "y": 346.6666666666667
             }
         },
         "house.tsx": {

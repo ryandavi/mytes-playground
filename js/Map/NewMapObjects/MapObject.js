@@ -601,8 +601,8 @@ const TYPE_CONFIGS = {
 		interactiveCollider: {
 			width: 196,
 			height: 196,
-			offsetX: -34, // Extend beyond visual
-			offsetY: -34
+			offsetX: -32, // Extend beyond visual
+			offsetY: -32
 		},
 		
 		spriteConfig: {
@@ -1078,8 +1078,8 @@ checkDropValidity(x, y) {
 				// set width, height, top left
 				interactiveElement.style.width = `${this.getConfig('interactiveCollider.width')}px`;
 				interactiveElement.style.height = `${this.getConfig('interactiveCollider.height')}px`;
-				interactiveElement.style.top = `-${this.getConfig('interactiveCollider.offsetY')}px`;
-				interactiveElement.style.left = `-${this.getConfig('interactiveCollider.offsetX')}px`;
+				interactiveElement.style.top = `${this.getConfig('interactiveCollider.offsetY')}px`;
+				interactiveElement.style.left = `${this.getConfig('interactiveCollider.offsetX')}px`;
 
 				divElement.appendChild(interactiveElement);
 			}

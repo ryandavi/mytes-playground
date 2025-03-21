@@ -1,7 +1,7 @@
 class GameMap {
     constructor(parent, mapData = null) {
         this.parent = parent;
-        this.mapData = mapData;
+        this.mapData = mapData || {}; // Default empty object if no data provided
 
         // Core properties
         this.name = mapData?.name || 'Default Map';
@@ -10,13 +10,13 @@ class GameMap {
             height: 1000
         };
 
-        // Layer references - avoid querying DOM repeatedly
+        // Layer references
         this.layers = {
-            background: parent.canvas.querySelector('.layer.background'),
-            objects: parent.canvas.querySelector('.layer.foreground'),
-            overlay: parent.canvas.querySelector('.layer.overlay'),
-            debug: parent.canvas.querySelector('.layer.debug'),
-            particles: parent.canvas.querySelector('.layer.particles')
+            background: parent.canvas?.querySelector('.layer.background'),
+            objects: parent.canvas?.querySelector('.layer.foreground'),
+            overlay: parent.canvas?.querySelector('.layer.overlay'),
+            debug: parent.canvas?.querySelector('.layer.debug'),
+            particles: parent.canvas?.querySelector('.layer.particles')
         };
 
         // Systems
@@ -24,84 +24,255 @@ class GameMap {
         this.gridSystem = new GridSystem(this);
         this.particleSystem = null; // Will be initialized later
 
-        // Map elements - use more efficient data structures
+        // Map elements
         this.objects = [];
         this.zones = new Map();
         this.spawnPoints = new Map();
 
         MapObjectFactory.parent = this;
+
+        this.noCache = true;
         
-        // Optimization: Track active objects for faster updates
+        // Optimization tracking
         this.activeObjectsCount = 0;
-        this.updateFrameSkip = 0; // For less frequent updates of non-critical objects
+        this.updateFrameSkip = 0;
         
         // Tile map loader
         this.tileMapLoader = null;
+
+        // Flag to track initialization state
+        this.initialized = false;
     }
 
-    async initialize() {
-        // load map
-        await this.loadMap('HouseNew');
-    }
+    async initialize(mapId) {
+        try {
+            console.log(`[GameMap] Initializing map: ${mapId}`);
+            
+            // Check if the parent and canvas exist
+            if (!this.parent) {
+                throw new Error('Parent is null or undefined');
+            }
+            
+            if (!this.parent.canvas) {
+                throw new Error('Parent canvas is null or undefined');
+            }
+            
+            // Initialize particle system first to avoid dependency issues
+            console.log(`[GameMap] Creating particle system`);
+            this.particleSystem = new GameMapParticleSystem(this);
+            this.particleSystem.start();
+            
+            // Initialize tile map loader
+            if (!this.tileMapLoader) {
+                console.log(`[GameMap] Creating new TileMapLoader`);
+                this.tileMapLoader = new TileMapLoader(this);
+            }
+            
+            // Build the TMX path - check if it already has the extension
+            let tmxPath = mapId.endsWith('.tmx') 
+                ? `data/spritesheets/${mapId}` 
+                : `data/spritesheets/${mapId}.tmx`;
+            
+            console.log(`[GameMap] Loading TMX from: ${tmxPath}`);
 
-    async loadMap(mapId, options = {}){
-
+            if(this.noCache) tmxPath = Utility.preventCache(tmxPath);
+            
+            // Try to load the TMX data without applying it yet
+            let mapData;
             try {
-                // Initialize tile map if not already done
-                if (!this.tileMapLoader) {
-                    this.tileMapLoader = new TileMapLoader(this);
+                mapData = await this.tileMapLoader.loadTileMap(tmxPath);
+                
+                if (!mapData) {
+                    throw new Error(`TMX data is null or undefined`);
                 }
                 
-                // Load map data - OPTIMIZATION: Store the promise to avoid loading twice
-                let mapLoadPromise;
-                try {
-                    // Load map data
-                    mapLoadPromise = this.tileMapLoader.loadTileMap(`data/spritesheets/${mapId}.tmx`);
-                    const mapData = await mapLoadPromise;
-                    
-                    // Apply the map data to this GameMap instance
-                    await this.tileMapLoader.applyToGameMap(this, mapData);
-                    
-                    console.log('Tile map successfully initialized');
-                } catch (error) {
-                    console.error('Error initializing tile map:', error);
-                }
-    
-                // Initialize particle system
-                this.particleSystem = new GameMapParticleSystem(this);
-                this.particleSystem.start();
-    
-                // Set background if defined in map data
-                if (this.mapData?.background) {
-                    this.setBackground(this.mapData.background);
-                }
-    
-                // Load predefined objects
-                if (this.mapData?.objects && this.mapData.objects.length > 0) {
-                    await this.loadPredefinedObjects();
-                }
-    
-                // DEMONSTRATION OBJECTS - Comment these out or make conditional for production
-                this.addObject('BUTTERFLY', 'small', 100, 100);
-                this.addObject('BUTTERFLY', 'purple', 400, 300);
-                this.addObject('BUTTERFLY', 'blue', 400, 300);
-    
-                // Calculate initial pathfinding routes if needed
-                if (this.gridSystem && this.gridSystem.pathfinder) {
-                    const path = this.gridSystem.pathfinder.findPath(192 / 2, 192 / 2, 500, 500, 192, 192);
-                    if (path) {
-                        console.log('Path found:', path);
-                        this.gridSystem.pathfinder.visualizePath(this.layers.debug, path);
+                console.log(`[GameMap] TMX data loaded successfully`);
+            } catch (tmxError) {
+                console.error(`[GameMap] Failed to load TMX data:`, tmxError);
+                
+                // Try alternative paths
+                const altPaths = [
+                    `data/maps/${mapId}.tmx`,
+                    `assets/maps/${mapId}.tmx`,
+                    `${mapId}.tmx`
+                ];
+                
+                let loaded = false;
+                for (const altPath of altPaths) {
+                    try {
+                        console.log(`[GameMap] Trying alternative path: ${altPath}`);
+                        mapData = await this.tileMapLoader.loadTileMap(altPath);
+                        if (mapData) {
+                            console.log(`[GameMap] Successfully loaded TMX from ${altPath}`);
+                            loaded = true;
+                            break;
+                        }
+                    } catch (e) {
+                        console.log(`[GameMap] Failed to load from ${altPath}`);
                     }
                 }
-    
+                
+                if (!loaded) {
+                    // If all attempts fail, try to create a minimal valid map
+                    console.log(`[GameMap] Creating default minimal map`);
+                    this.createDefaultMap(mapId);
+                    this.initialized = true;
+                    return true;
+                }
+            }
+            
+            // Apply the TMX data to this GameMap instance with error handling
+            try {
+                console.log(`[GameMap] Applying TMX data to game map`);
+                await this.tileMapLoader.applyToGameMap(this, mapData);
+                console.log(`[GameMap] TMX data applied successfully`);
+            } catch (applyError) {
+                console.error(`[GameMap] Error applying TMX data:`, applyError);
+                
+                // Even if applying fails, we can still create a valid map
+                this.createDefaultMap(mapId);
+                
+                // Extract properties from TMX if available
+                if (mapData && mapData.properties) {
+                    try {
+                        // Convert properties to a more accessible format
+                        const props = {};
+                        mapData.properties.forEach(prop => {
+                            props[prop.name] = prop.value;
+                        });
+                        
+                        // Update map metadata
+                        this.name = props.Name || mapId;
+                        this.description = props.Description || '';
+                        this.location = props.Location || '';
+                        
+                        // Store the original properties
+                        this.mapProperties = props;
+                    } catch (propsError) {
+                        console.warn(`[GameMap] Error extracting properties:`, propsError);
+                    }
+                }
+            }
+            
+            console.log(`[GameMap] Map ${mapId} initialization completed successfully`);
+            this.initialized = true;
+            return true;
+        } catch (error) {
+            console.error(`[GameMap] Error initializing map:`, error);
+            
+            // Even if initialization fails, create a minimal default map
+            try {
+                this.createDefaultMap(mapId);
+                this.initialized = true;
                 return true;
-            } catch (error) {
-                console.error('Error initializing map:', error);
+            } catch (e) {
+                console.error(`[GameMap] Failed to create default map:`, e);
                 return false;
             }
+        }
+    }
 
-    
+    // Create a minimal default map when loading fails
+    createDefaultMap(mapId) {
+        console.log(`[GameMap] Creating default map for ${mapId}`);
+        
+        // Set basic properties
+        this.name = mapId;
+        this.description = 'Default Map';
+        this.location = 'Unknown';
+        
+        // Set up dimensions
+        this.dimensions = {
+            width: 1000,
+            height: 1000
+        };
+        
+        // Set a background color
+        if (this.layers.background) {
+            this.layers.background.style.backgroundColor = '#87CEEB';
+        }
+        
+        // Add a spawn point
+        this.spawnPoints.set('default', { x: 500, y: 500 });
+        this.spawnPoints.set('myte', { x: 500, y: 500 });
+        
+        // Add a few basic objects if needed
+        // Note: This is safe because we've already initialized the particle system
+        try {
+            this.addObject('BUTTERFLY', 'small', 200, 200);
+        } catch (e) {
+            console.warn(`[GameMap] Could not add default objects:`, e);
+        }
+    }
+
+    // This method is now deprecated - use initialize() instead
+    async loadMap(mapId, options = {}) {
+        console.warn('[GameMap] GameMap.loadMap() is deprecated. Use GameMap.initialize() instead.');
+        return this.initialize(mapId);
+    }
+
+    // Safe version of addObject
+    addObject(type, variant, x, y, options = {}) {
+        try {
+            // Create the object with error handling
+            let object;
+            
+            try {
+                object = MapObjectFactory.create(type, variant, x, y, options);
+            } catch (objError) {
+                console.error(`[GameMap] Failed to create object of type: ${type}, variant: ${variant}`, objError);
+                return null;
+            }
+
+            // Check if object was created successfully
+            if (!object) {
+                console.error(`[GameMap] Object factory returned null for type: ${type}, variant: ${variant}`);
+                return null;
+            }
+
+            // Snap it to grid if possible
+            if (this.gridSystem) {
+                try {
+                    const newposition = this.gridSystem.snapToGrid(
+                        x, y, 
+                        object.size.width, 
+                        object.size.height, 
+                        this.gridSystem.config.cellSize
+                    );
+                    
+                    object.posX = newposition.x;
+                    object.posY = newposition.y;
+                } catch (gridError) {
+                    console.warn(`[GameMap] Error snapping to grid:`, gridError);
+                    // Use original position as fallback
+                    object.posX = x;
+                    object.posY = y;
+                }
+            }
+
+            return this.add(object, options);
+        } catch (error) {
+            console.error(`[GameMap] Error in addObject:`, error);
+            return null;
+        }
+    }
+
+
+    // This method is now deprecated - use initialize() instead
+    async loadMap(mapId, options = {}) {
+        console.warn('[GameMap] GameMap.loadMap() is deprecated. Use GameMap.initialize() instead.');
+        return this.initialize(mapId);
+    }
+
+    // Optional method to add demonstration objects for testing
+    addDemonstrationObjects() {
+        try {
+            this.addObject('BUTTERFLY', 'small', 100, 100);
+            this.addObject('BUTTERFLY', 'purple', 400, 300);
+            this.addObject('BUTTERFLY', 'blue', 400, 300);
+        } catch (error) {
+            console.warn(`[GameMap] Error adding demo objects:`, error);
+        }
     }
 
     setBackground(background) {
@@ -351,6 +522,14 @@ class GameMap {
                 this.gridSystem.dispose();
             }
             this.gridSystem = null;
+        }
+
+        // Add this to GameMap.dispose()
+        if (this.layers && this.layers.debug) {
+            // Clear all debug elements
+            while (this.layers.debug.firstChild) {
+                this.layers.debug.removeChild(this.layers.debug.firstChild);
+            }
         }
         
         // Clear layer references

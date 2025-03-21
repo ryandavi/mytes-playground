@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="80">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="82">
  <properties>
   <property name="Description" value="A cozy place for your Mytes"/>
   <property name="Location" value="outside"/>
@@ -131,7 +131,7 @@
   </object>
   <object id="65" name="Portal" x="544" y="192" width="128" height="128">
    <properties>
-    <property name="targetMap" value="Outside"/>
+    <property name="targetMap" value="OutsideTest"/>
    </properties>
   </object>
   <object id="66" name="Butterfly" x="352" y="224" width="64" height="64">
@@ -170,5 +170,15 @@
    </properties>
   </object>
   <object id="79" name="Spawn" x="96" y="64" width="192" height="192"/>
+  <object id="80" name="Butterfly" x="480" y="96" width="64" height="64">
+   <properties>
+    <property name="variant" value="yellow_butterfly"/>
+   </properties>
+  </object>
+  <object id="81" name="Butterfly" x="672" y="352" width="64" height="64">
+   <properties>
+    <property name="variant" value="blue_butterfly"/>
+   </properties>
+  </object>
  </objectgroup>
 </map>
