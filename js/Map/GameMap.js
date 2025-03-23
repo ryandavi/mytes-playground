@@ -5,6 +5,7 @@ class GameMap {
 
         // Core properties
         this.name = mapData?.name || 'Default Map';
+        this.id = null;
         this.dimensions = mapData?.dimensions || {
             width: 1000,
             height: 1000
@@ -26,7 +27,7 @@ class GameMap {
 
         // Map elements
         this.objects = [];
-        this.zones = new Map();
+        // this.zones = new Map();
         this.spawnPoints = new Map();
 
         MapObjectFactory.parent = this;
@@ -175,6 +176,7 @@ async initialize(mapId, options = {}) {
                     
                     // Store the original properties
                     this.mapProperties = props;
+
                 } catch (propsError) {
                     console.warn(`[GameMap] Error extracting properties:`, propsError);
                 }
@@ -213,6 +215,7 @@ createDefaultMap(mapId) {
     
     // Set basic properties
     this.name = mapId;
+    this.id = mapId;
     this.description = 'Default Map';
     this.location = 'Unknown';
     
@@ -290,13 +293,6 @@ createDefaultMap(mapId) {
             console.error(`[GameMap] Error in addObject:`, error);
             return null;
         }
-    }
-
-
-    // This method is now deprecated - use initialize() instead
-    async loadMap(mapId, options = {}) {
-        console.warn('[GameMap] GameMap.loadMap() is deprecated. Use GameMap.initialize() instead.');
-        return this.initialize(mapId);
     }
 
     // Optional method to add demonstration objects for testing
@@ -534,7 +530,7 @@ createDefaultMap(mapId) {
         this.objects = [];
 
         // Clean up zones
-        this.zones.clear();
+        // this.zones.clear();
 
         // Clean up spawn points
         this.spawnPoints.clear();
@@ -559,13 +555,16 @@ createDefaultMap(mapId) {
             this.gridSystem = null;
         }
 
-        // Add this to GameMap.dispose()
         if (this.layers && this.layers.debug) {
             // Clear all debug elements
             while (this.layers.debug.firstChild) {
                 this.layers.debug.removeChild(this.layers.debug.firstChild);
             }
         }
+
+        // dispose zones
+        this.zoneManager.dispose();
+
         
         // Clear layer references
         this.layers = {};

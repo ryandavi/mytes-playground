@@ -8,6 +8,7 @@ class Camera {
 		this.targetY = 0;
 		this.easing = 10; // Adjust this value to control camera smoothness
 
+		// zoom
 		this.canZoom = false;
 		this.zoomLevel = 1; // Initial zoom level
 		this.targetZoomLevel = 1; // Target zoom level
@@ -27,6 +28,9 @@ class Camera {
 		this.dragStartY = 0;
 		this.dragStartCameraX = 0;
 		this.dragStartCameraY = 0;
+
+		// limit movement
+		this.limitToBounds = false;
 
 		// Add event listeners for drag functionality
 		this.canvas.addEventListener('mousedown', this.startDrag.bind(this));
@@ -161,14 +165,16 @@ class Camera {
 		let posX = this.posX;
 		let posY = this.posY;
 
+
+
 		if (this.isScrollable.x) {
 			posX = -(x + (elementRect.width / 2) - (viewportRect.width / 2));
-			posX = Math.min(0, Math.max(-(canvasRect.width - viewportRect.width), posX));
+			if(this.limitToBounds) posX = Math.min(0, Math.max(-(canvasRect.width - viewportRect.width), posX));
 		}
 
 		if (this.isScrollable.y) {
 			posY = -(y + (elementRect.height / 2) - (viewportRect.height / 2));
-			posY = Math.min(0, Math.max(-(canvasRect.height - viewportRect.height), posY));
+			if(this.limitToBounds) posY = Math.min(0, Math.max(-(canvasRect.height - viewportRect.height), posY));
 		}
 
 		this.setTarget(posX, posY);
@@ -200,7 +206,7 @@ class Camera {
 			}
 
 			// Keep within bounds
-			targetX = Math.min(0, Math.max(targetX, -(canvasRect.width - viewportRect.width)));
+			if(this.limitToBounds) targetX = Math.min(0, Math.max(targetX, -(canvasRect.width - viewportRect.width)));
 		}
 
 		// Check vertical edges if scrollable vertically
@@ -216,7 +222,7 @@ class Camera {
 			}
 
 			// Keep within bounds
-			targetY = Math.min(0, Math.max(targetY, -(canvasRect.height - viewportRect.height)));
+			if(this.limitToBounds) targetY = Math.min(0, Math.max(targetY, -(canvasRect.height - viewportRect.height)));
 		}
 
 		this.setTarget(targetX, targetY);
@@ -242,6 +248,8 @@ class Camera {
 			this.doCameraLogic();
 			return;
 		}
+
+
 
 		// Calculate the distance to move in each frame
 		const deltaX = this.targetX - this.posX;
@@ -307,6 +315,7 @@ class Camera {
 						this.parent.activeMyte.getRect()
 					);
 				} else {
+					// if there's no active myte
 					if (!this.parent.isMouseInContainer()) return;
 					this.followCursorEdge(mouse.x, mouse.y, canvasRect, containerRect);
 				}
@@ -347,13 +356,16 @@ class Camera {
 			const canvasRect = this.parent.getCanvasRect();
 			const viewportRect = this.parent.getContainerRect();
 
-			if (this.isScrollable.x) {
-				newX = Math.min(0, Math.max(newX, -(canvasRect.width - viewportRect.width)));
+			if(this.limitToBounds){
+				if (this.isScrollable.x) {
+					newX = Math.min(0, Math.max(newX, -(canvasRect.width - viewportRect.width)));
+				}
+	
+				if (this.isScrollable.y) {
+					newY = Math.min(0, Math.max(newY, -(canvasRect.height - viewportRect.height)));
+				}
 			}
 
-			if (this.isScrollable.y) {
-				newY = Math.min(0, Math.max(newY, -(canvasRect.height - viewportRect.height)));
-			}
 
 			this.setTarget(newX, newY);
 		}

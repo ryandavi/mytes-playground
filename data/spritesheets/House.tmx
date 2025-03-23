@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="82">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="11" nextobjectid="106">
  <properties>
-  <property name="Description" value="A cozy place for your Mytes"/>
-  <property name="Location" value="outside"/>
-  <property name="Name" value="Your Home"/>
+  <property name="description" value="A cozy place for your Mytes"/>
+  <property name="location" value="outside"/>
+  <property name="name" value="Your Home"/>
  </properties>
  <tileset firstgid="1" source="walls3.tsx"/>
  <layer id="3" name="Base Floor" width="30" height="30">
@@ -108,35 +108,53 @@
 23,4,4,4,4,4,4,4,4,4,4,2,17,0,0,0,0,15,2,4,4,4,4,4,4,4,4,4,4,25
 </data>
  </layer>
- <objectgroup id="7" name="Objects">
-  <object id="2" name="Door" x="352" y="544" width="32" height="96">
+ <objectgroup id="9" name="Zones">
+  <object id="94" name="Zone" x="608" y="480" width="320" height="448">
    <properties>
-    <property name="Direction" value="Left"/>
+    <property name="displayName" value="Bedroom"/>
+    <property name="type" value="rest"/>
    </properties>
   </object>
+  <object id="95" name="Zone" x="32" y="480" width="320" height="448">
+   <properties>
+    <property name="displayName" value="Playroom"/>
+    <property name="type" value="play"/>
+   </properties>
+  </object>
+  <object id="96" name="Zone" x="32" y="31" width="448" height="417">
+   <properties>
+    <property name="displayName" value="Kitchen"/>
+    <property name="type" value="food"/>
+   </properties>
+  </object>
+  <object id="97" name="Zone" x="480" y="32" width="448" height="416">
+   <properties>
+    <property name="displayName" value="Chatroom"/>
+    <property name="type" value="social"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="7" name="Objects">
+  <object id="2" name="Fence" x="64" y="704" width="32" height="64"/>
   <object id="5" name="Door" x="576" y="704" width="32" height="96">
    <properties>
-    <property name="Direction" value="Right"/>
+    <property name="direction" value="Right"/>
    </properties>
   </object>
   <object id="7" name="Door" x="416" y="928" width="128" height="32">
    <properties>
-    <property name="Direction" value="Horizontal"/>
+    <property name="direction" value="Horizontal"/>
    </properties>
   </object>
   <object id="16" name="Bed" x="704" y="480" width="128" height="256">
    <properties>
-    <property name="Myte" value="Lentil"/>
+    <property name="claimedBy" value="Lentil"/>
+    <property name="direction" value="S"/>
    </properties>
   </object>
   <object id="65" name="Portal" x="544" y="192" width="128" height="128">
    <properties>
     <property name="targetMap" value="Outside"/>
-   </properties>
-  </object>
-  <object id="66" name="Butterfly" x="352" y="224" width="64" height="64">
-   <properties>
-    <property name="variant" value="small"/>
    </properties>
   </object>
   <object id="68" name="Grass" x="64" y="320" width="64" height="64">
@@ -166,16 +184,48 @@
   </object>
   <object id="78" name="Door" x="96" y="448" width="128" height="32">
    <properties>
-    <property name="Direction" value="Horizontal"/>
+    <property name="direction" value="Horizontal"/>
    </properties>
   </object>
-  <object id="79" name="Spawn" x="96" y="64" width="192" height="192"/>
+  <object id="79" name="Spawn" x="224" y="256" width="192" height="192">
+   <properties>
+    <property name="type" value="myte"/>
+   </properties>
+  </object>
+  <object id="82" name="Door" x="363" y="537.5" width="32" height="96">
+   <properties>
+    <property name="direction" value="Left"/>
+   </properties>
+  </object>
+  <object id="83" name="Fence" x="64" y="768" width="32" height="64"/>
+  <object id="84" name="Fence" x="64" y="832" width="32" height="64"/>
+  <object id="85" name="Fence" x="64" y="928" width="32" height="64" rotation="270"/>
+  <object id="86" name="Fence" x="128" y="928" width="32" height="64" rotation="270"/>
+  <object id="87" name="Fence" x="192" y="928" width="32" height="64" rotation="270"/>
+  <object id="88" name="Fence" x="224" y="704" width="32" height="64"/>
+  <object id="89" name="Fence" x="224" y="768" width="32" height="64"/>
+  <object id="90" name="Fence" x="224" y="832" width="32" height="64"/>
+  <object id="91" name="Fence" x="64" y="704" width="32" height="64" rotation="270"/>
+  <object id="92" name="Fence" x="192" y="704" width="32" height="64" rotation="270"/>
+  <object id="93" name="Gate" x="128" y="704" width="32" height="64" rotation="270"/>
+ </objectgroup>
+ <objectgroup id="10" name="Mobs">
+  <object id="66" name="Butterfly" x="352" y="160" width="64" height="64">
+   <properties>
+    <property name="variant" value="small"/>
+   </properties>
+  </object>
   <object id="80" name="Butterfly" x="480" y="96" width="64" height="64">
    <properties>
     <property name="variant" value="yellow_butterfly"/>
    </properties>
   </object>
   <object id="81" name="Butterfly" x="672" y="352" width="64" height="64">
+   <properties>
+    <property name="variant" value="blue_butterfly"/>
+   </properties>
+  </object>
+  <object id="105" name="Butterfly" x="448" y="800" width="64" height="64">
    <properties>
     <property name="variant" value="blue_butterfly"/>
    </properties>

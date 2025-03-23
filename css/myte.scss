@@ -1,673 +1,686 @@
-.myteContainer {
-	text-align: center;
-	margin: 20px;
+.myteWrapper {
+	--myte-size: 64px;
+	display: inline-block;
+	cursor: pointer;
+	position: absolute;
 
-	.myteWrapper {
-		--myte-size: 64px;
-		display: inline-block;
-		cursor: pointer;
+	// snail specific
+	&.snail {
+		--myte-size: 192px;
 
-		// snail specific
-		&.snail {
-			--myte-size: 192px;
+		>.interactive-myte {
+			>.inner-wrapper {
+				position: fixed;
+				width: inherit;
+				height: inherit;
 
-			>.interactive-myte {
-				>.inner-wrapper {
-					position: fixed;
-					width: inherit;
-					height: inherit;
+				>.sprite {
+					background: url(../images/snail/spritesheet.png);
+				}
+			}
+		}
+	}
 
-					>.sprite {
-						background: url(../images/snail/spritesheet.png);
+	>.interactive-myte {
+		width: var(--myte-size);
+		height: var(--myte-size);
+		color: var(--button-light);
+		margin: 0 auto;
+
+		// so it's in front of the canvas elements
+		position: relative;
+		z-index: 100000;
+
+		&.selected {
+			.sprite {
+				outline: 2px dashed green;
+				border-radius: 5px;
+			}
+		}
+
+		&.duplicate.deactivated {
+			display: none;
+		}
+
+		>.inner-wrapper {
+			>.sprite {
+				width: inherit;
+				height: inherit;
+				image-rendering: pixelated;
+				background: url(../images/character/spritesheet.png);
+				transform-origin: center;
+				transition: filter 0.2s ease-out, transform 0.2s ease-out;
+			}
+
+
+			// above - battery
+			>.above-wrapper {
+				display: flex;
+				gap: var(--border-width);
+				align-items: center;
+				left: 50%;
+				top: 10px;
+				transform: translate(-50%, 100%);
+				position: absolute;
+				transition: opacity .5s;
+				flex-direction: column;
+			}
+
+			// below - name
+			>.name-wrapper {
+				display: flex;
+				gap: var(--border-width);
+				align-items: center;
+				width: fit-content;
+				left: 50%;
+				transform: translate(-50%, -115%);
+				position: relative;
+				transition: opacity .5s;
+
+				&:before {
+					content: 'x';
+					position: absolute;
+					left: (-var(--border-width));
+					transform: translate(-100%, 0%);
+					color: red;
+					visibility: hidden;
+				}
+
+				&.bottom {
+					top: 25%;
+					transform: translate(50%, 0%);
+				}
+
+				>.before {
+					display: none;
+				}
+
+			}
+
+		}
+
+		// active pet name color
+		&.active {
+			>.inner-wrapper {
+				>.name-wrapper {
+					>.name {
+						background-color: #3269c4;
+						color: white;
+						outline-color: white;
 					}
+				}
+
+			}
+		}
+
+		// hide name when at home
+		&:not(.duplicate) {
+			>.inner-wrapper {
+				>.above-wrapper {
+					display: none;
+				}
+
+				>.name-wrapper {
+					display: none;
 				}
 			}
 		}
 
-		>.interactive-myte {
-			width: var(--myte-size);
-			height: var(--myte-size);
-			color: var(--button-light);
-			margin: 0 auto;
+		&.dragging {
 
-			// so it's in front of the canvas elements
-			position: relative;
-			z-index: 100000;
-
-			&.selected {
-				.sprite {
-					outline: 2px dashed green;
-					border-radius: 5px;
-				}
-			}
-
-			&.duplicate.deactivated {
-				display: none;
-			}
+			pointer-events: none;
+			user-select: none;
+			cursor: grab;
+			z-index: 100000 !important;
 
 			>.inner-wrapper {
 				>.sprite {
-					width: inherit;
-					height: inherit;
-					image-rendering: pixelated;
-					background: url(../images/character/spritesheet.png);
-					transform-origin: center;
-					transition: filter 0.2s ease-out, transform 0.2s ease-out;
-				}
+					/*
+					animation-name: wiggle;
+					animation-iteration-count: infinite;
+					animation-direction: alternate;
+					transform-origin: 50% 50%;
+					animation-delay: -0.4s;
+					animation-duration: .5s;
+					*/
 
+					animation-name: wiggle2;
+					animation-duration: 0.6s;
+					animation-iteration-count: infinite;
+					transform-origin: 50% 65%;
+					/* Adjust to make it pivot from the bottom */
+					animation-timing-function: ease-in-out;
+					filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
+					will-change: transform;
+					/* Performance optimization */
 
-				// above - battery
-				>.above-wrapper {
-					display: flex;
-					gap: var(--border-width);
-					align-items: center;
-					left: 50%;
-					top: 10px;
-					transform: translate(-50%, 100%);
-					position: absolute;
-					transition: opacity .5s;
-					flex-direction: column;
-				}
-
-				// below - name
-				>.name-wrapper {
-					display: flex;
-					gap: var(--border-width);
-					align-items: center;
-					width: fit-content;
-					left: 50%;
-					transform: translate(-50%, -115%);
-					position: relative;
-					transition: opacity .5s;
-
-					&:before {
-						content: 'x';
-						position: absolute;
-						left: (-var(--border-width));
-						transform: translate(-100%, 0%);
-						color: red;
-						visibility: hidden;
-					}
-
-					&.bottom {
-						top: 25%;
-						transform: translate(50%, 0%);
-					}
-
-					>.before {
-						display: none;
-					}
-
-				}
-
-			}
-
-			// active pet name color
-			&.active {
-				>.inner-wrapper {
-					>.name-wrapper {
-						>.name {
-							background-color: #3269c4;
-							color: white;
-							outline-color: white;
-						}
-					}
 
 				}
 			}
 
-			// hide name when at home
-			&:not(.duplicate) {
-				>.inner-wrapper {
-					>.above-wrapper {
-						display: none;
-					}
 
-					>.name-wrapper {
-						display: none;
-					}
-				}
-			}
-
-			&.dragging {
-
-				pointer-events: none;
-				user-select: none;
-				cursor: grab;
-				z-index: 100000 !important;
-
-				>.inner-wrapper {
-					>.sprite {
-						/*
-						animation-name: wiggle;
-						animation-iteration-count: infinite;
-						animation-direction: alternate;
-						transform-origin: 50% 50%;
-						animation-delay: -0.4s;
-						animation-duration: .5s;
-						*/
-
-						animation-name: wiggle2;
-						animation-duration: 0.6s;
-						animation-iteration-count: infinite;
-						transform-origin: 50% 65%; /* Adjust to make it pivot from the bottom */
-						animation-timing-function: ease-in-out;
-						filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
-						will-change: transform; /* Performance optimization */
-
-
-					}
-				}
-
-
-			}
-
-			&.deactivated {
-				visibility: hidden;
-				opacity: 0;
-			}
-
-			&.freemode {
-				position: absolute;
-				cursor: grab;
-
-				>.sprite {
-					position: fixed;
-				}
-
-			}
 		}
 
+		&.deactivated {
+			visibility: hidden;
+			opacity: 0;
+		}
+
+		&.freemode {
+			position: absolute;
+			cursor: grab;
+
+			>.sprite {
+				position: fixed;
+			}
+
+		}
 	}
+
 }
+
 
 
 
 /* HOME RELATED */
-.myteContainer {
-	.myteWrapper {
+
+.myteWrapper {
+	>.home-wrapper {
+		border-radius: var(--border-radius);
+		transition: opacity, .15s, background-color .15s, box-shadow .15s, outline-width .15s, outline-color .5s;
+
+		width: var(--myte-size);
+		height: var(--myte-size);
+		position: absolute;
+		z-index: 100000;
+
+		border-style: solid;
+		border-width: var(--border-width);
+		border-top-color: var(--button-light);
+		border-left-color: var(--button-light);
+		border-right-color: var(--button-dark);
+		border-bottom-color: var(--button-dark);
+		background-color: var(--button-mid);
+
+		filter: var(--shadow);
+	}
+
+	>.home-name {
+		position: relative;
+		transform: translateX(-100%);
+		z-index: 1000000;
+		width: 192px;
+		height: 192px;
+		position: absolute;
+		transform: unset;
+		pointer-events: none;
+
+
+
+		>.name {
+			display: inline-block;
+			top: 10px;
+
+			position: absolute;
+			right: 50%;
+			transform: translate(50%, 0%);
+		}
+
+	}
+
+
+
+
+	&:hover {
 		>.home-wrapper {
-			border-radius: var(--border-radius);
-			transition: opacity, .15s, background-color .15s, box-shadow .15s, outline-width .15s, outline-color .5s;
-
-			width: var(--myte-size);
-			height: var(--myte-size);
-			position: absolute;
-			z-index: 100000;
-
-			border-style: solid;
-			border-width: var(--border-width);
-			border-top-color: var(--button-light);
-			border-left-color: var(--button-light);
-			border-right-color: var(--button-dark);
-			border-bottom-color: var(--button-dark);
-			background-color: var(--button-mid);
-
-			filter: var(--shadow);
+			outline: var(--border-width) solid darkgrey;
 		}
-
-		>.home-name {
-			position: relative;
-			transform: translateX(-100%);
-			z-index: 1000000;
-			width: 192px;
-			height: 192px;
-			position: absolute;
-			transform: unset;
-			pointer-events: none;
-
-			>.name {
-				display: inline-block;
-				top: 10px;
-				position: relative;
-			}
-
-
-		}
-
-		&:hover {
-			>.home-wrapper {
-				outline: var(--border-width) solid darkgrey;
-			}
-		}
-
 	}
 
 	// empty home
 	&.empty {
-		.myteWrapper {
-			&:hover {
-				>.home-wrapper {
-					outline: unset;
-				}
-			}
 
+		&:hover {
 			>.home-wrapper {
-				opacity: .75;
-				z-index: 0;
+				outline: unset;
+			}
+		}
 
-				border-top-color: var(--button-dark);
-				border-left-color: var(--button-dark);
-				border-right-color: var(--button-light);
-				border-bottom-color: var(--button-light);
+		>.home-wrapper {
+			opacity: .75;
+			z-index: 0;
 
-				background-color: var(--button-mid);
+			border-top-color: var(--button-dark);
+			border-left-color: var(--button-dark);
+			border-right-color: var(--button-light);
+			border-bottom-color: var(--button-light);
 
-				filter: unset;
-				box-shadow: inset var(--border-width) var(--border-width) #0000000d;
+			background-color: var(--button-mid);
+
+			filter: unset;
+			box-shadow: inset var(--border-width) var(--border-width) #0000000d;
+		}
+
+		&.valid-drop-target {
+			>.home-wrapper {
+				z-index: 100000;
+				opacity: 1;
+				display: block;
+				outline: var(--border-width) solid var(--drop-target) !important;
 			}
 
-			&.valid-drop-target {
+			&.on-target {
 				>.home-wrapper {
-					z-index: 100000;
-					opacity: 1;
-					display: block;
-					outline: var(--border-width) solid var(--drop-target) !important;
-				}
-
-				&.on-target {
-					>.home-wrapper {
-						outline-color: var(--on-target) !important;
-					}
+					outline-color: var(--on-target) !important;
 				}
 			}
 		}
 	}
-
-
 }
 
+
+
+
+
+
+
+
+
+
 /* DIALOGUE */
-.myteContainer {
-	.myteWrapper {
-		>.interactive-myte {
-			>.inner-wrapper {
-				>.dialogue {
-					// Base Variables
-					--dialogue-background-color: #ffffe1;
-					--dialogue-border-color: black;
-					--dialogue-border-width: 2px;
-					--dialogue-arrow-size: 7px;
-					--dialogue-bubble-size: 10px;
 
-					// Base Styles
-					display: flex;
-					align-items: center;
-					flex-direction: column;
-					justify-content: center;
-					left: 50%;
-					top: 17.5%;
-					z-index: 1;
-					transform: translate(-50%, -100%);
+.myteWrapper {
+	>.interactive-myte {
+		>.inner-wrapper {
+			>.dialogue {
+				// Base Variables
+				--dialogue-background-color: #ffffe1;
+				--dialogue-border-color: black;
+				--dialogue-border-width: 2px;
+				--dialogue-arrow-size: 7px;
+				--dialogue-bubble-size: 10px;
+
+				// Base Styles
+				display: flex;
+				align-items: center;
+				flex-direction: column;
+				justify-content: center;
+				left: 50%;
+				top: 17.5%;
+				z-index: 1;
+				transform: translate(-50%, -100%);
+				position: absolute;
+				max-width: 100px;
+
+				border: var(--dialogue-border-width) solid var(--dialogue-border-color);
+				background-color: var(--dialogue-background-color);
+				padding: 4px 6px;
+				font-size: 10px;
+				text-transform: uppercase;
+				color: black;
+				border-radius: var(--dialogue-border-width);
+				filter: drop-shadow(2px 2px 0px #00000020);
+				opacity: 0;
+				transition: opacity 0.5s ease-in-out;
+
+				&.visible {
+					opacity: 1;
+				}
+
+				// Default Arrow Style
+				&::before {
+					content: "";
+					width: 0;
+					height: 0;
 					position: absolute;
-					max-width: 100px;
+					border-left: var(--dialogue-arrow-size) solid transparent;
+					border-right: var(--dialogue-arrow-size) solid transparent;
+					border-top: var(--dialogue-arrow-size) solid var(--dialogue-background-color);
+					border-bottom: var(--dialogue-arrow-size) solid transparent;
+					bottom: calc(var(--dialogue-border-width) + 1px);
+					transform: translate(0%, 100%);
+				}
 
-					border: var(--dialogue-border-width) solid var(--dialogue-border-color);
-					background-color: var(--dialogue-background-color);
-					padding: 4px 6px;
-					font-size: 10px;
-					text-transform: uppercase;
-					color: black;
-					border-radius: var(--dialogue-border-width);
-					filter: drop-shadow(2px 2px 0px #00000020);
+				// Outer arrow (border)
+				&::after {
+					content: "";
+					width: 0;
+					height: 0;
+					position: absolute;
+					border-left: var(--dialogue-arrow-size) solid transparent;
+					border-right: var(--dialogue-arrow-size) solid transparent;
+					border-top: var(--dialogue-arrow-size) solid var(--dialogue-border-color);
+					border-bottom: var(--dialogue-arrow-size) solid transparent;
+					bottom: 0;
+					transform: translate(0%, 100%);
+					z-index: -1;
+				}
+
+				// Thought Bubble Style
+				&.thought {
+					--bubble-color: var(--dialogue-background-color);
+					border-radius: 20px;
+
+					// Remove arrow elements
+					&::before,
+					&::after {
+						all: unset;
+					}
+
+					&::before {
+						content: "";
+						position: absolute;
+						bottom: calc(-1 * var(--dialogue-bubble-size));
+						left: 40%;
+						width: var(--dialogue-bubble-size);
+						height: var(--dialogue-bubble-size);
+						background: var(--bubble-color);
+						border: var(--dialogue-border-width) solid var(--dialogue-border-color);
+						border-radius: 50%;
+					}
+
+					&::after {
+						content: "";
+						position: absolute;
+						bottom: calc(-1.8 * var(--dialogue-bubble-size));
+						left: 35%;
+						width: calc(var(--dialogue-bubble-size) * 0.6);
+						height: calc(var(--dialogue-bubble-size) * 0.6);
+						background: var(--bubble-color);
+						border: var(--dialogue-border-width) solid var(--dialogue-border-color);
+						border-radius: 50%;
+					}
+
+					&.visible {
+						animation: thoughtBubblePop 0.5s ease-out;
+					}
+				}
+
+				// Emoji Style
+				&.emoji {
+					--emoji-padding: 5px;
+					border-radius: 50%;
+					padding: var(--emoji-padding);
+					min-width: calc(var(--emoji-padding) * 2 + 1em);
+					min-height: calc(var(--emoji-padding) * 2 + 1em);
+
+					font-size: 200%;
+
+					// Remove arrow elements
+					&::before,
+					&::after {
+						content: none;
+					}
+
+					// Center emoji content
+					.text {
+						display: flex;
+						align-items: center;
+						justify-content: center;
+					}
+
+					&.visible {
+						animation: emojiPop 0.4s ease-out;
+					}
+				}
+
+				// Alert Style (for important messages)
+				&.alert {
+					--dialogue-background-color: #ffe1e1;
+					--dialogue-border-color: #ff4444;
+
+					&.visible {
+						animation: alertShake 0.7s cubic-bezier(0.36, 0, 0.66, -0.56);
+						animation-fill-mode: forwards;
+					}
+
+
+				}
+
+				// Question Style
+				&.question {
+					--dialogue-background-color: #e1f5ff;
+					--dialogue-border-color: #44aaff;
+				}
+
+				// Whisper Style (smaller and more subtle)
+				&.whisper {
+					--dialogue-background-color: rgba(255, 255, 255, 0.9);
+					--dialogue-border-color: #cccccc;
+					font-size: 8px;
+					filter: blur(0px);
+
+					&.visible {
+						opacity: 0.8;
+						animation: whisperFloat 3s ease-out forwards;
+					}
+
+					// Style the text to look more whisper-like
+					.text {
+						font-style: italic;
+						letter-spacing: 0.5px;
+						color: #666;
+					}
+				}
+
+
+				// Custom animations for specific styles
+				@keyframes thoughtBubblePop {
+					0% {
+						transform: translate(-50%, -100%) scale(0);
+					}
+
+					70% {
+						transform: translate(-50%, -100%) scale(1.1);
+					}
+
+					100% {
+						transform: translate(-50%, -100%) scale(1);
+					}
+				}
+
+				@keyframes whisperFloat {
+					0% {
+						transform: translate(-50%, -90%) scale(0.8);
+						opacity: 0;
+						filter: blur(2px);
+					}
+
+					20% {
+						transform: translate(-50%, -95%) scale(0.9);
+						opacity: 0.4;
+						filter: blur(1px);
+					}
+
+					40% {
+						transform: translate(-50%, -100%) scale(0.95);
+						opacity: 0.6;
+						filter: blur(0px);
+					}
+
+					60% {
+						transform: translate(-50%, -98%) scale(1);
+						opacity: 0.7;
+					}
+
+					80% {
+						transform: translate(-50%, -100%) scale(1);
+						opacity: 0.8;
+					}
+
+					90% {
+						transform: translate(-50%, -99%) scale(1);
+					}
+
+					100% {
+						transform: translate(-50%, -100%) scale(1);
+						opacity: 0.8;
+					}
+				}
+
+				@keyframes emojiPop {
+					0% {
+						transform: translate(-50%, -100%) scale(0) rotate(-20deg);
+					}
+
+					60% {
+						transform: translate(-50%, -100%) scale(1.2) rotate(10deg);
+					}
+
+					100% {
+						transform: translate(-50%, -100%) scale(1) rotate(0deg);
+					}
+				}
+
+				@keyframes alertShake {
+					0% {
+						transform: translate(-50%, -100%) scale(1);
+					}
+
+					10% {
+						transform: translate(-50%, -100%) scale(1.5);
+					}
+
+					20%,
+					40%,
+					60% {
+						transform: translate(-52%, -100%) scale(1.5);
+					}
+
+					30%,
+					50%,
+					70% {
+						transform: translate(-48%, -100%) scale(1.5);
+					}
+
+					80% {
+						transform: translate(-50%, -100%) scale(1.5);
+					}
+
+					100% {
+						transform: translate(-50%, -100%) scale(1);
+					}
+				}
+
+			}
+		}
+	}
+}
+
+
+/* BATTERY */
+.myteWrapper {
+	>.interactive-myte {
+		>.inner-wrapper {
+			>.above-wrapper {
+				>.battery {
+					--icon-scale: 2;
+					--battery-size: 13px;
+
+					width: var(--battery-size);
+					height: 8px;
+					scale: var(--icon-scale);
+					image-rendering: pixelated;
+					filter: drop-shadow(1px 1px 0px #00000020);
+					transition: scale .3s ease-in-out, top .3s ease-in-out, filter .3s ease-in-out, opacity .3s ease-in-out;
+					background-image: url(../images/icons/battery.png);
+
 					opacity: 0;
-					transition: opacity 0.5s ease-in-out;
+					top: 12px;
+
+					position: relative;
 
 					&.visible {
 						opacity: 1;
+						top: 0;
 					}
 
-					// Default Arrow Style
-					&::before {
-						content: "";
-						width: 0;
-						height: 0;
-						position: absolute;
-						border-left: var(--dialogue-arrow-size) solid transparent;
-						border-right: var(--dialogue-arrow-size) solid transparent;
-						border-top: var(--dialogue-arrow-size) solid var(--dialogue-background-color);
-						border-bottom: var(--dialogue-arrow-size) solid transparent;
-						bottom: calc(var(--dialogue-border-width) + 1px);
-						transform: translate(0%, 100%);
+					&[data-level="3"],
+					&.full {
+						background-position: calc(var(--battery-size) * -3) 0;
 					}
 
-					// Outer arrow (border)
-					&::after {
-						content: "";
-						width: 0;
-						height: 0;
-						position: absolute;
-						border-left: var(--dialogue-arrow-size) solid transparent;
-						border-right: var(--dialogue-arrow-size) solid transparent;
-						border-top: var(--dialogue-arrow-size) solid var(--dialogue-border-color);
-						border-bottom: var(--dialogue-arrow-size) solid transparent;
-						bottom: 0;
-						transform: translate(0%, 100%);
-						z-index: -1;
+					&[data-level="2"],
+					&.medium {
+						background-position: calc(var(--battery-size) * -2) 0;
 					}
 
-					// Thought Bubble Style
-					&.thought {
-						--bubble-color: var(--dialogue-background-color);
-						border-radius: 20px;
-
-						// Remove arrow elements
-						&::before,
-						&::after {
-							all: unset;
-						}
-
-						&::before {
-							content: "";
-							position: absolute;
-							bottom: calc(-1 * var(--dialogue-bubble-size));
-							left: 40%;
-							width: var(--dialogue-bubble-size);
-							height: var(--dialogue-bubble-size);
-							background: var(--bubble-color);
-							border: var(--dialogue-border-width) solid var(--dialogue-border-color);
-							border-radius: 50%;
-						}
-
-						&::after {
-							content: "";
-							position: absolute;
-							bottom: calc(-1.8 * var(--dialogue-bubble-size));
-							left: 35%;
-							width: calc(var(--dialogue-bubble-size) * 0.6);
-							height: calc(var(--dialogue-bubble-size) * 0.6);
-							background: var(--bubble-color);
-							border: var(--dialogue-border-width) solid var(--dialogue-border-color);
-							border-radius: 50%;
-						}
-
-						&.visible {
-							animation: thoughtBubblePop 0.5s ease-out;
-						}
+					&[data-level="1"],
+					&.low {
+						background-position: calc(var(--battery-size) * -1) 0;
 					}
 
-					// Emoji Style
-					&.emoji {
-						--emoji-padding: 5px;
-						border-radius: 50%;
-						padding: var(--emoji-padding);
-						min-width: calc(var(--emoji-padding) * 2 + 1em);
-						min-height: calc(var(--emoji-padding) * 2 + 1em);
-
-						font-size: 200%;
-
-						// Remove arrow elements
-						&::before,
-						&::after {
-							content: none;
-						}
-
-						// Center emoji content
-						.text {
-							display: flex;
-							align-items: center;
-							justify-content: center;
-						}
-
-						&.visible {
-							animation: emojiPop 0.4s ease-out;
-						}
+					&[data-level="0"],
+					&.empty {
+						--icon-scale: 2.5;
+						background-position: 0 0;
 					}
 
-					// Alert Style (for important messages)
-					&.alert {
-						--dialogue-background-color: #ffe1e1;
-						--dialogue-border-color: #ff4444;
-
-						&.visible {
-							animation: alertShake 0.7s cubic-bezier(0.36, 0, 0.66, -0.56);
-							animation-fill-mode: forwards;
-						}
-
-
+					&.blinking {
+						animation: battery-blink 0.5s infinite alternate;
 					}
 
-					// Question Style
-					&.question {
-						--dialogue-background-color: #e1f5ff;
-						--dialogue-border-color: #44aaff;
+					&.critical-pulse {
+						animation: battery-pulse 0.2s infinite alternate;
 					}
 
-					// Whisper Style (smaller and more subtle)
-					&.whisper {
-						--dialogue-background-color: rgba(255, 255, 255, 0.9);
-						--dialogue-border-color: #cccccc;
-						font-size: 8px;
-						filter: blur(0px);
-
-						&.visible {
-							opacity: 0.8;
-							animation: whisperFloat 3s ease-out forwards;
-						}
-
-						// Style the text to look more whisper-like
-						.text {
-							font-style: italic;
-							letter-spacing: 0.5px;
-							color: #666;
-						}
+					&.charging {
+						animation: battery-charging 2s infinite;
 					}
 
+					&.rapid-charging {
+						animation: rapid-pulse 0.8s infinite alternate;
+					}
 
-					// Custom animations for specific styles
-					@keyframes thoughtBubblePop {
+					@keyframes rapid-pulse {
 						0% {
-							transform: translate(-50%, -100%) scale(0);
-						}
-
-						70% {
-							transform: translate(-50%, -100%) scale(1.1);
-						}
-
-						100% {
-							transform: translate(-50%, -100%) scale(1);
-						}
-					}
-
-					@keyframes whisperFloat {
-						0% {
-							transform: translate(-50%, -90%) scale(0.8);
-							opacity: 0;
-							filter: blur(2px);
-						}
-
-						20% {
-							transform: translate(-50%, -95%) scale(0.9);
-							opacity: 0.4;
-							filter: blur(1px);
-						}
-
-						40% {
-							transform: translate(-50%, -100%) scale(0.95);
-							opacity: 0.6;
-							filter: blur(0px);
-						}
-
-						60% {
-							transform: translate(-50%, -98%) scale(1);
 							opacity: 0.7;
 						}
 
-						80% {
-							transform: translate(-50%, -100%) scale(1);
-							opacity: 0.8;
-						}
-
-						90% {
-							transform: translate(-50%, -99%) scale(1);
-						}
-
 						100% {
-							transform: translate(-50%, -100%) scale(1);
-							opacity: 0.8;
-						}
-					}
-
-					@keyframes emojiPop {
-						0% {
-							transform: translate(-50%, -100%) scale(0) rotate(-20deg);
-						}
-
-						60% {
-							transform: translate(-50%, -100%) scale(1.2) rotate(10deg);
-						}
-
-						100% {
-							transform: translate(-50%, -100%) scale(1) rotate(0deg);
-						}
-					}
-
-					@keyframes alertShake {
-						0% {
-							transform: translate(-50%, -100%) scale(1);
-						}
-
-						10% {
-							transform: translate(-50%, -100%) scale(1.5);
-						}
-
-						20%,
-						40%,
-						60% {
-							transform: translate(-52%, -100%) scale(1.5);
-						}
-
-						30%,
-						50%,
-						70% {
-							transform: translate(-48%, -100%) scale(1.5);
-						}
-
-						80% {
-							transform: translate(-50%, -100%) scale(1.5);
-						}
-
-						100% {
-							transform: translate(-50%, -100%) scale(1);
-						}
-					}
-
-				}
-			}
-		}
-	}
-}
-
-/* BATTERY */
-.myteContainer {
-	.myteWrapper {
-		>.interactive-myte {
-			>.inner-wrapper {
-				>.above-wrapper {
-					>.battery {
-						--icon-scale: 2;
-						--battery-size: 13px;
-
-						width: var(--battery-size);
-						height: 8px;
-						scale: var(--icon-scale);
-						image-rendering: pixelated;
-						filter: drop-shadow(1px 1px 0px #00000020);
-						transition: scale .3s ease-in-out, top .3s ease-in-out, filter .3s ease-in-out, opacity .3s ease-in-out;
-						background-image: url(../images/icons/battery.png);
-
-						opacity: 0;
-						top: 12px;
-
-						position: relative;
-
-						&.visible {
 							opacity: 1;
-							top: 0;
 						}
-
-						&[data-level="3"],
-						&.full {
-							background-position: calc(var(--battery-size) * -3) 0;
-						}
-
-						&[data-level="2"],
-						&.medium {
-							background-position: calc(var(--battery-size) * -2) 0;
-						}
-
-						&[data-level="1"],
-						&.low {
-							background-position: calc(var(--battery-size) * -1) 0;
-						}
-
-						&[data-level="0"],
-						&.empty {
-							--icon-scale: 2.5;
-							background-position: 0 0;
-						}
-
-						&.blinking {
-							animation: battery-blink 0.5s infinite alternate;
-						}
-
-						&.critical-pulse {
-							animation: battery-pulse 0.2s infinite alternate;
-						}
-
-						&.charging {
-							animation: battery-charging 2s infinite;
-						}
-
-						&.rapid-charging {
-							animation: rapid-pulse 0.8s infinite alternate;
-						}
-						
-						@keyframes rapid-pulse {
-							0% { opacity: 0.7; }
-							100% { opacity: 1; }
-						}
-
-
-						/* Blink animation for low battery */
-						@keyframes battery-blink {
-							from {
-								opacity: 1;
-							}
-
-							to {
-								opacity: 0.3;
-							}
-						}
-
-						/* Pulse animation for critical battery */
-						@keyframes battery-pulse {
-							from {
-								opacity: 1;
-								filter: drop-shadow(1px 1px 0px #00000020);
-							}
-
-							to {
-								opacity: 0.3;
-								filter: drop-shadow(0px 0px 3% rgba(255, 0, 0, 1));
-							}
-						}
-
-						/* Charging animation */
-						@keyframes battery-charging {
-
-							0%,
-							100% {
-								filter: drop-shadow(1px 1px 0px #00000020);
-							}
-
-							50% {
-								filter: drop-shadow(0px 0px 3px rgba(0, 255, 0, 0.5));
-							}
-						}
-
-
 					}
+
+
+					/* Blink animation for low battery */
+					@keyframes battery-blink {
+						from {
+							opacity: 1;
+						}
+
+						to {
+							opacity: 0.3;
+						}
+					}
+
+					/* Pulse animation for critical battery */
+					@keyframes battery-pulse {
+						from {
+							opacity: 1;
+							filter: drop-shadow(1px 1px 0px #00000020);
+						}
+
+						to {
+							opacity: 0.3;
+							filter: drop-shadow(0px 0px 3% rgba(255, 0, 0, 1));
+						}
+					}
+
+					/* Charging animation */
+					@keyframes battery-charging {
+
+						0%,
+						100% {
+							filter: drop-shadow(1px 1px 0px #00000020);
+						}
+
+						50% {
+							filter: drop-shadow(0px 0px 3px rgba(0, 255, 0, 0.5));
+						}
+					}
+
+
 				}
 			}
 		}

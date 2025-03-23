@@ -195,7 +195,9 @@ MapObjectFactory.registry
     .register('BUTTERFLY', ButterflyMapObject)
     .register('BED', MapObject)
     .register('DOOR', DoorMapObject)
-    .register('PORTAL', PortalMapObject)	
+    .register('PORTAL', PortalMapObject)
+    .register('GATE', GateMapObject)
+    .register('FENCE', FenceMapObject)	
     .setDefaultConstructor(MapObject);
 
 MapObjectFactory.initialize(BASE_CONFIG, TYPE_CONFIGS);

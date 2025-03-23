@@ -135,33 +135,6 @@ getZoneDebugMessages() {
     return messages;
 }
 
-    getZoneDebugMessages() {
-        const messages = [];
-        const zoneManager = this.parent.gameMap.zoneManager;
-        
-        // Add total zones count
-        messages.push({
-            label: "Total Zones",
-            value: zoneManager.zones.size
-        });
-    
-        // Add information for each zone
-        zoneManager.zones.forEach((zone, zoneId) => {
-            const mytesInZone = Array.from(zone.mytesInZone)
-                .map(myteId => this.parent.mytes.find(m => m.id === myteId))
-                .filter(Boolean)
-                .map(myte => myte.name)
-                .join(', ');
-    
-            messages.push({
-                label: `Zone ${zoneId} (${zone.type})`,
-                value: mytesInZone || 'Empty'
-            });
-        });
-    
-        return messages;
-    }
-
     getCameraMessages() {
         if (!this.cameraEnabled || !this.camera) return [];
         

@@ -18,6 +18,10 @@ class Myte {
 		this.direction = DIRECTION.SOUTH;
 		this.diagonalMovement = false;
 
+		this.elements = {
+			wrapper: this.element.closest(".myteWrapper"),
+		};
+
 
 		// this character's elements
 		this.duplicate;
@@ -168,7 +172,7 @@ class Myte {
 		this.setSpritePosition(this.posX, this.posY);
 
 
-		console.log(this.parent.gameMap)
+
 		// Initialize particle effects if the game map has a particle system
 		if (this.parent && this.parent.gameMap && this.parent.gameMap.particleSystem) {
 			this.initParticleEffects();
@@ -201,6 +205,11 @@ class Myte {
 		this.duplicate.classList.add("deactivated"); // hide the original element
 	}
 
+	setWrapperPosition(x, y){
+		this.elements.wrapper.style.left = x + 'px';
+		this.elements.wrapper.style.top = y + 'px';
+	}
+
 	setStartTime() {
 		this.startTime = Date.now();
 	}
@@ -223,7 +232,7 @@ class Myte {
 		this.element.classList.remove("deactivated");
 		this.duplicate.classList.remove("active");
 		this.duplicate.classList.add('deactivated');
-		this.element.closest('.myteContainer').classList.remove('empty');
+		this.element.closest('.myteWrapper').classList.remove('empty');
 
 		// target dot
 		console.log('target dot hide at stop');
@@ -240,7 +249,7 @@ class Myte {
 		this.isActive = true;
 
 		this.element.classList.add("deactivated"); // hide the original element
-		this.element.closest('.myteContainer').classList.add('empty');
+		this.element.closest('.myteWrapper').classList.add('empty');
 		this.duplicate.classList.remove("deactivated"); // show the duplicate element
 
 		// show dot
@@ -253,9 +262,7 @@ class Myte {
 		// set start time - we need this to disable dragging for a few seconds at start
 		this.setStartTime();
 
-
 		this.parent.ui.debugMenu.enableButtons();
-		
 
 	}
 
@@ -701,6 +708,10 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 			y = Math.min(y, document.documentElement.scrollHeight - rect.height - container.top);
 		}
 
+
+		// offset parent wrapper
+		//x -= this.elements.wrapper.offsetLeft;
+		//y -= this.elements.wrapper.offsetTop;
 
 
 		if (setX) this.duplicate.style.left = x.toFixed(0) + 'px';

@@ -3,7 +3,7 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "Outside.tmx",
+    "activeFile": "House.tmx",
     "expandedProjectPaths": [
         "."
     ],
@@ -13,11 +13,16 @@
             "scaleInDock": 1
         },
         "House.tmx": {
-            "scale": 1.2567708333333334,
-            "selectedLayer": 0,
+            "expandedObjectLayers": [
+                7,
+                10,
+                9
+            ],
+            "scale": 1,
+            "selectedLayer": 4,
             "viewCenter": {
-                "x": 479.80107749689176,
-                "y": 479.8010774968918
+                "x": 494,
+                "y": 570
             }
         },
         "HouseNew.tmx": {
@@ -38,8 +43,8 @@
             "scale": 1.5,
             "selectedLayer": 3,
             "viewCenter": {
-                "x": 326.66666666666663,
-                "y": 346.6666666666667
+                "x": 458.66666666666663,
+                "y": 368
             }
         },
         "house.tsx": {
@@ -55,15 +60,16 @@
     "last.imagePath": "C:/xampp/htdocs/genes/chat/neko/images/MapObjects",
     "map.lastUsedFormat": "tmx",
     "openFiles": [
-        "HouseNew.tmx",
         "walls3.tsx",
-        "Outside.tmx"
+        "Outside.tmx",
+        "House.tmx"
     ],
     "project": "Mytes Spritesheets.tiled-project",
     "recentFiles": [
-        "HouseNew.tmx",
         "walls3.tsx",
         "Outside.tmx",
+        "House.tmx",
+        "HouseNew.tmx",
         "house.tsx"
     ],
     "tileset.lastUsedFormat": "tsx"

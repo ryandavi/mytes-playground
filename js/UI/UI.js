@@ -267,7 +267,7 @@ class UserInterface {
 
         // Add click handler
         thumbnail.addEventListener('click', () => {
-            if (myte !== this.activeMyte) {
+            if (myte !== this.parent.activeMyte) {
                 this.parent.setActiveMyte(myte);
             }
         });

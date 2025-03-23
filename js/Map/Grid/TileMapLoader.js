@@ -121,10 +121,15 @@ class TileMapLoader {
 		// Set dimensions
 		gameMap.dimensions = mapData.dimensions;
 
+		gameMap.name = mapData.name;
+		gameMap.id = mapData.id;
+		gameMap.description = mapData.description;
+		gameMap.location = mapData.environment.location;
+
 		console.log('Tile map dimensions:', gameMap.dimensions);
 
-		// this.parent.layers.background.style.width = `${gameMap.dimensions.width}px`;
-		// this.parent.layers.background.style.height = `${gameMap.dimensions.height}px`;
+		this.parent.layers.background.style.width = `${gameMap.dimensions.width}px`;
+		this.parent.layers.background.style.height = `${gameMap.dimensions.height}px`;
 
 		// Set background from map
 		const bgUrl = await this.createMapBackgroundUrl(mapData);
@@ -150,8 +155,10 @@ class TileMapLoader {
 
 		// Add zones
 		if (mapData.zones) {
+			console.log("mapData.zones", mapData.zones);
 			for (const zoneData of mapData.zones) {
 				gameMap.zoneManager.addZone(zoneData);
+				console.log("add zone");
 			}
 		}
 
@@ -161,6 +168,17 @@ class TileMapLoader {
 				gameMap.spawnPoints.set(key, value);
 			});
 		}
+
+		// set myte position to spawn point
+		// get first myte
+		let mytes = this.parent.parent.mytes;
+		console.log(mytes.length);
+		if(mytes.length > 0){
+			let myte = mytes[0];
+			myte.setWrapperPosition(mapData.spawns.myte.x, mapData.spawns.myte.y);
+			console.log("myte", mapData.spawns.myte.x, mapData.spawns.myte.y);
+		}
+
 
 		// Add objects
 		if (mapData.objects) {
@@ -352,7 +370,8 @@ class TileMapLoader {
 		const propertyElements = propertiesEl.querySelectorAll('property');
 
 		for (const propEl of propertyElements) {
-			const name = propEl.getAttribute('name');
+			const name_unformatted = propEl.getAttribute('name');
+			const name = name_unformatted.charAt(0).toLowerCase() + name_unformatted.slice(1);
 			const type = propEl.getAttribute('type') || 'string';
 			const valueAttr = propEl.getAttribute('value');
 
@@ -410,13 +429,13 @@ class TileMapLoader {
 	}
 
 	createZonesFromObjects(mapData) {
-		for (const obj of mapData.objects) {
-			if (obj.type === 'ZONE' && obj.properties) {
-				const zoneType = obj.properties.zoneType || 'REST';
-
+		mapData.objects = mapData.objects.filter(obj => {
+			if (obj.name.toUpperCase() == 'ZONE' && obj.properties) {
+				const type = obj.properties.type.toUpperCase() || 'REST';
+	
 				mapData.zones.push({
-					id: obj.name || `zone_${obj.id}`,
-					type: zoneType,
+					id: `zone_${obj.properties.displayName.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_')}`,
+					type: type,
 					bounds: {
 						x: obj.x,
 						y: obj.y,
@@ -429,66 +448,28 @@ class TileMapLoader {
 						...obj.properties
 					}
 				});
+	
+				return false; // Remove from objects
 			}
-		}
+			return true; // Keep in objects
+		});
 	}
 
 	createSpawnsFromObjects(mapData) {
-		for (const obj of mapData.objects) {
-			if (obj.type === 'SPAWN' && obj.properties) {
-				const spawnType = obj.properties.spawnType || 'myte';
+		mapData.objects = mapData.objects.filter(obj => {
+			if (obj.name.toUpperCase() === 'SPAWN') {
+				const type = obj?.properties?.type || 'myte';
+				console.log("create spawn");
 
-				if (spawnType === 'myte') {
+				if (type === 'myte') {
 					mapData.spawns.myte = { x: obj.x, y: obj.y };
-				} else if (spawnType === 'item') {
+				} else if (type === 'item') {
 					mapData.spawns.items.push({ x: obj.x, y: obj.y });
 				}
+				return false; // Remove from objects
 			}
-		}
-	}
-
-	// OPTIMIZED: Render map using canvas instead of DOM elements
-	renderMap(mapData, container) {
-		if (!mapData || !container) return null;
-
-		// Clear any existing layer canvases
-		this.clearLayerCanvases();
-
-		// Create layers container
-		const layersContainer = document.createElement('div');
-		layersContainer.className = 'layer tile-map';
-		container.appendChild(layersContainer);
-
-		const renderedLayers = {};
-
-		// Create and render each layer
-		for (const layer of mapData.TileData.layers) {
-			if (!layer.visible) continue;
-
-			// Create a canvas for this layer
-			const canvas = document.createElement('canvas');
-			canvas.width = mapData.dimensions.width;
-			canvas.height = mapData.dimensions.height;
-			canvas.className = `tile-layer ${layer.name.toLowerCase().replace(/\s+/g, '-')}`;
-			canvas.style.opacity = layer.opacity.toString();
-			canvas.style.position = 'absolute';
-			canvas.style.top = '0';
-			canvas.style.left = '0';
-
-			// Render tiles to canvas
-			this.renderTileLayerToCanvas(layer, mapData.TileData, canvas);
-
-			layersContainer.appendChild(canvas);
-			renderedLayers[layer.name] = canvas;
-			
-			// Store the canvas for later updates
-			this.layerCanvases.set(layer.name, canvas);
-		}
-
-		return {
-			container: layersContainer,
-			layers: renderedLayers
-		};
+			return true; // Keep in objects
+		});
 	}
 
 	// Render tile layer to canvas instead of creating DOM elements
@@ -589,16 +570,6 @@ class TileMapLoader {
 		});
 
 		return result;
-	}
-
-	getTileProperties(gid, tilesets) {
-		const tileset = this.findTilesetForGid(gid, tilesets);
-		if (!tileset) return null;
-
-		const localId = gid - tileset.firstgid;
-		const tileInfo = tileset.tiles[localId];
-
-		return tileInfo?.properties || null;
 	}
 
 	// Creating a background image from the map for the full view

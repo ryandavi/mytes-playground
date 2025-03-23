@@ -1,13 +1,20 @@
-
 class DoorMapObject extends AnimatedMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
-        super(parent, type, variant, posX, posY, config, options);
+        // Process the direction before calling super
+        const direction = options.direction || 'E';
+        
+        // Apply direction-specific configuration using the static method
+        const processedConfig = MapObject.processDirectionConfig(config, direction);
+
+        console.log("DIRECTION", direction);
+        
+        super(parent, type, variant, posX, posY, processedConfig, options);
         
         // Door-specific state
         this.isOpen = false;
         this.isAnimating = false;
-        this.facingDirection = options.direction || 'right'; // default direction
-        this.teleportTarget = options.teleportTarget || null; // optional map to teleport to
+        this.facingDirection = processedConfig.facingDirection || direction;
+        this.teleportTarget = options.teleportTarget || null;
         
         // Initialize collision state based on door being closed by default
         this.updateCollisionState();
@@ -17,7 +24,7 @@ class DoorMapObject extends AnimatedMapObject {
     press(myte) {
         if (this.isAnimating) return false;
 
-		console.log("Interacted with door");
+        console.log(`Interacted with door facing ${this.facingDirection}`);
         
         // Toggle door state
         if (this.isOpen) {
@@ -120,12 +127,33 @@ class DoorMapObject extends AnimatedMapObject {
     render(container, parent) {
         const element = super.render(container, parent);
         
-        // Add door-specific class
-        element.classList.add('door', `facing-${this.facingDirection}`);
+        // Add door-specific classes
+        element.classList.add('door');
+        element.classList.add(`facing-${this.facingDirection.toLowerCase()}`);
         
-        // Set appropriate transform based on facing direction
-        if (this.facingDirection === 'left') {
-            element.querySelector('.sprite').style.transform = 'scaleX(-1)';
+        // Get the sprite element
+        const spriteElement = element.querySelector('.sprite');
+        
+        // Apply transformations based on direction config
+        if (spriteElement) {
+            const transformStyle = this.getConfig('transformStyle', '');
+            if (transformStyle) {
+                spriteElement.style.transform = transformStyle;
+            }
+        }
+        
+        // Add interactive collision zone visualization if in debug mode
+        if (this.getConfig('debug', false) && this.getConfig('interactiveCollider')) {
+            const interactiveCollider = this.getConfig('interactiveCollider');
+            const interactiveZone = document.createElement('div');
+            interactiveZone.classList.add('interactive-zone', 'debug-visible');
+            
+            interactiveZone.style.width = `${interactiveCollider.width}px`;
+            interactiveZone.style.height = `${interactiveCollider.height}px`;
+            interactiveZone.style.left = `${interactiveCollider.offsetX}px`;
+            interactiveZone.style.top = `${interactiveCollider.offsetY}px`;
+            
+            element.appendChild(interactiveZone);
         }
         
         return element;

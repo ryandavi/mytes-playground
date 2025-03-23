@@ -434,6 +434,62 @@
   font-size: 0.9em;
 }
 
+.mapObject {
+  /* Fence Styles */
+  /* Gate Styles */
+}
+.mapObject .fence {
+  position: absolute;
+  pointer-events: auto;
+  z-index: 1;
+}
+.mapObject .fence .sprite {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+.mapObject .fence-connections.debug-visible {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  background-color: rgba(0, 255, 0, 0.5);
+  color: white;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.mapObject .gate {
+  position: absolute;
+  pointer-events: auto;
+  z-index: 2;
+  transition: opacity 0.3s ease;
+}
+.mapObject .gate .sprite {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  transition: transform 0.3s ease;
+}
+.mapObject .gate.open .sprite {
+  opacity: 0.8;
+}
+.mapObject .gate.closed .sprite {
+  opacity: 1;
+}
+.mapObject .gate .interactive-zone.debug-visible {
+  position: absolute;
+  border: 1px dashed rgba(255, 0, 0, 0.5);
+  background-color: rgba(255, 0, 0, 0.1);
+  pointer-events: none;
+}
+
 .map-transition {
   position: absolute;
   top: 0;

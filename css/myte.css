@@ -1,24 +1,21 @@
-.myteContainer {
-  text-align: center;
-  margin: 20px;
-}
-.myteContainer .myteWrapper {
+.myteWrapper {
   --myte-size: 64px;
   display: inline-block;
   cursor: pointer;
+  position: absolute;
 }
-.myteContainer .myteWrapper.snail {
+.myteWrapper.snail {
   --myte-size: 192px;
 }
-.myteContainer .myteWrapper.snail > .interactive-myte > .inner-wrapper {
+.myteWrapper.snail > .interactive-myte > .inner-wrapper {
   position: fixed;
   width: inherit;
   height: inherit;
 }
-.myteContainer .myteWrapper.snail > .interactive-myte > .inner-wrapper > .sprite {
+.myteWrapper.snail > .interactive-myte > .inner-wrapper > .sprite {
   background: url(../images/snail/spritesheet.png);
 }
-.myteContainer .myteWrapper > .interactive-myte {
+.myteWrapper > .interactive-myte {
   width: var(--myte-size);
   height: var(--myte-size);
   color: var(--button-light);
@@ -26,14 +23,14 @@
   position: relative;
   z-index: 100000;
 }
-.myteContainer .myteWrapper > .interactive-myte.selected .sprite {
+.myteWrapper > .interactive-myte.selected .sprite {
   outline: 2px dashed green;
   border-radius: 5px;
 }
-.myteContainer .myteWrapper > .interactive-myte.duplicate.deactivated {
+.myteWrapper > .interactive-myte.duplicate.deactivated {
   display: none;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .sprite {
+.myteWrapper > .interactive-myte > .inner-wrapper > .sprite {
   width: inherit;
   height: inherit;
   image-rendering: pixelated;
@@ -41,7 +38,7 @@
   transform-origin: center;
   transition: filter 0.2s ease-out, transform 0.2s ease-out;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper {
+.myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper {
   display: flex;
   gap: var(--border-width);
   align-items: center;
@@ -52,7 +49,7 @@
   transition: opacity 0.5s;
   flex-direction: column;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper {
+.myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper {
   display: flex;
   gap: var(--border-width);
   align-items: center;
@@ -63,7 +60,7 @@
   position: relative;
   transition: opacity 0.5s;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper:before {
+.myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper:before {
   content: "x";
   position: absolute;
   left: -var(--border-width);
@@ -71,25 +68,25 @@
   color: red;
   visibility: hidden;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper.bottom {
+.myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper.bottom {
   top: 25%;
   transform: translate(50%, 0%);
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper > .before {
+.myteWrapper > .interactive-myte > .inner-wrapper > .name-wrapper > .before {
   display: none;
 }
-.myteContainer .myteWrapper > .interactive-myte.active > .inner-wrapper > .name-wrapper > .name {
+.myteWrapper > .interactive-myte.active > .inner-wrapper > .name-wrapper > .name {
   background-color: #3269c4;
   color: white;
   outline-color: white;
 }
-.myteContainer .myteWrapper > .interactive-myte:not(.duplicate) > .inner-wrapper > .above-wrapper {
+.myteWrapper > .interactive-myte:not(.duplicate) > .inner-wrapper > .above-wrapper {
   display: none;
 }
-.myteContainer .myteWrapper > .interactive-myte:not(.duplicate) > .inner-wrapper > .name-wrapper {
+.myteWrapper > .interactive-myte:not(.duplicate) > .inner-wrapper > .name-wrapper {
   display: none;
 }
-.myteContainer .myteWrapper > .interactive-myte.dragging {
+.myteWrapper > .interactive-myte.dragging {
   pointer-events: none;
   -webkit-user-select: none;
      -moz-user-select: none;
@@ -97,7 +94,7 @@
   cursor: grab;
   z-index: 100000 !important;
 }
-.myteContainer .myteWrapper > .interactive-myte.dragging > .inner-wrapper > .sprite {
+.myteWrapper > .interactive-myte.dragging > .inner-wrapper > .sprite {
   /*
   animation-name: wiggle;
   animation-iteration-count: infinite;
@@ -109,25 +106,27 @@
   animation-name: wiggle2;
   animation-duration: 0.6s;
   animation-iteration-count: infinite;
-  transform-origin: 50% 65%; /* Adjust to make it pivot from the bottom */
+  transform-origin: 50% 65%;
+  /* Adjust to make it pivot from the bottom */
   animation-timing-function: ease-in-out;
   filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
-  will-change: transform; /* Performance optimization */
+  will-change: transform;
+  /* Performance optimization */
 }
-.myteContainer .myteWrapper > .interactive-myte.deactivated {
+.myteWrapper > .interactive-myte.deactivated {
   visibility: hidden;
   opacity: 0;
 }
-.myteContainer .myteWrapper > .interactive-myte.freemode {
+.myteWrapper > .interactive-myte.freemode {
   position: absolute;
   cursor: grab;
 }
-.myteContainer .myteWrapper > .interactive-myte.freemode > .sprite {
+.myteWrapper > .interactive-myte.freemode > .sprite {
   position: fixed;
 }
 
 /* HOME RELATED */
-.myteContainer .myteWrapper > .home-wrapper {
+.myteWrapper > .home-wrapper {
   border-radius: var(--border-radius);
   transition: opacity, 0.15s, background-color 0.15s, box-shadow 0.15s, outline-width 0.15s, outline-color 0.5s;
   width: var(--myte-size);
@@ -143,7 +142,7 @@
   background-color: var(--button-mid);
   filter: var(--shadow);
 }
-.myteContainer .myteWrapper > .home-name {
+.myteWrapper > .home-name {
   position: relative;
   transform: translateX(-100%);
   z-index: 1000000;
@@ -153,18 +152,20 @@
   transform: unset;
   pointer-events: none;
 }
-.myteContainer .myteWrapper > .home-name > .name {
+.myteWrapper > .home-name > .name {
   display: inline-block;
   top: 10px;
-  position: relative;
+  position: absolute;
+  right: 50%;
+  transform: translate(50%, 0%);
 }
-.myteContainer .myteWrapper:hover > .home-wrapper {
+.myteWrapper:hover > .home-wrapper {
   outline: var(--border-width) solid darkgrey;
 }
-.myteContainer.empty .myteWrapper:hover > .home-wrapper {
+.myteWrapper.empty:hover > .home-wrapper {
   outline: unset;
 }
-.myteContainer.empty .myteWrapper > .home-wrapper {
+.myteWrapper.empty > .home-wrapper {
   opacity: 0.75;
   z-index: 0;
   border-top-color: var(--button-dark);
@@ -175,18 +176,18 @@
   filter: unset;
   box-shadow: inset var(--border-width) var(--border-width) rgba(0, 0, 0, 0.0509803922);
 }
-.myteContainer.empty .myteWrapper.valid-drop-target > .home-wrapper {
+.myteWrapper.empty.valid-drop-target > .home-wrapper {
   z-index: 100000;
   opacity: 1;
   display: block;
   outline: var(--border-width) solid var(--drop-target) !important;
 }
-.myteContainer.empty .myteWrapper.valid-drop-target.on-target > .home-wrapper {
+.myteWrapper.empty.valid-drop-target.on-target > .home-wrapper {
   outline-color: var(--on-target) !important;
 }
 
 /* DIALOGUE */
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue {
   --dialogue-background-color: #ffffe1;
   --dialogue-border-color: black;
   --dialogue-border-width: 2px;
@@ -213,10 +214,10 @@
   opacity: 0;
   transition: opacity 0.5s ease-in-out;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.visible {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.visible {
   opacity: 1;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue::before {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue::before {
   content: "";
   width: 0;
   height: 0;
@@ -228,7 +229,7 @@
   bottom: calc(var(--dialogue-border-width) + 1px);
   transform: translate(0%, 100%);
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue::after {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue::after {
   content: "";
   width: 0;
   height: 0;
@@ -241,14 +242,14 @@
   transform: translate(0%, 100%);
   z-index: -1;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought {
   --bubble-color: var(--dialogue-background-color);
   border-radius: 20px;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::before, .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::after {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::before, .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::after {
   all: unset;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::before {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::before {
   content: "";
   position: absolute;
   bottom: calc(-1 * var(--dialogue-bubble-size));
@@ -259,7 +260,7 @@
   border: var(--dialogue-border-width) solid var(--dialogue-border-color);
   border-radius: 50%;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::after {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought::after {
   content: "";
   position: absolute;
   bottom: calc(-1.8 * var(--dialogue-bubble-size));
@@ -270,10 +271,10 @@
   border: var(--dialogue-border-width) solid var(--dialogue-border-color);
   border-radius: 50%;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought.visible {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.thought.visible {
   animation: thoughtBubblePop 0.5s ease-out;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji {
   --emoji-padding: 5px;
   border-radius: 50%;
   padding: var(--emoji-padding);
@@ -281,40 +282,40 @@
   min-height: calc(var(--emoji-padding) * 2 + 1em);
   font-size: 200%;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji::before, .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji::after {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji::before, .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji::after {
   content: none;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji .text {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji .text {
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji.visible {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.emoji.visible {
   animation: emojiPop 0.4s ease-out;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.alert {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.alert {
   --dialogue-background-color: #ffe1e1;
   --dialogue-border-color: #ff4444;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.alert.visible {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.alert.visible {
   animation: alertShake 0.7s cubic-bezier(0.36, 0, 0.66, -0.56);
   animation-fill-mode: forwards;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.question {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.question {
   --dialogue-background-color: #e1f5ff;
   --dialogue-border-color: #44aaff;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.whisper {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.whisper {
   --dialogue-background-color: rgba(255, 255, 255, 0.9);
   --dialogue-border-color: #cccccc;
   font-size: 8px;
   filter: blur(0px);
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.whisper.visible {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.whisper.visible {
   opacity: 0.8;
   animation: whisperFloat 3s ease-out forwards;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.whisper .text {
+.myteWrapper > .interactive-myte > .inner-wrapper > .dialogue.whisper .text {
   font-style: italic;
   letter-spacing: 0.5px;
   color: #666;
@@ -395,7 +396,7 @@
 }
 
 /* BATTERY */
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery {
+.myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery {
   --icon-scale: 2;
   --battery-size: 13px;
   width: var(--battery-size);
@@ -412,33 +413,33 @@
   /* Pulse animation for critical battery */
   /* Charging animation */
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.visible {
+.myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.visible {
   opacity: 1;
   top: 0;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="3"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.full {
+.myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="3"], .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.full {
   background-position: calc(var(--battery-size) * -3) 0;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="2"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.medium {
+.myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="2"], .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.medium {
   background-position: calc(var(--battery-size) * -2) 0;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="1"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.low {
+.myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="1"], .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.low {
   background-position: calc(var(--battery-size) * -1) 0;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="0"], .myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.empty {
+.myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery[data-level="0"], .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.empty {
   --icon-scale: 2.5;
   background-position: 0 0;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.blinking {
+.myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.blinking {
   animation: battery-blink 0.5s infinite alternate;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.critical-pulse {
+.myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.critical-pulse {
   animation: battery-pulse 0.2s infinite alternate;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.charging {
+.myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.charging {
   animation: battery-charging 2s infinite;
 }
-.myteContainer .myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.rapid-charging {
+.myteWrapper > .interactive-myte > .inner-wrapper > .above-wrapper > .battery.rapid-charging {
   animation: rapid-pulse 0.8s infinite alternate;
 }
 @keyframes rapid-pulse {

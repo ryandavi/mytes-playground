@@ -278,12 +278,13 @@ class Zone {
             myte.stats.updateMood(this.properties.continuousMoodBoost * this.properties.strength);
         }
     }
+
 }
 
 // ZoneManager class to handle multiple zones
 class ZoneManager {
     constructor(map) {
-        this.map = map;
+        this.parent = map;
         this.zones = new Map();
     }
 
@@ -292,7 +293,7 @@ class ZoneManager {
         this.zones.set(zone.id, zone);
         
         if (zone.element) {
-            this.map.layers.background.appendChild(zone.element);
+            this.parent.layers.background.appendChild(zone.element);
         }
         
         return zone;
@@ -314,5 +315,20 @@ class ZoneManager {
                 zone.update(myte);
             }
         });
+    }
+
+    dispose(){
+
+        // loop through zones and remove elements
+        this.zones.forEach(zone => {
+            if (zone.element) {
+                zone.element.remove();
+            }
+        });
+
+        this.zones = new Map();
+
+
+        
     }
 }
