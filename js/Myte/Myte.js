@@ -171,8 +171,6 @@ class Myte {
 		this.setPosition(offsetX, offsetY);
 		this.setSpritePosition(this.posX, this.posY);
 
-
-
 		// Initialize particle effects if the game map has a particle system
 		if (this.parent && this.parent.gameMap && this.parent.gameMap.particleSystem) {
 			this.initParticleEffects();
@@ -193,8 +191,8 @@ class Myte {
 		this.duplicate.classList.add("duplicate"); // free mode is when it can fly around
 		this.duplicate.id = "duplicate-" + this.duplicate.id;
 
-		// add duplicate
-		this.element.parentNode.insertBefore(this.duplicate, this.element.nextSibling); // insert new
+		// add duplicate to canvas
+		this.parent.canvas.appendChild(this.duplicate); // insert new
 
 		// elements
 		this.sprite = this.duplicate.querySelector('.sprite');
@@ -208,6 +206,9 @@ class Myte {
 	setWrapperPosition(x, y){
 		this.elements.wrapper.style.left = x + 'px';
 		this.elements.wrapper.style.top = y + 'px';
+
+		this.setPosition(x, y);
+		this.setSpritePosition(x, y);
 	}
 
 	setStartTime() {
@@ -220,19 +221,19 @@ class Myte {
 
 	stop() {
 		this.isActive = false;
+		this.atOriginal = true;
 
-		var rect = this.parent.getLocalOffset(this.element);
+		// set position
+		var rect = this.parent.getLocalOffset(this.elements.wrapper);
 		this.posX = rect.left;
 		this.posY = rect.top;
 		this.setSpritePosition(this.posX, this.posY);
 
-
-		this.atOriginal = true;
-		// this.duplicate.remove();
+		// hide it
 		this.element.classList.remove("deactivated");
 		this.duplicate.classList.remove("active");
 		this.duplicate.classList.add('deactivated');
-		this.element.closest('.myteWrapper').classList.remove('empty');
+		this.elements.wrapper.classList.remove('empty');
 
 		// target dot
 		console.log('target dot hide at stop');
@@ -246,10 +247,11 @@ class Myte {
 	}
 
 	start() {
+
 		this.isActive = true;
 
 		this.element.classList.add("deactivated"); // hide the original element
-		this.element.closest('.myteWrapper').classList.add('empty');
+		this.elements.wrapper.classList.add('empty');
 		this.duplicate.classList.remove("deactivated"); // show the duplicate element
 
 		// show dot
@@ -261,6 +263,10 @@ class Myte {
 
 		// set start time - we need this to disable dragging for a few seconds at start
 		this.setStartTime();
+
+
+		// start at home wrapper
+		this.setPosition(this.elements.wrapper.offsetLeft, this.elements.wrapper.offsetTop);
 
 		this.parent.ui.debugMenu.enableButtons();
 
@@ -362,7 +368,7 @@ class Myte {
 
 	set_target_to_origin() {
 
-		var rect = this.parent.getLocalOffset(this.element);
+		var rect = this.parent.getLocalOffset(this.elements.wrapper);
 
 		this.targetX = rect.left;
 		this.targetY = rect.top;
@@ -769,6 +775,8 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 	}
 
 	setPosition(x = null, y = null, limit = false) {
+
+
 		let maxDimensions = this.parent.getMaxDimensions();
 		let rect = this.getRect();
 		let container = this.parent.getContainerRect();
@@ -1381,19 +1389,17 @@ move_gravity() {
 			if (this.atOriginal == false) {
 				if (this.queue.isEmpty()) {
 					// Add a move action to return home if not already moving
-					const rect = this.parent.getLocalOffset(this.element);
+					const rect = this.parent.getLocalOffset(this.elements.wrapper);
 					this.queue.add('move', {
 						target: [{
 							x: rect.left,
 							y: rect.top
-						}]
+						}],
+						onComplete: () => this.stop()
 					});
 				}
 				this.queue.update();
 
-				if (this.is_at_target()) {
-					this.stop();
-				}
 			}
 		}
 		else if (this.goal == MOVE_TYPES.QUEUE_ONLY) {

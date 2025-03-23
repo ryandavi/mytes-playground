@@ -136,12 +136,12 @@ getZoneDebugMessages() {
 }
 
     getCameraMessages() {
-        if (!this.cameraEnabled || !this.camera) return [];
+        if (!this.parent.camera) return [];
         
         return [
-            { label: "Camera Position", value: `${this.camera.posX.toFixed(2)}px, ${this.camera.posY.toFixed(2)}px` },
-            { label: "Zoom Level", value: this.camera.zoomLevel.toFixed(2) },
-            { label: "Follow Mode", value: this.camera.followMode }
+            { label: "Camera Position", value: `${this.parent.camera.posX.toFixed(2)}px, ${this.parent.camera.posY.toFixed(2)}px` },
+            { label: "Zoom Level", value: this.parent.camera.zoomLevel.toFixed(2) },
+            { label: "Follow Mode", value: this.parent.camera.followMode }
         ];
     }
 

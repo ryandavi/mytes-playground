@@ -65,10 +65,6 @@ class DanceAction extends MyteAction {
         return this.current_duration <= 0;
     }
 
-    complete(){
-        super.complete();
-        // tired
-    }
 }
 
 // Sleep action with complete metadata defaults

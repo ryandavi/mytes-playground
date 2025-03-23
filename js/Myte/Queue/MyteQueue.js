@@ -141,12 +141,15 @@ class MyteQueue {
         }
 
         if (currentAction.update()) {
-            currentAction.complete();
+            
             this.removeCurrentAction();
             if (this.queue.length > 0) {
                 // go to next item
                 this.queue[0].start();
                 this.isDoingAction = true;
+            }else{
+                // no more, run complete
+                currentAction.complete();
             }
         }
     }

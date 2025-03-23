@@ -74,6 +74,7 @@ class DebugMenu extends ModalWindow {
         document.getElementById('cycleContainerLimit').addEventListener("click", (event) => {
             this.parent.parent.settings.limitMap = !this.parent.parent.settings.limitMap;
             this.updateContainerLimit(event.target);
+            this.parent.parent.camera.reset();
         });
 
         this.updateContainerLimit(document.getElementById('cycleContainerLimit'));
@@ -98,7 +99,7 @@ class DebugMenu extends ModalWindow {
             this.parent.parent.camera.isScrollable.x = true;
             this.parent.parent.camera.isScrollable.y = true;
             this.parent.parent.element.closest('.container').classList.add('noScroll');
-            this.parent.parent.camera.reset();
+            
         } else {
             this.parent.parent.camera.isScrollable.x = false;
             this.parent.parent.camera.isScrollable.y = false;

@@ -150,6 +150,7 @@ class ContainerManager {
                 isInitialLoad: true
             });
 
+
             if (!initialMapLoaded) {
                 throw new Error(`Failed to load initial map: ${initialMapId}`);
             }
@@ -411,18 +412,7 @@ class ContainerManager {
 
     // Add to ContainerManager class
     checkCollision(entityA, entityB) {
-        // Handle different collider types
-        if (entityA.collider?.type === 'circle' && entityB.collider?.type === 'circle') {
-            return this.checkCircleCollision(entityA, entityB);
-        } else if (entityA.collider?.type === 'circle' || entityB.collider?.type === 'circle') {
-            return this.checkCircleBoxCollision(
-                entityA.collider?.type === 'circle' ? entityA : entityB,
-                entityA.collider?.type === 'circle' ? entityB : entityA
-            );
-        } else {
-            // Default to box collision
-            return this.checkBoxCollision(entityA, entityB);
-        }
+        return this.checkBoxCollision(entityA, entityB);
     }
 
     handleCollision(entityA, entityB) {
@@ -460,55 +450,6 @@ class ContainerManager {
         );
     }
 
-    // Circle-to-circle collision check
-    checkCircleCollision(entityA, entityB) {
-        // Get circle centers
-        const centerA = {
-            x: entityA.posX + (entityA.collider.offsetX || 0) + (entityA.collider.width / 2),
-            y: entityA.posY + (entityA.collider.offsetY || 0) + (entityA.collider.width / 2)
-        };
-
-        const centerB = {
-            x: entityB.posX + (entityB.collider.offsetX || 0) + (entityB.collider.width / 2),
-            y: entityB.posY + (entityB.collider.offsetY || 0) + (entityB.collider.width / 2)
-        };
-
-        // Get radii
-        const radiusA = entityA.collider.width / 2;
-        const radiusB = entityB.collider.width / 2;
-
-        // Check distance between centers versus sum of radii
-        const dx = centerA.x - centerB.x;
-        const dy = centerA.y - centerB.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        return distance < (radiusA + radiusB);
-    }
-
-    // Circle-to-box collision check
-    checkCircleBoxCollision(circleEntity, boxEntity) {
-        // Get circle center and radius
-        const center = {
-            x: circleEntity.posX + (circleEntity.collider.offsetX || 0) + (circleEntity.collider.width / 2),
-            y: circleEntity.posY + (circleEntity.collider.offsetY || 0) + (circleEntity.collider.width / 2)
-        };
-        const radius = circleEntity.collider.width / 2;
-
-        // Get box bounds
-        const box = this.getColliderBounds(boxEntity);
-
-        // Find closest point on box to circle center
-        const closestX = Math.max(box.left, Math.min(center.x, box.right));
-        const closestY = Math.max(box.top, Math.min(center.y, box.bottom));
-
-        // Calculate distance between closest point and circle center
-        const dx = closestX - center.x;
-        const dy = closestY - center.y;
-        const distanceSquared = dx * dx + dy * dy;
-
-        return distanceSquared <= (radius * radius);
-    }
-
     // Add to checkBoxCollision
     checkBoxCollision(entityA, entityB, options = {}) {
         const boundsA = this.getColliderBounds(entityA);
@@ -533,37 +474,6 @@ class ContainerManager {
 
         return isColliding;
     }
-
-
-    // Add to checkBoxCollision
-    checkBoxCollision(entityA, entityB, options = {}) {
-        const boundsA = this.getColliderBounds(entityA);
-        const boundsB = this.getColliderBounds(entityB);
-
-        // Basic collision check
-        const isColliding = !(
-            boundsA.right < boundsB.left ||
-            boundsA.left > boundsB.right ||
-            boundsA.bottom < boundsB.top ||
-            boundsA.top > boundsB.bottom
-        );
-
-        // Handle one-way platforms
-        if (isColliding && entityB.config?.oneWayPlatform) {
-            // Only collide if entityA is above entityB and moving downward
-            const isAbove = entityA.posY + entityA.size.height <= entityB.posY + 5; // Small tolerance
-            const isMovingDown = entityA.velocity > 0;
-
-            return isAbove && isMovingDown;
-        }
-
-        return isColliding;
-    }
-
-
-
-
-
 
     setActiveMyte(myte) {
         if (this.activeMyte && myte !== null) {
@@ -574,7 +484,7 @@ class ContainerManager {
 
         this.camera.setMode(this.settings.defaultMyteCamera);
 
-
+        //  add active if myte isnt null
         if (myte !== null) {
             myte.duplicate.classList.add('active');
             myte.setStartTime();
@@ -588,6 +498,7 @@ class ContainerManager {
             }
         });
 
+        // start it if it's not active
         if (myte && !myte.isActive) {
             myte.start();
         }
@@ -597,7 +508,6 @@ class ContainerManager {
         listContainer.querySelectorAll('.myte-thumbnail').forEach(thumbnail => {
             thumbnail.classList.remove('active');
         });
-
         if (myte) {
             listContainer.querySelector(`[data-myte-id="${myte.id}"]`).classList.add('active');
         }

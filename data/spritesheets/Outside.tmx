@@ -136,6 +136,7 @@
   </object>
   <object id="16" name="Spawn" x="544" y="224" width="192" height="192">
    <properties>
+    <property name="displayName" value="Your Yard"/>
     <property name="type" value="myte"/>
    </properties>
   </object>

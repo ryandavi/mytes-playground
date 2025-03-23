@@ -367,7 +367,6 @@ class Utility {
 			try {
 				let element = event.target;
 				let xpath = getElementXPath(element);
-				console.log(xpath);
 				// Optionally retrieve the element by XPath and log it
 				// let retrievedElement = getElementByXPath(xpath);
 				// console.log(retrievedElement);

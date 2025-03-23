@@ -180,6 +180,31 @@ class Camera {
 		this.setTarget(posX, posY);
 	}
 
+
+	centerToPosition(x, y, elementRect, immediate = false){
+		if (!this.isScrollable.x && !this.isScrollable.y) return;
+
+		let posX = this.posX;
+		let posY = this.posY;
+
+
+		const canvasRect = this.parent.getCanvasRect();
+		const viewportRect = this.parent.getContainerRect();
+
+		if (this.isScrollable.x) {
+			posX = -(x + (elementRect.width / 2) - (viewportRect.width / 2));
+			if(this.limitToBounds) posX = Math.min(0, Math.max(-(canvasRect.width - viewportRect.width), posX));
+		}
+
+		if (this.isScrollable.y) {
+			posY = -(y + (elementRect.height / 2) - (viewportRect.height / 2));
+			if(this.limitToBounds) posY = Math.min(0, Math.max(-(canvasRect.height - viewportRect.height), posY));
+		}
+
+		this.setTarget(posX, posY);
+		if(immediate) this.setPosition(posX, posY);
+	}
+
 	followCursorEdge(x, y, canvasRect, viewportRect) {
 		if (!this.isScrollable.x && !this.isScrollable.y) return;
 

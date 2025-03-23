@@ -94,16 +94,32 @@ class MapTransitionManager {
     
             // Reset camera if needed
             if (!options.preserveCamera && this.container.camera) {
-                this.container.camera.reset();
+                // this.container.camera.reset();
             }
+
+
+
+
+
+            // set camera to center on first myte
+            if (this.container.mytes && this.container.mytes.length > 0) {
+
+                const firstMyte = this.container.mytes[0];
+
+                this.container.camera.centerToPosition(firstMyte.posX, firstMyte.posY, firstMyte.size, true);
+            }
+
     
             // Position mytes in the new map if they exist
             if (this.container.mytes && this.container.mytes.length > 0) {
                 this.container.mytes.forEach(myte => {
                     const spawnLocation = this.container.gameMap.getSpawnPoint(spawnPoint);
-                    myte.setPosition(spawnLocation.x, spawnLocation.y);
+                    // myte.setPosition(spawnLocation.x, spawnLocation.y);
                 });
             }
+
+
+
     
             // Hide transition screen if not initial load
             if (!isInitialLoad) {

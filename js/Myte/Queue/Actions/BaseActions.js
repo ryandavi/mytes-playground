@@ -56,7 +56,11 @@ class MyteAction {
     }
 
     complete() {
-        if (this.onComplete) this.onComplete();
+        console.log("complete x");
+        if (this.onComplete !== null) {
+            console.log("complete");
+            this.onComplete();
+        }
         return true;
     }
 

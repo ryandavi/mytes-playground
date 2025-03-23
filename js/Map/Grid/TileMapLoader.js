@@ -158,7 +158,6 @@ class TileMapLoader {
 			console.log("mapData.zones", mapData.zones);
 			for (const zoneData of mapData.zones) {
 				gameMap.zoneManager.addZone(zoneData);
-				console.log("add zone");
 			}
 		}
 
@@ -176,7 +175,6 @@ class TileMapLoader {
 		if(mytes.length > 0){
 			let myte = mytes[0];
 			myte.setWrapperPosition(mapData.spawns.myte.x, mapData.spawns.myte.y);
-			console.log("myte", mapData.spawns.myte.x, mapData.spawns.myte.y);
 		}
 
 
@@ -459,7 +457,6 @@ class TileMapLoader {
 		mapData.objects = mapData.objects.filter(obj => {
 			if (obj.name.toUpperCase() === 'SPAWN') {
 				const type = obj?.properties?.type || 'myte';
-				console.log("create spawn");
 
 				if (type === 'myte') {
 					mapData.spawns.myte = { x: obj.x, y: obj.y };
