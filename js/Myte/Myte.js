@@ -192,7 +192,8 @@ class Myte {
 		this.duplicate.id = "duplicate-" + this.duplicate.id;
 
 		// add duplicate to canvas
-		this.parent.canvas.appendChild(this.duplicate); // insert new
+		this.elements.wrapper.parentNode.appendChild(this.duplicate); // insert new
+
 
 		// elements
 		this.sprite = this.duplicate.querySelector('.sprite');

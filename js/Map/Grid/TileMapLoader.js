@@ -25,9 +25,12 @@ class TileMapLoader {
 			const mapEl = xmlDoc.querySelector('map');
 			if (!mapEl) throw new Error('Invalid TMX file: missing map element');
 
+			let id = mapPath.split('/').pop().split('?')[0].replace('.tmx', '');
+			
+
 			const mapData = {
-				id: mapPath.split('/').pop().replace('.tmx', ''),
-				name: mapEl.getAttribute('name') || mapPath.split('/').pop().replace('.tmx', ''),
+				id: id,
+				name: mapEl.getAttribute('name') || id,
 				width: parseInt(mapEl.getAttribute('width')),
 				height: parseInt(mapEl.getAttribute('height')),
 				tileWidth: parseInt(mapEl.getAttribute('tilewidth')),
@@ -50,6 +53,8 @@ class TileMapLoader {
 				zones: []
 			};
 
+
+
 			// Parse map properties to override defaults
 			if (mapData.properties) {
 				if (mapData.properties.environment) {
@@ -59,7 +64,15 @@ class TileMapLoader {
 				if (mapData.properties.description) {
 					mapData.description = mapData.properties.description;
 				}
+
+				if (mapData.properties.displayName) {
+					mapData.displayName = mapData.properties.displayName;
+					mapData.hi = true;
+				}
+				
 			}
+
+
 
 			// Load tilesets
 			const tilesetElements = xmlDoc.querySelectorAll('tileset');
@@ -108,6 +121,7 @@ class TileMapLoader {
 			// Cache the map
 			this.maps.set(mapData.id, gameMapData);
 
+
 			return gameMapData;
 		} catch (error) {
 			console.error('Error loading Tile map:', error);
@@ -118,18 +132,32 @@ class TileMapLoader {
 	async applyToGameMap(gameMap, mapData) {
 		if (!gameMap || !mapData) return;
 
+
 		// Set dimensions
 		gameMap.dimensions = mapData.dimensions;
-
 		gameMap.name = mapData.name;
 		gameMap.id = mapData.id;
+
+		gameMap.displayName = mapData.displayName;
+
 		gameMap.description = mapData.description;
 		gameMap.location = mapData.environment.location;
 
 		console.log('Tile map dimensions:', gameMap.dimensions);
 
-		this.parent.layers.background.style.width = `${gameMap.dimensions.width}px`;
-		this.parent.layers.background.style.height = `${gameMap.dimensions.height}px`;
+		//this.parent.layers.background.style.width = `${gameMap.dimensions.width}px`;
+		//this.parent.layers.background.style.height = `${gameMap.dimensions.height}px`;
+
+		// set canvas
+		this.parent.parent.canvas.style.width = `${gameMap.dimensions.width}px`;
+		this.parent.parent.canvas.style.height = `${gameMap.dimensions.height}px`;
+
+		for (const layer of Object.values(this.parent.layers)) {
+			if (layer) { // Ensure the layer exists before modifying it
+				//layer.style.width = `${gameMap.dimensions.width}px`;
+				//layer.style.height = `${gameMap.dimensions.height}px`;
+			}
+		}	
 
 		// Set background from map
 		const bgUrl = await this.createMapBackgroundUrl(mapData);
@@ -731,6 +759,7 @@ class TileMapLoader {
 		const gameMapData = {
 			id: TileMapData.id,
 			name: TileMapData.name,
+			displayName: TileMapData.displayName,
 			description: TileMapData.description || `A ${TileMapData.environment.location} map`,
 			dimensions: TileMapData.dimensions,
 			environment: TileMapData.environment,

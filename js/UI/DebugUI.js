@@ -58,7 +58,8 @@ getMapMessages() {
     
     // Check if gameMap exists
     if (this.parent && this.parent.gameMap) {
-        messages.push({ label: "Map Name", value: this.parent.gameMap.name || 'Unknown' });
+        messages.push({ label: "Map ID", value: this.parent.gameMap.id });
+        messages.push({ label: "Map Name", value: this.parent.gameMap.displayName || 'Unknown' });
         messages.push({ label: "Objects Count", value: (this.parent.gameMap.objects && this.parent.gameMap.objects.length) || 0 });
         
         // Check if dimensions exist

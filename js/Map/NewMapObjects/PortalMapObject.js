@@ -136,7 +136,7 @@ class PortalMapObject extends AnimatedMapObject {
         // title
 		const title = document.createElement("div");
 		title.className = "title";
-		title.textContent = "Outside";
+		title.innerHTML = "&nbsp;";
 		
         // content
 		const content = document.createElement("div");

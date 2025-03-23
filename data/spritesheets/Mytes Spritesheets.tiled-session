@@ -19,10 +19,10 @@
                 9
             ],
             "scale": 1,
-            "selectedLayer": 4,
+            "selectedLayer": 3,
             "viewCenter": {
-                "x": 488,
-                "y": 490
+                "x": 509,
+                "y": 500
             }
         },
         "HouseNew.tmx": {
@@ -40,11 +40,11 @@
             "expandedObjectLayers": [
                 4
             ],
-            "scale": 1.5,
+            "scale": 1,
             "selectedLayer": 3,
             "viewCenter": {
-                "x": 458.66666666666663,
-                "y": 368
+                "x": 362,
+                "y": 429
             }
         },
         "house.tsx": {

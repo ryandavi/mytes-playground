@@ -2,6 +2,7 @@
 <map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="11" nextobjectid="106">
  <properties>
   <property name="description" value="A cozy place for your Mytes"/>
+  <property name="displayName" value="Your Home"/>
   <property name="location" value="outside"/>
   <property name="name" value="Your Home"/>
  </properties>
@@ -135,6 +136,9 @@
   </object>
  </objectgroup>
  <objectgroup id="7" name="Objects">
+  <properties>
+   <property name="displayName" value="Your House"/>
+  </properties>
   <object id="2" name="Fence" x="64" y="704" width="32" height="64"/>
   <object id="5" name="Door" x="576" y="704" width="32" height="96">
    <properties>

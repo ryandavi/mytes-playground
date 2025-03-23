@@ -7,6 +7,7 @@ class Camera {
 		this.targetX = 0;
 		this.targetY = 0;
 		this.easing = 10; // Adjust this value to control camera smoothness
+		this.draggingEasing = 75;
 
 		// zoom
 		this.canZoom = false;
@@ -43,15 +44,37 @@ class Camera {
 		// Variable to control instant vs. eased movement
 		this.useInstantMovement = false;
 
+		// Add resize listener with debounce
+		this.debouncedResetView = this.debounce(() => this.resetView(), 250);
+		window.addEventListener('resize', this.debouncedResetView);
+
 
 	}
 
+	debounce(func, wait) {
+		let timeout;
+		return function() {
+			const context = this;
+			const args = arguments;
+			clearTimeout(timeout);
+			timeout = setTimeout(() => {
+				func.apply(context, args);
+			}, wait);
+		};
+	}
+	throttle(func, limit) {
+		let inThrottle;
+		return function() {
+			const context = this;
+			const args = arguments;
+			if (!inThrottle) {
+				func.apply(context, args);
+				inThrottle = true;
+				setTimeout(() => inThrottle = false, limit);
+			}
+		};
+	}
 
-
-	/**
-	 * Focus the camera on a specific entity
-	 * @param {Object} entity - The entity to focus on (needs posX, posY, and getRect method)
-	 */
 	focusOn(entity) {
 		if (!entity) return;
 
@@ -69,10 +92,6 @@ class Camera {
 		}
 	}
 
-	/**
-	 * Handles mouse wheel events for zooming
-	 * @param {Event} e - The wheel event
-	 */
 	handleZoom(e) {
 		e.preventDefault();
 
@@ -117,6 +136,43 @@ class Camera {
 		}
 
 		this.setZoomLevel(1);
+	}
+
+
+	resetView(immediate = false){
+		console.log("resetting view");
+		if(this.parent.settings.limitMap == false){
+            this.posX = 0;
+            this.posY = 0;
+            this.targetX = 0;
+            this.targetY = 0;
+		} else{
+			if(this.parent.activeMyte){
+				// center to active myte
+				this.centerToPosition(this.parent.activeMyte.posX, this.parent.activeMyte.posY, this.parent.activeMyte.size, immediate);
+				console.log("centered to active myte");
+			}else{
+				if(this.parent.mytes.length > 0){
+					// no myte - center to first myte
+					this.centerToPosition(
+						this.parent.mytes[0].posX, 
+						this.parent.mytes[0].posY, 
+						this.parent.mytes[0].size, 
+						immediate
+					);
+				}else{
+					// fallback - center to middle of canvas
+					const centerX = this.parent.getCanvasRect().width/2;
+					const centerY = this.parent.getCanvasRect().height/2;
+					this.centerToPosition(
+						centerX, 
+						centerY, 
+						{width: 0, height: 0},
+						immediate
+					);
+				}
+			}
+		}
 	}
 
 	setMode(i) {
@@ -181,6 +237,7 @@ class Camera {
 	}
 
 
+
 	centerToPosition(x, y, elementRect, immediate = false){
 		if (!this.isScrollable.x && !this.isScrollable.y) return;
 
@@ -231,7 +288,8 @@ class Camera {
 			}
 
 			// Keep within bounds
-			if(this.limitToBounds) targetX = Math.min(0, Math.max(targetX, -(canvasRect.width - viewportRect.width)));
+			// if(this.limitToBounds) 
+			targetX = Math.min(0, Math.max(targetX, -(canvasRect.width - viewportRect.width)));
 		}
 
 		// Check vertical edges if scrollable vertically
@@ -247,7 +305,8 @@ class Camera {
 			}
 
 			// Keep within bounds
-			if(this.limitToBounds) targetY = Math.min(0, Math.max(targetY, -(canvasRect.height - viewportRect.height)));
+			// if(this.limitToBounds) 
+			targetY = Math.min(0, Math.max(targetY, -(canvasRect.height - viewportRect.height)));
 		}
 
 		this.setTarget(targetX, targetY);
@@ -261,6 +320,10 @@ class Camera {
 	setTarget(x, y) {
 		this.targetX = x;
 		this.targetY = y;
+	}
+
+	handleScroll(){
+		return false;
 	}
 
 	update() {
@@ -280,9 +343,13 @@ class Camera {
 		const deltaX = this.targetX - this.posX;
 		const deltaY = this.targetY - this.posY;
 
+		let easing = this.parent.activeMyte &&this.parent.activeMyte.isDragging ? this.draggingEasing : this.easing;
+
 		// Adaptive easing - faster for larger distances
 		const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-		const adaptiveEasing = Math.max(4, this.easing - distance / 100);
+		const adaptiveEasing = Math.max(4, easing - distance / 100);
+
+
 
 		// Calculate the step for each frame
 		const stepX = deltaX / adaptiveEasing;
@@ -401,12 +468,14 @@ class Camera {
 		this.canvas.style.cursor = 'default';
 	}
 
+
 	dispose() {
 		// Remove event listeners to prevent memory leaks
 		this.canvas.removeEventListener('mousedown', this.startDrag);
 		document.removeEventListener('mousemove', this.drag);
 		document.removeEventListener('mouseup', this.endDrag);
 		this.canvas.removeEventListener('wheel', this.handleZoom);
+		window.removeEventListener('resize', this.debouncedResetView);
 
 		// Clear references
 		this.parent = null;

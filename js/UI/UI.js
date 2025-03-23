@@ -173,6 +173,8 @@ class UserInterface {
         this.SettingsMenu = new SettingsMenu(this);
         this.debugMenu = new DebugMenu(this);
 
+
+
     }
 
     initializeHandControls() {
@@ -232,8 +234,10 @@ class UserInterface {
         // toggle class on container
         this.parent.containerWrapper.classList.toggle('fullscreen');
         this.fullscreenButton.classList.toggle('active');
-    }
 
+        this.parent.camera.resetView(true);
+
+    }
 
     createThumbnail(myte) {
         const thumbnail = document.createElement('div');

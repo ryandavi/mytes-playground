@@ -1,6 +1,13 @@
 /* LAYERS */
+.container-wrapper > .container {
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: 12px;
+}
 .container-wrapper > .container.noScroll {
   overflow: hidden;
+}
+.container-wrapper > .container.noScroll > .container-inset {
+  display: none;
 }
 .container-wrapper > .container.noScroll > .canvas > .layer {
   width: 100%;
@@ -35,6 +42,16 @@
   left: 50%;
   transform: translateX(-50%);
 }
+.container-wrapper > .container > .container-inset {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10000;
+  pointer-events: none;
+  box-shadow: inset var(--border-width) var(--border-width) 0px 0px rgba(0, 0, 0, 0.05);
+}
 .container-wrapper > .container > .canvas {
   width: 100%;
   height: 100%;
@@ -57,8 +74,6 @@
   position: absolute;
 }
 .container-wrapper > .container > .canvas > .layer.background {
-  width: 800px;
-  height: 2000px;
   z-index: 0;
   background-repeat: no-repeat;
 }
@@ -175,6 +190,11 @@
 }
 
 /* MAP OBJECTS */
+.container-wrapper > .container > .canvas {
+  margin: var(--gap);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
 .container-wrapper > .container > .canvas > .layer > .mapObject {
   position: fixed;
   pointer-events: none;

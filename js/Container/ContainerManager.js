@@ -37,7 +37,7 @@ class ContainerManager {
             console.log('[ContainerManager] Initializing');
 
             if (this.settings.limitMap) {
-                this.element.classList.add('noScroll');
+                // this.element.classList.add('noScroll');
             }
 
             // Check for required DOM elements

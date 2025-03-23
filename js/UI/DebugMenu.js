@@ -74,7 +74,6 @@ class DebugMenu extends ModalWindow {
         document.getElementById('cycleContainerLimit').addEventListener("click", (event) => {
             this.parent.parent.settings.limitMap = !this.parent.parent.settings.limitMap;
             this.updateContainerLimit(event.target);
-            this.parent.parent.camera.reset();
         });
 
         this.updateContainerLimit(document.getElementById('cycleContainerLimit'));
@@ -96,16 +95,23 @@ class DebugMenu extends ModalWindow {
 
     updateContainerLimit(button) {
         if (this.parent.parent.settings.limitMap) {
+            // limit is on - overflow is hidden
             this.parent.parent.camera.isScrollable.x = true;
             this.parent.parent.camera.isScrollable.y = true;
             this.parent.parent.element.closest('.container').classList.add('noScroll');
+            // this.parent.parent.camera.reset();
             
         } else {
+            // limit is off
             this.parent.parent.camera.isScrollable.x = false;
             this.parent.parent.camera.isScrollable.y = false;
             this.parent.parent.element.closest('.container').classList.remove('noScroll');
+            this.parent.parent.camera.resetView(true);
         }
 
+        
+
+        // update button
         button.innerText = "Limit: " + (this.parent.parent.settings.limitMap ? "ON" : "OFF");
     }
 

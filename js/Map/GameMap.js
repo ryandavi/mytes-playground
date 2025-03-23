@@ -5,6 +5,7 @@ class GameMap {
 
         // Core properties
         this.name = mapData?.name || 'Default Map';
+        this.displayName = mapData?.displayName || this.name;
         this.id = null;
         this.dimensions = mapData?.dimensions || {
             width: 1000,

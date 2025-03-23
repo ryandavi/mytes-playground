@@ -10,7 +10,6 @@
 }
 .container-wrapper.styled {
   padding: var(--padding-outer);
-  box-shadow: var(--border-width) var(--border-width) 0px 0px rgba(0, 0, 0, 0.05), inset var(--border-width) var(--border-width) 0px 0px white, inset -var(--border-width) -var(--border-width) 0px 0px rgba(0, 0, 0, 0.05);
   filter: var(--shadow);
   border-bottom: var(--border-width) solid var(--button-dark);
   border-right: var(--border-width) solid var(--button-dark);
@@ -22,7 +21,6 @@
   border-left: var(--border-width) solid var(--button-dark);
   border-bottom: var(--border-width) solid white;
   border-right: var(--border-width) solid white;
-  box-shadow: inset var(--border-width) var(--border-width) 0px 0px rgba(0, 0, 0, 0.25);
 }
 .container-wrapper > .container {
   height: 500px;
@@ -138,13 +136,13 @@
 }
 
 .debugMenu {
-  --debug-color-system: rgba(255, 235, 235, 0.95);
-  --debug-color-input: rgba(235, 255, 235, 0.95);
-  --debug-color-time: rgba(235, 235, 255, 0.95);
-  --debug-color-map: rgba(255, 255, 235, 0.95);
-  --debug-color-camera: rgba(255, 235, 255, 0.95);
-  --debug-color-myte: rgba(235, 255, 255, 0.95);
-  --debug-color-myte-stats: rgba(235, 255, 241, 0.95);
+  --debug-color-system: rgba(255, 235, 235, .9);
+  --debug-color-input: rgba(235, 255, 235, .9);
+  --debug-color-time: rgba(235, 235, 255, .9);
+  --debug-color-map: rgba(255, 255, 235, .9);
+  --debug-color-camera: rgba(255, 235, 255, .9);
+  --debug-color-myte: rgba(235, 255, 255, .9);
+  --debug-color-myte-stats: rgba(235, 255, 241, .9);
   margin-left: 10px;
   line-height: 1em;
   font-size: 0.8em;
@@ -155,9 +153,9 @@
   left: 0;
   top: 50%;
   transform: translate(0%, -50%);
-  background-color: white;
   visibility: hidden;
   z-index: 1000;
+  pointer-events: none;
 }
 .debugMenu .debug-group {
   padding: var(--padding);

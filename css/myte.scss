@@ -1,7 +1,101 @@
+
+/* HOME RELATED */
+
 .myteWrapper {
 	display: inline-block;
 	cursor: pointer;
 	position: absolute;
+	>.home-wrapper {
+		border-radius: var(--border-radius);
+		transition: opacity, .15s, background-color .15s, box-shadow .15s, outline-width .15s, outline-color .5s;
+
+		width: 192px;
+		height: 192px;
+		position: absolute;
+		z-index: 100000;
+
+		border-style: solid;
+		border-width: var(--border-width);
+		border-top-color: var(--button-light);
+		border-left-color: var(--button-light);
+		border-right-color: var(--button-dark);
+		border-bottom-color: var(--button-dark);
+		background-color: var(--button-mid);
+
+		filter: var(--shadow);
+	}
+
+	>.home-name {
+		position: relative;
+		transform: translateX(-100%);
+		z-index: 1000000;
+		width: 192px;
+		height: 192px;
+		position: absolute;
+		transform: unset;
+		pointer-events: none;
+
+
+
+		>.name {
+			display: inline-block;
+			top: 10px;
+
+			position: absolute;
+			right: 50%;
+			transform: translate(50%, 0%);
+		}
+
+	}
+
+
+
+
+	&:hover {
+		>.home-wrapper {
+			outline: var(--border-width) solid darkgrey;
+		}
+	}
+
+	// empty home
+	&.empty {
+
+		&:hover {
+			>.home-wrapper {
+				outline: unset;
+			}
+		}
+
+		>.home-wrapper {
+			opacity: .75;
+			z-index: 0;
+
+			border-top-color: var(--button-dark);
+			border-left-color: var(--button-dark);
+			border-right-color: var(--button-light);
+			border-bottom-color: var(--button-light);
+
+			background-color: var(--button-mid);
+
+			filter: unset;
+			box-shadow: inset var(--border-width) var(--border-width) #0000000d;
+		}
+
+		&.valid-drop-target {
+			>.home-wrapper {
+				z-index: 100000;
+				opacity: 1;
+				display: block;
+				outline: var(--border-width) solid var(--drop-target) !important;
+			}
+
+			&.on-target {
+				>.home-wrapper {
+					outline-color: var(--on-target) !important;
+				}
+			}
+		}
+	}
 }
 
 
@@ -168,114 +262,10 @@
 
 
 
-/* HOME RELATED */
-
-.myteWrapper {
-	>.home-wrapper {
-		border-radius: var(--border-radius);
-		transition: opacity, .15s, background-color .15s, box-shadow .15s, outline-width .15s, outline-color .5s;
-
-		width: 192px;
-		height: 192px;
-		position: absolute;
-		z-index: 100000;
-
-		border-style: solid;
-		border-width: var(--border-width);
-		border-top-color: var(--button-light);
-		border-left-color: var(--button-light);
-		border-right-color: var(--button-dark);
-		border-bottom-color: var(--button-dark);
-		background-color: var(--button-mid);
-
-		filter: var(--shadow);
-	}
-
-	>.home-name {
-		position: relative;
-		transform: translateX(-100%);
-		z-index: 1000000;
-		width: 192px;
-		height: 192px;
-		position: absolute;
-		transform: unset;
-		pointer-events: none;
-
-
-
-		>.name {
-			display: inline-block;
-			top: 10px;
-
-			position: absolute;
-			right: 50%;
-			transform: translate(50%, 0%);
-		}
-
-	}
-
-
-
-
-	&:hover {
-		>.home-wrapper {
-			outline: var(--border-width) solid darkgrey;
-		}
-	}
-
-	// empty home
-	&.empty {
-
-		&:hover {
-			>.home-wrapper {
-				outline: unset;
-			}
-		}
-
-		>.home-wrapper {
-			opacity: .75;
-			z-index: 0;
-
-			border-top-color: var(--button-dark);
-			border-left-color: var(--button-dark);
-			border-right-color: var(--button-light);
-			border-bottom-color: var(--button-light);
-
-			background-color: var(--button-mid);
-
-			filter: unset;
-			box-shadow: inset var(--border-width) var(--border-width) #0000000d;
-		}
-
-		&.valid-drop-target {
-			>.home-wrapper {
-				z-index: 100000;
-				opacity: 1;
-				display: block;
-				outline: var(--border-width) solid var(--drop-target) !important;
-			}
-
-			&.on-target {
-				>.home-wrapper {
-					outline-color: var(--on-target) !important;
-				}
-			}
-		}
-	}
-}
-
-
-
-
-
-
-
 
 
 
 /* DIALOGUE */
-
-
 .interactive-myte {
 	>.inner-wrapper {
 		>.dialogue {

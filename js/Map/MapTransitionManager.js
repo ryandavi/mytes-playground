@@ -9,7 +9,7 @@ class MapTransitionManager {
 
         this.minimumDisplayTime = 500;
 
-        
+        this.currentMapId = null;
         this.previousMapId = null;
 
 
@@ -88,6 +88,8 @@ class MapTransitionManager {
                 this.previousMapId = this.container.gameMap.id;
                 console.log(`[MapTransitionManager] Saved previous map ID: ${this.previousMapId}`);
             }
+
+            this.currentMapId = mapId;
     
             // Set up the new map environment
             this.container.gameMap = newMap;
@@ -97,26 +99,62 @@ class MapTransitionManager {
                 // this.container.camera.reset();
             }
 
-
-
-
-
             // set camera to center on first myte
             if (this.container.mytes && this.container.mytes.length > 0) {
 
-                const firstMyte = this.container.mytes[0];
+                // center to corresponding portal
+                if(this.container.activeMyte){
+
+                    // get all portal objects
+                    let allPortals = this.container.gameMap.objects.filter(obj => obj instanceof PortalMapObject);
+
+                    // find the corresponding portal where targetMap is previousMapId
+                    let correspondingPortal = allPortals.find(portal => portal.targetMap === this.previousMapId);
+
+                    if(correspondingPortal){
+                        // set myte position centered to center of portal position
+
+                        
+                        this.container.activeMyte.posX = 
+                            correspondingPortal.posX + 
+                            correspondingPortal.size.width / 2 - 
+                            this.container.activeMyte.size.width/2;
+
+                        this.container.activeMyte.posY = 
+                            correspondingPortal.posY + 
+                            correspondingPortal.size.height / 2 -
+                            this.container.activeMyte.size.height/2;
+
+                            
+                        
+                    }
+
+                }
+
+
+                let firstMyte = this.container.mytes[0];
+                if(this.container.activeMyte){
+                    firstMyte = this.container.activeMyte;
+                }
 
                 this.container.camera.centerToPosition(firstMyte.posX, firstMyte.posY, firstMyte.size, true);
+
+
+
+
+
             }
 
     
             // Position mytes in the new map if they exist
+            /*
             if (this.container.mytes && this.container.mytes.length > 0) {
                 this.container.mytes.forEach(myte => {
                     const spawnLocation = this.container.gameMap.getSpawnPoint(spawnPoint);
                     // myte.setPosition(spawnLocation.x, spawnLocation.y);
                 });
             }
+                */
 
 
 
