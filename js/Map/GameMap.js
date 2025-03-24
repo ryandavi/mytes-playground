@@ -228,7 +228,7 @@ createDefaultMap(mapId) {
     
     // Set a background color
     if (this.layers.background) {
-        this.layers.background.style.backgroundColor = '#87CEEB';
+        // this.layers.background.style.backgroundColor = '#87CEEB';
     }
     
     // Add a spawn point
@@ -311,7 +311,7 @@ createDefaultMap(mapId) {
         if (!this.layers.background) return;
 
         if (background.color) {
-            this.layers.background.style.backgroundColor = background.color;
+            // this.layers.background.style.backgroundColor = background.color;
         }
 
         if (background.url) {

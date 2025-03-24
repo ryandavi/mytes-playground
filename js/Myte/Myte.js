@@ -244,6 +244,8 @@ class Myte {
 		this.parent.setNextMyteAsActive(this);
 		if (this.parent.activeMyte == null) {
 			this.parent.ui.debugMenu.disableButtons();
+			this.parent.camera.setMode(DEFAULT_CAMERA_FOLLOW_MODE);
+			this.parent.camera.resetView();
 		}
 	}
 
@@ -287,7 +289,9 @@ class Myte {
 
 		this.followGoal = newGoal;
 
-		this.parent.ui.debugMenu.updateFollowMode(document.getElementById("cycleFollowGoal"));
+		// this.parent.ui.debugMenu.updateFollowMode(document.getElementById("cycleFollowGoal"));
+
+		this.parent.ui.debugMenu.updateButton('cycleFollowGoal');
 
 		if (this.followGoal == MOVE_FOLLOW_TYPES.NORMAL) {
 			this.runAway = false;
@@ -323,7 +327,9 @@ class Myte {
 		}
 
 
-		this.parent.ui.debugMenu.updateGoal(document.getElementById("cycleGoal"));
+		//this.parent.ui.debugMenu.updateGoal(document.getElementById("cycleGoal"));
+
+		this.parent.ui.debugMenu.updateButton('cycleGoal');
 
 		if (this.goal == MOVE_TYPES.FOLLOW) {
 			this.atOriginal = false;
@@ -1329,13 +1335,13 @@ move_gravity() {
 
 		// this.playSound('land');
 
-        this.addEffect("LANDING_DUST", {
+        /* this.addEffect("LANDING_DUST", {
             count: 6,              // Override: create more particles for a bigger effect
             positionAtFeet: true,  // Position at character's feet
             emitWhenMoving: false, // Override: emit regardless of movement
             oneTimeEmission: true,  // Important: emit just once instead of continuously
 			loop: false
-        });
+        }); */
 
 
 		if (this.physics.velocity >= this.physics.minFallDamageVelocity) {

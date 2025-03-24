@@ -37,7 +37,7 @@ class ContainerManager {
             console.log('[ContainerManager] Initializing');
 
             if (this.settings.limitMap) {
-                // this.element.classList.add('noScroll');
+                this.element.classList.add('noScroll');
             }
 
             // Check for required DOM elements
@@ -503,14 +503,7 @@ class ContainerManager {
             myte.start();
         }
 
-        // Update mytes list
-        const listContainer = document.getElementById('all_mytes');
-        listContainer.querySelectorAll('.myte-thumbnail').forEach(thumbnail => {
-            thumbnail.classList.remove('active');
-        });
-        if (myte) {
-            listContainer.querySelector(`[data-myte-id="${myte.id}"]`).classList.add('active');
-        }
+        this.ui.updateMytesList(myte);
 
         // Update UI
         this.ui.debugMenu.updateButtons();

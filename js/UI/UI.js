@@ -167,7 +167,7 @@ class UserInterface {
         this.initializeButtons();
 
         // Initialize active mytes
-        this.initActiveMytes();
+        this.initMytesList();
 
         this.soundMenu = new SoundMenu(this);
         this.SettingsMenu = new SettingsMenu(this);
@@ -279,7 +279,7 @@ class UserInterface {
         return thumbnail;
     }
 
-    initActiveMytes() {
+    initMytesList() {
         // find #all_mytes
         const listContainer = document.getElementById('all_mytes');
 
@@ -296,6 +296,21 @@ class UserInterface {
             listContainer.appendChild(emptyState);
         }
 
+    }
+
+    updateMytesList(myte){
+        // Update mytes list
+        const listContainer = document.getElementById('all_mytes');
+
+        // remove active
+        listContainer.querySelectorAll('.myte-thumbnail').forEach(thumbnail => {
+            thumbnail.classList.remove('active');
+        });
+
+        // set current as active
+        if (myte) {
+            listContainer.querySelector(`[data-myte-id="${myte.id}"]`).classList.add('active');
+        }
     }
 
     // Update HUD to show mood from metadata

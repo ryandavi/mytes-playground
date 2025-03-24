@@ -136,13 +136,13 @@
 }
 
 .debugMenu {
-  --debug-color-system: rgba(255, 235, 235, .9);
-  --debug-color-input: rgba(235, 255, 235, .9);
-  --debug-color-time: rgba(235, 235, 255, .9);
-  --debug-color-map: rgba(255, 255, 235, .9);
-  --debug-color-camera: rgba(255, 235, 255, .9);
-  --debug-color-myte: rgba(235, 255, 255, .9);
-  --debug-color-myte-stats: rgba(235, 255, 241, .9);
+  --debug-color-system: rgba(255, 235, 235, .7);
+  --debug-color-input: rgba(235, 255, 235, .7);
+  --debug-color-time: rgba(235, 235, 255, .7);
+  --debug-color-map: rgba(255, 255, 235, .7);
+  --debug-color-camera: rgba(255, 235, 255, .7);
+  --debug-color-myte: rgba(235, 255, 255, .7);
+  --debug-color-myte-stats: rgba(235, 255, 241, .7);
   margin-left: 10px;
   line-height: 1em;
   font-size: 0.8em;
@@ -606,6 +606,7 @@
   padding-top: calc(var(--padding) + var(--border-width));
   flex: 1;
   overflow-y: auto;
+  scrollbar-color: var(--button-dark) transparent;
 }
 .modal-window > .modal-content .text-content {
   margin: var(--border-width);
@@ -660,21 +661,6 @@
 }
 .modal-window > .modal-content .setting-item.dropdown select {
   width: 100%;
-}
-
-.modal-window#game-debug-panel {
-  width: 500px;
-}
-.modal-window#game-debug-panel .controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: var(--gap);
-  width: 100%;
-}
-.modal-window#game-debug-panel .controls button {
-  flex: 0 1 calc(50% - var(--gap) / 2);
 }
 
 .loading-screen {
@@ -850,13 +836,15 @@
   bottom: 20px;
   right: 20px;
   display: flex;
-  flex-direction: column-reverse; /* New toasts appear at the bottom */
+  flex-direction: column-reverse;
+  /* New toasts appear at the bottom */
   gap: 10px;
   max-width: 350px;
   max-height: 80vh;
   overflow: hidden;
   z-index: 9000;
-  pointer-events: none; /* Allow clicking through the container */
+  pointer-events: none;
+  /* Allow clicking through the container */
   /* Container for when in game */
   /* For mobile/smaller screens */
 }
@@ -884,10 +872,12 @@
   overflow: hidden;
   max-height: 200px;
   width: 100%;
-  pointer-events: auto; /* Make the toast itself clickable */
+  pointer-events: auto;
+  /* Make the toast itself clickable */
   display: flex;
   flex-direction: column;
-  will-change: transform, opacity, height; /* Performance optimization */
+  will-change: transform, opacity, height;
+  /* Performance optimization */
   cursor: pointer;
   /* Toast types */
 }
@@ -971,4 +961,50 @@
 }
 .toast .toast-close:hover {
   opacity: 1;
+}
+
+#game-debug-panel .modal-content {
+  max-width: 500px;
+  margin: 0 auto;
+}
+#game-debug-panel .modal-content .button-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+}
+#game-debug-panel .modal-content .settings-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  width: 100%;
+}
+#game-debug-panel .modal-content .settings-group > .settings-group-title {
+  width: 100%;
+  margin: 0;
+  margin-bottom: 5px;
+}
+#game-debug-panel .modal-content .settings-group button {
+  padding: 0.5rem;
+  flex: 1 1 calc(50% - var(--gap) / 2);
+}
+#game-debug-panel .modal-content .settings-group #toggleDebug,
+#game-debug-panel .modal-content .settings-group #cycleFollowGoal,
+#game-debug-panel .modal-content .settings-group #cycleCamera {
+  flex: 1 1 100%;
+}
+#game-debug-panel .modal-content .settings-group #adjustSpeed {
+  flex: 1;
+}
+#game-debug-panel .modal-content .settings-group #adjustSpeed-down,
+#game-debug-panel .modal-content .settings-group #adjustSpeed-up {
+  flex: 0;
+  min-width: 50px;
+}
+#game-debug-panel .modal-content .settings-group:first-child {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
 }/*# sourceMappingURL=ui.css.map */

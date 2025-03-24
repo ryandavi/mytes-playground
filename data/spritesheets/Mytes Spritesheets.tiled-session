@@ -19,7 +19,7 @@
                 9
             ],
             "scale": 1,
-            "selectedLayer": 3,
+            "selectedLayer": 5,
             "viewCenter": {
                 "x": 509,
                 "y": 500
@@ -38,6 +38,7 @@
         },
         "Outside.tmx": {
             "expandedObjectLayers": [
+                7,
                 4
             ],
             "scale": 1,

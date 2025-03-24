@@ -1,12 +1,11 @@
-const MOVE_TYPES = { FOLLOW: 0, FREEROAM: 1, GRAVITY: 2, GOHOME: 3, QUEUE_ONLY: 4};
-const MOVE_FOLLOW_TYPES = { NORMAL: 0, CIRCLES: 1, RUNAWAY: 2 };
 
-const CAMERA_FOLLOW_MODES = { CHARACTER: 0, CURSOR: 1, CURSOR_EDGE: 2, DRAG_TO_PAN: 3 };
-const DEFAULT_CAMERA_FOLLOW_MODE = CAMERA_FOLLOW_MODES.DRAG_TO_PAN;
+
+
 
 const DIRECTION = { N: "N", S: "S", E: "E", W: "W", NORTH: "N", SOUTH: "S", EAST: "E", WEST: "W", RIGHT: "E", LEFT: "W" };
 
 
+// CURSOR
 const CURSOR = {
 	POINTER: 0,
 	GRAB: 1,
@@ -18,15 +17,20 @@ const CURSOR = {
 	MOVE: 7,
 	NO: 8,
 };
-
 const DEFAULT_CURSOR = CURSOR.POINTER;
+
+// MYTES
+const MOVE_TYPES = { FOLLOW: 0, FREEROAM: 1, GRAVITY: 2, GOHOME: 3, QUEUE_ONLY: 4};
+const MOVE_FOLLOW_TYPES = { NORMAL: 0, CIRCLES: 1, RUNAWAY: 2 };
 
 const DEFAULT_STATE = "idle";
 const DEFAULT_MODE = MOVE_TYPES.FOLLOW;
 const DEFAULT_FOLLOW_MODE = MOVE_FOLLOW_TYPES.NORMAL;
 const AUTO_ACTIVATE = true;
 
-const IS_DEBUG = true;
+// CAMERA
+const CAMERA_FOLLOW_MODES = { CHARACTER: 0, CURSOR: 1, CURSOR_EDGE: 2, DRAG_TO_PAN: 3 };
+const DEFAULT_CAMERA_FOLLOW_MODE = CAMERA_FOLLOW_MODES.DRAG_TO_PAN;
 
 
 
@@ -213,10 +217,6 @@ class Utility {
 
 	static random_int(min, max) { // min and max included 
 		return Math.floor(Math.random() * (max - min + 1) + min)
-	}
-
-	static log(txt) {
-		if (IS_DEBUG) console.log(txt);
 	}
 
 	// Define a to calculate the distance between two points

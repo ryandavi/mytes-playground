@@ -7,7 +7,7 @@
   overflow: hidden;
 }
 .container-wrapper > .container.noScroll > .container-inset {
-  display: none;
+  visibility: visible;
 }
 .container-wrapper > .container.noScroll > .canvas > .layer {
   width: 100%;
@@ -50,11 +50,13 @@
   height: 100%;
   z-index: 10000;
   pointer-events: none;
+  visibility: hidden;
   box-shadow: inset var(--border-width) var(--border-width) 0px 0px rgba(0, 0, 0, 0.05);
 }
 .container-wrapper > .container > .canvas {
   width: 100%;
   height: 100%;
+  filter: var(--shadow);
 }
 .container-wrapper > .container > .canvas > .layer {
   min-width: 100%;
@@ -191,7 +193,6 @@
 
 /* MAP OBJECTS */
 .container-wrapper > .container > .canvas {
-  margin: var(--gap);
   border-radius: var(--border-radius);
   overflow: hidden;
 }

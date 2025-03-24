@@ -24,7 +24,7 @@
         border-bottom: var(--border-width) solid var(--button-dark);
         border-right: var(--border-width) solid var(--button-dark);
 
-    
+
 
         >.container {
 
@@ -208,13 +208,13 @@
 // LEFT - DEBUG
 .debugMenu {
 
-    --debug-color-system: rgba(255, 235, 235, .9);
-    --debug-color-input: rgba(235, 255, 235, .9);
-    --debug-color-time: rgba(235, 235, 255, .9);
-    --debug-color-map: rgba(255, 255, 235, .9);
-    --debug-color-camera: rgba(255, 235, 255, .9);
-    --debug-color-myte: rgba(235, 255, 255, .9);
-    --debug-color-myte-stats: rgba(235, 255, 241, .9);
+    --debug-color-system: rgba(255, 235, 235, .7);
+    --debug-color-input: rgba(235, 255, 235, .7);
+    --debug-color-time: rgba(235, 235, 255, .7);
+    --debug-color-map: rgba(255, 255, 235, .7);
+    --debug-color-camera: rgba(255, 235, 255, .7);
+    --debug-color-myte: rgba(235, 255, 255, .7);
+    --debug-color-myte-stats: rgba(235, 255, 241, .7);
 
     margin-left: 10px;
     line-height: 1em;
@@ -818,6 +818,9 @@
         flex: 1;
         overflow-y: auto;
 
+        scrollbar-color: var(--button-dark) transparent;
+
+
 
         .text-content {
             margin: var(--border-width);
@@ -915,26 +918,6 @@
 
 
 // DEBUG MENU
-.modal-window#game-debug-panel {
-
-    width: 500px;
-
-    .controls {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: var(--gap);
-        width: 100%;
-
-        button {
-            flex: 0 1 calc(50% - calc(var(--gap) / 2));
-        }
-
-    }
-}
-
-
 
 
 
@@ -1192,152 +1175,248 @@
     bottom: 20px;
     right: 20px;
     display: flex;
-    flex-direction: column-reverse; /* New toasts appear at the bottom */
+    flex-direction: column-reverse;
+    /* New toasts appear at the bottom */
     gap: 10px;
     max-width: 350px;
     max-height: 80vh;
     overflow: hidden;
     z-index: 9000;
-    pointer-events: none; /* Allow clicking through the container */
-    
+    pointer-events: none;
+    /* Allow clicking through the container */
+
     /* Container for when in game */
     .container-wrapper & {
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
     }
-    
+
     /* For mobile/smaller screens */
     @media (max-width: 480px) {
-      left: 20px;
-      right: 20px;
-      max-width: none;
+        left: 20px;
+        right: 20px;
+        max-width: none;
     }
-  }
-  
-  .toast {
+}
+
+.toast {
     background-color: var(--button-mid);
 
-    
+
     box-shadow: var(--shadow, 0 2px 4px rgba(0, 0, 0, 0.1));
     padding: 12px;
     margin: 0;
-    transition: transform 0.3s ease, 
-                opacity 0.3s ease, 
-                height 0.5s ease, 
-                max-height 0.5s ease, 
-                margin-top 0.3s ease,
-                padding 0.3s ease,
-                border-width 0.3s ease;
+    transition: transform 0.3s ease,
+        opacity 0.3s ease,
+        height 0.5s ease,
+        max-height 0.5s ease,
+        margin-top 0.3s ease,
+        padding 0.3s ease,
+        border-width 0.3s ease;
     transform: translateX(120%);
     opacity: 0;
     overflow: hidden;
     max-height: 200px;
     width: 100%;
-    pointer-events: auto; /* Make the toast itself clickable */
+    pointer-events: auto;
+    /* Make the toast itself clickable */
     display: flex;
     flex-direction: column;
-    will-change: transform, opacity, height; /* Performance optimization */
+    will-change: transform, opacity, height;
+    /* Performance optimization */
 
     cursor: pointer;
 
 
     &.visible {
-      transform: translateX(0);
-      opacity: 1;
+        transform: translateX(0);
+        opacity: 1;
 
-      &:hover {
-        opacity: .9;
+        &:hover {
+            opacity: .9;
         }
-    
+
 
 
     }
-    
+
     &.removing {
-      opacity: 0;
-      max-height: 0;
-      height: 0;
-      padding-top: 0;
-      padding-bottom: 0;
-      margin-top: 0;
-      border-width: 0;
+        opacity: 0;
+        max-height: 0;
+        height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        margin-top: 0;
+        border-width: 0;
     }
-    
+
     /* Toast types */
     &.info {
-      background-color: #e8f0fe;
-      border-left: 4px solid #4285f4;
+        background-color: #e8f0fe;
+        border-left: 4px solid #4285f4;
     }
-    
+
     &.success {
-      background-color: #e6f4ea;
-      border-left: 4px solid #34a853;
+        background-color: #e6f4ea;
+        border-left: 4px solid #34a853;
     }
-    
+
     &.warning {
-      background-color: #fef6e0;
-      border-left: 4px solid #fbbc04;
+        background-color: #fef6e0;
+        border-left: 4px solid #fbbc04;
     }
-    
+
     &.error {
-      background-color: #fce8e6;
-      border-left: 4px solid #ea4335;
+        background-color: #fce8e6;
+        border-left: 4px solid #ea4335;
     }
-    
+
     .toast-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
     }
-    
+
     .toast-title {
-      font-weight: 500;
-      margin: 0;
-      flex-grow: 1;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+        font-weight: 500;
+        margin: 0;
+        flex-grow: 1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
-    
+
     .toast-content {
-      margin: 0;
-      word-break: break-word;
+        margin: 0;
+        word-break: break-word;
     }
-    
+
     .toast-progress {
-      height: 3px;
-      background-color: rgba(0, 0, 0, 0.1);
-      margin-top: 8px;
-      border-radius: 1px;
-      overflow: hidden;
-      
-      .toast-progress-bar {
-        height: 100%;
-        width: 100%;
-        background-color: rgba(0, 0, 0, 0.2);
-        transform-origin: left;
-        /* The animation will be set via JavaScript */
-      }
+        height: 3px;
+        background-color: rgba(0, 0, 0, 0.1);
+        margin-top: 8px;
+        border-radius: 1px;
+        overflow: hidden;
+
+        .toast-progress-bar {
+            height: 100%;
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.2);
+            transform-origin: left;
+            /* The animation will be set via JavaScript */
+        }
     }
-    
+
     .toast-close {
-      background: none;
-      border: none;
-      font-size: 16px;
-      cursor: pointer;
-      padding: 0;
-      width: 20px;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0.7;
-      transition: opacity 0.2s;
-      
-      &:hover {
-        opacity: 1;
-      }
+        background: none;
+        border: none;
+        font-size: 16px;
+        cursor: pointer;
+        padding: 0;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+
+        &:hover {
+            opacity: 1;
+        }
     }
-  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#game-debug-panel {
+    .modal-content {
+        max-width: 500px;
+        margin: 0 auto;
+    
+
+        .button-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            width: 100%;
+        }
+
+        // Grouping for controls
+        .settings-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 5px;
+            width: 100%;
+
+            >.settings-group-title {
+                width: 100%;
+                margin: 0;
+                margin-bottom: 5px;
+            }
+
+            button {
+                padding: 0.5rem;
+                flex: 1 1 calc(50% - calc(var(--gap) / 2));
+            }
+
+            #toggleDebug,
+            #cycleFollowGoal,
+            #cycleCamera {
+                flex: 1 1 100%;
+            }
+
+            #adjustSpeed {
+                flex: 1;
+            }
+
+            #adjustSpeed-down,
+            #adjustSpeed-up {
+                flex: 0;
+                min-width: 50px;
+            }
+
+            &:first-child {
+                border-top: none;
+                margin-top: 0;
+                padding-top: 0;
+            }
+
+        }
+
+    }
+}

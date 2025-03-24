@@ -6,7 +6,7 @@ class MyteStats {
         this.health = 100;
         this.minHealth = 0;
         this.maxHealth = 100;
-        this.speed = 1.5;
+        this.speed = 1;
         this.level = 1;
         this.experience = 0;
 
@@ -197,10 +197,9 @@ class MyteStats {
         this.lastInteractionTime = Date.now();
     }
 
-
     useEnergy(amount) {
         const previousEnergy = this.energy;
-        this.energy = Math.max(0, this.energy - amount);
+        this.energy = Math.max(this.minEnergy, Math.min(this.maxEnergy, this.energy - amount));
     
         // If energy just hit zero, show effects
         if (previousEnergy > 0 && this.energy <= 0) {
