@@ -147,7 +147,7 @@ class ContainerInputManager {
         // Check if we clicked on a valid element
         const element = event.originalEvent?.target;
         if (element && this.isClickableElement(element)) {
-          this.container.ui.setSelected(element);
+          // this.container.ui.setSelected(element);
         }
       }
     });

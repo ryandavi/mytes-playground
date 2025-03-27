@@ -53,7 +53,7 @@ class AnimationController {
     }
     
 
-    update() {
+    update(deltaTime) {
         if (!this.currentAnimation || this.currentAnimation.frames.length === 1) return;
         
         const now = Date.now();

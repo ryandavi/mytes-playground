@@ -172,9 +172,6 @@ class UserInterface {
         this.soundMenu = new SoundMenu(this);
         this.SettingsMenu = new SettingsMenu(this);
         this.debugMenu = new DebugMenu(this);
-
-
-
     }
 
     initializeHandControls() {
@@ -254,7 +251,7 @@ class UserInterface {
         const spriteContainer = document.createElement('div');
         spriteContainer.className = 'myte-sprite';
 
-
+        // Create sprite inner
         const spriteInner = document.createElement('div');
         spriteInner.className = 'myte-sprite-inner';
         spriteContainer.appendChild(spriteInner);
@@ -267,7 +264,6 @@ class UserInterface {
         // Build thumbnail
         thumbnail.appendChild(spriteContainer);
         thumbnail.appendChild(name);
-
 
         // Add click handler
         thumbnail.addEventListener('click', () => {
@@ -327,6 +323,7 @@ class UserInterface {
             activePet.classList.add('visible');
         }
 
+        // Update pet info
         activePet.querySelector('.name').textContent = activeMyte.name;
         activePet.querySelector('.mood').textContent = activeMyte.stats.getMoodStatus();
         activePet.querySelector('.energy').textContent = 'Full';
@@ -396,9 +393,6 @@ class UserInterface {
         this.parent.core.soundManager.playUISound(sound);
     }
 
-
-
-    // Modified method to use the centralized config
     changeToolMode(mode) {
         const toolConfig = this.toolConfig[mode];
 
@@ -453,7 +447,6 @@ class UserInterface {
 
     updateActions() {
 
-
         const selectedInfo = this.actionControls.querySelector('.selected-info');
         if (!selectedInfo) return;
 
@@ -498,6 +491,7 @@ class UserInterface {
             selectedInfo.classList.add('visible');
             this.updateActionList();
         } else {
+            // default
             interactionType.textContent = "Not Selected";
             targetType.textContent = "-";
             targetName.textContent = "None";
@@ -523,10 +517,12 @@ class UserInterface {
             const groupElement = document.createElement('div');
             groupElement.className = `action-group ${category}`;
 
+            // Add title
             const title = document.createElement('h3');
             title.textContent = this.getCategoryTitle(category);
             groupElement.appendChild(title);
 
+            // Add actions
             const actionList = document.createElement('ul');
             actions.forEach(action => {
                 const li = document.createElement('li');
@@ -546,7 +542,7 @@ class UserInterface {
 
                     if (options) {
                         activeMyte.queue.add(action.id, options);
-                        // this.updateActions();
+                        this.updateActions();
                     }
                 });
 

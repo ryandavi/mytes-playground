@@ -3,7 +3,7 @@
 class GoToObjectAction extends PositionableAction {
     static metadata = {
         id: 'go_to_object',
-        label: 'Go To',
+        label: 'Go To (Simple)',
         category: 'interactions',
         priority: 1,
         isMovementAction: true,

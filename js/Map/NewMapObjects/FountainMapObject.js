@@ -93,10 +93,10 @@ class FountainMapObject extends AnimatedMapObject {
         }
     }
 
-    checkNearbyMytes(parent) {
-        if (this.state !== 'on' || !parent.mytes) return;
+    checkNearbyMytes() {
+        if (this.state !== 'on' || !this.parent.mytes) return;
 
-        parent.mytes.forEach(myte => {
+        this.parent.mytes.forEach(myte => {
             if (!myte.isActive) return;
 
             const distance = Math.hypot(
@@ -117,8 +117,8 @@ class FountainMapObject extends AnimatedMapObject {
         return element;
     }
 
-    update(parent) {
-        super.update(parent);
-        this.checkNearbyMytes(parent);
+    update(deltaTime) {
+        super.update(deltaTime);
+        this.checkNearbyMytes();
     }
 }

@@ -148,8 +148,8 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
         }
     }
 
-    update(parent) {
-        super.update(parent);
+    update(deltaTime) {
+        super.update(deltaTime);
         
         // Skip breeding logic if not fully grown
         if (!this.fullyGrown) return;

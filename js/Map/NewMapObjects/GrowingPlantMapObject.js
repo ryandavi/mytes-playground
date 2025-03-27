@@ -138,8 +138,8 @@ class GrowingPlantMapObject extends AnimatedMapObject {
         // Override in subclasses to handle harvest
     }
 
-    update(parent) {
-        super.update(parent);
+    update(deltaTime) {
+        super.update(deltaTime);
         this.updateGrowth();
     }
 

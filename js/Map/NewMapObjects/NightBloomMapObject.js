@@ -87,8 +87,8 @@ class NightBloomMapObject extends BreedingFlowerMapObject {
         }
     }
 
-    update(parent) {
-        super.update(parent);
+    update(deltaTime) {
+        super.update(deltaTime);
         
         // Check day/night cycle for mature plants
         if (this.growthStage === 'mature') {

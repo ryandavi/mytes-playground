@@ -4,45 +4,6 @@ class MyteQueue {
         this.queue = [];
         this.isDoingAction = false;
         this.max_total_time = 1500;
-
-        // Action type mapping
-        this.actionTypes = {
-
-            // actions
-            'idle': IdleAction,
-            'expression': ExpressionAction,
-            'dance': DanceAction,
-            'simpleSleep': SimpleSleepAction,
-            'eat_element': EatElementAction,
-
-            // movement
-            'follow_mouse': FollowMouseAction,
-            'move': MoveAction,
-            'run_laps': RunLapsAction,
-            'follow_object': FollowObjectAction,
-            'go_to_object': GoToObjectAction,
-
-            // pickup/carrying
-            'carry_pickup': CarryPickupAction,
-            'carry': CarryAction,
-            'being_carried': BeingCarriedAction,
-            'carry_putdown': CarryPutdownAction,
-
-            // test
-            'jump': JumpAction,
-            'circle': CircleAction,
-            'zigzag': ZigzagAction,
-            'spin': SpinAction,
-            'show_affection': ShowAffectionAction,
-            'play_tag': PlayTagAction,
-
-            'run_away': RunAwayAction,
-            'hide': HideAction,
-            'sleep': SleepAction,
-            'inspect': InspectAction,
-            'play_fetch': PlayFetchAction
-
-        };
         
     }
 

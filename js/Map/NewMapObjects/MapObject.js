@@ -23,6 +23,9 @@ const BASE_CONFIG = {
 	draggable: false,
 	rubbable: false,
 
+	canInspect: true,
+	canPickUp: false,
+
 	// Render properties
 	renderType: 'single', // single, split, animated, sprite
 
@@ -451,18 +454,18 @@ const TYPE_CONFIGS = {
 					height: 400
 				}
 			},
-            animations: {
-                // Direction animations with 2D frames [x, y]
-                "E": { frames: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]], loop: true }, // right
-                "W": { frames: [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1]], loop: true }, // left
-                "N": { frames: [[0, 2], [1, 2], [2, 2], [3, 2], [4, 2]], loop: true }, // up
-                "S": { frames: [[0, 3], [1, 3], [2, 3], [3, 3], [4, 3]], loop: true }, // down
-                // Idle animation
-                "idle": { frames: [[1, 3]], loop: true },
-                // Flutter animation
-                "flutter": { frames: [[2, 3], [1, 3], [0, 3], [1, 3]], loop: true }
-            },
-            default: "idle"
+			animations: {
+				// Direction animations with 2D frames [x, y]
+				"E": { frames: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]], loop: true }, // right
+				"W": { frames: [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1]], loop: true }, // left
+				"N": { frames: [[0, 2], [1, 2], [2, 2], [3, 2], [4, 2]], loop: true }, // up
+				"S": { frames: [[0, 3], [1, 3], [2, 3], [3, 3], [4, 3]], loop: true }, // down
+				// Idle animation
+				"idle": { frames: [[1, 3]], loop: true },
+				// Flutter animation
+				"flutter": { frames: [[2, 3], [1, 3], [0, 3], [1, 3]], loop: true }
+			},
+			default: "idle"
 		},
 
 		variantConfigs: {
@@ -491,268 +494,268 @@ const TYPE_CONFIGS = {
 
 
 
-// Updated DOOR config with direction-specific configurations
-DOOR: {
-    category: 'interactive',
-    variants: ['wooden_door', 'metal_door', 'fancy_door'],
-    renderType: 'sprite',
-    collision: true,
-    renderPriority: 2,
-    interactionType: 'toggle',
-    interactionRadius: 100,
-    canToggle: true,
-    default: 'closed',
-    
-    // Base configurations
-    spriteConfig: {
-        default: 'closed',
-        spriteSheet: {
-            url: "images/MapObjects/door.png",
-            size: {
-                width: 800,
-                height: 256
-            },
-            frameSize: {
-                width: 32 * 5,
-                height: 32 * 8,
-                offsetX: 32 * 4,
-                offsetY: 32 * 5
-            }
-        },
-        animations: {
-            closed: { frames: [[0, 0]], loop: false },
-            opening: { frames: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]], loop: false },
-            open: { frames: [[4, 0]], loop: true },
-            closing: { frames: [[4, 0], [3, 0], [2, 0], [1, 0], [0, 0]], loop: false }
-        }
-    },
-    
-    // Direction-specific configurations
-    directionConfigs: {
-        // East-facing door (opens to the right)
-        E: {
-            size: { width: 32, height: 96 },
-            collider: { 
-                width: 32, 
-                height: 96,
-                offsetX: 0,
-                offsetY: 0
-            },
-            interactiveCollider: {
-                width: 64,
-                height: 128,
-                offsetX: -32,
-                offsetY: -16
-            },
-            transformStyle: '' // No transform needed
-        },
-        
-        // West-facing door (opens to the left)
-        W: {
-            size: { width: 32, height: 96 },
-            collider: { 
-                width: 32, 
-                height: 96,
-                offsetX: 0,
-                offsetY: 0
-            },
-            interactiveCollider: {
-                width: 64,
-                height: 128,
-                offsetX: 0,
-                offsetY: -16
-            },
-            transformStyle: 'scaleX(-1)' // Flip horizontally
-        },
-        
-        // South-facing door (horizontal, opens downward)
-        S: {
-            size: { width: 96, height: 32 },
-            collider: { 
-                width: 96, 
-                height: 32,
-                offsetX: 0,
-                offsetY: 0
-            },
-            interactiveCollider: {
-                width: 128,
-                height: 64,
-                offsetX: -16,
-                offsetY: -32
-            },
-            transformStyle: 'rotate(90deg)' // Rotate 90 degrees
-        },
-        
-        // North-facing door (horizontal, opens upward)
-        N: {
-            size: { width: 96, height: 32 },
-            collider: { 
-                width: 96, 
-                height: 32,
-                offsetX: 0,
-                offsetY: 0
-            },
-            interactiveCollider: {
-                width: 128,
-                height: 64,
-                offsetX: -16,
-                offsetY: 0
-            },
-            transformStyle: 'rotate(-90deg)' // Rotate -90 degrees
-        },
-        
-        // Aliases for common terms in the game
-        Horizontal: 'S', // Map Horizontal to South
-        Vertical: 'E',   // Map Vertical to East
-        Right: 'E',
-        Left: 'W',
-        Up: 'N',
-        Down: 'S'
-    },
-    
-    // Variant-specific configurations
-    variantConfigs: {
-        wooden_door: {
-            // Any wooden door specific settings
-        },
-        metal_door: {
-            spriteConfig: {
-                spriteSheet: {
-                    url: "images/MapObjects/metal_door.png"
-                }
-            }
-        }
-    }
-},
+	// Updated DOOR config with direction-specific configurations
+	DOOR: {
+		category: 'interactive',
+		variants: ['wooden_door', 'metal_door', 'fancy_door'],
+		renderType: 'sprite',
+		collision: true,
+		renderPriority: 2,
+		interactionType: 'toggle',
+		interactionRadius: 100,
+		canToggle: true,
+		default: 'closed',
 
-// Updated BED config with direction-specific configurations
-BED: {
-    category: 'static',
-    variants: ['bed', 'large_bed', 'bunk_bed'],
-    renderType: 'sprite',
-    collision: true,
-    draggable: true,
-    interactionType: 'rest',
-    restDuration: 5000,
-    restHealAmount: 10,
-    restMoodBoost: 15,
-    
-    // Base sprite configuration
-    spriteConfig: {
-        spriteSheet: {
-            url: "images/MapObjects/bed_default.png",
-            size: {
-                width: 128,
-                height: 256
-            }
-        }
-    },
-    
-    // Direction-specific configurations
-    directionConfigs: {
-        // South-facing bed (default)
-        S: {
-            size: { width: 128, height: 256 },
-            collider: { 
-                width: 112, 
-                height: 240,
-                offsetX: 8,
-                offsetY: 8
-            },
-            interactiveCollider: {
-                width: 192,
-                height: 64,
-                offsetX: -32,
-                offsetY: 256
-            },
-            transformStyle: '', // No transform
-            mytePosition: { xFactor: 0.5, yFactor: 0.75 }, // Position for sleeping myte
-            myteFacing: 'S'
-        },
-        
-        // North-facing bed
-        N: {
-            size: { width: 128, height: 256 },
-            collider: { 
-                width: 112, 
-                height: 240,
-                offsetX: 8,
-                offsetY: 8
-            },
-            interactiveCollider: {
-                width: 192,
-                height: 64,
-                offsetX: -32,
-                offsetY: -64
-            },
-            transformStyle: 'scaleY(-1)', // Flip vertically
-            mytePosition: { xFactor: 0.5, yFactor: 0.25 },
-            myteFacing: 'N'
-        },
-        
-        // East-facing bed
-        E: {
-            size: { width: 256, height: 128 },
-            collider: { 
-                width: 240, 
-                height: 112,
-                offsetX: 8,
-                offsetY: 8
-            },
-            interactiveCollider: {
-                width: 64,
-                height: 192,
-                offsetX: 256,
-                offsetY: -32
-            },
-            transformStyle: 'rotate(90deg)', // Rotate 90 degrees
-            mytePosition: { xFactor: 0.75, yFactor: 0.5 },
-            myteFacing: 'E'
-        },
-        
-        // West-facing bed
-        W: {
-            size: { width: 256, height: 128 },
-            collider: { 
-                width: 240, 
-                height: 112,
-                offsetX: 8,
-                offsetY: 8
-            },
-            interactiveCollider: {
-                width: 64,
-                height: 192,
-                offsetX: -64,
-                offsetY: -32
-            },
-            transformStyle: 'rotate(-90deg)', // Rotate -90 degrees
-            mytePosition: { xFactor: 0.25, yFactor: 0.5 },
-            myteFacing: 'W'
-        }
-    },
-    
-    // Variant-specific configurations
-    variantConfigs: {
-        bed: {
-            // Standard bed-specific settings
-        },
-        large_bed: {
-            size: { width: 192, height: 256 },
-            // Add size adjustments for each direction
-            directionConfigs: {
-                E: { size: { width: 256, height: 192 } },
-                W: { size: { width: 256, height: 192 } }
-            }
-        },
-        bunk_bed: {
-            spriteConfig: {
-                spriteSheet: {
-                    url: "images/MapObjects/bunk_bed.png"
-                }
-            }
-        }
-    }
-},
+		// Base configurations
+		spriteConfig: {
+			default: 'closed',
+			spriteSheet: {
+				url: "images/MapObjects/door.png",
+				size: {
+					width: 800,
+					height: 256
+				},
+				frameSize: {
+					width: 32 * 5,
+					height: 32 * 8,
+					offsetX: 32 * 4,
+					offsetY: 32 * 5
+				}
+			},
+			animations: {
+				closed: { frames: [[0, 0]], loop: false },
+				opening: { frames: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]], loop: false },
+				open: { frames: [[4, 0]], loop: true },
+				closing: { frames: [[4, 0], [3, 0], [2, 0], [1, 0], [0, 0]], loop: false }
+			}
+		},
+
+		// Direction-specific configurations
+		directionConfigs: {
+			// East-facing door (opens to the right)
+			E: {
+				size: { width: 32, height: 96 },
+				collider: {
+					width: 32,
+					height: 96,
+					offsetX: 0,
+					offsetY: 0
+				},
+				interactiveCollider: {
+					width: 64,
+					height: 128,
+					offsetX: -32,
+					offsetY: -16
+				},
+				transformStyle: '' // No transform needed
+			},
+
+			// West-facing door (opens to the left)
+			W: {
+				size: { width: 32, height: 96 },
+				collider: {
+					width: 32,
+					height: 96,
+					offsetX: 0,
+					offsetY: 0
+				},
+				interactiveCollider: {
+					width: 64,
+					height: 128,
+					offsetX: 0,
+					offsetY: -16
+				},
+				transformStyle: 'scaleX(-1)' // Flip horizontally
+			},
+
+			// South-facing door (horizontal, opens downward)
+			S: {
+				size: { width: 96, height: 32 },
+				collider: {
+					width: 96,
+					height: 32,
+					offsetX: 0,
+					offsetY: 0
+				},
+				interactiveCollider: {
+					width: 128,
+					height: 64,
+					offsetX: -16,
+					offsetY: -32
+				},
+				transformStyle: 'rotate(90deg)' // Rotate 90 degrees
+			},
+
+			// North-facing door (horizontal, opens upward)
+			N: {
+				size: { width: 96, height: 32 },
+				collider: {
+					width: 96,
+					height: 32,
+					offsetX: 0,
+					offsetY: 0
+				},
+				interactiveCollider: {
+					width: 128,
+					height: 64,
+					offsetX: -16,
+					offsetY: 0
+				},
+				transformStyle: 'rotate(-90deg)' // Rotate -90 degrees
+			},
+
+			// Aliases for common terms in the game
+			Horizontal: 'S', // Map Horizontal to South
+			Vertical: 'E',   // Map Vertical to East
+			Right: 'E',
+			Left: 'W',
+			Up: 'N',
+			Down: 'S'
+		},
+
+		// Variant-specific configurations
+		variantConfigs: {
+			wooden_door: {
+				// Any wooden door specific settings
+			},
+			metal_door: {
+				spriteConfig: {
+					spriteSheet: {
+						url: "images/MapObjects/metal_door.png"
+					}
+				}
+			}
+		}
+	},
+
+	// Updated BED config with direction-specific configurations
+	BED: {
+		category: 'static',
+		variants: ['bed', 'large_bed', 'bunk_bed'],
+		renderType: 'sprite',
+		collision: true,
+		draggable: true,
+		interactionType: 'rest',
+		restDuration: 5000,
+		restHealAmount: 10,
+		restMoodBoost: 15,
+
+		// Base sprite configuration
+		spriteConfig: {
+			spriteSheet: {
+				url: "images/MapObjects/bed_default.png",
+				size: {
+					width: 128,
+					height: 256
+				}
+			}
+		},
+
+		// Direction-specific configurations
+		directionConfigs: {
+			// South-facing bed (default)
+			S: {
+				size: { width: 128, height: 256 },
+				collider: {
+					width: 112,
+					height: 240,
+					offsetX: 8,
+					offsetY: 8
+				},
+				interactiveCollider: {
+					width: 192,
+					height: 64,
+					offsetX: -32,
+					offsetY: 256
+				},
+				transformStyle: '', // No transform
+				mytePosition: { xFactor: 0.5, yFactor: 0.75 }, // Position for sleeping myte
+				myteFacing: 'S'
+			},
+
+			// North-facing bed
+			N: {
+				size: { width: 128, height: 256 },
+				collider: {
+					width: 112,
+					height: 240,
+					offsetX: 8,
+					offsetY: 8
+				},
+				interactiveCollider: {
+					width: 192,
+					height: 64,
+					offsetX: -32,
+					offsetY: -64
+				},
+				transformStyle: 'scaleY(-1)', // Flip vertically
+				mytePosition: { xFactor: 0.5, yFactor: 0.25 },
+				myteFacing: 'N'
+			},
+
+			// East-facing bed
+			E: {
+				size: { width: 256, height: 128 },
+				collider: {
+					width: 240,
+					height: 112,
+					offsetX: 8,
+					offsetY: 8
+				},
+				interactiveCollider: {
+					width: 64,
+					height: 192,
+					offsetX: 256,
+					offsetY: -32
+				},
+				transformStyle: 'rotate(90deg)', // Rotate 90 degrees
+				mytePosition: { xFactor: 0.75, yFactor: 0.5 },
+				myteFacing: 'E'
+			},
+
+			// West-facing bed
+			W: {
+				size: { width: 256, height: 128 },
+				collider: {
+					width: 240,
+					height: 112,
+					offsetX: 8,
+					offsetY: 8
+				},
+				interactiveCollider: {
+					width: 64,
+					height: 192,
+					offsetX: -64,
+					offsetY: -32
+				},
+				transformStyle: 'rotate(-90deg)', // Rotate -90 degrees
+				mytePosition: { xFactor: 0.25, yFactor: 0.5 },
+				myteFacing: 'W'
+			}
+		},
+
+		// Variant-specific configurations
+		variantConfigs: {
+			bed: {
+				// Standard bed-specific settings
+			},
+			large_bed: {
+				size: { width: 192, height: 256 },
+				// Add size adjustments for each direction
+				directionConfigs: {
+					E: { size: { width: 256, height: 192 } },
+					W: { size: { width: 256, height: 192 } }
+				}
+			},
+			bunk_bed: {
+				spriteConfig: {
+					spriteSheet: {
+						url: "images/MapObjects/bunk_bed.png"
+					}
+				}
+			}
+		}
+	},
 
 
 
@@ -770,11 +773,12 @@ BED: {
 		default: 'active',
 		particleEffects: true,
 		lightEmission: true,
+		canInspect: false,
 		size: {
 			width: 128,
 			height: 128
 		},
-		
+
 		// Collider slightly smaller than visual
 		collider: {
 			width: 64,
@@ -782,7 +786,7 @@ BED: {
 			offsetX: 32, // Center the collider
 			offsetY: 32
 		},
-		
+
 		// Interactive area larger than visual
 		interactiveCollider: {
 			width: 196,
@@ -790,7 +794,7 @@ BED: {
 			offsetX: -32, // Extend beyond visual
 			offsetY: -32
 		},
-		
+
 		spriteConfig: {
 			default: 'idle',
 			spriteSheet: {
@@ -807,7 +811,7 @@ BED: {
 				deactivate: { frames: [[0, 3], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3]], loop: false, frameRate: 15 }
 			}
 		},
-		
+
 		// Particle system configuration
 		particleConfig: {
 			particleEffect: 'GLOW',
@@ -816,7 +820,7 @@ BED: {
 			pulseEffect: true,
 			pulseFrequency: 0.05
 		},
-		
+
 		// Variant-specific configurations
 		variantConfigs: {
 			blue_portal: {
@@ -864,97 +868,97 @@ BED: {
 		renderPriority: 2,
 		walkable: false,
 		interactive: false,
-		
+
 		// Default size for horizontal fence sections
 		size: {
 			width: 64,
 			height: 32
 		},
-		
+
 		// Basic collision properties
 		collider: {
 			width: 64,
 			height: 16,
 			offsetX: 0,
-			offsetY: 8
+			offsetY: 0
 		},
-		
+
 		// Direction-specific configurations
 		directionConfigs: {
 			// Horizontal fence (East-West)
 			E: {
 				size: { width: 64, height: 32 },
-				collider: { 
-					width: 64, 
+				collider: {
+					width: 64,
 					height: 16,
 					offsetX: 0,
 					offsetY: 8
 				},
 				transformStyle: '' // No transform needed
 			},
-			
+
 			// Vertical fence (North-South)
 			N: {
 				size: { width: 32, height: 64 },
-				collider: { 
-					width: 16, 
+				collider: {
+					width: 16,
 					height: 64,
 					offsetX: 8,
 					offsetY: 0
 				},
 				transformStyle: 'rotate(-90deg)' // Rotate for vertical orientation
 			},
-			
+
 			// Corner pieces
 			NE: { // Northeast corner
 				size: { width: 32, height: 32 },
-				collider: { 
-					width: 24, 
+				collider: {
+					width: 24,
 					height: 24,
 					offsetX: 4,
 					offsetY: 4
 				},
 				transformStyle: ''
 			},
-			
+
 			NW: { // Northwest corner
 				size: { width: 32, height: 32 },
-				collider: { 
-					width: 24, 
+				collider: {
+					width: 24,
 					height: 24,
 					offsetX: 4,
 					offsetY: 4
 				},
 				transformStyle: 'scaleX(-1)'
 			},
-			
+
 			SE: { // Southeast corner
 				size: { width: 32, height: 32 },
-				collider: { 
-					width: 24, 
+				collider: {
+					width: 24,
 					height: 24,
 					offsetX: 4,
 					offsetY: 4
 				},
 				transformStyle: 'scaleY(-1)'
 			},
-			
+
 			SW: { // Southwest corner
 				size: { width: 32, height: 32 },
-				collider: { 
-					width: 24, 
+				collider: {
+					width: 24,
 					height: 24,
 					offsetX: 4,
 					offsetY: 4
 				},
 				transformStyle: 'rotate(180deg)'
 			},
-			
+
 			// Aliases
 			Horizontal: 'E',
 			Vertical: 'N'
 		},
-		
+
 		// Sprite configuration
 		spriteConfig: {
 			spriteSheet: {
@@ -965,7 +969,7 @@ BED: {
 				}
 			}
 		},
-		
+
 		// Variant-specific configurations
 		variantConfigs: {
 			wooden_fence: {
@@ -995,7 +999,7 @@ BED: {
 			}
 		}
 	},
-	
+
 	GATE: {
 		category: 'interactive',
 		variants: ['wooden_gate', 'stone_gate', 'iron_gate', 'garden_gate'],
@@ -1006,20 +1010,20 @@ BED: {
 		interactionRadius: 80,
 		canToggle: true,
 		default: 'closed',
-		
+
 		// Default size for horizontal gates
 		size: {
 			width: 64,
 			height: 32
 		},
-		
+
 		// Direction-specific configurations
 		directionConfigs: {
 			// East-facing gate (horizontal, opens to the right)
 			E: {
 				size: { width: 64, height: 32 },
-				collider: { 
-					width: 64, 
+				collider: {
+					width: 64,
 					height: 16,
 					offsetX: 0,
 					offsetY: 8
@@ -1032,12 +1036,12 @@ BED: {
 				},
 				transformStyle: '' // No transform needed
 			},
-			
+
 			// West-facing gate (horizontal, opens to the left)
 			W: {
 				size: { width: 64, height: 32 },
-				collider: { 
-					width: 64, 
+				collider: {
+					width: 64,
 					height: 16,
 					offsetX: 0,
 					offsetY: 8
@@ -1050,12 +1054,12 @@ BED: {
 				},
 				transformStyle: 'scaleX(-1)' // Flip horizontally
 			},
-			
+
 			// North-facing gate (vertical, opens upward)
 			N: {
 				size: { width: 32, height: 64 },
-				collider: { 
-					width: 16, 
+				collider: {
+					width: 16,
 					height: 64,
 					offsetX: 8,
 					offsetY: 0
@@ -1068,12 +1072,12 @@ BED: {
 				},
 				transformStyle: 'rotate(-90deg)' // Rotate -90 degrees
 			},
-			
+
 			// South-facing gate (vertical, opens downward)
 			S: {
 				size: { width: 32, height: 64 },
-				collider: { 
-					width: 16, 
+				collider: {
+					width: 16,
 					height: 64,
 					offsetX: 8,
 					offsetY: 0
@@ -1086,12 +1090,12 @@ BED: {
 				},
 				transformStyle: 'rotate(90deg)' // Rotate 90 degrees
 			},
-			
+
 			// Aliases
 			Horizontal: 'E',
 			Vertical: 'N'
 		},
-		
+
 		// Sprite configuration
 		spriteConfig: {
 			default: 'closed',
@@ -1109,7 +1113,7 @@ BED: {
 				closing: { frames: [[4, 0], [3, 0], [2, 0], [1, 0], [0, 0]], loop: false }
 			}
 		},
-		
+
 		// Variant-specific configurations
 		variantConfigs: {
 			wooden_gate: {
@@ -1139,14 +1143,6 @@ BED: {
 			}
 		}
 	}
-
-
-
-
-
-
-
-
 
 
 
@@ -1192,7 +1188,6 @@ class MapObject {
 		this.isDragging = false;
 	}
 
-
 	// Clean config access with defaults
 	getConfig(path, defaultValue = null) {
 		const keys = path.split('.');
@@ -1208,80 +1203,78 @@ class MapObject {
 		return current !== undefined ? current : defaultValue;
 	}
 
-    
-    static processDirectionConfig(baseConfig, direction) {
-        // Create a deep copy of the config to avoid modifying the original
-        const config = JSON.parse(JSON.stringify(baseConfig));
-        
-        // Check if we have direction configurations
-        if (!config.directionConfigs) return config;
-        
-        // Normalize the direction
-        let normalizedDirection = MapObject.normalizeFacingDirection(direction, config.directionConfigs);
-        
-        // If we don't have config for this direction, return the base config
-        if (!config.directionConfigs[normalizedDirection]) return config;
-        
-        // Get the direction config
-        const dirConfig = config.directionConfigs[normalizedDirection];
-        
-        // Apply direction-specific properties to the base config
-        if (dirConfig.size) {
-            config.size = dirConfig.size;
-        }
-        
-        if (dirConfig.collider) {
-            config.collider = dirConfig.collider;
-        }
-        
-        if (dirConfig.interactiveCollider) {
-            config.interactiveCollider = dirConfig.interactiveCollider;
-        }
-        
-        // Store the direction and transform info
-        config.facingDirection = normalizedDirection;
-        config.transformStyle = dirConfig.transformStyle || '';
-        
-        // Copy any other direction-specific properties
-        for (const key in dirConfig) {
-            if (!['size', 'collider', 'interactiveCollider', 'transformStyle'].includes(key)) {
-                config[key] = dirConfig[key];
-            }
-        }
-        
-        return config;
-    }
-    
-    static normalizeFacingDirection(direction, directionConfigs = {}) {
-        // If it's already a standard direction, return it
-        if (['N', 'S', 'E', 'W'].includes(direction)) {
-            return direction;
-        }
-        
-        // Check if we have direction configs with this as an alias
-        if (directionConfigs[direction] && typeof directionConfigs[direction] === 'string') {
-            return directionConfigs[direction];
-        }
-        
-        // Common direction mappings
-        const dirMap = {
-            'up': 'N', 'north': 'N', 'u': 'N', 'n': 'N',
-            'right': 'E', 'east': 'E', 'r': 'E', 'e': 'E',
-            'down': 'S', 'south': 'S', 'd': 'S', 's': 'S',
-            'left': 'W', 'west': 'W', 'l': 'W', 'w': 'W',
-            'horizontal': 'S',
-            'vertical': 'E'
-        };
-        
-        // Convert to lowercase for case-insensitive matching
-        const dir = direction.toLowerCase();
-        return dirMap[dir] || 'S'; // Default to South if not recognized
-    }
-    
-    // You can also add an instance method that just calls the static method
-    normalizeFacingDirection(direction) {
-        return MapObject.normalizeFacingDirection(direction, this.getConfig('directionConfigs', {}));
-    }
+	static processDirectionConfig(baseConfig, direction) {
+		// Create a deep copy of the config to avoid modifying the original
+		const config = JSON.parse(JSON.stringify(baseConfig));
+
+		// Check if we have direction configurations
+		if (!config.directionConfigs) return config;
+
+		// Normalize the direction
+		let normalizedDirection = MapObject.normalizeFacingDirection(direction, config.directionConfigs);
+
+		// If we don't have config for this direction, return the base config
+		if (!config.directionConfigs[normalizedDirection]) return config;
+
+		// Get the direction config
+		const dirConfig = config.directionConfigs[normalizedDirection];
+
+		// Apply direction-specific properties to the base config
+		if (dirConfig.size) {
+			config.size = dirConfig.size;
+		}
+
+		if (dirConfig.collider) {
+			config.collider = dirConfig.collider;
+		}
+
+		if (dirConfig.interactiveCollider) {
+			config.interactiveCollider = dirConfig.interactiveCollider;
+		}
+
+		// Store the direction and transform info
+		config.facingDirection = normalizedDirection;
+		config.transformStyle = dirConfig.transformStyle || '';
+
+		// Copy any other direction-specific properties
+		for (const key in dirConfig) {
+			if (!['size', 'collider', 'interactiveCollider', 'transformStyle'].includes(key)) {
+				config[key] = dirConfig[key];
+			}
+		}
+
+		return config;
+	}
+
+	static normalizeFacingDirection(direction, directionConfigs = {}) {
+		// If it's already a standard direction, return it
+		if (['N', 'S', 'E', 'W'].includes(direction)) {
+			return direction;
+		}
+
+		// Check if we have direction configs with this as an alias
+		if (directionConfigs[direction] && typeof directionConfigs[direction] === 'string') {
+			return directionConfigs[direction];
+		}
+
+		// Common direction mappings
+		const dirMap = {
+			'up': 'N', 'north': 'N', 'u': 'N', 'n': 'N',
+			'right': 'E', 'east': 'E', 'r': 'E', 'e': 'E',
+			'down': 'S', 'south': 'S', 'd': 'S', 's': 'S',
+			'left': 'W', 'west': 'W', 'l': 'W', 'w': 'W',
+			'horizontal': 'S',
+			'vertical': 'E'
+		};
+
+		// Convert to lowercase for case-insensitive matching
+		const dir = direction.toLowerCase();
+		return dirMap[dir] || 'S'; // Default to South if not recognized
+	}
+
+	normalizeFacingDirection(direction) {
+		return MapObject.normalizeFacingDirection(direction, this.getConfig('directionConfigs', {}));
+	}
 	// Clean collider initialization
 	initializeCollider() {
 		// If we have a predefined collider, use it
@@ -1400,80 +1393,79 @@ class MapObject {
 		});
 	}
 
-// Add this method to MapObject class
-showDropTarget() {
-    // Remove any previous drop target visuals
-    const oldDropTargets = this.parent.gameMap.layers.debug.querySelectorAll('.drop-target');
-    oldDropTargets.forEach(t => t.remove());
-    
-    // Get the grid system
-    const gridSystem = this.parent.gameMap.gridSystem;
-    if (!gridSystem) return;
-    
-    // Calculate where the object would be dropped
-    const snappedPos = gridSystem.snapToGridOptimal(
-        this.posX, 
-        this.posY,
-        this.size.width, 
-        this.size.height,
-        gridSystem.config.cellSize
-    );
-    
-    // Create drop target visualization
-    const dropTarget = document.createElement('div');
-    dropTarget.className = 'drop-target debug';
-    
-    dropTarget.style.left = `${snappedPos.x}px`;
-    dropTarget.style.top = `${snappedPos.y}px`;
-    dropTarget.style.width = `${this.size.width}px`;
-    dropTarget.style.height = `${this.size.height}px`;
-    
-    // Check if this is a valid drop spot
-    const isValid = this.checkDropValidity(snappedPos.x, snappedPos.y);
-    dropTarget.classList.add(isValid ? 'valid-drop' : 'invalid-drop');
-    
-    this.parent.gameMap.layers.debug.appendChild(dropTarget);
-}
+	// Add this method to MapObject class
+	showDropTarget() {
+		// Remove any previous drop target visuals
+		const oldDropTargets = this.parent.gameMap.layers.debug.querySelectorAll('.drop-target');
+		oldDropTargets.forEach(t => t.remove());
 
-// Add this helper method to check drop validity
-checkDropValidity(x, y) {
-    // Get grid system
-    const gridSystem = this.parent.gameMap.gridSystem;
-    if (!gridSystem) return true;
-    
-    // Convert to grid coordinates
-    const startGridX = Math.floor(x / gridSystem.config.cellSize);
-    const startGridY = Math.floor(y / gridSystem.config.cellSize);
-    const endGridX = Math.ceil((x + this.size.width) / gridSystem.config.cellSize);
-    const endGridY = Math.ceil((y + this.size.height) / gridSystem.config.cellSize);
-    
-    // Check each cell
-    for (let gridX = startGridX; gridX < endGridX; gridX++) {
-        for (let gridY = startGridY; gridY < endGridY; gridY++) {
-            // Skip out of bounds cells
-            if (gridX < 0 || gridX >= gridSystem.gridWidth || 
-                gridY < 0 || gridY >= gridSystem.gridHeight) {
-                return false;
-            }
-            
-            // Check if cell is walkable (no collision)
-            if (!gridSystem.grid[gridX][gridY].walkable) {
-                // Skip checking our own position
-                let hasOtherObjects = false;
-                gridSystem.grid[gridX][gridY].objects.forEach(obj => {
-                    if (obj !== this && !obj.config.walkable) {
-                        hasOtherObjects = true;
-                    }
-                });
-                
-                if (hasOtherObjects) return false;
-            }
-        }
-    }
-    
-    return true;
-}
+		// Get the grid system
+		const gridSystem = this.parent.gameMap.gridSystem;
+		if (!gridSystem) return;
 
+		// Calculate where the object would be dropped
+		const snappedPos = gridSystem.snapToGridOptimal(
+			this.posX,
+			this.posY,
+			this.size.width,
+			this.size.height,
+			gridSystem.config.cellSize
+		);
+
+		// Create drop target visualization
+		const dropTarget = document.createElement('div');
+		dropTarget.className = 'drop-target debug';
+
+		dropTarget.style.left = `${snappedPos.x}px`;
+		dropTarget.style.top = `${snappedPos.y}px`;
+		dropTarget.style.width = `${this.size.width}px`;
+		dropTarget.style.height = `${this.size.height}px`;
+
+		// Check if this is a valid drop spot
+		const isValid = this.checkDropValidity(snappedPos.x, snappedPos.y);
+		dropTarget.classList.add(isValid ? 'valid-drop' : 'invalid-drop');
+
+		this.parent.gameMap.layers.debug.appendChild(dropTarget);
+	}
+
+	// Add this helper method to check drop validity
+	checkDropValidity(x, y) {
+		// Get grid system
+		const gridSystem = this.parent.gameMap.gridSystem;
+		if (!gridSystem) return true;
+
+		// Convert to grid coordinates
+		const startGridX = Math.floor(x / gridSystem.config.cellSize);
+		const startGridY = Math.floor(y / gridSystem.config.cellSize);
+		const endGridX = Math.ceil((x + this.size.width) / gridSystem.config.cellSize);
+		const endGridY = Math.ceil((y + this.size.height) / gridSystem.config.cellSize);
+
+		// Check each cell
+		for (let gridX = startGridX; gridX < endGridX; gridX++) {
+			for (let gridY = startGridY; gridY < endGridY; gridY++) {
+				// Skip out of bounds cells
+				if (gridX < 0 || gridX >= gridSystem.gridWidth ||
+					gridY < 0 || gridY >= gridSystem.gridHeight) {
+					return false;
+				}
+
+				// Check if cell is walkable (no collision)
+				if (!gridSystem.grid[gridX][gridY].walkable) {
+					// Skip checking our own position
+					let hasOtherObjects = false;
+					gridSystem.grid[gridX][gridY].objects.forEach(obj => {
+						if (obj !== this && !obj.config.walkable) {
+							hasOtherObjects = true;
+						}
+					});
+
+					if (hasOtherObjects) return false;
+				}
+			}
+		}
+
+		return true;
+	}
 
 	// Initialize rubbing component
 	initRubbingComponent() {
@@ -1627,8 +1619,7 @@ checkDropValidity(x, y) {
 		if (this.getConfig('category', false) == "interactive") {
 			divElement.classList.add('interactive');
 
-
-			if(this.getConfig('interactiveCollider')){
+			if (this.getConfig('interactiveCollider')) {
 				let interactiveElement = document.createElement('div');
 				interactiveElement.classList.add('interactive-collider');
 
@@ -1640,10 +1631,6 @@ checkDropValidity(x, y) {
 
 				divElement.appendChild(interactiveElement);
 			}
-
-
-
-
 		}
 
 		// Set position and size
@@ -1702,7 +1689,7 @@ checkDropValidity(x, y) {
 
 
 		// spritesheet info
-		if(this.getConfig('spriteConfig.spriteSheet.url')){
+		if (this.getConfig('spriteConfig.spriteSheet.url')) {
 			div.style.backgroundImage = `url(${this.getConfig('spriteConfig.spriteSheet.url')})`;
 
 			let size = {
@@ -1714,7 +1701,7 @@ checkDropValidity(x, y) {
 		}
 
 		// offsetting sprite
-		if(this.getConfig('spriteConfig.spriteSheet.frameSize')){
+		if (this.getConfig('spriteConfig.spriteSheet.frameSize')) {
 			div.style.width = `${this.getConfig('spriteConfig.spriteSheet.frameSize.width')}px`;
 			div.style.height = `${this.getConfig('spriteConfig.spriteSheet.frameSize.height')}px`;
 
@@ -1736,16 +1723,25 @@ checkDropValidity(x, y) {
 
 	// Handle click/press on this object
 	press(parent) {
+
 		if (!this.active) return false;
 
-		if (parent.activeMyte) {
-			parent.ui.setSelected(this);
+		if (this.parent.parent.activeMyte) {
+
+			if(this.getConfig('canInspect')){
+				this.parent.parent.ui.setSelected(this);
+			}
+			
+
 
 			// Trigger any onClick handler from config
+			/*
 			const onClick = this.getConfig('onClick');
 			if (typeof onClick === 'function') {
-				onClick(this, parent);
+				console.log("ON CLICK");
+				onClick(this, this.parent);
 			}
+			*/
 
 			return true;
 		}

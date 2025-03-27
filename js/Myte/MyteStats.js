@@ -33,9 +33,9 @@ class MyteStats {
         // Define battery thresholds with names and percentages
         this.batteryThresholds = [
             { name: 'empty', threshold: 0 },
-            { name: 'low', threshold: 1 },
-            { name: 'medium', threshold: 34 },
-            { name: 'full', threshold: 67 } // minimal threshold
+            { name: 'low', threshold: 30 },
+            { name: 'medium', threshold: 60 },
+            { name: 'full', threshold: 90 } // minimal threshold
         ];
 
 

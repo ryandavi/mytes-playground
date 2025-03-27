@@ -28,6 +28,11 @@ class MapTransitionManager {
         this.messageElement.className = 'transition-message';
         this.transitionElement.appendChild(this.messageElement);
 
+        //add transition-loader
+        const transitionLoader = document.createElement('div');
+        transitionLoader.className = 'transition-loader';
+        this.transitionElement.appendChild(transitionLoader);
+
         this.container.element.appendChild(this.transitionElement);
     }
 
@@ -88,76 +93,68 @@ class MapTransitionManager {
                 this.previousMapId = this.container.gameMap.id;
                 console.log(`[MapTransitionManager] Saved previous map ID: ${this.previousMapId}`);
             }
-
+    
             this.currentMapId = mapId;
     
             // Set up the new map environment
             this.container.gameMap = newMap;
     
+            // Force GridSystem re-initialization if debug mode was active
+            if (newMap.gridSystem) {
+                // Check if GridSystem already has debug mode
+                const wasDebugMode = newMap.gridSystem.debugMode;
+                
+                if (wasDebugMode) {
+                    console.log('[MapTransitionManager] Reinitializing GridSystem debug mode');
+                    
+                    // Small delay to ensure DOM is ready
+                    setTimeout(() => {
+                        // Reset debug initialization
+                        newMap.gridSystem.debugInitialized = false;
+                        
+                        // Toggle off and back on to properly reinitialize
+                        newMap.gridSystem.toggleDebug();  // Toggle off
+                        newMap.gridSystem.toggleDebug();  // Toggle back on
+                    }, 200);
+                }
+            }
+    
             // Reset camera if needed
             if (!options.preserveCamera && this.container.camera) {
                 // this.container.camera.reset();
             }
-
+    
             // set camera to center on first myte
             if (this.container.mytes && this.container.mytes.length > 0) {
-
                 // center to corresponding portal
                 if(this.container.activeMyte){
-
                     // get all portal objects
                     let allPortals = this.container.gameMap.objects.filter(obj => obj instanceof PortalMapObject);
-
+    
                     // find the corresponding portal where targetMap is previousMapId
                     let correspondingPortal = allPortals.find(portal => portal.targetMap === this.previousMapId);
-
+    
                     if(correspondingPortal){
                         // set myte position centered to center of portal position
-
-                        
                         this.container.activeMyte.posX = 
                             correspondingPortal.posX + 
                             correspondingPortal.size.width / 2 - 
                             this.container.activeMyte.size.width/2;
-
+    
                         this.container.activeMyte.posY = 
                             correspondingPortal.posY + 
                             correspondingPortal.size.height / 2 -
                             this.container.activeMyte.size.height/2;
-
-                            
-                        
                     }
-
                 }
-
-
+    
                 let firstMyte = this.container.mytes[0];
                 if(this.container.activeMyte){
                     firstMyte = this.container.activeMyte;
                 }
-
-                this.container.camera.centerToPosition(firstMyte.posX, firstMyte.posY, firstMyte.size, true);
-
-
-
-
-
-            }
-
     
-            // Position mytes in the new map if they exist
-            /*
-            if (this.container.mytes && this.container.mytes.length > 0) {
-                this.container.mytes.forEach(myte => {
-                    const spawnLocation = this.container.gameMap.getSpawnPoint(spawnPoint);
-                    // myte.setPosition(spawnLocation.x, spawnLocation.y);
-                });
+                this.container.camera.centerToPosition(firstMyte.posX, firstMyte.posY, firstMyte.size, true);
             }
-                */
-
-
-
     
             // Hide transition screen if not initial load
             if (!isInitialLoad) {

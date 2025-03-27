@@ -164,25 +164,25 @@ class TreasureChestMapObject extends AnimatedMapObject {
         return droppedItem;
     }
 
-    update(parent) {
+    update(deltaTime) {
 
         
-        super.update(parent);
+        super.update(deltaTime);
 
 
         
         // Update dropped items
-        this.updateDroppedItems(parent);
+        this.updateDroppedItems();
     }
     
-    updateDroppedItems(parent) {
+    updateDroppedItems() {
 
 
         this.droppedItems = this.droppedItems.filter(item => {
             if (!item.collected) {
 
-                if(parent?.activeMyte){
-                    item.update(parent.activeMyte);
+                if(this.parent?.activeMyte){
+                    item.update(this.parent.activeMyte);
                 }
                 
                 return true;
@@ -196,4 +196,63 @@ class TreasureChestMapObject extends AnimatedMapObject {
         element.classList.add('treasure-chest', this.state);
         return element;
     }
+
+
+
+
+
+    
+
+
+    generateItem(itemDef, randomFunc = Math.random) {
+        // Check probability
+        if (randomFunc() > itemDef.probability) {
+          return null; // Item doesn't spawn
+        }
+        
+        // Calculate quantity
+        let quantity = itemDef.quantity;
+        if (Array.isArray(quantity)) {
+          // If quantity is a range, pick a random number within that range
+          const [min, max] = quantity;
+          quantity = Math.floor(randomFunc() * (max - min + 1)) + min;
+        }
+        
+        // Calculate value (for variants that are ranges)
+        let variant = itemDef.variant;
+        if (Array.isArray(variant)) {
+          // If variant is a range, pick a random number within that range
+          const [min, max] = variant;
+          variant = Math.floor(randomFunc() * (max - min + 1)) + min;
+        }
+        
+        return {
+          type: itemDef.type,
+          variant: variant,
+          quantity: quantity
+        };
+      }
+      
+      openChest(chestDef, seed) {
+        const items = [];
+        
+        // Create a seeded random function if seed is provided
+        const randomFunc = seed !== undefined ? Utility.createRandomGenerator(seed) : Math.random;
+        
+        chestDef.forEach(itemDef => {
+          const item = generateItem(itemDef, randomFunc);
+          if (item) {
+            items.push(item);
+          }
+        });
+        
+        return items;
+      }
+
+
+
+
+
+
+
 }

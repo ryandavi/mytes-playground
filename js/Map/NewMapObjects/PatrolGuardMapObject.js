@@ -53,13 +53,13 @@ class PatrolGuardMapObject extends MovingMapObject {
     }
     
     // Check for targets in detection radius
-    detectTargets(parent) {
+    detectTargets() {
         // Skip detection if already in pursuit
         if (this.alertStatus === 'pursuit') return;
         
         // Find mytes within detection radius
-        if (parent && parent.mytes) {
-            const target = parent.mytes.find(myte => {
+        if (this.parent && this.parent.mytes) {
+            const target = this.parent.mytes.find(myte => {
                 if (!myte.isActive) return false;
                 
                 const distance = this.getDistanceTo(myte);
@@ -260,9 +260,9 @@ class PatrolGuardMapObject extends MovingMapObject {
     }
     
     // Override update method
-    update(deltaTime, parent) {
+    update(deltaTime) {
         // Detect nearby targets
-        this.detectTargets(parent);
+        this.detectTargets();
         
         // Handle behavior based on alert status
         if (this.alertStatus === 'pursuit') {

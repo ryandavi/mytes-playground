@@ -257,21 +257,28 @@ class BallMapObject extends AnimatedMapObject {
     }
 
     // Override update method
-    update(parent) {
+    update(deltaTime) {
         // Check for nearby mytes first (apply forces before physics)
-        if (parent && parent.mytes) {
-            parent.mytes.forEach(myte => {
+        if (this.parent.parent && this.parent.parent.mytes) {
+            this.parent.parent.mytes.forEach(myte => {
                 if (myte.isActive) {
                     this.reactToNearbyCreature(myte);
+                    
                 }
             });
+
+            
+        
         }
+
+
+
         
         // Update physics
         this.updatePhysics();
         
         // Call parent update (for animation)
-        super.update(parent);
+        super.update(deltaTime);
         
         // Update debug attributes
         if (this.element) {
@@ -280,8 +287,8 @@ class BallMapObject extends AnimatedMapObject {
             this.element.setAttribute('data-velocity-y', this.velocity.y.toFixed(2));
             
             // Update z-index
-            if (parent && parent.getZIndex) {
-                this.element.style.zIndex = parent.getZIndex(this.posY, this.size.height);
+            if (this.parent && this.parent.getZIndex) {
+                this.element.style.zIndex = this.parent.getZIndex(this.posY, this.size.height);
             }
         }
     }

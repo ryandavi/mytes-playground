@@ -22,7 +22,9 @@
 	--button-light: white;
 	--button-mid: #ece9d8;
 
-	--button-outline-color: black;
+	--black: rgb(25, 24, 20);
+
+	--button-outline-color: rgb(25, 24, 20);
 
 	--button-hover: #e6e4d4;
 
@@ -199,6 +201,7 @@ body.debug {
 	.crosshair,
 	.queueMenu,
 	.zone,
+	.debug-stats, 
 	.layer.debug {
 		visibility: visible !important;
 	}
@@ -221,9 +224,9 @@ body.debug {
 		>div.interact {
 			&:hover {
 				background-color: #ffffe1;
-				outline: 2px solid black;
+				outline: 2px solid var(--black);
 				border-radius: 2px;
-				color: black;
+				color: var(--black);
 				filter: drop-shadow(2px 2px 0px #00000020);
 			}
 		}
@@ -340,10 +343,10 @@ body.debug {
 .tooltip {
 	background-color: #ffffe1;
 	padding: 2px;
-	outline: 1px solid black;
+	outline: 1px solid var(--black);
 	font-size: 9px;
 	text-transform: uppercase;
-	color: black;
+	color: var(--black);
 	border-radius: 1px;
 	filter: drop-shadow(2px 2px 0px #00000020);
 }

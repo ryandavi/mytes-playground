@@ -182,7 +182,7 @@
 /* DIALOGUE */
 .interactive-myte > .inner-wrapper > .dialogue {
   --dialogue-background-color: #ffffe1;
-  --dialogue-border-color: black;
+  --dialogue-border-color: var(--black);
   --dialogue-border-width: 2px;
   --dialogue-arrow-size: 7px;
   --dialogue-bubble-size: 10px;
@@ -201,7 +201,7 @@
   padding: 4px 6px;
   font-size: 10px;
   text-transform: uppercase;
-  color: black;
+  color: var(--black);
   border-radius: var(--dialogue-border-width);
   filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.1254901961));
   opacity: 0;

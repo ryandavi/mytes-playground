@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="11" nextobjectid="106">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="11" nextobjectid="113">
  <properties>
   <property name="description" value="A cozy place for your Mytes"/>
   <property name="displayName" value="Your Home"/>
@@ -161,9 +161,9 @@
     <property name="targetMap" value="Outside"/>
    </properties>
   </object>
-  <object id="68" name="Grass" x="64" y="320" width="64" height="64">
+  <object id="68" name="Ball" x="160" y="128" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="red_ball"/>
    </properties>
   </object>
   <object id="69" name="Grass" x="768" y="256" width="64" height="64">
@@ -212,6 +212,19 @@
   <object id="91" name="Fence" x="64" y="704" width="32" height="64" rotation="270"/>
   <object id="92" name="Fence" x="192" y="704" width="32" height="64" rotation="270"/>
   <object id="93" name="Gate" x="128" y="704" width="32" height="64" rotation="270"/>
+  <object id="106" name="Grass" x="62" y="316" width="64" height="64">
+   <properties>
+    <property name="variant" value="grass_1"/>
+   </properties>
+  </object>
+  <object id="107" name="Treasure Chest" x="64" y="160" width="64" height="64">
+   <properties>
+    <property name="items">{&quot;COIN&quot;, 100},
+{&quot;ITEM&quot;, &quot;APPLE&quot;},
+{&quot;HEALTH&quot;, 10}</property>
+    <property name="variant" value="grass_2"/>
+   </properties>
+  </object>
  </objectgroup>
  <objectgroup id="10" name="Mobs">
   <object id="66" name="Butterfly" x="352" y="160" width="64" height="64">

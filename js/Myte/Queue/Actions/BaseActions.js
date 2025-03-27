@@ -38,6 +38,9 @@ class MyteAction {
         // Return specific options needed for this action
         return {};
     }
+    static canAddToQueue(selected, active) {
+        return true;
+    }
 
     static canPerform(selected, active) {
         return false;
@@ -56,9 +59,7 @@ class MyteAction {
     }
 
     complete() {
-        console.log("complete x");
         if (this.onComplete !== null) {
-            console.log("complete");
             this.onComplete();
         }
         return true;
@@ -140,16 +141,15 @@ class MoveAction extends MyteAction {
 }
 
 class AStarMoveAction extends MyteAction {
-
     static metadata = {
         id: 'astar-move',
-        label: 'Move To (Astar)',
+        label: 'Move To (A*)',
         category: 'movement',
         priority: 1,
         isMovementAction: true,
         isInterruptible: true,
         defaultDuration: 0,
-        description: 'Move to a specific location',
+        description: 'Move to a specific location using A* pathfinding',
         requiresTarget: true,
         affectsMood: false
     };
@@ -157,16 +157,22 @@ class AStarMoveAction extends MyteAction {
     constructor(myte, options) {
         super(myte, options);
 
-        // Target position (final destination)
-        this.finalTarget = options.target ? options.target[0] : null;
-
+        // Process target information from options
+        this.finalTarget = this.processTarget(options.target);
+        
         // Path properties
         this.path = null;
         this.currentPathIndex = 0;
         this.currentTarget = null;
 
-        // Pathfinding properties
-        this.pathfinder = this.myte.parent.pathfinding;
+        // Pathfinding properties - safely get the pathfinder
+        if (this.myte.parent && this.myte.parent.gameMap && this.myte.parent.gameMap.gridSystem) {
+            this.pathfinder = this.myte.parent.gameMap.gridSystem.pathfinder;
+        } else {
+            console.error("AStarMoveAction: Could not find pathfinder in grid system");
+            this.pathfinder = null;
+        }
+        
         this.maxPathRetries = options.maxPathRetries || 3;
         this.pathRetries = 0;
 
@@ -181,18 +187,75 @@ class AStarMoveAction extends MyteAction {
         this.debugMode = options.debugMode || false;
     }
 
+    // Helper method to process different types of targets
+    processTarget(target) {
+        if (!target) return null;
+        
+        // If target is an array of positions
+        if (Array.isArray(target)) {
+            // If it's an array of arrays (multi-point path)
+            if (Array.isArray(target[0])) {
+                return {
+                    x: target[0][0],
+                    y: target[0][1]
+                };
+            }
+            // If it's an array with a single object with x, y coordinates
+            else if (target.length > 0 && typeof target[0] === 'object' && 'x' in target[0] && 'y' in target[0]) {
+                return target[0];
+            }
+            // If it's a simple [x, y] coordinate pair
+            else if (target.length >= 2 && typeof target[0] === 'number' && typeof target[1] === 'number') {
+                return {
+                    x: target[0],
+                    y: target[1]
+                };
+            }
+        }
+        // If target is an object with x, y properties (like a position object)
+        else if (typeof target === 'object' && 'x' in target && 'y' in target) {
+            return {
+                x: target.x,
+                y: target.y
+            };
+        }
+        // If target is a Myte or MapObject
+        else if (typeof target === 'object' && ('posX' in target || 'posY' in target)) {
+            return {
+                x: target.posX,
+                y: target.posY
+            };
+        }
+
+        console.error("AStarMoveAction: Could not process target", target);
+        return null;
+    }
+
     static canPerform(selected, active) {
-        return true; // active && !active.queue?.isCarrying();
+        return active && 
+               active.parent && 
+               active.parent.gameMap && 
+               active.parent.gameMap.gridSystem && 
+               active.parent.gameMap.gridSystem.pathfinder;
     }
 
     start() {
         super.start();
+
+        // If no pathfinder available, cancel the action
+        if (!this.pathfinder) {
+            console.error("AStarMoveAction: No pathfinder available");
+            return false;
+        }
 
         // If no target provided, cancel the action
         if (!this.finalTarget) {
             console.error("AStarMoveAction: No target provided");
             return false;
         }
+
+        // Reset the Myte's movement state
+        this.myte.reset();
 
         // Calculate initial path and check validity
         if (!this.calculatePath()) {
@@ -229,6 +292,7 @@ class AStarMoveAction extends MyteAction {
 
             // If we've reached the end of the path, we're done
             if (this.currentPathIndex >= this.path.length) {
+                this.clearPathVisualization();
                 return true; // Action complete
             }
 
@@ -248,17 +312,26 @@ class AStarMoveAction extends MyteAction {
     }
 
     calculatePath() {
+        // Make sure we have all necessary components
+        if (!this.pathfinder || !this.finalTarget) {
+            return false;
+        }
+
         // Get current position and final target
         const startX = this.myte.posX;
         const startY = this.myte.posY;
         const endX = this.finalTarget.x;
         const endY = this.finalTarget.y;
 
+        // Use collider dimensions if available, otherwise use size
+        const width = (this.myte.collider && this.myte.collider.width) || this.myte.size.width;
+        const height = (this.myte.collider && this.myte.collider.height) || this.myte.size.height;
+
         // Calculate path using A* pathfinding
         this.path = this.pathfinder.findPath(
             startX, startY,
             endX, endY,
-            this.myte.size.width, this.myte.size.height
+            width, height
         );
 
         // Reset the path index
@@ -279,14 +352,24 @@ class AStarMoveAction extends MyteAction {
     visualizePath() {
         // Only visualize if debug mode is on and we have a valid path
         if (this.debugMode && this.path && this.path.length > 0) {
-            const debugLayer = this.myte.parent.parent.layers.debug;
+            const debugLayer = this.getDebugLayer();
             if (debugLayer) {
                 // Clear previous path visualization first
-                debugLayer.querySelectorAll('.path-node').forEach(node => node.remove());
+                this.clearPathVisualization();
                 // Visualize the new path
                 this.pathfinder.visualizePath(debugLayer, this.path);
             }
         }
+    }
+
+    getDebugLayer() {
+        // Try different ways to access the debug layer
+        if (this.myte.parent && this.myte.parent.parent && this.myte.parent.parent.layers) {
+            return this.myte.parent.parent.layers.debug;
+        } else if (this.myte.parent && this.myte.parent.layers) {
+            return this.myte.parent.layers.debug;
+        }
+        return null;
     }
 
     updateCurrentTarget() {
@@ -311,8 +394,7 @@ class AStarMoveAction extends MyteAction {
 
         // Find the nearest point on the remaining path
         let minDistance = Number.MAX_VALUE;
-        let nearestPointIndex = this.currentPathIndex;
-
+        
         // Check distance to each upcoming point in the path
         for (let i = this.currentPathIndex; i < this.path.length; i++) {
             const pathPoint = this.path[i];
@@ -322,7 +404,6 @@ class AStarMoveAction extends MyteAction {
 
             if (distanceSquared < minDistance) {
                 minDistance = distanceSquared;
-                nearestPointIndex = i;
             }
         }
 
@@ -340,20 +421,19 @@ class AStarMoveAction extends MyteAction {
     complete() {
         // Clean up path visualization
         this.clearPathVisualization();
-        return true;
+        
+        // Call parent's complete method
+        return super.complete();
     }
 
     clearPathVisualization() {
         if (this.debugMode) {
-            const debugLayer = this.myte.parent.parent.layers.debug;
+            const debugLayer = this.getDebugLayer();
             if (debugLayer) {
-                debugLayer.querySelectorAll('.path-node').forEach(node => node.remove());
+                const pathNodes = debugLayer.querySelectorAll('.path-node');
+                pathNodes.forEach(node => node.remove());
             }
         }
-    }
-
-    isMovementAction() {
-        return true;
     }
 }
 

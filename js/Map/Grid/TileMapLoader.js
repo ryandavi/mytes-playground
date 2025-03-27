@@ -435,6 +435,60 @@ class TileMapLoader {
 		return Object.keys(properties).length > 0 ? properties : null;
 	}
 
+	/**
+	 * Parse treasure chest item definitions from a string format
+	 * 
+	 * Format: {TYPE, VARIANT, QUANTITY, PROBABILITY}
+	 * - TYPE: Item type (string)
+	 * - VARIANT: Item variant or value (string, number, or range like "10-20")
+	 * - QUANTITY: Number or range of items (default: 1)
+	 * - PROBABILITY: Chance of item appearing (0-1, default: 1)
+	 * 
+	 * @param {string} str - String containing item definitions
+	 * @returns {Array} Parsed items with structured data
+	 */
+	parseItems(str) {
+		// Clean up the string
+		const cleanString = str.trim().replace(/\n/g, '');
+		
+		// Split by commas that are followed by an open brace
+		const itemStrings = cleanString.split(/,(?=\s*{)/);
+		
+		return itemStrings.map(itemStr => {
+		// Remove curly braces and split by commas
+		const parts = itemStr.replace(/[{}]/g, '').split(',').map(part => part.trim());
+		
+		// Process each part to handle quotes and convert types
+		const processedParts = parts.map(part => {
+			// Remove quotes if present
+			let processed = part.replace(/^["']|["']$/g, '');
+			
+			// Check if it's a range (e.g., "10-20")
+			if (/^\d+\s*-\s*\d+$/.test(processed)) {
+			const [min, max] = processed.split('-').map(Number);
+			return [min, max]; // Return as array of two numbers
+			}
+			
+			// Try to parse as number if possible
+			if (!isNaN(processed) && processed !== '') {
+			return Number(processed);
+			}
+			
+			return processed;
+		});
+		
+		// Create structured object with default values
+		const result = {
+			type: processedParts[0],
+			variant: processedParts[1],
+			quantity: processedParts[2] !== undefined ? processedParts[2] : 1,
+			probability: processedParts[3] !== undefined ? processedParts[3] : 1
+		};
+		
+		return result;
+		});
+	}
+
 	parsePoints(pointsStr) {
 		if (!pointsStr) return [];
 

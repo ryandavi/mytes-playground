@@ -270,7 +270,7 @@ class ButterflyMapObject extends AnimatedMapObject {
         return element;
     }
     
-    update(parent) {
+    update(deltaTime) {
         // Update butterfly behavior
         this.updateBehavior();
         
@@ -288,7 +288,7 @@ class ButterflyMapObject extends AnimatedMapObject {
         this.updateDirection();
         
         // Update animation
-        super.update(parent);
+        super.update(deltaTime);
         
         // Apply bobbing effect
         this.applyBobbing();

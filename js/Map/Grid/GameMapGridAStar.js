@@ -22,11 +22,13 @@ class AStarPathfinder {
             smoothPaths: true
         };
         
-        // Default entity size (no size)
+        // Entity dimensions - will be set during pathfinding
+        this.entityWidth = 0;
+        this.entityHeight = 0;
         this.entityRadius = { x: 0, y: 0 };
         
         // Debug support
-        this.debugMode = true;
+        this.debugMode = false;
     }
 
     getKey(x, y) {
@@ -34,6 +36,10 @@ class AStarPathfinder {
     }
 
     findPath(startX, startY, endX, endY, entityWidth = 0, entityHeight = 0) {
+        // Save entity dimensions for collision checking
+        this.entityWidth = entityWidth;
+        this.entityHeight = entityHeight;
+        
         // Convert world coordinates to grid coordinates
         const start = this.gridSystem.worldToGrid(startX, startY);
         const end = this.gridSystem.worldToGrid(endX, endY);
@@ -166,25 +172,9 @@ class AStarPathfinder {
         return neighbors;
     }
     
-    // Check if an entity of current size can fit at a grid position
+    // Fixed canFitEntityAt method to use the correct entity dimensions
     canFitEntityAt(x, y) {
-        // Create a temporary entity representation at the given position
-        const entityBounds = {
-            posX: x * this.gridSystem.config.cellSize,
-            posY: y * this.gridSystem.config.cellSize,
-            collider: {
-                width: this.entityWidth,
-                height: this.entityHeight,
-                offsetX: 0,
-                offsetY: 0
-            },
-            size: {
-                width: this.entityWidth,
-                height: this.entityHeight
-            }
-        };
-        
-        // Check grid cells for walkability
+        // Check grid cells for walkability based on entity size
         for (let dx = -this.entityRadius.x; dx <= this.entityRadius.x; dx++) {
             for (let dy = -this.entityRadius.y; dy <= this.entityRadius.y; dy++) {
                 const checkX = x + dx;
@@ -198,11 +188,39 @@ class AStarPathfinder {
             }
         }
         
+        // Create a temporary entity representation at the given position
+        const entityBounds = {
+            posX: x * this.gridSystem.config.cellSize,
+            posY: y * this.gridSystem.config.cellSize,
+            size: {
+                width: this.entityWidth,
+                height: this.entityHeight
+            },
+            collider: {
+                width: this.entityWidth,
+                height: this.entityHeight,
+                offsetX: 0,
+                offsetY: 0
+            },
+            config: {
+                walkable: true
+            }
+        };
+        
         // Check collision with objects in the grid cells
         const potentialColliders = this.gridSystem.getPotentialColliders(entityBounds);
+        
+        // Skip collision check if gridSystem doesn't have a parent or parent.parent
+        if (!this.gridSystem.parent || !this.gridSystem.parent.parent) {
+            return potentialColliders.length === 0;
+        }
+        
+        // Check for collisions with other objects
         for (const collider of potentialColliders) {
-            if (this.gridSystem.parent.parent.checkCollision(entityBounds, collider)) {
-                return false;
+            if (this.gridSystem.parent.parent.checkCollision) {
+                if (this.gridSystem.parent.parent.checkCollision(entityBounds, collider)) {
+                    return false;
+                }
             }
         }
         
@@ -281,7 +299,9 @@ class AStarPathfinder {
                 }
             } else {
                 // Otherwise just check the center point
-                if (!this.gridSystem.grid[x][y].walkable) {
+                if (x < 0 || x >= this.gridSystem.gridWidth || 
+                    y < 0 || y >= this.gridSystem.gridHeight ||
+                    !this.gridSystem.grid[x][y].walkable) {
                     return false;
                 }
             }
@@ -301,13 +321,11 @@ class AStarPathfinder {
     }
 
     visualizePath(container, path) {
-
-
         if (!this.debugMode || !container || !path) return;
 
-
         // Clear previous visualization
-        container.querySelectorAll('.path-node').forEach(node => node.remove());
+        const existingNodes = container.querySelectorAll('.path-node');
+        existingNodes.forEach(node => node.remove());
 
         // Draw path
         path.forEach((point, index) => {
@@ -318,15 +336,25 @@ class AStarPathfinder {
             Object.assign(node.style, {
                 left: `${point.x}px`,
                 top: `${point.y}px`,
+                width: '6px',
+                height: '6px',
+                position: 'absolute',
+                borderRadius: '50%',
+                backgroundColor: index === 0 ? 'green' : index === path.length - 1 ? 'red' : 'blue',
+                zIndex: 1000
             });
-
-
 
             container.appendChild(node);
         });
     }
+    
+    // Cleanup resources
+    dispose() {
+        this.openSet.clear();
+        this.directions = null;
+        this.gridSystem = null;
+    }
 }
-
 
 // Binary heap implementation for optimized open set
 class BinaryHeap {
