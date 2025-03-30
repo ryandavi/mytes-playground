@@ -46,6 +46,48 @@ class GameMap {
         this.initialized = false;
     }
 
+    // Add to GameMap class
+testPathfinding(startX = 80, startY = 80, endX = 0, endY = 0, entityWidth = 32, entityHeight = 32) {
+    if (!this.gridSystem || !this.gridSystem.pathfinder) {
+      console.error("Grid system or pathfinder not available");
+      return null;
+    }
+
+    if (this.parent.mytes && this.parent.mytes.length > 0) {
+
+        entityHeight = this.parent.mytes[0].collider.height;
+        entityWidth = this.parent.mytes[0].collider.width;
+
+        startX = this.parent.mytes[0].posX + this.parent.mytes[0].collider.offsetX + this.parent.mytes[0].collider.width / 2;
+        startY = this.parent.mytes[0].posY + this.parent.mytes[0].collider.offsetY + this.parent.mytes[0].collider.height / 2;
+
+        endX = this.parent.inputHandler.getAdjustedMouse().x;
+        endY = this.parent.inputHandler.getAdjustedMouse().y;
+    }
+    
+    console.log(`Testing path from (${startX},${startY}) to (${endX},${endY})`);
+    
+    // Enable debug visualization
+    this.gridSystem.pathfinder.options.debug = true;
+    
+    // Calculate path
+    const path = this.gridSystem.pathfinder.findPath(
+      startX, startY, endX, endY, entityWidth, entityHeight
+    );
+    
+    // Visualize the path
+    this.gridSystem.pathfinder.visualizePath(this.layers.debug, path || []);
+    
+    // Output results
+    if (path) {
+      console.log(`Path found with ${path.length} waypoints`);
+    } else {
+      console.log("No path found - check explored/rejected nodes for debugging");
+    }
+    
+    return path;
+  }
+
     // Modify the initialize method in GameMap.js to handle initial loads differently
     async initialize(mapId, options = {}) {
         try {
@@ -206,6 +248,12 @@ class GameMap {
                     }, 100);
                 }
             }
+
+            this._pathfindingDebugInterval = setInterval(() => {
+
+                this.testPathfinding();
+
+            }, 3000); // Update every 3 seconds
     
             console.log(`[GameMap] Map ${mapId} initialization completed successfully`);
             this.initialized = true;

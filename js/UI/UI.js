@@ -1,21 +1,121 @@
-class CursorManager {
+// Constants and enums
+const UIToolModes = {
+    SELECT: 'select',
+    DRAG: 'drag',
+    PET: 'pet'
+};
+
+class UIComponent {
     constructor(parent) {
         this.parent = parent;
-        this.cursorElement = document.getElementById('customCursor');
+    }
 
-        this.sprites = {
+    init() {
+        // Base initialization
+    }
+
+    update() {
+        // Base update method
+    }
+}
+
+class CursorManager extends UIComponent {
+
+    constructor(parent, options = {}) {
+        super(parent);
+        
+        // Default configuration
+        this.config = {
+            enabled: false,
+            elementId: 'customCursor',
+            basePath: 'assets/cursors/',
+            useCSS: true,
+            hideNativeCursor: true,
+            clickAnimationDuration: 200,
+            throttleDelay: 10,  // ms to throttle mousemove events
+            accessibility: {
+                respectReducedMotion: true,
+                showNativeCursorForScreenReaders: true
+            },
+            ...options
+        };
+        
+        // Cursor element
+        this.cursorElement = document.getElementById(this.config.elementId);
+        
+        if (!this.cursorElement) {
+            console.error(`Cursor element with ID "${this.config.elementId}" not found.`);
+            this.config.enabled = false;
+            return;
+        }
+        
+        // Cache for performance
+        this.position = { x: 0, y: 0 };
+        this.isVisible = true;
+        this.lastUpdateTime = 0;
+        
+        // Available cursor types with sprite data and metadata
+        this.cursorTypes = {
             POINTER: {
-                sprites: [
-                    [0, 0]
-                ]
+                file: 'pointer.png',
+                cssClass: 'cursor-pointer',
+                sprites: [[0, 0]],
+                offset: { x: 0, y: 0 }  // Custom offsets for better positioning
             },
             GRAB: {
-                sprites: [
-                    [0, 0]
-                ]
+                file: 'grab.png',
+                cssClass: 'cursor-grab',
+                sprites: [[0, 0]],
+                offset: { x: 0, y: 0 }
             },
+            GRABBING: {
+                file: 'grabbing.png',
+                cssClass: 'cursor-grabbing',
+                sprites: [[288, 32]],
+                offset: { x: -10, y: -10 }  // Adjust offset for grabbing position
+            },
+            ARROW_UP: {
+                file: 'arrow_up.png',
+                cssClass: 'cursor-arrow-up',
+                sprites: [[0, 0]],
+                offset: { x: 0, y: 0 }
+            },
+            ARROW_DOWN: {
+                file: 'arrow_down.png',
+                cssClass: 'cursor-arrow-down',
+                sprites: [[0, 0]],
+                offset: { x: 0, y: 0 }
+            },
+            ARROW_LEFT: {
+                file: 'arrow_left.png',
+                cssClass: 'cursor-arrow-left', 
+                sprites: [[0, 0]],
+                offset: { x: 0, y: 0 }
+            },
+            ARROW_RIGHT: {
+                file: 'arrow_right.png',
+                cssClass: 'cursor-arrow-right',
+                sprites: [[0, 0]],
+                offset: { x: 0, y: 0 }
+            },
+            MOVE: {
+                file: 'move.png',
+                cssClass: 'cursor-move',
+                sprites: [[0, 0]],
+                offset: { x: 0, y: 0 }
+            },
+            NO: {
+                file: 'no.png',
+                cssClass: 'cursor-no',
+                sprites: [[0, 0]],
+                offset: { x: 0, y: 0 }
+            }
+        };
+        
+        // Cursor animations
+        this.animations = {
             GRAB_TO_GRABBING: {
-                sprites: [
+                frames: [
                     [160, 32],
                     [192, 32],
                     [224, 32],
@@ -23,114 +123,350 @@ class CursorManager {
                     [288, 32]
                 ],
                 nextState: 'GRABBING',
+                duration: 150,  // ms for animation
+                cssClass: 'cursor-grab-to-grabbing'
             },
             GRABBING_TO_GRAB: {
-                sprites: [
-                    [160, 32],
-                    [192, 32],
-                    [224, 32],
+                frames: [
+                    [288, 32],
                     [256, 32],
-                    [288, 32]
+                    [224, 32],
+                    [192, 32],
+                    [160, 32]
                 ],
                 nextState: 'GRAB',
-            },
-            GRABBING: {
-                sprites: [
-                    [288, 32]
-                ]
+                duration: 150,
+                cssClass: 'cursor-grabbing-to-grab'
             }
         };
-
-        this.currentState = DEFAULT_CURSOR;
-        // this.setCursor(this.currentState);
-
-        document.addEventListener('mousemove', (event) => {
-            this.moveCursor(event);
-        });
-
+        
+        this.currentState = null;
+        this.currentAnimation = null;
+        this.animationTimer = null;
+        
+        // Initialize
+        this.init();
     }
 
-    moveCursor(event) {
-        this.cursorElement.style.left = `${event.clientX}px`;
-        this.cursorElement.style.top = `${event.clientY}px`;
-    }
-
-    setCursor(cursorType) {
-        this.currentState = cursorType;
-        switch (cursorType) {
-            case CURSOR.POINTER:
-                this.cursorElement.style.backgroundImage = "url('pointer.png')";
-                break;
-            case CURSOR.GRAB:
-                this.cursorElement.style.backgroundImage = "url('grab.png')";
-                break;
-            case CURSOR.GRABBING:
-                this.cursorElement.style.backgroundImage = "url('grabbing.png')";
-                break;
-            case CURSOR.ARROW_UP:
-                this.cursorElement.style.backgroundImage = "url('arrow_up.png')";
-                break;
-            case CURSOR.ARROW_DOWN:
-                this.cursorElement.style.backgroundImage = "url('arrow_down.png')";
-                break;
-            case CURSOR.ARROW_LEFT:
-                this.cursorElement.style.backgroundImage = "url('arrow_left.png')";
-                break;
-            case CURSOR.ARROW_RIGHT:
-                this.cursorElement.style.backgroundImage = "url('arrow_right.png')";
-                break;
-            case CURSOR.MOVE:
-                this.cursorElement.style.backgroundImage = "url('move.png')";
-                break;
-            case CURSOR.NO:
-                this.cursorElement.style.backgroundImage = "url('no.png')";
-                break;
-            default:
-                console.error("Invalid cursor type.");
+    init() {
+        if (!this.config.enabled) return;
+        
+        // Apply base styling
+        this.setupCursorElement();
+        
+        // Set initial cursor type (default)
+        this.setCursor(CURSOR.POINTER);
+        
+        // Set up event listeners
+        this.setupEventListeners();
+        
+        // Check for reduced motion preference if configured
+        if (this.config.accessibility.respectReducedMotion) {
+            this.checkReducedMotion();
         }
     }
 
-    update() {
+    setupCursorElement() {
+        // Apply base styles
+        this.cursorElement.style.position = 'fixed';
+        this.cursorElement.style.pointerEvents = 'none';
+        this.cursorElement.style.zIndex = '9999';
+        this.cursorElement.style.willChange = 'transform';  // Optimize for animations
+        this.cursorElement.style.transformOrigin = 'center center';
+        
+        // Hide native cursor if configured
+        if (this.config.hideNativeCursor) {
+            document.body.style.cursor = 'none';
+        }
+        
+        // Add base class
+        this.cursorElement.classList.add('custom-cursor');
+    }
+    
+    setupEventListeners() {
+        // Use throttled mousemove for performance
+        document.addEventListener('mousemove', this.throttle((event) => {
+            this.handleMouseMove(event);
+        }, this.config.throttleDelay));
+        
+        // Track mouse state
+        document.addEventListener('mousedown', () => this.handleMouseDown());
+        document.addEventListener('mouseup', () => this.handleMouseUp());
+        
+        // Handle visibility
+        document.addEventListener('mouseleave', () => this.hideCursor());
+        document.addEventListener('mouseenter', () => this.showCursor());
+        
+        // Handle focus for accessibility
+        document.addEventListener('focusin', (event) => {
+            // Show native cursor on focusable elements for accessibility
+            if (this.config.accessibility.showNativeCursorForScreenReaders && 
+                event.target.tabIndex >= 0) {
+                event.target.style.cursor = 'auto';
+            }
+        });
+    }
 
+    handleMouseMove(event) {
+        if (!this.config.enabled) return;
+        
+        this.position.x = event.clientX;
+        this.position.y = event.clientY;
+        
+        this.updateCursorPosition();
+        
+        // Make sure cursor is visible when mouse moves
+        if (!this.isVisible) {
+            this.showCursor();
+        }
+    }
+    
+    handleMouseDown() {
+        if (!this.config.enabled) return;
+        
+        this.cursorElement.classList.add('clicking');
+        
+        // If we're in GRAB state, transition to GRABBING
+        if (this.currentState === CURSOR.GRAB) {
+            this.playAnimation('GRAB_TO_GRABBING');
+        }
+    }
+    
+    handleMouseUp() {
+        if (!this.config.enabled) return;
+        
+        this.cursorElement.classList.remove('clicking');
+        
+        // If we're in GRABBING state, transition back to GRAB
+        if (this.currentState === CURSOR.GRABBING) {
+            this.playAnimation('GRABBING_TO_GRAB');
+        }
+    }
+    
+    updateCursorPosition() {
+        if (!this.cursorElement) return;
+        
+        // Get current cursor type for potential offsets
+        const cursorType = this.cursorTypes[this.currentState];
+        const offsetX = cursorType?.offset?.x || 0;
+        const offsetY = cursorType?.offset?.y || 0;
+        
+        // Use transform instead of left/top for better performance
+        this.cursorElement.style.transform = `translate3d(${this.position.x + offsetX}px, ${this.position.y + offsetY}px, 0)`;
+    }
+    
+    setCursor(cursorType) {
+        if (!this.config.enabled || !this.cursorElement) return;
+        
+        // Stop any current animation
+        this.stopAnimation();
+        
+        this.currentState = cursorType;
+        const cursor = this.cursorTypes[cursorType];
+        
+        if (!cursor) {
+            console.error(`Invalid cursor type: ${cursorType}`);
+            return;
+        }
+        
+        // Remove all cursor classes
+        Object.values(this.cursorTypes).forEach(type => {
+            if (type.cssClass) {
+                this.cursorElement.classList.remove(type.cssClass);
+            }
+        });
+        
+        // Apply new cursor class if using CSS
+        if (this.config.useCSS && cursor.cssClass) {
+            this.cursorElement.classList.add(cursor.cssClass);
+        } else {
+            // Use image otherwise
+            const filePath = `${this.config.basePath}${cursor.file}`;
+            this.cursorElement.style.backgroundImage = `url('${filePath}')`;
+        }
+        
+        // Update position to apply any new offsets
+        this.updateCursorPosition();
+    }
+
+    playAnimation(animationName) {
+        if (!this.config.enabled) return;
+        
+        const animation = this.animations[animationName];
+        if (!animation) {
+            console.error(`Animation not found: ${animationName}`);
+            return;
+        }
+        
+        // Clear any existing animation
+        this.stopAnimation();
+        
+        // Set current animation
+        this.currentAnimation = animationName;
+        
+        if (this.config.useCSS && animation.cssClass) {
+            // Use CSS animation
+            this.cursorElement.classList.add(animation.cssClass);
+            
+            // Set timer to handle state after animation
+            this.animationTimer = setTimeout(() => {
+                this.cursorElement.classList.remove(animation.cssClass);
+                if (animation.nextState) {
+                    this.setCursor(CURSOR[animation.nextState]);
+                }
+                this.currentAnimation = null;
+            }, animation.duration);
+        } else {
+            // Use JavaScript animation (frame-by-frame)
+            let frameIndex = 0;
+            const frameTime = animation.duration / animation.frames.length;
+            
+            const advanceFrame = () => {
+                if (frameIndex >= animation.frames.length) {
+                    // Animation complete
+                    if (animation.nextState) {
+                        this.setCursor(CURSOR[animation.nextState]);
+                    }
+                    this.currentAnimation = null;
+                    return;
+                }
+                
+                const frame = animation.frames[frameIndex];
+                this.cursorElement.style.backgroundPosition = `-${frame[0]}px -${frame[1]}px`;
+                
+                frameIndex++;
+                this.animationTimer = setTimeout(advanceFrame, frameTime);
+            };
+            
+            // Start animation
+            advanceFrame();
+        }
+    }
+
+    stopAnimation() {
+        if (this.animationTimer) {
+            clearTimeout(this.animationTimer);
+            this.animationTimer = null;
+        }
+        
+        if (this.currentAnimation) {
+            const animation = this.animations[this.currentAnimation];
+            if (animation && animation.cssClass) {
+                this.cursorElement.classList.remove(animation.cssClass);
+            }
+            this.currentAnimation = null;
+        }
+    }
+    
+    hideCursor() {
+        if (!this.config.enabled) return;
+        this.isVisible = false;
+        this.cursorElement.style.opacity = '0';
+    }
+    
+    showCursor() {
+        if (!this.config.enabled) return;
+        this.isVisible = true;
+        this.cursorElement.style.opacity = '1';
+    }
+    
+    enable() {
+        if (this.config.enabled) return;
+        
+        this.config.enabled = true;
+        
+        if (this.config.hideNativeCursor) {
+            document.body.style.cursor = 'none';
+        }
+        
+        this.showCursor();
+        this.setCursor(this.currentState || CURSOR.POINTER);
+    }
+    
+    disable() {
+        if (!this.config.enabled) return;
+        
+        this.config.enabled = false;
+        this.hideCursor();
+        
+        // Restore native cursor
+        document.body.style.cursor = '';
+    }
+    
+    toggle() {
+        if (this.config.enabled) {
+            this.disable();
+        } else {
+            this.enable();
+        }
+        return this.config.enabled;
+    }
+
+    checkReducedMotion() {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        
+        if (prefersReducedMotion) {
+            // Disable animations for users who prefer reduced motion
+            Object.keys(this.animations).forEach(animKey => {
+                this.animations[animKey].duration = 0;
+            });
+        }
+    }
+    
+    update() {
+        if (!this.config.enabled) return;
+        
         const isClicking = this.parent.isClicking;
         const hasClickingClass = this.cursorElement.classList.contains('clicking');
-
+        
+        // Update clicking state if needed
         if (isClicking && !hasClickingClass) {
-            this.cursorElement.classList.add('clicking');
+            this.handleMouseDown();
         } else if (!isClicking && hasClickingClass) {
-            this.cursorElement.classList.remove('clicking');
+            this.handleMouseUp();
         }
     }
-
+    
+    throttle(func, limit) {
+        let inThrottle;
+        return function(...args) {
+            if (!inThrottle) {
+                func.apply(this, args);
+                inThrottle = true;
+                setTimeout(() => inThrottle = false, limit);
+            }
+        };
+    }
+    
+    destroy() {
+        // Clean up event listeners
+        document.removeEventListener('mousemove', this.handleMouseMove);
+        document.removeEventListener('mousedown', this.handleMouseDown);
+        document.removeEventListener('mouseup', this.handleMouseUp);
+        document.removeEventListener('mouseleave', this.hideCursor);
+        document.removeEventListener('mouseenter', this.showCursor);
+        
+        // Stop animations
+        this.stopAnimation();
+        
+        // Restore default cursor
+        document.body.style.cursor = '';
+    }
 }
 
-// State machine for the fetch game stages
-const UIToolModes = {
-    SELECT: 'select',
-    DRAG: 'drag',
-    PET: 'pet'
-};
-
-
-
-class UserInterface {
+class ToolManager extends UIComponent {
     constructor(parent) {
-        this.parent = parent;
-        this.debug = new DebugUI(parent);
-
+        super(parent);
+        this.currentToolMode = UIToolModes.SELECT;
+        this.handControls = this.parent.containerWrapper.querySelector('#hand-controls');
         
-
-        this.isActive = false;
-
-        this.selectedObject = null;
-
         this.toolConfig = {
             [UIToolModes.SELECT]: {
                 id: 'hand-select',
-                icon: 'pointer-icon', // Optional, for future use
-                label: 'Select',      // Optional, for future use
-                cursor: 'pointer',    // Optional, for future cursor styles
-                shortcut: 's'         // Optional, for keyboard shortcuts
+                icon: 'pointer-icon',
+                label: 'Select',
+                cursor: 'pointer',
+                shortcut: 's'
             },
             [UIToolModes.DRAG]: {
                 id: 'hand-drag',
@@ -146,32 +482,11 @@ class UserInterface {
                 cursor: 'pointer',
                 shortcut: 'p'
             }
-            // Add new tools here in the future
         };
-
-        // Tool mode handling
-        this.currentToolMode = UIToolModes.SELECT;
-        this.handControls = this.parent.containerWrapper.querySelector('#hand-controls');
-        this.actionControls = this.parent.containerWrapper.querySelector('#action-controls');
-        this.fullscreenButton = this.parent.containerWrapper.querySelector('.fullscreen-btn');
-
-        // Initialize cursor manager
-        // this.cursorManager = new CursorManager(parent);
     }
 
     init() {
-        // Initialize hand controls
         this.initializeHandControls();
-
-        // Original button initialization
-        this.initializeButtons();
-
-        // Initialize active mytes
-        this.initMytesList();
-
-        this.soundMenu = new SoundMenu(this);
-        this.SettingsMenu = new SettingsMenu(this);
-        this.debugMenu = new DebugMenu(this);
     }
 
     initializeHandControls() {
@@ -226,119 +541,54 @@ class UserInterface {
         this.setToolMode(UIToolModes.SELECT);
     }
 
-    // toggle full screen
-    toggleFullscreen() {
-        // toggle class on container
-        this.parent.containerWrapper.classList.toggle('fullscreen');
-        this.fullscreenButton.classList.toggle('active');
+    setToolMode(mode) {
+        if (this.currentToolMode === mode) return;
 
-        this.parent.camera.resetView(true);
+        this.parent.playSound('hover');
 
+        // Set mode
+        this.currentToolMode = mode;
+
+        // Notify parent UI of tool change
+        this.parent.onToolModeChanged(mode);
     }
 
-    createThumbnail(myte) {
-        const thumbnail = document.createElement('div');
-        thumbnail.classList.add('myte-thumbnail');
-        thumbnail.classList.add('button');
-
-        if (myte === this.activeMyte) {
-            thumbnail.classList.add('active');
-        }
-
-        thumbnail.setAttribute('data-myte-id', myte.id);
-
-        // Create sprite container
-        const spriteContainer = document.createElement('div');
-        spriteContainer.className = 'myte-sprite';
-
-        // Create sprite inner
-        const spriteInner = document.createElement('div');
-        spriteInner.className = 'myte-sprite-inner';
-        spriteContainer.appendChild(spriteInner);
-
-        // Create name element
-        const name = document.createElement('span');
-        name.className = 'myte-name';
-        name.textContent = myte.name;
-
-        // Build thumbnail
-        thumbnail.appendChild(spriteContainer);
-        thumbnail.appendChild(name);
-
-        // Add click handler
-        thumbnail.addEventListener('click', () => {
-            if (myte !== this.parent.activeMyte) {
-                this.parent.setActiveMyte(myte);
-            }
-        });
-
-        return thumbnail;
+    isTool(mode) {
+        return this.currentToolMode === mode;
     }
 
-    initMytesList() {
-        // find #all_mytes
-        const listContainer = document.getElementById('all_mytes');
+    changeToolMode(mode) {
+        const toolConfig = this.toolConfig[mode];
 
-        // Add thumbnails
-        if (this.parent.mytes && this.parent.mytes.length > 0) {
-            this.parent.mytes.forEach(myte => {
-                listContainer.appendChild(this.createThumbnail(myte));
-            });
-        } else {
-            // No Mytes
-            const emptyState = document.createElement('div');
-            emptyState.className = 'empty';
-            emptyState.textContent = 'No Mytes found';
-            listContainer.appendChild(emptyState);
+        if (!toolConfig || !toolConfig.id) {
+            console.warn(`Invalid tool mode: ${mode}`);
+            return false;
         }
 
+        const radioButton = document.getElementById(toolConfig.id);
+
+        if (radioButton) {
+            // Check the radio button
+            radioButton.checked = true;
+
+            // Dispatch a change event to trigger any listeners
+            radioButton.dispatchEvent(new Event('change'));
+
+            // Update current tool mode
+            this.currentToolMode = mode;
+
+            return true;
+        }
+
+        console.warn(`Could not find radio button for tool: ${toolConfig.id}`);
+        return false;
     }
+}
 
-    updateMytesList(myte){
-        // Update mytes list
-        const listContainer = document.getElementById('all_mytes');
-
-        // remove active
-        listContainer.querySelectorAll('.myte-thumbnail').forEach(thumbnail => {
-            thumbnail.classList.remove('active');
-        });
-
-        // set current as active
-        if (myte) {
-            listContainer.querySelector(`[data-myte-id="${myte.id}"]`).classList.add('active');
-        }
-    }
-
-    // Update HUD to show mood from metadata
-    updateHud() {
-        const activePet = document.querySelector('#hud-active-pet');
-        const activeMyte = this.parent.activeMyte;
-
-        if (!activeMyte) {
-            activePet.classList.remove('visible');
-            return;
-        }
-
-        if (!activePet.classList.contains('visible')) {
-            activePet.classList.add('visible');
-        }
-
-        // Update pet info
-        activePet.querySelector('.name').textContent = activeMyte.name;
-        activePet.querySelector('.mood').textContent = activeMyte.stats.getMoodStatus();
-        activePet.querySelector('.energy').textContent = 'Full';
-
-        // Add stats from current action if any
-        const currentAction = activeMyte.queue.getCurrentAction();
-        if (currentAction) {
-            const actionMetadata = currentAction.constructor.metadata;
-            if (actionMetadata.affectsMood) {
-                const moodEffect = document.createElement('div');
-                moodEffect.className = 'mood-effect';
-                moodEffect.textContent = `Mood ${actionMetadata.moodEffect > 0 ? '+' : ''}${actionMetadata.moodEffect}`;
-                activePet.appendChild(moodEffect);
-            }
-        }
+class SelectionManager extends UIComponent {
+    constructor(parent) {
+        super(parent);
+        this.selectedObject = null;
     }
 
     setSelected(obj) {
@@ -371,66 +621,20 @@ class UserInterface {
         // Select new object
         if (this.selectedObject) select(this.selectedObject);
 
-        this.updateActions();
+        // Notify parent UI of selection change
+        this.parent.onSelectionChanged(this.selectedObject);
     }
 
-    setToolMode(mode) {
-        if (this.currentToolMode === mode) return;
-
-        this.playSound('hover');
-
-        // Set mode
-        this.currentToolMode = mode;
-
-        // update action list
-        this.updateActions();
-
-        // unset selected
-        this.setSelected(null);
+    getSelectedObject() {
+        return this.selectedObject;
     }
+}
 
-    playSound(sound) {
-        this.parent.core.soundManager.playUISound(sound);
+class ActionSidebarManager extends UIComponent {
+    constructor(parent) {
+        super(parent);
+        this.actionControls = this.parent.containerWrapper.querySelector('#action-controls');
     }
-
-    changeToolMode(mode) {
-        const toolConfig = this.toolConfig[mode];
-
-        if (!toolConfig || !toolConfig.id) {
-            console.warn(`Invalid tool mode: ${mode}`);
-            return false;
-        }
-
-        const radioButton = document.getElementById(toolConfig.id);
-
-        if (radioButton) {
-            // Check the radio button
-            radioButton.checked = true;
-
-            // Dispatch a change event to trigger any listeners
-            radioButton.dispatchEvent(new Event('change'));
-
-            // Update current tool mode
-            this.currentToolMode = mode;
-
-            return true;
-        }
-
-        console.warn(`Could not find radio button for tool: ${toolConfig.id}`);
-        return false;
-    }
-
-    isTool(mode) {
-        return this.currentToolMode === mode;
-    }
-
-
-    emptyActionList() {
-        const listElement = this.actionControls.querySelector('.action-list');
-        listElement.innerHTML = '';
-        this.actionControls.classList.remove('visible');
-    }
-
 
     // Helper method to get category titles
     getCategoryTitle(category) {
@@ -445,8 +649,13 @@ class UserInterface {
         return titles[category] || category;
     }
 
-    updateActions() {
+    emptyActionList() {
+        const actionGroups = this.actionControls.querySelector('.action-groups');
+        actionGroups.innerHTML = '';
+        this.actionControls.classList.remove('visible');
+    }
 
+    updateActions(selectedObject) {
         const selectedInfo = this.actionControls.querySelector('.selected-info');
         if (!selectedInfo) return;
 
@@ -458,38 +667,38 @@ class UserInterface {
         selectedInfo.classList.remove('self-selected', 'myte-interaction', 'map-interaction', 'element-interaction');
         this.emptyActionList();
 
-        if (this.selectedObject) {
+        if (selectedObject) {
             // Determine interaction type based on selected object
-            if (this.selectedObject === this.parent.activeMyte) {
+            if (selectedObject === this.parent.getActiveMyte()) {
                 interactionType.textContent = "Selected Self";
                 selectedInfo.classList.add('self-selected');
                 targetType.textContent = "Myte";
-                targetName.textContent = this.selectedObject.name;
+                targetName.textContent = selectedObject.name;
             } else {
                 interactionType.textContent = "Interacting with";
 
                 // Set target type and name based on object type
-                if (this.selectedObject instanceof Myte) {
+                if (selectedObject instanceof Myte) {
                     selectedInfo.classList.add('myte-interaction');
                     targetType.textContent = "Myte";
-                    targetName.textContent = this.selectedObject.name;
-                } else if (this.selectedObject instanceof MapObject) {
+                    targetName.textContent = selectedObject.name;
+                } else if (selectedObject instanceof MapObject) {
                     selectedInfo.classList.add('map-interaction');
                     targetType.textContent = "Object";
-                    targetName.textContent = this.selectedObject.type;
-                } else if (this.selectedObject instanceof Element) {
+                    targetName.textContent = selectedObject.type;
+                } else if (selectedObject instanceof Element) {
                     selectedInfo.classList.add('element-interaction');
                     targetType.textContent = "Element";
-                    targetName.textContent = this.selectedObject.tagName;
+                    targetName.textContent = selectedObject.tagName;
                 } else {
                     selectedInfo.classList.add('element-interaction');
                     targetType.textContent = "Element";
-                    targetName.textContent = this.selectedObject.tagName;
+                    targetName.textContent = selectedObject.tagName;
                 }
             }
 
             selectedInfo.classList.add('visible');
-            this.updateActionList();
+            this.updateActionList(selectedObject);
         } else {
             // default
             interactionType.textContent = "Not Selected";
@@ -499,18 +708,12 @@ class UserInterface {
         }
     }
 
-    emptyActionList() {
+    updateActionList(selectedObject) {
         const actionGroups = this.actionControls.querySelector('.action-groups');
-        actionGroups.innerHTML = '';
-        this.actionControls.classList.remove('visible');
-    }
+        const activeMyte = this.parent.getActiveMyte();
 
-    updateActionList() {
-        const actionGroups = this.actionControls.querySelector('.action-groups');
-        const activeMyte = this.parent.activeMyte;
-
-        // Get actions grouped by category from ActionManager
-        const groupedActions = ActionManager.getActionsByCategory(this.selectedObject, activeMyte);
+        // Get actions grouped by category from global ActionManager
+        const groupedActions = ActionManager.getActionsByCategory(selectedObject, activeMyte);
 
         // Create elements for each group
         Object.entries(groupedActions).forEach(([category, actions]) => {
@@ -536,13 +739,13 @@ class UserInterface {
                 button.addEventListener('click', () => {
                     const options = ActionManager.getActionRequirements(
                         action.id,
-                        this.selectedObject,
+                        selectedObject,
                         activeMyte
                     );
 
                     if (options) {
                         activeMyte.queue.add(action.id, options);
-                        this.updateActions();
+                        this.updateActions(selectedObject);
                     }
                 });
 
@@ -558,42 +761,259 @@ class UserInterface {
             this.actionControls.classList.add('visible');
         }
     }
+}
 
-    // Original button initialization method
-    initializeButtons() {
-        // fullscreen button
-        this.fullscreenButton.addEventListener("click", () => {
-            this.toggleFullscreen();
+class MyteListManager extends UIComponent {
+    constructor(parent) {
+        super(parent);
+        this.myteListContainer = document.getElementById('all_mytes');
+    }
+
+    init() {
+        this.initMytesList();
+    }
+
+    createThumbnail(myte) {
+        const thumbnail = document.createElement('div');
+        thumbnail.classList.add('myte-thumbnail');
+        thumbnail.classList.add('button');
+
+        if (myte === this.parent.getActiveMyte()) {
+            thumbnail.classList.add('active');
+        }
+
+        thumbnail.setAttribute('data-myte-id', myte.id);
+
+        // Create sprite container
+        const spriteContainer = document.createElement('div');
+        spriteContainer.className = 'myte-sprite';
+
+        // Create sprite inner
+        const spriteInner = document.createElement('div');
+        spriteInner.className = 'myte-sprite-inner';
+        spriteContainer.appendChild(spriteInner);
+
+        // Create name element
+        const name = document.createElement('span');
+        name.className = 'myte-name';
+        name.textContent = myte.name;
+
+        // Build thumbnail
+        thumbnail.appendChild(spriteContainer);
+        thumbnail.appendChild(name);
+
+        // Add click handler
+        thumbnail.addEventListener('click', () => {
+            if (myte !== this.parent.getActiveMyte()) {
+                this.parent.setActiveMyte(myte);
+            }
         });
 
+        return thumbnail;
     }
 
+    initMytesList() {
+        if (!this.myteListContainer) {
+            console.error('Myte list container not found');
+            return;
+        }
+
+        // Clear existing content
+        this.myteListContainer.innerHTML = '';
+
+        // Add thumbnails
+        const mytes = this.parent.getMytes();
+        if (mytes && mytes.length > 0) {
+            mytes.forEach(myte => {
+                this.myteListContainer.appendChild(this.createThumbnail(myte));
+            });
+        } else {
+            // No Mytes
+            const emptyState = document.createElement('div');
+            emptyState.className = 'empty';
+            emptyState.textContent = 'No Mytes found';
+            this.myteListContainer.appendChild(emptyState);
+        }
+    }
+
+    updateMytesList(activeMyte) {
+        // Update mytes list
+        if (!this.myteListContainer) return;
+
+        // remove active
+        this.myteListContainer.querySelectorAll('.myte-thumbnail').forEach(thumbnail => {
+            thumbnail.classList.remove('active');
+        });
+
+        // set current as active
+        if (activeMyte) {
+            const activeThumb = this.myteListContainer.querySelector(`[data-myte-id="${activeMyte.id}"]`);
+            if (activeThumb) {
+                activeThumb.classList.add('active');
+            }
+        }
+    }
+}
+
+class HUDManager extends UIComponent {
+    constructor(parent) {
+        super(parent);
+        this.hudElement = document.querySelector('#hud-active-pet');
+    }
 
     update() {
-        this.debug.update();
-        // this.cursorManager.update();
+        if (!this.hudElement) return;
+        
+        const activeMyte = this.parent.getActiveMyte();
+
+        if (!activeMyte) {
+            this.hudElement.classList.remove('visible');
+            return;
+        }
+
+        if (!this.hudElement.classList.contains('visible')) {
+            this.hudElement.classList.add('visible');
+        }
+
+        // Update pet info
+        this.hudElement.querySelector('.name').textContent = activeMyte.name;
+        this.hudElement.querySelector('.mood').textContent = activeMyte.stats.getMoodStatus();
+        this.hudElement.querySelector('.energy').textContent = 'Full';
+
+        // Clear any previous mood effects
+        const oldEffects = this.hudElement.querySelectorAll('.mood-effect');
+        oldEffects.forEach(effect => effect.remove());
+
+        // Add stats from current action if any
+        const currentAction = activeMyte.queue.getCurrentAction();
+        if (currentAction) {
+            const actionMetadata = currentAction.constructor.metadata;
+            if (actionMetadata.affectsMood) {
+                const moodEffect = document.createElement('div');
+                moodEffect.className = 'mood-effect';
+                moodEffect.textContent = `Mood ${actionMetadata.moodEffect > 0 ? '+' : ''}${actionMetadata.moodEffect}`;
+                this.hudElement.appendChild(moodEffect);
+            }
+        }
+    }
+}
+
+class ScreenManager extends UIComponent {
+    constructor(parent) {
+        super(parent);
+        this.fullscreenButton = this.parent.containerWrapper.querySelector('.fullscreen-btn');
     }
 
+    init() {
+        this.initializeButtons();
+    }
+
+    initializeButtons() {
+        if (this.fullscreenButton) {
+            this.fullscreenButton.addEventListener("click", () => {
+                this.toggleFullscreen();
+            });
+        }
+    }
+
+    toggleFullscreen() {
+        // toggle class on container
+        this.parent.containerWrapper.classList.toggle('fullscreen');
+        if (this.fullscreenButton) {
+            this.fullscreenButton.classList.toggle('active');
+        }
+
+        this.parent.parent.camera.resetView(true);
+    }
+}
 
 
+class UserInterface {
+    constructor(parent) {
+        this.parent = parent;
+        this.containerWrapper = parent.containerWrapper;
+        this.debug = new DebugUI(parent);
+        this.isActive = false;
 
+        // Initialize all UI components
+        this.toolManager = new ToolManager(this);
+        this.selectionManager = new SelectionManager(this);
+        this.actionSidebarManager = new ActionSidebarManager(this);
+        this.myteListManager = new MyteListManager(this);
+        this.hudManager = new HUDManager(this);
+        this.screenManager = new ScreenManager(this);
+        this.cursorManager = new CursorManager(this);
+    }
 
+    init() {
+        // Initialize all components
+        this.toolManager.init();
+        this.selectionManager.init();
+        this.actionSidebarManager.init();
+        this.myteListManager.init();
+        this.hudManager.init();
+        this.screenManager.init();
 
+        // Initialize additional menus
+        this.soundMenu = new SoundMenu(this);
+        this.settingsMenu = new SettingsMenu(this);
+        this.debugMenu = new DebugMenu(this);
+    }
 
+    // Methods for component communication
+    onToolModeChanged(mode) {
+        // Clear selection when tool mode changes
+        this.selectionManager.setSelected(null);
+        
+        // Notify action manager to update UI
+        this.actionSidebarManager.updateActions(null);
+    }
 
+    onSelectionChanged(selectedObject) {
+        // Update action panel based on selection
+        this.actionSidebarManager.updateActions(selectedObject);
+    }
 
+    // Proxy methods to parent for components to use
+    getMytes() {
+        return this.parent.mytes;
+    }
 
+    getActiveMyte() {
+        return this.parent.activeMyte;
+    }
 
+    setActiveMyte(myte) {
+        this.parent.setActiveMyte(myte);
+        this.myteListManager.updateMytesList(myte);
+        this.hudManager.update();
+    }
 
+    playSound(sound) {
+        this.parent.core.soundManager.playUISound(sound);
+    }
 
+    // Public methods
+    setSelected(obj) {
+        this.selectionManager.setSelected(obj);
+    }
 
+    setToolMode(mode) {
+        this.toolManager.setToolMode(mode);
+    }
 
+    isTool(mode) {
+        return this.toolManager.isTool(mode);
+    }
 
+    changeToolMode(mode) {
+        return this.toolManager.changeToolMode(mode);
+    }
 
-
-
-
-
-
-
+    // Update method called every frame
+    update() {
+        this.debug.update();
+        this.cursorManager.update();
+        this.hudManager.update();
+    }
 }

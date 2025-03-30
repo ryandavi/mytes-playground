@@ -2,6 +2,7 @@ class AStarPathfinder {
     constructor(gridSystem) {
         this.gridSystem = gridSystem;
         this.openSet = new BinaryHeap(node => node.f);
+        
         this.directions = [
             { x: 0, y: -1 },   // North
             { x: 1, y: 0 },    // East
@@ -13,114 +14,256 @@ class AStarPathfinder {
             { x: 1, y: 1 }     // Southeast
         ];
         
-        // Pathfinding options
         this.options = {
             allowDiagonals: true,
             allowDiagonalCutting: false,
-            heuristicWeight: 1,
-            maxSearchSteps: 1000,
-            smoothPaths: true
+            heuristicWeight: 1.2,
+            maxSearchSteps: 5000,
+            smoothPaths: true,
+            pathPaddingFactor: 0.2,
+            debug: true,
+            useDirectPathFallback: false  // Whether to use direct path as fallback
         };
         
-        // Entity dimensions - will be set during pathfinding
-        this.entityWidth = 0;
-        this.entityHeight = 0;
-        this.entityRadius = { x: 0, y: 0 };
+        this.entityDimensions = {
+            width: 0,
+            height: 0
+        };
         
-        // Debug support
-        this.debugMode = false;
+        this.entityCollider = null;
+        
+        this.debugElements = {
+            exploredNodes: new Set(),
+            rejectedNodes: new Set(),
+            path: []
+        };
     }
-
+    
     getKey(x, y) {
         return `${x},${y}`;
     }
 
-    findPath(startX, startY, endX, endY, entityWidth = 0, entityHeight = 0) {
-        // Save entity dimensions for collision checking
-        this.entityWidth = entityWidth;
-        this.entityHeight = entityHeight;
+    findPath(startX, startY, endX, endY, entityWidth = 0, entityHeight = 0, collider = null) {
+        // Add timestamp for timeout detection
+        const startTime = performance.now();
+        const timeoutMs = 500; // 500ms timeout
         
-        // Convert world coordinates to grid coordinates
+        if (this.options.debug) {
+            console.log(`Finding path from (${startX.toFixed(0)},${startY.toFixed(0)}) to (${endX.toFixed(0)},${endY.toFixed(0)})`);
+        }
+        
+        // Fast path: if start and end are very close, just return direct line
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const directDistance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (directDistance < this.gridSystem.config.cellSize * 2) {
+            return [
+                { x: startX, y: startY },
+                { x: endX, y: endY }
+            ];
+        }
+        
+        this.debugElements.exploredNodes.clear();
+        this.debugElements.rejectedNodes.clear();
+        this.debugElements.path = [];
+        
+        this.entityDimensions.width = entityWidth;
+        this.entityDimensions.height = entityHeight;
+        
+        if (collider) {
+            this.entityCollider = {
+                width: collider.width || entityWidth * 0.8,
+                height: collider.height || entityHeight * 0.5,
+                offsetX: collider.offsetX || 0,
+                offsetY: collider.offsetY || entityHeight * 0.5
+            };
+        } else {
+            this.entityCollider = {
+                width: entityWidth * 0.8, 
+                height: entityHeight * 0.5,
+                offsetX: 0,
+                offsetY: entityHeight * 0.5
+            };
+        }
+        
         const start = this.gridSystem.worldToGrid(startX, startY);
         const end = this.gridSystem.worldToGrid(endX, endY);
-
-        // Calculate entity radius in grid cells (if dimensions provided)
-        this.entityRadius = {
-            x: Math.ceil((entityWidth / 2) / this.gridSystem.config.cellSize),
-            y: Math.ceil((entityHeight / 2) / this.gridSystem.config.cellSize)
-        };
-
-        // Initialize data structures
+        
+        // Safety check for identical start and end positions
+        if (start.x === end.x && start.y === end.y) {
+            return [
+                { x: startX, y: startY },
+                { x: endX, y: endY }
+            ];
+        }
+        
+        // Check if start position is valid
+        let validStart = null;
+        
+        if (!this.canEntityFitAt(start.x, start.y)) {
+            if (this.options.debug) {
+                console.warn(`Entity cannot fit at start position (${start.x}, ${start.y})`);
+            }
+            
+            validStart = this.findNearestValidPosition(start.x, start.y, 5);
+            
+            // If we couldn't find a valid start position, return a direct path as fallback
+            if (!validStart) {
+                console.warn("No valid start position found");
+                if (this.options.useDirectPathFallback) {
+                    console.log("Using direct path as fallback");
+                    return [
+                        { x: startX, y: startY },
+                        { x: endX, y: endY }
+                    ];
+                }
+                return null; // Return null if fallbacks are disabled
+            }
+            
+            start.x = validStart.x;
+            start.y = validStart.y;
+        }
+        
+        // Check if end position is valid
+        let validEnd = null;
+        
+        if (!this.canEntityFitAt(end.x, end.y)) {
+            if (this.options.debug) {
+                console.warn(`Entity cannot fit at end position (${end.x}, ${end.y})`);
+            }
+            
+            validEnd = this.findNearestValidPosition(end.x, end.y, 5);
+            
+            // If we couldn't find a valid end position, return a direct path as fallback
+            if (!validEnd) {
+                console.warn("No valid end position found");
+                if (this.options.useDirectPathFallback) {
+                    console.log("Using direct path as fallback");
+                    return [
+                        { x: startX, y: startY },
+                        { x: endX, y: endY }
+                    ];
+                }
+                return null; // Return null if fallbacks are disabled
+            }
+            
+            end.x = validEnd.x;
+            end.y = validEnd.y;
+        }
+        
+        // Initialize the A* data structures
         this.openSet.clear();
         const closedSet = new Set();
         const cameFrom = new Map();
         const gScore = new Map();
         const fScore = new Map();
-
-        // Helper function to get node key
+        
         const startKey = this.getKey(start.x, start.y);
         const endKey = this.getKey(end.x, end.y);
-
-        // Check if the entity can fit at start and end positions
-        if ((this.entityRadius.x > 0 || this.entityRadius.y > 0) && 
-            (!this.canFitEntityAt(start.x, start.y) || !this.canFitEntityAt(end.x, end.y))) {
-            console.warn('Entity cannot fit at start or end position');
-            return null;
-        }
-
-        // Initialize start node
+        
         gScore.set(startKey, 0);
         fScore.set(startKey, this.heuristic(start.x, start.y, end.x, end.y));
-
+        
         this.openSet.push({
             x: start.x,
             y: start.y,
             f: fScore.get(startKey),
             key: startKey
         });
-
+        
         let steps = 0;
-
+        
         while (!this.openSet.isEmpty()) {
             steps++;
-            if (steps > this.options.maxSearchSteps) {
-                console.warn('Pathfinding exceeded maximum steps');
-                return null;
+            
+            // Check for timeout to prevent freezing
+            if (performance.now() - startTime > timeoutMs) {
+                console.warn(`Pathfinding timeout after ${steps} steps (${timeoutMs}ms)`);
+                const partialTarget = this.findBestPartialTarget(end.x, end.y, closedSet, cameFrom);
+                if (partialTarget) {
+                    return this.reconstructPath(cameFrom, partialTarget, end);
+                }
+                
+                // If no partial path found, return direct path as fallback
+                if (this.options.useDirectPathFallback) {
+                    return [
+                        this.gridSystem.gridToWorld(start.x, start.y),
+                        this.gridSystem.gridToWorld(end.x, end.y)
+                    ];
+                }
+                return null; // Return null if fallbacks are disabled
             }
-
+            
+            // Check for maximum steps
+            if (steps > this.options.maxSearchSteps) {
+                if (this.options.debug) {
+                    console.warn(`Exceeded max search steps (${this.options.maxSearchSteps})`);
+                }
+                const partialTarget = this.findBestPartialTarget(end.x, end.y, closedSet, cameFrom);
+                if (partialTarget) {
+                    return this.reconstructPath(cameFrom, partialTarget, end);
+                }
+                
+                // If no partial path found, return direct path as fallback
+                if (this.options.useDirectPathFallback) {
+                    return [
+                        this.gridSystem.gridToWorld(start.x, start.y),
+                        this.gridSystem.gridToWorld(end.x, end.y)
+                    ];
+                }
+                return null; // Return null if fallbacks are disabled
+            }
+            
             const current = this.openSet.pop();
-            const currentKey = current.key;
-
-            if (currentKey === endKey) {
+            
+            if (this.options.debug) {
+                this.debugElements.exploredNodes.add(current.key);
+            }
+            
+            // Check if we've reached the goal
+            if (current.key === endKey) {
+                if (this.options.debug) {
+                    console.log(`Path found in ${steps} steps`);
+                }
                 return this.reconstructPath(cameFrom, current, end);
             }
-
-            closedSet.add(currentKey);
-
-            // Get valid neighbors
+            
+            closedSet.add(current.key);
+            
+            // Check for direct line of sight to end (for smoother paths)
+            if (steps > 10 && this.hasLineOfSight(
+                this.gridSystem.gridToWorld(current.x, current.y),
+                this.gridSystem.gridToWorld(end.x, end.y)
+            )) {
+                // If we have line of sight to the goal from current position, go directly there
+                cameFrom.set(endKey, current);
+                return this.reconstructPath(cameFrom, { x: end.x, y: end.y, key: endKey }, end);
+            }
+            
             const neighbors = this.getNeighbors(current.x, current.y);
-
+            
             for (const neighbor of neighbors) {
                 const neighborKey = this.getKey(neighbor.x, neighbor.y);
-
+                
                 if (closedSet.has(neighborKey)) continue;
-
-                const tentativeG = gScore.get(currentKey) + this.getMovementCost(current, neighbor);
-
+                
+                const tentativeG = gScore.get(current.key) + this.getMovementCost(current, neighbor);
+                
                 if (!gScore.has(neighborKey) || tentativeG < gScore.get(neighborKey)) {
                     cameFrom.set(neighborKey, current);
                     gScore.set(neighborKey, tentativeG);
                     const h = this.heuristic(neighbor.x, neighbor.y, end.x, end.y);
-                    const f = tentativeG + h * this.options.heuristicWeight;
+                    const f = tentativeG + (h * this.options.heuristicWeight);
                     fScore.set(neighborKey, f);
-
+                    
                     const neighborNode = {
                         x: neighbor.x,
                         y: neighbor.y,
                         f: f,
                         key: neighborKey
                     };
-
+                    
                     if (!this.openSet.contains(neighborKey)) {
                         this.openSet.push(neighborNode);
                     }
@@ -128,121 +271,398 @@ class AStarPathfinder {
             }
         }
         
-        return null; // No path found
-    }
-
-    getNeighbors(x, y) {
-        const neighbors = [];
-        const directions = this.options.allowDiagonals ? this.directions : this.directions.slice(0, 4);
-
-        for (const dir of directions) {
-            const newX = x + dir.x;
-            const newY = y + dir.y;
-
-            // Check bounds
-            if (newX < 0 || newX >= this.gridSystem.gridWidth ||
-                newY < 0 || newY >= this.gridSystem.gridHeight) {
-                continue;
-            }
-
-            // Check if cell is walkable
-            if (!this.gridSystem.grid[newX][newY].walkable) {
-                continue;
-            }
-            
-            // For entities with size, check surrounding cells
-            if (this.entityRadius.x > 0 || this.entityRadius.y > 0) {
-                if (!this.canFitEntityAt(newX, newY)) {
-                    continue;
-                }
-            }
-
-            // Check diagonal movement blocking if not allowed to cut corners
-            if (!this.options.allowDiagonalCutting && 
-                Math.abs(dir.x) === 1 && Math.abs(dir.y) === 1) {
-                if (!this.gridSystem.grid[x][newY].walkable || 
-                    !this.gridSystem.grid[newX][y].walkable) {
-                    continue;
-                }
-            }
-
-            neighbors.push({ x: newX, y: newY });
+        if (this.options.debug) {
+            console.warn(`No path found after ${steps} steps`);
         }
-
-        return neighbors;
+        
+        // Return direct path as fallback
+        if (this.options.useDirectPathFallback) {
+            return [
+                this.gridSystem.gridToWorld(start.x, start.y),
+                this.gridSystem.gridToWorld(end.x, end.y)
+            ];
+        }
+        return null; // Return null if fallbacks are disabled
     }
     
-    // Fixed canFitEntityAt method to use the correct entity dimensions
-    canFitEntityAt(x, y) {
-        // Check grid cells for walkability based on entity size
-        for (let dx = -this.entityRadius.x; dx <= this.entityRadius.x; dx++) {
-            for (let dy = -this.entityRadius.y; dy <= this.entityRadius.y; dy++) {
-                const checkX = x + dx;
-                const checkY = y + dy;
+    findBestPartialTarget(endX, endY, closedSet, cameFrom) {
+        let bestNode = null;
+        let bestScore = Infinity;
+        
+        for (const key of closedSet) {
+            const [x, y] = key.split(',').map(Number);
+            const distance = this.heuristic(x, y, endX, endY);
+            
+            if (distance < bestScore && cameFrom.has(key)) {
+                bestScore = distance;
+                bestNode = { x, y, key };
+            }
+        }
+        
+        return bestNode;
+    }
+    
+    findNearestValidPosition(x, y, maxRadius) {
+        // First check if the original position is valid
+        if (this.canEntityFitAt(x, y)) {
+            return { x, y };
+        }
+        
+        // Safety check - limit the maxRadius to prevent excessive calculations
+        maxRadius = Math.min(maxRadius, 8);
+        
+        // Array of positions to check, in order of preference
+        const directions = [
+            { dx: 0, dy: -1 },  // North
+            { dx: 1, dy: 0 },   // East
+            { dx: 0, dy: 1 },   // South
+            { dx: -1, dy: 0 },  // West
+            { dx: 1, dy: -1 },  // Northeast
+            { dx: 1, dy: 1 },   // Southeast
+            { dx: -1, dy: 1 },  // Southwest
+            { dx: -1, dy: -1 }  // Northwest
+        ];
+        
+        // Maximum number of positions to check to prevent infinite loops
+        const maxChecks = 100;
+        let checksPerformed = 0;
+
+        // First try the direct neighbors for a faster solution
+        for (const dir of directions) {
+            const nx = x + dir.dx;
+            const ny = y + dir.dy;
+            
+            if (this.canEntityFitAt(nx, ny)) {
+                return { x: nx, y: ny };
+            }
+            checksPerformed++;
+        }
+        
+        // If direct neighbors don't work, try expanding rings
+        for (let radius = 2; radius <= maxRadius; radius++) {
+            // Check in order of preference: cardinal directions first, then diagonals
+            for (const dir of directions) {
+                const nx = x + (dir.dx * radius);
+                const ny = y + (dir.dy * radius);
                 
-                if (checkX < 0 || checkX >= this.gridSystem.gridWidth ||
-                    checkY < 0 || checkY >= this.gridSystem.gridHeight ||
-                    !this.gridSystem.grid[checkX][checkY].walkable) {
-                    return false;
+                if (this.canEntityFitAt(nx, ny)) {
+                    return { x: nx, y: ny };
+                }
+                checksPerformed++;
+                
+                if (checksPerformed >= maxChecks) {
+                    console.warn(`findNearestValidPosition reached max checks (${maxChecks}), returning null`);
+                    return null;
+                }
+            }
+            
+            // If cardinal and ordinal positions at this radius don't work, 
+            // check other positions along the perimeter
+            
+            // Check top and bottom edges (excluding corners)
+            for (let dx = -radius + 1; dx <= radius - 1; dx++) {
+                // Skip already checked positions
+                if (dx === 0 || Math.abs(dx) === radius) continue;
+                
+                // Top edge
+                if (this.canEntityFitAt(x + dx, y - radius)) {
+                    return { x: x + dx, y: y - radius };
+                }
+                
+                // Bottom edge
+                if (this.canEntityFitAt(x + dx, y + radius)) {
+                    return { x: x + dx, y: y + radius };
+                }
+                
+                checksPerformed += 2;
+                if (checksPerformed >= maxChecks) {
+                    console.warn(`findNearestValidPosition reached max checks (${maxChecks}), returning null`);
+                    return null;
+                }
+            }
+            
+            // Check left and right edges (excluding corners)
+            for (let dy = -radius + 1; dy <= radius - 1; dy++) {
+                // Skip already checked positions
+                if (dy === 0 || Math.abs(dy) === radius) continue;
+                
+                // Left edge
+                if (this.canEntityFitAt(x - radius, y + dy)) {
+                    return { x: x - radius, y: y + dy };
+                }
+                
+                // Right edge
+                if (this.canEntityFitAt(x + radius, y + dy)) {
+                    return { x: x + radius, y: y + dy };
+                }
+                
+                checksPerformed += 2;
+                if (checksPerformed >= maxChecks) {
+                    console.warn(`findNearestValidPosition reached max checks (${maxChecks}), returning null`);
+                    return null;
                 }
             }
         }
         
-        // Create a temporary entity representation at the given position
-        const entityBounds = {
-            posX: x * this.gridSystem.config.cellSize,
-            posY: y * this.gridSystem.config.cellSize,
-            size: {
-                width: this.entityWidth,
-                height: this.entityHeight
-            },
-            collider: {
-                width: this.entityWidth,
-                height: this.entityHeight,
-                offsetX: 0,
-                offsetY: 0
-            },
+        console.warn(`findNearestValidPosition found no valid position within radius ${maxRadius}`);
+        return null;
+    }
+
+    getNeighbors(x, y) {
+        const neighbors = [];
+        
+        const directions = this.options.allowDiagonals ? this.directions : this.directions.slice(0, 4);
+        
+        for (const dir of directions) {
+            const newX = x + dir.x;
+            const newY = y + dir.y;
+            
+            // Skip if out of bounds
+            if (newX < 0 || newX >= this.gridSystem.gridWidth ||
+                newY < 0 || newY >= this.gridSystem.gridHeight) {
+                continue;
+            }
+            
+            // Check if the cell is walkable - also check for doors specifically
+            const cell = this.gridSystem.grid[newX][newY];
+            if (!cell.walkable && !this.hasDoorInCell(newX, newY)) {
+                if (this.options.debug) {
+                    this.debugElements.rejectedNodes.add(this.getKey(newX, newY));
+                }
+                continue;
+            }
+            
+            // Check if entity can fit at the new position
+            if (this.entityDimensions.width > 0 && this.entityDimensions.height > 0) {
+                if (!this.canEntityFitAt(newX, newY)) {
+                    if (this.options.debug) {
+                        this.debugElements.rejectedNodes.add(this.getKey(newX, newY));
+                    }
+                    continue;
+                }
+            }
+            
+            // Check diagonal movement restrictions
+            if (!this.options.allowDiagonalCutting && 
+                Math.abs(dir.x) === 1 && Math.abs(dir.y) === 1) {
+                // Prevent cutting corners
+                if ((!this.gridSystem.grid[x][newY].walkable && !this.hasDoorInCell(x, newY)) || 
+                    (!this.gridSystem.grid[newX][y].walkable && !this.hasDoorInCell(newX, y))) {
+                    if (this.options.debug) {
+                        this.debugElements.rejectedNodes.add(this.getKey(newX, newY));
+                    }
+                    continue;
+                }
+                
+                // Check if entity can fit through the corner
+                if (this.entityDimensions.width > 0 && this.entityDimensions.height > 0) {
+                    if (!this.canEntityFitAt(x, newY) || !this.canEntityFitAt(newX, y)) {
+                        if (this.options.debug) {
+                            this.debugElements.rejectedNodes.add(this.getKey(newX, newY));
+                        }
+                        continue;
+                    }
+                }
+            }
+            
+            neighbors.push({ x: newX, y: newY });
+        }
+        
+        return neighbors;
+    }
+    
+    // Helper method to check for open doors in a cell
+    hasDoorInCell(gridX, gridY) {
+        if (gridX < 0 || gridX >= this.gridSystem.gridWidth || 
+            gridY < 0 || gridY >= this.gridSystem.gridHeight) {
+            return false;
+        }
+        
+        const cell = this.gridSystem.grid[gridX][gridY];
+        for (const obj of cell.objects) {
+            const isDoor = obj.type === 'door' || obj.objectType === 'door' || obj.type === 'DOOR' || obj.objectType === 'DOOR';
+            if (isDoor) {
+                const isOpen = typeof obj.isOpen === 'function' ? obj.isOpen() : obj.isOpen;
+                if (isOpen) {
+                    return true; // Found an open door
+                }
+            }
+        }
+        return false;
+    }
+    
+    canEntityFitAt(gridX, gridY) {
+        // Boundary check
+        if (gridX < 0 || gridX >= this.gridSystem.gridWidth || 
+            gridY < 0 || gridY >= this.gridSystem.gridHeight) {
+            return false;
+        }
+        
+        // Basic walkability check from the grid - check for open doors too
+        if (!this.gridSystem.grid[gridX][gridY].walkable && !this.hasDoorInCell(gridX, gridY)) {
+            return false;
+        }
+        
+        // If no entity dimensions provided, just use the grid walkability
+        if (this.entityDimensions.width <= 0 || this.entityDimensions.height <= 0) {
+            return true;
+        }
+        
+        // For entities with dimensions, do a more detailed check
+        const worldX = gridX * this.gridSystem.config.cellSize;
+        const worldY = gridY * this.gridSystem.config.cellSize;
+        
+        const collisionEntity = {
+            posX: worldX,
+            posY: worldY,
+            size: this.entityDimensions,
+            collider: this.entityCollider,
             config: {
                 walkable: true
             }
         };
         
-        // Check collision with objects in the grid cells
-        const potentialColliders = this.gridSystem.getPotentialColliders(entityBounds);
-        
-        // Skip collision check if gridSystem doesn't have a parent or parent.parent
-        if (!this.gridSystem.parent || !this.gridSystem.parent.parent) {
-            return potentialColliders.length === 0;
+        // Check all cells the entity would overlap
+        const cells = this.getEntityOverlappingCells(gridX, gridY);
+        for (const cell of cells) {
+            if (!cell.walkable && !this.hasCellWithOpenDoor(cell)) {
+                return false;
+            }
         }
         
-        // Check for collisions with other objects
-        for (const collider of potentialColliders) {
-            if (this.gridSystem.parent.parent.checkCollision) {
-                if (this.gridSystem.parent.parent.checkCollision(entityBounds, collider)) {
-                    return false;
+        // Get potential colliders
+        const potentialColliders = this.gridSystem.getPotentialColliders(collisionEntity);
+        if (!potentialColliders || potentialColliders.length === 0) {
+            return true;
+        }
+        
+        // Check for collisions
+        if (this.gridSystem.parent && this.gridSystem.parent.parent && 
+            typeof this.gridSystem.parent.parent.checkCollision === 'function') {
+            
+            // Use the parent's collision detection if available
+            for (const collider of potentialColliders) {
+                // Skip open doors
+                if (this.isDoorAndOpen(collider)) {
+                    continue;
+                }
+                // Only check collision with non-walkable objects
+                if (!collider.config?.walkable) {
+                    if (this.gridSystem.parent.parent.checkCollision(collisionEntity, collider)) {
+                        return false;
+                    }
+                }
+            }
+        } else {
+            // Simple bounding box collision check
+            for (const collider of potentialColliders) {
+                // Skip open doors
+                if (this.isDoorAndOpen(collider)) {
+                    continue;
+                }
+                // Only check collision with non-walkable objects
+                if (collider.config && !collider.config.walkable) {
+                    if (this.checkBoundingBoxCollision(collisionEntity, collider)) {
+                        return false;
+                    }
                 }
             }
         }
         
         return true;
     }
-
-    heuristic(x1, y1, x2, y2) {
-        // Octile distance (accounts for diagonal movement)
-        const dx = Math.abs(x2 - x1);
-        const dy = Math.abs(y2 - y1);
-        return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
+    
+    // Helper method to check if a collider is an open door
+    isDoorAndOpen(obj) {
+        const isDoor = obj.type === 'door' || obj.objectType === 'door' || 
+                     obj.type === 'DOOR' || obj.objectType === 'DOOR';
+        if (isDoor) {
+            const isOpen = typeof obj.isOpen === 'function' ? obj.isOpen() : obj.isOpen;
+            return isOpen;
+        }
+        return false;
     }
-
+    
+    // Helper method to check if a grid cell contains an open door
+    hasCellWithOpenDoor(cell) {
+        for (const obj of cell.objects) {
+            if (this.isDoorAndOpen(obj)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    getEntityOverlappingCells(gridX, gridY) {
+        const cells = [];
+        const worldX = gridX * this.gridSystem.config.cellSize;
+        const worldY = gridY * this.gridSystem.config.cellSize;
+        
+        const left = worldX + (this.entityCollider ? this.entityCollider.offsetX : 0);
+        const top = worldY + (this.entityCollider ? this.entityCollider.offsetY : 0);
+        const right = left + (this.entityCollider ? this.entityCollider.width : this.entityDimensions.width);
+        const bottom = top + (this.entityCollider ? this.entityCollider.height : this.entityDimensions.height);
+        
+        const startGridX = Math.floor(left / this.gridSystem.config.cellSize);
+        const startGridY = Math.floor(top / this.gridSystem.config.cellSize);
+        const endGridX = Math.ceil(right / this.gridSystem.config.cellSize);
+        const endGridY = Math.ceil(bottom / this.gridSystem.config.cellSize);
+        
+        for (let x = startGridX; x < endGridX; x++) {
+            for (let y = startGridY; y < endGridY; y++) {
+                if (x >= 0 && x < this.gridSystem.gridWidth && 
+                    y >= 0 && y < this.gridSystem.gridHeight) {
+                    cells.push(this.gridSystem.grid[x][y]);
+                }
+            }
+        }
+        
+        return cells;
+    }
+    
+    checkBoundingBoxCollision(entity1, entity2) {
+        const e1Left = entity1.posX + (entity1.collider ? entity1.collider.offsetX : 0);
+        const e1Top = entity1.posY + (entity1.collider ? entity1.collider.offsetY : 0);
+        const e1Right = e1Left + (entity1.collider ? entity1.collider.width : entity1.size.width);
+        const e1Bottom = e1Top + (entity1.collider ? entity1.collider.height : entity1.size.height);
+        
+        const e2Left = entity2.posX + (entity2.collider ? entity2.collider.offsetX : 0);
+        const e2Top = entity2.posY + (entity2.collider ? entity2.collider.offsetY : 0);
+        const e2Right = e2Left + (entity2.collider ? entity2.collider.width : entity2.size.width);
+        const e2Bottom = e2Top + (entity2.collider ? entity2.collider.height : entity2.size.height);
+        
+        return !(
+            e1Right < e2Left ||
+            e1Left > e2Right ||
+            e1Bottom < e2Top ||
+            e1Top > e2Bottom
+        );
+    }
+    
     getMovementCost(from, to) {
         // Diagonal movement costs more
-        return (from.x !== to.x && from.y !== to.y) ? Math.SQRT2 : 1;
+        if (from.x !== to.x && from.y !== to.y) {
+            return Math.SQRT2;
+        }
+        
+        return 1.0;
     }
-
+    
+    heuristic(x1, y1, x2, y2) {
+        const dx = Math.abs(x2 - x1);
+        const dy = Math.abs(y2 - y1);
+        
+        if (this.options.allowDiagonals) {
+            return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
+        } else {
+            return dx + dy;
+        }
+    }
+    
     reconstructPath(cameFrom, current, end) {
         const path = [];
         let currentNode = current;
-
+        
         while (currentNode) {
             const worldPos = this.gridSystem.gridToWorld(currentNode.x, currentNode.y);
             path.unshift(worldPos);
@@ -250,35 +670,41 @@ class AStarPathfinder {
             const key = this.getKey(currentNode.x, currentNode.y);
             currentNode = cameFrom.get(key);
         }
-
-        return this.options.smoothPaths ? this.smoothPath(path) : path;
+        
+        const finalPath = this.options.smoothPaths ? this.smoothPath(path) : path;
+        
+        if (this.options.debug) {
+            this.debugElements.path = [...finalPath];
+        }
+        
+        return finalPath;
     }
-
+    
     smoothPath(path) {
         if (path.length <= 2) return path;
-
+        
         const smoothed = [path[0]];
         let currentIndex = 0;
-
+        
         while (currentIndex < path.length - 1) {
             let furthestVisible = currentIndex + 1;
-
-            // Look ahead to find furthest visible node
+            
             for (let i = currentIndex + 2; i < path.length; i++) {
+                if ((i - currentIndex) % 2 !== 0 && i < path.length - 1) continue;
+                
                 if (this.hasLineOfSight(path[currentIndex], path[i])) {
                     furthestVisible = i;
                 }
             }
-
+            
             smoothed.push(path[furthestVisible]);
             currentIndex = furthestVisible;
         }
-
+        
         return smoothed;
     }
-
+    
     hasLineOfSight(start, end) {
-        // Bresenham's line algorithm to check if path is clear
         const startGrid = this.gridSystem.worldToGrid(start.x, start.y);
         const endGrid = this.gridSystem.worldToGrid(end.x, end.y);
         
@@ -287,25 +713,18 @@ class AStarPathfinder {
         const sx = startGrid.x < endGrid.x ? 1 : -1;
         const sy = startGrid.y < endGrid.y ? 1 : -1;
         let err = dx - dy;
-
+        
         let x = startGrid.x;
         let y = startGrid.y;
-
+        
         while (x !== endGrid.x || y !== endGrid.y) {
-            // For entities with size, check if they can fit
-            if (this.entityRadius.x > 0 || this.entityRadius.y > 0) {
-                if (!this.canFitEntityAt(x, y)) {
-                    return false;
-                }
-            } else {
-                // Otherwise just check the center point
-                if (x < 0 || x >= this.gridSystem.gridWidth || 
-                    y < 0 || y >= this.gridSystem.gridHeight ||
-                    !this.gridSystem.grid[x][y].walkable) {
-                    return false;
-                }
+            if (x < 0 || x >= this.gridSystem.gridWidth || 
+                y < 0 || y >= this.gridSystem.gridHeight ||
+                (!this.gridSystem.grid[x][y].walkable && !this.hasDoorInCell(x, y)) ||
+                !this.canEntityFitAt(x, y)) {
+                return false;
             }
-
+            
             const e2 = 2 * err;
             if (e2 > -dy) {
                 err -= dy;
@@ -316,47 +735,268 @@ class AStarPathfinder {
                 y += sy;
             }
         }
-
+        
         return true;
+    }
+    
+    // Debug method to diagnose door issues
+    diagnoseDoorPathfinding(startX, startY, endX, endY) {
+        console.log('=== DOOR PATHFINDING DIAGNOSIS ===');
+        
+        const start = this.gridSystem.worldToGrid(startX, startY);
+        const end = this.gridSystem.worldToGrid(endX, endY);
+        
+        // Check for doors along the theoretical path
+        const doorCells = [];
+        
+        // Draw a line between start and end
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const steps = Math.max(Math.abs(dx), Math.abs(dy));
+        
+        console.log(`Checking for doors between (${start.x},${start.y}) and (${end.x},${end.y})`);
+        
+        for (let i = 0; i <= steps; i++) {
+            const ratio = steps === 0 ? 0 : i / steps;
+            const x = Math.round(start.x + dx * ratio);
+            const y = Math.round(start.y + dy * ratio);
+            
+            if (x >= 0 && x < this.gridSystem.gridWidth && 
+                y >= 0 && y < this.gridSystem.gridHeight) {
+                
+                const cell = this.gridSystem.grid[x][y];
+                console.log(`Cell (${x},${y}): walkable=${cell.walkable}, tileWalkable=${cell.tileWalkable}, objectWalkable=${cell.objectWalkable}`);
+                
+                const hasDoor = this.hasDoorInCell(x, y);
+                console.log(`Has open door: ${hasDoor}`);
+                
+                for (const obj of cell.objects) {
+                    const isDoor = obj.type === 'door' || obj.objectType === 'door' || 
+                                 obj.type === 'DOOR' || obj.objectType === 'DOOR';
+                    if (isDoor) {
+                        const isOpen = typeof obj.isOpen === 'function' ? obj.isOpen() : obj.isOpen;
+                        console.log(`DOOR at (${x},${y}): open=${isOpen}, walkable=${obj.config.walkable}`);
+                        doorCells.push({x, y, door: obj});
+                    }
+                }
+                
+                // Check if this cell is considered valid for the entity
+                if (this.entityDimensions.width > 0 && this.entityDimensions.height > 0) {
+                    const canFit = this.canEntityFitAt(x, y);
+                    console.log(`Entity can fit at (${x},${y}): ${canFit}`);
+                }
+            }
+        }
+        
+        if (doorCells.length === 0) {
+            console.log('No doors found between start and end points.');
+        }
+        
+        // Try the actual pathfinding
+        const path = this.findPath(startX, startY, endX, endY, 
+            this.entityDimensions.width, this.entityDimensions.height);
+        
+        console.log(`Pathfinding result: ${path ? 'Path found' : 'No path found'}`);
+        console.log('================================');
+        
+        return path;
     }
 
     visualizePath(container, path) {
-        if (!this.debugMode || !container || !path) return;
-
-        // Clear previous visualization
-        const existingNodes = container.querySelectorAll('.path-node');
+        if (!container || !path) return;
+        
+        const existingNodes = container.querySelectorAll('.pathfinder-node');
         existingNodes.forEach(node => node.remove());
-
-        // Draw path
+        
+        if (this.options.debug && this.debugElements.exploredNodes.size > 0) {
+            for (const nodeKey of this.debugElements.exploredNodes) {
+                const [x, y] = nodeKey.split(',').map(Number);
+                const worldPos = this.gridSystem.gridToWorld(x, y);
+                
+                const node = document.createElement('div');
+                node.className = 'pathfinder-node explored-node debug';
+                
+                Object.assign(node.style, {
+                    left: `${worldPos.x - 3}px`,
+                    top: `${worldPos.y - 3}px`,
+                    width: '6px',
+                    height: '6px',
+                    position: 'absolute',
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(255, 255, 0, 0.3)',
+                    zIndex: 900
+                });
+                
+                container.appendChild(node);
+            }
+        }
+        
+        if (this.options.debug && this.debugElements.rejectedNodes.size > 0) {
+            for (const nodeKey of this.debugElements.rejectedNodes) {
+                const [x, y] = nodeKey.split(',').map(Number);
+                const worldPos = this.gridSystem.gridToWorld(x, y);
+                
+                const node = document.createElement('div');
+                node.className = 'pathfinder-node rejected-node debug';
+                
+                Object.assign(node.style, {
+                    left: `${worldPos.x - 3}px`,
+                    top: `${worldPos.y - 3}px`,
+                    width: '6px',
+                    height: '6px',
+                    position: 'absolute',
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(255, 0, 0, 0.3)',
+                    zIndex: 900
+                });
+                
+                container.appendChild(node);
+            }
+        }
+        
         path.forEach((point, index) => {
             const node = document.createElement('div');
-            node.className = `path-node debug`;
-            node.classList.add(index === 0 ? 'start' : index === path.length - 1 ? 'end' : 'middle');
-
+            node.className = 'pathfinder-node path-node debug';
+            node.classList.add(index === 0 ? 'start-node' : 
+                          index === path.length - 1 ? 'end-node' : 'waypoint-node');
+            
+            const nodeSize = index === 0 || index === path.length - 1 ? 10 : 6;
+            const nodeColor = index === 0 ? 'rgba(0, 255, 0, 0.8)' : 
+                         index === path.length - 1 ? 'rgba(255, 0, 0, 0.8)' : 
+                         'rgba(0, 100, 255, 0.8)';
+            
             Object.assign(node.style, {
-                left: `${point.x}px`,
-                top: `${point.y}px`,
-                width: '6px',
-                height: '6px',
+                left: `${point.x - nodeSize/2}px`,
+                top: `${point.y - nodeSize/2}px`,
+                width: `${nodeSize}px`,
+                height: `${nodeSize}px`,
                 position: 'absolute',
                 borderRadius: '50%',
-                backgroundColor: index === 0 ? 'green' : index === path.length - 1 ? 'red' : 'blue',
-                zIndex: 1000
+                backgroundColor: nodeColor,
+                zIndex: 1000 + index
             });
-
+            
+            if (index > 0 && index < path.length - 1) {
+                node.textContent = index;
+                node.style.color = 'white';
+                node.style.fontSize = '8px';
+                node.style.textAlign = 'center';
+                node.style.lineHeight = `${nodeSize}px`;
+            }
+            
             container.appendChild(node);
         });
+        
+        for (let i = 0; i < path.length - 1; i++) {
+            const start = path[i];
+            const end = path[i + 1];
+            
+            const line = document.createElement('div');
+            line.className = 'pathfinder-node path-line debug';
+            
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            
+            Object.assign(line.style, {
+                position: 'absolute',
+                left: `${start.x}px`,
+                top: `${start.y}px`,
+                width: `${distance}px`,
+                height: '2px',
+                backgroundColor: 'rgba(0, 100, 255, 0.6)',
+                transformOrigin: '0 0',
+                transform: `rotate(${angle}deg)`,
+                zIndex: 990 + i
+            });
+            
+            container.appendChild(line);
+        }
+        
+        this.visualizeEntityCollider(container, path[0], 'start');
+        this.visualizeEntityCollider(container, path[path.length - 1], 'end');
+    }
+
+    visualizeEntityCollider(container, point, nodeType) {
+        if (!container || !point) return;
+        
+        const collider = document.createElement('div');
+        collider.className = `pathfinder-node entity-collider debug ${nodeType}-collider`;
+        
+        const left = point.x + (this.entityCollider ? this.entityCollider.offsetX : 0);
+        const top = point.y + (this.entityCollider ? this.entityCollider.offsetY : 0);
+        const width = this.entityCollider ? this.entityCollider.width : this.entityDimensions.width;
+        const height = this.entityCollider ? this.entityCollider.height : this.entityDimensions.height;
+        
+        Object.assign(collider.style, {
+            position: 'absolute',
+            left: `${left}px`,
+            top: `${top}px`,
+            width: `${width}px`,
+            height: `${height}px`,
+            border: `1px solid ${nodeType === 'start' ? 'rgba(0, 255, 0, 0.8)' : 'rgba(255, 0, 0, 0.8)'}`,
+            backgroundColor: `${nodeType === 'start' ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255, 0, 0, 0.2)'}`,
+            zIndex: 980
+        });
+        
+        container.appendChild(collider);
+    }
+
+    setDebugMode(enabled) {
+        this.options.debug = enabled;
     }
     
-    // Cleanup resources
+    // New method to manually check walkability at a specific grid location
+    checkWalkableAt(gridX, gridY) {
+        // Boundary check
+        if (gridX < 0 || gridX >= this.gridSystem.gridWidth || 
+            gridY < 0 || gridY >= this.gridSystem.gridHeight) {
+            console.log(`Position (${gridX}, ${gridY}) is out of bounds`);
+            return false;
+        }
+        
+        const cell = this.gridSystem.grid[gridX][gridY];
+        console.log(`Checking cell at (${gridX}, ${gridY}):`);
+        console.log(`- Cell walkable: ${cell.walkable}`);
+        console.log(`- Tile walkable: ${cell.tileWalkable}`);
+        console.log(`- Object walkable: ${cell.objectWalkable}`);
+        
+        // Check for doors
+        let hasDoor = false;
+        for (const obj of cell.objects) {
+            const isDoor = obj.type === 'door' || obj.objectType === 'door' || 
+                         obj.type === 'DOOR' || obj.objectType === 'DOOR';
+            if (isDoor) {
+                const isOpen = typeof obj.isOpen === 'function' ? obj.isOpen() : obj.isOpen;
+                console.log(`- Door found: open=${isOpen}, walkable=${obj.config.walkable}`);
+                hasDoor = true;
+                if (isOpen) {
+                    console.log(`- Cell is passable because door is open`);
+                    return true;
+                }
+            }
+        }
+        
+        if (!hasDoor) {
+            console.log(`- No doors found in cell`);
+        }
+        
+        return cell.walkable;
+    }
+
     dispose() {
         this.openSet.clear();
-        this.directions = null;
+        this.debugElements.exploredNodes.clear();
+        this.debugElements.rejectedNodes.clear();
+        this.debugElements.path = [];
         this.gridSystem = null;
     }
 }
 
-// Binary heap implementation for optimized open set
+/**
+ * Binary heap implementation for optimized open set
+ */
 class BinaryHeap {
     constructor(scoreFunction) {
         this.content = [];

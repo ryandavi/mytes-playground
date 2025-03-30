@@ -97,9 +97,11 @@ class ContainerInputManager {
    * Set up keyboard shortcuts
    */
   setupKeyboardShortcuts() {
-    // Tool shortcuts
-    Object.entries(this.container.ui.toolConfig).forEach(([mode, config]) => {
-      if (config.shortcut) {
+    // Tool shortcuts - Add null check for this.container.ui.toolConfig
+    const toolConfig = this.container.ui?.toolConfig || {};
+    
+    Object.entries(toolConfig).forEach(([mode, config]) => {
+      if (config && config.shortcut) {
         this.inputSystem.on('keyboard.down', (event) => {
           if (!this.isEnabled) return; // Ignore when disabled
           if (event.key === config.shortcut.toLowerCase()) {
@@ -113,7 +115,8 @@ class ContainerInputManager {
     this.inputSystem.on('keyboard.down', (event) => {
       if (!this.isEnabled) return; // Ignore when disabled
       if (event.key === 'm') {
-        this.container.ui.soundMenu.toggleSounds();
+        // Add null check for soundMenu
+        this.container.ui?.soundMenu?.toggleSounds?.();
       }
     });
     
