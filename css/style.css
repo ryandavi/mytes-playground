@@ -178,6 +178,7 @@ body.debug .crosshair,
 body.debug .queueMenu,
 body.debug .zone,
 body.debug .debug-stats,
+body.debug .terrain-legend,
 body.debug .layer.debug {
   visibility: visible !important;
 }

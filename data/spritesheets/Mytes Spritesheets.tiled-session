@@ -3,7 +3,7 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "House.tmx",
+    "activeFile": "walls3.tsx",
     "expandedProjectPaths": [
         "."
     ],
@@ -14,15 +14,15 @@
         },
         "House.tmx": {
             "expandedObjectLayers": [
+                10,
                 9,
-                7,
-                10
+                7
             ],
             "scale": 1,
             "selectedLayer": 3,
             "viewCenter": {
-                "x": 509,
-                "y": 500
+                "x": 480,
+                "y": 480
             }
         },
         "HouseNew.tmx": {
@@ -38,13 +38,13 @@
         },
         "Outside.tmx": {
             "expandedObjectLayers": [
-                7,
-                4
+                4,
+                7
             ],
             "scale": 1,
             "selectedLayer": 3,
             "viewCenter": {
-                "x": 480.5,
+                "x": 515,
                 "y": 320
             }
         },
@@ -68,9 +68,9 @@
     "project": "Mytes Spritesheets.tiled-project",
     "property.type": "string",
     "recentFiles": [
-        "walls3.tsx",
-        "Outside.tmx",
         "House.tmx",
+        "Outside.tmx",
+        "walls3.tsx",
         "HouseNew.tmx",
         "house.tsx"
     ],

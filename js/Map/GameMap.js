@@ -47,106 +47,113 @@ class GameMap {
     }
 
     // Add to GameMap class
-testPathfinding(startX = 80, startY = 80, endX = 0, endY = 0, entityWidth = 32, entityHeight = 32) {
-    if (!this.gridSystem || !this.gridSystem.pathfinder) {
-      console.error("Grid system or pathfinder not available");
-      return null;
+    testPathfinding(startX = 80, startY = 80, endX = 0, endY = 0, entityWidth = 32, entityHeight = 32) {
+        if (!this.gridSystem || !this.gridSystem.pathfinder) {
+            console.error("Grid system or pathfinder not available", this);
+            return null;
+        }
+
+        if(!this.parent.inputHandler.isMouseInContainer()){
+            return null;
+        }
+
+        if (this.parent.mytes && this.parent.mytes.length > 0 && this.parent.mytes[0].isActive) {
+
+            entityHeight = this.parent.mytes[0].collider.height;
+            entityWidth = this.parent.mytes[0].collider.width;
+
+            startX = this.parent.mytes[0].posX + this.parent.mytes[0].collider.offsetX + this.parent.mytes[0].collider.width / 2;
+            startY = this.parent.mytes[0].posY + this.parent.mytes[0].collider.offsetY + this.parent.mytes[0].collider.height / 2;
+
+            endX = this.parent.inputHandler.getAdjustedMouse().x;
+            endY = this.parent.inputHandler.getAdjustedMouse().y;
+        }
+
+        console.log(`Testing path from (${startX},${startY}) to (${endX},${endY})`);
+
+        // Enable debug visualization
+        this.gridSystem.pathfinder.options.debug = true;
+        this.gridSystem.config.showTerrainColors = true;
+
+        // Calculate path
+        const path = this.gridSystem.pathfinder.findPath(
+            startX, startY, endX, endY, entityWidth, entityHeight,
+            this.parent.mytes[0].collider, // collider parameter
+            { can_open_doors: true, can_swim: false, follows_paths: true }
+        );
+
+        // Visualize the path
+        this.gridSystem.pathfinder.visualizePath(this.layers.debug, path || []);
+
+        // Output results
+        if (path) {
+            console.log(`Path found with ${path.length} waypoints`);
+        } else {
+            console.log("No path found - check explored/rejected nodes for debugging");
+        }
+
+        return path;
     }
-
-    if (this.parent.mytes && this.parent.mytes.length > 0) {
-
-        entityHeight = this.parent.mytes[0].collider.height;
-        entityWidth = this.parent.mytes[0].collider.width;
-
-        startX = this.parent.mytes[0].posX + this.parent.mytes[0].collider.offsetX + this.parent.mytes[0].collider.width / 2;
-        startY = this.parent.mytes[0].posY + this.parent.mytes[0].collider.offsetY + this.parent.mytes[0].collider.height / 2;
-
-        endX = this.parent.inputHandler.getAdjustedMouse().x;
-        endY = this.parent.inputHandler.getAdjustedMouse().y;
-    }
-    
-    console.log(`Testing path from (${startX},${startY}) to (${endX},${endY})`);
-    
-    // Enable debug visualization
-    this.gridSystem.pathfinder.options.debug = true;
-    
-    // Calculate path
-    const path = this.gridSystem.pathfinder.findPath(
-      startX, startY, endX, endY, entityWidth, entityHeight
-    );
-    
-    // Visualize the path
-    this.gridSystem.pathfinder.visualizePath(this.layers.debug, path || []);
-    
-    // Output results
-    if (path) {
-      console.log(`Path found with ${path.length} waypoints`);
-    } else {
-      console.log("No path found - check explored/rejected nodes for debugging");
-    }
-    
-    return path;
-  }
 
     // Modify the initialize method in GameMap.js to handle initial loads differently
     async initialize(mapId, options = {}) {
         try {
             console.log(`[GameMap] Initializing map: ${mapId}`);
-    
+
             // Get initialization options
             const isInitialLoad = options.isInitialLoad || false;
-    
+
             // Check if the parent and canvas exist
             if (!this.parent) {
                 throw new Error('Parent is null or undefined');
             }
-    
+
             if (!this.parent.canvas) {
                 throw new Error('Parent canvas is null or undefined');
             }
-    
+
             // Initialize particle system first to avoid dependency issues
             console.log(`[GameMap] Creating particle system`);
             this.particleSystem = new GameMapParticleSystem(this);
             this.particleSystem.start();
-    
+
             // Initialize tile map loader
             if (!this.tileMapLoader) {
                 console.log(`[GameMap] Creating new TileMapLoader`);
                 this.tileMapLoader = new TileMapLoader(this);
             }
-    
+
             // Build the TMX path - check if it already has the extension
             let tmxPath = mapId.endsWith('.tmx')
                 ? `data/spritesheets/${mapId}`
                 : `data/spritesheets/${mapId}.tmx`;
-    
+
             console.log(`[GameMap] Loading TMX from: ${tmxPath}`);
-    
+
             if (this.noCache) tmxPath = Utility.preventCache(tmxPath);
-    
+
             // Try to load the TMX data without applying it yet
             let mapData;
             let tmxLoadFailed = false;
             try {
                 mapData = await this.tileMapLoader.loadTileMap(tmxPath);
-    
+
                 if (!mapData) {
                     throw new Error(`TMX data is null or undefined`);
                 }
-    
+
                 console.log(`[GameMap] TMX data loaded successfully`);
             } catch (tmxError) {
                 console.error(`[GameMap] Failed to load TMX data:`, tmxError);
                 tmxLoadFailed = true;
-    
+
                 // Try alternative paths
                 const altPaths = [
                     `data/maps/${mapId}.tmx`,
                     `assets/maps/${mapId}.tmx`,
                     `${mapId}.tmx`
                 ];
-    
+
                 let loaded = false;
                 for (const altPath of altPaths) {
                     try {
@@ -162,7 +169,7 @@ testPathfinding(startX = 80, startY = 80, endX = 0, endY = 0, entityWidth = 32, 
                         console.log(`[GameMap] Failed to load from ${altPath}`);
                     }
                 }
-    
+
                 if (!loaded) {
                     // If this is an initial load, create a default map
                     // Otherwise, indicate that loading failed
@@ -178,7 +185,7 @@ testPathfinding(startX = 80, startY = 80, endX = 0, endY = 0, entityWidth = 32, 
                     }
                 }
             }
-    
+
             // Apply the TMX data to this GameMap instance with error handling
             try {
                 console.log(`[GameMap] Applying TMX data to game map`);
@@ -186,7 +193,7 @@ testPathfinding(startX = 80, startY = 80, endX = 0, endY = 0, entityWidth = 32, 
                 console.log(`[GameMap] TMX data applied successfully`);
             } catch (applyError) {
                 console.error(`[GameMap] Error applying TMX data:`, applyError);
-    
+
                 // If this is an initial load, try to create a default map
                 // Otherwise, return false if TMX loading failed completely
                 if (tmxLoadFailed) {
@@ -201,7 +208,7 @@ testPathfinding(startX = 80, startY = 80, endX = 0, endY = 0, entityWidth = 32, 
                         return false;
                     }
                 }
-    
+
                 // If we got some map data but couldn't fully apply it,
                 // we can extract basic properties as a fallback
                 if (mapData && mapData.properties) {
@@ -211,29 +218,29 @@ testPathfinding(startX = 80, startY = 80, endX = 0, endY = 0, entityWidth = 32, 
                         mapData.properties.forEach(prop => {
                             props[prop.name] = prop.value;
                         });
-    
+
                         // Update map metadata
                         this.name = props.Name || mapId;
                         this.description = props.Description || '';
                         this.location = props.Location || '';
-    
+
                         // Store the original properties
                         this.mapProperties = props;
-    
+
                     } catch (propsError) {
                         console.warn(`[GameMap] Error extracting properties:`, propsError);
                     }
                 }
             }
-    
+
             // Reset debug initialization state for GridSystem
             if (this.gridSystem) {
                 // Store the current debug mode
                 const wasDebugMode = this.gridSystem.debugMode;
-                
+
                 // Reset the initialization flag
                 this.gridSystem.debugInitialized = false;
-                
+
                 // If debug mode was on, make sure it gets reinitialized
                 if (wasDebugMode) {
                     console.log(`[GameMap] Reinitializing GridSystem debug elements`);
@@ -241,7 +248,7 @@ testPathfinding(startX = 80, startY = 80, endX = 0, endY = 0, entityWidth = 32, 
                     if (this.gridSystem.debugMode) {
                         this.gridSystem.toggleDebug();
                     }
-                    
+
                     // Delay to ensure DOM is ready before reinitializing
                     setTimeout(() => {
                         this.gridSystem.toggleDebug(); // Toggle back on to reinitialize
@@ -254,13 +261,13 @@ testPathfinding(startX = 80, startY = 80, endX = 0, endY = 0, entityWidth = 32, 
                 this.testPathfinding();
 
             }, 3000); // Update every 3 seconds
-    
+
             console.log(`[GameMap] Map ${mapId} initialization completed successfully`);
             this.initialized = true;
             return true;
         } catch (error) {
             console.error(`[GameMap] Error initializing map:`, error);
-    
+
             // If this is an initial load, create a default map
             // Otherwise, return failure
             if (options.isInitialLoad) {
@@ -551,104 +558,104 @@ testPathfinding(startX = 80, startY = 80, endX = 0, endY = 0, entityWidth = 32, 
         this.objects = this.objects.filter(obj => obj.active);
     }
 
-// Fixed GameMap update method to properly handle culling
-update(deltaTime) {
-    // OPTIMIZATION: Ensure GridSystem active objects are consistent
-    if (this.gridSystem) {
-        // Every 60 frames (about 1 second), verify active objects for consistency
-        this.updateFrameSkip = (this.updateFrameSkip + 1) % 60;
+    // Fixed GameMap update method to properly handle culling
+    update(deltaTime) {
+        // OPTIMIZATION: Ensure GridSystem active objects are consistent
+        if (this.gridSystem) {
+            // Every 60 frames (about 1 second), verify active objects for consistency
+            this.updateFrameSkip = (this.updateFrameSkip + 1) % 60;
+            if (this.updateFrameSkip === 0) {
+                this.gridSystem.verifyActiveObjects(this.parent.camera);
+            }
+
+            // Update culling based on camera - this will populate activeObjects
+            this.gridSystem.updateCulling(this.parent.camera);
+
+            // Get the active objects count directly from GridSystem
+            this.activeObjectsCount = this.gridSystem.activeObjects.size;
+
+            // Update only active objects from grid system
+            this.gridSystem.activeObjects.forEach(object => {
+                if (object.update) {
+                    object.update(deltaTime);
+                }
+            });
+        } else {
+            // Fallback to updating all objects if grid system isn't available
+            this.objects.forEach(object => {
+                if (object.update) {
+                    object.update(deltaTime);
+                }
+            });
+
+            this.activeObjectsCount = this.objects.length;
+        }
+
+        // Update zones - only for active mytes
+        this.parent.mytes.forEach(myte => {
+            if (myte.isActive) {
+                this.zoneManager.update(myte);
+            }
+        });
+
+        // Clean up inactive objects periodically
         if (this.updateFrameSkip === 0) {
-            this.gridSystem.verifyActiveObjects(this.parent.camera);
+            this.removeInactiveObjects();
         }
+    }
 
-        // Update culling based on camera - this will populate activeObjects
-        this.gridSystem.updateCulling(this.parent.camera);
-        
-        // Get the active objects count directly from GridSystem
-        this.activeObjectsCount = this.gridSystem.activeObjects.size;
-        
-        // Update only active objects from grid system
-        this.gridSystem.activeObjects.forEach(object => {
-            if (object.update) {
-                object.update(deltaTime);
+    dispose() {
+        // Clean up objects
+        this.objects.forEach(obj => {
+            if (obj.remove) {
+                obj.remove();
             }
         });
-    } else {
-        // Fallback to updating all objects if grid system isn't available
-        this.objects.forEach(object => {
-            if (object.update) {
-                object.update(deltaTime);
+        this.objects = [];
+
+        // Clean up zones
+        // this.zones.clear();
+
+        // Clean up spawn points
+        this.spawnPoints.clear();
+
+        // Clean up tile map loader
+        if (this.tileMapLoader) {
+            this.tileMapLoader.dispose();
+            this.tileMapLoader = null;
+        }
+
+        // Clean up particle system
+        if (this.particleSystem) {
+            this.particleSystem.dispose();
+            this.particleSystem = null;
+        }
+
+        // Clean up grid system
+        if (this.gridSystem) {
+            // Ensure grid system cleans up properly
+            if (this.gridSystem.dispose) {
+                this.gridSystem.dispose();
             }
-        });
-        
-        this.activeObjectsCount = this.objects.length;
-    }
-
-    // Update zones - only for active mytes
-    this.parent.mytes.forEach(myte => {
-        if (myte.isActive) {
-            this.zoneManager.update(myte);
+            this.gridSystem = null;
         }
-    });
 
-    // Clean up inactive objects periodically
-    if (this.updateFrameSkip === 0) {
-        this.removeInactiveObjects();
-    }
-}
-
-dispose() {
-    // Clean up objects
-    this.objects.forEach(obj => {
-        if (obj.remove) {
-            obj.remove();
+        if (this.layers && this.layers.debug) {
+            // Clear all debug elements
+            while (this.layers.debug.firstChild) {
+                this.layers.debug.removeChild(this.layers.debug.firstChild);
+            }
         }
-    });
-    this.objects = [];
 
-    // Clean up zones
-    // this.zones.clear();
-
-    // Clean up spawn points
-    this.spawnPoints.clear();
-
-    // Clean up tile map loader
-    if (this.tileMapLoader) {
-        this.tileMapLoader.dispose();
-        this.tileMapLoader = null;
-    }
-
-    // Clean up particle system
-    if (this.particleSystem) {
-        this.particleSystem.dispose();
-        this.particleSystem = null;
-    }
-
-    // Clean up grid system
-    if (this.gridSystem) {
-        // Ensure grid system cleans up properly
-        if (this.gridSystem.dispose) {
-            this.gridSystem.dispose();
+        // dispose zones
+        if (this.zoneManager) {
+            this.zoneManager.dispose();
+            this.zoneManager = null;
         }
-        this.gridSystem = null;
-    }
 
-    if (this.layers && this.layers.debug) {
-        // Clear all debug elements
-        while (this.layers.debug.firstChild) {
-            this.layers.debug.removeChild(this.layers.debug.firstChild);
-        }
-    }
+        // Clear layer references
+        this.layers = {};
 
-    // dispose zones
-    if (this.zoneManager) {
-        this.zoneManager.dispose();
-        this.zoneManager = null;
+        console.log("[GameMap] Map disposed successfully");
     }
-
-    // Clear layer references
-    this.layers = {};
-    
-    console.log("[GameMap] Map disposed successfully");
-}
 }

@@ -1,7 +1,8 @@
 class GridSystem {
     constructor(parent, config = {}) {
         this.parent = parent;
-        // Initialize pathfinder
+
+        // Initialize pathfinder with the enhanced version
         this.pathfinder = new AStarPathfinder(this);
 
         // Grid configuration
@@ -11,7 +12,10 @@ class GridSystem {
             width: parent.dimensions.width || 2000,  // Total width of the map
             height: parent.dimensions.height || 2000, // Total height of the map
             cullingPadding: config.cullingPadding || -64, // Increased padding for better culling behavior
+            showTerrainColors: config.showTerrainColors || false // Whether to color cells based on terrain
         };
+
+
 
         this.lastCameraPos = { x: -9999, y: -9999 }; // Initialize to force first update
 
@@ -26,6 +30,7 @@ class GridSystem {
                 tileWalkable: true, // Base tile walkability (from map data)
                 objectWalkable: true, // Whether objects in this cell allow walking
                 walkable: true, // Combined walkability status
+                terrainType: 'ground', // Default terrain type for pathfinding
                 // Store cell position and dimensions
                 posX: x * this.config.cellSize,
                 posY: y * this.config.cellSize,
@@ -47,13 +52,107 @@ class GridSystem {
             cursorTile: null,
             myteFrontTile: null,
             cullingBounds: null,
-            debugStats: null
+            debugStats: null,
+            terrainLegend: null
         };
 
         this.debugInitialized = false;
 
+        // Initialize terrain colors for visualization
+        this.terrainColors = {
+            'path': 'rgba(100, 100, 255, 0.3)',      // Blue
+            'floor': 'rgba(200, 200, 255, 0.3)',     // Light blue
+            'ground': 'rgba(150, 150, 150, 0.1)',    // Gray (default)
+            'grass': 'rgba(100, 200, 100, 0.3)',     // Green
+            'sand': 'rgba(255, 255, 180, 0.3)',      // Yellow
+            'mud': 'rgba(139, 69, 19, 0.3)',         // Brown
+            'shallow_water': 'rgba(0, 191, 255, 0.3)', // Deep sky blue
+            'deep_water': 'rgba(0, 0, 139, 0.4)',     // Dark blue
+            'door_closed': 'rgba(139, 69, 19, 0.5)',  // Brown (like wood)
+            'door_open': 'rgba(139, 69, 19, 0.2)'     // Lighter brown
+        };
+
         this.toggleDebug();
     }
+
+    // Default terrain movement cost multipliers
+    static terrainCosts = {
+        'path': 0.8,        // Paved paths/roads (preferred)
+        'floor': 0.9,       // Indoor flooring/carpet (slightly preferred)
+        'ground': 1.0,      // Regular ground (baseline)
+        'grass': 1.2,       // Tall grass (slightly avoided)
+        'sand': 1.4,        // Sand/gravel (moderately avoided)
+        'mud': 1.8,         // Mud/snow (strongly avoided)
+        'shallow_water': 2.5, // Shallow water (avoided unless necessary)
+        'deep_water': 5.0,  // Deep water (heavily avoided)
+        'door_closed': 5.0, // Closed doors (high cost unless can_open_doors)
+        'door_open': 1.0    // Open doors (normal passage)
+    };
+
+    // Add this method to update grid cells with terrain data
+    updateCellTerrain(gridX, gridY, terrainType) {
+        if (gridX < 0 || gridX >= this.gridWidth ||
+            gridY < 0 || gridY >= this.gridHeight) {
+            return false;
+        }
+
+        // Store the original terrain type if not already set
+        if (!this.grid[gridX][gridY].originalTerrainType) {
+            this.grid[gridX][gridY].originalTerrainType = this.grid[gridX][gridY].terrainType;
+        }
+
+        // Update the terrain type
+        this.grid[gridX][gridY].terrainType = terrainType;
+
+        // Update visual representation if in debug mode
+        if (this.debugMode && this.debugInitialized && this.config.showTerrainColors) {
+            this.updateGridCellVisuals(gridX, gridY);
+        }
+
+        return true;
+    }
+
+    updateGridCellVisuals(gridX, gridY) {
+        // Find the cell element in the debug grid
+        const cellElement = this.debugElements.gridCells.find(
+            cell => cell.gridX === gridX && cell.gridY === gridY
+        )?.element;
+
+        if (!cellElement) return;
+
+        // Get the terrain type for this cell
+        const terrainType = this.grid[gridX][gridY].terrainType || 'ground';
+
+        // Update the cell background color based on terrain
+        if (this.terrainColors[terrainType]) {
+            cellElement.style.backgroundColor = this.terrainColors[terrainType];
+
+            // Add a data attribute for terrain type
+            cellElement.dataset.terrainType = terrainType;
+
+            // Add cost label if debugging terrain costs
+            if (this.pathfinder && this.config.showTerrainCosts) {
+                const cost = GridSystem.terrainCosts[terrainType] || 1.0;
+
+                // Add or update cost label
+                let costLabel = cellElement.querySelector('.terrain-cost');
+                if (!costLabel) {
+                    costLabel = document.createElement('span');
+                    costLabel.className = 'terrain-cost';
+                    costLabel.style.fontSize = '8px';
+                    costLabel.style.position = 'absolute';
+                    costLabel.style.top = '2px';
+                    costLabel.style.left = '2px';
+                    costLabel.style.color = 'white';
+                    costLabel.style.textShadow = '1px 1px 1px black';
+                    cellElement.appendChild(costLabel);
+                }
+
+                costLabel.textContent = cost.toFixed(1) + 'x';
+            }
+        }
+    }
+
 
     // Initialize culling visualization elements
     initializeCullingDebug() {
@@ -225,6 +324,7 @@ class GridSystem {
     }
 
     // Update grid cell positions and visibility
+    // Enhanced version of the existing updateGridDebug method
     updateGridDebug(camera) {
         if (!this.debugMode || !this.debugInitialized) return;
 
@@ -251,6 +351,11 @@ class GridSystem {
                     // Update cell class based on walkability
                     this.updateCellClass(cell.element, x, y);
 
+                    // Update cell color based on terrain type if enabled
+                    if (this.config.showTerrainColors) {
+                        this.updateGridCellVisuals(x, y);
+                    }
+
                     cell.element.style.display = 'block';
                 } else {
                     cell.element.style.display = 'none';
@@ -264,10 +369,76 @@ class GridSystem {
 
                 if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
                     this.updateCellClass(cell.element, x, y);
+
+                    // Update cell color based on terrain type if enabled
+                    if (this.config.showTerrainColors) {
+                        this.updateGridCellVisuals(x, y);
+                    }
                 }
             });
         }
+
+        // Update terrain legend if showing terrain colors
+        this.updateTerrainLegend();
     }
+
+    // New method to update or create terrain legend
+    updateTerrainLegend() {
+        if (!this.debugMode || !this.config.showTerrainColors) {
+            // Hide legend if not showing terrain colors
+            if (this.debugElements.terrainLegend) {
+                this.debugElements.terrainLegend.style.display = 'none';
+            }
+            return;
+        }
+
+        // Create legend if it doesn't exist
+        if (!this.debugElements.terrainLegend) {
+            const legend = document.createElement('div');
+            legend.className = 'terrain-legend debug';
+
+
+
+            // Add to parent container
+            if (this.parent && this.parent.parent && this.parent.parent.element) {
+                this.parent.parent.element.appendChild(legend);
+                this.debugElements.terrainLegend = legend;
+            }
+        }
+
+        // Ensure legend is visible
+        if (this.debugElements.terrainLegend) {
+            this.debugElements.terrainLegend.style.display = 'block';
+
+            // Update legend content
+            let html = '<div style="font-weight: bold; margin-bottom: 5px">Terrain Types</div>';
+
+            // Add entries for each terrain type
+            Object.entries(this.terrainColors).forEach(([type, color]) => {
+                const cost = GridSystem.terrainCosts[type] || 1.0;
+                html += `
+            <div style="display: flex; align-items: center; margin-bottom: 2px">
+                <div style="width: 12px; height: 12px; background-color: ${color}; margin-right: 5px; border: 1px solid white;"></div>
+                <span>${type}: ${cost.toFixed(1)}x</span>
+            </div>`;
+            });
+
+            this.debugElements.terrainLegend.innerHTML = html;
+        }
+    }
+
+    // Toggle showing terrain colors in debug mode
+    toggleTerrainColors() {
+        this.config.showTerrainColors = !this.config.showTerrainColors;
+
+        if (this.debugMode && this.debugInitialized) {
+            // Update all grid cells
+            this.updateGridDebug(this.parent.parent.camera);
+        }
+
+        return this.config.showTerrainColors;
+    }
+
 
     // Helper method to update cell class based on walkability
     updateCellClass(cellElement, x, y) {
@@ -305,9 +476,10 @@ class GridSystem {
             this.debugElements.cursorTile.style.left = `${cell.posX}px`;
             this.debugElements.cursorTile.style.top = `${cell.posY}px`;
 
+
             // Update coordinates text
             const coordsElement = this.debugElements.cursorTile.querySelector('.coords');
-            coordsElement.innerText = `${gridPos.x}, ${gridPos.y}`;
+            coordsElement.innerText = `${cell.terrainType}: ${gridPos.x}, ${gridPos.y}`;
 
             if (!this.debugElements.cursorTile.classList.contains('visible')) {
                 this.debugElements.cursorTile.classList.add('visible');
@@ -318,158 +490,159 @@ class GridSystem {
     }
 
     // Update the tile in front of a myte based on direction
-// Update the tile in front of a myte based on direction and collider
-updateMyteFrontTile(myte) {
-    if (!this.debugMode || !this.debugInitialized || !myte) return;
+    // Update the tile in front of a myte based on direction and collider
+    updateMyteFrontTile(myte) {
+        if (!this.debugMode || !this.debugInitialized || !myte) return;
 
-    // Get myte's direction
-    const direction = myte.direction || DIRECTION.SOUTH;
+        // Get myte's direction
+        const direction = myte.direction || DIRECTION.SOUTH;
 
-    // Use the collider if available, otherwise fall back to the myte's position and size
-    const collider = myte.collider || {
-        x: 0,
-        y: 0,
-        width: myte.size.width,
-        height: myte.size.height,
-        offsetX: 0,
-        offsetY: 0
-    };
+        // Use the collider if available, otherwise fall back to the myte's position and size
+        const collider = myte.collider || {
+            x: 0,
+            y: 0,
+            width: myte.size.width,
+            height: myte.size.height,
+            offsetX: 0,
+            offsetY: 0
+        };
 
-    // Calculate the starting point at the edge of the collider based on direction
-    let edgeX, edgeY;
-    
-    // Calculate the actual collider position
-    const colliderX = myte.posX + (collider.offsetX || 0);
-    const colliderY = myte.posY + (collider.offsetY || 0);
-    const colliderWidth = collider.width || myte.size.width;
-    const colliderHeight = collider.height || myte.size.height;
-    
-    // Calculate the edge point based on direction
-    switch (direction) {
-        case DIRECTION.NORTH:
-            // Use the top-center of the collider
-            edgeX = colliderX + colliderWidth / 2;
-            edgeY = colliderY;
-            break;
-            
-        case DIRECTION.SOUTH:
-            // Use the bottom-center of the collider
-            edgeX = colliderX + colliderWidth / 2;
-            edgeY = colliderY + colliderHeight;
-            break;
-            
-        case DIRECTION.WEST:
-            // Use the left-center of the collider
-            edgeX = colliderX;
-            edgeY = colliderY + colliderHeight / 2;
-            break;
-            
-        case DIRECTION.EAST:
-            // Use the right-center of the collider
-            edgeX = colliderX + colliderWidth;
-            edgeY = colliderY + colliderHeight / 2;
-            break;
-            
-        // Handle diagonal directions if your game supports them
-        case DIRECTION.NORTHEAST:
-            edgeX = colliderX + colliderWidth;
-            edgeY = colliderY;
-            break;
-            
-        case DIRECTION.NORTHWEST:
-            edgeX = colliderX;
-            edgeY = colliderY;
-            break;
-            
-        case DIRECTION.SOUTHEAST:
-            edgeX = colliderX + colliderWidth;
-            edgeY = colliderY + colliderHeight;
-            break;
-            
-        case DIRECTION.SOUTHWEST:
-            edgeX = colliderX;
-            edgeY = colliderY + colliderHeight;
-            break;
-            
-        default:
-            // Default to bottom center if direction is unknown
-            edgeX = colliderX + colliderWidth / 2;
-            edgeY = colliderY + colliderHeight;
-            break;
-    }
+        // Calculate the starting point at the edge of the collider based on direction
+        let edgeX, edgeY;
 
-    // Calculate front tile position (one tile away from the edge)
-    let frontTileX = edgeX;
-    let frontTileY = edgeY;
-    const tileDistance = this.config.cellSize;
+        // Calculate the actual collider position
+        const colliderX = myte.posX + (collider.offsetX || 0);
+        const colliderY = myte.posY + (collider.offsetY || 0);
+        const colliderWidth = collider.width || myte.size.width;
+        const colliderHeight = collider.height || myte.size.height;
 
-    // Move one tile in the faced direction
-    switch (direction) {
-        case DIRECTION.NORTH:
-            frontTileY -= tileDistance;
-            break;
-            
-        case DIRECTION.SOUTH:
-            frontTileY += tileDistance;
-            break;
-            
-        case DIRECTION.WEST:
-            frontTileX -= tileDistance;
-            break;
-            
-        case DIRECTION.EAST:
-            frontTileX += tileDistance;
-            break;
-            
-        // Handle diagonal directions
-        case DIRECTION.NORTHEAST:
-            frontTileX += tileDistance * 0.7071; // cos(45°)
-            frontTileY -= tileDistance * 0.7071; // sin(45°)
-            break;
-            
-        case DIRECTION.NORTHWEST:
-            frontTileX -= tileDistance * 0.7071;
-            frontTileY -= tileDistance * 0.7071;
-            break;
-            
-        case DIRECTION.SOUTHEAST:
-            frontTileX += tileDistance * 0.7071;
-            frontTileY += tileDistance * 0.7071;
-            break;
-            
-        case DIRECTION.SOUTHWEST:
-            frontTileX -= tileDistance * 0.7071;
-            frontTileY += tileDistance * 0.7071;
-            break;
-    }
+        // Calculate the edge point based on direction
+        switch (direction) {
+            case DIRECTION.NORTH:
+                // Use the top-center of the collider
+                edgeX = colliderX + colliderWidth / 2;
+                edgeY = colliderY;
+                break;
 
-    // Get grid position for the front tile
-    const gridPos = this.worldToGrid(frontTileX, frontTileY);
+            case DIRECTION.SOUTH:
+                // Use the bottom-center of the collider
+                edgeX = colliderX + colliderWidth / 2;
+                edgeY = colliderY + colliderHeight;
+                break;
 
-    // Update front tile indicator if it's within the grid bounds
-    if (gridPos.x >= 0 && gridPos.x < this.gridWidth && 
-        gridPos.y >= 0 && gridPos.y < this.gridHeight) {
-        
-        const cell = this.grid[gridPos.x][gridPos.y];
+            case DIRECTION.WEST:
+                // Use the left-center of the collider
+                edgeX = colliderX;
+                edgeY = colliderY + colliderHeight / 2;
+                break;
 
-        // Set the visual indicator position
-        this.debugElements.myteFrontTile.style.left = `${cell.posX}px`;
-        this.debugElements.myteFrontTile.style.top = `${cell.posY}px`;
+            case DIRECTION.EAST:
+                // Use the right-center of the collider
+                edgeX = colliderX + colliderWidth;
+                edgeY = colliderY + colliderHeight / 2;
+                break;
 
-        // Make sure it's visible
-        if (!this.debugElements.myteFrontTile.classList.contains('visible')) {
-            this.debugElements.myteFrontTile.classList.add('visible');
+            // Handle diagonal directions if your game supports them
+            case DIRECTION.NORTHEAST:
+                edgeX = colliderX + colliderWidth;
+                edgeY = colliderY;
+                break;
+
+            case DIRECTION.NORTHWEST:
+                edgeX = colliderX;
+                edgeY = colliderY;
+                break;
+
+            case DIRECTION.SOUTHEAST:
+                edgeX = colliderX + colliderWidth;
+                edgeY = colliderY + colliderHeight;
+                break;
+
+            case DIRECTION.SOUTHWEST:
+                edgeX = colliderX;
+                edgeY = colliderY + colliderHeight;
+                break;
+
+            default:
+                // Default to bottom center if direction is unknown
+                edgeX = colliderX + colliderWidth / 2;
+                edgeY = colliderY + colliderHeight;
+                break;
         }
-        
-        // Optionally, you could add a data attribute to show which direction it's in
-        this.debugElements.myteFrontTile.dataset.direction = direction;
-    } else {
-        // Hide the indicator if outside the grid
-        this.debugElements.myteFrontTile.classList.remove('visible');
+
+        // Calculate front tile position (one tile away from the edge)
+        let frontTileX = edgeX;
+        let frontTileY = edgeY;
+        const tileDistance = this.config.cellSize;
+
+        // Move one tile in the faced direction
+        switch (direction) {
+            case DIRECTION.NORTH:
+                frontTileY -= tileDistance;
+                break;
+
+            case DIRECTION.SOUTH:
+                frontTileY += tileDistance;
+                break;
+
+            case DIRECTION.WEST:
+                frontTileX -= tileDistance;
+                break;
+
+            case DIRECTION.EAST:
+                frontTileX += tileDistance;
+                break;
+
+            // Handle diagonal directions
+            case DIRECTION.NORTHEAST:
+                frontTileX += tileDistance * 0.7071; // cos(45°)
+                frontTileY -= tileDistance * 0.7071; // sin(45°)
+                break;
+
+            case DIRECTION.NORTHWEST:
+                frontTileX -= tileDistance * 0.7071;
+                frontTileY -= tileDistance * 0.7071;
+                break;
+
+            case DIRECTION.SOUTHEAST:
+                frontTileX += tileDistance * 0.7071;
+                frontTileY += tileDistance * 0.7071;
+                break;
+
+            case DIRECTION.SOUTHWEST:
+                frontTileX -= tileDistance * 0.7071;
+                frontTileY += tileDistance * 0.7071;
+                break;
+        }
+
+        // Get grid position for the front tile
+        const gridPos = this.worldToGrid(frontTileX, frontTileY);
+
+        // Update front tile indicator if it's within the grid bounds
+        if (gridPos.x >= 0 && gridPos.x < this.gridWidth &&
+            gridPos.y >= 0 && gridPos.y < this.gridHeight) {
+
+            const cell = this.grid[gridPos.x][gridPos.y];
+
+            // Set the visual indicator position
+            this.debugElements.myteFrontTile.style.left = `${cell.posX}px`;
+            this.debugElements.myteFrontTile.style.top = `${cell.posY}px`;
+
+            // Make sure it's visible
+            if (!this.debugElements.myteFrontTile.classList.contains('visible')) {
+                this.debugElements.myteFrontTile.classList.add('visible');
+            }
+
+            // Optionally, you could add a data attribute to show which direction it's in
+            this.debugElements.myteFrontTile.dataset.direction = direction;
+        } else {
+            // Hide the indicator if outside the grid
+            this.debugElements.myteFrontTile.classList.remove('visible');
+        }
     }
-}
 
     // Modify the existing toggleDebug method 
+    // Enhanced version of the existing toggleDebug method
     toggleDebug() {
         const wasDebugMode = this.debugMode;
         this.debugMode = !this.debugMode;
@@ -496,8 +669,15 @@ updateMyteFrontTile(myte) {
                     }
                 }
             }
-        } else if (this.parent.layers.debug) {
-            this.parent.layers.debug.style.display = 'none';
+        } else {
+            if (this.parent.layers.debug) {
+                this.parent.layers.debug.style.display = 'none';
+            }
+
+            // Hide terrain legend when debug mode is off
+            if (this.debugElements.terrainLegend) {
+                this.debugElements.terrainLegend.style.display = 'none';
+            }
         }
 
         return this.debugMode;
@@ -688,6 +868,7 @@ updateMyteFrontTile(myte) {
     }
 
     // IMPROVED: Update object's position in grid - more efficient implementation
+    // UPDATED: Update object's position in grid with terrain awareness
     updateObjectPosition(obj, oldX, oldY) {
         if (!obj) return; // Safety check
 
@@ -700,6 +881,9 @@ updateMyteFrontTile(myte) {
         const oldCells = this.getObjectCells({ ...obj, posX: oldX, posY: oldY });
         const newCells = this.getObjectCells(obj);
 
+        // Track cells that need terrain update
+        const needsTerrainUpdate = new Set();
+
         // Find cells to remove from (cells in oldCells but not in newCells)
         oldCells.forEach(cell => {
             if (!newCells.has(cell)) {
@@ -710,6 +894,16 @@ updateMyteFrontTile(myte) {
                     const objects = Array.from(cell.objects);
                     cell.objectWalkable = objects.every(o => o.config.walkable);
                     cell.walkable = cell.tileWalkable && cell.objectWalkable;
+                }
+
+                // Add to cells needing terrain update
+                if (obj.terrainType) {
+                    // Get grid coordinates for this cell
+                    const cellX = Math.floor(cell.posX / this.config.cellSize);
+                    const cellY = Math.floor(cell.posY / this.config.cellSize);
+
+                    // Mark for terrain update
+                    needsTerrainUpdate.add(`${cellX},${cellY}`);
                 }
             }
         });
@@ -724,7 +918,37 @@ updateMyteFrontTile(myte) {
                     cell.objectWalkable = false;
                     cell.walkable = cell.tileWalkable && cell.objectWalkable;
                 }
+
+                // Update terrain type if the object modifies terrain
+                if (obj.terrainType) {
+                    // Get grid coordinates for this cell
+                    const cellX = Math.floor(cell.posX / this.config.cellSize);
+                    const cellY = Math.floor(cell.posY / this.config.cellSize);
+
+                    // Update terrain type
+                    this.updateCellTerrain(cellX, cellY, obj.terrainType);
+                }
             }
+        });
+
+        // Process terrain updates for cells the object left
+        needsTerrainUpdate.forEach(key => {
+            const [x, y] = key.split(',').map(Number);
+
+            // Reset to original terrain or recalculate based on remaining objects
+            let newTerrainType = this.grid[x][y].originalTerrainType || 'ground';
+
+            // Check if any other object in the cell defines terrain
+            const objects = Array.from(this.grid[x][y].objects);
+            for (const remainingObj of objects) {
+                if (remainingObj.terrainType) {
+                    newTerrainType = remainingObj.terrainType;
+                    break;
+                }
+            }
+
+            // Update the terrain
+            this.updateCellTerrain(x, y, newTerrainType);
         });
 
         // Check visibility state for active objects management
@@ -741,7 +965,6 @@ updateMyteFrontTile(myte) {
             }
         }
     }
-
     // Get objects in an area
     getObjectsInArea(x, y, width, height) {
         // OPTIMIZATION: Fast bounds checking
@@ -989,7 +1212,7 @@ updateMyteFrontTile(myte) {
             console.warn('[GridSystem] Debug stats element not available for update');
         }
     }
-    // OPTIMIZATION: Efficient grid update from tile map data
+    // Update from tile grid with terrain support
     updateFromTileGrid(tileGridData) {
         if (!tileGridData || !tileGridData.grid) {
             console.warn('[GridSystem] Invalid tile grid data provided');
@@ -1025,6 +1248,7 @@ updateMyteFrontTile(myte) {
                     tileWalkable: true,
                     objectWalkable: true,
                     walkable: true,
+                    terrainType: 'ground', // Default terrain type
                     posX: x * this.config.cellSize,
                     posY: y * this.config.cellSize,
                     width: this.config.cellSize,
@@ -1033,12 +1257,17 @@ updateMyteFrontTile(myte) {
             );
         }
 
-        // Update walkability from tile grid
+        // Update walkability and terrain types from tile grid
         for (let x = 0; x < dataWidth; x++) {
             for (let y = 0; y < dataHeight; y++) {
                 if (x < tileGridData.grid.length && y < tileGridData.grid[x].length) {
                     // Update base tile walkability from tile data
                     this.grid[x][y].tileWalkable = tileGridData.grid[x][y].walkable;
+
+                    // Update terrain type if provided
+                    if (tileGridData.grid[x][y].terrainType) {
+                        this.grid[x][y].terrainType = tileGridData.grid[x][y].terrainType;
+                    }
 
                     // Update combined walkability
                     this.grid[x][y].walkable = this.grid[x][y].tileWalkable && this.grid[x][y].objectWalkable;
@@ -1062,6 +1291,11 @@ updateMyteFrontTile(myte) {
                     // Update walkability for objects that affect it
                     if (!obj.config.walkable) {
                         this.grid[x][y].objectWalkable = false;
+                    }
+
+                    // Update terrain type if the object defines it
+                    if (obj.terrainType) {
+                        this.grid[x][y].terrainType = obj.terrainType;
                     }
                 }
 

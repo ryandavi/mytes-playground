@@ -653,6 +653,12 @@ class ActionSidebarManager extends UIComponent {
         const actionGroups = this.actionControls.querySelector('.action-groups');
         actionGroups.innerHTML = '';
         this.actionControls.classList.remove('visible');
+
+        // empty other info
+        this.actionControls.querySelector('.other-info').innerHTML = '';
+        this.actionControls.querySelector('.other-info').classList.remove('visible');
+
+
     }
 
     updateActions(selectedObject) {
@@ -663,11 +669,38 @@ class ActionSidebarManager extends UIComponent {
         const targetType = selectedInfo.querySelector('.target-info .type');
         const targetName = selectedInfo.querySelector('.target-info .name');
 
+        const otherInfo = this.actionControls.querySelector('.other-info');
+
+
         // Remove all state classes first
         selectedInfo.classList.remove('self-selected', 'myte-interaction', 'map-interaction', 'element-interaction');
         this.emptyActionList();
 
         if (selectedObject) {
+
+            // make div in otherInfo
+            const positionInfo = document.createElement('div');
+            positionInfo.classList.add('position-info');
+
+            // convert to grid coordinates
+            let gridCoords = this.parent.parent.gameMap.gridSystem.worldToGrid(selectedObject.posX, selectedObject.posY);
+
+            // add position info
+            positionInfo.innerHTML =`Coords: [${gridCoords.x}, ${gridCoords.y}]`;
+            positionInfo.innerHTML += `<br>World: (${selectedObject.posX.toFixed(0)}, ${selectedObject.posY.toFixed(0)})`;
+            otherInfo.append(positionInfo);
+
+            // add state info
+            if(selectedObject instanceof DoorMapObject) {
+                const stateInfo = document.createElement('div');
+                stateInfo.classList.add('state-info');
+                stateInfo.innerHTML = `State: ${selectedObject.isOpen ? 'Open' : 'Closed'}`;
+                otherInfo.append(stateInfo);
+            }
+
+            // make visible
+            otherInfo.classList.add('visible');
+
             // Determine interaction type based on selected object
             if (selectedObject === this.parent.getActiveMyte()) {
                 interactionType.textContent = "Selected Self";

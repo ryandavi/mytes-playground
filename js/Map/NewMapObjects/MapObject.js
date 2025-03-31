@@ -506,6 +506,8 @@ const TYPE_CONFIGS = {
 		canToggle: true,
 		default: 'closed',
 
+		canInspect: true,
+
 		// Base configurations
 		spriteConfig: {
 			default: 'closed',
@@ -1732,8 +1734,6 @@ class MapObject {
 				this.parent.parent.ui.setSelected(this);
 			}
 			
-
-
 			// Trigger any onClick handler from config
 			/*
 			const onClick = this.getConfig('onClick');

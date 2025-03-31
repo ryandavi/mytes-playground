@@ -22,15 +22,27 @@ class AStarPathfinder {
             smoothPaths: true,
             pathPaddingFactor: 0.2,
             debug: true,
-            useDirectPathFallback: false  // Whether to use direct path as fallback
+            useDirectPathFallback: false,  // Whether to use direct path as fallback
+            preferPaths: true,             // Whether to prefer established paths
+            avoidDifficultTerrain: true    // Whether to avoid difficult terrain
         };
+
         
         this.entityDimensions = {
             width: 0,
             height: 0
         };
+
+        this.defaultTerrainCost = 1.0;
         
         this.entityCollider = null;
+        
+        // Entity capabilities - defaults if not specified
+        this.entityCapabilities = {
+            can_open_doors: false,
+            can_swim: false,
+            follows_paths: true
+        };
         
         this.debugElements = {
             exploredNodes: new Set(),
@@ -42,14 +54,71 @@ class AStarPathfinder {
     getKey(x, y) {
         return `${x},${y}`;
     }
+    
+    // Set entity capabilities for pathfinding
+    setEntityCapabilities(capabilities) {
+        this.entityCapabilities = { 
+            ...this.entityCapabilities, 
+            ...capabilities 
+        };
+    }
 
-    findPath(startX, startY, endX, endY, entityWidth = 0, entityHeight = 0, collider = null) {
+    // Get terrain type at the specified grid position
+    getTerrainTypeAt(gridX, gridY) {
+        if (gridX < 0 || gridX >= this.gridSystem.gridWidth || 
+            gridY < 0 || gridY >= this.gridSystem.gridHeight) {
+            return 'ground'; // Default for out of bounds
+        }
+        
+        const cell = this.gridSystem.grid[gridX][gridY];
+        
+        // Check for doors first
+        for (const obj of cell.objects) {
+            // Check if it's a door
+            const isDoor = obj.type === 'door' || obj.objectType === 'door' || 
+                         obj.type === 'DOOR' || obj.objectType === 'DOOR';
+            
+            if (isDoor) {
+                const isOpen = typeof obj.isOpen === 'function' ? obj.isOpen() : obj.isOpen;
+                return isOpen ? 'door_open' : 'door_closed';
+            }
+            
+            // Check for terrain-defining objects
+            // This would look for objects that define the terrain type
+            if (obj.terrainType) {
+                return obj.terrainType;
+            }
+        }
+        
+        // If no object defines terrain, check cell properties
+        if (cell.terrainType) {
+            return cell.terrainType;
+        }
+        
+        // Default terrain type based on environment or other factors
+        // This could be enhanced to check the map type or layer data
+        return 'ground';
+    }
+
+    findPath(startX, startY, endX, endY, entityWidth = 0, entityHeight = 0, collider = null, entityCapabilities = null) {
         // Add timestamp for timeout detection
         const startTime = performance.now();
         const timeoutMs = 500; // 500ms timeout
         
         if (this.options.debug) {
             console.log(`Finding path from (${startX.toFixed(0)},${startY.toFixed(0)}) to (${endX.toFixed(0)},${endY.toFixed(0)})`);
+        }
+        
+        // Setup entity capabilities for this path calculation
+        if (entityCapabilities) {
+            this.setEntityCapabilities(entityCapabilities);
+        } else {
+            // Reset to defaults if not provided
+            this.entityCapabilities = {
+                can_open_doors: false,
+                can_swim: false,
+                follows_paths: true
+            };
         }
         
         // Fast path: if start and end are very close, just return direct line
@@ -423,9 +492,20 @@ class AStarPathfinder {
                 continue;
             }
             
+            // Get the terrain type for this cell
+            const terrainType = this.getTerrainTypeAt(newX, newY);
+            
+            // Check if this terrain is traversable based on entity capabilities
+            if (!this.canTraverseTerrain(terrainType)) {
+                if (this.options.debug) {
+                    this.debugElements.rejectedNodes.add(this.getKey(newX, newY));
+                }
+                continue;
+            }
+            
             // Check if the cell is walkable - also check for doors specifically
             const cell = this.gridSystem.grid[newX][newY];
-            if (!cell.walkable && !this.hasDoorInCell(newX, newY)) {
+            if (!cell.walkable && !this.canPassThroughCell(newX, newY)) {
                 if (this.options.debug) {
                     this.debugElements.rejectedNodes.add(this.getKey(newX, newY));
                 }
@@ -446,8 +526,8 @@ class AStarPathfinder {
             if (!this.options.allowDiagonalCutting && 
                 Math.abs(dir.x) === 1 && Math.abs(dir.y) === 1) {
                 // Prevent cutting corners
-                if ((!this.gridSystem.grid[x][newY].walkable && !this.hasDoorInCell(x, newY)) || 
-                    (!this.gridSystem.grid[newX][y].walkable && !this.hasDoorInCell(newX, y))) {
+                if ((!this.gridSystem.grid[x][newY].walkable && !this.canPassThroughCell(x, newY)) || 
+                    (!this.gridSystem.grid[newX][y].walkable && !this.canPassThroughCell(newX, y))) {
                     if (this.options.debug) {
                         this.debugElements.rejectedNodes.add(this.getKey(newX, newY));
                     }
@@ -465,14 +545,35 @@ class AStarPathfinder {
                 }
             }
             
-            neighbors.push({ x: newX, y: newY });
+            neighbors.push({ 
+                x: newX, 
+                y: newY,
+                terrainType: terrainType // Store the terrain type for use in getMovementCost
+            });
         }
         
         return neighbors;
     }
     
-    // Helper method to check for open doors in a cell
-    hasDoorInCell(gridX, gridY) {
+    // New method to check if entity can traverse this terrain type
+    canTraverseTerrain(terrainType) {
+        // Water traversal depends on swim capability
+        if ((terrainType === 'shallow_water' || terrainType === 'deep_water') && 
+            !this.entityCapabilities.can_swim) {
+            return false;
+        }
+        
+        // Closed door traversal depends on door opening capability
+        if (terrainType === 'door_closed' && !this.entityCapabilities.can_open_doors) {
+            return false;
+        }
+        
+        // All other terrain is traversable with varying costs
+        return true;
+    }
+    
+    // Enhanced version of hasDoorInCell that checks if the entity can pass through
+    canPassThroughCell(gridX, gridY) {
         if (gridX < 0 || gridX >= this.gridSystem.gridWidth || 
             gridY < 0 || gridY >= this.gridSystem.gridHeight) {
             return false;
@@ -480,15 +581,24 @@ class AStarPathfinder {
         
         const cell = this.gridSystem.grid[gridX][gridY];
         for (const obj of cell.objects) {
-            const isDoor = obj.type === 'door' || obj.objectType === 'door' || obj.type === 'DOOR' || obj.objectType === 'DOOR';
+            const isDoor = obj.type === 'door' || obj.objectType === 'door' || 
+                         obj.type === 'DOOR' || obj.objectType === 'DOOR';
+            
             if (isDoor) {
                 const isOpen = typeof obj.isOpen === 'function' ? obj.isOpen() : obj.isOpen;
-                if (isOpen) {
-                    return true; // Found an open door
+                
+                // Can pass if door is open or entity can open doors
+                if (isOpen || this.entityCapabilities.can_open_doors) {
+                    return true;
                 }
             }
         }
         return false;
+    }
+    
+    // Helper method to check if a door is present and usable
+    hasDoorInCell(gridX, gridY) {
+        return this.canPassThroughCell(gridX, gridY);
     }
     
     canEntityFitAt(gridX, gridY) {
@@ -498,8 +608,16 @@ class AStarPathfinder {
             return false;
         }
         
+        // Get terrain type for capability check
+        const terrainType = this.getTerrainTypeAt(gridX, gridY);
+        
+        // Check if entity can traverse this terrain
+        if (!this.canTraverseTerrain(terrainType)) {
+            return false;
+        }
+        
         // Basic walkability check from the grid - check for open doors too
-        if (!this.gridSystem.grid[gridX][gridY].walkable && !this.hasDoorInCell(gridX, gridY)) {
+        if (!this.gridSystem.grid[gridX][gridY].walkable && !this.canPassThroughCell(gridX, gridY)) {
             return false;
         }
         
@@ -525,7 +643,8 @@ class AStarPathfinder {
         // Check all cells the entity would overlap
         const cells = this.getEntityOverlappingCells(gridX, gridY);
         for (const cell of cells) {
-            if (!cell.walkable && !this.hasCellWithOpenDoor(cell)) {
+            // If can't traverse the terrain or can't pass through a closed door
+            if (!cell.walkable && !this.canPassThroughCell(gridX, gridY)) {
                 return false;
             }
         }
@@ -542,8 +661,8 @@ class AStarPathfinder {
             
             // Use the parent's collision detection if available
             for (const collider of potentialColliders) {
-                // Skip open doors
-                if (this.isDoorAndOpen(collider)) {
+                // Skip doors if entity can open them
+                if (this.isDoorAndCanPass(collider)) {
                     continue;
                 }
                 // Only check collision with non-walkable objects
@@ -556,8 +675,8 @@ class AStarPathfinder {
         } else {
             // Simple bounding box collision check
             for (const collider of potentialColliders) {
-                // Skip open doors
-                if (this.isDoorAndOpen(collider)) {
+                // Skip doors if entity can open them
+                if (this.isDoorAndCanPass(collider)) {
                     continue;
                 }
                 // Only check collision with non-walkable objects
@@ -572,21 +691,22 @@ class AStarPathfinder {
         return true;
     }
     
-    // Helper method to check if a collider is an open door
-    isDoorAndOpen(obj) {
+    // Enhanced check for doors that considers entity capabilities
+    isDoorAndCanPass(obj) {
         const isDoor = obj.type === 'door' || obj.objectType === 'door' || 
                      obj.type === 'DOOR' || obj.objectType === 'DOOR';
+        
         if (isDoor) {
             const isOpen = typeof obj.isOpen === 'function' ? obj.isOpen() : obj.isOpen;
-            return isOpen;
+            return isOpen || this.entityCapabilities.can_open_doors;
         }
         return false;
     }
     
-    // Helper method to check if a grid cell contains an open door
-    hasCellWithOpenDoor(cell) {
+    // Helper method to check if a grid cell contains a passable door
+    hasCellWithPassableDoor(cell) {
         for (const obj of cell.objects) {
-            if (this.isDoorAndOpen(obj)) {
+            if (this.isDoorAndCanPass(obj)) {
                 return true;
             }
         }
@@ -639,13 +759,36 @@ class AStarPathfinder {
         );
     }
     
+    // Enhanced movement cost calculation based on terrain type
     getMovementCost(from, to) {
-        // Diagonal movement costs more
-        if (from.x !== to.x && from.y !== to.y) {
-            return Math.SQRT2;
+        // Base cost for the move (1.0 for orthogonal, Math.SQRT2 for diagonal)
+        const baseMoveCost = (from.x !== to.x && from.y !== to.y) ? Math.SQRT2 : this.defaultTerrainCost;
+        
+        // Get terrain type at destination
+        const terrainType = to.terrainType || this.getTerrainTypeAt(to.x, to.y);
+        
+        // Get the cost multiplier for this terrain type
+        let terrainMultiplier = GridSystem.terrainCosts[terrainType] || this.defaultTerrainCost;
+        
+        // Apply entity capability modifiers
+        if ((terrainType === 'path' || terrainType === 'floor') && 
+            this.entityCapabilities.follows_paths && this.options.preferPaths) {
+            // Additional preference for paths if entity follows paths
+            terrainMultiplier *= 0.9;
         }
         
-        return 1.0;
+        if ((terrainType === 'grass' || terrainType === 'sand' || terrainType === 'mud') && 
+            !this.options.avoidDifficultTerrain) {
+            // If entity doesn't care about difficult terrain, make cost more neutral
+            terrainMultiplier = (terrainMultiplier + 1.0) / 2;
+        }
+        
+        // Special case for doors - add a small fixed cost for door opening
+        if (terrainType === 'door_closed' && this.entityCapabilities.can_open_doors) {
+            return baseMoveCost * terrainMultiplier + 0.5; // Small fixed cost for door opening
+        }
+        
+        return baseMoveCost * terrainMultiplier;
     }
     
     heuristic(x1, y1, x2, y2) {
@@ -704,6 +847,7 @@ class AStarPathfinder {
         return smoothed;
     }
     
+    // Enhanced line of sight check that considers terrain costs
     hasLineOfSight(start, end) {
         const startGrid = this.gridSystem.worldToGrid(start.x, start.y);
         const endGrid = this.gridSystem.worldToGrid(end.x, end.y);
@@ -717,11 +861,33 @@ class AStarPathfinder {
         let x = startGrid.x;
         let y = startGrid.y;
         
+        // Keep track of total terrain cost along the line
+        let totalCost = 0;
+        const maxTerrainCostRatio = 1.5; // Maximum allowed average terrain cost
+        
+        let steps = 0;
+        
         while (x !== endGrid.x || y !== endGrid.y) {
+            // Check if this cell is walkable by the entity
             if (x < 0 || x >= this.gridSystem.gridWidth || 
                 y < 0 || y >= this.gridSystem.gridHeight ||
-                (!this.gridSystem.grid[x][y].walkable && !this.hasDoorInCell(x, y)) ||
+                (!this.gridSystem.grid[x][y].walkable && !this.canPassThroughCell(x, y)) ||
                 !this.canEntityFitAt(x, y)) {
+                return false;
+            }
+            
+            // Get terrain cost for this cell
+            const terrainType = this.getTerrainTypeAt(x, y);
+            if (!this.canTraverseTerrain(terrainType)) {
+                return false;
+            }
+            
+            // Add cost for this cell
+            totalCost += GridSystem.terrainCosts[terrainType] || this.defaultTerrainCost;
+            steps++;
+            
+            // Check if average terrain cost is too high (inefficient path)
+            if (steps > 3 && (totalCost / steps) > maxTerrainCostRatio) {
                 return false;
             }
             
@@ -740,8 +906,13 @@ class AStarPathfinder {
     }
     
     // Debug method to diagnose door issues
-    diagnoseDoorPathfinding(startX, startY, endX, endY) {
+    diagnoseDoorPathfinding(startX, startY, endX, endY, entityCapabilities = null) {
         console.log('=== DOOR PATHFINDING DIAGNOSIS ===');
+        
+        // Setup entity capabilities for diagnosis
+        if (entityCapabilities) {
+            this.setEntityCapabilities(entityCapabilities);
+        }
         
         const start = this.gridSystem.worldToGrid(startX, startY);
         const end = this.gridSystem.worldToGrid(endX, endY);
@@ -755,6 +926,7 @@ class AStarPathfinder {
         const steps = Math.max(Math.abs(dx), Math.abs(dy));
         
         console.log(`Checking for doors between (${start.x},${start.y}) and (${end.x},${end.y})`);
+        console.log(`Entity capabilities: can_open_doors=${this.entityCapabilities.can_open_doors}, can_swim=${this.entityCapabilities.can_swim}, follows_paths=${this.entityCapabilities.follows_paths}`);
         
         for (let i = 0; i <= steps; i++) {
             const ratio = steps === 0 ? 0 : i / steps;
@@ -765,17 +937,19 @@ class AStarPathfinder {
                 y >= 0 && y < this.gridSystem.gridHeight) {
                 
                 const cell = this.gridSystem.grid[x][y];
-                console.log(`Cell (${x},${y}): walkable=${cell.walkable}, tileWalkable=${cell.tileWalkable}, objectWalkable=${cell.objectWalkable}`);
+                const terrainType = this.getTerrainTypeAt(x, y);
+                console.log(`Cell (${x},${y}): walkable=${cell.walkable}, tileWalkable=${cell.tileWalkable}, objectWalkable=${cell.objectWalkable}, terrain=${terrainType}, cost=${GridSystem.terrainCosts[terrainType] || this.defaultTerrainCost}x`);
                 
-                const hasDoor = this.hasDoorInCell(x, y);
-                console.log(`Has open door: ${hasDoor}`);
+                const canPass = this.canPassThroughCell(x, y);
+                console.log(`Cell passable: ${canPass}`);
                 
                 for (const obj of cell.objects) {
                     const isDoor = obj.type === 'door' || obj.objectType === 'door' || 
                                  obj.type === 'DOOR' || obj.objectType === 'DOOR';
                     if (isDoor) {
                         const isOpen = typeof obj.isOpen === 'function' ? obj.isOpen() : obj.isOpen;
-                        console.log(`DOOR at (${x},${y}): open=${isOpen}, walkable=${obj.config.walkable}`);
+                        const canPass = isOpen || this.entityCapabilities.can_open_doors;
+                        console.log(`DOOR at (${x},${y}): open=${isOpen}, walkable=${obj.config.walkable}, can_pass=${canPass}`);
                         doorCells.push({x, y, door: obj});
                     }
                 }
@@ -794,9 +968,10 @@ class AStarPathfinder {
         
         // Try the actual pathfinding
         const path = this.findPath(startX, startY, endX, endY, 
-            this.entityDimensions.width, this.entityDimensions.height);
+            this.entityDimensions.width, this.entityDimensions.height, 
+            this.entityCollider, entityCapabilities);
         
-        console.log(`Pathfinding result: ${path ? 'Path found' : 'No path found'}`);
+        console.log(`Pathfinding result: ${path ? 'Path found with ' + path.length + ' points' : 'No path found'}`);
         console.log('================================');
         
         return path;
@@ -851,6 +1026,34 @@ class AStarPathfinder {
                 });
                 
                 container.appendChild(node);
+            }
+        }
+        
+        // Visualize terrain costs along the path
+        if (this.options.debug && path.length > 0) {
+            for (let i = 0; i < path.length; i++) {
+                const point = path[i];
+                const gridPos = this.gridSystem.worldToGrid(point.x, point.y);
+                const terrainType = this.getTerrainTypeAt(gridPos.x, gridPos.y);
+                const cost = GridSystem.terrainCosts[terrainType] || this.defaultTerrainCost;
+                
+                const costLabel = document.createElement('div');
+                costLabel.className = 'pathfinder-node terrain-cost debug';
+                
+                Object.assign(costLabel.style, {
+                    left: `${point.x + 5}px`,
+                    top: `${point.y - 10}px`,
+                    fontSize: '8px',
+                    padding: '2px',
+                    position: 'absolute',
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    color: 'white',
+                    borderRadius: '3px',
+                    zIndex: 995
+                });
+                
+                costLabel.textContent = `${terrainType}:${cost.toFixed(1)}`;
+                container.appendChild(costLabel);
             }
         }
         
@@ -914,8 +1117,8 @@ class AStarPathfinder {
             container.appendChild(line);
         }
         
-        this.visualizeEntityCollider(container, path[0], 'start');
-        this.visualizeEntityCollider(container, path[path.length - 1], 'end');
+        // this.visualizeEntityCollider(container, path[0], 'start');
+        // this.visualizeEntityCollider(container, path[path.length - 1], 'end');
     }
 
     visualizeEntityCollider(container, point, nodeType) {
@@ -947,8 +1150,118 @@ class AStarPathfinder {
         this.options.debug = enabled;
     }
     
-    // New method to manually check walkability at a specific grid location
-    checkWalkableAt(gridX, gridY) {
+    // Method to visualize terrain costs across the map
+    visualizeTerrainCosts(container, area = null) {
+        if (!container) return;
+        
+        // Clear existing cost visualizations
+        const existingCosts = container.querySelectorAll('.terrain-cost-overlay');
+        existingCosts.forEach(node => node.remove());
+        
+        // Define the area to visualize (default to visible area)
+        const bounds = area || (this.gridSystem.lastCullingBounds || {
+            left: 0,
+            top: 0,
+            right: this.gridSystem.parent.dimensions.width,
+            bottom: this.gridSystem.parent.dimensions.height
+        });
+        
+        // Convert to grid coordinates
+        const startGrid = this.gridSystem.worldToGrid(bounds.left, bounds.top);
+        const endGrid = this.gridSystem.worldToGrid(bounds.right, bounds.bottom);
+        
+        // Create a semi-transparent overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'terrain-cost-overlay debug';
+        
+        Object.assign(overlay.style, {
+            position: 'absolute',
+            left: `${bounds.left}px`,
+            top: `${bounds.top}px`,
+            width: `${bounds.right - bounds.left}px`,
+            height: `${bounds.bottom - bounds.top}px`,
+            backgroundColor: 'rgba(0, 0, 0, 0.1)',
+            zIndex: 970,
+            display: 'grid',
+            gridTemplateColumns: `repeat(${endGrid.x - startGrid.x + 1}, ${this.gridSystem.config.cellSize}px)`,
+            gridTemplateRows: `repeat(${endGrid.y - startGrid.y + 1}, ${this.gridSystem.config.cellSize}px)`
+        });
+        
+        // Add cells with color coding based on terrain cost
+        for (let y = startGrid.y; y <= endGrid.y; y++) {
+            for (let x = startGrid.x; x <= endGrid.x; x++) {
+                if (x >= 0 && x < this.gridSystem.gridWidth && 
+                    y >= 0 && y < this.gridSystem.gridHeight) {
+                    
+                    const terrainType = this.getTerrainTypeAt(x, y);
+                    const cost = GridSystem.terrainCosts[terrainType] || this.defaultTerrainCost;
+                    
+                    const cell = document.createElement('div');
+                    cell.className = `terrain-cost-cell terrain-${terrainType}`;
+                    
+                    // Color based on cost (green for low, yellow for medium, red for high)
+                    let color;
+                    if (cost <= 0.9) color = `rgba(0, 255, 0, ${0.2 + 0.3 * (1 - cost)})`;  // Green for preferred
+                    else if (cost <= 1.5) color = `rgba(255, 255, 0, ${0.1 + 0.2 * (cost - 0.9)})`;  // Yellow for medium
+                    else color = `rgba(255, 0, 0, ${0.1 + 0.4 * Math.min(1, (cost - 1.5) / 3.5)})`;  // Red for high cost
+                    
+                    Object.assign(cell.style, {
+                        backgroundColor: color,
+                        position: 'relative',
+                        textAlign: 'center',
+                        fontSize: '8px',
+                        lineHeight: `${this.gridSystem.config.cellSize}px`,
+                        color: 'white',
+                        textShadow: '1px 1px 1px black'
+                    });
+                    
+                    // Add cost as text
+                    if (cost !== this.defaultTerrainCost) {
+                        cell.textContent = cost.toFixed(1) + 'x';
+                    }
+                    
+                    overlay.appendChild(cell);
+                }
+            }
+        }
+        
+        container.appendChild(overlay);
+        
+        // Add a legend
+        const legend = document.createElement('div');
+        legend.className = 'terrain-cost-legend debug';
+        
+        Object.assign(legend.style, {
+            position: 'absolute',
+            right: '10px',
+            top: '10px',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            color: 'white',
+            padding: '5px',
+            borderRadius: '5px',
+            fontSize: '10px',
+            zIndex: 1100
+        });
+        
+        legend.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 5px">Terrain Costs</div>
+            ${Object.entries(GridSystem.terrainCosts)
+                .map(([type, cost]) => `<div><span style="color: ${cost <= 0.9 ? 'lightgreen' : cost <= 1.5 ? 'yellow' : 'salmon'}">${type}</span>: ${cost.toFixed(1)}x</div>`)
+                .join('')}
+        `;
+        
+        container.appendChild(legend);
+        
+        return overlay;
+    }
+    
+    // Method to manually check walkability at a specific grid location
+    checkWalkableAt(gridX, gridY, entityCapabilities = null) {
+        // Apply entity capabilities if provided
+        if (entityCapabilities) {
+            this.setEntityCapabilities(entityCapabilities);
+        }
+        
         // Boundary check
         if (gridX < 0 || gridX >= this.gridSystem.gridWidth || 
             gridY < 0 || gridY >= this.gridSystem.gridHeight) {
@@ -957,10 +1270,20 @@ class AStarPathfinder {
         }
         
         const cell = this.gridSystem.grid[gridX][gridY];
+        const terrainType = this.getTerrainTypeAt(gridX, gridY);
+        
         console.log(`Checking cell at (${gridX}, ${gridY}):`);
         console.log(`- Cell walkable: ${cell.walkable}`);
         console.log(`- Tile walkable: ${cell.tileWalkable}`);
         console.log(`- Object walkable: ${cell.objectWalkable}`);
+        console.log(`- Terrain type: ${terrainType}`);
+        console.log(`- Terrain cost: ${GridSystem.terrainCosts[terrainType] || this.defaultTerrainCost}x`);
+        
+        // Check if terrain is traversable based on entity capabilities
+        if (!this.canTraverseTerrain(terrainType)) {
+            console.log(`- Cell not traversable due to terrain type (${terrainType}) and entity capabilities`);
+            return false;
+        }
         
         // Check for doors
         let hasDoor = false;
@@ -969,10 +1292,11 @@ class AStarPathfinder {
                          obj.type === 'DOOR' || obj.objectType === 'DOOR';
             if (isDoor) {
                 const isOpen = typeof obj.isOpen === 'function' ? obj.isOpen() : obj.isOpen;
-                console.log(`- Door found: open=${isOpen}, walkable=${obj.config.walkable}`);
+                const canPass = isOpen || this.entityCapabilities.can_open_doors;
+                console.log(`- Door found: open=${isOpen}, walkable=${obj.config.walkable}, can_pass=${canPass}`);
                 hasDoor = true;
-                if (isOpen) {
-                    console.log(`- Cell is passable because door is open`);
+                if (canPass) {
+                    console.log(`- Cell is passable because door is open or entity can open doors`);
                     return true;
                 }
             }

@@ -45,8 +45,8 @@ class AStarMoveAction extends MyteAction {
             const entityHeight = myteCollider.height;
             
             // Calculate start position (center of myte's collider)
-            const startX = this.myte.posX + myteCollider.offsetX + myteCollider.width / 2;
-            const startY = this.myte.posY + myteCollider.offsetY + myteCollider.height / 2;
+            const startX = this.myte.posX;
+            const startY = this.myte.posY;
             
             console.log(`Finding A* path from (${startX}, ${startY}) to (${targetX}, ${targetY})`);
             

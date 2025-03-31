@@ -1,3 +1,5 @@
+// Enhanced DoorMapObject class with pathfinding integration
+
 class DoorMapObject extends AnimatedMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         // Process the direction before calling super
@@ -15,6 +17,9 @@ class DoorMapObject extends AnimatedMapObject {
         this.isAnimating = false;
         this.facingDirection = processedConfig.facingDirection || direction;
         this.teleportTarget = options.teleportTarget || null;
+        
+        // Define terrain type for pathfinding
+        this.terrainType = 'door_closed';
         
         // Initialize collision state based on door being closed by default
         this.updateCollisionState();
@@ -34,12 +39,12 @@ class DoorMapObject extends AnimatedMapObject {
         }
         
         // Call parent interact for basic interaction tracking
-        super.interact(myte);
+        super.press(myte);
         
         return true;
     }
     
-    // Door-specific methods
+    // Enhanced open method with pathfinding updates
     open() {
         if (this.isOpen || this.isAnimating) return;
         
@@ -50,6 +55,9 @@ class DoorMapObject extends AnimatedMapObject {
             this.isOpen = true;
             this.isAnimating = false;
             
+            // Update terrain type for pathfinding
+            this.terrainType = 'door_open';
+            
             // Update collision after animation completes
             this.updateCollisionState();
             
@@ -57,9 +65,19 @@ class DoorMapObject extends AnimatedMapObject {
             if (this.hasAnimation('open')) {
                 this.playAnimation('open');
             }
+            
+            // Emit an event that pathfinding-related systems can listen for
+            if (this.parent && this.parent.eventManager) {
+                this.parent.eventManager.emit('door_state_changed', {
+                    door: this,
+                    state: 'open',
+                    position: { x: this.posX, y: this.posY }
+                });
+            }
         });
     }
     
+    // Enhanced close method with pathfinding updates
     close() {
         if (!this.isOpen || this.isAnimating) return;
         
@@ -70,6 +88,9 @@ class DoorMapObject extends AnimatedMapObject {
             this.isOpen = false;
             this.isAnimating = false;
             
+            // Update terrain type for pathfinding
+            this.terrainType = 'door_closed';
+            
             // Update collision after animation completes
             this.updateCollisionState();
             
@@ -77,10 +98,19 @@ class DoorMapObject extends AnimatedMapObject {
             if (this.hasAnimation('closed')) {
                 this.playAnimation('closed');
             }
+            
+            // Emit an event that pathfinding-related systems can listen for
+            if (this.parent && this.parent.eventManager) {
+                this.parent.eventManager.emit('door_state_changed', {
+                    door: this,
+                    state: 'closed',
+                    position: { x: this.posX, y: this.posY }
+                });
+            }
         });
     }
     
-    // Update collision state based on door open/closed state
+    // Enhanced update collision state method with pathfinding updates
     updateCollisionState() {
         this.config.walkable = this.isOpen;
         this.config.collision = !this.isOpen;
@@ -91,12 +121,32 @@ class DoorMapObject extends AnimatedMapObject {
             this.parent.gameMap.gridSystem.removeObject(this);
             // Add back to grid with new walkable status
             this.parent.gameMap.gridSystem.addObject(this);
+            
+            // Update pathfinding visualization if debug mode is enabled
+            if (this.parent.gameMap.gridSystem.pathfinder.options.debug) {
+                const pathfinder = this.parent.gameMap.gridSystem.pathfinder;
+                pathfinder.debugElements.path = []; // Clear current path
+                
+                // If we have a debug layer, refresh the visualization
+                if (this.parent.gameMap.layers.debug) {
+                    // Remove any previous path visualization
+                    const existingNodes = this.parent.gameMap.layers.debug.querySelectorAll('.pathfinder-node');
+                    existingNodes.forEach(node => node.remove());
+                }
+            }
         }
     }
     
-    // Teleport a myte if this door has a teleport target
+    // Enhanced teleport method with pathfinding context
     teleportMyte(myte) {
         if (!this.teleportTarget || !this.isOpen) return;
+        
+        // Store pathfinding capabilities before teleport
+        const entityCapabilities = {
+            can_open_doors: myte.canOpenDoors || false,
+            can_swim: myte.canSwim || false,
+            follows_paths: myte.followsPaths !== false
+        };
         
         // Check if teleport target is valid
         if (typeof this.teleportTarget === 'string') {
@@ -106,10 +156,18 @@ class DoorMapObject extends AnimatedMapObject {
             // Teleport within the same map
             myte.setPosition(this.teleportTarget.x, this.teleportTarget.y);
             myte.queue.addExpression('teleport');
+            
+            // Reset path if entity has AI pathfinding
+            if (myte.ai && typeof myte.ai.resetPath === 'function') {
+                // Reset AI path with the same capabilities
+                setTimeout(() => {
+                    myte.ai.resetPath(entityCapabilities);
+                }, 100); // Small delay to allow teleport to complete
+            }
         }
     }
     
-    // Check if a myte is trying to walk through the door
+    // Enhanced check for mytes trying to walk through the door
     checkMytePassThrough(myte) {
         if (!this.isOpen) return;
         
@@ -130,6 +188,7 @@ class DoorMapObject extends AnimatedMapObject {
         // Add door-specific classes
         element.classList.add('door');
         element.classList.add(`facing-${this.facingDirection.toLowerCase()}`);
+        element.classList.add(this.isOpen ? 'open' : 'closed');
         
         // Get the sprite element
         const spriteElement = element.querySelector('.sprite');
