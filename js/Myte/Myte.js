@@ -82,6 +82,8 @@ class Myte {
 			offsetY: this.size.height * 0.6 // Position at the bottom for proper z-sorting
 		};
 
+
+
 		this.physics = {
 			gravity: 0.3,                // Gravity acceleration
 			terminalVelocity: 12,        // Maximum falling speed

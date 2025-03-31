@@ -139,7 +139,6 @@
   <properties>
    <property name="displayName" value="Your House"/>
   </properties>
-  <object id="2" name="Fence" x="64" y="704" width="32" height="64"/>
   <object id="5" name="Door" x="576" y="704" width="32" height="96">
    <properties>
     <property name="direction" value="Right"/>
@@ -196,22 +195,11 @@
     <property name="type" value="myte"/>
    </properties>
   </object>
-  <object id="82" name="Door" x="363" y="537.5" width="32" height="96">
+  <object id="82" name="Door" x="352" y="544" width="32" height="96">
    <properties>
     <property name="direction" value="Left"/>
    </properties>
   </object>
-  <object id="83" name="Fence" x="64" y="768" width="32" height="64"/>
-  <object id="84" name="Fence" x="64" y="832" width="32" height="64"/>
-  <object id="85" name="Fence" x="64" y="928" width="32" height="64" rotation="270"/>
-  <object id="86" name="Fence" x="128" y="928" width="32" height="64" rotation="270"/>
-  <object id="87" name="Fence" x="192" y="928" width="32" height="64" rotation="270"/>
-  <object id="88" name="Fence" x="224" y="704" width="32" height="64"/>
-  <object id="89" name="Fence" x="224" y="768" width="32" height="64"/>
-  <object id="90" name="Fence" x="224" y="832" width="32" height="64"/>
-  <object id="91" name="Fence" x="64" y="704" width="32" height="64" rotation="270"/>
-  <object id="92" name="Fence" x="192" y="704" width="32" height="64" rotation="270"/>
-  <object id="93" name="Gate" x="128" y="704" width="32" height="64" rotation="270"/>
   <object id="106" name="Grass" x="62" y="316" width="64" height="64">
    <properties>
     <property name="variant" value="grass_1"/>

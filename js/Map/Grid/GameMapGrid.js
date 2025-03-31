@@ -12,10 +12,9 @@ class GridSystem {
             width: parent.dimensions.width || 2000,  // Total width of the map
             height: parent.dimensions.height || 2000, // Total height of the map
             cullingPadding: config.cullingPadding || -64, // Increased padding for better culling behavior
-            showTerrainColors: config.showTerrainColors || false // Whether to color cells based on terrain
+            showTerrainColors: config.showTerrainColors || false, // Whether to color cells based on terrain
+            showTerrainCosts: config.showTerrainCosts || false
         };
-
-
 
         this.lastCameraPos = { x: -9999, y: -9999 }; // Initialize to force first update
 
@@ -30,7 +29,7 @@ class GridSystem {
                 tileWalkable: true, // Base tile walkability (from map data)
                 objectWalkable: true, // Whether objects in this cell allow walking
                 walkable: true, // Combined walkability status
-                terrainType: 'ground', // Default terrain type for pathfinding
+                terrainType: GridSystem.defaultTerrain, // Default terrain type for pathfinding
                 // Store cell position and dimensions
                 posX: x * this.config.cellSize,
                 posY: y * this.config.cellSize,
@@ -77,7 +76,7 @@ class GridSystem {
 
     // Default terrain movement cost multipliers
     static terrainCosts = {
-        'path': 0.8,        // Paved paths/roads (preferred)
+        'path': 0.4,        // Paved paths/roads (preferred)
         'floor': 0.9,       // Indoor flooring/carpet (slightly preferred)
         'ground': 1.0,      // Regular ground (baseline)
         'grass': 1.2,       // Tall grass (slightly avoided)
@@ -85,9 +84,13 @@ class GridSystem {
         'mud': 1.8,         // Mud/snow (strongly avoided)
         'shallow_water': 2.5, // Shallow water (avoided unless necessary)
         'deep_water': 5.0,  // Deep water (heavily avoided)
+
         'door_closed': 5.0, // Closed doors (high cost unless can_open_doors)
         'door_open': 1.0    // Open doors (normal passage)
     };
+
+    static defaultTerrain = 'ground';
+    static defaultTerrainCost = 1.0;
 
     // Add this method to update grid cells with terrain data
     updateCellTerrain(gridX, gridY, terrainType) {
@@ -121,7 +124,7 @@ class GridSystem {
         if (!cellElement) return;
 
         // Get the terrain type for this cell
-        const terrainType = this.grid[gridX][gridY].terrainType || 'ground';
+        const terrainType = this.grid[gridX][gridY].terrainType || GridSystem.defaultTerrain;
 
         // Update the cell background color based on terrain
         if (this.terrainColors[terrainType]) {
@@ -132,7 +135,7 @@ class GridSystem {
 
             // Add cost label if debugging terrain costs
             if (this.pathfinder && this.config.showTerrainCosts) {
-                const cost = GridSystem.terrainCosts[terrainType] || 1.0;
+                const cost = GridSystem.terrainCosts[terrainType] || GridSystem.defaultTerrainCost;
 
                 // Add or update cost label
                 let costLabel = cellElement.querySelector('.terrain-cost');
@@ -415,7 +418,7 @@ class GridSystem {
 
             // Add entries for each terrain type
             Object.entries(this.terrainColors).forEach(([type, color]) => {
-                const cost = GridSystem.terrainCosts[type] || 1.0;
+                const cost = GridSystem.terrainCosts[type] || GridSystem.defaultTerrainCost;
                 html += `
             <div style="display: flex; align-items: center; margin-bottom: 2px">
                 <div style="width: 12px; height: 12px; background-color: ${color}; margin-right: 5px; border: 1px solid white;"></div>
@@ -936,7 +939,7 @@ class GridSystem {
             const [x, y] = key.split(',').map(Number);
 
             // Reset to original terrain or recalculate based on remaining objects
-            let newTerrainType = this.grid[x][y].originalTerrainType || 'ground';
+            let newTerrainType = this.grid[x][y].originalTerrainType || GridSystem.defaultTerrain;
 
             // Check if any other object in the cell defines terrain
             const objects = Array.from(this.grid[x][y].objects);
@@ -1248,7 +1251,7 @@ class GridSystem {
                     tileWalkable: true,
                     objectWalkable: true,
                     walkable: true,
-                    terrainType: 'ground', // Default terrain type
+                    terrainType: GridSystem.defaultTerrain, // Default terrain type
                     posX: x * this.config.cellSize,
                     posY: y * this.config.cellSize,
                     width: this.config.cellSize,

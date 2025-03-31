@@ -3,7 +3,7 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "walls3.tsx",
+    "activeFile": "Outside.tmx",
     "expandedProjectPaths": [
         "."
     ],
@@ -14,15 +14,15 @@
         },
         "House.tmx": {
             "expandedObjectLayers": [
-                10,
                 9,
-                7
+                7,
+                10
             ],
             "scale": 1,
             "selectedLayer": 3,
             "viewCenter": {
-                "x": 480,
-                "y": 480
+                "x": 1102,
+                "y": 883
             }
         },
         "HouseNew.tmx": {
@@ -38,14 +38,14 @@
         },
         "Outside.tmx": {
             "expandedObjectLayers": [
-                4,
-                7
+                7,
+                4
             ],
             "scale": 1,
-            "selectedLayer": 3,
+            "selectedLayer": 4,
             "viewCenter": {
-                "x": 515,
-                "y": 320
+                "x": 495,
+                "y": 671
             }
         },
         "house.tsx": {
@@ -55,7 +55,7 @@
         },
         "walls3.tsx": {
             "scaleInDock": 1,
-            "scaleInEditor": 2
+            "scaleInEditor": 3
         }
     },
     "last.imagePath": "C:/xampp/htdocs/genes/chat/neko/images/MapObjects",
@@ -68,9 +68,9 @@
     "project": "Mytes Spritesheets.tiled-project",
     "property.type": "string",
     "recentFiles": [
+        "walls3.tsx",
         "House.tmx",
         "Outside.tmx",
-        "walls3.tsx",
         "HouseNew.tmx",
         "house.tsx"
     ],

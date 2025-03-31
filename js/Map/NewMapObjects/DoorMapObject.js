@@ -44,98 +44,135 @@ class DoorMapObject extends AnimatedMapObject {
         return true;
     }
     
-    // Enhanced open method with pathfinding updates
-    open() {
-        if (this.isOpen || this.isAnimating) return;
-        
-        this.isAnimating = true;
-        
-        // Play opening animation
-        this.playAnimation('opening', () => {
-            this.isOpen = true;
-            this.isAnimating = false;
-            
-            // Update terrain type for pathfinding
-            this.terrainType = 'door_open';
-            
-            // Update collision after animation completes
-            this.updateCollisionState();
-            
-            // Switch to open state animation if it exists
-            if (this.hasAnimation('open')) {
-                this.playAnimation('open');
-            }
-            
-            // Emit an event that pathfinding-related systems can listen for
-            if (this.parent && this.parent.eventManager) {
-                this.parent.eventManager.emit('door_state_changed', {
-                    door: this,
-                    state: 'open',
-                    position: { x: this.posX, y: this.posY }
-                });
-            }
-        });
-    }
+// No need to replace the entire class, just these specific methods
+
+// Enhanced open method with improved pathfinding updates
+open() {
+    if (this.isOpen || this.isAnimating) return;
     
-    // Enhanced close method with pathfinding updates
-    close() {
-        if (!this.isOpen || this.isAnimating) return;
-        
-        this.isAnimating = true;
-        
-        // Play closing animation
-        this.playAnimation('closing', () => {
-            this.isOpen = false;
-            this.isAnimating = false;
-            
-            // Update terrain type for pathfinding
-            this.terrainType = 'door_closed';
-            
-            // Update collision after animation completes
-            this.updateCollisionState();
-            
-            // Switch to closed state animation if it exists
-            if (this.hasAnimation('closed')) {
-                this.playAnimation('closed');
-            }
-            
-            // Emit an event that pathfinding-related systems can listen for
-            if (this.parent && this.parent.eventManager) {
-                this.parent.eventManager.emit('door_state_changed', {
-                    door: this,
-                    state: 'closed',
-                    position: { x: this.posX, y: this.posY }
-                });
-            }
-        });
-    }
+    this.isAnimating = true;
     
-    // Enhanced update collision state method with pathfinding updates
-    updateCollisionState() {
-        this.config.walkable = this.isOpen;
-        this.config.collision = !this.isOpen;
+    // Play opening animation
+    this.playAnimation('opening', () => {
+        this.isOpen = true;
+        this.isAnimating = false;
         
-        // If the door is part of a grid system, update its cells
-        if (this.parent?.gameMap?.gridSystem) {
-            // Remove from grid to update walkable status
-            this.parent.gameMap.gridSystem.removeObject(this);
-            // Add back to grid with new walkable status
-            this.parent.gameMap.gridSystem.addObject(this);
+        // Update terrain type for pathfinding
+        this.terrainType = 'door_open';
+        
+        // Update grid terrain type
+        this.updateGridTerrain();
+        
+        // Update collision after animation completes
+        this.updateCollisionState();
+        
+        // Switch to open state animation if it exists
+        if (this.hasAnimation('open')) {
+            this.playAnimation('open');
+        }
+        
+        // Emit an event that pathfinding-related systems can listen for
+        if (this.parent && this.parent.eventManager) {
+            this.parent.eventManager.emit('door_state_changed', {
+                door: this,
+                state: 'open',
+                position: { x: this.posX, y: this.posY }
+            });
+        }
+    });
+}
+
+// Enhanced close method with improved pathfinding updates
+close() {
+    if (!this.isOpen || this.isAnimating) return;
+    
+    this.isAnimating = true;
+    
+    // Play closing animation
+    this.playAnimation('closing', () => {
+        this.isOpen = false;
+        this.isAnimating = false;
+        
+        // Update terrain type for pathfinding
+        this.terrainType = 'door_closed';
+        
+        // Update grid terrain type
+        this.updateGridTerrain();
+        
+        // Update collision after animation completes
+        this.updateCollisionState();
+        
+        // Switch to closed state animation if it exists
+        if (this.hasAnimation('closed')) {
+            this.playAnimation('closed');
+        }
+        
+        // Emit an event that pathfinding-related systems can listen for
+        if (this.parent && this.parent.eventManager) {
+            this.parent.eventManager.emit('door_state_changed', {
+                door: this,
+                state: 'closed',
+                position: { x: this.posX, y: this.posY }
+            });
+        }
+    });
+}
+
+// Add a new method to update grid terrain
+updateGridTerrain() {
+    // Ensure we have access to grid system
+    if (this.parent?.gameMap?.gridSystem) {
+        const gridSystem = this.parent.gameMap.gridSystem;
+        const gridPos = gridSystem.worldToGrid(this.posX, this.posY);
+        
+        // Update terrain type in the grid cell
+        gridSystem.updateCellTerrain(gridPos.x, gridPos.y, this.terrainType);
+        
+        // If door is larger than one cell, update adjacent cells too
+        if (this.collider && (this.collider.width > gridSystem.config.cellSize || 
+            this.collider.height > gridSystem.config.cellSize)) {
             
-            // Update pathfinding visualization if debug mode is enabled
-            if (this.parent.gameMap.gridSystem.pathfinder.options.debug) {
-                const pathfinder = this.parent.gameMap.gridSystem.pathfinder;
-                pathfinder.debugElements.path = []; // Clear current path
-                
-                // If we have a debug layer, refresh the visualization
-                if (this.parent.gameMap.layers.debug) {
-                    // Remove any previous path visualization
-                    const existingNodes = this.parent.gameMap.layers.debug.querySelectorAll('.pathfinder-node');
-                    existingNodes.forEach(node => node.remove());
+            const endPos = gridSystem.worldToGrid(
+                this.posX + this.collider.width, 
+                this.posY + this.collider.height
+            );
+            
+            // Update all cells the door covers
+            for (let x = gridPos.x; x <= endPos.x; x++) {
+                for (let y = gridPos.y; y <= endPos.y; y++) {
+                    gridSystem.updateCellTerrain(x, y, this.terrainType);
                 }
             }
         }
+        
+        // Force grid system to update pathfinding visualization if in debug mode
+        if (gridSystem.pathfinder && gridSystem.pathfinder.options.debug) {
+            // Refresh diagnostic visualization
+            if (this.parent.gameMap.testPathfinding) {
+                setTimeout(() => {
+                    this.parent.gameMap.testPathfinding();
+                }, 50); // Small delay to ensure terrain update is applied
+            }
+        }
     }
+}
+
+// Enhanced updateCollisionState method with pathfinding integration
+updateCollisionState() {
+    this.config.walkable = this.isOpen;
+    this.config.collision = !this.isOpen;
+    
+    // Update grid terrain before updating object
+    this.updateGridTerrain();
+    
+    // If the door is part of a grid system, update its cells
+    if (this.parent?.gameMap?.gridSystem) {
+        // Remove from grid to update walkable status
+        this.parent.gameMap.gridSystem.removeObject(this);
+        // Add back to grid with new walkable status
+        this.parent.gameMap.gridSystem.addObject(this);
+    }
+}
     
     // Enhanced teleport method with pathfinding context
     teleportMyte(myte) {

@@ -314,76 +314,91 @@
  <tile id="105">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="106">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="107">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="108">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="109">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="116">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="117">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="118">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="119">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="120">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="127">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="128">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="129">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="130">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <tile id="131">
   <properties>
    <property name="terrain" value="water"/>
+   <property name="type" value="collider"/>
   </properties>
  </tile>
  <wangsets>

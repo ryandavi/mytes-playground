@@ -9,8 +9,6 @@ class TileMapLoader {
 		// Canvas elements for rendering
 		this.layerCanvases = new Map(); // Store canvases for each layer
 
-		this.defaultTerrain = 'ground';
-
 		// Default terrain mapping
 		this.terrainMapping = {
 			// Map Tiled property names to our terrain type names
@@ -608,7 +606,7 @@ class TileMapLoader {
 	
 				if (terrain) {
 					// Map to our internal terrain type system
-					const terrainType = this.terrainMapping[terrain.toLowerCase()] || this.defaultTerrain;
+					const terrainType = this.terrainMapping[terrain.toLowerCase()] || GridSystem.defaultTerrain;
 					
 					// Save using global tile ID (tileset firstgid + local tile id)
 					const globalTileId = tileset.firstgid + parseInt(tileIdStr);
@@ -808,104 +806,111 @@ class TileMapLoader {
 	/**
 	 * Enhanced grid data generation with terrain types
 	 */
-	generateGridData(mapData, gridConfig = {}) {
-		const { tileWidth, tileHeight, width, height } = mapData.TileData;
-		const collisionLayerName = gridConfig.collisionLayer || 'Collider';
-	
-		// Find the collision layer
-		const collisionLayer = mapData.TileData.layers.find(l => l.name === collisionLayerName);
-		if (!collisionLayer) {
-			console.warn(`Collision layer "${collisionLayerName}" not found. Grid will be fully walkable.`);
+/**
+ * Enhanced grid data generation with terrain types, using top-most visible layer
+ */
+generateGridData(mapData, gridConfig = {}) {
+	const { tileWidth, tileHeight, width, height } = mapData.TileData;
+	const collisionLayerName = gridConfig.collisionLayer || 'Collider';
+
+	// Find the collision layer
+	const collisionLayer = mapData.TileData.layers.find(l => l.name === collisionLayerName);
+	if (!collisionLayer) {
+		console.warn(`Collision layer "${collisionLayerName}" not found. Grid will be fully walkable.`);
+	}
+
+	// Determine cell size for the grid
+	const cellSize = gridConfig.cellSize || tileWidth;
+
+	// Calculate grid dimensions
+	const gridWidth = Math.ceil(mapData.dimensions.width / cellSize);
+	const gridHeight = Math.ceil(mapData.dimensions.height / cellSize);
+
+	// Create grid cells
+	const grid = [];
+	for (let x = 0; x < gridWidth; x++) {
+		grid[x] = [];
+		for (let y = 0; y < gridHeight; y++) {
+			grid[x][y] = {
+				x: x * cellSize,
+				y: y * cellSize,
+				walkable: true,
+				objects: new Set(),
+				terrainType: GridSystem.defaultTerrain // Default terrain type
+			};
 		}
-	
-		// Determine cell size for the grid
-		const cellSize = gridConfig.cellSize || tileWidth;
-	
-		// Calculate grid dimensions
-		const gridWidth = Math.ceil(mapData.dimensions.width / cellSize);
-		const gridHeight = Math.ceil(mapData.dimensions.height / cellSize);
-	
-		// Create grid cells
-		const grid = [];
-		for (let x = 0; x < gridWidth; x++) {
-			grid[x] = [];
-			for (let y = 0; y < gridHeight; y++) {
-				grid[x][y] = {
-					x: x * cellSize,
-					y: y * cellSize,
-					walkable: true,
-					objects: new Set(),
-					terrainType: this.defaultTerrain // Default terrain type
-				};
-			}
-		}
-	
-		// Mark cells as unwalkable based on collision layer
-		if (collisionLayer) {
-			for (let y = 0; y < height; y++) {
-				for (let x = 0; x < width; x++) {
-					const index = y * width + x;
-					const gid = collisionLayer.data[index];
-	
-					if (gid !== 0) {
-						// This tile has collision, mark the corresponding grid cells as unwalkable
-						const tileX = x * tileWidth;
-						const tileY = y * tileHeight;
-	
-						// Mark grid cells covered by this tile as unwalkable
-						this.markGridCellsUnwalkable(grid, tileX, tileY, tileWidth, tileHeight, cellSize);
-					}
-				}
-			}
-		}
-	
-		// Apply terrain types based on all layers, using lowest cost approach
-		if (mapData.terrainTypes) {
-			for (let y = 0; y < height; y++) {
-				for (let x = 0; x < width; x++) {
+	}
+
+	// Mark cells as unwalkable based on collision layer
+	if (collisionLayer) {
+		for (let y = 0; y < height; y++) {
+			for (let x = 0; x < width; x++) {
+				const index = y * width + x;
+				const gid = collisionLayer.data[index];
+
+				if (gid !== 0) {
+					// This tile has collision, mark the corresponding grid cells as unwalkable
 					const tileX = x * tileWidth;
 					const tileY = y * tileHeight;
-					
-					// Start with default terrain and cost
-					let currentTerrainType = this.defaultTerrain;
-					let currentCost = GridSystem.terrainCosts[this.defaultTerrain] || 1.0;
-					
-					// Check each layer for better terrain
-					for (const layer of mapData.TileData.layers) {
-						if (!layer.visible) continue;
-						
-						const index = y * width + x;
-						const gid = layer.data[index];
-						
-						if (gid !== 0) {
-							// Get terrain type for this tile
-							const terrainType = mapData.terrainTypes.get(gid);
-							if (terrainType) {
-								// Get cost for this terrain type
-								const terrainCost = GridSystem.terrainCosts[terrainType] || 1.0;
-								
-								// If this terrain has a lower cost, use it instead
-								if (terrainCost < currentCost) {
-									currentTerrainType = terrainType;
-									currentCost = terrainCost;
-								}
-							}
-						}
-					}
-					
-					// Apply the lowest-cost terrain type to this cell
-					this.applyTerrainTypeToGridCells(grid, tileX, tileY, tileWidth, tileHeight, cellSize, currentTerrainType);
+
+					// Mark grid cells covered by this tile as unwalkable
+					this.markGridCellsUnwalkable(grid, tileX, tileY, tileWidth, tileHeight, cellSize);
 				}
 			}
 		}
-	
-		return {
-			grid,
-			width: gridWidth,
-			height: gridHeight,
-			cellSize: cellSize
-		};
 	}
+
+	// Apply terrain types based on the top-most non-empty tile in each position
+	if (mapData.terrainTypes) {
+		// Process layers in reverse order (from top to bottom visually)
+		const visibleLayers = mapData.TileData.layers.filter(layer => layer.visible);
+		
+		for (let y = 0; y < height; y++) {
+			for (let x = 0; x < width; x++) {
+				const tileX = x * tileWidth;
+				const tileY = y * tileHeight;
+				const index = y * width + x;
+				
+				// Start with default terrain
+				let terrainApplied = false;
+				
+				// Check each layer from top to bottom
+				for (let l = visibleLayers.length - 1; l >= 0; l--) {
+					const layer = visibleLayers[l];
+					const gid = layer.data[index];
+					
+					// Only process non-empty tiles
+					if (gid !== 0) {
+						// Get terrain type for this tile
+						const terrainType = mapData.terrainTypes.get(gid);
+						
+						// Apply the first valid terrain type we find (top-most)
+						if (terrainType && !terrainApplied) {
+							this.applyTerrainTypeToGridCells(
+								grid, 
+								tileX, 
+								tileY, 
+								tileWidth, 
+								tileHeight, 
+								cellSize, 
+								terrainType
+							);
+							terrainApplied = true;
+							// Don't break - we still need to check other cells
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return {
+		grid,
+		width: gridWidth,
+		height: gridHeight,
+		cellSize: cellSize
+	};
+}
 
 	/**
 	* Apply terrain type to grid cells covered by a tile
