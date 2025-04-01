@@ -63,15 +63,17 @@ class Myte {
 		// bools
 		this.checkForCollisions = true;
 
-		this.size = {
-			width: 192,
-			height: 192
-		};
+
 
 		this.followRadius = {
 			min: 192 / 2,
 			max: 192 * 2
 		}
+
+		this.size = {
+			width: 192,
+			height: 192
+		};
 
 		// Add to Myte class constructor
 		this.collider = {

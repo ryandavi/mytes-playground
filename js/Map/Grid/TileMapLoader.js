@@ -979,11 +979,7 @@ generateGridData(mapData, gridConfig = {}) {
 				});
 			}
 	
-			// Apply custom terrain costs to pathfinder
-			if (Object.keys(customTerrainCosts).length > 0) {
-				gameMap.gridSystem.pathfinder.setTerrainCosts(customTerrainCosts);
-				console.log("[TileMapLoader] Applied custom terrain costs:", customTerrainCosts);
-			}
+
 	
 			// Process objects that modify terrain
 			this.applyObjectTerrainModifiers(gameMap);
