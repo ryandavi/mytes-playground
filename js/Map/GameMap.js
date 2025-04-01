@@ -85,10 +85,6 @@ class GameMap {
             startY,    // 3. Entity top-left Y
             endX,      // 4. Target center X
             endY       // 5. Target center Y
-            // 6. Optional pathOptions {} - No longer needed here IF
-            //    myte object reliably has .size, .collider, .capabilities properties.
-            //    findPath now extracts these from the 'myte' object directly.
-            //    You could still pass overrides here if needed, e.g., {} or { heuristicWeight: 1.5 }
         );
         // --- END MODIFIED CALL ---
     

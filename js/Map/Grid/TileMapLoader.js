@@ -806,111 +806,141 @@ class TileMapLoader {
 	/**
 	 * Enhanced grid data generation with terrain types
 	 */
-/**
- * Enhanced grid data generation with terrain types, using top-most visible layer
- */
+
 generateGridData(mapData, gridConfig = {}) {
-	const { tileWidth, tileHeight, width, height } = mapData.TileData;
-	const collisionLayerName = gridConfig.collisionLayer || 'Collider';
+    const { tileWidth, tileHeight, width, height } = mapData.TileData;
+    
+    // Determine cell size for the grid
+    const cellSize = gridConfig.cellSize || tileWidth;
 
-	// Find the collision layer
-	const collisionLayer = mapData.TileData.layers.find(l => l.name === collisionLayerName);
-	if (!collisionLayer) {
-		console.warn(`Collision layer "${collisionLayerName}" not found. Grid will be fully walkable.`);
-	}
+    // Calculate grid dimensions
+    const gridWidth = Math.ceil(mapData.dimensions.width / cellSize);
+    const gridHeight = Math.ceil(mapData.dimensions.height / cellSize);
 
-	// Determine cell size for the grid
-	const cellSize = gridConfig.cellSize || tileWidth;
+    // Create grid cells
+    const grid = [];
+    for (let x = 0; x < gridWidth; x++) {
+        grid[x] = [];
+        for (let y = 0; y < gridHeight; y++) {
+            grid[x][y] = {
+                x: x * cellSize,
+                y: y * cellSize,
+                walkable: true,
+                swimmable: false,
+                conditionallyWalkable: false,
+                conditionType: null, // 'door', 'gate', etc.
+                conditionId: null,   // ID to reference the specific condition object
+                objects: new Set(),
+                terrainType: GridSystem.defaultTerrain // Default terrain type
+            };
+        }
+    }
 
-	// Calculate grid dimensions
-	const gridWidth = Math.ceil(mapData.dimensions.width / cellSize);
-	const gridHeight = Math.ceil(mapData.dimensions.height / cellSize);
+    // Process all tile layers to check for collision properties and terrain types
+    const layers = mapData.TileData.layers.filter(layer => layer.visible);
+    
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const tileX = x * tileWidth;
+            const tileY = y * tileHeight;
+            const index = y * width + x;
+            
+            // Process each visible layer from bottom to top
+            for (const layer of layers) {
+                const gid = layer.data[index];
+                
+                // Skip empty tiles
+                if (gid === 0) continue;
+                
+                // Find tileset for this gid
+                const tileset = this.findTilesetForGid(gid, mapData.TileData.tilesets);
+                if (!tileset) continue;
+                
+                // Calculate the local tile ID within the tileset
+                const localId = gid - tileset.firstgid;
+                
+                // Get tile properties from the tileset
+                const tileProps = tileset.tiles[localId]?.properties;
+                
+                if (tileProps) {
+                    // Check for collision property
+                    if (tileProps.type === 'collider') {
+                        // Check if it's a door or other conditional collider
+                        if (tileProps.conditionType === 'door' || tileProps.interactive === 'door') {
+                            this.markGridCellsConditional(grid, tileX, tileY, tileWidth, tileHeight, cellSize, 'door', tileProps.conditionId || tileProps.id);
+                        } else {
+                            this.markGridCellsUnwalkable(grid, tileX, tileY, tileWidth, tileHeight, cellSize);
+                        }
+                    }
+                    
+                    // Check for terrain type
+                    if (tileProps.terrain || tileProps.terrainType) {
+                        const terrainType = this.terrainMapping[tileProps.terrain?.toLowerCase() || 
+                                                                tileProps.terrainType?.toLowerCase()] || 
+                                            GridSystem.defaultTerrain;
+                        
+                        this.applyTerrainTypeToGridCells(grid, tileX, tileY, tileWidth, tileHeight, cellSize, terrainType);
+                        
+                        // Mark water tiles as swimmable
+                        if (terrainType === 'shallow_water' || terrainType === 'deep_water') {
+                            this.markGridCellsSwimmable(grid, tileX, tileY, tileWidth, tileHeight, cellSize);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
-	// Create grid cells
-	const grid = [];
-	for (let x = 0; x < gridWidth; x++) {
-		grid[x] = [];
-		for (let y = 0; y < gridHeight; y++) {
-			grid[x][y] = {
-				x: x * cellSize,
-				y: y * cellSize,
-				walkable: true,
-				objects: new Set(),
-				terrainType: GridSystem.defaultTerrain // Default terrain type
-			};
-		}
-	}
-
-	// Mark cells as unwalkable based on collision layer
-	if (collisionLayer) {
-		for (let y = 0; y < height; y++) {
-			for (let x = 0; x < width; x++) {
-				const index = y * width + x;
-				const gid = collisionLayer.data[index];
-
-				if (gid !== 0) {
-					// This tile has collision, mark the corresponding grid cells as unwalkable
-					const tileX = x * tileWidth;
-					const tileY = y * tileHeight;
-
-					// Mark grid cells covered by this tile as unwalkable
-					this.markGridCellsUnwalkable(grid, tileX, tileY, tileWidth, tileHeight, cellSize);
-				}
-			}
-		}
-	}
-
-	// Apply terrain types based on the top-most non-empty tile in each position
-	if (mapData.terrainTypes) {
-		// Process layers in reverse order (from top to bottom visually)
-		const visibleLayers = mapData.TileData.layers.filter(layer => layer.visible);
-		
-		for (let y = 0; y < height; y++) {
-			for (let x = 0; x < width; x++) {
-				const tileX = x * tileWidth;
-				const tileY = y * tileHeight;
-				const index = y * width + x;
-				
-				// Start with default terrain
-				let terrainApplied = false;
-				
-				// Check each layer from top to bottom
-				for (let l = visibleLayers.length - 1; l >= 0; l--) {
-					const layer = visibleLayers[l];
-					const gid = layer.data[index];
-					
-					// Only process non-empty tiles
-					if (gid !== 0) {
-						// Get terrain type for this tile
-						const terrainType = mapData.terrainTypes.get(gid);
-						
-						// Apply the first valid terrain type we find (top-most)
-						if (terrainType && !terrainApplied) {
-							this.applyTerrainTypeToGridCells(
-								grid, 
-								tileX, 
-								tileY, 
-								tileWidth, 
-								tileHeight, 
-								cellSize, 
-								terrainType
-							);
-							terrainApplied = true;
-							// Don't break - we still need to check other cells
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return {
-		grid,
-		width: gridWidth,
-		height: gridHeight,
-		cellSize: cellSize
-	};
+    return {
+        grid,
+        width: gridWidth,
+        height: gridHeight,
+        cellSize: cellSize
+    };
 }
+
+
+markGridCellsSwimmable(grid, tileX, tileY, tileWidth, tileHeight, cellSize) {
+    // Calculate the grid cell range this tile covers
+    const startGridX = Math.floor(tileX / cellSize);
+    const startGridY = Math.floor(tileY / cellSize);
+    const endGridX = Math.ceil((tileX + tileWidth) / cellSize);
+    const endGridY = Math.ceil((tileY + tileHeight) / cellSize);
+
+    // Mark cells as swimmable
+    for (let gridX = startGridX; gridX < endGridX; gridX++) {
+        for (let gridY = startGridY; gridY < endGridY; gridY++) {
+            if (gridX >= 0 && gridX < grid.length &&
+                gridY >= 0 && gridY < grid[0].length) {
+                grid[gridX][gridY].swimmable = true;
+            }
+        }
+    }
+}
+
+// Add a new method to mark grid cells as conditionally walkable
+markGridCellsConditional(grid, tileX, tileY, tileWidth, tileHeight, cellSize, conditionType, conditionId) {
+    // Calculate the grid cell range this tile covers
+    const startGridX = Math.floor(tileX / cellSize);
+    const startGridY = Math.floor(tileY / cellSize);
+    const endGridX = Math.ceil((tileX + tileWidth) / cellSize);
+    const endGridY = Math.ceil((tileY + tileHeight) / cellSize);
+
+    // Mark cells as conditionally walkable
+    for (let gridX = startGridX; gridX < endGridX; gridX++) {
+        for (let gridY = startGridY; gridY < endGridY; gridY++) {
+            if (gridX >= 0 && gridX < grid.length &&
+                gridY >= 0 && gridY < grid[0].length) {
+                grid[gridX][gridY].walkable = false; // Initially not walkable
+                grid[gridX][gridY].conditionallyWalkable = true;
+                grid[gridX][gridY].conditionType = conditionType;
+                grid[gridX][gridY].conditionId = conditionId;
+            }
+        }
+    }
+}
+
+
 
 	/**
 	* Apply terrain type to grid cells covered by a tile
@@ -979,10 +1009,41 @@ generateGridData(mapData, gridConfig = {}) {
 				});
 			}
 	
-
-	
 			// Process objects that modify terrain
 			this.applyObjectTerrainModifiers(gameMap);
+			
+			// Update pathfinder to check if entity can swim when calculating paths
+			if (gameMap.gridSystem.pathfinder.setTerrainCosts) {
+				const originalIsWalkable = gameMap.gridSystem.pathfinder.isWalkable;
+				
+				// Override isWalkable to check swimming ability and conditional walkability
+				gameMap.gridSystem.pathfinder.isWalkable = function(x, y, entity) {
+					const node = this.grid.getNodeAt(x, y);
+					if (!node) return false;
+					
+					// If it's a water tile, check if entity can swim
+					if (!node.walkable && node.swimmable) {
+						return entity && entity.canSwim === true;
+					}
+					
+					// If it's a conditionally walkable tile (like a door), check the condition
+					if (!node.walkable && node.conditionallyWalkable) {
+						if (node.conditionType === 'door') {
+							// Get the door object using conditionId
+							const door = gameMap.getObjectById(node.conditionId);
+							// Check if door exists and is open
+							return door && door.isOpen === true;
+						}
+						// Add more condition types as needed
+					}
+					
+					// Otherwise use the original walkable check
+					return node.walkable;
+				};
+				
+				// Update terrain costs
+				gameMap.gridSystem.pathfinder.setTerrainCosts(customTerrainCosts);
+			}
 		}
 	}
 	/**

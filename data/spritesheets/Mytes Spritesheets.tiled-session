@@ -42,10 +42,10 @@
                 4
             ],
             "scale": 1,
-            "selectedLayer": 4,
+            "selectedLayer": 6,
             "viewCenter": {
-                "x": 495,
-                "y": 671
+                "x": 419,
+                "y": 837
             }
         },
         "house.tsx": {

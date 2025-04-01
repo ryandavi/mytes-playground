@@ -25,7 +25,9 @@ class Myte {
 		this.capabilities = { 
 			can_swim: false,
 			follows_paths: true,
-			can_open_doors: true
+			can_open_doors: true,
+			can_wade: true,
+			fire_resistance: fakse
 		};
 
 		// this character's elements

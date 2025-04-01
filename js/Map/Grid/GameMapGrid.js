@@ -76,7 +76,7 @@ class GridSystem {
 
     // Default terrain movement cost multipliers
     static terrainCosts = {
-        'path': 0.4,        // Paved paths/roads (preferred)
+        'path': 0.8,        // Paved paths/roads (preferred)
         'floor': 0.9,       // Indoor flooring/carpet (slightly preferred)
         'ground': 1.0,      // Regular ground (baseline)
         'grass': 1.2,       // Tall grass (slightly avoided)
@@ -305,8 +305,8 @@ class GridSystem {
         const createAll = totalCells <= maxCells;
 
         // Create cells for visible area only
-        for (let x = 0; x < (createAll ? this.gridWidth : visibleCellsX); x++) {
-            for (let y = 0; y < (createAll ? this.gridHeight : visibleCellsY); y++) {
+        for (let x = 0; x < this.gridWidth; x++) { // Use full gridWidth
+            for (let y = 0; y < this.gridHeight; y++) { // Use full gridHeight
                 const cellElement = document.createElement('div');
                 cellElement.className = 'grid-cell';
 

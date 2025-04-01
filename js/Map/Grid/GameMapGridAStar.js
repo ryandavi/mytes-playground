@@ -1,10 +1,4 @@
-// --- START OF COMPLETE FILE GameMapGridAStar.js (Reflecting latest changes) ---
 
-/**
- * Optimized A* Pathfinder implementation for efficient path planning with
- * entity dimension awareness and collision avoidance, focusing on the collider.
- * VERSION: Includes Top-Left Start Input & Path Centering Preference.
- */
 class AStarPathfinder {
     constructor(gridSystem) {
         this.gridSystem = gridSystem;
@@ -200,8 +194,8 @@ class AStarPathfinder {
         // This check is slightly redundant if _findNearestValidGridPos guarantees validity,
         // but acts as a safeguard.
         if (!isEndValid) {
-             if (effectiveOptions.debug) { console.error(`End position remains invalid after adjustment attempt.`); }
-             return null;
+            if (effectiveOptions.debug) { console.error(`End position remains invalid after adjustment attempt.`); }
+            return null;
         }
 
 
@@ -290,8 +284,8 @@ class AStarPathfinder {
                 return null; // Timeout
             }
             if (steps > effectiveOptions.maxSearchSteps) {
-                 console.warn(`A* search exceeded max steps: ${effectiveOptions.maxSearchSteps}`);
-                 return null; // Max steps exceeded
+                console.warn(`A* search exceeded max steps: ${effectiveOptions.maxSearchSteps}`);
+                return null; // Max steps exceeded
             }
 
             const current = this.openSet.pop();
@@ -578,8 +572,8 @@ class AStarPathfinder {
             const mapPixelHeight = this.gridSystem.gridHeight * this.gridSystem.config.cellSize;
             if (entityX < 0 || entityX + entityWidth > mapPixelWidth ||
                 entityY < 0 || entityY + entityHeight > mapPixelHeight) {
-                 if (debug) console.log(`  ❌ FAIL: Entity TL (${entityX.toFixed(1)}, ${entityY.toFixed(1)}) or BR is out of map bounds [0..${mapPixelWidth}, 0..${mapPixelHeight}] (allowEntityOutOfBounds=false)`);
-                 return false;
+                if (debug) console.log(`  ❌ FAIL: Entity TL (${entityX.toFixed(1)}, ${entityY.toFixed(1)}) or BR is out of map bounds [0..${mapPixelWidth}, 0..${mapPixelHeight}] (allowEntityOutOfBounds=false)`);
+                return false;
             }
         }
 
@@ -594,7 +588,7 @@ class AStarPathfinder {
             if (zeroCached !== undefined) return zeroCached;
             this.validationCache.set(zeroSizeCacheKey, true);
             return true; // No collider means no collision
-         }
+        }
 
         const colliderWorldX = entityX + collider.offsetX;
         const colliderWorldY = entityY + collider.offsetY;
@@ -610,7 +604,7 @@ class AStarPathfinder {
 
         // --- Log Initial Info ---
         if (debug) {
-             console.log(`_validatePosition: Checking Entity ${entity?.id} at TL (${entityX.toFixed(1)}, ${entityY.toFixed(1)}). Collider Bounds: X[${colliderWorldX.toFixed(1)}..${colliderRight.toFixed(1)}], Y[${colliderWorldY.toFixed(1)}..${colliderBottom.toFixed(1)}]`);
+            console.log(`_validatePosition: Checking Entity ${entity?.id} at TL (${entityX.toFixed(1)}, ${entityY.toFixed(1)}). Collider Bounds: X[${colliderWorldX.toFixed(1)}..${colliderRight.toFixed(1)}], Y[${colliderWorldY.toFixed(1)}..${colliderBottom.toFixed(1)}]`);
         }
 
         // --- Grid Collision Check ---
@@ -623,7 +617,7 @@ class AStarPathfinder {
         const endGridY = Math.ceil(colliderBottom / cellSize);
 
         if (debug) {
-             console.log(`  Grid Check Loop Range: X[${startGridX}..${endGridX-1}], Y[${startGridY}..${endGridY-1}]`);
+            console.log(`  Grid Check Loop Range: X[${startGridX}..${endGridX - 1}], Y[${startGridY}..${endGridY - 1}]`);
         }
 
         // Iterate through all potentially overlapping grid cells
@@ -662,9 +656,9 @@ class AStarPathfinder {
                 if (overlapsThisCell) { // Check using standard overlap
                     const cell = this.gridSystem.grid[gridX]?.[gridY];
                     if (!cell) {
-                         if (debug) console.log(`  ❌ FAIL: Valid Cell Index (${gridX}, ${gridY}) is unexpectedly null/undefined.`);
-                         this.validationCache.set(cacheKey, false); return false;
-                     }
+                        if (debug) console.log(`  ❌ FAIL: Valid Cell Index (${gridX}, ${gridY}) is unexpectedly null/undefined.`);
+                        this.validationCache.set(cacheKey, false); return false;
+                    }
 
                     // Check properties for this valid, overlapped cell:
                     if (!cell.walkable) {
@@ -699,25 +693,25 @@ class AStarPathfinder {
                 const colliderDetails = potentialColliders.map(p => `ID ${p.id || 'N/A'}(Tile:${!!p.isTileCollider})@(${p.posX?.toFixed(0)},${p.posY?.toFixed(0)})`).join(', ');
                 console.log(`  Found ${potentialColliders.length} potential world colliders: [${colliderDetails}]`);
             } else {
-                 console.log(`  Found 0 potential world colliders.`);
+                console.log(`  Found 0 potential world colliders.`);
             }
         }
 
 
         if (potentialColliders && potentialColliders.length > 0) {
             const entityStateForCollision = {
-                 posX: entityX, posY: entityY, collider: collider,
-                 size: { width: entityWidth, height: entityHeight }
+                posX: entityX, posY: entityY, collider: collider,
+                size: { width: entityWidth, height: entityHeight }
             };
             for (const objFromGrid of potentialColliders) {
                 // Should only be actual objects now, not synthetic tiles
-                 if (debug) {
-                      console.log(`    Checking detailed collision against obj ID ${objFromGrid.id || 'N/A'} (isTile: ${!!objFromGrid.isTileCollider}, walkable: ${objFromGrid.config?.walkable})`);
-                 }
+                if (debug) {
+                    console.log(`    Checking detailed collision against obj ID ${objFromGrid.id || 'N/A'} (isTile: ${!!objFromGrid.isTileCollider}, walkable: ${objFromGrid.config?.walkable})`);
+                }
                 if (this._checkDetailedCollision(entityStateForCollision, objFromGrid)) {
-                     if (debug) console.log(`  ❌ FAIL: Detailed collision with obj ID ${objFromGrid.id || 'N/A'}`);
-                     this.validationCache.set(cacheKey, false);
-                     return false;
+                    if (debug) console.log(`  ❌ FAIL: Detailed collision with obj ID ${objFromGrid.id || 'N/A'}`);
+                    this.validationCache.set(cacheKey, false);
+                    return false;
                 }
             }
         }
@@ -765,7 +759,7 @@ class AStarPathfinder {
     /**
      * Get valid neighboring grid cells for pathfinding, ensuring the collider fits.
      * @private
-     */    
+     */
     _getNeighbors(entity, x, y, entityWidth, entityHeight, collider, entityCapabilities, effectiveOptions) {
         const neighbors = [];
         const directions = effectiveOptions.allowDiagonals ?
@@ -1206,11 +1200,7 @@ class AStarPathfinder {
         }
     }
 
-} // End AStarPathfinder Class
-
-/**
- * LRU Cache implementation
- */
+}
 class LRUCache {
     constructor(capacity) {
         this.capacity = capacity;
@@ -1238,11 +1228,7 @@ class LRUCache {
     clear() {
         this.cache.clear();
     }
-} // End LRUCache Class
-
-/**
- * Binary heap implementation (Min-Heap)
- */
+}
 class BinaryHeap {
     constructor(scoreFunction) {
         this.content = [];
@@ -1346,7 +1332,4 @@ class BinaryHeap {
             n = swapIndex; // Continue sinking down from the new position
         }
     }
-} // End BinaryHeap Class
-
-
-// --- END OF COMPLETE FILE GameMapGridAStar.js ---
+}
