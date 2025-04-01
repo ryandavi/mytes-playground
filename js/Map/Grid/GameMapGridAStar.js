@@ -27,19 +27,13 @@ class AStarPathfinder {
             avoidDifficultTerrain: true    // Whether to avoid difficult terrain
         };
 
-        this.entityDimensions = {
-            width: 0,
-            height: 0
+        // Terrain type categories - easily extensible
+        this.terrainCategories = {
+            WATER: ['shallow_water', 'deep_water'],
+            PREFERRED_PATHS: ['path'],
+            DIFFICULT_TERRAIN: ['mountains', 'swamp', 'mud']
         };
 
-        this.entityCollider = null;
-
-        // Entity capabilities - defaults if not specified
-        this.entityCapabilities = {
-            can_swim: false,
-            follows_paths: true,
-            can_open_doors: true
-        };
 
         this.debugElements = {
             exploredNodes: new Set(),
@@ -50,14 +44,6 @@ class AStarPathfinder {
 
     getKey(x, y) {
         return `${x},${y}`;
-    }
-
-    // Set entity capabilities for pathfinding
-    setEntityCapabilities(capabilities) {
-        this.entityCapabilities = {
-            ...this.entityCapabilities,
-            ...capabilities
-        };
     }
 
     // Get terrain type at the specified grid position
@@ -78,7 +64,12 @@ class AStarPathfinder {
         return GridSystem.defaultTerrain;
     }
 
-    findPath(startX, startY, endX, endY, entityWidth = 0, entityHeight = 0, collider = null, entityCapabilities = null) {
+    findPath(startX, startY, endX, endY, options = {}) {
+        const entityWidth = options.width || 0;
+        const entityHeight = options.height || 0;
+        const collider = options.collider || null;
+        const entityCapabilities = options.capabilities || null;
+
         // Add timestamp for timeout detection
         const startTime = performance.now();
         const timeoutMs = 500; // 500ms timeout
@@ -105,27 +96,9 @@ class AStarPathfinder {
             console.log(`Finding path from (${originalStartX.toFixed(0)},${originalStartY.toFixed(0)}) to center on (${originalEndX.toFixed(0)},${originalEndY.toFixed(0)})`);
         }
     
-        // Setup entity capabilities for this path calculation
-        if (entityCapabilities) {
-            this.setEntityCapabilities(entityCapabilities);
-        } else {
-            // Reset to defaults if not provided
-            this.entityCapabilities = {
-                can_swim: false,
-                follows_paths: true
-            };
-        }
-    
         // Adjust target points based on collider offset (if provided)
         if (collider) {
-            // Store entity dimensions and collider for collision checks
-            this.entityDimensions = {
-                width: entityWidth,
-                height: entityHeight
-            };
-    
-            this.entityCollider = collider;
-            
+
             // Apply collider offset to both start and end positions
             // Start position is already entity top-left, so just add collider offset
             adjustedStartX += collider.offsetX + (collider.width / 2);
@@ -139,19 +112,6 @@ class AStarPathfinder {
             if (this.options.debug) {
                 console.log(`Adjusted for collider: Start (${adjustedStartX.toFixed(0)},${adjustedStartY.toFixed(0)}) to (${adjustedEndX.toFixed(0)},${adjustedEndY.toFixed(0)})`);
             }
-        } else {
-            // Default collider if none provided
-            this.entityDimensions = {
-                width: entityWidth,
-                height: entityHeight
-            };
-    
-            this.entityCollider = {
-                width: entityWidth * 0.8,
-                height: entityHeight * 0.5,
-                offsetX: entityWidth * 0.1,
-                offsetY: entityHeight * 0.5
-            };
         }
     
         // Fast path: if start and end are very close, just return direct line
@@ -185,12 +145,12 @@ class AStarPathfinder {
         // Check if start position is valid
         let validStart = null;
     
-        if (!this.canEntityFitAt(start.x, start.y)) {
+        if (!this.canEntityFitAt(start.x, start.y, entityWidth, entityHeight, collider, entityCapabilities)) {
             if (this.options.debug) {
                 console.warn(`Entity cannot fit at start position (${start.x}, ${start.y})`);
             }
     
-            validStart = this.findNearestValidPosition(start.x, start.y, 5);
+            validStart = this.findNearestValidPosition(start.x, start.y, 5, entityWidth, entityHeight, collider, entityCapabilities);
     
             // If we couldn't find a valid start position, return a direct path as fallback
             if (!validStart) {
@@ -212,12 +172,12 @@ class AStarPathfinder {
         // Check if end position is valid
         let validEnd = null;
     
-        if (!this.canEntityFitAt(end.x, end.y)) {
+        if (!this.canEntityFitAt(end.x, end.y, entityWidth, entityHeight, collider, entityCapabilities)) {
             if (this.options.debug) {
                 console.warn(`Entity cannot fit at end position (${end.x}, ${end.y})`);
             }
     
-            validEnd = this.findNearestValidPosition(end.x, end.y, 5);
+            validEnd = this.findNearestValidPosition(end.x, end.y, 5, entityWidth, entityHeight, collider, entityCapabilities);
     
             // If we couldn't find a valid end position, return a direct path as fallback
             if (!validEnd) {
@@ -266,7 +226,17 @@ class AStarPathfinder {
                 console.warn(`Pathfinding timeout after ${steps} steps (${timeoutMs}ms)`);
                 const partialTarget = this.findBestPartialTarget(end.x, end.y, closedSet, cameFrom);
                 if (partialTarget) {
-                    return this.reconstructPath(cameFrom, partialTarget, end, originalStartX, originalStartY, originalEndX, originalEndY);
+                    const partialPath = this.reconstructPath(
+                        cameFrom, partialTarget, end, 
+                        originalStartX, originalStartY, 
+                        originalEndX, originalEndY,
+                        entityWidth, entityHeight,
+                        collider,
+                        entityCapabilities
+                    );
+                    
+                    // Don't cache partial paths to allow better paths in future
+                    return partialPath;
                 }
     
                 // If no partial path found, return direct path as fallback
@@ -286,7 +256,17 @@ class AStarPathfinder {
                 }
                 const partialTarget = this.findBestPartialTarget(end.x, end.y, closedSet, cameFrom);
                 if (partialTarget) {
-                    return this.reconstructPath(cameFrom, partialTarget, end, originalStartX, originalStartY, originalEndX, originalEndY);
+                    const partialPath = this.reconstructPath(
+                        cameFrom, partialTarget, end, 
+                        originalStartX, originalStartY, 
+                        originalEndX, originalEndY,
+                        entityWidth, entityHeight,
+                        collider,
+                        entityCapabilities
+                    );
+                    
+                    // Don't cache partial paths to allow better paths in future
+                    return partialPath;
                 }
     
                 // If no partial path found, return direct path as fallback
@@ -310,7 +290,16 @@ class AStarPathfinder {
                 if (this.options.debug) {
                     console.log(`Path found in ${steps} steps`);
                 }
-                return this.reconstructPath(cameFrom, current, end, originalStartX, originalStartY, originalEndX, originalEndY);
+                const path = this.reconstructPath(
+                    cameFrom, current, end, 
+                    originalStartX, originalStartY, 
+                    originalEndX, originalEndY,
+                    entityWidth, entityHeight,
+                    collider,
+                    entityCapabilities
+                );
+
+                return path;
             }
     
             closedSet.add(current.key);
@@ -318,21 +307,32 @@ class AStarPathfinder {
             // Check for direct line of sight to end (for smoother paths)
             if (steps > 10 && this.hasLineOfSight(
                 this.gridSystem.gridToWorld(current.x, current.y),
-                this.gridSystem.gridToWorld(end.x, end.y)
+                this.gridSystem.gridToWorld(end.x, end.y),
+                entityWidth, entityHeight, collider, entityCapabilities
             )) {
                 // If we have line of sight to the goal from current position, go directly there
                 cameFrom.set(endKey, current);
-                return this.reconstructPath(cameFrom, { x: end.x, y: end.y, key: endKey }, end, originalStartX, originalStartY, originalEndX, originalEndY);
+
+                const path = this.reconstructPath(
+                    cameFrom, { x: end.x, y: end.y, key: endKey }, end, 
+                    originalStartX, originalStartY, 
+                    originalEndX, originalEndY,
+                    entityWidth, entityHeight,
+                    collider,
+                    entityCapabilities
+                );
+
+                return path;
             }
     
-            const neighbors = this.getNeighbors(current.x, current.y);
+            const neighbors = this.getNeighbors(current.x, current.y, entityWidth, entityHeight, collider, entityCapabilities);
     
             for (const neighbor of neighbors) {
                 const neighborKey = this.getKey(neighbor.x, neighbor.y);
     
                 if (closedSet.has(neighborKey)) continue;
     
-                const tentativeG = gScore.get(current.key) + this.getMovementCost(current, neighbor);
+                const tentativeG = gScore.get(current.key) + this.getMovementCost(current, neighbor, entityCapabilities);
     
                 if (!gScore.has(neighborKey) || tentativeG < gScore.get(neighborKey)) {
                     cameFrom.set(neighborKey, current);
@@ -386,9 +386,9 @@ class AStarPathfinder {
         return bestNode;
     }
 
-    findNearestValidPosition(x, y, maxRadius) {
+    findNearestValidPosition(x, y, maxRadius, entityWidth, entityHeight, collider, entityCapabilities) {
         // First check if the original position is valid
-        if (this.canEntityFitAt(x, y)) {
+        if (this.canEntityFitAt(x, y, entityWidth, entityHeight, collider, entityCapabilities)) {
             return { x, y };
         }
 
@@ -416,7 +416,7 @@ class AStarPathfinder {
             const nx = x + dir.dx;
             const ny = y + dir.dy;
 
-            if (this.canEntityFitAt(nx, ny)) {
+            if (this.canEntityFitAt(nx, ny, entityWidth, entityHeight, collider, entityCapabilities)) {
                 return { x: nx, y: ny };
             }
             checksPerformed++;
@@ -429,7 +429,7 @@ class AStarPathfinder {
                 const nx = x + (dir.dx * radius);
                 const ny = y + (dir.dy * radius);
 
-                if (this.canEntityFitAt(nx, ny)) {
+                if (this.canEntityFitAt(nx, ny, entityWidth, entityHeight, collider, entityCapabilities)) {
                     return { x: nx, y: ny };
                 }
                 checksPerformed++;
@@ -449,12 +449,12 @@ class AStarPathfinder {
                 if (dx === 0 || Math.abs(dx) === radius) continue;
 
                 // Top edge
-                if (this.canEntityFitAt(x + dx, y - radius)) {
+                if (this.canEntityFitAt(x + dx, y - radius, entityWidth, entityHeight, collider, entityCapabilities)) {
                     return { x: x + dx, y: y - radius };
                 }
 
                 // Bottom edge
-                if (this.canEntityFitAt(x + dx, y + radius)) {
+                if (this.canEntityFitAt(x + dx, y + radius, entityWidth, entityHeight, collider, entityCapabilities)) {
                     return { x: x + dx, y: y + radius };
                 }
 
@@ -471,12 +471,12 @@ class AStarPathfinder {
                 if (dy === 0 || Math.abs(dy) === radius) continue;
 
                 // Left edge
-                if (this.canEntityFitAt(x - radius, y + dy)) {
+                if (this.canEntityFitAt(x - radius, y + dy, entityWidth, entityHeight, collider, entityCapabilities)) {
                     return { x: x - radius, y: y + dy };
                 }
 
                 // Right edge
-                if (this.canEntityFitAt(x + radius, y + dy)) {
+                if (this.canEntityFitAt(x + radius, y + dy, entityWidth, entityHeight, collider, entityCapabilities)) {
                     return { x: x + radius, y: y + dy };
                 }
 
@@ -492,7 +492,7 @@ class AStarPathfinder {
         return null;
     }
 
-    getNeighbors(x, y) {
+    getNeighbors(x, y, entityWidth, entityHeight, collider, entityCapabilities) {
         const neighbors = [];
 
         const directions = this.options.allowDiagonals ? this.directions : this.directions.slice(0, 4);
@@ -528,8 +528,8 @@ class AStarPathfinder {
             }
 
             // Check if entity can fit at the new position
-            if (this.entityDimensions.width > 0 && this.entityDimensions.height > 0) {
-                if (!this.canEntityFitAt(newX, newY)) {
+            if (entityWidth > 0 && entityHeight > 0) {
+                if (!this.canEntityFitAt(newX, newY, entityWidth, entityHeight, collider, entityCapabilities)) {
                     if (this.options.debug) {
                         this.debugElements.rejectedNodes.add(this.getKey(newX, newY));
                     }
@@ -549,8 +549,9 @@ class AStarPathfinder {
                 }
 
                 // Check if entity can fit through the corner
-                if (this.entityDimensions.width > 0 && this.entityDimensions.height > 0) {
-                    if (!this.canEntityFitAt(x, newY) || !this.canEntityFitAt(newX, y)) {
+                if (entityWidth > 0 && entityHeight > 0) {
+                    if (!this.canEntityFitAt(x, newY, entityWidth, entityHeight, collider, entityCapabilities) || 
+                        !this.canEntityFitAt(newX, y, entityWidth, entityHeight, collider, entityCapabilities)) {
                         if (this.options.debug) {
                             this.debugElements.rejectedNodes.add(this.getKey(newX, newY));
                         }
@@ -569,19 +570,24 @@ class AStarPathfinder {
         return neighbors;
     }
 
-    // New method to check if entity can traverse this terrain type
-    canTraverseTerrain(terrainType) {
+    // Check if entity can traverse specific terrain type based on capabilities
+    canTraverseTerrain(terrainType, entityCapabilities) {
         // Water traversal depends on swim capability
-        if ((terrainType === 'shallow_water' || terrainType === 'deep_water')) {
-            return this.entityCapabilities.can_swim;
+        if (this.isTerrainInCategory(terrainType, 'WATER')) {
+            return entityCapabilities.can_swim;
         }
 
         // All other terrain is traversable with varying costs
         return true;
     }
 
+
+    isTerrainInCategory(terrainType, category) {
+        return this.terrainCategories[category]?.includes(terrainType) || false;
+    }
+
     // Enhance canEntityFitAt to properly check for collisions
-    canEntityFitAt(gridX, gridY) {
+    canEntityFitAt(gridX, gridY, entityWidth, entityHeight, collider, entityCapabilities) {
         // Boundary check
         if (gridX < 0 || gridX >= this.gridSystem.gridWidth ||
             gridY < 0 || gridY >= this.gridSystem.gridHeight) {
@@ -592,7 +598,7 @@ class AStarPathfinder {
         const terrainType = this.getTerrainTypeAt(gridX, gridY);
 
         // Check if entity can traverse this terrain
-        if (!this.canTraverseTerrain(terrainType)) {
+        if (!this.canTraverseTerrain(terrainType, entityCapabilities)) {
             return false;
         }
 
@@ -603,8 +609,13 @@ class AStarPathfinder {
         }
 
         // If no entity dimensions provided, just use the grid walkability
-        if (this.entityDimensions.width <= 0 || this.entityDimensions.height <= 0) {
+        if (entityWidth <= 0 || entityHeight <= 0) {
             return cell.walkable;
+        }
+
+        // Check for doors if entity can't open them
+        if (!entityCapabilities.can_open_doors && cell.hasDoor) {
+            return false;
         }
 
         // For entities with dimensions, check potential collisions
@@ -614,15 +625,15 @@ class AStarPathfinder {
         const collisionEntity = {
             posX: worldX,
             posY: worldY,
-            size: this.entityDimensions,
-            collider: this.entityCollider,
+            size: { width: entityWidth, height: entityHeight },
+            collider: collider,
             config: {
                 walkable: true
             }
         };
 
         // Check all cells the entity would overlap
-        const cells = this.getEntityOverlappingCells(gridX, gridY);
+        const cells = this.getEntityOverlappingCells(gridX, gridY, entityWidth, entityHeight, collider);
         for (const cell of cells) {
             if (!cell.walkable) {
                 return false;
@@ -663,15 +674,15 @@ class AStarPathfinder {
         return true;
     }
 
-    getEntityOverlappingCells(gridX, gridY) {
+    getEntityOverlappingCells(gridX, gridY, entityWidth, entityHeight, entityCollider) {
         const cells = [];
         const worldX = gridX * this.gridSystem.config.cellSize;
         const worldY = gridY * this.gridSystem.config.cellSize;
 
-        const left = worldX + (this.entityCollider ? this.entityCollider.offsetX : 0);
-        const top = worldY + (this.entityCollider ? this.entityCollider.offsetY : 0);
-        const right = left + (this.entityCollider ? this.entityCollider.width : this.entityDimensions.width);
-        const bottom = top + (this.entityCollider ? this.entityCollider.height : this.entityDimensions.height);
+        const left = worldX + (entityCollider ? entityCollider.offsetX : 0);
+        const top = worldY + (entityCollider ? entityCollider.offsetY : 0);
+        const right = left + (entityCollider ? entityCollider.width : entityWidth);
+        const bottom = top + (entityCollider ? entityCollider.height : entityHeight);
 
         const startGridX = Math.floor(left / this.gridSystem.config.cellSize);
         const startGridY = Math.floor(top / this.gridSystem.config.cellSize);
@@ -710,7 +721,7 @@ class AStarPathfinder {
     }
 
     // Enhanced movement cost calculation based on terrain type
-    getMovementCost(from, to) {
+    getMovementCost(from, to, entityCapabilities) {
         // Base cost for the move (1.0 for orthogonal, Math.SQRT2 for diagonal)
         const baseMoveCost = (from.x !== to.x && from.y !== to.y) ? Math.SQRT2 : GridSystem.defaultTerrainCost;
 
@@ -720,11 +731,18 @@ class AStarPathfinder {
         // Get the cost multiplier for this terrain type
         let terrainMultiplier = GridSystem.terrainCosts[terrainType] || GridSystem.defaultTerrainCost;
 
+
         // Apply entity capability modifiers
-        if ((terrainType === 'path' || terrainType === 'floor') &&
-            this.entityCapabilities.follows_paths && this.options.preferPaths) {
+        if (this.isTerrainInCategory(terrainType, 'PREFERRED_PATHS') &&
+            entityCapabilities.follows_paths && this.options.preferPaths) {
             // Additional preference for paths if entity follows paths
             terrainMultiplier *= 0.9;
+        }
+
+        // Penalize difficult terrain if configured to do so
+        if (this.isTerrainInCategory(terrainType, 'DIFFICULT_TERRAIN') && 
+            this.options.avoidDifficultTerrain) {
+            terrainMultiplier *= 1.2;
         }
 
         return baseMoveCost * terrainMultiplier;
@@ -741,7 +759,7 @@ class AStarPathfinder {
         }
     }
 
-    reconstructPath(cameFrom, current, end, originalStartX, originalStartY, originalEndX, originalEndY) {
+    reconstructPath(cameFrom, current, end, originalStartX, originalStartY, originalEndX, originalEndY, entityWidth, entityHeight, collider, entityCapabilities) {
         const path = [];
         let currentNode = current;
     
@@ -765,7 +783,7 @@ class AStarPathfinder {
             }
         }
     
-        const finalPath = this.options.smoothPaths ? this.smoothPath(path) : path;
+        const finalPath = this.options.smoothPaths ? this.smoothPath(path, entityWidth, entityHeight, collider, entityCapabilities) : path;
     
         if (this.options.debug) {
             this.debugElements.path = [...finalPath];
@@ -774,32 +792,32 @@ class AStarPathfinder {
         return finalPath;
     }
 
-    smoothPath(path) {
+    smoothPath(path, entityWidth, entityHeight, collider, entityCapabilities) {
         if (path.length <= 2) return path;
-
+    
         const smoothed = [path[0]];
         let currentIndex = 0;
-
+    
         while (currentIndex < path.length - 1) {
             let furthestVisible = currentIndex + 1;
-
+    
             for (let i = currentIndex + 2; i < path.length; i++) {
                 if ((i - currentIndex) % 2 !== 0 && i < path.length - 1) continue;
-
-                if (this.hasLineOfSight(path[currentIndex], path[i])) {
+    
+                if (this.hasLineOfSight(path[currentIndex], path[i], entityWidth, entityHeight, collider, entityCapabilities)) {
                     furthestVisible = i;
                 }
             }
-
+    
             smoothed.push(path[furthestVisible]);
             currentIndex = furthestVisible;
         }
-
+    
         return smoothed;
     }
 
     // Enhanced line of sight check that considers walkability
-    hasLineOfSight(start, end) {
+    hasLineOfSight(start, end, entityWidth, entityHeight, collider, entityCapabilities) {
         const startGrid = this.gridSystem.worldToGrid(start.x, start.y);
         const endGrid = this.gridSystem.worldToGrid(end.x, end.y);
 
@@ -832,13 +850,13 @@ class AStarPathfinder {
             }
 
             // Also check entity fit
-            if (!this.canEntityFitAt(x, y)) {
+            if (!this.canEntityFitAt(x, y, entityWidth, entityHeight, collider, entityCapabilities)) {
                 return false;
             }
 
             // Add cost for this cell
             const terrainType = this.getTerrainTypeAt(x, y);
-            if (!this.canTraverseTerrain(terrainType)) {
+            if (!this.canTraverseTerrain(terrainType, entityCapabilities)) {
                 return false;
             }
 
@@ -865,10 +883,10 @@ class AStarPathfinder {
     }
 
     // Method to manually check walkability at a specific grid location
-    checkWalkableAt(gridX, gridY, entityCapabilities = null) {
+    checkWalkableAt(gridX, gridY, entityOptions = null) {
         // Apply entity capabilities if provided
-        if (entityCapabilities) {
-            this.setEntityCapabilities(entityCapabilities);
+        if (entityOptions) {
+            this.setEntityCapabilities(entityOptions);
         }
 
         // Boundary check
@@ -889,7 +907,7 @@ class AStarPathfinder {
         console.log(`- Terrain cost: ${GridSystem.terrainCosts[terrainType] || GridSystem.defaultTerrainCost}x`);
 
         // Check if terrain is traversable based on entity capabilities
-        if (!this.canTraverseTerrain(terrainType)) {
+        if (!this.canTraverseTerrain(terrainType, entityOptions)) {
             console.log(`- Cell not traversable due to terrain type (${terrainType}) and entity capabilities`);
             return false;
         }
@@ -897,7 +915,7 @@ class AStarPathfinder {
         return cell.walkable;
     }
 
-    visualizePath(container, path) {
+    visualizePath(container, path, entityWidth, entityHeight, collider) {
         if (!container || !path) return;
     
         const existingNodes = container.querySelectorAll('.pathfinder-node');
@@ -968,8 +986,8 @@ class AStarPathfinder {
             let displayX, displayY;
             if (index === 0) {
                 // Start point is entity top-left, but we show dot at center
-                displayX = point.x + (this.entityDimensions?.width || 0) / 2;
-                displayY = point.y + (this.entityDimensions?.height || 0) / 2;
+                displayX = point.x + (entityWidth || 0) / 2;
+                displayY = point.y + (entityHeight || 0) / 2;
             } else if (index === path.length - 1) {
                 // End point is already the center position
                 displayX = point.x;
@@ -1011,8 +1029,8 @@ class AStarPathfinder {
             let startDisplayX, startDisplayY;
             if (i === 0) {
                 // Start is entity top-left, but line should start from center
-                startDisplayX = start.x + (this.entityDimensions?.width || 0) / 2;
-                startDisplayY = start.y + (this.entityDimensions?.height || 0) / 2;
+                startDisplayX = start.x + (entityWidth || 0) / 2;
+                startDisplayY = start.y + (entityHeight || 0) / 2;
             } else {
                 // Intermediate points use original coordinates
                 startDisplayX = start.x;
@@ -1055,15 +1073,15 @@ class AStarPathfinder {
     
         // Visualize entity and collider at start and end
         if (path.length > 0) {
-            this.visualizeEntityCollider(container, path[0], 'start');
+            this.visualizeEntityCollider(container, path[0], 'start', entityWidth, entityHeight, collider);
             if (path.length > 1) {
-                this.visualizeEntityCollider(container, path[path.length - 1], 'end');
+                this.visualizeEntityCollider(container, path[path.length - 1], 'end', entityWidth, entityHeight, collider);
             }
         }
     }
 
-    visualizeEntityCollider(container, point, nodeType) {
-        if (!container || !point || !this.entityCollider) return;
+    visualizeEntityCollider(container, point, nodeType, entityWidth, entityHeight, entityCollider) {
+        if (!container || !point || !entityCollider) return;
     
         const collider = document.createElement('div');
         collider.className = `pathfinder-node entity-collider debug ${nodeType}-collider`;
@@ -1078,15 +1096,15 @@ class AStarPathfinder {
         } else {
             // For end point - position as if Myte were centered on this point
             // Adjust from target point (which Myte will center to) to get top-left
-            entityX = point.x - (this.entityDimensions.width / 2);
-            entityY = point.y - (this.entityDimensions.height / 2);
+            entityX = point.x - ((entityWidth) / 2);
+            entityY = point.y - (entityHeight / 2);
         }
     
         // Calculate collider position relative to entity top-left
-        const left = entityX + this.entityCollider.offsetX;
-        const top = entityY + this.entityCollider.offsetY;
-        const width = this.entityCollider.width;
-        const height = this.entityCollider.height;
+        const left = entityX + entityCollider.offsetX;
+        const top = entityY + entityCollider.offsetY;
+        const width = entityCollider.width;
+        const height = entityCollider.height;
     
         // Visualize the entity box (for debugging)
         const entity = document.createElement('div');
@@ -1096,8 +1114,8 @@ class AStarPathfinder {
             position: 'absolute',
             left: `${entityX}px`,
             top: `${entityY}px`,
-            width: `${this.entityDimensions.width}px`,
-            height: `${this.entityDimensions.height}px`,
+            width: `${entityWidth}px`,
+            height: `${entityHeight}px`,
             border: `1px dashed ${nodeType === 'start' ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)'}`,
             backgroundColor: 'transparent',
             zIndex: 979
@@ -1109,8 +1127,8 @@ class AStarPathfinder {
         
         let centerX, centerY;
         if (nodeType === 'start') {
-            centerX = entityX + this.entityDimensions.width/2;
-            centerY = entityY + this.entityDimensions.height/2;
+            centerX = entityX + entityWidth/2;
+            centerY = entityY + entityHeight/2;
         } else {
             centerX = point.x; // End point is already a center coordinate
             centerY = point.y;

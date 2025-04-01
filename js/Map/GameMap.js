@@ -47,124 +47,47 @@ class GameMap {
     }
 
     // Add to GameMap class
-// Update the testPathfinding method in GameMap class
-testPathfinding(startX = 80, startY = 80, endX = 0, endY = 0, entityWidth = 32, entityHeight = 32) {
-    // Check if grid system and pathfinder are available
-    if (!this.gridSystem) {
-        console.warn("Grid system not available, initializing...");
-        this.gridSystem = new GridSystem(this);
-        // Force grid system to initialize crucial components
-        if (this.parent && this.parent.camera) {
-            this.gridSystem.updateCulling(this.parent.camera);
+    testPathfinding() {
+        if (!this.gridSystem) {
+            console.warn("Grid system not available, initializing...");
+            this.gridSystem = new GridSystem(this);
+            this.parent?.camera && this.gridSystem.updateCulling(this.parent.camera);
         }
-    }
     
-    if (!this.gridSystem.pathfinder) {
-        console.warn("Pathfinder not available, initializing...");
-        this.gridSystem.pathfinder = new AStarPathfinder(this.gridSystem);
-    }
-
-    if (!this.parent.inputHandler.isMouseInContainer()) {
-        return null;
-    }
-
-    if (this.parent.mytes && this.parent.mytes.length > 0 && this.parent.mytes[0].isActive) {
-        const myte = this.parent.mytes[0];
-        entityHeight = myte.size.height;
-        entityWidth = myte.size.width;
-
-        // Use the center of the myte's collider as the start position
-        startX = myte.posX;
-        startY = myte.posY;
-
-        endX = this.parent.inputHandler.getAdjustedMouse().x;
-        endY = this.parent.inputHandler.getAdjustedMouse().y;
-        
-        console.log(`Testing path from myte collider center (${startX.toFixed(0)},${startY.toFixed(0)}) to (${endX.toFixed(0)},${endY.toFixed(0)})`);
-    }
-
-    // Enable debug visualization
-    this.gridSystem.pathfinder.options.debug = true;
-    this.gridSystem.config.showTerrainColors = true;
-
-    // Check for doors in the path
-    this.findDoorsInPath(startX, startY, endX, endY);
-
-    // Calculate path
-    const path = this.gridSystem.pathfinder.findPath(
-        startX, startY, endX, endY, entityWidth, entityHeight,
-        this.parent.mytes[0].collider, // collider parameter
-        { can_open_doors: true, can_swim: false, follows_paths: true }
-    );
-
-    // Visualize the path
-    this.gridSystem.pathfinder.visualizePath(this.layers.debug, path || []);
-
-    // Output results
-    if (path) {
-        console.log(`Path found with ${path.length} waypoints`);
-    } else {
-        console.log("No path found - check explored/rejected nodes for debugging");
-        
-        // Try diagnostic function if path failed
-        if (this.gridSystem.pathfinder.diagnoseDoorPathfinding) {
-            console.log("Running door diagnostic...");
-            this.gridSystem.pathfinder.diagnoseDoorPathfinding(
-                startX, startY, endX, endY,
-                { can_open_doors: true, can_swim: false, follows_paths: true }
-            );
+        if (!this.gridSystem.pathfinder) {
+            console.warn("Pathfinder not available, initializing...");
+            this.gridSystem.pathfinder = new AStarPathfinder(this.gridSystem);
         }
-    }
-
-    return path;
-}
-
-// Add helper method to find doors in path
-findDoorsInPath(startX, startY, endX, endY) {
-    if (!this.gridSystem) return [];
     
-    const start = this.gridSystem.worldToGrid(startX, startY);
-    const end = this.gridSystem.worldToGrid(endX, endY);
-    
-    console.log("Checking for doors between:", start, end);
-    
-    // Simple line between points to check for doors
-    const linePoints = this.getLinePoints(start.x, start.y, end.x, end.y);
-    
-    let doorsFound = 0;
-    const doors = [];
-    
-    for (const point of linePoints) {
-        if (point.x < 0 || point.x >= this.gridSystem.gridWidth || 
-            point.y < 0 || point.y >= this.gridSystem.gridHeight) {
-            continue;
-        }
+        if (!this.parent.inputHandler.isMouseInContainer()) return null;
         
-        const cell = this.gridSystem.grid[point.x][point.y];
-        const terrainType = cell.terrainType;
+        const myte = this.parent.mytes?.[0];
+        if (!myte?.isActive) return null;
         
-        if (terrainType === 'door_closed' || terrainType === 'door_open') {
-            console.log(`Door terrain found at (${point.x},${point.y}): ${terrainType}`);
-            doorsFound++;
-            
-            // Check for actual door objects
-            for (const obj of cell.objects) {
-                if (obj.type === 'door' || obj.objectType === 'door') {
-                    doors.push({
-                        x: point.x,
-                        y: point.y,
-                        isOpen: obj.isOpen,
-                        terrainType: obj.terrainType || terrainType
-                    });
-                    console.log(`Door object found: open=${obj.isOpen}`);
-                }
+        const { height: entityHeight, width: entityWidth } = myte.size;
+        const { x: endX, y: endY } = this.parent.inputHandler.getAdjustedMouse();
+        const { posX: startX, posY: startY, collider } = myte;
+
+        // show debug
+        this.gridSystem.pathfinder.options.debug = true;
+        this.gridSystem.config.showTerrainColors = true;
+        
+        const path = this.gridSystem.pathfinder.findPath(startX, startY, endX, endY, {
+            width: entityWidth, 
+            height: entityHeight,
+            collider,
+            capabilities: { 
+                can_swim: false,
+                follows_paths: true,
+                can_open_doors: true
             }
-        }
+        });
+        
+        this.gridSystem.pathfinder.visualizePath(this.layers.debug, path || [], entityWidth, entityHeight, collider);
+        
+        return path;
     }
-    
-    console.log(`Found ${doorsFound} doors along path`);
-    return doors;
-}
+
 
 // Line algorithm helper
 getLinePoints(x0, y0, x1, y1) {
@@ -361,7 +284,7 @@ getLinePoints(x0, y0, x1, y1) {
 
                 this.testPathfinding();
 
-            }, 3000); // Update every 3 seconds
+            }, 500); // Update every 3 seconds
 
             console.log(`[GameMap] Map ${mapId} initialization completed successfully`);
             this.initialized = true;
