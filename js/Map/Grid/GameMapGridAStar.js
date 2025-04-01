@@ -111,38 +111,40 @@ class AStarPathfinder {
         const startTime = performance.now();
 
         // --- Entity Properties ---
-        // Extract properties directly from the entity object
         const entityWidth = entity.size?.width || 0;
         const entityHeight = entity.size?.height || 0;
-        // Ensure collider exists and has defaults if partial
         const entityCollider = entity.collider || {};
         const collider = {
             offsetX: entityCollider.offsetX || 0,
             offsetY: entityCollider.offsetY || 0,
-            width: entityCollider.width || entityWidth, // Fallback to entity size
+            width: entityCollider.width || entityWidth,
             height: entityCollider.height || entityHeight,
         };
         const entityCapabilities = entity.capabilities || {};
 
-        // Combine default options with any overrides passed in pathOptions
         const effectiveOptions = { ...this.options, ...pathOptions };
+        const cellSize = this.gridSystem.config.cellSize;
 
         // --- Calculate Start Center from Input Top-Left ---
         const startCenterX = startX + (entityWidth / 2);
         const startCenterY = startY + (entityHeight / 2);
 
-        // Store the original target center positions
-        const originalEndX = endCenterX;
-        const originalEndY = endCenterY;
+        // --- Store Original Target and Calculate Initial End TL ---
+        const originalEndCenterX = endCenterX;
+        const originalEndCenterY = endCenterY;
+        let endEntityX = originalEndCenterX - (entityWidth / 2);
+        let endEntityY = originalEndCenterY - (entityHeight / 2);
 
-        // --- Calculate End Top-Left ---
-        const endEntityX = endCenterX - (entityWidth / 2);
-        const endEntityY = endCenterY - (entityHeight / 2);
+        // --- Initialize effective target variables ---
+        // These will hold the coordinates we actually pathfind towards.
+        let effectiveEndCenterX = originalEndCenterX;
+        let effectiveEndCenterY = originalEndCenterY;
+        let endGrid = this.gridSystem.worldToGrid(endEntityX, endEntityY); // Initial target grid
 
         if (effectiveOptions.debug) {
             console.log(`Finding path for entity (ID: ${entity.id || 'N/A'}, ${entityWidth}x${entityHeight}, collider: ${collider.width}x${collider.height} @ ${collider.offsetX},${collider.offsetY})`);
             console.log(`From TL (${startX.toFixed(0)},${startY.toFixed(0)}) [Center: (${startCenterX.toFixed(0)}, ${startCenterY.toFixed(0)})]`);
-            console.log(`To Center (${endCenterX.toFixed(0)},${endCenterY.toFixed(0)}) [TL: (${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)})]`);
+            console.log(`To Requested Center (${originalEndCenterX.toFixed(0)},${originalEndCenterY.toFixed(0)}) [TL: (${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)})]`);
         }
 
         // Clear debug data
@@ -153,50 +155,95 @@ class AStarPathfinder {
         }
 
         // --- Validate End Position ---
-        // Pass the actual entity object for potential exclusion during validation checks
-        if (!this._validatePosition(entity, endEntityX, endEntityY, entityWidth, entityHeight, collider, entityCapabilities)) {
+        let isEndValid = this._validatePosition(entity, endEntityX, endEntityY, entityWidth, entityHeight, collider, entityCapabilities);
+
+        // --- ADJUST TARGET IF INVALID ---
+        if (!isEndValid) {
             if (effectiveOptions.debug) {
-                console.warn(`Target end position (Center ${endCenterX.toFixed(0)}, ${endCenterY.toFixed(0)} / TL ${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)}) is invalid for the collider.`);
+                console.warn(`Requested target position (Center ${originalEndCenterX.toFixed(0)}, ${originalEndCenterY.toFixed(0)} / TL ${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)}) is invalid. Attempting to find nearest valid spot.`);
             }
-            return null;
+            // Use existing helper to find nearest valid grid coordinate for the entity's TL
+            const searchRadius = 5; // How far to search (in grid cells)
+            const validEndGrid = this._findNearestValidGridPos(
+                entity,
+                endGrid.x, // Start search from the original invalid grid pos
+                endGrid.y,
+                searchRadius,
+                entityWidth,
+                entityHeight,
+                collider,
+                entityCapabilities
+            );
+
+            if (!validEndGrid) {
+                if (effectiveOptions.debug) {
+                    console.error(`Could not find a valid alternative end position within ${searchRadius} cells of the original target.`);
+                }
+                return null; // Give up if no nearby valid spot found
+            }
+
+            // Update target grid and recalculate effective world center/TL
+            endGrid = validEndGrid; // Use the new valid grid coordinates
+            endEntityX = endGrid.x * cellSize; // TL X for the adjusted grid pos
+            endEntityY = endGrid.y * cellSize; // TL Y for the adjusted grid pos
+            effectiveEndCenterX = endEntityX + (entityWidth / 2); // Center X for the adjusted pos
+            effectiveEndCenterY = endEntityY + (entityHeight / 2); // Center Y for the adjusted pos
+            isEndValid = true; // Mark as valid now
+
+            if (effectiveOptions.debug) {
+                console.log(`Adjusted target to nearest valid grid: (${endGrid.x}, ${endGrid.y}). New Target Center: (${effectiveEndCenterX.toFixed(0)}, ${effectiveEndCenterY.toFixed(0)}), TL: (${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)})`);
+            }
+        }
+        // --- END ADJUST TARGET ---
+
+        // If even after adjustment (or initially) the end is invalid, return null.
+        // This check is slightly redundant if _findNearestValidGridPos guarantees validity,
+        // but acts as a safeguard.
+        if (!isEndValid) {
+             if (effectiveOptions.debug) { console.error(`End position remains invalid after adjustment attempt.`); }
+             return null;
         }
 
-        // --- OPTIMIZATION: Fast direct path check ---
-        const dx = endCenterX - startCenterX;
-        const dy = endCenterY - startCenterY;
+
+        // --- OPTIMIZATION: Fast direct path check (use EFFECTIVE end point) ---
+        const dx = effectiveEndCenterX - startCenterX;
+        const dy = effectiveEndCenterY - startCenterY;
         const directDistance = Math.sqrt(dx * dx + dy * dy);
-        const cellSize = this.gridSystem.config.cellSize;
 
         if (directDistance < cellSize * 1.5) {
-            // Check line of sight between centers (pass entity for validation context)
+            // Check line of sight between start center and EFFECTIVE end center
             if (this._hasLineOfSight(entity,
                 { x: startCenterX, y: startCenterY },
-                { x: endCenterX, y: endCenterY },
+                { x: effectiveEndCenterX, y: effectiveEndCenterY }, // Use effective target
                 entityWidth, entityHeight,
                 collider, entityCapabilities
             )) {
-                if (effectiveOptions.debug) { console.log(`Using direct path - distance: ${directDistance.toFixed(0)}px`); }
+                if (effectiveOptions.debug) { console.log(`Using direct path to effective target - distance: ${directDistance.toFixed(0)}px`); }
+                // Return path to the potentially adjusted end point
                 return [
                     { x: startCenterX, y: startCenterY },
-                    { x: endCenterX, y: endCenterY }
+                    { x: effectiveEndCenterX, y: effectiveEndCenterY } // Use effective target
                 ];
-            } else if (effectiveOptions.debug) { console.log(`Direct path (${directDistance.toFixed(0)}px) blocked, proceeding with A*.`); }
+            } else if (effectiveOptions.debug) { console.log(`Direct path (${directDistance.toFixed(0)}px) to effective target blocked, proceeding with A*.`); }
         }
 
         // --- A* Setup ---
         const startGrid = this.gridSystem.worldToGrid(startX, startY);
-        const endGrid = this.gridSystem.worldToGrid(endEntityX, endEntityY);
+        // Note: endGrid is already potentially adjusted from the validation step above
 
+        // Check if start and (potentially adjusted) end grid are the same
         if (startGrid.x === endGrid.x && startGrid.y === endGrid.y) {
+            // Still need to validate the start position itself
             if (!this._validatePosition(entity, startX, startY, entityWidth, entityHeight, collider, entityCapabilities)) {
-                if (effectiveOptions.debug) { console.warn(`Start and end grid positions are the same, but start TL (${startX}, ${startY}) is invalid.`); }
+                if (effectiveOptions.debug) { console.warn(`Start and (adjusted) end grid positions are the same, but start TL (${startX}, ${startY}) is invalid.`); }
                 return null;
             }
-            if (effectiveOptions.debug) { console.log("Start and end grid positions are the same and valid."); }
-            return [{ x: startCenterX, y: startCenterY }, { x: endCenterX, y: endCenterY }];
+            if (effectiveOptions.debug) { console.log("Start and (adjusted) end grid positions are the same and valid."); }
+            // Path goes from start center to the potentially adjusted end center
+            return [{ x: startCenterX, y: startCenterY }, { x: effectiveEndCenterX, y: effectiveEndCenterY }];
         }
 
-        // --- Validate Start Position ---
+        // --- Validate Start Position (and adjust if necessary) ---
         if (!this._validatePosition(entity, startX, startY, entityWidth, entityHeight, collider, entityCapabilities)) {
             if (effectiveOptions.debug) { console.warn(`Entity collider cannot fit at input start TL (${startX.toFixed(0)}, ${startY.toFixed(0)})`); }
             const validStartGrid = this._findNearestValidGridPos(entity, startGrid.x, startGrid.y, 5, entityWidth, entityHeight, collider, entityCapabilities);
@@ -205,8 +252,16 @@ class AStarPathfinder {
                 return null;
             }
             if (effectiveOptions.debug) { console.log(`Adjusted start grid position to (${validStartGrid.x}, ${validStartGrid.y})`); }
+            // IMPORTANT: If start is adjusted, we should ideally update startCenterX/Y as well,
+            // but for simplicity, we'll keep the original start center and let the path correct itself.
+            // A* will start from the adjusted grid.
             startGrid.x = validStartGrid.x;
             startGrid.y = validStartGrid.y;
+            // TODO: Optionally recalculate startCenterX/Y based on adjusted startGrid for perfect start point.
+            // const adjustedStartX = startGrid.x * cellSize;
+            // const adjustedStartY = startGrid.y * cellSize;
+            // startCenterX = adjustedStartX + entityWidth / 2;
+            // startCenterY = adjustedStartY + entityHeight / 2;
         }
 
         // --- Initialize A* Data Structures ---
@@ -216,45 +271,54 @@ class AStarPathfinder {
         const gScore = new Map();
         const fScore = new Map();
 
-        const startKey = this.getKey(startGrid.x, startGrid.y);
-        const endKey = this.getKey(endGrid.x, endGrid.y);
+        const startKey = this.getKey(startGrid.x, startGrid.y); // Use potentially adjusted startGrid
+        const endKey = this.getKey(endGrid.x, endGrid.y); // Use potentially adjusted endGrid
 
         gScore.set(startKey, 0);
-        fScore.set(startKey, this._heuristic(startGrid.x, startGrid.y, endGrid.x, endGrid.y));
+        fScore.set(startKey, this._heuristic(startGrid.x, startGrid.y, endGrid.x, endGrid.y)); // Heuristic to adjusted end
 
         this.openSet.push({ x: startGrid.x, y: startGrid.y, f: fScore.get(startKey), key: startKey });
 
         let steps = 0;
-        const timeoutMs = 250;
+        const timeoutMs = 250; // Example timeout
 
         // --- Main A* Search Loop ---
         while (!this.openSet.isEmpty()) {
             steps++;
-            if (performance.now() - startTime > timeoutMs) { /* ... timeout handling ... */ return null; }
-            if (steps > effectiveOptions.maxSearchSteps) { /* ... max steps handling ... */ return null; }
+            if (performance.now() - startTime > timeoutMs) {
+                console.warn(`A* search timed out after ${timeoutMs}ms`);
+                return null; // Timeout
+            }
+            if (steps > effectiveOptions.maxSearchSteps) {
+                 console.warn(`A* search exceeded max steps: ${effectiveOptions.maxSearchSteps}`);
+                 return null; // Max steps exceeded
+            }
 
             const current = this.openSet.pop();
 
             if (effectiveOptions.debug) { this.debugElements.exploredNodes.add(current.key); }
 
+            // Goal check against the potentially adjusted endKey
             if (current.key === endKey) {
                 if (effectiveOptions.debug) { console.log(`Path found in ${steps} steps (${(performance.now() - startTime).toFixed(2)}ms)`); }
-                const path = this._reconstructPath( // Pass entity for LOS checks during smoothing
+                // Pass the EFFECTIVE end center coordinates for path reconstruction
+                const path = this._reconstructPath(
                     entity, cameFrom, current, startGrid, endGrid,
-                    startCenterX, startCenterY, originalEndX, originalEndY,
+                    startCenterX, startCenterY, // Original start center
+                    effectiveEndCenterX, effectiveEndCenterY, // Use potentially adjusted end center
                     entityWidth, entityHeight, collider, entityCapabilities,
-                    effectiveOptions // Pass effective options
+                    effectiveOptions
                 );
                 return path;
             }
 
             closedSet.add(current.key);
 
-            // Get neighbors, passing entity for validation checks
+            // Get neighbors based on current grid node
             const neighbors = this._getNeighbors(
                 entity, current.x, current.y,
                 entityWidth, entityHeight, collider, entityCapabilities,
-                effectiveOptions // Pass options for debug etc.
+                effectiveOptions
             );
 
             for (const neighbor of neighbors) {
@@ -262,24 +326,27 @@ class AStarPathfinder {
                 if (closedSet.has(neighborKey)) continue;
 
                 const moveCost = this._getMovementCost(current, neighbor, entityCapabilities, effectiveOptions);
-                const tentativeG = gScore.get(current.key) + moveCost;
+                const tentativeG = (gScore.get(current.key) ?? Infinity) + moveCost; // Use Infinity default defensively
 
-                if (!gScore.has(neighborKey) || tentativeG < gScore.get(neighborKey)) {
+                if (!gScore.has(neighborKey) || tentativeG < (gScore.get(neighborKey) ?? Infinity)) {
                     cameFrom.set(neighborKey, current);
                     gScore.set(neighborKey, tentativeG);
+                    // Heuristic uses the potentially adjusted endGrid
                     const h = this._heuristic(neighbor.x, neighbor.y, endGrid.x, endGrid.y);
-                    const f = tentativeG + (h * effectiveOptions.heuristicWeight); // Use effective option
+                    const f = tentativeG + (h * effectiveOptions.heuristicWeight);
                     fScore.set(neighborKey, f);
+                    // Check if node already in openSet to potentially update, otherwise add
+                    // Note: BinaryHeap implementation might need an update method or handle duplicates
                     const neighborNode = { x: neighbor.x, y: neighbor.y, f: f, key: neighborKey };
+                    // Simple push; heap handles positioning. If duplicates are undesirable, need heap update logic.
                     this.openSet.push(neighborNode);
                 }
             }
-        }
+        } // End A* loop
 
         if (effectiveOptions.debug) { console.warn(`No path found after ${steps} steps (${(performance.now() - startTime).toFixed(2)}ms)`); }
-        return null;
+        return null; // No path found
     }
-
 
     /**
      * Renders the path visually for debugging purposes
