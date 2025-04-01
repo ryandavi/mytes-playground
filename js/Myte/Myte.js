@@ -27,7 +27,7 @@ class Myte {
 			follows_paths: true,
 			can_open_doors: true,
 			can_wade: true,
-			fire_resistance: fakse
+			fire_resistance: false
 		};
 
 		// this character's elements

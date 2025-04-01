@@ -11,7 +11,7 @@ class GridSystem {
             mainGridSize: config.mainGridSize || 64, // Larger grid size (64x64)
             width: parent.dimensions.width || 2000,  // Total width of the map
             height: parent.dimensions.height || 2000, // Total height of the map
-            cullingPadding: config.cullingPadding || -64, // Increased padding for better culling behavior
+            cullingPadding: config.cullingPadding || 32, // Increased padding for better culling behavior
             showTerrainColors: config.showTerrainColors || false, // Whether to color cells based on terrain
             showTerrainCosts: config.showTerrainCosts || false
         };
@@ -21,6 +21,8 @@ class GridSystem {
         // Calculate grid dimensions
         this.gridWidth = Math.ceil(this.parent.dimensions.width / this.config.cellSize);
         this.gridHeight = Math.ceil(this.parent.dimensions.height / this.config.cellSize);
+
+
 
         // Initialize grid cells - using arrays instead of Set where possible for performance
         this.grid = Array(this.gridWidth).fill(null).map((_, x) =>
@@ -70,6 +72,22 @@ class GridSystem {
             'door_closed': 'rgba(139, 69, 19, 0.5)',  // Brown (like wood)
             'door_open': 'rgba(139, 69, 19, 0.2)'     // Lighter brown
         };
+
+
+        console.log(`[GridSystem Init] Calculated Grid Dimensions: ${this.gridWidth} x ${this.gridHeight}`);
+        console.log(`[GridSystem Init] Parent Dimensions: ${this.parent.dimensions.width} x ${this.parent.dimensions.height}`);
+        console.log(`[GridSystem Init] Cell Size: ${this.config.cellSize}`);
+        
+        // Initialize grid cells...
+        // Check the actual created size
+        if (this.grid.length !== this.gridWidth || (this.gridWidth > 0 && this.grid[0].length !== this.gridHeight)) {
+            console.error(`[GridSystem Init] Mismatch! Grid created with size: ${this.grid.length} x ${this.grid[0]?.length || 0}`);
+        } else {
+            console.log(`[GridSystem Init] Grid array created successfully with size: ${this.grid.length} x ${this.grid[0]?.length || 0}`);
+        }
+
+
+
 
         this.toggleDebug();
     }

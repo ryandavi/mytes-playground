@@ -18,11 +18,11 @@
                 7,
                 10
             ],
-            "scale": 1,
+            "scale": 0.75,
             "selectedLayer": 3,
             "viewCenter": {
-                "x": 1102,
-                "y": 883
+                "x": 736,
+                "y": 661.3333333333334
             }
         },
         "HouseNew.tmx": {

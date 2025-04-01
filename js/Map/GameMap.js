@@ -4,13 +4,10 @@ class GameMap {
         this.mapData = mapData || {}; // Default empty object if no data provided
 
         // Core properties
-        this.name = mapData?.name || 'Default Map';
-        this.displayName = mapData?.displayName || this.name;
+        this.name = null;
+        this.displayName = null;
         this.id = null;
-        this.dimensions = mapData?.dimensions || {
-            width: 1000,
-            height: 1000
-        };
+        this.dimensions = null;
 
         // Layer references
         this.layers = {
@@ -22,8 +19,8 @@ class GameMap {
         };
 
         // Systems
-        this.zoneManager = new ZoneManager(this);
-        this.gridSystem = new GridSystem(this);
+        this.zoneManager = null;
+        this.gridSystem = null;
         this.particleSystem = null; // Will be initialized later
 
         // Map elements
@@ -48,17 +45,11 @@ class GameMap {
 
     // Add to GameMap class
     testPathfinding() {
-        if (!this.gridSystem) {
-            console.warn("Grid system not available, initializing...");
-            this.gridSystem = new GridSystem(this);
-            this.parent?.camera && this.gridSystem.updateCulling(this.parent.camera);
+
+        if (!this.initialized || !this.gridSystem || !this.gridSystem.pathfinder) {
+            return null;
         }
-    
-        if (!this.gridSystem.pathfinder) {
-            console.warn("Pathfinder not available, initializing...");
-            this.gridSystem.pathfinder = new AStarPathfinder(this.gridSystem);
-        }
-    
+
         if (!this.parent.inputHandler.isMouseInContainer()) return null;
     
         // Get the entity (myte)
@@ -95,37 +86,6 @@ class GameMap {
     }
 
 
-// Line algorithm helper
-getLinePoints(x0, y0, x1, y1) {
-    const points = [];
-    const dx = Math.abs(x1 - x0);
-    const dy = Math.abs(y1 - y0);
-    const sx = (x0 < x1) ? 1 : -1;
-    const sy = (y0 < y1) ? 1 : -1;
-    let err = dx - dy;
-    
-    let x = x0;
-    let y = y0;
-    
-    while (true) {
-        points.push({x, y});
-        
-        if (x === x1 && y === y1) break;
-        
-        const e2 = 2 * err;
-        if (e2 > -dy) {
-            err -= dy;
-            x += sx;
-        }
-        if (e2 < dx) {
-            err += dx;
-            y += sy;
-        }
-    }
-    
-    return points;
-}
-    // Modify the initialize method in GameMap.js to handle initial loads differently
     async initialize(mapId, options = {}) {
         try {
             console.log(`[GameMap] Initializing map: ${mapId}`);
@@ -220,6 +180,9 @@ getLinePoints(x0, y0, x1, y1) {
             try {
                 console.log(`[GameMap] Applying TMX data to game map`);
                 await this.tileMapLoader.applyToGameMap(this, mapData);
+
+
+
                 console.log(`[GameMap] TMX data applied successfully`);
             } catch (applyError) {
                 console.error(`[GameMap] Error applying TMX data:`, applyError);

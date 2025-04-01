@@ -758,7 +758,6 @@ class AStarPathfinder {
 
     /**
      * Get valid neighboring grid cells for pathfinding, ensuring the collider fits.
-     * @private
      */
     _getNeighbors(entity, x, y, entityWidth, entityHeight, collider, entityCapabilities, effectiveOptions) {
         const neighbors = [];
@@ -835,7 +834,6 @@ class AStarPathfinder {
 
     /**
      * Calculate movement cost between two grid nodes, considering terrain and path centering.
-     * @private
      */
     _getMovementCost(fromNode, toNode, entityCapabilities, effectiveOptions) { // Added options param
         const baseMoveCost = (fromNode.x !== toNode.x && fromNode.y !== toNode.y) ? Math.SQRT2 : 1.0;
@@ -894,7 +892,6 @@ class AStarPathfinder {
 
     /**
      * Check line of sight between two entity *center* points, considering the collider.
-     * @private
      */
     _hasLineOfSight(entity, startCenter, endCenter, entityWidth, entityHeight, collider, entityCapabilities) {
         const dx = endCenter.x - startCenter.x;
@@ -1175,7 +1172,6 @@ class AStarPathfinder {
             left: `${entityX}px`, top: `${entityY}px`,
             width: `${entityWidth}px`, height: `${entityHeight}px`,
             border: `1px dashed ${nodeType === 'start' ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)'}`,
-            boxSizing: 'border-box', // Important for accurate border rendering
             zIndex: 979
         });
         container.appendChild(entity);
@@ -1193,7 +1189,6 @@ class AStarPathfinder {
                 width: `${entityCollider.width}px`, height: `${entityCollider.height}px`,
                 border: `1px solid ${nodeType === 'start' ? 'rgba(0, 255, 0, 0.8)' : 'rgba(255, 0, 0, 0.8)'}`,
                 backgroundColor: `${nodeType === 'start' ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255, 0, 0, 0.2)'}`,
-                boxSizing: 'border-box', // Important for accurate border rendering
                 zIndex: 980
             });
             container.appendChild(colliderEl);

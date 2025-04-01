@@ -163,24 +163,18 @@ class TileMapLoader {
 		gameMap.dimensions = mapData.dimensions;
 		gameMap.name = mapData.name;
 		gameMap.id = mapData.id;
-
 		gameMap.displayName = mapData.displayName;
-
 		gameMap.description = mapData.description;
 		gameMap.location = mapData.environment.location;
+
+		gameMap.gridSystem = new GridSystem(gameMap);
+		gameMap.zoneManager = new ZoneManager(gameMap);
 
 		console.log('Tile map dimensions:', gameMap.dimensions);
 
 		// set canvas
 		this.parent.parent.canvas.style.width = `${gameMap.dimensions.width}px`;
 		this.parent.parent.canvas.style.height = `${gameMap.dimensions.height}px`;
-
-		for (const layer of Object.values(this.parent.layers)) {
-			if (layer) { // Ensure the layer exists before modifying it
-				//layer.style.width = `${gameMap.dimensions.width}px`;
-				//layer.style.height = `${gameMap.dimensions.height}px`;
-			}
-		}
 
 		// Set background from map
 		const bgUrl = await this.createMapBackgroundUrl(mapData);
