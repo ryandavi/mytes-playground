@@ -60,31 +60,41 @@ class GameMap {
         }
     
         if (!this.parent.inputHandler.isMouseInContainer()) return null;
-        
+    
+        // Get the entity (myte)
         const myte = this.parent.mytes?.[0];
         if (!myte?.isActive) return null;
-        
-        const { height: entityHeight, width: entityWidth } = myte.size;
+    
+        // Get start position (entity top-left)
+        const { posX: startX, posY: startY } = myte;
+        // Get end position (target center - mouse coords)
         const { x: endX, y: endY } = this.parent.inputHandler.getAdjustedMouse();
-        const { posX: startX, posY: startY, collider } = myte;
-
+    
+        // For visualization and potentially options if needed later
+        const { height: entityHeight, width: entityWidth } = myte.size;
+        const { collider } = myte; // Get collider from the entity itself
+    
         // show debug
-        this.gridSystem.pathfinder.options.debug = true;
+        this.gridSystem.pathfinder.options.debug = true; // Keep debug options separate
         this.gridSystem.config.showTerrainColors = true;
-        
-        const path = this.gridSystem.pathfinder.findPath(startX, startY, endX, endY, {
-            width: entityWidth, 
-            height: entityHeight,
-            collider,
-            capabilities: { 
-                can_swim: false,
-                follows_paths: true,
-                can_open_doors: true
-            }
-        });
-        
+    
+        // --- MODIFIED CALL to findPath ---
+        const path = this.gridSystem.pathfinder.findPath(
+            myte,      // 1. Pass the entity object itself
+            startX,    // 2. Entity top-left X
+            startY,    // 3. Entity top-left Y
+            endX,      // 4. Target center X
+            endY       // 5. Target center Y
+            // 6. Optional pathOptions {} - No longer needed here IF
+            //    myte object reliably has .size, .collider, .capabilities properties.
+            //    findPath now extracts these from the 'myte' object directly.
+            //    You could still pass overrides here if needed, e.g., {} or { heuristicWeight: 1.5 }
+        );
+        // --- END MODIFIED CALL ---
+    
+        // Visualization uses the entity's overall dimensions and collider
         this.gridSystem.pathfinder.visualizePath(this.layers.debug, path || [], entityWidth, entityHeight, collider);
-        
+    
         return path;
     }
 

@@ -816,6 +816,64 @@ class GridSystem {
         return cells;
     }
 
+
+
+    getObjectCellsForArea(areaX, areaY, areaWidth, areaHeight) {
+        // Calculate grid boundaries for the specific area
+        const startGrid = this.worldToGrid(areaX, areaY);
+        const endGrid = this.worldToGrid(areaX + areaWidth, areaY + areaHeight);
+    
+        const cells = new Set();
+        // Loop through the grid cells covered by the area, clamping to grid bounds
+        for (let x = Math.max(0, startGrid.x); x <= Math.min(endGrid.x, this.gridWidth - 1); x++) {
+            for (let y = Math.max(0, startGrid.y); y <= Math.min(endGrid.y, this.gridHeight - 1); y++) {
+                // Ensure the cell exists before adding
+                if (this.grid[x] && this.grid[x][y]) {
+                    cells.add(this.grid[x][y]);
+                }
+            }
+        }
+        return cells;
+    }
+    
+    /**
+     * Get potential colliders (non-walkable tiles and objects) within the specified world area.
+     * Designed specifically for checking collider footprints.
+     * @param {number} colliderWorldX - World X coordinate of the collider's top-left corner.
+     * @param {number} colliderWorldY - World Y coordinate of the collider's top-left corner.
+     * @param {number} colliderWidth - Width of the collider.
+     * @param {number} colliderHeight - Height of the collider.
+     * @param {Object} [entityToExclude=null] - The entity performing the check, to avoid self-collision.
+     * @returns {Array<Object>} An array of potential collision objects (tile representations or actual objects).
+     */
+    getPotentialCollidersForArea(colliderWorldX, colliderWorldY, colliderWidth, colliderHeight, entityToExclude = null) {
+        // Get grid cells overlapped specifically by the collider's area
+        const cells = this.getObjectCellsForArea(colliderWorldX, colliderWorldY, colliderWidth, colliderHeight);
+        const potentialColliders = new Set();
+
+        cells.forEach(cell => {
+            // Tile walkability check is REMOVED from this function.
+
+            // Add non-walkable OBJECTS physically present in this cell
+            if (cell.objects && cell.objects.length > 0) {
+                 cell.objects.forEach(obj => {
+                     // Check if the object is collidable (defined by having a !walkable config)
+                     // and not the entity performing the check.
+                     // Ensure obj and obj.config exist before checking walkable.
+                     if (obj && obj !== entityToExclude && obj.config && !obj.config.walkable) {
+                         potentialColliders.add(obj);
+                     }
+                 });
+            }
+        });
+
+        // Return only the actual objects found.
+        return Array.from(potentialColliders);
+    }
+
+
+
+
     // Add object to grid
     addObject(obj) {
         if (!obj) return; // Safety check

@@ -22,6 +22,11 @@ class Myte {
 			wrapper: this.element.closest(".myteWrapper"),
 		};
 
+		this.capabilities = { 
+			can_swim: false,
+			follows_paths: true,
+			can_open_doors: true
+		};
 
 		// this character's elements
 		this.duplicate;
