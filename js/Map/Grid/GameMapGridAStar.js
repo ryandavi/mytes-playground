@@ -520,7 +520,7 @@ class AStarPathfinder {
             const terrainType = this.getTerrainTypeAt(newX, newY);
 
             // Check if this terrain is traversable based on entity capabilities
-            if (!this.canTraverseTerrain(terrainType)) {
+            if (!this.canTraverseTerrain(terrainType, entityCapabilities)) {
                 if (this.options.debug) {
                     this.debugElements.rejectedNodes.add(this.getKey(newX, newY));
                 }
@@ -593,35 +593,36 @@ class AStarPathfinder {
             gridY < 0 || gridY >= this.gridSystem.gridHeight) {
             return false;
         }
-
-        // Get terrain type for capability check
-        const terrainType = this.getTerrainTypeAt(gridX, gridY);
-
-        // Check if entity can traverse this terrain
-        if (!this.canTraverseTerrain(terrainType, entityCapabilities)) {
-            return false;
-        }
-
-        // Basic walkability check
+    
+        // Basic walkability check first (quick rejection)
         const cell = this.gridSystem.grid[gridX][gridY];
         if (!cell.walkable) {
             return false;
         }
-
-        // If no entity dimensions provided, just use the grid walkability
-        if (entityWidth <= 0 || entityHeight <= 0) {
-            return cell.walkable;
-        }
-
-        // Check for doors if entity can't open them
-        if (!entityCapabilities.can_open_doors && cell.hasDoor) {
+        
+        // Get terrain type for capability check
+        const terrainType = this.getTerrainTypeAt(gridX, gridY);
+    
+        // Check if entity can traverse this terrain
+        if (!this.canTraverseTerrain(terrainType, entityCapabilities)) {
             return false;
         }
-
+    
+        // If no entity dimensions provided, just use the grid walkability
+        if (!entityWidth || !entityWidth <= 0 || !entityHeight || entityHeight <= 0 || !collider) {
+            return cell.walkable;
+        }
+    
+        // Check for doors if entity can't open them
+        if (entityCapabilities && !entityCapabilities.can_open_doors && cell.hasDoor) {
+            return false;
+        }
+    
         // For entities with dimensions, check potential collisions
         const worldX = gridX * this.gridSystem.config.cellSize;
         const worldY = gridY * this.gridSystem.config.cellSize;
-
+    
+        // Create a test entity at this position
         const collisionEntity = {
             posX: worldX,
             posY: worldY,
@@ -631,7 +632,7 @@ class AStarPathfinder {
                 walkable: true
             }
         };
-
+    
         // Check all cells the entity would overlap
         const cells = this.getEntityOverlappingCells(gridX, gridY, entityWidth, entityHeight, collider);
         for (const cell of cells) {
@@ -639,38 +640,37 @@ class AStarPathfinder {
                 return false;
             }
         }
-
+    
         // Get potential colliders
         const potentialColliders = this.gridSystem.getPotentialColliders(collisionEntity);
         if (!potentialColliders || potentialColliders.length === 0) {
             return true;
         }
-
-        // Check for collisions
+    
+        // Check for collisions using parent's collision detection if available
         if (this.gridSystem.parent && this.gridSystem.parent.parent &&
             typeof this.gridSystem.parent.parent.checkCollision === 'function') {
-
-            // Use the parent's collision detection if available
-            for (const collider of potentialColliders) {
+    
+            for (const potentialCollider of potentialColliders) {
                 // Only check collision with non-walkable objects
-                if (!collider.config?.walkable) {
-                    if (this.gridSystem.parent.parent.checkCollision(collisionEntity, collider)) {
+                if (!potentialCollider.config?.walkable) {
+                    if (this.gridSystem.parent.parent.checkCollision(collisionEntity, potentialCollider)) {
                         return false;
                     }
                 }
             }
         } else {
-            // Simple bounding box collision check
-            for (const collider of potentialColliders) {
+            // Fallback to simple bounding box collision check
+            for (const potentialCollider of potentialColliders) {
                 // Only check collision with non-walkable objects
-                if (collider.config && !collider.config.walkable) {
-                    if (this.checkBoundingBoxCollision(collisionEntity, collider)) {
+                if (potentialCollider.config && !potentialCollider.config.walkable) {
+                    if (this.checkBoundingBoxCollision(collisionEntity, potentialCollider)) {
                         return false;
                     }
                 }
             }
         }
-
+    
         return true;
     }
 
@@ -723,28 +723,34 @@ class AStarPathfinder {
     // Enhanced movement cost calculation based on terrain type
     getMovementCost(from, to, entityCapabilities) {
         // Base cost for the move (1.0 for orthogonal, Math.SQRT2 for diagonal)
-        const baseMoveCost = (from.x !== to.x && from.y !== to.y) ? Math.SQRT2 : GridSystem.defaultTerrainCost;
-
+        const baseMoveCost = (from.x !== to.x && from.y !== to.y) ? Math.SQRT2 : 1.0;
+    
         // Get terrain type at destination
         const terrainType = to.terrainType || this.getTerrainTypeAt(to.x, to.y);
-
+    
         // Get the cost multiplier for this terrain type
         let terrainMultiplier = GridSystem.terrainCosts[terrainType] || GridSystem.defaultTerrainCost;
-
-
-        // Apply entity capability modifiers
-        if (this.isTerrainInCategory(terrainType, 'PREFERRED_PATHS') &&
-            entityCapabilities.follows_paths && this.options.preferPaths) {
-            // Additional preference for paths if entity follows paths
-            terrainMultiplier *= 0.9;
+    
+        // Apply entity capability modifiers with stronger preferences
+        if (this.options.preferPaths && 
+            this.isTerrainInCategory(terrainType, 'PREFERRED_PATHS') &&
+            entityCapabilities && entityCapabilities.follows_paths) {
+            // Make paths even more attractive for entities that prefer them
+            terrainMultiplier *= 0.8;
         }
-
-        // Penalize difficult terrain if configured to do so
-        if (this.isTerrainInCategory(terrainType, 'DIFFICULT_TERRAIN') && 
-            this.options.avoidDifficultTerrain) {
-            terrainMultiplier *= 1.2;
+    
+        // Penalize difficult terrain more significantly if configured
+        if (this.options.avoidDifficultTerrain && 
+            this.isTerrainInCategory(terrainType, 'DIFFICULT_TERRAIN')) {
+            terrainMultiplier *= 1.5;
         }
-
+    
+        // Additional penalty for water if entity can't swim
+        if (this.isTerrainInCategory(terrainType, 'WATER') && 
+            entityCapabilities && !entityCapabilities.can_swim) {
+            terrainMultiplier *= 5.0; // Make water very unattractive
+        }
+    
         return baseMoveCost * terrainMultiplier;
     }
 
@@ -772,7 +778,7 @@ class AStarPathfinder {
             currentNode = cameFrom.get(key);
         }
     
-        // Replace first and last points with original positions
+        // Replace first and last points with original positions to ensure accuracy
         if (path.length > 0) {
             // Start position is entity top-left
             path[0] = { x: originalStartX, y: originalStartY };
@@ -783,14 +789,19 @@ class AStarPathfinder {
             }
         }
     
-        const finalPath = this.options.smoothPaths ? this.smoothPath(path, entityWidth, entityHeight, collider, entityCapabilities) : path;
+        // Apply path smoothing with entity collider awareness
+        const finalPath = this.options.smoothPaths 
+            ? this.smoothPath(path, entityWidth, entityHeight, collider, entityCapabilities) 
+            : path;
     
+        // Store for debugging
         if (this.options.debug) {
             this.debugElements.path = [...finalPath];
         }
     
         return finalPath;
     }
+    
 
     smoothPath(path, entityWidth, entityHeight, collider, entityCapabilities) {
         if (path.length <= 2) return path;
@@ -798,17 +809,39 @@ class AStarPathfinder {
         const smoothed = [path[0]];
         let currentIndex = 0;
     
+        // Use a slightly more conservative approach for smoothing
+        const safetyBuffer = 0.9; // 10% safety margin for collision checks
+    
         while (currentIndex < path.length - 1) {
             let furthestVisible = currentIndex + 1;
     
-            for (let i = currentIndex + 2; i < path.length; i++) {
+            // Try to find the furthest visible point from the current point
+            for (let i = furthestVisible + 1; i < path.length; i++) {
+                // Skip every other point for efficiency (can be removed if needed)
                 if ((i - currentIndex) % 2 !== 0 && i < path.length - 1) continue;
     
-                if (this.hasLineOfSight(path[currentIndex], path[i], entityWidth, entityHeight, collider, entityCapabilities)) {
+                // Add a bit of safety margin around the entity for line of sight checks
+                const adjustedWidth = entityWidth * safetyBuffer;
+                const adjustedHeight = entityHeight * safetyBuffer;
+                
+                // Check if there's a clear line of sight to this point
+                if (this.hasLineOfSight(
+                    path[currentIndex], 
+                    path[i], 
+                    adjustedWidth, 
+                    adjustedHeight, 
+                    collider, 
+                    entityCapabilities
+                )) {
                     furthestVisible = i;
+                } else {
+                    // Once we hit a non-visible point, stop looking further
+                    // to avoid skipping past invisible obstacles
+                    break;
                 }
             }
     
+            // Add the furthest visible point to our path
             smoothed.push(path[furthestVisible]);
             currentIndex = furthestVisible;
         }
@@ -818,56 +851,100 @@ class AStarPathfinder {
 
     // Enhanced line of sight check that considers walkability
     hasLineOfSight(start, end, entityWidth, entityHeight, collider, entityCapabilities) {
+        // If there's no entity size or collider, just return basic line of sight
+        if (!entityWidth || !entityHeight || !collider) {
+            return this.basicLineOfSight(start, end);
+        }
+    
+        // Convert world coordinates to grid coordinates
         const startGrid = this.gridSystem.worldToGrid(start.x, start.y);
         const endGrid = this.gridSystem.worldToGrid(end.x, end.y);
-
+    
         const dx = Math.abs(endGrid.x - startGrid.x);
         const dy = Math.abs(endGrid.y - startGrid.y);
         const sx = startGrid.x < endGrid.x ? 1 : -1;
         const sy = startGrid.y < endGrid.y ? 1 : -1;
         let err = dx - dy;
-
+    
         let x = startGrid.x;
         let y = startGrid.y;
-
+    
         // Keep track of total terrain cost along the line
         let totalCost = 0;
         const maxTerrainCostRatio = 1.5; // Maximum allowed average terrain cost
-
+    
         let steps = 0;
+        
+        // Number of intermediate points to check
+        const numIntermediatePoints = Math.max(dx, dy) * 3;
+        
+        if (numIntermediatePoints <= 1) {
+            // If the points are too close, just check if end point is valid
+            return this.canEntityFitAt(endGrid.x, endGrid.y, entityWidth, entityHeight, collider, entityCapabilities);
+        }
+        
+        // Check intermediate points along the direct line from start to end
+        for (let i = 1; i <= numIntermediatePoints; i++) {
+            // Use linear interpolation to get world coordinates along the path
+            const ratio = i / numIntermediatePoints;
+            const worldX = start.x + (end.x - start.x) * ratio;
+            const worldY = start.y + (end.y - start.y) * ratio;
+            
+            // Convert back to grid coordinates
+            const gridPos = this.gridSystem.worldToGrid(worldX, worldY);
+            
+            // Skip checking the start and end points (already validated)
+            if ((gridPos.x === startGrid.x && gridPos.y === startGrid.y) || 
+                (gridPos.x === endGrid.x && gridPos.y === endGrid.y)) {
+                continue;
+            }
+            
+            // If entity can't fit at this point, there's no line of sight
+            if (!this.canEntityFitAt(gridPos.x, gridPos.y, entityWidth, entityHeight, collider, entityCapabilities)) {
+                return false;
+            }
+            
+            // Add cost for this cell for terrain preference
+            const terrainType = this.getTerrainTypeAt(gridPos.x, gridPos.y);
+            totalCost += GridSystem.terrainCosts[terrainType] || GridSystem.defaultTerrainCost;
+            steps++;
+        }
+        
+        // Check if average terrain cost is too high (inefficient path)
+        if (steps > 3 && (totalCost / steps) > maxTerrainCostRatio) {
+            return false;
+        }
+    
+        return true;
+    }
 
+    basicLineOfSight(start, end) {
+        const startGrid = this.gridSystem.worldToGrid(start.x, start.y);
+        const endGrid = this.gridSystem.worldToGrid(end.x, end.y);
+    
+        const dx = Math.abs(endGrid.x - startGrid.x);
+        const dy = Math.abs(endGrid.y - startGrid.y);
+        const sx = startGrid.x < endGrid.x ? 1 : -1;
+        const sy = startGrid.y < endGrid.y ? 1 : -1;
+        let err = dx - dy;
+    
+        let x = startGrid.x;
+        let y = startGrid.y;
+    
         while (x !== endGrid.x || y !== endGrid.y) {
-            // Check if this cell is walkable by the entity
+            // Check if this cell is walkable
             if (x < 0 || x >= this.gridSystem.gridWidth ||
                 y < 0 || y >= this.gridSystem.gridHeight) {
                 return false;
             }
-
+    
             // Get the cell and check basic walkability
             const cell = this.gridSystem.grid[x][y];
             if (!cell.walkable) {
                 return false;
             }
-
-            // Also check entity fit
-            if (!this.canEntityFitAt(x, y, entityWidth, entityHeight, collider, entityCapabilities)) {
-                return false;
-            }
-
-            // Add cost for this cell
-            const terrainType = this.getTerrainTypeAt(x, y);
-            if (!this.canTraverseTerrain(terrainType, entityCapabilities)) {
-                return false;
-            }
-
-            totalCost += GridSystem.terrainCosts[terrainType] || GridSystem.defaultTerrainCost;
-            steps++;
-
-            // Check if average terrain cost is too high (inefficient path)
-            if (steps > 3 && (totalCost / steps) > maxTerrainCostRatio) {
-                return false;
-            }
-
+    
+            // Step to next grid position using Bresenham's algorithm
             const e2 = 2 * err;
             if (e2 > -dy) {
                 err -= dy;
@@ -878,9 +955,10 @@ class AStarPathfinder {
                 y += sy;
             }
         }
-
+    
         return true;
     }
+
 
     // Method to manually check walkability at a specific grid location
     checkWalkableAt(gridX, gridY, entityOptions = null) {
