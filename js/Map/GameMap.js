@@ -368,6 +368,52 @@ class GameMap {
 	}
 
 
+
+
+	applyObjectTerrainModifiers() {
+		if (!this.gridSystem) return;
+
+		const grid = this.gridSystem.grid;
+
+		// Check all map objects for terrain modifiers
+		this.objects.forEach(obj => {
+			if (!obj.type) return;
+
+			// Check if this object type modifies terrain
+			const terrainType = this.tileMapLoader.terrainModifiers[obj.type.toUpperCase()];
+			if (!terrainType) return;
+
+			// Calculate grid cells covered by this object
+			const objX = Math.floor(obj.posX / this.gridSystem.config.cellSize);
+			const objY = Math.floor(obj.posY / this.gridSystem.config.cellSize);
+			const objWidth = Math.ceil(obj.size.width / this.gridSystem.config.cellSize);
+			const objHeight = Math.ceil(obj.size.height / this.gridSystem.config.cellSize);
+
+			// Apply terrain type to these cells
+			for (let x = objX; x < objX + objWidth; x++) {
+				for (let y = objY; y < objY + objHeight; y++) {
+					if (x >= 0 && x < grid.length &&
+						y >= 0 && y < grid[x].length) {
+
+						// Store the original terrain type if not already set
+						if (!grid[x][y].originalTerrainType) {
+							grid[x][y].originalTerrainType = grid[x][y].terrainType;
+						}
+
+						// Apply the new terrain type
+						grid[x][y].terrainType = terrainType;
+
+						// Store reference to the modifying object
+						grid[x][y].terrainModifier = obj;
+					}
+				}
+			}
+
+			// Set terrain type on the object itself for reference
+			obj.terrainType = terrainType;
+		});
+	}
+
 	applyTerrainToGameMap(mapData) {
 		// Apply terrain data to grid system if it exists
 		if (this.gridSystem && this.gridSystem.pathfinder) {
@@ -393,7 +439,7 @@ class GameMap {
 			}
 	
 			// Process objects that modify terrain
-			this.applyObjectTerrainModifiers(gameMap);
+			this.applyObjectTerrainModifiers();
 			
 			// Update pathfinder to check if entity can swim when calculating paths
 			if (this.gridSystem.pathfinder.setTerrainCosts) {

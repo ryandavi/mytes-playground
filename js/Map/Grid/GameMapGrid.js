@@ -22,8 +22,6 @@ class GridSystem {
         this.gridWidth = Math.ceil(this.parent.dimensions.width / this.config.cellSize);
         this.gridHeight = Math.ceil(this.parent.dimensions.height / this.config.cellSize);
 
-
-
         // Initialize grid cells - using arrays instead of Set where possible for performance
         this.grid = Array(this.gridWidth).fill(null).map((_, x) =>
             Array(this.gridHeight).fill(null).map((_, y) => ({

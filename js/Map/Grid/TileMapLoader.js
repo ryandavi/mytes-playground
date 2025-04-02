@@ -6,8 +6,6 @@ class TileMapLoader {
 		this.maps = new Map(); // Store loaded maps
 		this.currentMapData = null; // Track current map data
 
-		// Canvas elements for rendering
-		this.layerCanvases = new Map(); // Store canvases for each layer
 
 		// Default terrain mapping
 		this.terrainMapping = {
@@ -895,57 +893,6 @@ markGridCellsConditional(grid, tileX, tileY, tileWidth, tileHeight, cellSize, co
 		}
 	}
 
-	/**
-	* Apply terrain data to pathfinding
-	*/
-
-	/**
-	* Check for objects that modify terrain and apply their effects
-	*/
-	applyObjectTerrainModifiers(gameMap) {
-		if (!gameMap || !gameMap.gridSystem) return;
-
-		const grid = gameMap.gridSystem.grid;
-
-		// Check all map objects for terrain modifiers
-		gameMap.objects.forEach(obj => {
-			if (!obj.type) return;
-
-			// Check if this object type modifies terrain
-			const terrainType = this.terrainModifiers[obj.type.toUpperCase()];
-			if (!terrainType) return;
-
-			// Calculate grid cells covered by this object
-			const objX = Math.floor(obj.posX / gameMap.gridSystem.config.cellSize);
-			const objY = Math.floor(obj.posY / gameMap.gridSystem.config.cellSize);
-			const objWidth = Math.ceil(obj.size.width / gameMap.gridSystem.config.cellSize);
-			const objHeight = Math.ceil(obj.size.height / gameMap.gridSystem.config.cellSize);
-
-			// Apply terrain type to these cells
-			for (let x = objX; x < objX + objWidth; x++) {
-				for (let y = objY; y < objY + objHeight; y++) {
-					if (x >= 0 && x < grid.length &&
-						y >= 0 && y < grid[x].length) {
-
-						// Store the original terrain type if not already set
-						if (!grid[x][y].originalTerrainType) {
-							grid[x][y].originalTerrainType = grid[x][y].terrainType;
-						}
-
-						// Apply the new terrain type
-						grid[x][y].terrainType = terrainType;
-
-						// Store reference to the modifying object
-						grid[x][y].terrainModifier = obj;
-					}
-				}
-			}
-
-			// Set terrain type on the object itself for reference
-			obj.terrainType = terrainType;
-		});
-	}
-
 	convertToGameMapFormat(TileMapData) {
 		// Create base map structure
 		const gameMapData = {
@@ -991,37 +938,8 @@ markGridCellsConditional(grid, tileX, tileY, tileWidth, tileHeight, cellSize, co
 		return gameMapData;
 	}
 
-	// Update existing layer canvases
-	updateLayerCanvas(layerName) {
-		const canvas = this.layerCanvases.get(layerName);
-		if (!canvas) return;
-
-		// Get the current map data
-		const mapData = this.currentMapData;
-		if (!mapData) return;
-
-		// Find the layer data
-		const layer = mapData.TileData.layers.find(l => l.name === layerName);
-		if (!layer) return;
-
-		// Rerender the layer
-		this.renderTileLayerToCanvas(layer, mapData.TileData, canvas);
-	}
-
-	// Clear all layer canvases
-	clearLayerCanvases() {
-		this.layerCanvases.forEach((canvas, layerName) => {
-			const ctx = canvas.getContext('2d');
-			ctx.clearRect(0, 0, canvas.width, canvas.height);
-		});
-	}
-
 	// Dispose resources
 	dispose() {
-		// Clear canvases
-		this.clearLayerCanvases();
-		this.layerCanvases.clear();
-
 		// Clear current map data
 		this.currentMapData = null;
 	}
