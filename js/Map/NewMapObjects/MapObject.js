@@ -12,7 +12,7 @@ const BASE_CONFIG = {
 	walkable: false,
 	collision: false,
 
-	direction: "S",
+	direction: DIRECTION.SOUTH,
 
 
 	// Interactive properties
@@ -25,6 +25,8 @@ const BASE_CONFIG = {
 
 	canInspect: true,
 	canPickUp: false,
+
+	interactionSide: null, // null = any side, DIRECTION.NORTH, DIRECTION.SOUTH, DIRECTION.EAST, DIRECTION.WEST
 
 	// Render properties
 	renderType: 'single', // single, split, animated, sprite

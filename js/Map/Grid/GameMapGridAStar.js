@@ -28,7 +28,7 @@ class AStarPathfinder {
             smoothPaths: true,
             debug: false,
             useDirectPathFallback: true,
-            preferPaths: true,           // General preference for paths
+            preferPaths: false,           // General preference for paths
             pathEdgePenaltyFactor: 0.3, // NEW: How much to penalize path edges (0=none, 1=max)
             avoidDifficultTerrain: true,
             allowEntityOutOfBounds: true,
