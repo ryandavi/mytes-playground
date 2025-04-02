@@ -156,88 +156,7 @@ class TileMapLoader {
 		}
 	}
 
-	async applyToGameMap(gameMap, mapData) {
-		if (!gameMap || !mapData) return;
 
-		// Set dimensions
-		gameMap.dimensions = mapData.dimensions;
-		gameMap.name = mapData.name;
-		gameMap.id = mapData.id;
-		gameMap.displayName = mapData.displayName;
-		gameMap.description = mapData.description;
-		gameMap.location = mapData.environment.location;
-
-		gameMap.gridSystem = new GridSystem(gameMap);
-		gameMap.zoneManager = new ZoneManager(gameMap);
-
-		console.log('Tile map dimensions:', gameMap.dimensions);
-
-		// set canvas
-		this.parent.parent.canvas.style.width = `${gameMap.dimensions.width}px`;
-		this.parent.parent.canvas.style.height = `${gameMap.dimensions.height}px`;
-
-		// Set background from map
-		const bgUrl = await this.createMapBackgroundUrl(mapData);
-		if (bgUrl) {
-			gameMap.setBackground({
-				url: bgUrl,
-				color: mapData.background?.color || '#f0f0f0'
-			});
-		} else if (mapData.background) {
-			gameMap.setBackground(mapData.background);
-		}
-
-		// Generate grid data for the GridSystem
-		const gridData = this.generateGridData(mapData, {
-			cellSize: gameMap.gridSystem?.config?.cellSize || 32,
-			collisionLayer: 'Collider'
-		});
-
-		// Update the grid system
-		if (gameMap.gridSystem) {
-			gameMap.gridSystem.updateFromTileGrid(gridData);
-		}
-
-		// Add zones
-		if (mapData.zones) {
-			console.log("mapData.zones", mapData.zones);
-			for (const zoneData of mapData.zones) {
-				gameMap.zoneManager.addZone(zoneData);
-			}
-		}
-
-		// Set spawn points
-		if (mapData.spawns) {
-			Object.entries(mapData.spawns).forEach(([key, value]) => {
-				gameMap.spawnPoints.set(key, value);
-			});
-		}
-
-		// set myte position to spawn point
-		// get first myte
-		let mytes = this.parent.parent.mytes;
-		console.log(mytes.length);
-		if (mytes.length > 0) {
-			let myte = mytes[0];
-			myte.setWrapperPosition(mapData.spawns.myte.x, mapData.spawns.myte.y);
-		}
-
-		// Add objects
-		if (mapData.objects) {
-			for (const objData of mapData.objects) {
-				gameMap.addObject(
-					objData.type.toUpperCase(),
-					objData.variant,
-					objData.x,
-					objData.y,
-					objData.properties
-				);
-			}
-		}
-
-		// Apply terrain data to pathfinding after objects have been added
-		this.applyTerrainToGameMap(gameMap, mapData);
-	}
 
 	async loadTileset(tilesetPath, firstgid, tilesetEl = null) {
 		// Check if we've already loaded this external tileset
@@ -979,67 +898,7 @@ markGridCellsConditional(grid, tileX, tileY, tileWidth, tileHeight, cellSize, co
 	/**
 	* Apply terrain data to pathfinding
 	*/
-	applyTerrainToGameMap(gameMap, mapData) {
-		// Apply terrain data to grid system if it exists
-		if (gameMap.gridSystem && gameMap.gridSystem.pathfinder) {
-			console.log("[TileMapLoader] Applying terrain types to pathfinder");
-	
-			// Get terrain costs from the pathfinder or use our local copy
-			let customTerrainCosts = {};
-			
-			// Start with our default costs
-			Object.assign(customTerrainCosts, GridSystem.terrainCosts);
-	
-			// Check for custom terrain costs in map properties
-			if (mapData.properties) {
-				Object.keys(mapData.properties).forEach(key => {
-					if (key.startsWith('terrain_cost_')) {
-						const terrainType = key.replace('terrain_cost_', '');
-						const cost = parseFloat(mapData.properties[key]);
-						if (!isNaN(cost)) {
-							customTerrainCosts[terrainType] = cost;
-						}
-					}
-				});
-			}
-	
-			// Process objects that modify terrain
-			this.applyObjectTerrainModifiers(gameMap);
-			
-			// Update pathfinder to check if entity can swim when calculating paths
-			if (gameMap.gridSystem.pathfinder.setTerrainCosts) {
-				const originalIsWalkable = gameMap.gridSystem.pathfinder.isWalkable;
-				
-				// Override isWalkable to check swimming ability and conditional walkability
-				gameMap.gridSystem.pathfinder.isWalkable = function(x, y, entity) {
-					const node = this.grid.getNodeAt(x, y);
-					if (!node) return false;
-					
-					// If it's a water tile, check if entity can swim
-					if (!node.walkable && node.swimmable) {
-						return entity && entity.canSwim === true;
-					}
-					
-					// If it's a conditionally walkable tile (like a door), check the condition
-					if (!node.walkable && node.conditionallyWalkable) {
-						if (node.conditionType === 'door') {
-							// Get the door object using conditionId
-							const door = gameMap.getObjectById(node.conditionId);
-							// Check if door exists and is open
-							return door && door.isOpen === true;
-						}
-						// Add more condition types as needed
-					}
-					
-					// Otherwise use the original walkable check
-					return node.walkable;
-				};
-				
-				// Update terrain costs
-				gameMap.gridSystem.pathfinder.setTerrainCosts(customTerrainCosts);
-			}
-		}
-	}
+
 	/**
 	* Check for objects that modify terrain and apply their effects
 	*/
