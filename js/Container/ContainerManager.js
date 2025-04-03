@@ -92,12 +92,6 @@ class ContainerManager {
                 this.core.loadingManager.updateStageProgress('container', 0.8);
             }
 
-            // Set up mytes
-            console.log('[ContainerManager] Setting up Mytes');
-            this.setupMytes();
-
-
-
 
 
             // Initialize transition manager
@@ -110,9 +104,6 @@ class ContainerManager {
             if (!this.core) {
                 throw new Error('Core reference is missing');
             }
-
-
-
 
             // Ensure the core has a mapLoader
             if (!this.core.mapLoader) {
@@ -154,6 +145,12 @@ class ContainerManager {
             if (!initialMapLoaded) {
                 throw new Error(`Failed to load initial map: ${initialMapId}`);
             }
+
+            // Set up mytes
+            console.log('[ContainerManager] Setting up Mytes');
+            this.setupMytes();
+
+
 
             console.log('[ContainerManager] Initial map loaded successfully');
 
@@ -379,15 +376,37 @@ class ContainerManager {
 
     // Myte management methods
     setupMytes() {
-        this.element.querySelectorAll('.myteWrapper').forEach(container => {
-            const wrapper = container; // container.querySelector('.myteWrapper');
+        const wrappers = this.element.querySelectorAll('.myteWrapper');
+
+        if (wrappers.length === 0) {
+            throw new Error("No Myte elements found.");
+        }
+        
+        wrappers.forEach(container => {
+            const wrapper = container;
             const wrapperId = wrapper.id;
             const idNumber = wrapperId.split('-')[1];
-
+        
+            // create myte
             let myte = new Myte(idNumber, this, wrapper.querySelector('.interactive-myte'));
             myte.init();
             this.mytes.push(myte);
         });
+
+
+
+        // set spawn position for first
+
+
+        const myteSpawn = this.gameMap.spawnPoints.get("myte");
+
+        if (this.mytes.length > 0 && myteSpawn) {
+            this.mytes[0].setWrapperPosition(myteSpawn.x, myteSpawn.y);
+        }
+        
+
+
+
     }
 
     setNextMyteAsActive(previous) {

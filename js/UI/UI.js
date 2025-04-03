@@ -591,23 +591,28 @@ class SelectionManager extends UIComponent {
         this.selectedObject = null;
     }
 
+
     setSelected(obj) {
         const deselect = (object) => {
+            if (!object) return; // Check if object exists
+            
             if (object instanceof Myte) {
-                object.duplicate.classList.remove('selected');
+                if (object.duplicate) object.duplicate.classList.remove('selected');
             } else if (object instanceof MapObject) {
-                object.element.classList.remove('selected');
-            } else {
+                if (object.element) object.element.classList.remove('selected');
+            } else if (object) {
                 object.classList.remove('selected');
             }
         };
 
         const select = (object) => {
+            if (!object) return; // Check if object exists
+            
             if (object instanceof Myte) {
-                object.duplicate.classList.add('selected');
+                if (object.duplicate) object.duplicate.classList.add('selected');
             } else if (object instanceof MapObject) {
-                object.element.classList.add('selected');
-            } else {
+                if (object.element) object.element.classList.add('selected');
+            } else if (object) {
                 object.classList.add('selected');
             }
         };

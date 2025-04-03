@@ -212,17 +212,11 @@ class TileMapLoader {
 	
 			// Parse individual tile properties
 			const tileElements = tilesetData.querySelectorAll('tile');
-			console.log(`Found ${tileElements.length} tile elements in tileset ${tileset.name}`);
 			
 			for (const tileEl of tileElements) {
 				const id = parseInt(tileEl.getAttribute('id'));
 				const propsEl = tileEl.querySelector('properties');
 				const props = this.parseProperties(propsEl);
-				
-				// Add debugging to see what properties we're finding
-				if (props) {
-					console.log(`Tile #${id} properties:`, props);
-				}
 				
 				tileset.tiles[id] = {
 					id,
@@ -340,8 +334,6 @@ class TileMapLoader {
 	
 		const properties = {};
 		const propertyElements = propertiesEl.querySelectorAll('property');
-		
-		console.log(`Found ${propertyElements.length} properties`);
 	
 		for (const propEl of propertyElements) {
 			const name_unformatted = propEl.getAttribute('name');
@@ -356,9 +348,6 @@ class TileMapLoader {
 			} else {
 				value = propEl.textContent;
 			}
-	
-			// Debug the property being parsed
-			console.log(`Parsing property: ${name}=${value} (type: ${type})`);
 	
 			// Convert value based on type
 			switch (type) {
@@ -498,14 +487,11 @@ class TileMapLoader {
 	 */
 	extractTerrainTypes(mapData) {
 		const terrainTypes = new Map();
-		
-		console.log("[TileMapLoader] Extracting terrain types from tilesets");
 	
 		// Process each tileset to check for terrain properties
 		mapData.tilesets.forEach(tileset => {
 			// Debug the tileset to ensure tiles are loaded correctly
-			console.log(`Processing tileset: ${tileset.name} with ${Object.keys(tileset.tiles || {}).length} tiles`);
-			
+
 			Object.entries(tileset.tiles || {}).forEach(([tileIdStr, tile]) => {
 				// Ensure we're working with the correct data structure
 				if (!tile || !tile.properties) return;
@@ -522,14 +508,10 @@ class TileMapLoader {
 					// Save using global tile ID (tileset firstgid + local tile id)
 					const globalTileId = tileset.firstgid + parseInt(tileIdStr);
 					terrainTypes.set(globalTileId, terrainType);
-					
-					// More detailed logging for troubleshooting
-					console.log(`Mapped tile ${tileset.name}:${tileIdStr} (global ID: ${globalTileId}) terrain:'${terrain}' to type: ${terrainType}`);
 				}
 			});
 		});
 	
-		console.log(`[TileMapLoader] Extracted ${terrainTypes.size} terrain mappings`);
 		return terrainTypes;
 	}
 

@@ -92,10 +92,10 @@ class GridSystem {
 
     // Default terrain movement cost multipliers
     static terrainCosts = {
-        'path': 0.8,        // Paved paths/roads (preferred)
+        'path': 0.9,        // Paved paths/roads (preferred)
         'floor': 0.9,       // Indoor flooring/carpet (slightly preferred)
         'ground': 1.0,      // Regular ground (baseline)
-        'grass': 1.2,       // Tall grass (slightly avoided)
+        'grass': 1.1,       // Tall grass (slightly avoided)
         'sand': 1.4,        // Sand/gravel (moderately avoided)
         'mud': 1.8,         // Mud/snow (strongly avoided)
         'shallow_water': 2.5, // Shallow water (avoided unless necessary)

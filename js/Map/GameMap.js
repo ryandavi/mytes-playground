@@ -251,7 +251,7 @@ class GameMap {
 
             this._pathfindingDebugInterval = setInterval(() => {
 
-                this.testPathfinding();
+                // this.testPathfinding();
 
             }, 500); // Update every 3 seconds
 

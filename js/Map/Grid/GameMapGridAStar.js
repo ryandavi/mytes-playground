@@ -23,7 +23,7 @@ class AStarPathfinder {
         this.options = {
             allowDiagonals: true,
             allowDiagonalCutting: true,  // Allows cutting corners
-            heuristicWeight: 1.1,
+            heuristicWeight: 1,
             maxSearchSteps: 3000,
             smoothPaths: true,
             debug: false,

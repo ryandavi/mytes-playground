@@ -70,6 +70,8 @@ class Myte {
 		// bools
 		this.checkForCollisions = true;
 
+		this.pathfinder = null; // Initialize pathfinder property
+
 
 
 		this.followRadius = {
@@ -183,9 +185,22 @@ class Myte {
 		this.setSpritePosition(this.posX, this.posY);
 
 		// Initialize particle effects if the game map has a particle system
-		if (this.parent && this.parent.gameMap && this.parent.gameMap.particleSystem) {
+		if (this.parent?.gameMap?.particleSystem) {
 			this.initParticleEffects();
+		}else{
+			console.error(`Myte ${this.id}: Cannot initialize particle effects - ParticleSystem not found.`);
 		}
+
+		if (this.parent?.gameMap?.gridSystem) {
+            this.pathfinder = new AStarPathfinder(this.parent.gameMap.gridSystem);
+
+            // Optional: Configure this Myte's pathfinder instance if needed later
+            // e.g., this.pathfinder.setDebugMode(some_myte_specific_flag);
+            console.log(`Myte ${this.id}: Pathfinder initialized.`);
+
+        } else {
+            console.error(`Myte ${this.id}: Cannot initialize pathfinder - GridSystem not found.`);
+        }
 
 		/********************************************
 		 * CLICK EVENTS
@@ -318,6 +333,20 @@ class Myte {
 
 	isIndependent(){
 		return this.isDragging == false;
+	}
+
+	updatePathfinder() {
+		if (this.parent?.gameMap?.gridSystem) {
+			// Dispose of the old pathfinder if it exists
+			if (this.pathfinder) {
+				this.pathfinder.dispose();
+			}
+			// Create a new pathfinder with the new grid system
+			this.pathfinder = new AStarPathfinder(this.parent.gameMap.gridSystem);
+			console.log(`Myte ${this.id}: Pathfinder updated for new map.`);
+		} else {
+			console.error(`Myte ${this.id}: Cannot update pathfinder - GridSystem not found.`);
+		}
 	}
 
 	setMode(newGoal = null) {

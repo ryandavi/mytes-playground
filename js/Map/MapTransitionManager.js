@@ -118,6 +118,17 @@ class MapTransitionManager {
                     }, 200);
                 }
             }
+
+            this.container.ui.setSelected(null);
+
+            if(this.container.activeMyte){
+                // clear queue
+                this.container.activeMyte.queue.clear();
+
+                // unset target
+                this.container.activeMyte.unset_target();
+            }
+
     
             // Reset camera if needed
             if (!options.preserveCamera && this.container.camera) {
@@ -152,6 +163,11 @@ class MapTransitionManager {
                 if(this.container.activeMyte){
                     firstMyte = this.container.activeMyte;
                 }
+
+                //reset pathfinder for all mytes
+                this.container.mytes.forEach(myte => {
+                    myte.updatePathfinder();
+                });
     
                 this.container.camera.centerToPosition(firstMyte.posX, firstMyte.posY, firstMyte.size, true);
             }
