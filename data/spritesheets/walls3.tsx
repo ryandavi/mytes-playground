@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<tileset version="1.10" tiledversion="1.11.2" name="walls3-export" tilewidth="32" tileheight="32" tilecount="132" columns="11">
+<tileset version="1.10" tiledversion="1.11.2" name="walls3-export" tilewidth="32" tileheight="32" tilecount="192" columns="11">
  <image source="walls3-export.png" width="352" height="384"/>
  <tile id="0">
   <properties>

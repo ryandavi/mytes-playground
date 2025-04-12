@@ -1,13 +1,18 @@
 class MyteCore {
     constructor() {
-        if (MyteCore.instance) {
-            return MyteCore.instance;
-        }
-        MyteCore.instance = this;
+		// Singleton pattern
+		if (MyteCore.instance) {
+			console.warn("MyteCore instance already exists.");
+			return MyteCore.instance;
+		}
+		MyteCore.instance = this;
+		console.log("Initializing MyteCore Singleton...");
+
 
         // User management
         this.user = null;
         this.defaultUserDataPath = 'data/user/Ryan.json'; // Path to default user data
+
 
         // System configuration
         this.config = {
@@ -410,12 +415,25 @@ class MyteCore {
     }
 }
 
-// Initialize the application when the window loads
+
+// --- Global Initialization ---
 window.addEventListener('load', async () => {
-    try {
-        const core = new MyteCore();
-        await core.init();
-    } catch (error) {
-        console.error('Failed to initialize application:', error);
-    }
+	console.log("Window loaded event fired. Initializing MyteCore.");
+	if (window.MyteCoreInstance) {
+		console.warn("MyteCore instance already exists on window load. Skipping initialization.");
+		return;
+	}
+	try {
+		const core = new MyteCore();
+		window.MyteCoreInstance = core;
+		await core.init();
+		console.log("MyteCore initialization complete from window.load listener.");
+	} catch (error) {
+		console.error('FATAL ERROR during application initialization:', error);
+        const errorDiv = document.getElementById('fatal-error-display') || document.createElement('div');
+        errorDiv.id = 'fatal-error-display';
+        errorDiv.setAttribute('style', 'position:fixed; top:0; left:0; width:100%; padding:20px; background-color:#A00; color:white; z-index:10000; font-family:sans-serif; border-bottom: 2px solid red;');
+        errorDiv.textContent = 'Fatal Error Initializing Application. Check console (F12). Message: ' + error.message;
+        if (!errorDiv.parentNode) { document.body.prepend(errorDiv); }
+	}
 });

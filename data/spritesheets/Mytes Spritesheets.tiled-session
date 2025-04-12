@@ -3,7 +3,7 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "Outside.tmx",
+    "activeFile": "",
     "expandedProjectPaths": [
         "."
     ],
@@ -13,16 +13,11 @@
             "scaleInDock": 1
         },
         "House.tmx": {
-            "expandedObjectLayers": [
-                9,
-                7,
-                10
-            ],
             "scale": 0.75,
-            "selectedLayer": 3,
+            "selectedLayer": 2,
             "viewCenter": {
-                "x": 736,
-                "y": 661.3333333333334
+                "x": 73.33333333333333,
+                "y": 388
             }
         },
         "HouseNew.tmx": {
@@ -44,8 +39,8 @@
             "scale": 1,
             "selectedLayer": 6,
             "viewCenter": {
-                "x": 419,
-                "y": 837
+                "x": 236,
+                "y": 417
             }
         },
         "house.tsx": {
@@ -69,8 +64,8 @@
     "property.type": "string",
     "recentFiles": [
         "walls3.tsx",
-        "House.tmx",
         "Outside.tmx",
+        "House.tmx",
         "HouseNew.tmx",
         "house.tsx"
     ],
