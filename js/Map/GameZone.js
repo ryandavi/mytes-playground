@@ -16,7 +16,8 @@ const ZONE_THRESHOLD = {
 };
 
 class Zone {
-    constructor(data) {
+    constructor(data, map) {
+        this.map = map;
         this.id = data.id;
         this.type = data.type;
         this.bounds = data.bounds;
@@ -209,10 +210,8 @@ class Zone {
     }
 
     applyPlayZoneEffects(myte) {
-        
         // Make Myte more playful
         if (Math.random() < 0.2 && myte.queue.isEmpty()) {
-            console.log("IN PLAY ZONE");
             const actions = ['dance', 'spin', 'jump'];
             const randomAction = actions[Math.floor(Math.random() * actions.length)];
             myte.queue.add(randomAction);
@@ -226,7 +225,7 @@ class Zone {
                 x: (Math.random() - 0.5) * 100,
                 y: (Math.random() - 0.5) * 100
             };
-            myte.parent.mapArea.addObject(
+            this.map?.addObject(
                 'FOOD',
                 'apple',
                 myte.posX + offset.x,
@@ -238,7 +237,7 @@ class Zone {
     applySocialZoneEffects(myte) {
         // Make Mytes more likely to interact with each other
         const nearbyMytes = Array.from(this.mytesInZone)
-            .map(id => myte.parent.mytes.find(m => m.id === id))
+            .map(id => this.map?.getMyteById(id))
             .filter(m => m && m !== myte);
 
         if (nearbyMytes.length > 0 && Math.random() < 0.2) {
@@ -289,7 +288,7 @@ class ZoneManager {
     }
 
     addZone(zoneData) {
-        const zone = new Zone(zoneData);
+        const zone = new Zone(zoneData, this.parent);
         this.zones.set(zone.id, zone);
         
         if (zone.element) {

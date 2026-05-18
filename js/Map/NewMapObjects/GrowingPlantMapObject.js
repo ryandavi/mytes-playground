@@ -1,4 +1,4 @@
-class GrowingPlantMapObject extends AnimatedMapObject {
+class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         

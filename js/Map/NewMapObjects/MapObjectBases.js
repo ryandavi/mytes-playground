@@ -1,4 +1,4 @@
-class DirectionalMapObject extends MapObject {
+const withDirectionalBehavior = (BaseClass) => class extends BaseClass {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         const direction = options.direction || config.direction || 'S';
         const processedConfig = MapObject.processDirectionConfig(config, direction);
@@ -41,52 +41,194 @@ class DirectionalMapObject extends MapObject {
     render(container, parent) {
         const element = super.render(container, parent);
         return this.applyDirectionalVisuals(element);
+    }
+};
+
+class DirectionalMapObject extends withDirectionalBehavior(MapObject) {}
+
+class DirectionalAnimatedMapObject extends withDirectionalBehavior(AnimatedMapObject) {}
+
+class RangeInteractiveAnimatedMapObject extends AnimatedMapObject {
+    getInteractionActor() {
+        return this.activeMyte;
+    }
+
+    shouldSelectOnPress() {
+        return true;
+    }
+
+    getApproachActionId() {
+        return 'go_to_object';
+    }
+
+    enqueueApproach(myte, onComplete = null) {
+        if (!myte?.queue) return false;
+
+        const payload = { target: this };
+        if (onComplete) {
+            payload.onComplete = onComplete;
+        }
+
+        myte.queue.add(this.getApproachActionId(), payload);
+        return true;
+    }
+
+    runInteractionWhenInRange(action, myte = this.getInteractionActor(), options = {}) {
+        if (!myte || typeof action !== 'function') return false;
+
+        if (this.shouldSelectOnPress()) {
+            this.selectInUi();
+        }
+
+        const {
+            interactionRadius = this.getInteractionRadius(),
+            queueIfOutOfRange = true,
+            allowUnlimitedRange = interactionRadius === -1
+        } = options;
+
+        if (allowUnlimitedRange || this.isInInteractionRange(myte, interactionRadius)) {
+            action(myte);
+            return true;
+        }
+
+        if (!queueIfOutOfRange) return false;
+        return this.enqueueApproach(myte, () => action(myte));
     }
 }
 
-class DirectionalAnimatedMapObject extends AnimatedMapObject {
+class StatefulAnimatedMapObject extends RangeInteractiveAnimatedMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
-        const direction = options.direction || config.direction || 'S';
-        const processedConfig = MapObject.processDirectionConfig(config, direction);
-        super(parent, type, variant, posX, posY, processedConfig, options);
-        this.facingDirection = processedConfig.facingDirection || direction;
+        super(parent, type, variant, posX, posY, config, options);
+        this.state = options.initialState ?? this.getDefaultState();
     }
 
-    getBaseCssClass() {
-        return null;
+    getDefaultState() {
+        return this.getConfig('default', 'default');
     }
 
-    applyDirectionalVisuals(element) {
-        const baseClass = this.getBaseCssClass();
-        if (baseClass) {
-            element.classList.add(baseClass);
+    getStateAttributeName() {
+        return 'data-state';
+    }
+
+    getAnimationSequence(state) {
+        return [state, state];
+    }
+
+    updateElementState(value = this.state) {
+        if (!this.element) return;
+        this.element.setAttribute(this.getStateAttributeName(), value);
+    }
+
+    transitionToState(nextState, options = {}) {
+        const {
+            beforeChange,
+            afterChange
+        } = options;
+
+        if (typeof beforeChange === 'function') {
+            beforeChange(nextState, this.state);
         }
 
-        element.classList.add(`facing-${this.facingDirection.toLowerCase()}`);
+        this.state = nextState;
+        this.updateElementState();
 
-        const spriteElement = element.querySelector('.sprite');
-        const transformStyle = this.getConfig('transformStyle', '');
-        if (spriteElement && transformStyle) {
-            spriteElement.style.transform = transformStyle;
-        }
-
-        if (this.getConfig('debug', false) && this.getConfig('interactiveCollider')) {
-            const interactiveCollider = this.getConfig('interactiveCollider');
-            const interactiveZone = document.createElement('div');
-            interactiveZone.classList.add('interactive-zone', 'debug-visible');
-            interactiveZone.style.width = `${interactiveCollider.width}px`;
-            interactiveZone.style.height = `${interactiveCollider.height}px`;
-            interactiveZone.style.left = `${interactiveCollider.offsetX}px`;
-            interactiveZone.style.top = `${interactiveCollider.offsetY}px`;
-            element.appendChild(interactiveZone);
-        }
-
-        return element;
+        const [firstAnim, secondAnim] = this.getAnimationSequence(nextState);
+        this.playAnimation(firstAnim, () => {
+            this.playAnimation(secondAnim);
+            if (typeof afterChange === 'function') {
+                afterChange(nextState);
+            }
+        });
     }
 
     render(container, parent) {
         const element = super.render(container, parent);
-        return this.applyDirectionalVisuals(element);
+        this.updateElementState();
+        return element;
+    }
+}
+
+class BinaryStateAnimatedMapObject extends StatefulAnimatedMapObject {
+    getEnabledState() {
+        return 'on';
+    }
+
+    getDisabledState() {
+        return 'off';
+    }
+
+    isEnabled() {
+        return this.state === this.getEnabledState();
+    }
+
+    getAnimationSequence(state) {
+        if (state === this.getEnabledState()) {
+            return ['turnOn', 'idle'];
+        }
+
+        if (state === this.getDisabledState()) {
+            return ['turnOff', 'off'];
+        }
+
+        return super.getAnimationSequence(state);
+    }
+
+    toggleState(options = {}) {
+        const nextState = this.isEnabled()
+            ? this.getDisabledState()
+            : this.getEnabledState();
+
+        this.transitionToState(nextState, options);
+        return nextState;
+    }
+}
+
+class ClassStateAnimatedMapObject extends StatefulAnimatedMapObject {
+    getDefaultState() {
+        return this.getConfig('spriteConfig.default', super.getDefaultState());
+    }
+
+    getStateClassNames() {
+        return [];
+    }
+
+    updateElementState(value = this.state) {
+        if (!this.element) return;
+
+        const stateClasses = this.getStateClassNames();
+        if (stateClasses.length) {
+            this.element.classList.remove(...stateClasses);
+        }
+
+        this.element.classList.add(value);
+    }
+
+    playStateTransition(transitionState, finalState, options = {}) {
+        const {
+            beforeChange,
+            afterChange,
+            transitionAnimation = transitionState,
+            finalAnimation = finalState
+        } = options;
+
+        if (typeof beforeChange === 'function') {
+            beforeChange(finalState, this.state, transitionState);
+        }
+
+        this.state = transitionState;
+        this.updateElementState();
+
+        this.playAnimation(transitionAnimation, () => {
+            this.state = finalState;
+            this.updateElementState();
+            this.playAnimation(finalAnimation);
+
+            if (typeof afterChange === 'function') {
+                afterChange(finalState, transitionState);
+            }
+        });
+
+        return true;
     }
 }
 

@@ -112,6 +112,15 @@ class GameMap {
         return this.objectsById.get(String(id)) || null;
     }
 
+    getMyteById(id) {
+        if (id === undefined || id === null) return null;
+        return this.mytes.find(myte => String(myte.id) === String(id)) || null;
+    }
+
+    checkCollision(entityA, entityB) {
+        return this.parent?.checkCollision?.(entityA, entityB) ?? false;
+    }
+
     // Add to GameMap class
     testPathfinding() {
 
@@ -122,7 +131,7 @@ class GameMap {
         if (!this.parent.inputHandler.isMouseInContainer()) return null;
     
         // Get the entity (myte)
-        const myte = this.parent.mytes?.[0];
+        const myte = this.mytes?.[0];
         if (!myte?.isActive) return null;
     
         // Get start position (entity top-left)
@@ -412,11 +421,10 @@ class GameMap {
 
 		// set myte position to spawn point
 		// get first myte
-		let mytes = this.parent.mytes;
-		console.log(mytes.length);
-		if (mytes.length > 0) {
-			let myte = mytes[0];
-			myte.setWrapperPosition(mapData.spawns.myte.x, mapData.spawns.myte.y);
+        let mytes = this.mytes;
+        if (mytes.length > 0) {
+            let myte = mytes[0];
+            myte.setWrapperPosition(mapData.spawns.myte.x, mapData.spawns.myte.y);
 		}
 
 		// Add objects
@@ -851,7 +859,7 @@ class GameMap {
 
         // Zone updates for active mytes
         if (this.zoneManager) {
-            this.parent.mytes.forEach(myte => {
+            this.mytes.forEach(myte => {
                 if (myte.isActive) this.zoneManager.update(myte);
             });
         }

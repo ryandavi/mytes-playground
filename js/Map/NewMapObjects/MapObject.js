@@ -1829,15 +1829,6 @@ class MapObject {
 				this.selectInUi();
 			}
 			
-			// Trigger any onClick handler from config
-			/*
-			const onClick = this.getConfig('onClick');
-			if (typeof onClick === 'function') {
-				console.log("ON CLICK");
-				onClick(this, this.parent);
-			}
-			*/
-
 			return true;
 		}
 		return false;

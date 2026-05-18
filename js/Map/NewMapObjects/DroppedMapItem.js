@@ -129,31 +129,34 @@ class DroppedMapItem {
                     this.velocityY = 0;
                 }
             }
-        } else if (myte && myte.parent.activeMyte == myte) {
-            // Magnet effect when grounded
-            const myteCenter = {
-                x: myte.posX + (myte.size.width / 2),
-                y: myte.posY + (myte.size.height / 2)
-            };
+        } else if (myte) {
+            const activeMyte = this.parent?.activeMyte || myte.parent?.activeMyte;
+            if (activeMyte === myte) {
+                // Magnet effect when grounded
+                const myteCenter = {
+                    x: myte.posX + (myte.size.width / 2),
+                    y: myte.posY + (myte.size.height / 2)
+                };
 
-            const center = {
-                x: this.posX + (this.size.width / 2),
-                y: this.posY + (this.size.height / 2)
-            };
+                const center = {
+                    x: this.posX + (this.size.width / 2),
+                    y: this.posY + (this.size.height / 2)
+                };
 
 
-            const dx = myteCenter.x - center.x;
-            const dy = myteCenter.y - center.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
+                const dx = myteCenter.x - center.x;
+                const dy = myteCenter.y - center.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
 
-            // if within collection distance
-            if (myte.isIndependent() && distance < this.minimumCollectDistance) {
-                const magnetStrength = 1 - (distance / this.minimumCollectDistance);
-                this.posX += dx * this.magnetSpeed * magnetStrength;
-                this.posY += dy * this.magnetSpeed * magnetStrength;
+                // if within collection distance
+                if (myte.isIndependent() && distance < this.minimumCollectDistance) {
+                    const magnetStrength = 1 - (distance / this.minimumCollectDistance);
+                    this.posX += dx * this.magnetSpeed * magnetStrength;
+                    this.posY += dy * this.magnetSpeed * magnetStrength;
 
-                if (distance < 20) {
-                    this.collect(myte);
+                    if (distance < 20) {
+                        this.collect(myte);
+                    }
                 }
             }
         }
@@ -178,18 +181,19 @@ class DroppedMapItem {
     collect(myte) {
         if (this.collected) return;
         this.collected = true;
+        const owner = this.parent || myte.parent;
 
         // Add to inventory or apply effect based on item type
         switch (this.type) {
             case 'COIN':
-                myte.parent.core.user.addCurrency('coins', 1);
+                owner?.core?.user?.addCurrency?.('coins', 1);
                 break;
             case 'HEALTH':
                 myte.updateHealth(20);
                 break;
             default:
                 // Add to inventory
-                myte.parent.inventory.addItem(this.variant, 1, this.type);
+                owner?.inventory?.addItem?.(this.variant, 1, this.type);
         }
 
         // Add collection animation class

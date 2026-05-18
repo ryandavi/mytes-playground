@@ -100,30 +100,24 @@ class CropPlantMapObject extends GrowingPlantMapObject {
         const myte = this.activeMyte;
         if (!myte) return false;
 
-        this.selectInUi();
-
-        if (this.isInInteractionRange(myte)) {
-            // If harvestable, harvest
+        return this.runInteractionWhenInRange(() => {
             if (this.harvestable) {
-                return this.performHarvest(parent, myte);
-            } 
-            // Otherwise try to water
-            else if (this.canWater()) {
-                return this.water();
+                this.performHarvest(parent, myte);
+                return;
             }
-            return false;
-        } else {
-            // Move myte to the plant
-            myte.setTarget(this.posX, this.posY);
-            return true;
-        }
+
+            if (this.canWater()) {
+                this.water();
+            }
+        }, myte);
     }
     
     performHarvest(parent, myte) {
         const harvest = this.harvest();
-        if (harvest && parent.inventory) {
-            // Add to inventory
-            parent.inventory.addItem(harvest.variant, harvest.quantity, harvest.type);
+        const inventory = this.gameMap?.inventory || parent?.inventory;
+
+        if (harvest && inventory) {
+            inventory.addItem(harvest.variant, harvest.quantity, harvest.type);
             
             // Boost myte mood
             myte.stats.updateMood(5);

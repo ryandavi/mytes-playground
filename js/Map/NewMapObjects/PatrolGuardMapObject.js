@@ -76,13 +76,6 @@ class PatrolGuardMapObject extends MovingMapObject {
         }
     }
     
-    // Calculate distance to another entity
-    getDistanceTo(entity) {
-        const dx = this.posX - entity.posX;
-        const dy = this.posY - entity.posY;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-    
     // Handle target detection
     onTargetDetected(target) {
         this.targetEntity = target;

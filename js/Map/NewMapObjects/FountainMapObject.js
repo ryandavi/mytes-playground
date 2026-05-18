@@ -1,10 +1,7 @@
-class FountainMapObject extends AnimatedMapObject {
+class FountainMapObject extends BinaryStateAnimatedMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         
-        // State
-        this.state = this.getConfig('default', 'on');
-
         // Fountain configuration
         this.moodBoostRadius = this.getConfig('moodBoostRadius', 150);
         this.moodBoostAmount = this.getConfig('moodBoostAmount', 0.1);
@@ -17,65 +14,15 @@ class FountainMapObject extends AnimatedMapObject {
         this._proximityInterval = 500;
     }
 
-    getNextAction() {
-        return {
-            method: this.toggle.bind(this),
-            allowed: true
-        };
-    }
-
-    handleInteraction(parent, action) {
-        const myte = this.activeMyte;
-        if (!myte) return false;
-
-        if (this.isInInteractionRange(myte)) {
-            action.method(parent);
-            return true;
-        }
-
-        myte.queue.add('go_to_object', {
-            target: this,
-            onComplete: () => action.method(parent)
-        });
-        return true;
-    }
-
     press(parent) {
-        if (!this.active || !this.activeMyte) return false;
-
-        const action = this.getNextAction();
-        return this.handleInteraction(parent, action);
+        if (!this.active) return false;
+        return this.runInteractionWhenInRange(() => this.toggle(parent));
     }
 
     toggle(parent) {
-        const newState = this.state === 'on' ? 'off' : 'on';
-        const animationSequence = this.getAnimationSequence(newState);
-
-        // Update state
-        this.state = newState;
-        this.updateElementState();
-        
-        // Play animation sequence
-        const [firstAnim, secondAnim] = animationSequence;
-        this.playAnimation(firstAnim, () => {
-            this.playAnimation(secondAnim);
-        });
+        this.toggleState();
     }
     
-    getAnimationSequence(state) {
-        const sequences = {
-            'off': ['turnOn', 'idle'],
-            'on': ['turnOff', 'off']
-        };
-        return sequences[state] || ['idle', 'idle'];
-    }
-    
-    updateElementState() {
-        if (this.element) {
-            this.element.setAttribute('data-state', this.state);
-        }
-    }
-
     applyMoodBoost(myte) {
         const now = performance.now();
         const lastBoost = this.lastBoostTimes.get(myte.id) || 0;
@@ -92,7 +39,7 @@ class FountainMapObject extends AnimatedMapObject {
     }
 
     checkNearbyMytes() {
-        if (this.state !== 'on' || !this.mytes.length) return;
+        if (!this.isEnabled() || !this.mytes.length) return;
 
         this.mytes.forEach(myte => {
             if (!myte.isActive) return;
@@ -106,7 +53,6 @@ class FountainMapObject extends AnimatedMapObject {
     render(container, parent) {
         const element = super.render(container, parent);
         element.classList.add('fountain');
-        element.setAttribute('data-state', this.state);
         return element;
     }
 

@@ -1,9 +1,6 @@
-class TreasureChestMapObject extends AnimatedMapObject {
+class TreasureChestMapObject extends ClassStateAnimatedMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
-        
-        // State
-        this.state = this.getConfig('spriteConfig.default', 'closed');
         this.items = [];
         this.droppedItems = [];
         this.canClose = this.getConfig('canClose', false);
@@ -12,93 +9,46 @@ class TreasureChestMapObject extends AnimatedMapObject {
         this.addItems(options.items || []);
     }
 
+    getStateClassNames() {
+        return ['closed', 'opening', 'opened', 'closing'];
+    }
+
     addItems(items) {
-        this.items = items;
+        this.items = Array.isArray(items) ? [...items] : [];
     }
 
     open(parent) {
-        if (this.state !== 'closed') return;
+        if (this.state !== 'closed') return false;
 
-        console.log("opening chest");
-
-        // Update state
-        this.state = 'opening';
-        this.updateElementState('opening');
-        
-        // Play animation
-        this.playAnimation('opening', () => {
-            this.state = 'opened';
-            this.updateElementState('opened');
-            this.playAnimation('opened');
-            this.spawnItems(parent);
+        return this.playStateTransition('opening', 'opened', {
+            afterChange: () => {
+                this.spawnItems(parent);
+            }
         });
     }
 
     close(parent) {
-        if (this.state !== 'opened' || !this.canClose) return;
-
-        // Update state
-        this.state = 'closing';
-        this.updateElementState('closing');
-        
-        // Play animation
-        this.playAnimation('closing', () => {
-            this.state = 'closed';
-            this.updateElementState('closed');
-            this.playAnimation('closed');
-        });
-    }
-    
-    updateElementState(newState) {
-        if (!this.element) return;
-        
-        // Remove previous state classes
-        ['closed', 'opening', 'opened', 'closing'].forEach(state => {
-            this.element.classList.remove(state);
-        });
-        
-        // Add new state class
-        this.element.classList.add(newState);
+        if (this.state !== 'opened' || !this.canClose) return false;
+        return this.playStateTransition('closing', 'closed');
     }
 
     press(parent) {
         const myte = this.activeMyte;
         if (!this.active || !myte) return false;
 
-        this.selectInUi();
-
-        // Check if we can interact directly
         if (this.state === 'closed') {
-            return this.handleChestPress(parent, myte, this.getDistanceTo(myte), this.getInteractionRadius(), 
-                   () => this.open(parent));
-        } 
-        else if (this.state === 'opened' && this.canClose) {
-            return this.handleChestPress(parent, myte, this.getDistanceTo(myte), this.getInteractionRadius(), 
-                   () => this.close(parent));
+            return this.runInteractionWhenInRange(() => {
+                this.open(parent);
+            }, myte);
+        }
+
+        if (this.state === 'opened' && this.canClose) {
+            return this.runInteractionWhenInRange(() => {
+                this.close(parent);
+            }, myte);
         }
 
         return false;
-    }
-    
-    handleChestPress(parent, myte, distance, interactionRadius, action) {
-        // If no distance check is needed
-        if (interactionRadius === -1) {
-            action();
-            return true;
-        }
-
-        // If myte is close enough, perform action
-        if (distance <= interactionRadius) {
-            myte.queue.add('go_to_object', {
-                target: this,
-                onComplete: action
-            });
-            return true;
-        }
-
-        // Otherwise just go to the chest
-        myte.queue.add('go_to_object', { target: this });
-        return true;
     }
     
     spawnItems(parent) {
@@ -112,18 +62,15 @@ class TreasureChestMapObject extends AnimatedMapObject {
         if (!foregroundLayer) return;
 
         this.items.forEach((item, index) => {
-            // Calculate spawn angle
             const angle = this.calculateSpawnAngle(index, spreadAngle);
-            
-            // Create dropped item
             const droppedItem = this.createDroppedItem(item, spawnPoint, angle, baseVelocity);
-            
-            // Add to scene
+
+            if (!droppedItem?.element) return;
+
             foregroundLayer.appendChild(droppedItem.element);
             this.droppedItems.push(droppedItem);
         });
 
-        // Clear items after spawning
         this.items = [];
     }
     
@@ -142,6 +89,7 @@ class TreasureChestMapObject extends AnimatedMapObject {
     
     createDroppedItem(item, spawnPoint, angle, baseVelocity) {
         const droppedItem = new DroppedMapItem(
+            this.gameMap,
             item.type,
             item.variant,
             spawnPoint.x,
@@ -156,23 +104,15 @@ class TreasureChestMapObject extends AnimatedMapObject {
     }
 
     update(deltaTime) {
-
-        
         super.update(deltaTime);
-
-
-        
-        // Update dropped items
         this.updateDroppedItems();
     }
     
     updateDroppedItems() {
-
-
+        const activeMyte = this.activeMyte;
         this.droppedItems = this.droppedItems.filter(item => {
             if (!item.collected) {
-                item.update(this.activeMyte);
-                
+                item.update(activeMyte);
                 return true;
             }
             return false;

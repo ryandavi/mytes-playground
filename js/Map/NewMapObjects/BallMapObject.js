@@ -52,7 +52,9 @@ class BallMapObject extends AnimatedMapObject {
         if (!myte.is_moving()) return;
 
         // Check if myte collides with ball
-        let collides = myte.parent.checkCollision(myte, this);
+        const collides = this.gameMap?.checkCollision
+            ? this.gameMap.checkCollision(myte, this)
+            : myte.parent?.checkCollision?.(myte, this);
 
         if (collides) {
             // Calculate push direction and force
@@ -250,5 +252,8 @@ class BallMapObject extends AnimatedMapObject {
     // update: animation + dirty marking
     update(deltaTime) {
         super.update(deltaTime);
+        if (this.element) {
+            this.element.setAttribute('data-moving', String(this.isMoving));
+        }
     }
 }
