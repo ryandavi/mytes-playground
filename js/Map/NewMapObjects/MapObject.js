@@ -1153,8 +1153,11 @@ const TYPE_CONFIGS = {
 };
 
 class MapObject {
+	static nextObjectId = 1;
+
 	constructor(parent, type, variant, posX, posY, config = {}) {
 		// Store base identity properties
+		this.id = config.id ?? `${type.toLowerCase()}_${MapObject.nextObjectId++}`;
 		this.type = type;
 		this.variant = variant;
 		this.posX = posX;
@@ -1168,6 +1171,9 @@ class MapObject {
 		this.active = true;
 		this.element = null;
 		this.parent = parent;
+		this.map = parent || null;
+		this.container = parent?.parent || null;
+		this.core = this.container?.core || null;
 
 		// Set up size based on config
 		this.size = {
@@ -1210,6 +1216,35 @@ class MapObject {
 		// Sleep/wake: objects outside the culling zone skip tick and update.
 		// GridSystem.updateCulling() calls wake()/sleep() on transitions.
 		this.sleeping = false;
+	}
+
+	get gameMap() {
+		return this.map;
+	}
+
+	get activeMyte() {
+		return this.container?.activeMyte || this.map?.activeMyte || null;
+	}
+
+	get mytes() {
+		return this.map?.mytes || this.container?.mytes || [];
+	}
+
+	getInteractionRadius(defaultValue = 100) {
+		return this.getConfig('interactionRadius', defaultValue);
+	}
+
+	getDistanceTo(target) {
+		if (!target) return Infinity;
+		return Math.hypot(this.posX - target.posX, this.posY - target.posY);
+	}
+
+	isInInteractionRange(target, radius = this.getInteractionRadius()) {
+		return this.getDistanceTo(target) <= radius;
+	}
+
+	selectInUi() {
+		this.container?.ui?.setSelected?.(this);
 	}
 
 	// Called by GridSystem when this object enters the active viewport
@@ -1788,10 +1823,10 @@ class MapObject {
 
 		if (!this.active) return false;
 
-		if (this.parent.parent.activeMyte) {
+		if (this.activeMyte) {
 
 			if(this.getConfig('canInspect')){
-				this.parent.parent.ui.setSelected(this);
+				this.selectInUi();
 			}
 			
 			// Trigger any onClick handler from config

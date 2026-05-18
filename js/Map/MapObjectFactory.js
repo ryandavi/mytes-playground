@@ -108,6 +108,32 @@ class MapObjectFactory {
         return new Constructor(this.parent, type, variant, x, y, config, options);
     }
 
+    static isPlainObject(value) {
+        return value !== null && typeof value === 'object' && !Array.isArray(value);
+    }
+
+    static deepMerge(target = {}, ...sources) {
+        const result = { ...target };
+
+        for (const source of sources) {
+            if (!this.isPlainObject(source)) continue;
+
+            Object.entries(source).forEach(([key, value]) => {
+                if (this.isPlainObject(value) && this.isPlainObject(result[key])) {
+                    result[key] = this.deepMerge(result[key], value);
+                } else if (this.isPlainObject(value)) {
+                    result[key] = this.deepMerge({}, value);
+                } else if (Array.isArray(value)) {
+                    result[key] = value.slice();
+                } else {
+                    result[key] = value;
+                }
+            });
+        }
+
+        return result;
+    }
+
     static getTypeConfig(type) {
         // Fallback to hardcoded MAP_OBJECT_TYPES if config not loaded
         if (!this.CONFIG_LOADED && typeof MAP_OBJECT_TYPES !== 'undefined') {
@@ -118,37 +144,31 @@ class MapObjectFactory {
     }
 
     static mergeConfigs(type, variant, options = {}) {
-        // Start with the base config
-        const config = {...this.BASE_CONFIG};
-        
-        // Get the type config
         const typeConfig = this.getTypeConfig(type);
+        let config = this.deepMerge({}, this.BASE_CONFIG);
         
         // Get the base type if specified
         const baseType = typeConfig.baseType;
         if (baseType && this.TYPE_CONFIGS[baseType]) {
-            // Merge base type config
-            Object.assign(config, this.TYPE_CONFIGS[baseType]);
+            config = this.deepMerge(config, this.TYPE_CONFIGS[baseType]);
         }
         
-        // Merge type-specific config
-        Object.assign(config, typeConfig);
+        config = this.deepMerge(config, typeConfig);
         
         // Merge variant-specific config if available
         if (typeConfig.variants && typeConfig.variantConfigs && typeConfig.variantConfigs[variant]) {
-            Object.assign(config, typeConfig.variantConfigs[variant]);
-        
-            if (typeConfig.variantConfigs[variant].spriteConfig) {
-                config.spriteConfig = { 
-                    ...typeConfig.spriteConfig, // Keep original spriteConfig
-                    ...typeConfig.variantConfigs[variant].spriteConfig // Only overwrite specified properties
-                };
-            }
+            config = this.deepMerge(config, typeConfig.variantConfigs[variant]);
         }
         
         // Merge any config overrides from options
         if (options && options?.configOverrides) {
-            Object.assign(config, options.configOverrides);
+            config = this.deepMerge(config, options.configOverrides);
+        }
+
+        if (options?.id !== undefined) {
+            config.id = options.id;
+        } else if (options?.objectId !== undefined) {
+            config.id = options.objectId;
         }
         
         return config;

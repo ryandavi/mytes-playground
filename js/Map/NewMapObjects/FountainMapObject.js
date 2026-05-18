@@ -25,11 +25,10 @@ class FountainMapObject extends AnimatedMapObject {
     }
 
     handleInteraction(parent, action) {
-        const myte = parent.activeMyte;
-        const distance = this.getDistanceFromMyte(myte);
-        const interactionRadius = this.getConfig('interactionRadius', 100);
+        const myte = this.activeMyte;
+        if (!myte) return false;
 
-        if (distance <= interactionRadius) {
+        if (this.isInInteractionRange(myte)) {
             action.method(parent);
             return true;
         }
@@ -40,13 +39,9 @@ class FountainMapObject extends AnimatedMapObject {
         });
         return true;
     }
-    
-    getDistanceFromMyte(myte) {
-        return Math.hypot(this.posX - myte.posX, this.posY - myte.posY);
-    }
 
     press(parent) {
-        if (!this.active || !parent.activeMyte) return false;
+        if (!this.active || !this.activeMyte) return false;
 
         const action = this.getNextAction();
         return this.handleInteraction(parent, action);
@@ -102,12 +97,7 @@ class FountainMapObject extends AnimatedMapObject {
         this.parent.mytes.forEach(myte => {
             if (!myte.isActive) return;
 
-            const distance = Math.hypot(
-                this.posX - myte.posX,
-                this.posY - myte.posY
-            );
-
-            if (distance <= this.moodBoostRadius) {
+            if (this.getDistanceTo(myte) <= this.moodBoostRadius) {
                 this.applyMoodBoost(myte);
             }
         });

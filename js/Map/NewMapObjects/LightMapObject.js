@@ -12,11 +12,10 @@ class LightMapObject extends AnimatedMapObject {
     }
 
     handleInteraction(parent, action) {
-        const myte = parent.activeMyte;
-        const distance = this.getDistanceFromMyte(myte);
-        const interactionRadius = this.getConfig('interactionRadius', 100);
+        const myte = this.activeMyte;
+        if (!myte) return false;
 
-        if (distance <= interactionRadius) {
+        if (this.isInInteractionRange(myte)) {
             this.playAnimation('flicker', () => action.method(parent));
             return true;
         }
@@ -27,13 +26,9 @@ class LightMapObject extends AnimatedMapObject {
         });
         return true;
     }
-    
-    getDistanceFromMyte(myte) {
-        return Math.hypot(this.posX - myte.posX, this.posY - myte.posY);
-    }
 
     press(parent) {
-        if (!this.active || !parent.activeMyte) return false;
+        if (!this.active || !this.activeMyte) return false;
 
         const action = this.getNextAction();
         return this.handleInteraction(parent, action);
@@ -73,9 +68,9 @@ class LightMapObject extends AnimatedMapObject {
     
     applyEffects(parent) {
         // Apply mood boost effect when turned on
-        if (this.state === 'on' && parent.activeMyte) {
+        if (this.state === 'on' && this.activeMyte) {
             const moodBoostAmount = this.getConfig('moodBoostAmount', 5);
-            parent.activeMyte.stats.updateMood(moodBoostAmount);
+            this.activeMyte.stats.updateMood(moodBoostAmount);
         }
     }
 

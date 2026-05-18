@@ -11,8 +11,9 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
         this.colorOverlay = null;
         
         // Initialize genetics if config exists
-        this.genes = this.getConfig('geneticConfig') ? 
-                    this.initializeGenes(this.getConfig('geneticConfig')) : null;
+        this.genes = options.initialGenes ||
+            (this.getConfig('geneticConfig') ?
+                this.initializeGenes(this.getConfig('geneticConfig')) : null);
         
         // Cache breeding config values
         this.pollinationRadius = this.getConfig('breedingConfig.pollinationRadius', 150);
@@ -31,9 +32,9 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
     }
 
     getBreedingPartners() {
-        if (!this.pollinationRadius || !this.parent?.mapArea) return [];
+        if (!this.pollinationRadius || !this.gameMap) return [];
         
-        return this.parent.mapArea.getObjectsInRadius(this.posX, this.posY, this.pollinationRadius)
+        return this.gameMap.getObjectsInRadius(this.posX, this.posY, this.pollinationRadius)
             .filter(obj => obj instanceof BreedingFlowerMapObject && 
                          obj !== this && 
                          obj.growthStage === 'mature');
@@ -68,18 +69,17 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
         const childGenes = this.createChildGenes(partner);
         const spawnPoint = this.findSpawnPoint();
         
-        if (spawnPoint && this.parent?.mapArea) {
+        if (spawnPoint && this.gameMap) {
             const newPlant = new this.constructor(
+                this.gameMap,
                 this.type,
                 this.variant,
                 spawnPoint.x,
                 spawnPoint.y,
-                {
-                    ...this.config,
-                    initialGenes: childGenes
-                }
+                { ...this.config },
+                { initialGenes: childGenes }
             );
-            this.parent.mapArea.addObject(newPlant);
+            this.gameMap.addObject(newPlant);
         }
     }
 
@@ -114,9 +114,9 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
             const x = this.posX + Math.cos(angleStep * i) * radius;
             const y = this.posY + Math.sin(angleStep * i) * radius;
             
-            if (!this.parent?.mapArea) continue;
+            if (!this.gameMap) continue;
             
-            const nearby = this.parent.mapArea.getObjectsInRadius(x, y, 20);
+            const nearby = this.gameMap.getObjectsInRadius(x, y, 20);
             if (nearby.length === 0) {
                 return { x, y };
             }
@@ -162,12 +162,11 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
         // Apply seasonal effects once per update if config exists
         const seasonConfig = this.getConfig(`seasonalConfig.${this.currentSeason}`);
         if (seasonConfig) {
-            // Adjust growth rate for season
-            this.growthRate *= seasonConfig.growthRate || 1;
-            
-            // Adjust pollination chance for season
+            // Seasonal breeding modifiers should be derived, not compounded every tick.
             this.pollinationChance = this.getConfig('breedingConfig.pollinationChance', 0.2) * 
                                    (seasonConfig.pollinationChance || 1);
+        } else {
+            this.pollinationChance = this.getConfig('breedingConfig.pollinationChance', 0.2);
         }
     }
     

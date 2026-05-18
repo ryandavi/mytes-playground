@@ -103,16 +103,17 @@ class NightBloomMapObject extends BreedingFlowerMapObject {
             const boostFactor = this.getConfig('dayNightConfig.moonlightBoost', 1.2);
             
             // Apply boost to nearby plants if implemented
-            if (this.parent?.mapArea) {
+            if (this.gameMap) {
                 const boostRadius = this.getConfig('dayNightConfig.moonlightBoostRadius', 100);
-                const nearbyPlants = this.parent.mapArea.getObjectsInRadius(
+                const nearbyPlants = this.gameMap.getObjectsInRadius(
                     this.posX, this.posY, boostRadius
                 ).filter(obj => obj instanceof GrowingPlantMapObject);
                 
-                // Apply boosting effect to nearby plants
+                // Apply a temporary growth boost through the existing watering mechanic
+                // instead of permanently compounding their growth multiplier.
                 nearbyPlants.forEach(plant => {
-                    if (plant.growthTimeMultiplier) {
-                        plant.growthTimeMultiplier *= boostFactor;
+                    if (plant !== this && typeof plant.water === 'function' && plant.canWater()) {
+                        plant.water(this.timeCheckInterval * boostFactor);
                     }
                 });
             }

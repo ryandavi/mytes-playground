@@ -83,11 +83,9 @@ class GridSystem {
         } else {
             console.log(`[GridSystem Init] Grid array created successfully with size: ${this.grid.length} x ${this.grid[0]?.length || 0}`);
         }
-
-
-
-
-        this.toggleDebug();
+        if (config.debugMode === true) {
+            this.toggleDebug();
+        }
     }
 
     // Default terrain movement cost multipliers
@@ -294,7 +292,9 @@ class GridSystem {
         this.debugInitialized = true;
 
         // Remove any existing listener to prevent duplicates
-        this.parent.parent.element.removeEventListener('mousemove', this.handleMouseMove);
+        if (this.boundMouseMoveHandler) {
+            this.parent.parent.element.removeEventListener('mousemove', this.boundMouseMoveHandler);
+        }
 
         // Create a bound version of the handler to use for both adding and removing
         this.boundMouseMoveHandler = this.handleMouseMove.bind(this);
@@ -1509,8 +1509,8 @@ class GridSystem {
         this.debugInitialized = false;
 
         // Remove any event listeners
-        if (this.parent && this.parent.parent && this.parent.parent.element) {
-            this.parent.parent.element.removeEventListener('mousemove', this.handleMouseMove);
+        if (this.parent && this.parent.parent && this.parent.parent.element && this.boundMouseMoveHandler) {
+            this.parent.parent.element.removeEventListener('mousemove', this.boundMouseMoveHandler);
         }
 
         // Clean up pathfinder

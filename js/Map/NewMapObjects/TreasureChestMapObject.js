@@ -62,24 +62,18 @@ class TreasureChestMapObject extends AnimatedMapObject {
     }
 
     press(parent) {
-        if (!this.active || !parent.activeMyte) return false;
+        const myte = this.activeMyte;
+        if (!this.active || !myte) return false;
 
-        const myte = parent.activeMyte;
-        const distance = this.getDistanceFromMyte(myte);
-        const interactionRadius = this.getConfig('interactionRadius', 100);
-
-        this.open(parent);
-
-
-        return;
+        this.selectInUi();
 
         // Check if we can interact directly
         if (this.state === 'closed') {
-            return this.handleChestPress(parent, myte, distance, interactionRadius, 
+            return this.handleChestPress(parent, myte, this.getDistanceTo(myte), this.getInteractionRadius(), 
                    () => this.open(parent));
         } 
         else if (this.state === 'opened' && this.canClose) {
-            return this.handleChestPress(parent, myte, distance, interactionRadius, 
+            return this.handleChestPress(parent, myte, this.getDistanceTo(myte), this.getInteractionRadius(), 
                    () => this.close(parent));
         }
 
@@ -107,18 +101,15 @@ class TreasureChestMapObject extends AnimatedMapObject {
         return true;
     }
     
-    getDistanceFromMyte(myte) {
-        const dx = this.posX - myte.posX;
-        const dy = this.posY - myte.posY;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-
     spawnItems(parent) {
         if (!this.items.length) return;
 
         const spawnPoint = this.getSpawnPoint();
         const spreadAngle = Math.PI / 6;
         const baseVelocity = 5;
+        const foregroundLayer = this.gameMap?.layers?.objects || parent?.canvas?.querySelector('.layer.foreground');
+
+        if (!foregroundLayer) return;
 
         this.items.forEach((item, index) => {
             // Calculate spawn angle
@@ -128,7 +119,7 @@ class TreasureChestMapObject extends AnimatedMapObject {
             const droppedItem = this.createDroppedItem(item, spawnPoint, angle, baseVelocity);
             
             // Add to scene
-            parent.canvas.querySelector('.layer.foreground').appendChild(droppedItem.element);
+            foregroundLayer.appendChild(droppedItem.element);
             this.droppedItems.push(droppedItem);
         });
 
@@ -180,10 +171,7 @@ class TreasureChestMapObject extends AnimatedMapObject {
 
         this.droppedItems = this.droppedItems.filter(item => {
             if (!item.collected) {
-
-                if(this.parent?.activeMyte){
-                    item.update(this.parent.activeMyte);
-                }
+                item.update(this.activeMyte);
                 
                 return true;
             }
@@ -240,7 +228,7 @@ class TreasureChestMapObject extends AnimatedMapObject {
         const randomFunc = seed !== undefined ? Utility.createRandomGenerator(seed) : Math.random;
         
         chestDef.forEach(itemDef => {
-          const item = generateItem(itemDef, randomFunc);
+          const item = this.generateItem(itemDef, randomFunc);
           if (item) {
             items.push(item);
           }

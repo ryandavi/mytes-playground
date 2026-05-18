@@ -909,6 +909,7 @@ markGridCellsConditional(grid, tileX, tileY, tileWidth, tileHeight, cellSize, co
 
 			// Convert Tile objects to game objects
 			gameMapData.objects.push({
+				id: obj.id,
 				type: obj.properties?.type || obj.name || 'UNKNOWN',
 				variant: obj.properties?.variant || 'default',
 				x: obj.x,

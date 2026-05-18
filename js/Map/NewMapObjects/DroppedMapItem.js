@@ -17,7 +17,16 @@ class BaseMapObject {
 
 class DroppedMapItem {
     constructor(parent, type, variant, posX, posY) {
+        if (posY === undefined) {
+            posY = posX;
+            posX = variant;
+            variant = type;
+            type = parent;
+            parent = null;
+        }
+
         // Store base identity properties
+        this.parent = parent;
         this.type = type;
         this.variant = variant;
         this.posX = posX;
@@ -161,6 +170,8 @@ class DroppedMapItem {
             this.renderState.posX = this.posX;
             this.renderState.posY = displayY;
             this.renderState.dirty = true;
+        } else {
+            this.updatePosition();
         }
     }
 
@@ -191,6 +202,7 @@ class DroppedMapItem {
     }
 
     remove() {
+        this.active = false;
         if (this.element && this.element.parentNode) {
             this.element.parentNode.removeChild(this.element);
         }

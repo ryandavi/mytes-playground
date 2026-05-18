@@ -199,6 +199,18 @@ class ContainerManager {
         });
     }
 
+    get mapArea() {
+        return this.gameMap;
+    }
+
+    get soundManager() {
+        return this.core?.soundManager || null;
+    }
+
+    get eventManager() {
+        return this.core?.eventManager || null;
+    }
+
 
     // Input state accessors that delegate to inputHandler
     getLocalMouse(element = null) {

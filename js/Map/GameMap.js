@@ -1,6 +1,8 @@
 class GameMap {
     constructor(parent, mapData = null) {
         this.parent = parent;
+        this.gameMap = this;
+        this.mapArea = this;
         this.mapData = mapData || {}; // Default empty object if no data provided
 
         // Core properties
@@ -26,6 +28,7 @@ class GameMap {
 
         // Map elements
         this.objects = [];
+        this.objectsById = new Map();
         // this.zones = new Map();
         this.spawnPoints = new Map();
 
@@ -42,6 +45,71 @@ class GameMap {
 
         // Flag to track initialization state
         this.initialized = false;
+    }
+
+    get container() {
+        return this.parent;
+    }
+
+    get core() {
+        return this.parent?.core || null;
+    }
+
+    get ui() {
+        return this.parent?.ui || null;
+    }
+
+    get camera() {
+        return this.parent?.camera || null;
+    }
+
+    get mytes() {
+        return this.parent?.mytes || [];
+    }
+
+    get activeMyte() {
+        return this.parent?.activeMyte || null;
+    }
+
+    get inventory() {
+        return this.parent?.inventory || null;
+    }
+
+    get eventManager() {
+        return this.core?.eventManager || null;
+    }
+
+    get soundManager() {
+        return this.core?.soundManager || null;
+    }
+
+    getContainerRect() {
+        return this.parent?.getContainerRect?.() || {
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0
+        };
+    }
+
+    getZIndex(y, height) {
+        return this.parent?.getZIndex?.(y, height) ?? 0;
+    }
+
+    getMaxDimensions() {
+        return this.parent?.getMaxDimensions?.() || this.dimensions || {
+            width: 0,
+            height: 0
+        };
+    }
+
+    transitionToMap(mapId, options = {}) {
+        return this.parent?.loadMap?.(mapId, options) || null;
+    }
+
+    getObjectById(id) {
+        if (id === undefined || id === null) return null;
+        return this.objectsById.get(String(id)) || null;
     }
 
     // Add to GameMap class
@@ -359,7 +427,10 @@ class GameMap {
 					objData.variant,
 					objData.x,
 					objData.y,
-					objData.properties
+					{
+						...objData.properties,
+						id: objData.id
+					}
 				);
 			}
 		}
@@ -444,6 +515,7 @@ class GameMap {
 			
 			// Update pathfinder to check if entity can swim when calculating paths
 			if (this.gridSystem.pathfinder.setTerrainCosts) {
+				const gameMap = this;
 				const originalIsWalkable = this.gridSystem.pathfinder.isWalkable;
 				
 				// Override isWalkable to check swimming ability and conditional walkability
@@ -460,7 +532,7 @@ class GameMap {
 					if (!node.walkable && node.conditionallyWalkable) {
 						if (node.conditionType === 'door') {
 							// Get the door object using conditionId
-							const door = this.getObjectById(node.conditionId);
+							const door = gameMap.getObjectById(node.conditionId);
 							// Check if door exists and is open
 							return door && door.isOpen === true;
 						}
@@ -468,7 +540,7 @@ class GameMap {
 					}
 					
 					// Otherwise use the original walkable check
-					return node.walkable;
+					return originalIsWalkable.call(this, x, y, entity);
 				};
 				
 				// Update terrain costs
@@ -517,52 +589,6 @@ class GameMap {
     async loadMap(mapId, options = {}) {
         console.warn('[GameMap] GameMap.loadMap() is deprecated. Use GameMap.initialize() instead.');
         return this.initialize(mapId);
-    }
-
-    // Safe version of addObject
-    addObject(type, variant, x, y, options = {}) {
-        try {
-            // Create the object with error handling
-            let object;
-
-            try {
-                object = MapObjectFactory.create(type, variant, x, y, options);
-            } catch (objError) {
-                console.error(`[GameMap] Failed to create object of type: ${type}, variant: ${variant}`, objError);
-                return null;
-            }
-
-            // Check if object was created successfully
-            if (!object) {
-                console.error(`[GameMap] Object factory returned null for type: ${type}, variant: ${variant}`);
-                return null;
-            }
-
-            // Snap it to grid if possible
-            if (this.gridSystem) {
-                try {
-                    const newposition = this.gridSystem.snapToGrid(
-                        x, y,
-                        object.size.width,
-                        object.size.height,
-                        this.gridSystem.config.cellSize
-                    );
-
-                    object.posX = newposition.x;
-                    object.posY = newposition.y;
-                } catch (gridError) {
-                    console.warn(`[GameMap] Error snapping to grid:`, gridError);
-                    // Use original position as fallback
-                    object.posX = x;
-                    object.posY = y;
-                }
-            }
-
-            return this.add(object, options);
-        } catch (error) {
-            console.error(`[GameMap] Error in addObject:`, error);
-            return null;
-        }
     }
 
     // Optional method to add demonstration objects for testing
@@ -624,6 +650,22 @@ class GameMap {
         // Apply any custom properties
         Object.assign(object, properties);
 
+        if (!object.parent) {
+            object.parent = this;
+        }
+
+        if (!object.map) {
+            object.map = this;
+        }
+
+        if (!object.container) {
+            object.container = this.parent;
+        }
+
+        if (object.id !== undefined && object.id !== null) {
+            this.objectsById.set(String(object.id), object);
+        }
+
         // Add to objects array
         this.objects.push(object);
 
@@ -640,30 +682,42 @@ class GameMap {
         return object;
     }
 
-    addObject(type, variant, x, y, options = {}) {
-        // Create the object
-        const object = MapObjectFactory.create(type, variant, x, y, options);
+    addObject(typeOrObject, variant, x, y, options = {}) {
+        if (typeOrObject && typeof typeOrObject === 'object' && variant === undefined) {
+            return this.add(typeOrObject);
+        }
 
-        // Check if object was created successfully
-        if (!object) {
-            console.error(`Failed to create object of type: ${type}, variant: ${variant}`);
+        try {
+            const object = MapObjectFactory.create(typeOrObject, variant, x, y, options);
+
+            if (!object) {
+                console.error(`Failed to create object of type: ${typeOrObject}, variant: ${variant}`);
+                return null;
+            }
+
+            if (this.gridSystem) {
+                try {
+                    const newposition = this.gridSystem.snapToGrid(
+                        x, y,
+                        object.size.width,
+                        object.size.height,
+                        this.gridSystem.config.cellSize
+                    );
+
+                    object.posX = newposition.x;
+                    object.posY = newposition.y;
+                } catch (gridError) {
+                    console.warn(`[GameMap] Error snapping to grid:`, gridError);
+                    object.posX = x;
+                    object.posY = y;
+                }
+            }
+
+            return this.add(object, options);
+        } catch (error) {
+            console.error(`[GameMap] Error in addObject:`, error);
             return null;
         }
-
-        // Snap it to grid
-        if (this.gridSystem) {
-            const newposition = this.gridSystem.snapToGrid(
-                x, y,
-                object.size.width,
-                object.size.height,
-                this.gridSystem.config.cellSize
-            );
-
-            object.posX = newposition.x;
-            object.posY = newposition.y;
-        }
-
-        return this.add(object, options);
     }
 
     getObjectsInRadius(x, y, radius) {
@@ -745,6 +799,12 @@ class GameMap {
             inactiveObjects.forEach(obj => this.gridSystem.removeObject(obj));
         }
 
+        inactiveObjects.forEach(obj => {
+            if (obj.id !== undefined && obj.id !== null) {
+                this.objectsById.delete(String(obj.id));
+            }
+        });
+
         // Remove from the main array
         this.objects = this.objects.filter(obj => obj.active);
     }
@@ -803,6 +863,11 @@ class GameMap {
     }
 
     dispose() {
+        if (this._pathfindingDebugInterval) {
+            clearInterval(this._pathfindingDebugInterval);
+            this._pathfindingDebugInterval = null;
+        }
+
         // Clean up objects
         this.objects.forEach(obj => {
             if (obj.remove) {
@@ -810,6 +875,7 @@ class GameMap {
             }
         });
         this.objects = [];
+        this.objectsById.clear();
 
         // Clean up zones
         // this.zones.clear();

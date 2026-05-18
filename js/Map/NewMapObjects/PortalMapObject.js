@@ -20,21 +20,15 @@ class PortalMapObject extends AnimatedMapObject {
     // Set up portal particle effects if configured
     initializePortalEffects() {
         // Set up portal particle effects if available
-        if (this.parent?.gameMap?.particleSystem && this.getConfig('particleEffects', true)) {
-            this.particleSystem = this.parent.gameMap.particleSystem.createEmitter({
-                position: {
-                    x: this.posX + this.size.width/2,
-                    y: this.posY + this.size.height/2
-                },
-                velocity: { x: 0, y: -1 },
-                spread: 360,
-                startColor: this.getConfig('particleStartColor', '#8A2BE2'),
-                endColor: this.getConfig('particleEndColor', '#4B0082'),
-                startSize: 5,
-                endSize: 1,
-                particleLife: { min: 1000, max: 2000 },
-                emissionRate: this.isActive ? 10 : 1,
-                gravity: { x: 0, y: -0.01 }
+        if (this.gameMap?.particleSystem && this.getConfig('particleEffects', true)) {
+            this.particleSystem = this.gameMap.particleSystem.addEffect(this, 'GLOW', {
+                colors: [
+                    this.getConfig('particleStartColor', '#8A2BE2'),
+                    this.getConfig('particleEndColor', '#4B0082')
+                ],
+                count: this.isActive ? 1 : 0,
+                randomizePosition: true,
+                randomizeFactor: 20
             });
         }
     }
@@ -161,8 +155,8 @@ class PortalMapObject extends AnimatedMapObject {
     // tickUpdate: proximity check (gameplay trigger, no DOM)
     tickUpdate(tickDelta) {
         super.tickUpdate(tickDelta);
-        if (this.isActive && !this.getConfig('interactionOnly', false) && this.parent.activeMyte) {
-            this.checkProximityActivation(this.parent.activeMyte);
+        if (this.isActive && !this.getConfig('interactionOnly', false) && this.activeMyte) {
+            this.checkProximityActivation(this.activeMyte);
         }
     }
 
@@ -170,15 +164,15 @@ class PortalMapObject extends AnimatedMapObject {
         super.update(deltaTime);
 
         // Particle emission rate is a visual property — stays in update
-        if (this.particleSystem) {
-            this.particleSystem.emissionRate = this.isActive ? 10 : 1;
+        if (this.particleSystem?.options) {
+            this.particleSystem.options.count = this.isActive ? 1 : 0;
         }
     }
     
     // Clean up resources when removed
     remove() {
         if (this.particleSystem) {
-            this.particleSystem.stop();
+            this.particleSystem.active = false;
             this.particleSystem = null;
         }
         

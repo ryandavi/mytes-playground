@@ -97,16 +97,12 @@ class CropPlantMapObject extends GrowingPlantMapObject {
     }
 
     press(parent) {
-        if (!parent?.activeMyte) return false;
+        const myte = this.activeMyte;
+        if (!myte) return false;
 
-        const myte = parent.activeMyte;
-        parent.ui.setSelected(this);
+        this.selectInUi();
 
-        // Calculate distance to myte
-        const distance = this.getDistanceFromMyte(myte);
-        const interactionRadius = this.getConfig('interactionRadius', 100);
-
-        if (distance <= interactionRadius) {
+        if (this.isInInteractionRange(myte)) {
             // If harvestable, harvest
             if (this.harvestable) {
                 return this.performHarvest(parent, myte);
@@ -121,12 +117,6 @@ class CropPlantMapObject extends GrowingPlantMapObject {
             myte.setTarget(this.posX, this.posY);
             return true;
         }
-    }
-    
-    getDistanceFromMyte(myte) {
-        const dx = this.posX - myte.posX;
-        const dy = this.posY - myte.posY;
-        return Math.sqrt(dx * dx + dy * dy);
     }
     
     performHarvest(parent, myte) {
