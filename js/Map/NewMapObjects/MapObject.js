@@ -1433,16 +1433,16 @@ class MapObject {
 			onDragStart: (event) => {
 				this.isDragging = true;
 				this.element.classList.add('dragging');
-				if (this.parent?.ui) {
-					this.parent.ui.setSelected(this);
+				if (this.container?.ui) {
+					this.container.ui.setSelected(this);
 				}
 			},
 			onDragMove: (event) => {
-				const containerRect = this.parent.getContainerRect();
+				const containerRect = this.gameMap.getContainerRect();
 				const relativeX = event.position.x - containerRect.left;
 				const relativeY = event.position.y - containerRect.top;
-				const cameraOffsetX = this.parent.camera ? this.parent.camera.posX : 0;
-				const cameraOffsetY = this.parent.camera ? this.parent.camera.posY : 0;
+				const cameraOffsetX = this.container?.camera ? this.container.camera.posX : 0;
+				const cameraOffsetY = this.container?.camera ? this.container.camera.posY : 0;
 
 				this.posX = relativeX - (this.size.width / 2) - cameraOffsetX;
 				this.posY = relativeY - (this.size.height / 2) - cameraOffsetY;
@@ -1469,7 +1469,7 @@ class MapObject {
 	}
 
 	showDropTarget() {
-		const gridSystem = this.parent?.gameMap?.gridSystem;
+		const gridSystem = this.gameMap?.gridSystem;
 		if (!gridSystem) return;
 
 		// Create the indicator once and reuse it for the entire drag session
@@ -1478,7 +1478,7 @@ class MapObject {
 			this._dropTargetEl.className = 'drop-target debug';
 			this._dropTargetEl.style.width  = `${this.size.width}px`;
 			this._dropTargetEl.style.height = `${this.size.height}px`;
-			this.parent.gameMap.layers.debug.appendChild(this._dropTargetEl);
+			this.gameMap.layers.debug.appendChild(this._dropTargetEl);
 		}
 
 		const snappedPos = gridSystem.snapToGridOptimal(
@@ -1505,7 +1505,7 @@ class MapObject {
 	// Add this helper method to check drop validity
 	checkDropValidity(x, y) {
 		// Get grid system
-		const gridSystem = this.parent.gameMap.gridSystem;
+		const gridSystem = this.gameMap.gridSystem;
 		if (!gridSystem) return true;
 
 		// Convert to grid coordinates
@@ -1903,8 +1903,8 @@ class MapObject {
 		}
 
 		// Update grid position if using a grid system
-		if (this.parent?.gameMap?.gridSystem) {
-			this.parent.gameMap.gridSystem.updateObjectPosition(this);
+		if (this.gameMap?.gridSystem) {
+			this.gameMap.gridSystem.updateObjectPosition(this);
 		}
 	}
 

@@ -238,8 +238,8 @@ class BallMapObject extends AnimatedMapObject {
     tickUpdate(tickDelta) {
         super.tickUpdate(tickDelta);
 
-        if (this.parent?.parent?.mytes) {
-            for (const myte of this.parent.parent.mytes) {
+        if (this.mytes.length) {
+            for (const myte of this.mytes) {
                 if (myte.isActive) this.reactToNearbyCreature(myte);
             }
         }

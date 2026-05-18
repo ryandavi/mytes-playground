@@ -92,9 +92,9 @@ class FountainMapObject extends AnimatedMapObject {
     }
 
     checkNearbyMytes() {
-        if (this.state !== 'on' || !this.parent.mytes) return;
+        if (this.state !== 'on' || !this.mytes.length) return;
 
-        this.parent.mytes.forEach(myte => {
+        this.mytes.forEach(myte => {
             if (!myte.isActive) return;
 
             if (this.getDistanceTo(myte) <= this.moodBoostRadius) {

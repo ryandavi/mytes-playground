@@ -79,8 +79,8 @@ class PortalMapObject extends AnimatedMapObject {
             this.playAnimation('activate');
         }
 
-		let container = this.parent.parent;
-		let gameMap = this.parent;
+		let container = this.container;
+		let gameMap = this.gameMap;
 
         // Trigger the map transition
         if (container.transitionManager) {
