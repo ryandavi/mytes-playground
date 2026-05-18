@@ -1621,19 +1621,23 @@ canMoveToPosition(newX, newY) {
 
 	update(deltaTime) {
 		if (!this.isActive) return;
-		
+
 		// personal target dot
 		this.update_target_dot();
-	
+
 		// movement logic
 		this.do_movement_logic();
-	
-		// update frame
-		if (this.parent && this.parent.core && deltaTime >= this.parent.core.config.frameInterval) {
+
+		// Rate-limit animation/state updates to ~8fps using an accumulator
+		this._animElapsed = (this._animElapsed || 0) + deltaTime;
+		const frameInterval = this.parent?.core?.config?.frameInterval ?? 125;
+		if (this._animElapsed >= frameInterval) {
+			this._animElapsed -= frameInterval;
+			if (this._animElapsed >= frameInterval) this._animElapsed = 0;
+
 			this.stats.update(deltaTime);
 			this.update_frame();
-			
-			// Add defensive check before updating tile
+
 			if (this.parent && this.parent.gameMap && this.parent.gameMap.gridSystem) {
 				this.parent.gameMap.gridSystem.updateMyteFrontTile(this);
 			}

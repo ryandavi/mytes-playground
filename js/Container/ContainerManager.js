@@ -551,7 +551,7 @@ class ContainerManager {
 
         if (this.camera) this.camera.update();
         if (this.ui) this.ui.update();
-        if (this.gameMap) this.gameMap.update();
+        if (this.gameMap) this.gameMap.update(deltaTime);
     }
 
     tickUpdate(tickDelta) {
