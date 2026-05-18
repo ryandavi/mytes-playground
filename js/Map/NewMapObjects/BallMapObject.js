@@ -66,6 +66,10 @@ class BallMapObject extends AnimatedMapObject {
             const dy = ballCenter.y - myteCenter.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
+            if (!Number.isFinite(distance) || distance <= 0.0001) {
+                return;
+            }
+
             // Calculate push vector
             const pushX = (dx / distance) * this.pushForce;
             const pushY = (dy / distance) * this.pushForce;
@@ -96,6 +100,14 @@ class BallMapObject extends AnimatedMapObject {
     // Cap velocity at maximum speed
     capVelocity() {
         const speed = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.y * this.velocity.y);
+        if (!Number.isFinite(speed)) {
+            this.velocity.x = 0;
+            this.velocity.y = 0;
+            this.isMoving = false;
+            this.pauseAnimation();
+            return;
+        }
+
         if (speed > this.maxSpeed) {
             this.velocity.x = (this.velocity.x / speed) * this.maxSpeed;
             this.velocity.y = (this.velocity.y / speed) * this.maxSpeed;

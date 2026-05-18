@@ -1216,6 +1216,7 @@ class MapObject {
 		// Sleep/wake: objects outside the culling zone skip tick and update.
 		// GridSystem.updateCulling() calls wake()/sleep() on transitions.
 		this.sleeping = false;
+		this._animationPausedBeforeSleep = false;
 	}
 
 	get gameMap() {
@@ -1252,14 +1253,17 @@ class MapObject {
 		if (!this.sleeping) return;
 		this.sleeping = false;
 		this.renderState.dirty = true; // force a full re-render after waking
-		if (this.animation) this.animation.paused = false;
+		if (this.animation) this.animation.paused = this._animationPausedBeforeSleep;
 	}
 
 	// Called by GridSystem when this object leaves the active viewport
 	sleep() {
 		if (this.sleeping) return;
 		this.sleeping = true;
-		if (this.animation) this.animation.paused = true;
+		if (this.animation) {
+			this._animationPausedBeforeSleep = this.animation.paused;
+			this.animation.paused = true;
+		}
 	}
 
 	// Clean config access with defaults

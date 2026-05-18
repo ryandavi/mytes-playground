@@ -482,8 +482,11 @@ class GridSystem {
     handleMouseMove(event) {
         if (!this.debugMode || !this.debugInitialized) return;
 
-        // Convert to world coordinates
-        const mouse = this.parent.parent.getLocalMouse();
+        const pageX = event?.pageX ?? this.parent.parent.inputHandler?.getMousePosition()?.x ?? 0;
+        const pageY = event?.pageY ?? this.parent.parent.inputHandler?.getMousePosition()?.y ?? 0;
+        const mouse = this.parent.parent.inputHandler?.screenToWorldCoordinates
+            ? this.parent.parent.inputHandler.screenToWorldCoordinates(pageX, pageY)
+            : this.parent.parent.getLocalMouse();
 
         // Get grid coordinates
         const gridPos = this.worldToGrid(mouse.x, mouse.y);
@@ -1422,9 +1425,17 @@ class GridSystem {
 
             if (shouldBeActive && !isActive) {
                 this.activeObjects.add(obj);
+                const cells = this.getObjectCells(obj);
+                cells.forEach(cell => {
+                    if (!cell.objects.has(obj)) {
+                        cell.objects.add(obj);
+                    }
+                });
+                if (obj.wake) obj.wake();
                 missingCount++;
             } else if (!shouldBeActive && isActive) {
                 this.activeObjects.delete(obj);
+                if (obj.sleep) obj.sleep();
                 extraCount++;
             }
         });

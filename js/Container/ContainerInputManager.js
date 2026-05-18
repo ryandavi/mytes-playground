@@ -68,6 +68,7 @@ class ContainerInputManager {
    */
   setLastActive() {
     this.lastActiveTime = Date.now();
+    this.inputSystem.recordActivity?.();
   }
 
   /**
@@ -76,12 +77,12 @@ class ContainerInputManager {
    * @returns {boolean} Whether the user's status has changed
    */
   checkInactive() {
-    // Don't call this.checkInactive() as it creates an infinite recursion!
-    // Instead, directly implement the functionality without recursion
-    const elapsedTime = Date.now() - this.lastActiveTime;
-    const isNowActive = elapsedTime < this.inactivityTimeout;
-    
-    return false; // Always return false for backward compatibility
+    const didChange = this.inputSystem.checkInactivity(this.inactivityTimeout);
+    if (this.inputSystem.isUserActive()) {
+      this.lastActiveTime = Date.now();
+    }
+
+    return didChange;
   }
 
   /**
@@ -89,17 +90,20 @@ class ContainerInputManager {
    * @returns {boolean} Whether the user is active
    */
   isUserActive() {
-    const elapsedTime = Date.now() - this.lastActiveTime;
-    return elapsedTime < this.inactivityTimeout;
+    return this.inputSystem.isUserActive();
   }
 
   /**
    * Check for user inactivity and notify container
    */
   checkInactivity() {
-    const wasActive = this.isUserActive();
+    const wasActive = this.inputSystem.isUserActive();
     this.inputSystem.checkInactivity(this.inactivityTimeout);
     const isActive = this.inputSystem.isUserActive();
+
+    if (isActive) {
+      this.lastActiveTime = Date.now();
+    }
 
     // If activity state changed
     if (wasActive !== isActive) {

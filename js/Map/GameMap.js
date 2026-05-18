@@ -818,9 +818,8 @@ class GameMap {
     }
 
     tickUpdate(tickDelta) {
-        if (!this.gridSystem) return;
-        for (const object of this.gridSystem.activeObjects) {
-            if (object.tickUpdate && !object.sleeping) {
+        for (const object of this.objects) {
+            if (object.tickUpdate) {
                 object.tickUpdate(tickDelta);
             }
         }
@@ -828,9 +827,10 @@ class GameMap {
 
     update(deltaTime) {
         if (this.gridSystem) {
-            this.updateFrameSkip = (this.updateFrameSkip + 1) % 60;
+            this.updateFrameSkip = (this.updateFrameSkip + 1) % 15;
 
-            // Full consistency check once per second
+            // Full consistency check several times per second so moving objects
+            // can re-enter the viewport even if the camera is stationary.
             if (this.updateFrameSkip === 0) {
                 this.gridSystem.verifyActiveObjects(this.parent.camera);
             }

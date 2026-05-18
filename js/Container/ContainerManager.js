@@ -24,6 +24,7 @@ class ContainerManager {
         this.inventory.loadItems(this.core.user.items);
 
         this.transitionManager = new MapTransitionManager(this);
+        this.userIsActive = true;
 
         this.settings = {
             limitMap: true,
@@ -246,8 +247,26 @@ class ContainerManager {
     updateUserActivity() {
         const statusChanged = this.inputHandler.checkInactive(this.core.config.inactiveTimeout);
         if (statusChanged) {
-            console.log(`User is ${this.inputHandler.isUserActive() ? 'active' : 'inactive'}`);
+            if (this.inputHandler.isUserActive()) {
+                this.handleUserActive();
+            } else {
+                this.handleUserInactive();
+            }
         }
+    }
+
+    handleUserActive() {
+        if (this.userIsActive) return;
+        this.userIsActive = true;
+        this.element?.classList.remove('user-inactive');
+        this.eventManager?.emit?.('user_activity_changed', { active: true });
+    }
+
+    handleUserInactive() {
+        if (!this.userIsActive) return;
+        this.userIsActive = false;
+        this.element?.classList.add('user-inactive');
+        this.eventManager?.emit?.('user_activity_changed', { active: false });
     }
 
     // Container-specific utility methods

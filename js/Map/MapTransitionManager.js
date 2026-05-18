@@ -146,16 +146,19 @@ class MapTransitionManager {
                     let correspondingPortal = allPortals.find(portal => portal.targetMap === this.previousMapId);
     
                     if(correspondingPortal){
-                        // set myte position centered to center of portal position
-                        this.container.activeMyte.posX = 
-                            correspondingPortal.posX + 
-                            correspondingPortal.size.width / 2 - 
-                            this.container.activeMyte.size.width/2;
-    
-                        this.container.activeMyte.posY = 
-                            correspondingPortal.posY + 
-                            correspondingPortal.size.height / 2 -
-                            this.container.activeMyte.size.height/2;
+                        const exitPosition = correspondingPortal.getExitPositionFor
+                            ? correspondingPortal.getExitPositionFor(this.container.activeMyte)
+                            : {
+                                x: correspondingPortal.posX,
+                                y: correspondingPortal.posY + correspondingPortal.size.height + 16
+                            };
+
+                        this.container.activeMyte.setPosition(exitPosition.x, exitPosition.y);
+                        this.container.activeMyte.portalCooldownUntil = Date.now() + (
+                            correspondingPortal.getPortalCooldownDuration
+                                ? correspondingPortal.getPortalCooldownDuration()
+                                : 1500
+                        );
                     }
                 }
     

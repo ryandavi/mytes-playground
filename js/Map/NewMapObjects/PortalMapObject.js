@@ -18,6 +18,26 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         return this.activationRadius;
     }
 
+    getPortalCooldownDuration() {
+        return this.getConfig('portalCooldownDuration', 1500);
+    }
+
+    canTransitionMyte(myte) {
+        if (!myte) return false;
+        return (myte.portalCooldownUntil || 0) <= Date.now();
+    }
+
+    getExitPositionFor(myte) {
+        const myteWidth = myte?.size?.width || 0;
+        const myteHeight = myte?.size?.height || 0;
+        const exitOffset = Math.max(this.activationRadius + 16, this.size.height + 8);
+
+        return {
+            x: this.posX + (this.size.width / 2) - (myteWidth / 2),
+            y: this.posY + exitOffset - (myteHeight / 2)
+        };
+    }
+
     initializePortalEffects() {
         if (this.gameMap?.particleSystem && this.getConfig('particleEffects', true)) {
             this.particleSystem = this.gameMap.particleSystem.addEffect(this, 'GLOW', {
@@ -36,7 +56,7 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         if (!this.active || this.isAnimating || !this.isActive || !this.targetMap) return false;
 
         const myte = this.activeMyte;
-        if (!myte) return false;
+        if (!myte || !this.canTransitionMyte(myte)) return false;
 
         return this.runInteractionWhenInRange(() => {
             this.beginTransition(myte);
@@ -44,7 +64,7 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
     }
 
     checkProximityActivation(myte) {
-        if (!this.isActive || !myte || !this.targetMap || this.isAnimating) return;
+        if (!this.isActive || !myte || !this.targetMap || this.isAnimating || !this.canTransitionMyte(myte)) return;
 
         if (this.isInInteractionRange(myte, this.activationRadius)) {
             this.beginTransition(myte);
@@ -56,6 +76,9 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
 
         this.isAnimating = true;
         this.isActive = false;
+        if (myte) {
+            myte.portalCooldownUntil = Date.now() + this.transitionDuration + this.getPortalCooldownDuration();
+        }
 
         if (this.hasAnimation('activate')) {
             this.playAnimation('activate');
