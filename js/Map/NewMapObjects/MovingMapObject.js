@@ -1,6 +1,6 @@
 class MovingMapObject extends MapObject {
 	constructor(parent, type, variant, posX, posY, config = {}) {
-		super(type, variant, posX, posY, config);
+		super(parent, type, variant, posX, posY, config);
 
 		// Movement properties
 		this.velocity = { x: 0, y: 0 };
@@ -46,12 +46,11 @@ class MovingMapObject extends MapObject {
 		}
 	}
 
-	// Set position with boundary checking
+	// Set position with boundary checking (simulation only — no DOM write)
 	setPosition(x, y) {
 		const newX = Math.max(this.bounds.left, Math.min(this.bounds.right - this.size.width, x));
 		const newY = Math.max(this.bounds.top, Math.min(this.bounds.bottom - this.size.height, y));
 
-		// Check if we hit a boundary and handle it
 		if (newX <= this.bounds.left || newX >= this.bounds.right - this.size.width) {
 			this.handleBoundaryCollision('horizontal');
 		}
@@ -62,7 +61,7 @@ class MovingMapObject extends MapObject {
 
 		this.posX = newX;
 		this.posY = newY;
-		this.updatePosition();
+		// markPositionDirty() will be called at the end of update()
 	}
 
 	// Handle collision with boundaries
@@ -145,11 +144,10 @@ class MovingMapObject extends MapObject {
 		}
 	}
 
-	// Update method - called each frame
-	update(deltaTime) {
-		super.update(deltaTime);
+	// tickUpdate: physics integration at fixed rate
+	tickUpdate(tickDelta) {
+		super.tickUpdate(tickDelta);
 
-		// Apply movement if moving
 		if (this.isMoving) {
 			this.setPosition(
 				this.posX + this.velocity.x,
@@ -157,19 +155,21 @@ class MovingMapObject extends MapObject {
 			);
 		}
 
-		// Apply friction
 		this.velocity.x *= this.friction;
 		this.velocity.y *= this.friction;
 
-		// Check if velocity is very low, stop movement
 		if (Math.abs(this.velocity.x) < 0.01 && Math.abs(this.velocity.y) < 0.01) {
 			this.stopMoving();
 		}
 
-		// Move toward target if not reached
 		if (!this.reachedTarget && !this.isMoving) {
 			this.moveToward(this.targetX, this.targetY);
 		}
+	}
+
+	// update: visual only (markPositionDirty handled by base MapObject.update)
+	update(deltaTime) {
+		super.update(deltaTime);
 	}
 
 	// Render - extend parent method

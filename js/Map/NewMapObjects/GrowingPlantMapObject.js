@@ -5,8 +5,9 @@ class GrowingPlantMapObject extends AnimatedMapObject {
         // Growth state
         this.growthStage = this.getConfig('defaultStage', 'seed');
         this.growthProgress = 0;
-        this.lastGrowthUpdate = Date.now();
-        
+        // No longer uses Date.now() — growth is driven by accumulated tickDelta
+        this._growthAccumulator = 0;
+
         // Watering state
         this.isWatered = false;
         this.wateredBoostTimeRemaining = 0;
@@ -58,17 +59,12 @@ class GrowingPlantMapObject extends AnimatedMapObject {
         }
     }
 
-    updateGrowth() {
-        // Skip growth updates if fully grown
+    // updateGrowth is now called from tickUpdate with the fixed tickDelta
+    updateGrowth(tickDelta) {
         if (this.fullyGrown) return;
 
-        const now = Date.now();
-        const elapsed = now - this.lastGrowthUpdate;
-        this.lastGrowthUpdate = now;
-
-        // Update watered state
         if (this.isWatered) {
-            this.wateredBoostTimeRemaining -= elapsed;
+            this.wateredBoostTimeRemaining -= tickDelta;
             if (this.wateredBoostTimeRemaining <= 0) {
                 this.isWatered = false;
                 this.growthRate = this.calculateGrowthRate();
@@ -76,11 +72,9 @@ class GrowingPlantMapObject extends AnimatedMapObject {
             }
         }
 
-        // Add small random variations to growth progress (±10%)
         const progressMultiplier = 0.9 + (Math.random() * 0.2);
-        this.growthProgress += (elapsed / this.growthRate) * progressMultiplier;
-        
-        // Check for stage advancement
+        this.growthProgress += (tickDelta / this.growthRate) * progressMultiplier;
+
         if (this.growthProgress >= 1) {
             this.advanceGrowthStage();
         }
@@ -138,9 +132,13 @@ class GrowingPlantMapObject extends AnimatedMapObject {
         // Override in subclasses to handle harvest
     }
 
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
+        this.updateGrowth(tickDelta);
+    }
+
     update(deltaTime) {
         super.update(deltaTime);
-        this.updateGrowth();
     }
 
     render(container, parent) {

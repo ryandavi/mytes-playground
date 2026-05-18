@@ -4,8 +4,8 @@ class NightBloomMapObject extends BreedingFlowerMapObject {
         
         // Bloom state
         this.bloomState = 'closed';
-        this.lastTimeCheck = 0;
-        this.timeCheckInterval = 1000; // Check time every second
+        this._timeCheckAccumulator = 0;
+        this.timeCheckInterval = 1000; // re-evaluate day/night state every ~1 second of game time
         
         // Cache time values for better performance
         const [openHour] = this.getConfig('dayNightConfig.openTime', '18:00').split(':').map(Number);
@@ -18,17 +18,9 @@ class NightBloomMapObject extends BreedingFlowerMapObject {
     }
 
     updateDayNightState() {
-        const now = Date.now();
-        if (now - this.lastTimeCheck < this.timeCheckInterval) return;
-        this.lastTimeCheck = now;
-
-        // Get current hour
         const currentHour = new Date().getHours();
-        
-        // Determine if flower should be open based on time
         const shouldBeOpen = this.shouldBeOpen(currentHour);
-        
-        // Update bloom state if needed
+
         if (shouldBeOpen && this.bloomState === 'closed') {
             this.open();
         } else if (!shouldBeOpen && this.bloomState === 'open') {
@@ -87,16 +79,22 @@ class NightBloomMapObject extends BreedingFlowerMapObject {
         }
     }
 
-    update(deltaTime) {
-        super.update(deltaTime);
-        
-        // Check day/night cycle for mature plants
-        if (this.growthStage === 'mature') {
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
+
+        if (this.growthStage !== 'mature') return;
+
+        // Only re-evaluate day/night state every timeCheckInterval ms
+        this._timeCheckAccumulator += tickDelta;
+        if (this._timeCheckAccumulator >= this.timeCheckInterval) {
+            this._timeCheckAccumulator = 0;
             this.updateDayNightState();
-            
-            // Apply moonlight growth boost if configured
             this.applyMoonlightBoost();
         }
+    }
+
+    update(deltaTime) {
+        super.update(deltaTime);
     }
     
     applyMoonlightBoost() {

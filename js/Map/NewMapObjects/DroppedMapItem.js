@@ -149,17 +149,18 @@ class DroppedMapItem {
             }
         }
 
-        // Apply hover effect when grounded
+        // Apply hover effect when grounded (visual-only offset)
         let displayY = this.posY;
         if (this.grounded) {
             this.hoverOffset += this.hoverSpeed;
             displayY -= Math.sin(this.hoverOffset) * 5;
         }
 
-        // Update element position
-        if (this.element) {
-            this.element.style.left = `${this.posX}px`;
-            this.element.style.top = `${displayY}px`;
+        // Write into renderState — MapRenderer.flush() applies this to the DOM
+        if (this.renderState) {
+            this.renderState.posX = this.posX;
+            this.renderState.posY = displayY;
+            this.renderState.dirty = true;
         }
     }
 

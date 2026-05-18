@@ -37,10 +37,10 @@ class AnimatedMapObject extends MapObject {
         return this.animation.play(animationName, onComplete);
     }
     
-    // Update animation state
-    updateAnimation() {
+    // Update animation state — must receive deltaTime from game loop
+    updateAnimation(deltaTime) {
         if (!this.animation || this.animation.paused) return;
-        this.animation.update();
+        this.animation.update(deltaTime);
     }
     
     // Update sprite frame
@@ -116,12 +116,14 @@ class AnimatedMapObject extends MapObject {
         }
     }
     
-    // Override update method
-    update(deltaTime) {
+    // tickUpdate: gameplay logic (override in subclasses)
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
+    }
 
+    // update: visual/animation only
+    update(deltaTime) {
         super.update(deltaTime);
-        
-        // Update animation
-        this.updateAnimation();
+        this.updateAnimation(deltaTime);
     }
 }

@@ -555,6 +555,16 @@ class ContainerManager {
     }
 
     tickUpdate(tickDelta) {
+        // Fixed-rate gameplay logic for all systems
+        if (this.gameMap) this.gameMap.tickUpdate(tickDelta);
+
+        this.mytes.forEach(myte => {
+            if (myte.isActive && myte.tickUpdate) {
+                myte.tickUpdate(tickDelta);
+            }
+        });
+
+        if (this.timeManager) this.timeManager.tickUpdate?.(tickDelta);
     }
 
 

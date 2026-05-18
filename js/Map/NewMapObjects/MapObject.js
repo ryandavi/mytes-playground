@@ -1182,7 +1182,9 @@ class MapObject {
 		this.interactionState = {
 			lastInteractionTime: 0,
 			cooldown: this.getConfig('interactionCooldown', 5000),
-			activeInteractions: new Set()
+			activeInteractions: new Set(),
+			// Maps myte id → timestamp of last interaction (replaces setTimeout)
+			interactionTimes: new Map()
 		};
 
 		// Initialize components when element is available
@@ -1190,6 +1192,39 @@ class MapObject {
 
 		// Track if the object is currently being dragged
 		this.isDragging = false;
+
+		// Render state: simulation writes here, MapRenderer reads and flushes to DOM.
+		// Nothing outside MapRenderer should write to the DOM directly.
+		this.renderState = {
+			posX: posX,
+			posY: posY,
+			zIndex: 0,
+			bgPosition: null,
+			visible: true,
+			dirty: true     // true = needs a DOM flush
+		};
+		// Previous render position used for dirty-checking
+		this._prevRenderX = -1;
+		this._prevRenderY = -1;
+
+		// Sleep/wake: objects outside the culling zone skip tick and update.
+		// GridSystem.updateCulling() calls wake()/sleep() on transitions.
+		this.sleeping = false;
+	}
+
+	// Called by GridSystem when this object enters the active viewport
+	wake() {
+		if (!this.sleeping) return;
+		this.sleeping = false;
+		this.renderState.dirty = true; // force a full re-render after waking
+		if (this.animation) this.animation.paused = false;
+	}
+
+	// Called by GridSystem when this object leaves the active viewport
+	sleep() {
+		if (this.sleeping) return;
+		this.sleeping = true;
+		if (this.animation) this.animation.paused = true;
 	}
 
 	// Clean config access with defaults
@@ -1387,6 +1422,7 @@ class MapObject {
 			onDragEnd: (event) => {
 				this.isDragging = false;
 				this.element.classList.remove('dragging');
+				this.hideDropTarget();
 
 				if (this.getConfig('snapToGrid', false)) {
 					this.snapToGrid();
@@ -1397,39 +1433,38 @@ class MapObject {
 		});
 	}
 
-	// Add this method to MapObject class
 	showDropTarget() {
-		// Remove any previous drop target visuals
-		const oldDropTargets = this.parent.gameMap.layers.debug.querySelectorAll('.drop-target');
-		oldDropTargets.forEach(t => t.remove());
-
-		// Get the grid system
-		const gridSystem = this.parent.gameMap.gridSystem;
+		const gridSystem = this.parent?.gameMap?.gridSystem;
 		if (!gridSystem) return;
 
-		// Calculate where the object would be dropped
+		// Create the indicator once and reuse it for the entire drag session
+		if (!this._dropTargetEl) {
+			this._dropTargetEl = document.createElement('div');
+			this._dropTargetEl.className = 'drop-target debug';
+			this._dropTargetEl.style.width  = `${this.size.width}px`;
+			this._dropTargetEl.style.height = `${this.size.height}px`;
+			this.parent.gameMap.layers.debug.appendChild(this._dropTargetEl);
+		}
+
 		const snappedPos = gridSystem.snapToGridOptimal(
-			this.posX,
-			this.posY,
-			this.size.width,
-			this.size.height,
+			this.posX, this.posY,
+			this.size.width, this.size.height,
 			gridSystem.config.cellSize
 		);
 
-		// Create drop target visualization
-		const dropTarget = document.createElement('div');
-		dropTarget.className = 'drop-target debug';
+		this._dropTargetEl.style.left = `${snappedPos.x}px`;
+		this._dropTargetEl.style.top  = `${snappedPos.y}px`;
 
-		dropTarget.style.left = `${snappedPos.x}px`;
-		dropTarget.style.top = `${snappedPos.y}px`;
-		dropTarget.style.width = `${this.size.width}px`;
-		dropTarget.style.height = `${this.size.height}px`;
-
-		// Check if this is a valid drop spot
 		const isValid = this.checkDropValidity(snappedPos.x, snappedPos.y);
-		dropTarget.classList.add(isValid ? 'valid-drop' : 'invalid-drop');
+		this._dropTargetEl.classList.toggle('valid-drop',   isValid);
+		this._dropTargetEl.classList.toggle('invalid-drop', !isValid);
+		this._dropTargetEl.style.display = '';
+	}
 
-		this.parent.gameMap.layers.debug.appendChild(dropTarget);
+	hideDropTarget() {
+		if (this._dropTargetEl) {
+			this._dropTargetEl.style.display = 'none';
+		}
 	}
 
 	// Add this helper method to check drop validity
@@ -1506,15 +1541,42 @@ class MapObject {
 		});
 	}
 
-	// Update the object's position in DOM
+	// Mark renderState dirty when simulation position changes.
+	// DOM writes are deferred to MapRenderer.flush() at end of frame.
+	markPositionDirty() {
+		if (this.posX !== this._prevRenderX || this.posY !== this._prevRenderY) {
+			this.renderState.posX = this.posX;
+			this.renderState.posY = this.posY;
+			if (this.parent && this.parent.getZIndex) {
+				this.renderState.zIndex = this.parent.getZIndex(this.posY, this.size.height);
+			}
+			this.renderState.dirty = true;
+		}
+	}
+
+	// Legacy path: still works for one-shot moves (drag snap, teleport, init).
+	// Prefer markPositionDirty() inside update loops.
 	updatePosition() {
 		if (!this.element) return;
 
-		this.element.style.left = `${this.posX}px`;
-		this.element.style.top = `${this.posY}px`;
-
+		this.renderState.posX = this.posX;
+		this.renderState.posY = this.posY;
 		if (this.parent && this.parent.getZIndex) {
-			this.element.style.zIndex = this.parent.getZIndex(this.posY, this.size.height);
+			this.renderState.zIndex = this.parent.getZIndex(this.posY, this.size.height);
+		}
+		this.renderState.dirty = true;
+
+		// Flush immediately for one-shot callers (drag, init) so they don't
+		// have to wait for the next render pass.
+		if (this.element) {
+			this.element.style.left = `${this.posX}px`;
+			this.element.style.top  = `${this.posY}px`;
+			if (this.renderState.zIndex) {
+				this.element.style.zIndex = this.renderState.zIndex;
+			}
+			this._prevRenderX = this.posX;
+			this._prevRenderY = this.posY;
+			this.renderState.dirty = false;
 		}
 	}
 
@@ -1552,24 +1614,26 @@ class MapObject {
 			y <= this.posY + this.size.height;
 	}
 
-	// Check if a Myte can interact with this object
 	canInteract(myte) {
 		if (!this.getConfig('interactionType')) return false;
 
-		const timeSinceLastInteraction = Date.now() - this.interactionState.lastInteractionTime;
-		if (timeSinceLastInteraction < this.interactionState.cooldown) return false;
-
+		// Use performance.now() + the interactionTimes map instead of setTimeout closures.
+		// Expiry is checked in tickUpdate() — no allocations per call.
 		if (this.interactionState.activeInteractions.has(myte.id)) return false;
+
+		const timeSinceLastInteraction = performance.now() - this.interactionState.lastInteractionTime;
+		if (timeSinceLastInteraction < this.interactionState.cooldown) return false;
 
 		return true;
 	}
 
-	// Handle interaction with a Myte
 	interact(myte) {
 		if (!this.canInteract(myte)) return false;
 
-		this.interactionState.lastInteractionTime = Date.now();
+		const now = performance.now();
+		this.interactionState.lastInteractionTime = now;
 		this.interactionState.activeInteractions.add(myte.id);
+		this.interactionState.interactionTimes.set(myte.id, now);
 
 		const interactionType = this.getConfig('interactionType');
 		switch (interactionType) {
@@ -1585,19 +1649,13 @@ class MapObject {
 					this.remove();
 				}
 				break;
-			default:
-				// Handle custom interaction types
+			default: {
 				const onInteract = this.getConfig('onInteract');
-				if (typeof onInteract === 'function') {
-					onInteract(myte, this);
-				}
+				if (typeof onInteract === 'function') onInteract(myte, this);
+			}
 		}
 
-		// Reset interaction state after cooldown
-		setTimeout(() => {
-			this.interactionState.activeInteractions.delete(myte.id);
-		}, this.interactionState.cooldown);
-
+		// No setTimeout — expiry is handled in MapObject.tickUpdate() via interactionTimes
 		return true;
 	}
 
@@ -1762,17 +1820,16 @@ class MapObject {
 		this.element.classList.remove('selected-object');
 	}
 
-	// Remove this object
 	remove() {
-		// Clean up all input components
-		Object.values(this.inputComponents).forEach(component => {
-			component.destroy();
-		});
-
-		// Clear input components
+		Object.values(this.inputComponents).forEach(component => component.destroy());
 		this.inputComponents = {};
 
-		// Remove element
+		// Remove cached drop target indicator
+		if (this._dropTargetEl) {
+			this._dropTargetEl.remove();
+			this._dropTargetEl = null;
+		}
+
 		if (this.element) {
 			this.element.remove();
 			this.element = null;
@@ -1874,9 +1931,23 @@ class MapObject {
 		}
 	}
 
-	// Update method called each frame
+	// Per-tick gameplay update (20 Hz fixed). Subclasses override this for AI, state, cooldowns.
+	// Must not touch the DOM.
+	tickUpdate(tickDelta) {
+		// Expire interaction cooldowns without allocating closures
+		const now = performance.now();
+		for (const [id, time] of this.interactionState.interactionTimes) {
+			if (now - time >= this.interactionState.cooldown) {
+				this.interactionState.activeInteractions.delete(id);
+				this.interactionState.interactionTimes.delete(id);
+			}
+		}
+	}
+
+	// Per-frame visual update (variable rate). Subclasses override for animation.
+	// Must not change simulation state.
 	update(deltaTime) {
-		// Update components that need per-frame updates
+		// Update input components that need per-frame processing
 		Object.values(this.inputComponents).forEach(component => {
 			if (component.isActive()) {
 				component.update(deltaTime);
@@ -1888,5 +1959,8 @@ class MapObject {
 		if (typeof updateFn === 'function') {
 			updateFn(this, deltaTime);
 		}
+
+		// Mark render dirty if simulation moved this object
+		this.markPositionDirty();
 	}
 }

@@ -158,18 +158,20 @@ class PortalMapObject extends AnimatedMapObject {
         return element;
     }
     
-    // Update method called each frame
-    update(deltaTime) {
-        super.update(deltaTime);
-        
-        // Update particle effects based on active state
-        if (this.particleSystem) {
-            this.particleSystem.emissionRate = this.isActive ? 10 : 1;
-        }
-        
-        // Check proximity for active myte if not in interaction mode
+    // tickUpdate: proximity check (gameplay trigger, no DOM)
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
         if (this.isActive && !this.getConfig('interactionOnly', false) && this.parent.activeMyte) {
             this.checkProximityActivation(this.parent.activeMyte);
+        }
+    }
+
+    update(deltaTime) {
+        super.update(deltaTime);
+
+        // Particle emission rate is a visual property — stays in update
+        if (this.particleSystem) {
+            this.particleSystem.emissionRate = this.isActive ? 10 : 1;
         }
     }
     

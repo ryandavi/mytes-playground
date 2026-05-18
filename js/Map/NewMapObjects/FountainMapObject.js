@@ -10,8 +10,11 @@ class FountainMapObject extends AnimatedMapObject {
         this.moodBoostAmount = this.getConfig('moodBoostAmount', 0.1);
         this.boostCooldown = this.getConfig('boostCooldown', 1000);
 
-        // Boost tracking with Map for better performance
+        // Boost tracking: myte.id → last boost timestamp (performance.now())
         this.lastBoostTimes = new Map();
+        // Only check nearby mytes every 500ms to avoid scanning every tick
+        this._proximityAccumulator = 0;
+        this._proximityInterval = 500;
     }
 
     getNextAction() {
@@ -79,7 +82,7 @@ class FountainMapObject extends AnimatedMapObject {
     }
 
     applyMoodBoost(myte) {
-        const now = Date.now();
+        const now = performance.now();
         const lastBoost = this.lastBoostTimes.get(myte.id) || 0;
 
         if (now - lastBoost >= this.boostCooldown) {
@@ -117,8 +120,17 @@ class FountainMapObject extends AnimatedMapObject {
         return element;
     }
 
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
+
+        this._proximityAccumulator += tickDelta;
+        if (this._proximityAccumulator >= this._proximityInterval) {
+            this._proximityAccumulator = 0;
+            this.checkNearbyMytes();
+        }
+    }
+
     update(deltaTime) {
         super.update(deltaTime);
-        this.checkNearbyMytes();
     }
 }

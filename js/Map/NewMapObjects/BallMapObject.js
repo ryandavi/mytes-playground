@@ -42,13 +42,10 @@ class BallMapObject extends AnimatedMapObject {
         };
     }
 
-    // React to a nearby creature (myte)
     reactToNearbyCreature(myte) {
-        // Skip if being dragged
         if (this.isDragging) return;
 
-        // Check cooldown
-        const now = Date.now();
+        const now = performance.now();
         if (now - this.lastPushTime < this.pushCooldown) return;
 
         // Only react to moving mytes
@@ -138,45 +135,26 @@ class BallMapObject extends AnimatedMapObject {
         }
     }
 
-    // Update physics for the ball
     updatePhysics() {
         if (!this.isMoving) return;
-        
-        // Store previous position
-        const previousX = this.posX;
-        const previousY = this.posY;
-        
-        // Update position based on velocity
+
         this.posX += this.velocity.x;
         this.posY += this.velocity.y;
-        
-        // Check boundaries and handle collision
         this.checkBoundaries();
-        
-        // Apply friction to gradually slow down
+
         this.velocity.x *= this.friction;
         this.velocity.y *= this.friction;
-        
-        // Update animation if still moving significantly
+
         if (Math.abs(this.velocity.x) > 0.1 || Math.abs(this.velocity.y) > 0.1) {
             this.updateBallAnimation();
-        }
-        // Check if ball has effectively stopped
-        else if (Math.abs(this.velocity.x) < 0.3 && Math.abs(this.velocity.y) < 0.3) {
+        } else if (Math.abs(this.velocity.x) < 0.3 && Math.abs(this.velocity.y) < 0.3) {
             this.velocity.x = 0;
             this.velocity.y = 0;
             this.isMoving = false;
-            
-            // Pause the current animation
             this.pauseAnimation();
-            
-            if (this.debug) {
-                console.log("Ball stopped, staying on last frame");
-            }
+            if (this.debug) console.log("Ball stopped");
         }
-        
-        // Update element position
-        this.updatePosition();
+        // markPositionDirty() called by base update()
     }
     
     // Check and handle boundary collisions
@@ -256,40 +234,21 @@ class BallMapObject extends AnimatedMapObject {
         }
     }
 
-    // Override update method
-    update(deltaTime) {
-        // Check for nearby mytes first (apply forces before physics)
-        if (this.parent.parent && this.parent.parent.mytes) {
-            this.parent.parent.mytes.forEach(myte => {
-                if (myte.isActive) {
-                    this.reactToNearbyCreature(myte);
-                    
-                }
-            });
+    // tickUpdate: collision detection + physics (no DOM)
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
 
-            
-        
-        }
-
-
-
-        
-        // Update physics
-        this.updatePhysics();
-        
-        // Call parent update (for animation)
-        super.update(deltaTime);
-        
-        // Update debug attributes
-        if (this.element) {
-            this.element.setAttribute('data-moving', this.isMoving);
-            this.element.setAttribute('data-velocity-x', this.velocity.x.toFixed(2));
-            this.element.setAttribute('data-velocity-y', this.velocity.y.toFixed(2));
-            
-            // Update z-index
-            if (this.parent && this.parent.getZIndex) {
-                this.element.style.zIndex = this.parent.getZIndex(this.posY, this.size.height);
+        if (this.parent?.parent?.mytes) {
+            for (const myte of this.parent.parent.mytes) {
+                if (myte.isActive) this.reactToNearbyCreature(myte);
             }
         }
+
+        this.updatePhysics();
+    }
+
+    // update: animation + dirty marking
+    update(deltaTime) {
+        super.update(deltaTime);
     }
 }

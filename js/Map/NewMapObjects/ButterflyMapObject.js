@@ -23,15 +23,15 @@ class ButterflyMapObject extends AnimatedMapObject {
         this.bobAmplitude = options.bobAmplitude || this.getConfig('bobAmplitude', 15);
         this.bobFrequency = options.bobFrequency || this.getConfig('bobFrequency', 0.05);
         
-        // Butterfly hover/move state system
-        this.stateTimer = Date.now();
+        // Butterfly hover/move state system — all durations in ms, advanced by tickDelta
+        this.stateElapsed = 0;
         this.hoverDuration = 2000 + Math.random() * 2000;
-        this.moveDuration = 2000 + Math.random() * 3000;
+        this.moveDuration  = 2000 + Math.random() * 3000;
         this.isHovering = Math.random() > 0.5;
-        
+
         // Idle state
         this.isIdle = false;
-        this.idleTimer = 0;
+        this.idleElapsed  = 0;
         this.idleDuration = 0;
         this.idleChance = options.idleChance || this.getConfig('idleChance', 0.001);
         
@@ -70,48 +70,42 @@ class ButterflyMapObject extends AnimatedMapObject {
         }
     }
     
-    // Update butterfly behavior
-    updateBehavior() {
-        const currentTime = Date.now();
-        
-        // Handle idle state
+    // updateBehavior — called from tickUpdate with elapsed ms since last tick
+    updateBehavior(tickDelta) {
         if (this.isIdle) {
-            if (currentTime - this.idleTimer > this.idleDuration) {
+            this.idleElapsed += tickDelta;
+            if (this.idleElapsed >= this.idleDuration) {
                 this.exitIdleState();
             } else {
                 this.updateIdleState();
             }
             return;
         }
-        
-        // Random chance to go idle
+
+        // Random chance per tick — scale by tick rate so it feels consistent regardless of Hz
         if (Math.random() < this.idleChance) {
-            this.enterIdleState(currentTime);
+            this.enterIdleState();
             return;
         }
-        
-        // Normal hover/move behavior
-        this.updateHoverMoveBehavior(currentTime);
+
+        this.updateHoverMoveBehavior(tickDelta);
     }
-    
-    // Enter idle state
-    enterIdleState(currentTime) {
+
+    enterIdleState() {
         this.isIdle = true;
         this.fluttering = false;
-        this.idleTimer = currentTime;
+        this.idleElapsed  = 0;
         this.idleDuration = 3000 + Math.random() * 5000;
         this.velocity.x = 0;
         this.velocity.y = 0;
         this.playAnimation('idle');
     }
-    
-    // Exit idle state
+
     exitIdleState() {
         this.isIdle = false;
         this.fluttering = false;
-        this.stateTimer = Date.now();
-        
-        // Start moving again with random direction
+        this.stateElapsed = 0;
+
         const angle = Math.random() * Math.PI * 2;
         this.velocity.x = Math.cos(angle) * this.speed * 0.5;
         this.velocity.y = Math.sin(angle) * this.speed * 0.5;
@@ -139,55 +133,46 @@ class ButterflyMapObject extends AnimatedMapObject {
         this.velocity.y = 0;
     }
     
-    // Update hover/move behavior
-    updateHoverMoveBehavior(currentTime) {
-        const timeInState = currentTime - this.stateTimer;
-        
+    updateHoverMoveBehavior(tickDelta) {
+        this.stateElapsed += tickDelta;
+
         if (this.isHovering) {
-            // Hovering state
-            if (timeInState > this.hoverDuration) {
-                this.switchToMoving(currentTime);
+            if (this.stateElapsed >= this.hoverDuration) {
+                this.switchToMoving();
             } else {
-                this.updateHoveringMotion(currentTime);
+                this.updateHoveringMotion();
             }
         } else {
-            // Moving state
-            if (timeInState > this.moveDuration) {
-                this.switchToHovering(currentTime);
+            if (this.stateElapsed >= this.moveDuration) {
+                this.switchToHovering();
             } else {
                 this.updateMovingMotion();
             }
         }
     }
-    
-    // Switch to moving state
-    switchToMoving(currentTime) {
+
+    switchToMoving() {
         this.isHovering = false;
-        this.stateTimer = currentTime;
+        this.stateElapsed = 0;
         this.moveDuration = 2000 + Math.random() * 3000;
-        
-        // Choose random direction
         const angle = Math.random() * Math.PI * 2;
         this.velocity.x = Math.cos(angle) * this.speed;
         this.velocity.y = Math.sin(angle) * this.speed;
     }
-    
-    // Switch to hovering state
-    switchToHovering(currentTime) {
+
+    switchToHovering() {
         this.isHovering = true;
-        this.stateTimer = currentTime;
+        this.stateElapsed = 0;
         this.hoverDuration = 1000 + Math.random() * 2000;
-        
-        // Slow down
         this.velocity.x *= 0.3;
         this.velocity.y *= 0.3;
     }
-    
-    // Update hovering motion
-    updateHoveringMotion(currentTime) {
-        // Hover with minimal movement
-        this.velocity.x = Math.sin(currentTime * 0.001) * this.speed * 0.2;
-        this.velocity.y = Math.cos(currentTime * 0.001) * this.speed * 0.2;
+
+    updateHoveringMotion() {
+        // Use stateElapsed for oscillation so it's deterministic to game time
+        const t = this.stateElapsed * 0.001;
+        this.velocity.x = Math.sin(t) * this.speed * 0.2;
+        this.velocity.y = Math.cos(t) * this.speed * 0.2;
     }
     
     // Update moving motion
@@ -270,49 +255,26 @@ class ButterflyMapObject extends AnimatedMapObject {
         return element;
     }
     
-    update(deltaTime) {
-        // Update butterfly behavior
-        this.updateBehavior();
-        
-        // Update position based on velocity
+    // tickUpdate: AI, physics, direction state (no DOM)
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
+
+        this.updateBehavior(tickDelta);
+
         this.posX += this.velocity.x;
         this.posY += this.velocity.y;
-        
-        // Check boundaries
         this.checkBoundaries();
-        
-        // Update visual position
-        this.updatePosition();
-        
-        // Update direction based on movement
         this.updateDirection();
-        
-        // Update animation
-        super.update(deltaTime);
-        
-        // Apply bobbing effect
+    }
+
+    // update: visual-only (animation, bobbing, dirty marking)
+    update(deltaTime) {
+        super.update(deltaTime);    // calls markPositionDirty()
         this.applyBobbing();
-        
-        // Update debug attributes
-        this.updateDebugAttributes();
     }
-    
-    updatePosition() {
-        if (!this.element) return;
-        
-        this.element.style.left = `${this.posX}px`;
-        this.element.style.top = `${this.posY}px`;
-        
-        // Update z-index if parent has getZIndex method
-        if (this.parent && this.parent.getZIndex) {
-            const height = this.size.height;
-            this.element.style.zIndex = this.parent.getZIndex(this.posY, height);
-        }
-    }
-    
+
     updateDebugAttributes() {
         if (!this.element) return;
-        
         this.element.setAttribute('data-idle', this.isIdle);
         this.element.setAttribute('data-hovering', this.isHovering);
         this.element.setAttribute('data-fluttering', this.fluttering);

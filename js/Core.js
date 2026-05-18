@@ -321,38 +321,27 @@ class MyteCore {
         const updateFrame = (timestamp) => {
             if (!this.isInitialized) return;
 
-            // Calculate time since last frame
-            const deltaTime = timestamp - this.lastFrameTime;
-            // this.lastFrameTime = timestamp;
+            // Cap deltaTime to 100ms to prevent spiral-of-death after tab focus loss.
+            // Always update lastFrameTime so the accumulator stays accurate.
+            const deltaTime = Math.min(timestamp - this.lastFrameTime, 100);
+            this.lastFrameTime = timestamp;
 
-            // Update FPS counter
             this.updateFPSCounter(timestamp);
 
-            // Accumulate time for fixed update steps
+            // Accumulate time and drain with fixed-size steps
             this.tickAccumulator += deltaTime;
-
-
-            // Run fixed update steps
             while (this.tickAccumulator >= this.config.tickInterval) {
                 this.tickUpdate(this.config.tickInterval);
                 this.tickAccumulator -= this.config.tickInterval;
             }
 
-            // Run variable-rate updates
+            // Variable-rate render/animation update
             this.update(deltaTime);
 
-
-            // Update last frame time
-            if (deltaTime >= this.config.frameInterval) {
-                this.lastFrameTime = timestamp;
-            }
-
-
-            // Request next frame
             requestAnimationFrame(updateFrame);
         };
 
-        // Start the update loop
+        this.lastFrameTime = performance.now();
         requestAnimationFrame(updateFrame);
     }
 

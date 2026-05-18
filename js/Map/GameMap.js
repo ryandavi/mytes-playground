@@ -21,7 +21,8 @@ class GameMap {
         // Systems
         this.zoneManager = null;
         this.gridSystem = null;
-        this.particleSystem = null; // Will be initialized later
+        this.particleSystem = null;
+        this.renderer = new MapRenderer();
 
         // Map elements
         this.objects = [];
@@ -748,47 +749,54 @@ class GameMap {
         this.objects = this.objects.filter(obj => obj.active);
     }
 
-    // Fixed GameMap update method to properly handle culling
+    tickUpdate(tickDelta) {
+        if (!this.gridSystem) return;
+        for (const object of this.gridSystem.activeObjects) {
+            if (object.tickUpdate && !object.sleeping) {
+                object.tickUpdate(tickDelta);
+            }
+        }
+    }
+
     update(deltaTime) {
-        // OPTIMIZATION: Ensure GridSystem active objects are consistent
         if (this.gridSystem) {
-            // Every 60 frames (about 1 second), verify active objects for consistency
             this.updateFrameSkip = (this.updateFrameSkip + 1) % 60;
+
+            // Full consistency check once per second
             if (this.updateFrameSkip === 0) {
                 this.gridSystem.verifyActiveObjects(this.parent.camera);
             }
 
-            // Update culling based on camera - this will populate activeObjects
+            // Update culling (skips work when camera hasn't moved — see GridSystem)
             this.gridSystem.updateCulling(this.parent.camera);
-
-            // Get the active objects count directly from GridSystem
             this.activeObjectsCount = this.gridSystem.activeObjects.size;
 
-            // Update only active objects from grid system
-            this.gridSystem.activeObjects.forEach(object => {
-                if (object.update) {
+            // Animation / visual updates only — no DOM writes here
+            for (const object of this.gridSystem.activeObjects) {
+                if (object.update && !object.sleeping) {
                     object.update(deltaTime);
                 }
-            });
-        } else {
-            // Fallback to updating all objects if grid system isn't available
-            this.objects.forEach(object => {
-                if (object.update) {
-                    object.update(deltaTime);
-                }
-            });
+            }
 
+            // Batch-flush all dirty renderStates to the DOM in one pass
+            this.renderer.flush(this.gridSystem.activeObjects);
+        } else {
+            // Fallback when grid system isn't ready
+            for (const object of this.objects) {
+                if (object.update) object.update(deltaTime);
+            }
+            this.renderer.flush(this.objects);
             this.activeObjectsCount = this.objects.length;
         }
 
-        // Update zones - only for active mytes
-        this.parent.mytes.forEach(myte => {
-            if (myte.isActive) {
-                this.zoneManager.update(myte);
-            }
-        });
+        // Zone updates for active mytes
+        if (this.zoneManager) {
+            this.parent.mytes.forEach(myte => {
+                if (myte.isActive) this.zoneManager.update(myte);
+            });
+        }
 
-        // Clean up inactive objects periodically
+        // Periodic cleanup
         if (this.updateFrameSkip === 0) {
             this.removeInactiveObjects();
         }

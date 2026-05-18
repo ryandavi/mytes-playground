@@ -12,7 +12,7 @@ class PatrolGuardMapObject extends MovingMapObject {
         // Patrol state
         this.currentPointIndex = 0;
         this.waitTime = this.getConfig('waitTime', 1000);
-        this.lastWaitTime = 0;
+        this.waitElapsed = 0;   // accumulated ms since we started waiting
         this.isWaiting = false;
         this.detectionRadius = this.getConfig('detectionRadius', 150);
         
@@ -157,38 +157,27 @@ class PatrolGuardMapObject extends MovingMapObject {
         return this.alertStatus === 'pursuit' ? `pursuit_${direction}` : direction;
     }
     
-    // Update patrol logic
-    updatePatrol() {
+    // updatePatrol receives tickDelta so wait timing is game-loop-accurate
+    updatePatrol(tickDelta) {
         if (this.patrolPoints.length === 0) return;
-        
-        const currentTime = Date.now();
-        
+
         if (this.isWaiting) {
-            // Waiting at a patrol point
-            if (currentTime - this.lastWaitTime >= this.waitTime) {
+            this.waitElapsed += tickDelta;
+            if (this.waitElapsed >= this.waitTime) {
                 this.isWaiting = false;
+                this.waitElapsed = 0;
                 this.advanceToNextPatrolPoint();
             }
         } else {
-            // Moving to next patrol point
             if (this.isAtTarget()) {
                 this.isWaiting = true;
-                this.lastWaitTime = currentTime;
+                this.waitElapsed = 0;
                 this.stopMoving();
-                
-                // Play idle animation while waiting
-                if (this.hasAnimation('idle')) {
-                    this.playAnimation('idle');
-                }
+                if (this.hasAnimation('idle')) this.playAnimation('idle');
             } else {
-                // Continue moving to target
                 this.moveToward(this.targetX, this.targetY);
-                
-                // Play appropriate movement animation
                 const direction = this.getMovementDirection();
-                if (direction && this.hasAnimation(direction)) {
-                    this.playAnimation(direction);
-                }
+                if (direction && this.hasAnimation(direction)) this.playAnimation(direction);
             }
         }
     }
@@ -259,19 +248,21 @@ class PatrolGuardMapObject extends MovingMapObject {
         }
     }
     
-    // Override update method
-    update(deltaTime) {
-        // Detect nearby targets
+    // tickUpdate: AI, detection, patrol/pursuit logic (no DOM)
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
+
         this.detectTargets();
-        
-        // Handle behavior based on alert status
+
         if (this.alertStatus === 'pursuit') {
-            this.updatePursuit(deltaTime);
+            this.updatePursuit(tickDelta);
         } else {
-            this.updatePatrol();
+            this.updatePatrol(tickDelta);
         }
-        
-        // Call parent update (applies movement)
+    }
+
+    // update: visual only (animation handled by parent chain)
+    update(deltaTime) {
         super.update(deltaTime);
     }
     

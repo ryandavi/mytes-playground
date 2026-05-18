@@ -1,123 +1,135 @@
 class AnimationController {
     constructor(host, config) {
-        // Store reference to the host object
         this.host = host;
-        
-        // Animation configuration
         this.config = config;
-        
-        // Animation state
-        this.framePosition = 0;  // Position in frames array (not the frame itself)
-        this.lastFrameTime = 0;
+
+        this.framePosition = 0;
         this.currentAnimation = null;
-        
-        // Frame rate (default to 10fps or 100ms per frame)
         this.frameDelay = config.frameDelay || 100;
-        
+        this._elapsed = 0;
+
         // DOM elements
         this.element = null;
         this.sprite = null;
+
+        // Pause flag
+        this.paused = false;
     }
-    
 
     play(animationName, onComplete) {
         const animation = this.config.animations?.[animationName];
         if (!animation) return;
-        
+
         // Don't restart the same animation
         if (this.currentAnimation?.name === animationName) return;
-        
+
         this.currentAnimation = {
             name: animationName,
             frames: animation.frames,
             loop: animation.loop ?? true,
             onComplete: onComplete
         };
-        
-        // Reset frame position
+
         this.framePosition = 0;
-        
-        // Update visual immediately
+        this._elapsed = 0;
+
+        // Show first frame immediately
         this.updateFrame();
-        
-        // If single frame animation, call onComplete immediately
+
+        // Single-frame animations resolve instantly
         if (this.currentAnimation.frames.length === 1) {
             if (onComplete) onComplete();
-            // Keep current frame if it's meant to loop
-            if (!this.currentAnimation.loop) {
-                this.currentAnimation = null;
-            }
-        } else {
-            this.lastFrameTime = Date.now();
+            if (!this.currentAnimation.loop) this.currentAnimation = null;
         }
     }
-    
 
+    // deltaTime is now passed from the game loop — no wall-clock polling
     update(deltaTime) {
-        if (!this.currentAnimation || this.currentAnimation.frames.length === 1) return;
-        
-        const now = Date.now();
-        if (now - this.lastFrameTime > this.frameDelay) {
-            // Increment the position in the frames array
+        if (!this.currentAnimation || this.paused) return;
+        if (this.currentAnimation.frames.length <= 1) return;
+
+        this._elapsed += deltaTime;
+        if (this._elapsed >= this.frameDelay) {
+            // Consume one or more frame intervals (handles very slow frames gracefully)
+            this._elapsed -= this.frameDelay;
+            if (this._elapsed >= this.frameDelay) this._elapsed = 0; // avoid runaway catch-up
+
             this.framePosition = (this.framePosition + 1) % this.currentAnimation.frames.length;
-            this.lastFrameTime = now;
-            
-            this.updateFrame();
-            
-            // Handle animation completion
+
+            // Write bg-position into renderState instead of directly to DOM
+            this._computeFramePosition();
+
             if (this.framePosition === 0) {
-                if (this.currentAnimation.onComplete) {
-                    this.currentAnimation.onComplete();
-                }
-                if (!this.currentAnimation?.loop) {
-                    this.currentAnimation = null;
-                }
+                if (this.currentAnimation.onComplete) this.currentAnimation.onComplete();
+                if (!this.currentAnimation.loop) this.currentAnimation = null;
             }
         }
     }
-    
 
-    updateFrame() {
-        if (!this.element || !this.currentAnimation) return;
-        
+    // Computes the CSS background-position string and stores it on the host's renderState.
+    // DOM writes happen in MapRenderer.flush(), not here.
+    _computeFramePosition() {
+        if (!this.currentAnimation) return;
+
         let { frameWidth, frameHeight = frameWidth, scale = 1 } = this.config;
 
-        // for sprites that are larger than the object
-        if(this.host.getConfig('spriteConfig.spriteSheet.frameSize')){
+        if (this.host.getConfig('spriteConfig.spriteSheet.frameSize')) {
             frameWidth = this.host.getConfig('spriteConfig.spriteSheet.frameSize.width');
             frameHeight = this.host.getConfig('spriteConfig.spriteSheet.frameSize.height');
         }
 
-        // Get the current frame (could be a number or an array [x,y])
         const frame = this.currentAnimation.frames[this.framePosition];
-        
+        let bgPos;
+
         if (Array.isArray(frame)) {
-            // It's a 2D coordinate [x, y]
             const [x, y] = frame;
-            this.sprite.style.backgroundPosition = 
-                `${-x * frameWidth * scale}px ${-y * frameHeight * scale}px`;
+            bgPos = `${-x * frameWidth * scale}px ${-y * frameHeight * scale}px`;
         } else {
-            // It's a 1D index (original format)
-            this.sprite.style.backgroundPosition = `${-frame * frameWidth * scale}px 0px`;
+            bgPos = `${-frame * frameWidth * scale}px 0px`;
+        }
+
+        // Write into renderState for batched flushing
+        if (this.host.renderState) {
+            this.host.renderState.bgPosition = bgPos;
+            this.host.renderState.dirty = true;
+        } else if (this.sprite) {
+            // Fallback for objects that don't use renderState yet
+            this.sprite.style.backgroundPosition = bgPos;
+        }
+    }
+
+    // Called once during initial animation switch to show the correct frame immediately.
+    // Writes directly to DOM since this happens outside the normal update/render cycle.
+    updateFrame() {
+        if (!this.element || !this.currentAnimation) return;
+
+        let { frameWidth, frameHeight = frameWidth, scale = 1 } = this.config;
+
+        if (this.host.getConfig('spriteConfig.spriteSheet.frameSize')) {
+            frameWidth = this.host.getConfig('spriteConfig.spriteSheet.frameSize.width');
+            frameHeight = this.host.getConfig('spriteConfig.spriteSheet.frameSize.height');
+        }
+
+        const frame = this.currentAnimation.frames[this.framePosition];
+        let bgPos;
+
+        if (Array.isArray(frame)) {
+            const [x, y] = frame;
+            bgPos = `${-x * frameWidth * scale}px ${-y * frameHeight * scale}px`;
+        } else {
+            bgPos = `${-frame * frameWidth * scale}px 0px`;
+        }
+
+        if (this.host.renderState) {
+            this.host.renderState.bgPosition = bgPos;
+            this.host.renderState.dirty = true;
+        } else if (this.sprite) {
+            this.sprite.style.backgroundPosition = bgPos;
         }
     }
 
     setup(element) {
         this.element = element;
-
         this.sprite = element.querySelector('.sprite') || this.element;
-        
-        
-        // Set dimensions
-        if (this.config.frameWidth && this.config.scale) {
-            // this.element.style.width = `${this.config.frameWidth * this.config.scale}px`;
-            // const height = this.config.frameHeight || this.config.frameWidth;
-            //this.element.style.height = `${height * this.config.scale}px`;
-        }
-        
-        // Set up spritesheet background if provided
-        if (this.config.spriteSheet.url) {
-            // this.sprite.style.backgroundImage = `url(${this.config.spriteSheet.url})`;
-        }
     }
 }

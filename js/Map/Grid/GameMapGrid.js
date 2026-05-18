@@ -1170,22 +1170,29 @@ class GridSystem {
         const startGrid = this.worldToGrid(bounds.left, bounds.top);
         const endGrid = this.worldToGrid(bounds.right, bounds.bottom);
 
-        // Clear previously visible cells and active objects
+        // Build the new active set from visible grid cells
         this.visibleCells = [];
-        this.activeObjects.clear();
+        const nextActive = new Set();
 
-        // Gather visible cells and active objects from grid
         for (let x = Math.max(0, startGrid.x); x <= Math.min(endGrid.x, this.gridWidth - 1); x++) {
             for (let y = Math.max(0, startGrid.y); y <= Math.min(endGrid.y, this.gridHeight - 1); y++) {
                 const cell = this.grid[x][y];
                 this.visibleCells.push(cell);
-
-                // Add objects to active set
-                cell.objects.forEach(obj => {
-                    this.activeObjects.add(obj);
-                });
+                cell.objects.forEach(obj => nextActive.add(obj));
             }
         }
+
+        // Wake objects that just entered the viewport
+        for (const obj of nextActive) {
+            if (!this.activeObjects.has(obj) && obj.wake) obj.wake();
+        }
+
+        // Sleep objects that just left the viewport
+        for (const obj of this.activeObjects) {
+            if (!nextActive.has(obj) && obj.sleep) obj.sleep();
+        }
+
+        this.activeObjects = nextActive;
 
         // Check for any objects that might have been missed
         const missedCount = this.ensureObjectActivation(bounds);

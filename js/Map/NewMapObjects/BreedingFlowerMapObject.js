@@ -4,8 +4,8 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
         
         // State flags
         this.pollinationState = 'ready';
-        this.lastBreedingAttempt = 0;
-        this.breedingCooldown = this.getConfig('breedingCooldown', 5000); // 5 seconds between breeding attempts
+        this._breedingElapsed = 0;      // accumulated ms since last attempt
+        this.breedingCooldown = this.getConfig('breedingCooldown', 5000);
         
         // Cache DOM elements
         this.colorOverlay = null;
@@ -39,14 +39,13 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
                          obj.growthStage === 'mature');
     }
 
-    attemptBreeding() {
-        const now = Date.now();
-        if (this.pollinationState !== 'ready' || 
-            !this.genes ||
-            this.growthStage !== 'mature' ||
-            now - this.lastBreedingAttempt < this.breedingCooldown) return;
+    // tickDelta is passed from tickUpdate so the cooldown is game-loop-driven
+    attemptBreeding(tickDelta) {
+        if (this.pollinationState !== 'ready' || !this.genes || this.growthStage !== 'mature') return;
 
-        this.lastBreedingAttempt = now;
+        this._breedingElapsed += tickDelta;
+        if (this._breedingElapsed < this.breedingCooldown) return;
+        this._breedingElapsed = 0;
         
         const partners = this.getBreedingPartners();
         if (!partners.length) return;
@@ -148,16 +147,15 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
         }
     }
 
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
+        if (!this.fullyGrown) return;
+        this.attemptBreeding(tickDelta);
+        this.applySeasonalEffects();
+    }
+
     update(deltaTime) {
         super.update(deltaTime);
-        
-        // Skip breeding logic if not fully grown
-        if (!this.fullyGrown) return;
-        
-        this.attemptBreeding();
-        
-        // Apply seasonal effects
-        this.applySeasonalEffects();
     }
     
     applySeasonalEffects() {
