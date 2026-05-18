@@ -241,6 +241,7 @@ class ContainerManager {
     // Container-specific utility methods
     getZIndex(y, height) {
         let maxHeight = this.getMaxDimensions().height;
+        // Consider zoom in this calculation if needed
         return Math.floor(((y + height) / Math.max(maxHeight, 1)) * 100);
     }
 
@@ -266,9 +267,15 @@ class ContainerManager {
     drawTargetDot() {
         const mouse = this.getLocalMouse();
         var cursorElement = this.element.querySelector('.cursor-dot');
-        cursorElement.style.left = mouse.x + 'px';
-        cursorElement.style.top = mouse.y + 'px';
-    }
+        
+        // Convert world coordinates back to screen coordinates
+        const screenX = mouse.x + this.camera.posX;
+        const screenY = mouse.y + this.camera.posY;
+        
+        // Apply the position
+        cursorElement.style.left = screenX + 'px';
+        cursorElement.style.top = screenY + 'px';
+      }
 
     getOffset(el) {
         let rect = el.getBoundingClientRect();
@@ -507,7 +514,7 @@ class ContainerManager {
         if (myte !== null) {
             myte.duplicate.classList.add('active');
             myte.setStartTime();
-            this.ui.updateHud();
+            this.ui.hudManager.update();
         }
 
         // Set other mytes to free roam
@@ -522,7 +529,7 @@ class ContainerManager {
             myte.start();
         }
 
-        this.ui.updateMytesList(myte);
+        this.ui.myteListManager.updateMytesList(myte);
 
         // Update UI
         this.ui.debugMenu.updateButtons();

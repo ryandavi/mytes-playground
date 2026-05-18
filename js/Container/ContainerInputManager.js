@@ -11,13 +11,9 @@ class ContainerInputManager {
     this.isEnabled = true;
     this.lastActiveTime = Date.now();
 
-    // Set up keyboard shortcuts
+    // Set up event handlers
     this.setupKeyboardShortcuts();
-
-    // Set up click handling
     this.setupClickHandling();
-
-    // Setup scroll handling
     this.setupScrollHandling();
 
     // Track inactivity
@@ -27,6 +23,10 @@ class ContainerInputManager {
     }, 10000); // Check every 10 seconds
   }
 
+  //==================================================
+  // INPUT ENABLE/DISABLE METHODS
+  //==================================================
+  
   /**
    * Disable all input handling
    * This is called during map transitions or other moments when input should be ignored
@@ -58,6 +58,10 @@ class ContainerInputManager {
     this.setLastActive();
   }
 
+  //==================================================
+  // ACTIVITY TRACKING METHODS
+  //==================================================
+  
   /**
    * Set the last active time to now
    * This is used to track user activity
@@ -71,13 +75,13 @@ class ContainerInputManager {
    * @param {number} timeout The timeout in milliseconds
    * @returns {boolean} Whether the user's status has changed
    */
-  checkInactive(timeout) {
-    const wasActive = this.isUserActive();
+  checkInactive() {
+    // Don't call this.checkInactive() as it creates an infinite recursion!
+    // Instead, directly implement the functionality without recursion
     const elapsedTime = Date.now() - this.lastActiveTime;
-    const isNowActive = elapsedTime < timeout;
-
-    // Return true if status changed
-    return wasActive !== isNowActive;
+    const isNowActive = elapsedTime < this.inactivityTimeout;
+    
+    return false; // Always return false for backward compatibility
   }
 
   /**
@@ -89,10 +93,30 @@ class ContainerInputManager {
     return elapsedTime < this.inactivityTimeout;
   }
 
-  checkInactive() {
-    return false;
+  /**
+   * Check for user inactivity and notify container
+   */
+  checkInactivity() {
+    const wasActive = this.isUserActive();
+    this.inputSystem.checkInactivity(this.inactivityTimeout);
+    const isActive = this.inputSystem.isUserActive();
+
+    // If activity state changed
+    if (wasActive !== isActive) {
+      if (isActive) {
+        // User became active
+        this.container.handleUserActive();
+      } else {
+        // User became inactive
+        this.container.handleUserInactive();
+      }
+    }
   }
 
+  //==================================================
+  // EVENT SETUP METHODS
+  //==================================================
+  
   /**
    * Set up keyboard shortcuts
    */
@@ -170,6 +194,28 @@ class ContainerInputManager {
     });
   }
 
+  /**
+   * Handle escape key
+   */
+  handleEscape() {
+    // Clear selection
+    this.container.ui.setSelected(null);
+
+    // Handle carrying state
+    if (this.container.activeMyte?.queue.isCarrying()) {
+      this.container.activeMyte.queue.addPutDownMyte();
+    }
+  }
+
+  //==================================================
+  // ELEMENT INTERACTION METHODS
+  //==================================================
+  
+  /**
+   * Check if an element is clickable
+   * @param {HTMLElement} element Element to check
+   * @returns {boolean} Whether element is clickable
+   */
   isClickableElement(element) {
     // Ignore elements with ignore class
     if (element.classList && element.classList.contains('ignore')) {
@@ -186,55 +232,86 @@ class ContainerInputManager {
   }
 
   /**
-   * Handle escape key
+   * Check if a point is within an element's bounds
+   * @param {number} x X coordinate
+   * @param {number} y Y coordinate
+   * @param {HTMLElement} element Element to check
+   * @returns {boolean} Whether point is within element
    */
-  handleEscape() {
-    // Clear selection
-    this.container.ui.setSelected(null);
-
-    // Handle carrying state
-    if (this.container.activeMyte?.queue.isCarrying()) {
-      this.container.activeMyte.queue.addPutDownMyte();
-    }
+  isPointInElement(x, y, element) {
+    const rect = element.getBoundingClientRect();
+    
+    return (
+      x >= rect.left &&
+      x <= rect.right &&
+      y >= rect.top &&
+      y <= rect.bottom
+    );
   }
 
   /**
-   * Get mouse position in local container coordinates
-   * @param {Object} element Optional element for offset
-   * @returns {Object} Local coordinates {x, y}
+   * Check if the current mouse position is within an element
+   * @param {HTMLElement} element Element to check
+   * @returns {boolean} Whether mouse is over element
    */
-  getLocalMouse(element = null) {
-    const mousePos = this.inputSystem.getMousePosition();
+  isMouseOverElement(element) {
+    const mousePos = this.getMousePosition();
+    return this.isPointInElement(mousePos.x, mousePos.y, element);
+  }
+
+  //==================================================
+  // COORDINATE TRANSFORMATION METHODS
+  //==================================================
+  
+  /**
+   * Convert screen coordinates to world coordinates
+   * Core coordinate transformation function
+   * @param {number} x X coordinate
+   * @param {number} y Y coordinate
+   * @param {Object} options Additional options
+   * @returns {Object} World coordinates {x, y}
+   */
+  screenToWorldCoordinates(x, y, options = {}) {
     const containerRect = this.container.getContainerRect();
-    const cameraOffset = this.container.camera ? {
+    const zoomLevel = this.container.camera ? this.container.camera.zoomLevel : 1;
+    const cameraOffset = (options.includeCamera !== false && this.container.camera) ? {
       x: this.container.camera.posX,
       y: this.container.camera.posY
     } : { x: 0, y: 0 };
-
+    
+    // Calculate element offset
+    const elementOffset = options.element ? {
+      x: options.element.getRect ? options.element.getRect().width / 2 : 0,
+      y: options.element.getRect ? options.element.getRect().height / 2 : 0
+    } : { x: 0, y: 0 };
+    
+    // Calculate additional offset
+    const additionalOffset = options.additionalOffset || { x: 0, y: 0 };
+    
     return {
-      x: mousePos.x - containerRect.left -
-        (element ? (element.getRect().width / 2) : 0) -
-        cameraOffset.x,
-      y: mousePos.y - containerRect.top -
-        (element ? (element.getRect().height / 2) : 0) -
-        cameraOffset.y
+      x: (x - containerRect.left) / zoomLevel - elementOffset.x - cameraOffset.x - additionalOffset.x,
+      y: (y - containerRect.top) / zoomLevel - elementOffset.y - cameraOffset.y - additionalOffset.y
     };
   }
 
   /**
-   * Check if mouse is within container
-   * @returns {boolean}
+   * Convert world coordinates to screen coordinates
+   * @param {number} x X coordinate
+   * @param {number} y Y coordinate
+   * @returns {Object} Screen coordinates {x, y}
    */
-  isMouseInContainer() {
-    const mousePos = this.inputSystem.getMousePosition();
+  worldToScreenCoordinates(x, y) {
     const containerRect = this.container.getContainerRect();
-
-    return (
-      mousePos.x >= containerRect.left &&
-      mousePos.x <= containerRect.right &&
-      mousePos.y >= containerRect.top &&
-      mousePos.y <= containerRect.bottom
-    );
+    const zoomLevel = this.container.camera ? this.container.camera.zoomLevel : 1;
+    const cameraOffset = this.container.camera ? {
+      x: this.container.camera.posX,
+      y: this.container.camera.posY
+    } : { x: 0, y: 0 };
+    
+    return {
+      x: (x + cameraOffset.x) * zoomLevel + containerRect.left,
+      y: (y + cameraOffset.y) * zoomLevel + containerRect.top
+    };
   }
 
   /**
@@ -254,28 +331,11 @@ class ContainerInputManager {
   }
 
   /**
-   * Get mouse position relative to the container, ignoring camera offset
-   * @param {Object} element Optional element for offset
-   * @returns {Object} Container-relative coordinates {x, y}
+   * Get the current press state
+   * @returns {boolean} Whether mouse/touch is currently pressed
    */
-  getContainerMouse(element = null) {
-    const mousePos = this.inputSystem.getMousePosition();
-    const containerRect = this.container.getContainerRect();
-
-    return {
-      x: mousePos.x - containerRect.left -
-        (element ? (element.getRect().width / 2) : 0),
-      y: mousePos.y - containerRect.top -
-        (element ? (element.getRect().height / 2) : 0)
-    };
-  }
-
-  /**
-   * Get mouse position in global/page coordinates
-   * @returns {Object} Mouse position {x, y}
-   */
-  getGlobalMouse() {
-    return this.inputSystem.getMousePosition();
+  isPressed() {
+    return this.inputSystem.isMouseButtonPressed();
   }
 
   /**
@@ -284,107 +344,65 @@ class ContainerInputManager {
    * @returns {Object} Element-relative coordinates {x, y}
    */
   getElementMouse(element) {
-    const mousePos = this.inputSystem.getMousePosition();
+    const mousePos = this.getMousePosition();
     const rect = element.getBoundingClientRect();
-
+    const zoomLevel = this.container.camera ? this.container.camera.zoomLevel : 1;
+  
     return {
-      x: mousePos.x - rect.left - window.scrollX,
-      y: mousePos.y - rect.top - window.scrollY
+      x: (mousePos.x - rect.left - window.scrollX) / zoomLevel,
+      y: (mousePos.y - rect.top - window.scrollY) / zoomLevel
     };
   }
 
+  //==================================================
+  // COMPATIBILITY METHODS (TO BE PHASED OUT)
+  //==================================================
+  
   /**
+   * @deprecated Use screenToWorldCoordinates instead
+   * Get mouse position in local container coordinates
+   * @param {Object} element Optional element for offset
+   * @returns {Object} Local coordinates {x, y}
+   */
+  getLocalMouse(element = null) {
+    const mousePos = this.getMousePosition();
+    return this.screenToWorldCoordinates(mousePos.x, mousePos.y, { element });
+  }
+
+  /**
+   * @deprecated Use screenToWorldCoordinates instead
+   * Get mouse position relative to the container, ignoring camera offset
+   * @param {Object} element Optional element for offset
+   * @returns {Object} Container-relative coordinates {x, y}
+   */
+  getContainerMouse(element = null) {
+    const mousePos = this.getMousePosition();
+    return this.screenToWorldCoordinates(mousePos.x, mousePos.y, { element, includeCamera: false });
+  }
+
+  /**
+   * @deprecated Use getMousePosition instead
+   * Get mouse position in global/page coordinates
+   * @returns {Object} Mouse position {x, y}
+   */
+  getGlobalMouse() {
+    return this.getMousePosition();
+  }
+
+  /**
+   * @deprecated Use screenToWorldCoordinates instead
    * Get mouse position in local coordinates with camera offset
    * Similar to getLocalMouse but with customizable offset behavior
    * @param {Object} options Configuration options
    * @returns {Object} Adjusted coordinates {x, y}
    */
   getAdjustedMouse(options = {}) {
-    const mousePos = this.inputSystem.getMousePosition();
-    const containerRect = this.container.getContainerRect();
-
-    // Default options
-    const opts = {
-      includeCamera: true,
-      elementOffset: null,
-      additionalOffset: { x: 0, y: 0 },
-      ...options
-    };
-
-    // Calculate camera offset
-    const cameraOffset = (opts.includeCamera && this.container.camera) ? {
-      x: this.container.camera.posX,
-      y: this.container.camera.posY
-    } : { x: 0, y: 0 };
-
-    // Calculate element offset
-    const elementOffset = opts.elementOffset ? {
-      x: opts.elementOffset.getRect().width / 2,
-      y: opts.elementOffset.getRect().height / 2
-    } : { x: 0, y: 0 };
-
-    return {
-      x: mousePos.x - containerRect.left - elementOffset.x -
-        cameraOffset.x - opts.additionalOffset.x,
-      y: mousePos.y - containerRect.top - elementOffset.y -
-        cameraOffset.y - opts.additionalOffset.y
-    };
-  }
-
-  /**
-   * Check if a point is within an element's bounds
-   * @param {number} x X coordinate
-   * @param {number} y Y coordinate
-   * @param {HTMLElement} element Element to check
-   * @returns {boolean} Whether point is within element
-   */
-  isPointInElement(x, y, element) {
-    const rect = element.getBoundingClientRect();
-    return (
-      x >= rect.left &&
-      x <= rect.right &&
-      y >= rect.top &&
-      y <= rect.bottom
-    );
-  }
-
-  /**
-   * Check if the current mouse position is within an element
-   * @param {HTMLElement} element Element to check
-   * @returns {boolean} Whether mouse is over element
-   */
-  isMouseOverElement(element) {
-    const mousePos = this.inputSystem.getMousePosition();
-    return this.isPointInElement(mousePos.x, mousePos.y, element);
-  }
-
-  /**
-   * Get the current press state
-   * @returns {boolean} Whether mouse/touch is currently pressed
-   */
-  isPressed() {
-    return this.inputSystem.isMouseButtonPressed();
-  }
-
-
-  /**
-   * Check for user inactivity
-   */
-  checkInactivity() {
-    const wasActive = this.inputSystem.isUserActive();
-    this.inputSystem.checkInactivity(this.inactivityTimeout);
-    const isActive = this.inputSystem.isUserActive();
-
-    // If activity state changed
-    if (wasActive !== isActive) {
-      if (isActive) {
-        // User became active
-        this.container.handleUserActive();
-      } else {
-        // User became inactive
-        this.container.handleUserInactive();
-      }
-    }
+    const mousePos = this.getMousePosition();
+    return this.screenToWorldCoordinates(mousePos.x, mousePos.y, {
+      element: options.elementOffset,
+      includeCamera: options.includeCamera,
+      additionalOffset: options.additionalOffset
+    });
   }
 
   /**

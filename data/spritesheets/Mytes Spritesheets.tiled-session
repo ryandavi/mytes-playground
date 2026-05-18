@@ -3,7 +3,7 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "",
+    "activeFile": "House.tmx",
     "expandedProjectPaths": [
         "."
     ],
@@ -16,8 +16,8 @@
             "scale": 0.75,
             "selectedLayer": 2,
             "viewCenter": {
-                "x": 73.33333333333333,
-                "y": 388
+                "x": 716.6666666666665,
+                "y": 121.33333333333337
             }
         },
         "HouseNew.tmx": {
@@ -39,7 +39,7 @@
             "scale": 1,
             "selectedLayer": 6,
             "viewCenter": {
-                "x": 236,
+                "x": 235.5,
                 "y": 417
             }
         },

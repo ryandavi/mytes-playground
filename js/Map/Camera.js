@@ -135,20 +135,20 @@ class Camera {
 		
 		// Only proceed if zoom level is changing
 		if (newZoom !== this.targetZoomLevel) {
-			// Calculate zoom point in world coordinates
-			const worldX = mouseX - this.posX;
-			const worldY = mouseY - this.posY;
-			
-			// Calculate new target position to zoom toward cursor
-			const zoomRatio = newZoom / this.targetZoomLevel;
-			this.setTarget(
-				mouseX - worldX * zoomRatio,
-				mouseY - worldY * zoomRatio
-			);
-			
-			this.setZoomLevel(newZoom);
+		  // Calculate zoom point in world coordinates - adjust for current zoom
+		  const worldX = (mouseX - this.posX) / this.zoomLevel;
+		  const worldY = (mouseY - this.posY) / this.zoomLevel;
+		  
+		  // Calculate new target position to zoom toward cursor
+		  const zoomRatio = newZoom / this.targetZoomLevel;
+		  this.setTarget(
+			mouseX - worldX * zoomRatio * this.zoomLevel,
+			mouseY - worldY * zoomRatio * this.zoomLevel
+		  );
+		  
+		  this.setZoomLevel(newZoom);
 		}
-	}
+	  }
 	
 	// ========== DRAG METHODS ==========
 	
