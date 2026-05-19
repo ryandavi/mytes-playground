@@ -281,11 +281,34 @@ class ContainerManager {
 
     isMouseInContainer() {
         const mousePos = this.inputHandler.getMousePosition();
-        return Utility.isIntersecting(
+        if (!Utility.isIntersecting(
             mousePos.x,
             mousePos.y,
             this.getContainerRect()
-        );
+        )) {
+            return false;
+        }
+
+        const mouseState = this.inputHandler?.inputSystem?.state?.mouse;
+        const clientX = mouseState?.clientX ?? (mousePos.x - window.scrollX);
+        const clientY = mouseState?.clientY ?? (mousePos.y - window.scrollY);
+        const hoveredElement = document.elementFromPoint(clientX, clientY);
+
+        if (!hoveredElement || !this.element.contains(hoveredElement)) {
+            return false;
+        }
+
+        if (!this.camera || !this.inputHandler) {
+            return true;
+        }
+
+        const world = this.inputHandler.screenToWorldCoordinates(mousePos.x, mousePos.y);
+        const canvasRect = this.getCanvasRect();
+
+        return world.x >= 0 &&
+            world.y >= 0 &&
+            world.x <= canvasRect.width &&
+            world.y <= canvasRect.height;
     }
 
     drawTargetDot() {
@@ -470,10 +493,6 @@ class ContainerManager {
                     break;
                 }
             }
-        }
-
-        if (next === null) {
-            this.camera.setMode(CAMERA_FOLLOW_MODES.CURSOR_EDGE);
         }
 
         this.setActiveMyte(next);

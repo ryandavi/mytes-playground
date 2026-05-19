@@ -479,10 +479,35 @@ setMode(newGoal = null) {
 		}
 	}
 
+	faceTowardsPoint(x, y, directionWeight = 2) {
+		const dx = x - (this.posX + this.size.width / 2);
+		const dy = y - (this.posY + this.size.height / 2);
+		const distance = Math.sqrt(dx * dx + dy * dy);
+
+		if (!Number.isFinite(distance) || distance === 0) {
+			return this.direction;
+		}
+
+		const directionX = dx / distance;
+		const directionY = dy / distance;
+		const weightedDirectionX = directionX * directionWeight;
+		const weightedDirectionY = directionY;
+		const direction = Math.abs(weightedDirectionX) > Math.abs(weightedDirectionY)
+			? (weightedDirectionX > 0 ? DIRECTION.EAST : DIRECTION.WEST)
+			: (weightedDirectionY > 0 ? DIRECTION.SOUTH : DIRECTION.NORTH);
+
+		this.setDirection(direction);
+		return direction;
+	}
+
 	getDirection(directionWeight = 2) {
 		let dx = this.targetX - this.posX;
 		let dy = this.targetY - this.posY;
 		let distance = Math.sqrt(dx * dx + dy * dy);
+
+		if (!Number.isFinite(distance) || distance === 0) {
+			return this.direction;
+		}
 
 		const directionX = dx / distance;
 		const directionY = dy / distance;

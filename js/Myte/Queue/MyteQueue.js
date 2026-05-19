@@ -31,6 +31,11 @@ class MyteQueue {
             options.duration = ActionClass.metadata.defaultDuration;
         }
 
+        if (ActionClass.metadata.requiresTarget && (options.target == null)) {
+            console.warn(`[MyteQueue] action "${actionId}" requires a target but got`, options.target);
+            console.trace('[MyteQueue] queued without target');
+        }
+
         this.queue.push(new ActionClass(this.myte, options));
         return this; // chainable
     }
@@ -45,6 +50,10 @@ class MyteQueue {
 
         if (options.duration == null) {
             options.duration = ActionClass.metadata.defaultDuration;
+        }
+
+        if (this.isDoingAction && this.queue[0]?.interrupt) {
+            this.queue[0].interrupt();
         }
 
         this.queue.unshift(new ActionClass(this.myte, options));
@@ -68,6 +77,9 @@ class MyteQueue {
     }
 
     clear() {
+        if (this.isDoingAction && this.queue[0]?.interrupt) {
+            this.queue[0].interrupt();
+        }
         this.queue        = [];
         this.isDoingAction = false;
     }

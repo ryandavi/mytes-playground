@@ -469,6 +469,10 @@ class ContainerInputManager {
     return this.inputSystem.getMousePosition();
   }
 
+  isMouseInContainer() {
+    return this.container?.isMouseInContainer?.() ?? false;
+  }
+
   /**
    * Get mouse press duration
    * @returns {number} Duration in ms

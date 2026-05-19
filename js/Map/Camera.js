@@ -707,9 +707,6 @@ class Camera {
 						containerRect,
 						this.parent.activeMyte.size
 					);
-				} else if (isMouseInContainer) {
-					// Fallback to cursor edge if no active myte
-					this.followCursorEdge(mouse.x, mouse.y, canvasRect, containerRect);
 				}
 				break;
 		}

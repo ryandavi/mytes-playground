@@ -194,7 +194,6 @@
 /* MAP OBJECTS */
 .container-wrapper > .container > .canvas {
   border-radius: var(--border-radius);
-  overflow: hidden;
 }
 .container-wrapper > .container > .canvas > .layer > .mapObject {
   position: fixed;

@@ -17,12 +17,12 @@ class ActionManager {
         const ActionClass = this.actions.get(actionId);
         if (!ActionClass) return null;
 
-        const options = {};
-
-        if (ActionClass.getRequiredOptions) {
+        // Only use getRequiredOptions if the action defines its own (not the base no-op)
+        if (Object.prototype.hasOwnProperty.call(ActionClass, 'getRequiredOptions')) {
             return { ...ActionClass.metadata.defaultOptions, ...ActionClass.getRequiredOptions(selected, active) };
         }
 
+        const options = {};
         if (ActionClass.metadata.requiresTarget) {
             options.target = selected;
         }

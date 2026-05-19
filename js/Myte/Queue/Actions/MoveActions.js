@@ -131,6 +131,10 @@ class AStarMoveAction extends MyteAction {
         return active && selected && !active?.queue?.isCarrying();
     }
 
+    static getRequiredOptions(selected, active) {
+        return { target: selected };
+    }
+
     start() {
         super.start();
         this.targetPoints = null;
@@ -138,16 +142,20 @@ class AStarMoveAction extends MyteAction {
         this._actionComplete = false;
 
         if (!this.myte?.pathfinder) {
+            console.warn(`[ASTAR] start: no pathfinder — completing immediately`);
             this._actionComplete = true;
             return;
         }
 
         const target = this.getTargetPosition();
         if (!target) {
+            console.warn(`[ASTAR] start: could not resolve target position from`, this.target, `— completing immediately`);
+            console.trace('[ASTAR] null target call stack');
             this._actionComplete = true;
             return;
         }
 
+        console.log(`[ASTAR] start: from=(${this.myte.posX.toFixed(1)},${this.myte.posY.toFixed(1)}) to=(${target.x.toFixed(1)},${target.y.toFixed(1)})`);
         this._finalTarget = target;
         this._buildPath(this.myte.posX, this.myte.posY, target);
     }
@@ -158,6 +166,7 @@ class AStarMoveAction extends MyteAction {
         const path = myte.pathfinder.findPath(myte, fromX, fromY, to.x, to.y, effectiveOptions);
 
         if (!path?.length) {
+            console.warn(`[ASTAR] _buildPath: pathfinder returned no path from=(${fromX.toFixed(1)},${fromY.toFixed(1)}) to=(${to.x.toFixed(1)},${to.y.toFixed(1)}) — completing`);
             this._actionComplete = true;
             return;
         }
@@ -173,22 +182,25 @@ class AStarMoveAction extends MyteAction {
         if (this.targetPoints.length > 0 &&
             Math.abs((this.targetPoints[0].x + myte.size.width  / 2) - cx) < 1 &&
             Math.abs((this.targetPoints[0].y + myte.size.height / 2) - cy) < 1) {
+            console.log(`[ASTAR] _buildPath: dropped first waypoint (already there)`);
             this.targetPoints.shift();
         }
 
         if (this.targetPoints.length === 0) {
+            console.warn(`[ASTAR] _buildPath: targetPoints empty after filtering — completing`);
             this._actionComplete = true;
             return;
         }
 
+        console.log(`[ASTAR] _buildPath: ${path.length} raw pts → ${this.targetPoints.length} waypoints. First=(${this.targetPoints[0].x.toFixed(1)},${this.targetPoints[0].y.toFixed(1)}) Last=(${this.targetPoints[this.targetPoints.length-1].x.toFixed(1)},${this.targetPoints[this.targetPoints.length-1].y.toFixed(1)})`);
         this.currentTargetIndex = 0;
         myte.setTarget(this.targetPoints[0].x, this.targetPoints[0].y);
     }
 
     update() {
         if (this._actionComplete) return true;
-        if (!this.myte?.isActive) return true;
-        if (!this.targetPoints?.length) return true;
+        if (!this.myte?.isActive) { console.warn(`[ASTAR] update: myte inactive — completing`); return true; }
+        if (!this.targetPoints?.length) { console.warn(`[ASTAR] update: no targetPoints — completing`); return true; }
 
         if (this.myte.is_at_target()) {
             this._stuckCount = 0;
@@ -325,14 +337,20 @@ class GoToObjectAction extends PositionableAction {
     // Priority: action-level override → target.getApproachConfig() → target.getApproachMode() → 'side'
     _resolveApproachConfig() {
         if (this.approachConfig != null) {
-            return this._normalizeConfig(this.approachConfig);
+            const cfg = this._normalizeConfig(this.approachConfig);
+            console.log(`[APPROACH] config source=action-override`, cfg);
+            return cfg;
         }
         const targetCfg = this.target?.getApproachConfig?.();
         if (targetCfg != null) {
-            return this._normalizeConfig(targetCfg);
+            const cfg = this._normalizeConfig(targetCfg);
+            console.log(`[APPROACH] config source=getApproachConfig raw=`, targetCfg, `resolved=`, cfg);
+            return cfg;
         }
         const mode = this.target?.getApproachMode?.() ?? 'side';
-        return { ...APPROACH_CONFIGS[mode] ?? APPROACH_CONFIGS.side };
+        const cfg = { ...APPROACH_CONFIGS[mode] ?? APPROACH_CONFIGS.side };
+        console.log(`[APPROACH] config source=getApproachMode mode="${mode}"`, cfg);
+        return cfg;
     }
 
     // Resolve allowedSides to an ordered array, accounting for the 'front' special case.
@@ -396,21 +414,26 @@ class GoToObjectAction extends PositionableAction {
         const spriteRect = this.getTargetRect(this.target, 'sprite');
 
         if (!targetRect) {
+            console.warn(`[APPROACH] buildApproachPlan: no targetRect — alignTo="${cfg.alignTo}" target=`, this.target);
             this.targetPos = null;
             this.targetPoints = null;
             return;
         }
 
         const myteRect = this.myte.getRect();
+        console.log(`[APPROACH] buildApproachPlan target="${this.target?.constructor?.name ?? this.target?.id}" alignTo="${cfg.alignTo}" targetRect=`, {...targetRect}, `myteRect=`, {...myteRect}, `mytePos=(${this.myte.posX.toFixed(1)},${this.myte.posY.toFixed(1)})`);
+
         this.targetCenter = {
             x: spriteRect.x + spriteRect.width  / 2,
             y: spriteRect.y + spriteRect.height / 2
         };
 
         const candidates = this.getCandidatePositions(targetRect, myteRect, cfg);
+        console.log(`[APPROACH] candidates (${candidates.length}):`, candidates.map((c, i) => `[${i}] (${c.x.toFixed(1)},${c.y.toFixed(1)})`).join('  '));
         const bestPath   = this.findBestPath(candidates);
 
         if (bestPath) {
+            console.log(`[APPROACH] bestPath → targetPos=(${bestPath.targetPos.x.toFixed(1)},${bestPath.targetPos.y.toFixed(1)}) score=${bestPath.score.toFixed(1)} waypoints=${bestPath.targetPoints.length}`);
             this.targetPos    = bestPath.targetPos;
             this.targetPoints = bestPath.targetPoints;
             return;
@@ -420,6 +443,7 @@ class GoToObjectAction extends PositionableAction {
             x: this.targetCenter.x - myteRect.width  / 2,
             y: this.targetCenter.y - myteRect.height / 2
         };
+        console.log(`[APPROACH] no path found — falling back to candidate[0] targetPos=(${this.targetPos.x.toFixed(1)},${this.targetPos.y.toFixed(1)})`);
         this.targetPoints = null;
     }
 
@@ -429,11 +453,14 @@ class GoToObjectAction extends PositionableAction {
         const seen     = new Set();
         const candidates = [];
 
+        console.log(`[APPROACH] sides order: [${sides.join(', ')}]`);
         for (const side of sides) {
             const raw      = this.calculatePosition(myteRect, targetRect, side, posOpts);
             const clamped  = this.adjustPositionToBounds(raw, myteRect);
             const key      = `${Math.round(clamped.x)},${Math.round(clamped.y)}`;
-            if (seen.has(key)) continue;
+            const dup = seen.has(key);
+            console.log(`[APPROACH]   side=${side} raw=(${raw.x.toFixed(1)},${raw.y.toFixed(1)}) clamped=(${clamped.x.toFixed(1)},${clamped.y.toFixed(1)})${dup ? ' [DUPLICATE - skipped]' : ''}`);
+            if (dup) continue;
             seen.add(key);
             candidates.push(clamped);
         }
@@ -442,16 +469,27 @@ class GoToObjectAction extends PositionableAction {
     }
 
     findBestPath(candidates) {
-        if (!this.myte?.pathfinder || !candidates.length) return null;
+        if (!this.myte?.pathfinder) {
+            console.warn(`[APPROACH] findBestPath: no pathfinder on myte`);
+            return null;
+        }
+        if (!candidates.length) {
+            console.warn(`[APPROACH] findBestPath: no candidates`);
+            return null;
+        }
 
         let bestPath = null;
 
-        for (const candidate of candidates) {
+        for (let i = 0; i < candidates.length; i++) {
+            const candidate = candidates[i];
             const endCX = candidate.x + (this.myte.size.width  / 2);
             const endCY = candidate.y + (this.myte.size.height / 2);
             const path  = this.myte.pathfinder.findPath(this.myte, this.myte.posX, this.myte.posY, endCX, endCY);
 
-            if (!path?.length) continue;
+            if (!path?.length) {
+                console.log(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) → no path`);
+                continue;
+            }
 
             const targetPoints = path
                 .map(wp => ({
@@ -465,6 +503,7 @@ class GoToObjectAction extends PositionableAction {
                 });
 
             const score = this.getPathScore(targetPoints);
+            console.log(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) → path ok rawPts=${path.length} filteredPts=${targetPoints.length} score=${score.toFixed(1)}${(!bestPath || score < bestPath.score) ? ' ← best so far' : ''}`);
             if (!bestPath || score < bestPath.score) {
                 bestPath = { targetPos: candidate, targetPoints, score };
             }
@@ -486,14 +525,7 @@ class GoToObjectAction extends PositionableAction {
 
     faceTarget() {
         if (!this.targetCenter) return;
-        const dx = this.targetCenter.x - (this.myte.posX + this.myte.size.width  / 2);
-        const dy = this.targetCenter.y - (this.myte.posY + this.myte.size.height / 2);
-
-        if (Math.abs(dx) > Math.abs(dy)) {
-            this.myte.setDirection(dx > 0 ? DIRECTION.EAST : DIRECTION.WEST);
-        } else {
-            this.myte.setDirection(dy > 0 ? DIRECTION.SOUTH : DIRECTION.NORTH);
-        }
+        this.myte.faceTowardsPoint(this.targetCenter.x, this.targetCenter.y, 1);
     }
 
     _moveToward() {
