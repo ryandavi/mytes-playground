@@ -38,10 +38,16 @@ class MyteTouchHandler extends DragHandler {
                 const newX = world.x;
                 const newY = world.y;
 
-                // Move myte
-                myte.setTarget(newX, newY, myte.limitToContainer);
-                myte.setPosition(newX, newY, myte.limitToContainer);
-                myte.setSpritePosition(newX, newY, myte.limitToContainer);
+                // Always limit to canvas during drag using collider bounds
+                if (!this._loggedBounds) {
+                    this._loggedBounds = true;
+                    console.log('[drag bounds] canvas.clientWidth:', myte.parent.canvas?.clientWidth,
+                        'canvas.clientHeight:', myte.parent.canvas?.clientHeight,
+                        'getMaxDimensions:', myte.parent.getMaxDimensions());
+                }
+                myte.setTarget(newX, newY, true);
+                myte.setPosition(newX, newY, true);
+                myte.setSpritePosition(newX, newY, true);
 
                 // Update home drop target
                 const dropTargetRect = myte.parent.getRect(myte.dropTarget);

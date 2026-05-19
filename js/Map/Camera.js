@@ -11,7 +11,7 @@ class Camera {
 		this.targetX = 0;
 		this.targetY = 0;
 		this.easing = 10;
-		this.draggingEasing = 75;
+		this.draggingEasing = 20;
 		
 		// Zoom properties
 		this.canZoom = true;

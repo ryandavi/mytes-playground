@@ -794,10 +794,13 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 		let container = this.parent.getContainerRect();
 
 		if (limit) {
-			x = Math.max(x, 0);
-			y = Math.max(y, 0);
-			x = Math.min(x, maxDimensions.width - rect.width);
-			y = Math.min(y, maxDimensions.height - rect.height);
+			const col = this.collider;
+			const canvasW = this.parent.canvas?.clientWidth || maxDimensions.width;
+			const canvasH = this.parent.canvas?.clientHeight || maxDimensions.height;
+			x = Math.max(x, -(col?.offsetX ?? 0));
+			y = Math.max(y, -(col?.offsetY ?? 0));
+			x = Math.min(x, canvasW - (col?.offsetX ?? 0) - (col?.width ?? rect.width));
+			y = Math.min(y, canvasH - (col?.offsetY ?? 0) - (col?.height ?? rect.height));
 		} else {
 			// full page
 			x = Math.max(x, -container.left);
@@ -849,10 +852,13 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 		let container = this.parent.getContainerRect();
 
 		if (limit) {
-			x = Math.max(x, 0);
-			y = Math.max(y, 0);
-			x = Math.min(x, maxDimensions.width - rect.width);
-			y = Math.min(y, maxDimensions.height - rect.height);
+			const col = this.collider;
+			const canvasW = this.parent.canvas?.clientWidth || maxDimensions.width;
+			const canvasH = this.parent.canvas?.clientHeight || maxDimensions.height;
+			x = Math.max(x, -(col?.offsetX ?? 0));
+			y = Math.max(y, -(col?.offsetY ?? 0));
+			x = Math.min(x, canvasW - (col?.offsetX ?? 0) - (col?.width ?? rect.width));
+			y = Math.min(y, canvasH - (col?.offsetY ?? 0) - (col?.height ?? rect.height));
 		} else {
 			// full page
 			x = Math.max(x, -container.left);
@@ -886,11 +892,13 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 
 
 		if (limit) {
-
-			x = Math.max(x, 0);
-			y = Math.max(y, 0);
-			x = Math.min(x, maxDimensions.width - rect.width);
-			y = Math.min(y, maxDimensions.height - rect.height);
+			const col = this.collider;
+			const canvasW = this.parent.canvas?.clientWidth || maxDimensions.width;
+			const canvasH = this.parent.canvas?.clientHeight || maxDimensions.height;
+			x = Math.max(x, -(col?.offsetX ?? 0));
+			y = Math.max(y, -(col?.offsetY ?? 0));
+			x = Math.min(x, canvasW - (col?.offsetX ?? 0) - (col?.width ?? rect.width));
+			y = Math.min(y, canvasH - (col?.offsetY ?? 0) - (col?.height ?? rect.height));
 		} else {
 			// full page
 			x = Math.max(x, -container.left);
