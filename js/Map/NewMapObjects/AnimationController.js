@@ -60,8 +60,12 @@ class AnimationController {
             this._computeFramePosition();
 
             if (this.framePosition === 0) {
-                if (this.currentAnimation.onComplete) this.currentAnimation.onComplete();
-                if (!this.currentAnimation.loop) this.currentAnimation = null;
+                // Snapshot before calling onComplete — the callback may start a new animation
+                // (or a single-frame non-looping one that nulls currentAnimation inside play()),
+                // which would make reading .loop on the original reference crash.
+                const anim = this.currentAnimation;
+                if (anim.onComplete) anim.onComplete();
+                if (this.currentAnimation === anim && !anim.loop) this.currentAnimation = null;
             }
         }
     }

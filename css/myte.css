@@ -402,9 +402,6 @@
   opacity: 0;
   top: 12px;
   position: relative;
-  /* Blink animation for low battery */
-  /* Pulse animation for critical battery */
-  /* Charging animation */
 }
 .interactive-myte > .inner-wrapper > .above-wrapper > .battery.visible {
   opacity: 1;
@@ -443,6 +440,9 @@
     opacity: 1;
   }
 }
+.interactive-myte > .inner-wrapper > .above-wrapper > .battery {
+  /* Blink animation for low battery */
+}
 @keyframes battery-blink {
   from {
     opacity: 1;
@@ -450,6 +450,9 @@
   to {
     opacity: 0.3;
   }
+}
+.interactive-myte > .inner-wrapper > .above-wrapper > .battery {
+  /* Pulse animation for critical battery */
 }
 @keyframes battery-pulse {
   from {
@@ -460,6 +463,9 @@
     opacity: 0.3;
     filter: drop-shadow(0px 0px 3% rgb(255, 0, 0));
   }
+}
+.interactive-myte > .inner-wrapper > .above-wrapper > .battery {
+  /* Charging animation */
 }
 @keyframes battery-charging {
   0%, 100% {

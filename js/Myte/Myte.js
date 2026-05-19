@@ -192,12 +192,8 @@ class Myte {
 		}
 
 		if (this.parent?.gameMap?.gridSystem) {
-            this.pathfinder = new AStarPathfinder(this.parent.gameMap.gridSystem);
-
-            // Optional: Configure this Myte's pathfinder instance if needed later
-            // e.g., this.pathfinder.setDebugMode(some_myte_specific_flag);
+            this.initPathfinder(this.parent.gameMap.gridSystem);
             console.log(`Myte ${this.id}: Pathfinder initialized.`);
-
         } else {
             console.error(`Myte ${this.id}: Cannot initialize pathfinder - GridSystem not found.`);
         }
@@ -337,12 +333,7 @@ class Myte {
 
 	updatePathfinder() {
 		if (this.parent?.gameMap?.gridSystem) {
-			// Dispose of the old pathfinder if it exists
-			if (this.pathfinder) {
-				this.pathfinder.dispose();
-			}
-			// Create a new pathfinder with the new grid system
-			this.pathfinder = new AStarPathfinder(this.parent.gameMap.gridSystem);
+			this.initPathfinder(this.parent.gameMap.gridSystem);
 			console.log(`Myte ${this.id}: Pathfinder updated for new map.`);
 		} else {
 			console.error(`Myte ${this.id}: Cannot update pathfinder - GridSystem not found.`);
@@ -543,20 +534,7 @@ class Myte {
 		return distance2.toFixed(2);
 	}
 
-	canAutoOpenCollider(collider) {
-		return !!(
-			collider &&
-			this.capabilities?.can_open_doors &&
-			['DOOR', 'GATE'].includes(collider.type) &&
-			typeof collider.open === 'function' &&
-			!collider.isOpen
-		);
-	}
-
-	tryOpenCollider(collider) {
-		if (!this.canAutoOpenCollider(collider)) return false;
-		return collider.open() !== false;
-	}
+	// canAutoOpenCollider and tryOpenCollider are provided by EntityMixin (Entity.js).
 
 
 // Add this defensive check to the move_toward_target method
@@ -651,10 +629,10 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 			// Try to move on X axis
 			if (doXAxis) {
 				const newX = this.posX + moveX;
-				
+
 				if (this.canMoveToPosition(newX, this.posY)) {
 					this.posX = newX;
-					
+
 					if (this.checkForCollisions) {
 						const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
 						for (const collider of potentialColliders) {
@@ -672,16 +650,25 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 					}
 				} else {
 					xBlocked = true;
+					// Grid cell is blocked — temporarily step into it to find door colliders there.
+					if (this.checkForCollisions && this.parent?.gameMap?.gridSystem) {
+						this.posX = newX;
+						const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
+						this.posX = originalX;
+						for (const collider of potentialColliders) {
+							this.tryOpenCollider(collider);
+						}
+					}
 				}
 			}
-	
+
 			// Try to move on Y axis
 			if (doYAxis) {
 				const newY = this.posY + moveY;
-				
+
 				if (this.canMoveToPosition(this.posX, newY)) {
 					this.posY = newY;
-					
+
 					if (this.checkForCollisions) {
 						const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
 						for (const collider of potentialColliders) {
@@ -699,6 +686,15 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 					}
 				} else {
 					yBlocked = true;
+					// Grid cell is blocked — temporarily step into it to find door colliders there.
+					if (this.checkForCollisions && this.parent?.gameMap?.gridSystem) {
+						this.posY = newY;
+						const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
+						this.posY = originalY;
+						for (const collider of potentialColliders) {
+							this.tryOpenCollider(collider);
+						}
+					}
 				}
 			}
 			
@@ -1680,3 +1676,6 @@ canMoveToPosition(newX, newY) {
 
 
 }
+
+// Shared pathfinding and capability methods (initPathfinder, tryOpenCollider, etc.)
+applyEntityMixin(Myte);

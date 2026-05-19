@@ -220,6 +220,7 @@ MapObjectFactory.registry
     .register('BREEDING_FLOWER', BreedingFlowerMapObject)
     .register('BALL', BallMapObject)
     .register('PATROL_GUARD', PatrolGuardMapObject)
+    .register('NPC', NpcMapObject)
     .register('BUTTERFLY', ButterflyMapObject)
     .register('BED', MapObject)
     .register('DOOR', DoorMapObject)

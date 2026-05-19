@@ -582,6 +582,20 @@ class GameMap {
         } catch (e) {
             console.warn(`[GameMap] Could not add default objects:`, e);
         }
+
+        // Spawn a default NPC that will aggro and chase active mytes.
+        try {
+            this.addObject('NPC', 'slime', 400, 300, {
+                configOverrides: {
+                    aggroRadius: 250,
+                    chaseRadius: 500,
+                    wanderRadius: 80,
+                    speed: 1.8
+                }
+            });
+        } catch (e) {
+            console.warn(`[GameMap] Could not add default NPC:`, e);
+        }
     }
 
     setBackground(background) {

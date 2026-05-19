@@ -23,6 +23,10 @@ class AStarMoveAction extends MyteAction {
         this.targetPoints = null;
         this.currentTargetIndex = 0;
         this._actionComplete = false;
+        this._finalTarget = null;
+        this._stuckCount = 0;
+        this._prevPosX = null;
+        this._prevPosY = null;
     }
 
     getTargetPosition() {
@@ -102,12 +106,14 @@ class AStarMoveAction extends MyteAction {
         const startX = myte.posX;
         const startY = myte.posY;
         const target = this.getTargetPosition();
-        
+
         if (!target) {
             console.error(`AStarMoveAction (${myte.id}): Could not determine target position.`);
             this._actionComplete = true;
             return;
         }
+
+        this._finalTarget = target;
 
         // 3. Pathfinding Options
         const effectivePathOptions = {
@@ -175,6 +181,7 @@ class AStarMoveAction extends MyteAction {
 
         // Check if we've reached the current target point
         if (this.myte.is_at_target()) {
+            this._stuckCount = 0;
             this.currentTargetIndex++;
             
             // Check if we've reached the end of the path
@@ -205,8 +212,63 @@ class AStarMoveAction extends MyteAction {
         } else {
             this.myte.move_toward_target();
         }
-        
+
+        // Stuck detection: if position hasn't changed in ~45 frames, recompute the path.
+        // This handles cases like waiting for a door animation to finish — once the door
+        // opens and the grid becomes walkable, the new path routes through it correctly.
+        const movedDist = Math.abs(this.myte.posX - (this._prevPosX ?? this.myte.posX))
+                        + Math.abs(this.myte.posY - (this._prevPosY ?? this.myte.posY));
+        if (movedDist < 0.1) {
+            this._stuckCount++;
+            if (this._stuckCount >= 45) {
+                console.log(`AStarMoveAction (${this.myte.id}): stuck for ${this._stuckCount} frames, recomputing path.`);
+                if (!this._recomputePath()) {
+                    this._actionComplete = true;
+                }
+            }
+        } else {
+            this._stuckCount = 0;
+        }
+        this._prevPosX = this.myte.posX;
+        this._prevPosY = this.myte.posY;
+
         return false; // Still in progress
+    }
+
+    _recomputePath() {
+        const myte = this.myte;
+        const pathfinder = myte?.pathfinder;
+        if (!pathfinder || !this._finalTarget) return false;
+
+        const effectivePathOptions = {
+            ...myte.pathfindingOptions,
+            ...(this.options?.pathfindingOptions || {})
+        };
+
+        const path = pathfinder.findPath(
+            myte, myte.posX, myte.posY,
+            this._finalTarget.x, this._finalTarget.y,
+            effectivePathOptions
+        );
+
+        if (!path || path.length === 0) {
+            console.warn(`AStarMoveAction (${myte.id}): Recompute found no path, giving up.`);
+            return false;
+        }
+
+        this.targetPoints = path.map(waypoint => ({
+            x: waypoint.x - myte.size.width / 2,
+            y: waypoint.y - myte.size.height / 2
+        }));
+        this.currentTargetIndex = 0;
+        this._stuckCount = 0;
+
+        if (this.targetPoints.length > 0) {
+            console.log(`AStarMoveAction (${myte.id}): Recomputed path, ${this.targetPoints.length} waypoints.`);
+            myte.setTarget(this.targetPoints[0].x, this.targetPoints[0].y);
+            return true;
+        }
+        return false;
     }
 
     interrupt() {

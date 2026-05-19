@@ -214,23 +214,6 @@
   transition: background-color 0.2s;
   padding: var(--padding);
   border-radius: var(--border-width);
-  /*
-        &.movement {
-            border-left: 3px solid #3498db;
-        }
-
-        &.expression {
-            border-left: 3px solid #e74c3c;
-        }
-
-        &.interaction {
-            border-left: 3px solid #2ecc71;
-        }
-
-        &.other {
-            border-left: 3px solid #95a5a6;
-        }
-  */
 }
 .queueMenu .queue-item + .queue-item {
   margin-top: 4px;
@@ -323,6 +306,25 @@
 }
 .queueMenu .queue-item.current .progress .bar {
   background: rgba(0, 128, 0, 0.2);
+}
+.queueMenu .queue-item {
+  /*
+        &.movement {
+            border-left: 3px solid #3498db;
+        }
+
+        &.expression {
+            border-left: 3px solid #e74c3c;
+        }
+
+        &.interaction {
+            border-left: 3px solid #2ecc71;
+        }
+
+        &.other {
+            border-left: 3px solid #95a5a6;
+        }
+  */
 }
 
 .container-wrapper > .hand-controls {
@@ -439,7 +441,6 @@
   background: #f5f5f5;
   border-radius: 4px;
   margin: var(--padding);
-  /* Different states */
 }
 .container-wrapper > .sidebar > .action-controls > .selected-info .interaction-type {
   font-size: 0.8em;
@@ -461,6 +462,9 @@
 }
 .container-wrapper > .sidebar > .action-controls > .selected-info .target-info .name {
   font-weight: 500;
+}
+.container-wrapper > .sidebar > .action-controls > .selected-info {
+  /* Different states */
 }
 .container-wrapper > .sidebar > .action-controls > .selected-info.self-selected {
   background: #e8f0fe;
@@ -526,7 +530,6 @@
   opacity: 0;
   transform: translateY(5px);
   transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
-  /* Position classes */
 }
 .modal-window.floating {
   position: fixed;
@@ -535,6 +538,9 @@
   pointer-events: all;
   transform: translateY(0px);
   opacity: 1;
+}
+.modal-window {
+  /* Position classes */
 }
 .modal-window.position-center {
   top: 50%;
@@ -798,10 +804,12 @@
   height: 100vh;
   height: 100dvh;
   /* Header - full width at the top */
-  /* Hand controls - left side */
 }
 .container-wrapper.fullscreen > .header {
   grid-area: header;
+}
+.container-wrapper.fullscreen {
+  /* Hand controls - left side */
 }
 .container-wrapper.fullscreen > .hand-controls {
   grid-area: hand-controls;
@@ -862,12 +870,14 @@
   pointer-events: none;
   /* Allow clicking through the container */
   /* Container for when in game */
-  /* For mobile/smaller screens */
 }
 .container-wrapper .toast-container {
   position: absolute;
   bottom: 20px;
   right: 20px;
+}
+.toast-container {
+  /* For mobile/smaller screens */
 }
 @media (max-width: 480px) {
   .toast-container {
@@ -895,7 +905,6 @@
   will-change: transform, opacity, height;
   /* Performance optimization */
   cursor: pointer;
-  /* Toast types */
 }
 .toast.visible {
   transform: translateX(0);
@@ -912,6 +921,9 @@
   padding-bottom: 0;
   margin-top: 0;
   border-width: 0;
+}
+.toast {
+  /* Toast types */
 }
 .toast.info {
   background-color: #e8f0fe;

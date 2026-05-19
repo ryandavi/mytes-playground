@@ -386,6 +386,57 @@ const TYPE_CONFIGS = {
 		}
 	},
 
+	// ── NPC entity (A* pathfinding, aggro AI) ────────────────────────────────────
+
+	NPC: {
+		category: 'moving',
+		variants: ['slime', 'ghost', 'goblin'],
+		renderType: 'animated',
+		collision: false,   // does not block other objects
+		renderPriority: 2,
+		speed: 1.5,
+		aggroRadius: 220,
+		chaseRadius: 450,
+		alertDuration: 800,
+		pathRefreshInterval: 900,
+		wanderRadius: 120,
+		wanderInterval: 3500,
+		pathWaypointThreshold: 20,
+		capabilities: {
+			can_open_doors: false,
+			can_wade: false,
+			can_swim: false,
+			follows_paths: true,
+			fire_resistance: false
+		},
+		size: { width: 64, height: 64 },
+		spriteConfig: {
+			spriteSheet: {
+				url: 'images/MapObjects/npc_slime.gif',
+				size: { width: 256, height: 128 }
+			},
+			animations: {
+				idle: { frames: [[0, 0], [1, 0]], loop: true },
+				S:    { frames: [[0, 0], [1, 0], [2, 0], [3, 0]], loop: true },
+				N:    { frames: [[0, 1], [1, 1], [2, 1], [3, 1]], loop: true },
+				E:    { frames: [[0, 0], [1, 0], [2, 0], [3, 0]], loop: true },
+				W:    { frames: [[0, 1], [1, 1], [2, 1], [3, 1]], loop: true }
+			},
+			default: 'idle'
+		},
+		variantConfigs: {
+			ghost: {
+				speed: 2,
+				aggroRadius: 300,
+				capabilities: { can_swim: true, can_wade: true }
+			},
+			goblin: {
+				speed: 2.5,
+				capabilities: { can_open_doors: true, can_wade: true }
+			}
+		}
+	},
+
 	BUTTERFLY: {
 		category: 'moving',
 		variants: ['blue_butterfly', 'yellow_butterfly', 'small'],
