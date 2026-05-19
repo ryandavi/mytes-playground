@@ -1,95 +1,78 @@
 class MyteQueue {
     constructor(myte) {
-        this.myte = myte;
+        this.myte  = myte;
         this.queue = [];
         this.isDoingAction = false;
-        this.max_total_time = 1500;
-        
     }
+
+    // ─── Core API ─────────────────────────────────────────────────────────────
 
     count() {
         return this.queue.length;
     }
 
-    addMoveToElement(element = null, duration = 1) {
-
-        const destination = this.myte.parent.getLocalOffset(element);
-        this.add('move', {
-            target: [{
-                x: destination.x,
-                y: destination.y
-            }],
-            mapObject: element,
-            duration: 300
-        });
+    isEmpty() {
+        return this.queue.length === 0;
     }
 
-    addPickupMyte(target) {
-        if (!target || target.queue.isBeingCarried()) return false;
-
-        this.add("go_to_object", {
-            target: target
-        });
-
-        this.add("carry_pickup", {
-            target: target,
-            duration: 100
-        });
-
-        return true;
+    getCurrentAction() {
+        return this.queue[0] ?? null;
     }
 
-    addFollowObject(element) {
-        this.add("follow_object", {
-            target: element
-        });
-    }
-
-    addPutDownMyte() {
-        const currentAction = this.getCurrentAction();
-        if (!(currentAction instanceof CarryAction) || !currentAction.target) return false;
-
-        this.clear();
-
-        this.add("carry_putdown", {
-            target: currentAction.target,
-            duration: 100
-        });
-
-        return true;
-    }
-
+    // Add an action to the end of the queue
     add(actionId, options = {}) {
         const ActionClass = ActionManager.actions.get(actionId);
         if (!ActionClass) {
-            console.error(`Unknown action type: ${actionId}`);
-            return;
+            console.error(`[MyteQueue] Unknown action: ${actionId}`);
+            return this;
         }
 
-        // Use metadata for default duration if not specified
-        if (!options.duration) {
+        if (options.duration == null) {
             options.duration = ActionClass.metadata.defaultDuration;
         }
 
-        // Handle mood effects
-        if (ActionClass.metadata.affectsMood) {
-            this.myte.stats.updateMood(ActionClass.metadata.moodEffect);
-        }
-
-        const action = new ActionClass(this.myte, options);
-        this.queue.push(action);
+        this.queue.push(new ActionClass(this.myte, options));
+        return this; // chainable
     }
 
-    addToBeginning(actionType, options = {}) {
-        const ActionClass = this.actionTypes[actionType];
+    // Insert an action at the front — interrupts the current action cleanly
+    addToFront(actionId, options = {}) {
+        const ActionClass = ActionManager.actions.get(actionId);
         if (!ActionClass) {
-            console.error(`Unknown action type: ${actionType}`);
-            return;
+            console.error(`[MyteQueue] Unknown action: ${actionId}`);
+            return this;
         }
 
-        const action = new ActionClass(this.myte, options);
-        this.queue.unshift(action);
+        if (options.duration == null) {
+            options.duration = ActionClass.metadata.defaultDuration;
+        }
+
+        this.queue.unshift(new ActionClass(this.myte, options));
+        this.isDoingAction = false; // force re-start on next update
+        return this;
     }
+
+    // Clear queue and immediately start a new action
+    interrupt(actionId, options = {}) {
+        this.clear();
+        return this.add(actionId, options);
+    }
+
+    // Queue a sequence of [actionId, options] pairs in order
+    addSequence(steps) {
+        for (const step of steps) {
+            const [actionId, options = {}] = Array.isArray(step) ? step : [step, {}];
+            this.add(actionId, options);
+        }
+        return this;
+    }
+
+    clear() {
+        this.queue        = [];
+        this.isDoingAction = false;
+    }
+
+    // ─── Update loop ──────────────────────────────────────────────────────────
 
     update() {
         if (this.queue.length === 0) return;
@@ -102,155 +85,209 @@ class MyteQueue {
         }
 
         if (currentAction.update()) {
-            
-            this.removeCurrentAction();
+            this.queue.shift();
+            this.isDoingAction = false;
+            currentAction.complete(); // always called, regardless of queue state
+
             if (this.queue.length > 0) {
-                // go to next item
                 this.queue[0].start();
                 this.isDoingAction = true;
-            }else{
-                // no more, run complete
-                currentAction.complete();
             }
         }
     }
 
-    removeCurrentAction() {
-        this.queue.shift();
-        this.isDoingAction = false;
-    }
-
-    clear() {
-        this.queue = [];
-        this.isDoingAction = false;
-    }
-
-    getCurrentAction() {
-        return this.queue[0] || null;
-    }
-
-    isEmpty() {
-        return this.queue.length === 0;
-    }
-
-    // Convenience methods for common actions
-    addIdle(duration = 200) {
-        this.add('idle', { duration });
-    }
-
-    addExpression(type, duration = 50, repeat = 1) {
-        this.add('expression', { action_type: type, duration, repeat });
-    }
-
-    addExpressionToBeginning(type, duration = 50, repeat = 1) {
-        this.addToBeginning('expression', { action_type: type, duration, repeat });
-    }
-
-    addDance(duration = 2000) {
-        this.add('dance', { duration });
-    }
-
-    addSimpleSleep(duration = 5000) {
-        this.add('simple_sleep', { duration });
-    }
-
-    addFollowMouse() {
-        this.add('follow_mouse');
-    }
-
-    // Add convenience methods to MyteQueue:
-    addJump(height = 100) {
-        this.add('jump', { height });
-    }
-
-    addCircle(centerX, centerY, radius = 50, duration = 3000) {
-        this.add('circle', { centerX, centerY, radius, duration });
-    }
-
-    addEatElement(element) {
-        this.addMoveToElement(element);
-        this.add('eat_element', { element });
-    }
-
-    addZigzag(direction = { x: 1, y: 0 }, duration = 2000) {
-        this.add('zigzag', { direction, duration });
-    }
-
-    addSpin(rotations = 2, duration = 1000) {
-        this.add('spin', { rotations, duration });
-    }
-
-    addShowAffection(targetMyte) {
-        this.add('show_affection', { targetMyte });
-    }
-
-    addPlayTag(targetMyte, isIt = true) {
-        this.add('play_tag', { targetMyte, isIt });
-    }
-
-    addRunLaps(element, repeat = 5) {
-        // Calculate targets based on element
-        const targets = this.calculateLapTargets(element);
-        this.add('run_laps', { target: targets, repeat });
-    }
-
-    // Add convenience methods to MyteQueue:
-    addRunAway(target, duration = -1) {
-        this.add('run_away', { target, duration });
-    }
-
-    addHide(hideTarget, scaryObject, duration = 5000) {
-        this.add('hide', { hideTarget, scaryObject, duration });
-    }
-
-    addSleep(duration = 5000) {
-        this.add('sleep', { duration });
-    }
-
-    addInspect(target, duration = 3000) {
-        this.add('inspect', { target, duration });
-    }
-
-    addPlayFetch(throwable, throwStrength = 10) {
-        this.add('play_fetch', {
-            throwable,
-            throwStrength
-        });
-    }
-
-    addCarry(targetMyte) {
-        if (!targetMyte.queue.isBeingCarried()) {
-            this.add('pickup', { target: targetMyte });
-            this.add('carry', { target: targetMyte });
-        }
-    }
+    // ─── Carry state queries ──────────────────────────────────────────────────
 
     isBeingCarried() {
-        const current = this.getCurrentAction();
-        return current instanceof BeingCarriedAction;
+        return this.getCurrentAction() instanceof BeingCarriedAction;
     }
 
     isCarrying() {
-        const current = this.getCurrentAction();
-        return current instanceof CarryAction || current instanceof HoldBallAction;
+        const action = this.getCurrentAction();
+        return action instanceof CarryAction || action instanceof HoldBallAction;
     }
 
-    addPickupBall(ball) {
-        if (!ball || ball.isPickedUp || this.isCarrying()) return false;
-        ball.pendingPickup = true;
-        const centerX = ball.posX + ball.size.width / 2;
-        const centerY = ball.posY + ball.size.height / 2;
-        this.add('astar-move', { target: { x: centerX, y: centerY } });
-        this.add('hold-ball', { ball });
+    // ─── Convenience methods ──────────────────────────────────────────────────
+
+    addIdle(duration = 200) {
+        return this.add('idle', { duration });
+    }
+
+    addExpression(type, duration = 50, repeat = 1) {
+        return this.add('expression', { action_type: type, duration, repeat });
+    }
+
+    addDance(duration = 2000) {
+        return this.add('dance', { duration });
+    }
+
+    addSimpleSleep(duration = 5000) {
+        return this.add('simple_sleep', { duration });
+    }
+
+    addSleep(duration = 5000) {
+        return this.add('sleep', { duration });
+    }
+
+    addFollowMouse() {
+        return this.add('follow_mouse');
+    }
+
+    addFollowObject(target) {
+        return this.add('follow_object', { target });
+    }
+
+    addJump(height = 100) {
+        return this.add('jump', { height });
+    }
+
+    addCircle(centerX, centerY, radius = 50, duration = 3000) {
+        return this.add('circle', { centerX, centerY, radius, duration });
+    }
+
+    addZigzag(direction = { x: 1, y: 0 }, duration = 2000) {
+        return this.add('zigzag', { direction, duration });
+    }
+
+    addSpin(rotations = 2, duration = 1000) {
+        return this.add('spin', { rotations, duration });
+    }
+
+    addInspect(target, duration = 3000) {
+        return this.add('inspect', { target, duration });
+    }
+
+    // Approach then eat
+    addEatElement(target) {
+        return this.addSequence([
+            ['go_to_object', { target }],
+            ['eat_element',  { target }]
+        ]);
+    }
+
+    // Approach and open a treasure chest
+    addOpenChest(chest) {
+        return this.addSequence([
+            ['go_to_object', { target: chest }],
+            ['open_chest',   { target: chest }]
+        ]);
+    }
+
+    // Approach and smell a flower
+    addSmellFlower(flower) {
+        return this.addSequence([
+            ['go_to_object',  { target: flower }],
+            ['smell_flower',  { target: flower }]
+        ]);
+    }
+
+    // Approach a fountain and drink
+    addDrinkFromFountain(fountain) {
+        return this.addSequence([
+            ['go_to_object',    { target: fountain }],
+            ['drink_fountain',  { target: fountain }]
+        ]);
+    }
+
+    // Approach and water a crop plant
+    addWaterPlant(plant) {
+        return this.addSequence([
+            ['go_to_object', { target: plant }],
+            ['water_plant',  { target: plant }]
+        ]);
+    }
+
+    // Approach and harvest a crop
+    addHarvest(plant) {
+        return this.addSequence([
+            ['go_to_object', { target: plant }],
+            ['harvest',      { target: plant }]
+        ]);
+    }
+
+    // Approach then show affection
+    addShowAffection(targetMyte) {
+        return this.addSequence([
+            ['go_to_object',  { target: targetMyte }],
+            ['show_affection', { target: targetMyte }]
+        ]);
+    }
+
+    // Approach then greet (greet action pushes receive onto the target's queue)
+    addGreet(targetMyte) {
+        return this.addSequence([
+            ['go_to_object', { target: targetMyte }],
+            ['greet',        { target: targetMyte }]
+        ]);
+    }
+
+    // Stand near and watch another Myte
+    addWatch(targetMyte, duration = 5000) {
+        return this.addSequence([
+            ['go_to_object', { target: targetMyte }],
+            ['watch',        { target: targetMyte, duration }]
+        ]);
+    }
+
+    addPlayTag(targetMyte, isIt = true) {
+        return this.add('play_tag', { target: targetMyte, isIt });
+    }
+
+    addPlayFetch(throwable, throwStrength = 10) {
+        return this.add('play_fetch', { throwable, throwStrength });
+    }
+
+    addRunAway(target, duration = -1) {
+        return this.add('run_away', { target, duration });
+    }
+
+    addHide(hideTarget, scaryObject, duration = 5000) {
+        return this.add('hide', { hideTarget, scaryObject, duration });
+    }
+
+    // Approach then pick up another Myte
+    addPickupMyte(target) {
+        if (!target || target.queue.isBeingCarried()) return false;
+
+        this.addSequence([
+            ['go_to_object',  { target }],
+            ['carry_pickup',  { target, duration: 100 }]
+        ]);
         return true;
     }
 
-    calculateLapTargets(element) {
-        // Implementation to calculate targets for running laps
-        // This would return an array of target positions around the element
-        return [
-            { x: element.offsetLeft - 50, y: element.offsetTop },
-            { x: element.offsetLeft + element.offsetWidth + 50, y: element.offsetTop }
-        ];
+    // Put down the currently carried Myte
+    addPutDownMyte() {
+        const currentAction = this.getCurrentAction();
+        if (!(currentAction instanceof CarryAction) || !currentAction.target) return false;
+
+        this.clear();
+        this.add('carry_putdown', { target: currentAction.target, duration: 100 });
+        return true;
+    }
+
+    // Pick up a ball using A* then hold it
+    addPickupBall(ball) {
+        if (!ball || ball.isPickedUp || this.isCarrying()) return false;
+        ball.pendingPickup = true;
+        this.addSequence([
+            ['astar-move', { target: { x: ball.posX + ball.size.width / 2, y: ball.posY + ball.size.height / 2 } }],
+            ['hold-ball',  { ball }]
+        ]);
+        return true;
+    }
+
+    // Move to a position using A*
+    addAStarMove(target) {
+        return this.add('astar-move', { target });
+    }
+
+    // Low-level: move to a DOM element position (legacy)
+    addMoveToElement(element = null) {
+        const destination = this.myte.parent.getLocalOffset(element);
+        return this.add('move', {
+            target: [{ x: destination.x, y: destination.y }],
+            duration: 300
+        });
     }
 }

@@ -1,4 +1,8 @@
 class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
+    getApproachMode() {
+        return 'front';
+    }
+
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         this.teleportTarget = options.teleportTarget || null;

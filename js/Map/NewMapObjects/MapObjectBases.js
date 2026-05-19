@@ -61,6 +61,14 @@ class RangeInteractiveAnimatedMapObject extends AnimatedMapObject {
         return 'go_to_object';
     }
 
+    // 'side'     — stop at the nearest horizontal side (default)
+    // 'adjacent' — stop just outside, no overlap (flowers, fountains)
+    // 'center'   — walk into the center (portals)
+    // 'front'    — face directly toward the object (doors, NPCs)
+    getApproachMode() {
+        return 'side';
+    }
+
     enqueueApproach(myte, onComplete = null) {
         if (!myte?.queue) return false;
 

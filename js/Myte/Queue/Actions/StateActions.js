@@ -1,4 +1,4 @@
-// Action for dancing
+// Perform a happy dance — moves in small steps around a base position
 class DanceAction extends MyteAction {
     static metadata = {
         id: 'dance',
@@ -16,13 +16,17 @@ class DanceAction extends MyteAction {
             stepDuration: 250
         }
     };
+
+    static canPerform(selected, active) {
+        return selected === active && !active?.queue.isCarrying();
+    }
+
     constructor(myte, options) {
         super(myte, {
             ...DanceAction.metadata.defaultOptions,
             duration: options.duration || DanceAction.metadata.defaultDuration,
             ...options
         });
-        
         this.danceSteps = [
             { x: 0, y: -20 },
             { x: 20, y: 0 },
@@ -30,44 +34,32 @@ class DanceAction extends MyteAction {
             { x: -20, y: 0 }
         ];
         this.currentStep = 0;
-        this.stepDuration = this.stepDuration;
-        this.stepTimer = this.stepDuration;
-    }
-
-    static canPerform(selected, active) {
-        return selected === active && !active?.queue.isCarrying();
+        this.stepTimer   = this.stepDuration;
     }
 
     start() {
         super.start();
         this.baseX = this.myte.posX;
         this.baseY = this.myte.posY;
-        this.current_duration = this.duration;
     }
 
     update() {
-        this.stepTimer -= 16; // Assuming 60fps
+        this.stepTimer -= 16;
 
         if (this.stepTimer <= 0) {
             this.currentStep = (this.currentStep + 1) % this.danceSteps.length;
-            this.stepTimer = this.stepDuration;
-
+            this.stepTimer   = this.stepDuration;
             const step = this.danceSteps[this.currentStep];
-            this.myte.setTarget(
-                this.baseX + step.x,
-                this.baseY + step.y
-            );
+            this.myte.setTarget(this.baseX + step.x, this.baseY + step.y);
         }
 
         this.myte.move_toward_target();
-
         this.current_duration--;
         return this.current_duration <= 0;
     }
-
 }
 
-// Sleep action with complete metadata defaults
+// Deep sleep with bobbing animation
 class SleepAction extends MyteAction {
     static metadata = {
         id: 'sleep',
@@ -77,7 +69,7 @@ class SleepAction extends MyteAction {
         isMovementAction: false,
         isInterruptible: true,
         defaultDuration: 5000,
-        description: 'Take a deep sleep with bobbing animation and Z\'s',
+        description: 'Take a deep sleep with bobbing animation',
         requiresTarget: false,
         affectsMood: true,
         moodEffect: 8,
@@ -87,6 +79,10 @@ class SleepAction extends MyteAction {
         }
     };
 
+    static canPerform(selected, active) {
+        return selected === active && !active?.queue.isCarrying();
+    }
+
     constructor(myte, options) {
         super(myte, {
             ...SleepAction.metadata.defaultOptions,
@@ -94,17 +90,13 @@ class SleepAction extends MyteAction {
             ...options
         });
         this.bobPhase = 0;
-        this.zTimer = this.zInterval;
-        this.startY = myte.posY;
-    }
-
-    static canPerform(selected, active) {
-        return selected === active && !active?.queue.isCarrying();
+        this.zTimer   = this.zInterval;
+        this.startY   = myte.posY;
     }
 
     start() {
         super.start();
-        this.myte.queue.addExpression("sleep", 1000);
+        this.myte.queue.addExpression('sleep', 1000);
     }
 
     update() {
@@ -123,8 +115,58 @@ class SleepAction extends MyteAction {
     }
 }
 
+// Quick nap with gentle floating
+class SimpleSleepAction extends MyteAction {
+    static metadata = {
+        id: 'simple_sleep',
+        label: 'Take a Nap',
+        category: 'state',
+        priority: 2,
+        isMovementAction: false,
+        isInterruptible: true,
+        defaultDuration: 5000,
+        description: 'Take a quick nap with gentle floating animation',
+        requiresTarget: false,
+        affectsMood: true,
+        moodEffect: 5,
+        defaultOptions: {
+            zSpeed: 0.1
+        }
+    };
 
-// Spin action with complete metadata defaults
+    static canPerform(selected, active) {
+        return selected === active && !active?.queue.isCarrying();
+    }
+
+    constructor(myte, options) {
+        super(myte, {
+            ...SimpleSleepAction.metadata.defaultOptions,
+            duration: options.duration || SimpleSleepAction.metadata.defaultDuration,
+            ...options
+        });
+        this._zPosition = 0;
+        this._zSpeed    = this.zSpeed;
+    }
+
+    start() {
+        super.start();
+        this.baseY = this.myte.posY;
+        this.myte.queue.addExpression('sleep', 500, 10);
+    }
+
+    update() {
+        this._zPosition += this._zSpeed;
+        if (this._zPosition > 1 || this._zPosition < 0) {
+            this._zSpeed = -this._zSpeed;
+        }
+
+        this.myte.setPosition(null, this.baseY - (Math.sin(this._zPosition * Math.PI) * 10));
+        this.current_duration--;
+        return this.current_duration <= 0;
+    }
+}
+
+// Spin in place by cycling through directions
 class SpinAction extends MyteAction {
     static metadata = {
         id: 'spin',
@@ -154,77 +196,22 @@ class SpinAction extends MyteAction {
             duration: options.duration || SpinAction.metadata.defaultDuration,
             ...options
         });
-        
-        this.directions = [
-            DIRECTION.NORTH,
-            DIRECTION.EAST,
-            DIRECTION.SOUTH,
-            DIRECTION.WEST
-        ];
-        this.currentDirectionIndex = 0;
-        this.frameDelay = this.frameDelay;
+        this.directions = [DIRECTION.NORTH, DIRECTION.EAST, DIRECTION.SOUTH, DIRECTION.WEST];
+        this.dirIndex   = 0;
         this.frameTimer = this.frameDelay;
+    }
+
+    start() {
+        super.start();
     }
 
     update() {
         this.frameTimer--;
         if (this.frameTimer <= 0) {
-            this.currentDirectionIndex = (this.currentDirectionIndex + 1) % this.directions.length;
-            this.myte.setDirection(this.directions[this.currentDirectionIndex]);
+            this.dirIndex   = (this.dirIndex + 1) % this.directions.length;
             this.frameTimer = this.frameDelay;
+            this.myte.setDirection(this.directions[this.dirIndex]);
         }
-
-        this.current_duration--;
-        return this.current_duration <= 0;
-    }
-}
-
-// Action for simple sleep animation
-class SimpleSleepAction extends MyteAction {
-    static metadata = {
-        id: 'simple_sleep',
-        label: 'Take a Nap',
-        category: 'state',
-        priority: 2,
-        isMovementAction: false,
-        isInterruptible: true,
-        defaultDuration: 5000,
-        description: 'Take a quick nap with gentle floating animation',
-        requiresTarget: false,
-        affectsMood: true,
-        moodEffect: 5,
-        defaultOptions: {
-            zSpeed: 0.1
-        }
-    };
-
-    constructor(myte, options) {
-        super(myte, {
-            ...SimpleSleepAction.metadata.defaultOptions,
-            duration: options.duration || SimpleSleepAction.metadata.defaultDuration,
-            ...options
-        });
-        this.zPosition = 0;
-        this.zSpeed = this.zSpeed;
-    }
-
-    static canPerform(selected, active) {
-        return selected === active && !active?.queue.isCarrying();
-    }
-
-    start() {
-        super.start();
-        this.baseY = this.myte.posY;
-        this.myte.queue.addExpression("sleep", 500, 10);
-    }
-
-    update() {
-        this.zPosition += this.zSpeed;
-        if (this.zPosition > 1 || this.zPosition < 0) {
-            this.zSpeed = -this.zSpeed;
-        }
-
-        this.myte.setPosition(null, this.baseY - (Math.sin(this.zPosition * Math.PI) * 10));
 
         this.current_duration--;
         return this.current_duration <= 0;

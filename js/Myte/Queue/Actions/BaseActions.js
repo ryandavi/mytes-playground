@@ -1,4 +1,37 @@
-// Base Action class that all actions inherit from
+// Coordinates two actions so they can wait for each other before proceeding.
+// Both action instances call sync.signal(this); both will be notified via onReady().
+class ActionSync {
+    constructor() {
+        this._ready = new Set();
+        this._callbacks = [];
+    }
+
+    signal(actionInstance) {
+        this._ready.add(actionInstance);
+        if (this._ready.size >= 2) {
+            this._callbacks.forEach(cb => cb());
+            this._callbacks = [];
+        }
+    }
+
+    onReady(cb) {
+        if (this._ready.size >= 2) {
+            cb();
+        } else {
+            this._callbacks.push(cb);
+        }
+    }
+
+    reset() {
+        this._ready.clear();
+    }
+
+    get bothReady() {
+        return this._ready.size >= 2;
+    }
+}
+
+// Base class for all Myte actions
 class MyteAction {
     static metadata = {
         id: null,
@@ -14,7 +47,6 @@ class MyteAction {
         moodEffect: 0
     };
 
-
     constructor(myte, options = {}) {
         this.myte = myte;
         this.duration = 0;
@@ -23,21 +55,15 @@ class MyteAction {
         this.userInitiated = false;
         this.onComplete = null;
 
-        // Apply options and then apply defaults
         Object.assign(this, options, {
             duration: options.duration ?? this.constructor.metadata.defaultDuration,
         });
-
-        // Apply mood effects if configured
-        if (this.constructor.metadata.affectsMood) {
-            this.myte.stats.updateMood(this.constructor.metadata.moodEffect);
-        }
     }
 
     static getRequiredOptions(selected, active) {
-        // Return specific options needed for this action
         return {};
     }
+
     static canAddToQueue(selected, active) {
         return true;
     }
@@ -47,10 +73,8 @@ class MyteAction {
     }
 
     start() {
-        if (this.duration > 0) {
-            if (this.current_duration === -1) {
-                this.current_duration = this.duration;
-            }
+        if (this.duration > 0 && this.current_duration === -1) {
+            this.current_duration = this.duration;
         }
     }
 
@@ -65,84 +89,11 @@ class MyteAction {
         return true;
     }
 
+    interrupt() {}
 }
 
-class MoveAction extends MyteAction {
-    static metadata = {
-        id: 'move',
-        label: 'Move To',
-        category: 'movement',
-        priority: 1,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Move to a specific location',
-        requiresTarget: true,
-        affectsMood: false
-    };
-
-    static canPerform(selected, active) {
-        return false; // active && !active.queue?.isCarrying();
-    }
-
-    constructor(myte, options) {
-        super(myte, options);
-
-        if (!options?.target?.length) {
-            throw new Error('MoveAction requires at least one target position');
-        }
-
-        this.targets = options.target;
-        this.targetIndex = 0;
-    }
-
-    start() {
-        super.start();
-        
-        // If we have complex collisions, use A* pathfinding
-        if (this.myte.checkForCollisions && this.myte.parent.gameMap) {
-            const path = this.myte.parent.gameMap.gridSystem.pathfinder.findPath(
-                this.myte.posX, 
-                this.myte.posY,
-                this.targets[this.targetIndex].x,
-                this.targets[this.targetIndex].y,
-                this.myte.collider.width,
-                this.myte.collider.height
-            );
-            
-            if (path) {
-                // Replace direct target with path waypoints
-                this.targets = path;
-                this.targetIndex = 0;
-            }
-        }
-        
-        this.setNextTarget();
-        this.myte.reset();
-    }
-
-    update() {
-        if (this.myte.is_at_target()) {
-            this.targetIndex++;
-            return !this.setNextTarget();
-        }
-        this.myte.move_toward_target();
-        return false;
-    }
-
-    setNextTarget() {
-        if (this.targets[this.targetIndex]) {
-            const { x, y } = this.targets[this.targetIndex];
-            this.myte.setTarget(x, y);
-            return true;
-        }
-        return false;
-    }
-}
-
-// New base class for actions that need positioning
+// Base class for actions that need to position the Myte relative to a target
 class PositionableAction extends MyteAction {
-
     static metadata = {
         id: 'positionable',
         label: 'Position',
@@ -159,7 +110,6 @@ class PositionableAction extends MyteAction {
     constructor(myte, options) {
         super(myte, options);
 
-        // Validate target if required
         if (this.constructor.metadata.requiresTarget && !options.target) {
             throw new Error(`${this.constructor.name} requires a target`);
         }
@@ -170,109 +120,107 @@ class PositionableAction extends MyteAction {
     }
 
     getCanvasBounds() {
-        const canvasRect = this.myte.parent.getCanvasRect();
-        return {
-            width: canvasRect.width,
-            height: canvasRect.height,
-            x: 0,
-            y: 0
-        };
+        const r = this.myte.parent.getCanvasRect();
+        return { x: 0, y: 0, width: r.width, height: r.height };
     }
 
-    isWithinBounds(position, myteRect) {
-        const bounds = this.getCanvasBounds();
-        return (
-            position.x >= bounds.x &&
-            position.x + myteRect.width <= bounds.width &&
-            position.y >= bounds.y &&
-            position.y + myteRect.height <= bounds.height
-        );
-    }
+    // Get the target's rect. alignTo='collider' uses physics bounds when available,
+    // falling back to sprite bounds. This lets the Myte stop at the right place even
+    // when the sprite has visual padding beyond the interactive area.
+    getTargetRect(target, alignTo = 'sprite') {
+        if (target instanceof Myte) return target.getOffsetRect();
 
-    adjustPositionToBounds(position, myteRect, targetRect) {
-        const bounds = this.getCanvasBounds();
-        let horizontal = this.getClosestSideHorizontal(targetRect, myteRect);
-        let vertical = 'bottom';
-
-        // Adjust horizontal position if out of bounds
-        if (position.x + myteRect.width > bounds.width || position.x < bounds.x) {
-            horizontal = (position.x < bounds.x) ? 'right' : 'left';
-            position = this.calculatePosition(myteRect, targetRect, horizontal, vertical, false, true);
+        if (alignTo === 'collider' && target?.collider && target.posX !== undefined) {
+            return {
+                x:      target.posX + (target.collider.offsetX ?? 0),
+                y:      target.posY + (target.collider.offsetY ?? 0),
+                width:  target.collider.width,
+                height: target.collider.height
+            };
         }
 
-        // Adjust vertical position if out of bounds
-        if (position.y + myteRect.height > bounds.height || position.y < bounds.y) {
-            vertical = (position.y < bounds.y) ? 'bottom' : 'top';
-            position = this.calculatePosition(myteRect, targetRect, horizontal, vertical, false, true);
-        }
-
-        return {
-            position,
-            horizontal,
-            vertical
-        };
+        return this.myte.parent.getLocalOffset(target.element ?? target);
     }
 
+    // Backward-compatible alias — always uses sprite rect
     getRect(target) {
+        return this.getTargetRect(target, 'sprite');
+    }
 
-        if (target instanceof Myte) {
-            return target.getOffsetRect();
-        } else if (target instanceof MapObject) {
-            return this.myte.parent.getLocalOffset(target.element);
-        } else if (target instanceof Element) {
-            return this.myte.parent.getLocalOffset(target);
-        } else {
-            return this.myte.parent.getLocalOffset(target);
+    /**
+     * Returns the {x, y} top-left position for the Myte to stand at beside destRect.
+     *
+     * @param {object} myteRect         — Myte's bounding rect
+     * @param {object} destRect         — Target's bounding rect
+     * @param {string} side             — Which side to stand on:
+     *                                    'left' | 'right' | 'top' | 'bottom' | 'center'
+     * @param {object} [opts]
+     * @param {number} [opts.gap=0]     — Distance from the target edge.
+     *                                    Positive = clear space, negative = overlap.
+     * @param {string} [opts.align]     — Cross-axis alignment (default 'center').
+     *                                    For left/right sides: 'top-edge' | 'center' | 'bottom-edge'
+     *                                    For top/bottom sides: 'left-edge' | 'center' | 'right-edge'
+     */
+    calculatePosition(myteRect, destRect, side, { gap = 0, align = 'center' } = {}) {
+        switch (side) {
+            case 'left':
+                return { x: destRect.x - myteRect.width - gap,       y: this._crossY(myteRect, destRect, align) };
+            case 'right':
+                return { x: destRect.x + destRect.width + gap,        y: this._crossY(myteRect, destRect, align) };
+            case 'top':
+                return { x: this._crossX(myteRect, destRect, align),  y: destRect.y - myteRect.height - gap };
+            case 'bottom':
+                return { x: this._crossX(myteRect, destRect, align),  y: destRect.y + destRect.height + gap };
+            case 'center':
+            default:
+                return {
+                    x: destRect.x + (destRect.width  - myteRect.width)  / 2,
+                    y: destRect.y + (destRect.height - myteRect.height) / 2
+                };
         }
     }
 
-    getClosestSideHorizontal(destination_rect, myte_rect) {
-        return this.myte.posX + (myte_rect.width / 2) < destination_rect.x + (destination_rect.width / 2) ? 'left' : 'right';
+    _crossY(myteRect, destRect, align) {
+        switch (align) {
+            case 'top-edge':    return destRect.y;
+            case 'bottom-edge': return destRect.y + destRect.height - myteRect.height;
+            default:            return destRect.y + (destRect.height - myteRect.height) / 2;
+        }
     }
 
-    getClosestSideVertical(destination_rect, myte_rect) {
-        const myteCenterY = this.myte.posY + (myte_rect.height / 2);
-        const destinationCenterY = destination_rect.y + (destination_rect.height / 2);
-        return myteCenterY < destinationCenterY ? 'top' : 'bottom';
+    _crossX(myteRect, destRect, align) {
+        switch (align) {
+            case 'left-edge':  return destRect.x;
+            case 'right-edge': return destRect.x + destRect.width - myteRect.width;
+            default:           return destRect.x + (destRect.width - myteRect.width) / 2;
+        }
+    }
+
+    // Clamp a position so the Myte stays fully within canvas bounds
+    adjustPositionToBounds(position, myteRect) {
+        const b = this.getCanvasBounds();
+        return {
+            x: Math.max(b.x, Math.min(position.x, b.x + b.width  - myteRect.width)),
+            y: Math.max(b.y, Math.min(position.y, b.y + b.height - myteRect.height))
+        };
+    }
+
+    getClosestSideHorizontal(destRect, myteRect) {
+        return this.myte.posX + myteRect.width / 2 < destRect.x + destRect.width / 2
+            ? 'left' : 'right';
+    }
+
+    getClosestSideVertical(destRect, myteRect) {
+        return this.myte.posY + myteRect.height / 2 < destRect.y + destRect.height / 2
+            ? 'top' : 'bottom';
     }
 
     getOpposite(side) {
-        switch (side) {
-            case 'left': return 'right';
-            case 'right': return 'left';
-            case 'top': return 'bottom';
-            case 'bottom': return 'top';
-            default: return null;
-        }
-    }
-    calculatePosition(myteRect, destinationRect, horizontal = "center", vertical = "middle", insideHorizontal = false, insideVertical = false) {
-        // this is so it appears to be within
-        let myteOffset = {
-            left: (insideHorizontal ? -1 : 1) * 35,
-            right: (insideHorizontal ? -1 : 1) * 35,
-            top: (insideVertical ? -1 : 1) * 35,
-            bottom: (insideVertical ? 1 : -1) * 35
-        };
-
-
-        const positions = {
-            left: destinationRect.x - (insideHorizontal ? 0 : myteRect.width) + myteOffset.left,
-            center: destinationRect.x + (destinationRect.width / 2) - (myteRect.width / 2),
-            right: destinationRect.x + destinationRect.width - (insideHorizontal ? myteRect.width : 0) - myteOffset.right,
-
-            top: destinationRect.y - (insideVertical ? 0 : myteRect.height) + myteOffset.top,
-            middle: destinationRect.y + (destinationRect.height / 2) - (myteRect.height / 2),
-            bottom: destinationRect.y + destinationRect.height - (insideVertical ? myteRect.height : 0) + myteOffset.bottom
-        };
-
-        return {
-            x: positions[horizontal] || positions.center,
-            y: positions[vertical] || positions.bottom
-        };
+        return { left: 'right', right: 'left', top: 'bottom', bottom: 'top' }[side] ?? null;
     }
 }
 
-// Action for idle state
+// Pause in place for a fixed number of frames
 class IdleAction extends MyteAction {
     static metadata = {
         id: 'idle',
@@ -291,16 +239,20 @@ class IdleAction extends MyteAction {
         return active && selected === active;
     }
 
-    update() {
+    start() {
+        super.start();
         if (this.current_duration === -1) {
             this.current_duration = this.duration;
         }
+    }
+
+    update() {
         this.current_duration--;
         return this.current_duration <= 0;
     }
 }
 
-// Action for expressing emotions/animations
+// Show an expression overlay (hearts, Zs, etc.)
 class ExpressionAction extends MyteAction {
     static metadata = {
         id: 'expression',
@@ -310,7 +262,7 @@ class ExpressionAction extends MyteAction {
         isMovementAction: false,
         isInterruptible: false,
         defaultDuration: 50,
-        description: 'Show an emotion or expression',
+        description: 'Show an emotion or expression overlay',
         requiresTarget: false,
         affectsMood: true,
         moodEffect: 5
@@ -326,15 +278,19 @@ class ExpressionAction extends MyteAction {
         this.repeat = options.repeat || 1;
     }
 
+    start() {
+        super.start();
+        if (this.current_duration === -1) {
+            this.current_duration = this.duration;
+        }
+    }
+
     update() {
         this.current_duration--;
 
         if (this.current_duration <= 0) {
             this.repeat--;
-            if (this.repeat <= 0) {
-                // complete
-                return true;
-            }
+            if (this.repeat <= 0) return true;
             this.current_duration = this.duration;
         }
         return false;

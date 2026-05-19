@@ -775,7 +775,7 @@ class ActionSidebarManager extends UIComponent {
 
                 // click event for actions
                 button.addEventListener('click', () => {
-                    const options = ActionManager.getActionRequirements(
+                    const options = ActionManager.getActionOptions(
                         action.id,
                         selectedObject,
                         activeMyte

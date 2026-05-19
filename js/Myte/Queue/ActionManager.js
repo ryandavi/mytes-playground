@@ -1,7 +1,6 @@
-// Action Manager for centralized action handling
 class ActionManager {
     static actions = new Map();
-    
+
     static registerAction(ActionClass) {
         if (!ActionClass.metadata?.id) {
             throw new Error(`Action class ${ActionClass.name} must have an id in metadata`);
@@ -9,130 +8,115 @@ class ActionManager {
         this.actions.set(ActionClass.metadata.id, ActionClass);
     }
 
-    static getActionRequirements(actionId, selected, active) {
-        const ActionClass = this.actions.get(actionId);
-        if (!ActionClass) return null;
-
-        // Each action class can define what data it needs based on the target
-
-        /*
-        if (ActionClass.getRequiredOptions) {
-            return ActionClass.getRequiredOptions(selected, active);
-        }
-        */
-
-        // Default handling based on metadata
-        const metadata = ActionClass.metadata;
-        const options = { /* userInitiated: true */ };
-
-        if (metadata.requiresTarget) {
-            if (selected instanceof Myte) {
-                options.target = selected;
-            } else if (selected instanceof MapObject) {
-                options.target = selected;
-            } else {
-                options.target = selected;
-            }
-        }
-
-        return {
-            ...(metadata.defaultOptions || {}),
-            ...options
-        };
-    }
-
     static registerActions(actionClasses) {
         actionClasses.forEach(ActionClass => this.registerAction(ActionClass));
     }
 
-    static getAvailableActions(selected, active) {
-        const availableActions = [];
-        
-        for (const [id, ActionClass] of this.actions) {
-            if (ActionClass.canPerform(selected, active)) {
-                availableActions.push({
-                    ...ActionClass.metadata,
-                    ActionClass
-                });
-            }
+    // Resolve options for an action from a UI selection context
+    static getActionOptions(actionId, selected, active) {
+        const ActionClass = this.actions.get(actionId);
+        if (!ActionClass) return null;
+
+        const options = {};
+
+        if (ActionClass.getRequiredOptions) {
+            return { ...ActionClass.metadata.defaultOptions, ...ActionClass.getRequiredOptions(selected, active) };
         }
 
-        return availableActions.sort((a, b) => a.priority - b.priority);
+        if (ActionClass.metadata.requiresTarget) {
+            options.target = selected;
+        }
+
+        return { ...ActionClass.metadata.defaultOptions, ...options };
+    }
+
+    // One-call helper: resolve options and enqueue on a Myte
+    static enqueue(actionId, myte, selected) {
+        const options = this.getActionOptions(actionId, selected, myte);
+        if (!options) return false;
+        myte.queue.add(actionId, options);
+        return true;
+    }
+
+    static getAvailableActions(selected, active) {
+        const available = [];
+        for (const [id, ActionClass] of this.actions) {
+            if (ActionClass.canPerform(selected, active)) {
+                available.push({ ...ActionClass.metadata, ActionClass });
+            }
+        }
+        return available.sort((a, b) => a.priority - b.priority);
     }
 
     static getActionsByCategory(selected, active) {
-        const actions = this.getAvailableActions(selected, active);
-        return actions.reduce((groups, action) => {
-            const category = action.category;
-            if (!groups[category]) {
-                groups[category] = [];
-            }
-            groups[category].push(action);
+        return this.getAvailableActions(selected, active).reduce((groups, action) => {
+            const cat = action.category;
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(action);
             return groups;
         }, {});
     }
 
     static getMovementActions() {
-        return Array.from(this.actions.values())
-            .filter(ActionClass => ActionClass.metadata.isMovementAction);
+        return Array.from(this.actions.values()).filter(A => A.metadata.isMovementAction);
     }
 
     static getInterruptibleActions() {
-        return Array.from(this.actions.values())
-            .filter(ActionClass => ActionClass.metadata.isInterruptible);
+        return Array.from(this.actions.values()).filter(A => A.metadata.isInterruptible);
     }
 
     static getMoodAffectingActions() {
-        return Array.from(this.actions.values())
-            .filter(ActionClass => ActionClass.metadata.affectsMood);
-    }
-
-    static getActionRequiringTarget() {
-        return Array.from(this.actions.values())
-            .filter(ActionClass => ActionClass.metadata.requiresTarget);
+        return Array.from(this.actions.values()).filter(A => A.metadata.affectsMood);
     }
 }
 
-// Register all actions
 ActionManager.registerActions([
-    // Base actions
+    // Base
     MoveAction,
     AStarMoveAction,
     IdleAction,
     ExpressionAction,
 
-    // Movement patterns
+    // Movement
     FollowMouseAction,
     FollowObjectAction,
     RunLapsAction,
     CircleAction,
     ZigzagAction,
     JumpAction,
+    GoToObjectAction,
 
-    // State actions
+    // State
     DanceAction,
     SimpleSleepAction,
     SleepAction,
     SpinAction,
 
-    // Interaction actions
-    GoToObjectAction,
+    // Object interactions
     InspectAction,
     EatElementAction,
-    ShowAffectionAction,
+    OpenChestAction,
+    SmellFlowerAction,
+    DrinkFromFountainAction,
+    WaterPlantAction,
+    HarvestAction,
 
-    // Play actions
+    // Social (Myte-to-Myte)
+    ShowAffectionAction,
+    GreetAction,
+    GreetReceiveAction,
+    WatchAction,
     PlayTagAction,
     PlayFetchAction,
 
-    // Carry actions
+    // Carry
     CarryPickupAction,
     CarryAction,
     BeingCarriedAction,
     CarryPutdownAction,
     HoldBallAction,
 
-    // Reactive actions
+    // Reactive
     RunAwayAction,
-    HideAction
+    HideAction,
 ]);

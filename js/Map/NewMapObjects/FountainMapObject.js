@@ -1,4 +1,8 @@
 class FountainMapObject extends BinaryStateAnimatedMapObject {
+    getApproachMode() {
+        return 'adjacent';
+    }
+
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         
