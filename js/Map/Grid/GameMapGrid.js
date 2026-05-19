@@ -1206,9 +1206,11 @@ class GridSystem {
             if (isVisible && !wasVisible) {
                 // Object entered visible area
                 this.activeObjects.add(obj);
+                if (obj.wake) obj.wake();
             } else if (!isVisible && wasVisible) {
                 // Object left visible area
                 this.activeObjects.delete(obj);
+                if (obj.sleep) obj.sleep();
             }
         }
 
@@ -1271,6 +1273,7 @@ class GridSystem {
         this.parent.objects.forEach(obj => {
             if (this.isObjectVisible(obj, bounds) && !this.activeObjects.has(obj)) {
                 this.activeObjects.add(obj);
+                if (obj.wake) obj.wake();
                 missingObjects.push(obj);
 
                 // Also add to appropriate grid cells if not already there

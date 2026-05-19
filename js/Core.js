@@ -90,6 +90,10 @@ class MyteCore {
             await this.resourceManager.preloadEssentialResources();
             this.loadingManager.updateStageProgress('resources', 0.3); // Essential resources are ~30% of all resources
 
+            // Load shared metadata that UI and map objects both depend on.
+            this.loadingManager.setMessage("Loading item metadata...");
+            await ItemRegistry.preload();
+
             // Initialize user system
             this.loadingManager.setMessage("Loading user data...");
             await this.initializeUser();

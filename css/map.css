@@ -258,12 +258,18 @@
 .container-wrapper > .container > .canvas > .layer > .mapObject.draggable {
   cursor: grab;
 }
+body[data-tool-mode=select] .container-wrapper > .container > .canvas > .layer > .mapObject.draggable {
+  cursor: pointer;
+}
+body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .mapObject.draggable {
+  cursor: grab;
+}
 .container-wrapper > .container > .canvas > .layer > .mapObject.dragging {
   pointer-events: none;
   -webkit-user-select: none;
      -moz-user-select: none;
           user-select: none;
-  cursor: grab;
+  cursor: grabbing;
   z-index: 100000 !important;
 }
 .container-wrapper > .container > .canvas > .layer > .mapObject.dragging > .sprite {
@@ -292,6 +298,18 @@
 .container-wrapper > .container > .canvas > .layer > .mapObject.fountain[data-active=false] {
   filter: brightness(0.8);
 }
+.container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object {
+  cursor: grab;
+}
+body[data-tool-mode=select] .container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object {
+  cursor: pointer;
+}
+body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object {
+  cursor: grab;
+}
+.container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object:active {
+  cursor: grabbing;
+}
 .container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.butterfly.blue > .sprite {
   filter: hue-rotate(156deg);
 }
@@ -301,16 +319,33 @@
 .container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.butterfly.purple > .sprite {
   filter: hue-rotate(270deg);
 }
+.container-wrapper > .container > .canvas > .layer > .dropped-item-shadow {
+  position: absolute;
+  width: 24px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 50%;
+  filter: blur(2px);
+  pointer-events: none;
+  transform-origin: center;
+}
 .container-wrapper > .container > .canvas > .layer > .dropped-item {
   position: absolute;
   width: 16px;
   height: 16px;
-  transition: transform 0.05s linear;
+  transition: none;
   pointer-events: none;
-  outline: 3px solid red;
 }
 .container-wrapper > .container > .canvas > .layer > .dropped-item.collected {
   animation: collect 0.5s ease-out forwards;
+}
+.container-wrapper > .container > .canvas > .layer > .dropped-item.food {
+  width: var(--item-sprite-width, 32px);
+  height: var(--item-sprite-height, 32px);
+  background-image: url("../images/items/items.png");
+  background-repeat: no-repeat;
+  background-position: var(--item-sprite-x, 0px) var(--item-sprite-y, 0px);
+  image-rendering: pixelated;
 }
 .container-wrapper > .container > .canvas > .layer > .dropped-item.coin {
   border-radius: 50%;
@@ -521,15 +556,12 @@
 }
 @keyframes portal-pulse {
   0% {
-    transform: scale(1);
     filter: brightness(1);
   }
   50% {
-    transform: scale(1.05);
     filter: brightness(1.2);
   }
   100% {
-    transform: scale(1);
     filter: brightness(1);
   }
 }

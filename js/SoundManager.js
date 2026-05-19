@@ -866,6 +866,23 @@ class SoundManager {
 				}
 			},
 			
+			"ui_drag_item": {
+				type: "ui",
+				create: () => {
+				const synth = new Tone.Synth({
+					oscillator: { type: "sine" },
+					envelope: {
+					attack: 0.001,
+					decay: 0.06,
+					sustain: 0,
+					release: 0.08
+					}
+				}).toDestination();
+				// Soft high tick — "lifted"
+				return { synth, note: "B5", duration: "32n" };
+				}
+			},
+
 			"ui_drop_item": {
 				type: "ui",
 				create: () => {

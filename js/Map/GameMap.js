@@ -29,6 +29,7 @@ class GameMap {
         // Map elements
         this.objects = [];
         this.objectsById = new Map();
+        this.droppedItems = [];
         // this.zones = new Map();
         this.spawnPoints = new Map();
 
@@ -690,6 +691,17 @@ class GameMap {
         }
     }
 
+    addDroppedItem(type, variant, posX, posY) {
+        const item = new DroppedMapItem(this, type, variant, posX, posY);
+        if (this.layers.objects) {
+            // Shadow appended first so it renders behind the item
+            if (item.shadowElement) this.layers.objects.appendChild(item.shadowElement);
+            if (item.element) this.layers.objects.appendChild(item.element);
+        }
+        this.droppedItems.push(item);
+        return item;
+    }
+
     getObjectsInRadius(x, y, radius) {
         // OPTIMIZATION: Use grid system for spatial queries if available
         if (this.gridSystem) {
@@ -825,6 +837,19 @@ class GameMap {
         if (this.zoneManager) {
             this.mytes.forEach(myte => {
                 if (myte.isActive) this.zoneManager.update(myte);
+            });
+        }
+
+        // Update dropped items (physics + magnet collection)
+        if (this.droppedItems.length > 0) {
+            const activeMyte = this.mytes?.find(m => m.isActive) || null;
+            this.droppedItems = this.droppedItems.filter(item => {
+                if (item.collected) {
+                    item.remove();
+                    return false;
+                }
+                item.update(activeMyte);
+                return true;
             });
         }
 

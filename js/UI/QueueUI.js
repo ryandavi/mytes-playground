@@ -185,14 +185,17 @@ class QueueUI {
             };
         }
 
-		// Update progress bar
+		// Update progress bar and status text every frame (not cached)
 		const progress = element.querySelector('.progress');
-		if (progress) {  // Check if progress element exists
+		if (progress) {
 			if (index === 0 && item.duration && item.duration > 0) {
 				progress.style.display = 'block';
 				const bar = progress.querySelector('.bar');
 				const percentage = this.calculateProgress(item);
 				bar.style.width = `${percentage}%`;
+
+				const statusEl = element.querySelector('.status');
+				if (statusEl) statusEl.textContent = `${percentage}%`;
 			} else {
 				progress.style.display = 'none';
 			}

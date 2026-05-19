@@ -47,5 +47,15 @@
       "slide_down": [[0, 3]],
       "land": [[0, 3]]
     }
+  },
+  "carryOffsets": {
+    "item": {
+      "anchorX": 0.5,
+      "anchorY": 0.52,
+      "itemAnchorX": 0.5,
+      "itemAnchorY": 1,
+      "offsetX": 0,
+      "offsetY": 0
+    }
   }
 }

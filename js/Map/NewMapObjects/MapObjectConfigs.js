@@ -105,6 +105,11 @@ const TYPE_CONFIGS = {
 		scale: 2,
 		collider: { width: 56, height: 24, offsetX: 4, offsetY: 36 },
 		interactiveCollider: { width: 88, height: 88, offsetX: -12, offsetY: -12 },
+		approachConfig: {
+			alignTo: 'collider',
+			align: 'center',
+			gap: 8
+		},
 		spriteConfig: {
 			default: 'closed',
 			spriteSheet: {
@@ -180,6 +185,7 @@ const TYPE_CONFIGS = {
 	// ── Plants ────────────────────────────────────────────────────────────────
 
 	GROWING_PLANT: {
+		abstract: true,
 		category: 'plant',
 		renderType: 'animated',
 		walkable: true,
@@ -344,6 +350,19 @@ const TYPE_CONFIGS = {
 		walkable: true,
 		draggable: true,
 		renderPriority: 2,
+		shadow: {
+			enabled: true,
+			width: 40,
+			height: 10,
+			anchorX: 0.5,
+			anchorY: 0.88,
+			maxOpacity: 0.32,
+			minOpacity: 0.08,
+			blur: 4,
+			opacityFadeDistance: 120,
+			scaleFadeDistance: 80,
+			minScale: 0.45
+		},
 		speed: 5,
 		friction: 0.94,
 		settleFriction: 0.82,
@@ -356,6 +375,10 @@ const TYPE_CONFIGS = {
 		pushForce: 6,
 		debug: false,
 		animation: 'sway',
+		soundEffects: {
+			pickup: 'ui_pickup_item',
+			drop: 'ui_drop_item'
+		},
 		spriteConfig: {
 			spriteSheet: {
 				url: 'images/MapObjects/ball.gif',

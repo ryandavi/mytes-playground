@@ -310,10 +310,18 @@
 						cursor: grab;
 					}
 
+					body[data-tool-mode="select"] &.draggable {
+						cursor: pointer;
+					}
+
+					body[data-tool-mode="drag"] &.draggable {
+						cursor: grab;
+					}
+
 					&.dragging {
 						pointer-events: none;
 						user-select: none;
-						cursor: grab;
+						cursor: grabbing;
 						z-index: 100000 !important;
 
 						>.sprite {
@@ -355,6 +363,22 @@
 					}
 
 					&.animated-map-object {
+						&.ball-object {
+							cursor: grab;
+
+							body[data-tool-mode="select"] & {
+								cursor: pointer;
+							}
+
+							body[data-tool-mode="drag"] & {
+								cursor: grab;
+							}
+
+							&:active {
+								cursor: grabbing;
+							}
+						}
+
 						&.butterfly {
 							&.blue {
 								>.sprite {
@@ -377,17 +401,37 @@
 					}
 				}
 
+				>.dropped-item-shadow {
+					position: absolute;
+					width: 24px;
+					height: 6px;
+					background: rgba(0, 0, 0, 0.25);
+					border-radius: 50%;
+					filter: blur(2px);
+					pointer-events: none;
+					transform-origin: center;
+				}
+
 				>.dropped-item {
 					position: absolute;
 					width: 16px;
 					height: 16px;
-					transition: transform 0.05s linear;
+					transition: none;
 					pointer-events: none;
-					outline: 3px solid red;
 
 					// Collection animation
 					&.collected {
 						animation: collect 0.5s ease-out forwards;
+					}
+
+					// Food items use items sprite sheet
+					&.food {
+						width: var(--item-sprite-width, 32px);
+						height: var(--item-sprite-height, 32px);
+						background-image: url('../images/items/items.png');
+						background-repeat: no-repeat;
+						background-position: var(--item-sprite-x, 0px) var(--item-sprite-y, 0px);
+						image-rendering: pixelated;
 					}
 
 					// Item variants
@@ -704,17 +748,17 @@
 		/* Portal pulse animation */
 		@keyframes portal-pulse {
 			0% {
-				transform: scale(1);
+
 				filter: brightness(1);
 			}
 
 			50% {
-				transform: scale(1.05);
+
 				filter: brightness(1.2);
 			}
 
 			100% {
-				transform: scale(1);
+
 				filter: brightness(1);
 			}
 		}

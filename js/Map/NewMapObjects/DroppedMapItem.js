@@ -28,7 +28,7 @@ class DroppedMapItem {
         // Store base identity properties
         this.parent = parent;
         this.type = type;
-        this.variant = variant;
+        this.variant = ItemRegistry.resolveIdSync(variant) || variant;
         this.posX = posX;
         this.posY = posY;
         this.posZ = 0;
@@ -45,9 +45,11 @@ class DroppedMapItem {
         this.bounceCount = 0;
         this.maxBounces = 1;
 
-        // grounding
-        this.groundY = posY + 32; // Store the ground position
+        // grounding — shadow stays at the drop position; item bounces upward from there
+        this.groundY = posY; // Shadow at the indicator center
         this.grounded = false;
+
+        this.droppedAt = Date.now();
 
         // hover
         this.hoverOffset = 0;
@@ -63,6 +65,7 @@ class DroppedMapItem {
             height: 24
         };
 
+        this.shadowElement = this.createShadowElement();
         this.element = this.createItemElement();
     }
 
@@ -71,35 +74,59 @@ class DroppedMapItem {
         const element = document.createElement('div');
         element.classList.add('dropped-item', this.type.toLowerCase(), this.variant);
 
-        // Set size
+        if (ItemRegistry.applySpriteStyles(element, this.variant)) {
+            const itemDefinition = ItemRegistry.getItemSync(this.variant);
+            const spriteWidth = itemDefinition?.sprite?.width || 32;
+            const spriteHeight = itemDefinition?.sprite?.height || 32;
+            this.size = { width: spriteWidth, height: spriteHeight };
+            element.style.backgroundRepeat = 'no-repeat';
+            element.style.backgroundPosition = 'var(--item-sprite-x) var(--item-sprite-y)';
+            element.style.imageRendering = 'pixelated';
+        }
+
         element.style.width = `${this.size.width}px`;
         element.style.height = `${this.size.height}px`;
 
-        // Set initial position
-        this.updatePosition(element);
+        this._applyPosition(element, this.posY);
         return element;
     }
 
-    updatePosition(element = this.element) {
-        if (!element) return;
+    createShadowElement() {
+        const shadow = document.createElement('div');
+        shadow.className = 'dropped-item-shadow';
+        this._applyShadowPosition(shadow, 0);
+        return shadow;
+    }
 
-        // Apply hover effect when grounded
+    _applyPosition(element, displayY) {
+        element.style.left = `${this.posX - this.size.width / 2}px`;
+        element.style.top  = `${displayY - this.size.height / 2}px`;
+        element.style.zIndex = Math.floor(this.groundY);
+    }
+
+    _applyShadowPosition(shadow, heightAboveGround) {
+        const scale = Math.max(0.35, 1 - heightAboveGround / 80);
+        shadow.style.left   = `${this.posX - 12}px`;
+        shadow.style.top    = `${this.groundY - 2}px`;
+        shadow.style.transform = `scaleX(${scale})`;
+        shadow.style.opacity   = `${Math.max(0.1, scale * 0.55)}`;
+    }
+
+    updatePosition() {
+        if (!this.element) return;
+
         let displayY = this.posY;
         if (this.grounded) {
-            this.hoverOffset += this.hoverSpeed;
             displayY -= Math.sin(this.hoverOffset) * 5;
         }
-
-        // Subtract posZ for height
         displayY -= this.posZ;
 
-        // Set position using top/left
-        element.style.left = `${this.posX - (this.size.width / 2)}px`;
-        element.style.top = `${displayY - (this.size.height / 2)}px`;
-        // element.style.zIndex = parent.getZIndex(displayY, this.size.height)
+        this._applyPosition(this.element, displayY);
 
-        // Update z-index based on y position for proper layering
-        element.style.zIndex = Math.floor(displayY);
+        if (this.shadowElement) {
+            const heightAboveGround = Math.max(0, this.groundY - this.posY);
+            this._applyShadowPosition(this.shadowElement, heightAboveGround);
+        }
     }
 
     update(myte = null) {
@@ -161,21 +188,11 @@ class DroppedMapItem {
             }
         }
 
-        // Apply hover effect when grounded (visual-only offset)
-        let displayY = this.posY;
         if (this.grounded) {
             this.hoverOffset += this.hoverSpeed;
-            displayY -= Math.sin(this.hoverOffset) * 5;
         }
 
-        // Write into renderState — MapRenderer.flush() applies this to the DOM
-        if (this.renderState) {
-            this.renderState.posX = this.posX;
-            this.renderState.posY = displayY;
-            this.renderState.dirty = true;
-        } else {
-            this.updatePosition();
-        }
+        this.updatePosition();
     }
 
     collect(myte) {
@@ -193,24 +210,20 @@ class DroppedMapItem {
                 myte.updateHealth(20);
                 break;
             default:
-                // Add to inventory
-                owner?.inventory?.addItem?.(this.variant, 1, this.type);
+                // Use the original inventory name if available to ensure stack matching
+                owner?.inventory?.addItem?.(this.inventoryName || this.variant, 1, this.type);
         }
 
-        // Add collection animation class
         this.element.classList.add('collected');
+        if (this.shadowElement) this.shadowElement.style.display = 'none';
 
-        // Remove after animation
-        setTimeout(() => {
-            this.remove();
-        }, 500);
+        setTimeout(() => this.remove(), 500);
     }
 
     remove() {
         this.active = false;
-        if (this.element && this.element.parentNode) {
-            this.element.parentNode.removeChild(this.element);
-        }
+        this.element?.parentNode?.removeChild(this.element);
+        this.shadowElement?.parentNode?.removeChild(this.shadowElement);
     }
 
 }

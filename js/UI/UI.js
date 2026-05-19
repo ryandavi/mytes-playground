@@ -485,6 +485,11 @@ class ToolManager extends UIComponent {
         };
     }
 
+    applyToolModeState(mode) {
+        document.body.dataset.toolMode = mode;
+        this.parent.containerWrapper?.setAttribute('data-tool-mode', mode);
+    }
+
     init() {
         this.initializeHandControls();
     }
@@ -539,15 +544,20 @@ class ToolManager extends UIComponent {
 
         // Set initial mode
         this.setToolMode(UIToolModes.SELECT);
+        this.applyToolModeState(this.currentToolMode);
     }
 
     setToolMode(mode) {
-        if (this.currentToolMode === mode) return;
+        if (this.currentToolMode === mode) {
+            this.applyToolModeState(mode);
+            return;
+        }
 
         this.parent.playSound('hover');
 
         // Set mode
         this.currentToolMode = mode;
+        this.applyToolModeState(mode);
 
         // Notify parent UI of tool change
         this.parent.onToolModeChanged(mode);
@@ -576,6 +586,7 @@ class ToolManager extends UIComponent {
 
             // Update current tool mode
             this.currentToolMode = mode;
+            this.applyToolModeState(mode);
 
             return true;
         }

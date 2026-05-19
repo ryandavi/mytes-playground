@@ -57,12 +57,8 @@
 
 
 
-        &.valid-drop-target {
-            outline: var(--border-width) solid var(--drop-target) !important;
-
-            &.on-target {
-                outline-color: var(--on-target) !important;
-            }
+        &.on-target {
+            outline: var(--border-width) solid var(--on-target) !important;
         }
 
     }

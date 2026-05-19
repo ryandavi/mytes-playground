@@ -47,13 +47,13 @@
 			"name": "Turnip",
 			"quantity": 13,
 			"type": "food",
-			"variant": "yellow_turnip"
+			"variant": "turnip"
 		},
 		{
 			"name": "Apple",
 			"quantity": 3,
 			"type": "food",
-			"variant": "red_apple"
+			"variant": "apple"
 		}
 	]
 }

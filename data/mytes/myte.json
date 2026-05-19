@@ -81,6 +81,16 @@
     },
     "spriteSets": null
   },
+  "carryOffsets": {
+    "item": {
+      "anchorX": 0.5,
+      "anchorY": 0.12,
+      "itemAnchorX": 0.5,
+      "itemAnchorY": 1,
+      "offsetX": 0,
+      "offsetY": -8
+    }
+  },
   "expressions": {
     "surprised": "surprise",
     "happy": "surprise",

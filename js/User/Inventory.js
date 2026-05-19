@@ -34,8 +34,9 @@ class Inventory {
         // State tracking
         this.state = {
             draggedItem: null,
-            lastFeedTime: {}, // Track last feed time per Myte
+            lastFeedTime: {},
             isDragging: false,
+            myteTarget: null,
             activeDropTargets: new Set()
         };
 
@@ -52,18 +53,30 @@ class Inventory {
     createDropIndicator() {
         this.dropIndicator = document.createElement('div');
         this.dropIndicator.className = 'inventory-drop-indicator';
-        document.body.appendChild(this.dropIndicator);
+        // Attached to world layer on first drag, not document.body
     }
 
     // Item Management Methods
-    createItemElement({ name, quantity, type, variant, description = '' }) {
+    normalizeItemData(itemData = {}) {
+        const normalized = ItemRegistry.buildInventoryItem(itemData);
+        return {
+            ...normalized,
+            type: String(normalized.type || '').toUpperCase()
+        };
+    }
+
+    createItemElement(itemData) {
+        const { name, quantity, type, variant, description = '' } = this.normalizeItemData(itemData);
         const itemElement = document.createElement('div');
-        itemElement.className = `item ${type.toLowerCase()}`;
+        const variantClass = ItemRegistry.normalizeId(variant || name);
+        itemElement.className = `item ${type.toLowerCase()} ${variantClass}`;
         itemElement.dataset.name = name;
         itemElement.dataset.quantity = quantity;
         itemElement.dataset.type = type;
-        itemElement.dataset.variant = variant || name;
+        itemElement.dataset.variant = variant;
         itemElement.draggable = true;
+
+        ItemRegistry.applySpriteStyles(itemElement, variant);
 
         if (description) {
             itemElement.title = `${name}\n${description}`;
@@ -80,9 +93,10 @@ class Inventory {
         // Load new items
         itemsArray.forEach(itemData => {
             try {
-                const itemElement = this.createItemElement(itemData);
+                const normalizedItem = this.normalizeItemData(itemData);
+                const itemElement = this.createItemElement(normalizedItem);
                 this.inventoryElement.appendChild(itemElement);
-                this.items.push({ ...itemData, element: itemElement });
+                this.items.push({ ...normalizedItem, element: itemElement });
             } catch (error) {
                 console.error(`Failed to load item: ${itemData.name}`, error);
             }
@@ -97,7 +111,15 @@ class Inventory {
             return false;
         }
 
-        const existingItem = this.items.find(item => item.name === name);
+        const normalizedItem = this.normalizeItemData({
+            name,
+            quantity,
+            type,
+            description,
+            variant: name
+        });
+
+        const existingItem = this.items.find(item => item.variant === normalizedItem.variant);
 
         if (existingItem) {
             const newQuantity = Math.min(
@@ -108,25 +130,27 @@ class Inventory {
             existingItem.element.dataset.quantity = newQuantity;
             this.updateItemDisplay(existingItem);
         } else {
-            const newItem = { name, quantity, type, variant: name, description };
-            const itemElement = this.createItemElement(newItem);
+            const itemElement = this.createItemElement(normalizedItem);
             this.inventoryElement.appendChild(itemElement);
-            this.items.push({ ...newItem, element: itemElement });
+            this.items.push({ ...normalizedItem, element: itemElement });
         }
 
         this.updateInventoryDisplay();
         return true;
     }
 
-    removeItem(name, quantity = 1) {
-        const item = this.items.find(item => item.name === name);
+    removeItem(nameOrVariant, quantity = 1) {
+        const canonicalVariant = ItemRegistry.resolveIdSync(nameOrVariant) || ItemRegistry.normalizeId(nameOrVariant);
+        const item = this.items.find(existingItem =>
+            existingItem.variant === canonicalVariant || existingItem.name === nameOrVariant
+        );
         if (!item) return false;
 
         const newQuantity = Math.max(0, parseInt(item.quantity) - quantity);
 
         if (newQuantity === 0) {
             this.inventoryElement.removeChild(item.element);
-            this.items = this.items.filter(i => i.name !== name);
+            this.items = this.items.filter(i => i !== item);
         } else {
             item.quantity = newQuantity;
             item.element.dataset.quantity = newQuantity;
@@ -176,54 +200,139 @@ class Inventory {
         if (e.dataTransfer) {
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', e.target.dataset.name || '');
+
+            // Custom ghost: clone without quantity badge, centered on cursor
+            const ghost = e.target.cloneNode(true);
+            ghost.removeAttribute('data-quantity');
+            ghost.style.position = 'fixed';
+            ghost.style.top = '-1000px';
+            ghost.style.pointerEvents = 'none';
+            document.body.appendChild(ghost);
+            // zoom: 2 is applied via CSS, so actual rendered size is 64px
+            const ghostSize = 32 * 2;
+            e.dataTransfer.setDragImage(ghost, ghostSize / 2, ghostSize / 2);
+            requestAnimationFrame(() => ghost.remove());
         }
 
-        // Store offset for precise dropping
-        const rect = e.target.getBoundingClientRect();
-        this.config.dragOffsetX = e.clientX - rect.left;
-        this.config.dragOffsetY = e.clientY - rect.top;
-
-        // Add visual cues
-        document.querySelectorAll('.container').forEach(container => {
-            container.classList.add('valid-drop-target');
-        });
+        // Play lift sound
+        this.parent.soundManager?.play('ui_drag_item');
 
         document.querySelectorAll('.duplicate').forEach(myte => {
             myte.classList.add('droppable');
         });
 
-        // Show drop indicator
-        this.dropIndicator.style.display = 'block';
+        // Keep indicator hidden until the first dragover tells us where we are
+        this.dropIndicator.style.display = 'none';
+        this.state.snappedDropPos = null;
+        this.state.dropValid = true;
     }
 
     handleDragEnd(e) {
         this.state.isDragging = false;
         this.state.draggedItem = null;
 
-        // Remove visual cues
         document.querySelectorAll('.container').forEach(container => {
-            container.classList.remove('valid-drop-target', 'on-target');
+            container.classList.remove('on-target');
         });
 
         document.querySelectorAll('.duplicate').forEach(myte => {
-            myte.classList.remove('droppable', 'drag-over');
+            myte.classList.remove('droppable', 'on-target');
         });
+
+        this._hideIndicator();
 
         // Hide drop indicator
         this.dropIndicator.style.display = 'none';
     }
 
     handleContainerDragOver(e) {
-        if (!this.state.isDragging) return;
+        if (!this.state.isDragging || this.state.myteTarget) return;
         e.preventDefault();
+        clearTimeout(this._indicatorHideTimer);
         e.currentTarget.classList.add('on-target');
-
-        // Update drop indicator position
-        this.updateDropIndicator(e.pageX, e.pageY);
+        this._updateIndicator(e.clientX, e.clientY);
     }
 
     handleContainerDragLeave(e) {
         e.currentTarget.classList.remove('on-target');
+        // Small delay to avoid flicker when moving between child elements
+        this._indicatorHideTimer = setTimeout(() => this._hideIndicator(), 60);
+    }
+
+    _hideIndicator() {
+        this.dropIndicator.style.display = 'none';
+        this.dropIndicator.classList.remove('invalid');
+        if (this.dropIndicator.parentElement) {
+            this.dropIndicator.parentElement.removeChild(this.dropIndicator);
+        }
+        this.state.snappedDropPos = null;
+        this.state.dropValid = true;
+    }
+
+    _updateIndicator(clientX, clientY) {
+        const layer = this.parent.gameMap?.layers?.objects;
+        if (!layer) return;
+
+        if (!this.dropIndicator.parentElement) {
+            layer.appendChild(this.dropIndicator);
+        }
+
+        const worldPos = this.parent.inputHandler.screenToWorldCoordinates(clientX, clientY);
+        const itemSize = this._getDragItemSize();
+        const gridSystem = this.parent.gameMap?.gridSystem;
+        const map = this.parent.gameMap;
+
+        let snappedX = worldPos.x - itemSize / 2;
+        let snappedY = worldPos.y - itemSize / 2;
+
+        if (gridSystem) {
+            const s = gridSystem.snapToGrid(snappedX, snappedY, itemSize, itemSize, gridSystem.config.cellSize);
+            snappedX = s.x;
+            snappedY = s.y;
+        }
+
+        this.state.snappedDropPos = { x: snappedX, y: snappedY, size: itemSize };
+        this.state.dropValid = this._isDropPositionValid(snappedX, snappedY, itemSize, gridSystem, map);
+
+        this.dropIndicator.style.width  = `${itemSize}px`;
+        this.dropIndicator.style.height = `${itemSize}px`;
+        this.dropIndicator.style.left   = `${snappedX}px`;
+        this.dropIndicator.style.top    = `${snappedY}px`;
+        this.dropIndicator.style.display = 'block';
+        this.dropIndicator.classList.toggle('invalid', !this.state.dropValid);
+    }
+
+    _isDropPositionValid(snappedX, snappedY, itemSize, gridSystem, map) {
+        if (!gridSystem || !map) return true;
+
+        // Bounds check
+        const mapW = map.dimensions?.width ?? Infinity;
+        const mapH = map.dimensions?.height ?? Infinity;
+        if (snappedX < 0 || snappedY < 0 || snappedX + itemSize > mapW || snappedY + itemSize > mapH) {
+            return false;
+        }
+
+        // Check all grid cells the item overlaps
+        const cellSize = gridSystem.config.cellSize;
+        const startGX = Math.floor(snappedX / cellSize);
+        const startGY = Math.floor(snappedY / cellSize);
+        const endGX   = Math.floor((snappedX + itemSize - 1) / cellSize);
+        const endGY   = Math.floor((snappedY + itemSize - 1) / cellSize);
+
+        for (let gx = startGX; gx <= endGX; gx++) {
+            for (let gy = startGY; gy <= endGY; gy++) {
+                const cell = gridSystem.grid[gx]?.[gy];
+                if (!cell || !cell.walkable) return false;
+            }
+        }
+
+        return true;
+    }
+
+    _getDragItemSize() {
+        const type = this.state.draggedItem?.dataset?.type?.toUpperCase();
+        // Food items and most inventory items are 32px in world space
+        return 32;
     }
 
     handleContainerDrop(e) {
@@ -242,31 +351,54 @@ class Inventory {
         if (!layerForeground) return;
 
         const { name, variant, type } = this.state.draggedItem.dataset;
-        const resolvedObject = this.resolveDroppedMapObject({ name, type, variant });
-        if (!resolvedObject) {
-            console.warn(`Inventory item "${name}" is not placeable on the map.`);
+
+        // Use the exact snapped position the indicator showed, or fall back to cursor
+        let posX, posY;
+        if (this.state.snappedDropPos) {
+            const sz = this.state.snappedDropPos.size ?? 32;
+            posX = this.state.snappedDropPos.x + sz / 2;
+            posY = this.state.snappedDropPos.y + sz / 2;
+        } else {
+            const worldPos = this.parent.inputHandler.screenToWorldCoordinates(e.clientX, e.clientY);
+            posX = worldPos.x;
+            posY = worldPos.y;
+        }
+
+        if (this.state.dropValid === false) {
+            this._hideIndicator();
             return;
         }
 
-        const dropPosition = this.parent.inputHandler.screenToWorldCoordinates(
-            e.clientX,
-            e.clientY
-        );
-        const dragOffset = this.parent.inputHandler.screenDeltaToWorldDelta(
-            this.config.dragOffsetX,
-            this.config.dragOffsetY
-        );
+        let success = false;
 
-        // Create object in world
-        const object = this.parent.gameMap.addObject(
-            resolvedObject.type,
-            resolvedObject.variant,
-            dropPosition.x - dragOffset.x,
-            dropPosition.y - dragOffset.y
-        );
+        // Food items spawn as dropped world items with physics
+        if (type?.toUpperCase() === 'FOOD') {
+            const itemVariant = variant || name;
+            const dropped = this.parent.gameMap.addDroppedItem('FOOD', itemVariant, posX, posY);
+            // Store the inventory name so collect() adds back to the correct stack
+            if (dropped) dropped.inventoryName = name;
+            success = !!dropped;
+        } else {
+            const resolvedObject = this.resolveDroppedMapObject({ name, type, variant });
+            if (!resolvedObject) {
+                console.warn(`Inventory item "${name}" is not placeable on the map.`);
+                return;
+            }
+            const object = this.parent.gameMap.addObject(
+                resolvedObject.type,
+                resolvedObject.variant,
+                posX,
+                posY
+            );
+            if (object?.triggerDropBounce) object.triggerDropBounce();
+            success = !!object;
+        }
 
-        if (object) {
-            this.removeItem(name);
+        this._hideIndicator();
+
+        if (success) {
+            this.removeItem(variant || name);
+            this.parent.soundManager?.play('ui_drop_item');
         }
     }
 
@@ -282,11 +414,16 @@ class Inventory {
     handleMyteDragOver(e) {
         if (!this.state.isDragging) return;
         e.preventDefault();
-        e.currentTarget.classList.add('drag-over');
+        e.stopPropagation();
+        this.state.myteTarget = e.currentTarget;
+        e.currentTarget.classList.add('on-target');
+        // Clear container outline — Myte is the only target
+        document.querySelectorAll('.container').forEach(c => c.classList.remove('on-target'));
     }
 
     handleMyteDragLeave(e) {
-        e.currentTarget.classList.remove('drag-over');
+        e.currentTarget.classList.remove('on-target');
+        this.state.myteTarget = null;
     }
 
     handleMyteDrop(e) {
@@ -301,12 +438,9 @@ class Inventory {
         // Check feeding cooldown
         const now = Date.now();
         if (now - (this.state.lastFeedTime[myte.id] || 0) < this.config.feedCooldown) {
-            console.log('Feeding cooldown active');
-            // Return item to inventory since we can't feed now
             return;
         }
 
-        // Get item configuration
         const itemType = this.state.draggedItem.dataset.type;
         const itemConfig = this.config.itemTypes[itemType];
 
@@ -314,13 +448,17 @@ class Inventory {
 
         // Apply item effects and remove from inventory
         this.applyItemEffects(myte, itemType, itemConfig);
-        this.removeItem(this.state.draggedItem.dataset.name);
+        this.removeItem(this.state.draggedItem.dataset.variant || this.state.draggedItem.dataset.name);
+
+        // Play type-appropriate sound
+        const soundMap = { FOOD: 'myte_eat', TOY: 'myte_happy', MEDICINE: 'myte_happy' };
+        this.parent.soundManager?.play(soundMap[itemType] || 'ui_drop_item');
 
         // Update cooldown
         this.state.lastFeedTime[myte.id] = now;
 
-        // Remove visual feedback
-        myteElement.classList.remove('drag-over');
+        myteElement.classList.remove('on-target');
+        this.state.myteTarget = null;
     }
 
     applyItemEffects(myte, itemType, itemConfig) {
@@ -347,11 +485,6 @@ class Inventory {
 
     findMyteFromElement(element) {
         return this.parent.mytes.find(myte => myte.duplicate === element);
-    }
-
-    updateDropIndicator(x, y) {
-        this.dropIndicator.style.left = `${x}px`;
-        this.dropIndicator.style.top = `${y}px`;
     }
 
     resolveDroppedMapObject({ name, type, variant }) {

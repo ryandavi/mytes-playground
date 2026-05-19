@@ -103,6 +103,10 @@ class MapObjectFactory {
             console.error(`Unknown object type: ${type}`);
             return null;
         }
+        if (typeConfig.abstract) {
+            console.error(`Cannot create abstract object type directly: ${type}`);
+            return null;
+        }
 
         // Merge base config with type config and options
         const config = this.mergeConfigs(type, variant, options);

@@ -701,6 +701,23 @@ class Myte {
 		if (setY) this.posY = y;
 	}
 
+	getCarriedItemPosition(itemSize = {}) {
+		const carryConfig = this.definition?.carryOffsets?.item || {};
+		const itemWidth = itemSize.width ?? 0;
+		const itemHeight = itemSize.height ?? 0;
+		const anchorX = carryConfig.anchorX ?? 0.5;
+		const anchorY = carryConfig.anchorY ?? 0.12;
+		const itemAnchorX = carryConfig.itemAnchorX ?? 0.5;
+		const itemAnchorY = carryConfig.itemAnchorY ?? 1;
+		const offsetX = carryConfig.offsetX ?? 0;
+		const offsetY = carryConfig.offsetY ?? -8;
+
+		return {
+			x: this.posX + (this.size.width * anchorX) - (itemWidth * itemAnchorX) + offsetX,
+			y: this.posY + (this.size.height * anchorY) - (itemHeight * itemAnchorY) + offsetY
+		};
+	}
+
 	isDoingAction(action) {
 		return this.queue.count() >= 1 && this.queue.getCurrentAction().action === action;
 	}

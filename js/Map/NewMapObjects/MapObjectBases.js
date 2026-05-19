@@ -67,6 +67,10 @@ class RangeInteractiveAnimatedMapObject extends withAnimation(MapObject) {
     // 'adjacent' — stop just outside, no overlap (flowers, fountains)
     // 'center'   — walk into the center (portals)
     // 'front'    — face directly toward the object (doors, NPCs)
+    getApproachConfig() {
+        return this.getConfig('approachConfig', null);
+    }
+
     getApproachMode() {
         return 'side';
     }

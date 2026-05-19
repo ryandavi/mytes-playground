@@ -137,7 +137,7 @@ class MyteQueue {
 
     isCarrying() {
         const action = this.getCurrentAction();
-        return action instanceof CarryAction || action instanceof HoldBallAction;
+        return action instanceof CarryAction || action instanceof HoldBallAction || action instanceof CarryPickupAction;
     }
 
     // ─── Convenience methods ──────────────────────────────────────────────────

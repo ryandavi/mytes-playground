@@ -364,8 +364,8 @@ body.debug {
 	position: fixed;
 	pointer-events: none;
 	z-index: 9999;
-	width: 32px;
-	height: 32px;
+	width: var(--item-sprite-width, 32px);
+	height: var(--item-sprite-height, 32px);
 	background-image: url('../images/cursor/hand2.png');
 	background-size: cover;
 	transform: translate(-50%, -50%);
@@ -438,63 +438,39 @@ body.debug {
 
 
 .item {
+	position: relative;
 	width: 32px;
 	height: 32px;
-	background: url(../images/items/items.png);
+	background-image: url(../images/items/items.png);
+	background-repeat: no-repeat;
+	background-position: var(--item-sprite-x, 0px) var(--item-sprite-y, 0px);
 	image-rendering: pixelated;
 	zoom: 2;
-	position: relative;
+	border-radius: var(--border-radius);
+	cursor: grab;
+	transition: transform 0.2s ease, filter 0.2s ease;
 
-	&.acorn {
-		background-position: 0px 0px;
-	}
 
-	&.turnip {
-		background-position: -32px 0px;
-	}
+	// Type tints — background-color layered behind the sprite
+	&.food     { background-color: rgba(240, 230, 140, 0.15); }
+	&.toy      { background-color: rgba(135, 206, 235, 0.15); }
+	&.medicine { background-color: rgba(152, 251, 152, 0.15); }
 
-	&.apple {
-		background-position: -128px 0px;
-	}
-
-	&.cherries {
-		background-position: -160px 0px;
-	}
-
-	&.music_box {
-		background-position: 0px -64px;
-	}
-
-	&:after {
-		// Display only if data-quantity > 1
+	// Quantity badge
+	&::after {
 		content: attr(data-quantity);
 		position: absolute;
 		top: 0;
 		right: 0;
-
-		// content: attr(data-zindex);
-
 		background-color: white;
 		border-radius: 5px;
 		padding: 2px;
 		font-size: 6px;
 	}
 
-	&[data-quantity="1"]:after {
+	&[data-quantity="1"]::after {
 		visibility: hidden;
 	}
-}
-
-.item {
-	position: relative;
-
-	background: rgba(255, 255, 255, 0.1);
-	border-radius: var(--border-radius);
-	cursor: grab;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	transition: all 0.2s ease;
 
 	&:hover {
 		transform: translateY(-2px);
@@ -510,47 +486,26 @@ body.debug {
 		opacity: 0.7;
 		pointer-events: none;
 	}
-
-	&.food {
-		background: rgba(240, 230, 140, 0.2);
-
-		&::before {
-			content: '🍎';
-			font-size: 24px;
-		}
-	}
-
-	&.toy {
-		background: rgba(135, 206, 235, 0.2);
-
-		&::before {
-			content: '🎾';
-			font-size: 24px;
-		}
-	}
-
-	&.medicine {
-		background: rgba(152, 251, 152, 0.2);
-
-		&::before {
-			content: '💊';
-			font-size: 24px;
-		}
-	}
-
 }
 
 .inventory-drop-indicator {
 	position: absolute;
-	width: var(--item-size);
-	height: var(--item-size);
-	border: 2px dashed white;
-	border-radius: 50%;
+	border: 2px dashed var(--on-target);
+	border-radius: 4px;
 	pointer-events: none;
 	display: none;
 	z-index: 9999;
-	transform: translate(-50%, -50%);
-	animation: pulse 1s infinite;
+	animation: drop-indicator-pulse 0.8s ease-in-out infinite;
+
+	&.invalid {
+		border-color: #ff4444;
+		background-color: rgba(255, 68, 68, 0.1);
+	}
+}
+
+@keyframes drop-indicator-pulse {
+	0%, 100% { opacity: 1; }
+	50%       { opacity: 0.35; }
 }
 
 .consumption-effect {
@@ -577,13 +532,11 @@ body.debug {
 
 .duplicate {
 	&.droppable {
-		transition: transform 0.2s ease;
+		transition: outline 0.1s ease;
 	}
 
-	&.drag-over {
-		transform: scale(1.1);
-		filter: brightness(1.1);
-		box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+	&.on-target {
+		outline: var(--border-width) solid var(--on-target) !important;
 	}
 }
 

@@ -225,7 +225,7 @@ class Zone {
                 x: (Math.random() - 0.5) * 100,
                 y: (Math.random() - 0.5) * 100
             };
-            this.map?.addObject(
+            this.map?.addDroppedItem(
                 'FOOD',
                 'apple',
                 myte.posX + offset.x,

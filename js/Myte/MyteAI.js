@@ -84,6 +84,7 @@ class MyteAI {
         const candidates = [
             this.buildRestCandidate(),
             this.buildSocialCandidate(),
+            this.buildDroppedItemCandidate(),
             this.buildInteractionCandidate(),
             this.buildWanderCandidate(),
             this.buildIdleCandidate()
@@ -298,6 +299,50 @@ class MyteAI {
                 this.myte.queue.addIdle(45);
             }
         };
+    }
+
+    buildDroppedItemCandidate() {
+        const droppedItems = this.myte.parent?.gameMap?.droppedItems;
+        if (!droppedItems || droppedItems.length === 0) return null;
+
+        const stats = this.myte.stats;
+        const curiosity = stats?.getTraitNormalized?.('curiosity') ?? 0.5;
+        const energy = stats?.getEnergyRatio?.() ?? 1;
+
+        let best = null;
+        for (const item of droppedItems) {
+            if (item.collected || !item.active) continue;
+
+            const distance = this.myte.getDistanceTo?.(item) ?? Infinity;
+            if (distance > this.objectSearchRadius) continue;
+
+            let score = 10 + (curiosity * 18) + Math.max(0, 120 - distance) * 0.1;
+
+            // Curiosity boost for recently dropped items (fades over 30s)
+            const age = Date.now() - (item.droppedAt ?? 0);
+            if (age < 30000) score += 22 * (1 - age / 30000);
+
+            // Hunger-driven boost for food
+            if (item.type?.toUpperCase() === 'FOOD' && energy < 0.7) {
+                score += (1 - energy) * 50;
+            }
+
+            score = this.applyRepeatPenalty(score, `dropped_item:${item.type}`);
+
+            if (!best || score > best.score) {
+                best = {
+                    label: `dropped_item:${item.type}`,
+                    score,
+                    execute: () => {
+                        this.myte.queue.add('astar-move', {
+                            target: { x: item.posX, y: item.posY }
+                        });
+                    }
+                };
+            }
+        }
+
+        return best;
     }
 
     applyRepeatPenalty(score, label) {

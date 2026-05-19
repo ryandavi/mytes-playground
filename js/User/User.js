@@ -205,7 +205,9 @@ class User {
             this.inventory.items.map(item => ({
                 name: item.name,
                 quantity: item.quantity,
-                type: item.type
+                type: item.type,
+                variant: item.variant,
+                description: item.description || ''
             })) : [];
 
         const userData = {
@@ -243,7 +245,7 @@ class User {
                 }
                 // Load saved inventory items
                 userData.inventory.forEach(item => {
-                    this.inventory.addItem(item.name, item.quantity, item.type);
+                    this.inventory.addItem(item.variant || item.name, item.quantity, item.type, item.description || '');
                 });
             }
         }

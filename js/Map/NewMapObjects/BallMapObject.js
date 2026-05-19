@@ -29,16 +29,77 @@ class BallMapObject extends AnimatedMapObject {
         this.carrier = null;
         this.pendingPickup = false;
 
+        // Drop bounce (Z-axis visual only — sprite translates, shadow stays grounded)
+        this.dropZ = 0;
+        this.dropVelocityZ = 0;
+        this.isDropBouncing = false;
+        this.dropBounceCount = 0;
+        this.maxDropBounces = 3;
+        this.dropGravity = 1.2;
+        this.dropBounceFactor = 0.48;
+
         // Safe defaults — overwritten by setupBoundaries() once render() has a parent
         this.bounds = { left: 0, top: 0, right: 500, bottom: 500 };
     }
 
+    triggerArcBounce(height = 30) {
+        if (height < 2) return;
+        // Single-arc: launch upward, one small bounce, settle
+        this.dropZ = height;
+        this.dropVelocityZ = 0;
+        this.isDropBouncing = true;
+        this.dropBounceCount = 0;
+        this.maxDropBounces = 1;
+    }
+
+    triggerDropBounce(initialHeight = 90) {
+        this.dropZ = initialHeight;
+        this.dropVelocityZ = 0;
+        this.isDropBouncing = true;
+        this.dropBounceCount = 0;
+    }
+
+    _updateDropBounce() {
+        this.dropVelocityZ -= this.dropGravity;
+        this.dropZ += this.dropVelocityZ;
+
+        if (this.dropZ <= 0) {
+            this.dropZ = 0;
+            const speed = Math.abs(this.dropVelocityZ);
+            if (this.dropBounceCount < this.maxDropBounces && speed > 1.5) {
+                this.dropVelocityZ = speed * this.dropBounceFactor;
+                this.dropBounceCount++;
+                this.gameMap?.soundManager?.play('obj_ball_bounce');
+            } else {
+                this.dropVelocityZ = 0;
+                this.isDropBouncing = false;
+                this.maxDropBounces = 3; // restore default
+                this._applySpriteDropOffset(0);
+            }
+        }
+    }
+
+    _applySpriteDropOffset(z) {
+        const sprite = this.element?.querySelector('.sprite');
+        if (!sprite) return;
+        sprite.style.transform = z > 0 ? `translateY(-${z.toFixed(1)}px)` : '';
+    }
+
     shouldSimulateOffScreen() { return true; }
 
-    // Override to only allow dragging when not in motion and not being carried
+    // Override to only allow dragging when not in motion
+    // (if carried, startDrag will drop it from the myte first)
     canBeDragged() {
-        if (this.isMoving || this.isPickedUp) return false;
+        if (this.isMoving) return false;
         return super.canBeDragged();
+    }
+
+    startDrag() {
+        // If the myte is holding this ball, interrupt the hold so the ball is freed
+        if (this.isPickedUp && this.carrier) {
+            this.carrier.queue.clear();
+        }
+        super.startDrag?.();
     }
 
     // Get the center of the collider
@@ -61,11 +122,13 @@ class BallMapObject extends AnimatedMapObject {
         this.isPickedUp = true;
         this.carrier = myte;
         this.stopMotion();
+        this.playConfiguredSound?.('pickup');
     }
 
     drop(vx = 0, vy = 0) {
         this.isPickedUp = false;
         this.carrier = null;
+        this.playConfiguredSound?.('drop');
         if (vx !== 0 || vy !== 0) {
             this.velocity.x = vx;
             this.velocity.y = vy;
@@ -115,6 +178,11 @@ class BallMapObject extends AnimatedMapObject {
 
             // Update animation based on movement
             this.updateBallAnimation();
+
+            // Arc the ball upward proportional to push speed
+            const pushSpeed = Math.hypot(pushX, pushY);
+            const arcHeight = Math.min(60, pushSpeed * 6);
+            this.triggerArcBounce(arcHeight);
 
             // Mark as moving and update last push time
             this.isMoving = true;
@@ -315,30 +383,35 @@ class BallMapObject extends AnimatedMapObject {
         super.playAnimation(animationName, onComplete);
     }
 
+    press() {
+        const myte = this.activeMyte;
+        if (!myte?.isActive) return false;
+        if (this.isPickedUp && this.carrier === myte) {
+            myte.queue.clear();
+        } else if (!myte.queue.isCarrying()) {
+            myte.queue.addPickupBall(this);
+        }
+        return true;
+    }
+
     // Override render method
     render(container, parent) {
         const element = super.render(container, parent);
         element.classList.add('ball-object');
         element.setAttribute('data-moving', this.isMoving);
 
-        element.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const myte = this.activeMyte;
-            if (!myte?.isActive) return;
-            if (this.isPickedUp && this.carrier === myte) {
-                // Click ball while carrying it → drop in place
-                myte.queue.clear();
-            } else if (!myte.queue.isCarrying()) {
-                myte.queue.addPickupBall(this);
-            }
-        });
-
         // Set up boundaries and other parent-dependent configs
         if (parent) {
             this.setupBoundaries(parent);
         }
 
+        this._initSelectDragHandler();
+
         return element;
+    }
+
+    _initSelectDragHandler() {
+        super._initSelectDragHandler?.();
     }
     
     // Override drag component init to apply physics velocity on drop
@@ -351,6 +424,11 @@ class BallMapObject extends AnimatedMapObject {
             if (originalOnDragEnd) originalOnDragEnd(event);
             this._applyDragVelocity(event?.velocity);
         };
+    }
+
+    remove() {
+        this._selectDragCleanup?.();
+        super.remove();
     }
 
     _applyDragVelocity(dragVelocity) {
@@ -413,10 +491,17 @@ class BallMapObject extends AnimatedMapObject {
         super.tickUpdate(tickDelta);
 
         if (this.isPickedUp && this.carrier) {
-            // Center ball above carrier's head
-            this.posX = this.carrier.posX + (this.carrier.size.width - this.size.width) / 2;
-            this.posY = this.carrier.posY - this.size.height - 8;
+            const carriedPosition = this.carrier.getCarriedItemPosition?.(this.size) || {
+                x: this.carrier.posX + (this.carrier.size.width - this.size.width) / 2,
+                y: this.carrier.posY - this.size.height - 8
+            };
+            this.posX = carriedPosition.x;
+            this.posY = carriedPosition.y;
             return;
+        }
+
+        if (this.isDropBouncing) {
+            this._updateDropBounce();
         }
 
         if (this.mytes.length) {
@@ -433,6 +518,9 @@ class BallMapObject extends AnimatedMapObject {
         super.update(deltaTime);
         if (this.element) {
             this.element.setAttribute('data-moving', String(this.isMoving));
+        }
+        if (this.isDropBouncing) {
+            this._applySpriteDropOffset(this.dropZ);
         }
     }
 }

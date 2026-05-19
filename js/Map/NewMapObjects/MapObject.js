@@ -296,6 +296,7 @@ class MapObject {
 				this.isDragging = true;
 				this.element.classList.add('dragging');
 				if (this.container?.ui) this.container.ui.setSelected(this);
+				this.playConfiguredSound?.('pickup');
 			},
 			onDragMove: (event) => {
 				const world = this.container?.inputHandler?.screenToWorldCoordinates
@@ -313,6 +314,7 @@ class MapObject {
 				this.element.classList.remove('dragging');
 				this.hideDropTarget();
 				if (this.getConfig('snapToGrid', false)) this.snapToGrid();
+				this.playConfiguredSound?.('drop');
 				this.handleMovedEvent();
 			}
 		});
@@ -357,6 +359,87 @@ class MapObject {
 	startDrag() {
 		if (!this.canBeDragged() || !this.inputComponents.drag) return;
 		this.inputComponents.drag.startDragAtCurrentPosition();
+	}
+
+	_initSelectDragHandler() {
+		if (!this.getConfig('draggable', false) || !this.element || this._selectDragCleanup) {
+			return;
+		}
+
+		const dragThreshold = this.getConfig('selectDragThreshold', 8);
+		let pressStart = null;
+		let previousMode = null;
+
+		const onMouseDown = (event) => {
+			if (event.button !== 0 || !this.active || this.isDragging || !this.parent?.ui?.isTool(UIToolModes.SELECT)) {
+				return;
+			}
+
+			pressStart = { x: event.clientX, y: event.clientY };
+			previousMode = UIToolModes.SELECT;
+		};
+
+		const onMouseMove = (event) => {
+			if (!pressStart || this.isDragging || !this.parent?.ui?.isTool(UIToolModes.SELECT)) {
+				return;
+			}
+
+			const dx = event.clientX - pressStart.x;
+			const dy = event.clientY - pressStart.y;
+			if (Math.hypot(dx, dy) < dragThreshold) {
+				return;
+			}
+
+			pressStart = null;
+			this.parent?.ui?.setSelected?.(this);
+			this.parent?.ui?.changeToolMode(UIToolModes.DRAG);
+			this.startDrag();
+			if (this.isDragging) {
+				this._restoreToolModeAfterDrag(previousMode);
+			} else {
+				this.parent?.ui?.changeToolMode(previousMode);
+			}
+		};
+
+		const onMouseUp = () => {
+			pressStart = null;
+			previousMode = null;
+		};
+
+		this.element.addEventListener('mousedown', onMouseDown);
+		document.addEventListener('mousemove', onMouseMove);
+		document.addEventListener('mouseup', onMouseUp);
+
+		this._selectDragCleanup = () => {
+			this.element?.removeEventListener('mousedown', onMouseDown);
+			document.removeEventListener('mousemove', onMouseMove);
+			document.removeEventListener('mouseup', onMouseUp);
+			this._selectDragCleanup = null;
+		};
+	}
+
+	_restoreToolModeAfterDrag(mode) {
+		const dragComp = this.inputComponents.drag;
+		if (!dragComp || !mode) {
+			return;
+		}
+
+		const savedEnd = dragComp.options.onDragEnd;
+		dragComp.options.onDragEnd = (event) => {
+			if (savedEnd) {
+				savedEnd(event);
+			}
+
+			this.parent?.ui?.changeToolMode(mode);
+			dragComp.options.onDragEnd = savedEnd;
+		};
+	}
+
+	playConfiguredSound(type) {
+		const soundEffect = this.getConfig(`soundEffects.${type}`);
+		if (soundEffect && this.gameMap?.soundManager) {
+			this.gameMap.soundManager.play(soundEffect);
+		}
 	}
 
 	showDropTarget() {
@@ -504,6 +587,7 @@ class MapObject {
 		container.appendChild(divElement);
 		this.updateShadowVisual();
 		this.initializeInputComponents();
+		this._initSelectDragHandler();
 		return divElement;
 	}
 
@@ -605,6 +689,7 @@ class MapObject {
 	remove() {
 		Object.values(this.inputComponents).forEach(c => c.destroy());
 		this.inputComponents = {};
+		this._selectDragCleanup?.();
 		if (this._dropTargetEl) {
 			this._dropTargetEl.remove();
 			this._dropTargetEl = null;
@@ -615,6 +700,7 @@ class MapObject {
 		}
 		this.shadowElement = null;
 		this.active = false;
+		this.gameMap?.gridSystem?.removeObject(this);
 	}
 
 	// ── Event handlers ────────────────────────────────────────────────────────
