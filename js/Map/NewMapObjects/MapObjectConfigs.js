@@ -541,7 +541,8 @@ const TYPE_CONFIGS = {
 				size: { width: 32, height: 96 },
 				collider: { width: 32, height: 96, offsetX: 0, offsetY: 0 },
 				interactiveCollider: { width: 64, height: 128, offsetX: 0, offsetY: -16 },
-				transformStyle: 'scaleX(-1)'
+				transformStyle: 'scaleX(-1)',
+				spriteFrameOffset: { offsetX: 0, offsetY: 160 }
 			},
 			S: {
 				size: { width: 96, height: 32 },

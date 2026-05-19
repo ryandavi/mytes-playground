@@ -511,10 +511,14 @@ class MapObject {
 		}
 
 		if (this.getConfig('spriteConfig.spriteSheet.frameSize')) {
-			div.style.width = `${this.getConfig('spriteConfig.spriteSheet.frameSize.width')}px`;
-			div.style.height = `${this.getConfig('spriteConfig.spriteSheet.frameSize.height')}px`;
-			div.style.left = `${-this.getConfig('spriteConfig.spriteSheet.frameSize.offsetX')}px`;
-			div.style.top = `${-this.getConfig('spriteConfig.spriteSheet.frameSize.offsetY')}px`;
+			const frameSize = this.getConfig('spriteConfig.spriteSheet.frameSize');
+			const offsetOverride = this.getConfig('spriteFrameOffset');
+			const offsetX = offsetOverride?.offsetX ?? frameSize.offsetX;
+			const offsetY = offsetOverride?.offsetY ?? frameSize.offsetY;
+			div.style.width = `${frameSize.width}px`;
+			div.style.height = `${frameSize.height}px`;
+			div.style.left = `${-offsetX}px`;
+			div.style.top = `${-offsetY}px`;
 		}
 
 		if (this.getConfig('animation') === 'sway') {
@@ -559,7 +563,12 @@ class MapObject {
 
 	handleDoubleClick(event) {
 		const fn = this.getConfig('doubleClickAction');
-		if (typeof fn === 'function') fn(this, event);
+		if (typeof fn === 'function') {
+			fn(this, event);
+			return;
+		}
+		const myte = this.activeMyte;
+		if (myte?.queue) myte.queue.add('go_to_object', { target: this });
 	}
 
 	handleLongPress(event) {

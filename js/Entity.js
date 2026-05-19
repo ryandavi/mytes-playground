@@ -41,19 +41,26 @@ const EntityMethods = {
 	},
 
 	// Returns true when this entity is allowed to auto-open the given collider.
-	canAutoOpenCollider(collider) {
-		return !!(
-			collider &&
-			this.capabilities?.can_open_doors &&
-			['DOOR', 'GATE'].includes(collider.type) &&
-			typeof collider.open === 'function' &&
-			!collider.isOpen
-		);
+	// axis: 'x' | 'y' | undefined — when provided, doors must be perpendicular to the movement axis.
+	// E/W doors (tall, vertical) block X movement; N/S doors (wide, horizontal) block Y movement.
+	canAutoOpenCollider(collider, axis) {
+		if (!collider || !this.capabilities?.can_open_doors) return false;
+		if (!['DOOR', 'GATE'].includes(collider.type)) return false;
+		if (typeof collider.open !== 'function' || collider.isOpen) return false;
+
+		if (axis && collider.facingDirection) {
+			const verticalDoors = ['E', 'W']; // tall doors — block X movement
+			const horizontalDoors = ['N', 'S']; // wide doors — block Y movement
+			if (axis === 'x' && !verticalDoors.includes(collider.facingDirection)) return false;
+			if (axis === 'y' && !horizontalDoors.includes(collider.facingDirection)) return false;
+		}
+
+		return true;
 	},
 
 	// Tries to open the collider. Returns true if the door was opened.
-	tryOpenCollider(collider) {
-		if (!this.canAutoOpenCollider(collider)) return false;
+	tryOpenCollider(collider, axis) {
+		if (!this.canAutoOpenCollider(collider, axis)) return false;
 		return collider.open() !== false;
 	},
 
