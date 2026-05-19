@@ -22,6 +22,37 @@ class MytePhysics {
 		this.stuckFrames = 0;
 	}
 
+	syncGroundState() {
+		const m = this.myte;
+		const worldBounds = m.parent?.getWorldBounds?.();
+		if (!worldBounds) {
+			return false;
+		}
+
+		const feetY = this.getFeetPosition();
+		const worldGrounded = feetY >= worldBounds.bottom - (m.physics.collisionTolerance ?? 5);
+		let colliderGrounded = false;
+
+		if (m.parent?.gameMap?.gridSystem) {
+			const currentEntity = this.createCollisionEntity(m.posX, m.posY);
+			const colliders = m.parent.gameMap.gridSystem.getPotentialColliders(m);
+			colliderGrounded = colliders.some(collider =>
+				this.isStandingOnCollider(collider) && m.parent?.checkCollision?.(currentEntity, collider)
+			);
+		}
+
+		this.isOnSolidGround = worldGrounded || colliderGrounded;
+		this.isJumping = false;
+		this.isFalling = !this.isOnSolidGround;
+
+		if (this.isOnSolidGround) {
+			m.physics.velocity = 0;
+			this.leftGroundTime = undefined;
+		}
+
+		return this.isOnSolidGround;
+	}
+
 	isCurrentlyJumping() {
 		return this.isJumping || this.isFalling;
 	}

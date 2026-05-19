@@ -46,10 +46,11 @@ class MyteStats {
         this.lastSoundTime = {};
 
 
+        const traitConfig = statConfig.traits || {};
         this.traits = {
-            neediness: this.generateTraitValue(),
-            activity:  this.generateTraitValue(),
-            curiosity: this.generateTraitValue()
+            neediness: this.resolveTraitValue(traitConfig.neediness),
+            activity:  this.resolveTraitValue(traitConfig.activity),
+            curiosity: this.resolveTraitValue(traitConfig.curiosity)
         };
 
         this.lastInteractionTime = 0;
@@ -89,6 +90,14 @@ class MyteStats {
     // Generate random trait value between -100 and 100
     generateTraitValue() {
         return Math.floor(Math.random() * 201) - 100;
+    }
+
+    resolveTraitValue(value) {
+        if (Number.isFinite(value)) {
+            return Utility.clamp(value, -100, 100);
+        }
+
+        return this.generateTraitValue();
     }
 
     // Mood management
@@ -131,6 +140,26 @@ class MyteStats {
         if (this.mood >= 40) return 'neutral';
         if (this.mood >= 20) return 'unhappy';
         return 'very unhappy';
+    }
+
+    getMoodRatio() {
+        return this.mood / this.maxMood;
+    }
+
+    getEnergyRatio() {
+        return this.energy / this.maxEnergy;
+    }
+
+    getHealthRatio() {
+        return this.health / this.maxHealth;
+    }
+
+    getTrait(name) {
+        return this.traits?.[name] ?? 0;
+    }
+
+    getTraitNormalized(name) {
+        return (this.getTrait(name) + 100) / 200;
     }
 
 

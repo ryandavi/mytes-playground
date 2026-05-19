@@ -408,6 +408,7 @@ const TYPE_CONFIGS = {
 		variants: ['slime', 'ghost', 'goblin'],
 		renderType: 'animated',
 		collision: false,   // does not block other objects
+		walkable: true,
 		renderPriority: 2,
 		speed: 1.5,
 		aggroRadius: 220,

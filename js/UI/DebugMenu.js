@@ -99,6 +99,33 @@ class DebugMenu extends ModalWindow {
                 }
             },
             {
+                id: 'cycleAutonomyGoal',
+                type: 'cycle',
+                label: 'AI: ',
+                target: {
+                    path: ['parent', 'activeMyte'],
+                    property: 'autonomyGoal'
+                },
+                options: MOVE_AUTONOMY_TYPES,
+                requiresActiveMyte: true,
+                getValue: () => {
+                    const activeMyte = this.parent.parent.activeMyte;
+                    return activeMyte?.isActive ? activeMyte.autonomyGoal : null;
+                },
+                format: (value) => {
+                    return Utility.getKeyByValue(MOVE_AUTONOMY_TYPES, value) || "None";
+                },
+                action: () => {
+                    const activeMyte = this.parent.parent.activeMyte;
+                    if (activeMyte?.isActive) {
+                        const currentGoal = activeMyte.autonomyGoal;
+                        const nextGoal = Utility.getNextKey(currentGoal, MOVE_AUTONOMY_TYPES);
+                        activeMyte.setAutonomyMode(nextGoal);
+                        this.updateButton('cycleAutonomyGoal');
+                    }
+                }
+            },
+            {
                 id: 'cycleCamera',
                 type: 'cycle',
                 label: 'Camera: ',

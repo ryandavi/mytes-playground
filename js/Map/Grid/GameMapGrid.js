@@ -881,6 +881,55 @@ class GridSystem {
         };
     }
 
+    isEntityPositionValid(entity, x, y) {
+        if (!entity) return false;
+
+        if (this.pathfinder) {
+            const entityWidth = entity.size?.width || 0;
+            const entityHeight = entity.size?.height || 0;
+            const entityCollider = entity.collider || {};
+            const collider = {
+                offsetX: entityCollider.offsetX || 0,
+                offsetY: entityCollider.offsetY || 0,
+                width: entityCollider.width || entityWidth,
+                height: entityCollider.height || entityHeight
+            };
+            const capabilities = entity.capabilities || {};
+
+            return this.pathfinder._validatePosition(
+                entity,
+                x,
+                y,
+                entityWidth,
+                entityHeight,
+                collider,
+                capabilities
+            );
+        }
+
+        const cellSize = this.config.cellSize;
+        const left = x + (entity.collider?.offsetX || 0);
+        const top = y + (entity.collider?.offsetY || 0);
+        const right = left + (entity.collider?.width || entity.size?.width || 0);
+        const bottom = top + (entity.collider?.height || entity.size?.height || 0);
+        const startGridX = Math.floor(left / cellSize);
+        const startGridY = Math.floor(top / cellSize);
+        const endGridX = Math.ceil(right / cellSize);
+        const endGridY = Math.ceil(bottom / cellSize);
+
+        for (let gridX = startGridX; gridX < endGridX; gridX++) {
+            for (let gridY = startGridY; gridY < endGridY; gridY++) {
+                if (gridX < 0 || gridX >= this.gridWidth ||
+                    gridY < 0 || gridY >= this.gridHeight ||
+                    !this.grid[gridX]?.[gridY]?.walkable) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     // Get all potential colliders for an entity
     getPotentialColliders(entity) {
         // Get all cells that the entity overlaps
@@ -1019,6 +1068,8 @@ class GridSystem {
             this.activeObjects.add(obj);
         }
 
+        obj._gridOccupancyX = obj.posX;
+        obj._gridOccupancyY = obj.posY;
         this.invalidatePathfinderCaches();
     }
 
@@ -1034,7 +1085,9 @@ class GridSystem {
     removeObject(obj) {
         if (!obj) return; // Safety check
 
-        const cells = this.getObjectCells(obj);
+        const trackedX = Number.isFinite(obj._gridOccupancyX) ? obj._gridOccupancyX : obj.posX;
+        const trackedY = Number.isFinite(obj._gridOccupancyY) ? obj._gridOccupancyY : obj.posY;
+        const cells = this.getObjectCells({ ...obj, posX: trackedX, posY: trackedY });
         cells.forEach(cell => {
             cell.objects.delete(obj);
 
@@ -1051,16 +1104,23 @@ class GridSystem {
 
         // Remove from active objects
         this.activeObjects.delete(obj);
+        delete obj._gridOccupancyX;
+        delete obj._gridOccupancyY;
         this.invalidatePathfinderCaches();
     }
 
     // IMPROVED: Update object's position in grid - more efficient implementation
     // UPDATED: Update object's position in grid with terrain awareness
-    updateObjectPosition(obj, oldX, oldY) {
+    updateObjectPosition(obj, oldX = obj?._gridOccupancyX, oldY = obj?._gridOccupancyY) {
         if (!obj) return; // Safety check
+
+        if (!Number.isFinite(oldX)) oldX = obj.posX;
+        if (!Number.isFinite(oldY)) oldY = obj.posY;
 
         // Skip if position hasn't changed significantly
         if (Math.abs(oldX - obj.posX) < 1 && Math.abs(oldY - obj.posY) < 1) {
+            obj._gridOccupancyX = obj.posX;
+            obj._gridOccupancyY = obj.posY;
             return;
         }
 
@@ -1152,6 +1212,8 @@ class GridSystem {
             }
         }
 
+        obj._gridOccupancyX = obj.posX;
+        obj._gridOccupancyY = obj.posY;
         this.invalidatePathfinderCaches();
     }
     // Get objects in an area

@@ -35,6 +35,8 @@ class MovingMapObject extends withAnimation(MapObject) {
 
 	// Clamps to bounds and reverses velocity on impact. No DOM write.
 	setPosition(x, y) {
+		const oldX = this.posX;
+		const oldY = this.posY;
 		const newX = Math.max(this.bounds.left, Math.min(this.bounds.right - this.size.width, x));
 		const newY = Math.max(this.bounds.top, Math.min(this.bounds.bottom - this.size.height, y));
 
@@ -47,6 +49,10 @@ class MovingMapObject extends withAnimation(MapObject) {
 
 		this.posX = newX;
 		this.posY = newY;
+
+		if ((newX !== oldX || newY !== oldY) && this.gameMap?.gridSystem) {
+			this.gameMap.gridSystem.updateObjectPosition(this, oldX, oldY);
+		}
 	}
 
 	handleBoundaryCollision(direction) {

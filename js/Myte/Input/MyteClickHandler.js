@@ -46,6 +46,9 @@ class MyteClickHandler extends MyteBaseHandler {
 	_onActiveClick(event) {
 		if (this.myte.isActive && !this.isDragging) {
 			event.stopPropagation();
+			if (!this.myte.isActiveMyte) {
+				this.myte.parent.setActiveMyte(this.myte);
+			}
 			if (this.myte.parent.ui.isTool(UIToolModes.SELECT)) {
 				this.myte.parent.ui.setSelected(this.myte);
 				if (this.myte.isActiveMyte &&

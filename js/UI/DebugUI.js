@@ -168,9 +168,13 @@ getZoneDebugMessages() {
             { label: "Goal", value: activeMyte.getMoveType(activeMyte.goal) },
             { label: "Previous Goal", value: activeMyte.getMoveType(activeMyte.previousGoal) },
             { label: "Follow Goal", value: activeMyte.getMoveFollowType(activeMyte.followGoal) },
+            { label: "AI Goal", value: activeMyte.getMoveAutonomyType(activeMyte.autonomyGoal) },
             
             // Status
             { label: "Active", value: activeMyte.isActive },
+            { label: "Deployed", value: activeMyte.isDeployed },
+            { label: "In Slot", value: activeMyte.isInSlot },
+            { label: "Controlled", value: activeMyte.isActiveMyte },
 
             // Movement
             { label: "Position", value: `${activeMyte.posX.toFixed(2)}px, ${activeMyte.posY.toFixed(2)}px` },

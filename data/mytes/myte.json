@@ -40,6 +40,17 @@
     "canWade": true,
     "fireResistance": false
   },
+  "ai": {
+    "enabled": true,
+    "defaultMode": "INTERACT",
+    "thinkInterval": 900,
+    "minThinkInterval": 450,
+    "maxThinkInterval": 1800,
+    "wanderRadius": 220,
+    "homeRadius": 320,
+    "objectSearchRadius": 280,
+    "socialRadius": 240
+  },
   "stats": {
     "health": 100,
     "mood": 100,
@@ -48,6 +59,11 @@
     "moodDecayRate": 0.0005,
     "energyDecayRate": 0.0005,
     "energyRegenRate": 0.005,
+    "traits": {
+      "neediness": 0,
+      "activity": 0,
+      "curiosity": 0
+    },
     "moods": {
       "happy":   { "duration": 10000, "speedMultiplier": 1.2, "expression": "happy" },
       "sad":     { "duration": 15000, "speedMultiplier": 0.8, "expression": "sad" },

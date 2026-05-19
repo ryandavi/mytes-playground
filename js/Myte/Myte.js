@@ -48,7 +48,8 @@ class Myte {
 		this.targetY = 0;
 
 		this.modes = [MOVE_TYPES.FOLLOW, MOVE_TYPES.FREEROAM, MOVE_TYPES.GRAVITY, MOVE_TYPES.GOHOME, MOVE_TYPES.QUEUE_ONLY];
-		this.followModes = [MOVE_FOLLOW_TYPES.NORMAL, MOVE_FOLLOW_TYPES.CIRCLES, MOVE_FOLLOW_TYPES.RUNAWAY];
+		this.followModes = [MOVE_FOLLOW_TYPES.NORMAL, MOVE_FOLLOW_TYPES.CIRCLES, MOVE_FOLLOW_TYPES.RUNAWAY, MOVE_FOLLOW_TYPES.LEASH];
+		this.autonomyModes = [MOVE_AUTONOMY_TYPES.WANDER, MOVE_AUTONOMY_TYPES.INTERACT, MOVE_AUTONOMY_TYPES.REST, MOVE_AUTONOMY_TYPES.SOCIAL];
 
 		// goal vars
 		this.atOriginal = true;
@@ -61,11 +62,13 @@ class Myte {
 		this.goal = DEFAULT_MODE;
 		this.previousGoal = DEFAULT_MODE;
 		this.followGoal = DEFAULT_FOLLOW_MODE;
+		this.autonomyGoal = DEFAULT_AUTONOMY_MODE;
 
 		// systems
 		this.queue;
 		this.stateMachine;
 		this.physicsController;
+		this.ai;
 
 		// bools
 		this.checkForCollisions = true;
@@ -110,6 +113,9 @@ class Myte {
 
 		this.startTime = 0;
 		this.runAwayAngleDistance = this.definition.movement?.runAwayDistance ?? 300;
+		this.followOrbitAngle = 0;
+		this.followOrbitSpeed = this.definition.movement?.orbitSpeed ?? 0.08;
+		this.followLeashDistance = this.definition.movement?.leashDistance ?? Math.max(96, this.followRadius.min + 32);
 		this.inputHandler;
 		this._lastVisualDebugAt = 0;
 		this._animElapsed = 0;
@@ -132,6 +138,9 @@ class Myte {
 	get sprite()    { return this.renderer?.sprite ?? null; }
 	get targetDot() { return this.renderer?.targetDot ?? null; }
 	get battery()   { return this.renderer?.battery ?? null; }
+	get isDeployed() { return this.isActive; }
+	get isControlled() { return this.isActiveMyte; }
+	get isInSlot() { return !this.isDeployed; }
 
 	initParticleEffects() {
 		const particleSystem = this.parent.gameMap.particleSystem;
@@ -166,6 +175,7 @@ class Myte {
 		this.inputHandler = new MyteInputHandler(this);
 		this.dialogue = new MyteDialogue(this);
 		this.stats = new MyteStats(this);
+		this.ai = new MyteAI(this);
 
 		const rect = this.parent.getOffset(this.element);
 		const offsetX = rect.x - this.parent.getContainerRect().x;
@@ -236,6 +246,15 @@ class Myte {
 	}
 
 	start() {
+		this.startWithOptions();
+	}
+
+	startWithOptions(options = {}) {
+		const {
+			goal = this.goal,
+			followGoal = this.followGoal,
+			autonomyGoal = this.autonomyGoal
+		} = options;
 
 		this.isActive = true;
 
@@ -243,12 +262,10 @@ class Myte {
 		this.elements.wrapper.classList.add('empty');
 		this.duplicate.classList.remove("deactivated"); // show the duplicate element
 
-		// show dot
-		this.targetDot.classList.remove('hidden');
-
 		// modes
-		this.setMode();
-		this.setFollowMode();
+		this.setAutonomyMode(autonomyGoal);
+		this.setFollowMode(followGoal);
+		this.setMode(goal);
 
 		// set start time - we need this to disable dragging for a few seconds at start
 		this.setStartTime();
@@ -256,8 +273,13 @@ class Myte {
 
 		// start at home wrapper
 		this.setPosition(this.elements.wrapper.offsetLeft, this.elements.wrapper.offsetTop);
+		this.setTarget(this.posX, this.posY);
+		this.setSpritePosition(this.posX, this.posY);
 
-		this.parent.ui.debugMenu.enableButtons();
+		this.syncSelectionState();
+		if (this.isActiveMyte) {
+			this.parent.ui?.debugMenu?.enableButtons?.();
+		}
 
 		this.parent.eventManager?.emit('myte:started', { myte: this });
 	}
@@ -279,18 +301,20 @@ class Myte {
 
 		// this.parent.ui.debugMenu.updateFollowMode(document.getElementById("cycleFollowGoal"));
 
-		this.parent.ui.debugMenu.updateButton('cycleFollowGoal');
+		this.parent.ui?.debugMenu?.updateButton?.('cycleFollowGoal');
 
-		if (this.followGoal === MOVE_FOLLOW_TYPES.NORMAL) {
-			this.runAway = false;
-			this.goingInCircles = false;
-		} else if (this.followGoal === MOVE_FOLLOW_TYPES.CIRCLES) {
-			this.runAway = false;
-			this.goingInCircles = true;
-		} else if (this.followGoal === MOVE_FOLLOW_TYPES.RUNAWAY) {
-			this.runAway = true;
-			this.goingInCircles = false;
+		this.runAway = this.followGoal === MOVE_FOLLOW_TYPES.RUNAWAY;
+		this.goingInCircles = this.followGoal === MOVE_FOLLOW_TYPES.CIRCLES;
+	}
+
+	setAutonomyMode(newGoal = null) {
+		if (newGoal == null) {
+			newGoal = this.autonomyGoal;
 		}
+
+		this.autonomyGoal = newGoal;
+		this.ai?.setMode(newGoal);
+		this.parent.ui?.debugMenu?.updateButton?.('cycleAutonomyGoal');
 	}
 
 	isIndependent(){
@@ -302,6 +326,7 @@ class Myte {
 			newGoal = this.goal;
 		}
 
+		const previousGoal = this.goal;
 		if (newGoal !== this.goal) {
 			this.previousGoal = this.goal;
 			this.goal = newGoal;
@@ -309,11 +334,11 @@ class Myte {
 			this.queue.clear();
 		}
 
-		this.parent.ui.debugMenu.updateButton('cycleGoal');
+		this.parent.ui?.debugMenu?.updateButton?.('cycleGoal');
 
 		const modeConfig = {
 			[MOVE_TYPES.FOLLOW]: { isFreeRoam: false, followMouse: true, isGravity: false },
-			[MOVE_TYPES.GRAVITY]: { isFreeRoam: false, followMouse: false, isGravity: true },
+			[MOVE_TYPES.GRAVITY]: { isFreeRoam: false, followMouse: true, isGravity: true },
 			[MOVE_TYPES.FREEROAM]: { isFreeRoam: true, followMouse: false, isGravity: false },
 			[MOVE_TYPES.GOHOME]: { isFreeRoam: false, followMouse: false, isGravity: false },
 			[MOVE_TYPES.QUEUE_ONLY]: { isFreeRoam: false, followMouse: false, isGravity: false }
@@ -330,12 +355,28 @@ class Myte {
 		this.isDragging = false;
 		this.unsetTarget();
 		this.queue.clear();
+		this.handleModeTransition(previousGoal, this.goal);
 
 		if (this.goal === MOVE_TYPES.GOHOME) {
 			this.setTargetToOrigin();
 		}
 
 		this.parent?.eventManager?.emit('myte:mode_changed', { myte: this, mode: this.goal });
+	}
+
+	handleModeTransition(previousGoal, nextGoal) {
+		if (!this.physicsController) {
+			return;
+		}
+
+		if (nextGoal === MOVE_TYPES.GRAVITY) {
+			this.physicsController.syncGroundState();
+			return;
+		}
+
+		if (previousGoal === MOVE_TYPES.GRAVITY) {
+			this.physicsController.reset();
+		}
 	}
 
 	unsetTarget() {
@@ -353,6 +394,15 @@ class Myte {
 
 	get isActiveMyte() {
 		return this === this.parent.activeMyte;
+	}
+
+	syncSelectionState() {
+		if (!this.duplicate || !this.targetDot) {
+			return;
+		}
+
+		this.duplicate.classList.toggle('active', this.isActiveMyte);
+		this.targetDot.classList.toggle('hidden', !this.isActiveMyte);
 	}
 
 	/********************************************
@@ -592,33 +642,7 @@ class Myte {
 		}
 
 		const gridSystem = this.parent.gameMap.gridSystem;
-		const cellSize = gridSystem.config.cellSize;
-		
-		// Get collider bounds at the new position
-		const left = newX + this.collider.offsetX;
-		const top = newY + this.collider.offsetY;
-		const right = left + this.collider.width;
-		const bottom = top + this.collider.height;
-		
-		// Convert to grid coordinates
-		const startGridX = Math.floor(left / cellSize);
-		const startGridY = Math.floor(top / cellSize);
-		const endGridX = Math.ceil(right / cellSize);
-		const endGridY = Math.ceil(bottom / cellSize);
-		
-		// Check each grid cell that the collider would overlap
-		for (let gridX = startGridX; gridX < endGridX; gridX++) {
-			for (let gridY = startGridY; gridY < endGridY; gridY++) {
-				// Check if this grid cell is within bounds and walkable
-				if (gridX < 0 || gridX >= gridSystem.gridWidth || 
-					gridY < 0 || gridY >= gridSystem.gridHeight ||
-					!gridSystem.grid[gridX][gridY].walkable) {
-					return false;
-				}
-			}
-		}
-		
-		return true;
+		return gridSystem.isEntityPositionValid?.(this, newX, newY) ?? true;
 	}
 
 	setSpritePosition(x, y, limit) { this.renderer?.setSpritePosition(x, y, limit); }
@@ -844,14 +868,6 @@ class Myte {
 			}
 		}
 		else if (this.goal === MOVE_TYPES.FREEROAM) {
-			if (this.queue.isEmpty()) {
-				// Add new random actions to the queue when empty
-				//this.doFreeRoamLogic();
-
-				this.updateTargetToFollowMouse();
-				this.moveTowardsTarget();
-
-			}
 			this.queue.update();
 		}
 		else if (this.goal === MOVE_TYPES.FOLLOW) {
@@ -941,6 +957,11 @@ class Myte {
 		return Math.sqrt(dx * dx + dy * dy);
 	}
 
+	getDistanceTo(target) {
+		if (!target) return Infinity;
+		return Math.hypot((target.posX ?? 0) - this.posX, (target.posY ?? 0) - this.posY);
+	}
+
 	getMoveType(i) {
 		return Utility.getKeyByValue(MOVE_TYPES, i);
 	}
@@ -949,22 +970,81 @@ class Myte {
 		return Utility.getKeyByValue(MOVE_FOLLOW_TYPES, i);
 	}
 
+	getMoveAutonomyType(i) {
+		return Utility.getKeyByValue(MOVE_AUTONOMY_TYPES, i);
+	}
+
 
 	updateTargetToFollowMouse(doXAxis = true, doYAxis = true) {
 		const mouseDistance = this.getDistanceFromMouse();
+		const mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
 
-		if (this.runAway === true) {
-			this.doRunAway(doXAxis, doYAxis);
-		} else {
-			if (mouseDistance > this.followRadius.min && mouseDistance < this.followRadius.max) {
-				const mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
-				this.setTarget(
-					doXAxis ? mouse.x : null,
-					doYAxis ? mouse.y : null,
-					this.limitToContainer
-				);
-			}
+		switch (this.followGoal) {
+			case MOVE_FOLLOW_TYPES.CIRCLES:
+				this.doCircleFollow(mouse, mouseDistance, doXAxis, doYAxis);
+				break;
+			case MOVE_FOLLOW_TYPES.RUNAWAY:
+				this.doRunAway(doXAxis, doYAxis);
+				break;
+			case MOVE_FOLLOW_TYPES.LEASH:
+				this.doLeashFollow(mouse, mouseDistance, doXAxis, doYAxis);
+				break;
+			case MOVE_FOLLOW_TYPES.NORMAL:
+			default:
+				if (mouseDistance > this.followRadius.min && mouseDistance < this.followRadius.max) {
+					this.setTarget(
+						doXAxis ? mouse.x : null,
+						doYAxis ? mouse.y : null,
+						false
+					);
+				}
+				break;
 		}
+	}
+
+	doCircleFollow(mouse, mouseDistance, doXAxis = true, doYAxis = true) {
+		if (mouseDistance > this.followRadius.max * 1.15) {
+			this.setTarget(
+				doXAxis ? mouse.x : null,
+				doYAxis ? mouse.y : null,
+				false
+			);
+			return;
+		}
+
+		this.followOrbitAngle += this.followOrbitSpeed;
+		const orbitRadius = Utility.clamp(
+			(this.followRadius.min + this.followRadius.max) / 3,
+			this.followRadius.min,
+			this.followRadius.max - 24
+		);
+
+		this.setTarget(
+			doXAxis ? mouse.x + Math.cos(this.followOrbitAngle) * orbitRadius : null,
+			doYAxis ? mouse.y + Math.sin(this.followOrbitAngle) * orbitRadius : null,
+			false
+		);
+	}
+
+	doLeashFollow(mouse, mouseDistance, doXAxis = true, doYAxis = true) {
+		if (mouseDistance <= this.followRadius.min || mouseDistance >= this.followRadius.max) {
+			return;
+		}
+
+		const dx = mouse.x - this.posX;
+		const dy = mouse.y - this.posY;
+		const distance = Math.max(mouseDistance, 1);
+		const leashDistance = Utility.clamp(
+			this.followLeashDistance,
+			this.followRadius.min,
+			this.followRadius.max - 16
+		);
+
+		this.setTarget(
+			doXAxis ? mouse.x - (dx / distance) * leashDistance : null,
+			doYAxis ? mouse.y - (dy / distance) * leashDistance : null,
+			false
+		);
 	}
 
 	doRunAway(doXAxis = true, doYAxis = true) {
@@ -1036,6 +1116,11 @@ class Myte {
 				this.parent.gameMap.gridSystem.updateMyteFrontTile(this);
 			}
 		}
+	}
+
+	tickUpdate(tickDelta) {
+		if (!this.isActive) return;
+		this.ai?.tickUpdate(tickDelta);
 	}
 
 

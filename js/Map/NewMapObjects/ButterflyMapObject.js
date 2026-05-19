@@ -332,34 +332,7 @@ class ButterflyMapObject extends AnimatedMapObject {
     canOccupyPosition(x, y) {
         const gridSystem = this.gameMap?.gridSystem;
         if (!gridSystem) return true;
-
-        const left = x + (this.collider?.offsetX || 0);
-        const top = y + (this.collider?.offsetY || 0);
-        const width = this.collider?.width || this.size.width;
-        const height = this.collider?.height || this.size.height;
-        const epsilon = 0.001;
-
-        const startGrid = gridSystem.worldToGrid(left, top);
-        const endGrid = gridSystem.worldToGrid(
-            Math.max(left, left + width - epsilon),
-            Math.max(top, top + height - epsilon)
-        );
-
-        for (let gx = startGrid.x; gx <= endGrid.x; gx++) {
-            for (let gy = startGrid.y; gy <= endGrid.y; gy++) {
-                if (gx < 0 || gx >= gridSystem.gridWidth || gy < 0 || gy >= gridSystem.gridHeight) {
-                    return false;
-                }
-
-                const cell = gridSystem.grid[gx]?.[gy];
-                if (!cell || !cell.tileWalkable) {
-                    return false;
-                }
-            }
-        }
-
-        const blockers = gridSystem.getPotentialCollidersForArea(left, top, width, height, this);
-        return !blockers.some(obj => !obj.config?.walkable);
+        return gridSystem.isEntityPositionValid?.(this, x, y) ?? true;
     }
 
     isPathToPositionClear(targetX, targetY, stepSize = 12) {
@@ -510,6 +483,8 @@ class ButterflyMapObject extends AnimatedMapObject {
 
     tickUpdate(tickDelta) {
         super.tickUpdate(tickDelta);
+        const oldX = this.posX;
+        const oldY = this.posY;
 
         this.updateBehavior(tickDelta);
 
@@ -545,6 +520,10 @@ class ButterflyMapObject extends AnimatedMapObject {
 
         if (this.blockedFrames >= 8 || this.stuckFrames >= 20 || !this.canOccupyPosition(this.posX, this.posY)) {
             this.recoverFromStuckState(this.blockedFrames >= 8 ? 'blocked repeatedly' : 'stuck in place');
+        }
+
+        if ((this.posX !== oldX || this.posY !== oldY) && this.gameMap?.gridSystem) {
+            this.gameMap.gridSystem.updateObjectPosition(this, oldX, oldY);
         }
     }
 

@@ -28,7 +28,8 @@ class ContainerManager {
 
         this.settings = {
             limitMap: true,
-            defaultMyteCamera: CAMERA_FOLLOW_MODES.CHARACTER
+            defaultMyteCamera: CAMERA_FOLLOW_MODES.CHARACTER,
+            autoDeployMytesOnLoad: false
         }
 
     }
@@ -548,10 +549,17 @@ class ContainerManager {
         if (this.mytes.length > 0 && myteSpawn) {
             this.mytes[0].setWrapperPosition(myteSpawn.x, myteSpawn.y);
         }
-        
 
+        if (this.settings.autoDeployMytesOnLoad) {
+            this.mytes.forEach(myte => {
+                myte.startWithOptions({
+                    goal: MOVE_TYPES.FREEROAM,
+                    autonomyGoal: myte.autonomyGoal
+                });
+            });
+        }
 
-
+        this.ui?.debugMenu?.disableButtons?.();
     }
 
     setNextMyteAsActive(previous) {
@@ -614,17 +622,12 @@ class ContainerManager {
     }
 
     setActiveMyte(myte) {
-        if (this.activeMyte && myte !== null) {
-            this.activeMyte.duplicate.classList.remove('active');
-        }
-
         this.activeMyte = myte;
 
         this.camera.setMode(this.settings.defaultMyteCamera);
 
         //  add active if myte isnt null
         if (myte !== null) {
-            myte.duplicate.classList.add('active');
             myte.setStartTime();
             this.ui.hudManager.update();
         }
@@ -632,13 +635,19 @@ class ContainerManager {
         // Set other mytes to free roam
         this.mytes.forEach(m => {
             if (m != this.activeMyte) {
-                m.setMode(MOVE_TYPES.FREEROAM);
+                if (m.isDeployed) {
+                    m.setMode(MOVE_TYPES.FREEROAM);
+                }
+            } else if (m.goal === MOVE_TYPES.FREEROAM) {
+                m.setMode(DEFAULT_MODE);
             }
+
+            m.syncSelectionState();
         });
 
         // start it if it's not active
         if (myte && !myte.isActive) {
-            myte.start();
+            myte.startWithOptions({ goal: DEFAULT_MODE });
         }
 
         this.ui.myteListManager.updateMytesList(myte);
