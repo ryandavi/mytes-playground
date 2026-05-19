@@ -29,7 +29,7 @@ class SoundManager {
 		};
 
 		this.criticalSounds = [
-			"ui_click", "ui_select", // "myte_happy", "myte_sad", "myte_jump", "myte_land", "myte_eat"
+			"ui_click", "ui_select", "ball_hit",
 		];
 
 		this.speech = null;
@@ -725,6 +725,25 @@ class SoundManager {
 				}
 			},
 
+
+			// Ball hit — bouncy thud
+			"ball_hit": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.MembraneSynth({
+						pitchDecay: 0.06,
+						octaves: 2.5,
+						oscillator: { type: "sine" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.18,
+							sustain: 0,
+							release: 0.08
+						}
+					}).toDestination();
+					return { synth, note: "C3", duration: "16n" };
+				}
+			},
 
 			// UI sounds for battery and item interactions
 			"myte_battery_charging": {

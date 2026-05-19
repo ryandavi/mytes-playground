@@ -24,15 +24,19 @@ class BallMapObject extends AnimatedMapObject {
 
         this.debug = this.getConfig('debug', false);
 
+        // Pickup state
+        this.isPickedUp = false;
+        this.carrier = null;
+
         // Safe defaults — overwritten by setupBoundaries() once render() has a parent
         this.bounds = { left: 0, top: 0, right: 500, bottom: 500 };
     }
 
     shouldSimulateOffScreen() { return true; }
 
-    // Override to only allow dragging when not in motion
+    // Override to only allow dragging when not in motion and not being carried
     canBeDragged() {
-        if (this.isMoving) return false;
+        if (this.isMoving || this.isPickedUp) return false;
         return super.canBeDragged();
     }
 
@@ -52,8 +56,25 @@ class BallMapObject extends AnimatedMapObject {
         };
     }
 
+    pickup(myte) {
+        this.isPickedUp = true;
+        this.carrier = myte;
+        this.stopMotion();
+    }
+
+    drop(vx = 0, vy = 0) {
+        this.isPickedUp = false;
+        this.carrier = null;
+        if (vx !== 0 || vy !== 0) {
+            this.velocity.x = vx;
+            this.velocity.y = vy;
+            this.isMoving = true;
+            this.updateBallAnimation();
+        }
+    }
+
     reactToNearbyCreature(myte) {
-        if (this.isDragging) return;
+        if (this.isDragging || this.isPickedUp) return;
 
         const now = performance.now();
         if (now - this.lastPushTime < this.pushCooldown) return;
@@ -100,6 +121,8 @@ class BallMapObject extends AnimatedMapObject {
                 this.element.setAttribute('data-moving', 'true');
             }
             this.lastPushTime = now;
+
+            this.gameMap?.soundManager?.play('ball_hit');
 
             // Make the creature react
             myte.queue.addExpression('happy');
@@ -238,12 +261,24 @@ class BallMapObject extends AnimatedMapObject {
         const element = super.render(container, parent);
         element.classList.add('ball-object');
         element.setAttribute('data-moving', this.isMoving);
-        
+
+        element.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const myte = this.activeMyte;
+            if (!myte?.isActive) return;
+            if (this.isPickedUp && this.carrier === myte) {
+                // Click ball while carrying it → drop in place
+                myte.queue.clear();
+            } else if (!myte.queue.isCarrying()) {
+                myte.queue.addPickupBall(this);
+            }
+        });
+
         // Set up boundaries and other parent-dependent configs
         if (parent) {
             this.setupBoundaries(parent);
         }
-        
+
         return element;
     }
     
@@ -289,6 +324,13 @@ class BallMapObject extends AnimatedMapObject {
     // tickUpdate: collision detection + physics (no DOM)
     tickUpdate(tickDelta) {
         super.tickUpdate(tickDelta);
+
+        if (this.isPickedUp && this.carrier) {
+            // Center ball above carrier's head
+            this.posX = this.carrier.posX + (this.carrier.size.width - this.size.width) / 2;
+            this.posY = this.carrier.posY - this.size.height - 8;
+            return;
+        }
 
         if (this.mytes.length) {
             for (const myte of this.mytes) {

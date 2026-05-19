@@ -130,6 +130,7 @@ ActionManager.registerActions([
     CarryAction,
     BeingCarriedAction,
     CarryPutdownAction,
+    HoldBallAction,
 
     // Reactive actions
     RunAwayAction,

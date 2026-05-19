@@ -15,6 +15,7 @@ class ContainerInputManager {
     this.setupKeyboardShortcuts();
     this.setupClickHandling();
     this.setupScrollHandling();
+    this.setupLongTapHandling();
 
     // Track inactivity
     this.inactivityTimeout = 60000; // 1 minute
@@ -170,6 +171,12 @@ class ContainerInputManager {
         return;
       }
 
+      // Double-click on the map → A* move active myte to clicked world position
+      if (event.isDoubleClick) {
+        this._tryAStarToClick(event.position.x, event.position.y);
+        return;
+      }
+
       // Handle element click for active Myte
       if (this.container.activeMyte &&
         this.container.activeMyte.isActive &&
@@ -182,6 +189,54 @@ class ContainerInputManager {
         }
       }
     });
+  }
+
+  /**
+   * Set up long-press on mobile to A* move the active myte
+   */
+  setupLongTapHandling() {
+    const LONG_PRESS_MS = 500;
+    const MOVE_CANCEL_PX = 10;
+    let timer = null;
+    let startX = 0;
+    let startY = 0;
+
+    this.inputSystem.on('touch.start', (event) => {
+      if (!this.isEnabled) return;
+      startX = event.position.x;
+      startY = event.position.y;
+      timer = setTimeout(() => {
+        timer = null;
+        this._tryAStarToClick(startX, startY);
+      }, LONG_PRESS_MS);
+    });
+
+    this.inputSystem.on('touch.move', (event) => {
+      if (!timer) return;
+      if (Math.abs(event.position.x - startX) > MOVE_CANCEL_PX ||
+          Math.abs(event.position.y - startY) > MOVE_CANCEL_PX) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    });
+
+    this.inputSystem.on('touch.end', () => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    });
+  }
+
+  /**
+   * A* move the active myte to a screen-space coordinate
+   */
+  _tryAStarToClick(screenX, screenY) {
+    const myte = this.container.activeMyte;
+    if (!myte?.isActive || !myte.pathfinder || myte.queue.isCarrying()) return;
+    if (!this.container.ui?.isTool(UIToolModes.SELECT)) return;
+    const world = this.screenToWorldCoordinates(screenX, screenY);
+    myte.queue.add('astar-move', { target: { x: world.x, y: world.y } });
   }
 
   /**

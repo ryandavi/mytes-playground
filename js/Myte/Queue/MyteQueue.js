@@ -232,7 +232,16 @@ class MyteQueue {
 
     isCarrying() {
         const current = this.getCurrentAction();
-        return current instanceof CarryAction;
+        return current instanceof CarryAction || current instanceof HoldBallAction;
+    }
+
+    addPickupBall(ball) {
+        if (!ball || ball.isPickedUp || this.isCarrying()) return false;
+        const centerX = ball.posX + ball.size.width / 2;
+        const centerY = ball.posY + ball.size.height / 2;
+        this.add('astar-move', { target: { x: centerX, y: centerY } });
+        this.add('hold-ball', { ball });
+        return true;
     }
 
     calculateLapTargets(element) {

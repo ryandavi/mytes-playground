@@ -148,6 +148,65 @@ class BeingCarriedAction extends MyteAction {
     }
 }
 
+// Action for carrying a BallMapObject (no queue on the ball side)
+class HoldBallAction extends MyteAction {
+    static metadata = {
+        id: 'hold-ball',
+        label: 'Hold Ball',
+        category: 'interactions',
+        priority: 2,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: -1,
+        description: 'Carry a ball',
+        requiresTarget: false,
+        affectsMood: false
+    };
+
+    constructor(myte, options) {
+        super(myte, options);
+        this.ball = options.ball || null;
+    }
+
+    static canPerform(selected, active) {
+        return active?.queue.isCarrying();
+    }
+
+    start() {
+        super.start();
+        if (this.ball) this.ball.pickup(this.myte);
+    }
+
+    update() {
+        if (!this.ball) return true;
+        this.myte.updateTargetToFollowMouse();
+        this.myte.move_toward_target();
+        return false;
+    }
+
+    interrupt() {
+        super.interrupt();
+        this._dropBall();
+    }
+
+    complete() {
+        super.complete();
+        this._dropBall();
+    }
+
+    _dropBall() {
+        if (!this.ball) return;
+        const dx = this.myte.targetX - this.myte.posX;
+        const dy = this.myte.targetY - this.myte.posY;
+        const dist = Math.hypot(dx, dy);
+        const throwSpeed = 3;
+        const vx = dist > 1 ? (dx / dist) * throwSpeed : 0;
+        const vy = dist > 1 ? (dy / dist) * throwSpeed : 0;
+        this.ball.drop(vx, vy);
+        this.ball = null;
+    }
+}
+
 // Action for putting down a carried Myte
 class CarryPutdownAction extends MyteAction {
 
