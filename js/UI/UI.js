@@ -794,6 +794,18 @@ class ActionSidebarManager extends UIComponent {
 
                 // click event for actions
                 button.addEventListener('click', () => {
+                    if (action.id === 'carry_putdown') {
+                        activeMyte.queue.addPutDownMyte();
+                        this.updateActions(selectedObject);
+                        return;
+                    }
+
+                    if (action.id === 'drop_item') {
+                        activeMyte.queue.addDropHeldItem();
+                        this.updateActions(selectedObject);
+                        return;
+                    }
+
                     const options = ActionManager.getActionOptions(
                         action.id,
                         selectedObject,

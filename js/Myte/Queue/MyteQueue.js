@@ -137,7 +137,23 @@ class MyteQueue {
 
     isCarrying() {
         const action = this.getCurrentAction();
-        return action instanceof CarryAction || action instanceof HoldBallAction || action instanceof CarryPickupAction;
+        return action instanceof CarryAction || action instanceof HoldItemAction || action instanceof CarryPickupAction;
+    }
+
+    isCarryingItem() {
+        return this.getCurrentAction() instanceof HoldItemAction;
+    }
+
+    isCarryingMyte() {
+        return this.getCurrentAction() instanceof CarryAction || this.getCurrentAction() instanceof CarryPickupAction;
+    }
+
+    getHeldItem() {
+        const currentAction = this.getCurrentAction();
+        if (currentAction instanceof HoldItemAction) {
+            return currentAction.target ?? null;
+        }
+        return null;
     }
 
     // ─── Convenience methods ──────────────────────────────────────────────────
@@ -299,14 +315,28 @@ class MyteQueue {
         return true;
     }
 
-    // Pick up a ball using A* then hold it
+    addPickupItem(target) {
+        if (!target || target.isPickedUp || target.pendingPickup || this.isCarrying()) return false;
+        this.add('pickup_item', { target });
+        return true;
+    }
+
+    // Backward-compatible helper for existing ball callers
     addPickupBall(ball) {
-        if (!ball || ball.isPickedUp || this.isCarrying()) return false;
-        ball.pendingPickup = true;
-        this.addSequence([
-            ['astar-move', { target: { x: ball.posX + ball.size.width / 2, y: ball.posY + ball.size.height / 2 } }],
-            ['hold-ball',  { ball }]
-        ]);
+        return this.addPickupItem(ball);
+    }
+
+    addDropHeldItem() {
+        const heldItem = this.getHeldItem();
+        if (!heldItem) return false;
+
+        const currentAction = this.getCurrentAction();
+        if (currentAction instanceof HoldItemAction) {
+            currentAction.target = null;
+        }
+
+        this.clear();
+        this.add('drop_item', { target: heldItem });
         return true;
     }
 

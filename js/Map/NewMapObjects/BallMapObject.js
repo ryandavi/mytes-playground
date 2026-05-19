@@ -87,19 +87,32 @@ class BallMapObject extends AnimatedMapObject {
 
     shouldSimulateOffScreen() { return true; }
 
-    // Override to only allow dragging when not in motion
-    // (if carried, startDrag will drop it from the myte first)
+    getApproachConfig() {
+        return {
+            allowedSides: ['center'],
+            preferredSide: 'center',
+            gap: 0,
+            align: 'center',
+            alignTo: 'collider'
+        };
+    }
+
     canBeDragged() {
-        if (this.isMoving) return false;
         return super.canBeDragged();
     }
 
     startDrag() {
+        this.stopMotion();
         // If the myte is holding this ball, interrupt the hold so the ball is freed
         if (this.isPickedUp && this.carrier) {
             this.carrier.queue.clear();
         }
         super.startDrag?.();
+    }
+
+    startDragAtPosition(position = null) {
+        this.stopMotion();
+        super.startDragAtPosition?.(position);
     }
 
     // Get the center of the collider
@@ -119,22 +132,22 @@ class BallMapObject extends AnimatedMapObject {
     }
 
     pickup(myte) {
-        this.isPickedUp = true;
-        this.carrier = myte;
+        if (!super.pickup(myte)) {
+            return false;
+        }
         this.stopMotion();
-        this.playConfiguredSound?.('pickup');
+        return true;
     }
 
     drop(vx = 0, vy = 0) {
-        this.isPickedUp = false;
-        this.carrier = null;
-        this.playConfiguredSound?.('drop');
+        super.drop(vx, vy);
         if (vx !== 0 || vy !== 0) {
             this.velocity.x = vx;
             this.velocity.y = vy;
             this.isMoving = true;
             this.updateBallAnimation();
         }
+        this.triggerDropBounce(Math.max(36, Math.hypot(vx, vy) * 14));
     }
 
     reactToNearbyCreature(myte) {
@@ -384,14 +397,7 @@ class BallMapObject extends AnimatedMapObject {
     }
 
     press() {
-        const myte = this.activeMyte;
-        if (!myte?.isActive) return false;
-        if (this.isPickedUp && this.carrier === myte) {
-            myte.queue.clear();
-        } else if (!myte.queue.isCarrying()) {
-            myte.queue.addPickupBall(this);
-        }
-        return true;
+        return super.press();
     }
 
     // Override render method
@@ -491,12 +497,6 @@ class BallMapObject extends AnimatedMapObject {
         super.tickUpdate(tickDelta);
 
         if (this.isPickedUp && this.carrier) {
-            const carriedPosition = this.carrier.getCarriedItemPosition?.(this.size) || {
-                x: this.carrier.posX + (this.carrier.size.width - this.size.width) / 2,
-                y: this.carrier.posY - this.size.height - 8
-            };
-            this.posX = carriedPosition.x;
-            this.posY = carriedPosition.y;
             return;
         }
 

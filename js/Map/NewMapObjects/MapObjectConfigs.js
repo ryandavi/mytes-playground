@@ -349,7 +349,9 @@ const TYPE_CONFIGS = {
 		renderType: 'sprite',
 		walkable: true,
 		draggable: true,
+		canPickUp: true,
 		renderPriority: 2,
+		pickupRange: 96,
 		shadow: {
 			enabled: true,
 			width: 40,
@@ -626,6 +628,7 @@ const TYPE_CONFIGS = {
 		renderType: 'sprite',
 		collision: true,
 		draggable: true,
+		snapToGrid: true,
 		interactionType: 'rest',
 		restDuration: 5000,
 		restHealAmount: 10,

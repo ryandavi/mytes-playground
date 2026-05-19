@@ -114,7 +114,9 @@ ActionManager.registerActions([
     CarryAction,
     BeingCarriedAction,
     CarryPutdownAction,
-    HoldBallAction,
+    PickupItemAction,
+    HoldItemAction,
+    DropItemAction,
 
     // Reactive
     RunAwayAction,

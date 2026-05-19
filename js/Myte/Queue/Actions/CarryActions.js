@@ -72,7 +72,7 @@ class CarryAction extends MyteAction {
     };
 
     static canPerform(selected, active) {
-        return active?.queue.isCarrying();
+        return active?.queue.isCarryingMyte?.();
     }
 
     update() {
@@ -130,7 +130,7 @@ class CarryPutdownAction extends MyteAction {
     };
 
     static canPerform(selected, active) {
-        return active?.queue.isCarrying();
+        return active?.queue.isCarryingMyte?.();
     }
 
     constructor(myte, options) {
@@ -163,40 +163,208 @@ class CarryPutdownAction extends MyteAction {
     }
 }
 
-// Hold a BallMapObject (no queue on the ball side)
-class HoldBallAction extends MyteAction {
+class PickupItemAction extends MyteAction {
     static metadata = {
-        id: 'hold-ball',
-        label: 'Hold Ball',
+        id: 'pickup_item',
+        label: 'Pick Up',
+        category: 'carry',
+        priority: 2,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Pick up an item and carry it',
+        requiresTarget: true,
+        affectsMood: false
+    };
+
+    static canPerform(selected, active) {
+        return active &&
+               selected instanceof MapObject &&
+               selected.getConfig?.('canPickUp', false) &&
+               !selected.isPickedUp &&
+               !active.queue.isCarrying();
+    }
+
+    constructor(myte, options) {
+        super(myte, options);
+        this.target = options.target ?? null;
+        this.approachAction = null;
+        this.maxReplans = 4;
+        this.replanCount = 0;
+        this.lastTargetPosition = null;
+        this.lastReplanAt = 0;
+        this.startedAt = 0;
+        this.lastDistance = Infinity;
+        this.lastProgressAt = 0;
+        this.maxPickupDurationMs = 8000;
+        this.maxStallDurationMs = 2000;
+    }
+
+    start() {
+        super.start();
+        this.startedAt = performance.now();
+        this.lastProgressAt = this.startedAt;
+        this.lastDistance = this._getDistanceToTarget();
+        if (this.target) {
+            this.target.pendingPickup = true;
+            this.lastTargetPosition = { x: this.target.posX, y: this.target.posY };
+        }
+    }
+
+    update() {
+        if (!this.target?.active) return true;
+        if (this.target.isPickedUp && this.target.carrier !== this.myte) return true;
+        if (!this.target.canBePickedUpBy?.(this.myte)) {
+            this.target.pendingPickup = false;
+            return true;
+        }
+
+        const now = performance.now();
+        const distance = this._getDistanceToTarget();
+        if (distance + 4 < this.lastDistance) {
+            this.lastDistance = distance;
+            this.lastProgressAt = now;
+        } else if (Number.isFinite(distance)) {
+            this.lastDistance = Math.min(this.lastDistance, distance);
+        }
+
+        if (this.target.isInPickupRange?.(this.myte)) {
+            this.target.pendingPickup = false;
+            if (this.target.pickup?.(this.myte)) {
+                this.myte.queue.add('hold_item', { target: this.target });
+            }
+            return true;
+        }
+
+        if (now - this.startedAt >= this.maxPickupDurationMs) {
+            this.target.pendingPickup = false;
+            return true;
+        }
+
+        if (now - this.lastProgressAt >= this.maxStallDurationMs) {
+            if (this.replanCount >= this.maxReplans) {
+                this.target.pendingPickup = false;
+                return true;
+            }
+            this._createApproachAction();
+            this.lastProgressAt = now;
+        }
+
+        if (!this.approachAction || this._shouldReplan()) {
+            if (this.replanCount >= this.maxReplans) {
+                this.target.pendingPickup = false;
+                return true;
+            }
+
+            this._createApproachAction();
+        }
+
+        if (!this.approachAction) {
+            this.target.pendingPickup = false;
+            return true;
+        }
+
+        const approachComplete = this.approachAction.update();
+        if (approachComplete && !this.target.isInPickupRange?.(this.myte)) {
+            this._createApproachAction();
+        }
+
+        return false;
+    }
+
+    interrupt() {
+        super.interrupt();
+        if (this.target?.carrier !== this.myte) {
+            this.target.pendingPickup = false;
+        }
+    }
+
+    complete() {
+        super.complete();
+        if (this.target?.carrier !== this.myte) {
+            this.target.pendingPickup = false;
+        }
+    }
+
+    _createApproachAction() {
+        this.approachAction = new GoToObjectAction(this.myte, {
+            target: this.target,
+            approachConfig: 'center'
+        });
+        this.approachAction.start();
+        this.replanCount++;
+        this.lastReplanAt = performance.now();
+        this.lastTargetPosition = this.target ? { x: this.target.posX, y: this.target.posY } : null;
+    }
+
+    _shouldReplan() {
+        if (!this.target || !this.lastTargetPosition) {
+            return false;
+        }
+
+        const now = performance.now();
+        if (now - this.lastReplanAt < 150) {
+            return false;
+        }
+
+        const movedDistance = Math.hypot(
+            this.target.posX - this.lastTargetPosition.x,
+            this.target.posY - this.lastTargetPosition.y
+        );
+
+        return movedDistance >= 16;
+    }
+
+    _getDistanceToTarget() {
+        if (!this.target) {
+            return Infinity;
+        }
+
+        const targetCenter = this.target.getCenterPoint?.() || {
+            x: this.target.posX + ((this.target.size?.width ?? 0) / 2),
+            y: this.target.posY + ((this.target.size?.height ?? 0) / 2)
+        };
+        const myteCenter = {
+            x: this.myte.posX + (this.myte.collider?.offsetX ?? 0) + ((this.myte.collider?.width ?? this.myte.size.width) / 2),
+            y: this.myte.posY + (this.myte.collider?.offsetY ?? 0) + ((this.myte.collider?.height ?? this.myte.size.height) / 2)
+        };
+
+        return Math.hypot(targetCenter.x - myteCenter.x, targetCenter.y - myteCenter.y);
+    }
+}
+
+class HoldItemAction extends MyteAction {
+    static metadata = {
+        id: 'hold_item',
+        label: 'Carry Item',
         category: 'carry',
         priority: 2,
         isMovementAction: true,
         isInterruptible: true,
         defaultDuration: -1,
-        description: 'Carry a ball',
-        requiresTarget: false,
+        description: 'Carry an item',
+        requiresTarget: true,
         affectsMood: false
     };
 
-    static canPerform(selected, active) {
-        return active?.queue.isCarrying();
+    static canPerform() {
+        return false;
     }
 
     constructor(myte, options) {
         super(myte, options);
-        this.ball = options.ball ?? null;
+        this.target = options.target ?? null;
     }
 
     start() {
         super.start();
-        if (this.ball) {
-            this.ball.pendingPickup = false;
-            this.ball.pickup(this.myte);
+        if (this.target && this.target.carrier !== this.myte && this.target.isInPickupRange?.(this.myte)) {
+            this.target.pickup?.(this.myte);
         }
     }
 
     update() {
-        if (!this.ball) return true;
+        if (!this.target || this.target.carrier !== this.myte) return true;
         this.myte.updateTargetToFollowMouse();
         this.myte.moveTowardsTarget();
         return false;
@@ -204,25 +372,67 @@ class HoldBallAction extends MyteAction {
 
     interrupt() {
         super.interrupt();
-        this._dropBall();
+        this._dropItem();
     }
 
     complete() {
         super.complete();
-        this._dropBall();
+        this._dropItem();
     }
 
-    _dropBall() {
-        if (!this.ball) return;
-        const dx   = this.myte.targetX - this.myte.posX;
-        const dy   = this.myte.targetY - this.myte.posY;
+    _dropItem() {
+        if (!this.target || this.target.carrier !== this.myte) return;
+        const dx = this.myte.targetX - this.myte.posX;
+        const dy = this.myte.targetY - this.myte.posY;
         const dist = Math.hypot(dx, dy);
-        const spd  = 3;
-        this.ball.pendingPickup = false;
-        this.ball.drop(
+        const spd = 3;
+        this.target.drop?.(
             dist > 1 ? (dx / dist) * spd : 0,
             dist > 1 ? (dy / dist) * spd : 0
         );
-        this.ball = null;
+    }
+}
+
+class DropItemAction extends MyteAction {
+    static metadata = {
+        id: 'drop_item',
+        label: 'Drop Item',
+        category: 'carry',
+        priority: 2,
+        isMovementAction: false,
+        isInterruptible: false,
+        defaultDuration: 0,
+        description: 'Drop the item currently being carried',
+        requiresTarget: true,
+        affectsMood: false
+    };
+
+    static canPerform(selected, active) {
+        const heldItem = active?.queue?.getHeldItem?.() || null;
+        return !!heldItem && (selected === active || selected === heldItem);
+    }
+
+    static getRequiredOptions(selected, active) {
+        return { target: active?.queue?.getHeldItem?.() || null };
+    }
+
+    start() {
+        super.start();
+        if (!this.target || this.target.carrier !== this.myte) {
+            return;
+        }
+
+        const dx = this.myte.targetX - this.myte.posX;
+        const dy = this.myte.targetY - this.myte.posY;
+        const dist = Math.hypot(dx, dy);
+        const spd = 3;
+        this.target.drop?.(
+            dist > 1 ? (dx / dist) * spd : 0,
+            dist > 1 ? (dy / dist) * spd : 0
+        );
+    }
+
+    update() {
+        return true;
     }
 }

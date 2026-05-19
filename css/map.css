@@ -256,10 +256,11 @@
   border-radius: 5px;
 }
 .container-wrapper > .container > .canvas > .layer > .mapObject.draggable {
+  pointer-events: all;
   cursor: grab;
 }
 body[data-tool-mode=select] .container-wrapper > .container > .canvas > .layer > .mapObject.draggable {
-  cursor: pointer;
+  cursor: grab;
 }
 body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .mapObject.draggable {
   cursor: grab;
@@ -299,10 +300,11 @@ body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .
   filter: brightness(0.8);
 }
 .container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object {
+  pointer-events: all;
   cursor: grab;
 }
 body[data-tool-mode=select] .container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object {
-  cursor: pointer;
+  cursor: grab;
 }
 body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object {
   cursor: grab;

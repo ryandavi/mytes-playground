@@ -309,6 +309,8 @@ class GoToObjectAction extends PositionableAction {
     targetCenter = null;
     _stuckFrames = 0;
     _lastPos = null;
+    _lastTargetSnapshot = null;
+    _lastTargetReplanAt = 0;
 
     constructor(myte, options) {
         super(myte, { ...GoToObjectAction.metadata.defaultOptions, ...options });
@@ -401,6 +403,28 @@ class GoToObjectAction extends PositionableAction {
         this.currentTargetIndex  = 0;
         this._resolvedApproachConfig = this._resolveApproachConfig();
         this.buildApproachPlan();
+        this._lastTargetSnapshot = this._captureTargetSnapshot();
+        this._lastTargetReplanAt = performance.now();
+    }
+
+    _captureTargetSnapshot() {
+        if (!this.target || this.target.posX == null || this.target.posY == null) {
+            return null;
+        }
+
+        return { x: this.target.posX, y: this.target.posY };
+    }
+
+    _targetMovedSignificantly() {
+        const snapshot = this._captureTargetSnapshot();
+        if (!snapshot || !this._lastTargetSnapshot) {
+            return false;
+        }
+
+        return Math.hypot(
+            snapshot.x - this._lastTargetSnapshot.x,
+            snapshot.y - this._lastTargetSnapshot.y
+        ) >= 16;
     }
 
     buildApproachPlan() {
@@ -526,6 +550,14 @@ class GoToObjectAction extends PositionableAction {
 
 
     update() {
+        const now = performance.now();
+        if (this._targetMovedSignificantly() && now - this._lastTargetReplanAt >= 150) {
+            this.currentTargetIndex = 0;
+            this.buildApproachPlan();
+            this._lastTargetSnapshot = this._captureTargetSnapshot();
+            this._lastTargetReplanAt = now;
+        }
+
         // Stuck detection
         if (!this._lastPos) this._lastPos = { x: this.myte.posX, y: this.myte.posY };
         const moved = Math.hypot(this.myte.posX - this._lastPos.x, this.myte.posY - this._lastPos.y);
@@ -545,6 +577,8 @@ class GoToObjectAction extends PositionableAction {
             }
             this._stuckFrames = 0;
             this.buildApproachPlan();
+            this._lastTargetSnapshot = this._captureTargetSnapshot();
+            this._lastTargetReplanAt = performance.now();
             if (!this.targetPos && !this.targetPoints) return true;
         }
 

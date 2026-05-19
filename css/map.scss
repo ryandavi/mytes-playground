@@ -307,11 +307,12 @@
 					}
 
 					&.draggable {
+						pointer-events: all;
 						cursor: grab;
 					}
 
 					body[data-tool-mode="select"] &.draggable {
-						cursor: pointer;
+						cursor: grab;
 					}
 
 					body[data-tool-mode="drag"] &.draggable {
@@ -364,10 +365,11 @@
 
 					&.animated-map-object {
 						&.ball-object {
+							pointer-events: all;
 							cursor: grab;
 
 							body[data-tool-mode="select"] & {
-								cursor: pointer;
+								cursor: grab;
 							}
 
 							body[data-tool-mode="drag"] & {

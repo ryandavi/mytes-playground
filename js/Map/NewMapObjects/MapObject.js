@@ -38,6 +38,10 @@ class MapObject {
 		this.inputComponents = {};
 		this.isDragging = false;
 		this.shadowElement = null;
+		this.isPickedUp = false;
+		this.carrier = null;
+		this.pendingPickup = false;
+		this._tempSelectDragActive = false;
 
 		// Render state — simulation writes here, MapRenderer reads and flushes to DOM
 		this.renderState = {
@@ -202,6 +206,137 @@ class MapObject {
 		return Math.hypot(this.posX - target.posX, this.posY - target.posY);
 	}
 
+	getCenterPoint() {
+		return {
+			x: this.posX + (this.collider?.offsetX ?? 0) + ((this.collider?.width ?? this.size.width) / 2),
+			y: this.posY + (this.collider?.offsetY ?? 0) + ((this.collider?.height ?? this.size.height) / 2)
+		};
+	}
+
+	getColliderRectFor(entity = this) {
+		if (!entity) return null;
+
+		const width = entity.collider?.width ?? entity.size?.width ?? 0;
+		const height = entity.collider?.height ?? entity.size?.height ?? 0;
+		return {
+			left: (entity.posX ?? 0) + (entity.collider?.offsetX ?? 0),
+			top: (entity.posY ?? 0) + (entity.collider?.offsetY ?? 0),
+			right: (entity.posX ?? 0) + (entity.collider?.offsetX ?? 0) + width,
+			bottom: (entity.posY ?? 0) + (entity.collider?.offsetY ?? 0) + height,
+			width,
+			height
+		};
+	}
+
+	getColliderGapTo(entity) {
+		const a = this.getColliderRectFor(this);
+		const b = this.getColliderRectFor(entity);
+		if (!a || !b) return Infinity;
+
+		const gapX = Math.max(0, a.left - b.right, b.left - a.right);
+		const gapY = Math.max(0, a.top - b.bottom, b.top - a.bottom);
+		return Math.hypot(gapX, gapY);
+	}
+
+	getPickupRange(myte) {
+		const explicitRange = this.getConfig('pickupRange', null);
+		if (Number.isFinite(explicitRange)) {
+			return explicitRange;
+		}
+
+		const myteReach = Math.max(myte?.collider?.width ?? 0, myte?.collider?.height ?? 0) * 0.5;
+		const objectReach = Math.max(this.collider?.width ?? 0, this.collider?.height ?? 0) * 0.5;
+		return Math.max(24, myteReach + objectReach + 8);
+	}
+
+	canBePickedUpBy(myte) {
+		return !!myte?.isActive &&
+			this.active &&
+			this.getConfig('canPickUp', false) &&
+			(!this.isPickedUp || this.carrier === myte);
+	}
+
+	isInPickupRange(myte) {
+		if (!myte) return false;
+
+		const touchThreshold = this.getConfig('pickupTouchThreshold', 12);
+		if (this.getColliderGapTo(myte) <= touchThreshold) {
+			return true;
+		}
+
+		const myteCenter = {
+			x: myte.posX + (myte.collider?.offsetX ?? 0) + ((myte.collider?.width ?? myte.size.width) / 2),
+			y: myte.posY + (myte.collider?.offsetY ?? 0) + ((myte.collider?.height ?? myte.size.height) / 2)
+		};
+		const objectCenter = this.getCenterPoint();
+		return Math.hypot(objectCenter.x - myteCenter.x, objectCenter.y - myteCenter.y) <= this.getPickupRange(myte);
+	}
+
+	getCarriedPosition(carrier) {
+		return carrier?.getCarriedItemPosition?.(this.size) || {
+			x: this.posX,
+			y: this.posY
+		};
+	}
+
+	updateCarriedState() {
+		if (!this.isPickedUp || !this.carrier) {
+			return false;
+		}
+
+		const previousX = this.posX;
+		const previousY = this.posY;
+		const carriedPosition = this.getCarriedPosition(this.carrier);
+		if (!carriedPosition) {
+			return false;
+		}
+
+		this.posX = carriedPosition.x;
+		this.posY = carriedPosition.y;
+		this.posZ = 0;
+
+		if (Math.abs(previousX - this.posX) >= 1 || Math.abs(previousY - this.posY) >= 1) {
+			this.gameMap?.gridSystem?.updateObjectPosition(this, previousX, previousY);
+			if (this.sleeping) {
+				this.wake();
+			}
+		}
+		return true;
+	}
+
+	getRenderZIndex() {
+		if (this.isPickedUp && this.carrier?.renderer?.getZIndex) {
+			return this.carrier.renderer.getZIndex(this.carrier.posY) + 2;
+		}
+
+		return this.parent?.getZIndex ? this.parent.getZIndex(this.posY, this.size.height) : 0;
+	}
+
+	pickup(myte) {
+		if (!this.canBePickedUpBy(myte)) {
+			return false;
+		}
+
+		this.isPickedUp = true;
+		this.carrier = myte;
+		this.pendingPickup = false;
+		this.element?.classList.add('picked-up');
+		this.wake();
+		this.container?.ui?.setSelected?.(this);
+		this.playConfiguredSound?.('pickup');
+		return true;
+	}
+
+	drop(vx = 0, vy = 0) {
+		this.isPickedUp = false;
+		this.carrier = null;
+		this.pendingPickup = false;
+		this.element?.classList.remove('picked-up');
+		this.gameMap?.gridSystem?.updateObjectPosition(this);
+		this.playConfiguredSound?.('drop');
+		return { vx, vy };
+	}
+
 	isInInteractionRange(target, radius = this.getInteractionRadius()) {
 		return this.getDistanceTo(target) <= radius;
 	}
@@ -350,14 +485,29 @@ class MapObject {
 	canBeDragged() {
 		if (!this.getConfig('draggable', false)) return false;
 		const isDragMode = this.parent?.ui?.isTool(UIToolModes.DRAG);
+		const requiresPickupGesture = this.getConfig('canPickUp', false);
 		const isSelectedInSelectMode =
 			this.parent?.ui?.isTool(UIToolModes.SELECT) &&
 			this.parent?.ui?.selectionManager?.getSelectedObject?.() === this;
+		if (requiresPickupGesture) {
+			return isDragMode || this._tempSelectDragActive;
+		}
 		return isDragMode || isSelectedInSelectMode;
 	}
 
 	startDrag() {
+		this.startDragAtPosition();
+	}
+
+	startDragAtPosition(position = null) {
+		if (this.isPickedUp && this.carrier?.queue) {
+			this.carrier.queue.clear();
+		}
 		if (!this.canBeDragged() || !this.inputComponents.drag) return;
+		if (position) {
+			this.inputComponents.drag.startDragAtPosition(position);
+			return;
+		}
 		this.inputComponents.drag.startDragAtCurrentPosition();
 	}
 
@@ -367,16 +517,30 @@ class MapObject {
 		}
 
 		const dragThreshold = this.getConfig('selectDragThreshold', 8);
+		const dragTimeThreshold = this.getConfig('selectDragTimeThreshold', 300);
+		const maxYForPickup = this.getConfig('selectPickupMaxY', 500);
+		const maxXForPickup = this.getConfig('selectPickupMaxX', 300);
+		const usePickupGesture = this.getConfig('canPickUp', false);
+		const dragModeRestoreDelay = this.getConfig('selectDragModeRestoreDelay', 100);
+		const dragStartDelay = this.getConfig('selectDragStartDelay', 10);
 		let pressStart = null;
 		let previousMode = null;
+		let pressStartTime = 0;
+		let pendingTemporaryDrag = null;
 
 		const onMouseDown = (event) => {
 			if (event.button !== 0 || !this.active || this.isDragging || !this.parent?.ui?.isTool(UIToolModes.SELECT)) {
 				return;
 			}
 
-			pressStart = { x: event.clientX, y: event.clientY };
+			pressStart = {
+				x: event.clientX,
+				y: event.clientY,
+				pageX: event.pageX,
+				pageY: event.pageY
+			};
 			previousMode = UIToolModes.SELECT;
+			pressStartTime = Date.now();
 		};
 
 		const onMouseMove = (event) => {
@@ -386,24 +550,76 @@ class MapObject {
 
 			const dx = event.clientX - pressStart.x;
 			const dy = event.clientY - pressStart.y;
-			if (Math.hypot(dx, dy) < dragThreshold) {
+			const distance = Math.hypot(dx, dy);
+			const timeElapsed = Date.now() - pressStartTime;
+			const passesPickupGesture = !usePickupGesture || (
+				distance > dragThreshold &&
+				timeElapsed > dragTimeThreshold &&
+				event.clientY < pressStart.y &&
+				pressStart.y - event.clientY > dragThreshold &&
+				pressStart.y - event.clientY < maxYForPickup &&
+				Math.abs(pressStart.x - event.clientX) < maxXForPickup
+			);
+
+			if (!passesPickupGesture && distance < dragThreshold) {
 				return;
 			}
 
-			pressStart = null;
-			this.parent?.ui?.setSelected?.(this);
-			this.parent?.ui?.changeToolMode(UIToolModes.DRAG);
-			this.startDrag();
-			if (this.isDragging) {
-				this._restoreToolModeAfterDrag(previousMode);
-			} else {
-				this.parent?.ui?.changeToolMode(previousMode);
+			if (usePickupGesture && !passesPickupGesture) {
+				return;
 			}
+
+			const previousStart = pressStart;
+			const pointerPosition = {
+				x: event.pageX,
+				y: event.pageY,
+				clientX: event.clientX,
+				clientY: event.clientY
+			};
+			pressStart = null;
+			this._tempSelectDragActive = true;
+			pendingTemporaryDrag = {
+				previousMode,
+				startPosition: previousStart,
+				pointerPosition
+			};
+			this.parent?.ui?.changeToolMode(UIToolModes.DRAG);
+			window.setTimeout(() => {
+				if (!pendingTemporaryDrag || this.isDragging) {
+					return;
+				}
+
+				const { previousMode: queuedMode, startPosition, pointerPosition: queuedPointer } = pendingTemporaryDrag;
+				pendingTemporaryDrag = null;
+
+				this.startDragAtPosition({
+					x: startPosition.pageX ?? startPosition.x,
+					y: startPosition.pageY ?? startPosition.y,
+					clientX: startPosition.x,
+					clientY: startPosition.y
+				});
+
+				if (this.isDragging) {
+					this.inputComponents.drag?.handleMove?.({
+						position: queuedPointer,
+						originalEvent: event
+					});
+					this._restoreToolModeAfterDrag(queuedMode, dragModeRestoreDelay);
+				} else {
+					this._tempSelectDragActive = false;
+					this.parent?.ui?.changeToolMode(queuedMode);
+				}
+			}, dragStartDelay);
 		};
 
 		const onMouseUp = () => {
 			pressStart = null;
 			previousMode = null;
+			pressStartTime = 0;
+			pendingTemporaryDrag = null;
+			if (!this.isDragging) {
+				this._tempSelectDragActive = false;
+			}
 		};
 
 		this.element.addEventListener('mousedown', onMouseDown);
@@ -418,7 +634,7 @@ class MapObject {
 		};
 	}
 
-	_restoreToolModeAfterDrag(mode) {
+	_restoreToolModeAfterDrag(mode, delay = 0) {
 		const dragComp = this.inputComponents.drag;
 		if (!dragComp || !mode) {
 			return;
@@ -430,7 +646,10 @@ class MapObject {
 				savedEnd(event);
 			}
 
-			this.parent?.ui?.changeToolMode(mode);
+			this._tempSelectDragActive = false;
+			window.setTimeout(() => {
+				this.parent?.ui?.changeToolMode(mode);
+			}, delay);
 			dragComp.options.onDragEnd = savedEnd;
 		};
 	}
@@ -454,11 +673,9 @@ class MapObject {
 			this.gameMap.layers.debug.appendChild(this._dropTargetEl);
 		}
 
-		const snappedPos = gridSystem.snapToGridOptimal(
-			this.posX, this.posY,
-			this.size.width, this.size.height,
-			gridSystem.config.cellSize
-		);
+		const snappedPos = this.getConfig('snapToGrid', false)
+			? gridSystem.snapToGrid(this.posX, this.posY, this.size.width, this.size.height, gridSystem.config.cellSize)
+			: { x: this.posX, y: this.posY };
 		this._dropTargetEl.style.left = `${snappedPos.x}px`;
 		this._dropTargetEl.style.top = `${snappedPos.y}px`;
 
@@ -504,9 +721,7 @@ class MapObject {
 		if (this.posX !== this._prevRenderX || this.posY !== this._prevRenderY) {
 			this.renderState.posX = this.posX;
 			this.renderState.posY = this.posY;
-			if (this.parent?.getZIndex) {
-				this.renderState.zIndex = this.parent.getZIndex(this.posY, this.size.height);
-			}
+			this.renderState.zIndex = this.getRenderZIndex();
 			this.renderState.dirty = true;
 		}
 	}
@@ -516,9 +731,7 @@ class MapObject {
 		if (!this.element) return;
 		this.renderState.posX = this.posX;
 		this.renderState.posY = this.posY;
-		if (this.parent?.getZIndex) {
-			this.renderState.zIndex = this.parent.getZIndex(this.posY, this.size.height);
-		}
+		this.renderState.zIndex = this.getRenderZIndex();
 		this.element.style.left = `${this.posX}px`;
 		this.element.style.top = `${this.posY}px`;
 		if (this.renderState.zIndex) this.element.style.zIndex = this.renderState.zIndex;
@@ -546,6 +759,7 @@ class MapObject {
 		if (this.getConfig('draggable', false)) {
 			divElement.classList.add('draggable');
 			divElement.style.touchAction = 'none';
+			divElement.style.pointerEvents = 'all';
 		}
 		if (this.getConfig('rubbable', false)) divElement.classList.add('rubbable');
 
@@ -567,7 +781,7 @@ class MapObject {
 			top: `${this.posY}px`,
 			width: `${this.size.width}px`,
 			height: `${this.size.height}px`,
-			zIndex: parent.getZIndex(this.posY, this.size.height)
+			zIndex: this.getRenderZIndex()
 		});
 
 		if (this.shouldRenderShadow()) {
@@ -593,6 +807,10 @@ class MapObject {
 
 	updateShadowVisual() {
 		if (!this.shadowElement) return;
+		if (this.isPickedUp) {
+			this.shadowElement.style.display = 'none';
+			return;
+		}
 
 		const config = this.getShadowConfig();
 		if (!config) {
@@ -676,7 +894,9 @@ class MapObject {
 
 	press(parent) {
 		if (!this.active) return false;
-		if (this.activeMyte && this.getConfig('canInspect')) this.selectInUi();
+		if (this.activeMyte && (this.getConfig('canInspect') || this.getConfig('canPickUp') || this.isPickedUp)) {
+			this.selectInUi();
+		}
 		return !!this.activeMyte;
 	}
 
@@ -763,6 +983,7 @@ class MapObject {
 
 	// Fixed-rate simulation (20 Hz). No DOM writes. Override in subclasses for AI/physics.
 	tickUpdate(tickDelta) {
+		this.updateCarriedState();
 		const now = performance.now();
 		for (const [id, time] of this.interactionState.interactionTimes) {
 			if (now - time >= this.interactionState.cooldown) {
@@ -774,6 +995,7 @@ class MapObject {
 
 	// Variable-rate visual update. No simulation state changes. Override for animation.
 	update(deltaTime) {
+		this.updateCarriedState();
 		Object.values(this.inputComponents).forEach(component => {
 			if (component.isActive()) component.update(deltaTime);
 		});

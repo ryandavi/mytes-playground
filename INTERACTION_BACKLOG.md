@@ -4,6 +4,28 @@ Updated: 2026-05-19
 
 This note tracks interaction-system issues that came up during ball/item carry work.
 
+## Implementation Status
+
+Implemented in code:
+
+- Item carry is now explicit instead of implicit:
+  - `pickup_item`
+  - `hold_item`
+  - `drop_item`
+- Clicking/selecting the ball no longer auto-queues pickup.
+- Pickup validates live range before succeeding.
+- Pickup follows moved targets instead of relying on a stale position snapshot.
+- `go_to_object` now replans when the target moves significantly.
+- Held items use species-based carry anchors and render in front of the carrier via elevated z-order.
+- Select-mode pickup gesture for pickup-capable draggable objects now uses the same upward-drag style trigger as Mytes.
+- Ball pickup/drop uses shared item-carry flow and still preserves ball-specific physics on release.
+
+Still needs real gameplay QA:
+
+- Confirm the select-mode ball pickup gesture now feels identical enough to Myte pickup in practice.
+- Confirm the carried-item front layering looks right across all map depths and not just the shell case.
+- Confirm the new pickup retry / replan behavior feels sensible when an item is dragged away mid-approach.
+
 ## Current Problems
 
 ### 1. Held items should render in front of the Myte sprite

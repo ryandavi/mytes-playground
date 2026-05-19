@@ -105,7 +105,7 @@ class Inventory {
         this.updateInventoryDisplay();
     }
 
-    addItem(name, quantity, type, description = '') {
+    addItem(name, quantity, type, description = '', variantOverride = null) {
         if (this.items.length >= this.config.maxItems) {
             console.warn('Inventory is full!');
             return false;
@@ -116,7 +116,7 @@ class Inventory {
             quantity,
             type,
             description,
-            variant: name
+            variant: variantOverride || name
         });
 
         const existingItem = this.items.find(item => item.variant === normalizedItem.variant);

@@ -699,6 +699,9 @@ class AStarPathfinder {
             return cached;
         }
 
+        // Entity state for precise AABB checks in the grid loop below
+        const entityState = { posX: entityX, posY: entityY, collider, size: { width: entityWidth, height: entityHeight } };
+
         // --- Log Initial Info ---
         if (debug) {
             console.log(`_validatePosition: Checking Entity ${entity?.id} at TL (${entityX.toFixed(1)}, ${entityY.toFixed(1)}). Collider Bounds: X[${colliderWorldX.toFixed(1)}..${colliderRight.toFixed(1)}], Y[${colliderWorldY.toFixed(1)}..${colliderBottom.toFixed(1)}]`);
@@ -758,10 +761,21 @@ class AStarPathfinder {
                     }
 
                     // Check properties for this valid, overlapped cell:
-                    if ((!cell.tileWalkable && !this._canTraverseConditionalCell(cell, entityCapabilities)) ||
-                        (!cell.objectWalkable && this._getCellBlockingObjects(cell, entity).some(obj => !this._isOpenableObstacle(obj, entityCapabilities)))) {
+                    if (!cell.tileWalkable && !this._canTraverseConditionalCell(cell, entityCapabilities)) {
                         if (debug) console.log(`  ❌ FAIL: Collider overlaps non-walkable tile at valid grid (${gridX}, ${gridY})`);
                         this.validationCache.set(cacheKey, false); return false;
+                    }
+                    // For objects: use precise AABB check so the entity can pass through
+                    // grid cells that contain an obstacle's bounding box but not its actual collider.
+                    if (!cell.objectWalkable) {
+                        const blockingObjs = this._getCellBlockingObjects(cell, entity);
+                        for (const obj of blockingObjs) {
+                            if (this._isOpenableObstacle(obj, entityCapabilities)) continue;
+                            if (this._checkDetailedCollision(entityState, obj)) {
+                                if (debug) console.log(`  ❌ FAIL: Precise collider collision with obj ID ${obj.id || 'N/A'} at cell (${gridX}, ${gridY})`);
+                                this.validationCache.set(cacheKey, false); return false;
+                            }
+                        }
                     }
                     if (cell.hasDoor && entityCapabilities && !entityCapabilities.canOpenDoors) {
                         if (debug) console.log(`  ❌ FAIL: Collider overlaps door at valid grid (${gridX}, ${gridY})`);

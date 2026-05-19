@@ -59,6 +59,10 @@ class DroppedMapItem {
         this.magnetSpeed = 0.2;
         this.collected = false;
         this.minimumCollectDistance = 192 / 2;
+        this.quantity = 1;
+        this.inventoryType = null;
+        this.inventoryVariant = null;
+        this.description = '';
 
         this.size = {
             width: 24,
@@ -201,23 +205,51 @@ class DroppedMapItem {
         const owner = this.parent || myte.parent;
         owner?.soundManager?.play?.('ui_pickup_item');
 
+        const quantity = Math.max(1, Number(this.quantity) || 1);
+        const inventoryEntry = this.getInventoryEntryData(quantity);
+
         // Add to inventory or apply effect based on item type
-        switch (this.type) {
+        switch (String(this.type || '').toUpperCase()) {
             case 'COIN':
-                owner?.core?.user?.addCurrency?.('coins', 1);
+                owner?.core?.user?.addCurrency?.('coins', quantity);
                 break;
             case 'HEALTH':
-                myte.updateHealth(20);
+                myte.stats?.updateHealth(quantity);
                 break;
             default:
-                // Use the original inventory name if available to ensure stack matching
-                owner?.inventory?.addItem?.(this.inventoryName || this.variant, 1, this.type);
+                owner?.inventory?.addItem?.(
+                    inventoryEntry.name,
+                    inventoryEntry.quantity,
+                    inventoryEntry.type,
+                    inventoryEntry.description,
+                    inventoryEntry.variant
+                );
         }
 
         this.element.classList.add('collected');
         if (this.shadowElement) this.shadowElement.style.display = 'none';
 
         setTimeout(() => this.remove(), 500);
+    }
+
+    getInventoryEntryData(quantity = 1) {
+        const rawVariant = this.inventoryVariant || this.inventoryName || this.variant;
+        const definition = ItemRegistry.getItemSync(rawVariant);
+        const canonicalVariant = definition?.id ||
+            ItemRegistry.resolveIdSync(rawVariant) ||
+            ItemRegistry.normalizeId(rawVariant);
+        const requestedType = String(this.inventoryType || this.type || definition?.type || 'item').toUpperCase();
+        const resolvedType = definition?.type && requestedType === 'ITEM'
+            ? String(definition.type).toUpperCase()
+            : requestedType;
+
+        return {
+            name: definition?.name || this.inventoryName || canonicalVariant,
+            variant: canonicalVariant,
+            type: resolvedType,
+            quantity,
+            description: definition?.description || this.description || ''
+        };
     }
 
     remove() {

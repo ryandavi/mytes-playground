@@ -471,12 +471,26 @@ class DragComponent extends InputComponent {
 	 */
 	startDragAtCurrentPosition() {
 		const mousePos = this.inputSystem.getMousePosition();
+		this.startDragAtPosition(mousePos);
+	}
+
+	/**
+	 * Manually start a drag operation at an explicit screen position
+	 * @param {Object} position Position object with x/y and optional clientX/clientY
+	 */
+	startDragAtPosition(position = {}) {
+		const normalizedPosition = {
+			x: position.x ?? position.clientX ?? 0,
+			y: position.y ?? position.clientY ?? 0,
+			clientX: position.clientX ?? position.x ?? 0,
+			clientY: position.clientY ?? position.y ?? 0
+		};
 		this.handleStart({
-			position: mousePos,
+			position: normalizedPosition,
 			originalEvent: null
 		});
 		this.startDrag({
-			position: mousePos,
+			position: normalizedPosition,
 			originalEvent: null
 		});
 	}

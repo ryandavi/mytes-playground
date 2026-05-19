@@ -79,7 +79,7 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
                     .replace(/^\[|\]$/g, '')
                     .replace(/[{}]/g, '')
                     .split(',')
-                    .map(part => part.trim())
+                    .map(part => this._sanitizeItemToken(part))
                     .filter(part => part.length > 0);
 
                 if (!parts.length) return null;
@@ -111,12 +111,80 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
             return Number.isFinite(numericValue) ? numericValue : value;
         };
 
+        const normalizedType = this._sanitizeItemToken(item.type).toUpperCase();
+        let variant = this._sanitizeItemToken(item.variant ?? 'default');
+        let quantity = parseRangeValue(this._sanitizeItemToken(item.quantity ?? 1));
+        const probability = Number(this._sanitizeItemToken(item.probability ?? 1));
+        const parsedVariant = parseRangeValue(variant);
+
+        if (!normalizedType) {
+            console.warn('[TreasureChestMapObject] Ignoring item with empty type:', item);
+            return null;
+        }
+
+        // Chest shorthand like {"COIN", 100} uses the second slot as the amount.
+        if ((normalizedType === 'COIN' || normalizedType === 'HEALTH') &&
+            (typeof parsedVariant === 'number' || Array.isArray(parsedVariant)) &&
+            (item.quantity === undefined || item.quantity === null)) {
+            quantity = parsedVariant;
+            variant = 'default';
+        }
+
+        if (typeof variant === 'string') {
+            variant = ItemRegistry.resolveIdSync(variant) || variant;
+        }
+
+        const resolvedItemDefinition = typeof variant === 'string'
+            ? ItemRegistry.getItemSync(variant)
+            : null;
+        const supportedSpecialTypes = new Set(['COIN', 'HEALTH']);
+        const supportedInventoryTypes = new Set(['ITEM', 'FOOD', 'TOY', 'CROP', 'MEDICINE']);
+        const normalizedInventoryType = resolvedItemDefinition?.type
+            ? String(resolvedItemDefinition.type).toUpperCase()
+            : null;
+
+        if (supportedInventoryTypes.has(normalizedType) && !resolvedItemDefinition) {
+            console.warn('[TreasureChestMapObject] Ignoring chest item with unknown inventory variant:', item);
+            return null;
+        }
+
+        if (!supportedSpecialTypes.has(normalizedType) &&
+            !supportedInventoryTypes.has(normalizedType) &&
+            !MapObjectFactory.hasType(normalizedType)) {
+            console.warn('[TreasureChestMapObject] Ignoring chest item with unsupported type:', item);
+            return null;
+        }
+
+        if (supportedInventoryTypes.has(normalizedType) && normalizedInventoryType) {
+            variant = resolvedItemDefinition.id;
+        }
+
+        if (!Number.isFinite(probability) || probability <= 0) {
+            console.warn('[TreasureChestMapObject] Ignoring chest item with invalid probability:', item);
+            return null;
+        }
+
         return {
-            type: String(item.type).toUpperCase(),
-            variant: item.variant ?? 'default',
-            quantity: parseRangeValue(item.quantity ?? 1),
-            probability: Number(item.probability ?? 1)
+            type: supportedInventoryTypes.has(normalizedType) && normalizedInventoryType
+                ? normalizedInventoryType
+                : normalizedType,
+            variant,
+            quantity,
+            probability
         };
+    }
+
+    _sanitizeItemToken(value) {
+        if (value == null) return value;
+        if (Array.isArray(value)) {
+            return value.map(entry => this._sanitizeItemToken(entry));
+        }
+        if (typeof value !== 'string') {
+            return value;
+        }
+
+        const trimmed = value.trim();
+        return trimmed.replace(/^['"]+|['"]+$/g, '');
     }
 
     open(parent) {
@@ -195,6 +263,9 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
     }
     
     createDroppedItem(item, spawnPoint, angle, baseVelocity) {
+        const resolvedQuantity = Array.isArray(item.quantity)
+            ? Math.floor(Math.random() * (item.quantity[1] - item.quantity[0] + 1)) + item.quantity[0]
+            : Math.max(1, Number(item.quantity) || 1);
         const droppedItem = new DroppedMapItem(
             this.gameMap,
             item.type,
@@ -206,6 +277,15 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         droppedItem.velocityX = Math.cos(angle) * baseVelocity;
         droppedItem.velocityY = Math.sin(angle) * baseVelocity;
         droppedItem.velocityZ = baseVelocity;
+        droppedItem.quantity = resolvedQuantity;
+
+        const itemDefinition = ItemRegistry.getItemSync(item.variant);
+        droppedItem.inventoryVariant = itemDefinition?.id || ItemRegistry.resolveIdSync(item.variant) || item.variant;
+        droppedItem.inventoryType = itemDefinition?.type
+            ? String(itemDefinition.type).toUpperCase()
+            : item.type;
+        droppedItem.inventoryName = itemDefinition?.name || droppedItem.inventoryVariant;
+        droppedItem.description = itemDefinition?.description || '';
         
         return droppedItem;
     }
