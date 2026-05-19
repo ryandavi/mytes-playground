@@ -646,15 +646,16 @@ class FollowObjectAction extends PositionableAction {
 
         const targetRect  = this.getRect(this.target);
         const myteRect    = this.myte.getRect();
-        const canvasWidth = this.myte.parent.getCanvasRect().width;
         const posOpts     = { gap: this.gap, align: this.align };
 
         let horizontal = this.getClosestSideHorizontal(targetRect, myteRect);
-        let targetPos  = this.calculatePosition(myteRect, targetRect, horizontal, posOpts);
+        let rawTargetPos = this.calculatePosition(myteRect, targetRect, horizontal, posOpts);
+        let targetPos = this.adjustPositionToBounds(rawTargetPos, myteRect);
 
-        if (targetPos.x + myteRect.width > canvasWidth || targetPos.x < 0) {
-            horizontal = targetPos.x < 0 ? 'right' : 'left';
-            targetPos  = this.calculatePosition(myteRect, targetRect, horizontal, posOpts);
+        if (Math.abs(targetPos.x - rawTargetPos.x) > 0.01) {
+            horizontal = rawTargetPos.x < targetPos.x ? 'right' : 'left';
+            rawTargetPos = this.calculatePosition(myteRect, targetRect, horizontal, posOpts);
+            targetPos = this.adjustPositionToBounds(rawTargetPos, myteRect);
         }
 
         this.myte.setTarget(targetPos.x, targetPos.y);

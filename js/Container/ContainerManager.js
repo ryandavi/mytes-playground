@@ -374,14 +374,21 @@ class ContainerManager {
 
     getCanvasRect() {
         let rect = this.getRect(this.canvas);
-        const contentWidth = Math.max(
+        const configuredWidth = Number.isFinite(this.gameMap?.dimensions?.width)
+            ? this.gameMap.dimensions.width
+            : Number.parseFloat(this.canvas.style.width);
+        const configuredHeight = Number.isFinite(this.gameMap?.dimensions?.height)
+            ? this.gameMap.dimensions.height
+            : Number.parseFloat(this.canvas.style.height);
+
+        const fallbackWidth = Math.max(
             this.canvas.scrollWidth || 0,
             this.canvas.clientWidth || 0,
             ...Array.from(this.canvas.children || []).map(child =>
                 Math.max(child.scrollWidth || 0, child.offsetWidth || 0)
             )
         );
-        const contentHeight = Math.max(
+        const fallbackHeight = Math.max(
             this.canvas.scrollHeight || 0,
             this.canvas.clientHeight || 0,
             ...Array.from(this.canvas.children || []).map(child =>
@@ -389,11 +396,71 @@ class ContainerManager {
             )
         );
 
+        const contentWidth = Number.isFinite(configuredWidth) && configuredWidth > 0
+            ? configuredWidth
+            : fallbackWidth;
+        const contentHeight = Number.isFinite(configuredHeight) && configuredHeight > 0
+            ? configuredHeight
+            : fallbackHeight;
+
         return {
             left: rect.left,
             top: rect.top,
             width: contentWidth,
             height: contentHeight
+        };
+    }
+
+    getWorldBounds() {
+        const canvasRect = this.getCanvasRect();
+        return {
+            left: 0,
+            top: 0,
+            right: canvasRect.width,
+            bottom: canvasRect.height,
+            width: canvasRect.width,
+            height: canvasRect.height
+        };
+    }
+
+    getEntityBoundsAt(entity, x = 0, y = 0, options = {}) {
+        const useCollider = options.useCollider !== false && !!entity?.collider;
+        const collider = entity?.collider || {};
+        const rect = options.rect || entity?.getOffsetRect?.() || entity?.getRect?.() || entity?.size || {
+            width: 0,
+            height: 0
+        };
+
+        const offsetX = useCollider ? (collider.offsetX ?? 0) : 0;
+        const offsetY = useCollider ? (collider.offsetY ?? 0) : 0;
+        const width = useCollider ? (collider.width ?? rect.width ?? 0) : (rect.width ?? entity?.size?.width ?? 0);
+        const height = useCollider ? (collider.height ?? rect.height ?? 0) : (rect.height ?? entity?.size?.height ?? 0);
+
+        return {
+            left: x + offsetX,
+            top: y + offsetY,
+            right: x + offsetX + width,
+            bottom: y + offsetY + height,
+            width,
+            height,
+            offsetX,
+            offsetY
+        };
+    }
+
+    clampEntityPosition(entity, x = 0, y = 0, options = {}) {
+        const worldBounds = options.bounds || this.getWorldBounds();
+        const entityBounds = this.getEntityBoundsAt(entity, x, y, options);
+
+        return {
+            x: Math.max(
+                worldBounds.left - entityBounds.offsetX,
+                Math.min(x, worldBounds.right - entityBounds.offsetX - entityBounds.width)
+            ),
+            y: Math.max(
+                worldBounds.top - entityBounds.offsetY,
+                Math.min(y, worldBounds.bottom - entityBounds.offsetY - entityBounds.height)
+            )
         };
     }
 

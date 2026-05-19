@@ -41,8 +41,9 @@ class MyteTouchHandler extends DragHandler {
                 // Always limit to canvas during drag using collider bounds
                 if (!this._loggedBounds) {
                     this._loggedBounds = true;
-                    console.log('[drag bounds] canvas.clientWidth:', myte.parent.canvas?.clientWidth,
-                        'canvas.clientHeight:', myte.parent.canvas?.clientHeight,
+                    const canvasRect = myte.parent.getCanvasRect?.() || {};
+                    console.log('[drag bounds] canvasRect.width:', canvasRect.width,
+                        'canvasRect.height:', canvasRect.height,
                         'getMaxDimensions:', myte.parent.getMaxDimensions());
                 }
                 myte.setTarget(newX, newY, true);
@@ -91,6 +92,7 @@ class MyteTouchHandler extends DragHandler {
                 myte.dropTarget.classList.remove('valid-drop-target', 'on-target');
                 this._getPortalElements(myte).forEach(el => el.classList.remove('valid-drop-target', 'on-target'));
                 myte.targetDot.classList.remove('hidden');
+                myte.logVisualDebug('drag_end');
 
                 // Reset auto-pickup flag
                 this.autoPickup = false;

@@ -224,10 +224,11 @@ body.debug .mapObject > div.interact:hover {
   transform: translate(-50%, -50%);
 }
 .dot.target {
+  position: absolute;
   background-color: green;
 }
 .dot.target:after {
-  position: fixed;
+  position: absolute;
   top: -2em;
   left: 50%;
   transform: translateX(-50%);

@@ -80,7 +80,9 @@
   display: none;
 }
 .interactive-myte > .inner-wrapper {
-  position: fixed;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: inherit;
   height: inherit;
 }
@@ -175,8 +177,10 @@
   position: absolute;
   cursor: grab;
 }
-.interactive-myte.freemode > .sprite {
-  position: fixed;
+.interactive-myte.freemode > .inner-wrapper > .sprite {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 /* DIALOGUE */

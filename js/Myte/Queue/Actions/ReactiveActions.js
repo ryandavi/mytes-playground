@@ -38,11 +38,13 @@ class RunAwayAction extends MyteAction {
 
         if (distance < this.panicDistance) {
             const angle    = Math.atan2(dy, dx) + Math.PI;
-            const maxDim   = this.myte.parent.getMaxDimensions();
-            const boundedX = Math.max(0, Math.min(this.myte.posX + Math.cos(angle) * this.runDistance, maxDim.width));
-            const boundedY = Math.max(0, Math.min(this.myte.posY + Math.sin(angle) * this.runDistance, maxDim.height));
+            const clamped = this.myte.parent.clampEntityPosition(
+                this.myte,
+                this.myte.posX + Math.cos(angle) * this.runDistance,
+                this.myte.posY + Math.sin(angle) * this.runDistance
+            );
 
-            this.myte.setTarget(boundedX, boundedY);
+            this.myte.setTarget(clamped.x, clamped.y);
 
             if (Math.random() < 0.02) {
                 this.myte.queue.addExpression('panic', 200);

@@ -121,7 +121,9 @@
 	}
 
 	>.inner-wrapper {
-		position: fixed;
+		position: absolute;
+		top: 0;
+		left: 0;
 		width: inherit;
 		height: inherit;
 
@@ -252,8 +254,12 @@
 		position: absolute;
 		cursor: grab;
 
-		>.sprite {
-			position: fixed;
+		>.inner-wrapper {
+			>.sprite {
+				position: absolute;
+				top: 0;
+				left: 0;
+			}
 		}
 
 	}

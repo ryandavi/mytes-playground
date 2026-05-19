@@ -270,10 +270,11 @@ body.debug {
 	}
 
 	&.target {
+		position: absolute;
 		background-color: green;
 
 		&:after {
-			position: fixed;
+			position: absolute;
 			top: -2em;
 			left: 50%;
 			transform: translateX(-50%);

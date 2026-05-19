@@ -120,8 +120,8 @@ class PositionableAction extends MyteAction {
     }
 
     getCanvasBounds() {
-        const r = this.myte.parent.getCanvasRect();
-        return { x: 0, y: 0, width: r.width, height: r.height };
+        const bounds = this.myte.parent.getWorldBounds();
+        return { x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height };
     }
 
     // Get the target's rect. alignTo='collider' uses physics bounds when available,
@@ -198,11 +198,7 @@ class PositionableAction extends MyteAction {
 
     // Clamp a position so the Myte stays fully within canvas bounds
     adjustPositionToBounds(position, myteRect) {
-        const b = this.getCanvasBounds();
-        return {
-            x: Math.max(b.x, Math.min(position.x, b.x + b.width  - myteRect.width)),
-            y: Math.max(b.y, Math.min(position.y, b.y + b.height - myteRect.height))
-        };
+        return this.myte.parent.clampEntityPosition(this.myte, position.x, position.y, { rect: myteRect });
     }
 
     getClosestSideHorizontal(destRect, myteRect) {

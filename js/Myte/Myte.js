@@ -128,6 +128,7 @@ class Myte {
 		this.startTime = null;
 		this.runAway_angle_distance = 300;
 		this.inputHandler;
+		this._lastVisualDebugAt = 0;
 
 	}
 
@@ -300,6 +301,7 @@ class Myte {
 	update_target_dot() {
 		this.targetDot.style.left = (this.targetX + this.size.width / 2) + 'px';
 		this.targetDot.style.top = (this.targetY + this.size.height / 2) + 'px';
+		this.logVisualDebug('update_target_dot');
 
 	}
 
@@ -437,6 +439,96 @@ setMode(newGoal = null) {
 
 	getOffsetRect() {
 		return this.parent.getLocalOffset(this.duplicate);
+	}
+
+	shouldLogVisualDebug() {
+		return document.body.classList.contains('debug') && this.isActive;
+	}
+
+	logVisualDebug(source = 'unknown') {
+		if (!this.shouldLogVisualDebug()) return;
+
+		const now = performance.now();
+		if (now - this._lastVisualDebugAt < 150) return;
+		this._lastVisualDebugAt = now;
+
+		const duplicateLocal = this.parent.getLocalOffset(this.duplicate);
+		const innerWrapper = this.duplicate?.querySelector('.inner-wrapper');
+		const innerLocal = innerWrapper ? this.parent.getLocalOffset(innerWrapper) : null;
+		const spriteLocal = this.sprite ? this.parent.getLocalOffset(this.sprite) : null;
+		const collider = this.parent.getColliderBounds(this);
+		const worldBounds = this.parent.getWorldBounds?.() || null;
+		const duplicateRect = this.duplicate?.getBoundingClientRect?.();
+		const spriteRect = this.sprite?.getBoundingClientRect?.();
+		const targetRect = this.targetDot?.getBoundingClientRect?.();
+		const round = (value) => Number.isFinite(value) ? Math.round(value * 100) / 100 : null;
+		const summary = {
+			source,
+			name: this.name,
+			zoom: round(this.parent.camera?.zoomLevel ?? 1),
+			cameraX: round(this.parent.camera?.posX ?? 0),
+			cameraY: round(this.parent.camera?.posY ?? 0),
+			posX: round(this.posX),
+			posY: round(this.posY),
+			targetX: round(this.targetX),
+			targetY: round(this.targetY),
+			duplicateStyleLeft: round(Number.parseFloat(this.duplicate.style.left)),
+			duplicateStyleTop: round(Number.parseFloat(this.duplicate.style.top)),
+			duplicateLocalLeft: round(duplicateLocal.left),
+			duplicateLocalTop: round(duplicateLocal.top),
+			duplicateOffsetX: round(duplicateLocal.left - this.posX),
+			duplicateOffsetY: round(duplicateLocal.top - this.posY),
+			innerOffsetX: round((innerLocal?.left ?? 0) - duplicateLocal.left),
+			innerOffsetY: round((innerLocal?.top ?? 0) - duplicateLocal.top),
+			spriteOffsetX: round((spriteLocal?.left ?? 0) - duplicateLocal.left),
+			spriteOffsetY: round((spriteLocal?.top ?? 0) - duplicateLocal.top),
+			colliderOffsetX: round(collider.left - this.posX),
+			colliderOffsetY: round(collider.top - this.posY),
+			targetStyleLeft: round(this.targetDot ? Number.parseFloat(this.targetDot.style.left) : null),
+			targetStyleTop: round(this.targetDot ? Number.parseFloat(this.targetDot.style.top) : null),
+			targetExpectedLeft: round(this.targetX + this.size.width / 2),
+			targetExpectedTop: round(this.targetY + this.size.height / 2),
+			duplicateScreenLeft: round(duplicateRect?.left),
+			duplicateScreenTop: round(duplicateRect?.top),
+			spriteScreenLeft: round(spriteRect?.left),
+			spriteScreenTop: round(spriteRect?.top),
+			targetScreenLeft: round(targetRect?.left),
+			targetScreenTop: round(targetRect?.top),
+			worldWidth: round(worldBounds?.width),
+			worldHeight: round(worldBounds?.height)
+		};
+
+		console.log('[myte visual debug]', {
+			source,
+			name: this.name,
+			zoom: this.parent.camera?.zoomLevel ?? 1,
+			cameraX: this.parent.camera?.posX ?? 0,
+			cameraY: this.parent.camera?.posY ?? 0,
+			posX: this.posX,
+			posY: this.posY,
+			targetX: this.targetX,
+			targetY: this.targetY,
+			duplicateStyleLeft: Number.parseFloat(this.duplicate.style.left),
+			duplicateStyleTop: Number.parseFloat(this.duplicate.style.top),
+			duplicateLocalLeft: duplicateLocal.left,
+			duplicateLocalTop: duplicateLocal.top,
+			duplicateOffsetX: duplicateLocal.left - this.posX,
+			duplicateOffsetY: duplicateLocal.top - this.posY,
+			innerLocalLeft: innerLocal?.left ?? null,
+			innerLocalTop: innerLocal?.top ?? null,
+			spriteLocalLeft: spriteLocal?.left ?? null,
+			spriteLocalTop: spriteLocal?.top ?? null,
+			colliderLeft: collider.left,
+			colliderTop: collider.top,
+			colliderRight: collider.right,
+			colliderBottom: collider.bottom,
+			targetStyleLeft: this.targetDot ? Number.parseFloat(this.targetDot.style.left) : null,
+			targetStyleTop: this.targetDot ? Number.parseFloat(this.targetDot.style.top) : null,
+			expectedTargetLeft: this.targetX + this.size.width / 2,
+			expectedTargetTop: this.targetY + this.size.height / 2,
+			worldBounds
+		});
+		console.log('[myte visual debug compact]', JSON.stringify(summary));
 	}
 
 
@@ -787,26 +879,12 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 			y = this.posY;
 		}
 
-
-		let maxDimensions = this.parent.getMaxDimensions();
 		let rect = this.getRect();
 
-		let container = this.parent.getContainerRect();
-
 		if (limit) {
-			const col = this.collider;
-			const canvasW = this.parent.canvas?.clientWidth || maxDimensions.width;
-			const canvasH = this.parent.canvas?.clientHeight || maxDimensions.height;
-			x = Math.max(x, -(col?.offsetX ?? 0));
-			y = Math.max(y, -(col?.offsetY ?? 0));
-			x = Math.min(x, canvasW - (col?.offsetX ?? 0) - (col?.width ?? rect.width));
-			y = Math.min(y, canvasH - (col?.offsetY ?? 0) - (col?.height ?? rect.height));
-		} else {
-			// full page
-			x = Math.max(x, -container.left);
-			y = Math.max(y, -container.top);
-			x = Math.min(x, window.outerWidth - rect.width - container.left);
-			y = Math.min(y, document.documentElement.scrollHeight - rect.height - container.top);
+			const clamped = this.parent.clampEntityPosition(this, x, y, { rect });
+			x = clamped.x;
+			y = clamped.y;
 		}
 
 
@@ -820,6 +898,8 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 			this.duplicate.style.top = y.toFixed(0) + 'px';
 			this.setZIndex(y);
 		}
+
+		this.logVisualDebug('setSpritePosition');
 	}
 
 
@@ -847,24 +927,12 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 			y = this.targetY;
 		}
 
-		let maxDimensions = this.parent.getMaxDimensions();
 		let rect = this.getRect();
-		let container = this.parent.getContainerRect();
 
 		if (limit) {
-			const col = this.collider;
-			const canvasW = this.parent.canvas?.clientWidth || maxDimensions.width;
-			const canvasH = this.parent.canvas?.clientHeight || maxDimensions.height;
-			x = Math.max(x, -(col?.offsetX ?? 0));
-			y = Math.max(y, -(col?.offsetY ?? 0));
-			x = Math.min(x, canvasW - (col?.offsetX ?? 0) - (col?.width ?? rect.width));
-			y = Math.min(y, canvasH - (col?.offsetY ?? 0) - (col?.height ?? rect.height));
-		} else {
-			// full page
-			x = Math.max(x, -container.left);
-			y = Math.max(y, -container.top);
-			x = Math.min(x, window.outerWidth - rect.width - container.left);
-			y = Math.min(y, document.documentElement.scrollHeight - rect.height - container.top - 100);
+			const clamped = this.parent.clampEntityPosition(this, x, y, { rect });
+			x = clamped.x;
+			y = clamped.y;
 		}
 
 
@@ -874,10 +942,7 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 
 	setPosition(x = null, y = null, limit = false) {
 
-
-		let maxDimensions = this.parent.getMaxDimensions();
 		let rect = this.getRect();
-		let container = this.parent.getContainerRect();
 
 		let setX = (x == null ? false : true);
 		let setY = (y == null ? false : true);
@@ -892,19 +957,9 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 
 
 		if (limit) {
-			const col = this.collider;
-			const canvasW = this.parent.canvas?.clientWidth || maxDimensions.width;
-			const canvasH = this.parent.canvas?.clientHeight || maxDimensions.height;
-			x = Math.max(x, -(col?.offsetX ?? 0));
-			y = Math.max(y, -(col?.offsetY ?? 0));
-			x = Math.min(x, canvasW - (col?.offsetX ?? 0) - (col?.width ?? rect.width));
-			y = Math.min(y, canvasH - (col?.offsetY ?? 0) - (col?.height ?? rect.height));
-		} else {
-			// full page
-			x = Math.max(x, -container.left);
-			y = Math.max(y, -container.top);
-			x = Math.min(x, window.outerWidth - rect.width - container.left);
-			y = Math.min(y, document.documentElement.scrollHeight - rect.height - container.top);
+			const clamped = this.parent.clampEntityPosition(this, x, y, { rect });
+			x = clamped.x;
+			y = clamped.y;
 		}
 
 		if (setX) this.posX = x;
@@ -1233,7 +1288,7 @@ checkMovementCollision(newX, newY, colliders) {
 // Add similar defensive checks to move_gravity
 move_gravity() {
     // Get current dimensions and positions
-    const limit_ground = this.parent.getCanvasRect().height;
+    const limit_ground = this.parent.getWorldBounds().bottom;
     const limit_ceiling = 0;
 
     // Cache collider values to avoid repeated conditionals
