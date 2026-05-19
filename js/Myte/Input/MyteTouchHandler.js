@@ -32,14 +32,16 @@ class MyteTouchHandler extends DragHandler {
                 this._getPortalElements(myte).forEach(el => el.classList.add('valid-drop-target'));
             },
             onDragUpdate: (position) => {
-                const containerRect = myte.parent.getContainerRect();
-                const newX = (position.x - myte.parent.camera.posX) - containerRect.left - (192/2);
-                const newY = (position.y - myte.parent.camera.posY) - containerRect.top - (192/2);
+                const world = myte.parent.inputHandler.screenToWorldCoordinates(position.x, position.y, {
+                    element: myte
+                });
+                const newX = world.x;
+                const newY = world.y;
 
                 // Move myte
-                myte.setTarget(newX, newY, myte.limitTocontainer);
-                myte.setPosition(newX, newY, myte.limitTocontainer);
-                myte.setSpritePosition(newX, newY, myte.limitTocontainer);
+                myte.setTarget(newX, newY, myte.limitToContainer);
+                myte.setPosition(newX, newY, myte.limitToContainer);
+                myte.setSpritePosition(newX, newY, myte.limitToContainer);
 
                 // Update home drop target
                 const dropTargetRect = myte.parent.getRect(myte.dropTarget);

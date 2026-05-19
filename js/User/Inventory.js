@@ -252,13 +252,17 @@ class Inventory {
             e.clientX,
             e.clientY
         );
+        const dragOffset = this.parent.inputHandler.screenDeltaToWorldDelta(
+            this.config.dragOffsetX,
+            this.config.dragOffsetY
+        );
 
         // Create object in world
         const object = this.parent.gameMap.addObject(
             resolvedObject.type,
             resolvedObject.variant,
-            dropPosition.x - this.config.dragOffsetX,
-            dropPosition.y - this.config.dragOffsetY
+            dropPosition.x - dragOffset.x,
+            dropPosition.y - dragOffset.y
         );
 
         if (object) {

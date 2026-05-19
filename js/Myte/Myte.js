@@ -298,8 +298,8 @@ class Myte {
 	}
 
 	update_target_dot() {
-		this.targetDot.style.left = (this.targetX + this.getRect().width / 2) + 'px';
-		this.targetDot.style.top = (this.targetY + this.getRect().height / 2) + 'px';
+		this.targetDot.style.left = (this.targetX + this.size.width / 2) + 'px';
+		this.targetDot.style.top = (this.targetY + this.size.height / 2) + 'px';
 
 	}
 
@@ -514,7 +514,7 @@ setMode(newGoal = null) {
 	}
 
 	get distance_from_mouse() {
-		let mouse = this.parent.getLocalMouse(this);
+		let mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
 
 		var d = {
 			x: mouse.x - this.posX,
@@ -887,7 +887,7 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 
 		var rect = this.getRect();
 
-		let mouse = this.parent.getLocalMouse();
+		let mouse = this.parent.inputHandler.getMouseWorldPosition();
 		var newMousePosX = mouse.x;
 		var newMousePosY = mouse.y;
 
@@ -1424,7 +1424,7 @@ move_gravity() {
 				if (!this.isCurrentlyJumping()) {
 					if (Math.random() < 0.2 &&
 						this.parent.isMouseInContainer() &&
-						this.parent.getLocalMouse().y < this.posY) {
+						this.parent.inputHandler.getMouseWorldPosition().y < this.posY) {
 						this.do_jump();
 					}
 				}
@@ -1479,7 +1479,7 @@ move_gravity() {
 	}
 
 	watchCursor() {
-		const mouse = this.parent.getLocalMouse(this);
+		const mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
 		const dx = mouse.x - this.posX;
 		const dy = mouse.y - this.posY;
 		const distanceFromMouse = Math.sqrt(dx * dx + dy * dy);
@@ -1523,7 +1523,7 @@ move_gravity() {
 	}
 
 	getDistanceFromMouse() {
-		const mouse = this.parent.getLocalMouse(this);
+		const mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
 		const dx = mouse.x - this.posX;
 		const dy = mouse.y - this.posY;
 		return Math.sqrt(dx * dx + dy * dy).toFixed(2);
@@ -1545,7 +1545,7 @@ move_gravity() {
 			this.doRunAway(doXAxis, doYAxis);
 		} else {
 			if (mouseDistance > this.followRadius.min && mouseDistance < this.followRadius.max) {
-				const mouse = this.parent.getLocalMouse(this);
+				const mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
 				this.setTarget(
 					doXAxis ? mouse.x : null,
 					doYAxis ? mouse.y : null,
@@ -1565,7 +1565,7 @@ move_gravity() {
 			let currentX = this.posX;
 			let currentY = this.posY;
 
-			const mouse = this.parent.getLocalMouse(this);
+			const mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
 
 			var dx3 = mouse.x - currentX;
 			var dy3 = mouse.y - currentY;

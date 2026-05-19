@@ -1257,6 +1257,124 @@ class SoundManager {
 					return { synth, note: "D3", duration: "8n" };
 				}
 			},
+			"obj_door_open": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.MembraneSynth({
+						pitchDecay: 0.02,
+						octaves: 1.5,
+						oscillator: { type: "triangle" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.18,
+							sustain: 0,
+							release: 0.12
+						}
+					}).toDestination();
+					return {
+						synth,
+						notes: ["E3", "G3"],
+						durations: ["32n", "8n"]
+					};
+				}
+			},
+			"obj_door_close": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.MembraneSynth({
+						pitchDecay: 0.015,
+						octaves: 1,
+						oscillator: { type: "sine" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.14,
+							sustain: 0,
+							release: 0.08
+						}
+					}).toDestination();
+					return { synth, note: "C3", duration: "8n" };
+				}
+			},
+			"obj_gate_open": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.MetalSynth({
+						frequency: 120,
+						envelope: {
+							attack: 0.01,
+							decay: 0.18,
+							sustain: 0,
+							release: 0.2
+						},
+						harmonicity: 2.5,
+						modulationIndex: 18,
+						resonance: 2200,
+						octaves: 1
+					}).toDestination();
+					return { synth, note: "A2", duration: "8n" };
+				}
+			},
+			"obj_gate_close": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.MetalSynth({
+						frequency: 90,
+						envelope: {
+							attack: 0.01,
+							decay: 0.14,
+							sustain: 0,
+							release: 0.15
+						},
+						harmonicity: 2.2,
+						modulationIndex: 16,
+						resonance: 1800,
+						octaves: 0.8
+					}).toDestination();
+					return { synth, note: "F2", duration: "8n" };
+				}
+			},
+			"obj_fountain_on": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.NoiseSynth({
+						noise: { type: "pink" },
+						envelope: {
+							attack: 0.01,
+							decay: 0.35,
+							sustain: 0,
+							release: 0.1
+						}
+					});
+					const filter = new Tone.Filter({
+						frequency: 1800,
+						type: "bandpass",
+						Q: 2
+					}).toDestination();
+					synth.connect(filter);
+					return { synth, duration: "8n" };
+				}
+			},
+			"obj_fountain_off": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.NoiseSynth({
+						noise: { type: "pink" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.18,
+							sustain: 0,
+							release: 0.08
+						}
+					});
+					const filter = new Tone.Filter({
+						frequency: 900,
+						type: "lowpass",
+						Q: 1
+					}).toDestination();
+					synth.connect(filter);
+					return { synth, duration: "16n" };
+				}
+			},
 			"obj_fountain": {
 				type: "ambient",
 				create: () => {
@@ -1299,6 +1417,42 @@ class SoundManager {
 					}).toDestination();
 					// synth.volume.value = Tone.gainToDb(0.3);
 					return { synth, note: "E5", duration: "8n" };
+				}
+			},
+			"obj_lantern_on": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.AMSynth({
+						harmonicity: 2.5,
+						oscillator: { type: "sine" },
+						envelope: {
+							attack: 0.02,
+							decay: 0.24,
+							sustain: 0.15,
+							release: 0.25
+						}
+					}).toDestination();
+					return {
+						synth,
+						notes: ["C5", "E5"],
+						durations: ["32n", "8n"]
+					};
+				}
+			},
+			"obj_lantern_off": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.AMSynth({
+						harmonicity: 1.8,
+						oscillator: { type: "triangle" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.14,
+							sustain: 0,
+							release: 0.12
+						}
+					}).toDestination();
+					return { synth, note: "B4", duration: "16n" };
 				}
 			},
 			"obj_crop_harvest": {

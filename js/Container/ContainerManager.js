@@ -214,14 +214,6 @@ class ContainerManager {
 
 
     // Input state accessors that delegate to inputHandler
-    getLocalMouse(element = null) {
-        return this.inputHandler.getLocalMouse(element);
-    }
-
-    getContainerMouse(element = null) {
-        return this.inputHandler.getContainerMouse(element);
-    }
-
     getPressDuration() {
         return this.inputHandler.getPressDuration();
     }
@@ -309,9 +301,9 @@ class ContainerManager {
 
         cursorElement.classList.remove('hidden');
 
-        const mouse = this.inputHandler.getMousePosition();
-        cursorElement.style.left = mouse.x + 'px';
-        cursorElement.style.top = mouse.y + 'px';
+        const world = this.inputHandler.getMouseWorldPosition();
+        cursorElement.style.left = world.x + 'px';
+        cursorElement.style.top = world.y + 'px';
       }
 
     getOffset(el) {
@@ -358,13 +350,26 @@ class ContainerManager {
 
     getCanvasRect() {
         let rect = this.getRect(this.canvas);
-        var dimensions = Utility.findLargestChildDimensions(this.canvas);
+        const contentWidth = Math.max(
+            this.canvas.scrollWidth || 0,
+            this.canvas.clientWidth || 0,
+            ...Array.from(this.canvas.children || []).map(child =>
+                Math.max(child.scrollWidth || 0, child.offsetWidth || 0)
+            )
+        );
+        const contentHeight = Math.max(
+            this.canvas.scrollHeight || 0,
+            this.canvas.clientHeight || 0,
+            ...Array.from(this.canvas.children || []).map(child =>
+                Math.max(child.scrollHeight || 0, child.offsetHeight || 0)
+            )
+        );
 
         return {
             left: rect.left,
             top: rect.top,
-            width: dimensions.width,
-            height: dimensions.height
+            width: contentWidth,
+            height: contentHeight
         };
     }
 

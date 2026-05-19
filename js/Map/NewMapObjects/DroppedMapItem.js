@@ -182,6 +182,7 @@ class DroppedMapItem {
         if (this.collected) return;
         this.collected = true;
         const owner = this.parent || myte.parent;
+        owner?.soundManager?.play?.('ui_pickup_item');
 
         // Add to inventory or apply effect based on item type
         switch (this.type) {

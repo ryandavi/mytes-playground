@@ -221,6 +221,7 @@ body.debug .mapObject > div.interact:hover {
 }
 .dot.cursor-dot {
   background-color: blueviolet;
+  transform: translate(-50%, -50%);
 }
 .dot.target {
   background-color: green;

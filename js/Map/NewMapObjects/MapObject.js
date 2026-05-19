@@ -259,7 +259,7 @@ class MapObject {
 			},
 			onLongPress: (event) => {
 				if (this.getConfig('draggable') && this.parent?.ui?.isTool(UIToolModes.SELECT)) {
-					this.parent?.ui?.setTool(UIToolModes.DRAG);
+					this.parent?.ui?.changeToolMode(UIToolModes.DRAG);
 					this.startDrag();
 				} else {
 					this.handleLongPress(event);
@@ -284,11 +284,13 @@ class MapObject {
 				if (this.container?.ui) this.container.ui.setSelected(this);
 			},
 			onDragMove: (event) => {
-				const containerRect = this.gameMap.getContainerRect();
-				const cameraOffsetX = this.container?.camera?.posX ?? 0;
-				const cameraOffsetY = this.container?.camera?.posY ?? 0;
-				this.posX = event.position.x - containerRect.left - (this.size.width / 2) - cameraOffsetX;
-				this.posY = event.position.y - containerRect.top - (this.size.height / 2) - cameraOffsetY;
+				const world = this.container?.inputHandler?.screenToWorldCoordinates
+					? this.container.inputHandler.screenToWorldCoordinates(event.position.x, event.position.y, {
+						element: this
+					})
+					: { x: this.posX, y: this.posY };
+				this.posX = world.x;
+				this.posY = world.y;
 				this.updatePosition();
 				this.showDropTarget();
 			},
@@ -334,7 +336,7 @@ class MapObject {
 		const isDragMode = this.parent?.ui?.isTool(UIToolModes.DRAG);
 		const isSelectedInSelectMode =
 			this.parent?.ui?.isTool(UIToolModes.SELECT) &&
-			this.parent?.ui?.selectedObject === this;
+			this.parent?.ui?.selectionManager?.getSelectedObject?.() === this;
 		return isDragMode || isSelectedInSelectMode;
 	}
 

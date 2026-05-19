@@ -115,6 +115,11 @@ const TYPE_CONFIGS = {
 				closing: { frames: [[4, 0], [3, 0], [2, 0], [1, 0], [0, 0]], loop: false },
 				opened:  { frames: [[4, 0]], loop: true }
 			}
+		},
+		soundEffects: {
+			open: 'obj_chest_open',
+			close: 'obj_chest_close',
+			drop: 'ui_drop_item'
 		}
 	},
 
@@ -132,6 +137,10 @@ const TYPE_CONFIGS = {
 		moodBoostRadius: 150,
 		moodBoostAmount: 0.1,
 		boostCooldown: 1000,
+		soundEffects: {
+			on: 'obj_fountain_on',
+			off: 'obj_fountain_off'
+		},
 		spriteConfig: {
 			animations: {
 				idle:    { frames: [[0, 0], [1, 0], [2, 0], [3, 0]], loop: true },
@@ -151,6 +160,10 @@ const TYPE_CONFIGS = {
 		renderPriority: 2,
 		interactionType: 'light',
 		default: 'off',
+		soundEffects: {
+			on: 'obj_lantern_on',
+			off: 'obj_lantern_off'
+		},
 		spriteConfig: {
 			animations: {
 				idle:    { frames: [[0, 0], [1, 0], [2, 0], [1, 0]], loop: true },
@@ -494,6 +507,10 @@ const TYPE_CONFIGS = {
 		canToggle: true,
 		default: 'closed',
 		canInspect: true,
+		soundEffects: {
+			open: 'obj_door_open',
+			close: 'obj_door_close'
+		},
 		spriteConfig: {
 			default: 'closed',
 			spriteSheet: {
@@ -766,6 +783,10 @@ const TYPE_CONFIGS = {
 		canToggle: true,
 		default: 'closed',
 		size: { width: 64, height: 32 },
+		soundEffects: {
+			open: 'obj_gate_open',
+			close: 'obj_gate_close'
+		},
 		directionConfigs: {
 			E: {
 				size: { width: 64, height: 32 },

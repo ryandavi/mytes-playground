@@ -321,6 +321,102 @@ class ContainerInputManager {
   //==================================================
   // COORDINATE TRANSFORMATION METHODS
   //==================================================
+
+  getZoomLevel() {
+    return this.container.camera?.zoomLevel || 1;
+  }
+
+  getCameraOffset(includeCamera = true) {
+    if (!includeCamera || !this.container.camera) {
+      return { x: 0, y: 0 };
+    }
+
+    return {
+      x: this.container.camera.posX,
+      y: this.container.camera.posY
+    };
+  }
+
+  pageToContainerCoordinates(x, y) {
+    const containerRect = this.container.getContainerRect();
+    const zoomLevel = this.getZoomLevel();
+
+    return {
+      x: (x - containerRect.left) / zoomLevel,
+      y: (y - containerRect.top) / zoomLevel
+    };
+  }
+
+  containerToPageCoordinates(x, y) {
+    const containerRect = this.container.getContainerRect();
+    const zoomLevel = this.getZoomLevel();
+
+    return {
+      x: x * zoomLevel + containerRect.left,
+      y: y * zoomLevel + containerRect.top
+    };
+  }
+
+  containerToWorldCoordinates(x, y, options = {}) {
+    const cameraOffset = this.getCameraOffset(options.includeCamera !== false);
+    const elementOffset = this.getElementWorldOffset(options.element);
+    const additionalOffset = options.additionalOffset || { x: 0, y: 0 };
+
+    return {
+      x: x - elementOffset.x - cameraOffset.x - additionalOffset.x,
+      y: y - elementOffset.y - cameraOffset.y - additionalOffset.y
+    };
+  }
+
+  worldToContainerCoordinates(x, y, options = {}) {
+    const cameraOffset = this.getCameraOffset(options.includeCamera !== false);
+    const elementOffset = this.getElementWorldOffset(options.element);
+    const additionalOffset = options.additionalOffset || { x: 0, y: 0 };
+
+    return {
+      x: x + cameraOffset.x + elementOffset.x + additionalOffset.x,
+      y: y + cameraOffset.y + elementOffset.y + additionalOffset.y
+    };
+  }
+
+  getElementWorldOffset(element, zoomLevel = this.getZoomLevel()) {
+    if (!element) {
+      return { x: 0, y: 0 };
+    }
+
+    if (element.size?.width || element.size?.height) {
+      return {
+        x: (element.size?.width || 0) / 2,
+        y: (element.size?.height || 0) / 2
+      };
+    }
+
+    if (typeof element.getRect === 'function') {
+      const rect = element.getRect();
+      return {
+        x: rect.width / (2 * zoomLevel),
+        y: rect.height / (2 * zoomLevel)
+      };
+    }
+
+    if (typeof element.getBoundingClientRect === 'function') {
+      const rect = element.getBoundingClientRect();
+      return {
+        x: rect.width / (2 * zoomLevel),
+        y: rect.height / (2 * zoomLevel)
+      };
+    }
+
+    return { x: 0, y: 0 };
+  }
+
+  screenDeltaToWorldDelta(x, y) {
+    const zoomLevel = this.getZoomLevel();
+    return {
+      x: x / zoomLevel,
+      y: y / zoomLevel
+    };
+  }
   
   /**
    * Convert screen coordinates to world coordinates
@@ -331,26 +427,8 @@ class ContainerInputManager {
    * @returns {Object} World coordinates {x, y}
    */
   screenToWorldCoordinates(x, y, options = {}) {
-    const containerRect = this.container.getContainerRect();
-    const zoomLevel = this.container.camera ? this.container.camera.zoomLevel : 1;
-    const cameraOffset = (options.includeCamera !== false && this.container.camera) ? {
-      x: this.container.camera.posX,
-      y: this.container.camera.posY
-    } : { x: 0, y: 0 };
-    
-    // Calculate element offset
-    const elementOffset = options.element ? {
-      x: options.element.getRect ? options.element.getRect().width / 2 : 0,
-      y: options.element.getRect ? options.element.getRect().height / 2 : 0
-    } : { x: 0, y: 0 };
-    
-    // Calculate additional offset
-    const additionalOffset = options.additionalOffset || { x: 0, y: 0 };
-    
-    return {
-      x: (x - containerRect.left) / zoomLevel - elementOffset.x - cameraOffset.x - additionalOffset.x,
-      y: (y - containerRect.top) / zoomLevel - elementOffset.y - cameraOffset.y - additionalOffset.y
-    };
+    const containerPoint = this.pageToContainerCoordinates(x, y);
+    return this.containerToWorldCoordinates(containerPoint.x, containerPoint.y, options);
   }
 
   /**
@@ -360,17 +438,27 @@ class ContainerInputManager {
    * @returns {Object} Screen coordinates {x, y}
    */
   worldToScreenCoordinates(x, y) {
-    const containerRect = this.container.getContainerRect();
-    const zoomLevel = this.container.camera ? this.container.camera.zoomLevel : 1;
-    const cameraOffset = this.container.camera ? {
-      x: this.container.camera.posX,
-      y: this.container.camera.posY
-    } : { x: 0, y: 0 };
-    
-    return {
-      x: (x + cameraOffset.x) * zoomLevel + containerRect.left,
-      y: (y + cameraOffset.y) * zoomLevel + containerRect.top
-    };
+    const containerPoint = this.worldToContainerCoordinates(x, y);
+    return this.containerToPageCoordinates(containerPoint.x, containerPoint.y);
+  }
+
+  getMouseWorldPosition(options = {}) {
+    const mousePos = this.getMousePosition();
+    return this.screenToWorldCoordinates(mousePos.x, mousePos.y, options);
+  }
+
+  getMouseContainerPosition(options = {}) {
+    const mousePos = this.getMousePosition();
+    const containerPoint = this.pageToContainerCoordinates(mousePos.x, mousePos.y);
+
+    if (options.includeCamera === false && !options.element && !options.additionalOffset) {
+      return containerPoint;
+    }
+
+    return this.containerToWorldCoordinates(containerPoint.x, containerPoint.y, {
+      ...options,
+      includeCamera: false
+    });
   }
 
   /**
@@ -403,13 +491,9 @@ class ContainerInputManager {
    * @returns {Object} Element-relative coordinates {x, y}
    */
   getElementMouse(element) {
-    const mousePos = this.getMousePosition();
-    const rect = element.getBoundingClientRect();
-    const zoomLevel = this.container.camera ? this.container.camera.zoomLevel : 1;
-  
     return {
-      x: (mousePos.x - rect.left - window.scrollX) / zoomLevel,
-      y: (mousePos.y - rect.top - window.scrollY) / zoomLevel
+      x: this.getMousePosition().x - this.container.getRect(element).left,
+      y: this.getMousePosition().y - this.container.getRect(element).top
     };
   }
 
@@ -417,53 +501,6 @@ class ContainerInputManager {
   // COMPATIBILITY METHODS (TO BE PHASED OUT)
   //==================================================
   
-  /**
-   * @deprecated Use screenToWorldCoordinates instead
-   * Get mouse position in local container coordinates
-   * @param {Object} element Optional element for offset
-   * @returns {Object} Local coordinates {x, y}
-   */
-  getLocalMouse(element = null) {
-    const mousePos = this.getMousePosition();
-    return this.screenToWorldCoordinates(mousePos.x, mousePos.y, { element });
-  }
-
-  /**
-   * @deprecated Use screenToWorldCoordinates instead
-   * Get mouse position relative to the container, ignoring camera offset
-   * @param {Object} element Optional element for offset
-   * @returns {Object} Container-relative coordinates {x, y}
-   */
-  getContainerMouse(element = null) {
-    const mousePos = this.getMousePosition();
-    return this.screenToWorldCoordinates(mousePos.x, mousePos.y, { element, includeCamera: false });
-  }
-
-  /**
-   * @deprecated Use getMousePosition instead
-   * Get mouse position in global/page coordinates
-   * @returns {Object} Mouse position {x, y}
-   */
-  getGlobalMouse() {
-    return this.getMousePosition();
-  }
-
-  /**
-   * @deprecated Use screenToWorldCoordinates instead
-   * Get mouse position in local coordinates with camera offset
-   * Similar to getLocalMouse but with customizable offset behavior
-   * @param {Object} options Configuration options
-   * @returns {Object} Adjusted coordinates {x, y}
-   */
-  getAdjustedMouse(options = {}) {
-    const mousePos = this.getMousePosition();
-    return this.screenToWorldCoordinates(mousePos.x, mousePos.y, {
-      element: options.elementOffset,
-      includeCamera: options.includeCamera,
-      additionalOffset: options.additionalOffset
-    });
-  }
-
   /**
    * Clean up resources
    */

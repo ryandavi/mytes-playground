@@ -14,10 +14,14 @@ class Camera {
 		this.draggingEasing = 75;
 		
 		// Zoom properties
-		this.canZoom = false;
+		this.canZoom = true;
 		this.zoomLevel = 1;
 		this.targetZoomLevel = 1;
 		this.zoomEasing = 5;
+		this.minZoomLevel = 0.5;
+		this.maxZoomLevel = 2.5;
+		this.zoomStep = 0.1;
+		this.zoomAnchor = null;
 		
 		// Camera behavior
 		this.followMode = DEFAULT_CAMERA_FOLLOW_MODE;
@@ -34,6 +38,7 @@ class Camera {
 		this.dragStartCameraY = 0;
 		
 		// Initialize event handlers
+		this.canvas.style.transformOrigin = 'top left';
 		this._initEventListeners();
 	}
 	
@@ -83,7 +88,7 @@ class Camera {
 	}
 	
 	updateTransform(x, y, zoom) {
-		this.canvas.style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) scale(${zoom.toFixed(3)})`;
+		this.canvas.style.transform = `scale(${zoom.toFixed(3)}) translate(${x.toFixed(2)}px, ${y.toFixed(2)}px)`;
 	}
 	
 	// ========== POSITION METHODS ==========
@@ -117,43 +122,93 @@ class Camera {
 	setZoomLevel(zoom) {
 		this.targetZoomLevel = zoom;
 	}
-	
+
+	_clearZoomAnchor() {
+		this.zoomAnchor = null;
+	}
+
+	_getRawContainerPointFromClient(clientX, clientY) {
+		const containerRect = this.parent.getContainerRect();
+		return {
+			x: clientX - containerRect.left,
+			y: clientY - containerRect.top
+		};
+	}
+
+	_getZoomAnchorForEvent(e) {
+		const containerRect = this.parent.getContainerRect();
+		const fallbackClientX = e.clientX ?? ((e.pageX ?? window.scrollX) - window.scrollX);
+		const fallbackClientY = e.clientY ?? ((e.pageY ?? window.scrollY) - window.scrollY);
+		const pointerPoint = this._getRawContainerPointFromClient(fallbackClientX, fallbackClientY);
+
+		if (this.followMode === CAMERA_FOLLOW_MODES.CHARACTER && this.parent.activeMyte) {
+			const activeMyte = this.parent.activeMyte;
+			return {
+				screenX: containerRect.width / 2,
+				screenY: containerRect.height / 2,
+				worldX: activeMyte.posX + (activeMyte.size.width / 2),
+				worldY: activeMyte.posY + (activeMyte.size.height / 2)
+			};
+		}
+
+		const pageX = e.pageX ?? (fallbackClientX + window.scrollX);
+		const pageY = e.pageY ?? (fallbackClientY + window.scrollY);
+		const worldPoint = this.parent.inputHandler?.screenToWorldCoordinates
+			? this.parent.inputHandler.screenToWorldCoordinates(pageX, pageY)
+			: {
+				x: pointerPoint.x / this.zoomLevel - this.posX,
+				y: pointerPoint.y / this.zoomLevel - this.posY
+			};
+
+		return {
+			screenX: pointerPoint.x,
+			screenY: pointerPoint.y,
+			worldX: worldPoint.x,
+			worldY: worldPoint.y
+		};
+	}
+
+	_calculateAnchoredPosition(anchor, zoom = this.zoomLevel) {
+		let targetX = anchor.screenX / zoom - anchor.worldX;
+		let targetY = anchor.screenY / zoom - anchor.worldY;
+
+		if (this.limitToBounds) {
+			const bounds = this._calculateBounds(null, null, zoom);
+			targetX = Math.min(0, Math.max(bounds.minX, targetX));
+			targetY = Math.min(0, Math.max(bounds.minY, targetY));
+		}
+
+		return { x: targetX, y: targetY };
+	}
+
 	handleZoom(e) {
 		e.preventDefault();
 		
 		if (this.canZoom === false) return;
 		
-		// Get mouse position relative to canvas
-		const rect = this.canvas.getBoundingClientRect();
-		const mouseX = e.clientX - rect.left;
-		const mouseY = e.clientY - rect.top;
-		
 		// Calculate new zoom level
 		const zoomDirection = e.deltaY < 0 ? 1 : -1;
-		const zoomFactor = 0.1;
-		const newZoom = Math.max(0.5, Math.min(2.5, this.targetZoomLevel + zoomDirection * zoomFactor));
+		const newZoom = Math.max(
+			this.minZoomLevel,
+			Math.min(this.maxZoomLevel, this.targetZoomLevel + zoomDirection * this.zoomStep)
+		);
 		
 		// Only proceed if zoom level is changing
 		if (newZoom !== this.targetZoomLevel) {
-		  // Calculate zoom point in world coordinates - adjust for current zoom
-		  const worldX = (mouseX - this.posX) / this.zoomLevel;
-		  const worldY = (mouseY - this.posY) / this.zoomLevel;
-		  
-		  // Calculate new target position to zoom toward cursor
-		  const zoomRatio = newZoom / this.targetZoomLevel;
-		  this.setTarget(
-			mouseX - worldX * zoomRatio * this.zoomLevel,
-			mouseY - worldY * zoomRatio * this.zoomLevel
-		  );
-		  
-		  this.setZoomLevel(newZoom);
+			const anchor = this._getZoomAnchorForEvent(e);
+			this.zoomAnchor = anchor;
+
+			const newTarget = this._calculateAnchoredPosition(anchor, newZoom);
+			this.setTarget(newTarget.x, newTarget.y);
+			this.setZoomLevel(newZoom);
 		}
-	  }
+	}
 	
 	// ========== DRAG METHODS ==========
 	
 	startDrag(e) {
 		if (this.followMode === CAMERA_FOLLOW_MODES.DRAG_TO_PAN) {
+			this._clearZoomAnchor();
 			this.isDragging = true;
 			this.dragStartX = e.clientX;
 			this.dragStartY = e.clientY;
@@ -169,8 +224,8 @@ class Camera {
 	drag(e) {
 		if (!this.isDragging || this.followMode !== CAMERA_FOLLOW_MODES.DRAG_TO_PAN) return;
 		
-		const dx = e.clientX - this.dragStartX;
-		const dy = e.clientY - this.dragStartY;
+		const dx = (e.clientX - this.dragStartX) / this.zoomLevel;
+		const dy = (e.clientY - this.dragStartY) / this.zoomLevel;
 		
 		// Apply drag only in scrollable directions
 		let newX = this.isScrollable.x ? this.dragStartCameraX + dx : this.dragStartCameraX;
@@ -203,7 +258,7 @@ class Camera {
 		
 		const canvasRect = this.parent.getCanvasRect();
 		const viewportRect = this.parent.getContainerRect();
-		const entityRect = entity.getRect ? entity.getRect() : { width: 50, height: 50 };
+		const entityRect = entity.size || (entity.getRect ? entity.getRect() : { width: 50, height: 50 });
 		
 		this.followCharacter(entity.posX, entity.posY, canvasRect, viewportRect, entityRect);
 		
@@ -218,23 +273,24 @@ class Camera {
 	followCursor(x, y, canvasRect, viewportRect) {
 		// Only apply scrolling in directions that make sense
 		if (!this.isScrollable.x && !this.isScrollable.y) return;
+		const viewportWorld = this._getViewportWorldSize(viewportRect);
 		
 		// Get the percentage position of the mouse within the viewport
-		const mouseXPercent = x / viewportRect.width;
-		const mouseYPercent = y / viewportRect.height;
+		const mouseXPercent = viewportWorld.width > 0 ? x / viewportWorld.width : 0;
+		const mouseYPercent = viewportWorld.height > 0 ? y / viewportWorld.height : 0;
 		
 		// Calculate camera positions
 		let cameraX = this.posX;
 		let cameraY = this.posY;
 		
 		if (this.isScrollable.x) {
-			cameraX = -Math.max(0, Math.min(mouseXPercent * canvasRect.width - viewportRect.width / 2,
-				canvasRect.width - viewportRect.width));
+			cameraX = -Math.max(0, Math.min(mouseXPercent * canvasRect.width - viewportWorld.width / 2,
+				canvasRect.width - viewportWorld.width));
 		}
 		
 		if (this.isScrollable.y) {
-			cameraY = -Math.max(0, Math.min(mouseYPercent * canvasRect.height - viewportRect.height / 2,
-				canvasRect.height - viewportRect.height));
+			cameraY = -Math.max(0, Math.min(mouseYPercent * canvasRect.height - viewportWorld.height / 2,
+				canvasRect.height - viewportWorld.height));
 		}
 		
 		this.setTarget(cameraX, cameraY);
@@ -262,10 +318,11 @@ class Camera {
 	
 	followCursorEdge(x, y, canvasRect, viewportRect) {
 		if (!this.isScrollable.x && !this.isScrollable.y) return;
+		const viewportWorld = this._getViewportWorldSize(viewportRect);
 		
 		// Edge thresholds (20% of viewport)
-		const horizEdgeThreshold = viewportRect.width * 0.2;
-		const vertEdgeThreshold = viewportRect.height * 0.2;
+		const horizEdgeThreshold = viewportWorld.width * 0.2;
+		const vertEdgeThreshold = viewportWorld.height * 0.2;
 		
 		// Start with current position
 		let targetX = this.posX;
@@ -280,10 +337,10 @@ class Camera {
 				// Moving toward left edge
 				const intensity = 1 - (x / horizEdgeThreshold);
 				targetX += (horizEdgeThreshold - x) / easing * intensity * 2;
-			} else if (x > viewportRect.width - horizEdgeThreshold) {
+			} else if (x > viewportWorld.width - horizEdgeThreshold) {
 				// Moving toward right edge
-				const intensity = (x - (viewportRect.width - horizEdgeThreshold)) / horizEdgeThreshold;
-				targetX -= (x - (viewportRect.width - horizEdgeThreshold)) / easing * intensity * 2;
+				const intensity = (x - (viewportWorld.width - horizEdgeThreshold)) / horizEdgeThreshold;
+				targetX -= (x - (viewportWorld.width - horizEdgeThreshold)) / easing * intensity * 2;
 			}
 		}
 		
@@ -293,10 +350,10 @@ class Camera {
 				// Moving toward top edge
 				const intensity = 1 - (y / vertEdgeThreshold);
 				targetY += (vertEdgeThreshold - y) / easing * intensity * 2;
-			} else if (y > viewportRect.height - vertEdgeThreshold) {
+			} else if (y > viewportWorld.height - vertEdgeThreshold) {
 				// Moving toward bottom edge
-				const intensity = (y - (viewportRect.height - vertEdgeThreshold)) / vertEdgeThreshold;
-				targetY -= (y - (viewportRect.height - vertEdgeThreshold)) / easing * intensity * 2;
+				const intensity = (y - (viewportWorld.height - vertEdgeThreshold)) / vertEdgeThreshold;
+				targetY -= (y - (viewportWorld.height - vertEdgeThreshold)) / easing * intensity * 2;
 			}
 		}
 		
@@ -311,24 +368,33 @@ class Camera {
 	// ========== POSITION HELPERS ==========
 	
 	_calculateCenterPosition(x, y, viewportRect, elementRect) {
+		const viewportWorld = this._getViewportWorldSize(viewportRect);
 		const centerPosX = this.isScrollable.x 
-			? -(x + (elementRect.width / 2) - (viewportRect.width / 2)) 
+			? -(x + (elementRect.width / 2) - (viewportWorld.width / 2)) 
 			: this.posX;
 			
 		const centerPosY = this.isScrollable.y 
-			? -(y + (elementRect.height / 2) - (viewportRect.height / 2)) 
+			? -(y + (elementRect.height / 2) - (viewportWorld.height / 2)) 
 			: this.posY;
 			
 		return { x: centerPosX, y: centerPosY };
 	}
 	
-	_calculateBounds(canvasRect, viewportRect) {
+	_getViewportWorldSize(viewportRect, zoom = this.zoomLevel) {
+		return {
+			width: viewportRect.width / zoom,
+			height: viewportRect.height / zoom
+		};
+	}
+
+	_calculateBounds(canvasRect, viewportRect, zoom = this.zoomLevel) {
 		if (!canvasRect) canvasRect = this.parent.getCanvasRect();
 		if (!viewportRect) viewportRect = this.parent.getContainerRect();
+		const viewportWorld = this._getViewportWorldSize(viewportRect, zoom);
 		
 		return {
-			minX: -(canvasRect.width - viewportRect.width),
-			minY: -(canvasRect.height - viewportRect.height)
+			minX: -(canvasRect.width - viewportWorld.width),
+			minY: -(canvasRect.height - viewportWorld.height)
 		};
 	}
 	
@@ -347,6 +413,7 @@ class Camera {
 	}
 	
 	resetToZero() {
+		this._clearZoomAnchor();
 		this.posX = 0;
 		this.posY = 0;
 		this.targetX = 0;
@@ -424,41 +491,66 @@ class Camera {
 	update() {
 		// Handle instant movement case
 		if (this.useInstantMovement) {
+			this.zoomLevel = this.targetZoomLevel;
+
+			if (this.zoomAnchor) {
+				const anchoredPosition = this._calculateAnchoredPosition(this.zoomAnchor, this.zoomLevel);
+				this.setTarget(anchoredPosition.x, anchoredPosition.y);
+			}
+
 			this.posX = this.targetX;
 			this.posY = this.targetY;
-			this.zoomLevel = this.targetZoomLevel;
 			this.updateTransform(this.posX, this.posY, this.zoomLevel);
+			this._clearZoomAnchor();
 			this.doCameraLogic();
 			return;
 		}
-		
-		// Calculate the distance to move
-		const deltaX = this.targetX - this.posX;
-		const deltaY = this.targetY - this.posY;
-		const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-		
-		// Use adaptive easing based on distance and state
-		const baseEasing = this.parent.activeMyte && this.parent.activeMyte.isDragging 
-			? this.draggingEasing 
-			: this.easing;
-			
-		const adaptiveEasing = Math.max(4, baseEasing - distance / 100);
-		
-		// Calculate steps
-		const stepX = deltaX / adaptiveEasing;
-		const stepY = deltaY / adaptiveEasing;
-		
-		// Update zoom level
+
+		// Update zoom level first so camera positioning can react to the actual visual zoom.
 		const zoomDelta = this.targetZoomLevel - this.zoomLevel;
 		this.zoomLevel += zoomDelta / this.zoomEasing;
-		
-		// Snap to target if very close
-		const snapThreshold = 0.5;
-		if (distance < snapThreshold && Math.abs(zoomDelta) < 0.01) {
-			this.setPosition(this.targetX, this.targetY);
+		if (Math.abs(this.targetZoomLevel - this.zoomLevel) < 0.001) {
 			this.zoomLevel = this.targetZoomLevel;
+		}
+
+		const isZoomAnchored = !!this.zoomAnchor && Math.abs(this.targetZoomLevel - this.zoomLevel) > 0.0001;
+
+		if (isZoomAnchored) {
+			const anchoredPosition = this._calculateAnchoredPosition(this.zoomAnchor, this.zoomLevel);
+			this.setTarget(anchoredPosition.x, anchoredPosition.y);
+			this.setPosition(anchoredPosition.x, anchoredPosition.y);
 		} else {
-			this.setPosition(this.posX + stepX, this.posY + stepY);
+			// Calculate the distance to move
+			const deltaX = this.targetX - this.posX;
+			const deltaY = this.targetY - this.posY;
+			const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+			// Use adaptive easing based on distance and state
+			const baseEasing = this.parent.activeMyte && this.parent.activeMyte.isDragging
+				? this.draggingEasing
+				: this.easing;
+
+			const adaptiveEasing = Math.max(4, baseEasing - distance / 100);
+
+			// Calculate steps
+			const stepX = deltaX / adaptiveEasing;
+			const stepY = deltaY / adaptiveEasing;
+
+			// Snap to target if very close
+			const snapThreshold = 0.5;
+			if (distance < snapThreshold && Math.abs(zoomDelta) < 0.01) {
+				this.setPosition(this.targetX, this.targetY);
+				this.zoomLevel = this.targetZoomLevel;
+			} else {
+				this.setPosition(this.posX + stepX, this.posY + stepY);
+			}
+		}
+
+		if (this.zoomAnchor && this.zoomLevel === this.targetZoomLevel) {
+			const finalAnchoredPosition = this._calculateAnchoredPosition(this.zoomAnchor, this.zoomLevel);
+			this.setTarget(finalAnchoredPosition.x, finalAnchoredPosition.y);
+			this.setPosition(finalAnchoredPosition.x, finalAnchoredPosition.y);
+			this._clearZoomAnchor();
 		}
 		
 		// Update transform and camera logic
@@ -471,7 +563,7 @@ class Camera {
 			return; // Handled by drag event
 		}
 		
-		const mouse = this.parent.getContainerMouse();
+		const mouse = this.parent.inputHandler.getMouseContainerPosition();
 		const canvasRect = this.parent.getCanvasRect();
 		const containerRect = this.parent.getContainerRect();
 		
@@ -496,7 +588,7 @@ class Camera {
 						this.parent.activeMyte.posY,
 						canvasRect,
 						containerRect,
-						this.parent.activeMyte.getRect()
+						this.parent.activeMyte.size
 					);
 				} else if (isMouseInContainer) {
 					// Fallback to cursor edge if no active myte

@@ -127,6 +127,13 @@ class StatefulAnimatedMapObject extends RangeInteractiveAnimatedMapObject {
         this.element.setAttribute(this.getStateAttributeName(), value);
     }
 
+    playConfiguredSound(type) {
+        const soundEffect = this.getConfig(`soundEffects.${type}`);
+        if (soundEffect && this.gameMap?.soundManager) {
+            this.gameMap.soundManager.play(soundEffect);
+        }
+    }
+
     transitionToState(nextState, options = {}) {
         const {
             beforeChange,
@@ -186,7 +193,18 @@ class BinaryStateAnimatedMapObject extends StatefulAnimatedMapObject {
             ? this.getDisabledState()
             : this.getEnabledState();
 
-        this.transitionToState(nextState, options);
+        const soundType = nextState === this.getEnabledState() ? 'on' : 'off';
+        const { beforeChange, ...restOptions } = options;
+
+        this.transitionToState(nextState, {
+            ...restOptions,
+            beforeChange: (...args) => {
+                this.playConfiguredSound(soundType);
+                if (typeof beforeChange === 'function') {
+                    beforeChange(...args);
+                }
+            }
+        });
         return nextState;
     }
 }
@@ -324,6 +342,7 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
         if (this.isOpen || this.isAnimating) return false;
 
         this.isAnimating = true;
+        this.playConfiguredSound('open');
         this.playAnimation(this.getOpenAnimationName(), () => {
             this.isOpen = true;
             this.isAnimating = false;
@@ -335,7 +354,6 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
                 this.playAnimation(loopAnimation);
             }
 
-            this.playConfiguredSound('open');
             this.emitToggleEvent('open');
             this.onOpenStateChanged();
         });
@@ -347,6 +365,7 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
         if (!this.isOpen || this.isAnimating) return false;
 
         this.isAnimating = true;
+        this.playConfiguredSound('close');
         this.playAnimation(this.getCloseAnimationName(), () => {
             this.isOpen = false;
             this.isAnimating = false;
@@ -358,7 +377,6 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
                 this.playAnimation(loopAnimation);
             }
 
-            this.playConfiguredSound('close');
             this.emitToggleEvent('closed');
             this.onOpenStateChanged();
         });

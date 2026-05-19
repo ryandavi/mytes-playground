@@ -137,7 +137,7 @@ class GameMap {
         // Get start position (entity top-left)
         const { posX: startX, posY: startY } = myte;
         // Get end position (target center - mouse coords)
-        const { x: endX, y: endY } = this.parent.inputHandler.getAdjustedMouse();
+        const { x: endX, y: endY } = this.parent.inputHandler.getMouseWorldPosition();
     
         // For visualization and potentially options if needed later
         const { height: entityHeight, width: entityWidth } = myte.size;

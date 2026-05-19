@@ -17,6 +17,7 @@ class GridSystem {
         };
 
         this.lastCameraPos = { x: -9999, y: -9999 }; // Initialize to force first update
+        this.lastCameraZoom = -1;
 
         // Calculate grid dimensions
         this.gridWidth = Math.ceil(this.parent.dimensions.width / this.config.cellSize);
@@ -514,11 +515,12 @@ class GridSystem {
     handleMouseMove(event) {
         if (!this.debugMode || !this.debugInitialized) return;
 
-        const pageX = event?.pageX ?? this.parent.parent.inputHandler?.getMousePosition()?.x ?? 0;
-        const pageY = event?.pageY ?? this.parent.parent.inputHandler?.getMousePosition()?.y ?? 0;
-        const mouse = this.parent.parent.inputHandler?.screenToWorldCoordinates
-            ? this.parent.parent.inputHandler.screenToWorldCoordinates(pageX, pageY)
-            : this.parent.parent.getLocalMouse();
+        const inputHandler = this.parent.parent.inputHandler;
+        const mouse = inputHandler?.getMouseWorldPosition
+            ? (event?.pageX !== undefined && event?.pageY !== undefined
+                ? inputHandler.screenToWorldCoordinates(event.pageX, event.pageY)
+                : inputHandler.getMouseWorldPosition())
+            : { x: 0, y: 0 };
 
         // Get grid coordinates
         const gridPos = this.worldToGrid(mouse.x, mouse.y);
@@ -1182,6 +1184,7 @@ class GridSystem {
             this.activeObjects.size === 0 ||
             Math.abs(camera.posX - this.lastCameraPos.x) >= moveThreshold ||
             Math.abs(camera.posY - this.lastCameraPos.y) >= moveThreshold ||
+            Math.abs(camera.zoomLevel - this.lastCameraZoom) >= 0.001 ||
             needsDebugRecreation;
 
         if (!forceUpdate) {
@@ -1191,16 +1194,19 @@ class GridSystem {
         // Save current camera position
         this.lastCameraPos.x = camera.posX;
         this.lastCameraPos.y = camera.posY;
+        this.lastCameraZoom = camera.zoomLevel;
 
         // Get viewport bounds with padding
         const viewport = this.parent.parent.getContainerRect();
+        const viewportWidth = viewport.width / camera.zoomLevel;
+        const viewportHeight = viewport.height / camera.zoomLevel;
         const pad = this.config.cullingPadding;
 
         const bounds = {
             left: Math.max(0, -camera.posX - pad),
             top: Math.max(0, -camera.posY - pad),
-            right: Math.min(this.parent.dimensions.width, -camera.posX + viewport.width + pad),
-            bottom: Math.min(this.parent.dimensions.height, -camera.posY + viewport.height + pad)
+            right: Math.min(this.parent.dimensions.width, -camera.posX + viewportWidth + pad),
+            bottom: Math.min(this.parent.dimensions.height, -camera.posY + viewportHeight + pad)
         };
 
         // Store for reference in other methods

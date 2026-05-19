@@ -121,6 +121,7 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
 
     open(parent) {
         if (this.state !== 'closed') return false;
+        this.playConfiguredSound('open');
 
         return this.playStateTransition('opening', 'opened', {
             afterChange: () => {
@@ -131,6 +132,7 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
 
     close(parent) {
         if (this.state !== 'opened' || !this.canClose) return false;
+        this.playConfiguredSound('close');
         return this.playStateTransition('closing', 'closed');
     }
 
@@ -173,6 +175,8 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
             foregroundLayer.appendChild(droppedItem.element);
             this.droppedItems.push(droppedItem);
         });
+
+        this.playConfiguredSound('drop');
 
         this.items = [];
     }

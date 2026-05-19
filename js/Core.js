@@ -84,7 +84,6 @@ class MyteCore {
             
             // Show welcome toast on successful initialization
             this.toastManager.info('Game loaded successfully!', 'Welcome');
-            this.toastManager.error('Game loaded successfully!', 'Welcome');
 
             // Load essential resources first
             this.loadingManager.setMessage("Loading essential resources...");
