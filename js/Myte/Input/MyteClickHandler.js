@@ -1,21 +1,18 @@
-class MyteClickHandler {
+class MyteClickHandler extends MyteBaseHandler {
 	constructor(myte) {
-		this.myte = myte;
+		super(myte);
 
-		// Configuration
 		this.config = {
 			doubleClickTimeout: 300,
-			
 			longPressTimeout: 500,
-			dragThreshold: 10, // Distance in pixels before considering it a drag
-			dragTimeThreshold: 300, // Time in ms before considering it a drag
-
+			dragThreshold: 10,
+			dragTimeThreshold: 300,
 			maxYForPickup: 500,
-			maxXForPickup: 300
-
+			maxXForPickup: 300,
+			clickPressDuration: 100,
+			dragModeRestoreDelay: 100
 		};
 
-		// State tracking
 		this.lastClickTime = 0;
 		this.longPressTimer = null;
 		this.isPressed = false;
@@ -23,120 +20,68 @@ class MyteClickHandler {
 		this.dragStartY = 0;
 		this.dragStartTime = 0;
 		this.isDragging = false;
-		this.previousMode = null; // Store previous mode when auto-switching
+		this.previousMode = null;
 
-		// Bind methods
-		this.handleClick = this.handleClick.bind(this);
-		this.handleDoubleClick = this.handleDoubleClick.bind(this);
-		this.handleLongPress = this.handleLongPress.bind(this);
-		this.handlePressStart = this.handlePressStart.bind(this);
-		this.handlePressEnd = this.handlePressEnd.bind(this);
-		this.handleRightClick = this.handleRightClick.bind(this);
-		this.handleMouseMove = this.handleMouseMove.bind(this);
-		this.handleInactiveClick = this.handleInactiveClick.bind(this);
-		this.handleActiveClick = this.handleActiveClick.bind(this);
-		this.handleHomeTargetClick = this.handleHomeTargetClick.bind(this);
-		this.handleContextMenu = this.handleContextMenu.bind(this);
-
-		this.initializeEventListeners();
+		this._initListeners();
 	}
 
-	initializeEventListeners() {
-		// Click events for inactive myte
-		this.myte.element.addEventListener('click', this.handleInactiveClick);
-
-		// Click events for active myte
-		this.myte.duplicate.addEventListener('click', this.handleActiveClick);
-
-		// Double click events
-		this.myte.duplicate.addEventListener('mousedown', this.handlePressStart);
-		document.addEventListener('mouseup', this.handlePressEnd);
-		document.addEventListener('mousemove', this.handleMouseMove);
-
-		// Home click events
-		this.myte.dropTarget.addEventListener('click', this.handleHomeTargetClick);
-
-		this.myte.duplicate.addEventListener('contextmenu', this.handleContextMenu);
+	_initListeners() {
+		this._on(this.myte.element,     'click',       this._onInactiveClick.bind(this));
+		this._on(this.myte.duplicate,   'click',       this._onActiveClick.bind(this));
+		this._on(this.myte.duplicate,   'mousedown',   this._onPressStart.bind(this));
+		this._on(document,              'mouseup',     this._onPressEnd.bind(this));
+		this._on(document,              'mousemove',   this._onMouseMove.bind(this));
+		this._on(this.myte.dropTarget,  'click',       this._onHomeClick.bind(this));
+		this._on(this.myte.duplicate,   'contextmenu', this._onContextMenu.bind(this));
 	}
 
-	handleInactiveClick(event) {
+	_onInactiveClick(event) {
 		if (!this.myte.isActive) {
-			if (!this.myte.isActive) {
-				this.handleInactiveMyteClick(event);
-			}
-		}
-	}
-
-	handleActiveClick(event) {
-		if (this.myte.isActive && !this.isDragging) {
-			this.handleActiveMyteClick(event);
-		}
-	}
-
-	handleHomeTargetClick(event) {
-		this.handleHomeClick(event);
-	}
-
-	handleContextMenu(event) {
-		this.handleRightClick(event);
-	}
-
-	handleRightClick(event) {
-		event.preventDefault();
-		return false;
-	}
-
-	handleInactiveMyteClick(event) {
-		event.stopPropagation();
-		if (!this.myte.isActive) {
+			event.stopPropagation();
 			this.myte.start();
 			this.myte.parent.setActiveMyte(this.myte);
 		}
 	}
 
-	handleActiveMyteClick(event) {
-		event.stopPropagation();
-
-		if (this.myte.parent.ui.isTool(UIToolModes.SELECT)) {
-			this.myte.parent.ui.setSelected(this.myte);
-
-			if (this.myte.isActiveMyte) {
-				if (this.myte.isActive && !this.myte.isDragging &&
-					this.myte.parent.getPressDuration() < 100) {
-					// Handle click on active myte
-					this.handleClick(event);
+	_onActiveClick(event) {
+		if (this.myte.isActive && !this.isDragging) {
+			event.stopPropagation();
+			if (this.myte.parent.ui.isTool(UIToolModes.SELECT)) {
+				this.myte.parent.ui.setSelected(this.myte);
+				if (this.myte.isActiveMyte &&
+					!this.myte.isDragging &&
+					this.myte.parent.getPressDuration() < this.config.clickPressDuration) {
+					this._onClick(event);
 				}
 			}
 		}
 	}
 
-	handleHomeClick(event) {
+	_onContextMenu(event) {
+		event.preventDefault();
+	}
+
+	_onHomeClick() {
 		if (this.myte.isActive) {
-			// Handle click on myte's home area
 			this.myte.queue.clear();
 			this.myte.setMode(MOVE_TYPES.GOHOME);
 		}
 	}
 
-	handleClick(event) {
-		const currentTime = Date.now();
-		const timeSinceLastClick = currentTime - this.lastClickTime;
-
-		if (timeSinceLastClick < this.config.doubleClickTimeout) {
-			this.handleDoubleClick(event);
+	_onClick(event) {
+		const now = Date.now();
+		if (now - this.lastClickTime < this.config.doubleClickTimeout) {
+			this._onDoubleClick(event);
 		}
-
-		this.lastClickTime = currentTime;
+		this.lastClickTime = now;
 	}
 
-	handleDoubleClick(event) {
-		// Handle double click behavior
-		// For example, make the myte do a special animation
+	_onDoubleClick() {
 		this.myte.queue.addExpression('surprise');
 		this.myte.queue.addExpression('dance');
 	}
 
-	handlePressStart(event) {
+	_onPressStart(event) {
 		if (!this.myte.isActiveMyte) return;
 
 		this.isPressed = true;
@@ -146,19 +91,12 @@ class MyteClickHandler {
 		this.isDragging = false;
 
 		this.longPressTimer = setTimeout(() => {
-			if (this.isPressed) {
-				this.handleLongPress(event);
-			}
+			if (this.isPressed) this._onLongPress(event);
 		}, this.config.longPressTimeout);
 	}
 
-	handleMouseMove(event) {
-
+	_onMouseMove(event) {
 		if (!this.isPressed || !this.myte.isActiveMyte || this.myte.isDragging) return;
-
-
-
-		// Only check for auto-drag if in SELECT mode
 		if (!this.myte.parent.ui.isTool(UIToolModes.SELECT)) return;
 
 		const dx = event.clientX - this.dragStartX;
@@ -166,26 +104,19 @@ class MyteClickHandler {
 		const distance = Math.sqrt(dx * dx + dy * dy);
 		const timeElapsed = Date.now() - this.dragStartTime;
 
-		// If dragged far enough and long enough, switch to drag mode
 		if (
 			distance > this.config.dragThreshold &&
-			timeElapsed > this.config.dragTimeThreshold && 
+			timeElapsed > this.config.dragTimeThreshold &&
 			!this.isDragging &&
-			(event.clientY < this.dragStartY && 
-			this.dragStartY-event.clientY > this.config.dragThreshold && 
-			this.dragStartY-event.clientY < this.config.maxYForPickup &&
-			Math.abs(this.dragStartX-event.clientX) < this.config.maxXForPickup)
+			event.clientY < this.dragStartY &&
+			this.dragStartY - event.clientY > this.config.dragThreshold &&
+			this.dragStartY - event.clientY < this.config.maxYForPickup &&
+			Math.abs(this.dragStartX - event.clientX) < this.config.maxXForPickup
 		) {
-
-
-
 			this.isDragging = true;
-
-			// Auto-switch to drag mode
 			this.previousMode = UIToolModes.SELECT;
-			this.switchToDragMode();
+			this._switchToDragMode();
 
-			// Stop the long press timer
 			if (this.longPressTimer) {
 				clearTimeout(this.longPressTimer);
 				this.longPressTimer = null;
@@ -193,49 +124,34 @@ class MyteClickHandler {
 		}
 	}
 
-	switchToDragMode() {
-		// Store the current UI mode
-		this.previousMode = UIToolModes.SELECT;
-
-		// change tool
+	_switchToDragMode() {
 		this.myte.parent.ui.changeToolMode(UIToolModes.DRAG);
-
-		// Make sure this Myte is the active one
 		if (!this.myte.isActiveMyte) {
 			this.myte.parent.setActiveMyte(this.myte);
 		}
-
-		// Start the drag after a small timeout to allow UI to update
 		setTimeout(() => {
-			// Directly call the handleStart method on touchHandler
 			if (this.myte.inputHandler.touchHandler) {
 				this.myte.inputHandler.touchHandler.handleStart({
-					preventDefault: () => { },
+					preventDefault: () => {},
 					clientX: this.dragStartX,
 					clientY: this.dragStartY,
 					type: 'mousedown'
 				});
 			}
 		}, 10);
-
 	}
 
-
-
-
-	handlePressEnd(event) {
+	_onPressEnd() {
 		if (!this.isPressed) return;
 
 		this.isPressed = false;
 		this.isDragging = false;
 
-		// If we auto-switched to drag mode, switch back to previous mode
 		if (this.previousMode && this.myte.parent.ui.isTool(UIToolModes.DRAG)) {
-			// Wait a short delay to ensure the drop action completes
 			setTimeout(() => {
 				this.myte.parent.ui.changeToolMode(this.previousMode);
 				this.previousMode = null;
-			}, 100);
+			}, this.config.dragModeRestoreDelay);
 		}
 
 		if (this.longPressTimer) {
@@ -244,24 +160,16 @@ class MyteClickHandler {
 		}
 	}
 
-	handleLongPress(event) {
+	_onLongPress() {
 		if (this.myte.isActiveMyte) {
 			this.myte.queue.addExpression('surprise');
 		}
 	}
 
 	dispose() {
-		// Clean up event listeners
-		this.myte.element.removeEventListener('click', this.handleInactiveClick);
-		this.myte.duplicate.removeEventListener('click', this.handleActiveClick);
-		this.myte.duplicate.removeEventListener('mousedown', this.handlePressStart);
-		document.removeEventListener('mouseup', this.handlePressEnd);
-		document.removeEventListener('mousemove', this.handleMouseMove);
-		this.myte.dropTarget.removeEventListener('click', this.handleHomeTargetClick);
-		this.myte.duplicate.removeEventListener('contextmenu', this.handleContextMenu);
-
 		if (this.longPressTimer) {
 			clearTimeout(this.longPressTimer);
 		}
+		super.dispose();
 	}
 }

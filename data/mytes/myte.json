@@ -34,17 +34,28 @@
     "velocity": 0
   },
   "capabilities": {
-    "can_swim": false,
-    "follows_paths": true,
-    "can_open_doors": true,
-    "can_wade": true,
-    "fire_resistance": false
+    "canSwim": false,
+    "followsPaths": true,
+    "canOpenDoors": true,
+    "canWade": true,
+    "fireResistance": false
   },
   "stats": {
     "health": 100,
     "mood": 100,
     "energy": 75,
-    "speed": 1
+    "speed": 1,
+    "moodDecayRate": 0.0005,
+    "energyDecayRate": 0.0005,
+    "energyRegenRate": 0.005,
+    "moods": {
+      "happy":   { "duration": 10000, "speedMultiplier": 1.2, "expression": "happy" },
+      "sad":     { "duration": 15000, "speedMultiplier": 0.8, "expression": "sad" },
+      "excited": { "duration": 8000,  "speedMultiplier": 1.5, "expression": "excited" },
+      "sleepy":  { "duration": 12000, "speedMultiplier": 0.7, "expression": "sleepy" },
+      "grumpy":  { "duration": 10000, "speedMultiplier": 0.9, "expression": "grumpy" },
+      "neutral": { "duration": 5000,  "speedMultiplier": 1.0, "expression": "neutral" }
+    }
   },
   "visual": {
     "cssClass": "snail",
@@ -52,7 +63,7 @@
       "width": 192,
       "height": 192
     },
-    "spriteSets": {}
+    "spriteSets": null
   },
   "expressions": {
     "surprised": "surprise",

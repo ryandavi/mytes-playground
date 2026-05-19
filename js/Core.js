@@ -176,16 +176,6 @@ class MyteCore {
 
                     // Add a small delay before playing sounds
                     setTimeout(() => {
-                        // Play startup sound
-                        //this.soundManager.playUISound('select');
-
-                        // Speak text with the character's voice
-                        /* this.soundManager.speakAnimalText("Hi my name is baby!", {
-                            species: "bird",
-                            speed: 1.6,
-                            pitch: 1.3
-                        }); */
-
                         // Add another delay before playing music
                         setTimeout(() => {
                             // Start appropriate background music based on time

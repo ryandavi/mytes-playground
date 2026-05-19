@@ -1,6 +1,6 @@
-// MovingMapObject extends AnimatedMapObject so subclasses (PatrolGuard, etc.)
-// get animation capabilities alongside physics/movement helpers.
-class MovingMapObject extends AnimatedMapObject {
+// MovingMapObject composes animation + movement directly from MapObject.
+// Avoiding AnimatedMapObject in the chain keeps the hierarchy one level flatter.
+class MovingMapObject extends withAnimation(MapObject) {
 	constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
 		super(parent, type, variant, posX, posY, config, options);
 

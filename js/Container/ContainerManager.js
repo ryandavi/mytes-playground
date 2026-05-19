@@ -233,7 +233,7 @@ class ContainerManager {
     }
 
     // Activity tracking delegates to inputHandler
-    set_last_active() {
+    setLastActive() {
         this.inputHandler.setLastActive();
     }
 
@@ -570,21 +570,14 @@ class ContainerManager {
         this.setActiveMyte(next);
     }
 
-    // Add to ContainerManager class
     checkCollision(entityA, entityB) {
         return this.checkBoxCollision(entityA, entityB);
     }
 
     handleCollision(entityA, entityB) {
-        // Notify both entities of the collision
         if (entityA.onCollision) entityA.onCollision(entityB);
         if (entityB.onCollision) entityB.onCollision(entityA);
-
-        // Emit event for other systems
-        this.core.eventManager.emit('collision', {
-            entityA,
-            entityB
-        });
+        this.core.eventManager.emit('collision', { entityA, entityB });
     }
 
     getColliderBounds(entity) {
@@ -596,21 +589,6 @@ class ContainerManager {
         };
     }
 
-
-    // Box-to-box collision check
-    checkBoxCollision(entityA, entityB) {
-        const boundsA = this.getColliderBounds(entityA);
-        const boundsB = this.getColliderBounds(entityB);
-
-        return !(
-            boundsA.right < boundsB.left ||
-            boundsA.left > boundsB.right ||
-            boundsA.bottom < boundsB.top ||
-            boundsA.top > boundsB.bottom
-        );
-    }
-
-    // Add to checkBoxCollision
     checkBoxCollision(entityA, entityB, options = {}) {
         const boundsA = this.getColliderBounds(entityA);
         const boundsB = this.getColliderBounds(entityB);
@@ -664,10 +642,10 @@ class ContainerManager {
         }
 
         this.ui.myteListManager.updateMytesList(myte);
-
-        // Update UI
         this.ui.debugMenu.updateButtons();
         this.ui.setSelected(null);
+
+        this.eventManager?.emit('container:active_myte_changed', { myte });
     }
 
     update(deltaTime) {

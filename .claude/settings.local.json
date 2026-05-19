@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/xampp/htdocs/genes/chat/neko/js && grep -n \"setTarget\\\\|moveTowardsTarget\" Myte/Myte.js | head -20)",
+      "Read(//c/c/xampp/htdocs/genes/chat/neko/js/Myte/**)"
+    ]
+  }
+}

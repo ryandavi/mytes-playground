@@ -165,9 +165,9 @@ getZoneDebugMessages() {
         return [
             // State & Behavior
             { label: "State", value: activeMyte.stateMachine.stateController.currentState },
-            { label: "Goal", value: activeMyte.get_move_type(activeMyte.goal) },
-            { label: "Previous Goal", value: activeMyte.get_move_type(activeMyte.previousGoal) },
-            { label: "Follow Goal", value: activeMyte.get_move_follow_type(activeMyte.followGoal) },
+            { label: "Goal", value: activeMyte.getMoveType(activeMyte.goal) },
+            { label: "Previous Goal", value: activeMyte.getMoveType(activeMyte.previousGoal) },
+            { label: "Follow Goal", value: activeMyte.getMoveFollowType(activeMyte.followGoal) },
             
             // Status
             { label: "Active", value: activeMyte.isActive },
@@ -176,8 +176,8 @@ getZoneDebugMessages() {
             { label: "Position", value: `${activeMyte.posX.toFixed(2)}px, ${activeMyte.posY.toFixed(2)}px` },
             { label: "Target", value: `${activeMyte.targetX.toFixed(2)}px, ${activeMyte.targetY.toFixed(2)}px` },
             { label: "Direction", value: activeMyte.direction },
-            { label: "Distance to Target", value: activeMyte.distance_from_target },
-            { label: "Distance from Mouse", value: activeMyte.distance_from_mouse },
+            { label: "Distance to Target", value: activeMyte.distanceFromTarget },
+            { label: "Distance from Mouse", value: activeMyte.distanceFromMouse },
             
             // Physics
             { label: "Falling", value: activeMyte.isFalling },

@@ -29,11 +29,11 @@ class CarryPickupAction extends MyteAction {
     }
 
     update() {
-        if (this.current_duration === -1) {
-            this.current_duration = this.duration;
+        if (this.currentDuration === -1) {
+            this.currentDuration = this.duration;
         }
 
-        const progress      = 1 - (this.current_duration / this.duration);
+        const progress      = 1 - (this.currentDuration / this.duration);
         const easedProgress = 1 - Math.pow(1 - progress, 3);
 
         const currentPos = {
@@ -44,15 +44,15 @@ class CarryPickupAction extends MyteAction {
         this.target.setPosition(currentPos.x, currentPos.y);
         this.target.setSpritePosition(currentPos.x, currentPos.y);
 
-        this.current_duration--;
+        this.currentDuration--;
 
-        if (this.current_duration <= 0) {
+        if (this.currentDuration <= 0) {
             this.myte.queue.add('carry', { target: this.target, duration: -1 });
             this.target.queue.clear();
             this.target.queue.add('being_carried', { carrierMyte: this.myte, duration: -1 });
         }
 
-        return this.current_duration <= 0;
+        return this.currentDuration <= 0;
     }
 }
 
@@ -77,7 +77,7 @@ class CarryAction extends MyteAction {
 
     update() {
         this.myte.updateTargetToFollowMouse();
-        this.myte.move_toward_target();
+        this.myte.moveTowardsTarget();
 
         this.target.setPosition(this.myte.posX, this.myte.posY - CARRY_OFFSET);
         this.target.setSpritePosition(this.myte.posX, this.myte.posY - CARRY_OFFSET);
@@ -139,11 +139,11 @@ class CarryPutdownAction extends MyteAction {
     }
 
     update() {
-        if (this.current_duration === -1) {
-            this.current_duration = this.duration;
+        if (this.currentDuration === -1) {
+            this.currentDuration = this.duration;
         }
 
-        const progress      = 1 - (this.current_duration / this.duration);
+        const progress      = 1 - (this.currentDuration / this.duration);
         const easedProgress = 1 - Math.pow(1 - progress, 3);
 
         const currentPos = {
@@ -153,13 +153,13 @@ class CarryPutdownAction extends MyteAction {
 
         this.target.setPosition(currentPos.x, currentPos.y);
         this.target.setSpritePosition(currentPos.x, currentPos.y);
-        this.current_duration--;
+        this.currentDuration--;
 
-        if (this.current_duration <= 0) {
+        if (this.currentDuration <= 0) {
             this.target.queue.clear();
         }
 
-        return this.current_duration <= 0;
+        return this.currentDuration <= 0;
     }
 }
 
@@ -198,7 +198,7 @@ class HoldBallAction extends MyteAction {
     update() {
         if (!this.ball) return true;
         this.myte.updateTargetToFollowMouse();
-        this.myte.move_toward_target();
+        this.myte.moveTowardsTarget();
         return false;
     }
 

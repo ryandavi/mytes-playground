@@ -14,7 +14,7 @@ class GameTime {
 			dayDurationInMinutes: 5, // Real-time minutes for one game day
 			daysPerSeason: 28,
 			seasons: ['spring', 'summer', 'autumn', 'winter'],
-			days_of_the_week: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+			daysOfTheWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
 
 			// Natural day/night cycle times (in hours)
 			naturalCycle: {
@@ -124,7 +124,7 @@ class GameTime {
 
 	getCurrentDayOfWeek() {
 		const totalDays = this._getTotalGameDays();
-		return this.config.days_of_the_week[totalDays % this.config.days_of_the_week.length];
+		return this.config.daysOfTheWeek[totalDays % this.config.daysOfTheWeek.length];
 	}
 
 	getCurrentSeason() {

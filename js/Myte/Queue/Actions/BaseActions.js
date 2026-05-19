@@ -50,8 +50,8 @@ class MyteAction {
     constructor(myte, options = {}) {
         this.myte = myte;
         this.duration = 0;
-        this.current_duration = -1;
-        this.total_time = 0;
+        this.currentDuration = -1;
+        this.totalTime = 0;
         this.userInitiated = false;
         this.onComplete = null;
 
@@ -73,8 +73,8 @@ class MyteAction {
     }
 
     start() {
-        if (this.duration > 0 && this.current_duration === -1) {
-            this.current_duration = this.duration;
+        if (this.duration > 0 && this.currentDuration === -1) {
+            this.currentDuration = this.duration;
         }
     }
 
@@ -237,14 +237,14 @@ class IdleAction extends MyteAction {
 
     start() {
         super.start();
-        if (this.current_duration === -1) {
-            this.current_duration = this.duration;
+        if (this.currentDuration === -1) {
+            this.currentDuration = this.duration;
         }
     }
 
     update() {
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }
 
@@ -270,24 +270,24 @@ class ExpressionAction extends MyteAction {
 
     constructor(myte, options) {
         super(myte, options);
-        this.type = options.action_type;
+        this.type = options.actionType;
         this.repeat = options.repeat || 1;
     }
 
     start() {
         super.start();
-        if (this.current_duration === -1) {
-            this.current_duration = this.duration;
+        if (this.currentDuration === -1) {
+            this.currentDuration = this.duration;
         }
     }
 
     update() {
-        this.current_duration--;
+        this.currentDuration--;
 
-        if (this.current_duration <= 0) {
+        if (this.currentDuration <= 0) {
             this.repeat--;
             if (this.repeat <= 0) return true;
-            this.current_duration = this.duration;
+            this.currentDuration = this.duration;
         }
         return false;
     }

@@ -36,8 +36,8 @@ class ShowAffectionAction extends MyteAction {
     }
 
     update() {
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }
 
@@ -117,8 +117,8 @@ class GreetAction extends PositionableAction {
     }
 
     update() {
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }
 
@@ -175,8 +175,8 @@ class GreetReceiveAction extends PositionableAction {
     }
 
     update() {
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }
 
@@ -224,14 +224,10 @@ class WatchAction extends PositionableAction {
         const watchPos   = this.calculatePosition(myteRect, targetRect, horizontal, { gap: -5, align: 'bottom-edge' });
 
         this.myte.setTarget(watchPos.x, watchPos.y);
-        if (typeof this.myte.move_toward_target_new === 'function') {
-            this.myte.move_toward_target_new();
-        } else {
-            this.myte.move_toward_target();
-        }
+        this.myte.moveTowardsTarget();
 
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }
 
@@ -276,14 +272,14 @@ class PlayTagAction extends PositionableAction {
 
         if (this.isIt) {
             this.myte.setTarget(target.posX, target.posY);
-            this.myte.move_toward_target();
+            this.myte.moveTowardsTarget();
 
             if (distance < this.catchDistance) {
                 this.isIt = false;
                 target.queue.add('play_tag', {
                     target: this.myte,
                     isIt: true,
-                    duration: this.current_duration
+                    duration: this.currentDuration
                 });
                 return true;
             }
@@ -293,11 +289,11 @@ class PlayTagAction extends PositionableAction {
                 this.myte.posX + Math.cos(angle) * this.runDistance,
                 this.myte.posY + Math.sin(angle) * this.runDistance
             );
-            this.myte.move_toward_target();
+            this.myte.moveTowardsTarget();
         }
 
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }
 
@@ -369,7 +365,7 @@ class PlayFetchAction extends MyteAction {
 
         if (Math.hypot(dx, dy) > this.pickupDistance) {
             this.myte.setTarget(this.throwable.posX, this.throwable.posY);
-            this.myte.move_toward_target();
+            this.myte.moveTowardsTarget();
             return false;
         }
 
@@ -411,7 +407,7 @@ class PlayFetchAction extends MyteAction {
         if (!this.throwable) return true;
 
         this.myte.setTarget(this.throwTarget.x, this.throwTarget.y);
-        this.myte.move_toward_target();
+        this.myte.moveTowardsTarget();
 
         if (Math.hypot(this.myte.posX - this.throwTarget.x, this.myte.posY - this.throwTarget.y) < this.catchDistance) {
             this.myte.queue.addExpression('excited', 500);
@@ -423,14 +419,14 @@ class PlayFetchAction extends MyteAction {
 
     _handleReturn() {
         this.myte.setTarget(this.throwPosition.x, this.throwPosition.y);
-        this.myte.move_toward_target();
+        this.myte.moveTowardsTarget();
 
         if (this.throwable) {
             this.throwable.setPosition(this.myte.posX, this.myte.posY - 20);
             this.throwable.setSpritePosition(this.myte.posX, this.myte.posY - 20);
         }
 
-        if (this.myte.is_at_target()) {
+        if (this.myte.isAtTarget()) {
             this.throwProgress = 0;
             this.fetchState    = FetchStates.THROW;
         }

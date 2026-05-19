@@ -65,10 +65,10 @@ class InspectAction extends PositionableAction {
 
         const point = this.inspectPoints[this.currentPoint];
         this.myte.setTarget(point.x, point.y);
-        this.myte.move_toward_target();
+        this.myte.moveTowardsTarget();
 
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }
 

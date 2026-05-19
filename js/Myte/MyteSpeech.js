@@ -329,35 +329,15 @@ class MyteSpeech {
 				pitchMultiplier *= (1 + randomVariation);
 
 
-				if(2 == 1){
-					// Get note and duration
-					const note = this.getPhonemeNote(phoneme, baseNote, pitchMultiplier);
-					const duration = this.getPhonemeDuration(phoneme, baseSpeed);
+				const duration = this.getPhonemeDuration(phoneme, baseSpeed);
+				const basePhonemeNote = this.getPhonemeNote(phoneme, baseNote, pitchMultiplier);
+				const acNote = this.applyEffect(basePhonemeNote, phoneme, j/phonemes.length, phonemes.length);
 
-					// Schedule the phoneme
-					synth.triggerAttackRelease(note, duration, time);
+				const randomDelay = Math.random() > 0.7 ? baseSpeed * 0.5 : 0;
+				const actualDuration = duration * 0.8;
 
-					// Advance time
-					time += duration;
-
-				}else{
-					// Get note and duration
-					const duration = this.getPhonemeDuration(phoneme, baseSpeed);
-					const basePhonemeNote = this.getPhonemeNote(phoneme, baseNote, pitchMultiplier);
-					const acNote = this.applyEffect(basePhonemeNote, phoneme, j/phonemes.length, phonemes.length);
-						
-					// Add small random pauses between some phonemes
-					const randomDelay = Math.random() > 0.7 ? baseSpeed * 0.5 : 0;
-						
-					// AC speech has slightly sharper attacks and decays
-					const actualDuration = duration * 0.8;
-						
-					// Schedule the phoneme
-					synth.triggerAttackRelease(acNote, actualDuration, time);
-						
-					// Advance time
-					time += duration + randomDelay;
-				}
+				synth.triggerAttackRelease(acNote, actualDuration, time);
+				time += duration + randomDelay;
 
 
 			}

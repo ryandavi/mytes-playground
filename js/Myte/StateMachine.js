@@ -8,38 +8,6 @@ const StateTypes = {
 	BEING_CARRIED: 'being_carried'  // Add this
 };
 
-const BaseSpriteSets = {
-	S: [
-		[0, 0], [1, 0], [2, 0], [3, 0]
-	],
-	W: [
-		[0, 1], [1, 1], [2, 1], [3, 1]
-	],
-	E: [
-		[0, 2], [1, 2], [2, 2], [3, 2]
-	],
-	N: [
-		[0, 3], [1, 3], [2, 3], [3, 3]
-	],
-	dance: [
-		[0, 0], [0, 1], [0, 2], [0, 3]
-	],
-	horizontalTurn: [[0, 0]],
-	verticalTurn: [[1, 2]],
-	idle: [[0, 4], [1, 4]],
-	dragging: [[0, 4], [1, 4]],
-	scratchLeft: [[0, 1], [0, 1], [2, 1], [3, 1]],
-	scratchRight: [[0, 2], [1, 2], [2, 2], [3, 2]],
-	cry_expression: [[0, 5], [1, 5], [2, 5]],
-	fall_expression: [[1, 5], [2, 5]],
-	sit_expression: [[0, 5], [1, 5], [2, 5]],
-	surprise_expression: [[0, 5], [1, 5], [2, 5]],
-	kiss_expression: [[1, 4]],
-	jumping: [[0, 4]],
-	falling: [[1, 4]],
-	slide_down: [[0, 3]],
-	land: [[1, 4]], 
-};
 
 class SpriteAnimator {
 	constructor(sprite, spriteConfig) {
@@ -162,7 +130,7 @@ class StateMachine {
 		this.parent = parent;
 		this.animator = new SpriteAnimator(
 			parent.duplicate.querySelector('.sprite'),
-			BaseSpriteSets
+			{}
 		);
 		this.stateRules = this.loadStateRules();
 		this.statePriorities = this.loadStatePriorities();
@@ -202,17 +170,17 @@ class StateMachine {
 				}
 			},
 			[StateTypes.SLIDE_DOWN]: {
-				check: (context) => context.is_doing_action('slide_down') &&
+				check: (context) => context.isDoingAction('slide_down') &&
 					context.queue.getCurrentAction().currentTargetIndex > 0,
 				getState: () => 'slide_down'
 			},
 
 			[StateTypes.EXPRESSION]: {
-				check: (context) => context.is_doing_action('expression'),
+				check: (context) => context.isDoingAction('expression'),
 				getState: () => this.handleExpressionState()
 			},
 			[StateTypes.MOVING]: {
-				check: (context) => context.is_moving() && !context.isDragging,
+				check: (context) => context.isMoving() && !context.isDragging,
 				getState: (context) => 'moving_' + context.direction
 			},
 			[StateTypes.IDLE]: {
@@ -220,7 +188,7 @@ class StateMachine {
 				getState: (context) => 'idle_' + (context.direction || 'S')
 			},
 			[StateTypes.BEING_CARRIED]: {
-				check: (context) => context.is_doing_action('being_carried'),
+				check: (context) => context.isDoingAction('being_carried'),
 				getState: (context) => 'being_carried_' + context.direction
 			},
 		};
@@ -435,7 +403,7 @@ class StateMachine {
 		}
 
 		const resolvedState = MyteDefinitionRegistry.resolveExpression(
-			currentAction.action_type,
+			currentAction.actionType,
 			this.stateConfig
 		);
 
@@ -454,7 +422,7 @@ class StateMachine {
 	applySpeciesDefinition(definition) {
 		const visualConfig = definition?.visual || {};
 		const frameSize = visualConfig.frameSize || {};
-		const spriteSets = visualConfig.spriteSets || BaseSpriteSets;
+		const spriteSets = visualConfig.spriteSets;
 		const speciesId = definition?.id || this.parent.species;
 
 		MyteDefinitionRegistry.getSpeciesIds().forEach((knownSpeciesId) => {
@@ -470,8 +438,12 @@ class StateMachine {
 		this.parent.element.dataset.myteSpecies = speciesId;
 		this.parent.elements.wrapper.dataset.myteSpecies = speciesId;
 
+		if (!spriteSets || Object.keys(spriteSets).length === 0) {
+			console.error(`[StateMachine] Species "${speciesId}" has no spriteSets defined.`);
+		}
+
 		this.animator.setSize(frameSize.width || 64, frameSize.height || 64);
-		this.animator.setSpriteConfig(spriteSets);
+		this.animator.setSpriteConfig(spriteSets || {});
 	}
 
 	update() {
@@ -482,8 +454,8 @@ class StateMachine {
 			isFalling: this.parent.isFalling,
 			isJumping: this.parent.isJumping,
 			direction: this.parent.direction,
-			is_doing_action: (action) => this.parent.is_doing_action(action),
-			is_moving: () => this.parent.is_moving(),
+			isDoingAction: (action) => this.parent.isDoingAction(action),
+			isMoving: () => this.parent.isMoving(),
 			queue: this.parent.queue,
 			stateController: this.stateController // Add this line
 		};

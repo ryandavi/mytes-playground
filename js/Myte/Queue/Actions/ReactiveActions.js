@@ -51,11 +51,11 @@ class RunAwayAction extends MyteAction {
             }
         }
 
-        this.myte.move_toward_target();
+        this.myte.moveTowardsTarget();
 
         if (this.duration > 0) {
-            this.current_duration--;
-            return this.current_duration <= 0;
+            this.currentDuration--;
+            return this.currentDuration <= 0;
         }
 
         return false;
@@ -114,7 +114,7 @@ class HideAction extends MyteAction {
             hideTarget.posX + Math.cos(angle) * 30,
             hideTarget.posY + Math.sin(angle) * 30
         );
-        this.myte.move_toward_target();
+        this.myte.moveTowardsTarget();
 
         this.peekTimer -= 16;
         if (this.peekTimer <= 0) {
@@ -125,7 +125,7 @@ class HideAction extends MyteAction {
             }
         }
 
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }

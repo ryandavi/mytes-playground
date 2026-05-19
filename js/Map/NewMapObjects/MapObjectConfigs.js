@@ -418,11 +418,11 @@ const TYPE_CONFIGS = {
 		wanderInterval: 3500,
 		pathWaypointThreshold: 20,
 		capabilities: {
-			can_open_doors: false,
-			can_wade: false,
-			can_swim: false,
-			follows_paths: true,
-			fire_resistance: false
+			canOpenDoors: false,
+			canWade: false,
+			canSwim: false,
+			followsPaths: true,
+			fireResistance: false
 		},
 		size: { width: 64, height: 64 },
 		spriteConfig: {
@@ -443,11 +443,11 @@ const TYPE_CONFIGS = {
 			ghost: {
 				speed: 2,
 				aggroRadius: 300,
-				capabilities: { can_swim: true, can_wade: true }
+				capabilities: { canSwim: true, canWade: true }
 			},
 			goblin: {
 				speed: 2.5,
-				capabilities: { can_open_doors: true, can_wade: true }
+				capabilities: { canOpenDoors: true, canWade: true }
 			}
 		}
 	},

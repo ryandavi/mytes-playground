@@ -40,14 +40,14 @@ class Utility {
     /********************************************
      * find elements
     ********************************************/
-	static findable_elements_selector = 'img, iframe, select, table, textarea, input, h1, h2, h3, h4, h5, h6';
-	static ignore_elements_selector = 'body, html, .ignore, .particle, .interactableObject, .interactive-myte, .myte, button, .myteWrapper, .container-wrapper, .container,#controls, .canvas, .canvas > .layer, #inventory';
+	static findableElementsSelector = 'img, iframe, select, table, textarea, input, h1, h2, h3, h4, h5, h6';
+	static ignoreElementsSelector = 'body, html, .ignore, .particle, .interactableObject, .interactive-myte, .myte, button, .myteWrapper, .container-wrapper, .container,#controls, .canvas, .canvas > .layer, #inventory';
 
 	static numToReturn = 3; // Number of closest elements to return
 	static maxDistance = 200; // Maximum distance to include an element
-	static clickable_element_tags = ['textarea', 'input', 'select', 'img']; 	// elements you can click
+	static clickableElementTags = ['textarea', 'input', 'select', 'img']; 	// elements you can click
 
-	static top_only_tags = ['button', 'textarea', 'input', 'select', 'iframe', 'canvas']; // tags they sit on top of
+	static topOnlyTags = ['button', 'textarea', 'input', 'select', 'iframe', 'canvas']; // tags they sit on top of
 
 
 	static createRandomGenerator(seed) {
@@ -65,7 +65,7 @@ class Utility {
 	static isClickableElement(x) {
 		if (x.tagName) x = x.tagName;
 		if (typeof x === 'string') {
-			return this.clickable_element_tags.includes(x.toLowerCase());
+			return this.clickableElementTags.includes(x.toLowerCase());
 		}
 		return false;
 	}
@@ -77,19 +77,15 @@ class Utility {
 
 	static isTopOnlyTag(x) {
 		if (x.tagName) x = x.tagName;
-
-		
 		if (typeof x === 'string') {
-			console.log(x);
-			return this.top_only_tags.includes(x.toLowerCase());
-			
+			return this.topOnlyTags.includes(x.toLowerCase());
 		}
 		return false;
 	}
 	
 	
 	static shouldIgnoreElement(element) {
-		return element.matches(this.ignore_elements_selector);
+		return element.matches(this.ignoreElementsSelector);
 	}
 	
 	static isNotIgnored(element) {
@@ -106,37 +102,27 @@ class Utility {
      * find elements - functions
     ********************************************/
 
-    static get_random_element(withinSelector = null) {
-        var visibleElements = this.get_filtered_elements(withinSelector);
+    static getRandomElement(withinSelector = null) {
+        var visibleElements = this.getFilteredElements(withinSelector);
         return visibleElements[Math.floor(Math.random() * visibleElements.length)];
     }
-    static get_findable_elements() {
-        return `${this.findable_elements_selector}${this.ignore_elements_selector.split(',')}`;
+    static getFindableElements() {
+        return `${this.findableElementsSelector}${this.ignoreElementsSelector.split(',')}`;
     }
 
-	static get_filtered_elements(withinSelector = null) {
-		// Retrieve the elements
-		const elements = withinSelector 
-			? withinSelector.querySelectorAll(this.get_findable_elements()) 
-			: document.querySelectorAll(this.get_findable_elements());
-	
-		// Convert NodeList to array for filtering
+	static getFilteredElements(withinSelector = null) {
+		const elements = withinSelector
+			? withinSelector.querySelectorAll(this.getFindableElements())
+			: document.querySelectorAll(this.getFindableElements());
+
 		const elementsArray = Array.from(elements);
-	
-		// Filter elements based on visibility and ignore selectors
+
 		const visibleElements = elementsArray.filter(element => {
-			// Check if the element is visible
 			const isVisible = element.offsetParent !== null;
-	
-			// Check if the element matches any ignore selectors
-			const isIgnored = this.ignore_elements_selector.split(',').map(selector => selector.trim()).some(ignoreSelector => {
-				return element.matches(ignoreSelector);
-			});
-	
-			// Return element if it is visible and does not match ignore selectors
+			const isIgnored = this.ignoreElementsSelector.split(',').map(s => s.trim()).some(sel => element.matches(sel));
 			return isVisible && !isIgnored;
 		});
-	
+
 		return visibleElements;
 	}
 
@@ -145,12 +131,12 @@ class Utility {
         // Create an array to store elements with their distances
         const elementsWithinDistance = [];
         const fromCenter = false;
-        var visibleElements = this.get_filtered_elements(withinSelector);
+        var visibleElements = this.getFilteredElements(withinSelector);
 
 
         // Calculate the distance between the mouse click and each element
         visibleElements.forEach((element) => {
-            const elementRect = Utility.get_bounding_box_with_scroll(element);
+            const elementRect = Utility.getBoundingBoxWithScroll(element);
             var elementX, elementY;
 
             if (fromCenter) {
@@ -228,8 +214,8 @@ class Utility {
 		return start * (1 - t) + end * t;
 	}
 
-	static random_int(min, max) { // min and max included 
-		return Math.floor(Math.random() * (max - min + 1) + min)
+	static randomInt(min, max) {
+		return Math.floor(Math.random() * (max - min + 1) + min);
 	}
 
 	// Define a to calculate the distance between two points
@@ -263,24 +249,24 @@ class Utility {
 			element1.bottom >= element2.top;
 	}
 
-	static is_coord_touching_element(posX, posY, element) {
+	static isCoordTouchingElement(posX, posY, element) {
 		return posX >= element.left &&
 			posX <= element.right &&
 			posY >= element.top &&
 			posY <= element.bottom;
 	}
 
-	static is_element_above_viewport(element) {
+	static isElementAboveViewport(element) {
 		const elementRect = element.getBoundingClientRect();
 		return elementRect.bottom < 0;
 	}
 
-	static is_element_below_viewport(element) {
+	static isElementBelowViewport(element) {
 		const elementRect = element.getBoundingClientRect();
 		return elementRect.top > window.innerHeight;
 	}
 
-	static get_bounding_box_with_scroll(x) {
+	static getBoundingBoxWithScroll(x) {
 		var c = x.getBoundingClientRect();
 
 		return {
@@ -297,7 +283,7 @@ class Utility {
 		return Math.max(min, Math.min(max, current));
 	}
 
-	static get_key_by_value(object, value) {
+	static getKeyByValue(object, value) {
 		for (const key in object) {
 			if (object[key] === value) {
 				return key;

@@ -147,7 +147,7 @@ class MyteQueue {
     }
 
     addExpression(type, duration = 50, repeat = 1) {
-        return this.add('expression', { action_type: type, duration, repeat });
+        return this.add('expression', { actionType: type, duration, repeat });
     }
 
     addDance(duration = 2000) {

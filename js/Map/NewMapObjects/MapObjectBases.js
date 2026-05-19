@@ -46,9 +46,11 @@ const withDirectionalBehavior = (BaseClass) => class extends BaseClass {
 
 class DirectionalMapObject extends withDirectionalBehavior(MapObject) {}
 
-class DirectionalAnimatedMapObject extends withDirectionalBehavior(AnimatedMapObject) {}
+// Uses withAnimation directly rather than the named AnimatedMapObject class,
+// removing one level from the inheritance chain.
+class DirectionalAnimatedMapObject extends withDirectionalBehavior(withAnimation(MapObject)) {}
 
-class RangeInteractiveAnimatedMapObject extends AnimatedMapObject {
+class RangeInteractiveAnimatedMapObject extends withAnimation(MapObject) {
     getInteractionActor() {
         return this.activeMyte;
     }

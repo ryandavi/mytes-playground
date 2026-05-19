@@ -235,9 +235,9 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
         if (!this.teleportTarget || !this.isOpen) return;
 
         const entityCapabilities = {
-            can_open_doors: myte.canOpenDoors || false,
-            can_swim: myte.canSwim || false,
-            follows_paths: myte.followsPaths !== false
+            canOpenDoors: myte.canOpenDoors || false,
+            canSwim: myte.canSwim || false,
+            followsPaths: myte.followsPaths !== false
         };
 
         if (typeof this.teleportTarget === 'string') {

@@ -124,7 +124,7 @@ class MapTransitionManager {
                 this.container.activeMyte.queue.clear();
 
                 // unset target
-                this.container.activeMyte.unset_target();
+                this.container.activeMyte.unsetTarget();
             }
 
     

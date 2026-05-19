@@ -46,7 +46,7 @@ class MyteTouchHandler extends DragHandler {
 
                 // Update home drop target
                 const dropTargetRect = myte.parent.getRect(myte.dropTarget);
-                if (Utility.is_coord_touching_element(position.x, position.y, dropTargetRect)) {
+                if (Utility.isCoordTouchingElement(position.x, position.y, dropTargetRect)) {
                     myte.dropTarget.classList.add("on-target");
                 } else {
                     myte.dropTarget.classList.remove("on-target");
@@ -55,7 +55,7 @@ class MyteTouchHandler extends DragHandler {
                 // Update portal drop targets
                 this._getPortalElements(myte).forEach(el => {
                     const rect = myte.parent.getRect(el);
-                    if (Utility.is_coord_touching_element(position.x, position.y, rect)) {
+                    if (Utility.isCoordTouchingElement(position.x, position.y, rect)) {
                         el.classList.add('on-target');
                     } else {
                         el.classList.remove('on-target');

@@ -53,9 +53,9 @@ class DanceAction extends MyteAction {
             this.myte.setTarget(this.baseX + step.x, this.baseY + step.y);
         }
 
-        this.myte.move_toward_target();
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.myte.moveTowardsTarget();
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }
 
@@ -110,8 +110,8 @@ class SleepAction extends MyteAction {
             this.zTimer = this.zInterval;
         }
 
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }
 
@@ -161,8 +161,8 @@ class SimpleSleepAction extends MyteAction {
         }
 
         this.myte.setPosition(null, this.baseY - (Math.sin(this._zPosition * Math.PI) * 10));
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }
 
@@ -213,7 +213,7 @@ class SpinAction extends MyteAction {
             this.myte.setDirection(this.directions[this.dirIndex]);
         }
 
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }

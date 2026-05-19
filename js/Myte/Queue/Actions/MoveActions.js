@@ -52,11 +52,11 @@ class MoveAction extends MyteAction {
     }
 
     update() {
-        if (this.myte.is_at_target()) {
+        if (this.myte.isAtTarget()) {
             this.targetIndex++;
             return !this.setNextTarget();
         }
-        this.myte.move_toward_target();
+        this.myte.moveTowardsTarget();
         return false;
     }
 
@@ -202,7 +202,7 @@ class AStarMoveAction extends MyteAction {
         if (!this.myte?.isActive) { console.warn(`[ASTAR] update: myte inactive — completing`); return true; }
         if (!this.targetPoints?.length) { console.warn(`[ASTAR] update: no targetPoints — completing`); return true; }
 
-        if (this.myte.is_at_target()) {
+        if (this.myte.isAtTarget()) {
             this._stuckCount = 0;
             this.currentTargetIndex++;
 
@@ -221,11 +221,7 @@ class AStarMoveAction extends MyteAction {
             );
         }
 
-        if (typeof this.myte.move_toward_target_new === 'function') {
-            this.myte.move_toward_target_new();
-        } else {
-            this.myte.move_toward_target();
-        }
+        this.myte.moveTowardsTarget();
 
         // Stuck detection: recompute path after ~45 frames of no movement
         const moved = Math.abs(this.myte.posX - (this._prevPosX ?? this.myte.posX))
@@ -528,13 +524,6 @@ class GoToObjectAction extends PositionableAction {
         this.myte.faceTowardsPoint(this.targetCenter.x, this.targetCenter.y, 1);
     }
 
-    _moveToward() {
-        if (typeof this.myte.move_toward_target_new === 'function') {
-            this.myte.move_toward_target_new();
-        } else {
-            this.myte.move_toward_target();
-        }
-    }
 
     update() {
         // Stuck detection
@@ -560,7 +549,7 @@ class GoToObjectAction extends PositionableAction {
         }
 
         if (this.targetPoints?.length) {
-            if (this.myte.is_at_target()) {
+            if (this.myte.isAtTarget()) {
                 this.currentTargetIndex++;
                 if (this.currentTargetIndex >= this.targetPoints.length) {
                     this.faceTarget();
@@ -569,16 +558,16 @@ class GoToObjectAction extends PositionableAction {
             }
             const wp = this.targetPoints[this.currentTargetIndex];
             this.myte.setTarget(wp.x, wp.y);
-            this._moveToward();
+            this.myte.moveTowardsTarget();
             return false;
         }
 
         if (!this.targetPos) return true;
 
         this.myte.setTarget(this.targetPos.x, this.targetPos.y);
-        this._moveToward();
+        this.myte.moveTowardsTarget();
 
-        if (this.myte.is_at_target()) {
+        if (this.myte.isAtTarget()) {
             this.faceTarget();
             return true;
         }
@@ -608,7 +597,7 @@ class FollowMouseAction extends MyteAction {
 
     update() {
         this.myte.updateTargetToFollowMouse();
-        this.myte.move_toward_target();
+        this.myte.moveTowardsTarget();
         return false;
     }
 }
@@ -660,11 +649,7 @@ class FollowObjectAction extends PositionableAction {
 
         this.myte.setTarget(targetPos.x, targetPos.y);
 
-        if (typeof this.myte.move_toward_target_new === 'function') {
-            this.myte.move_toward_target_new();
-        } else {
-            this.myte.move_toward_target();
-        }
+        this.myte.moveTowardsTarget();
 
         return false;
     }
@@ -716,7 +701,7 @@ class RunLapsAction extends PositionableAction {
     }
 
     update() {
-        if (this.myte.is_at_target()) {
+        if (this.myte.isAtTarget()) {
             this.currentTargetIndex = (this.currentTargetIndex + 1) % this.targetPoints.length;
 
             if (this.currentTargetIndex === 0) {
@@ -726,7 +711,7 @@ class RunLapsAction extends PositionableAction {
 
             this.myte.setTarget(this.targetPoints[this.currentTargetIndex].x, this.targetPoints[this.currentTargetIndex].y);
         }
-        this.myte.move_toward_target();
+        this.myte.moveTowardsTarget();
         return false;
     }
 }
@@ -778,9 +763,9 @@ class CircleAction extends MyteAction {
             this.centerX + Math.cos(this.angle) * this.radius,
             this.centerY + Math.sin(this.angle) * this.radius
         );
-        this.myte.move_toward_target();
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.myte.moveTowardsTarget();
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }
 
@@ -827,9 +812,9 @@ class ZigzagAction extends MyteAction {
             this.startX + this.distance * this.direction.x - zigzag * this.direction.y,
             this.startY + this.distance * this.direction.y + zigzag * this.direction.x
         );
-        this.myte.move_toward_target();
-        this.current_duration--;
-        return this.current_duration <= 0;
+        this.myte.moveTowardsTarget();
+        this.currentDuration--;
+        return this.currentDuration <= 0;
     }
 }
 

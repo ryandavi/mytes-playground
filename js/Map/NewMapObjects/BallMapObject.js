@@ -81,7 +81,7 @@ class BallMapObject extends AnimatedMapObject {
         if (now - this.lastPushTime < this.pushCooldown) return;
 
         // Only react to moving mytes
-        if (!myte.is_moving()) return;
+        if (!myte.isMoving()) return;
 
         // Check if myte collides with ball
         const collides = this.gameMap?.checkCollision

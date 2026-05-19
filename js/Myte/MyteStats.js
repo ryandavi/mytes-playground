@@ -17,7 +17,7 @@ class MyteStats {
         this.minMood = 0;
         this.maxMood = 100;
         this.mood = Math.max(this.minMood, Math.min(this.maxMood, statConfig.mood ?? 100));
-        this.moodDecayRate = 0.0005;
+        this.moodDecayRate = statConfig.moodDecayRate ?? 0.0005;
         this.currentMood = 'neutral';
         this.moodTimeout = null;
 
@@ -25,78 +25,43 @@ class MyteStats {
         this.minEnergy = 0;
         this.maxEnergy = 100;
         this.energy = Math.max(this.minEnergy, Math.min(this.maxEnergy, statConfig.energy ?? 75));
-        this.energyDecayRate = 0.0005;
-        this.energyRegenRate = 0.005;
+        this.energyDecayRate = statConfig.energyDecayRate ?? 0.0005;
+        this.energyRegenRate = statConfig.energyRegenRate ?? 0.005;
 
-        // Battery display properties
-        this.batteryLevel = -1; // -1 so we show the battery at the start
-        this.batteryVisible = false; // Whether battery is currently displayed
-        this.batteryHideTimeout = null; // Timeout for hiding full battery
-
-        // Define battery thresholds with names and percentages
+        this.batteryLevel = -1;
+        this.batteryVisible = false;
+        this.batteryHideTimeout = null;
         this.batteryThresholds = [
-            { name: 'empty', threshold: 0 },
-            { name: 'low', threshold: 30 },
+            { name: 'empty',  threshold: 0 },
+            { name: 'low',    threshold: 30 },
             { name: 'medium', threshold: 60 },
-            { name: 'full', threshold: 90 } // minimal threshold
+            { name: 'full',   threshold: 90 }
         ];
 
-
-
-        // Add this for rapid charging state
         this.isRapidCharging = false;
-        this.rapidChargingThreshold = 0.01; // Energy increase per frame to consider "rapid"
+        this.rapidChargingThreshold = 0.01;
         this.lastEnergyChange = 0;
-        
-        // Add this to prevent repeated sound playing
         this.lastBatterySound = null;
-        this.soundCooldown = 8000; // 2 seconds between same sounds
+        this.soundCooldown = 8000;
         this.lastSoundTime = {};
 
 
-        // Personality traits (-100 to 100)
         this.traits = {
-            neediness: this.generateTraitValue(),    // How much attention they want
-            activity: this.generateTraitValue(),     // How energetic they are
-            curiosity: this.generateTraitValue()     // How interested in new things
+            neediness: this.generateTraitValue(),
+            activity:  this.generateTraitValue(),
+            curiosity: this.generateTraitValue()
         };
 
-        // Interaction cooldowns
         this.lastInteractionTime = 0;
         this.interactionCooldown = 5000;
 
-        // Define possible moods and their effects
-        this.moods = {
-            happy: {
-                duration: 10000,
-                speedMultiplier: 1.2,
-                expression: 'happy'
-            },
-            sad: {
-                duration: 15000,
-                speedMultiplier: 0.8,
-                expression: 'sad'
-            },
-            excited: {
-                duration: 8000,
-                speedMultiplier: 1.5,
-                expression: 'excited'
-            },
-            sleepy: {
-                duration: 12000,
-                speedMultiplier: 0.7,
-                expression: 'sleepy'
-            },
-            grumpy: {
-                duration: 10000,
-                speedMultiplier: 0.9,
-                expression: 'grumpy'
-            },
-            neutral: {
-                duration: 5000,
-                speedMultiplier: 1,
-                expression: 'neutral'
-            }
+        this.moods = statConfig.moods ?? {
+            happy:   { duration: 10000, speedMultiplier: 1.2, expression: 'happy' },
+            sad:     { duration: 15000, speedMultiplier: 0.8, expression: 'sad' },
+            excited: { duration: 8000,  speedMultiplier: 1.5, expression: 'excited' },
+            sleepy:  { duration: 12000, speedMultiplier: 0.7, expression: 'sleepy' },
+            grumpy:  { duration: 10000, speedMultiplier: 0.9, expression: 'grumpy' },
+            neutral: { duration: 5000,  speedMultiplier: 1.0, expression: 'neutral' }
         };
 
         // Initialize battery display
@@ -117,7 +82,7 @@ class MyteStats {
     }
 
     heal(amount) {
-        this.health = Math.min(100, this.health + amount);
+        this.health = Math.min(this.maxHealth, this.health + amount);
     }
 
 
@@ -153,11 +118,6 @@ class MyteStats {
         }
 
         this.currentMood = mood;
-
-        // Apply mood effects
-        if (this.moods[mood].expression) {
-            // this.myte.queue.addExpression(this.moods[mood].expression);
-        }
 
         // Set timeout to return to neutral
         this.moodTimeout = this.setManagedTimeout(() => {
@@ -482,7 +442,7 @@ class MyteStats {
         // Natural mood decay
         this.updateMood(-this.moodDecayRate * deltaTime);
 
-        if (this.myte.is_moving()) {
+        if (this.myte.isMoving()) {
             // Energy decay
             this.useEnergy(this.energyDecayRate * deltaTime);
         } else {

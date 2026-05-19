@@ -26,7 +26,7 @@ const NPC_STATES = Object.freeze({
 //   capabilities       (obj)  — overrides for EntityDefaults.capabilities  {}
 //   likedTerrain       (arr)  — terrain types this NPC prefers             []
 //   dislikedTerrain    (arr)  — terrain types this NPC avoids              []
-//   terrain_cost_multipliers (obj) — per-terrain cost overrides            {}
+//   terrainCostMultipliers (obj) — per-terrain cost overrides              {}
 //   pathfindingOptions (obj)  — extra raw options forwarded to A*          {}
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -49,7 +49,7 @@ class NpcMapObject extends MovingMapObject {
 		this.pathfindingOptions = {
 			likedTerrain:              this.getConfig('likedTerrain', []),
 			dislikedTerrain:           this.getConfig('dislikedTerrain', []),
-			terrain_cost_multipliers:  this.getConfig('terrain_cost_multipliers', {}),
+			terrainCostMultipliers:    this.getConfig('terrainCostMultipliers', {}),
 			...this.getConfig('pathfindingOptions', {})
 		};
 
@@ -168,7 +168,7 @@ class NpcMapObject extends MovingMapObject {
 	// Asks the gridSystem for nearby collidable objects and tries to open any
 	// door/gate among them. Called by the stuck detector.
 	_tryOpenNearbyDoors() {
-		if (!this.capabilities.can_open_doors) return;
+		if (!this.capabilities.canOpenDoors) return;
 		const gridSystem = this.map?.gridSystem;
 		if (!gridSystem) return;
 		const colliders = gridSystem.getPotentialColliders(this);

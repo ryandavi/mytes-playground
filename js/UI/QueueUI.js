@@ -200,8 +200,8 @@ class QueueUI {
     }
 
     calculateProgress(item) {
-        if (item.current_duration === -1) return 0;
-        return Math.round(100 - (item.current_duration / item.duration * 100));
+        if (item.currentDuration === -1) return 0;
+        return Math.round(100 - (item.currentDuration / item.duration * 100));
     }
 
     update() {

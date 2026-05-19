@@ -6,11 +6,11 @@
 const EntityDefaults = {
 	capabilities() {
 		return {
-			can_swim: false,
-			follows_paths: true,
-			can_open_doors: false,
-			can_wade: true,
-			fire_resistance: false
+			canSwim: false,
+			followsPaths: true,
+			canOpenDoors: false,
+			canWade: true,
+			fireResistance: false
 		};
 	},
 
@@ -44,7 +44,7 @@ const EntityMethods = {
 	// axis: 'x' | 'y' | undefined — when provided, doors must be perpendicular to the movement axis.
 	// E/W doors (tall, vertical) block X movement; N/S doors (wide, horizontal) block Y movement.
 	canAutoOpenCollider(collider, axis) {
-		if (!collider || !this.capabilities?.can_open_doors) return false;
+		if (!collider || !this.capabilities?.canOpenDoors) return false;
 		if (!['DOOR', 'GATE'].includes(collider.type)) return false;
 		if (typeof collider.open !== 'function' || collider.isOpen) return false;
 

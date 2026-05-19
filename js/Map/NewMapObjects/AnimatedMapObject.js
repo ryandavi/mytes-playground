@@ -1,129 +1,86 @@
-class AnimatedMapObject extends MapObject {
+// withAnimation — composable mixin that adds sprite animation to any MapObject subclass.
+// Usage: class Foo extends withAnimation(MapObject) {}
+const withAnimation = (BaseClass) => class extends BaseClass {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
-        
+
         const animConfig = {
-            frameWidth: this.getConfig('spriteConfig.frameWidth', this.getConfig('size.width')),
+            frameWidth:  this.getConfig('spriteConfig.frameWidth',  this.getConfig('size.width')),
             frameHeight: this.getConfig('spriteConfig.frameHeight', this.getConfig('size.height')),
-            scale: this.getConfig('spriteConfig.scale', this.getConfig('scale')),
+            scale:       this.getConfig('spriteConfig.scale',       this.getConfig('scale')),
             spriteSheet: this.getConfig('spriteConfig.spriteSheet.url', this.getConfig('spriteSheet.url')),
-            frameDelay: options.frameDelay || this.getConfig('spriteConfig.frameDelay'),
-            animations: this.convertAnimations(this.getConfig('spriteConfig.animations')),
-            default: this.getConfig('spriteConfig.default', this.getConfig('default'))
+            frameDelay:  options.frameDelay || this.getConfig('spriteConfig.frameDelay'),
+            animations:  this.getConfig('spriteConfig.animations') || {},
+            default:     this.getConfig('spriteConfig.default', this.getConfig('default'))
         };
 
-        // Create animation controller
         this.animation = new AnimationController(this, animConfig);
-        
-        // Animation state
         this.currentAnimation = null;
         this.defaultAnimation = this.getConfig('spriteConfig.default', 'idle');
     }
-    
-    // Convert animations to unified format if needed
-    convertAnimations(animations) {
-        if (!animations) return {};
-        return animations;
-    }
-    
-    // Play an animation with optional completion callback
+
     playAnimation(animationName, onComplete) {
         if (!this.animation) return false;
-        
-        // Track current animation
         this.currentAnimation = animationName;
-        
-        // Play the animation
         return this.animation.play(animationName, onComplete);
     }
-    
-    // Update animation state — must receive deltaTime from game loop
+
     updateAnimation(deltaTime) {
         if (!this.animation || this.animation.paused) return;
         this.animation.update(deltaTime);
     }
-    
-    // Update sprite frame
+
     updateSpriteFrame() {
-        if (!this.animation) return;
-        this.animation.updateFrame();
+        this.animation?.updateFrame();
     }
-    
-    // Pause current animation
+
     pauseAnimation() {
-        if (this.animation) {
-            this.animation.paused = true;
-        }
+        if (this.animation) this.animation.paused = true;
     }
-    
-    // Resume current animation
+
     resumeAnimation() {
-        if (this.animation) {
-            this.animation.paused = false;
-        }
+        if (this.animation) this.animation.paused = false;
     }
-    
-    // Check if animation exists
+
     hasAnimation(animationName) {
-        if (!this.animation || !this.animation.config.animations) return false;
-        return !!this.animation.config.animations[animationName];
+        return !!(this.animation?.config?.animations?.[animationName]);
     }
-    
-    // Get number of frames for an animation
+
     getAnimationFrameCount(animationName) {
         if (!this.hasAnimation(animationName)) return 0;
-        
-        const anim = this.animation.config.animations[animationName];
-        return anim.frames?.length || 0;
+        return this.animation.config.animations[animationName].frames?.length || 0;
     }
-    
-    // Set animation speed
+
     setAnimationSpeed(frameDelay) {
-        if (this.animation) {
-            this.animation.frameDelay = frameDelay;
-        }
+        if (this.animation) this.animation.frameDelay = frameDelay;
     }
-    
-    // Override render to set up animation
+
     render(container, parent) {
         const element = super.render(container, parent);
-        
-        // Add animated class
         element.classList.add('animated-map-object');
-        
-        // Set up the animation controller
+
         if (this.getConfig('renderType') === 'animated' || this.getConfig('renderType') === 'sprite') {
-            this.setupAnimation(element);
-            
-            // Start default animation
+            this._setupAnimation(element);
             this.playAnimation(this.defaultAnimation);
         }
-        
+
         return element;
     }
-    
-    // Setup animation with element
-    setupAnimation(element) {
-        if (!this.animation) return;
-        
-        // Set up the animation controller with the rendered element
-        this.animation.setup(element);
-        
-        // Apply any custom spritesheet
-        const spriteSheet = this.getConfig('spriteConfig.spriteSheet.url');
-        if (spriteSheet && this.animation.sprite) {
-            // this.animation.sprite.style.backgroundImage = `url(${spriteSheet})`;
-        }
+
+    _setupAnimation(element) {
+        this.animation?.setup(element);
     }
-    
-    // tickUpdate: gameplay logic (override in subclasses)
+
     tickUpdate(tickDelta) {
         super.tickUpdate(tickDelta);
     }
 
-    // update: visual/animation only
     update(deltaTime) {
         super.update(deltaTime);
         this.updateAnimation(deltaTime);
     }
-}
+};
+
+// Named class for backward compatibility — concrete objects that already extend
+// AnimatedMapObject continue to work unchanged.
+class AnimatedMapObject extends withAnimation(MapObject) {}

@@ -551,11 +551,11 @@ class AStarPathfinder {
     /** Check terrain traversability */
     _canTraverseTerrain(terrainType, entityCapabilities) {
         if (terrainType === 'deep_water') {
-            return !!entityCapabilities.can_swim;
+            return !!entityCapabilities.canSwim;
         }
 
         if (terrainType === 'shallow_water') {
-            return !!entityCapabilities.can_swim || !!entityCapabilities.can_wade;
+            return !!entityCapabilities.canSwim || !!entityCapabilities.canWade;
         }
 
         return true;
@@ -569,7 +569,7 @@ class AStarPathfinder {
     _isOpenableObstacle(obj, entityCapabilities) {
         return !!(
             obj &&
-            entityCapabilities?.can_open_doors &&
+            entityCapabilities?.canOpenDoors &&
             typeof obj.open === 'function' &&
             ['DOOR', 'GATE'].includes(obj.type)
         );
@@ -581,7 +581,7 @@ class AStarPathfinder {
         switch (cell.conditionType) {
             case 'door':
             case 'gate':
-                return !!entityCapabilities?.can_open_doors;
+                return !!entityCapabilities?.canOpenDoors;
             default:
                 return false;
         }
@@ -601,7 +601,7 @@ class AStarPathfinder {
     _getEntityTerrainCostMultiplier(terrainType, entityCapabilities = {}) {
         let multiplier = 1.0;
 
-        const explicitMultipliers = entityCapabilities.terrain_cost_multipliers || entityCapabilities.terrainCostMultipliers;
+        const explicitMultipliers = entityCapabilities.terrainCostMultipliers;
         if (explicitMultipliers && explicitMultipliers[terrainType] !== undefined) {
             const numericValue = Number(explicitMultipliers[terrainType]);
             if (Number.isFinite(numericValue) && numericValue > 0) {
@@ -609,12 +609,12 @@ class AStarPathfinder {
             }
         }
 
-        const likedTerrain = entityCapabilities.liked_terrain || entityCapabilities.likedTerrain || [];
+        const likedTerrain = entityCapabilities.likedTerrain || [];
         if (likedTerrain.includes?.(terrainType)) {
             multiplier *= 0.75;
         }
 
-        const dislikedTerrain = entityCapabilities.disliked_terrain || entityCapabilities.dislikedTerrain || [];
+        const dislikedTerrain = entityCapabilities.dislikedTerrain || [];
         if (dislikedTerrain.includes?.(terrainType)) {
             multiplier *= 1.35;
         }
@@ -763,7 +763,7 @@ class AStarPathfinder {
                         if (debug) console.log(`  ❌ FAIL: Collider overlaps non-walkable tile at valid grid (${gridX}, ${gridY})`);
                         this.validationCache.set(cacheKey, false); return false;
                     }
-                    if (cell.hasDoor && entityCapabilities && !entityCapabilities.can_open_doors) {
+                    if (cell.hasDoor && entityCapabilities && !entityCapabilities.canOpenDoors) {
                         if (debug) console.log(`  ❌ FAIL: Collider overlaps door at valid grid (${gridX}, ${gridY})`);
                         this.validationCache.set(cacheKey, false); return false;
                     }
@@ -950,7 +950,7 @@ class AStarPathfinder {
 
         // Use options passed in effectiveOptions if they exist, otherwise fallback to this.options
         const preferPaths = (effectiveOptions.preferPaths !== undefined ? effectiveOptions.preferPaths : this.options.preferPaths) &&
-            entityCapabilities?.follows_paths !== false;
+            entityCapabilities?.followsPaths !== false;
         const pathEdgePenaltyFactor = effectiveOptions.pathEdgePenaltyFactor !== undefined ? effectiveOptions.pathEdgePenaltyFactor : this.options.pathEdgePenaltyFactor;
         const avoidDifficultTerrain = effectiveOptions.avoidDifficultTerrain !== undefined ? effectiveOptions.avoidDifficultTerrain : this.options.avoidDifficultTerrain;
 

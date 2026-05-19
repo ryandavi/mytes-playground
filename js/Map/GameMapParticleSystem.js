@@ -371,7 +371,7 @@ class GameMapParticleSystem extends ParticleSystem {
 				this.y = object.posY;
 
 				// Apply directional offset if moving
-				const isStationary = object.is_moving ? !object.is_moving() : false;
+				const isStationary = object.isMoving ? !object.isMoving() : false;
 
 				if (!isStationary) {
 					this.x += offset.x;

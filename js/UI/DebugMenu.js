@@ -47,7 +47,7 @@ class DebugMenu extends ModalWindow {
                 },
                 // Custom format function for display
                 format: (value) => {
-                    return Utility.get_key_by_value(MOVE_FOLLOW_TYPES, value) || "None";
+                    return Utility.getKeyByValue(MOVE_FOLLOW_TYPES, value) || "None";
                 },
                 action: (button) => {
                     const activeMyte = this.parent.parent.activeMyte;
@@ -81,7 +81,7 @@ class DebugMenu extends ModalWindow {
                 },
                 // Custom format function for display
                 format: (value) => {
-                    return Utility.get_key_by_value(MOVE_TYPES, value) || "None";
+                    return Utility.getKeyByValue(MOVE_TYPES, value) || "None";
                 },
                 action: (button) => {
                     const activeMyte = this.parent.parent.activeMyte;
@@ -110,7 +110,7 @@ class DebugMenu extends ModalWindow {
                 // Custom getValue function
                 getValue: () => this.parent.parent.camera.followMode,
                 // Custom format function
-                format: (value) => Utility.get_key_by_value(CAMERA_FOLLOW_MODES, value) || "None",
+                format: (value) => Utility.getKeyByValue(CAMERA_FOLLOW_MODES, value) || "None",
                 action: (button) => {
                     // Get current mode and directly find the next one
                     const currentMode = this.parent.parent.camera.followMode;
@@ -177,7 +177,7 @@ class DebugMenu extends ModalWindow {
                     const activeMyte = this.parent.parent.activeMyte;
                     if (activeMyte?.isActive) {
                         activeMyte.queue.removeCurrentAction();
-                        activeMyte.unset_target();
+                        activeMyte.unsetTarget();
                     }
                 }
             },
@@ -406,7 +406,7 @@ class DebugMenu extends ModalWindow {
                     if (config.format) {
                         displayText += config.format(currentValue);
                     } else if (config.options) {
-                        const keyName = Utility.get_key_by_value(config.options, currentValue) || 'None';
+                        const keyName = Utility.getKeyByValue(config.options, currentValue) || 'None';
                         displayText += keyName;
                     } else {
                         displayText += currentValue || 'None';
