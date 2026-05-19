@@ -16,9 +16,13 @@ class BallMapObject extends AnimatedMapObject {
         this.lastPushTime = 0;
         this.pushCooldown = options.pushCooldown || 1500; // ms
 
-        // Debug flag
         this.debug = this.getConfig('debug', false);
+
+        // Safe defaults — overwritten by setupBoundaries() once render() has a parent
+        this.bounds = { left: 0, top: 0, right: 500, bottom: 500 };
     }
+
+    shouldSimulateOffScreen() { return true; }
 
     // Override to only allow dragging when not in motion
     canBeDragged() {

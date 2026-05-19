@@ -90,6 +90,7 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
             container.transitionManager.startTransition({
                 targetMap: this.targetMap,
                 targetSpawnPoint: this.targetSpawnPoint,
+                sourceMapId: this.gameMap?.id ?? null,
                 duration: this.transitionDuration,
                 myte,
                 sourcePortal: this,

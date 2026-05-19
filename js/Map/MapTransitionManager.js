@@ -41,6 +41,9 @@ class MapTransitionManager {
         const spawnPoint = options.targetSpawnPoint || 'default';
         const isInitialLoad = options.isInitialLoad || false;
         const sourcePortal = options.sourcePortal || null;
+        // sourceMapId: the map we're leaving. Passed explicitly by portal objects so the
+        // destination can find the matching return portal without relying on previousMapId.
+        const sourceMapId = options.sourceMapId || (this.container.gameMap?.id ?? null);
     
         // For regular transitions (not initial load), disable inputs and show transition
         if (!isInitialLoad) {
@@ -88,12 +91,7 @@ class MapTransitionManager {
         }
     
         if (newMap) {
-            // Save the current map ID as previous before switching to the new map
-            if (this.container.gameMap && this.container.gameMap.id) {
-                this.previousMapId = this.container.gameMap.id;
-                console.log(`[MapTransitionManager] Saved previous map ID: ${this.previousMapId}`);
-            }
-    
+            this.previousMapId = sourceMapId;
             this.currentMapId = mapId;
     
             // Set up the new map environment
@@ -138,25 +136,21 @@ class MapTransitionManager {
             // set camera to center on first myte
             if (this.container.mytes && this.container.mytes.length > 0) {
                 // center to corresponding portal
-                if(this.container.activeMyte){
-                    // get all portal objects
-                    let allPortals = this.container.gameMap.objects.filter(obj => obj instanceof PortalMapObject);
-    
-                    // find the corresponding portal where targetMap is previousMapId
-                    let correspondingPortal = allPortals.find(portal => portal.targetMap === this.previousMapId);
-    
-                    if(correspondingPortal){
-                        const exitPosition = correspondingPortal.getExitPositionFor
-                            ? correspondingPortal.getExitPositionFor(this.container.activeMyte)
+                if (this.container.activeMyte) {
+                    const returnPortal = this._findReturnPortal(this.previousMapId);
+
+                    if (returnPortal) {
+                        const exitPosition = returnPortal.getExitPositionFor
+                            ? returnPortal.getExitPositionFor(this.container.activeMyte)
                             : {
-                                x: correspondingPortal.posX,
-                                y: correspondingPortal.posY + correspondingPortal.size.height + 16
+                                x: returnPortal.posX,
+                                y: returnPortal.posY + returnPortal.size.height + 16
                             };
 
                         this.container.activeMyte.setPosition(exitPosition.x, exitPosition.y);
                         this.container.activeMyte.portalCooldownUntil = Date.now() + (
-                            correspondingPortal.getPortalCooldownDuration
-                                ? correspondingPortal.getPortalCooldownDuration()
+                            returnPortal.getPortalCooldownDuration
+                                ? returnPortal.getPortalCooldownDuration()
                                 : 1500
                         );
                     }
@@ -252,6 +246,15 @@ class MapTransitionManager {
     
             return false;
         }
+    }
+
+    // Find the portal on the current map whose targetMap points back to sourceMapId.
+    // If multiple portals target the same map, returns the first one found.
+    _findReturnPortal(sourceMapId) {
+        if (!sourceMapId || !this.container.gameMap?.objects) return null;
+        return this.container.gameMap.objects.find(
+            obj => obj instanceof PortalMapObject && obj.targetMap === sourceMapId
+        ) || null;
     }
 
     showTransition(message) {

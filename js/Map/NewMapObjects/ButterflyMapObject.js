@@ -10,7 +10,7 @@ class ButterflyMapObject extends AnimatedMapObject {
         this.moveThreshold = options.moveThreshold || 0.025;
         this.direction = "S"; // Default direction
         
-        // Boundary checking
+        // Boundary checking — updated from real map dimensions in render()
         this.bounds = {
             left: 0,
             right: options.mapWidth || 500,
@@ -44,9 +44,9 @@ class ButterflyMapObject extends AnimatedMapObject {
 
         this.parent.particleSystem.addParticleMethodsToObject(this);
         this.addEffect("SPARKLE_SPRITE");
-
-
     }
+
+    shouldSimulateOffScreen() { return true; }
 
     
     // Initialize random velocity
@@ -245,6 +245,12 @@ class ButterflyMapObject extends AnimatedMapObject {
     render(container, parent) {
         const element = super.render(container, parent);
         element.classList.add('animated-map-object', 'butterfly');
+
+        // Pull real map dimensions now that we have a parent reference
+        if (parent?.getMaxDimensions) {
+            const { width, height } = parent.getMaxDimensions();
+            this.bounds = { left: 0, right: width, top: 0, bottom: height };
+        }
         
         // Add data attributes for debugging
         element.setAttribute('data-idle', this.isIdle);

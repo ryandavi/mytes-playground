@@ -32,6 +32,8 @@ class PatrolGuardMapObject extends MovingMapObject {
         // Initialize with first patrol point
         this.initializePatrol();
     }
+
+    shouldSimulateOffScreen() { return true; }
     
     // Set up initial patrol state
     initializePatrol() {

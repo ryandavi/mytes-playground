@@ -327,12 +327,6 @@ class GameMap {
                 }
             }
 
-            this._pathfindingDebugInterval = setInterval(() => {
-
-                // this.testPathfinding();
-
-            }, 500); // Update every 3 seconds
-
             console.log(`[GameMap] Map ${mapId} initialization completed successfully`);
             this.initialized = true;
             return true;
@@ -593,23 +587,6 @@ class GameMap {
         }
     }
 
-    // This method is now deprecated - use initialize() instead
-    async loadMap(mapId, options = {}) {
-        console.warn('[GameMap] GameMap.loadMap() is deprecated. Use GameMap.initialize() instead.');
-        return this.initialize(mapId);
-    }
-
-    // Optional method to add demonstration objects for testing
-    addDemonstrationObjects() {
-        try {
-            this.addObject('BUTTERFLY', 'small', 100, 100);
-            this.addObject('BUTTERFLY', 'purple', 400, 300);
-            this.addObject('BUTTERFLY', 'blue', 400, 300);
-        } catch (error) {
-            console.warn(`[GameMap] Error adding demo objects:`, error);
-        }
-    }
-
     setBackground(background) {
         if (!this.layers.background) return;
 
@@ -620,35 +597,6 @@ class GameMap {
         if (background.url) {
             this.layers.background.style.backgroundImage = `url(${background.url})`;
             this.layers.background.style.backgroundSize = 'fill';
-        }
-    }
-
-    async loadPredefinedObjects() {
-        // OPTIMIZATION: Batch object creation for better performance
-        const objectBatches = [];
-        const BATCH_SIZE = 10; // Process 10 objects at a time
-
-        for (let i = 0; i < this.mapData.objects.length; i += BATCH_SIZE) {
-            const batch = this.mapData.objects.slice(i, i + BATCH_SIZE);
-            objectBatches.push(batch);
-        }
-
-        // Process batches with a slight delay to avoid blocking the main thread
-        for (const batch of objectBatches) {
-            await Promise.all(batch.map(objData =>
-                this.addObject(
-                    objData.type,
-                    objData.variant,
-                    objData.x,
-                    objData.y,
-                    objData.properties
-                )
-            ));
-
-            // Small delay to allow other operations
-            if (objectBatches.length > 1) {
-                await new Promise(resolve => setTimeout(resolve, 0));
-            }
         }
     }
 
@@ -819,9 +767,11 @@ class GameMap {
 
     tickUpdate(tickDelta) {
         for (const object of this.objects) {
-            if (object.tickUpdate) {
-                object.tickUpdate(tickDelta);
-            }
+            if (!object.tickUpdate) continue;
+            // Skip sleeping objects that don't need off-screen simulation (e.g. static props).
+            // Autonomous objects (butterflies, guards, balls) return true and always tick.
+            if (object.sleeping && !object.shouldSimulateOffScreen?.()) continue;
+            object.tickUpdate(tickDelta);
         }
     }
 
@@ -871,11 +821,6 @@ class GameMap {
     }
 
     dispose() {
-        if (this._pathfindingDebugInterval) {
-            clearInterval(this._pathfindingDebugInterval);
-            this._pathfindingDebugInterval = null;
-        }
-
         // Clean up objects
         this.objects.forEach(obj => {
             if (obj.remove) {
