@@ -62,7 +62,7 @@ class Inventory {
         itemElement.dataset.name = name;
         itemElement.dataset.quantity = quantity;
         itemElement.dataset.type = type;
-        itemElement.dataset.variant = variant;
+        itemElement.dataset.variant = variant || name;
         itemElement.draggable = true;
 
         if (description) {
@@ -108,7 +108,7 @@ class Inventory {
             existingItem.element.dataset.quantity = newQuantity;
             this.updateItemDisplay(existingItem);
         } else {
-            const newItem = { name, quantity, type, description };
+            const newItem = { name, quantity, type, variant: name, description };
             const itemElement = this.createItemElement(newItem);
             this.inventoryElement.appendChild(itemElement);
             this.items.push({ ...newItem, element: itemElement });
@@ -173,6 +173,11 @@ class Inventory {
         this.state.draggedItem = e.target;
         this.state.isDragging = true;
 
+        if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', e.target.dataset.name || '');
+        }
+
         // Store offset for precise dropping
         const rect = e.target.getBoundingClientRect();
         this.config.dragOffsetX = e.clientX - rect.left;
@@ -214,8 +219,7 @@ class Inventory {
         e.currentTarget.classList.add('on-target');
 
         // Update drop indicator position
-        const mouse = this.parent.getLocalMouse();
-        this.updateDropIndicator(mouse.x, mouse.y);
+        this.updateDropIndicator(e.pageX, e.pageY);
     }
 
     handleContainerDragLeave(e) {
@@ -237,15 +241,24 @@ class Inventory {
         const layerForeground = container.querySelector('.layer.foreground');
         if (!layerForeground) return;
 
-        const { name, quantity, variant, type } = this.state.draggedItem.dataset;
-        const mouse = this.parent.getLocalMouse();
+        const { name, variant, type } = this.state.draggedItem.dataset;
+        const resolvedObject = this.resolveDroppedMapObject({ name, type, variant });
+        if (!resolvedObject) {
+            console.warn(`Inventory item "${name}" is not placeable on the map.`);
+            return;
+        }
+
+        const dropPosition = this.parent.inputHandler.screenToWorldCoordinates(
+            e.clientX,
+            e.clientY
+        );
 
         // Create object in world
         const object = this.parent.gameMap.addObject(
-            type,
-            variant,
-            mouse.x - this.config.dragOffsetX,
-            mouse.y - this.config.dragOffsetY
+            resolvedObject.type,
+            resolvedObject.variant,
+            dropPosition.x - this.config.dragOffsetX,
+            dropPosition.y - this.config.dragOffsetY
         );
 
         if (object) {
@@ -335,6 +348,47 @@ class Inventory {
     updateDropIndicator(x, y) {
         this.dropIndicator.style.left = `${x}px`;
         this.dropIndicator.style.top = `${y}px`;
+    }
+
+    resolveDroppedMapObject({ name, type, variant }) {
+        const canonicalVariant = this.findCanonicalVariant(variant || name);
+        const normalizedType = MapObjectFactory.normalizeType(type);
+
+        if (MapObjectFactory.hasType(normalizedType)) {
+            return {
+                type: normalizedType,
+                variant: canonicalVariant || variant || name
+            };
+        }
+
+        if (!canonicalVariant) return null;
+
+        const matchedType = MapObjectFactory.getAvailableTypes().find(objectType =>
+            MapObjectFactory.getVariantsForType(objectType).includes(canonicalVariant)
+        );
+
+        if (!matchedType) return null;
+
+        return {
+            type: matchedType,
+            variant: canonicalVariant
+        };
+    }
+
+    findCanonicalVariant(rawVariant) {
+        if (!rawVariant) return null;
+
+        const normalizedVariant = String(rawVariant).trim().toLowerCase();
+        for (const objectType of MapObjectFactory.getAvailableTypes()) {
+            const match = MapObjectFactory.getVariantsForType(objectType).find(
+                variant => String(variant).toLowerCase() === normalizedVariant
+            );
+            if (match) {
+                return match;
+            }
+        }
+
+        return normalizedVariant;
     }
 
     setupMutationObserver() {

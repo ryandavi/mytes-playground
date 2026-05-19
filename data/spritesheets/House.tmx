@@ -210,7 +210,7 @@
     <property name="items">{&quot;COIN&quot;, 100},
 {&quot;ITEM&quot;, &quot;APPLE&quot;},
 {&quot;HEALTH&quot;, 10}</property>
-    <property name="variant" value="grass_2"/>
+    <property name="variant" value="wooden_chest"/>
    </properties>
   </object>
  </objectgroup>

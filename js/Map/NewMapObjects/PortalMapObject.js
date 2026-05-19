@@ -24,6 +24,7 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
 
     canTransitionMyte(myte) {
         if (!myte) return false;
+        if (myte.isDragging) return false;
         return (myte.portalCooldownUntil || 0) <= Date.now();
     }
 

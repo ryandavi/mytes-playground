@@ -59,6 +59,13 @@ class MapObjectFactory {
     static TYPE_CONFIGS = {};
     static CONFIG_LOADED = false;
 
+    static normalizeType(type) {
+        return String(type || '')
+            .trim()
+            .replace(/\s+/g, '_')
+            .toUpperCase();
+    }
+
     static initialize(baseConfig = {}, typeConfigs = {}) {
         this.BASE_CONFIG = baseConfig || {};
         this.TYPE_CONFIGS = typeConfigs || {};
@@ -88,8 +95,7 @@ class MapObjectFactory {
     }
 
     static create(type, variant, x, y, options = {}) {
-        // Ensure type is uppercase for consistency
-        type = type.toUpperCase();
+        type = this.normalizeType(type);
 
         // Get the configuration for this type
         const typeConfig = this.getTypeConfig(type);
@@ -135,6 +141,8 @@ class MapObjectFactory {
     }
 
     static getTypeConfig(type) {
+        type = this.normalizeType(type);
+
         // Fallback to hardcoded MAP_OBJECT_TYPES if config not loaded
         if (!this.CONFIG_LOADED && typeof MAP_OBJECT_TYPES !== 'undefined') {
             return MAP_OBJECT_TYPES[type];
@@ -185,13 +193,13 @@ class MapObjectFactory {
     }
 
     static getVariantsForType(type) {
-        type = type.toUpperCase();
+        type = this.normalizeType(type);
         const typeConfig = this.getTypeConfig(type);
         return typeConfig?.variants || [];
     }
 
     static hasType(type) {
-        type = type.toUpperCase();
+        type = this.normalizeType(type);
         return !!this.getTypeConfig(type);
     }
 }

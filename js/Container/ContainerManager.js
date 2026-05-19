@@ -296,16 +296,22 @@ class ContainerManager {
     }
 
     drawTargetDot() {
-        const mouse = this.getLocalMouse();
-        var cursorElement = this.element.querySelector('.cursor-dot');
-        
-        // Convert world coordinates back to screen coordinates
-        const screenX = mouse.x + this.camera.posX;
-        const screenY = mouse.y + this.camera.posY;
-        
-        // Apply the position
-        cursorElement.style.left = screenX + 'px';
-        cursorElement.style.top = screenY + 'px';
+        const cursorElement = this.element.querySelector('.cursor-dot');
+        if (!cursorElement) return;
+
+        // This debug dot represents the raw screen-space pointer position.
+        // Keep it visible alongside the world-space goal/grid markers, but only
+        // while the pointer is actually over the container.
+        if (!this.isMouseInContainer()) {
+            cursorElement.classList.add('hidden');
+            return;
+        }
+
+        cursorElement.classList.remove('hidden');
+
+        const mouse = this.inputHandler.getMousePosition();
+        cursorElement.style.left = mouse.x + 'px';
+        cursorElement.style.top = mouse.y + 'px';
       }
 
     getOffset(el) {

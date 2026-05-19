@@ -7,12 +7,18 @@ class BallMapObject extends AnimatedMapObject {
 
         // Physics properties
         this.velocity = { x: 0, y: 0 };
-        this.friction = this.getConfig('friction', 0.95);
-        this.maxSpeed = this.getConfig('speed', 3);
+        this.friction = this.getConfig('friction', 0.94);
+        this.settleFriction = this.getConfig('settleFriction', 0.82);
+        this.maxSpeed = this.getConfig('speed', 5);
+        this.stopThreshold = this.getConfig('stopThreshold', 0.18);
+        this.settleThreshold = this.getConfig('settleThreshold', 1.2);
+        this.minAnimationSpeed = this.getConfig('minAnimationSpeed', 0.2);
+        this.minAnimationFrameDelay = this.getConfig('minAnimationFrameDelay', 45);
+        this.maxAnimationFrameDelay = this.getConfig('maxAnimationFrameDelay', 120);
         this.isMoving = false;
 
         // Interaction properties
-        this.pushForce = this.getConfig('pushForce', 5);
+        this.pushForce = this.getConfig('pushForce', 6);
         this.lastPushTime = 0;
         this.pushCooldown = options.pushCooldown || 1500; // ms
 
@@ -90,6 +96,9 @@ class BallMapObject extends AnimatedMapObject {
 
             // Mark as moving and update last push time
             this.isMoving = true;
+            if (this.element) {
+                this.element.setAttribute('data-moving', 'true');
+            }
             this.lastPushTime = now;
 
             // Make the creature react
@@ -103,12 +112,9 @@ class BallMapObject extends AnimatedMapObject {
     
     // Cap velocity at maximum speed
     capVelocity() {
-        const speed = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.y * this.velocity.y);
+        const speed = this.getSpeed();
         if (!Number.isFinite(speed)) {
-            this.velocity.x = 0;
-            this.velocity.y = 0;
-            this.isMoving = false;
-            this.pauseAnimation();
+            this.stopMotion();
             return;
         }
 
@@ -120,8 +126,10 @@ class BallMapObject extends AnimatedMapObject {
     
     // Update animation based on movement direction
     updateBallAnimation() {
+        const speed = this.getSpeed();
+
         // Skip if not moving significantly
-        if (Math.abs(this.velocity.x) < 0.1 && Math.abs(this.velocity.y) < 0.1) {
+        if (speed < this.minAnimationSpeed) {
             return;
         }
         
@@ -146,6 +154,7 @@ class BallMapObject extends AnimatedMapObject {
             animName = this.velocity.y > 0 ? 'rotateX' : 'rotateX_reverse';
         }
         
+        this.syncAnimationSpeed(speed);
         this.playAnimation(animName);
         
         if (this.debug) {
@@ -160,17 +169,20 @@ class BallMapObject extends AnimatedMapObject {
         this.posY += this.velocity.y;
         this.checkBoundaries();
 
-        this.velocity.x *= this.friction;
-        this.velocity.y *= this.friction;
+        const speedBeforeFriction = this.getSpeed();
+        const friction = speedBeforeFriction <= this.settleThreshold
+            ? this.settleFriction
+            : this.friction;
 
-        if (Math.abs(this.velocity.x) > 0.1 || Math.abs(this.velocity.y) > 0.1) {
+        this.velocity.x *= friction;
+        this.velocity.y *= friction;
+
+        const speed = this.getSpeed();
+
+        if (speed >= this.minAnimationSpeed) {
             this.updateBallAnimation();
-        } else if (Math.abs(this.velocity.x) < 0.3 && Math.abs(this.velocity.y) < 0.3) {
-            this.velocity.x = 0;
-            this.velocity.y = 0;
-            this.isMoving = false;
-            this.pauseAnimation();
-            if (this.debug) console.log("Ball stopped");
+        } else if (speed <= this.stopThreshold) {
+            this.stopMotion();
         }
         // markPositionDirty() called by base update()
     }
@@ -250,6 +262,28 @@ class BallMapObject extends AnimatedMapObject {
                 console.log("Ball boundaries set:", this.bounds);
             }
         }
+    }
+
+    getSpeed() {
+        return Math.hypot(this.velocity.x, this.velocity.y);
+    }
+
+    syncAnimationSpeed(speed = this.getSpeed()) {
+        const normalizedSpeed = Math.max(0, Math.min(1, speed / Math.max(this.maxSpeed, 0.001)));
+        const frameDelay = this.maxAnimationFrameDelay -
+            ((this.maxAnimationFrameDelay - this.minAnimationFrameDelay) * normalizedSpeed);
+        this.setAnimationSpeed(frameDelay);
+    }
+
+    stopMotion() {
+        this.velocity.x = 0;
+        this.velocity.y = 0;
+        this.isMoving = false;
+        this.pauseAnimation();
+        if (this.element) {
+            this.element.setAttribute('data-moving', 'false');
+        }
+        if (this.debug) console.log("Ball stopped");
     }
 
     // tickUpdate: collision detection + physics (no DOM)

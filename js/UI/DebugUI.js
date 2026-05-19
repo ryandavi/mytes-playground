@@ -30,11 +30,21 @@ class DebugUI {
     }
 
     getInputMessages() {
+        const lastInputTime =
+            this.parent.inputHandler?.inputSystem?.state?.lastActivityTime ??
+            this.parent.inputHandler?.lastActiveTime ??
+            null;
+
         return [
             { label: "User Active", value: this.parent.isActive },
             { label: "Local Mouse", value: `${this.parent.getLocalMouse().x.toFixed(2)}px, ${this.parent.getLocalMouse().y.toFixed(2)}px` },
             { label: "Mouse", value: `${this.parent.mousePosX.toFixed(2)}px, ${this.parent.mousePosY.toFixed(2)}px` },
-            { label: "Last Input Time", value: new Date(this.parent.inputHandler?.lastActivityTime).toLocaleTimeString() }
+            {
+                label: "Last Input Time",
+                value: Number.isFinite(lastInputTime)
+                    ? new Date(lastInputTime).toLocaleTimeString()
+                    : 'N/A'
+            }
         ];
     }
 
