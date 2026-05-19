@@ -144,8 +144,8 @@ class GameMap {
         const { collider } = myte; // Get collider from the entity itself
     
         // show debug
-        this.gridSystem.pathfinder.options.debug = true; // Keep debug options separate
-        this.gridSystem.config.showTerrainColors = true;
+        this.gridSystem.pathfinder.setDebugMode(true);
+        this.gridSystem.pathfinder.options.visualizeSearch = true;
     
         // --- MODIFIED CALL to findPath ---
         const path = this.gridSystem.pathfinder.findPath(
@@ -515,39 +515,36 @@ class GameMap {
 			// Process objects that modify terrain
 			this.applyObjectTerrainModifiers();
 			
-			// Update pathfinder to check if entity can swim when calculating paths
-			if (this.gridSystem.pathfinder.setTerrainCosts) {
-				const gameMap = this;
-				const originalIsWalkable = this.gridSystem.pathfinder.isWalkable;
-				
-				// Override isWalkable to check swimming ability and conditional walkability
-				this.gridSystem.pathfinder.isWalkable = function(x, y, entity) {
-					const node = this.grid.getNodeAt(x, y);
-					if (!node) return false;
-					
-					// If it's a water tile, check if entity can swim
-					if (!node.walkable && node.swimmable) {
-						return entity && entity.canSwim === true;
-					}
-					
-					// If it's a conditionally walkable tile (like a door), check the condition
-					if (!node.walkable && node.conditionallyWalkable) {
-						if (node.conditionType === 'door') {
-							// Get the door object using conditionId
-							const door = gameMap.getObjectById(node.conditionId);
-							// Check if door exists and is open
-							return door && door.isOpen === true;
-						}
-						// Add more condition types as needed
-					}
-					
-					// Otherwise use the original walkable check
-					return originalIsWalkable.call(this, x, y, entity);
-				};
-				
-				// Update terrain costs
-				this.gridSystem.pathfinder.setTerrainCosts(customTerrainCosts);
-			}
+            this.gridSystem.pathfinder.setTerrainCosts(customTerrainCosts);
+
+            const pathfinderOptions = this.gridSystem.pathfinder.options;
+            if (mapData.properties.pathfinderPreferPaths !== undefined) {
+                pathfinderOptions.preferPaths = !!mapData.properties.pathfinderPreferPaths;
+            }
+            if (mapData.properties.pathfinderAvoidDifficultTerrain !== undefined) {
+                pathfinderOptions.avoidDifficultTerrain = !!mapData.properties.pathfinderAvoidDifficultTerrain;
+            }
+            if (mapData.properties.pathfinderAllowDiagonals !== undefined) {
+                pathfinderOptions.allowDiagonals = !!mapData.properties.pathfinderAllowDiagonals;
+            }
+            if (mapData.properties.pathfinderVisualizeSearch !== undefined) {
+                pathfinderOptions.visualizeSearch = !!mapData.properties.pathfinderVisualizeSearch;
+            }
+            if (mapData.properties.pathfinderVisualizeRejectedNodes !== undefined) {
+                pathfinderOptions.visualizeRejectedNodes = !!mapData.properties.pathfinderVisualizeRejectedNodes;
+            }
+            if (mapData.properties.pathfinderMaxVisualizedNodes !== undefined) {
+                const maxNodes = Number(mapData.properties.pathfinderMaxVisualizedNodes);
+                if (Number.isFinite(maxNodes) && maxNodes > 0) {
+                    pathfinderOptions.maxVisualizedNodes = maxNodes;
+                }
+            }
+            if (mapData.properties.pathfinderPathEdgePenaltyFactor !== undefined) {
+                const edgePenalty = Number(mapData.properties.pathfinderPathEdgePenaltyFactor);
+                if (Number.isFinite(edgePenalty)) {
+                    pathfinderOptions.pathEdgePenaltyFactor = edgePenalty;
+                }
+            }
 		}
 	}
 
@@ -605,6 +602,9 @@ class GameMap {
 
         // Apply any custom properties
         Object.assign(object, properties);
+        if (typeof object.applyRuntimeProperties === 'function') {
+            object.applyRuntimeProperties(properties);
+        }
 
         if (!object.parent) {
             object.parent = this;

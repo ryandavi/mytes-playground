@@ -28,10 +28,13 @@ class AStarPathfinder {
             smoothPaths: true,
             debug: false,
             useDirectPathFallback: true,
-            preferPaths: false,           // General preference for paths
-            pathEdgePenaltyFactor: 0.3, // NEW: How much to penalize path edges (0=none, 1=max)
+            preferPaths: true,
+            pathEdgePenaltyFactor: 0.3,
             avoidDifficultTerrain: true,
             allowEntityOutOfBounds: true,
+            visualizeSearch: true,
+            visualizeRejectedNodes: false,
+            maxVisualizedNodes: 250,
 
             // Smoothing related options
             maxSmoothingDistance: 3,
@@ -47,6 +50,11 @@ class AStarPathfinder {
             WATER: ['shallow_water', 'deep_water'],
             PREFERRED_PATHS: ['path'],
             DIFFICULT_TERRAIN: ['mountains', 'swamp', 'mud']
+        };
+
+        this.terrainCosts = {
+            default: (typeof GridSystem !== 'undefined' ? GridSystem.defaultTerrainCost : 1.0),
+            ...(typeof GridSystem !== 'undefined' ? GridSystem.terrainCosts : {})
         };
 
         // Debug elements - only populated when debug is enabled
@@ -351,11 +359,26 @@ class AStarPathfinder {
      * @param {Object} collider - Entity's collider object
      */
     visualizePath(container, path, entityWidth, entityHeight, collider) {
-        if (!container || !path || path.length === 0 || !this.options.debug) return;
+        this.clearVisualization(container);
+        if (!container || !this.options.debug) return;
 
-        // Clear existing visualizations
-        const existingNodes = container.querySelectorAll('.pathfinder-node');
-        existingNodes.forEach(node => node.remove());
+        if (this.options.visualizeSearch) {
+            this._visualizeSearchNodes(container, this.debugElements?.exploredNodes, {
+                className: 'search-node',
+                color: 'rgba(64, 156, 255, 0.22)',
+                size: Math.max(4, this.gridSystem.config.cellSize * 0.3)
+            });
+
+            if (this.options.visualizeRejectedNodes) {
+                this._visualizeSearchNodes(container, this.debugElements?.rejectedNodes, {
+                    className: 'rejected-node',
+                    color: 'rgba(255, 80, 80, 0.18)',
+                    size: Math.max(3, this.gridSystem.config.cellSize * 0.22)
+                });
+            }
+        }
+
+        if (!path || path.length === 0) return;
 
         const nodeSize = 6; // Smaller default size
         const endNodeSize = 10;
@@ -428,6 +451,20 @@ class AStarPathfinder {
         if (path.length > 0) { // Use last point if exists
             this._visualizeEntityColliderAtCenter(container, path[path.length - 1], 'end', entityWidth, entityHeight, collider);
         }
+    }
+
+    clearVisualization(container) {
+        if (!container) return;
+        const existingNodes = container.querySelectorAll('.pathfinder-node');
+        existingNodes.forEach(node => node.remove());
+    }
+
+    setTerrainCosts(terrainCosts = {}) {
+        this.terrainCosts = {
+            ...this.terrainCosts,
+            ...terrainCosts
+        };
+        this.validationCache.clear();
     }
 
 
@@ -513,16 +550,76 @@ class AStarPathfinder {
 
     /** Check terrain traversability */
     _canTraverseTerrain(terrainType, entityCapabilities) {
-        if (this._isTerrainInCategory(terrainType, 'WATER')) {
-            return !!entityCapabilities.can_swim; // Use !! for explicit boolean conversion
+        if (terrainType === 'deep_water') {
+            return !!entityCapabilities.can_swim;
         }
-        // Assume other terrains are fundamentally traversable, cost handled elsewhere
+
+        if (terrainType === 'shallow_water') {
+            return !!entityCapabilities.can_swim || !!entityCapabilities.can_wade;
+        }
+
         return true;
     }
 
     /** Check if terrain type is in category */
     _isTerrainInCategory(terrainType, category) {
         return this.terrainCategories[category]?.includes(terrainType) || false;
+    }
+
+    _isOpenableObstacle(obj, entityCapabilities) {
+        return !!(
+            obj &&
+            entityCapabilities?.can_open_doors &&
+            typeof obj.open === 'function' &&
+            ['DOOR', 'GATE'].includes(obj.type)
+        );
+    }
+
+    _canTraverseConditionalCell(cell, entityCapabilities) {
+        if (!cell?.conditionallyWalkable) return false;
+
+        switch (cell.conditionType) {
+            case 'door':
+            case 'gate':
+                return !!entityCapabilities?.can_open_doors;
+            default:
+                return false;
+        }
+    }
+
+    _getCellBlockingObjects(cell, entityToExclude = null) {
+        if (!cell?.objects?.size) return [];
+
+        return Array.from(cell.objects).filter(obj =>
+            obj &&
+            obj !== entityToExclude &&
+            obj.config &&
+            !obj.config.walkable
+        );
+    }
+
+    _getEntityTerrainCostMultiplier(terrainType, entityCapabilities = {}) {
+        let multiplier = 1.0;
+
+        const explicitMultipliers = entityCapabilities.terrain_cost_multipliers || entityCapabilities.terrainCostMultipliers;
+        if (explicitMultipliers && explicitMultipliers[terrainType] !== undefined) {
+            const numericValue = Number(explicitMultipliers[terrainType]);
+            if (Number.isFinite(numericValue) && numericValue > 0) {
+                multiplier *= numericValue;
+            }
+        }
+
+        const likedTerrain = entityCapabilities.liked_terrain || entityCapabilities.likedTerrain || [];
+        if (likedTerrain.includes?.(terrainType)) {
+            multiplier *= 0.75;
+        }
+
+        const dislikedTerrain = entityCapabilities.disliked_terrain || entityCapabilities.dislikedTerrain || [];
+        if (dislikedTerrain.includes?.(terrainType)) {
+            multiplier *= 1.35;
+        }
+
+        return multiplier;
     }
 
     /**
@@ -661,7 +758,8 @@ class AStarPathfinder {
                     }
 
                     // Check properties for this valid, overlapped cell:
-                    if (!cell.walkable) {
+                    if ((!cell.tileWalkable && !this._canTraverseConditionalCell(cell, entityCapabilities)) ||
+                        (!cell.objectWalkable && this._getCellBlockingObjects(cell, entity).some(obj => !this._isOpenableObstacle(obj, entityCapabilities)))) {
                         if (debug) console.log(`  ❌ FAIL: Collider overlaps non-walkable tile at valid grid (${gridX}, ${gridY})`);
                         this.validationCache.set(cacheKey, false); return false;
                     }
@@ -707,6 +805,9 @@ class AStarPathfinder {
                 // Should only be actual objects now, not synthetic tiles
                 if (debug) {
                     console.log(`    Checking detailed collision against obj ID ${objFromGrid.id || 'N/A'} (isTile: ${!!objFromGrid.isTileCollider}, walkable: ${objFromGrid.config?.walkable})`);
+                }
+                if (this._isOpenableObstacle(objFromGrid, entityCapabilities)) {
+                    continue;
                 }
                 if (this._checkDetailedCollision(entityStateForCollision, objFromGrid)) {
                     if (debug) console.log(`  ❌ FAIL: Detailed collision with obj ID ${objFromGrid.id || 'N/A'}`);
@@ -789,8 +890,9 @@ class AStarPathfinder {
                     // (to avoid trying to visualize nodes at like -1000, -1000)
                     // A better approach might be to log the world coords that failed validation.
                     // For now, just continue.
-                    // const key = this.getKey(newX, newY); // Potential issue if coords are wild
-                    // this.debugElements.rejectedNodes.add(key);
+                    if (newX >= 0 && newX < this.gridSystem.gridWidth && newY >= 0 && newY < this.gridSystem.gridHeight) {
+                        this.debugElements.rejectedNodes.add(this.getKey(newX, newY));
+                    }
                 }
                 continue; // Invalid placement according to _validatePosition, skip this neighbor.
             }
@@ -827,7 +929,14 @@ class AStarPathfinder {
 
             // Add the neighbor node to the list. The node is identified by the grid coordinates (newX, newY)
             // representing where the entity's TL would be. The terrainType is stored for cost calculation.
-            neighbors.push({ x: newX, y: newY, terrainType: terrainType });
+            const centerCell = this.gridSystem.grid[centerGrid.x]?.[centerGrid.y];
+            neighbors.push({
+                x: newX,
+                y: newY,
+                terrainType: terrainType,
+                conditionType: centerCell?.conditionType || null,
+                conditionallyWalkable: !!centerCell?.conditionallyWalkable
+            });
         }
         return neighbors;
     }
@@ -840,11 +949,12 @@ class AStarPathfinder {
         const terrainType = toNode.terrainType;
 
         // Use options passed in effectiveOptions if they exist, otherwise fallback to this.options
-        const preferPaths = effectiveOptions.preferPaths !== undefined ? effectiveOptions.preferPaths : this.options.preferPaths;
+        const preferPaths = (effectiveOptions.preferPaths !== undefined ? effectiveOptions.preferPaths : this.options.preferPaths) &&
+            entityCapabilities?.follows_paths !== false;
         const pathEdgePenaltyFactor = effectiveOptions.pathEdgePenaltyFactor !== undefined ? effectiveOptions.pathEdgePenaltyFactor : this.options.pathEdgePenaltyFactor;
         const avoidDifficultTerrain = effectiveOptions.avoidDifficultTerrain !== undefined ? effectiveOptions.avoidDifficultTerrain : this.options.avoidDifficultTerrain;
 
-        const terrainCosts = { /* ... */ }; // Same definition
+        const terrainCosts = this.terrainCosts || { default: 1.0 };
         let terrainMultiplier = terrainCosts[terrainType] || terrainCosts['default'];
         const defaultCost = terrainCosts['default'] || 1.0;
 
@@ -875,6 +985,12 @@ class AStarPathfinder {
         if (avoidDifficultTerrain && this._isTerrainInCategory(terrainType, 'DIFFICULT_TERRAIN')) {
             terrainMultiplier *= 1.5;
         }
+
+        if (toNode.conditionallyWalkable && ['door', 'gate'].includes(toNode.conditionType)) {
+            terrainMultiplier = Math.max(terrainMultiplier, terrainCosts.door_closed || 3.0);
+        }
+
+        terrainMultiplier *= this._getEntityTerrainCostMultiplier(terrainType, entityCapabilities);
 
         return baseMoveCost * terrainMultiplier;
     }
@@ -1192,6 +1308,41 @@ class AStarPathfinder {
                 zIndex: 980
             });
             container.appendChild(colliderEl);
+        }
+    }
+
+    _visualizeSearchNodes(container, nodeKeys, options = {}) {
+        if (!container || !nodeKeys?.size || !this.options.debug) return;
+
+        const {
+            className = 'search-node',
+            color = 'rgba(64, 156, 255, 0.22)',
+            size = Math.max(4, this.gridSystem.config.cellSize * 0.3)
+        } = options;
+
+        const keys = Array.from(nodeKeys);
+        const maxNodes = Math.max(1, this.options.maxVisualizedNodes || 250);
+        const step = Math.max(1, Math.ceil(keys.length / maxNodes));
+
+        for (let i = 0; i < keys.length; i += step) {
+            const [gridX, gridY] = keys[i].split(',').map(Number);
+            if (!Number.isFinite(gridX) || !Number.isFinite(gridY)) continue;
+
+            const center = this.gridSystem.gridToWorld(gridX, gridY);
+            const node = document.createElement('div');
+            node.className = `pathfinder-node ${className} debug`;
+            Object.assign(node.style, {
+                position: 'absolute',
+                left: `${center.x - size / 2}px`,
+                top: `${center.y - size / 2}px`,
+                width: `${size}px`,
+                height: `${size}px`,
+                borderRadius: '50%',
+                backgroundColor: color,
+                zIndex: 985,
+                pointerEvents: 'none'
+            });
+            container.appendChild(node);
         }
     }
 

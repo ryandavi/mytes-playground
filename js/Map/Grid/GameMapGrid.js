@@ -24,18 +24,7 @@ class GridSystem {
 
         // Initialize grid cells - using arrays instead of Set where possible for performance
         this.grid = Array(this.gridWidth).fill(null).map((_, x) =>
-            Array(this.gridHeight).fill(null).map((_, y) => ({
-                objects: new Set(), // Still need Set for uniqueness
-                tileWalkable: true, // Base tile walkability (from map data)
-                objectWalkable: true, // Whether objects in this cell allow walking
-                walkable: true, // Combined walkability status
-                terrainType: GridSystem.defaultTerrain, // Default terrain type for pathfinding
-                // Store cell position and dimensions
-                posX: x * this.config.cellSize,
-                posY: y * this.config.cellSize,
-                width: this.config.cellSize,
-                height: this.config.cellSize
-            }))
+            Array(this.gridHeight).fill(null).map((_, y) => this.createCellData(x, y))
         );
 
         // Viewport tracking for culling - use arrays for better performance
@@ -106,6 +95,38 @@ class GridSystem {
     static defaultTerrain = 'ground';
     static defaultTerrainCost = 1.0;
 
+    createCellData(x, y) {
+        return {
+            objects: new Set(),
+            tileWalkable: true,
+            objectWalkable: true,
+            walkable: true,
+            swimmable: false,
+            conditionallyWalkable: false,
+            conditionType: null,
+            conditionId: null,
+            terrainType: GridSystem.defaultTerrain,
+            originalTerrainType: GridSystem.defaultTerrain,
+            posX: x * this.config.cellSize,
+            posY: y * this.config.cellSize,
+            width: this.config.cellSize,
+            height: this.config.cellSize
+        };
+    }
+
+    invalidatePathfinderCaches() {
+        if (this.pathfinder?.validationCache) {
+            this.pathfinder.validationCache.clear();
+        }
+
+        const mytes = this.parent?.mytes || [];
+        mytes.forEach(myte => {
+            if (myte?.pathfinder?.validationCache) {
+                myte.pathfinder.validationCache.clear();
+            }
+        });
+    }
+
     // Add this method to update grid cells with terrain data
     updateCellTerrain(gridX, gridY, terrainType) {
         if (gridX < 0 || gridX >= this.gridWidth ||
@@ -125,6 +146,8 @@ class GridSystem {
         if (this.debugMode && this.debugInitialized && this.config.showTerrainColors) {
             this.updateGridCellVisuals(gridX, gridY);
         }
+
+        this.invalidatePathfinderCaches();
 
         return true;
     }
@@ -874,7 +897,7 @@ class GridSystem {
             // Tile walkability check is REMOVED from this function.
 
             // Add non-walkable OBJECTS physically present in this cell
-            if (cell.objects && cell.objects.length > 0) {
+            if (cell.objects && cell.objects.size > 0) {
                  cell.objects.forEach(obj => {
                      // Check if the object is collidable (defined by having a !walkable config)
                      // and not the entity performing the check.
@@ -914,6 +937,8 @@ class GridSystem {
         if (this.lastCullingBounds && this.isObjectVisible(obj, this.lastCullingBounds)) {
             this.activeObjects.add(obj);
         }
+
+        this.invalidatePathfinderCaches();
     }
 
     // Helper method to check if an object is within visible bounds
@@ -945,6 +970,7 @@ class GridSystem {
 
         // Remove from active objects
         this.activeObjects.delete(obj);
+        this.invalidatePathfinderCaches();
     }
 
     // IMPROVED: Update object's position in grid - more efficient implementation
@@ -1044,6 +1070,8 @@ class GridSystem {
                 this.activeObjects.delete(obj);
             }
         }
+
+        this.invalidatePathfinderCaches();
     }
     // Get objects in an area
     getObjectsInArea(x, y, width, height) {
@@ -1330,17 +1358,7 @@ class GridSystem {
 
             // Create new grid with updated dimensions
             this.grid = Array(this.gridWidth).fill(null).map((_, x) =>
-                Array(this.gridHeight).fill(null).map((_, y) => ({
-                    objects: new Set(),
-                    tileWalkable: true,
-                    objectWalkable: true,
-                    walkable: true,
-                    terrainType: GridSystem.defaultTerrain, // Default terrain type
-                    posX: x * this.config.cellSize,
-                    posY: y * this.config.cellSize,
-                    width: this.config.cellSize,
-                    height: this.config.cellSize
-                }))
+                Array(this.gridHeight).fill(null).map((_, y) => this.createCellData(x, y))
             );
         }
 
@@ -1348,13 +1366,21 @@ class GridSystem {
         for (let x = 0; x < dataWidth; x++) {
             for (let y = 0; y < dataHeight; y++) {
                 if (x < tileGridData.grid.length && y < tileGridData.grid[x].length) {
+                    const sourceCell = tileGridData.grid[x][y];
+
                     // Update base tile walkability from tile data
-                    this.grid[x][y].tileWalkable = tileGridData.grid[x][y].walkable;
+                    this.grid[x][y].tileWalkable = sourceCell.walkable;
 
                     // Update terrain type if provided
-                    if (tileGridData.grid[x][y].terrainType) {
-                        this.grid[x][y].terrainType = tileGridData.grid[x][y].terrainType;
+                    if (sourceCell.terrainType) {
+                        this.grid[x][y].terrainType = sourceCell.terrainType;
+                        this.grid[x][y].originalTerrainType = sourceCell.terrainType;
                     }
+
+                    this.grid[x][y].swimmable = !!sourceCell.swimmable;
+                    this.grid[x][y].conditionallyWalkable = !!sourceCell.conditionallyWalkable;
+                    this.grid[x][y].conditionType = sourceCell.conditionType || null;
+                    this.grid[x][y].conditionId = sourceCell.conditionId ?? null;
 
                     // Update combined walkability
                     this.grid[x][y].walkable = this.grid[x][y].tileWalkable && this.grid[x][y].objectWalkable;
@@ -1393,6 +1419,7 @@ class GridSystem {
 
         // Force culling update on next frame
         this.lastCameraPos = { x: -9999, y: -9999 };
+        this.invalidatePathfinderCaches();
 
         console.log(`[GridSystem] Grid system updated: ${this.gridWidth}x${this.gridHeight} cells`);
     }

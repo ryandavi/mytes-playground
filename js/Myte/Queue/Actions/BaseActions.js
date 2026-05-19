@@ -227,7 +227,7 @@ class PositionableAction extends MyteAction {
     }
 
     getClosestSideHorizontal(destination_rect, myte_rect) {
-        return this.myte.posX + (myte_rect.width / 2) < destination_rect.x + (destination_rect.height / 2) ? 'left' : 'right';
+        return this.myte.posX + (myte_rect.width / 2) < destination_rect.x + (destination_rect.width / 2) ? 'left' : 'right';
     }
 
     getClosestSideVertical(destination_rect, myte_rect) {

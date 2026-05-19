@@ -14,7 +14,109 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
     }
 
     addItems(items) {
-        this.items = Array.isArray(items) ? [...items] : [];
+        this.items = this.normalizeItems(items);
+    }
+
+    applyRuntimeProperties(properties = {}) {
+        if (Object.prototype.hasOwnProperty.call(properties, 'items')) {
+            this.items = this.normalizeItems(properties.items);
+        }
+
+        if (Object.prototype.hasOwnProperty.call(properties, 'canClose')) {
+            this.canClose = !!properties.canClose;
+        }
+    }
+
+    normalizeItems(items) {
+        if (items == null) return [];
+
+        if (Array.isArray(items)) {
+            return items
+                .flatMap(item => this.normalizeItems(item))
+                .filter(Boolean);
+        }
+
+        if (typeof items === 'string') {
+            const trimmed = items.trim();
+            if (!trimmed) return [];
+
+            if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                try {
+                    return this.normalizeItems(JSON.parse(trimmed));
+                } catch (error) {
+                    return this.parseItemDefinitionString(trimmed);
+                }
+            }
+
+            return this.parseItemDefinitionString(trimmed);
+        }
+
+        if (typeof items === 'object') {
+            if ('type' in items) {
+                const normalizedItem = this.normalizeItemDefinition(items);
+                return normalizedItem ? [normalizedItem] : [];
+            }
+
+            return Object.values(items)
+                .flatMap(item => this.normalizeItems(item))
+                .filter(Boolean);
+        }
+
+        return [];
+    }
+
+    parseItemDefinitionString(str) {
+        const cleanString = str.trim().replace(/\n/g, '');
+        if (!cleanString) return [];
+
+        const itemStrings = cleanString.includes('{')
+            ? cleanString.split(/,(?=\s*{)/)
+            : [cleanString];
+
+        return itemStrings
+            .map(itemStr => {
+                const parts = itemStr
+                    .replace(/^\[|\]$/g, '')
+                    .replace(/[{}]/g, '')
+                    .split(',')
+                    .map(part => part.trim())
+                    .filter(part => part.length > 0);
+
+                if (!parts.length) return null;
+
+                return this.normalizeItemDefinition({
+                    type: parts[0],
+                    variant: parts[1] ?? 'default',
+                    quantity: parts[2] ?? 1,
+                    probability: parts[3] ?? 1
+                });
+            })
+            .filter(Boolean);
+    }
+
+    normalizeItemDefinition(item) {
+        if (!item || typeof item !== 'object' || !item.type) return null;
+
+        const parseRangeValue = (value) => {
+            if (Array.isArray(value)) {
+                return value.map(Number);
+            }
+
+            if (typeof value === 'string' && /^\d+\s*-\s*\d+$/.test(value)) {
+                const [min, max] = value.split('-').map(part => Number(part.trim()));
+                return [min, max];
+            }
+
+            const numericValue = Number(value);
+            return Number.isFinite(numericValue) ? numericValue : value;
+        };
+
+        return {
+            type: String(item.type).toUpperCase(),
+            variant: item.variant ?? 'default',
+            quantity: parseRangeValue(item.quantity ?? 1),
+            probability: Number(item.probability ?? 1)
+        };
     }
 
     open(parent) {
@@ -52,7 +154,8 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
     }
     
     spawnItems(parent) {
-        if (!this.items.length) return;
+        const itemsToSpawn = this.normalizeItems(this.items);
+        if (!itemsToSpawn.length) return;
 
         const spawnPoint = this.getSpawnPoint();
         const spreadAngle = Math.PI / 6;
@@ -61,8 +164,8 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
 
         if (!foregroundLayer) return;
 
-        this.items.forEach((item, index) => {
-            const angle = this.calculateSpawnAngle(index, spreadAngle);
+        itemsToSpawn.forEach((item, index) => {
+            const angle = this.calculateSpawnAngle(index, itemsToSpawn.length, spreadAngle);
             const droppedItem = this.createDroppedItem(item, spawnPoint, angle, baseVelocity);
 
             if (!droppedItem?.element) return;
@@ -81,10 +184,10 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         };
     }
     
-    calculateSpawnAngle(index, spreadAngle) {
-        return this.items.length === 1
+    calculateSpawnAngle(index, totalItems, spreadAngle) {
+        return totalItems === 1
             ? -Math.PI / 2  // Single item goes straight up
-            : -Math.PI / 2 - spreadAngle / 2 + (spreadAngle * index / (this.items.length - 1));
+            : -Math.PI / 2 - spreadAngle / 2 + (spreadAngle * index / (totalItems - 1));
     }
     
     createDroppedItem(item, spawnPoint, angle, baseVelocity) {

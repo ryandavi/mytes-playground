@@ -200,7 +200,11 @@ class AStarMoveAction extends MyteAction {
         }
         
         // Let myte's own movement logic handle the actual movement
-        this.myte.move_toward_target();
+        if (typeof this.myte.move_toward_target_new === 'function') {
+            this.myte.move_toward_target_new();
+        } else {
+            this.myte.move_toward_target();
+        }
         
         return false; // Still in progress
     }

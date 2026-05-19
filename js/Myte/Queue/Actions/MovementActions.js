@@ -45,7 +45,8 @@ class FollowObjectAction extends PositionableAction {
     };
 
     static canPerform(selected, active) {
-        return active && selected && selected !== active && selected instanceof Myte && !active?.queue.isCarrying();
+        const isFollowableTarget = selected instanceof Myte || selected instanceof MapObject;
+        return active && selected && selected !== active && isFollowableTarget && !active?.queue.isCarrying();
     }
 
     constructor(myte, options) {
@@ -60,7 +61,7 @@ class FollowObjectAction extends PositionableAction {
     update() {
         if (!this.target) return true;
 
-        let targetRect = this.target.getOffsetRect();
+        let targetRect = this.getRect(this.target);
         const myteRect = this.myte.getRect();
         const canvasWidth = this.myte.parent.getCanvasRect().width;
 
@@ -87,7 +88,11 @@ class FollowObjectAction extends PositionableAction {
         }
 
         this.myte.setTarget(targetPos.x, targetPos.y);
-        this.myte.move_toward_target();
+        if (typeof this.myte.move_toward_target_new === 'function') {
+            this.myte.move_toward_target_new();
+        } else {
+            this.myte.move_toward_target();
+        }
 
         return false;
     }

@@ -543,6 +543,21 @@ class Myte {
 		return distance2.toFixed(2);
 	}
 
+	canAutoOpenCollider(collider) {
+		return !!(
+			collider &&
+			this.capabilities?.can_open_doors &&
+			['DOOR', 'GATE'].includes(collider.type) &&
+			typeof collider.open === 'function' &&
+			!collider.isOpen
+		);
+	}
+
+	tryOpenCollider(collider) {
+		if (!this.canAutoOpenCollider(collider)) return false;
+		return collider.open() !== false;
+	}
+
 
 // Add this defensive check to the move_toward_target method
 move_toward_target(doXAxis = true, doYAxis = true) {
@@ -569,6 +584,10 @@ move_toward_target(doXAxis = true, doYAxis = true) {
                     const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
                     for (const collider of potentialColliders) {
                         if (this.parent.checkCollision(this, collider)) {
+                            if (this.tryOpenCollider(collider)) {
+                                this.posX = originalX;
+                                break;
+                            }
                             // Simply revert to original X position
                             this.posX = originalX;
                             break;
@@ -588,6 +607,10 @@ move_toward_target(doXAxis = true, doYAxis = true) {
                     const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
                     for (const collider of potentialColliders) {
                         if (this.parent.checkCollision(this, collider)) {
+                            if (this.tryOpenCollider(collider)) {
+                                this.posY = originalY;
+                                break;
+                            }
                             // Simply revert to original Y position
                             this.posY = originalY;
                             break;
@@ -636,6 +659,11 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 						const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
 						for (const collider of potentialColliders) {
 							if (this.parent.checkCollision(this, collider)) {
+								if (this.tryOpenCollider(collider)) {
+									this.posX = originalX;
+									xBlocked = true;
+									break;
+								}
 								this.posX = originalX;
 								xBlocked = true;
 								break;
@@ -658,6 +686,11 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 						const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
 						for (const collider of potentialColliders) {
 							if (this.parent.checkCollision(this, collider)) {
+								if (this.tryOpenCollider(collider)) {
+									this.posY = originalY;
+									yBlocked = true;
+									break;
+								}
 								this.posY = originalY;
 								yBlocked = true;
 								break;

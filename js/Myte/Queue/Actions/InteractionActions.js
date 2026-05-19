@@ -22,6 +22,9 @@ class GoToObjectAction extends PositionableAction {
     };
 
 	targetPos = null;
+    targetPoints = null;
+    currentTargetIndex = 0;
+    targetCenter = null;
 
     constructor(myte, options) {
         super(myte, {
@@ -42,26 +45,189 @@ class GoToObjectAction extends PositionableAction {
 
 
 	start(){
-		const targetRect = this.getRect(this.target);
-        const myteRect = this.myte.getRect();
-        let horizontal = this.getClosestSideHorizontal(targetRect, myteRect);
-        let targetPos = this.calculatePosition(
-            myteRect, 
-            targetRect, 
-            horizontal, 
-            this.targetPosition.vertical, 
-            this.targetPosition.insideHorizontal, 
-            this.targetPosition.insideVertical
-        );
-
-        const adjusted = this.adjustPositionToBounds(targetPos, myteRect, targetRect);
-        this.targetPos = adjusted.position;
+        super.start();
+        this.currentTargetIndex = 0;
+        this.buildApproachPlan();
 	}
 
-    update() {
-        this.myte.setTarget(this.targetPos.x, this.targetPos.y);
+    buildApproachPlan() {
+        const targetRect = this.getRect(this.target);
+        if (!targetRect) {
+            this.targetPos = null;
+            this.targetPoints = null;
+            return;
+        }
+
+        const myteRect = this.myte.getRect();
+        this.targetCenter = {
+            x: targetRect.x + (targetRect.width / 2),
+            y: targetRect.y + (targetRect.height / 2)
+        };
+
+        const candidates = this.getCandidatePositions(targetRect, myteRect);
+        const bestPath = this.findBestPath(candidates);
+
+        if (bestPath) {
+            this.targetPos = bestPath.targetPos;
+            this.targetPoints = bestPath.targetPoints;
+            return;
+        }
+
+        this.targetPos = candidates[0] || {
+            x: this.targetCenter.x - (myteRect.width / 2),
+            y: this.targetCenter.y - (myteRect.height / 2)
+        };
+        this.targetPoints = null;
+    }
+
+    getCandidatePositions(targetRect, myteRect) {
+        const preferredHorizontal = this.getClosestSideHorizontal(targetRect, myteRect);
+        const secondaryHorizontal = this.getOpposite(preferredHorizontal);
+
+        const rawCandidates = [
+            this.calculatePosition(
+                myteRect,
+                targetRect,
+                preferredHorizontal,
+                this.targetPosition.vertical,
+                this.targetPosition.insideHorizontal,
+                this.targetPosition.insideVertical
+            ),
+            this.calculatePosition(
+                myteRect,
+                targetRect,
+                secondaryHorizontal,
+                this.targetPosition.vertical,
+                this.targetPosition.insideHorizontal,
+                this.targetPosition.insideVertical
+            ),
+            this.calculatePosition(myteRect, targetRect, 'center', 'top', false, false),
+            this.calculatePosition(myteRect, targetRect, 'center', 'bottom', false, true)
+        ];
+
+        const uniqueCandidates = [];
+        const seen = new Set();
+
+        for (const candidate of rawCandidates) {
+            const adjusted = this.adjustPositionToBounds(candidate, myteRect, targetRect).position;
+            const key = `${Math.round(adjusted.x)},${Math.round(adjusted.y)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            uniqueCandidates.push(adjusted);
+        }
+
+        return uniqueCandidates;
+    }
+
+    findBestPath(candidates) {
+        if (!this.myte?.pathfinder || !candidates.length) {
+            return null;
+        }
+
+        let bestPath = null;
+
+        for (const candidate of candidates) {
+            const endCenterX = candidate.x + (this.myte.size.width / 2);
+            const endCenterY = candidate.y + (this.myte.size.height / 2);
+            const path = this.myte.pathfinder.findPath(
+                this.myte,
+                this.myte.posX,
+                this.myte.posY,
+                endCenterX,
+                endCenterY
+            );
+
+            if (!path?.length) continue;
+
+            const targetPoints = path
+                .map(waypoint => ({
+                    x: waypoint.x - this.myte.size.width / 2,
+                    y: waypoint.y - this.myte.size.height / 2
+                }))
+                .filter((point, index, arr) => {
+                    if (index === 0) {
+                        return Math.hypot(point.x - this.myte.posX, point.y - this.myte.posY) > 1;
+                    }
+
+                    const previous = arr[index - 1];
+                    return Math.hypot(point.x - previous.x, point.y - previous.y) > 0.5;
+                });
+
+            const score = this.getPathScore(targetPoints);
+            if (!bestPath || score < bestPath.score) {
+                bestPath = { targetPos: candidate, targetPoints, score };
+            }
+        }
+
+        return bestPath;
+    }
+
+    getPathScore(points) {
+        if (!points?.length) return 0;
+
+        let total = 0;
+        let previous = { x: this.myte.posX, y: this.myte.posY };
+        for (const point of points) {
+            total += Math.hypot(point.x - previous.x, point.y - previous.y);
+            previous = point;
+        }
+        return total;
+    }
+
+    moveMyteTowardCurrentTarget() {
+        if (typeof this.myte.move_toward_target_new === 'function') {
+            this.myte.move_toward_target_new();
+            return;
+        }
+
         this.myte.move_toward_target();
-        return this.myte.is_at_target();
+    }
+
+    faceTarget() {
+        if (!this.targetCenter) return;
+
+        const myteCenterX = this.myte.posX + (this.myte.size.width / 2);
+        const myteCenterY = this.myte.posY + (this.myte.size.height / 2);
+        const dx = this.targetCenter.x - myteCenterX;
+        const dy = this.targetCenter.y - myteCenterY;
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+            this.myte.setDirection(dx > 0 ? DIRECTION.EAST : DIRECTION.WEST);
+        } else {
+            this.myte.setDirection(dy > 0 ? DIRECTION.SOUTH : DIRECTION.NORTH);
+        }
+    }
+
+    update() {
+        if (this.targetPoints?.length) {
+            if (this.myte.is_at_target()) {
+                this.currentTargetIndex++;
+
+                if (this.currentTargetIndex >= this.targetPoints.length) {
+                    this.faceTarget();
+                    return true;
+                }
+            }
+
+            const waypoint = this.targetPoints[this.currentTargetIndex];
+            this.myte.setTarget(waypoint.x, waypoint.y);
+            this.moveMyteTowardCurrentTarget();
+            return false;
+        }
+
+        if (!this.targetPos) {
+            return true;
+        }
+
+        this.myte.setTarget(this.targetPos.x, this.targetPos.y);
+        this.moveMyteTowardCurrentTarget();
+
+        if (!this.myte.is_at_target()) {
+            return false;
+        }
+
+        this.faceTarget();
+        return true;
     }
 }
 
