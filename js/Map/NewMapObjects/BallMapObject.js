@@ -27,6 +27,7 @@ class BallMapObject extends AnimatedMapObject {
         // Pickup state
         this.isPickedUp = false;
         this.carrier = null;
+        this.pendingPickup = false;
 
         // Safe defaults — overwritten by setupBoundaries() once render() has a parent
         this.bounds = { left: 0, top: 0, right: 500, bottom: 500 };
@@ -74,7 +75,7 @@ class BallMapObject extends AnimatedMapObject {
     }
 
     reactToNearbyCreature(myte) {
-        if (this.isDragging || this.isPickedUp) return;
+        if (this.isDragging || this.isPickedUp || this.pendingPickup) return;
 
         const now = performance.now();
         if (now - this.lastPushTime < this.pushCooldown) return;
@@ -188,8 +189,13 @@ class BallMapObject extends AnimatedMapObject {
     updatePhysics() {
         if (!this.isMoving) return;
 
+        const prevX = this.posX;
+        const prevY = this.posY;
+
         this.posX += this.velocity.x;
         this.posY += this.velocity.y;
+
+        this.checkWallCollision(prevX, prevY);
         this.checkBoundaries();
 
         const speedBeforeFriction = this.getSpeed();
@@ -209,35 +215,88 @@ class BallMapObject extends AnimatedMapObject {
         }
         // markPositionDirty() called by base update()
     }
+
+    // Check collisions with non-walkable grid cells (interior walls)
+    checkWallCollision(prevX, prevY) {
+        const gs = this.gameMap?.gridSystem;
+        if (!gs?.grid) return;
+
+        const bounceMultiplier = 0.65;
+        let bouncedX = false;
+        let bouncedY = false;
+
+        // Check X axis: test new X with old Y
+        if (!this._isBallPositionWalkable(this.posX, prevY, gs)) {
+            this.posX = prevX;
+            this.velocity.x *= -bounceMultiplier;
+            bouncedX = true;
+        }
+
+        // Check Y axis: test new Y with (possibly reverted) X
+        if (!this._isBallPositionWalkable(this.posX, this.posY, gs)) {
+            this.posY = prevY;
+            this.velocity.y *= -bounceMultiplier;
+            bouncedY = true;
+        }
+
+        if (bouncedX || bouncedY) {
+            this.gameMap?.soundManager?.play('ball_hit');
+            this.updateBallAnimation();
+        }
+    }
+
+    _isBallPositionWalkable(px, py, gs) {
+        const margin = 6;
+        const cx = px + this.size.width / 2;
+        const cy = py + this.size.height / 2;
+
+        const points = [
+            [px + margin, cy],
+            [px + this.size.width - margin, cy],
+            [cx, py + margin],
+            [cx, py + this.size.height - margin],
+        ];
+
+        for (const [wx, wy] of points) {
+            const gp = gs.worldToGrid(wx, wy);
+            const cell = gs.grid[gp.x]?.[gp.y];
+            if (cell && !cell.walkable) return false;
+        }
+        return true;
+    }
     
     // Check and handle boundary collisions
     checkBoundaries() {
-        const bounceMultiplier = 0.8; // Reduce velocity slightly on bounce
-        
-        // Check and handle horizontal boundaries
+        const bounceMultiplier = 0.8;
+        let bounced = false;
+
         if (this.posX < this.bounds.left) {
             this.posX = this.bounds.left;
             this.velocity.x = Math.abs(this.velocity.x) * bounceMultiplier;
-            this.updateBallAnimation();
+            bounced = true;
             if (this.debug) console.log("Bounced left boundary");
         } else if (this.posX + this.size.width > this.bounds.right) {
             this.posX = this.bounds.right - this.size.width;
             this.velocity.x = -Math.abs(this.velocity.x) * bounceMultiplier;
-            this.updateBallAnimation();
+            bounced = true;
             if (this.debug) console.log("Bounced right boundary");
         }
-        
-        // Check and handle vertical boundaries
+
         if (this.posY < this.bounds.top) {
             this.posY = this.bounds.top;
             this.velocity.y = Math.abs(this.velocity.y) * bounceMultiplier;
-            this.updateBallAnimation();
+            bounced = true;
             if (this.debug) console.log("Bounced top boundary");
         } else if (this.posY + this.size.height > this.bounds.bottom) {
             this.posY = this.bounds.bottom - this.size.height;
             this.velocity.y = -Math.abs(this.velocity.y) * bounceMultiplier;
-            this.updateBallAnimation();
+            bounced = true;
             if (this.debug) console.log("Bounced bottom boundary");
+        }
+
+        if (bounced) {
+            this.gameMap?.soundManager?.play('ball_hit');
+            this.updateBallAnimation();
         }
     }
 
@@ -282,6 +341,34 @@ class BallMapObject extends AnimatedMapObject {
         return element;
     }
     
+    // Override drag component init to apply physics velocity on drop
+    initDragComponent() {
+        super.initDragComponent();
+        const dragComp = this.inputComponents.drag;
+        if (!dragComp) return;
+        const originalOnDragEnd = dragComp.options.onDragEnd;
+        dragComp.options.onDragEnd = (event) => {
+            if (originalOnDragEnd) originalOnDragEnd(event);
+            this._applyDragVelocity(event?.velocity);
+        };
+    }
+
+    _applyDragVelocity(dragVelocity) {
+        if (!dragVelocity) return;
+        // DragComponent velocity is in px/sec; scale to game units per frame (~60fps)
+        const scale = 1 / 55;
+        const vx = dragVelocity.x * scale;
+        const vy = dragVelocity.y * scale;
+        if (Math.abs(vx) > 0.2 || Math.abs(vy) > 0.2) {
+            this.velocity.x = vx;
+            this.velocity.y = vy;
+            this.capVelocity();
+            this.isMoving = true;
+            this.updateBallAnimation();
+            if (this.element) this.element.setAttribute('data-moving', 'true');
+        }
+    }
+
     // Set up boundaries based on parent container
     setupBoundaries(parent) {
         if (parent && parent.getMaxDimensions) {

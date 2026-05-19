@@ -25,6 +25,8 @@ class GoToObjectAction extends PositionableAction {
     targetPoints = null;
     currentTargetIndex = 0;
     targetCenter = null;
+    _stuckFrames = 0;
+    _lastPos = null;
 
     constructor(myte, options) {
         super(myte, {
@@ -199,6 +201,29 @@ class GoToObjectAction extends PositionableAction {
     }
 
     update() {
+        // Stuck detection: if myte hasn't moved for 45 frames while near the target, complete
+        if (!this._lastPos) this._lastPos = { x: this.myte.posX, y: this.myte.posY };
+        const moved = Math.hypot(this.myte.posX - this._lastPos.x, this.myte.posY - this._lastPos.y);
+        this._lastPos = { x: this.myte.posX, y: this.myte.posY };
+        this._stuckFrames = moved < 0.1 ? this._stuckFrames + 1 : 0;
+
+        if (this._stuckFrames > 45) {
+            const finalTarget = this.targetPoints?.length
+                ? this.targetPoints[this.targetPoints.length - 1]
+                : this.targetPos;
+            if (finalTarget) {
+                const distToFinal = Math.hypot(this.myte.posX - finalTarget.x, this.myte.posY - finalTarget.y);
+                if (distToFinal < 80) {
+                    this.faceTarget();
+                    return true;
+                }
+            }
+            // Far from target and stuck — rebuild plan once, then give up
+            this._stuckFrames = 0;
+            this.buildApproachPlan();
+            if (!this.targetPos && !this.targetPoints) return true;
+        }
+
         if (this.targetPoints?.length) {
             if (this.myte.is_at_target()) {
                 this.currentTargetIndex++;

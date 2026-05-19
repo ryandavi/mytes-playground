@@ -237,6 +237,7 @@ class MyteQueue {
 
     addPickupBall(ball) {
         if (!ball || ball.isPickedUp || this.isCarrying()) return false;
+        ball.pendingPickup = true;
         const centerX = ball.posX + ball.size.width / 2;
         const centerY = ball.posY + ball.size.height / 2;
         this.add('astar-move', { target: { x: centerX, y: centerY } });

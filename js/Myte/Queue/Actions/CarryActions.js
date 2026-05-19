@@ -174,7 +174,10 @@ class HoldBallAction extends MyteAction {
 
     start() {
         super.start();
-        if (this.ball) this.ball.pickup(this.myte);
+        if (this.ball) {
+            this.ball.pendingPickup = false;
+            this.ball.pickup(this.myte);
+        }
     }
 
     update() {
@@ -202,6 +205,7 @@ class HoldBallAction extends MyteAction {
         const throwSpeed = 3;
         const vx = dist > 1 ? (dx / dist) * throwSpeed : 0;
         const vy = dist > 1 ? (dy / dist) * throwSpeed : 0;
+        this.ball.pendingPickup = false;
         this.ball.drop(vx, vy);
         this.ball = null;
     }

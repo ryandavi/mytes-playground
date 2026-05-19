@@ -24,7 +24,7 @@ class AStarPathfinder {
             allowDiagonals: true,
             allowDiagonalCutting: true,  // Allows cutting corners
             heuristicWeight: 1,
-            maxSearchSteps: 3000,
+            maxSearchSteps: 8000,
             smoothPaths: true,
             debug: false,
             useDirectPathFallback: true,
@@ -165,7 +165,7 @@ class AStarPathfinder {
                 console.warn(`Requested target position (Center ${originalEndCenterX.toFixed(0)}, ${originalEndCenterY.toFixed(0)} / TL ${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)}) is invalid. Attempting to find nearest valid spot.`);
             }
             // Use existing helper to find nearest valid grid coordinate for the entity's TL
-            const searchRadius = 5; // How far to search (in grid cells)
+            const searchRadius = 12; // How far to search (in grid cells)
             const validEndGrid = this._findNearestValidGridPos(
                 entity,
                 endGrid.x, // Start search from the original invalid grid pos
@@ -248,7 +248,7 @@ class AStarPathfinder {
         // --- Validate Start Position (and adjust if necessary) ---
         if (!this._validatePosition(entity, startX, startY, entityWidth, entityHeight, collider, entityCapabilities)) {
             if (effectiveOptions.debug) { console.warn(`Entity collider cannot fit at input start TL (${startX.toFixed(0)}, ${startY.toFixed(0)})`); }
-            const validStartGrid = this._findNearestValidGridPos(entity, startGrid.x, startGrid.y, 5, entityWidth, entityHeight, collider, entityCapabilities);
+            const validStartGrid = this._findNearestValidGridPos(entity, startGrid.x, startGrid.y, 12, entityWidth, entityHeight, collider, entityCapabilities);
             if (!validStartGrid) {
                 console.error("No valid start grid position found near the initial one.");
                 return null;
@@ -282,7 +282,7 @@ class AStarPathfinder {
         this.openSet.push({ x: startGrid.x, y: startGrid.y, f: fScore.get(startKey), key: startKey });
 
         let steps = 0;
-        const timeoutMs = 250; // Example timeout
+        const timeoutMs = 500;
 
         // --- Main A* Search Loop ---
         while (!this.openSet.isEmpty()) {
