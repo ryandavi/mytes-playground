@@ -642,6 +642,19 @@
 			filter: grayscale(70%);
 		}
 
+		&.valid-drop-target {
+			>.portal-window {
+				outline: var(--border-width) solid var(--drop-target);
+			}
+		}
+
+		&.on-target {
+			>.portal-window {
+				outline: var(--border-width) solid var(--on-target) !important;
+			}
+			animation: portal-pulse 0.4s infinite ease-in-out;
+		}
+
 		/* Portal variants */
 		&.blue_portal .sprite {
 			box-shadow: 0 0 20px rgba(0, 191, 255, 0.7);

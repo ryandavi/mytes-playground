@@ -468,6 +468,15 @@
   opacity: 0.6;
   filter: grayscale(70%);
 }
+.mapObject.portal.valid-drop-target > .portal-window {
+  outline: var(--border-width) solid var(--drop-target);
+}
+.mapObject.portal.on-target > .portal-window {
+  outline: var(--border-width) solid var(--on-target) !important;
+}
+.mapObject.portal.on-target {
+  animation: portal-pulse 0.4s infinite ease-in-out;
+}
 .mapObject.portal {
   /* Portal variants */
 }

@@ -331,16 +331,7 @@ class Myte {
 		return this.isDragging == false;
 	}
 
-	updatePathfinder() {
-		if (this.parent?.gameMap?.gridSystem) {
-			this.initPathfinder(this.parent.gameMap.gridSystem);
-			console.log(`Myte ${this.id}: Pathfinder updated for new map.`);
-		} else {
-			console.error(`Myte ${this.id}: Cannot update pathfinder - GridSystem not found.`);
-		}
-	}
-
-	setMode(newGoal = null) {
+setMode(newGoal = null) {
 
 
 		if (newGoal == null) {

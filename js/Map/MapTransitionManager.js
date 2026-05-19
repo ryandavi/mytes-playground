@@ -162,8 +162,9 @@ class MapTransitionManager {
                 }
 
                 //reset pathfinder for all mytes
+                const newGridSystem = this.container.gameMap.gridSystem;
                 this.container.mytes.forEach(myte => {
-                    myte.updatePathfinder();
+                    myte.updatePathfinder(newGridSystem);
                 });
     
                 this.container.camera.centerToPosition(firstMyte.posX, firstMyte.posY, firstMyte.size, true);
