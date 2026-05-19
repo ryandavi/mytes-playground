@@ -158,7 +158,7 @@
 				<div class="layer foreground">
 					<!-- MYTE CONTAINER -->
 					
-						<div id="myteWrapper-1" class="myteWrapper snail">
+						<div id="myteWrapper-1" class="myteWrapper snail" data-myte-species="snail">
 							<!-- HOME -->
 							<div class="home-name">
 								<div class="name tooltip">Lentil's Slot</div>
@@ -166,7 +166,7 @@
 							<div class="home-wrapper"></div>
 							<!-- END HOME -->
 							<!-- MYTE START-->
-							<div id="myte-pookie" class="interactive-myte" data-myte-name="Lentil" draggable="false">
+							<div id="myte-pookie" class="interactive-myte" data-myte-name="Lentil" data-myte-species="snail" draggable="false">
 								<div class="inner-wrapper">
 									<div class="sprite"></div>
 									<div class="selectbox"></div>
@@ -190,14 +190,14 @@
 					<!-- Myte 2 -->
 					<!--
 							<div class="myteContainer">
-								<div id="myteWrapper-2" class="myteWrapper snail">
+								<div id="myteWrapper-2" class="myteWrapper worm" data-myte-species="worm">
 									<div class="home-name">
 										<div class="name tooltip">Pookie's Home</div>
 									</div>
 									<div class="home-wrapper"></div>
 
 
-									<div id="myte-pookie2" class="interactive-myte" data-myte-name="Pookie" draggable="false">
+									<div id="myte-pookie2" class="interactive-myte" data-myte-name="Pookie" data-myte-species="worm" draggable="false">
 										<div class="inner-wrapper">
 											<div class="sprite"></div>
 											<div class="selectbox"></div>
@@ -453,10 +453,10 @@
 	<!-- SHARED ENTITY MIXIN (must load before Myte and any NPC class) -->
 	<script src="js/Entity.js"></script>
 	<!-- MYTE -->
+	<script src="js/Myte/MyteDefinitions.js"></script>
 	<script src="js/Myte/Myte.js"></script>
 	<script src="js/Myte/MyteStats.js"></script>
 	<script src="js/Myte/StateMachine.js"></script>
-	<script src="js/Myte/MyteCommand.js"></script>
 	<script src="js/Myte/Input/MyteInputHandler.js"></script>
 	<script src="js/Myte/Input/MyteTouchHandler.js"></script>
 	<script src="js/Myte/Input/MyteClickHandler.js"></script>

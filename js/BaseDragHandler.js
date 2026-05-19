@@ -41,6 +41,7 @@ class DragHandler {
         
         // Performance optimization
         this.rafId = null;
+        this.boundHandleStart = this.handleStart.bind(this);
         this.boundHandleMove = this.handleMove.bind(this);
         this.boundHandleEnd = this.handleEnd.bind(this);
 
@@ -51,10 +52,10 @@ class DragHandler {
         if (!this.element) return;
 
         // Mouse events
-        this.element.addEventListener('mousedown', this.handleStart.bind(this), { passive: false });
+        this.element.addEventListener('mousedown', this.boundHandleStart, { passive: false });
 
         // Touch events
-        this.element.addEventListener('touchstart', this.handleStart.bind(this), { passive: false });
+        this.element.addEventListener('touchstart', this.boundHandleStart, { passive: false });
         
         // Add touch-action CSS for better mobile scrolling
         this.element.style.touchAction = 'none';
@@ -207,8 +208,8 @@ class DragHandler {
     dispose() {
         this.cleanup();
         if (this.element) {
-            this.element.removeEventListener('mousedown', this.handleStart);
-            this.element.removeEventListener('touchstart', this.handleStart);
+            this.element.removeEventListener('mousedown', this.boundHandleStart);
+            this.element.removeEventListener('touchstart', this.boundHandleStart);
             this.element.style.touchAction = '';
         }
     }

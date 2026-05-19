@@ -71,6 +71,20 @@ class SoundManager {
 				baseNote: "G3",  // Base note for this species
 				volume: 0.5
 			},
+			"worm": {
+				synthType: "Synth",
+				settings: {
+					oscillator: { type: "triangle" },
+					envelope: {
+						attack: 0.03,
+						decay: 0.12,
+						sustain: 0.15,
+						release: 0.22
+					}
+				},
+				baseNote: "D3",
+				volume: 0.45
+			},
 			"butterfly": {
 				synthType: "AM",  // AMSynth for butterflies
 				settings: {

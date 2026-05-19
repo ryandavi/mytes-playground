@@ -39,13 +39,6 @@ class MyteTouchHandler extends DragHandler {
                 const newY = world.y;
 
                 // Always limit to canvas during drag using collider bounds
-                if (!this._loggedBounds) {
-                    this._loggedBounds = true;
-                    const canvasRect = myte.parent.getCanvasRect?.() || {};
-                    console.log('[drag bounds] canvasRect.width:', canvasRect.width,
-                        'canvasRect.height:', canvasRect.height,
-                        'getMaxDimensions:', myte.parent.getMaxDimensions());
-                }
                 myte.setTarget(newX, newY, true);
                 myte.setPosition(newX, newY, true);
                 myte.setSpritePosition(newX, newY, true);
@@ -98,8 +91,8 @@ class MyteTouchHandler extends DragHandler {
                 this.autoPickup = false;
 
                 // If this was started via click handler auto-drag, let it handle mode switching back
-                if (myte.clickHandler?.isDragging) {
-                    myte.clickHandler.isDragging = false;
+                if (myte.inputHandler?.clickHandler?.isDragging) {
+                    myte.inputHandler.clickHandler.isDragging = false;
                 }
             }
         });

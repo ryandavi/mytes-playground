@@ -41,45 +41,6 @@ const BaseSpriteSets = {
 	land: [[1, 4]], 
 };
 
-const SnailSpriteSets = {
-	E: [
-		[0, 0], [1, 0], [2, 0], [3, 0],
-		[4, 0], [5, 0], [6, 0], [7, 0]
-	],
-	W: [
-		[0, 1], [1, 1], [2, 1], [3, 1],
-		[4, 1], [5, 1], [6, 1], [7, 1]
-	],
-	N: [
-		[0, 2], [1, 2], [2, 2], [3, 2],
-		[4, 2], [5, 2], [6, 2], [7, 2]
-	],
-	S: [
-		[0, 3], [1, 3], [2, 3], [3, 3],
-		[4, 3], [5, 3], [6, 3], [7, 3]
-	],
-	horizontalTurn: [[3, 3]],
-	verticalTurn: [[4, 0]],
-	idle: [[0, 3]],
-	idle_E: [[0, 0]],
-	idle_W: [[0, 1]],
-	idle_N: [[0, 2]],
-	idle_S: [[0, 3]],
-	dragging: [[0, 5]],
-	pickup: [[0, 4], [2, 4], [4, 4], [6, 4]],
-	dropping: [[6, 4], [4, 4], [2, 4], [0, 4]],
-	scratchLeft: [[0, 3]],
-	scratchRight: [[0, 3]],
-	cry_expression: [[0, 3]],
-	fall_expression: [[0, 3]],
-	sit_expression: [[0, 3]],
-	surprise_expression: [[0, 3]],
-	jumping: [[7, 4]],
-	falling: [[7, 4]],
-	slide_down: [[0, 3]],
-	land: [[0, 3]], // Again, use an appropriate frame for landing
-};
-
 class SpriteAnimator {
 	constructor(sprite, spriteConfig) {
 		this.sprite = sprite;
@@ -174,8 +135,7 @@ class StateController {
 		this.currentState = newState;
 
 		const stateConfig = this.stateConfig[newState];
-		if (stateConfig.sound) {
-			console.log("play sound ", stateConfig.sound)
+		if (stateConfig?.sound) {
 			this.parent.parent.playSound(stateConfig.sound);
 		}
 
@@ -204,15 +164,19 @@ class StateMachine {
 			parent.duplicate.querySelector('.sprite'),
 			BaseSpriteSets
 		);
+		this.stateRules = this.loadStateRules();
+		this.statePriorities = this.loadStatePriorities();
+		this.stateConfig = this.loadStateConfig();
 
 		this.stateController = new StateController(
 			this,
-			this.loadStateRules(),
-			this.loadStatePriorities(),
-			this.loadStateConfig()
+			this.stateRules,
+			this.statePriorities,
+			this.stateConfig
 		);
 
 		this.currentFrameIndex = 0;
+		this.applySpeciesDefinition(this.parent.definition);
 		this.stateController.transitionTo(initialState);
 	}
 
@@ -244,7 +208,7 @@ class StateMachine {
 			},
 
 			[StateTypes.EXPRESSION]: {
-				check: (context) => context.is_doing_action('do_expression'),
+				check: (context) => context.is_doing_action('expression'),
 				getState: () => this.handleExpressionState()
 			},
 			[StateTypes.MOVING]: {
@@ -466,17 +430,48 @@ class StateMachine {
 
 	handleExpressionState() {
 		const currentAction = this.parent.queue.getCurrentAction();
+		if (!currentAction) {
+			return 'idle_' + this.parent.direction;
+		}
+
+		const resolvedState = MyteDefinitionRegistry.resolveExpression(
+			currentAction.action_type,
+			this.stateConfig
+		);
+
+		if (!resolvedState) {
+			this.parent.queue.removeCurrentAction();
+			return 'idle_' + this.parent.direction;
+		}
+
 		if (this.currentFrameIndex === -1) {
 			this.parent.queue.removeCurrentAction();
 			return 'idle_' + this.parent.direction;
 		}
-		return currentAction.action_type;
+		return resolvedState;
 	}
 
-	setSnail() {
-		this.parent.duplicate.classList.add('snail');
-		this.animator.setSize(192, 192);
-		this.animator.setSpriteConfig(SnailSpriteSets);
+	applySpeciesDefinition(definition) {
+		const visualConfig = definition?.visual || {};
+		const frameSize = visualConfig.frameSize || {};
+		const spriteSets = visualConfig.spriteSets || BaseSpriteSets;
+		const speciesId = definition?.id || this.parent.species;
+
+		MyteDefinitionRegistry.getSpeciesIds().forEach((knownSpeciesId) => {
+			this.parent.duplicate.classList.remove(knownSpeciesId);
+			this.parent.element.classList.remove(knownSpeciesId);
+			this.parent.elements.wrapper.classList.remove(knownSpeciesId);
+		});
+
+		this.parent.duplicate.classList.add(speciesId);
+		this.parent.element.classList.add(speciesId);
+		this.parent.elements.wrapper.classList.add(speciesId);
+		this.parent.duplicate.dataset.myteSpecies = speciesId;
+		this.parent.element.dataset.myteSpecies = speciesId;
+		this.parent.elements.wrapper.dataset.myteSpecies = speciesId;
+
+		this.animator.setSize(frameSize.width || 64, frameSize.height || 64);
+		this.animator.setSpriteConfig(spriteSets);
 	}
 
 	update() {
@@ -525,7 +520,7 @@ class StateMachine {
 	}
 
 	getAnimationKey(state) {
-		return this.loadStateConfig()[state]?.spriteSet[0];
+		return this.stateConfig[state]?.spriteSet[0];
 	}
 
 	isAtLastFrame(animationKey) {
@@ -533,7 +528,11 @@ class StateMachine {
 	}
 
 	handleAnimationComplete(state) {
-		const config = this.loadStateConfig()[state];
+		const config = this.stateConfig[state];
+		if (!config) {
+			this.currentFrameIndex = 0;
+			return;
+		}
 
 		if (this.stateController.isTransitioning) {
 			this.stateController.handleTransitionComplete();

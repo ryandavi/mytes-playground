@@ -167,6 +167,7 @@
 
 
                 .myte-sprite {
+                    --myte-species-filter: none;
                     width: 48px;
                     height: 48px;
                     border-radius: 50%;
@@ -183,6 +184,11 @@
                         transform: scale(0.25);
                         transform-origin: top left;
                         image-rendering: pixelated;
+                        filter: var(--myte-species-filter);
+                    }
+
+                    &[data-myte-species="worm"] {
+                        --myte-species-filter: hue-rotate(38deg) saturate(1.15) brightness(1.03);
                     }
                 }
 

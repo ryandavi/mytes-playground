@@ -1,0 +1,68 @@
+{
+  "id": "myte",
+  "displayName": "Myte",
+  "movement": {
+    "baseSpeed": 1,
+    "followRadius": {
+      "min": 96,
+      "max": 384
+    },
+    "runAwayDistance": 300
+  },
+  "size": {
+    "width": 192,
+    "height": 192
+  },
+  "collider": {
+    "type": "box",
+    "width": 96,
+    "height": 58,
+    "offsetX": 48,
+    "offsetY": 115
+  },
+  "physics": {
+    "gravity": 0.3,
+    "terminalVelocity": 12,
+    "jumpHeight": 10,
+    "airControl": 0.7,
+    "groundFriction": 0.8,
+    "minFallDamageVelocity": 22,
+    "coyoteTime": 80,
+    "jumpBuffer": 150,
+    "collisionTolerance": 5,
+    "stepHeight": 3,
+    "velocity": 0
+  },
+  "capabilities": {
+    "can_swim": false,
+    "follows_paths": true,
+    "can_open_doors": true,
+    "can_wade": true,
+    "fire_resistance": false
+  },
+  "stats": {
+    "health": 100,
+    "mood": 100,
+    "energy": 75,
+    "speed": 1
+  },
+  "visual": {
+    "cssClass": "snail",
+    "frameSize": {
+      "width": 192,
+      "height": 192
+    },
+    "spriteSets": {}
+  },
+  "expressions": {
+    "surprised": "surprise",
+    "happy": "surprise",
+    "excited": "surprise",
+    "panic": "surprise",
+    "dizzy": "fall",
+    "faint": "fall",
+    "peek": "sit",
+    "sleep": "sit",
+    "heart": "kiss"
+  }
+}

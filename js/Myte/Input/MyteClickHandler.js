@@ -33,24 +33,20 @@ class MyteClickHandler {
 		this.handlePressEnd = this.handlePressEnd.bind(this);
 		this.handleRightClick = this.handleRightClick.bind(this);
 		this.handleMouseMove = this.handleMouseMove.bind(this);
+		this.handleInactiveClick = this.handleInactiveClick.bind(this);
+		this.handleActiveClick = this.handleActiveClick.bind(this);
+		this.handleHomeTargetClick = this.handleHomeTargetClick.bind(this);
+		this.handleContextMenu = this.handleContextMenu.bind(this);
 
 		this.initializeEventListeners();
 	}
 
 	initializeEventListeners() {
 		// Click events for inactive myte
-		this.myte.element.addEventListener('click', (event) => {
-			if (!this.myte.isActive) {
-				this.handleInactiveMyteClick(event);
-			}
-		});
+		this.myte.element.addEventListener('click', this.handleInactiveClick);
 
 		// Click events for active myte
-		this.myte.duplicate.addEventListener('click', (event) => {
-			if (this.myte.isActive && !this.isDragging) {
-				this.handleActiveMyteClick(event);
-			}
-		});
+		this.myte.duplicate.addEventListener('click', this.handleActiveClick);
 
 		// Double click events
 		this.myte.duplicate.addEventListener('mousedown', this.handlePressStart);
@@ -58,13 +54,31 @@ class MyteClickHandler {
 		document.addEventListener('mousemove', this.handleMouseMove);
 
 		// Home click events
-		this.myte.dropTarget.addEventListener('click', (event) => {
-			this.handleHomeClick(event);
-		});
+		this.myte.dropTarget.addEventListener('click', this.handleHomeTargetClick);
 
-		this.myte.duplicate.addEventListener('contextmenu', (event) => {
-			this.handleRightClick(event);
-		});
+		this.myte.duplicate.addEventListener('contextmenu', this.handleContextMenu);
+	}
+
+	handleInactiveClick(event) {
+		if (!this.myte.isActive) {
+			if (!this.myte.isActive) {
+				this.handleInactiveMyteClick(event);
+			}
+		}
+	}
+
+	handleActiveClick(event) {
+		if (this.myte.isActive && !this.isDragging) {
+			this.handleActiveMyteClick(event);
+		}
+	}
+
+	handleHomeTargetClick(event) {
+		this.handleHomeClick(event);
+	}
+
+	handleContextMenu(event) {
+		this.handleRightClick(event);
 	}
 
 	handleRightClick(event) {
@@ -232,19 +246,19 @@ class MyteClickHandler {
 
 	handleLongPress(event) {
 		if (this.myte.isActiveMyte) {
-			// Optional: Add some visual feedback for long press
-			this.myte.queue.addExpression('surprised');
+			this.myte.queue.addExpression('surprise');
 		}
 	}
 
 	dispose() {
 		// Clean up event listeners
-		this.myte.element.removeEventListener('click', this.handleInactiveMyteClick);
-		this.myte.duplicate.removeEventListener('click', this.handleActiveMyteClick);
+		this.myte.element.removeEventListener('click', this.handleInactiveClick);
+		this.myte.duplicate.removeEventListener('click', this.handleActiveClick);
 		this.myte.duplicate.removeEventListener('mousedown', this.handlePressStart);
 		document.removeEventListener('mouseup', this.handlePressEnd);
 		document.removeEventListener('mousemove', this.handleMouseMove);
-		this.myte.dropTarget.removeEventListener('click', this.handleHomeClick);
+		this.myte.dropTarget.removeEventListener('click', this.handleHomeTargetClick);
+		this.myte.duplicate.removeEventListener('contextmenu', this.handleContextMenu);
 
 		if (this.longPressTimer) {
 			clearTimeout(this.longPressTimer);

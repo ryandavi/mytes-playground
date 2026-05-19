@@ -113,6 +113,7 @@
   padding: 8px 12px;
 }
 .container-wrapper .bottom > .allMytes .myte-thumbnail .myte-sprite {
+  --myte-species-filter: none;
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -129,6 +130,10 @@
   transform: scale(0.25);
   transform-origin: top left;
   image-rendering: pixelated;
+  filter: var(--myte-species-filter);
+}
+.container-wrapper .bottom > .allMytes .myte-thumbnail .myte-sprite[data-myte-species=worm] {
+  --myte-species-filter: hue-rotate(38deg) saturate(1.15) brightness(1.03);
 }
 .container-wrapper .bottom > .inventory {
   margin: 0 auto;

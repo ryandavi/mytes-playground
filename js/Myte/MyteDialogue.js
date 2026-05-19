@@ -15,6 +15,8 @@ class MyteDialogue {
         // Queue for managing multiple dialogue messages
         this.messageQueue = [];
         this.isDisplaying = false;
+        this.isDestroyed = false;
+        this.pendingTimeouts = new Set();
 
         // Default settings
         this.settings = {
@@ -68,7 +70,7 @@ class MyteDialogue {
 
     // Display the next message in the queue
     async displayNextMessage() {
-        if (this.messageQueue.length === 0 || this.isDisplaying) {
+        if (this.isDestroyed || this.messageQueue.length === 0 || this.isDisplaying) {
             return;
         }
 
@@ -148,11 +150,20 @@ class MyteDialogue {
     // Fade out animation
     async fadeOut() {
         return new Promise(resolve => {
+            if (this.isDestroyed) {
+                resolve();
+                return;
+            }
+
             // Remove visible class to trigger fade out
             this.dialogue.classList.remove('visible');
 
             // Wait for transition duration before resolving
-            setTimeout(resolve, this.settings.transitionDuration);
+            const timeoutId = setTimeout(() => {
+                this.pendingTimeouts.delete(timeoutId);
+                resolve();
+            }, this.settings.transitionDuration);
+            this.pendingTimeouts.add(timeoutId);
         });
     }
 
@@ -171,11 +182,20 @@ class MyteDialogue {
 
     // Utility method for creating promises
     wait(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise(resolve => {
+            const timeoutId = setTimeout(() => {
+                this.pendingTimeouts.delete(timeoutId);
+                resolve();
+            }, ms);
+            this.pendingTimeouts.add(timeoutId);
+        });
     }
 
     // Clean up event listeners
     destroy() {
+        this.isDestroyed = true;
+        this.pendingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+        this.pendingTimeouts.clear();
         this.dialogue.removeEventListener('click', this.handleClick);
         this.dialogue.removeEventListener('transitionend', this.handleTransitionEnd);
     }

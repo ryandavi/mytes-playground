@@ -1,45 +1,51 @@
 {
-	"SNAIL": {
-		"size": {
-			"width": 8,
-			"height": 4
-		},
-		"sprites": {
-			"E": [
-				[0, 0], [1, 0], [2, 0], [3, 0],
-				[4, 0], [5, 0], [6, 0], [7, 0]
-			],
-			"W": [
-				[0, 1], [1, 1], [2, 1], [3, 1],
-				[4, 1], [5, 1], [6, 1], [7, 1]
-			],
-			"N": [
-				[0, 2], [1, 2], [2, 2], [3, 2],
-				[4, 2], [5, 2], [6, 2], [7, 2]
-			],
-			"S": [
-				[0, 3], [1, 3], [2, 3], [3, 3],
-				[4, 3], [5, 3], [6, 3], [7, 3]
-			],
-			"horizontalTurn": [[3, 3]],
-			"verticalTurn": [[4, 0]],
-			"idle": [[0, 3]],
-			"idle_E": [[0, 0]],
-			"idle_W": [[0, 1]],
-			"idle_N": [[0, 2]],
-			"idle_S": [[0, 3]],
-			"dragging": [[0, 5]],
-			"pickup": [[0, 4], [2, 4], [4, 4], [6, 4]],
-			"dropping": [[6, 4], [4, 4], [2, 4], [0, 4]],
-			"scratchLeft": [[0, 3]],
-			"scratchRight": [[0, 3]],
-			"cry_expression": [[0, 3]],
-			"fall_expression": [[0, 3]],
-			"sit_expression": [[0, 3]],
-			"surprise_expression": [[0, 3]],
-			"jumping": [[7, 4]],
-			"falling": [[7, 4]],
-			"slide_down": [[0, 3]]
-		}
-	}
+  "id": "snail",
+  "displayName": "Snail",
+  "movement": {
+    "baseSpeed": 1,
+    "followRadius": {
+      "min": 96,
+      "max": 384
+    },
+    "runAwayDistance": 300
+  },
+  "physics": {
+    "gravity": 0.25,
+    "jumpHeight": 10,
+    "airControl": 0.5
+  },
+  "visual": {
+    "cssClass": "snail",
+    "frameSize": {
+      "width": 192,
+      "height": 192
+    },
+    "spriteSets": {
+      "E": [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0]],
+      "W": [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1]],
+      "N": [[0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [5, 2], [6, 2], [7, 2]],
+      "S": [[0, 3], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3]],
+      "horizontalTurn": [[3, 3]],
+      "verticalTurn": [[4, 0]],
+      "idle": [[0, 3]],
+      "idle_E": [[0, 0]],
+      "idle_W": [[0, 1]],
+      "idle_N": [[0, 2]],
+      "idle_S": [[0, 3]],
+      "dragging": [[0, 5]],
+      "pickup": [[0, 4], [2, 4], [4, 4], [6, 4]],
+      "dropping": [[6, 4], [4, 4], [2, 4], [0, 4]],
+      "scratchLeft": [[0, 3]],
+      "scratchRight": [[0, 3]],
+      "cry_expression": [[0, 3]],
+      "fall_expression": [[0, 3]],
+      "sit_expression": [[0, 3]],
+      "surprise_expression": [[0, 3]],
+      "kiss_expression": [[0, 4]],
+      "jumping": [[7, 4]],
+      "falling": [[7, 4]],
+      "slide_down": [[0, 3]],
+      "land": [[0, 3]]
+    }
+  }
 }

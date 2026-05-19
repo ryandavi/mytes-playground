@@ -1,27 +1,30 @@
 class MyteStats {
     constructor(myte) {
         this.myte = myte;
+        const statConfig = myte.definition?.stats || {};
+        const movementConfig = myte.definition?.movement || {};
+        this.pendingTimeouts = new Set();
 
         // Basic stats
-        this.health = 100;
         this.minHealth = 0;
         this.maxHealth = 100;
-        this.speed = 1;
+        this.health = Math.max(this.minHealth, Math.min(this.maxHealth, statConfig.health ?? 100));
+        this.speed = statConfig.speed ?? movementConfig.baseSpeed ?? 1;
         this.level = 1;
         this.experience = 0;
 
         // Mood system
-        this.mood = 100;
         this.minMood = 0;
         this.maxMood = 100;
+        this.mood = Math.max(this.minMood, Math.min(this.maxMood, statConfig.mood ?? 100));
         this.moodDecayRate = 0.0005;
         this.currentMood = 'neutral';
         this.moodTimeout = null;
 
         // Energy system
-        this.energy = 75;
         this.minEnergy = 0;
         this.maxEnergy = 100;
+        this.energy = Math.max(this.minEnergy, Math.min(this.maxEnergy, statConfig.energy ?? 75));
         this.energyDecayRate = 0.0005;
         this.energyRegenRate = 0.005;
 
@@ -157,7 +160,7 @@ class MyteStats {
         }
 
         // Set timeout to return to neutral
-        this.moodTimeout = setTimeout(() => {
+        this.moodTimeout = this.setManagedTimeout(() => {
             this.currentMood = 'neutral';
         }, this.moods[mood].duration);
     }
@@ -258,7 +261,7 @@ class MyteStats {
         // If no longer rapid charging, remove the class
         if (!this.isRapidCharging && this.myte.battery && this.myte.battery.classList.contains('charging')) {
             // Keep the animation for a moment before removing
-            setTimeout(() => {
+            this.setManagedTimeout(() => {
                 this.myte.battery.classList.remove('charging');
                 // Recheck visibility rules after animation ends
                 this.handleBatteryVisibility();
@@ -294,7 +297,7 @@ class MyteStats {
             this.playBatterySound(this.batteryThresholds.length - 1); // Full threshold index
     
             // Remove charging effect after a moment
-            setTimeout(() => {
+            this.setManagedTimeout(() => {
                 this.myte.battery.classList.remove('charging');
                 this.hideBattery();
             }, 2000);
@@ -310,7 +313,7 @@ class MyteStats {
         this.exhaustionSpeedMultiplier = 0.4;
 
         // Schedule recovery
-        setTimeout(() => {
+        this.setManagedTimeout(() => {
             this.exhaustionSpeedMultiplier = 1.0;
             if (this.myte.battery) {
                 this.myte.battery.classList.remove('critical-pulse');
@@ -383,9 +386,9 @@ class MyteStats {
             soundToPlay = 'battery_empty';
         } else if (this.energy >= this.maxEnergy) {
             soundToPlay = 'battery_full';
-        } else if (currentThresholdIndex < this.batteryLevel) {
+        } else if (this.batteryLevel >= 0 && currentThresholdIndex < this.batteryLevel) {
             soundToPlay = 'battery_depleting';
-        } else if (currentThresholdIndex > this.batteryLevel) {
+        } else if (this.batteryLevel >= 0 && currentThresholdIndex > this.batteryLevel) {
             soundToPlay = 'battery_charging';
         }
         
@@ -437,7 +440,7 @@ class MyteStats {
             this.myte.battery.classList.add('blinking');
     
             // Hide after 5 seconds
-            this.batteryHideTimeout = setTimeout(() => {
+            this.batteryHideTimeout = this.setManagedTimeout(() => {
                 this.myte.battery.classList.remove('blinking');
                 this.batteryHideTimeout = null;
             }, 5000);
@@ -447,7 +450,7 @@ class MyteStats {
             this.showBattery();
     
             // Hide after 6 seconds
-            this.batteryHideTimeout = setTimeout(() => {
+            this.batteryHideTimeout = this.setManagedTimeout(() => {
                 this.hideBattery();
                 this.batteryHideTimeout = null;
             }, 6000);
@@ -457,11 +460,21 @@ class MyteStats {
             this.showBattery();
     
             // Hide after 3 seconds
-            this.batteryHideTimeout = setTimeout(() => {
+            this.batteryHideTimeout = this.setManagedTimeout(() => {
                 this.hideBattery();
                 this.batteryHideTimeout = null;
             }, 3000);
         }
+    }
+
+    setManagedTimeout(callback, delay) {
+        const timeoutId = setTimeout(() => {
+            this.pendingTimeouts.delete(timeoutId);
+            callback();
+        }, delay);
+
+        this.pendingTimeouts.add(timeoutId);
+        return timeoutId;
     }
 
     // Update function called each frame
@@ -519,5 +532,20 @@ class MyteStats {
                 traits: this.traits
             }
         };
+    }
+
+    destroy() {
+        if (this.moodTimeout) {
+            clearTimeout(this.moodTimeout);
+            this.moodTimeout = null;
+        }
+
+        if (this.batteryHideTimeout) {
+            clearTimeout(this.batteryHideTimeout);
+            this.batteryHideTimeout = null;
+        }
+
+        this.pendingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+        this.pendingTimeouts.clear();
     }
 }

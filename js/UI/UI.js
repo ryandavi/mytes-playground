@@ -821,10 +821,12 @@ class MyteListManager extends UIComponent {
         }
 
         thumbnail.setAttribute('data-myte-id', myte.id);
+        thumbnail.setAttribute('data-myte-species', myte.species);
 
         // Create sprite container
         const spriteContainer = document.createElement('div');
         spriteContainer.className = 'myte-sprite';
+        spriteContainer.setAttribute('data-myte-species', myte.species);
 
         // Create sprite inner
         const spriteInner = document.createElement('div');

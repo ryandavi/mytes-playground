@@ -65,6 +65,7 @@
 }
 
 .interactive-myte {
+  --myte-species-filter: none;
   width: 192px;
   height: 192px;
   color: var(--button-light);
@@ -91,6 +92,7 @@
   height: inherit;
   image-rendering: pixelated;
   background: url(../images/snail/spritesheet.png);
+  filter: var(--myte-species-filter);
   transform-origin: center;
   transition: filter 0.2s ease-out, transform 0.2s ease-out;
 }
@@ -109,7 +111,6 @@
   display: flex;
   gap: var(--border-width);
   align-items: center;
-  width: -moz-fit-content;
   width: fit-content;
   left: 50%;
   transform: translate(-50%, -115%);
@@ -144,9 +145,7 @@
 }
 .interactive-myte.dragging {
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   cursor: grab;
   z-index: 100000 !important;
 }
@@ -165,7 +164,7 @@
   transform-origin: 50% 65%;
   /* Adjust to make it pivot from the bottom */
   animation-timing-function: ease-in-out;
-  filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
+  filter: var(--myte-species-filter) drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
   will-change: transform;
   /* Performance optimization */
 }
@@ -181,6 +180,9 @@
   position: absolute;
   top: 0;
   left: 0;
+}
+.interactive-myte[data-myte-species=worm] {
+  --myte-species-filter: hue-rotate(38deg) saturate(1.15) brightness(1.03);
 }
 
 /* DIALOGUE */
@@ -478,4 +480,6 @@
   50% {
     filter: drop-shadow(0px 0px 3px rgba(0, 255, 0, 0.5));
   }
-}/*# sourceMappingURL=myte.css.map */
+}
+
+/*# sourceMappingURL=myte.css.map */

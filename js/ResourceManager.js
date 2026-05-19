@@ -18,6 +18,7 @@ class ResourceManager {
         this.spriteConfigs = {
             'myte': 'images/snail/spritesheet.png',
             'snail': 'images/snail/spritesheet.png',
+            'worm': 'images/snail/spritesheet.png',
             'grass_1_back': 'images/MapObjects/grass_1_back.png',
             'grass_1_front': 'images/MapObjects/grass_1_front.png',
             'grass_2_back': 'images/MapObjects/grass_2_back.png',
@@ -43,6 +44,7 @@ class ResourceManager {
             // Essential sprites
             'myte',
             'snail',
+            'worm',
             // Essential cursor
             'pointer',
             'grab',

@@ -150,7 +150,7 @@ class ContainerManager {
 
             // Set up mytes
             console.log('[ContainerManager] Setting up Mytes');
-            this.setupMytes();
+            await this.setupMytes();
 
 
 
@@ -515,20 +515,25 @@ class ContainerManager {
     }
 
     // Myte management methods
-    setupMytes() {
+    async setupMytes() {
         const wrappers = this.element.querySelectorAll('.myteWrapper');
 
         if (wrappers.length === 0) {
             throw new Error("No Myte elements found.");
         }
+
+        await MyteDefinitionRegistry.preload();
         
         wrappers.forEach(container => {
             const wrapper = container;
             const wrapperId = wrapper.id;
             const idNumber = wrapperId.split('-')[1];
+            const interactiveElement = wrapper.querySelector('.interactive-myte');
+            const speciesId = interactiveElement?.dataset?.myteSpecies || wrapper.dataset?.myteSpecies || 'snail';
+            const definition = MyteDefinitionRegistry.getSpeciesSync(speciesId);
         
             // create myte
-            let myte = new Myte(idNumber, this, wrapper.querySelector('.interactive-myte'));
+            let myte = new Myte(idNumber, this, interactiveElement, definition);
             myte.init();
             this.mytes.push(myte);
         });

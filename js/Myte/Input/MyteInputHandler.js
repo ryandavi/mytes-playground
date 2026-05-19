@@ -5,5 +5,11 @@ class MyteInputHandler {
 		this.rubbingHandler = new MyteRubbingHandler(myte);
 		this.clickHandler = new MyteClickHandler(myte);
 	}
+
+	dispose() {
+		this.touchHandler?.dispose?.();
+		this.rubbingHandler?.dispose?.();
+		this.clickHandler?.dispose?.();
+	}
 }
 

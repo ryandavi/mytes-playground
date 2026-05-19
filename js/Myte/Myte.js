@@ -2,16 +2,19 @@
 
 class Myte {
 
-	constructor(id, parent, element) {
+	constructor(id, parent, element, definition = null) {
 		this.id = id;
-		this.species = "snail";
-		this.name = element.dataset.myteName;
-
-
-		this.stats = null;
-
 		this.parent = parent;
 		this.element = element;
+		this.species = MyteDefinitionRegistry.normalizeSpeciesId(
+			element?.dataset?.myteSpecies ||
+			element?.closest('.myteWrapper')?.dataset?.myteSpecies ||
+			definition?.id ||
+			'snail'
+		);
+		this.definition = definition || MyteDefinitionRegistry.getSpeciesSync(this.species);
+		this.name = element.dataset.myteName || this.definition.displayName || `Myte ${id}`;
+		this.stats = null;
 		this.isActive = false;
 		this.isPaused = false;
 
@@ -22,12 +25,9 @@ class Myte {
 			wrapper: this.element.closest(".myteWrapper"),
 		};
 
-		this.capabilities = { 
-			can_swim: false,
-			follows_paths: true,
-			can_open_doors: true,
-			can_wade: true,
-			fire_resistance: false
+		this.capabilities = {
+			...(typeof EntityDefaults?.capabilities === 'function' ? EntityDefaults.capabilities() : {}),
+			...(this.definition.capabilities || {})
 		};
 
 		// this character's elements
@@ -40,7 +40,7 @@ class Myte {
 		this.battery = null;
 
 		// speed
-		this.speed = 1;
+		this.speed = this.definition.movement?.baseSpeed ?? 1;
 
 		// positions
 		this.posX = 0;
@@ -75,46 +75,36 @@ class Myte {
 
 
 		this.followRadius = {
-			min: 192 / 2,
-			max: 192 * 2
-		}
+			min: this.definition.movement?.followRadius?.min ?? 96,
+			max: this.definition.movement?.followRadius?.max ?? 384
+		};
 
 		this.size = {
-			width: 192,
-			height: 192
+			width: this.definition.size?.width ?? 192,
+			height: this.definition.size?.height ?? 192
 		};
 
-		// Add to Myte class constructor
 		this.collider = {
-			type: 'box', // or 'circle', etc.
-			width: this.size.width * 0.5, // Smaller than visual size for more forgiving collisions
-			height: this.size.height * 0.3, // Lower height to allow walking behind objects
-			offsetX: this.size.width * 0.25, // Center the collider
-			offsetY: this.size.height * 0.6 // Position at the bottom for proper z-sorting
+			type: this.definition.collider?.type ?? 'box',
+			width: this.definition.collider?.width ?? this.size.width * 0.5,
+			height: this.definition.collider?.height ?? this.size.height * 0.3,
+			offsetX: this.definition.collider?.offsetX ?? this.size.width * 0.25,
+			offsetY: this.definition.collider?.offsetY ?? this.size.height * 0.6
 		};
-
-
 
 		this.physics = {
-			gravity: 0.3,                // Gravity acceleration
-			terminalVelocity: 12,        // Maximum falling speed
-			jumpHeight: 10,               // Initial jump velocity
-			airControl: 0.7,             // Horizontal control while airborne (0-1)
-			groundFriction: 0.8,         // Friction when on ground (0-1)
-			minFallDamageVelocity: 22,   // Minimum velocity to cause damage when landing
-			coyoteTime: 80,              // Time in ms when you can still jump after walking off an edge
-			jumpBuffer: 150,             // Time in ms to buffer a jump input before landing
-			collisionTolerance: 5,       // Tolerance in pixels for collision detection
-			stepHeight: 3,                // Maximum height in pixels a character can automatically step up
-			velocity: 0                 // Current vertical velocity (starts at 0)
+			gravity: this.definition.physics?.gravity ?? 0.3,
+			terminalVelocity: this.definition.physics?.terminalVelocity ?? 12,
+			jumpHeight: this.definition.physics?.jumpHeight ?? 10,
+			airControl: this.definition.physics?.airControl ?? 0.7,
+			groundFriction: this.definition.physics?.groundFriction ?? 0.8,
+			minFallDamageVelocity: this.definition.physics?.minFallDamageVelocity ?? 22,
+			coyoteTime: this.definition.physics?.coyoteTime ?? 80,
+			jumpBuffer: this.definition.physics?.jumpBuffer ?? 150,
+			collisionTolerance: this.definition.physics?.collisionTolerance ?? 5,
+			stepHeight: this.definition.physics?.stepHeight ?? 3,
+			velocity: this.definition.physics?.velocity ?? 0
 		};
-
-		// Override specific settings based on species
-		if (this.species === "snail") {
-			this.physics.gravity = 0.25;
-			this.physics.jumpHeight = 10;
-			this.physics.airControl = 0.5;
-		}
 
 		// Initialize jump-related variables
 		this.leftGroundTime = undefined;  // Tracks when character left solid ground (for coyote time)
@@ -125,10 +115,11 @@ class Myte {
 		this.isJumping = false;
 		this.isFalling = false;
 
-		this.startTime = null;
-		this.runAway_angle_distance = 300;
+		this.startTime = 0;
+		this.runAwayAngleDistance = this.definition.movement?.runAwayDistance ?? 300;
 		this.inputHandler;
 		this._lastVisualDebugAt = 0;
+		this._animElapsed = 0;
 
 	}
 
@@ -158,27 +149,16 @@ class Myte {
 
 
 	init() {
-		/********************************************
-		 * duplicated element
-		********************************************/
 		this.initInteractiveMyte();
-
-		// create dots
 		this.createTargetDot();
 
-		// add functions
 		this.queue = new MyteQueue(this);
-		this.stateMachine = new StateMachine(this, DEFAULT_STATE, 'snail');
+		this.stateMachine = new StateMachine(this, DEFAULT_STATE);
 		this.inputHandler = new MyteInputHandler(this);
-
 		this.dialogue = new MyteDialogue(this);
 		this.stats = new MyteStats(this);
 
-		// temp - make it a snail
-		this.stateMachine.setSnail();
-
-		// position
-		let rect = this.parent.getOffset(this.element);
+		const rect = this.parent.getOffset(this.element);
 		const offsetX = rect.x - this.parent.getContainerRect().x;
 		const offsetY = rect.y - this.parent.getContainerRect().y;
 		this.setTarget(offsetX, offsetY);
@@ -188,43 +168,35 @@ class Myte {
 		// Initialize particle effects if the game map has a particle system
 		if (this.parent?.gameMap?.particleSystem) {
 			this.initParticleEffects();
-		}else{
+		} else {
 			console.error(`Myte ${this.id}: Cannot initialize particle effects - ParticleSystem not found.`);
 		}
 
 		if (this.parent?.gameMap?.gridSystem) {
             this.initPathfinder(this.parent.gameMap.gridSystem);
-            console.log(`Myte ${this.id}: Pathfinder initialized.`);
         } else {
             console.error(`Myte ${this.id}: Cannot initialize pathfinder - GridSystem not found.`);
         }
-
-		/********************************************
-		 * CLICK EVENTS
-		********************************************/
-
-		// for dragging - we dont want to allow it for a few seconds
 		this.setStartTime();
 	}
 
 	initInteractiveMyte() {
-		// clone myte
 		this.duplicate = this.element.cloneNode(true);
-		this.duplicate.classList.add("freemode"); // free mode is when it can fly around
-		this.duplicate.classList.add("duplicate"); // free mode is when it can fly around
+		this.duplicate.classList.add("freemode");
+		this.duplicate.classList.add("duplicate");
 		this.duplicate.id = "duplicate-" + this.duplicate.id;
+		this.duplicate.dataset.myteSpecies = this.species;
+		this.element.dataset.myteSpecies = this.species;
+		this.elements.wrapper.dataset.myteSpecies = this.species;
 
-		// add duplicate to canvas
-		this.elements.wrapper.parentNode.appendChild(this.duplicate); // insert new
+		this.elements.wrapper.parentNode.appendChild(this.duplicate);
 
 
-		// elements
 		this.sprite = this.duplicate.querySelector('.sprite');
 		this.dropTarget = this.element.closest(".myteWrapper");
 		this.battery = this.duplicate.querySelector('.battery');
 
-		// original element
-		this.duplicate.classList.add("deactivated"); // hide the original element
+		this.duplicate.classList.add("deactivated");
 	}
 
 	setWrapperPosition(x, y){
@@ -248,7 +220,7 @@ class Myte {
 		this.atOriginal = true;
 
 		// set position
-		var rect = this.parent.getLocalOffset(this.elements.wrapper);
+		const rect = this.parent.getLocalOffset(this.elements.wrapper);
 		this.posX = rect.left;
 		this.posY = rect.top;
 		this.setSpritePosition(this.posX, this.posY);
@@ -259,8 +231,6 @@ class Myte {
 		this.duplicate.classList.add('deactivated');
 		this.elements.wrapper.classList.remove('empty');
 
-		// target dot
-		console.log('target dot hide at stop');
 		this.targetDot.classList.add('hidden');
 
 		// set next as active
@@ -317,76 +287,57 @@ class Myte {
 
 		this.parent.ui.debugMenu.updateButton('cycleFollowGoal');
 
-		if (this.followGoal == MOVE_FOLLOW_TYPES.NORMAL) {
+		if (this.followGoal === MOVE_FOLLOW_TYPES.NORMAL) {
 			this.runAway = false;
 			this.goingInCircles = false;
-		} else if (this.followGoal == MOVE_FOLLOW_TYPES.CIRCLES) {
+		} else if (this.followGoal === MOVE_FOLLOW_TYPES.CIRCLES) {
 			this.runAway = false;
 			this.goingInCircles = true;
-		} else if (this.followGoal == MOVE_FOLLOW_TYPES.RUNAWAY) {
+		} else if (this.followGoal === MOVE_FOLLOW_TYPES.RUNAWAY) {
 			this.runAway = true;
 			this.goingInCircles = false;
 		}
 	}
 
 	isIndependent(){
-		return this.isDragging == false;
+		return !this.isDragging;
 	}
 
-setMode(newGoal = null) {
-
-
+	setMode(newGoal = null) {
 		if (newGoal == null) {
-			// set new goal to current go if nothing is set -- this is to set the buttons
 			newGoal = this.goal;
 		}
 
-		if (newGoal != this.goal) {
-			// if the goal is actually changing
+		if (newGoal !== this.goal) {
 			this.previousGoal = this.goal;
 			this.goal = newGoal;
-
 			this.unset_target();
 			this.queue.clear();
 		}
 
-
-		//this.parent.ui.debugMenu.updateGoal(document.getElementById("cycleGoal"));
-
 		this.parent.ui.debugMenu.updateButton('cycleGoal');
 
-		if (this.goal == MOVE_TYPES.FOLLOW) {
-			this.atOriginal = false;
-			this.isFreeRoam = false;
-			this.followMouse = true;
-			this.isGravity = false;
-			this.isDragging = false;
-			this.unset_target();
-			this.queue.clear();
-		} else if (this.goal == MOVE_TYPES.GRAVITY) {
-			this.atOriginal = false;
-			this.isFreeRoam = false;
-			this.followMouse = false;
-			this.isGravity = true;
-			this.isDragging = false;
-			this.unset_target();
-			this.queue.clear();
-		} else if (this.goal == MOVE_TYPES.FREEROAM) {
-			this.atOriginal = false;
-			this.isFreeRoam = true;
-			this.followMouse = false;
-			this.isGravity = false;
-			this.isDragging = false;
-			this.unset_target();
-			this.queue.clear();
-		} else if (this.goal == MOVE_TYPES.GOHOME) {
-			this.atOriginal = false;
-			this.isFreeRoam = false;
-			this.followMouse = false;
-			this.isGravity = false;
-			this.isDragging = false;
-			this.unset_target();
-			this.queue.clear();
+		const modeConfig = {
+			[MOVE_TYPES.FOLLOW]: { isFreeRoam: false, followMouse: true, isGravity: false },
+			[MOVE_TYPES.GRAVITY]: { isFreeRoam: false, followMouse: false, isGravity: true },
+			[MOVE_TYPES.FREEROAM]: { isFreeRoam: true, followMouse: false, isGravity: false },
+			[MOVE_TYPES.GOHOME]: { isFreeRoam: false, followMouse: false, isGravity: false },
+			[MOVE_TYPES.QUEUE_ONLY]: { isFreeRoam: false, followMouse: false, isGravity: false }
+		}[this.goal];
+
+		if (!modeConfig) {
+			return;
+		}
+
+		this.atOriginal = false;
+		this.isFreeRoam = modeConfig.isFreeRoam;
+		this.followMouse = modeConfig.followMouse;
+		this.isGravity = modeConfig.isGravity;
+		this.isDragging = false;
+		this.unset_target();
+		this.queue.clear();
+
+		if (this.goal === MOVE_TYPES.GOHOME) {
 			this.set_target_to_origin();
 		}
 	}
@@ -398,15 +349,14 @@ setMode(newGoal = null) {
 
 
 	set_target_to_origin() {
-
-		var rect = this.parent.getLocalOffset(this.elements.wrapper);
+		const rect = this.parent.getLocalOffset(this.elements.wrapper);
 
 		this.targetX = rect.left;
 		this.targetY = rect.top;
 	}
 
 	get isActiveMyte() {
-		return this == this.parent.activeMyte;
+		return this === this.parent.activeMyte;
 	}
 
 	/********************************************
@@ -565,8 +515,7 @@ setMode(newGoal = null) {
 	}
 
 	setDirection(direction) {
-		if (direction != this.direction) {
-			console.log("set direction", direction);
+		if (direction !== this.direction) {
 			this.direction = direction;
 		}
 	}
@@ -644,84 +593,18 @@ setMode(newGoal = null) {
 
 	// canAutoOpenCollider and tryOpenCollider are provided by EntityMixin (Entity.js).
 
-
-// Add this defensive check to the move_toward_target method
-move_toward_target(doXAxis = true, doYAxis = true) {
-    var dx = this.targetX - this.posX;
-    var dy = this.targetY - this.posY;
-    var distance = Math.sqrt(dx * dx + dy * dy);
-
-    // Store original position
-    const originalX = this.posX;
-    const originalY = this.posY;
-
-    if (distance !== 0) {
-        const moveX = (dx / distance) * this.stats.getSpeed();
-        const moveY = (dy / distance) * this.stats.getSpeed();
-
-        // Try to move on each axis separately - preserving original behavior
-        if (doXAxis) {
-            this.posX += moveX;
-
-            // Check for collisions on X axis - using original collision approach
-            if (this.checkForCollisions) {
-                // Add defensive check for gameMap and gridSystem
-                if (this.parent && this.parent.gameMap && this.parent.gameMap.gridSystem) {
-                    const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
-                    for (const collider of potentialColliders) {
-                        if (this.parent.checkCollision(this, collider)) {
-                            if (this.tryOpenCollider(collider, 'x')) {
-                                this.posX = originalX;
-                                break;
-                            }
-                            // Simply revert to original X position
-                            this.posX = originalX;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (doYAxis) {
-            this.posY += moveY;
-
-            // Check for collisions on Y axis - using original collision approach
-            if (this.checkForCollisions) {
-                // Add defensive check for gameMap and gridSystem
-                if (this.parent && this.parent.gameMap && this.parent.gameMap.gridSystem) {
-                    const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
-                    for (const collider of potentialColliders) {
-                        if (this.parent.checkCollision(this, collider)) {
-                            if (this.tryOpenCollider(collider, 'y')) {
-                                this.posY = originalY;
-                                break;
-                            }
-                            // Simply revert to original Y position
-                            this.posY = originalY;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // If the distance is small enough, snap to the target
-    if (distance < this.stats.getSpeed()) {
-        this.snap_position_to_target(doXAxis, doYAxis);
-    }
-
-    this.setDirection(this.getDirection());
-    this.setSpritePosition(this.posX, this.posY);
-}
-
-
+	move_toward_target(doXAxis = true, doYAxis = true) {
+		return this.moveTowardsTarget(doXAxis, doYAxis);
+	}
 
 	move_toward_target_new(doXAxis = true, doYAxis = true) {
-		var dx = this.targetX - this.posX;
-		var dy = this.targetY - this.posY;
-		var distance = Math.sqrt(dx * dx + dy * dy);
+		return this.moveTowardsTarget(doXAxis, doYAxis);
+	}
+
+	moveTowardsTarget(doXAxis = true, doYAxis = true) {
+		const dx = this.targetX - this.posX;
+		const dy = this.targetY - this.posY;
+		const distance = Math.sqrt(dx * dx + dy * dy);
 	
 		// Store original position
 		const originalX = this.posX;
@@ -730,6 +613,7 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 		if (distance !== 0) {
 			const moveX = (dx / distance) * this.stats.getSpeed();
 			const moveY = (dy / distance) * this.stats.getSpeed();
+			const gridSystem = this.parent?.gameMap?.gridSystem;
 			
 			let xBlocked = false;
 			let yBlocked = false;
@@ -741,8 +625,8 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 				if (this.canMoveToPosition(newX, this.posY)) {
 					this.posX = newX;
 
-					if (this.checkForCollisions) {
-						const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
+					if (this.checkForCollisions && gridSystem) {
+						const potentialColliders = gridSystem.getPotentialColliders(this);
 						for (const collider of potentialColliders) {
 							if (this.parent.checkCollision(this, collider)) {
 								if (this.tryOpenCollider(collider, 'x')) {
@@ -759,9 +643,9 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 				} else {
 					xBlocked = true;
 					// Grid cell is blocked — temporarily step into it to find door colliders there.
-					if (this.checkForCollisions && this.parent?.gameMap?.gridSystem) {
+					if (this.checkForCollisions && gridSystem) {
 						this.posX = newX;
-						const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
+						const potentialColliders = gridSystem.getPotentialColliders(this);
 						this.posX = originalX;
 						for (const collider of potentialColliders) {
 							this.tryOpenCollider(collider, 'x');
@@ -777,8 +661,8 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 				if (this.canMoveToPosition(this.posX, newY)) {
 					this.posY = newY;
 
-					if (this.checkForCollisions) {
-						const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
+					if (this.checkForCollisions && gridSystem) {
+						const potentialColliders = gridSystem.getPotentialColliders(this);
 						for (const collider of potentialColliders) {
 							if (this.parent.checkCollision(this, collider)) {
 								if (this.tryOpenCollider(collider, 'y')) {
@@ -795,9 +679,9 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 				} else {
 					yBlocked = true;
 					// Grid cell is blocked — temporarily step into it to find door colliders there.
-					if (this.checkForCollisions && this.parent?.gameMap?.gridSystem) {
+					if (this.checkForCollisions && gridSystem) {
 						this.posY = newY;
-						const potentialColliders = this.parent.gameMap.gridSystem.getPotentialColliders(this);
+						const potentialColliders = gridSystem.getPotentialColliders(this);
 						this.posY = originalY;
 						for (const collider of potentialColliders) {
 							this.tryOpenCollider(collider, 'y');
@@ -836,6 +720,10 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 	
 	// Add this helper method to check if a position is valid
 	canMoveToPosition(newX, newY) {
+		if (!this.parent?.gameMap?.gridSystem) {
+			return true;
+		}
+
 		const gridSystem = this.parent.gameMap.gridSystem;
 		const cellSize = gridSystem.config.cellSize;
 		
@@ -967,7 +855,7 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 	}
 
 	is_doing_action(action) {
-		return this.queue.count() >= 1 && this.queue.getCurrentAction().action == action;
+		return this.queue.count() >= 1 && this.queue.getCurrentAction().action === action;
 	}
 
 
@@ -1012,7 +900,7 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 
 		let random = Math.random();
 
-		if (random < 0.1 && this.startTime > 10000) {
+		if (random < 0.1 && Date.now() - this.startTime > 10000) {
 			// idle
 			// this.queue.addIdle(500);
 
@@ -1022,8 +910,6 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 
 		} else if (random < 0.5) {
 			// move to random element
-			console.log("random move");
-
 			let e = Utility.findClosestElementToMouse(this.parent.mousePosX, this.parent.mousePosY, inWhere, 3, 250, true);
 
 			if (e) {
@@ -1045,7 +931,6 @@ move_toward_target(doXAxis = true, doYAxis = true) {
 
 		} else {
 			// run laps
-			console.log("run laps");
 			let e = Utility.findClosestElementToMouse(this.parent.mousePosX, this.parent.mousePosY, inWhere, 3, 250, true);
 
 			if (e) {
@@ -1165,6 +1050,7 @@ checkMovementCollision(newX, newY, colliders) {
 
     const wasJumping = this.isJumping;
     const wasFalling = this.isFalling;
+    const wasOnSolidGround = this.isOnSolidGround;
 
     // Check each collider for various collision types
     for (const collider of colliders) {
@@ -1408,7 +1294,7 @@ move_gravity() {
         this.isOnSolidGround = false;
 
         // Track when we left the ground for coyote time
-        if (this.isOnSolidGround && this.leftGroundTime === undefined) {
+        if (wasOnSolidGround && this.leftGroundTime === undefined) {
             this.leftGroundTime = Date.now();
         }
     }
@@ -1504,7 +1390,7 @@ move_gravity() {
 			return;
 		}
 
-		if (this.goal == MOVE_TYPES.GRAVITY) {
+		if (this.goal === MOVE_TYPES.GRAVITY) {
 			if (!this.queue.isEmpty()) {
 				this.queue.update();
 			} else {
@@ -1519,7 +1405,7 @@ move_gravity() {
 				this.move_gravity();
 			}
 		}
-		else if (this.goal == MOVE_TYPES.FREEROAM) {
+		else if (this.goal === MOVE_TYPES.FREEROAM) {
 			if (this.queue.isEmpty()) {
 				// Add new random actions to the queue when empty
 				//this.doFreeRoamLogic();
@@ -1530,7 +1416,7 @@ move_gravity() {
 			}
 			this.queue.update();
 		}
-		else if (this.goal == MOVE_TYPES.FOLLOW) {
+		else if (this.goal === MOVE_TYPES.FOLLOW) {
 			if (this.queue.isEmpty()) {
 				// If no other actions, follow the mouse
 				this.updateTargetToFollowMouse();
@@ -1540,8 +1426,8 @@ move_gravity() {
 			}
 			this.queue.update();
 		}
-		else if (this.goal == MOVE_TYPES.GOHOME) {
-			if (this.atOriginal == false) {
+		else if (this.goal === MOVE_TYPES.GOHOME) {
+			if (this.atOriginal === false) {
 				if (this.queue.isEmpty()) {
 					// Add a move action to return home if not already moving
 					const rect = this.parent.getLocalOffset(this.elements.wrapper);
@@ -1557,7 +1443,7 @@ move_gravity() {
 
 			}
 		}
-		else if (this.goal == MOVE_TYPES.QUEUE_ONLY) {
+		else if (this.goal === MOVE_TYPES.QUEUE_ONLY) {
 			if (this.queue.isEmpty()) {
 				this.watchCursor();
 			} else {
@@ -1614,7 +1500,7 @@ move_gravity() {
 		const mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
 		const dx = mouse.x - this.posX;
 		const dy = mouse.y - this.posY;
-		return Math.sqrt(dx * dx + dy * dy).toFixed(2);
+		return Math.sqrt(dx * dx + dy * dy);
 	}
 
 	get_move_type(i) {
@@ -1629,7 +1515,7 @@ move_gravity() {
 	updateTargetToFollowMouse(doXAxis = true, doYAxis = true) {
 		const mouseDistance = this.getDistanceFromMouse();
 
-		if (this.runAway == true) {
+		if (this.runAway === true) {
 			this.doRunAway(doXAxis, doYAxis);
 		} else {
 			if (mouseDistance > this.followRadius.min && mouseDistance < this.followRadius.max) {
@@ -1648,7 +1534,7 @@ move_gravity() {
 		const mouseDistance = this.getDistanceFromMouse();
 		let rect = this.getRect();
 
-		if (mouseDistance < this.runAway_angle_distance) { // don't move target unless we're a little far away
+		if (mouseDistance < this.runAwayAngleDistance) { // don't move target unless we're a little far away
 
 			let currentX = this.posX;
 			let currentY = this.posY;
@@ -1659,8 +1545,8 @@ move_gravity() {
 			var dy3 = mouse.y - currentY;
 
 			var angle = Math.atan2(dy3, dx3) + Math.PI; // Calculate the angle between the mouse cursor and the element
-			mouse.x += this.runAway_angle_distance * Math.cos(angle);
-			mouse.y += this.runAway_angle_distance * Math.sin(angle);
+			mouse.x += this.runAwayAngleDistance * Math.cos(angle);
+			mouse.y += this.runAwayAngleDistance * Math.sin(angle);
 
 			this.setTarget(
 				doXAxis ? mouse.x : null,
@@ -1673,10 +1559,12 @@ move_gravity() {
 
 
 	dispose() {
-		// ... existing dispose code ...
-		if (this.rubbingDetector) {
-			this.rubbingDetector.dispose();
-		}
+		this.queue?.clear?.();
+		this.inputHandler?.dispose?.();
+		this.dialogue?.destroy?.();
+		this.stats?.destroy?.();
+		this.targetDot?.remove?.();
+		this.duplicate?.remove?.();
 	}
 
 	update_frame() {
@@ -1686,46 +1574,6 @@ move_gravity() {
 
 
 	}
-
-
-// Add defensive check to canMoveToPosition method
-canMoveToPosition(newX, newY) {
-    // Check if gridSystem exists
-    if (!this.parent || !this.parent.gameMap || !this.parent.gameMap.gridSystem) {
-        return true; // Allow movement if we can't check grid
-    }
-    
-    const gridSystem = this.parent.gameMap.gridSystem;
-    const cellSize = gridSystem.config.cellSize;
-    
-    // Get collider bounds at the new position
-    const left = newX + this.collider.offsetX;
-    const top = newY + this.collider.offsetY;
-    const right = left + this.collider.width;
-    const bottom = top + this.collider.height;
-    
-    // Convert to grid coordinates
-    const startGridX = Math.floor(left / cellSize);
-    const startGridY = Math.floor(top / cellSize);
-    const endGridX = Math.ceil(right / cellSize);
-    const endGridY = Math.ceil(bottom / cellSize);
-    
-    // Check each grid cell that the collider would overlap
-    for (let gridX = startGridX; gridX < endGridX; gridX++) {
-        for (let gridY = startGridY; gridY < endGridY; gridY++) {
-            // Check if this grid cell is within bounds and walkable
-            if (gridX < 0 || gridX >= gridSystem.gridWidth || 
-                gridY < 0 || gridY >= gridSystem.gridHeight ||
-                !gridSystem.grid[gridX][gridY].walkable) {
-                return false;
-            }
-        }
-    }
-    
-    return true;
-}
-
-
 
 	update(deltaTime) {
 		if (!this.isActive) return;

@@ -84,6 +84,27 @@ class MyteQueue {
         this.isDoingAction = false;
     }
 
+    removeCurrentAction() {
+        if (this.queue.length === 0) {
+            return null;
+        }
+
+        const currentAction = this.queue.shift();
+        if (this.isDoingAction && currentAction?.interrupt) {
+            currentAction.interrupt();
+        }
+
+        currentAction?.complete?.();
+        this.isDoingAction = false;
+
+        if (this.queue.length > 0) {
+            this.queue[0].start();
+            this.isDoingAction = true;
+        }
+
+        return currentAction;
+    }
+
     // ─── Update loop ──────────────────────────────────────────────────────────
 
     update() {

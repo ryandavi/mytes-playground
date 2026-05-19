@@ -100,6 +100,7 @@
 
 
 .interactive-myte {
+	--myte-species-filter: none;
 	width: 192px;
 	height: 192px;
 	color: var(--button-light);
@@ -132,6 +133,7 @@
 			height: inherit;
 			image-rendering: pixelated;
 			background: url(../images/snail/spritesheet.png);
+			filter: var(--myte-species-filter);
 			transform-origin: center;
 			transition: filter 0.2s ease-out, transform 0.2s ease-out;
 		}
@@ -234,7 +236,7 @@
 				transform-origin: 50% 65%;
 				/* Adjust to make it pivot from the bottom */
 				animation-timing-function: ease-in-out;
-				filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
+				filter: var(--myte-species-filter) drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
 				will-change: transform;
 				/* Performance optimization */
 
@@ -262,6 +264,10 @@
 			}
 		}
 
+	}
+
+	&[data-myte-species="worm"] {
+		--myte-species-filter: hue-rotate(38deg) saturate(1.15) brightness(1.03);
 	}
 }
 

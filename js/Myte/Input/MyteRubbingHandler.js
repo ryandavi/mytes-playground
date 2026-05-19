@@ -133,11 +133,9 @@ class MyteRubbingHandler {
 			// Add expression based on how good the rub was
 			if (this.rubCounter <= this.config.maxRubs) {
 				// Good rubs
-				console.log('Good rubs');
 				this.myte.queue.addExpression('happy');
 			} else {
 				// Too much rubbing
-				console.log('Too much rubbing');
 				this.myte.queue.addExpression('dizzy');
 			}
 
