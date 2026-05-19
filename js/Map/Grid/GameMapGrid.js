@@ -966,13 +966,13 @@ class GridSystem {
         cells.forEach(cell => {
             cell.objects.delete(obj);
 
-            // Only recalculate walkable if removing a non-walkable object
-            if (!obj.config.walkable) {
-                // Recalculate objectWalkable status - use Array.from only once
+            // Recalculate if removing a non-walkable object OR if cell is currently
+            // blocked — handles the case where an object became walkable (e.g. door
+            // opening) before refreshGridOccupancy calls removeObject, so the old
+            // objectWalkable=false never gets cleared by the config check alone.
+            if (!obj.config.walkable || !cell.objectWalkable) {
                 const objects = Array.from(cell.objects);
                 cell.objectWalkable = objects.every(o => o.config.walkable);
-
-                // Update combined walkability
                 cell.walkable = cell.tileWalkable && cell.objectWalkable;
             }
         });

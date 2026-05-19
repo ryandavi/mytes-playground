@@ -14,6 +14,10 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         this.initializePortalEffects();
     }
 
+    getApproachActionId() {
+        return 'astar-move';
+    }
+
     getInteractionRadius() {
         return this.activationRadius;
     }
