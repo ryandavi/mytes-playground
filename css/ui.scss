@@ -92,6 +92,20 @@
             height: 40px;
         }
 
+        >.camera-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+
+            >.camera-control-btn {
+                min-width: 40px;
+                height: 40px;
+                padding: 0 10px;
+                font-size: .85rem;
+                line-height: 1;
+            }
+        }
+
         >.active-pet {
             gap: 10px;
             display: none;

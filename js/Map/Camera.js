@@ -120,7 +120,118 @@ class Camera {
 	// ========== ZOOM METHODS ==========
 	
 	setZoomLevel(zoom) {
-		this.targetZoomLevel = zoom;
+		this.targetZoomLevel = Math.max(
+			this.minZoomLevel,
+			Math.min(this.maxZoomLevel, zoom)
+		);
+	}
+
+	getViewportCenterAnchor() {
+		const viewportRect = this.parent.getContainerRect();
+		const screenX = viewportRect.width / 2;
+		const screenY = viewportRect.height / 2;
+
+		return {
+			screenX,
+			screenY,
+			worldX: screenX / this.zoomLevel - this.posX,
+			worldY: screenY / this.zoomLevel - this.posY
+		};
+	}
+
+	zoomTo(zoom, options = {}) {
+		const targetZoom = Math.max(
+			this.minZoomLevel,
+			Math.min(this.maxZoomLevel, zoom)
+		);
+		const anchor = options.anchor || this.getViewportCenterAnchor();
+		const targetPosition = this._calculateAnchoredPosition(anchor, targetZoom);
+
+		this.zoomAnchor = anchor;
+		this.setTarget(targetPosition.x, targetPosition.y);
+		this.setZoomLevel(targetZoom);
+
+		if (options.immediate) {
+			this.zoomLevel = this.targetZoomLevel;
+			this.setPosition(targetPosition.x, targetPosition.y);
+			this.updateTransform(this.posX, this.posY, this.zoomLevel);
+			this._clearZoomAnchor();
+		}
+
+		return targetZoom;
+	}
+
+	zoomBy(delta, options = {}) {
+		return this.zoomTo(this.targetZoomLevel + delta, options);
+	}
+
+	zoomIn(options = {}) {
+		return this.zoomBy(this.zoomStep, options);
+	}
+
+	zoomOut(options = {}) {
+		return this.zoomBy(-this.zoomStep, options);
+	}
+
+	resetZoom(immediate = false) {
+		return this.zoomTo(1, {
+			anchor: this.getViewportCenterAnchor(),
+			immediate
+		});
+	}
+
+	centerOnActiveMyte(immediate = true) {
+		if (!this.parent.activeMyte) return false;
+
+		this.centerToPosition(
+			this.parent.activeMyte.posX,
+			this.parent.activeMyte.posY,
+			this.parent.activeMyte.size,
+			immediate
+		);
+
+		return true;
+	}
+
+	fitMap(mode = 'contain', immediate = true, padding = 32) {
+		const canvasRect = this.parent.getCanvasRect();
+		const viewportRect = this.parent.getContainerRect();
+
+		if (!canvasRect?.width || !canvasRect?.height || !viewportRect?.width || !viewportRect?.height) {
+			return false;
+		}
+
+		const usableWidth = Math.max(1, viewportRect.width - padding * 2);
+		const usableHeight = Math.max(1, viewportRect.height - padding * 2);
+		const zoomX = usableWidth / canvasRect.width;
+		const zoomY = usableHeight / canvasRect.height;
+
+		let targetZoom = zoomX;
+		if (mode === 'height') {
+			targetZoom = zoomY;
+		} else if (mode === 'contain') {
+			targetZoom = Math.min(zoomX, zoomY);
+		}
+
+		targetZoom = Math.max(
+			this.minZoomLevel,
+			Math.min(this.maxZoomLevel, targetZoom)
+		);
+
+		const centeredPosition = this._clampToBounds(0, 0, canvasRect, viewportRect, targetZoom);
+
+		this._clearZoomAnchor();
+		this.setMode(CAMERA_FOLLOW_MODES.DRAG_TO_PAN);
+		this.setTarget(centeredPosition.x, centeredPosition.y);
+		this.setZoomLevel(targetZoom);
+
+		if (immediate) {
+			this.zoomLevel = this.targetZoomLevel;
+			this.setPosition(centeredPosition.x, centeredPosition.y);
+			this.updateTransform(this.posX, this.posY, this.zoomLevel);
+		}
+
+		return true;
 	}
 
 	_clearZoomAnchor() {
@@ -172,13 +283,9 @@ class Camera {
 		let targetX = anchor.screenX / zoom - anchor.worldX;
 		let targetY = anchor.screenY / zoom - anchor.worldY;
 
-		if (this.limitToBounds) {
-			const bounds = this._calculateBounds(null, null, zoom);
-			targetX = Math.min(0, Math.max(bounds.minX, targetX));
-			targetY = Math.min(0, Math.max(bounds.minY, targetY));
-		}
-
-		return { x: targetX, y: targetY };
+		return this.limitToBounds
+			? this._clampToBounds(targetX, targetY, null, null, zoom)
+			: { x: targetX, y: targetY };
 	}
 
 	handleZoom(e) {
@@ -233,14 +340,9 @@ class Camera {
 		
 		// Apply bounds if needed
 		if (this.limitToBounds) {
-			const bounds = this._calculateBounds();
-			if (this.isScrollable.x) {
-				newX = Math.min(0, Math.max(newX, bounds.minX));
-			}
-			
-			if (this.isScrollable.y) {
-				newY = Math.min(0, Math.max(newY, bounds.minY));
-			}
+			const clampedPosition = this._clampToBounds(newX, newY);
+			newX = clampedPosition.x;
+			newY = clampedPosition.y;
 		}
 		
 		this.setTarget(newX, newY);
@@ -293,7 +395,10 @@ class Camera {
 				canvasRect.height - viewportWorld.height));
 		}
 		
-		this.setTarget(cameraX, cameraY);
+		const targetPosition = this.limitToBounds
+			? this._clampToBounds(cameraX, cameraY, canvasRect, viewportRect)
+			: { x: cameraX, y: cameraY };
+		this.setTarget(targetPosition.x, targetPosition.y);
 	}
 	
 	followCharacter(x, y, canvasRect, viewportRect, elementRect) {
@@ -302,15 +407,9 @@ class Camera {
 		const centerPos = this._calculateCenterPosition(x, y, viewportRect, elementRect);
 		
 		if (this.limitToBounds) {
-			const bounds = this._calculateBounds(canvasRect, viewportRect);
-			
-			if (this.isScrollable.x) {
-				centerPos.x = Math.min(0, Math.max(bounds.minX, centerPos.x));
-			}
-			
-			if (this.isScrollable.y) {
-				centerPos.y = Math.min(0, Math.max(bounds.minY, centerPos.y));
-			}
+			const clampedPosition = this._clampToBounds(centerPos.x, centerPos.y, canvasRect, viewportRect);
+			centerPos.x = clampedPosition.x;
+			centerPos.y = clampedPosition.y;
 		}
 		
 		this.setTarget(centerPos.x, centerPos.y);
@@ -358,9 +457,9 @@ class Camera {
 		}
 		
 		// Apply bounds
-		const bounds = this._calculateBounds(canvasRect, viewportRect);
-		targetX = Math.min(0, Math.max(targetX, bounds.minX));
-		targetY = Math.min(0, Math.max(targetY, bounds.minY));
+		const clampedPosition = this._clampToBounds(targetX, targetY, canvasRect, viewportRect);
+		targetX = clampedPosition.x;
+		targetY = clampedPosition.y;
 		
 		this.setTarget(targetX, targetY);
 	}
@@ -387,14 +486,38 @@ class Camera {
 		};
 	}
 
+	_calculateAxisBounds(contentSize, viewportSize) {
+		if (contentSize <= viewportSize) {
+			const centeredOffset = (viewportSize - contentSize) / 2;
+			return { min: centeredOffset, max: centeredOffset };
+		}
+
+		return {
+			min: -(contentSize - viewportSize),
+			max: 0
+		};
+	}
+
 	_calculateBounds(canvasRect, viewportRect, zoom = this.zoomLevel) {
 		if (!canvasRect) canvasRect = this.parent.getCanvasRect();
 		if (!viewportRect) viewportRect = this.parent.getContainerRect();
 		const viewportWorld = this._getViewportWorldSize(viewportRect, zoom);
+		const horizontalBounds = this._calculateAxisBounds(canvasRect.width, viewportWorld.width);
+		const verticalBounds = this._calculateAxisBounds(canvasRect.height, viewportWorld.height);
 		
 		return {
-			minX: -(canvasRect.width - viewportWorld.width),
-			minY: -(canvasRect.height - viewportWorld.height)
+			minX: horizontalBounds.min,
+			maxX: horizontalBounds.max,
+			minY: verticalBounds.min,
+			maxY: verticalBounds.max
+		};
+	}
+
+	_clampToBounds(x, y, canvasRect, viewportRect, zoom = this.zoomLevel) {
+		const bounds = this._calculateBounds(canvasRect, viewportRect, zoom);
+		return {
+			x: this.isScrollable.x ? Math.min(bounds.maxX, Math.max(bounds.minX, x)) : x,
+			y: this.isScrollable.y ? Math.min(bounds.maxY, Math.max(bounds.minY, y)) : y
 		};
 	}
 	
@@ -429,15 +552,9 @@ class Camera {
 		const centerPos = this._calculateCenterPosition(x, y, viewportRect, elementRect);
 		
 		if (this.limitToBounds) {
-			const bounds = this._calculateBounds(canvasRect, viewportRect);
-			
-			if (this.isScrollable.x) {
-				centerPos.x = Math.min(0, Math.max(bounds.minX, centerPos.x));
-			}
-			
-			if (this.isScrollable.y) {
-				centerPos.y = Math.min(0, Math.max(bounds.minY, centerPos.y));
-			}
+			const clampedPosition = this._clampToBounds(centerPos.x, centerPos.y, canvasRect, viewportRect);
+			centerPos.x = clampedPosition.x;
+			centerPos.y = clampedPosition.y;
 		}
 		
 		this.setTarget(centerPos.x, centerPos.y);

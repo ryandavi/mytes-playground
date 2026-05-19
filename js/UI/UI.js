@@ -939,11 +939,48 @@ class HUDManager extends UIComponent {
 class ScreenManager extends UIComponent {
     constructor(parent) {
         super(parent);
+        this.headerElement = this.parent.containerWrapper.querySelector('.header');
         this.fullscreenButton = this.parent.containerWrapper.querySelector('.fullscreen-btn');
+        this.cameraControls = null;
     }
 
     init() {
+        this.initializeCameraControls();
         this.initializeButtons();
+    }
+
+    initializeCameraControls() {
+        if (!this.headerElement || this.cameraControls) return;
+
+        this.cameraControls = document.createElement('div');
+        this.cameraControls.className = 'camera-controls';
+
+        const controlConfigs = [
+            { label: '-', title: 'Zoom out', action: () => this.parent.parent.camera?.zoomOut({ immediate: true }) },
+            { label: '1x', title: 'Reset zoom', action: () => this.parent.parent.camera?.resetZoom(true) },
+            { label: 'Me', title: 'Center on active myte', action: () => this.parent.parent.camera?.centerOnActiveMyte(true) },
+            { label: 'Fit', title: 'Fit entire map', action: () => this.parent.parent.camera?.fitMap('contain', true) },
+            { label: '+', title: 'Zoom in', action: () => this.parent.parent.camera?.zoomIn({ immediate: true }) }
+        ];
+
+        controlConfigs.forEach(config => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'camera-control-btn';
+            button.textContent = config.label;
+            button.title = config.title;
+            button.setAttribute('aria-label', config.title);
+            button.addEventListener('click', () => {
+                config.action();
+            });
+            this.cameraControls.appendChild(button);
+        });
+
+        if (this.fullscreenButton) {
+            this.headerElement.insertBefore(this.cameraControls, this.fullscreenButton);
+        } else {
+            this.headerElement.appendChild(this.cameraControls);
+        }
     }
 
     initializeButtons() {
@@ -955,13 +992,20 @@ class ScreenManager extends UIComponent {
     }
 
     toggleFullscreen() {
+        const camera = this.parent.parent.camera;
+        const anchor = camera?.getViewportCenterAnchor ? camera.getViewportCenterAnchor() : null;
+
         // toggle class on container
         this.parent.containerWrapper.classList.toggle('fullscreen');
         if (this.fullscreenButton) {
             this.fullscreenButton.classList.toggle('active');
         }
 
-        this.parent.parent.camera.resetView(true);
+        if (camera && anchor) {
+            requestAnimationFrame(() => {
+                camera.zoomTo(camera.zoomLevel, { anchor, immediate: true });
+            });
+        }
     }
 }
 

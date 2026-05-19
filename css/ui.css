@@ -59,6 +59,18 @@
   width: 40px;
   height: 40px;
 }
+.container-wrapper > .header > .camera-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.container-wrapper > .header > .camera-controls > .camera-control-btn {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 10px;
+  font-size: 0.85rem;
+  line-height: 1;
+}
 .container-wrapper > .header > .active-pet {
   gap: 10px;
   display: none;

@@ -59,6 +59,7 @@ class ContainerManager {
             // Initialize camera
             console.log('[ContainerManager] Initializing camera');
             this.camera = new Camera(this, this.canvas, this.element);
+            this.camera.limitToBounds = this.settings.limitMap;
 
             // Ensure the input handler is initialized
             if (!this.inputHandler) {

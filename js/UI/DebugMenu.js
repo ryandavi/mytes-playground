@@ -148,11 +148,13 @@ class DebugMenu extends ModalWindow {
                     // Apply state changes based on the new setting
                     if (this.parent.parent.settings.limitMap) {
                         // limit is on - overflow is hidden
+                        this.parent.parent.camera.limitToBounds = true;
                         this.parent.parent.camera.isScrollable.x = true;
                         this.parent.parent.camera.isScrollable.y = true;
                         this.parent.parent.element.closest('.container').classList.add('noScroll');
                     } else {
                         // limit is off
+                        this.parent.parent.camera.limitToBounds = false;
                         this.parent.parent.camera.isScrollable.x = false;
                         this.parent.parent.camera.isScrollable.y = false;
                         this.parent.parent.element.closest('.container').classList.remove('noScroll');
