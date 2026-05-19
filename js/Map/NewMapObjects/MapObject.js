@@ -37,6 +37,7 @@ class MapObject {
 
 		this.inputComponents = {};
 		this.isDragging = false;
+		this.shadowElement = null;
 
 		// Render state — simulation writes here, MapRenderer reads and flushes to DOM
 		this.renderState = {
@@ -67,6 +68,15 @@ class MapObject {
 
 	get mytes() {
 		return this.map?.mytes || this.container?.mytes || [];
+	}
+
+	getShadowConfig() {
+		const shadow = this.getConfig('shadow', null);
+		return shadow?.enabled ? shadow : null;
+	}
+
+	shouldRenderShadow() {
+		return !!this.getShadowConfig();
 	}
 
 	// ── Simulation contract ───────────────────────────────────────────────────
@@ -194,6 +204,10 @@ class MapObject {
 
 	isInInteractionRange(target, radius = this.getInteractionRadius()) {
 		return this.getDistanceTo(target) <= radius;
+	}
+
+	getSelectionDebugInfo() {
+		return [];
 	}
 
 	canInteract(myte) {
@@ -428,6 +442,7 @@ class MapObject {
 		this._prevRenderX = this.posX;
 		this._prevRenderY = this.posY;
 		this.renderState.dirty = false;
+		this.updateShadowVisual();
 	}
 
 	snapToGrid() {
@@ -472,6 +487,12 @@ class MapObject {
 			zIndex: parent.getZIndex(this.posY, this.size.height)
 		});
 
+		if (this.shouldRenderShadow()) {
+			this.shadowElement = document.createElement('div');
+			this.shadowElement.className = 'ground-shadow';
+			divElement.appendChild(this.shadowElement);
+		}
+
 		const renderType = this.getConfig('renderType', 'single');
 		if (renderType === 'split') {
 			this.renderSplitObject(divElement);
@@ -481,8 +502,44 @@ class MapObject {
 
 		this.element = divElement;
 		container.appendChild(divElement);
+		this.updateShadowVisual();
 		this.initializeInputComponents();
 		return divElement;
+	}
+
+	updateShadowVisual() {
+		if (!this.shadowElement) return;
+
+		const config = this.getShadowConfig();
+		if (!config) {
+			this.shadowElement.style.display = 'none';
+			return;
+		}
+
+		const elevation = Math.max(0, Number(this.posZ) || 0);
+		const width = Number(config.width) || this.size.width * (config.widthRatio ?? 0.5);
+		const height = Number(config.height) || this.size.height * (config.heightRatio ?? 0.18);
+		const left = ((this.size.width - width) * (config.anchorX ?? 0.5)) + (config.offsetX ?? 0);
+		const top = (this.size.height * (config.anchorY ?? 0.82)) - (height / 2) + (config.offsetY ?? 0);
+		const opacityDistance = Math.max(1, config.opacityFadeDistance ?? 96);
+		const scaleDistance = Math.max(1, config.scaleFadeDistance ?? 72);
+		const maxOpacity = config.maxOpacity ?? 0.28;
+		const minOpacity = config.minOpacity ?? 0.08;
+		const minScale = config.minScale ?? 0.6;
+		const opacity = Math.max(minOpacity, maxOpacity * (1 - (elevation / opacityDistance)));
+		const scale = Math.max(minScale, 1 - (elevation / scaleDistance) * 0.35);
+
+		Object.assign(this.shadowElement.style, {
+			display: '',
+			width: `${width}px`,
+			height: `${height}px`,
+			left: `${left}px`,
+			top: `${top}px`,
+			opacity: `${opacity}`,
+			transform: `scale(${scale})`,
+			backgroundColor: config.color || 'rgba(0, 0, 0, 0.35)',
+			filter: `blur(${config.blur ?? 2}px)`
+		});
 	}
 
 	renderSplitObject(container) {
@@ -556,6 +613,7 @@ class MapObject {
 			this.element.remove();
 			this.element = null;
 		}
+		this.shadowElement = null;
 		this.active = false;
 	}
 
@@ -635,6 +693,7 @@ class MapObject {
 		});
 		const updateFn = this.getConfig('update');
 		if (typeof updateFn === 'function') updateFn(this, deltaTime);
+		this.updateShadowVisual();
 		this.markPositionDirty();
 	}
 }

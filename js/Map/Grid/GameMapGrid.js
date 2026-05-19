@@ -747,6 +747,22 @@ class GridSystem {
         };
     }
 
+    getBoundsForGridOccupancy(obj) {
+        const offsetX = obj?.collider?.offsetX || 0;
+        const offsetY = obj?.collider?.offsetY || 0;
+        const width = obj?.collider?.width || obj?.size?.width || 0;
+        const height = obj?.collider?.height || obj?.size?.height || 0;
+
+        return {
+            left: obj.posX + offsetX,
+            top: obj.posY + offsetY,
+            width,
+            height,
+            right: obj.posX + offsetX + width,
+            bottom: obj.posY + offsetY + height
+        };
+    }
+
     // Convert grid coordinates to world coordinates (center of cell)
     gridToWorld(gridX, gridY) {
         return {
@@ -817,6 +833,54 @@ class GridSystem {
         }
     }
 
+    findNearestValidPositionForEntity(entity, x, y, maxRadius = 8) {
+        if (!entity || !this.pathfinder) {
+            return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+        }
+
+        const entityWidth = entity.size?.width || 0;
+        const entityHeight = entity.size?.height || 0;
+        const entityCollider = entity.collider || {};
+        const collider = {
+            offsetX: entityCollider.offsetX || 0,
+            offsetY: entityCollider.offsetY || 0,
+            width: entityCollider.width || entityWidth,
+            height: entityCollider.height || entityHeight
+        };
+        const capabilities = entity.capabilities || {};
+
+        if (this.pathfinder._validatePosition(
+            entity,
+            x,
+            y,
+            entityWidth,
+            entityHeight,
+            collider,
+            capabilities
+        )) {
+            return { x, y };
+        }
+
+        const startGrid = this.worldToGrid(x, y);
+        const validGrid = this.pathfinder._findNearestValidGridPos(
+            entity,
+            startGrid.x,
+            startGrid.y,
+            maxRadius,
+            entityWidth,
+            entityHeight,
+            collider,
+            capabilities
+        );
+
+        if (!validGrid) return null;
+
+        return {
+            x: validGrid.x * this.config.cellSize,
+            y: validGrid.y * this.config.cellSize
+        };
+    }
+
     // Get all potential colliders for an entity
     getPotentialColliders(entity) {
         // Get all cells that the entity overlaps
@@ -854,10 +918,12 @@ class GridSystem {
 
     // OPTIMIZATION: Improved boundary checking for object cells
     getObjectCells(obj) {
-        const startGrid = this.worldToGrid(obj.posX, obj.posY);
+        const bounds = this.getBoundsForGridOccupancy(obj);
+        const epsilon = 0.001;
+        const startGrid = this.worldToGrid(bounds.left, bounds.top);
         const endGrid = this.worldToGrid(
-            obj.posX + obj.size.width,
-            obj.posY + obj.size.height
+            Math.max(bounds.left, bounds.right - epsilon),
+            Math.max(bounds.top, bounds.bottom - epsilon)
         );
 
         const cells = new Set();
@@ -872,9 +938,13 @@ class GridSystem {
 
 
     getObjectCellsForArea(areaX, areaY, areaWidth, areaHeight) {
+        const epsilon = 0.001;
         // Calculate grid boundaries for the specific area
         const startGrid = this.worldToGrid(areaX, areaY);
-        const endGrid = this.worldToGrid(areaX + areaWidth, areaY + areaHeight);
+        const endGrid = this.worldToGrid(
+            Math.max(areaX, areaX + areaWidth - epsilon),
+            Math.max(areaY, areaY + areaHeight - epsilon)
+        );
     
         const cells = new Set();
         // Loop through the grid cells covered by the area, clamping to grid bounds

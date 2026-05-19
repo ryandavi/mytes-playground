@@ -212,7 +212,7 @@ body.debug {
 	}
 
 	.mapObject {
-		outline: 1px solid green;
+		outline: 1px dashed rgba(255, 230, 0, 0.85);
 
 		&:hover {
 			z-index: 100000 !important;
@@ -231,6 +231,12 @@ body.debug {
 				filter: drop-shadow(2px 2px 0px #00000020);
 			}
 		}
+	}
+
+	.mapObject > .interactive-collider {
+		outline: 1px dashed rgba(255, 165, 0, 0.95);
+		background: rgba(255, 165, 0, 0.08);
+		opacity: 1;
 	}
 
 

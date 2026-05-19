@@ -111,6 +111,7 @@
   display: flex;
   gap: var(--border-width);
   align-items: center;
+  width: -moz-fit-content;
   width: fit-content;
   left: 50%;
   transform: translate(-50%, -115%);
@@ -145,7 +146,9 @@
 }
 .interactive-myte.dragging {
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   cursor: grab;
   z-index: 100000 !important;
 }
@@ -480,6 +483,4 @@
   50% {
     filter: drop-shadow(0px 0px 3px rgba(0, 255, 0, 0.5));
   }
-}
-
-/*# sourceMappingURL=myte.css.map */
+}/*# sourceMappingURL=myte.css.map */

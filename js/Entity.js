@@ -55,13 +55,21 @@ const EntityMethods = {
 			if (axis === 'y' && !horizontalDoors.includes(collider.facingDirection)) return false;
 		}
 
+		if (typeof collider.canAutoOpenFor === 'function' && !collider.canAutoOpenFor(this, axis)) {
+			return false;
+		}
+
 		return true;
 	},
 
 	// Tries to open the collider. Returns true if the door was opened.
 	tryOpenCollider(collider, axis) {
 		if (!this.canAutoOpenCollider(collider, axis)) return false;
-		return collider.open() !== false;
+		return collider.open({
+			triggeredBy: 'auto',
+			actor: this,
+			axis
+		}) !== false;
 	},
 
 	// Euclidean distance to another entity (posX / posY duck-typed).

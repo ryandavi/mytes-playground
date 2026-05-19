@@ -703,6 +703,14 @@ class ActionSidebarManager extends UIComponent {
                 otherInfo.append(stateInfo);
             }
 
+            const debugInfo = selectedObject.getSelectionDebugInfo?.() || [];
+            debugInfo.forEach(({ label, value }) => {
+                const info = document.createElement('div');
+                info.classList.add('state-info');
+                info.innerHTML = `${label}: ${value}`;
+                otherInfo.append(info);
+            });
+
             // make visible
             otherInfo.classList.add('visible');
 

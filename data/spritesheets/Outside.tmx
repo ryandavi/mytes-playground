@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="40" tilewidth="32" tileheight="32" infinite="0" nextlayerid="10" nextobjectid="18">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="40" tilewidth="32" tileheight="32" infinite="0" nextlayerid="10" nextobjectid="19">
  <properties>
   <property name="description" value="Bliss"/>
   <property name="location" value="outside"/>
@@ -288,6 +288,12 @@
   <object id="11" name="Portal" x="256" y="448" width="128" height="128">
    <properties>
     <property name="targetMap" value="House"/>
+   </properties>
+  </object>
+  <object id="17" name="Portal" x="800" y="64" width="128" height="128">
+   <properties>
+    <property name="targetMap" value="FieldTest"/>
+    <property name="variant" value="red_portal"/>
    </properties>
   </object>
   <object id="16" name="Spawn" x="544" y="224" width="192" height="192">

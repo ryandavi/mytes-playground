@@ -22,6 +22,7 @@ class MyteTouchHandler extends DragHandler {
 
 
                 myte.isDragging = true;
+                this.dragStartPosition = { x: myte.posX, y: myte.posY };
                 myte.parent.camera.setMode(CAMERA_FOLLOW_MODES.CHARACTER);
                 myte.reset();
                 myte.targetDot.classList.add('hidden');
@@ -79,6 +80,17 @@ class MyteTouchHandler extends DragHandler {
                 const droppedPortal = this._getPortals(myte).find(p => p.element?.classList.contains('on-target'));
                 if (droppedPortal && !myte.dropTarget.classList.contains("on-target")) {
                     droppedPortal.beginTransition(myte);
+                } else if (!myte.dropTarget.classList.contains("on-target")) {
+                    const safePosition = myte.parent?.gameMap?.gridSystem?.findNearestValidPositionForEntity(
+                        myte,
+                        myte.posX,
+                        myte.posY,
+                        10
+                    ) || this.dragStartPosition || { x: myte.posX, y: myte.posY };
+
+                    myte.setTarget(safePosition.x, safePosition.y, true);
+                    myte.setPosition(safePosition.x, safePosition.y, true);
+                    myte.setSpritePosition(safePosition.x, safePosition.y, true);
                 }
 
                 // Reset drop target states
@@ -89,6 +101,7 @@ class MyteTouchHandler extends DragHandler {
 
                 // Reset auto-pickup flag
                 this.autoPickup = false;
+                this.dragStartPosition = null;
 
                 // If this was started via click handler auto-drag, let it handle mode switching back
                 if (myte.inputHandler?.clickHandler?.isDragging) {
@@ -100,6 +113,7 @@ class MyteTouchHandler extends DragHandler {
         this.myte = myte;
         // Add auto-pickup flag
         this.autoPickup = false;
+        this.dragStartPosition = null;
     }
 
     _getPortals(myte) {

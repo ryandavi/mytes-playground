@@ -186,7 +186,7 @@ body.debug .interactive-myte .sprite {
   outline: 1px solid red;
 }
 body.debug .mapObject {
-  outline: 1px solid green;
+  outline: 1px dashed rgba(255, 230, 0, 0.85);
 }
 body.debug .mapObject:hover {
   z-index: 100000 !important;
@@ -200,6 +200,11 @@ body.debug .mapObject > div.interact:hover {
   border-radius: 2px;
   color: var(--black);
   filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.1254901961));
+}
+body.debug .mapObject > .interactive-collider {
+  outline: 1px dashed rgba(255, 165, 0, 0.95);
+  background: rgba(255, 165, 0, 0.08);
+  opacity: 1;
 }
 
 .dot {

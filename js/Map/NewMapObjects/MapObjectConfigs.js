@@ -103,6 +103,8 @@ const TYPE_CONFIGS = {
 		interactionType: 'open',
 		size: { width: 32, height: 32 },
 		scale: 2,
+		collider: { width: 56, height: 24, offsetX: 4, offsetY: 36 },
+		interactiveCollider: { width: 88, height: 88, offsetX: -12, offsetY: -12 },
 		spriteConfig: {
 			default: 'closed',
 			spriteSheet: {
@@ -458,11 +460,29 @@ const TYPE_CONFIGS = {
 		renderPriority: 3,
 		speed: 1.5,
 		wanderRadius: 100,
-		bobAmplitude: 15,
+		bobAmplitude: 10,
 		bobFrequency: 0.05,
 		flutterChance: 0.01,
 		idleChance: 0.001,
+		hoverHeight: 18,
+		hoverVariance: 8,
+		flowerSeekChance: 0.003,
+		flowerSearchRadius: 320,
+		flowerRestDurationMin: 2200,
+		flowerRestDurationMax: 5200,
 		size: { width: 100, height: 100 },
+		collider: { width: 24, height: 14, offsetX: 38, offsetY: 72 },
+		shadow: {
+			enabled: true,
+			widthRatio: 0.28,
+			heightRatio: 0.1,
+			anchorX: 0.5,
+			anchorY: 0.88,
+			maxOpacity: 0.24,
+			minOpacity: 0.08,
+			minScale: 0.7,
+			blur: 2
+		},
 		spriteConfig: {
 			spriteSheet: {
 				url: 'images/MapObjects/butterfly.gif',
@@ -481,9 +501,12 @@ const TYPE_CONFIGS = {
 		variantConfigs: {
 			small: {
 				size: { width: 50, height: 50 },
-				bobAmplitude: 10,
+				bobAmplitude: 7,
 				bobFrequency: 0.07,
 				speed: 1.2,
+				hoverHeight: 12,
+				hoverVariance: 5,
+				collider: { width: 14, height: 8, offsetX: 18, offsetY: 36 },
 				spriteConfig: {
 					spriteSheet: {
 						url: 'images/MapObjects/butterfly_small.gif',

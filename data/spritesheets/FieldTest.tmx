@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="40" height="43" tilewidth="32" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="65">
+ <properties>
+  <property name="description" value="Oversized outdoor sandbox for interaction, collision, and performance testing."/>
+  <property name="displayName" value="Field Test"/>
+  <property name="location" value="outside"/>
+  <property name="name" value="Field Test"/>
+ </properties>
+ <tileset firstgid="1" source="walls3.tsx"/>
+ <layer id="1" name="Grass" width="40" height="43">
+  <data encoding="csv">
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85
+</data>
+ </layer>
+ <objectgroup id="2" name="Objects">
+  <object id="1" name="Portal" x="64" y="64" width="128" height="128">
+   <properties>
+    <property name="targetMap" value="Outside"/>
+    <property name="variant" value="red_portal"/>
+   </properties>
+  </object>
+  <object id="2" name="Spawn" x="224" y="128" width="192" height="192">
+   <properties>
+    <property name="displayName" value="Field Test"/>
+    <property name="type" value="myte"/>
+   </properties>
+  </object>
+  <object id="3" name="Flower" x="416" y="160" width="64" height="64">
+   <properties>
+    <property name="variant" value="flower_red"/>
+   </properties>
+  </object>
+  <object id="4" name="Flower" x="480" y="160" width="64" height="64">
+   <properties>
+    <property name="variant" value="flower_blue"/>
+   </properties>
+  </object>
+  <object id="5" name="Flower" x="544" y="160" width="64" height="64">
+   <properties>
+    <property name="variant" value="flower_yellow"/>
+   </properties>
+  </object>
+  <object id="6" name="Flower" x="416" y="224" width="64" height="64">
+   <properties>
+    <property name="variant" value="flower_yellow"/>
+   </properties>
+  </object>
+  <object id="7" name="Flower" x="480" y="224" width="64" height="64">
+   <properties>
+    <property name="variant" value="flower_red"/>
+   </properties>
+  </object>
+  <object id="8" name="Flower" x="544" y="224" width="64" height="64">
+   <properties>
+    <property name="variant" value="flower_blue"/>
+   </properties>
+  </object>
+  <object id="9" name="Grass" x="640" y="160" width="64" height="64">
+   <properties>
+    <property name="variant" value="grass_1"/>
+   </properties>
+  </object>
+  <object id="10" name="Grass" x="704" y="160" width="64" height="64">
+   <properties>
+    <property name="variant" value="grass_2"/>
+   </properties>
+  </object>
+  <object id="11" name="Grass" x="768" y="160" width="64" height="64">
+   <properties>
+    <property name="variant" value="grass_3"/>
+   </properties>
+  </object>
+  <object id="12" name="Treasure Chest" x="384" y="320" width="32" height="32">
+   <properties>
+    <property name="variant" value="wooden_chest"/>
+   </properties>
+  </object>
+  <object id="13" name="Treasure Chest" x="448" y="320" width="32" height="32">
+   <properties>
+    <property name="variant" value="golden_chest"/>
+   </properties>
+  </object>
+  <object id="14" name="Ball" x="544" y="320" width="64" height="64">
+   <properties>
+    <property name="variant" value="red_ball"/>
+   </properties>
+  </object>
+  <object id="15" name="Ball" x="640" y="320" width="64" height="64">
+   <properties>
+    <property name="variant" value="blue_ball"/>
+   </properties>
+  </object>
+  <object id="16" name="Door" x="800" y="160" width="32" height="96">
+   <properties>
+    <property name="direction" value="Right"/>
+    <property name="variant" value="wooden_door"/>
+   </properties>
+  </object>
+  <object id="17" name="Door" x="896" y="160" width="32" height="96">
+   <properties>
+    <property name="direction" value="Left"/>
+    <property name="variant" value="metal_door"/>
+   </properties>
+  </object>
+  <object id="18" name="Door" x="800" y="288" width="128" height="32">
+   <properties>
+    <property name="direction" value="Horizontal"/>
+    <property name="variant" value="fancy_door"/>
+   </properties>
+  </object>
+  <object id="19" name="Bed" x="992" y="128" width="128" height="256">
+   <properties>
+    <property name="direction" value="S"/>
+    <property name="variant" value="bed"/>
+   </properties>
+  </object>
+  <object id="20" name="Bed" x="928" y="416" width="256" height="128">
+   <properties>
+    <property name="direction" value="E"/>
+    <property name="variant" value="large_bed"/>
+   </properties>
+  </object>
+  <object id="21" name="Fence" x="352" y="544" width="64" height="32">
+   <properties>
+    <property name="direction" value="Horizontal"/>
+   </properties>
+  </object>
+  <object id="22" name="Fence" x="416" y="544" width="64" height="32">
+   <properties>
+    <property name="direction" value="Horizontal"/>
+   </properties>
+  </object>
+  <object id="23" name="Gate" x="480" y="544" width="64" height="32">
+   <properties>
+    <property name="direction" value="Horizontal"/>
+   </properties>
+  </object>
+  <object id="24" name="Fence" x="544" y="544" width="64" height="32">
+   <properties>
+    <property name="direction" value="Horizontal"/>
+   </properties>
+  </object>
+  <object id="25" name="Fence" x="352" y="576" width="32" height="64">
+   <properties>
+    <property name="direction" value="Vertical"/>
+   </properties>
+  </object>
+  <object id="26" name="Fence" x="576" y="576" width="32" height="64">
+   <properties>
+    <property name="direction" value="Vertical"/>
+   </properties>
+  </object>
+  <object id="27" name="Fence" x="352" y="640" width="64" height="32">
+   <properties>
+    <property name="direction" value="Horizontal"/>
+   </properties>
+  </object>
+  <object id="28" name="Fence" x="416" y="640" width="64" height="32">
+   <properties>
+    <property name="direction" value="Horizontal"/>
+   </properties>
+  </object>
+  <object id="29" name="Fence" x="480" y="640" width="64" height="32">
+   <properties>
+    <property name="direction" value="Horizontal"/>
+   </properties>
+  </object>
+  <object id="30" name="Fence" x="544" y="640" width="64" height="32">
+   <properties>
+    <property name="direction" value="Horizontal"/>
+   </properties>
+  </object>
+  <object id="31" name="Flower" x="416" y="576" width="64" height="64">
+   <properties>
+    <property name="variant" value="flower_red"/>
+   </properties>
+  </object>
+  <object id="32" name="Flower" x="480" y="576" width="64" height="64">
+   <properties>
+    <property name="variant" value="flower_blue"/>
+   </properties>
+  </object>
+  <object id="33" name="Flower" x="512" y="608" width="64" height="64">
+   <properties>
+    <property name="variant" value="flower_yellow"/>
+   </properties>
+  </object>
+  <object id="34" name="Grass" x="160" y="544" width="64" height="64">
+   <properties>
+    <property name="variant" value="grass_1"/>
+   </properties>
+  </object>
+  <object id="35" name="Grass" x="224" y="608" width="64" height="64">
+   <properties>
+    <property name="variant" value="grass_2"/>
+   </properties>
+  </object>
+  <object id="36" name="Grass" x="288" y="672" width="64" height="64">
+   <properties>
+    <property name="variant" value="grass_3"/>
+   </properties>
+  </object>
+  <object id="37" name="Treasure Chest" x="896" y="672" width="32" height="32">
+   <properties>
+    <property name="variant" value="golden_chest"/>
+   </properties>
+  </object>
+  <object id="38" name="Treasure Chest" x="960" y="672" width="32" height="32">
+   <properties>
+    <property name="variant" value="wooden_chest"/>
+   </properties>
+  </object>
+  <object id="39" name="Door" x="1088" y="672" width="128" height="32">
+   <properties>
+    <property name="direction" value="Horizontal"/>
+    <property name="variant" value="fancy_door"/>
+   </properties>
+  </object>
+  <object id="40" name="Ball" x="1120" y="768" width="64" height="64">
+   <properties>
+    <property name="variant" value="red_ball"/>
+   </properties>
+  </object>
+  <object id="41" name="Flower" x="1056" y="864" width="64" height="64">
+   <properties>
+    <property name="variant" value="flower_red"/>
+   </properties>
+  </object>
+  <object id="42" name="Flower" x="1120" y="864" width="64" height="64">
+   <properties>
+    <property name="variant" value="flower_blue"/>
+   </properties>
+  </object>
+  <object id="43" name="Flower" x="1184" y="864" width="64" height="64">
+   <properties>
+    <property name="variant" value="flower_yellow"/>
+   </properties>
+  </object>
+  <object id="53" name="Crop" x="160" y="800" width="64" height="128">
+   <properties>
+    <property name="variant" value="tomato"/>
+   </properties>
+  </object>
+  <object id="54" name="Crop" x="224" y="800" width="64" height="128">
+   <properties>
+    <property name="variant" value="carrot"/>
+   </properties>
+  </object>
+  <object id="55" name="Crop" x="288" y="800" width="64" height="128">
+   <properties>
+    <property name="variant" value="wheat"/>
+   </properties>
+  </object>
+  <object id="56" name="Crop" x="352" y="800" width="64" height="128">
+   <properties>
+    <property name="variant" value="berry"/>
+   </properties>
+  </object>
+  <object id="57" name="Lantern" x="736" y="864" width="64" height="64">
+   <properties>
+    <property name="variant" value="paper"/>
+   </properties>
+  </object>
+  <object id="58" name="Lantern" x="800" y="864" width="64" height="64">
+   <properties>
+    <property name="variant" value="crystal"/>
+   </properties>
+  </object>
+  <object id="59" name="Fountain" x="864" y="800" width="128" height="128">
+   <properties>
+    <property name="variant" value="stone"/>
+   </properties>
+  </object>
+  <object id="60" name="Music Box" x="704" y="960" width="64" height="64">
+   <properties>
+    <property name="variant" value="music_box"/>
+   </properties>
+  </object>
+  <object id="61" name="Breeding Flower" x="448" y="800" width="64" height="128">
+   <properties>
+    <property name="variant" value="rose"/>
+   </properties>
+  </object>
+  <object id="62" name="Night Bloom" x="512" y="800" width="64" height="128">
+   <properties>
+    <property name="variant" value="blue_moon"/>
+   </properties>
+  </object>
+  <object id="63" name="Fountain" x="992" y="896" width="128" height="128">
+   <properties>
+    <property name="variant" value="marble"/>
+   </properties>
+  </object>
+  <object id="64" name="Lantern" x="1184" y="768" width="64" height="64">
+   <properties>
+    <property name="variant" value="paper"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="3" name="Mobs">
+  <object id="44" name="Butterfly" x="416" y="448" width="64" height="64">
+   <properties>
+    <property name="variant" value="small"/>
+   </properties>
+  </object>
+  <object id="45" name="Butterfly" x="512" y="448" width="64" height="64">
+   <properties>
+    <property name="variant" value="yellow_butterfly"/>
+   </properties>
+  </object>
+  <object id="46" name="Butterfly" x="736" y="544" width="64" height="64">
+   <properties>
+    <property name="variant" value="blue_butterfly"/>
+   </properties>
+  </object>
+  <object id="47" name="Butterfly" x="1056" y="800" width="64" height="64">
+   <properties>
+    <property name="variant" value="yellow_butterfly"/>
+   </properties>
+  </object>
+  <object id="48" name="NPC" x="704" y="256" width="64" height="64">
+   <properties>
+    <property name="variant" value="goblin"/>
+   </properties>
+  </object>
+  <object id="49" name="NPC" x="736" y="704" width="64" height="64">
+   <properties>
+    <property name="variant" value="slime"/>
+   </properties>
+  </object>
+  <object id="50" name="NPC" x="1024" y="512" width="64" height="64">
+   <properties>
+    <property name="variant" value="ghost"/>
+   </properties>
+  </object>
+  <object id="51" name="Butterfly" x="256" y="736" width="64" height="64">
+   <properties>
+    <property name="variant" value="small"/>
+   </properties>
+  </object>
+  <object id="52" name="Butterfly" x="640" y="928" width="64" height="64">
+   <properties>
+    <property name="variant" value="blue_butterfly"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

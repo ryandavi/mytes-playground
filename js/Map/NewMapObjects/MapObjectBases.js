@@ -332,13 +332,13 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
         }
     }
 
-    onOpened() {}
+    onOpened(_context = {}) {}
 
-    onClosed() {}
+    onClosed(_context = {}) {}
 
-    onOpenStateChanged() {}
+    onOpenStateChanged(_context = {}) {}
 
-    open() {
+    open(openContext = {}) {
         if (this.isOpen || this.isAnimating) return false;
 
         this.isAnimating = true;
@@ -347,7 +347,7 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
             this.isOpen = true;
             this.isAnimating = false;
             this.updateCollisionState();
-            this.onOpened();
+            this.onOpened(openContext);
 
             const loopAnimation = this.getOpenLoopAnimationName();
             if (this.hasAnimation(loopAnimation)) {
@@ -355,13 +355,13 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
             }
 
             this.emitToggleEvent('open');
-            this.onOpenStateChanged();
+            this.onOpenStateChanged(openContext);
         });
 
         return true;
     }
 
-    close() {
+    close(closeContext = {}) {
         if (!this.isOpen || this.isAnimating) return false;
 
         this.isAnimating = true;
@@ -370,7 +370,7 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
             this.isOpen = false;
             this.isAnimating = false;
             this.updateCollisionState();
-            this.onClosed();
+            this.onClosed(closeContext);
 
             const loopAnimation = this.getClosedLoopAnimationName();
             if (this.hasAnimation(loopAnimation)) {
@@ -378,14 +378,14 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
             }
 
             this.emitToggleEvent('closed');
-            this.onOpenStateChanged();
+            this.onOpenStateChanged(closeContext);
         });
 
         return true;
     }
 
-    toggle() {
-        return this.isOpen ? this.close() : this.open();
+    toggle(toggleContext = {}) {
+        return this.isOpen ? this.close(toggleContext) : this.open(toggleContext);
     }
 
     press(interactor) {
