@@ -132,22 +132,36 @@ class MyteClickHandler extends MyteBaseHandler {
 		if (!this.myte.isActiveMyte) {
 			this.myte.parent.setActiveMyte(this.myte);
 		}
-		setTimeout(() => {
-			if (this.myte.inputHandler.touchHandler) {
-				this.myte.inputHandler.touchHandler.handleStart({
-					preventDefault: () => {},
-					clientX: this.dragStartX,
-					clientY: this.dragStartY,
-					type: 'mousedown'
-				});
-			}
-		}, 10);
+
+		const touchHandler = this.myte.inputHandler?.touchHandler;
+		if (!touchHandler) return;
+
+		touchHandler.handleStart({
+			preventDefault: () => {},
+			clientX: this.dragStartX,
+			clientY: this.dragStartY,
+			type: 'mousedown'
+		});
+
+		// If the mouse was released before we got here, end immediately
+		const inputSystem = InputSystem.getInstance();
+		if (!inputSystem.isMouseButtonPressed()) {
+			touchHandler.handleEnd({ type: 'mouseup', changedTouches: null });
+		}
 	}
 
-	_onPressEnd() {
+	_onPressEnd(event) {
 		if (!this.isPressed) return;
 
 		this.isPressed = false;
+
+		// Safety valve: if the touch handler is still dragging (e.g. setTimeout race),
+		// force-end it now so the myte doesn't get stuck in drag state.
+		const touchHandler = this.myte.inputHandler?.touchHandler;
+		if (this.isDragging && touchHandler?.isDragging) {
+			touchHandler.handleEnd({ type: 'mouseup', changedTouches: null });
+		}
+
 		this.isDragging = false;
 
 		if (this.previousMode && this.myte.parent.ui.isTool(UIToolModes.DRAG)) {

@@ -19,8 +19,7 @@ class MyteTouchHandler extends DragHandler {
                     myte.parent.setActiveMyte(myte);
                 }
 
-
-
+                myte.playSound('ui_pickup_item');
                 myte.isDragging = true;
                 this.dragStartPosition = { x: myte.posX, y: myte.posY };
                 myte.parent.camera.setMode(CAMERA_FOLLOW_MODES.CHARACTER);
@@ -63,6 +62,7 @@ class MyteTouchHandler extends DragHandler {
                 });
             },
             onDragEnd: () => {
+                myte.playSound('ui_drop_item');
                 myte.queue.clear();
                 myte.parent.camera.setToPreviousMode();
                 if (myte.goal == MOVE_TYPES.GOHOME) {

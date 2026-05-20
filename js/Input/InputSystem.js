@@ -257,7 +257,8 @@ class InputSystem {
 		// Update mouse state
 		this.state.mouse.pressed = false;
 		this.state.mouse.button = null;
-		this.isDragging = false; // Reset dragging state
+		this.isDragging = false;
+		this._dragOwner = null; // Release exclusive drag claim
 		
 		// Record activity
 		this.recordActivity();
@@ -269,10 +270,40 @@ class InputSystem {
 	  get isDragging() {
 		return this._isDragging || false;
 	  }
-	  
+
 	  set isDragging(value) {
 		this._isDragging = value;
 	  }
+
+	/**
+	 * Claim exclusive drag ownership for this press cycle.
+	 * Returns true if the claim succeeded, false if another owner already holds it.
+	 * @param {Object} owner The DragComponent (or any object) claiming the drag
+	 * @returns {boolean}
+	 */
+	claimDrag(owner) {
+		if (this._dragOwner && this._dragOwner !== owner) return false;
+		this._dragOwner = owner;
+		return true;
+	}
+
+	/**
+	 * Release the exclusive drag claim.
+	 * @param {Object} owner Must match the current owner to release
+	 */
+	releaseDrag(owner) {
+		if (this._dragOwner === owner) {
+			this._dragOwner = null;
+		}
+	}
+
+	/**
+	 * Whether any component currently owns the drag for this press.
+	 * @returns {boolean}
+	 */
+	get hasDragOwner() {
+		return !!this._dragOwner;
+	}
 	
 	/**
 	 * Handle click events
@@ -549,6 +580,7 @@ class InputSystem {
 	  if (activeTouch) {
 		this.state.activeTouchId = null;
 		this.state.mouse.pressed = false;
+		this._dragOwner = null; // Release exclusive drag claim
 		
 		// Find new active touch if any remain
 		if (this.state.touches.size > 0) {

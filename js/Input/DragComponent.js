@@ -50,7 +50,6 @@ class DragComponent extends InputComponent {
 	 */
 	windowMouseUpHandler = (event) => {
 		if (this.isDragging) {
-			console.log('Window mouseup detected while dragging');
 			this.handleEnd({
 				position: {
 					x: event.pageX || 0,
@@ -68,7 +67,6 @@ class DragComponent extends InputComponent {
 	 */
 	windowTouchEndHandler = (event) => {
 		if (this.isDragging && event.changedTouches) {
-			console.log('Window touchend detected while dragging');
 			for (let i = 0; i < event.changedTouches.length; i++) {
 				const touch = event.changedTouches[i];
 				if (touch.identifier === this.touchId) {
@@ -129,8 +127,6 @@ class DragComponent extends InputComponent {
 			}
 		}
 	
-		// Rest of the function remains the same...
-		console.log('DragComponent: handleStart called');
 
 
 		// Store starting information
@@ -178,12 +174,9 @@ class DragComponent extends InputComponent {
 			const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 			const timeElapsed = Date.now() - this.dragStartTime;
 
-			console.log(`DragComponent: Move distance=${distance}, threshold=${this.options.dragThreshold}`);
-
 			// Start dragging if we've moved enough and enough time has passed
 			if (distance >= this.options.dragThreshold &&
 				timeElapsed >= this.options.dragTimeThreshold) {
-				console.log('DragComponent: Starting drag from move');
 				this.startDrag(event);
 			}
 
@@ -243,7 +236,6 @@ class DragComponent extends InputComponent {
 	handleEnd = (event) => {
 		if (!this.active) return;
 
-		console.log('DragComponent: handleEnd called, isDragging=', this.isDragging);
 
 		// Reset mousedown tracking regardless of whether we were dragging
 		this.mouseDownReceived = false;
@@ -261,7 +253,6 @@ class DragComponent extends InputComponent {
 
 		// Call end callback
 		if (this.options.onDragEnd) {
-			console.log('DragComponent: Calling onDragEnd callback');
 			this.options.onDragEnd({
 				originalEvent: event.originalEvent,
 				position: constrainedPosition,
@@ -277,6 +268,7 @@ class DragComponent extends InputComponent {
 		// Reset state
 		this.isDragging = false;
 		this.touchId = null;
+		this.inputSystem.releaseDrag(this);
 
 		// Reset element style if we modified it
 		if (this.element && this.options.touchAction) {
@@ -293,7 +285,9 @@ class DragComponent extends InputComponent {
 	 * Start the drag operation
 	 */
 	startDrag(event) {
-		console.log('DragComponent: startDrag called');
+		// Only one entity may drag at a time per press cycle
+		if (!this.inputSystem.claimDrag(this)) return;
+
 		this.isDragging = true;
 
 		// Set touch-action CSS for better touch handling
@@ -500,7 +494,6 @@ class DragComponent extends InputComponent {
 	 */
 	stopDrag() {
 		if (this.isDragging) {
-			console.log('DragComponent: Externally stopping drag');
 			const mousePos = this.inputSystem.getMousePosition();
 			this.handleEnd({
 				position: mousePos,

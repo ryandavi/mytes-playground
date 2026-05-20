@@ -44,6 +44,7 @@ class DragHandler {
         this.boundHandleStart = this.handleStart.bind(this);
         this.boundHandleMove = this.handleMove.bind(this);
         this.boundHandleEnd = this.handleEnd.bind(this);
+        this.boundHandleVisibility = this.handleVisibility.bind(this);
 
         this.initializeEventListeners();
     }
@@ -88,6 +89,7 @@ class DragHandler {
         window.addEventListener('mouseup', this.boundHandleEnd);
         window.addEventListener('touchend', this.boundHandleEnd);
         window.addEventListener('touchcancel', this.boundHandleEnd);
+        document.addEventListener('visibilitychange', this.boundHandleVisibility);
 
         // Initialize drag state
         this.initializeDrag();
@@ -166,9 +168,16 @@ class DragHandler {
     handleEnd = (event) => {
         if (!this.isDragging) return;
         if (event.type === 'touchend' && !this.isCorrectTouch(event)) return;
-        
+
         this.finalizeDrag();
         this.cleanup();
+    }
+
+    handleVisibility = () => {
+        if (document.hidden && this.isDragging) {
+            this.finalizeDrag();
+            this.cleanup();
+        }
     }
 
     isCorrectTouch(event) {
@@ -191,6 +200,7 @@ class DragHandler {
         window.removeEventListener('mouseup', this.boundHandleEnd);
         window.removeEventListener('touchend', this.boundHandleEnd);
         window.removeEventListener('touchcancel', this.boundHandleEnd);
+        document.removeEventListener('visibilitychange', this.boundHandleVisibility);
 
         // Cancel any pending animation frame
         if (this.rafId) {
