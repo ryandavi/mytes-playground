@@ -1,6 +1,12 @@
 // LoadingManager.js
 class LoadingManager {
-    constructor() {
+    static STAGES = Object.freeze({
+        CORE: 'core',
+        RESOURCES: 'resources',
+        CONTAINER: 'container',
+    });
+
+    constructor(options = {}) {
 		this.loadingScreen = document.getElementById('loading-screen');
 		this.window         = this.loadingScreen?.querySelector('#loading-modal')         ?? null;
 		this.progressBar    = this.loadingScreen?.querySelector('.loading-progress')       ?? null;
@@ -9,13 +15,16 @@ class LoadingManager {
 		this.skipIcon       = this.loadingScreen?.querySelector('.modal-close-btn')        ?? null;
 		this.progressContainer = this.loadingScreen?.querySelector('.loading-progress-container') ?? null;
         this.isLoading = false;
-        
+
+        const params = new URLSearchParams(window.location.search);
+
         // Debug options
         this.debugOptions = {
-            skipLoading: false,     // Skip loading screen entirely (dev only)
-            fastLoading: false,     // Show messages immediately without minimum display time
-            dontHide: false,        // Keep loading screen visible after completion
+            skipLoading: params.has('skipLoading'),
+            fastLoading: params.has('fastLoading'),
+            dontHide: params.has('dontHide'),
             skipLoadingButton: true,
+            ...options.debugOptions,
         };
 
         // Settings
@@ -25,15 +34,11 @@ class LoadingManager {
             finalMessage: "Ready to play!",
             hideDelay: 100,
             showWindowDelay: 150,
+            ...options.settings,
         };
-        
-        // Loading stages tracking (normalized to 0-1 range)
-        this.stages = {
-            core: { weight: 0.45, progress: 0 },        // Core initialization
-            resources: { weight: 0.1, progress: 0 },   // Resource loading (reduced weight since we have minimal resources)
-            container: { weight: 0.45, progress: 0 }    // Container initialization
-        };
-        
+
+        this.stages = this.createStages(options.stages);
+
         // Message management
         this.messageQueue = [];
         this.currentMessage = null;
@@ -48,6 +53,68 @@ class LoadingManager {
         this.showWindowTimer = null;
         this.hideTimer = null;
         this.finalHideTimer = null;
+        this.manualProgress = null;
+        this._containerWidth = 0;
+        this.boundHandleResize = null;
+    }
+
+    createStages(stageDefinitions = null) {
+        const fallbackStages = {
+            [LoadingManager.STAGES.CORE]: { weight: 1 },
+            [LoadingManager.STAGES.RESOURCES]: { weight: 1 },
+            [LoadingManager.STAGES.CONTAINER]: { weight: 1 },
+        };
+        const definitions = stageDefinitions ?? fallbackStages;
+
+        return Object.fromEntries(
+            Object.entries(definitions).map(([stageName, config = {}]) => [
+                stageName,
+                {
+                    weight: Number.isFinite(config.weight) ? Math.max(0, config.weight) : 1,
+                    progress: 0,
+                },
+            ])
+        );
+    }
+
+    resetStages() {
+        Object.values(this.stages).forEach(stage => {
+            stage.progress = 0;
+        });
+    }
+
+    cacheProgressMeasurements() {
+        const containerWidth = this.progressContainer?.offsetWidth ?? 0;
+        const iconWidth = this.loadingIcon?.offsetWidth ?? 0;
+        this._containerWidth = Math.max(0, containerWidth - iconWidth);
+    }
+
+    beginOverlay(options = {}) {
+        const {
+            progress = 0,
+            message = null,
+        } = options;
+
+        this.manualProgress = Math.min(100, Math.max(0, progress));
+        this.show();
+        this.cacheProgressMeasurements();
+        this.updateProgressUI(this.manualProgress);
+
+        if (message) {
+            this.setMessage(message);
+        }
+
+        if (this.window) {
+            this.window.classList.add('visible');
+        }
+
+        this.cacheProgressMeasurements();
+        this.updateProgressUI(this.manualProgress);
+        this.startProgressAnimation();
+    }
+
+    setManualProgress(percent) {
+        this.manualProgress = Math.min(100, Math.max(0, percent));
     }
     
     initialize() {
@@ -58,13 +125,17 @@ class LoadingManager {
             this.hide();
 
 
-			this.loadingScreen.style.transition = 'none'; // Disable transition
-			this.loadingScreen.style.opacity = '0'; // Instantly show it
+			if (this.loadingScreen) {
+				this.loadingScreen.style.transition = 'none'; // Disable transition
+				this.loadingScreen.style.opacity = '0'; // Instantly show it
+			}
 	
 			// Restore transition after a short delay to avoid affecting future animations
 			requestAnimationFrame(() => {
 				requestAnimationFrame(() => {
-					this.loadingScreen.style.transition = ''; // Restore original transition
+					if (this.loadingScreen) {
+						this.loadingScreen.style.transition = ''; // Restore original transition
+					}
 				});
 			});
 
@@ -76,12 +147,18 @@ class LoadingManager {
         this.show();
         
         // Reset progress for all stages
-        Object.keys(this.stages).forEach(key => {
-            this.stages[key].progress = 0;
-        });
+        this.resetStages();
+        this.manualProgress = null;
 
         this.displayProgress = 0;
         this.isComplete = false;
+        this.cacheProgressMeasurements();
+
+        if (!this.boundHandleResize) {
+            this.boundHandleResize = () => this.cacheProgressMeasurements();
+        }
+        window.removeEventListener('resize', this.boundHandleResize);
+        window.addEventListener('resize', this.boundHandleResize);
         
         this.updateProgressUI(0);
         this.setMessage("Initializing...");
@@ -109,7 +186,9 @@ class LoadingManager {
 
 		// delay with  showWindowDelay
 		this.showWindowTimer = setTimeout(() => {
-			this.window.classList.add('visible');
+			this.window?.classList.add('visible');
+            this.cacheProgressMeasurements();
+            this.updateProgressUI(this.displayProgress);
 			// Start progress animation
 			this.startProgressAnimation();
 		}, this.settings.showWindowDelay)
@@ -119,16 +198,18 @@ class LoadingManager {
     startProgressAnimation() {
         // Clear any existing interval
         if (this.progressInterval) {
-            clearInterval(this.progressInterval);
+            return;
         }
         
         // Update progress at regular intervals
         const updateInterval = 40;
         this.progressInterval = setInterval(() => {
-            let baseProgress = this.calculateActualProgress();
+            let baseProgress = this.manualProgress ?? this.calculateActualProgress();
 
             // Don't reach 100% while message queue is still draining
-            if (this.isComplete && (this.messageQueue.length > 0 || this.messageTimer)) {
+            if (this.manualProgress === null &&
+                this.isComplete &&
+                (this.messageQueue.length > 0 || this.messageTimer)) {
                 baseProgress = Math.min(baseProgress, 95);
             }
             
@@ -213,11 +294,12 @@ class LoadingManager {
         }
     }
     
-    hide() {
+	hide() {
 
 		if(this.debugOptions.dontHide) return false;
 
         this.isLoading = false;
+        this.manualProgress = null;
 
         if (this.loadingScreen) {
             this.loadingScreen.classList.add('hidden');
@@ -247,8 +329,8 @@ class LoadingManager {
             const canvas = document.querySelector('.canvas');
             if (canvas) {
                 canvas.style.visibility = 'visible';
-                this.window.classList.remove('visible');
             }
+            this.window?.classList.remove('visible');
         }, this.settings.hideDelay);
     }
     
@@ -267,10 +349,13 @@ class LoadingManager {
     
     positionLoadingIcon(percent) {
         if (!this.loadingIcon) return;
+
+        if (this._containerWidth <= 0) {
+            this.cacheProgressMeasurements();
+        }
         
         // Calculate new position
-        const containerWidth = this.progressContainer.offsetWidth - this.loadingIcon.offsetWidth;
-        const position = (percent / 100) * containerWidth;
+        const position = (percent / 100) * this._containerWidth;
         
         // Apply new positioning
         this.loadingIcon.style.left = `${position}px`;
@@ -320,8 +405,8 @@ class LoadingManager {
     
     completeLoading() {
         if (this.isComplete) return; // Guard against multiple calls
-        Object.keys(this.stages).forEach(key => {
-            this.stages[key].progress = 1;
+        Object.values(this.stages).forEach(stage => {
+            stage.progress = 1;
         });
         this.isComplete = true;
         this.setMessage(this.settings.finalMessage);
@@ -347,9 +432,10 @@ class LoadingManager {
         this.messageQueue = [];
         
         // Set all progress to 100%
-        Object.keys(this.stages).forEach(key => {
-            this.stages[key].progress = 1;
+        Object.values(this.stages).forEach(stage => {
+            stage.progress = 1;
         });
+        this.manualProgress = 100;
         
         // Force progress to 100%
         this.displayProgress = 100;
@@ -390,6 +476,10 @@ class LoadingManager {
         if (this.finalHideTimer) {
             clearTimeout(this.finalHideTimer);
             this.finalHideTimer = null;
+        }
+
+        if (this.boundHandleResize) {
+            window.removeEventListener('resize', this.boundHandleResize);
         }
 
         if (this.skipIcon && this.skipClickHandler) {

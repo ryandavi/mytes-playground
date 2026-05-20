@@ -1,5 +1,6 @@
 class MyteCore {
     static AUDIO_UNLOCK_EVENTS = ['click', 'touchstart', 'keydown'];
+    static USER_DATA_ID_TOKEN = '{userId}';
 
     constructor() {
 		// Singleton pattern
@@ -30,13 +31,31 @@ class MyteCore {
             defaultMode: MOVE_TYPES.FOLLOW,
             defaultFollowMode: MOVE_FOLLOW_TYPES.NORMAL,
 
-            // Default user data file (dev fallback when no saved session exists)
-            defaultUserDataPath: 'data/user/Ryan.json',
+            // User data
+            userData: {
+                defaultPath: 'data/user/Ryan.json',
+                filePathTemplate: `data/user/${MyteCore.USER_DATA_ID_TOKEN}.json`,
+                localStorageKeyPrefix: 'user_',
+                lastUserIdKey: 'lastUserId',
+            },
+
+            // DOM/boot configuration
+            primaryContainerId: 'container-1',
+
+            // Loading
+            loading: {
+                stages: {
+                    [LoadingManager.STAGES.CORE]: { weight: 0.45 },
+                    [LoadingManager.STAGES.RESOURCES]: { weight: 0.10 },
+                    [LoadingManager.STAGES.CONTAINER]: { weight: 0.45 },
+                },
+            },
 
             // Audio
             sound: {
                 enabled: true,
                 musicEnabled: true,
+                unlockDelay: 400,
             },
         };
 
@@ -45,8 +64,9 @@ class MyteCore {
         this.eventManager = new EventManager(this);
         this.resourceManager = new ResourceManager(this);
 
-        this.loadingManager = new LoadingManager();
+        this.loadingManager = new LoadingManager(this.config.loading);
         this.boundUnlockAudio = null;
+        this.boundHandleVisibilityChange = this.handleVisibilityChange.bind(this);
 
         this.soundManager = new SoundManager(this, {
             soundEnabled: this.config.sound.enabled,
@@ -78,19 +98,19 @@ class MyteCore {
             await this.initializeUser();
 
             this.loadingManager.setMessage("Setting up world...");
-            const container = await this.createContainer('container-1');
+            const container = await this.createContainer(this.config.primaryContainerId);
             if (!container) throw new Error('Failed to create main container');
             await container.init();
 
             this.loadingManager.setMessage("Initializing audio...");
             this.initializeAudio();
-            this.loadingManager.updateStageProgress('core', 1);
+            this.loadingManager.updateStageProgress(LoadingManager.STAGES.CORE, 1);
 
             // Load remaining resources in background; complete loading when done
             this.resourceManager.loadResources()
                 .catch(error => console.warn('Some resources failed to load:', error))
                 .finally(() => {
-                    this.loadingManager.updateStageProgress('resources', 1);
+                    this.loadingManager.updateStageProgress(LoadingManager.STAGES.RESOURCES, 1);
                     this.loadingManager.completeLoading();
                 });
 
@@ -122,7 +142,7 @@ class MyteCore {
             try {
                 await this.soundManager.init();
                 this.removeAudioUnlockListeners();
-                setTimeout(() => this.soundManager.startAllSounds(), 400);
+                setTimeout(() => this.soundManager.startAllSounds(), this.config.sound.unlockDelay);
             } catch (error) {
                 console.error('Failed to initialize audio after user interaction:', error);
             }
@@ -150,42 +170,45 @@ class MyteCore {
 
         try {
             // Try to load saved user data from localStorage first
-            const savedUserId = localStorage.getItem('lastUserId');
+            const savedUserId = localStorage.getItem(this.config.userData.lastUserIdKey);
             if (savedUserId) {
                 const success = await this.loadUserData(savedUserId);
                 if (success) {
+                    this.rememberLastUserId();
                     console.log('Loaded saved user data');
                     return;
                 }
             }
 
             // If no saved data, load default user data from JSON
-            const success = await this.user.loadUserDataFromFile(this.config.defaultUserDataPath);
+            const success = await this.user.loadUserDataFromFile(this.config.userData.defaultPath);
             if (!success) {
                 console.warn('Failed to load default user data, using empty user');
                 // Set some basic default values
                 this.user.login('Guest' + Math.floor(Math.random() * 1000), 'guest_' + Date.now());
+                this.rememberLastUserId();
+            } else {
+                this.rememberLastUserId();
             }
         } catch (error) {
             console.error('Error initializing user:', error);
             // Create a basic guest user as fallback
             this.user.login('Guest' + Math.floor(Math.random() * 1000), 'guest_' + Date.now());
+            this.rememberLastUserId();
         }
     }
 
     async loadUserData(userId) {
         try {
-            // Try to load user-specific data file first
-            const success = await this.user.loadUserDataFromFile(`user_${userId}.json`);
-            if (success) {
+            // Prefer the local save because it is synchronous and reflects the latest user state.
+            if (this.user.loadUserDataFromStorage(userId)) {
+                this.rememberLastUserId(userId);
                 return true;
             }
 
-            // If that fails, try localStorage
-            const savedData = localStorage.getItem(`user_${userId}`);
-            if (savedData) {
-                const userData = JSON.parse(savedData);
-                this.user.login(userData.username, userData.userId);
+            const success = await this.user.loadUserDataFromFile(this.getUserDataFilePath(userId));
+            if (success) {
+                this.rememberLastUserId();
                 return true;
             }
 
@@ -194,6 +217,19 @@ class MyteCore {
             console.error('Error loading user data:', error);
             return false;
         }
+    }
+
+    getUserStorageKey(userId) {
+        return `${this.config.userData.localStorageKeyPrefix}${userId}`;
+    }
+
+    getUserDataFilePath(userId) {
+        return this.config.userData.filePathTemplate.replace(MyteCore.USER_DATA_ID_TOKEN, userId);
+    }
+
+    rememberLastUserId(userId = this.user?.userId) {
+        if (!userId) return;
+        localStorage.setItem(this.config.userData.lastUserIdKey, userId);
     }
 
     async createContainer(elementId) {
@@ -233,7 +269,17 @@ class MyteCore {
         }
     }
 
+    handleVisibilityChange() {
+        if (document.hidden) return;
+
+        this.tickAccumulator = 0;
+        this.lastFrameTime = performance.now();
+    }
+
     startUpdateLoop() {
+        document.removeEventListener('visibilitychange', this.boundHandleVisibilityChange);
+        document.addEventListener('visibilitychange', this.boundHandleVisibilityChange);
+
         const updateFrame = (timestamp) => {
             if (!this.isInitialized) return;
 
@@ -284,6 +330,7 @@ class MyteCore {
         this.removeAudioUnlockListeners();
         this.soundManager?.dispose();
         this.soundManager = null;
+        document.removeEventListener('visibilitychange', this.boundHandleVisibilityChange);
 
         // Snapshot keys to avoid mutating the Map during iteration
         [...this.containers.keys()].forEach(id => this.removeContainer(id));

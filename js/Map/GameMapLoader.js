@@ -7,6 +7,17 @@ class GameMapLoader {
         console.log(`[GameMapLoader] Initialized`);
     }
 
+    updateTransitionOverlay(progress, message = null) {
+        const loadingManager = this.core?.loadingManager;
+        if (!loadingManager) return;
+
+        loadingManager.setManualProgress(progress);
+
+        if (message) {
+            loadingManager.setMessage(message);
+        }
+    }
+
     // Optional initialization method
     async init() {
         console.log(`[GameMapLoader] Init called`);
@@ -58,9 +69,10 @@ class GameMapLoader {
 
         // Show loading screen
         if (this.core && this.core.loadingManager) {
-            this.core.loadingManager.show();
-            this.core.loadingManager.setMessage(options.message || `Traveling to ${mapId}...`);
-            this.core.loadingManager.updateStageProgress('container', 0.1); // 10% progress
+            this.core.loadingManager.beginOverlay({
+                progress: 10,
+                message: options.message || `Traveling to ${mapId}...`
+            });
         }
 
         try {
@@ -68,8 +80,7 @@ class GameMapLoader {
             if (this.currentMap) {
                 // Update progress
                 if (this.core && this.core.loadingManager) {
-                    this.core.loadingManager.updateStageProgress('container', 0.3); // 30% progress
-                    this.core.loadingManager.setMessage(`Unloading current map...`);
+                    this.updateTransitionOverlay(30, `Unloading current map...`);
                 }
 
                 // Don't dispose the current map yet - keep it in case we need to roll back
@@ -77,8 +88,7 @@ class GameMapLoader {
 
             // Update progress
             if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.updateStageProgress('container', 0.5); // 50% progress
-                this.core.loadingManager.setMessage(`Loading ${mapId}...`);
+                this.updateTransitionOverlay(50, `Loading ${mapId}...`);
             }
 
             // Load the new map
@@ -92,8 +102,7 @@ class GameMapLoader {
 
             // Update progress
             if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.updateStageProgress('container', 0.9); // 90% progress
-                this.core.loadingManager.setMessage(`Almost ready...`);
+                this.updateTransitionOverlay(90, `Almost ready...`);
             }
 
             // Now that we have successfully loaded the new map, we can safely dispose the old one
@@ -106,8 +115,7 @@ class GameMapLoader {
 
             // Complete loading and hide loading screen
             if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.updateStageProgress('container', 1.0); // 100% progress
-                this.core.loadingManager.setMessage(`Welcome to ${mapId}!`);
+                this.updateTransitionOverlay(100, `Welcome to ${mapId}!`);
 
                 // Wait a short moment before hiding
                 setTimeout(() => {

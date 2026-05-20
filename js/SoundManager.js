@@ -47,7 +47,7 @@ class SoundManager {
 		this.triggeredSounds = new Set(); // Keep track of currently triggered sounds
 
 		// Species sound profiles - defines which instrument/synth to use for each species
-		this.speciesVoices = {
+		this.defaultSpeciesVoices = {
 			"snail": {
 				synthType: "FM",  // FMSynth for snails
 				settings: {
@@ -507,6 +507,7 @@ class SoundManager {
 				volume: 0.5
 			}
 		};
+		this.speciesVoices = this._cloneVoiceData(this.defaultSpeciesVoices);
 
 		// Sound definitions using Tone.js synthesis
 		this.synthPresets = {
@@ -1640,6 +1641,108 @@ class SoundManager {
 		};
 	}
 
+	_cloneVoiceData(data) {
+		if (typeof structuredClone === 'function') {
+			return structuredClone(data);
+		}
+
+		return JSON.parse(JSON.stringify(data));
+	}
+
+	registerVoice(characterId, profile = {}) {
+		if (!characterId) {
+			console.warn('registerVoice called without a characterId');
+			return this.getVoice('default');
+		}
+
+		const fallbackVoice = this.getVoice('default') || {
+			synthType: 'Synth',
+			baseNote: 'C4',
+			settings: {
+				oscillator: { type: 'triangle' },
+				envelope: {
+					attack: 0.01,
+					decay: 0.1,
+					sustain: 0.2,
+					release: 0.2
+				}
+			},
+			volume: 0.5
+		};
+
+		const normalizedVoice = {
+			synthType: profile.synthType || fallbackVoice.synthType,
+			baseNote: profile.baseNote || fallbackVoice.baseNote,
+			settings: profile.settings
+				? this._cloneVoiceData(profile.settings)
+				: {
+					oscillator: {
+						type: profile.waveform || fallbackVoice.settings?.oscillator?.type || 'triangle'
+					},
+					envelope: {
+						attack: profile.attack ?? fallbackVoice.settings?.envelope?.attack ?? 0.01,
+						decay: profile.decay ?? fallbackVoice.settings?.envelope?.decay ?? 0.1,
+						sustain: profile.sustain ?? fallbackVoice.settings?.envelope?.sustain ?? 0.2,
+						release: profile.release ?? fallbackVoice.settings?.envelope?.release ?? 0.2
+					}
+				},
+			volume: profile.volume ?? fallbackVoice.volume ?? 0.5
+		};
+
+		if (profile.notePattern) {
+			normalizedVoice.notePattern = [...profile.notePattern];
+		}
+
+		if (profile.speedMultiplier !== undefined) {
+			normalizedVoice.speedMultiplier = profile.speedMultiplier;
+		}
+
+		if (profile.modifiers) {
+			normalizedVoice.modifiers = this._cloneVoiceData(profile.modifiers);
+		}
+
+		this.speciesVoices[characterId] = normalizedVoice;
+		return normalizedVoice;
+	}
+
+	getVoice(characterId) {
+		if (!characterId) {
+			return this.speciesVoices.default ?? null;
+		}
+
+		return this.speciesVoices[characterId] ?? this.speciesVoices.default ?? null;
+	}
+
+	clearVoices(preserveDefaults = true) {
+		this.speciesVoices = preserveDefaults
+			? this._cloneVoiceData(this.defaultSpeciesVoices)
+			: {};
+	}
+
+	_getCurrentHour() {
+		const firstContainer = this.parent?.getFirstContainer?.();
+		const timeData = firstContainer?.timeManager?.getTimeData?.();
+		return Number.isFinite(timeData?.hour) ? timeData.hour : null;
+	}
+
+	_getMusicForHour(hour) {
+		if (!Number.isFinite(hour)) {
+			return "music_main";
+		}
+
+		return hour >= 6 && hour < 19 ? "music_main" : "music_sunny";
+	}
+
+	_getAmbientForHour(hour) {
+		const ambientTracks = ["env_wind"];
+
+		if (Number.isFinite(hour) && hour >= 7 && hour <= 12) {
+			ambientTracks.push("env_birds");
+		}
+
+		return ambientTracks;
+	}
+
 	init() {
 		if (this.initialized) return Promise.resolve();
 
@@ -1982,22 +2085,7 @@ class SoundManager {
 		if (this._lastMusicId) {
 			this.startMusic(this._lastMusicId);
 		} else {
-			// Otherwise use time-based music selection
-			let firstContainer = this.parent.getFirstContainer();
-			if (firstContainer && firstContainer.timeManager) {
-				const timeData = firstContainer.timeManager.getTimeData();
-				const hour = timeData.hour;
-
-				// Play appropriate music based on time
-				if (hour >= 6 && hour < 19) {
-					this.startMusic("music_main");
-				} else {
-					this.startMusic("music_sunny");
-				}
-			} else {
-				// Default fallback
-				this.startMusic("music_main");
-			}
+			this.startMusic(this._getMusicForHour(this._getCurrentHour()));
 		}
 	}
 
@@ -2016,21 +2104,9 @@ class SoundManager {
 		if (!this.soundEnabled || !this.initialized) return;
 
 
-		// Restart basic ambient sounds
-		this.playAmbient("env_wind");
-
-		// Time-based ambient sounds
-		let firstContainer = this.parent.getFirstContainer();
-		if (firstContainer && firstContainer.timeManager) {
-			const timeData = firstContainer.timeManager.getTimeData();
-			const hour = timeData.hour;
-
-			if (hour >= 7 && hour <= 12) {
-				this.playAmbient("env_birds");
-			} else if (hour < 6 || hour >= 19) {
-				// this.playAmbient("env_cricket");
-			}
-		}
+		this._getAmbientForHour(this._getCurrentHour()).forEach(soundId => {
+			this.playAmbient(soundId);
+		});
 	}
 
 	// Stop only sound effects without affecting music

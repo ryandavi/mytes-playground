@@ -149,22 +149,7 @@ class MyteSpeech {
 	 * @param {Object} options - Voice configuration options
 	 */
 	createVoice(characterId, options = {}) {
-		this.soundManager.speciesVoices[characterId] = {
-			synthType: options.synthType || "Synth",
-			baseNote: options.baseNote || "C4",
-			settings: options.settings || {
-				oscillator: { type: options.waveform || "triangle" },
-				envelope: {
-					attack: options.attack || 0.01,
-					decay: options.decay || 0.1,
-					sustain: options.sustain || 0.2,
-					release: options.release || 0.2
-				}
-			},
-			volume: options.volume || 0.5
-		};
-
-		return this.soundManager.speciesVoices[characterId];
+		return this.soundManager.registerVoice(characterId, options);
 	}
 
 	/**
@@ -268,7 +253,7 @@ class MyteSpeech {
 		}
 
 		// Get voice profile
-		const voiceProfile = this.soundManager.speciesVoices[options?.species] || this.soundManager.speciesVoices.default;
+		const voiceProfile = this.soundManager.getVoice(options?.species || settings.character);
 		const baseSynthType = voiceProfile.synthType || "Synth";
 		const baseNote = voiceProfile.baseNote || "C4";
 
@@ -577,6 +562,6 @@ class MyteSpeech {
 	 */
 	dispose() {
 		this.stopSpeech();
-		this.soundManager.speciesVoices = {};
+		this.soundManager.clearVoices();
 	}
 }

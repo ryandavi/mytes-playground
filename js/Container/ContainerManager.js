@@ -1,4 +1,12 @@
 class ContainerManager {
+    static INIT_PROGRESS = Object.freeze({
+        ENVIRONMENT: 0.10,
+        INVENTORY: 0.30,
+        MAP: 0.50,
+        MYTES: 0.80,
+        COMPLETE: 1.00,
+    });
+
     constructor(elementId, core) {
         this.core = core;
         this.mytes = [];
@@ -32,6 +40,16 @@ class ContainerManager {
         }
 
     }
+
+    updateContainerLoading(progress, message = null) {
+        if (!this.core?.loadingManager) return;
+
+        if (message) {
+            this.core.loadingManager.setMessage(message);
+        }
+
+        this.core.loadingManager.updateStageProgress(LoadingManager.STAGES.CONTAINER, progress);
+    }
     // Update the init method in ContainerManager.js to set isInitialLoad flag
     async init() {
         try {
@@ -50,11 +68,10 @@ class ContainerManager {
                 throw new Error('Canvas element is missing');
             }
 
-            // Update loading status
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Initializing game environment...");
-                this.core.loadingManager.updateStageProgress('container', 0.1);
-            }
+            this.updateContainerLoading(
+                ContainerManager.INIT_PROGRESS.ENVIRONMENT,
+                "Initializing game environment..."
+            );
 
             // Initialize camera
             console.log('[ContainerManager] Initializing camera');
@@ -94,11 +111,7 @@ class ContainerManager {
                 this.core.user.setInventory(this.inventory);
             }
 
-            // Update loading progress
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Initializing Mytes...");
-                this.core.loadingManager.updateStageProgress('container', 0.8);
-            }
+            this.updateContainerLoading(ContainerManager.INIT_PROGRESS.INVENTORY);
 
 
 
@@ -124,11 +137,10 @@ class ContainerManager {
                 }
             }
 
-            // Update loading progress
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Loading initial map...");
-                this.core.loadingManager.updateStageProgress('container', 0.5);
-            }
+            this.updateContainerLoading(
+                ContainerManager.INIT_PROGRESS.MAP,
+                "Loading initial map..."
+            );
 
             console.log('[ContainerManager] Starting initial map transition');
 
@@ -156,6 +168,10 @@ class ContainerManager {
 
             // Set up mytes
             console.log('[ContainerManager] Setting up Mytes');
+            this.updateContainerLoading(
+                ContainerManager.INIT_PROGRESS.MYTES,
+                "Initializing Mytes..."
+            );
             await this.setupMytes();
 
 
@@ -170,7 +186,7 @@ class ContainerManager {
                 console.warn('[ContainerManager] UI not defined');
             }
 
-            this.core?.loadingManager?.updateStageProgress('container', 1.0);
+            this.updateContainerLoading(ContainerManager.INIT_PROGRESS.COMPLETE);
             // completeLoading() is called by Core once all stages finish — not here.
 
             console.log('[ContainerManager] Initialization completed successfully');

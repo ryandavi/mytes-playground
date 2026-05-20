@@ -17,8 +17,8 @@ class ResourceManager {
 
     static CURSORS = {
         'pointer':     { path: 'images/cursor/arrow.png', essential: true  },
-        'grab':        { path: 'images/cursor/arrow.png', essential: true  },
-        'grabbing':    { path: 'images/cursor/arrow.png', essential: true  },
+        'grab':        { path: 'images/cursor/hand2.png', essential: true  },
+        'grabbing':    { path: 'images/cursor/hand3.png', essential: true  },
         'arrow_up':    { path: 'images/cursor/arrow.png'                   },
         'arrow_down':  { path: 'images/cursor/arrow.png'                   },
         'arrow_left':  { path: 'images/cursor/arrow.png'                   },
@@ -29,12 +29,16 @@ class ResourceManager {
 
     // Maximum simultaneous image loads (browser typically allows 6-8 per origin anyway)
     static MAX_CONCURRENT_LOADS = 8;
+    static MAX_LOAD_ATTEMPTS = 2;
+    static RETRY_DELAY_MS = 150;
+    static PLACEHOLDER_SPRITE_DATA_URI = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
     constructor(core) {
         this.core = core;
         this.sprites = new Map();
         this.isLoaded = false;
-        this.loadedResources = new Set(); // Tracks IDs in-flight or completed to prevent duplicate loads
+        this.loadedResources = new Set();
+        this.pendingLoads = new Map();
     }
 
     // --- Public API ---------------------------------------------------------
@@ -48,7 +52,7 @@ class ResourceManager {
             this.loadSprite(id, path, true).then(() => {
                 loaded++;
                 this.core?.loadingManager?.updateStageProgress(
-                    'resources',
+                    LoadingManager.STAGES.RESOURCES,
                     (loaded / total) * 0.3 // Essentials occupy the first 30% of the resources stage
                 );
             })
@@ -163,7 +167,7 @@ class ResourceManager {
                 loaded++;
                 if (stageRange > 0) {
                     this.core?.loadingManager?.updateStageProgress(
-                        'resources',
+                        LoadingManager.STAGES.RESOURCES,
                         Math.min(stageOffset + (loaded / total) * stageRange, 0.99)
                     );
                 }
@@ -179,23 +183,81 @@ class ResourceManager {
     }
 
     loadSprite(id, url, isPriority = false) {
-        if (this.loadedResources.has(id)) {
+        if (this.sprites.has(id)) {
             return Promise.resolve(this.sprites.get(id));
         }
-        this.loadedResources.add(id);
 
-        return new Promise((resolve) => {
-            const img = new Image();
-            if (isPriority) img.fetchPriority = 'high';
-            img.onload = () => {
+        if (this.pendingLoads.has(id)) {
+            return this.pendingLoads.get(id);
+        }
+
+        const loadPromise = this._loadSpriteWithRetry(id, url, isPriority)
+            .then(img => {
                 this.sprites.set(id, img);
-                resolve(img);
-            };
-            img.onerror = () => {
-                console.warn(`Failed to load sprite: ${id} from ${url}`);
-                resolve(null);
-            };
+                this.loadedResources.add(id);
+                return img;
+            })
+            .finally(() => {
+                this.pendingLoads.delete(id);
+            });
+
+        this.pendingLoads.set(id, loadPromise);
+        return loadPromise;
+    }
+
+    async _loadSpriteWithRetry(id, url, isPriority) {
+        for (let attempt = 1; attempt <= ResourceManager.MAX_LOAD_ATTEMPTS; attempt++) {
+            const requestUrl = attempt === 1 ? url : this._appendCacheBust(url, attempt);
+
+            try {
+                return await this._loadImage(requestUrl, isPriority);
+            } catch (error) {
+                const isFinalAttempt = attempt === ResourceManager.MAX_LOAD_ATTEMPTS;
+
+                if (isFinalAttempt) {
+                    console.warn(`Failed to load sprite: ${id} from ${url}. Using placeholder sprite.`, error);
+                    return this._createPlaceholderSprite(id, url);
+                }
+
+                console.warn(`Retrying sprite load: ${id} from ${url} (attempt ${attempt + 1})`, error);
+                await this._delay(ResourceManager.RETRY_DELAY_MS);
+            }
+        }
+
+        return this._createPlaceholderSprite(id, url);
+    }
+
+    _loadImage(url, isPriority) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+
+            if (isPriority && 'fetchPriority' in img) {
+                img.fetchPriority = 'high';
+            }
+
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error(`Unable to load ${url}`));
             img.src = url;
         });
+    }
+
+    _createPlaceholderSprite(id, sourceUrl) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.dataset.resourceId = id;
+            img.dataset.resourceFallback = 'true';
+            img.dataset.resourceSource = sourceUrl;
+            img.onload = () => resolve(img);
+            img.src = ResourceManager.PLACEHOLDER_SPRITE_DATA_URI;
+        });
+    }
+
+    _appendCacheBust(url, attempt) {
+        const separator = url.includes('?') ? '&' : '?';
+        return `${url}${separator}retry=${attempt}&ts=${Date.now()}`;
+    }
+
+    _delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }

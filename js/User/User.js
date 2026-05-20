@@ -47,11 +47,113 @@ class User {
         this.inventory = inventoryInstance;
     }
 
+    getStorageKey(userId = this.userId) {
+        if (!userId) return null;
+        return this.core?.getUserStorageKey?.(userId) ?? `user_${userId}`;
+    }
+
+    serializeUserData() {
+        const inventoryData = this.inventory ?
+            this.inventory.items.map(item => ({
+                name: item.name,
+                quantity: item.quantity,
+                type: item.type,
+                variant: item.variant,
+                description: item.description || ''
+            })) :
+            this.items.map(item => ({
+                name: item.name,
+                quantity: item.quantity,
+                type: item.type,
+                variant: item.variant,
+                description: item.description || ''
+            }));
+
+        return {
+            username: this.username,
+            userId: this.userId,
+            lastLogin: this.lastLogin,
+            dateCreated: this.dateCreated,
+            inventory: inventoryData,
+            preferences: this.preferences,
+            stats: this.stats,
+            achievements: Array.from(this.achievements.entries()),
+            currency: this.currency
+        };
+    }
+
+    applyUserData(userData = {}) {
+        this.username = userData.username ?? this.username;
+        this.userId = userData.userId ?? this.userId;
+        this.lastLogin = userData.lastLogin ? new Date(userData.lastLogin) : this.lastLogin;
+        this.dateCreated = userData.dateCreated ? new Date(userData.dateCreated) : this.dateCreated;
+
+        if (userData.preferences) {
+            this.preferences = {
+                ...this.preferences,
+                ...userData.preferences
+            };
+        }
+
+        if (userData.stats) {
+            this.stats = {
+                ...this.stats,
+                ...userData.stats
+            };
+        }
+
+        if (userData.achievements) {
+            this.achievements = new Map(userData.achievements);
+        }
+
+        if (userData.currency) {
+            this.currency = {
+                ...this.currency,
+                ...userData.currency
+            };
+        }
+
+        if (Array.isArray(userData.inventory)) {
+            this.items = userData.inventory.map(item => ({ ...item }));
+        }
+
+        this.syncInventoryFromItems();
+    }
+
+    syncInventoryFromItems() {
+        if (!this.inventory) return;
+
+        while (this.inventory.items.length > 0) {
+            this.inventory.items.pop();
+        }
+
+        this.items.forEach(item => {
+            this.inventory.addItem(
+                item.variant || item.name,
+                item.quantity,
+                item.type,
+                item.description || ''
+            );
+        });
+    }
+
+    loadUserDataFromStorage(userId = this.userId) {
+        const storageKey = this.getStorageKey(userId);
+        if (!storageKey) return false;
+
+        const savedData = localStorage.getItem(storageKey);
+        if (!savedData) return false;
+
+        this.applyUserData(JSON.parse(savedData));
+        return true;
+    }
+
     // User authentication and profile methods
     login(username, userId) {
         this.username = username;
         this.userId = userId;
         this.lastLogin = new Date();
+        this.dateCreated ??= new Date();
         this.loadUserData();
     }
 
@@ -130,59 +232,8 @@ class User {
             const responseText = await response.text(); // Extract the response text
             const userData = JSON.parse(responseText); // Parse it as JSON
             console.log(userData);
-            
-            // Set basic user info
-            this.username = userData.username;
-            this.userId = userData.userId;
-            this.lastLogin = new Date(userData.lastLogin);
-            this.dateCreated = new Date(userData.dateCreated);
-            
-            // Load preferences
-            if (userData.preferences) {
-                this.preferences = {
-                    ...this.preferences, // Keep default values as fallback
-                    ...userData.preferences // Override with loaded values
-                };
-            }
-            
-            // Load stats
-            if (userData.stats) {
-                this.stats = {
-                    ...this.stats, // Keep default values as fallback
-                    ...userData.stats // Override with loaded values
-                };
-            }
-            
-            // Load achievements
-            if (userData.achievements) {
-                this.achievements = new Map(userData.achievements);
-            }
-            
-            // Load currency
-            if (userData.currency) {
-                this.currency = {
-                    ...this.currency, // Keep default values as fallback
-                    ...userData.currency // Override with loaded values
-                };
-            }
 
-            if (userData.inventory) {
-                this.items = userData.inventory;
-            }
-            
-            // Load inventory if we have an inventory instance
-            /*
-            if (this.inventory && userData.inventory) {
-                // Clear existing inventory
-                while (this.inventory.items.length > 0) {
-                    this.inventory.items.pop();
-                }
-                // Load saved inventory items
-                userData.inventory.forEach(item => {
-                    this.inventory.addItem(item.name, item.quantity, item.type);
-                });
-            }
-            */
+            this.applyUserData(userData);
 
             return true;
         } catch (error) {
@@ -200,55 +251,19 @@ class User {
     saveUserData() {
         if (!this.userId) return;
 
-        // Convert inventory items to simple objects for storage
-        const inventoryData = this.inventory ? 
-            this.inventory.items.map(item => ({
-                name: item.name,
-                quantity: item.quantity,
-                type: item.type,
-                variant: item.variant,
-                description: item.description || ''
-            })) : [];
+        const storageKey = this.getStorageKey();
+        if (!storageKey) return;
 
-        const userData = {
-            username: this.username,
-            userId: this.userId,
-            lastLogin: this.lastLogin,
-            inventory: inventoryData,
-            preferences: this.preferences,
-            stats: this.stats,
-            achievements: Array.from(this.achievements.entries()),
-            currency: this.currency
-        };
+        localStorage.setItem(storageKey, JSON.stringify(this.serializeUserData()));
 
-        localStorage.setItem(`user_${this.userId}`, JSON.stringify(userData));
+        const lastUserIdKey = this.core?.config?.userData?.lastUserIdKey;
+        if (lastUserIdKey) {
+            localStorage.setItem(lastUserIdKey, this.userId);
+        }
     }
 
     loadUserData() {
-        if (!this.userId) return;
-
-        const savedData = localStorage.getItem(`user_${this.userId}`);
-        if (savedData) {
-            const userData = JSON.parse(savedData);
-            
-            // Restore user data
-            this.preferences = userData.preferences;
-            this.stats = userData.stats;
-            this.achievements = new Map(userData.achievements);
-            this.currency = userData.currency;
-
-            // Restore inventory if we have an inventory instance
-            if (this.inventory && userData.inventory) {
-                // Clear existing inventory
-                while (this.inventory.items.length > 0) {
-                    this.inventory.items.pop();
-                }
-                // Load saved inventory items
-                userData.inventory.forEach(item => {
-                    this.inventory.addItem(item.variant || item.name, item.quantity, item.type, item.description || '');
-                });
-            }
-        }
+        return this.loadUserDataFromStorage(this.userId);
     }
 
     // Analytics and tracking
