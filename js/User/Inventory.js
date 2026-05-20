@@ -3,6 +3,19 @@ class Inventory {
         this.parent = parent;
         this.inventoryElement = inventoryElement;
         this.items = [];
+        this.boundHandlers = {
+            dragStart: this.handleDragStart.bind(this),
+            dragEnd: this.handleDragEnd.bind(this),
+            containerDragOver: this.handleContainerDragOver.bind(this),
+            containerDragLeave: this.handleContainerDragLeave.bind(this),
+            containerDrop: this.handleContainerDrop.bind(this),
+            myteDragOver: this.handleMyteDragOver.bind(this),
+            myteDragLeave: this.handleMyteDragLeave.bind(this),
+            myteDrop: this.handleMyteDrop.bind(this)
+        };
+        this.containerElements = [];
+        this.boundMyteElements = new WeakSet();
+        this.mutationObserver = null;
 
         // Configuration
         this.config = {
@@ -176,15 +189,15 @@ class Inventory {
     // Drag and Drop Event Handlers
     setupEventListeners() {
         // Inventory events
-        this.inventoryElement.addEventListener('dragstart', this.handleDragStart.bind(this));
-        this.inventoryElement.addEventListener('dragend', this.handleDragEnd.bind(this));
+        this.inventoryElement.addEventListener('dragstart', this.boundHandlers.dragStart);
+        this.inventoryElement.addEventListener('dragend', this.boundHandlers.dragEnd);
 
         // Container events
-        const containers = Array.from(document.querySelectorAll('.container'));
-        containers.forEach(container => {
-            container.addEventListener('dragover', this.handleContainerDragOver.bind(this));
-            container.addEventListener('dragleave', this.handleContainerDragLeave.bind(this));
-            container.addEventListener('drop', this.handleContainerDrop.bind(this));
+        this.containerElements = Array.from(document.querySelectorAll('.container'));
+        this.containerElements.forEach(container => {
+            container.addEventListener('dragover', this.boundHandlers.containerDragOver);
+            container.addEventListener('dragleave', this.boundHandlers.containerDragLeave);
+            container.addEventListener('drop', this.boundHandlers.containerDrop);
         });
 
         // Add Myte events to existing Mytes
@@ -405,9 +418,12 @@ class Inventory {
     // Myte Interaction Methods
     addMyteListeners(myteElements) {
         myteElements.forEach(myte => {
-            myte.addEventListener('dragover', this.handleMyteDragOver.bind(this));
-            myte.addEventListener('dragleave', this.handleMyteDragLeave.bind(this));
-            myte.addEventListener('drop', this.handleMyteDrop.bind(this));
+            if (!myte || this.boundMyteElements.has(myte)) return;
+
+            myte.addEventListener('dragover', this.boundHandlers.myteDragOver);
+            myte.addEventListener('dragleave', this.boundHandlers.myteDragLeave);
+            myte.addEventListener('drop', this.boundHandlers.myteDrop);
+            this.boundMyteElements.add(myte);
         });
     }
 
@@ -530,7 +546,7 @@ class Inventory {
 
     setupMutationObserver() {
         // Observer for new Mytes
-        const observer = new MutationObserver(mutations => {
+        this.mutationObserver = new MutationObserver(mutations => {
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
                     if (node.classList?.contains('duplicate')) {
@@ -540,11 +556,30 @@ class Inventory {
             });
         });
 
-        observer.observe(document.body, { childList: true, subtree: true });
+        this.mutationObserver.observe(document.body, { childList: true, subtree: true });
     }
 
     dispose() {
-        // Cleanup
+        this.inventoryElement?.removeEventListener('dragstart', this.boundHandlers.dragStart);
+        this.inventoryElement?.removeEventListener('dragend', this.boundHandlers.dragEnd);
+
+        this.containerElements.forEach(container => {
+            container.removeEventListener('dragover', this.boundHandlers.containerDragOver);
+            container.removeEventListener('dragleave', this.boundHandlers.containerDragLeave);
+            container.removeEventListener('drop', this.boundHandlers.containerDrop);
+        });
+        this.containerElements = [];
+
+        document.querySelectorAll('.duplicate').forEach(myte => {
+            myte.removeEventListener('dragover', this.boundHandlers.myteDragOver);
+            myte.removeEventListener('dragleave', this.boundHandlers.myteDragLeave);
+            myte.removeEventListener('drop', this.boundHandlers.myteDrop);
+        });
+
+        this.mutationObserver?.disconnect();
+        this.mutationObserver = null;
+        clearTimeout(this._indicatorHideTimer);
+
         this.dropIndicator?.remove();
         this.items = [];
         this.state = {};

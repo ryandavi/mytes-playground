@@ -60,7 +60,7 @@ class MapRenderer {
 
             // Animation frame (background-position on the sprite child)
             if (rs.bgPosition !== null && rs.bgPosition !== undefined) {
-                const sprite = obj.animation?.sprite || obj.element.querySelector('.sprite');
+                const sprite = obj.animation?.sprite || obj._spriteElement || (obj._spriteElement = obj.element.querySelector('.sprite'));
                 if (sprite) {
                     sprite.style.backgroundPosition = rs.bgPosition;
                 }
@@ -93,7 +93,7 @@ class MapRenderer {
         if (rs.zIndex !== undefined) obj.element.style.zIndex = rs.zIndex;
 
         if (rs.bgPosition !== null && rs.bgPosition !== undefined) {
-            const sprite = obj.animation?.sprite || obj.element.querySelector('.sprite');
+            const sprite = obj.animation?.sprite || obj._spriteElement || (obj._spriteElement = obj.element.querySelector('.sprite'));
             if (sprite) sprite.style.backgroundPosition = rs.bgPosition;
         }
 

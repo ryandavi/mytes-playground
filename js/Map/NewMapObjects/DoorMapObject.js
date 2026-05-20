@@ -80,6 +80,45 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
         };
     }
 
+    isValueWithinDoorSpan(value, start, length, padding = 12) {
+        return value >= (start - padding) && value <= (start + length + padding);
+    }
+
+    isEntityAlignedWithDoor(entity, axis, actorCenter, intent, padding = 12) {
+        const bounds = this.getDoorBounds();
+        const entityBounds = this.getColliderRectFor?.(entity);
+
+        if (axis === 'x') {
+            if (
+                this.isValueWithinDoorSpan(actorCenter.y, bounds.top, bounds.height, padding) ||
+                this.isValueWithinDoorSpan(intent.y, bounds.top, bounds.height, padding)
+            ) {
+                return true;
+            }
+
+            return !!entityBounds && !(
+                entityBounds.bottom < (bounds.top - padding) ||
+                entityBounds.top > (bounds.top + bounds.height + padding)
+            );
+        }
+
+        if (axis === 'y') {
+            if (
+                this.isValueWithinDoorSpan(actorCenter.x, bounds.left, bounds.width, padding) ||
+                this.isValueWithinDoorSpan(intent.x, bounds.left, bounds.width, padding)
+            ) {
+                return true;
+            }
+
+            return !!entityBounds && !(
+                entityBounds.right < (bounds.left - padding) ||
+                entityBounds.left > (bounds.left + bounds.width + padding)
+            );
+        }
+
+        return false;
+    }
+
     getEntityCenter(entity) {
         if (!entity) return null;
         return {
@@ -117,16 +156,32 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
         const doorCenter = this.getDoorCenter();
         const margin = 4;
 
+        if (!this.isEntityAlignedWithDoor(entity, axis, actorCenter, intent)) {
+            return false;
+        }
+
         if (axis === 'x') {
+            const motion = intent.x - actorCenter.x;
+            const doorOffset = doorCenter.x - actorCenter.x;
+            if (Math.abs(motion) < 0.5) return false;
+
             const actorSide = actorCenter.x < (doorCenter.x - margin) ? -1 : actorCenter.x > (doorCenter.x + margin) ? 1 : 0;
             const intentSide = intent.x < (doorCenter.x - margin) ? -1 : intent.x > (doorCenter.x + margin) ? 1 : 0;
-            return actorSide !== 0 && intentSide !== 0 && actorSide !== intentSide;
+            const crossesDoor = actorSide !== 0 && intentSide !== 0 && actorSide !== intentSide;
+            const movingTowardDoor = Math.abs(doorOffset) <= margin || Math.sign(motion) === Math.sign(doorOffset);
+            return crossesDoor || movingTowardDoor;
         }
 
         if (axis === 'y') {
+            const motion = intent.y - actorCenter.y;
+            const doorOffset = doorCenter.y - actorCenter.y;
+            if (Math.abs(motion) < 0.5) return false;
+
             const actorSide = actorCenter.y < (doorCenter.y - margin) ? -1 : actorCenter.y > (doorCenter.y + margin) ? 1 : 0;
             const intentSide = intent.y < (doorCenter.y - margin) ? -1 : intent.y > (doorCenter.y + margin) ? 1 : 0;
-            return actorSide !== 0 && intentSide !== 0 && actorSide !== intentSide;
+            const crossesDoor = actorSide !== 0 && intentSide !== 0 && actorSide !== intentSide;
+            const movingTowardDoor = Math.abs(doorOffset) <= margin || Math.sign(motion) === Math.sign(doorOffset);
+            return crossesDoor || movingTowardDoor;
         }
 
         return false;

@@ -85,7 +85,9 @@
 .container-wrapper > .container > .canvas > .layer.debug {
   z-index: 100;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   width: 100%;
   height: 100%;
   visibility: hidden;
@@ -95,7 +97,9 @@
   border: 1px solid rgba(255, 0, 0, 0.5);
   pointer-events: none;
   position: absolute;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   z-index: 9999;
 }
 .container-wrapper > .container > .canvas > .layer.debug .debug-collider.myte-collider {
@@ -116,7 +120,9 @@
   height: 8px;
   border-radius: 50%;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   opacity: 0.7;
   z-index: 1000;
   transform: translate(-50%, -50%);
@@ -164,7 +170,9 @@
 .container-wrapper > .container > .canvas > .layer.effects {
   z-index: 2;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .container-wrapper > .container > .canvas > .layer > .zone {
   outline: 1px dashed red;
@@ -208,7 +216,9 @@
   z-index: 1;
   image-rendering: pixelated;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .container-wrapper > .container > .canvas > .layer > .mapObject > .sprite > .front,
 .container-wrapper > .container > .canvas > .layer > .mapObject > .sprite .back {
@@ -260,7 +270,9 @@ body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .
 }
 .container-wrapper > .container > .canvas > .layer > .mapObject.dragging {
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   cursor: grabbing;
   z-index: 100000 !important;
 }
@@ -717,6 +729,4 @@ body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .
   right: 10px;
   bottom: 10px;
   visibility: hidden;
-}
-
-/*# sourceMappingURL=map.css.map */
+}/*# sourceMappingURL=map.css.map */

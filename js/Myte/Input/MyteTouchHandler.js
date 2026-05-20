@@ -62,7 +62,6 @@ class MyteTouchHandler extends DragHandler {
                 });
             },
             onDragEnd: () => {
-                myte.playSound('ui_drop_item');
                 myte.queue.clear();
                 myte.parent.camera.setToPreviousMode();
                 if (myte.goal == MOVE_TYPES.GOHOME) {
@@ -79,8 +78,10 @@ class MyteTouchHandler extends DragHandler {
                 // Check if dropped on a portal
                 const droppedPortal = this._getPortals(myte).find(p => p.element?.classList.contains('on-target'));
                 if (droppedPortal && !myte.dropTarget.classList.contains("on-target")) {
+                    myte.playSound('ui_drop_item');
                     droppedPortal.beginTransition(myte);
                 } else if (!myte.dropTarget.classList.contains("on-target")) {
+                    myte.playSound('ui_drop_item');
                     const safePosition = myte.parent?.gameMap?.gridSystem?.findNearestValidPositionForEntity(
                         myte,
                         myte.posX,

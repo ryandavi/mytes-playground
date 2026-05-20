@@ -6,10 +6,15 @@ class ContainerInputManager {
   constructor(containerManager) {
     this.container = containerManager;
     this.inputSystem = InputSystem.getInstance();
+    this.subscriptions = [];
 
     // Track input state
     this.isEnabled = true;
     this.lastActiveTime = Date.now();
+    this.inactivityTimeout = this.container?.core?.config?.inactiveTimeout ?? 60000;
+    this.longTapTimer = null;
+    this.longTapStartX = 0;
+    this.longTapStartY = 0;
 
     // Set up event handlers
     this.setupKeyboardShortcuts();
@@ -18,7 +23,6 @@ class ContainerInputManager {
     this.setupLongTapHandling();
 
     // Track inactivity
-    this.inactivityTimeout = 60000; // 1 minute
     this.inactivityCheckInterval = setInterval(() => {
       this.checkInactivity();
     }, 10000); // Check every 10 seconds
@@ -77,7 +81,11 @@ class ContainerInputManager {
    * @param {number} timeout The timeout in milliseconds
    * @returns {boolean} Whether the user's status has changed
    */
-  checkInactive() {
+  checkInactive(timeout = this.inactivityTimeout) {
+    if (Number.isFinite(timeout) && timeout > 0) {
+      this.inactivityTimeout = timeout;
+    }
+
     const didChange = this.inputSystem.checkInactivity(this.inactivityTimeout);
     if (this.inputSystem.isUserActive()) {
       this.lastActiveTime = Date.now();
@@ -126,12 +134,11 @@ class ContainerInputManager {
    * Set up keyboard shortcuts
    */
   setupKeyboardShortcuts() {
-    // Tool shortcuts - Add null check for this.container.ui.toolConfig
-    const toolConfig = this.container.ui?.toolConfig || {};
+    const toolConfig = this.container.ui?.toolManager?.toolConfig || this.container.ui?.toolConfig || {};
 
     Object.entries(toolConfig).forEach(([mode, config]) => {
       if (config && config.shortcut) {
-        this.inputSystem.on('keyboard.down', (event) => {
+        this.subscribe('keyboard.down', (event) => {
           if (!this.isEnabled) return; // Ignore when disabled
           if (event.key === config.shortcut.toLowerCase()) {
             this.container.ui.changeToolMode(mode);
@@ -141,7 +148,7 @@ class ContainerInputManager {
     });
 
     // Sound toggle
-    this.inputSystem.on('keyboard.down', (event) => {
+    this.subscribe('keyboard.down', (event) => {
       if (!this.isEnabled) return; // Ignore when disabled
       if (event.key === 'm') {
         // Add null check for soundMenu
@@ -150,7 +157,7 @@ class ContainerInputManager {
     });
 
     // Escape key
-    this.inputSystem.on('keyboard.down', (event) => {
+    this.subscribe('keyboard.down', (event) => {
       if (!this.isEnabled) return; // Ignore when disabled
       if (event.key === 'escape') {
         this.handleEscape();
@@ -163,7 +170,7 @@ class ContainerInputManager {
    */
   setupClickHandling() {
     // Handle clicks on the container
-    this.inputSystem.on('mouse.click', (event) => {
+    this.subscribe('mouse.click', (event) => {
       if (!this.isEnabled) return; // Ignore when disabled
 
       // Don't handle clicks if they've been handled by a specific element
@@ -197,35 +204,27 @@ class ContainerInputManager {
   setupLongTapHandling() {
     const LONG_PRESS_MS = 500;
     const MOVE_CANCEL_PX = 10;
-    let timer = null;
-    let startX = 0;
-    let startY = 0;
 
-    this.inputSystem.on('touch.start', (event) => {
+    this.subscribe('touch.start', (event) => {
       if (!this.isEnabled) return;
-      startX = event.position.x;
-      startY = event.position.y;
-      timer = setTimeout(() => {
-        timer = null;
-        this._tryAStarToClick(startX, startY);
+      this.longTapStartX = event.position.x;
+      this.longTapStartY = event.position.y;
+      this.clearLongTapTimer();
+      this.longTapTimer = setTimeout(() => {
+        this.longTapTimer = null;
+        this._tryAStarToClick(this.longTapStartX, this.longTapStartY);
       }, LONG_PRESS_MS);
     });
 
-    this.inputSystem.on('touch.move', (event) => {
-      if (!timer) return;
-      if (Math.abs(event.position.x - startX) > MOVE_CANCEL_PX ||
-          Math.abs(event.position.y - startY) > MOVE_CANCEL_PX) {
-        clearTimeout(timer);
-        timer = null;
+    this.subscribe('touch.move', (event) => {
+      if (!this.longTapTimer) return;
+      if (Math.abs(event.position.x - this.longTapStartX) > MOVE_CANCEL_PX ||
+          Math.abs(event.position.y - this.longTapStartY) > MOVE_CANCEL_PX) {
+        this.clearLongTapTimer();
       }
     });
 
-    this.inputSystem.on('touch.end', () => {
-      if (timer) {
-        clearTimeout(timer);
-        timer = null;
-      }
-    });
+    this.subscribe('touch.end', () => this.clearLongTapTimer());
   }
 
   /**
@@ -243,7 +242,7 @@ class ContainerInputManager {
    * Set up scroll handling
    */
   setupScrollHandling() {
-    this.inputSystem.on('scroll', (event) => {
+    this.subscribe('scroll', (event) => {
       if (!this.isEnabled) return; // Ignore when disabled
 
       // Update camera if needed
@@ -504,14 +503,33 @@ class ContainerInputManager {
   //==================================================
   // COMPATIBILITY METHODS (TO BE PHASED OUT)
   //==================================================
+
+  subscribe(eventName, handler) {
+    const subscription = this.inputSystem.on(eventName, handler);
+    this.subscriptions.push(subscription);
+    return subscription;
+  }
+
+  clearLongTapTimer() {
+    if (this.longTapTimer) {
+      clearTimeout(this.longTapTimer);
+      this.longTapTimer = null;
+    }
+  }
   
   /**
    * Clean up resources
    */
   dispose() {
+    this.clearLongTapTimer();
+    document.body.classList.remove('inputs-disabled');
+
     if (this.inactivityCheckInterval) {
       clearInterval(this.inactivityCheckInterval);
       this.inactivityCheckInterval = null;
     }
+
+    this.subscriptions.forEach(subscription => subscription?.unsubscribe?.());
+    this.subscriptions = [];
   }
 }

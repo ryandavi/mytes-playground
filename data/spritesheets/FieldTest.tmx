@@ -151,7 +151,9 @@
  <objectgroup id="2" name="Objects">
   <object id="1" name="Portal" x="64" y="64" width="128" height="128">
    <properties>
+    <property name="portalId" value="field_outside"/>
     <property name="targetMap" value="Outside"/>
+    <property name="targetPortalId" value="outside_field"/>
     <property name="variant" value="red_portal"/>
    </properties>
   </object>

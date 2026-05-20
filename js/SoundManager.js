@@ -904,6 +904,46 @@ class SoundManager {
 				}
 			},
 
+			"myte_slot_exit": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.Synth({
+						oscillator: { type: "triangle" },
+						envelope: {
+							attack: 0.003,
+							decay: 0.12,
+							sustain: 0.05,
+							release: 0.18
+						}
+					}).toDestination();
+					return {
+						synth,
+						notes: ["D5", "A5", "D6"],
+						durations: ["32n", "32n", "16n"]
+					};
+				}
+			},
+
+			"myte_slot_enter": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.Synth({
+						oscillator: { type: "sine" },
+						envelope: {
+							attack: 0.002,
+							decay: 0.14,
+							sustain: 0,
+							release: 0.22
+						}
+					}).toDestination();
+					return {
+						synth,
+						notes: ["G5", "D5"],
+						durations: ["32n", "8n"]
+					};
+				}
+			},
+
 
 
 			// Myte Sounds
@@ -1486,6 +1526,60 @@ class SoundManager {
 					return { synth, note: "B4", duration: "16n" };
 				}
 			},
+			"obj_portal_depart": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.AMSynth({
+						harmonicity: 2.2,
+						oscillator: { type: "sine" },
+						envelope: {
+							attack: 0.01,
+							decay: 0.18,
+							sustain: 0.08,
+							release: 0.24
+						},
+						modulation: { type: "triangle" },
+						modulationEnvelope: {
+							attack: 0.02,
+							decay: 0.15,
+							sustain: 0.05,
+							release: 0.18
+						}
+					}).toDestination();
+					return {
+						synth,
+						notes: ["E4", "B4", "E5"],
+						durations: ["32n", "32n", "16n"]
+					};
+				}
+			},
+			"obj_portal_arrive": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.AMSynth({
+						harmonicity: 1.9,
+						oscillator: { type: "triangle" },
+						envelope: {
+							attack: 0.005,
+							decay: 0.22,
+							sustain: 0.1,
+							release: 0.3
+						},
+						modulation: { type: "sine" },
+						modulationEnvelope: {
+							attack: 0.01,
+							decay: 0.18,
+							sustain: 0.06,
+							release: 0.2
+						}
+					}).toDestination();
+					return {
+						synth,
+						notes: ["B4", "E5", "G5"],
+						durations: ["32n", "32n", "8n"]
+					};
+				}
+			},
 			"obj_crop_harvest": {
 				type: "sfx",
 				create: () => {
@@ -1714,8 +1808,6 @@ class SoundManager {
 
 		// Apply master volume, category volume, AND base volume
 		const effectiveVolume = (options.volume || 1) * this.volume.master * categoryVolume * sound.baseVolume;
-
-		console.log(`Playing sound: ${id}, volume: ${options.volume}, categoryVolume: ${categoryVolume}, baseVolume: ${sound.baseVolume}, effectiveVolume: ${effectiveVolume}`);
 
 		try {
 			if (sound.notes) {
@@ -2348,8 +2440,14 @@ class SoundManager {
 
 
 
-	toggle(){
-
+	toggle() {
+		this.soundEnabled = !this.soundEnabled;
+		this.musicEnabled = !this.musicEnabled;
+		if (this.soundEnabled) {
+			this.startAllSounds();
+		} else {
+			this.stopAllSounds();
+		}
 	}
 
 
@@ -2401,65 +2499,6 @@ class SoundManager {
 				console.warn(`Error playing Myte sound ${soundId}:`, error.message);
 			}
 		}
-
-
-
-		return;
-		if (!this.initialized || !this.soundEnabled) return;
-
-		// Get species voice profile (or default if not found)
-		const species = options.species || "default";
-		const voiceProfile = this.speciesVoices[species] || this.speciesVoices.default;
-
-		// Set up options based on action type
-		let soundOptions = {
-			volume: options.volume || voiceProfile.volume || 0.5,
-			playbackRate: options.playbackRate || 1
-		};
-
-		// Create temporary synth based on species profile
-		let synth;
-		switch (voiceProfile.synthType) {
-			case "FM":
-				synth = new Tone.FMSynth(voiceProfile.settings).toDestination();
-				break;
-			case "AM":
-				synth = new Tone.AMSynth(voiceProfile.settings).toDestination();
-				break;
-			case "Membrane":
-				synth = new Tone.MembraneSynth(voiceProfile.settings).toDestination();
-				break;
-			default:
-				synth = new Tone.Synth(voiceProfile.settings).toDestination();
-		}
-
-		// Set appropriate volume
-		synth.volume.value = Tone.gainToDb(soundOptions.volume * this.volume.sfx);
-
-		// Configure notes based on action
-		let note = voiceProfile.baseNote;
-		let duration = "8n";
-
-		switch (action.toLowerCase()) {
-			case "happy":
-				note = Tone.Frequency(voiceProfile.baseNote).transpose(4).toNote();
-				synth.triggerAttackRelease(note, duration, Tone.now());
-				break;
-			case "sad":
-				note = Tone.Frequency(voiceProfile.baseNote).transpose(-3).toNote();
-				synth.triggerAttackRelease(note, duration, Tone.now());
-				break;
-			case "jump":
-				synth.triggerAttackRelease(note, "16n", Tone.now());
-				break;
-			default:
-				synth.triggerAttackRelease(note, "8n", Tone.now());
-		}
-
-		// Dispose synth after a delay
-		setTimeout(() => {
-			synth.dispose();
-		}, 2000);
 	}
 
 	playUISound(action) {

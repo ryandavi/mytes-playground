@@ -162,7 +162,9 @@
   </object>
   <object id="65" name="Portal" x="544" y="192" width="128" height="128">
    <properties>
+    <property name="portalId" value="house_outside"/>
     <property name="targetMap" value="Outside"/>
+    <property name="targetPortalId" value="outside_house"/>
    </properties>
   </object>
   <object id="68" name="Ball" x="160" y="128" width="64" height="64">

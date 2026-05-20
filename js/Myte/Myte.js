@@ -117,8 +117,20 @@ class Myte {
 		this.followOrbitSpeed = this.definition.movement?.orbitSpeed ?? 0.08;
 		this.followLeashDistance = this.definition.movement?.leashDistance ?? Math.max(96, this.followRadius.min + 32);
 		this.inputHandler;
+		this.holdAtHomeSlotWhilePointerInside = false;
 		this._lastVisualDebugAt = 0;
 		this._animElapsed = 0;
+		this.inactivityState = {
+			isFreeRoaming: false,
+			goal: null,
+			followGoal: null,
+			autonomyGoal: null
+		};
+		this.goHomePathState = {
+			hasPlannedPath: false,
+			directFallbackFrames: 0,
+			lastPlanAt: 0
+		};
 
 	}
 
@@ -204,8 +216,7 @@ class Myte {
 		this.elements.wrapper.style.left = x + 'px';
 		this.elements.wrapper.style.top = y + 'px';
 
-		this.setPosition(x, y);
-		this.setSpritePosition(x, y);
+		this.snapToHomePosition();
 	}
 
 	setStartTime() {
@@ -219,12 +230,20 @@ class Myte {
 	stop() {
 		this.isActive = false;
 		this.atOriginal = true;
+		this.clearHomeSlotHold();
+		this.cancelInactivityFreeRoam();
+		this.resetGoHomeState();
 
-		// set position
-		const rect = this.parent.getLocalOffset(this.elements.wrapper);
-		this.posX = rect.left;
-		this.posY = rect.top;
-		this.setSpritePosition(this.posX, this.posY);
+		if (this.goal === MOVE_TYPES.GOHOME) {
+			this.goal = this.previousGoal === MOVE_TYPES.GOHOME ? DEFAULT_MODE : this.previousGoal;
+		}
+
+		// Keep the duplicate aligned to the exact center of the home slot.
+		const home = this.getHomePosition();
+		this.posX = home.x;
+		this.posY = home.y;
+		this.setTarget(home.x, home.y);
+		this.setSpritePosition(home.x, home.y);
 
 		// hide it
 		this.element.classList.remove("deactivated");
@@ -235,6 +254,7 @@ class Myte {
 		this.targetDot.classList.add('hidden');
 
 		// set next as active
+		this.playSlotEnterSound();
 		this.parent.setNextMyteAsActive(this);
 		if (this.parent.activeMyte == null) {
 			this.parent.ui.debugMenu.disableButtons();
@@ -271,10 +291,11 @@ class Myte {
 		this.setStartTime();
 
 
-		// start at home wrapper
-		this.setPosition(this.elements.wrapper.offsetLeft, this.elements.wrapper.offsetTop);
-		this.setTarget(this.posX, this.posY);
-		this.setSpritePosition(this.posX, this.posY);
+		// Start centered in the home slot rather than at the slot's top-left corner.
+		this.cancelInactivityFreeRoam();
+		this.resetGoHomeState();
+		this.snapToHomePosition();
+		this.playSlotExitSound();
 
 		this.syncSelectionState();
 		if (this.isActiveMyte) {
@@ -358,7 +379,9 @@ class Myte {
 		this.handleModeTransition(previousGoal, this.goal);
 
 		if (this.goal === MOVE_TYPES.GOHOME) {
-			this.setTargetToOrigin();
+			this.beginGoHomeJourney(true);
+		} else {
+			this.resetGoHomeState();
 		}
 
 		this.parent?.eventManager?.emit('myte:mode_changed', { myte: this, mode: this.goal });
@@ -384,12 +407,194 @@ class Myte {
 		this.targetY = this.posY;
 	}
 
+	getHomeSlotRect() {
+		const rect = this.parent.getLocalOffset(this.element);
+		return {
+			x: rect.left,
+			y: rect.top,
+			left: rect.left,
+			top: rect.top,
+			right: rect.right,
+			bottom: rect.bottom,
+			width: rect.width,
+			height: rect.height
+		};
+	}
+
+	getHomePosition() {
+		const rect = this.getHomeSlotRect();
+		return {
+			x: rect.left + ((rect.width - this.size.width) / 2),
+			y: rect.top + ((rect.height - this.size.height) / 2)
+		};
+	}
+
+	isAtHomePosition(tolerance = 0.5) {
+		const home = this.getHomePosition();
+		return Math.abs(this.posX - home.x) <= tolerance &&
+			Math.abs(this.posY - home.y) <= tolerance;
+	}
+
+	snapToHomePosition() {
+		const home = this.getHomePosition();
+		this.setPosition(home.x, home.y);
+		this.setTarget(home.x, home.y);
+		this.setSpritePosition(home.x, home.y);
+		return home;
+	}
+
+	holdInHomeSlotUntilPointerLeaves() {
+		this.holdAtHomeSlotWhilePointerInside = true;
+		return this.snapToHomePosition();
+	}
+
+	clearHomeSlotHold() {
+		this.holdAtHomeSlotWhilePointerInside = false;
+	}
+
+	isPointerInsideHomeSlot() {
+		if (!this.dropTarget || !this.parent?.inputHandler) {
+			return false;
+		}
+
+		const mouse = this.parent.inputHandler.getMousePosition();
+		const slotRect = this.parent.getRect(this.dropTarget);
+		return Utility.isCoordTouchingElement(mouse.x, mouse.y, slotRect);
+	}
+
+	shouldHoldInHomeSlot() {
+		if (!this.holdAtHomeSlotWhilePointerInside) {
+			return false;
+		}
+
+		if (!this.isActive || this.isDragging) {
+			this.clearHomeSlotHold();
+			return false;
+		}
+
+		if (this.isPointerInsideHomeSlot()) {
+			return true;
+		}
+
+		this.clearHomeSlotHold();
+		return false;
+	}
+
+	moveTowardsTargetDirect(doXAxis = true, doYAxis = true) {
+		const dx = this.targetX - this.posX;
+		const dy = this.targetY - this.posY;
+		const distance = Math.sqrt(dx * dx + dy * dy);
+
+		if (distance !== 0) {
+			const step = this.stats.getSpeed();
+			const moveX = (dx / distance) * step;
+			const moveY = (dy / distance) * step;
+
+			if (doXAxis) {
+				this.posX += moveX;
+			}
+
+			if (doYAxis) {
+				this.posY += moveY;
+			}
+		}
+
+		if (distance < this.stats.getSpeed()) {
+			this.snapPositionToTarget(doXAxis, doYAxis);
+		}
+
+		this.setDirection(this.getDirection());
+		this.setSpritePosition(this.posX, this.posY);
+	}
+
 
 	setTargetToOrigin() {
-		const rect = this.parent.getLocalOffset(this.elements.wrapper);
+		const home = this.getHomePosition();
+		this.targetX = home.x;
+		this.targetY = home.y;
+	}
 
-		this.targetX = rect.left;
-		this.targetY = rect.top;
+	resetGoHomeState() {
+		this.goHomePathState.hasPlannedPath = false;
+		this.goHomePathState.directFallbackFrames = 0;
+		this.goHomePathState.lastPlanAt = 0;
+	}
+
+	beginGoHomeJourney(forceReplan = false) {
+		const home = this.getHomePosition();
+		const gridSystem = this.parent?.gameMap?.gridSystem;
+
+		this.setTarget(home.x, home.y);
+		this.goHomePathState.lastPlanAt = Date.now();
+		this.goHomePathState.directFallbackFrames = 0;
+
+		if (!forceReplan && !this.queue.isEmpty()) {
+			return false;
+		}
+
+		const safeHome = gridSystem?.findNearestValidPositionForEntity?.(this, home.x, home.y, 12) ?? home;
+		const needsPath = Math.hypot(safeHome.x - this.posX, safeHome.y - this.posY) > Math.max(24, this.stats?.getSpeed?.() ?? 1);
+
+		this.queue.clear();
+		if (gridSystem && needsPath) {
+			this.queue.add('astar-move', { target: safeHome });
+			this.goHomePathState.hasPlannedPath = true;
+			return true;
+		}
+
+		this.goHomePathState.hasPlannedPath = false;
+		return false;
+	}
+
+	enterInactivityFreeRoam() {
+		if (!this.isActive || this.isDragging || this.goal !== MOVE_TYPES.FOLLOW) {
+			return false;
+		}
+
+		if (this.inactivityState.isFreeRoaming) {
+			return true;
+		}
+
+		this.inactivityState = {
+			isFreeRoaming: true,
+			goal: this.goal,
+			followGoal: this.followGoal,
+			autonomyGoal: this.autonomyGoal
+		};
+
+		this.setMode(MOVE_TYPES.FREEROAM);
+		return true;
+	}
+
+	restoreFromInactivityFreeRoam() {
+		if (!this.inactivityState.isFreeRoaming) {
+			return false;
+		}
+
+		const restoreGoal = this.inactivityState.goal ?? DEFAULT_MODE;
+		const restoreFollowGoal = this.inactivityState.followGoal ?? this.followGoal;
+		const restoreAutonomyGoal = this.inactivityState.autonomyGoal ?? this.autonomyGoal;
+
+		this.inactivityState = {
+			isFreeRoaming: false,
+			goal: null,
+			followGoal: null,
+			autonomyGoal: null
+		};
+
+		this.setFollowMode(restoreFollowGoal);
+		this.setAutonomyMode(restoreAutonomyGoal);
+		this.setMode(restoreGoal);
+		return true;
+	}
+
+	cancelInactivityFreeRoam() {
+		this.inactivityState = {
+			isFreeRoaming: false,
+			goal: null,
+			followGoal: null,
+			autonomyGoal: null
+		};
 	}
 
 	get isActiveMyte() {
@@ -861,6 +1066,14 @@ class Myte {
 		});
 	}
 
+	playSlotEnterSound() {
+		this.playSound('slot_enter');
+	}
+
+	playSlotExitSound() {
+		this.playSound('slot_exit');
+	}
+
 	doJump()        { return this.physicsController.doJump(); }
 	doLandFromFall() { this.physicsController.doLandFromFall(); }
 
@@ -899,19 +1112,32 @@ class Myte {
 		}
 		else if (this.goal === MOVE_TYPES.GOHOME) {
 			if (this.atOriginal === false) {
-				if (this.queue.isEmpty()) {
-					// Add a move action to return home if not already moving
-					const rect = this.parent.getLocalOffset(this.elements.wrapper);
-					this.queue.add('move', {
-						target: [{
-							x: rect.left,
-							y: rect.top
-						}],
-						onComplete: () => this.stop()
-					});
-				}
-				this.queue.update();
+				const home = this.getHomePosition();
+				this.setTarget(home.x, home.y);
 
+				if (!this.queue.isEmpty()) {
+					this.queue.update();
+					this.goHomePathState.directFallbackFrames = 0;
+				} else {
+					const distanceToHome = this.getDistanceToPoint(home.x, home.y);
+
+					if (
+						!this.goHomePathState.hasPlannedPath &&
+						distanceToHome > 96 &&
+						Date.now() - this.goHomePathState.lastPlanAt > 300
+					) {
+						this.beginGoHomeJourney(true);
+					}
+
+					this.goHomePathState.directFallbackFrames++;
+					if (distanceToHome <= 96 || this.goHomePathState.directFallbackFrames > 20) {
+						this.moveTowardsTargetDirect();
+					}
+				}
+
+				if (this.isAtHomePosition(1) || this.isAtTarget()) {
+					this.stop();
+				}
 			}
 		}
 		else if (this.goal === MOVE_TYPES.QUEUE_ONLY) {
@@ -979,6 +1205,10 @@ class Myte {
 		return Math.hypot((target.posX ?? 0) - this.posX, (target.posY ?? 0) - this.posY);
 	}
 
+	getDistanceToPoint(x, y) {
+		return Math.hypot(x - this.posX, y - this.posY);
+	}
+
 	getMoveType(i) {
 		return Utility.getKeyByValue(MOVE_TYPES, i);
 	}
@@ -993,6 +1223,16 @@ class Myte {
 
 
 	updateTargetToFollowMouse(doXAxis = true, doYAxis = true) {
+		if (this.shouldHoldInHomeSlot()) {
+			const home = this.getHomePosition();
+			this.setTarget(
+				doXAxis ? home.x : null,
+				doYAxis ? home.y : null,
+				false
+			);
+			return;
+		}
+
 		const mouseDistance = this.getDistanceFromMouse();
 		const mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
 

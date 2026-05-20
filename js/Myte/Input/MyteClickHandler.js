@@ -37,9 +37,9 @@ class MyteClickHandler extends MyteBaseHandler {
 
 	_onInactiveClick(event) {
 		if (!this.myte.isActive) {
-			event.stopPropagation();
-			this.myte.start();
-			this.myte.parent.setActiveMyte(this.myte);
+			event?.preventDefault?.();
+			event?.stopImmediatePropagation?.();
+			this._activateFromHomeSlot(event);
 		}
 	}
 
@@ -64,11 +64,38 @@ class MyteClickHandler extends MyteBaseHandler {
 		event.preventDefault();
 	}
 
-	_onHomeClick() {
-		if (this.myte.isActive) {
-			this.myte.queue.clear();
-			this.myte.setMode(MOVE_TYPES.GOHOME);
+	_onHomeClick(event) {
+		event?.stopPropagation?.();
+
+		if (!this.myte.isActive) {
+			this._activateFromHomeSlot(event);
+			return;
 		}
+
+		if (!this.myte.isActiveMyte) {
+			this.myte.parent.setActiveMyte(this.myte);
+		}
+
+		if (this.myte.isAtHomePosition?.(1)) {
+			this.myte.stop?.();
+			return;
+		}
+
+		this.myte.clearHomeSlotHold?.();
+		this.myte.queue.clear();
+		this.myte.setMode(MOVE_TYPES.GOHOME);
+	}
+
+	_activateFromHomeSlot(event) {
+		event?.preventDefault?.();
+		event?.stopPropagation?.();
+		this.myte.startWithOptions({
+			goal: DEFAULT_MODE,
+			followGoal: this.myte.followGoal,
+			autonomyGoal: this.myte.autonomyGoal
+		});
+		this.myte.parent.setActiveMyte(this.myte);
+		this.myte.holdInHomeSlotUntilPointerLeaves?.();
 	}
 
 	_onClick(event) {

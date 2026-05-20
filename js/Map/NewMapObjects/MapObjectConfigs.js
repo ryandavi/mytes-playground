@@ -603,16 +603,18 @@ const TYPE_CONFIGS = {
 				spriteFrameOffset: { offsetX: 0, offsetY: 160 }
 			},
 			S: {
-				size: { width: 96, height: 32 },
-				collider: { width: 96, height: 32, offsetX: 0, offsetY: 0 },
-				interactiveCollider: { width: 128, height: 64, offsetX: -16, offsetY: -32 },
-				transformStyle: 'rotate(90deg)'
+				size: { width: 128, height: 32 },
+				collider: { width: 128, height: 32, offsetX: 0, offsetY: 0 },
+				interactiveCollider: { width: 160, height: 64, offsetX: -16, offsetY: -32 },
+				transformStyle: 'rotate(90deg)',
+				spriteFrameOffset: { offsetX: 64, offsetY: 160 }
 			},
 			N: {
-				size: { width: 96, height: 32 },
-				collider: { width: 96, height: 32, offsetX: 0, offsetY: 0 },
-				interactiveCollider: { width: 128, height: 64, offsetX: -16, offsetY: 0 },
-				transformStyle: 'rotate(-90deg)'
+				size: { width: 128, height: 32 },
+				collider: { width: 128, height: 32, offsetX: 0, offsetY: 0 },
+				interactiveCollider: { width: 160, height: 64, offsetX: -16, offsetY: 0 },
+				transformStyle: 'rotate(-90deg)',
+				spriteFrameOffset: { offsetX: 64, offsetY: 160 }
 			},
 			Horizontal: 'S',
 			Vertical: 'E',
@@ -742,6 +744,11 @@ const TYPE_CONFIGS = {
 		size: { width: 128, height: 128 },
 		collider: { width: 64, height: 64, offsetX: 32, offsetY: 32 },
 		interactiveCollider: { width: 196, height: 196, offsetX: -32, offsetY: -32 },
+		transitionAlignTo: 'sprite',
+		soundEffects: {
+			depart: 'obj_portal_depart',
+			arrive: 'obj_portal_arrive'
+		},
 		spriteConfig: {
 			default: 'idle',
 			spriteSheet: {

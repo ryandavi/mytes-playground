@@ -2,36 +2,29 @@
 class LoadingManager {
     constructor() {
 		this.loadingScreen = document.getElementById('loading-screen');
-		if (this.loadingScreen) {
-			this.window = this.loadingScreen.querySelector('#loading-modal');
-			this.progressBar = this.loadingScreen.querySelector('.loading-progress');
-			this.loadingText = this.loadingScreen.querySelector('.loading-status');
-			this.loadingIcon = this.loadingScreen.querySelector('.loading-icon');
-
-            this.skipIcon = this.loadingScreen.querySelector('.modal-close-btn');
-
-            this.progressContainer = this.loadingScreen.querySelector('.loading-progress-container')
-
-			this.isLoading = true;
-		}
+		this.window         = this.loadingScreen?.querySelector('#loading-modal')         ?? null;
+		this.progressBar    = this.loadingScreen?.querySelector('.loading-progress')       ?? null;
+		this.loadingText    = this.loadingScreen?.querySelector('.loading-status')         ?? null;
+		this.loadingIcon    = this.loadingScreen?.querySelector('.loading-icon')           ?? null;
+		this.skipIcon       = this.loadingScreen?.querySelector('.modal-close-btn')        ?? null;
+		this.progressContainer = this.loadingScreen?.querySelector('.loading-progress-container') ?? null;
+        this.isLoading = false;
         
         // Debug options
         this.debugOptions = {
-            skipLoading: true,         // Set to true to skip loading screen
-            fastLoading: false,         // Set to true for accelerated loading
-            logMessages: true,           // Show debug logs for messages
-			dontHide: false,
-			skipLoadingButton: true
+            skipLoading: false,     // Skip loading screen entirely (dev only)
+            fastLoading: false,     // Show messages immediately without minimum display time
+            dontHide: false,        // Keep loading screen visible after completion
+            skipLoadingButton: true,
         };
-        
+
         // Settings
         this.settings = {
-            minMessageDisplayTime: 150,    // Minimum time to display a message (ms) - for testing
-            finalDelay: 0,               // Delay before hiding when complete (ms)
-            finalMessage: "Ready to play!",  // Final message to display before hiding
-			hideDelay: 100,
-			checkMessageDelay: 100,
-			showWindowDelay: 150,
+            minMessageDisplayTime: 150, // Minimum ms each status message is shown
+            finalDelay: 0,              // Delay before hiding once progress hits 100%
+            finalMessage: "Ready to play!",
+            hideDelay: 100,
+            showWindowDelay: 150,
         };
         
         // Loading stages tracking (normalized to 0-1 range)
@@ -46,11 +39,15 @@ class LoadingManager {
         this.currentMessage = null;
         this.messageTimer = null;
         this.lastMessageTime = 0;
-        
+
         // Progress tracking
-        this.displayProgress = 0;         // The displayed progress (0-100)
-        this.progressInterval = null;     // Interval for updating progress
-        this.isComplete = false;          // Flag indicating loading is complete
+        this.displayProgress = 0;
+        this.progressInterval = null;
+        this.isComplete = false;
+        this.skipClickHandler = null;
+        this.showWindowTimer = null;
+        this.hideTimer = null;
+        this.finalHideTimer = null;
     }
     
     initialize() {
@@ -78,15 +75,13 @@ class LoadingManager {
         // Reset the loading screen
         this.show();
         
-        // Reset progress for all stages and message counters
+        // Reset progress for all stages
         Object.keys(this.stages).forEach(key => {
             this.stages[key].progress = 0;
         });
-        
+
         this.displayProgress = 0;
         this.isComplete = false;
-        this.totalMessages = 0;
-        this.processedMessages = 0;
         
         this.updateProgressUI(0);
         this.setMessage("Initializing...");
@@ -101,16 +96,19 @@ class LoadingManager {
 			if (this.skipIcon) {
 
 				this.skipIcon.classList.add('visible');
-				// Add click event
-				this.skipIcon.addEventListener('click', () => {
-					this.skipLoading();
-				});
+				if (!this.skipClickHandler) {
+					this.skipClickHandler = () => {
+						this.skipLoading();
+					};
+				}
+				this.skipIcon.removeEventListener('click', this.skipClickHandler);
+				this.skipIcon.addEventListener('click', this.skipClickHandler);
 			}
 		}
 
 
 		// delay with  showWindowDelay
-		setTimeout(() => {
+		this.showWindowTimer = setTimeout(() => {
 			this.window.classList.add('visible');
 			// Start progress animation
 			this.startProgressAnimation();
@@ -125,22 +123,11 @@ class LoadingManager {
         }
         
         // Update progress at regular intervals
-        const updateInterval = 40; // Update every 40ms
+        const updateInterval = 40;
         this.progressInterval = setInterval(() => {
-            // Calculate raw technical progress based on loading stages
-            const technicalProgress = this.calculateActualProgress();
-            
-            // Calculate message-based progress (as a percentage)
-            let messageProgress = 0;
-            if (this.totalMessages > 0) {
-                messageProgress = (this.processedMessages / this.totalMessages) * 100;
-            }
-            
-            // Combine technical and message progress
-            // Messages control 70% of the bar, technical progress 30%
-            let baseProgress = (messageProgress * 0.7) + (technicalProgress * 0.3);
-            
-            // If loading is complete but messages are still showing, cap at 95%
+            let baseProgress = this.calculateActualProgress();
+
+            // Don't reach 100% while message queue is still draining
             if (this.isComplete && (this.messageQueue.length > 0 || this.messageTimer)) {
                 baseProgress = Math.min(baseProgress, 95);
             }
@@ -179,7 +166,10 @@ class LoadingManager {
 
 
                     
-                    setTimeout(() => this.hide(), this.settings.finalDelay);
+                    if (this.finalHideTimer) {
+                        clearTimeout(this.finalHideTimer);
+                    }
+                    this.finalHideTimer = setTimeout(() => this.hide(), this.settings.finalDelay);
                 }
             }
         }, updateInterval);
@@ -208,25 +198,6 @@ class LoadingManager {
         
         // Ensure percent is between 0-1
         this.stages[stage].progress = Math.min(1, Math.max(0, percent));
-    }
-    
-    // Legacy methods for backward compatibility
-    updateCoreProgress(percent) {
-        this.updateStageProgress('core', percent / 100);
-    }
-    
-    updateContainerProgress(percent) {
-        this.updateStageProgress('container', percent);
-    }
-    
-    updateResourceProgress(category, loaded, total = null) {
-        // Resource progress is tracked within the 'resources' stage
-        if (total !== null && total > 0) {
-            this.updateStageProgress('resources', loaded / total);
-        } else if (total === null) {
-            // If total is not provided, assume it's a direct percentage
-            this.updateStageProgress('resources', loaded);
-        }
     }
     
     show() {
@@ -268,7 +239,11 @@ class LoadingManager {
         this.messageQueue = [];
         
         // Wait for transition to complete before making canvas visible
-        setTimeout(() => {
+        if (this.hideTimer) {
+            clearTimeout(this.hideTimer);
+        }
+
+        this.hideTimer = setTimeout(() => {
             const canvas = document.querySelector('.canvas');
             if (canvas) {
                 canvas.style.visibility = 'visible';
@@ -302,29 +277,16 @@ class LoadingManager {
     }
     
     setMessage(message) {
-        const now = Date.now();
-        const timeSinceLastMessage = now - this.lastMessageTime;
-        
-        // Increment total message count for progress tracking
-        this.totalMessages++;
-        
-        // Check if we're in fast loading mode
         if (this.debugOptions.fastLoading) {
-            // Show message immediately, ignoring timing
             this.showMessage(message);
-            this.processedMessages++;
             return;
         }
-        
-        // If enough time has passed, show the message immediately
+
+        const timeSinceLastMessage = Date.now() - this.lastMessageTime;
         if (timeSinceLastMessage >= this.settings.minMessageDisplayTime) {
             this.showMessage(message);
-            this.processedMessages++;
         } else {
-            // Otherwise, queue the message
             this.messageQueue.push(message);
-            
-            // If this is the first queued message, start processing the queue
             if (this.messageQueue.length === 1 && !this.messageTimer) {
                 const delay = this.settings.minMessageDisplayTime - timeSinceLastMessage;
                 this.messageTimer = setTimeout(() => this.processNextQueuedMessage(), delay);
@@ -342,16 +304,10 @@ class LoadingManager {
     
     processNextQueuedMessage() {
         if (this.messageQueue.length > 0) {
-            const nextMessage = this.messageQueue.shift();
-            this.showMessage(nextMessage);
-            
-            // Increment processed messages count for progress tracking
-            this.processedMessages++;
-            
-            // If there are more messages, schedule the next one
+            this.showMessage(this.messageQueue.shift());
             if (this.messageQueue.length > 0) {
                 this.messageTimer = setTimeout(
-                    () => this.processNextQueuedMessage(), 
+                    () => this.processNextQueuedMessage(),
                     this.settings.minMessageDisplayTime
                 );
             } else {
@@ -362,38 +318,15 @@ class LoadingManager {
         }
     }
     
-    // Call this when all loading is truly complete
     completeLoading() {
-        // Set all stages to 100%
+        if (this.isComplete) return; // Guard against multiple calls
         Object.keys(this.stages).forEach(key => {
             this.stages[key].progress = 1;
         });
-        
-        // Don't set isComplete to true until all messages are processed
-        if (this.messageQueue.length === 0 && !this.messageTimer) {
-            // If no messages are pending, complete immediately
-            this.isComplete = true;
-            // Add the final message sooner
-            this.setMessage(this.settings.finalMessage);
-        } else {
-            // Otherwise, wait for messages to finish before completing
-            // Set up a watcher to check when messages are done
-            const checkMessages = () => {
-                if (this.messageQueue.length === 0 && !this.messageTimer) {
-                    this.isComplete = true;
-                    // Add the final message
-                    this.setMessage(this.settings.finalMessage);
-
-                } else {
-                    setTimeout(checkMessages, this.settings.checkMessageDelay);
-                }
-            };
-
-
-            
-            // Start checking
-            setTimeout(checkMessages, this.settings.checkMessageDelay);
-        }
+        this.isComplete = true;
+        this.setMessage(this.settings.finalMessage);
+        // The progress animation loop caps at 95% while the message queue drains,
+        // then accelerates to 100% and hides.
     }
     
 
@@ -412,7 +345,6 @@ class LoadingManager {
         
         // Clear message queue
         this.messageQueue = [];
-        this.processedMessages = this.totalMessages; // Mark all messages as processed
         
         // Set all progress to 100%
         Object.keys(this.stages).forEach(key => {
@@ -431,6 +363,37 @@ class LoadingManager {
         const canvas = document.querySelector('.canvas');
         if (canvas) {
             canvas.style.visibility = 'visible';
+        }
+    }
+
+    dispose() {
+        if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+            this.progressInterval = null;
+        }
+
+        if (this.messageTimer) {
+            clearTimeout(this.messageTimer);
+            this.messageTimer = null;
+        }
+
+        if (this.showWindowTimer) {
+            clearTimeout(this.showWindowTimer);
+            this.showWindowTimer = null;
+        }
+
+        if (this.hideTimer) {
+            clearTimeout(this.hideTimer);
+            this.hideTimer = null;
+        }
+
+        if (this.finalHideTimer) {
+            clearTimeout(this.finalHideTimer);
+            this.finalHideTimer = null;
+        }
+
+        if (this.skipIcon && this.skipClickHandler) {
+            this.skipIcon.removeEventListener('click', this.skipClickHandler);
         }
     }
 }

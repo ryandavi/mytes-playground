@@ -1,12 +1,11 @@
 class MyteQueue {
     constructor(myte) {
-        this.myte  = myte;
+        this.myte = myte;
         this.queue = [];
         this.isDoingAction = false;
     }
 
-    // ─── Core API ─────────────────────────────────────────────────────────────
-
+    // Core API
     count() {
         return this.queue.length;
     }
@@ -31,16 +30,16 @@ class MyteQueue {
             options.duration = ActionClass.metadata.defaultDuration;
         }
 
-        if (ActionClass.metadata.requiresTarget && (options.target == null)) {
+        if (ActionClass.metadata.requiresTarget && options.target == null) {
             console.warn(`[MyteQueue] action "${actionId}" requires a target but got`, options.target);
             console.trace('[MyteQueue] queued without target');
         }
 
         this.queue.push(new ActionClass(this.myte, options));
-        return this; // chainable
+        return this;
     }
 
-    // Insert an action at the front — interrupts the current action cleanly
+    // Insert an action at the front - interrupts the current action cleanly.
     addToFront(actionId, options = {}) {
         const ActionClass = ActionManager.actions.get(actionId);
         if (!ActionClass) {
@@ -57,7 +56,7 @@ class MyteQueue {
         }
 
         this.queue.unshift(new ActionClass(this.myte, options));
-        this.isDoingAction = false; // force re-start on next update
+        this.isDoingAction = false;
         return this;
     }
 
@@ -80,7 +79,7 @@ class MyteQueue {
         if (this.isDoingAction && this.queue[0]?.interrupt) {
             this.queue[0].interrupt();
         }
-        this.queue        = [];
+        this.queue = [];
         this.isDoingAction = false;
     }
 
@@ -105,8 +104,7 @@ class MyteQueue {
         return currentAction;
     }
 
-    // ─── Update loop ──────────────────────────────────────────────────────────
-
+    // Update loop
     update() {
         if (this.queue.length === 0) return;
 
@@ -120,7 +118,7 @@ class MyteQueue {
         if (currentAction.update()) {
             this.queue.shift();
             this.isDoingAction = false;
-            currentAction.complete(); // always called, regardless of queue state
+            currentAction.complete();
 
             if (this.queue.length > 0) {
                 this.queue[0].start();
@@ -129,8 +127,7 @@ class MyteQueue {
         }
     }
 
-    // ─── Carry state queries ──────────────────────────────────────────────────
-
+    // Carry state queries
     isBeingCarried() {
         return this.getCurrentAction() instanceof BeingCarriedAction;
     }
@@ -156,8 +153,7 @@ class MyteQueue {
         return null;
     }
 
-    // ─── Convenience methods ──────────────────────────────────────────────────
-
+    // Convenience methods
     addIdle(duration = 200) {
         return this.add('idle', { duration });
     }
@@ -206,75 +202,66 @@ class MyteQueue {
         return this.add('inspect', { target, duration });
     }
 
-    // Approach then eat
     addEatElement(target) {
         return this.addSequence([
             ['go_to_object', { target }],
-            ['eat_element',  { target }]
+            ['eat_element', { target }]
         ]);
     }
 
-    // Approach and open a treasure chest
     addOpenChest(chest) {
         return this.addSequence([
             ['go_to_object', { target: chest }],
-            ['open_chest',   { target: chest }]
+            ['open_chest', { target: chest }]
         ]);
     }
 
-    // Approach and smell a flower
     addSmellFlower(flower) {
         return this.addSequence([
-            ['go_to_object',  { target: flower }],
-            ['smell_flower',  { target: flower }]
+            ['go_to_object', { target: flower }],
+            ['smell_flower', { target: flower }]
         ]);
     }
 
-    // Approach a fountain and drink
     addDrinkFromFountain(fountain) {
         return this.addSequence([
-            ['go_to_object',    { target: fountain }],
-            ['drink_fountain',  { target: fountain }]
+            ['go_to_object', { target: fountain }],
+            ['drink_fountain', { target: fountain }]
         ]);
     }
 
-    // Approach and water a crop plant
     addWaterPlant(plant) {
         return this.addSequence([
             ['go_to_object', { target: plant }],
-            ['water_plant',  { target: plant }]
+            ['water_plant', { target: plant }]
         ]);
     }
 
-    // Approach and harvest a crop
     addHarvest(plant) {
         return this.addSequence([
             ['go_to_object', { target: plant }],
-            ['harvest',      { target: plant }]
+            ['harvest', { target: plant }]
         ]);
     }
 
-    // Approach then show affection
     addShowAffection(targetMyte) {
         return this.addSequence([
-            ['go_to_object',  { target: targetMyte }],
+            ['go_to_object', { target: targetMyte }],
             ['show_affection', { target: targetMyte }]
         ]);
     }
 
-    // Approach then greet (greet action pushes receive onto the target's queue)
     addGreet(targetMyte) {
         return this.addSequence([
             ['go_to_object', { target: targetMyte }],
-            ['greet',        { target: targetMyte }]
+            ['greet', { target: targetMyte }]
         ]);
     }
 
-    // Stand near and watch another Myte
     addWatch(targetMyte, duration = 5000) {
         return this.addSequence([
             ['go_to_object', { target: targetMyte }],
-            ['watch',        { target: targetMyte, duration }]
+            ['watch', { target: targetMyte, duration }]
         ]);
     }
 
@@ -294,18 +281,16 @@ class MyteQueue {
         return this.add('hide', { hideTarget, scaryObject, duration });
     }
 
-    // Approach then pick up another Myte
     addPickupMyte(target) {
         if (!target || target.queue.isBeingCarried()) return false;
 
         this.addSequence([
-            ['go_to_object',  { target }],
-            ['carry_pickup',  { target, duration: 100 }]
+            ['go_to_object', { target }],
+            ['carry_pickup', { target, duration: 100 }]
         ]);
         return true;
     }
 
-    // Put down the currently carried Myte
     addPutDownMyte() {
         const currentAction = this.getCurrentAction();
         if (!(currentAction instanceof CarryAction) || !currentAction.target) return false;
@@ -321,7 +306,6 @@ class MyteQueue {
         return true;
     }
 
-    // Backward-compatible helper for existing ball callers
     addPickupBall(ball) {
         return this.addPickupItem(ball);
     }
@@ -340,12 +324,10 @@ class MyteQueue {
         return true;
     }
 
-    // Move to a position using A*
     addAStarMove(target) {
         return this.add('astar-move', { target });
     }
 
-    // Low-level: move to a DOM element position (legacy)
     addMoveToElement(element = null) {
         const destination = this.myte.parent.getLocalOffset(element);
         return this.add('move', {

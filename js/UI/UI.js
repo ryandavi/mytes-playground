@@ -143,6 +143,9 @@ class CursorManager extends UIComponent {
         this.currentState = null;
         this.currentAnimation = null;
         this.animationTimer = null;
+        this.listenersAttached = false;
+        this.boundHandlers = null;
+        this.isSetup = false;
         
         // Initialize
         this.init();
@@ -167,6 +170,8 @@ class CursorManager extends UIComponent {
     }
 
     setupCursorElement() {
+        if (this.isSetup) return;
+
         // Apply base styles
         this.cursorElement.style.position = 'fixed';
         this.cursorElement.style.pointerEvents = 'none';
@@ -181,30 +186,43 @@ class CursorManager extends UIComponent {
         
         // Add base class
         this.cursorElement.classList.add('custom-cursor');
+        this.isSetup = true;
     }
     
     setupEventListeners() {
+        if (this.listenersAttached) return;
+
+        this.boundHandlers = {
+            mouseMove: this.throttle((event) => {
+                this.handleMouseMove(event);
+            }, this.config.throttleDelay),
+            mouseDown: this.handleMouseDown.bind(this),
+            mouseUp: this.handleMouseUp.bind(this),
+            mouseLeave: this.hideCursor.bind(this),
+            mouseEnter: this.showCursor.bind(this),
+            focusIn: (event) => {
+                // Show native cursor on focusable elements for accessibility
+                if (this.config.accessibility.showNativeCursorForScreenReaders && 
+                    event.target.tabIndex >= 0) {
+                    event.target.style.cursor = 'auto';
+                }
+            }
+        };
+
         // Use throttled mousemove for performance
-        document.addEventListener('mousemove', this.throttle((event) => {
-            this.handleMouseMove(event);
-        }, this.config.throttleDelay));
+        document.addEventListener('mousemove', this.boundHandlers.mouseMove);
         
         // Track mouse state
-        document.addEventListener('mousedown', () => this.handleMouseDown());
-        document.addEventListener('mouseup', () => this.handleMouseUp());
+        document.addEventListener('mousedown', this.boundHandlers.mouseDown);
+        document.addEventListener('mouseup', this.boundHandlers.mouseUp);
         
         // Handle visibility
-        document.addEventListener('mouseleave', () => this.hideCursor());
-        document.addEventListener('mouseenter', () => this.showCursor());
+        document.addEventListener('mouseleave', this.boundHandlers.mouseLeave);
+        document.addEventListener('mouseenter', this.boundHandlers.mouseEnter);
         
         // Handle focus for accessibility
-        document.addEventListener('focusin', (event) => {
-            // Show native cursor on focusable elements for accessibility
-            if (this.config.accessibility.showNativeCursorForScreenReaders && 
-                event.target.tabIndex >= 0) {
-                event.target.style.cursor = 'auto';
-            }
-        });
+        document.addEventListener('focusin', this.boundHandlers.focusIn);
+        this.listenersAttached = true;
     }
 
     handleMouseMove(event) {
@@ -374,6 +392,10 @@ class CursorManager extends UIComponent {
         if (this.config.enabled) return;
         
         this.config.enabled = true;
+        this.setupCursorElement();
+        if (!this.listenersAttached) {
+            this.setupEventListeners();
+        }
         
         if (this.config.hideNativeCursor) {
             document.body.style.cursor = 'none';
@@ -440,17 +462,23 @@ class CursorManager extends UIComponent {
     
     destroy() {
         // Clean up event listeners
-        document.removeEventListener('mousemove', this.handleMouseMove);
-        document.removeEventListener('mousedown', this.handleMouseDown);
-        document.removeEventListener('mouseup', this.handleMouseUp);
-        document.removeEventListener('mouseleave', this.hideCursor);
-        document.removeEventListener('mouseenter', this.showCursor);
+        if (this.boundHandlers) {
+            document.removeEventListener('mousemove', this.boundHandlers.mouseMove);
+            document.removeEventListener('mousedown', this.boundHandlers.mouseDown);
+            document.removeEventListener('mouseup', this.boundHandlers.mouseUp);
+            document.removeEventListener('mouseleave', this.boundHandlers.mouseLeave);
+            document.removeEventListener('mouseenter', this.boundHandlers.mouseEnter);
+            document.removeEventListener('focusin', this.boundHandlers.focusIn);
+            this.boundHandlers = null;
+        }
+        this.listenersAttached = false;
         
         // Stop animations
         this.stopAnimation();
         
         // Restore default cursor
         document.body.style.cursor = '';
+        this.isSetup = false;
     }
 }
 
@@ -459,6 +487,7 @@ class ToolManager extends UIComponent {
         super(parent);
         this.currentToolMode = UIToolModes.SELECT;
         this.handControls = this.parent.containerWrapper.querySelector('#hand-controls');
+        this.listenerCleanup = [];
         
         this.toolConfig = {
             [UIToolModes.SELECT]: {
@@ -505,7 +534,7 @@ class ToolManager extends UIComponent {
 
         radioInputs.forEach(input => {
             // Existing change event listener
-            input.addEventListener('change', (event) => {
+            const handleChange = (event) => {
                 const toolId = event.target.id;
 
                 // Map the tool ID to the corresponding mode
@@ -520,25 +549,31 @@ class ToolManager extends UIComponent {
                         this.setToolMode(UIToolModes.PET);
                         break;
                 }
-            });
+            };
+            input.addEventListener('change', handleChange);
+            this.listenerCleanup.push(() => input.removeEventListener('change', handleChange));
 
             // Add context menu (right-click) event listener to the input itself
-            input.addEventListener('contextmenu', (event) => {
+            const handleInputContextMenu = (event) => {
                 event.preventDefault();
                 input.checked = true;
                 input.dispatchEvent(new Event('change'));
                 return false;
-            });
+            };
+            input.addEventListener('contextmenu', handleInputContextMenu);
+            this.listenerCleanup.push(() => input.removeEventListener('contextmenu', handleInputContextMenu));
 
             // Also add to the label if it exists
             const label = this.handControls.querySelector(`label[for="${input.id}"]`);
             if (label) {
-                label.addEventListener('contextmenu', (event) => {
+                const handleLabelContextMenu = (event) => {
                     event.preventDefault();
                     input.checked = true;
                     input.dispatchEvent(new Event('change'));
                     return false;
-                });
+                };
+                label.addEventListener('contextmenu', handleLabelContextMenu);
+                this.listenerCleanup.push(() => label.removeEventListener('contextmenu', handleLabelContextMenu));
             }
         });
 
@@ -593,6 +628,11 @@ class ToolManager extends UIComponent {
 
         console.warn(`Could not find radio button for tool: ${toolConfig.id}`);
         return false;
+    }
+
+    destroy() {
+        this.listenerCleanup.forEach(cleanup => cleanup());
+        this.listenerCleanup = [];
     }
 }
 
@@ -930,6 +970,18 @@ class HUDManager extends UIComponent {
     constructor(parent) {
         super(parent);
         this.hudElement = document.querySelector('#hud-active-pet');
+        this.nameElement = this.hudElement?.querySelector('.name') || null;
+        this.moodElement = this.hudElement?.querySelector('.mood') || null;
+        this.energyElement = this.hudElement?.querySelector('.energy') || null;
+        this.currentMoodEffect = null;
+        this.lastRenderedState = {
+            visible: false,
+            myteId: null,
+            name: null,
+            mood: null,
+            energy: null,
+            moodEffect: null
+        };
     }
 
     update() {
@@ -938,33 +990,55 @@ class HUDManager extends UIComponent {
         const activeMyte = this.parent.getActiveMyte();
 
         if (!activeMyte) {
-            this.hudElement.classList.remove('visible');
+            if (this.lastRenderedState.visible) {
+                this.hudElement.classList.remove('visible');
+                this.lastRenderedState.visible = false;
+            }
             return;
         }
 
-        if (!this.hudElement.classList.contains('visible')) {
+        if (!this.lastRenderedState.visible) {
             this.hudElement.classList.add('visible');
+            this.lastRenderedState.visible = true;
         }
 
-        // Update pet info
-        this.hudElement.querySelector('.name').textContent = activeMyte.name;
-        this.hudElement.querySelector('.mood').textContent = activeMyte.stats.getMoodStatus();
-        this.hudElement.querySelector('.energy').textContent = 'Full';
-
-        // Clear any previous mood effects
-        const oldEffects = this.hudElement.querySelectorAll('.mood-effect');
-        oldEffects.forEach(effect => effect.remove());
-
-        // Add stats from current action if any
+        const mood = activeMyte.stats.getMoodStatus();
+        const energy = 'Full';
         const currentAction = activeMyte.queue.getCurrentAction();
-        if (currentAction) {
-            const actionMetadata = currentAction.constructor.metadata;
-            if (actionMetadata.affectsMood) {
+        const actionMetadata = currentAction?.constructor?.metadata;
+        const moodEffectText = actionMetadata?.affectsMood
+            ? `Mood ${actionMetadata.moodEffect > 0 ? '+' : ''}${actionMetadata.moodEffect}`
+            : null;
+
+        if (this.lastRenderedState.myteId !== activeMyte.id || this.lastRenderedState.name !== activeMyte.name) {
+            this.nameElement.textContent = activeMyte.name;
+            this.lastRenderedState.myteId = activeMyte.id;
+            this.lastRenderedState.name = activeMyte.name;
+        }
+
+        if (this.lastRenderedState.mood !== mood) {
+            this.moodElement.textContent = mood;
+            this.lastRenderedState.mood = mood;
+        }
+
+        if (this.lastRenderedState.energy !== energy) {
+            this.energyElement.textContent = energy;
+            this.lastRenderedState.energy = energy;
+        }
+
+        if (this.lastRenderedState.moodEffect !== moodEffectText) {
+            this.currentMoodEffect?.remove();
+            this.currentMoodEffect = null;
+
+            if (moodEffectText) {
                 const moodEffect = document.createElement('div');
                 moodEffect.className = 'mood-effect';
-                moodEffect.textContent = `Mood ${actionMetadata.moodEffect > 0 ? '+' : ''}${actionMetadata.moodEffect}`;
+                moodEffect.textContent = moodEffectText;
                 this.hudElement.appendChild(moodEffect);
+                this.currentMoodEffect = moodEffect;
             }
+
+            this.lastRenderedState.moodEffect = moodEffectText;
         }
     }
 }
@@ -975,6 +1049,7 @@ class ScreenManager extends UIComponent {
         this.headerElement = this.parent.containerWrapper.querySelector('.header');
         this.fullscreenButton = this.parent.containerWrapper.querySelector('.fullscreen-btn');
         this.cameraControls = null;
+        this.listenerCleanup = [];
     }
 
     init() {
@@ -1003,9 +1078,11 @@ class ScreenManager extends UIComponent {
             button.textContent = config.label;
             button.title = config.title;
             button.setAttribute('aria-label', config.title);
-            button.addEventListener('click', () => {
+            const handleClick = () => {
                 config.action();
-            });
+            };
+            button.addEventListener('click', handleClick);
+            this.listenerCleanup.push(() => button.removeEventListener('click', handleClick));
             this.cameraControls.appendChild(button);
         });
 
@@ -1018,9 +1095,11 @@ class ScreenManager extends UIComponent {
 
     initializeButtons() {
         if (this.fullscreenButton) {
-            this.fullscreenButton.addEventListener("click", () => {
+            this.handleFullscreenClick = () => {
                 this.toggleFullscreen();
-            });
+            };
+            this.fullscreenButton.addEventListener("click", this.handleFullscreenClick);
+            this.listenerCleanup.push(() => this.fullscreenButton?.removeEventListener('click', this.handleFullscreenClick));
         }
     }
 
@@ -1039,6 +1118,13 @@ class ScreenManager extends UIComponent {
                 camera.zoomTo(camera.zoomLevel, { anchor, immediate: true });
             });
         }
+    }
+
+    destroy() {
+        this.listenerCleanup.forEach(cleanup => cleanup());
+        this.listenerCleanup = [];
+        this.cameraControls?.remove();
+        this.cameraControls = null;
     }
 }
 
@@ -1130,5 +1216,24 @@ class UserInterface {
         this.debug.update();
         this.cursorManager.update();
         this.hudManager.update();
+    }
+
+    dispose() {
+        this.debug?.dispose?.();
+        this.debug = null;
+        this.debugMenu?.dispose?.();
+        this.debugMenu = null;
+        this.settingsMenu?.dispose?.();
+        this.settingsMenu = null;
+        this.soundMenu?.dispose?.();
+        this.soundMenu = null;
+
+        this.screenManager?.destroy?.();
+        this.toolManager?.destroy?.();
+        this.cursorManager?.destroy?.();
+
+        this.screenManager = null;
+        this.toolManager = null;
+        this.cursorManager = null;
     }
 }

@@ -1,4 +1,4 @@
-// Perform a happy dance — moves in small steps around a base position
+// Perform a happy dance - moves in small steps around a base position.
 class DanceAction extends MyteAction {
     static metadata = {
         id: 'dance',
@@ -34,7 +34,7 @@ class DanceAction extends MyteAction {
             { x: -20, y: 0 }
         ];
         this.currentStep = 0;
-        this.stepTimer   = this.stepDuration;
+        this.stepTimer = this.stepDuration;
     }
 
     start() {
@@ -48,7 +48,7 @@ class DanceAction extends MyteAction {
 
         if (this.stepTimer <= 0) {
             this.currentStep = (this.currentStep + 1) % this.danceSteps.length;
-            this.stepTimer   = this.stepDuration;
+            this.stepTimer = this.stepDuration;
             const step = this.danceSteps[this.currentStep];
             this.myte.setTarget(this.baseX + step.x, this.baseY + step.y);
         }
@@ -59,7 +59,7 @@ class DanceAction extends MyteAction {
     }
 }
 
-// Deep sleep with bobbing animation
+// Deep sleep with bobbing animation.
 class SleepAction extends MyteAction {
     static metadata = {
         id: 'sleep',
@@ -90,8 +90,8 @@ class SleepAction extends MyteAction {
             ...options
         });
         this.bobPhase = 0;
-        this.zTimer   = this.zInterval;
-        this.startY   = myte.posY;
+        this.zTimer = this.zInterval;
+        this.startY = myte.posY;
     }
 
     start() {
@@ -115,7 +115,7 @@ class SleepAction extends MyteAction {
     }
 }
 
-// Quick nap with gentle floating
+// Quick nap with gentle floating.
 class SimpleSleepAction extends MyteAction {
     static metadata = {
         id: 'simple_sleep',
@@ -145,7 +145,7 @@ class SimpleSleepAction extends MyteAction {
             ...options
         });
         this._zPosition = 0;
-        this._zSpeed    = this.zSpeed;
+        this._zSpeed = this.zSpeed;
     }
 
     start() {
@@ -166,7 +166,7 @@ class SimpleSleepAction extends MyteAction {
     }
 }
 
-// Spin in place by cycling through directions
+// Spin in place by cycling through directions.
 class SpinAction extends MyteAction {
     static metadata = {
         id: 'spin',
@@ -197,7 +197,7 @@ class SpinAction extends MyteAction {
             ...options
         });
         this.directions = [DIRECTION.NORTH, DIRECTION.EAST, DIRECTION.SOUTH, DIRECTION.WEST];
-        this.dirIndex   = 0;
+        this.dirIndex = 0;
         this.frameTimer = this.frameDelay;
     }
 
@@ -208,7 +208,7 @@ class SpinAction extends MyteAction {
     update() {
         this.frameTimer--;
         if (this.frameTimer <= 0) {
-            this.dirIndex   = (this.dirIndex + 1) % this.directions.length;
+            this.dirIndex = (this.dirIndex + 1) % this.directions.length;
             this.frameTimer = this.frameDelay;
             this.myte.setDirection(this.directions[this.dirIndex]);
         }

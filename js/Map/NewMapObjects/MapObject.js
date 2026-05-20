@@ -730,9 +730,17 @@ class MapObject {
 		if (dirConfig.collider) {
 			this.collider = dirConfig.collider;
 		}
+		this.config.interactiveCollider = dirConfig.interactiveCollider || null;
 
 		this.config.facingDirection = normalizedDir;
 		this.config.transformStyle = dirConfig.transformStyle || '';
+		this.config.spriteFrameOffset = dirConfig.spriteFrameOffset || null;
+
+		for (const key in dirConfig) {
+			if (!['size', 'collider', 'interactiveCollider', 'transformStyle', 'spriteFrameOffset'].includes(key)) {
+				this.config[key] = dirConfig[key];
+			}
+		}
 
 		if ('facingDirection' in this) {
 			this.facingDirection = normalizedDir;
@@ -744,7 +752,31 @@ class MapObject {
 			['n', 's', 'e', 'w'].forEach(d => this.element.classList.remove(`facing-${d}`));
 			this.element.classList.add(`facing-${normalizedDir.toLowerCase()}`);
 			const spriteEl = this.element.querySelector('.sprite');
-			if (spriteEl) spriteEl.style.transform = dirConfig.transformStyle || '';
+			if (spriteEl) {
+				spriteEl.style.transform = dirConfig.transformStyle || '';
+
+				const frameSize = this.getConfig('spriteConfig.spriteSheet.frameSize');
+				if (frameSize) {
+					const offsetOverride = this.getConfig('spriteFrameOffset');
+					const offsetX = offsetOverride?.offsetX ?? frameSize.offsetX;
+					const offsetY = offsetOverride?.offsetY ?? frameSize.offsetY;
+					spriteEl.style.width = `${frameSize.width}px`;
+					spriteEl.style.height = `${frameSize.height}px`;
+					spriteEl.style.left = `${-offsetX}px`;
+					spriteEl.style.top = `${-offsetY}px`;
+				}
+			}
+
+			const interactiveEl = this.element.querySelector('.interactive-collider');
+			if (interactiveEl) {
+				const interactiveCollider = this.getConfig('interactiveCollider');
+				if (interactiveCollider) {
+					interactiveEl.style.width = `${interactiveCollider.width}px`;
+					interactiveEl.style.height = `${interactiveCollider.height}px`;
+					interactiveEl.style.left = `${interactiveCollider.offsetX}px`;
+					interactiveEl.style.top = `${interactiveCollider.offsetY}px`;
+				}
+			}
 		}
 
 		if (this._dropTargetEl) {

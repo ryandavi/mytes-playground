@@ -41,11 +41,10 @@ class ShowAffectionAction extends MyteAction {
     }
 }
 
-// ─── Greet ────────────────────────────────────────────────────────────────────
+// Greet
 // Two-part synchronized greeting. The initiator queues itself; on start it
 // pushes GreetReceiveAction onto the target's queue and shares an ActionSync.
 // Both actions signal the sync when positioned, then play a wave expression.
-
 class GreetAction extends PositionableAction {
     static metadata = {
         id: 'greet',
@@ -76,7 +75,7 @@ class GreetAction extends PositionableAction {
 
     constructor(myte, options) {
         super(myte, { ...GreetAction.metadata.defaultOptions, duration: GreetAction.metadata.defaultDuration, ...options });
-        this.sync    = options.sync ?? new ActionSync();
+        this.sync = options.sync ?? new ActionSync();
         this._synced = false;
     }
 
@@ -84,19 +83,17 @@ class GreetAction extends PositionableAction {
         super.start();
         this._faceTarget();
 
-        // Signal our own readiness
         this.sync.signal(this);
         this.sync.onReady(() => {
             this._synced = true;
             this.myte.queue.addExpression(this.expressionType, this.expressionDuration, this.expressionRepeat);
         });
 
-        // Invite the target Myte to respond if they're free
         const target = this.target;
         if (target instanceof Myte && !target.queue.isCarrying() && !target.queue.isBeingCarried()) {
             target.queue.addToFront('greet_receive', { target: this.myte, sync: this.sync });
         } else {
-            // No partner available — signal both sides ourselves so the expression still plays
+            // No partner available - signal both sides ourselves so the expression still plays.
             this.sync.signal({});
         }
     }
@@ -106,7 +103,7 @@ class GreetAction extends PositionableAction {
         const mr = this.myte.getRect();
         if (!tr) return;
 
-        const dx = (tr.x + tr.width  / 2) - (mr.x + mr.width  / 2);
+        const dx = (tr.x + tr.width / 2) - (mr.x + mr.width / 2);
         const dy = (tr.y + tr.height / 2) - (mr.y + mr.height / 2);
 
         if (Math.abs(dx) > Math.abs(dy)) {
@@ -122,7 +119,7 @@ class GreetAction extends PositionableAction {
     }
 }
 
-// Receiver side of a greet — queued on the target Myte by GreetAction.start()
+// Receiver side of a greet - queued on the target Myte by GreetAction.start().
 class GreetReceiveAction extends PositionableAction {
     static metadata = {
         id: 'greet_receive',
@@ -143,7 +140,7 @@ class GreetReceiveAction extends PositionableAction {
         }
     };
 
-    static canPerform() { return false; } // only added programmatically
+    static canPerform() { return false; }
 
     constructor(myte, options) {
         super(myte, { ...GreetReceiveAction.metadata.defaultOptions, duration: GreetReceiveAction.metadata.defaultDuration, ...options });
@@ -164,7 +161,7 @@ class GreetReceiveAction extends PositionableAction {
         const mr = this.myte.getRect();
         if (!tr) return;
 
-        const dx = (tr.x + tr.width  / 2) - (mr.x + mr.width  / 2);
+        const dx = (tr.x + tr.width / 2) - (mr.x + mr.width / 2);
         const dy = (tr.y + tr.height / 2) - (mr.y + mr.height / 2);
 
         if (Math.abs(dx) > Math.abs(dy)) {
@@ -180,7 +177,7 @@ class GreetReceiveAction extends PositionableAction {
     }
 }
 
-// Stand near another Myte and loosely follow their position (observing)
+// Stand near another Myte and loosely follow their position.
 class WatchAction extends PositionableAction {
     static metadata = {
         id: 'watch',
@@ -219,9 +216,9 @@ class WatchAction extends PositionableAction {
         if (!this.target) return true;
 
         const targetRect = this.getRect(this.target);
-        const myteRect   = this.myte.getRect();
+        const myteRect = this.myte.getRect();
         const horizontal = this.getClosestSideHorizontal(targetRect, myteRect);
-        const watchPos   = this.calculatePosition(myteRect, targetRect, horizontal, { gap: -5, align: 'bottom-edge' });
+        const watchPos = this.calculatePosition(myteRect, targetRect, horizontal, { gap: -5, align: 'bottom-edge' });
 
         this.myte.setTarget(watchPos.x, watchPos.y);
         this.myte.moveTowardsTarget();
@@ -231,7 +228,7 @@ class WatchAction extends PositionableAction {
     }
 }
 
-// Play tag — chaser/runner role switches on catch
+// Play tag - chaser/runner role switches on catch.
 class PlayTagAction extends PositionableAction {
     static metadata = {
         id: 'play_tag',
@@ -266,8 +263,8 @@ class PlayTagAction extends PositionableAction {
         const target = this.target;
         if (!target) return true;
 
-        const dx       = target.posX - this.myte.posX;
-        const dy       = target.posY - this.myte.posY;
+        const dx = target.posX - this.myte.posX;
+        const dy = target.posY - this.myte.posY;
         const distance = Math.hypot(dx, dy);
 
         if (this.isIt) {
@@ -297,15 +294,14 @@ class PlayTagAction extends PositionableAction {
     }
 }
 
-// State machine stages for fetch
 const FetchStates = {
     PICKUP: 'pickup',
-    THROW:  'throw',
-    CHASE:  'chase',
+    THROW: 'throw',
+    CHASE: 'chase',
     RETURN: 'return'
 };
 
-// Play fetch with a throwable object
+// Play fetch with a throwable object.
 class PlayFetchAction extends MyteAction {
     static metadata = {
         id: 'play_fetch',
@@ -338,7 +334,7 @@ class PlayFetchAction extends MyteAction {
     constructor(myte, options) {
         super(myte, { ...PlayFetchAction.metadata.defaultOptions, ...options });
         this.throwPosition = null;
-        this.throwTarget   = null;
+        this.throwTarget = null;
         this.throwProgress = 0;
     }
 
@@ -350,8 +346,8 @@ class PlayFetchAction extends MyteAction {
     update() {
         switch (this.fetchState) {
             case FetchStates.PICKUP: return this._handlePickup();
-            case FetchStates.THROW:  return this._handleThrow();
-            case FetchStates.CHASE:  return this._handleChase();
+            case FetchStates.THROW: return this._handleThrow();
+            case FetchStates.CHASE: return this._handleChase();
             case FetchStates.RETURN: return this._handleReturn();
             default: return true;
         }
@@ -371,14 +367,14 @@ class PlayFetchAction extends MyteAction {
 
         this.throwPosition = { x: this.myte.posX, y: this.myte.posY };
 
-        const angle       = Math.random() * Math.PI * 2;
-        const throwDist   = Math.random() * this.maxThrowDistance;
-        this.throwTarget  = {
+        const angle = Math.random() * Math.PI * 2;
+        const throwDist = Math.random() * this.maxThrowDistance;
+        this.throwTarget = {
             x: this.throwPosition.x + Math.cos(angle) * throwDist,
             y: this.throwPosition.y + Math.sin(angle) * throwDist
         };
         this.throwProgress = 0;
-        this.fetchState    = FetchStates.THROW;
+        this.fetchState = FetchStates.THROW;
         return false;
     }
 
@@ -428,7 +424,7 @@ class PlayFetchAction extends MyteAction {
 
         if (this.myte.isAtTarget()) {
             this.throwProgress = 0;
-            this.fetchState    = FetchStates.THROW;
+            this.fetchState = FetchStates.THROW;
         }
 
         return false;

@@ -142,7 +142,7 @@ class PositionableAction extends MyteAction {
         return this.myte.parent.getLocalOffset(target.element ?? target);
     }
 
-    // Backward-compatible alias — always uses sprite rect
+    // Backward-compatible alias - always uses sprite rect
     getRect(target) {
         return this.getTargetRect(target, 'sprite');
     }
@@ -150,14 +150,14 @@ class PositionableAction extends MyteAction {
     /**
      * Returns the {x, y} top-left position for the Myte to stand at beside destRect.
      *
-     * @param {object} myteRect         — Myte's bounding rect
-     * @param {object} destRect         — Target's bounding rect
-     * @param {string} side             — Which side to stand on:
+     * @param {object} myteRect         - Myte's bounding rect
+     * @param {object} destRect         - Target's bounding rect
+     * @param {string} side             - Which side to stand on:
      *                                    'left' | 'right' | 'top' | 'bottom' | 'center'
      * @param {object} [opts]
-     * @param {number} [opts.gap=0]     — Distance from the target edge.
+     * @param {number} [opts.gap=0]     - Distance from the target edge.
      *                                    Positive = clear space, negative = overlap.
-     * @param {string} [opts.align]     — Cross-axis alignment (default 'center').
+     * @param {string} [opts.align]     - Cross-axis alignment (default 'center').
      *                                    For left/right sides: 'top-edge' | 'center' | 'bottom-edge'
      *                                    For top/bottom sides: 'left-edge' | 'center' | 'right-edge'
      */
@@ -166,15 +166,15 @@ class PositionableAction extends MyteAction {
             case 'left':
                 return { x: destRect.x - myteRect.width - gap,       y: this._crossY(myteRect, destRect, align) };
             case 'right':
-                return { x: destRect.x + destRect.width + gap,        y: this._crossY(myteRect, destRect, align) };
+                return { x: destRect.x + destRect.width + gap,       y: this._crossY(myteRect, destRect, align) };
             case 'top':
-                return { x: this._crossX(myteRect, destRect, align),  y: destRect.y - myteRect.height - gap };
+                return { x: this._crossX(myteRect, destRect, align), y: destRect.y - myteRect.height - gap };
             case 'bottom':
-                return { x: this._crossX(myteRect, destRect, align),  y: destRect.y + destRect.height + gap };
+                return { x: this._crossX(myteRect, destRect, align), y: destRect.y + destRect.height + gap };
             case 'center':
             default:
                 return {
-                    x: destRect.x + (destRect.width  - myteRect.width)  / 2,
+                    x: destRect.x + (destRect.width - myteRect.width) / 2,
                     y: destRect.y + (destRect.height - myteRect.height) / 2
                 };
         }

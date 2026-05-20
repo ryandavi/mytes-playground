@@ -20,8 +20,7 @@ class ContainerManager {
 
 
         // inventory
-        this.inventory = new Inventory(this, document.getElementById('inventory'));
-        this.inventory.loadItems(this.core.user.items);
+        this.inventory = null;
 
         this.transitionManager = new MapTransitionManager(this);
         this.userIsActive = true;
@@ -78,9 +77,15 @@ class ContainerManager {
                 const placeholder = document.createElement('div');
                 placeholder.id = 'inventory';
                 document.body.appendChild(placeholder);
-                this.inventory = new Inventory(this, placeholder);
+                if (this.inventory?.inventoryElement !== placeholder) {
+                    this.inventory?.dispose?.();
+                    this.inventory = new Inventory(this, placeholder);
+                }
             } else {
-                this.inventory = new Inventory(this, inventoryElement);
+                if (this.inventory?.inventoryElement !== inventoryElement) {
+                    this.inventory?.dispose?.();
+                    this.inventory = new Inventory(this, inventoryElement);
+                }
             }
 
             this.inventory.loadItems(this.core.user?.items || []);
@@ -165,16 +170,8 @@ class ContainerManager {
                 console.warn('[ContainerManager] UI not defined');
             }
 
-            // Final loading update
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.updateStageProgress('container', 1.0);
-
-                // Check if other systems are ready before completing
-                if (this.core.loadingManager.stages.resources.progress >= 0.95 &&
-                    this.core.loadingManager.stages.core.progress >= 0.95) {
-                    this.core.loadingManager.completeLoading();
-                }
-            }
+            this.core?.loadingManager?.updateStageProgress('container', 1.0);
+            // completeLoading() is called by Core once all stages finish — not here.
 
             console.log('[ContainerManager] Initialization completed successfully');
             return true;
@@ -253,6 +250,7 @@ class ContainerManager {
         if (this.userIsActive) return;
         this.userIsActive = true;
         this.element?.classList.remove('user-inactive');
+        this.activeMyte?.restoreFromInactivityFreeRoam?.();
         this.eventManager?.emit?.('user_activity_changed', { active: true });
     }
 
@@ -260,6 +258,7 @@ class ContainerManager {
         if (!this.userIsActive) return;
         this.userIsActive = false;
         this.element?.classList.add('user-inactive');
+        this.activeMyte?.enterInactivityFreeRoam?.();
         this.eventManager?.emit?.('user_activity_changed', { active: false });
     }
 
@@ -622,7 +621,12 @@ class ContainerManager {
     }
 
     setActiveMyte(myte) {
+        const previousActiveMyte = this.activeMyte;
         this.activeMyte = myte;
+
+        if (previousActiveMyte && previousActiveMyte !== myte) {
+            previousActiveMyte.cancelInactivityFreeRoam?.();
+        }
 
         this.camera.setMode(this.settings.defaultMyteCamera);
 
@@ -708,6 +712,11 @@ class ContainerManager {
         if (this.gameMap) {
             this.gameMap.dispose();
             this.gameMap = null;
+        }
+
+        if (this.inventory) {
+            this.inventory.dispose();
+            this.inventory = null;
         }
 
         if (this.inputHandler) {

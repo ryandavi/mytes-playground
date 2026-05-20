@@ -1,7 +1,7 @@
 class QueueUI {
     constructor(parent) {
         this.parent = parent;
-        this.queue = document.querySelector(".queueMenu");
+        this.queue = document.querySelector('.queueMenu');
         this.elements = new Map();
         this.previousValues = new Map();
         this.allowControls = true;
@@ -10,40 +10,57 @@ class QueueUI {
     createQueueItem(item) {
         const element = document.createElement('div');
         element.className = 'queue-item';
-        
+
         const content = document.createElement('div');
         content.className = 'content';
 
-        // Number
         const number = document.createElement('span');
         number.className = 'number';
-		content.appendChild(number);
+        content.appendChild(number);
 
-        // Information section
         const information = document.createElement('div');
         information.className = 'information';
 
-        // Title section with controls
         const title = document.createElement('div');
         title.className = 'title';
 
         const name = document.createElement('span');
         name.className = 'name';
 
+        let controls = null;
+        let skipBtn = null;
+        let removeBtn = null;
+
         if (this.allowControls) {
-            const controls = document.createElement('div');
+            controls = document.createElement('div');
             controls.className = 'controls';
-            
-            const skipBtn = document.createElement('button');
+
+            skipBtn = document.createElement('button');
             skipBtn.className = 'skip';
-            skipBtn.innerHTML = '⏭️';
+            skipBtn.textContent = '>>';
             skipBtn.title = 'Skip action';
-            
-            const removeBtn = document.createElement('button');
+
+            removeBtn = document.createElement('button');
             removeBtn.className = 'remove';
-            removeBtn.innerHTML = '✖️';
+            removeBtn.textContent = 'X';
             removeBtn.title = 'Remove action';
-            
+
+            skipBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const index = Number(element.dataset.index);
+                if (index === 0) {
+                    this.parent.activeMyte?.queue?.removeCurrentAction?.();
+                }
+            });
+
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const index = Number(element.dataset.index);
+                if (Number.isFinite(index)) {
+                    this.parent.activeMyte?.queue?.queue?.splice(index, 1);
+                }
+            });
+
             controls.appendChild(skipBtn);
             controls.appendChild(removeBtn);
             title.appendChild(controls);
@@ -52,79 +69,77 @@ class QueueUI {
         title.insertBefore(name, title.firstChild);
         information.appendChild(title);
 
-        // Description section
         const description = document.createElement('div');
         description.className = 'description';
         information.appendChild(description);
+        content.appendChild(information);
 
-		content.appendChild(information);
+        let progress = null;
+        let bar = null;
+        if (item.duration && item.duration > 0) {
+            progress = document.createElement('div');
+            progress.className = 'progress';
+            bar = document.createElement('div');
+            bar.className = 'bar';
+            progress.appendChild(bar);
+            content.appendChild(progress);
+        }
 
-        // Progress bar
-		if(item.duration && item.duration > 0){
-			const progress = document.createElement('div');
-			progress.className = 'progress';
-			const bar = document.createElement('div');
-			bar.className = 'bar';
-			progress.appendChild(bar);
-
-			content.appendChild(progress);
-		}
-
-        
         element.appendChild(content);
+        element._refs = {
+            number,
+            name,
+            description,
+            controls,
+            skipBtn,
+            removeBtn,
+            progress,
+            bar,
+            status: null
+        };
 
         return element;
     }
 
-    // Helper function to safely get an identifier for a target object
     getTargetIdentifier(target) {
         if (!target) return null;
-        
-        // For map objects, use type and variant
+
         if (target.type && target.variant) {
             return `${target.type}-${target.variant}-${target.posX?.toFixed(0) || 0}-${target.posY?.toFixed(0) || 0}`;
         }
-        
-        // For other objects, use a class name or some other identifier
+
         return target.constructor?.name || 'Unknown';
     }
 
     updateQueueItem(element, item, index) {
         const key = `queue-${index}`;
-        
-        // Instead of stringifying the whole item (which may have circular references),
-        // create a simple object with just the properties we care about for comparison
+        const refs = element._refs;
+        element.dataset.index = String(index);
+
         const targetId = this.getTargetIdentifier(item.target);
         const simplifiedValue = {
-            targetId: targetId,
+            targetId,
             repeat: item.repeat,
-            name: item.constructor.name
+            name: item.constructor.name,
+            isCurrent: index === 0,
+            hasProgress: !!(item.duration && item.duration > 0),
+            expressionType: item.type || null
         };
         const currentValue = JSON.stringify(simplifiedValue);
-        
+
         if (this.previousValues.get(key) !== currentValue) {
             element.className = `queue-item ${item.constructor.metadata?.category || ''}${index === 0 ? ' current' : ''}`;
 
-            const content = element.querySelector('.content');
-            const number = content.querySelector('.number');
-            const name = content.querySelector('.name');
-            const description = content.querySelector('.description');
-            
-            // Update number
-            number.textContent = `#${index + 1}`;
+            refs.number.textContent = `#${index + 1}`;
+            refs.name.textContent = item.constructor.name.replace('Action', '');
+            refs.description.innerHTML = '';
+            refs.status = null;
 
-            // Update name
-            name.textContent = item.constructor.name.replace('Action', '');
-
-            // Update description
-            description.innerHTML = '';
-
-            // Add target information
             if (item.target || item.element) {
                 const arrow = document.createElement('span');
                 arrow.className = 'arrow';
-                arrow.textContent = '→';
-                description.appendChild(arrow);
+                arrow.textContent = '->';
+                refs.description.appendChild(arrow);
 
                 const target = document.createElement('span');
                 target.className = 'target';
@@ -133,73 +148,50 @@ class QueueUI {
                 } else if (item.element) {
                     target.textContent = `${item.element.tagName}${item.target ? ` (${item.target.x?.toFixed(0) || 0}, ${item.target.y?.toFixed(0) || 0})` : ''}`;
                 }
-                description.appendChild(target);
+                refs.description.appendChild(target);
             }
 
-            // Add expression type
             if (item.constructor.name === 'ExpressionAction') {
                 const type = document.createElement('span');
                 type.className = 'target';
                 type.textContent = `[${item.type}]`;
-                description.appendChild(type);
+                refs.description.appendChild(type);
             }
 
-            // Add repeats
             if (item.repeat && item.repeat > 1) {
                 const repeats = document.createElement('span');
                 repeats.className = 'repeats';
-                repeats.textContent = `×${item.repeat}`;
-                description.appendChild(repeats);
+                repeats.textContent = `x${item.repeat}`;
+                refs.description.appendChild(repeats);
             }
 
-            // Add status for current action
-			if(index == 0){
-				const status = document.createElement('span');
-				status.className = 'status';
-				status.textContent = item.duration && item.duration > 0 ? 
-				`${this.calculateProgress(item)}%`:
-					'in progress'
-				description.appendChild(status);
-			}
-            
+            if (index === 0) {
+                const status = document.createElement('span');
+                status.className = 'status';
+                status.textContent = item.duration && item.duration > 0
+                    ? `${this.calculateProgress(item)}%`
+                    : 'in progress';
+                refs.description.appendChild(status);
+                refs.status = status;
+            }
+
             this.previousValues.set(key, currentValue);
         }
 
-        // Update controls
-        if (this.allowControls) {
-            const controls = element.querySelector('.controls');
-            const skipBtn = controls.querySelector('.skip');
-            skipBtn.style.display = index === 0 ? 'block' : 'none';
-            
-            if (index === 0) {
-                skipBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    this.parent.activeMyte.queue.removeCurrentAction();
-                };
-            }
-
-            const removeBtn = controls.querySelector('.remove');
-            removeBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.parent.activeMyte.queue.queue.splice(index, 1);
-            };
+        if (this.allowControls && refs.skipBtn) {
+            refs.skipBtn.style.display = index === 0 ? 'block' : 'none';
         }
 
-		// Update progress bar and status text every frame (not cached)
-		const progress = element.querySelector('.progress');
-		if (progress) {
-			if (index === 0 && item.duration && item.duration > 0) {
-				progress.style.display = 'block';
-				const bar = progress.querySelector('.bar');
-				const percentage = this.calculateProgress(item);
-				bar.style.width = `${percentage}%`;
-
-				const statusEl = element.querySelector('.status');
-				if (statusEl) statusEl.textContent = `${percentage}%`;
-			} else {
-				progress.style.display = 'none';
-			}
-		}
+        if (refs.progress) {
+            if (index === 0 && item.duration && item.duration > 0) {
+                refs.progress.style.display = 'block';
+                const percentage = this.calculateProgress(item);
+                if (refs.bar) refs.bar.style.width = `${percentage}%`;
+                if (refs.status) refs.status.textContent = `${percentage}%`;
+            } else {
+                refs.progress.style.display = 'none';
+            }
+        }
     }
 
     calculateProgress(item) {
@@ -209,7 +201,6 @@ class QueueUI {
 
     update() {
         if (!this.parent.activeMyte || !this.queue) {
-            // Clear queue if it exists
             if (this.queue) {
                 this.queue.innerHTML = '';
                 this.elements.clear();
@@ -219,8 +210,7 @@ class QueueUI {
         }
 
         const queueItems = this.parent.activeMyte.queue.queue;
-        
-        // Remove excess elements
+
         while (this.elements.size > queueItems.length) {
             const key = `queue-${this.elements.size - 1}`;
             const element = this.elements.get(key);
@@ -229,7 +219,6 @@ class QueueUI {
             this.previousValues.delete(key);
         }
 
-        // Update or create elements for each queue item
         queueItems.forEach((item, index) => {
             const key = `queue-${index}`;
             let element = this.elements.get(key);
@@ -247,5 +236,11 @@ class QueueUI {
     setControlsEnabled(enabled) {
         this.allowControls = enabled;
         this.update();
+    }
+
+    dispose() {
+        this.queue?.replaceChildren();
+        this.elements.clear();
+        this.previousValues.clear();
     }
 }

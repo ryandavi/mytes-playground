@@ -287,12 +287,16 @@
   </object>
   <object id="11" name="Portal" x="256" y="448" width="128" height="128">
    <properties>
+    <property name="portalId" value="outside_house"/>
     <property name="targetMap" value="House"/>
+    <property name="targetPortalId" value="house_outside"/>
    </properties>
   </object>
   <object id="17" name="Portal" x="800" y="64" width="128" height="128">
    <properties>
+    <property name="portalId" value="outside_field"/>
     <property name="targetMap" value="FieldTest"/>
+    <property name="targetPortalId" value="field_outside"/>
     <property name="variant" value="red_portal"/>
    </properties>
   </object>

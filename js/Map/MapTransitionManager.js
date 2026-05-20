@@ -12,8 +12,6 @@ class MapTransitionManager {
         this.currentMapId = null;
         this.previousMapId = null;
 
-
-        // Create if not exists
         if (!this.transitionElement) {
             this.createTransitionElement();
         }
@@ -28,7 +26,6 @@ class MapTransitionManager {
         this.messageElement.className = 'transition-message';
         this.transitionElement.appendChild(this.messageElement);
 
-        //add transition-loader
         const transitionLoader = document.createElement('div');
         transitionLoader.className = 'transition-loader';
         this.transitionElement.appendChild(transitionLoader);
@@ -36,48 +33,219 @@ class MapTransitionManager {
         this.container.element.appendChild(this.transitionElement);
     }
 
+    _normalizePortalRef(value) {
+        if (value === undefined || value === null || value === '') return null;
+        return String(value);
+    }
+
+    _getPortalObjects(map = this.container.gameMap) {
+        return (map?.objects || []).filter(obj => obj instanceof PortalMapObject);
+    }
+
+    _findPortalByReference(map, portalRef) {
+        const normalizedRef = this._normalizePortalRef(portalRef);
+        if (!normalizedRef) return null;
+
+        return this._getPortalObjects(map).find(portal =>
+            this._normalizePortalRef(
+                portal.getPortalReferenceId?.() ?? portal.portalId ?? portal.id
+            ) === normalizedRef
+        ) || null;
+    }
+
+    _findLinkedReturnPortal(map, sourceMapId, sourcePortalId) {
+        const portals = this._getPortalObjects(map);
+        if (!sourceMapId || portals.length === 0) return null;
+
+        const normalizedSourcePortalId = this._normalizePortalRef(sourcePortalId);
+        if (normalizedSourcePortalId) {
+            const exactLinkedPortal = portals.find(portal =>
+                portal.getResolvedTargetMapId?.() === sourceMapId &&
+                this._normalizePortalRef(portal.targetPortalId) === normalizedSourcePortalId
+            );
+
+            if (exactLinkedPortal) {
+                return exactLinkedPortal;
+            }
+        }
+
+        const returnCandidates = portals.filter(portal =>
+            portal.getResolvedTargetMapId?.() === sourceMapId
+        );
+
+        return returnCandidates.length === 1 ? returnCandidates[0] : null;
+    }
+
+    _resolveArrivalDestination(map, options = {}) {
+        const {
+            myte = this.container.activeMyte,
+            targetPortalId = null,
+            targetSpawnPoint = null,
+            sourceMapId = null,
+            sourcePortalId = null
+        } = options;
+
+        const explicitPortal = this._findPortalByReference(map, targetPortalId);
+        if (explicitPortal) {
+            return {
+                type: 'portal',
+                portal: explicitPortal,
+                position: explicitPortal.getCenteredPositionFor?.(myte) || {
+                    x: explicitPortal.posX,
+                    y: explicitPortal.posY
+                }
+            };
+        }
+
+        if (targetSpawnPoint) {
+            const spawnPoint = map?.getSpawnPoint?.(targetSpawnPoint);
+            if (spawnPoint) {
+                return {
+                    type: 'spawn',
+                    spawnPoint: targetSpawnPoint,
+                    position: { x: spawnPoint.x, y: spawnPoint.y }
+                };
+            }
+        }
+
+        const linkedReturnPortal = this._findLinkedReturnPortal(map, sourceMapId, sourcePortalId);
+        if (linkedReturnPortal) {
+            return {
+                type: 'portal',
+                portal: linkedReturnPortal,
+                position: linkedReturnPortal.getCenteredPositionFor?.(myte) || {
+                    x: linkedReturnPortal.posX,
+                    y: linkedReturnPortal.posY
+                }
+            };
+        }
+
+        const myteSpawn = map?.getSpawnPoint?.('myte');
+        if (myteSpawn) {
+            return {
+                type: 'spawn',
+                spawnPoint: 'myte',
+                position: { x: myteSpawn.x, y: myteSpawn.y }
+            };
+        }
+
+        const defaultSpawn = map?.getSpawnPoint?.('default');
+        if (defaultSpawn) {
+            return {
+                type: 'spawn',
+                spawnPoint: 'default',
+                position: { x: defaultSpawn.x, y: defaultSpawn.y }
+            };
+        }
+
+        return null;
+    }
+
+    _applyMyteArrival(myte, arrival) {
+        if (!myte || !arrival?.position) return;
+
+        myte.setPosition(arrival.position.x, arrival.position.y);
+        myte.setTarget(arrival.position.x, arrival.position.y);
+        myte.setSpritePosition(arrival.position.x, arrival.position.y);
+
+        if (arrival.portal) {
+            myte.portalCooldownUntil = Date.now() + (
+                arrival.portal.getPortalCooldownDuration?.() || 1500
+            );
+            arrival.portal.playPortalSound?.('arrive');
+        }
+    }
+
+    _prepareMyteForTransition(myte) {
+        if (!myte) return;
+        myte.queue?.clear?.();
+        myte.unsetTarget?.();
+    }
+
+    _centerCameraOnMyte(myte) {
+        if (!myte || !this.container.camera) return;
+        this.container.camera.centerToPosition(myte.posX, myte.posY, myte.size, true);
+    }
+
+    _completeTransitionUi(isInitialLoad) {
+        if (isInitialLoad) return;
+
+        this.hideTransition();
+
+        if (this.container.inputHandler && this.container.inputHandler.enable) {
+            this.container.inputHandler.enable();
+        } else {
+            console.warn('InputHandler enable method not available');
+        }
+    }
+
+    _finishSuccessfulTransition(options, isInitialLoad) {
+        if (typeof options.onComplete === 'function') {
+            options.onComplete(true);
+        }
+
+        this._completeTransitionUi(isInitialLoad);
+        return true;
+    }
+
     async startTransition(options = {}) {
-        const mapId = options.targetMap;
-        const spawnPoint = options.targetSpawnPoint || 'default';
+        const sourceMapId = options.sourceMapId || (this.container.gameMap?.id ?? null);
+        const mapId = options.targetMap || sourceMapId;
+        const spawnPoint = options.targetSpawnPoint || null;
+        const targetPortalId = options.targetPortalId || null;
         const isInitialLoad = options.isInitialLoad || false;
         const sourcePortal = options.sourcePortal || null;
-        // sourceMapId: the map we're leaving. Passed explicitly by portal objects so the
-        // destination can find the matching return portal without relying on previousMapId.
-        const sourceMapId = options.sourceMapId || (this.container.gameMap?.id ?? null);
-    
-        // For regular transitions (not initial load), disable inputs and show transition
+        const sourcePortalId = options.sourcePortalId || sourcePortal?.getPortalReferenceId?.() || null;
+        const sameMapTransition = !isInitialLoad && !!mapId && mapId === sourceMapId;
+
         if (!isInitialLoad) {
-            // Disable user controls during transition
             if (this.container.inputHandler && this.container.inputHandler.disable) {
                 this.container.inputHandler.disable();
             } else {
                 console.warn('InputHandler disable method not available');
             }
-    
-            // Show transition screen AND wait for it to complete
+
             await this.showTransition(options.message || `Loading Map`);
         }
-    
-        // Try to load map using the core's mapLoader
+
+        if (sameMapTransition) {
+            const myte = options.myte || this.container.activeMyte || null;
+            const currentMap = this.container.gameMap;
+
+            this.container.ui.setSelected(null);
+            this._prepareMyteForTransition(myte);
+
+            const arrival = this._resolveArrivalDestination(currentMap, {
+                myte,
+                targetPortalId,
+                targetSpawnPoint: spawnPoint,
+                sourceMapId,
+                sourcePortalId
+            });
+
+            if (myte && arrival) {
+                this._applyMyteArrival(myte, arrival);
+            }
+
+            this._centerCameraOnMyte(myte);
+            return this._finishSuccessfulTransition(options, isInitialLoad);
+        }
+
         let newMap;
-    
+
         if (this.core && this.core.mapLoader) {
-            // Core has a mapLoader, use it
             if (isInitialLoad) {
-                // For initial load, use the regular load method to avoid nested loading screens
                 newMap = await this.core.mapLoader.loadMap(mapId, this.container, { isInitialLoad: true });
             } else {
-                // For transitions, use the transition method
                 newMap = await this.core.mapLoader.loadMapWithTransition(mapId, this.container, {
                     ...options,
                     isInitialLoad: false
                 });
             }
         } else {
-            // No core mapLoader, create map directly
             console.warn('Core mapLoader not available, creating map directly');
             newMap = new GameMap(this.container);
-    
+
             try {
                 const success = await newMap.initialize(mapId, { isInitialLoad });
                 if (!success) {
@@ -89,173 +257,114 @@ class MapTransitionManager {
                 newMap = null;
             }
         }
-    
+
         if (newMap) {
             this.previousMapId = sourceMapId;
             this.currentMapId = mapId;
-    
-            // Set up the new map environment
+
             this.container.gameMap = newMap;
-    
-            // Force GridSystem re-initialization if debug mode was active
+
             if (newMap.gridSystem) {
-                // Check if GridSystem already has debug mode
                 const wasDebugMode = newMap.gridSystem.debugMode;
-                
+
                 if (wasDebugMode) {
                     console.log('[MapTransitionManager] Reinitializing GridSystem debug mode');
-                    
-                    // Small delay to ensure DOM is ready
+
                     setTimeout(() => {
-                        // Reset debug initialization
                         newMap.gridSystem.debugInitialized = false;
-                        
-                        // Toggle off and back on to properly reinitialize
-                        newMap.gridSystem.toggleDebug();  // Toggle off
-                        newMap.gridSystem.toggleDebug();  // Toggle back on
+                        newMap.gridSystem.toggleDebug();
+                        newMap.gridSystem.toggleDebug();
                     }, 200);
                 }
             }
 
             this.container.ui.setSelected(null);
 
-            if(this.container.activeMyte){
-                // clear queue
-                this.container.activeMyte.queue.clear();
+            const activeMyte = options.myte || this.container.activeMyte || null;
+            this._prepareMyteForTransition(activeMyte);
 
-                // unset target
-                this.container.activeMyte.unsetTarget();
-            }
-
-    
-            // Reset camera if needed
             if (!options.preserveCamera && this.container.camera) {
-                // this.container.camera.reset();
+                // Reserved for future custom camera reset behavior.
             }
-    
-            // set camera to center on first myte
+
             if (this.container.mytes && this.container.mytes.length > 0) {
-                // center to corresponding portal
-                if (this.container.activeMyte) {
-                    const returnPortal = this._findReturnPortal(this.previousMapId);
+                if (activeMyte) {
+                    const arrival = this._resolveArrivalDestination(newMap, {
+                        myte: activeMyte,
+                        targetPortalId,
+                        targetSpawnPoint: spawnPoint,
+                        sourceMapId: this.previousMapId,
+                        sourcePortalId
+                    });
 
-                    if (returnPortal) {
-                        const exitPosition = returnPortal.getExitPositionFor
-                            ? returnPortal.getExitPositionFor(this.container.activeMyte)
-                            : {
-                                x: returnPortal.posX,
-                                y: returnPortal.posY + returnPortal.size.height + 16
-                            };
-
-                        this.container.activeMyte.setPosition(exitPosition.x, exitPosition.y);
-                        this.container.activeMyte.portalCooldownUntil = Date.now() + (
-                            returnPortal.getPortalCooldownDuration
-                                ? returnPortal.getPortalCooldownDuration()
-                                : 1500
-                        );
+                    if (arrival) {
+                        this._applyMyteArrival(activeMyte, arrival);
                     }
                 }
-    
+
                 let firstMyte = this.container.mytes[0];
-                if(this.container.activeMyte){
-                    firstMyte = this.container.activeMyte;
+                if (activeMyte) {
+                    firstMyte = activeMyte;
                 }
 
-                //reset pathfinder for all mytes
                 const newGridSystem = this.container.gameMap.gridSystem;
                 this.container.mytes.forEach(myte => {
                     myte.updatePathfinder(newGridSystem);
                 });
-    
-                this.container.camera.centerToPosition(firstMyte.posX, firstMyte.posY, firstMyte.size, true);
+
+                this._centerCameraOnMyte(firstMyte);
             }
-    
-            // Hide transition screen if not initial load
-            if (!isInitialLoad) {
-                // successful transition
+
+            return this._finishSuccessfulTransition(options, isInitialLoad);
+        }
+
+        if (!isInitialLoad) {
+            this.messageElement.textContent = "Map not found!";
+
+            if (this.container.ui && this.container.ui.showMessage) {
+                this.container.ui.showMessage(`Cannot find map "${mapId}"`);
+            }
+
+            setTimeout(() => {
                 this.hideTransition();
-    
-                // Re-enable user controls
+
                 if (this.container.inputHandler && this.container.inputHandler.enable) {
                     this.container.inputHandler.enable();
                 } else {
                     console.warn('InputHandler enable method not available');
                 }
-            }
-    
-            // Call onComplete callback if provided
-            if (typeof options.onComplete === 'function') {
-                options.onComplete(true);
-            }
-    
-            return true;
+            }, 2000);
         } else {
-            // Handle failed map loading
-            if (!isInitialLoad) {
-                this.messageElement.textContent = "Map not found!";
-    
-                // Show UI message if possible
-                if (this.container.ui && this.container.ui.showMessage) {
-                    this.container.ui.showMessage(`Cannot find map "${mapId}"`);
-                }
-    
-                // Hide after delay
-                setTimeout(() => {
-                    this.hideTransition();
-    
-                    // Re-enable user controls
-                    if (this.container.inputHandler && this.container.inputHandler.enable) {
-                        this.container.inputHandler.enable();
-                    } else {
-                        console.warn('InputHandler enable method not available');
-                    }
-                }, 2000);
-            } else {
-                // For initial load failures, we need a fallback approach
-                console.error(`[MapTransitionManager] Initial map load failed for ${mapId}`);
-    
-                // Try to load a known default map as a last resort
-                const fallbackMapId = 'House'; // Use a map that should always exist
-    
-                if (mapId !== fallbackMapId) {
-                    console.log(`[MapTransitionManager] Trying fallback map: ${fallbackMapId}`);
-                    return this.startTransition({
-                        ...options,
-                        targetMap: fallbackMapId,
-                        message: `Loading fallback map...`
-                    });
-                } else {
-                    // If even the fallback map failed, show critical error
-                    console.error(`[MapTransitionManager] Critical error: Fallback map failed to load`);
-    
-                    if (this.core && this.core.loadingManager) {
-                        this.core.loadingManager.setMessage(`Critical error: Could not load any map`);
-                    }
-                }
-            }
-    
-            // Call onComplete callback with failure if provided
-            if (typeof options.onComplete === 'function') {
-                options.onComplete(false);
-            }
-    
-            // If this transition came from a portal, re-enable it
-            if (sourcePortal) {
-                sourcePortal.isAnimating = false;
-                sourcePortal.isActive = true;
-            }
-    
-            return false;
-        }
-    }
+            console.error(`[MapTransitionManager] Initial map load failed for ${mapId}`);
 
-    // Find the portal on the current map whose targetMap points back to sourceMapId.
-    // If multiple portals target the same map, returns the first one found.
-    _findReturnPortal(sourceMapId) {
-        if (!sourceMapId || !this.container.gameMap?.objects) return null;
-        return this.container.gameMap.objects.find(
-            obj => obj instanceof PortalMapObject && obj.targetMap === sourceMapId
-        ) || null;
+            const fallbackMapId = 'House';
+
+            if (mapId !== fallbackMapId) {
+                console.log(`[MapTransitionManager] Trying fallback map: ${fallbackMapId}`);
+                return this.startTransition({
+                    ...options,
+                    targetMap: fallbackMapId,
+                    message: `Loading fallback map...`
+                });
+            }
+
+            console.error(`[MapTransitionManager] Critical error: Fallback map failed to load`);
+
+            if (this.core && this.core.loadingManager) {
+                this.core.loadingManager.setMessage(`Critical error: Could not load any map`);
+            }
+        }
+
+        if (typeof options.onComplete === 'function') {
+            options.onComplete(false);
+        }
+
+        if (sourcePortal) {
+            sourcePortal.isAnimating = false;
+            sourcePortal.isActive = true;
+        }
+
+        return false;
     }
 
     showTransition(message) {
@@ -264,12 +373,9 @@ class MapTransitionManager {
             this.messageElement.textContent = message;
         }
 
-        // Show the transition element
         this.transitionElement.classList.add('active');
 
-        // Return a promise that resolves when the transition completes
         return new Promise(resolve => {
-            // Listen for the transitionend event
             const transitionEndHandler = () => {
                 this.transitionElement.removeEventListener('transitionend', transitionEndHandler);
                 resolve();
@@ -277,12 +383,9 @@ class MapTransitionManager {
 
             this.transitionElement.addEventListener('transitionend', transitionEndHandler);
 
-            // Fallback in case the transition event doesn't fire
-            // Get computed style to find actual transition duration
             const computedStyle = window.getComputedStyle(this.transitionElement);
             const transitionDuration = parseFloat(computedStyle.transitionDuration) * 1000;
 
-            // Add a small buffer (50ms) to ensure the transition is complete
             setTimeout(() => {
                 this.transitionElement.removeEventListener('transitionend', transitionEndHandler);
                 resolve();
@@ -291,16 +394,13 @@ class MapTransitionManager {
     }
 
     hideTransition() {
-
         const timeShown = Date.now() - this.transitionStartTime;
 
         if (timeShown < this.minimumDisplayTime) {
-            // If it hasn't been shown long enough, delay hiding
             setTimeout(() => {
                 this.transitionElement.classList.remove('active');
             }, this.minimumDisplayTime - timeShown);
         } else {
-            // If it's been shown long enough, hide immediately
             this.transitionElement.classList.remove('active');
         }
     }

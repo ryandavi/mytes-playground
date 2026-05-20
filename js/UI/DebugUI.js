@@ -4,6 +4,8 @@ class DebugUI {
         this.debug = document.querySelector(".debugMenu");
         this.cameraEnabled = false;
         this.camera = null;
+        this.wasDebugEnabled = false;
+        this.lastDebugMarkup = '';
 
         this.queueUI = new QueueUI(parent);
     }
@@ -313,21 +315,44 @@ drawDebugColliders() {
 
         this.drawDebugColliders();
 
-        this.debug.innerHTML = debugGroups
+        const markup = debugGroups
             .filter(group => group.messages.length > 0)
             .map(group => this.generateDebugGroup(group.name, group.messages))
             .join("");
+
+        if (markup !== this.lastDebugMarkup) {
+            this.debug.innerHTML = markup;
+            this.lastDebugMarkup = markup;
+        }
+    }
+
+    clearDebugVisuals() {
+        if (this.debug && this.lastDebugMarkup) {
+            this.debug.innerHTML = '';
+            this.lastDebugMarkup = '';
+        }
+
+        const debugLayer = this.parent?.gameMap?.layers?.debug;
+        if (debugLayer) {
+            debugLayer.querySelectorAll('.debug-collider').forEach(collider => collider.remove());
+        }
     }
 
     update() {
+        const debugEnabled = document.body.classList.contains('debug');
+
         // Check if debug element exists
-        if (this.debug) {
+        if (debugEnabled && this.debug) {
             try {
                 this.updateDebug();
+                this.wasDebugEnabled = true;
             } catch (error) {
                 // Silently handle errors during transitions
                 console.warn('Debug UI update error:', error);
             }
+        } else if (this.wasDebugEnabled) {
+            this.clearDebugVisuals();
+            this.wasDebugEnabled = false;
         }
     
         // Update queue UI with error handling
@@ -338,5 +363,11 @@ drawDebugColliders() {
                 // Silently handle errors during transitions
             }
         }
+    }
+
+    dispose() {
+        this.clearDebugVisuals();
+        this.queueUI?.dispose?.();
+        this.queueUI = null;
     }
 }

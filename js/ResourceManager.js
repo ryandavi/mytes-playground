@@ -1,242 +1,96 @@
 class ResourceManager {
-    constructor() {
+    // Asset registry — single source of truth for all game images.
+    // To add a new asset: add one entry here. Set essential: true if it must
+    // finish loading before the game world appears (keeps the essentials list
+    // automatically in sync with the config).
+    static SPRITES = {
+        'myte':          { path: 'images/snail/spritesheet.png', essential: true  },
+        'snail':         { path: 'images/snail/spritesheet.png', essential: true  },
+        'worm':          { path: 'images/snail/spritesheet.png'                   },
+        'grass_1_back':  { path: 'images/MapObjects/grass_1_back.png'             },
+        'grass_1_front': { path: 'images/MapObjects/grass_1_front.png'            },
+        'grass_2_back':  { path: 'images/MapObjects/grass_2_back.png'             },
+        'grass_2_front': { path: 'images/MapObjects/grass_2_front.png'            },
+        'grass_3_back':  { path: 'images/MapObjects/grass_3_back.png'             },
+        'grass_3_front': { path: 'images/MapObjects/grass_3_front.png'            },
+    };
+
+    static CURSORS = {
+        'pointer':     { path: 'images/cursor/arrow.png', essential: true  },
+        'grab':        { path: 'images/cursor/arrow.png', essential: true  },
+        'grabbing':    { path: 'images/cursor/arrow.png', essential: true  },
+        'arrow_up':    { path: 'images/cursor/arrow.png'                   },
+        'arrow_down':  { path: 'images/cursor/arrow.png'                   },
+        'arrow_left':  { path: 'images/cursor/arrow.png'                   },
+        'arrow_right': { path: 'images/cursor/arrow.png'                   },
+        'move':        { path: 'images/cursor/arrow.png'                   },
+        'no':          { path: 'images/cursor/arrow.png'                   },
+    };
+
+    // Maximum simultaneous image loads (browser typically allows 6-8 per origin anyway)
+    static MAX_CONCURRENT_LOADS = 8;
+
+    constructor(core) {
+        this.core = core;
         this.sprites = new Map();
-        this.sounds = new Map();
-        this.loadingPromises = [];
         this.isLoaded = false;
-        this.core = null; // Will be set by MyteCore
-        
-        // Track loaded resources to avoid duplicates
-        this.loadedResources = new Set();
-        
-        // Image loading optimization
-        this.imageLoadQueue = [];
-        this.maxConcurrentLoads = 8; // Limit concurrent image loads
-        this.activeLoads = 0;
-
-        // Define configurations as static properties
-        this.spriteConfigs = {
-            'myte': 'images/snail/spritesheet.png',
-            'snail': 'images/snail/spritesheet.png',
-            'worm': 'images/snail/spritesheet.png',
-            'grass_1_back': 'images/MapObjects/grass_1_back.png',
-            'grass_1_front': 'images/MapObjects/grass_1_front.png',
-            'grass_2_back': 'images/MapObjects/grass_2_back.png',
-            'grass_2_front': 'images/MapObjects/grass_2_front.png',
-            'grass_3_back': 'images/MapObjects/grass_3_back.png',
-            'grass_3_front': 'images/MapObjects/grass_3_front.png'
-        };
-
-        this.cursorConfigs = {
-            'pointer': 'images/cursor/arrow.png',
-            'grab': 'images/cursor/arrow.png',
-            'grabbing': 'images/cursor/arrow.png',
-            'arrow_up': 'images/cursor/arrow.png',
-            'arrow_down': 'images/cursor/arrow.png',
-            'arrow_left': 'images/cursor/arrow.png',
-            'arrow_right': 'images/cursor/arrow.png',
-            'move': 'images/cursor/arrow.png',
-            'no': 'images/cursor/arrow.png',
-        };
-
-        // Define essential resources
-        this.essentialResources = [
-            // Essential sprites
-            'myte',
-            'snail',
-            'worm',
-            // Essential cursor
-            'pointer',
-            'grab',
-            'grabbing'
-        ];
+        this.loadedResources = new Set(); // Tracks IDs in-flight or completed to prevent duplicate loads
     }
 
+    // --- Public API ---------------------------------------------------------
+
     async preloadEssentialResources() {
-        try {
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage("Loading essential assets...");
-            }
-            
-            // Create a batch of promises for essential resources
-            const loadingPromises = this.essentialResources.map(id => {
-                // Check if it's a sprite or cursor
-                if (this.spriteConfigs[id]) {
-                    return this.loadSprite(id, this.spriteConfigs[id], true); // Priority loading
-                } else if (this.cursorConfigs[id]) {
-                    return this.loadSprite(`cursor_${id}`, this.cursorConfigs[id], true);
-                }
-                return Promise.resolve(); // Skip if not found
-            });
+        const essentials = this._buildLoadList({ essentialOnly: true });
+        const total = essentials.length;
+        let loaded = 0;
 
-            // Track loading progress
-            const totalEssentials = loadingPromises.length;
-            let loadedEssentials = 0;
-            
-            const trackingPromises = loadingPromises.map(promise => {
-                return promise.then(result => {
-                    loadedEssentials++;
-                    
-                    // Update loading manager if available
-                    if (this.core && this.core.loadingManager) {
-                        this.core.loadingManager.updateStageProgress(
-                            'resources', 
-                            loadedEssentials / totalEssentials * 0.3 // Essential resources are ~30% of all resources
-                        );
-                    }
-                    
-                    return result;
-                });
-            });
-
-            await Promise.all(trackingPromises);
-            console.log('Essential resources loaded successfully');
-        } catch (error) {
-            console.error('Error loading essential resources:', error);
-            throw error;
-        }
+        await Promise.all(essentials.map(({ id, path }) =>
+            this.loadSprite(id, path, true).then(() => {
+                loaded++;
+                this.core?.loadingManager?.updateStageProgress(
+                    'resources',
+                    (loaded / total) * 0.3 // Essentials occupy the first 30% of the resources stage
+                );
+            })
+        ));
     }
 
     async loadResources() {
-        try {
-            // Load sprites
-            const spritesToLoad = [...Object.entries(this.spriteConfigs), 
-                              ...Object.entries(this.cursorConfigs).map(([key, path]) => 
-                                  [`cursor_${key}`, path])];
-            
-            // Filter out essential resources which are already loaded
-            const nonEssentialResources = spritesToLoad.filter(([id]) => 
-                !this.essentialResources.includes(id.replace('cursor_', '')) && 
-                !this.sprites.has(id));
-            
-            // If there are very few resources to load (or none), accelerate the progress
-            if (nonEssentialResources.length < 5) {
-                console.log('Few resources to load, accelerating progress');
-                
-                // Update loading manager to reflect quick load
-                if (this.core && this.core.loadingManager) {
-                    // Start at 30% (essentials) and quickly move to 75%
-                    this.core.loadingManager.updateStageProgress('resources', 0.75);
-                    
-                    // After a shorter delay, mark as complete
-                    setTimeout(() => {
-                        this.core.loadingManager.updateStageProgress('resources', 1.0);
-                        
-                        // Check if we can complete loading now
-                        if (this.core.loadingManager.stages.container.progress >= 0.95) {
-                            this.core.loadingManager.completeLoading();
-                        }
-                    }, 100); // Much shorter delay (100ms instead of 300ms)
-                }
-            }
-            
-            // OPTIMIZATION: Queue non-essential loads for controlled processing
-            this.imageLoadQueue = nonEssentialResources.map(([id, path]) => ({ id, path }));
-            
-            // Process queue with controlled concurrency
-            await this.processImageQueue(nonEssentialResources.length);
-            
-            this.isLoaded = true;
-            console.log('All resources loaded successfully');
-            
-            // Ensure we mark as complete even if there were no resources to load
-            if (this.core && this.core.loadingManager && nonEssentialResources.length === 0) {
-                this.core.loadingManager.updateStageProgress('resources', 1.0);
-            }
-            
-        } catch (error) {
-            console.error('Error loading resources:', error);
-            // In case of error, still mark resources as loaded to let the game continue
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.updateStageProgress('resources', 1.0);
-            }
-            throw error;
-        }
-    }
-    
-    // OPTIMIZATION: Process image queue with controlled concurrency
-    async processImageQueue(totalResources) {
-        return new Promise((resolve) => {
-            // If the queue is empty, resolve immediately
-            if (this.imageLoadQueue.length === 0) {
-                resolve();
-                return;
-            }
-            
-            let loadedResources = 0;
-            const initialProgress = 0.3; // Start after essential resources
-            const remainingProgress = 0.7;
-            
-            // Process next item in queue
-            const processNext = () => {
-                // If queue is empty or we've loaded everything, resolve
-                if (this.imageLoadQueue.length === 0 && this.activeLoads === 0) {
-                    resolve();
-                    return;
-                }
-                
-                // If we have capacity and items to load, start loading
-                while (this.activeLoads < this.maxConcurrentLoads && this.imageLoadQueue.length > 0) {
-                    const { id, path } = this.imageLoadQueue.shift();
-                    this.activeLoads++;
-                    
-                    this.loadSprite(id, path).then(() => {
-                        loadedResources++;
-                        this.activeLoads--;
-                        
-                        // Update loading manager if available
-                        if (this.core && this.core.loadingManager) {
-                            const progress = initialProgress + 
-                                (loadedResources / totalResources) * remainingProgress;
-                            
-                            this.core.loadingManager.updateStageProgress('resources', Math.min(progress, 0.99));
-                        }
-                        
-                        // Process next item
-                        setTimeout(processNext, 0);
-                    }).catch(() => {
-                        // Even on error, continue processing
-                        loadedResources++;
-                        this.activeLoads--;
-                        setTimeout(processNext, 0);
-                    });
-                }
-            };
-            
-            // Start processing
-            processNext();
-        });
+        const nonEssentials = this._buildLoadList({ essentialOnly: false })
+            .filter(({ id }) => !this.loadedResources.has(id));
+
+        await this._loadQueue(nonEssentials, { stageOffset: 0.3, stageRange: 0.7 });
+        this.isLoaded = true;
     }
 
-    loadSprite(id, url, isPriority = false) {
-        // Check if already loaded or loading
-        if (this.loadedResources.has(id)) {
-            return Promise.resolve(this.sprites.get(id));
-        }
-        
-        // Track this resource as being loaded
-        this.loadedResources.add(id);
-        
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            
-            // OPTIMIZATION: Set loading priority
-            if (isPriority) {
-                img.fetchPriority = 'high';
+    // Preload tilesets and object sprites for a specific map.
+    async preloadMapResources(mapData) {
+        if (!mapData) return;
+
+        // Use a Map keyed by ID to deduplicate entries before loading
+        const pending = new Map();
+
+        if (mapData.TileData?.tilesets) {
+            for (const tileset of mapData.TileData.tilesets) {
+                if (tileset.imageSource && !this.isResourceLoaded(tileset.name)) {
+                    pending.set(tileset.name, { id: tileset.name, path: tileset.imageSource });
+                }
             }
-            
-            img.onload = () => {
-                this.sprites.set(id, img);
-                resolve(img);
-            };
-            
-            img.onerror = () => {
-                console.warn(`Failed to load sprite: ${id} at ${url}`);
-                resolve(null); // Resolve with null instead of rejecting
-            };
-            
-            img.src = url;
-        });
+        }
+
+        if (mapData.objects) {
+            for (const obj of mapData.objects) {
+                const id = `${obj.type.toLowerCase()}_${obj.variant}`;
+                const config = ResourceManager.SPRITES[id];
+                if (config && !this.isResourceLoaded(id)) {
+                    pending.set(id, { id, path: config.path });
+                }
+            }
+        }
+
+        if (pending.size > 0) {
+            await this._loadQueue([...pending.values()]);
+        }
     }
 
     getSprite(id) {
@@ -245,99 +99,103 @@ class ResourceManager {
 
     getSpriteURL(id) {
         if (id.startsWith('cursor_')) {
-            const cursorId = id.replace('cursor_', '');
-            return this.cursorConfigs[cursorId];
+            return ResourceManager.CURSORS[id.slice(7)]?.path ?? null;
         }
-        return this.spriteConfigs[id];
-    }
-
-    getLoadingProgress() {
-        const totalToLoad = this.loadingPromises.length + this.imageLoadQueue.length;
-        if (totalToLoad === 0) return 1;
-        
-        // Count loaded resources
-        const loadedCount = this.loadingPromises.filter(p => p.status === 'resolved').length;
-        const remainingInQueue = this.imageLoadQueue.length;
-        
-        return (totalToLoad - remainingInQueue) / totalToLoad;
+        return ResourceManager.SPRITES[id]?.path ?? null;
     }
 
     isResourceLoaded(id) {
         return this.sprites.has(id);
     }
 
-    // OPTIMIZATION: Improved resource cleanup
     unloadUnusedResources(usedResourceIds) {
-        // Create a Set for O(1) lookups
-        const usedResources = new Set(usedResourceIds);
-        const essentialResources = new Set(this.essentialResources);
-        
-        // Track unloaded resources for logging
-        const unloadedResources = [];
-        
-        // Check each sprite
+        const keep = new Set(usedResourceIds);
+        const essentialIds = new Set(this._buildLoadList({ essentialOnly: true }).map(e => e.id));
+
         for (const [id, resource] of this.sprites.entries()) {
-            // Skip essential resources and used resources
-            if (essentialResources.has(id) || usedResources.has(id)) {
-                continue;
-            }
-            
-            // Unload the sprite
+            if (keep.has(id) || essentialIds.has(id)) continue;
             this.sprites.delete(id);
             this.loadedResources.delete(id);
-            unloadedResources.push(id);
-            
-            // Release image memory if possible
-            if (resource instanceof Image) {
-                resource.src = ''; // Clear the source to help garbage collection
-            }
-        }
-        
-        // Log unloaded resources
-        if (unloadedResources.length > 0) {
-            console.log(`Unloaded ${unloadedResources.length} unused resources`);
+            if (resource instanceof Image) resource.src = '';
         }
     }
-    
-    // OPTIMIZATION: Added method to preload resources for a specific map
-    async preloadMapResources(mapData) {
-        if (!mapData) return;
-        
-        const resources = new Set();
-        
-        // Extract tileset image sources
-        if (mapData.TileData && mapData.TileData.tilesets) {
-            mapData.TileData.tilesets.forEach(tileset => {
-                if (tileset.imageSource && !this.isResourceLoaded(tileset.name)) {
-                    resources.add({
-                        id: tileset.name,
-                        path: tileset.imageSource
-                    });
+
+    // --- Private helpers ----------------------------------------------------
+
+    // Returns a flat array of {id, path} entries from SPRITES + CURSORS.
+    // essentialOnly: true  → only entries with essential: true
+    // essentialOnly: false → only entries without essential: true (background load)
+    _buildLoadList({ essentialOnly }) {
+        const result = [];
+
+        for (const [id, cfg] of Object.entries(ResourceManager.SPRITES)) {
+            if (Boolean(cfg.essential) === essentialOnly) {
+                result.push({ id, path: cfg.path });
+            }
+        }
+        for (const [id, cfg] of Object.entries(ResourceManager.CURSORS)) {
+            const key = `cursor_${id}`;
+            if (Boolean(cfg.essential) === essentialOnly) {
+                result.push({ id: key, path: cfg.path });
+            }
+        }
+
+        return result;
+    }
+
+    // Loads a list of {id, path} entries with bounded concurrency.
+    // Optionally reports progress into the 'resources' loading stage.
+    async _loadQueue(items, { stageOffset = 0, stageRange = 0 } = {}) {
+        if (items.length === 0) return;
+
+        const total = items.length;
+        let loaded = 0;
+        const queue = [...items];
+
+        const runOne = async () => {
+            while (queue.length > 0) {
+                const { id, path } = queue.shift();
+                try {
+                    await this.loadSprite(id, path);
+                } catch {
+                    // Non-fatal: log already emitted inside loadSprite
                 }
-            });
-        }
-        
-        // Extract object sprites
-        if (mapData.objects) {
-            mapData.objects.forEach(obj => {
-                const spriteId = `${obj.type.toLowerCase()}_${obj.variant}`;
-                if (this.spriteConfigs[spriteId] && !this.isResourceLoaded(spriteId)) {
-                    resources.add({
-                        id: spriteId,
-                        path: this.spriteConfigs[spriteId]
-                    });
+                loaded++;
+                if (stageRange > 0) {
+                    this.core?.loadingManager?.updateStageProgress(
+                        'resources',
+                        Math.min(stageOffset + (loaded / total) * stageRange, 0.99)
+                    );
                 }
-            });
+            }
+        };
+
+        // Launch up to MAX_CONCURRENT_LOADS workers simultaneously
+        const workers = Array.from(
+            { length: Math.min(ResourceManager.MAX_CONCURRENT_LOADS, items.length) },
+            runOne
+        );
+        await Promise.all(workers);
+    }
+
+    loadSprite(id, url, isPriority = false) {
+        if (this.loadedResources.has(id)) {
+            return Promise.resolve(this.sprites.get(id));
         }
-        
-        // Load all resources in parallel with controlled concurrency
-        if (resources.size > 0) {
-            console.log(`Preloading ${resources.size} resources for map ${mapData.id}`);
-            
-            this.imageLoadQueue = [...resources];
-            await this.processImageQueue(resources.size);
-            
-            console.log(`Completed preloading resources for map ${mapData.id}`);
-        }
+        this.loadedResources.add(id);
+
+        return new Promise((resolve) => {
+            const img = new Image();
+            if (isPriority) img.fetchPriority = 'high';
+            img.onload = () => {
+                this.sprites.set(id, img);
+                resolve(img);
+            };
+            img.onerror = () => {
+                console.warn(`Failed to load sprite: ${id} from ${url}`);
+                resolve(null);
+            };
+            img.src = url;
+        });
     }
 }

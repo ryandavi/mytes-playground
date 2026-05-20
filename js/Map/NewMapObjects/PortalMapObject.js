@@ -3,7 +3,9 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         super(parent, type, variant, posX, posY, config, options);
 
         this.targetMap = options.targetMap || null;
-        this.targetSpawnPoint = options.targetSpawnPoint || 'default';
+        this.targetSpawnPoint = options.targetSpawnPoint || null;
+        this.targetPortalId = options.targetPortalId || null;
+        this.portalId = String(options.portalId || options.id || `${type}_${variant}_${posX}_${posY}`);
         this.isActive = options.isActive !== undefined ? options.isActive : true;
         this.activationRadius = options.activationRadius || 75;
         this.transitionDuration = options.transitionDuration || 1000;
@@ -15,7 +17,11 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
     }
 
     getApproachActionId() {
-        return 'astar-move';
+        return 'go_to_object';
+    }
+
+    getApproachMode() {
+        return 'center';
     }
 
     getInteractionRadius() {
@@ -32,15 +38,62 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         return (myte.portalCooldownUntil || 0) <= Date.now();
     }
 
-    getExitPositionFor(myte) {
-        const myteWidth = myte?.size?.width || 0;
-        const myteHeight = myte?.size?.height || 0;
-        const exitOffset = Math.max(this.activationRadius + 16, this.size.height + 8);
+    getPortalReferenceId() {
+        return String(this.portalId || this.id || '');
+    }
+
+    getResolvedTargetMapId() {
+        if (this.targetMap) {
+            return this.targetMap;
+        }
+
+        if (this.targetPortalId || this.targetSpawnPoint) {
+            return this.gameMap?.id || null;
+        }
+
+        return null;
+    }
+
+    hasTransitionDestination() {
+        return !!(this.targetMap || this.targetSpawnPoint || this.targetPortalId);
+    }
+
+    getTransitionRect(alignTo = 'sprite') {
+        if (alignTo === 'collider' && this.collider) {
+            return {
+                x: this.posX + (this.collider.offsetX || 0),
+                y: this.posY + (this.collider.offsetY || 0),
+                width: this.collider.width || this.size.width,
+                height: this.collider.height || this.size.height
+            };
+        }
 
         return {
-            x: this.posX + (this.size.width / 2) - (myteWidth / 2),
-            y: this.posY + exitOffset - (myteHeight / 2)
+            x: this.posX,
+            y: this.posY,
+            width: this.size.width,
+            height: this.size.height
         };
+    }
+
+    getPortalCenter(alignTo = 'sprite') {
+        const rect = this.getTransitionRect(alignTo);
+        return {
+            x: rect.x + rect.width / 2,
+            y: rect.y + rect.height / 2
+        };
+    }
+
+    getCenteredPositionFor(myte, alignTo = 'sprite') {
+        const center = this.getPortalCenter(alignTo);
+        return {
+            x: center.x - ((myte?.size?.width || 0) / 2),
+            y: center.y - ((myte?.size?.height || 0) / 2)
+        };
+    }
+
+    getExitPositionFor(myte) {
+        return this.getCenteredPositionFor(myte, this.getConfig('transitionAlignTo', 'sprite'));
     }
 
     initializePortalEffects() {
@@ -57,8 +110,15 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         }
     }
 
+    playPortalSound(type) {
+        const soundEffect = this.getConfig(`soundEffects.${type}`);
+        if (soundEffect && this.gameMap?.soundManager) {
+            this.gameMap.soundManager.play(soundEffect);
+        }
+    }
+
     press(parent) {
-        if (!this.active || this.isAnimating || !this.isActive || !this.targetMap) return false;
+        if (!this.active || this.isAnimating || !this.isActive || !this.hasTransitionDestination()) return false;
 
         const myte = this.activeMyte;
         if (!myte || !this.canTransitionMyte(myte)) return false;
@@ -69,7 +129,7 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
     }
 
     checkProximityActivation(myte) {
-        if (!this.isActive || !myte || !this.targetMap || this.isAnimating || !this.canTransitionMyte(myte)) return;
+        if (!this.isActive || !myte || !this.hasTransitionDestination() || this.isAnimating || !this.canTransitionMyte(myte)) return;
 
         if (this.isInInteractionRange(myte, this.activationRadius)) {
             this.beginTransition(myte);
@@ -77,13 +137,16 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
     }
 
     beginTransition(myte) {
-        if (this.isAnimating || !this.isActive || !this.targetMap) return;
+        const targetMapId = this.getResolvedTargetMapId();
+        if (this.isAnimating || !this.isActive || !targetMapId) return;
 
         this.isAnimating = true;
         this.isActive = false;
         if (myte) {
             myte.portalCooldownUntil = Date.now() + this.transitionDuration + this.getPortalCooldownDuration();
         }
+
+        this.playPortalSound('depart');
 
         if (this.hasAnimation('activate')) {
             this.playAnimation('activate');
@@ -93,9 +156,11 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
 
         if (container.transitionManager) {
             container.transitionManager.startTransition({
-                targetMap: this.targetMap,
+                targetMap: targetMapId,
                 targetSpawnPoint: this.targetSpawnPoint,
+                targetPortalId: this.targetPortalId,
                 sourceMapId: this.gameMap?.id ?? null,
+                sourcePortalId: this.getPortalReferenceId(),
                 duration: this.transitionDuration,
                 myte,
                 sourcePortal: this,
@@ -107,13 +172,27 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
             return;
         }
 
-        container.loadMap(this.targetMap).then(() => {
+        container.loadMap(targetMapId).then(() => {
             this.isAnimating = false;
             this.isActive = true;
 
             if (myte && container.gameMap) {
-                const spawnPoint = container.gameMap.getSpawnPoint(this.targetSpawnPoint);
-                myte.setPosition(spawnPoint.x, spawnPoint.y);
+                const portalPosition = this.targetPortalId
+                    ? container.gameMap.objects.find(obj =>
+                        obj instanceof PortalMapObject &&
+                        obj.getPortalReferenceId?.() === String(this.targetPortalId)
+                    )?.getCenteredPositionFor?.(myte)
+                    : null;
+                const spawnPoint = this.targetSpawnPoint
+                    ? container.gameMap.getSpawnPoint(this.targetSpawnPoint)
+                    : container.gameMap.getSpawnPoint('myte');
+                const position = portalPosition || spawnPoint;
+
+                if (position) {
+                    myte.setPosition(position.x, position.y);
+                    myte.setTarget(position.x, position.y);
+                    myte.setSpritePosition(position.x, position.y);
+                }
             }
         });
     }
