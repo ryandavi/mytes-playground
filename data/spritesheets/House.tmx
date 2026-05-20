@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="11" nextobjectid="113">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="11" nextobjectid="114">
  <properties>
   <property name="description" value="A cozy place for your Mytes"/>
   <property name="displayName" value="Your Home"/>
@@ -147,6 +147,11 @@
   <object id="7" name="Door" x="416" y="928" width="128" height="32">
    <properties>
     <property name="direction" value="Horizontal"/>
+   </properties>
+  </object>
+  <object id="113" name="Rug" x="640" y="576" width="192" height="128">
+   <properties>
+    <property name="variant" value="rug_default"/>
    </properties>
   </object>
   <object id="16" name="Bed" x="704" y="480" width="128" height="256">

@@ -312,6 +312,29 @@ class MapObject {
 		return this.parent?.getZIndex ? this.parent.getZIndex(this.posY, this.size.height) : 0;
 	}
 
+	getRenderLayerKey() {
+		return this.getConfig('renderLayer', 'objects');
+	}
+
+	getActiveRenderLayerKey() {
+		if (this.isDragging || this.isPickedUp) {
+			return 'objects';
+		}
+
+		return this.getRenderLayerKey();
+	}
+
+	syncRenderLayer() {
+		if (!this.element || !this.gameMap?.getObjectRenderLayer) {
+			return;
+		}
+
+		const targetLayer = this.gameMap.getObjectRenderLayer(this);
+		if (targetLayer && this.element.parentNode !== targetLayer) {
+			targetLayer.appendChild(this.element);
+		}
+	}
+
 	pickup(myte) {
 		if (!this.canBePickedUpBy(myte)) {
 			return false;
@@ -321,6 +344,7 @@ class MapObject {
 		this.carrier = myte;
 		this.pendingPickup = false;
 		this.element?.classList.add('picked-up');
+		this.syncRenderLayer();
 		this.wake();
 		this.container?.ui?.setSelected?.(this);
 		this.playConfiguredSound?.('pickup');
@@ -332,6 +356,7 @@ class MapObject {
 		this.carrier = null;
 		this.pendingPickup = false;
 		this.element?.classList.remove('picked-up');
+		this.syncRenderLayer();
 		this.gameMap?.gridSystem?.updateObjectPosition(this);
 		this.playConfiguredSound?.('drop');
 		return { vx, vy };
@@ -429,9 +454,22 @@ class MapObject {
 			preventDefaultsForDrag: true,
 			onDragStart: () => {
 				this.isDragging = true;
+				this._dragOriginX = this.posX;
+				this._dragOriginY = this.posY;
+				this._dragOriginDirection = this.getConfig('facingDirection', null);
+				this.syncRenderLayer();
 				this.element.classList.add('dragging');
 				if (this.container?.ui) this.container.ui.setSelected(this);
 				this.playConfiguredSound?.('pickup');
+				if (this.getConfig('directionConfigs', null)) {
+					this._rotateKeyHandler = (e) => {
+						if ((e.key === 'r' || e.key === 'R') && this.isDragging) {
+							e.preventDefault();
+							this._rotateDuringDrag();
+						}
+					};
+					window.addEventListener('keydown', this._rotateKeyHandler);
+				}
 			},
 			onDragMove: (event) => {
 				const world = this.container?.inputHandler?.screenToWorldCoordinates
@@ -448,8 +486,25 @@ class MapObject {
 				this.isDragging = false;
 				this.element.classList.remove('dragging');
 				this.hideDropTarget();
+				if (this._rotateKeyHandler) {
+					window.removeEventListener('keydown', this._rotateKeyHandler);
+					this._rotateKeyHandler = null;
+				}
 				if (this.getConfig('snapToGrid', false)) this.snapToGrid();
-				this.playConfiguredSound?.('drop');
+				const isValid = this.checkDropValidity(this.posX, this.posY);
+				if (!isValid) {
+					this.posX = this._dragOriginX;
+					this.posY = this._dragOriginY;
+					if (this._dragOriginDirection !== null &&
+						this._dragOriginDirection !== this.getConfig('facingDirection', null)) {
+						this.applyFacingDirection(this._dragOriginDirection);
+					}
+					this.updatePosition();
+					this.playConfiguredSound?.('drop_error');
+				} else {
+					this.playConfiguredSound?.('drop');
+				}
+				this.syncRenderLayer();
 				this.handleMovedEvent();
 			}
 		});
@@ -661,16 +716,67 @@ class MapObject {
 		}
 	}
 
+	applyFacingDirection(direction) {
+		const directionConfigs = this.getConfig('directionConfigs', null);
+		if (!directionConfigs) return;
+
+		const normalizedDir = MapObject.normalizeFacingDirection(direction, directionConfigs);
+		const dirConfig = directionConfigs[normalizedDir];
+		if (!dirConfig) return;
+
+		if (dirConfig.size) {
+			this.size = { width: dirConfig.size.width, height: dirConfig.size.height };
+		}
+		if (dirConfig.collider) {
+			this.collider = dirConfig.collider;
+		}
+
+		this.config.facingDirection = normalizedDir;
+		this.config.transformStyle = dirConfig.transformStyle || '';
+
+		if ('facingDirection' in this) {
+			this.facingDirection = normalizedDir;
+		}
+
+		if (this.element) {
+			this.element.style.width = `${this.size.width}px`;
+			this.element.style.height = `${this.size.height}px`;
+			['n', 's', 'e', 'w'].forEach(d => this.element.classList.remove(`facing-${d}`));
+			this.element.classList.add(`facing-${normalizedDir.toLowerCase()}`);
+			const spriteEl = this.element.querySelector('.sprite');
+			if (spriteEl) spriteEl.style.transform = dirConfig.transformStyle || '';
+		}
+
+		if (this._dropTargetEl) {
+			this._dropTargetEl.style.width = `${this.size.width}px`;
+			this._dropTargetEl.style.height = `${this.size.height}px`;
+		}
+
+		this.updatePosition();
+	}
+
+	_rotateDuringDrag() {
+		const directionConfigs = this.getConfig('directionConfigs', null);
+		if (!directionConfigs) return;
+
+		const directions = Object.keys(directionConfigs);
+		const currentDir = this.getConfig('facingDirection', directions[0]);
+		const currentIdx = directions.indexOf(currentDir);
+		const nextDir = directions[(currentIdx + 1) % directions.length];
+		this.applyFacingDirection(nextDir);
+		this.showDropTarget();
+	}
+
 	showDropTarget() {
 		const gridSystem = this.gameMap?.gridSystem;
 		if (!gridSystem) return;
 
 		if (!this._dropTargetEl) {
 			this._dropTargetEl = document.createElement('div');
-			this._dropTargetEl.className = 'drop-target debug';
+			this._dropTargetEl.className = 'drop-target';
 			this._dropTargetEl.style.width = `${this.size.width}px`;
 			this._dropTargetEl.style.height = `${this.size.height}px`;
-			this.gameMap.layers.debug.appendChild(this._dropTargetEl);
+			this.gameMap.layers.objects.appendChild(this._dropTargetEl);
 		}
 
 		const snappedPos = this.getConfig('snapToGrid', false)
@@ -693,6 +799,7 @@ class MapObject {
 		const gridSystem = this.gameMap?.gridSystem;
 		if (!gridSystem) return true;
 
+		const thisOverlappable = this.getConfig('overlappable', false);
 		const startGridX = Math.floor(x / gridSystem.config.cellSize);
 		const startGridY = Math.floor(y / gridSystem.config.cellSize);
 		const endGridX = Math.ceil((x + this.size.width) / gridSystem.config.cellSize);
@@ -703,9 +810,15 @@ class MapObject {
 				if (gx < 0 || gx >= gridSystem.gridWidth || gy < 0 || gy >= gridSystem.gridHeight) {
 					return false;
 				}
-				if (!gridSystem.grid[gx][gy].walkable) {
-					const hasBlocker = [...gridSystem.grid[gx][gy].objects].some(
-						obj => obj !== this && !obj.config.walkable
+				const cell = gridSystem.grid[gx][gy];
+
+				// Tile-level block (walls, water) — always hard-block regardless of overlappable
+				if (!cell.tileWalkable) return false;
+
+				// Object-level block — skip if this object is overlappable (e.g. rug)
+				if (!thisOverlappable) {
+					const hasBlocker = [...cell.objects].some(
+						obj => obj !== this && !obj.getConfig('overlappable', false)
 					);
 					if (hasBlocker) return false;
 				}
@@ -755,6 +868,7 @@ class MapObject {
 		divElement.classList.add('mapObject', this.variant);
 		divElement.dataset.objectType = this.type;
 		divElement.dataset.objectId = this.id || '';
+		divElement.dataset.renderLayer = this.getRenderLayerKey();
 
 		if (this.getConfig('draggable', false)) {
 			divElement.classList.add('draggable');

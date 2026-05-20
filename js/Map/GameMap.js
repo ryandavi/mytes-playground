@@ -14,6 +14,7 @@ class GameMap {
         // Layer references
         this.layers = {
             background: parent.canvas?.querySelector('.layer.background'),
+            groundDecor: parent.canvas?.querySelector('.layer.ground-decor'),
             objects: parent.canvas?.querySelector('.layer.foreground'),
             overlay: parent.canvas?.querySelector('.layer.overlay'),
             debug: parent.canvas?.querySelector('.layer.debug'),
@@ -95,6 +96,11 @@ class GameMap {
 
     getZIndex(y, height) {
         return this.parent?.getZIndex?.(y, height) ?? 0;
+    }
+
+    getObjectRenderLayer(object) {
+        const layerKey = object?.getActiveRenderLayerKey?.() || object?.getRenderLayerKey?.() || 'objects';
+        return this.layers[layerKey] || this.layers.objects || this.layers.background || null;
     }
 
     getMaxDimensions() {
@@ -645,9 +651,10 @@ class GameMap {
             this.gridSystem.addObject(object);
         }
 
-        // Render in the objects layer
-        if (this.layers.objects) {
-            object.render(this.layers.objects, this.parent);
+        // Render in the appropriate layer for this object type
+        const renderLayer = this.getObjectRenderLayer(object);
+        if (renderLayer) {
+            object.render(renderLayer, this.parent);
         }
 
         return object;

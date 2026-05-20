@@ -37,7 +37,14 @@ const BASE_CONFIG = {
 
 	particleEffects: false,
 	lightEmission: false,
-	soundEffects: false,
+	overlappable: false,
+	renderLayer: 'objects',
+
+	soundEffects: {
+		pickup: 'ui_pickup_item',
+		drop: 'ui_drop_item',
+		drop_error: 'ui_error'
+	},
 
 	lootable: false,
 	consumable: false,
@@ -59,6 +66,7 @@ const TYPE_CONFIGS = {
 		variants: ['grass_1', 'grass_2', 'grass_3'],
 		renderType: 'split',
 		walkable: true,
+		overlappable: true,
 		animation: 'sway'
 	},
 
@@ -66,6 +74,7 @@ const TYPE_CONFIGS = {
 		category: 'nature',
 		variants: ['flower_red', 'flower_yellow', 'flower_blue'],
 		walkable: true,
+		overlappable: true,
 		interactionType: 'mood_boost',
 		moodBoostAmount: 5
 	},
@@ -678,14 +687,37 @@ const TYPE_CONFIGS = {
 			large_bed: {
 				size: { width: 192, height: 256 },
 				directionConfigs: {
-					E: { size: { width: 256, height: 192 } },
-					W: { size: { width: 256, height: 192 } }
+					S: { size: { width: 192, height: 256 }, collider: { width: 176, height: 240, offsetX: 8, offsetY: 8 } },
+					N: { size: { width: 192, height: 256 }, collider: { width: 176, height: 240, offsetX: 8, offsetY: 8 } },
+					E: { size: { width: 256, height: 192 }, collider: { width: 240, height: 176, offsetX: 8, offsetY: 8 } },
+					W: { size: { width: 256, height: 192 }, collider: { width: 240, height: 176, offsetX: 8, offsetY: 8 } }
 				}
 			},
 			bunk_bed: {
 				spriteConfig: {
 					spriteSheet: { url: 'images/MapObjects/bunk_bed.png' }
 				}
+			}
+		}
+	},
+
+	// ── Floor decorations ────────────────────────────────────────────────────
+
+	RUG: {
+		category: 'static',
+		variants: ['rug_default'],
+		renderType: 'single',
+		walkable: true,
+		overlappable: true,
+		draggable: true,
+		snapToGrid: true,
+		renderPriority: 0,
+		renderLayer: 'groundDecor',
+		size: { width: 192, height: 128 },
+		collider: null,
+		spriteConfig: {
+			spriteSheet: {
+				url: 'images/MapObjects/rug.gif'
 			}
 		}
 	},
