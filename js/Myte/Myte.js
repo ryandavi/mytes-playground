@@ -131,6 +131,8 @@ class Myte {
 			directFallbackFrames: 0,
 			lastPlanAt: 0
 		};
+		this._lastFinitePosition = { x: 0, y: 0 };
+		this._lastFiniteTarget = { x: 0, y: 0 };
 
 	}
 
@@ -195,6 +197,7 @@ class Myte {
 		this.setTarget(offsetX, offsetY);
 		this.setPosition(offsetX, offsetY);
 		this.setSpritePosition(this.posX, this.posY);
+		this.ensureFiniteCoordinates('init');
 
 		// Initialize particle effects if the game map has a particle system
 		if (this.parent?.gameMap?.particleSystem) {
@@ -481,11 +484,12 @@ class Myte {
 	}
 
 	moveTowardsTargetDirect(doXAxis = true, doYAxis = true) {
+		this.ensureFiniteCoordinates('moveTowardsTargetDirect:start');
 		const dx = this.targetX - this.posX;
 		const dy = this.targetY - this.posY;
 		const distance = Math.sqrt(dx * dx + dy * dy);
 
-		if (distance !== 0) {
+		if (Number.isFinite(distance) && distance !== 0) {
 			const step = this.stats.getSpeed();
 			const moveX = (dx / distance) * step;
 			const moveY = (dy / distance) * step;
@@ -503,6 +507,7 @@ class Myte {
 			this.snapPositionToTarget(doXAxis, doYAxis);
 		}
 
+		this.ensureFiniteCoordinates('moveTowardsTargetDirect:end');
 		this.setDirection(this.getDirection());
 		this.setSpritePosition(this.posX, this.posY);
 	}
@@ -622,6 +627,80 @@ class Myte {
 
 	reset() { this.physicsController.reset(); }
 
+	getSafeHomePosition() {
+		const home = this.getHomePosition();
+		return {
+			x: Number.isFinite(home?.x) ? home.x : 0,
+			y: Number.isFinite(home?.y) ? home.y : 0
+		};
+	}
+
+	rememberFiniteCoordinates() {
+		if (Number.isFinite(this.posX) && Number.isFinite(this.posY)) {
+			this._lastFinitePosition = { x: this.posX, y: this.posY };
+		}
+
+		if (Number.isFinite(this.targetX) && Number.isFinite(this.targetY)) {
+			this._lastFiniteTarget = { x: this.targetX, y: this.targetY };
+		}
+	}
+
+	ensureFiniteCoordinates(source = 'unknown') {
+		const home = this.getSafeHomePosition();
+		const fallbackPosition = {
+			x: Number.isFinite(this._lastFinitePosition?.x)
+				? this._lastFinitePosition.x
+				: (Number.isFinite(this.targetX) ? this.targetX : home.x),
+			y: Number.isFinite(this._lastFinitePosition?.y)
+				? this._lastFinitePosition.y
+				: (Number.isFinite(this.targetY) ? this.targetY : home.y)
+		};
+		const fallbackTarget = {
+			x: Number.isFinite(this._lastFiniteTarget?.x)
+				? this._lastFiniteTarget.x
+				: (Number.isFinite(this.posX) ? this.posX : home.x),
+			y: Number.isFinite(this._lastFiniteTarget?.y)
+				? this._lastFiniteTarget.y
+				: (Number.isFinite(this.posY) ? this.posY : home.y)
+		};
+
+		let didCorrect = false;
+
+		if (!Number.isFinite(this.posX)) {
+			this.posX = Number.isFinite(fallbackPosition.x) ? fallbackPosition.x : home.x;
+			didCorrect = true;
+		}
+
+		if (!Number.isFinite(this.posY)) {
+			this.posY = Number.isFinite(fallbackPosition.y) ? fallbackPosition.y : home.y;
+			didCorrect = true;
+		}
+
+		if (!Number.isFinite(this.targetX)) {
+			this.targetX = Number.isFinite(fallbackTarget.x) ? fallbackTarget.x : this.posX;
+			didCorrect = true;
+		}
+
+		if (!Number.isFinite(this.targetY)) {
+			this.targetY = Number.isFinite(fallbackTarget.y) ? fallbackTarget.y : this.posY;
+			didCorrect = true;
+		}
+
+		if (didCorrect) {
+			this.physicsController?.reset?.();
+			this.setSpritePosition(this.posX, this.posY);
+			console.warn(`[Myte:${this.name}] Recovered invalid coordinates during ${source}`, {
+				posX: this.posX,
+				posY: this.posY,
+				targetX: this.targetX,
+				targetY: this.targetY
+			});
+		}
+
+		this.rememberFiniteCoordinates();
+		return didCorrect;
+	}
+
 	isMoving() {
 
 		if (this.isAtTarget()) return false;
@@ -638,6 +717,11 @@ class Myte {
 
 
 	isAtTarget() {
+		if (!Number.isFinite(this.posX) || !Number.isFinite(this.posY) ||
+			!Number.isFinite(this.targetX) || !Number.isFinite(this.targetY)) {
+			return false;
+		}
+
 		var dx = this.targetX - this.posX;
 		var dy = this.targetY - this.posY;
 		var distance = Math.sqrt(dx * dx + dy * dy);
@@ -699,6 +783,7 @@ class Myte {
 	snapPositionToTarget(doXAxis = true, doYAxis = true) {
 		if (doXAxis) this.posX = this.targetX;
 		if (doYAxis) this.posY = this.targetY;
+		this.ensureFiniteCoordinates('snapPositionToTarget');
 	}
 	get distanceFromTarget() {
 		var d = {
@@ -724,6 +809,7 @@ class Myte {
 	// canAutoOpenCollider and tryOpenCollider are provided by EntityMixin (Entity.js).
 
 	moveTowardsTarget(doXAxis = true, doYAxis = true) {
+		this.ensureFiniteCoordinates('moveTowardsTarget:start');
 		const dx = this.targetX - this.posX;
 		const dy = this.targetY - this.posY;
 		const distance = Math.sqrt(dx * dx + dy * dy);
@@ -732,7 +818,7 @@ class Myte {
 		const originalX = this.posX;
 		const originalY = this.posY;
 	
-		if (distance !== 0) {
+		if (Number.isFinite(distance) && distance !== 0) {
 			const moveX = (dx / distance) * this.stats.getSpeed();
 			const moveY = (dy / distance) * this.stats.getSpeed();
 			const gridSystem = this.parent?.gameMap?.gridSystem;
@@ -835,7 +921,8 @@ class Myte {
 		if (distance < this.stats.getSpeed()) {
 			this.snapPositionToTarget(doXAxis, doYAxis);
 		}
-	
+
+		this.ensureFiniteCoordinates('moveTowardsTarget:end');
 		this.setDirection(this.getDirection());
 		this.setSpritePosition(this.posX, this.posY);
 	}
@@ -875,9 +962,9 @@ class Myte {
 			y = clamped.y;
 		}
 
-
-		if (setX) this.targetX = x;
-		if (setY) this.targetY = y;
+		if (setX && Number.isFinite(x)) this.targetX = x;
+		if (setY && Number.isFinite(y)) this.targetY = y;
+		this.rememberFiniteCoordinates();
 	}
 
 	setPosition(x = null, y = null, limit = false) {
@@ -902,8 +989,9 @@ class Myte {
 			y = clamped.y;
 		}
 
-		if (setX) this.posX = x;
-		if (setY) this.posY = y;
+		if (setX && Number.isFinite(x)) this.posX = x;
+		if (setY && Number.isFinite(y)) this.posY = y;
+		this.rememberFiniteCoordinates();
 	}
 
 	getCarriedItemPosition(itemSize = {}) {
@@ -1352,12 +1440,14 @@ class Myte {
 
 	update(deltaTime) {
 		if (!this.isActive) return;
+		this.ensureFiniteCoordinates('update:start');
 
 		// personal target dot
 		this.updateTargetDot();
 
 		// movement logic
 		this.doMovementLogic();
+		this.ensureFiniteCoordinates('update:end');
 
 		// Rate-limit animation/state updates to ~8fps using an accumulator
 		this._animElapsed = (this._animElapsed || 0) + deltaTime;

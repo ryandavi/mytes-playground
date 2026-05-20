@@ -88,19 +88,101 @@ class Camera {
 	}
 	
 	updateTransform(x, y, zoom) {
+		if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(zoom) || zoom <= 0) {
+			return;
+		}
 		this.canvas.style.transform = `scale(${zoom.toFixed(3)}) translate(${x.toFixed(2)}px, ${y.toFixed(2)}px)`;
+	}
+
+	_getSafeZoomValue(zoom = this.zoomLevel, fallback = 1) {
+		const baseZoom = Number.isFinite(zoom) && zoom > 0
+			? zoom
+			: (Number.isFinite(fallback) && fallback > 0 ? fallback : 1);
+
+		return Math.max(
+			this.minZoomLevel,
+			Math.min(this.maxZoomLevel, baseZoom)
+		);
+	}
+
+	_getFallbackPosition(zoom = this.zoomLevel) {
+		const safeZoom = this._getSafeZoomValue(zoom, 1);
+		const activeMyte = this.parent?.activeMyte;
+
+		if (activeMyte && Number.isFinite(activeMyte.posX) && Number.isFinite(activeMyte.posY)) {
+			const canvasRect = this.parent.getCanvasRect?.();
+			const viewportRect = this.parent.getContainerRect?.();
+			const centered = this._calculateCenterPosition(
+				activeMyte.posX,
+				activeMyte.posY,
+				viewportRect,
+				activeMyte.size
+			);
+
+			if (this.limitToBounds) {
+				const clamped = this._clampToBounds(centered.x, centered.y, canvasRect, viewportRect, safeZoom);
+				if (Number.isFinite(clamped.x) && Number.isFinite(clamped.y)) {
+					return clamped;
+				}
+			} else if (Number.isFinite(centered.x) && Number.isFinite(centered.y)) {
+				return centered;
+			}
+		}
+
+		const origin = this.limitToBounds
+			? this._clampToBounds(0, 0, null, null, safeZoom)
+			: { x: 0, y: 0 };
+
+		return {
+			x: Number.isFinite(origin.x) ? origin.x : 0,
+			y: Number.isFinite(origin.y) ? origin.y : 0
+		};
+	}
+
+	sanitizeState() {
+		const safeZoomLevel = this._getSafeZoomValue(this.zoomLevel, this.targetZoomLevel);
+		const safeTargetZoomLevel = this._getSafeZoomValue(this.targetZoomLevel, safeZoomLevel);
+		let didCorrect = false;
+
+		if (safeZoomLevel !== this.zoomLevel) {
+			this.zoomLevel = safeZoomLevel;
+			didCorrect = true;
+		}
+
+		if (safeTargetZoomLevel !== this.targetZoomLevel) {
+			this.targetZoomLevel = safeTargetZoomLevel;
+			didCorrect = true;
+		}
+
+		if (
+			!Number.isFinite(this.posX) ||
+			!Number.isFinite(this.posY) ||
+			!Number.isFinite(this.targetX) ||
+			!Number.isFinite(this.targetY)
+		) {
+			const fallback = this._getFallbackPosition(this.zoomLevel);
+			const safeX = Number.isFinite(this.targetX) ? this.targetX : fallback.x;
+			const safeY = Number.isFinite(this.targetY) ? this.targetY : fallback.y;
+			this.targetX = safeX;
+			this.targetY = safeY;
+			this.posX = Number.isFinite(this.posX) ? this.posX : safeX;
+			this.posY = Number.isFinite(this.posY) ? this.posY : safeY;
+			didCorrect = true;
+		}
+
+		return didCorrect;
 	}
 	
 	// ========== POSITION METHODS ==========
 	
 	setPosition(x, y) {
-		this.posX = x;
-		this.posY = y;
+		if (Number.isFinite(x)) this.posX = x;
+		if (Number.isFinite(y)) this.posY = y;
 	}
-	
+
 	setTarget(x, y) {
-		this.targetX = x;
-		this.targetY = y;
+		if (Number.isFinite(x)) this.targetX = x;
+		if (Number.isFinite(y)) this.targetY = y;
 	}
 	
 	// ========== MODE MANAGEMENT ==========
@@ -120,10 +202,7 @@ class Camera {
 	// ========== ZOOM METHODS ==========
 	
 	setZoomLevel(zoom) {
-		this.targetZoomLevel = Math.max(
-			this.minZoomLevel,
-			Math.min(this.maxZoomLevel, zoom)
-		);
+		this.targetZoomLevel = this._getSafeZoomValue(zoom, this.targetZoomLevel);
 	}
 
 	getViewportCenterAnchor() {
@@ -280,11 +359,18 @@ class Camera {
 	}
 
 	_calculateAnchoredPosition(anchor, zoom = this.zoomLevel) {
-		let targetX = anchor.screenX / zoom - anchor.worldX;
-		let targetY = anchor.screenY / zoom - anchor.worldY;
+		const safeZoom = this._getSafeZoomValue(zoom, this.zoomLevel);
+		const safeAnchor = {
+			screenX: Number.isFinite(anchor?.screenX) ? anchor.screenX : 0,
+			screenY: Number.isFinite(anchor?.screenY) ? anchor.screenY : 0,
+			worldX: Number.isFinite(anchor?.worldX) ? anchor.worldX : 0,
+			worldY: Number.isFinite(anchor?.worldY) ? anchor.worldY : 0
+		};
+		let targetX = safeAnchor.screenX / safeZoom - safeAnchor.worldX;
+		let targetY = safeAnchor.screenY / safeZoom - safeAnchor.worldY;
 
 		return this.limitToBounds
-			? this._clampToBounds(targetX, targetY, null, null, zoom)
+			? this._clampToBounds(targetX, targetY, null, null, safeZoom)
 			: { x: targetX, y: targetY };
 	}
 
@@ -480,9 +566,10 @@ class Camera {
 	}
 	
 	_getViewportWorldSize(viewportRect, zoom = this.zoomLevel) {
+		const safeZoom = this._getSafeZoomValue(zoom, this.zoomLevel);
 		return {
-			width: viewportRect.width / zoom,
-			height: viewportRect.height / zoom
+			width: viewportRect.width / safeZoom,
+			height: viewportRect.height / safeZoom
 		};
 	}
 
@@ -606,6 +693,8 @@ class Camera {
 	}
 	
 	update() {
+		this.sanitizeState();
+
 		// Handle instant movement case
 		if (this.useInstantMovement) {
 			this.zoomLevel = this.targetZoomLevel;
@@ -676,6 +765,8 @@ class Camera {
 	}
 	
 	doCameraLogic() {
+		this.sanitizeState();
+
 		if (this.followMode === CAMERA_FOLLOW_MODES.DRAG_TO_PAN) {
 			return; // Handled by drag event
 		}
@@ -689,17 +780,21 @@ class Camera {
 		
 		switch (this.followMode) {
 			case CAMERA_FOLLOW_MODES.CURSOR:
-				if (!isMouseInContainer) return;
+				if (!isMouseInContainer || !Number.isFinite(mouse.x) || !Number.isFinite(mouse.y)) return;
 				this.followCursor(mouse.x, mouse.y, canvasRect, containerRect);
 				break;
 				
 			case CAMERA_FOLLOW_MODES.CURSOR_EDGE:
-				if (!isMouseInContainer) return;
+				if (!isMouseInContainer || !Number.isFinite(mouse.x) || !Number.isFinite(mouse.y)) return;
 				this.followCursorEdge(mouse.x, mouse.y, canvasRect, containerRect);
 				break;
 				
 			case CAMERA_FOLLOW_MODES.CHARACTER:
-				if (this.parent.activeMyte) {
+				if (
+					this.parent.activeMyte &&
+					Number.isFinite(this.parent.activeMyte.posX) &&
+					Number.isFinite(this.parent.activeMyte.posY)
+				) {
 					this.followCharacter(
 						this.parent.activeMyte.posX,
 						this.parent.activeMyte.posY,

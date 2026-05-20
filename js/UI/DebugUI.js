@@ -38,7 +38,7 @@ class DebugUI {
             null;
 
         return [
-            { label: "User Active", value: this.parent.isActive },
+            { label: "User Active", value: this.parent.userIsActive },
             { label: "Local Mouse", value: `${this.parent.inputHandler.getMouseWorldPosition().x.toFixed(2)}px, ${this.parent.inputHandler.getMouseWorldPosition().y.toFixed(2)}px` },
             { label: "Mouse", value: `${this.parent.mousePosX.toFixed(2)}px, ${this.parent.mousePosY.toFixed(2)}px` },
             {

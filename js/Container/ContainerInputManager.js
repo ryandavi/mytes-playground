@@ -322,7 +322,8 @@ class ContainerInputManager {
   //==================================================
 
   getZoomLevel() {
-    return this.container.camera?.zoomLevel || 1;
+    const zoomLevel = this.container.camera?.zoomLevel;
+    return Number.isFinite(zoomLevel) && zoomLevel > 0 ? zoomLevel : 1;
   }
 
   getCameraOffset(includeCamera = true) {
@@ -331,28 +332,36 @@ class ContainerInputManager {
     }
 
     return {
-      x: this.container.camera.posX,
-      y: this.container.camera.posY
+      x: Number.isFinite(this.container.camera.posX) ? this.container.camera.posX : 0,
+      y: Number.isFinite(this.container.camera.posY) ? this.container.camera.posY : 0
     };
   }
 
   pageToContainerCoordinates(x, y) {
     const containerRect = this.container.getContainerRect();
     const zoomLevel = this.getZoomLevel();
+    const safeX = Number.isFinite(x) ? x : containerRect.left;
+    const safeY = Number.isFinite(y) ? y : containerRect.top;
+    const safeLeft = Number.isFinite(containerRect.left) ? containerRect.left : 0;
+    const safeTop = Number.isFinite(containerRect.top) ? containerRect.top : 0;
 
     return {
-      x: (x - containerRect.left) / zoomLevel,
-      y: (y - containerRect.top) / zoomLevel
+      x: (safeX - safeLeft) / zoomLevel,
+      y: (safeY - safeTop) / zoomLevel
     };
   }
 
   containerToPageCoordinates(x, y) {
     const containerRect = this.container.getContainerRect();
     const zoomLevel = this.getZoomLevel();
+    const safeX = Number.isFinite(x) ? x : 0;
+    const safeY = Number.isFinite(y) ? y : 0;
+    const safeLeft = Number.isFinite(containerRect.left) ? containerRect.left : 0;
+    const safeTop = Number.isFinite(containerRect.top) ? containerRect.top : 0;
 
     return {
-      x: x * zoomLevel + containerRect.left,
-      y: y * zoomLevel + containerRect.top
+      x: safeX * zoomLevel + safeLeft,
+      y: safeY * zoomLevel + safeTop
     };
   }
 
@@ -379,6 +388,8 @@ class ContainerInputManager {
   }
 
   getElementWorldOffset(element, zoomLevel = this.getZoomLevel()) {
+    const safeZoomLevel = Number.isFinite(zoomLevel) && zoomLevel > 0 ? zoomLevel : 1;
+
     if (!element) {
       return { x: 0, y: 0 };
     }
@@ -393,16 +404,16 @@ class ContainerInputManager {
     if (typeof element.getRect === 'function') {
       const rect = element.getRect();
       return {
-        x: rect.width / (2 * zoomLevel),
-        y: rect.height / (2 * zoomLevel)
+        x: rect.width / (2 * safeZoomLevel),
+        y: rect.height / (2 * safeZoomLevel)
       };
     }
 
     if (typeof element.getBoundingClientRect === 'function') {
       const rect = element.getBoundingClientRect();
       return {
-        x: rect.width / (2 * zoomLevel),
-        y: rect.height / (2 * zoomLevel)
+        x: rect.width / (2 * safeZoomLevel),
+        y: rect.height / (2 * safeZoomLevel)
       };
     }
 
@@ -412,8 +423,8 @@ class ContainerInputManager {
   screenDeltaToWorldDelta(x, y) {
     const zoomLevel = this.getZoomLevel();
     return {
-      x: x / zoomLevel,
-      y: y / zoomLevel
+      x: (Number.isFinite(x) ? x : 0) / zoomLevel,
+      y: (Number.isFinite(y) ? y : 0) / zoomLevel
     };
   }
   
