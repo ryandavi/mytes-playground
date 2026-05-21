@@ -274,9 +274,6 @@
   cursor: pointer;
   font-weight: 600;
   font-size: 0.85em;
-  margin: 0 0 4px 0;
-  padding-bottom: 2px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   -webkit-user-select: none;
      -moz-user-select: none;
           user-select: none;
@@ -291,6 +288,11 @@
 }
 .debugMenu .debug-group:not([open]) > .debug-group-summary::after {
   content: ">";
+}
+.debugMenu .debug-group[open] > .debug-group-summary {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-bottom: 4px;
+  padding-bottom: 4px;
 }
 .debugMenu .debug-table {
   width: 100%;

@@ -368,9 +368,8 @@
             cursor: pointer;
             font-weight: 600;
             font-size: 0.85em;
-            margin: 0 0 4px 0;
-            padding-bottom: 2px;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+
+
             user-select: none;
 
             &::-webkit-details-marker { display: none; }
@@ -386,6 +385,14 @@
             content: ">";
         }
     }
+
+    .debug-group[open] > .debug-group-summary {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        margin-bottom: 4px;
+        padding-bottom: 4px;
+
+    }
+
 
     .debug-table {
         width: 100%;
