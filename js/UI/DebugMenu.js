@@ -333,7 +333,7 @@ class DebugMenu extends ModalWindow {
 
         // Create the button container if it doesn't exist
         if (this.modalElement) {
-            let buttonContainer = this.modalElement.querySelector('.modal-content');
+            let buttonContainer = this.modalElement.querySelector('.window-panel__content');
 
             // Create buttons from config
             this.createButtons(buttonContainer);

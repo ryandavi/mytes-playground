@@ -12,7 +12,7 @@ class ContainerManager {
         this.mytes = [];
 
         this.element = document.getElementById(elementId);
-        this.containerWrapper = this.element.closest('.app-shell, .container-wrapper');
+        this.containerWrapper = this.element.closest('.app-shell');
         this.canvas = this.element.querySelector('.canvas');
 
         this.activeMyte = null;
@@ -335,11 +335,11 @@ class ContainerManager {
         // Keep it visible alongside the world-space goal/grid markers, but only
         // while the pointer is actually over the container.
         if (!this.isMouseInContainer()) {
-            cursorElement.classList.add('hidden');
+            cursorElement.classList.add('is-hidden');
             return;
         }
 
-        cursorElement.classList.remove('hidden');
+        cursorElement.classList.remove('is-hidden');
 
         const world = this.inputHandler.getMouseWorldPosition();
         cursorElement.style.left = world.x + 'px';
@@ -504,7 +504,7 @@ class ContainerManager {
 
     // Myte management methods
     async setupMytes() {
-        const wrappers = this.element.querySelectorAll('.myte-slot, .myteWrapper');
+        const wrappers = this.element.querySelectorAll('.myte-slot');
 
         if (wrappers.length === 0) {
             throw new Error("No Myte elements found.");

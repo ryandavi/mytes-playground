@@ -9,7 +9,7 @@ class LoadingManager {
 	constructor(options = {}) {
 		this.loadingScreen = document.getElementById('loading-screen');
 		this.window         = this.loadingScreen?.querySelector('#loading-modal')         ?? null;
-		this.titleText      = this.loadingScreen?.querySelector('.window-panel__title .text, .modal-title .text') ?? null;
+		this.titleText      = this.loadingScreen?.querySelector('.window-panel__title .text') ?? null;
 		this.descriptionText = this.loadingScreen?.querySelector('.loading-message p')    ?? null;
 		this.progressBar    = this.loadingScreen?.querySelector('.loading-progress')       ?? null;
 		this.loadingText    = this.loadingScreen?.querySelector('.loading-status')         ?? null;
@@ -141,7 +141,7 @@ class LoadingManager {
         }
 
         if (this.window) {
-            this.window.classList.add('visible');
+            this.window.classList.add('is-visible');
         }
 
         this.cacheProgressMeasurements();
@@ -208,7 +208,7 @@ class LoadingManager {
 
 			if (this.skipIcon) {
 
-				this.skipIcon.classList.add('visible');
+				this.skipIcon.classList.add('is-visible');
 				if (!this.skipClickHandler) {
 					this.skipClickHandler = () => {
 						this.skipLoading();
@@ -222,7 +222,7 @@ class LoadingManager {
 
 		// delay with  showWindowDelay
 		this.showWindowTimer = setTimeout(() => {
-			this.window?.classList.add('visible');
+			this.window?.classList.add('is-visible');
             this.cacheProgressMeasurements();
             this.updateProgressUI(this.displayProgress);
 			// Start progress animation
@@ -328,7 +328,7 @@ class LoadingManager {
                 this.loadingScreen.style.transition = '';
                 this.loadingScreen.style.opacity = '';
             }
-            this.loadingScreen.classList.remove('hidden');
+            this.loadingScreen.classList.remove('is-hidden');
 
             if (this.currentVariant === 'transition') {
                 requestAnimationFrame(() => {
@@ -367,7 +367,7 @@ class LoadingManager {
             } else {
                 this.loadingScreen.style.transition = '';
             }
-            this.loadingScreen.classList.add('hidden');
+            this.loadingScreen.classList.add('is-hidden');
         }
         
         // Cancel any pending timers
@@ -397,7 +397,7 @@ class LoadingManager {
             if (!isTransition && canvas) {
                 canvas.style.visibility = 'visible';
             }
-            this.window?.classList.remove('visible');
+            this.window?.classList.remove('is-visible');
             this.applyOverlayVariant({ variant: 'default' });
             if (this.loadingScreen) {
                 this.loadingScreen.style.transition = '';

@@ -201,7 +201,7 @@ class Inventory {
         });
 
         // Add Myte events to existing Mytes
-        this.addMyteListeners(document.querySelectorAll('.world-myte, .duplicate'));
+        this.addMyteListeners(document.querySelectorAll('.world-myte'));
     }
 
     handleDragStart(e) {
@@ -230,7 +230,7 @@ class Inventory {
         // Play lift sound
         this.parent.soundManager?.play('ui_drag_item');
 
-        document.querySelectorAll('.world-myte, .duplicate').forEach(myte => {
+        document.querySelectorAll('.world-myte').forEach(myte => {
             myte.classList.add('droppable');
         });
 
@@ -248,7 +248,7 @@ class Inventory {
             container.classList.remove('on-target');
         });
 
-        document.querySelectorAll('.world-myte, .duplicate').forEach(myte => {
+        document.querySelectorAll('.world-myte').forEach(myte => {
             myte.classList.remove('droppable', 'on-target');
         });
 
@@ -570,7 +570,7 @@ class Inventory {
         });
         this.containerElements = [];
 
-        document.querySelectorAll('.world-myte, .duplicate').forEach(myte => {
+        document.querySelectorAll('.world-myte').forEach(myte => {
             myte.removeEventListener('dragover', this.boundHandlers.myteDragOver);
             myte.removeEventListener('dragleave', this.boundHandlers.myteDragLeave);
             myte.removeEventListener('drop', this.boundHandlers.myteDrop);

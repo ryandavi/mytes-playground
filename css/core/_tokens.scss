@@ -25,6 +25,10 @@
     --border-radius-outer: var(--radius-md);
     --border-radius-inner: var(--radius-sm);
 
+    --color-danger: #ff4444;
+    --color-danger-glow: rgba(255, 68, 68, 0.5);
+    --color-danger-tint: rgba(255, 68, 68, 0.1);
+
     --drop-target: rgba(2, 141, 255, 0.5);
     --on-target: green;
     --drop-target-invalid: rgba(220, 50, 50, 0.9);

@@ -8,7 +8,7 @@ class Myte {
 		this.element = element;
 		this.species = MyteDefinitionRegistry.normalizeSpeciesId(
 			element?.dataset?.myteSpecies ||
-			element?.closest('.myte-slot, .myteWrapper')?.dataset?.myteSpecies ||
+			element?.closest('.myte-slot')?.dataset?.myteSpecies ||
 			definition?.id ||
 			'snail'
 		);
@@ -22,7 +22,7 @@ class Myte {
 		this.diagonalMovement = false;
 
 		this.elements = {
-			wrapper: this.element.closest(".myte-slot, .myteWrapper"),
+			wrapper: this.element.closest(".myte-slot"),
 		};
 
 		this.capabilities = {
@@ -185,7 +185,7 @@ class Myte {
 		this.renderer = new MyteRenderer(this);
 		this.renderer.initInteractiveMyte();
 		this.renderer.createTargetDot();
-		this.dropTarget = this.element.closest('.myte-slot, .myteWrapper');
+		this.dropTarget = this.element.closest('.myte-slot');
 
 		this.queue = new MyteQueue(this);
 		this.stateMachine = new StateMachine(this, DEFAULT_STATE);
@@ -248,12 +248,12 @@ class Myte {
 		this.setSpritePosition(home.x, home.y);
 
 		// hide it
-		this.element.classList.remove("deactivated", "is-deactivated");
-		this.duplicate.classList.remove("active", "is-active");
-		this.duplicate.classList.add('deactivated', 'is-deactivated');
+		this.element.classList.remove("is-deactivated");
+		this.duplicate.classList.remove("is-active");
+		this.duplicate.classList.add('is-deactivated');
 		this.elements.wrapper.classList.remove('empty');
 
-		this.targetDot.classList.add('hidden', 'is-hidden');
+		this.targetDot.classList.add('is-hidden');
 
 		// set next as active
 		this.playSlotEnterSound();
@@ -280,9 +280,9 @@ class Myte {
 
 		this.isActive = true;
 
-		this.element.classList.add("deactivated", "is-deactivated"); // hide the original element
+		this.element.classList.add("is-deactivated"); // hide the original element
 		this.elements.wrapper.classList.add('empty');
-		this.duplicate.classList.remove("deactivated", "is-deactivated"); // show the duplicate element
+		this.duplicate.classList.remove("is-deactivated"); // show the duplicate element
 
 		// modes
 		this.setAutonomyMode(autonomyGoal);
@@ -411,7 +411,7 @@ class Myte {
 
 	getHomeSlotRect() {
 		const slotElement =
-			this.dropTarget?.querySelector?.('.myte-home-slot, .home-wrapper') ||
+			this.dropTarget?.querySelector?.('.myte-home-slot') ||
 			this.dropTarget ||
 			this.elements.wrapper ||
 			this.element;
@@ -618,9 +618,7 @@ class Myte {
 			return;
 		}
 
-		this.duplicate.classList.toggle('active', this.isActiveMyte);
 		this.duplicate.classList.toggle('is-active', this.isActiveMyte);
-		this.targetDot.classList.toggle('hidden', !this.isActiveMyte);
 		this.targetDot.classList.toggle('is-hidden', !this.isActiveMyte);
 	}
 
@@ -1102,7 +1100,7 @@ class Myte {
 		this.setSpritePosition(x, y, this.limitToContainer);
 
 		// Add the "dragging" class to the draggable element when dragging
-		this.duplicate.classList.add("dragging", "is-dragging");
+		this.duplicate.classList.add("is-dragging");
 
 		// Check if the draggable element is touching the drop target
 		const dropTargetRect = this.parent.getRect(this.dropTarget);

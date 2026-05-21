@@ -1,11 +1,13 @@
-.inventory,
+$item-color-food:     #f0e68c;
+$item-color-toy:      #87ceeb;
+$item-color-medicine: #98fb98;
+
 .inventory-grid {
     --inventory-grid-gap: var(--space-md);
     --inventory-slot-radius: var(--radius-md);
 
     padding: var(--space-xl);
 
-    &.empty,
     &.is-empty {
         opacity: 0.7;
 
@@ -21,9 +23,8 @@
         }
     }
 
-    &.full,
     &.is-full {
-        box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+        box-shadow: 0 0 10px var(--color-danger-glow);
 
         &::after {
             content: 'Inventory Full';
@@ -31,7 +32,7 @@
             top: -20px;
             left: 50%;
             transform: translateX(-50%);
-            color: #ff4444;
+            color: var(--color-danger);
             font-size: 12px;
             white-space: nowrap;
         }
@@ -51,17 +52,9 @@
     cursor: grab;
     transition: transform 0.2s var(--ease-ui), filter 0.2s var(--ease-ui);
 
-    &.food {
-        background-color: rgba(240, 230, 140, 0.15);
-    }
-
-    &.toy {
-        background-color: rgba(135, 206, 235, 0.15);
-    }
-
-    &.medicine {
-        background-color: rgba(152, 251, 152, 0.15);
-    }
+    &.food     { background-color: rgba($item-color-food,     0.15); }
+    &.toy      { background-color: rgba($item-color-toy,      0.15); }
+    &.medicine { background-color: rgba($item-color-medicine, 0.15); }
 
     &::after {
         content: attr(data-quantity);
@@ -69,8 +62,8 @@
         top: 0;
         right: 0;
         background-color: white;
-        border-radius: 5px;
-        padding: 2px;
+        border-radius: var(--radius-sm);
+        padding: var(--space-2xs);
         font-size: 6px;
     }
 
@@ -104,8 +97,8 @@
     animation: drop-indicator-pulse 0.8s ease-in-out infinite;
 
     &.invalid {
-        border-color: #ff4444;
-        background-color: rgba(255, 68, 68, 0.1);
+        border-color: var(--color-danger);
+        background-color: var(--color-danger-tint);
     }
 }
 
@@ -115,23 +108,13 @@
     height: var(--item-size);
     pointer-events: none;
     animation: consume 1s ease-out forwards;
-    outline: 1px solid red;
 
-    &.food {
-        background: radial-gradient(circle, #f0e68c, transparent);
-    }
-
-    &.toy {
-        background: radial-gradient(circle, #87ceeb, transparent);
-    }
-
-    &.medicine {
-        background: radial-gradient(circle, #98fb98, transparent);
-    }
+    &.food     { background: radial-gradient(circle, $item-color-food,     transparent); }
+    &.toy      { background: radial-gradient(circle, $item-color-toy,      transparent); }
+    &.medicine { background: radial-gradient(circle, $item-color-medicine, transparent); }
 }
 
-.world-myte,
-.duplicate {
+.world-myte {
     &.droppable {
         transition: outline var(--motion-fast) var(--ease-ui);
     }
@@ -141,8 +124,7 @@
     }
 }
 
-.app-stage,
-.container {
+.app-stage {
     &.valid-drop-target {
         &::after {
             content: '';

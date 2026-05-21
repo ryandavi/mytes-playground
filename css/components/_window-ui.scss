@@ -1,7 +1,6 @@
 @use '../primitives/ui' as *;
 
-.window-panel,
-.modal-window {
+.window-panel {
     --modal-page-margin: 20px;
 
     position: absolute;
@@ -17,12 +16,10 @@
     transform: translateY(5px);
     transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
 
-    &.floating,
     &.is-floating {
         position: fixed;
     }
 
-    &.visible,
     &.is-visible {
         pointer-events: all;
         transform: translateY(0);
@@ -55,7 +52,6 @@
         left: var(--modal-page-margin);
     }
 
-    &.fullscreen,
     &.is-fullscreen {
         width: calc(100% - (var(--modal-page-margin) * 2)) !important;
         height: calc(100% - (var(--modal-page-margin) * 2)) !important;
@@ -68,23 +64,18 @@
         transform: none !important;
     }
 
-    &.minimize,
     &.is-minimized {
-        >.window-panel__header,
-        >.modal-header {
+        >.window-panel__header {
             border-bottom: 0;
         }
 
         >.window-panel__content,
-        >.window-panel__footer,
-        >.modal-content,
-        >.modal-footer {
+        >.window-panel__footer {
             display: none;
         }
     }
 
-    >.window-panel__header,
-    >.modal-header {
+    >.window-panel__header {
         align-items: center;
         padding: 7.5px;
         flex: 1;
@@ -97,16 +88,14 @@
         justify-content: space-between;
         flex-grow: 0;
 
-        .window-panel__title,
-        .modal-title {
+        .window-panel__title {
             font-size: 16px;
             margin: 0;
             display: flex;
             gap: var(--gap);
         }
 
-        >.window-panel__controls,
-        >.modal-controls {
+        >.window-panel__controls {
             display: flex;
             gap: var(--gap);
             user-select: none;
@@ -124,8 +113,7 @@
         }
     }
 
-    >.window-panel__content,
-    >.modal-content {
+    >.window-panel__content {
         padding: var(--padding);
         padding-top: calc(var(--padding) + var(--border-width));
         flex: 1;
@@ -187,8 +175,7 @@
         }
     }
 
-    >.window-panel__footer,
-    >.modal-footer {
+    >.window-panel__footer {
         padding: var(--padding);
         flex-grow: 0;
         margin-top: auto;

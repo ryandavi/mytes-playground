@@ -18,7 +18,7 @@ input[type=button],
 button {
     @include button-base;
     padding: calc(var(--padding) * 2);
-    color: var(--button-text-color);
+    
 
     &:not(:disabled):not(.disabled) {
         cursor: pointer;

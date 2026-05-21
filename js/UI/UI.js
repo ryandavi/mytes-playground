@@ -634,11 +634,11 @@ class SelectionManager extends UIComponent {
             if (!object) return; // Check if object exists
             
             if (object instanceof Myte) {
-                if (object.duplicate) object.duplicate.classList.remove('selected', 'is-selected');
+                if (object.duplicate) object.duplicate.classList.remove('is-selected');
             } else if (object instanceof MapObject) {
-                if (object.element) object.element.classList.remove('selected', 'is-selected');
+                if (object.element) object.element.classList.remove('is-selected');
             } else if (object) {
-                object.classList.remove('selected', 'is-selected');
+                object.classList.remove('is-selected');
             }
         };
 
@@ -646,11 +646,11 @@ class SelectionManager extends UIComponent {
             if (!object) return; // Check if object exists
             
             if (object instanceof Myte) {
-                if (object.duplicate) object.duplicate.classList.add('selected', 'is-selected');
+                if (object.duplicate) object.duplicate.classList.add('is-selected');
             } else if (object instanceof MapObject) {
-                if (object.element) object.element.classList.add('selected', 'is-selected');
+                if (object.element) object.element.classList.add('is-selected');
             } else if (object) {
-                object.classList.add('selected', 'is-selected');
+                object.classList.add('is-selected');
             }
         };
 
@@ -1241,7 +1241,7 @@ class OffscreenMyteIndicatorManager extends UIComponent {
 
         if (!this.markers.has(markerId)) {
             const marker = document.createElement('div');
-            marker.className = 'myte-offscreen-indicator hidden';
+            marker.className = 'myte-offscreen-indicator is-hidden';
             marker.dataset.myteId = markerId;
             this.overlay.appendChild(marker);
             this.markers.set(markerId, marker);
@@ -1252,7 +1252,7 @@ class OffscreenMyteIndicatorManager extends UIComponent {
 
     hideMarker(marker) {
         if (!marker) return;
-        marker.classList.add('hidden');
+        marker.classList.add('is-hidden');
     }
 
     hideAllMarkers() {
@@ -1371,7 +1371,7 @@ class OffscreenMyteIndicatorManager extends UIComponent {
         const marker = this.getMarker(markerData.myte);
         if (!marker) return;
 
-        marker.classList.remove('hidden');
+        marker.classList.remove('is-hidden');
         marker.classList.toggle('active-myte', markerData.myte === activeMyte);
         marker.dataset.edge = markerData.edge;
         marker.title = markerData.myte?.name || 'Myte';
@@ -1452,7 +1452,7 @@ class ScreenManager extends UIComponent {
     constructor(parent) {
         super(parent);
         this.headerElement = this.parent.containerWrapper.querySelector('.header');
-        this.fullscreenButton = this.parent.containerWrapper.querySelector('.app-fullscreen-btn, .fullscreen-btn');
+        this.fullscreenButton = this.parent.containerWrapper.querySelector('.fullscreen-btn');
         this.listenerCleanup = [];
     }
 
@@ -1475,7 +1475,6 @@ class ScreenManager extends UIComponent {
         const anchor = camera?.getViewportCenterAnchor ? camera.getViewportCenterAnchor() : null;
 
         // toggle class on container
-        this.parent.containerWrapper.classList.toggle('fullscreen');
         this.parent.containerWrapper.classList.toggle('is-fullscreen');
         if (this.fullscreenButton) {
             this.fullscreenButton.classList.toggle('active');

@@ -1,7 +1,6 @@
 @use '../primitives/ui' as *;
 
-.action-queue-panel,
-.queueMenu {
+.action-queue-panel {
     visibility: hidden;
     margin-right: 10px;
     position: fixed;
@@ -66,13 +65,8 @@
                             font-size: 0.8em;
                             line-height: 1;
 
-                            &.skip {
-                                color: #3498db;
-                            }
-
-                            &.remove {
-                                color: #e74c3c;
-                            }
+                            &.skip   { color: #3498db; }
+                            &.remove { color: #e74c3c; }
                         }
                     }
                 }
@@ -83,13 +77,8 @@
                     gap: 4px;
                     font-size: 0.8em;
 
-                    .arrow {
-                        opacity: 0.5;
-                    }
-
-                    .target {
-                        opacity: 0.7;
-                    }
+                    .arrow  { opacity: 0.5; }
+                    .target { opacity: 0.7; }
 
                     .repeats {
                         background: rgba(0, 0, 0, 0.05);
@@ -122,7 +111,6 @@
             }
         }
 
-        &.current,
         &.is-current {
             background-color: rgba(235, 255, 235);
 
@@ -133,8 +121,7 @@
     }
 }
 
-.app-shell,
-.container-wrapper {
+.app-shell {
     >.hand-controls {
         @include surface-raised;
         padding: var(--padding);
@@ -224,7 +211,6 @@
             grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
             @include surface-raised;
 
-            &.visible,
             &.is-visible {
                 display: grid;
             }
@@ -234,7 +220,7 @@
                 margin: var(--padding);
                 display: none;
                 flex-direction: column;
-                gap: 8px;
+                gap: var(--space-md);
                 font-size: 0.8em;
                 text-transform: uppercase;
                 color: var(--text-muted);
@@ -242,7 +228,6 @@
                 min-height: 0;
                 overflow-y: auto;
 
-                &.visible,
                 &.is-visible {
                     display: flex;
                 }
@@ -274,21 +259,10 @@
                     }
                 }
 
-                &.self-selected {
-                    background: var(--surface-state-self);
-                }
-
-                &.myte-interaction {
-                    background: var(--surface-state-myte);
-                }
-
-                &.map-interaction {
-                    background: var(--surface-state-map);
-                }
-
-                &.element-interaction {
-                    background: var(--surface-state-element);
-                }
+                &.self-selected      { background: var(--surface-state-self);    }
+                &.myte-interaction   { background: var(--surface-state-myte);    }
+                &.map-interaction    { background: var(--surface-state-map);     }
+                &.element-interaction { background: var(--surface-state-element); }
             }
 
             >.action-groups {

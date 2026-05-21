@@ -3,11 +3,9 @@
 body.debug {
     .target.dot,
     .debug-panel,
-    .debugMenu,
     .cursor-dot.dot,
     .crosshair,
     .action-queue-panel,
-    .queueMenu,
     .zone,
     .debug-stats,
     .terrain-legend,
@@ -19,8 +17,7 @@ body.debug {
         outline: 1px solid red;
     }
 
-    .map-object,
-    .mapObject {
+    .map-object {
         outline: 1px dashed rgba(255, 230, 0, 0.85);
 
         &:hover {
@@ -38,15 +35,12 @@ body.debug {
                 border-radius: 2px;
             }
         }
-    }
 
-    .map-object > .interactive-hitbox,
-    .map-object > .interactive-collider,
-    .mapObject > .interactive-hitbox,
-    .mapObject > .interactive-collider {
-        outline: 1px dashed rgba(255, 165, 0, 0.95);
-        background: rgba(255, 165, 0, 0.08);
-        opacity: 1;
+        > .interactive-hitbox {
+            outline: 1px dashed rgba(255, 165, 0, 0.95);
+            background: rgba(255, 165, 0, 0.08);
+            opacity: 1;
+        }
     }
 }
 
@@ -64,7 +58,6 @@ body.debug {
     z-index: 1000000;
     visibility: hidden;
 
-    &.hidden,
     &.is-hidden {
         visibility: hidden !important;
     }

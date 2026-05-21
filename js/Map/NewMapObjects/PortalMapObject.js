@@ -248,7 +248,7 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         portal.className = 'portal-window';
 
         const title = document.createElement('div');
-        title.className = 'title';
+        title.className = 'portal-panel__title';
         title.textContent = this.getPortalWindowTitle();
         title.title = this.getPortalWindowTitle();
 

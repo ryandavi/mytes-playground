@@ -2,7 +2,7 @@ class QueueUI {
     constructor(parent, options = {}) {
         this.parent = parent;
         this.mode = options.mode || 'debug';
-        this.queue = options.element || document.querySelector('.action-queue-panel, .queueMenu');
+        this.queue = options.element || document.querySelector('.action-queue-panel');
         this.elements = new Map();
         this.previousValues = new Map();
         this.allowControls = options.allowControls ?? this.mode !== 'compact';
@@ -241,7 +241,7 @@ class QueueUI {
         const currentValue = JSON.stringify(simplifiedValue);
 
         if (this.previousValues.get(key) !== currentValue) {
-            element.className = `queue-item ${item.constructor.metadata?.category || ''}${index === 0 ? ' current' : ''}`;
+            element.className = `queue-item ${item.constructor.metadata?.category || ''}${index === 0 ? ' is-current' : ''}`;
 
             refs.number.textContent = `#${index + 1}`;
             refs.name.textContent = this.getQueueTitle(item);
@@ -311,14 +311,14 @@ class QueueUI {
 
         tooltipParts.push(`Hold to cancel${index === 0 ? ' current action' : ''}.`);
 
-        element.className = `queue-item compact ${item.constructor.metadata?.category || ''}${index === 0 ? ' current' : ''}`;
+        element.className = `queue-item compact ${item.constructor.metadata?.category || ''}${index === 0 ? ' is-current' : ''}`;
         element.dataset.index = String(index);
         element.dataset.queueTitle = title;
         element.dataset.queueDescription = description;
         element.dataset.queueState = index === 0 ? 'now' : 'next';
         // element.title = `${index === 0 ? 'Now' : `Next ${index}`}: ${title}${description ? ` - ${description}` : ''}`;
         refs.icon.textContent = this.getCompactLabel(item);
-        refs.order.textContent = index === 0 ? 'NOW' : String(index);
+        // refs.order.textContent = index === 0 ? 'NOW' : String(index);
         refs.tooltip.textContent = tooltipParts.join(' · ');
     }
 

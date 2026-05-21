@@ -42,6 +42,7 @@
 
 @mixin button-base {
     @include surface-raised;
+    color: var(--button-text-color);
 }
 
 @mixin button-pressed {

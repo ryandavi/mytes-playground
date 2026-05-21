@@ -1,5 +1,4 @@
-.debug-panel,
-.debugMenu {
+.debug-panel {
     --debug-color-system: rgba(255, 235, 235, 0.7);
     --debug-color-input: rgba(235, 255, 235, 0.7);
     --debug-color-time: rgba(235, 235, 255, 0.7);
@@ -71,42 +70,15 @@
             border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
 
-        &.system {
-            background-color: var(--debug-color-system);
-            --badge-bg: var(--debug-color-system);
-        }
-
-        &.input {
-            background-color: var(--debug-color-input);
-            --badge-bg: var(--debug-color-input);
-        }
-
-        &.time {
-            background-color: var(--debug-color-time);
-            --badge-bg: var(--debug-color-time);
-        }
-
-        &.map {
-            background-color: var(--debug-color-map);
-            --badge-bg: var(--debug-color-map);
-        }
-
-        &.camera {
-            background-color: var(--debug-color-camera);
-            --badge-bg: var(--debug-color-camera);
-        }
-
+        &.system        { background-color: var(--debug-color-system);     --badge-bg: var(--debug-color-system);     }
+        &.input         { background-color: var(--debug-color-input);      --badge-bg: var(--debug-color-input);      }
+        &.time          { background-color: var(--debug-color-time);       --badge-bg: var(--debug-color-time);       }
+        &.map           { background-color: var(--debug-color-map);        --badge-bg: var(--debug-color-map);        }
+        &.camera        { background-color: var(--debug-color-camera);     --badge-bg: var(--debug-color-camera);     }
         &.overview,
         &.myte,
-        &.myte-ai {
-            background-color: var(--debug-color-myte);
-            --badge-bg: var(--debug-color-myte);
-        }
-
-        &.myte-stats {
-            background-color: var(--debug-color-myte-stats);
-            --badge-bg: var(--debug-color-myte-stats);
-        }
+        &.myte-ai       { background-color: var(--debug-color-myte);       --badge-bg: var(--debug-color-myte);       }
+        &.myte-stats    { background-color: var(--debug-color-myte-stats); --badge-bg: var(--debug-color-myte-stats); }
 
         .badge {
             background-color: color-mix(in oklch, var(--badge-bg) 70%, #ff4400 30%);
@@ -175,8 +147,7 @@
 }
 
 #view-panel {
-    .window-panel__content,
-    .modal-content {
+    .window-panel__content {
         .settings-group {
             display: flex;
             align-items: center;
@@ -211,7 +182,7 @@
 }
 
 #game-debug-panel {
-    .modal-content {
+    .window-panel__content {
         max-width: 500px;
         margin: 0 auto;
 
@@ -246,15 +217,9 @@
                 flex: 1 1 100%;
             }
 
-            #adjustSpeed {
-                flex: 1;
-            }
-
+            #adjustSpeed       { flex: 1; }
             #adjustSpeed-down,
-            #adjustSpeed-up {
-                flex: 0;
-                min-width: 50px;
-            }
+            #adjustSpeed-up    { flex: 0; min-width: 50px; }
 
             &:first-child {
                 border-top: none;

@@ -7,7 +7,6 @@
 @use 'core/animations';
 
 // ui
-// @use 'components/ui-legacy';
 @use 'layout/app-shell';
 @use 'components/debug-ui';
 @use 'components/controls-and-sidebar';
@@ -15,11 +14,9 @@
 @use 'components/overlays';
 
 // myte
-// @use 'features/myte-legacy';
 @use 'features/myte';
 
 // map
-// @use 'features/map-legacy';
 @use 'features/map';
 
 // fonts
