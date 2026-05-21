@@ -252,8 +252,8 @@
     --debug-color-myte: rgba(235, 255, 255, .7);
     --debug-color-myte-stats: rgba(235, 255, 241, .7);
 
-    line-height: 1em;
-    font-size: 0.8em;
+    line-height: .85em;
+    font-size: 0.7em;
     position: fixed;
     inset: 0;
     visibility: hidden;
@@ -262,9 +262,11 @@
 
     .debug-section {
         position: absolute;
-        width: min(340px, calc(100vw - 16px));
+        width: min(400px, calc(100vw - 16px));
         pointer-events: auto;
         margin: 0;
+        // blur bg
+        backdrop-filter: blur(4px);
 
         >summary {
             align-items: center;
@@ -318,14 +320,45 @@
             border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
 
-        &.system { background-color: var(--debug-color-system); }
-        &.input { background-color: var(--debug-color-input); }
-        &.time { background-color: var(--debug-color-time); }
-        &.map { background-color: var(--debug-color-map); }
-        &.camera { background-color: var(--debug-color-camera); }
-        &.overview, &.myte { background-color: var(--debug-color-myte); }
-        &.myte-stats { background-color: var(--debug-color-myte-stats); }
-        &.myte-ai { background-color: var(--debug-color-myte); }
+
+        // Cleaner solution using CSS custom properties + color-mix
+        &.system { 
+            background-color: var(--debug-color-system);
+            --badge-bg: var(--debug-color-system);
+        }
+        &.input { 
+            background-color: var(--debug-color-input);
+            --badge-bg: var(--debug-color-input);
+        }
+        &.time { 
+            background-color: var(--debug-color-time);
+            --badge-bg: var(--debug-color-time);
+        }
+        &.map { 
+            background-color: var(--debug-color-map);
+            --badge-bg: var(--debug-color-map);
+        }
+        &.camera { 
+            background-color: var(--debug-color-camera);
+            --badge-bg: var(--debug-color-camera);
+        }
+        &.overview, &.myte { 
+            background-color: var(--debug-color-myte);
+            --badge-bg: var(--debug-color-myte);
+        }
+        &.myte-stats { 
+            background-color: var(--debug-color-myte-stats);
+            --badge-bg: var(--debug-color-myte-stats);
+        }
+        &.myte-ai { 
+            background-color: var(--debug-color-myte);
+            --badge-bg: var(--debug-color-myte);
+        }
+        .badge {
+            // Mix with a deep, saturated color instead of black
+            background-color: color-mix(in oklch, var(--badge-bg) 70%, #ff4400 30%);
+        }
+
 
         >.debug-group-summary {
             display: flex;
@@ -372,6 +405,14 @@
             white-space: normal;
             width: 7.5rem;
             overflow-wrap: anywhere;
+            width: 70%;
+
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: inline-block;
+
+
         }
 
         .debug-value {
@@ -1828,4 +1869,12 @@
         }
 
     }
+}
+
+
+.badge {
+    background-color: #ffdfdf;
+    font-size: .8em;
+    padding: 1px 3px;
+    border-radius: 3px;
 }

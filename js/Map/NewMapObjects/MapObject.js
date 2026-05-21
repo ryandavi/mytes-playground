@@ -507,7 +507,7 @@ class MapObject {
 				if (this.getConfig('doubleClickAction')) this.handleDoubleClick(event);
 			},
 			onLongPress: (event) => {
-				if (this.getConfig('draggable') && this.parent?.ui?.isTool(UIToolModes.SELECT)) {
+				if (this.canStartSelectModeDrag()) {
 					this.parent?.ui?.changeToolMode(UIToolModes.DRAG);
 					this.startDrag();
 				} else {
@@ -534,6 +534,7 @@ class MapObject {
 				this._dragOriginDirection = this.getConfig('facingDirection', null);
 				this.syncRenderLayer();
 				this.element.classList.add('dragging');
+				this.container?.camera?.beginTemporaryFollow?.(this);
 				if (this.container?.ui) this.container.ui.setSelected(this);
 				this.playConfiguredSound?.('pickup');
 				if (this.getConfig('directionConfigs', null)) {
@@ -552,13 +553,18 @@ class MapObject {
 						element: this
 					})
 					: { x: this.posX, y: this.posY };
-				this.posX = world.x;
-				this.posY = world.y;
+				const clampedWorld = this.container?.clampEntityPosition
+					? this.container.clampEntityPosition(this, world.x, world.y)
+					: world;
+				this.posX = clampedWorld.x;
+				this.posY = clampedWorld.y;
 				this.updatePosition();
+				this.container?.camera?.focusOn?.(this);
 				this.showDropTarget();
 			},
 			onDragEnd: () => {
 				this.isDragging = false;
+				this.container?.camera?.endTemporaryFollow?.(this);
 				this.element.classList.remove('dragging');
 				this.hideDropTarget();
 				if (this._rotateKeyHandler) {
@@ -566,6 +572,12 @@ class MapObject {
 					this._rotateKeyHandler = null;
 				}
 				if (this.getConfig('snapToGrid', false)) this.snapToGrid();
+				if (this.container?.clampEntityPosition) {
+					const clampedWorld = this.container.clampEntityPosition(this, this.posX, this.posY);
+					this.posX = clampedWorld.x;
+					this.posY = clampedWorld.y;
+					this.updatePosition();
+				}
 				const isValid = this.checkDropValidity(this.posX, this.posY);
 				if (!isValid) {
 					const safePosition = this.gameMap?.gridSystem?.findNearestValidPositionForEntity?.(
@@ -628,14 +640,32 @@ class MapObject {
 	canBeDragged() {
 		if (!this.getConfig('draggable', false)) return false;
 		const isDragMode = this.parent?.ui?.isTool(UIToolModes.DRAG);
+		if (isDragMode) {
+			return true;
+		}
+		if (!this.canStartSelectModeDrag()) {
+			return false;
+		}
 		const requiresPickupGesture = this.getConfig('canPickUp', false);
 		const isSelectedInSelectMode =
 			this.parent?.ui?.isTool(UIToolModes.SELECT) &&
 			this.parent?.ui?.selectionManager?.getSelectedObject?.() === this;
 		if (requiresPickupGesture) {
-			return isDragMode || this._tempSelectDragActive;
+			return this._tempSelectDragActive;
 		}
-		return isDragMode || isSelectedInSelectMode;
+		return isSelectedInSelectMode || this._tempSelectDragActive;
+	}
+
+	canStartSelectModeDrag() {
+		return this.getConfig('draggable', false) &&
+			this.getConfig('dragInSelectMode', false) &&
+			this.parent?.ui?.isTool(UIToolModes.SELECT);
+	}
+
+	canShowSelectPointer() {
+		return this.getConfig('canInspect', true) !== false ||
+			this.getConfig('canPickUp', false) ||
+			this.getConfig('interactionType') != null;
 	}
 
 	startDrag() {
@@ -655,7 +685,7 @@ class MapObject {
 	}
 
 	_initSelectDragHandler() {
-		if (!this.getConfig('draggable', false) || !this.element || this._selectDragCleanup) {
+		if (!this.element || this._selectDragCleanup || !this.getConfig('dragInSelectMode', false)) {
 			return;
 		}
 
@@ -672,7 +702,7 @@ class MapObject {
 		let pendingTemporaryDrag = null;
 
 		const onMouseDown = (event) => {
-			if (event.button !== 0 || !this.active || this.isDragging || !this.parent?.ui?.isTool(UIToolModes.SELECT)) {
+			if (event.button !== 0 || !this.active || this.isDragging || !this.canStartSelectModeDrag()) {
 				return;
 			}
 
@@ -687,7 +717,7 @@ class MapObject {
 		};
 
 		const onMouseMove = (event) => {
-			if (!pressStart || this.isDragging || !this.parent?.ui?.isTool(UIToolModes.SELECT)) {
+			if (!pressStart || this.isDragging || !this.canStartSelectModeDrag()) {
 				return;
 			}
 
@@ -1014,8 +1044,14 @@ class MapObject {
 
 		if (this.getConfig('draggable', false)) {
 			divElement.classList.add('draggable');
+			if (this.getConfig('dragInSelectMode', false)) {
+				divElement.classList.add('drag-in-select-mode');
+			}
 			divElement.style.touchAction = 'none';
 			divElement.style.pointerEvents = 'all';
+		}
+		if (this.canShowSelectPointer()) {
+			divElement.classList.add('inspectable');
 		}
 		if (this.getConfig('rubbable', false)) divElement.classList.add('rubbable');
 
@@ -1181,6 +1217,11 @@ class MapObject {
 
 	// ── Event handlers ────────────────────────────────────────────────────────
 
+	getBestInteractionAction(myte) {
+		const SKIP = new Set(['inspect', 'deep_inspect']);
+		return ActionManager.getAvailableActions(this, myte).find(a => !SKIP.has(a.id)) ?? null;
+	}
+
 	handleDoubleClick(event) {
 		const fn = this.getConfig('doubleClickAction');
 		if (typeof fn === 'function') {
@@ -1188,7 +1229,14 @@ class MapObject {
 			return;
 		}
 		const myte = this.activeMyte;
-		if (myte?.queue) myte.queue.add('go_to_object', { target: this });
+		if (!myte?.queue) return;
+
+		const best = this.getBestInteractionAction(myte);
+		if (best) {
+			myte.queue.interrupt(best.id, ActionManager.getActionOptions(best.id, this, myte));
+		} else {
+			myte.queue.interrupt('go_to_object', { target: this });
+		}
 	}
 
 	handleLongPress(event) {

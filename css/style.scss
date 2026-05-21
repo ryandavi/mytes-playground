@@ -45,6 +45,12 @@
 }
 
 
+// Define helper function in SCSS
+@function darker-saturated($color, $darken-amount: 20%, $saturate-amount: 10%) {
+    @return saturate(darken($color, $darken-amount), $saturate-amount);
+}
+
+
 *,
 *::before,
 *::after {
@@ -272,12 +278,13 @@ body.debug {
 
 	&.cursor-dot {
 		background-color: blueviolet;
-		transform: translate(-50%, -50%);
+		transform: translate(-100%, -100%);
 	}
 
 	&.target {
 		position: absolute;
 		background-color: green;
+		transform: translate(-50%, -50%);
 
 		&:after {
 			position: absolute;

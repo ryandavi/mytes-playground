@@ -17,6 +17,7 @@ const BASE_CONFIG = {
 	interactionRadius: 100,
 	interactionCooldown: 5000,
 	draggable: false,
+	dragInSelectMode: false,
 	rubbable: false,
 
 	canInspect: true,
@@ -380,6 +381,7 @@ const TYPE_CONFIGS = {
 		renderType: 'sprite',
 		walkable: true,
 		draggable: true,
+		dragInSelectMode: true,
 		canPickUp: true,
 		renderPriority: 2,
 		pickupRange: 96,
@@ -405,7 +407,12 @@ const TYPE_CONFIGS = {
 		minAnimationFrameDelay: 45,
 		maxAnimationFrameDelay: 120,
 		triggerRadius: 96,
-		pushForce: 6,
+		pushForce: 10,
+		mytePushForceMultiplier: 1.4,
+		myteKickMaxSpeed: 18,          // speed cap for myte-kicked ball (separate from drag maxSpeed)
+		dragVelocityScale: 180,        // px/s of pointer speed that = 1 world unit/tick; higher = wider proportional range
+		dragReleaseVelocityMultiplier: 1, // fine-tune multiplier on top of dragVelocityScale
+		dragReleaseMaxSpeed: 16,       // max world units/tick a throw can launch the ball
 		debug: false,
 		animation: 'sway',
 		soundEffects: {

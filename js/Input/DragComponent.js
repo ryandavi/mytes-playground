@@ -15,6 +15,7 @@ class DragComponent extends InputComponent {
 			touchAction: 'none',             // CSS touch-action property during drag
 			dragOriginX: 0.5,                // Origin point for drag (0.5 = center)
 			dragOriginY: 0.5,                // Origin point for drag (0.5 = center)
+			velocityWindow: 100,             // ms of position history used to compute throw velocity on release
 
 			// Callbacks
 			canDrag: null,                   // Function to check if dragging is allowed
@@ -34,6 +35,7 @@ class DragComponent extends InputComponent {
 		this.dragStartTime = 0;
 		this.lastPosition = { x: 0, y: 0 };
 		this.velocity = { x: 0, y: 0 };
+		this.positionHistory = [];
 		this.touchId = null;
 		this.mouseDownReceived = false; // Track if mousedown was received
 
@@ -207,6 +209,13 @@ class DragComponent extends InputComponent {
 		this.currentPosition = { ...event.position };
 		this.dragStartTime = now;
 
+		// Track position history for throw velocity
+		this.positionHistory.push({ x: event.position.x, y: event.position.y, t: now });
+		const cutoff = now - this.options.velocityWindow;
+		while (this.positionHistory.length > 1 && this.positionHistory[0].t < cutoff) {
+			this.positionHistory.shift();
+		}
+
 		// Apply movement constraints
 		const constrainedPosition = this.constrainPosition(this.currentPosition);
 
@@ -261,9 +270,10 @@ class DragComponent extends InputComponent {
 					x: constrainedPosition.x - this.dragStartPosition.x,
 					y: constrainedPosition.y - this.dragStartPosition.y
 				},
-				velocity: this.velocity
+				velocity: this._computeThrowVelocity()
 			});
 		}
+		this.positionHistory = [];
 
 		// Reset state
 		this.isDragging = false;
@@ -289,6 +299,7 @@ class DragComponent extends InputComponent {
 		if (!this.inputSystem.claimDrag(this)) return;
 
 		this.isDragging = true;
+		this.positionHistory = [];
 
 		// Set touch-action CSS for better touch handling
 		if (this.element && this.options.touchAction) {
@@ -500,6 +511,24 @@ class DragComponent extends InputComponent {
 				originalEvent: null
 			});
 		}
+	}
+
+	/**
+	 * Compute throw velocity from recent position history.
+	 * Uses the oldest sample within velocityWindow ms to get a stable average,
+	 * avoiding the stale-last-frame problem when the user releases mid-movement.
+	 */
+	_computeThrowVelocity() {
+		const history = this.positionHistory;
+		if (history.length < 2) return { ...this.velocity };
+		const oldest = history[0];
+		const newest = history[history.length - 1];
+		const dt = (newest.t - oldest.t) / 1000;
+		if (dt <= 0) return { ...this.velocity };
+		return {
+			x: (newest.x - oldest.x) / dt,
+			y: (newest.y - oldest.y) / dt
+		};
 	}
 
 	/**

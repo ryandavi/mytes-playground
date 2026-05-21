@@ -693,6 +693,8 @@ class ActionSidebarManager extends UIComponent {
         this.currentSelectedObject = null;
         this.lastInfoRefreshAt = 0;
         this.infoRefreshInterval = 250;
+        this._otherInfoCache = null;
+        this._otherInfoRowMap = new Map();
     }
 
     // Helper method to get category titles
@@ -768,86 +770,120 @@ class ActionSidebarManager extends UIComponent {
         container.append(wrapper);
     }
 
-    renderMyteNeeds(otherInfo, myte) {
-        const snapshot = myte.ai?.getNeedsSnapshot?.({ live: true });
-        if (!snapshot) {
-            return;
+    _buildOtherInfoRows(selectedObject) {
+        const rows = [];
+        const gridCoords = this.parent.parent.gameMap.gridSystem.worldToGrid(selectedObject.posX, selectedObject.posY);
+        rows.push({ label: 'Coords', value: `[${gridCoords.x}, ${gridCoords.y}]`, className: 'position-info' });
+        rows.push({ label: 'World', value: `(${selectedObject.posX.toFixed(0)}, ${selectedObject.posY.toFixed(0)})`, className: 'position-info' });
+
+        if (selectedObject instanceof DoorMapObject) {
+            rows.push({ label: 'State', value: selectedObject.isOpen ? 'Open' : 'Closed' });
         }
 
-        const vitals = snapshot.vitals ?? {};
-        this.appendInfoRow(otherInfo, 'Energy', `${vitals.energy ?? 0}%`);
-        this.appendInfoRow(otherInfo, 'Mood', `${myte.stats.getMoodStatus()} (${vitals.mood ?? 0}%)`);
-        this.appendInfoRow(otherInfo, 'Fun', `${vitals.fun ?? 0}%`);
-        this.appendInfoRow(otherInfo, 'Comfort', `${vitals.comfort ?? 0}%`);
-        this.appendInfoRow(otherInfo, 'Confidence', `${vitals.confidence ?? 0}%`);
-
-        if (snapshot.topNeed) {
-            this.appendInfoRow(
-                otherInfo,
-                'Top Need',
-                `${snapshot.topNeed.label} (${snapshot.topNeed.percent}%)`
-            );
+        if (selectedObject instanceof Myte) {
+            const snapshot = selectedObject.ai?.getNeedsSnapshot?.({ live: true });
+            if (snapshot) {
+                const vitals = snapshot.vitals ?? {};
+                rows.push({ label: 'Energy', value: `${vitals.energy ?? 0}%` });
+                rows.push({ label: 'Mood', value: `${selectedObject.stats.getMoodStatus()} (${vitals.mood ?? 0}%)` });
+                rows.push({ label: 'Fun', value: `${vitals.fun ?? 0}%` });
+                rows.push({ label: 'Comfort', value: `${vitals.comfort ?? 0}%` });
+                rows.push({ label: 'Confidence', value: `${vitals.confidence ?? 0}%` });
+                if (snapshot.topNeed) {
+                    rows.push({ label: 'Top Need', value: `${snapshot.topNeed.label} (${snapshot.topNeed.percent}%)` });
+                }
+                rows.push({ label: '__header_needs', value: 'Needs', className: 'needs-title' });
+                snapshot.needs.slice(0, 5).forEach(need => {
+                    const pct = Math.max(0, 100 - need.percent);
+                    rows.push({ label: `need_${need.label}`, value: pct, meta: { label: need.label, tone: this.getNeedFulfillmentLabel(pct) }, type: 'meter' });
+                });
+                const environment = snapshot.environment ?? {};
+                rows.push({ label: 'Light Need', value: `${environment.lightNeed ?? 0}%` });
+                rows.push({ label: 'Music Need', value: `${environment.musicNeed ?? 0}%` });
+                if (snapshot.lastDecisionLabel) {
+                    rows.push({ label: 'Last AI Choice', value: snapshot.lastDecisionLabel });
+                }
+            }
         }
 
-        const needsTitle = document.createElement('div');
-        needsTitle.classList.add('state-info', 'needs-title');
-        needsTitle.textContent = 'Needs';
-        otherInfo.append(needsTitle);
+        const debugInfo = selectedObject.getSelectionDebugInfo?.() || [];
+        debugInfo.forEach(({ label, value }) => rows.push({ label, value: String(value) }));
 
-        snapshot.needs.slice(0, 5).forEach(need => {
-            const fulfilledPercent = Math.max(0, 100 - need.percent);
-            this.appendNeedMeter(
-                otherInfo,
-                need.label,
-                fulfilledPercent,
-                this.getNeedFulfillmentLabel(fulfilledPercent)
-            );
-        });
-
-        const environment = snapshot.environment ?? {};
-        this.appendInfoRow(otherInfo, 'Light Need', `${environment.lightNeed ?? 0}%`);
-        this.appendInfoRow(otherInfo, 'Music Need', `${environment.musicNeed ?? 0}%`);
-
-        if (snapshot.lastDecisionLabel) {
-            this.appendInfoRow(otherInfo, 'Last AI Choice', snapshot.lastDecisionLabel);
-        }
+        return rows;
     }
 
     renderOtherInfo(selectedObject) {
         const otherInfo = this.actionControls.querySelector('.other-info');
-        if (!otherInfo) {
+        if (!otherInfo) return;
+
+        if (!selectedObject) {
+            if (otherInfo.classList.contains('visible')) {
+                otherInfo.innerHTML = '';
+                otherInfo.classList.remove('visible');
+                this._otherInfoCache = null;
+                this._otherInfoRowMap.clear();
+            }
             return;
+        }
+
+        const rows = this._buildOtherInfoRows(selectedObject);
+        const cacheKey = rows.map(r => `${r.label}=${r.value}`).join('|');
+
+        if (cacheKey === this._otherInfoCache) return;
+        this._otherInfoCache = cacheKey;
+
+        const prevRowMap = this._otherInfoRowMap;
+        const newRowMap = new Map();
+        const fragment = document.createDocumentFragment();
+
+        for (const row of rows) {
+            const strVal = String(row.value);
+            let el = prevRowMap.get(row.label);
+
+            if (row.type === 'meter') {
+                if (!el) {
+                    el = document.createElement('div');
+                    el.classList.add('state-info', 'need-info');
+                    const heading = document.createElement('div');
+                    heading.classList.add('need-label');
+                    const meter = document.createElement('progress');
+                    meter.classList.add('need-meter');
+                    meter.max = 100;
+                    meter.style.width = '100%';
+                    el.append(heading, meter);
+                }
+                const heading = el.querySelector('.need-label');
+                const meter = el.querySelector('progress');
+                const pct = row.value;
+                const text = `${row.meta.label}: ${pct}% ${row.meta.tone}`;
+                if (heading.textContent !== text) heading.textContent = text;
+                if (meter.value !== pct) meter.value = pct;
+            } else if (row.label.startsWith('__header_')) {
+                if (!el) {
+                    el = document.createElement('div');
+                    el.classList.add('state-info');
+                    if (row.className) el.classList.add(row.className);
+                }
+                if (el.textContent !== strVal) el.textContent = strVal;
+            } else {
+                if (!el) {
+                    el = document.createElement('div');
+                    el.classList.add('state-info');
+                    if (row.className) el.classList.add(row.className);
+                    el.innerHTML = `${row.label}: <span></span>`;
+                }
+                const span = el.querySelector('span');
+                if (span && span.textContent !== strVal) span.textContent = strVal;
+            }
+
+            newRowMap.set(row.label, el);
+            fragment.appendChild(el);
         }
 
         otherInfo.innerHTML = '';
-        if (!selectedObject) {
-            otherInfo.classList.remove('visible');
-            return;
-        }
-
-        const gridCoords = this.parent.parent.gameMap.gridSystem.worldToGrid(selectedObject.posX, selectedObject.posY);
-        this.appendInfoRow(otherInfo, 'Coords', `[${gridCoords.x}, ${gridCoords.y}]`, 'position-info');
-        this.appendInfoRow(
-            otherInfo,
-            'World',
-            `(${selectedObject.posX.toFixed(0)}, ${selectedObject.posY.toFixed(0)})`,
-            'position-info'
-        );
-
-        if (selectedObject instanceof DoorMapObject) {
-            this.appendInfoRow(otherInfo, 'State', selectedObject.isOpen ? 'Open' : 'Closed');
-        }
-
-        if (selectedObject instanceof Myte) {
-            this.renderMyteNeeds(otherInfo, selectedObject);
-        }
-
-        const debugInfo = selectedObject.getSelectionDebugInfo?.() || [];
-        debugInfo.forEach(({ label, value }) => {
-            this.appendInfoRow(otherInfo, label, value);
-        });
-
+        otherInfo.appendChild(fragment);
         otherInfo.classList.add('visible');
+        this._otherInfoRowMap = newRowMap;
     }
 
     updateActions(selectedObject) {
@@ -859,6 +895,8 @@ class ActionSidebarManager extends UIComponent {
         const targetName = selectedInfo.querySelector('.target-info .name');
         this.currentSelectedObject = selectedObject;
         this.lastInfoRefreshAt = 0;
+        this._otherInfoCache = null;
+        this._otherInfoRowMap.clear();
 
 
         // Remove all state classes first

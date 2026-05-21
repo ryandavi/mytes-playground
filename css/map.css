@@ -243,6 +243,7 @@
 }
 .container-wrapper > .container > .canvas > .layer > .mapObject > .interactive-collider {
   pointer-events: all;
+  cursor: inherit;
   outline: none;
   background: transparent;
   opacity: 0;
@@ -259,9 +260,11 @@
 }
 .container-wrapper > .container > .canvas > .layer > .mapObject.draggable {
   pointer-events: all;
-  cursor: grab;
 }
-body[data-tool-mode=select] .container-wrapper > .container > .canvas > .layer > .mapObject.draggable {
+body[data-tool-mode=select] .container-wrapper > .container > .canvas > .layer > .mapObject.inspectable {
+  cursor: pointer;
+}
+body[data-tool-mode=select] .container-wrapper > .container > .canvas > .layer > .mapObject.draggable.drag-in-select-mode {
   cursor: grab;
 }
 body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .mapObject.draggable {
@@ -303,16 +306,6 @@ body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .
 }
 .container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object {
   pointer-events: all;
-  cursor: grab;
-}
-body[data-tool-mode=select] .container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object {
-  cursor: grab;
-}
-body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object {
-  cursor: grab;
-}
-.container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object:active {
-  cursor: grabbing;
 }
 .container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.butterfly.blue > .sprite {
   filter: hue-rotate(156deg);

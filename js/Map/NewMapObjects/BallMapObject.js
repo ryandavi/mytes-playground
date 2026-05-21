@@ -103,6 +103,10 @@ class BallMapObject extends AnimatedMapObject {
 
     startDrag() {
         this.stopMotion();
+        this.isDropBouncing = false;
+        this.dropZ = 0;
+        this.dropVelocityZ = 0;
+        this._applySpriteDropOffset(0);
         // If the myte is holding this ball, interrupt the hold so the ball is freed
         if (this.isPickedUp && this.carrier) {
             this.carrier.queue.clear();
@@ -112,6 +116,10 @@ class BallMapObject extends AnimatedMapObject {
 
     startDragAtPosition(position = null) {
         this.stopMotion();
+        this.isDropBouncing = false;
+        this.dropZ = 0;
+        this.dropVelocityZ = 0;
+        this._applySpriteDropOffset(0);
         super.startDragAtPosition?.(position);
     }
 
@@ -168,7 +176,7 @@ class BallMapObject extends AnimatedMapObject {
             // Calculate push direction and force
             const ballCenter = this.getColliderCenter();
             const myteCenter = this.getMyteColliderCenter(myte);
-    
+
             // Calculate distance between centers
             const dx = ballCenter.x - myteCenter.x;
             const dy = ballCenter.y - myteCenter.y;
@@ -179,15 +187,24 @@ class BallMapObject extends AnimatedMapObject {
             }
 
             // Calculate push vector
-            const pushX = (dx / distance) * this.pushForce;
-            const pushY = (dy / distance) * this.pushForce;
+            const mytePushForce = this.pushForce * this.getConfig('mytePushForceMultiplier', 1);
+            const pushX = (dx / distance) * mytePushForce;
+            const pushY = (dy / distance) * mytePushForce;
 
-            // Apply push force as velocity
-            this.velocity.x += pushX;
-            this.velocity.y += pushY;
+            // Kicks always launch at at least kick force in the kick direction
+            const kickMaxSpeed = this.getConfig('myteKickMaxSpeed', this.maxSpeed);
+            const kickMinSpeed = this.getConfig('myteKickMinSpeed', mytePushForce * 0.6);
+            const currentSpeedInKickDir = this.velocity.x * (dx / distance) + this.velocity.y * (dy / distance);
+            if (currentSpeedInKickDir < kickMinSpeed) {
+                this.velocity.x = (dx / distance) * kickMinSpeed;
+                this.velocity.y = (dy / distance) * kickMinSpeed;
+            } else {
+                this.velocity.x += pushX;
+                this.velocity.y += pushY;
+            }
 
-            // Cap velocity at maxSpeed
-            this.capVelocity();
+            // Cap velocity at kick max speed (separate from normal maxSpeed)
+            this.capVelocityTo(kickMaxSpeed);
 
             // Update animation based on movement
             this.updateBallAnimation();
@@ -258,10 +275,22 @@ class BallMapObject extends AnimatedMapObject {
             this.posY += (dy / distance) * pushOutDistance;
         }
 
-        const force = this.pushForce * forceMultiplier;
-        this.velocity.x += (dx / distance) * force;
-        this.velocity.y += (dy / distance) * force;
-        this.capVelocity();
+        const kickMaxSpeed = this.getConfig('myteKickMaxSpeed', this.maxSpeed);
+        const force = this.pushForce * this.getConfig('mytePushForceMultiplier', 1) * forceMultiplier;
+
+        // Kicks always launch at at least kick force in the kick direction
+        const kickMinSpeed = this.getConfig('myteKickMinSpeed', force * 0.6);
+        const nx = dx / distance;
+        const ny = dy / distance;
+        const currentSpeedInKickDir = this.velocity.x * nx + this.velocity.y * ny;
+        if (currentSpeedInKickDir < kickMinSpeed) {
+            this.velocity.x = nx * kickMinSpeed;
+            this.velocity.y = ny * kickMinSpeed;
+        } else {
+            this.velocity.x += nx * force;
+            this.velocity.y += ny * force;
+        }
+        this.capVelocityTo(kickMaxSpeed);
         this.isMoving = true;
         this.lastPushTime = now;
         this.updateBallAnimation();
@@ -285,6 +314,23 @@ class BallMapObject extends AnimatedMapObject {
         if (speed > this.maxSpeed) {
             this.velocity.x = (this.velocity.x / speed) * this.maxSpeed;
             this.velocity.y = (this.velocity.y / speed) * this.maxSpeed;
+        }
+    }
+
+    capVelocityTo(limit = this.maxSpeed) {
+        const speed = this.getSpeed();
+        if (!Number.isFinite(speed)) {
+            this.stopMotion();
+            return;
+        }
+
+        if (!Number.isFinite(limit) || limit <= 0) {
+            return;
+        }
+
+        if (speed > limit) {
+            this.velocity.x = (this.velocity.x / speed) * limit;
+            this.velocity.y = (this.velocity.y / speed) * limit;
         }
     }
     
@@ -498,14 +544,33 @@ class BallMapObject extends AnimatedMapObject {
 
     _applyDragVelocity(dragVelocity) {
         if (!dragVelocity) return;
-        // DragComponent velocity is in px/sec; scale to game units per frame (~60fps)
-        const scale = 1 / 55;
-        const vx = dragVelocity.x * scale;
-        const vy = dragVelocity.y * scale;
+        // Release inertia: convert pointer speed (px/s) into world units/tick.
+        // dragVelocityScale = the pointer px/s that maps to 1 world unit/tick.
+        // Higher value = need faster mouse for same ball speed (wider proportional range).
+        const dragVelocityScale = this.getConfig('dragVelocityScale', 55);
+        const scale = (1 / dragVelocityScale) * this.getConfig('dragReleaseVelocityMultiplier', 1);
+        const dragReleaseMaxSpeed = this.getConfig('dragReleaseMaxSpeed', this.maxSpeed);
+        let vx = dragVelocity.x * scale;
+        let vy = dragVelocity.y * scale;
+
+        const edgeTolerance = 0.5;
+        const atLeftEdge = this.posX <= this.bounds.left + edgeTolerance;
+        const atRightEdge = this.posX >= (this.bounds.right - this.size.width - edgeTolerance);
+        const atTopEdge = this.posY <= this.bounds.top + edgeTolerance;
+        const atBottomEdge = this.posY >= (this.bounds.bottom - this.size.height - edgeTolerance);
+
+        if ((atLeftEdge && vx < 0) || (atRightEdge && vx > 0)) {
+            vx = 0;
+        }
+
+        if ((atTopEdge && vy < 0) || (atBottomEdge && vy > 0)) {
+            vy = 0;
+        }
+
         if (Math.abs(vx) > 0.2 || Math.abs(vy) > 0.2) {
             this.velocity.x = vx;
             this.velocity.y = vy;
-            this.capVelocity();
+            this.capVelocityTo(dragReleaseMaxSpeed);
             this.isMoving = true;
             this.updateBallAnimation();
             if (this.element) this.element.setAttribute('data-moving', 'true');
@@ -514,15 +579,27 @@ class BallMapObject extends AnimatedMapObject {
 
     // Set up boundaries based on parent container
     setupBoundaries(parent) {
-        if (parent && parent.getMaxDimensions) {
-            const mapDimensions = parent.getMaxDimensions();
+        const explicitMapDimensions = this.gameMap?.dimensions
+            || parent?.gameMap?.dimensions
+            || null;
+        const worldBounds = parent?.getWorldBounds?.() || null;
+        const fallbackDimensions = parent?.getMaxDimensions?.() || null;
+
+        const width = explicitMapDimensions?.width
+            ?? worldBounds?.width
+            ?? fallbackDimensions?.width;
+        const height = explicitMapDimensions?.height
+            ?? worldBounds?.height
+            ?? fallbackDimensions?.height;
+
+        if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
             this.bounds = {
-                left: 0,
-                top: 0,
-                right: mapDimensions.width,
-                bottom: mapDimensions.height
+                left: worldBounds?.left ?? 0,
+                top: worldBounds?.top ?? 0,
+                right: (worldBounds?.left ?? 0) + width,
+                bottom: (worldBounds?.top ?? 0) + height
             };
-            
+
             if (this.debug) {
                 console.log("Ball boundaries set:", this.bounds);
             }
@@ -554,6 +631,10 @@ class BallMapObject extends AnimatedMapObject {
     // tickUpdate: collision detection + physics (no DOM)
     tickUpdate(tickDelta) {
         super.tickUpdate(tickDelta);
+
+        if (this.isDragging) {
+            return;
+        }
 
         if (this.isPickedUp && this.carrier) {
             return;

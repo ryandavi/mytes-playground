@@ -64,7 +64,7 @@ class MyteRenderer {
 			this.setZIndex(y);
 		}
 
-		this.logVisualDebug('setSpritePosition');
+		// this.logVisualDebug('setSpritePosition');
 	}
 
 	getZIndex(y) {
@@ -81,7 +81,7 @@ class MyteRenderer {
 		const m = this.myte;
 		this.targetDot.style.left = `${m.targetX + m.size.width / 2}px`;
 		this.targetDot.style.top  = `${m.targetY + m.size.height / 2}px`;
-		this.logVisualDebug('update_target_dot');
+		// this.logVisualDebug('update_target_dot');
 	}
 
 	// ── Debug ─────────────────────────────────────────────────────────────────

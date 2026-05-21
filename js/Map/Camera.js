@@ -26,6 +26,8 @@ class Camera {
 		// Camera behavior
 		this.followMode = DEFAULT_CAMERA_FOLLOW_MODE;
 		this.previousFollowMode = DEFAULT_CAMERA_FOLLOW_MODE;
+		this.temporaryFollowTarget = null;
+		this.temporaryFollowRestoreMode = null;
 		this.isScrollable = { x: true, y: true };
 		this.useInstantMovement = false;
 		this.limitToBounds = false;
@@ -198,6 +200,61 @@ class Camera {
 	setToPreviousMode() {
 		this.setMode(this.previousFollowMode);
 	}
+
+	beginTemporaryFollow(target, mode = CAMERA_FOLLOW_MODES.CHARACTER) {
+		if (!target) return false;
+
+		if (this.temporaryFollowRestoreMode === null) {
+			this.temporaryFollowRestoreMode = this.followMode;
+		}
+
+		this.cancelDragPan();
+		this.temporaryFollowTarget = target;
+
+		if (mode !== undefined && mode !== null && this.followMode !== mode) {
+			this.setMode(mode);
+		}
+
+		return true;
+	}
+
+	endTemporaryFollow(target = null) {
+		if (target && this.temporaryFollowTarget && this.temporaryFollowTarget !== target) {
+			return false;
+		}
+
+		this.temporaryFollowTarget = null;
+
+		if (this.temporaryFollowRestoreMode !== null && this.followMode !== this.temporaryFollowRestoreMode) {
+			this.setMode(this.temporaryFollowRestoreMode);
+		}
+
+		this.temporaryFollowRestoreMode = null;
+		return true;
+	}
+
+	cancelDragPan() {
+		this.isDragging = false;
+		if (this.canvas) {
+			this.canvas.style.cursor = 'default';
+		}
+	}
+
+	getCurrentFollowTarget() {
+		if (this.temporaryFollowTarget &&
+			Number.isFinite(this.temporaryFollowTarget.posX) &&
+			Number.isFinite(this.temporaryFollowTarget.posY)) {
+			return this.temporaryFollowTarget;
+		}
+
+		if (this.parent.activeMyte &&
+			Number.isFinite(this.parent.activeMyte.posX) &&
+			Number.isFinite(this.parent.activeMyte.posY)) {
+			return this.parent.activeMyte;
+		}
+
+		return null;
+	}
 	
 	// ========== ZOOM METHODS ==========
 	
@@ -331,13 +388,13 @@ class Camera {
 		const fallbackClientY = e.clientY ?? ((e.pageY ?? window.scrollY) - window.scrollY);
 		const pointerPoint = this._getRawContainerPointFromClient(fallbackClientX, fallbackClientY);
 
-		if (this.followMode === CAMERA_FOLLOW_MODES.CHARACTER && this.parent.activeMyte) {
-			const activeMyte = this.parent.activeMyte;
+		const followTarget = this.getCurrentFollowTarget();
+		if (this.followMode === CAMERA_FOLLOW_MODES.CHARACTER && followTarget) {
 			return {
 				screenX: containerRect.width / 2,
 				screenY: containerRect.height / 2,
-				worldX: activeMyte.posX + (activeMyte.size.width / 2),
-				worldY: activeMyte.posY + (activeMyte.size.height / 2)
+				worldX: followTarget.posX + (followTarget.size.width / 2),
+				worldY: followTarget.posY + (followTarget.size.height / 2)
 			};
 		}
 
@@ -732,7 +789,8 @@ class Camera {
 			const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
 			// Use adaptive easing based on distance and state
-			const baseEasing = this.parent.activeMyte && this.parent.activeMyte.isDragging
+			const followTarget = this.getCurrentFollowTarget();
+			const baseEasing = followTarget?.isDragging
 				? this.draggingEasing
 				: this.easing;
 
@@ -790,18 +848,17 @@ class Camera {
 				break;
 				
 			case CAMERA_FOLLOW_MODES.CHARACTER:
-				if (
-					this.parent.activeMyte &&
-					Number.isFinite(this.parent.activeMyte.posX) &&
-					Number.isFinite(this.parent.activeMyte.posY)
-				) {
+				{
+					const followTarget = this.getCurrentFollowTarget();
+					if (followTarget) {
 					this.followCharacter(
-						this.parent.activeMyte.posX,
-						this.parent.activeMyte.posY,
+						followTarget.posX,
+						followTarget.posY,
 						canvasRect,
 						containerRect,
-						this.parent.activeMyte.size
+						followTarget.size
 					);
+				}
 				}
 				break;
 		}

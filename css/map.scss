@@ -290,6 +290,7 @@
 
 					>.interactive-collider {
 						pointer-events: all;
+						cursor: inherit;
 						outline: none;
 						background: transparent;
 						opacity: 0;
@@ -308,10 +309,13 @@
 
 					&.draggable {
 						pointer-events: all;
-						cursor: grab;
 					}
 
-					body[data-tool-mode="select"] &.draggable {
+					body[data-tool-mode="select"] &.inspectable {
+						cursor: pointer;
+					}
+
+					body[data-tool-mode="select"] &.draggable.drag-in-select-mode {
 						cursor: grab;
 					}
 
@@ -366,19 +370,6 @@
 					&.animated-map-object {
 						&.ball-object {
 							pointer-events: all;
-							cursor: grab;
-
-							body[data-tool-mode="select"] & {
-								cursor: grab;
-							}
-
-							body[data-tool-mode="drag"] & {
-								cursor: grab;
-							}
-
-							&:active {
-								cursor: grabbing;
-							}
 						}
 
 						&.butterfly {

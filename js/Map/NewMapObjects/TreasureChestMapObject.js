@@ -204,18 +204,40 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         return this.playStateTransition('closing', 'closed');
     }
 
-    press(parent) {
-        const myte = this.activeMyte;
+    isWithinChestInteractionRange(myte = this.activeMyte) {
+        if (!myte) return false;
+        return this.getColliderGapTo(myte) <= this.getConfig('interactionTouchThreshold', 12);
+    }
+
+    runChestInteraction(action, myte = this.activeMyte) {
+        if (!this.active || !myte || typeof action !== 'function') return false;
+
+        this.selectInUi?.();
+
+        if (this.isWithinChestInteractionRange(myte)) {
+            action(myte);
+            return true;
+        }
+
+        return this.enqueueApproach(myte, () => {
+            if (this.isWithinChestInteractionRange(myte)) {
+                action(myte);
+            }
+        });
+    }
+
+    press(parent, actor = this.activeMyte) {
+        const myte = actor;
         if (!this.active || !myte) return false;
 
         if (this.state === 'closed') {
-            return this.runInteractionWhenInRange(() => {
+            return this.runChestInteraction(() => {
                 this.open(parent);
             }, myte);
         }
 
         if (this.state === 'opened' && this.canClose) {
-            return this.runInteractionWhenInRange(() => {
+            return this.runChestInteraction(() => {
                 this.close(parent);
             }, myte);
         }

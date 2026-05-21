@@ -493,8 +493,8 @@ class OpenChestAction extends GoToObjectAction {
 
     complete() {
         super.complete();
-        if (this.target?.open) {
-            this.target.open(this.myte.parent);
+        if (this.target?.press) {
+            this.target.press(this.myte.parent, this.myte);
         }
         this.myte.queue.addExpression('excited', 300, 2);
     }

@@ -158,6 +158,7 @@
    <properties>
     <property name="claimedBy" value="Lentil"/>
     <property name="direction" value="S"/>
+    <property name="variant" value="large_bed"/>
    </properties>
   </object>
   <object id="65" name="Portal" x="544" y="192" width="128" height="128">

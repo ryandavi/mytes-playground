@@ -18,6 +18,8 @@ class DebugUI {
         this.handleDebugSummaryClick = this.onDebugSummaryClick.bind(this);
 
         this.queueUI = new QueueUI(parent);
+        this.lastDebugUpdate = 0;
+        this.debugUpdateInterval = 100;
     }
 
     getDebugSections(debugGroups) {
@@ -123,30 +125,34 @@ class DebugUI {
             activeGroups.add(name);
             const activeLabels = new Set();
 
-            for (const { label, value } of messages) {
-                activeLabels.add(label);
-                let valueCell = groupRefs.rowMap.get(label);
+for (const item of messages) {
+    const { label, value } = item;
+    const labelClean = item.labelClean ?? label;  // Use item's labelClean, not messages
+    
+    activeLabels.add(label);
+    let valueCell = groupRefs.rowMap.get(label);
 
-                if (!valueCell) {
-                    const tr = document.createElement('tr');
-                    const labelCell = document.createElement('td');
-                    labelCell.className = 'debug-label';
-                    labelCell.textContent = label;
-                    tr.appendChild(labelCell);
+    if (!valueCell) {
+        const tr = document.createElement('tr');
+        const labelCell = document.createElement('td');
+        labelCell.className = 'debug-label';
+        labelCell.innerHTML = label;
+        labelCell.title = labelClean;  // Will be labelClean if exists, otherwise label
+        tr.appendChild(labelCell);
 
-                    valueCell = document.createElement('td');
-                    valueCell.className = 'debug-value';
-                    tr.appendChild(valueCell);
+        valueCell = document.createElement('td');
+        valueCell.className = 'debug-value';
+        tr.appendChild(valueCell);
 
-                    groupRefs.tableEl.appendChild(tr);
-                    groupRefs.rowMap.set(label, valueCell);
-                }
+        groupRefs.tableEl.appendChild(tr);
+        groupRefs.rowMap.set(label, valueCell);
+    }
 
-                const str = String(value ?? 'N/A');
-                if (valueCell.textContent !== str) {
-                    valueCell.textContent = str;
-                }
-            }
+    const str = String(value ?? 'N/A');
+    if (valueCell.textContent !== str) {
+        valueCell.textContent = str;
+    }
+}
 
             for (const [label, valueCell] of groupRefs.rowMap) {
                 if (!activeLabels.has(label)) {
@@ -284,10 +290,16 @@ class DebugUI {
             this.parent.inputHandler?.lastActiveTime ??
             null;
 
+        const localMouse = this.parent.inputHandler.getMouseWorldPosition();
+        const localTile = this.pixelToTile(localMouse.x, localMouse.y);
+        const mouseTile = this.pixelToTile(this.parent.mousePosX, this.parent.mousePosY);
+
         return [
             { label: "User Active", value: this.parent.userIsActive },
-            { label: "Local Mouse", value: `${this.parent.inputHandler.getMouseWorldPosition().x.toFixed(2)}px, ${this.parent.inputHandler.getMouseWorldPosition().y.toFixed(2)}px` },
+            { label: "Local Mouse", value: `${localMouse.x.toFixed(2)}px, ${localMouse.y.toFixed(2)}px` },
+            { label: "Local Mouse Tile", value: localTile ? `[${localTile.x}, ${localTile.y}]` : 'N/A' },
             { label: "Mouse", value: `${this.parent.mousePosX.toFixed(2)}px, ${this.parent.mousePosY.toFixed(2)}px` },
+            { label: "Mouse Tile", value: mouseTile ? `[${mouseTile.x}, ${mouseTile.y}]` : 'N/A' },
             {
                 label: "Last Input Time",
                 value: Number.isFinite(lastInputTime)
@@ -311,32 +323,34 @@ class DebugUI {
     }
 
 
-// Add defensive checks to getMapMessages
 getMapMessages() {
     const messages = [];
-    
-    // Check if gameMap exists
+
     if (this.parent && this.parent.gameMap) {
-        messages.push({ label: "Map ID", value: this.parent.gameMap.id });
-        messages.push({ label: "Map Name", value: this.parent.gameMap.displayName || 'Unknown' });
-        messages.push({ label: "Objects Count", value: (this.parent.gameMap.objects && this.parent.gameMap.objects.length) || 0 });
-        
-        // Check if dimensions exist
-        if (this.parent.gameMap.dimensions) {
-            const { width, height } = this.parent.gameMap.dimensions;
-            messages.push({ label: "Size", value: `${width} × ${height} px` });
+        const gm = this.parent.gameMap;
+        messages.push({ label: "Map ID", value: gm.id });
+        messages.push({ label: "Map Name", value: gm.displayName || 'Unknown' });
+
+        const cellSize = gm.gridSystem?.config?.cellSize;
+        if (cellSize) messages.push({ label: "Tile Size", value: `${cellSize}px` });
+
+        if (gm.dimensions) {
+            const { width, height } = gm.dimensions;
+            messages.push({ label: "Size", value: `${width} × ${height}px` });
+            if (cellSize) {
+                messages.push({ label: "Size (tiles)", value: `${Math.floor(width / cellSize)} × ${Math.floor(height / cellSize)}` });
+            }
         }
-        
-        // Check if particleSystem exists
-        if (this.parent.gameMap.particleSystem) {
-            messages.push({ label: "Particles", value: `${this.parent.gameMap.particleSystem.particles?.length || 0}` });
-            messages.push({ label: "Particle Emitters", value: `${this.parent.gameMap.particleSystem.emitters?.length || 0}` });
+
+        messages.push({ label: "Objects", value: (gm.objects && gm.objects.length) || 0 });
+
+        if (gm.particleSystem) {
+            messages.push({ label: "Particles", value: `${gm.particleSystem.particles?.length || 0}` });
+            messages.push({ label: "Particle Emitters", value: `${gm.particleSystem.emitters?.length || 0}` });
         }
     }
 
-    // Check if zoneManager exists and has zones
-    if (this.parent && this.parent.gameMap && this.parent.gameMap.zoneManager && 
-        this.parent.gameMap.zoneManager.zones && this.parent.gameMap.zoneManager.zones.size > 0) {
+    if (this.parent?.gameMap?.zoneManager?.zones?.size > 0) {
         messages.push(...this.getZoneDebugMessages());
     }
 
@@ -371,7 +385,8 @@ getZoneDebugMessages() {
 
                 const type = zone.type || 'zone';
                 messages.push({
-                    label: `${type} ${zoneId}`,
+                    label: `<span class="badge ${type}">${type}</span> ${zoneId}`,
+                    labelClean: `${type} ${zoneId}`,
                     value: names || '—'
                 });
             } catch {
@@ -387,11 +402,30 @@ getZoneDebugMessages() {
 
     getCameraMessages() {
         if (!this.parent.camera) return [];
-        
+
+        const cam = this.parent.camera;
+        const zoom = cam.zoomLevel;
+        const vp = this.parent.getContainerRect?.();
+        const vpW = vp?.width ?? 0;
+        const vpH = vp?.height ?? 0;
+
+        const worldLeft   = -cam.posX;
+        const worldTop    = -cam.posY;
+        const worldRight  = vpW / zoom - cam.posX;
+        const worldBottom = vpH / zoom - cam.posY;
+
+        const tl = this.pixelToTile(worldLeft, worldTop);
+        const br = this.pixelToTile(worldRight, worldBottom);
+        const visW = tl && br ? br.x - tl.x + 1 : null;
+        const visH = tl && br ? br.y - tl.y + 1 : null;
+
         return [
-            { label: "Camera Position", value: `${this.parent.camera.posX.toFixed(2)}px, ${this.parent.camera.posY.toFixed(2)}px` },
-            { label: "Zoom Level", value: this.parent.camera.zoomLevel.toFixed(2) },
-            { label: "Follow Mode", value: this.parent.camera.followMode }
+            { label: "Camera Position", value: `${cam.posX.toFixed(2)}px, ${cam.posY.toFixed(2)}px` },
+            { label: "Zoom Level", value: zoom.toFixed(2) },
+            { label: "Follow Mode", value: cam.followMode },
+            { label: "Viewport Size", value: `${vpW.toFixed(0)}×${vpH.toFixed(0)}px` },
+            { label: "Visible World", value: `${worldLeft.toFixed(0)},${worldTop.toFixed(0)} → ${worldRight.toFixed(0)},${worldBottom.toFixed(0)}px` },
+            { label: "Visible Tiles", value: tl && br ? `(${tl.x},${tl.y}) → (${br.x},${br.y}) [${visW}×${visH}]` : 'N/A' },
         ];
     }
 
@@ -399,7 +433,8 @@ getZoneDebugMessages() {
         const activeMyte = this.parent.activeMyte;
         if (!activeMyte) return [];
 
-
+        const posTile = this.pixelToTile(activeMyte.posX, activeMyte.posY);
+        const targetTile = this.pixelToTile(activeMyte.targetX, activeMyte.targetY);
 
         return [
             // State & Behavior
@@ -417,10 +452,12 @@ getZoneDebugMessages() {
 
             // Movement
             { label: "Position", value: `${activeMyte.posX.toFixed(2)}px, ${activeMyte.posY.toFixed(2)}px` },
+            { label: "Position Tile", value: posTile ? `[${posTile.x}, ${posTile.y}]` : 'N/A' },
             { label: "Target", value: `${activeMyte.targetX.toFixed(2)}px, ${activeMyte.targetY.toFixed(2)}px` },
+            { label: "Target Tile", value: targetTile ? `[${targetTile.x}, ${targetTile.y}]` : 'N/A' },
             { label: "Direction", value: activeMyte.direction },
-            { label: "Distance to Target", value: activeMyte.distanceFromTarget },
-            { label: "Distance from Mouse", value: activeMyte.distanceFromMouse },
+            { label: "Distance to Target", value: `${activeMyte.distanceFromTarget}px` },
+            { label: "Distance from Mouse", value: `${activeMyte.distanceFromMouse}px` },
             
             // Physics
             { label: "Falling", value: activeMyte.isFalling },
@@ -508,6 +545,12 @@ getZoneDebugMessages() {
             { label: "Local light", value: fmt(aiState.context?.localLightLevel) },
             ...candidateRows
         ];
+    }
+
+    pixelToTile(px, py) {
+        const cellSize = this.parent.gameMap?.gridSystem?.config?.cellSize;
+        if (!cellSize) return null;
+        return { x: Math.floor(px / cellSize), y: Math.floor(py / cellSize) };
     }
 
     getActiveEntitiesCount() {
@@ -634,6 +677,9 @@ drawDebugColliders() {
 
         // Check if debug element exists
         if (debugEnabled && this.debug) {
+            const now = performance.now();
+            if (now - this.lastDebugUpdate < this.debugUpdateInterval) return;
+            this.lastDebugUpdate = now;
             try {
                 this.updateDebug();
                 this.wasDebugEnabled = true;
