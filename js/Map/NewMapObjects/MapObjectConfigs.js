@@ -76,7 +76,12 @@ const TYPE_CONFIGS = {
 		walkable: true,
 		overlappable: true,
 		interactionType: 'mood_boost',
-		moodBoostAmount: 5
+		moodBoostAmount: 5,
+		ai: {
+			affordances: [
+				{ actionId: 'smell_flower', purpose: 'soothe' }
+			]
+		}
 	},
 
 	// ── Items ─────────────────────────────────────────────────────────────────
@@ -88,7 +93,19 @@ const TYPE_CONFIGS = {
 		renderPriority: 2,
 		interactionType: 'dance',
 		interactionRadius: 150,
-		animates: true
+		animates: true,
+		defaultPlaying: false,
+		moodBoostRadius: 180,
+		moodBoostAmount: 0.15,
+		boostCooldown: 1200,
+		startMoodBoostAmount: 4,
+		soundEffects: {
+			on: 'ui_select',
+			off: 'ui_close'
+		},
+		ai: {
+			musicSource: true
+		}
 	},
 
 	FOOD: {
@@ -136,6 +153,11 @@ const TYPE_CONFIGS = {
 			open: 'obj_chest_open',
 			close: 'obj_chest_close',
 			drop: 'ui_drop_item'
+		},
+		ai: {
+			affordances: [
+				{ actionId: 'inspect', purpose: 'inspect' }
+			]
 		}
 	},
 
@@ -389,6 +411,11 @@ const TYPE_CONFIGS = {
 		soundEffects: {
 			pickup: 'ui_pickup_item',
 			drop: 'ui_drop_item'
+		},
+		ai: {
+			affordances: [
+				{ actionId: 'nudge_ball', purpose: 'play' }
+			]
 		},
 		spriteConfig: {
 			spriteSheet: {
@@ -644,6 +671,11 @@ const TYPE_CONFIGS = {
 		restDuration: 5000,
 		restHealAmount: 10,
 		restMoodBoost: 15,
+		ai: {
+			affordances: [
+				{ actionId: 'rest_on_bed', purpose: 'rest' }
+			]
+		},
 		spriteConfig: {
 			spriteSheet: {
 				url: 'images/MapObjects/bed_default.png',
@@ -653,7 +685,7 @@ const TYPE_CONFIGS = {
 		directionConfigs: {
 			S: {
 				size: { width: 128, height: 256 },
-				collider: { width: 112, height: 240, offsetX: 8, offsetY: 8 },
+				collider: { width: 104, height: 168, offsetX: 12, offsetY: 68 },
 				interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: 256 },
 				transformStyle: '',
 				mytePosition: { xFactor: 0.5, yFactor: 0.75 },
@@ -661,7 +693,7 @@ const TYPE_CONFIGS = {
 			},
 			N: {
 				size: { width: 128, height: 256 },
-				collider: { width: 112, height: 240, offsetX: 8, offsetY: 8 },
+				collider: { width: 104, height: 168, offsetX: 12, offsetY: 20 },
 				interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: -64 },
 				transformStyle: 'scaleY(-1)',
 				mytePosition: { xFactor: 0.5, yFactor: 0.25 },
@@ -669,7 +701,7 @@ const TYPE_CONFIGS = {
 			},
 			E: {
 				size: { width: 256, height: 128 },
-				collider: { width: 240, height: 112, offsetX: 8, offsetY: 8 },
+				collider: { width: 168, height: 104, offsetX: 68, offsetY: 12 },
 				interactiveCollider: { width: 64, height: 192, offsetX: 256, offsetY: -32 },
 				transformStyle: 'rotate(90deg)',
 				mytePosition: { xFactor: 0.75, yFactor: 0.5 },
@@ -677,7 +709,7 @@ const TYPE_CONFIGS = {
 			},
 			W: {
 				size: { width: 256, height: 128 },
-				collider: { width: 240, height: 112, offsetX: 8, offsetY: 8 },
+				collider: { width: 168, height: 104, offsetX: 20, offsetY: 12 },
 				interactiveCollider: { width: 64, height: 192, offsetX: -64, offsetY: -32 },
 				transformStyle: 'rotate(-90deg)',
 				mytePosition: { xFactor: 0.25, yFactor: 0.5 },
@@ -689,10 +721,10 @@ const TYPE_CONFIGS = {
 			large_bed: {
 				size: { width: 192, height: 256 },
 				directionConfigs: {
-					S: { size: { width: 192, height: 256 }, collider: { width: 176, height: 240, offsetX: 8, offsetY: 8 } },
-					N: { size: { width: 192, height: 256 }, collider: { width: 176, height: 240, offsetX: 8, offsetY: 8 } },
-					E: { size: { width: 256, height: 192 }, collider: { width: 240, height: 176, offsetX: 8, offsetY: 8 } },
-					W: { size: { width: 256, height: 192 }, collider: { width: 240, height: 176, offsetX: 8, offsetY: 8 } }
+					S: { size: { width: 192, height: 256 }, collider: { width: 168, height: 176, offsetX: 12, offsetY: 68 } },
+					N: { size: { width: 192, height: 256 }, collider: { width: 168, height: 176, offsetX: 12, offsetY: 20 } },
+					E: { size: { width: 256, height: 192 }, collider: { width: 176, height: 168, offsetX: 68, offsetY: 12 } },
+					W: { size: { width: 256, height: 192 }, collider: { width: 176, height: 168, offsetX: 20, offsetY: 12 } }
 				}
 			},
 			bunk_bed: {

@@ -49,16 +49,28 @@
     "wanderRadius": 220,
     "homeRadius": 320,
     "objectSearchRadius": 280,
-    "socialRadius": 240
+    "socialRadius": 240,
+    "preferences": {
+      "music": 0.5,
+      "light": 0.5,
+      "harvest": 0.5,
+      "coziness": 0.5
+    }
   },
   "stats": {
     "health": 100,
     "mood": 100,
     "energy": 75,
     "speed": 1,
-    "moodDecayRate": 0.0005,
-    "energyDecayRate": 0.0005,
-    "energyRegenRate": 0.005,
+    "moodDecayRate": 0.00018,
+    "energyDecayRate": 0.00018,
+    "energyRegenRate": 0.0012,
+    "needSignalCooldown": 45000,
+    "behaviorDriveRate": 0.42,
+    "noteBehaviorScale": 0.55,
+    "moodSyncRate": 0.00016,
+    "fullChargeAnnounceCooldown": 30000,
+    "fullChargeResetThreshold": 0.94,
     "traits": {
       "neediness": 0,
       "activity": 0,

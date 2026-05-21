@@ -270,7 +270,7 @@ class MyteQueue {
     }
 
     addPlayFetch(throwable, throwStrength = 10) {
-        return this.add('play_fetch', { throwable, throwStrength });
+        return this.add('play_fetch', { target: throwable, throwable, throwStrength });
     }
 
     addRunAway(target, duration = -1) {

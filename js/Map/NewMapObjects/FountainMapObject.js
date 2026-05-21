@@ -73,4 +73,15 @@ class FountainMapObject extends BinaryStateAnimatedMapObject {
     update(deltaTime) {
         super.update(deltaTime);
     }
+
+    getAiAffordances(context = {}, actor = null) {
+        const affordances = super.getAiAffordances(context, actor).filter(affordance => affordance.actionId !== 'inspect');
+        affordances.push({ actionId: 'drink_fountain', purpose: 'soothe' });
+
+        if (this.canBeInspectedByAi()) {
+            affordances.push({ actionId: 'inspect', purpose: 'inspect' });
+        }
+
+        return affordances;
+    }
 }

@@ -364,6 +364,22 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         return items;
       }
 
+      getAiAffordances(context = {}, actor = null) {
+        const affordances = super.getAiAffordances(context, actor).filter(affordance => {
+          if ((affordance.actionId === 'inspect' || affordance.actionId === 'deep_inspect') &&
+              (this.state !== 'closed' || this.items.length === 0)) {
+            return false;
+          }
+          return true;
+        });
+
+        if (this.state === 'closed') {
+          affordances.push({ actionId: 'open_chest', purpose: 'open' });
+        }
+
+        return affordances;
+      }
+
 
 
 

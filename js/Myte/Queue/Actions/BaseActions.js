@@ -90,6 +90,52 @@ class MyteAction {
     }
 
     interrupt() {}
+
+    getQueueTitle() {
+        return this.constructor.metadata?.label || this.constructor.name.replace(/Action$/, '');
+    }
+
+    getQueueDescription() {
+        if (this.target) {
+            return this.getQueueTargetLabel(this.target);
+        }
+
+        return '';
+    }
+
+    getQueueTargetLabel(target = this.target) {
+        if (!target) {
+            return '';
+        }
+
+        if (typeof target.getDisplayName === 'function') {
+            return target.getDisplayName();
+        }
+
+        if (typeof target.name === 'string' && target.name.trim()) {
+            return target.name.trim();
+        }
+
+        if (Number.isFinite(target.x) && Number.isFinite(target.y) && target.posX == null) {
+            return `(${Math.round(target.x)}, ${Math.round(target.y)})`;
+        }
+
+        if (target.type || target.variant) {
+            const raw = String(target.variant || target.type || 'Target');
+            return raw
+                .toLowerCase()
+                .split(/[_\s-]+/)
+                .filter(Boolean)
+                .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+                .join(' ');
+        }
+
+        if (target.constructor?.name && target.constructor.name !== 'Object') {
+            return target.constructor.name.replace(/MapObject$/, '').replace(/Action$/, '');
+        }
+
+        return 'Target';
+    }
 }
 
 // Base class for actions that need to position the Myte relative to a target

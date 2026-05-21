@@ -94,6 +94,10 @@ ActionManager.registerActions([
 
     // Object interactions
     InspectAction,
+    DeepInspectAction,
+    InteractObjectAction,
+    RestOnBedAction,
+    NudgeBallAction,
     EatElementAction,
     OpenChestAction,
     SmellFlowerAction,

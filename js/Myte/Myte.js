@@ -131,6 +131,10 @@ class Myte {
 			directFallbackFrames: 0,
 			lastPlanAt: 0
 		};
+		this.colliderRecoveryState = {
+			overlapFrames: 0,
+			lastRecoverAt: 0
+		};
 		this._lastFinitePosition = { x: 0, y: 0 };
 		this._lastFiniteTarget = { x: 0, y: 0 };
 
@@ -937,6 +941,65 @@ class Myte {
 		return gridSystem.isEntityPositionValid?.(this, newX, newY) ?? true;
 	}
 
+	getOverlappingColliders() {
+		if (!this.checkForCollisions) {
+			return [];
+		}
+
+		const gridSystem = this.parent?.gameMap?.gridSystem;
+		if (!gridSystem || !this.parent?.checkCollision) {
+			return [];
+		}
+
+		return gridSystem.getPotentialColliders(this).filter(collider =>
+			collider &&
+			collider !== this &&
+			!collider.isPickedUp &&
+			this.parent.checkCollision(this, collider)
+		);
+	}
+
+	tryResolveColliderOverlap(force = false) {
+		if (this.isDragging || !this.checkForCollisions) {
+			this.colliderRecoveryState.overlapFrames = 0;
+			return false;
+		}
+
+		const overlaps = this.getOverlappingColliders();
+		if (overlaps.length === 0) {
+			this.colliderRecoveryState.overlapFrames = 0;
+			return false;
+		}
+
+		this.colliderRecoveryState.overlapFrames++;
+		const now = Date.now();
+		if (this.colliderRecoveryState.overlapFrames < (force ? 1 : 24)) {
+			return false;
+		}
+
+		if (!force && now - this.colliderRecoveryState.lastRecoverAt < 700) {
+			return false;
+		}
+
+		const gridSystem = this.parent?.gameMap?.gridSystem;
+		const safePosition = gridSystem?.findNearestValidPositionForEntity?.(this, this.posX, this.posY, 22)
+			?? gridSystem?.findNearestValidPositionForEntity?.(this, this.targetX, this.targetY, 22)
+			?? gridSystem?.findNearestValidPositionForEntity?.(this, this.getHomePosition().x, this.getHomePosition().y, 18)
+			?? null;
+
+		if (!safePosition) {
+			return false;
+		}
+
+		this.setPosition(safePosition.x, safePosition.y);
+		this.setTarget(safePosition.x, safePosition.y);
+		this.setSpritePosition(safePosition.x, safePosition.y);
+		this.physicsController?.reset?.();
+		this.colliderRecoveryState.overlapFrames = 0;
+		this.colliderRecoveryState.lastRecoverAt = now;
+		return true;
+	}
+
 	setSpritePosition(x, y, limit) { this.renderer?.setSpritePosition(x, y, limit); }
 	getZIndex(y)              { return this.renderer?.getZIndex(y) ?? 0; }
 	setZIndex(y)              { this.renderer?.setZIndex(y); }
@@ -1447,7 +1510,10 @@ class Myte {
 
 		// movement logic
 		this.doMovementLogic();
+		this.tryResolveColliderOverlap();
 		this.ensureFiniteCoordinates('update:end');
+
+		this.stats.update(deltaTime);
 
 		// Rate-limit animation/state updates to ~8fps using an accumulator
 		this._animElapsed = (this._animElapsed || 0) + deltaTime;
@@ -1456,7 +1522,6 @@ class Myte {
 			this._animElapsed -= frameInterval;
 			if (this._animElapsed >= frameInterval) this._animElapsed = 0;
 
-			this.stats.update(deltaTime);
 			this.updateFrame();
 
 			if (this.parent && this.parent.gameMap && this.parent.gameMap.gridSystem) {

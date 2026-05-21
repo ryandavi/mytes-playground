@@ -121,6 +121,8 @@ class QueueUI {
             targetId,
             repeat: item.repeat,
             name: item.constructor.name,
+            queueTitle: item.getQueueTitle?.() || item.constructor.metadata?.label || item.constructor.name,
+            queueDescription: item.getQueueDescription?.() || '',
             isCurrent: index === 0,
             hasProgress: !!(item.duration && item.duration > 0),
             expressionType: item.type || null
@@ -131,24 +133,16 @@ class QueueUI {
             element.className = `queue-item ${item.constructor.metadata?.category || ''}${index === 0 ? ' current' : ''}`;
 
             refs.number.textContent = `#${index + 1}`;
-            refs.name.textContent = item.constructor.name.replace('Action', '');
+            refs.name.textContent = item.getQueueTitle?.() || item.constructor.metadata?.label || item.constructor.name.replace('Action', '');
             refs.description.innerHTML = '';
             refs.status = null;
 
-            if (item.target || item.element) {
-                const arrow = document.createElement('span');
-                arrow.className = 'arrow';
-                arrow.textContent = '->';
-                refs.description.appendChild(arrow);
-
-                const target = document.createElement('span');
-                target.className = 'target';
-                if (item.target) {
-                    target.textContent = item.target.constructor.name;
-                } else if (item.element) {
-                    target.textContent = `${item.element.tagName}${item.target ? ` (${item.target.x?.toFixed(0) || 0}, ${item.target.y?.toFixed(0) || 0})` : ''}`;
-                }
-                refs.description.appendChild(target);
+            const queueDescription = item.getQueueDescription?.();
+            if (queueDescription) {
+                const detail = document.createElement('span');
+                detail.className = 'target';
+                detail.textContent = queueDescription;
+                refs.description.appendChild(detail);
             }
 
             if (item.constructor.name === 'ExpressionAction') {

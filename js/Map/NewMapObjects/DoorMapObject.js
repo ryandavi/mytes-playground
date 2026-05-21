@@ -247,6 +247,9 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
     }
 
     close(context = {}) {
+        if (!context.force && context.actor && this.isEntityInDoorway(context.actor, 16)) {
+            return false;
+        }
         if (!context.force && !this.isDoorwayClear()) return false;
         return super.close(context);
     }
@@ -263,6 +266,9 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
 
         const desiredState = this.isOpen ? 'closed' : 'open';
         const interact = () => {
+            if (desiredState === 'closed' && this.isEntityInDoorway(myte, 16)) {
+                return false;
+            }
             this.trySetOpenState(desiredState === 'open', {
                 triggeredBy: 'manual',
                 actor: myte,

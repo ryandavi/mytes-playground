@@ -322,13 +322,21 @@ class PlayFetchAction extends MyteAction {
             arcHeight: 100,
             pickupDistance: 10,
             catchDistance: 10,
+            roundTrips: 1,
             expressionType: 'excited',
             expressionDuration: 500
         }
     };
 
     static canPerform(selected, active) {
-        return active && selected instanceof MapObject && !active.queue.isCarrying();
+        return active &&
+               selected instanceof MapObject &&
+               selected.type?.toUpperCase?.() === 'BALL' &&
+               !active.queue.isCarrying();
+    }
+
+    static getRequiredOptions(selected) {
+        return { target: selected, throwable: selected };
     }
 
     constructor(myte, options) {
@@ -336,6 +344,7 @@ class PlayFetchAction extends MyteAction {
         this.throwPosition = null;
         this.throwTarget = null;
         this.throwProgress = 0;
+        this.completedTrips = 0;
     }
 
     start() {
@@ -423,6 +432,17 @@ class PlayFetchAction extends MyteAction {
         }
 
         if (this.myte.isAtTarget()) {
+            this.completedTrips++;
+
+            if (this.throwable) {
+                this.throwable.setPosition(this.throwPosition.x, this.throwPosition.y);
+                this.throwable.setSpritePosition(this.throwPosition.x, this.throwPosition.y);
+            }
+
+            if (this.completedTrips >= this.roundTrips) {
+                return true;
+            }
+
             this.throwProgress = 0;
             this.fetchState = FetchStates.THROW;
         }

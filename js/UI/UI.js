@@ -690,6 +690,9 @@ class ActionSidebarManager extends UIComponent {
     constructor(parent) {
         super(parent);
         this.actionControls = this.parent.containerWrapper.querySelector('#action-controls');
+        this.currentSelectedObject = null;
+        this.lastInfoRefreshAt = 0;
+        this.infoRefreshInterval = 250;
     }
 
     // Helper method to get category titles
@@ -717,6 +720,134 @@ class ActionSidebarManager extends UIComponent {
 
     }
 
+    update() {
+        if (!this.currentSelectedObject) {
+            return;
+        }
+
+        const now = performance.now();
+        if (now - this.lastInfoRefreshAt < this.infoRefreshInterval) {
+            return;
+        }
+
+        this.lastInfoRefreshAt = now;
+        this.renderOtherInfo(this.currentSelectedObject);
+    }
+
+    appendInfoRow(container, label, value, className = 'state-info') {
+        const info = document.createElement('div');
+        info.classList.add(className);
+        info.innerHTML = `${label}: ${value}`;
+        container.append(info);
+        return info;
+    }
+
+    getNeedUrgencyLabel(percent) {
+        if (percent >= 80) return 'Urgent';
+        if (percent >= 60) return 'High';
+        if (percent >= 35) return 'Medium';
+        return 'Low';
+    }
+
+    appendNeedMeter(container, label, percent, tone) {
+        const wrapper = document.createElement('div');
+        wrapper.classList.add('state-info', 'need-info');
+
+        const heading = document.createElement('div');
+        heading.classList.add('need-label');
+        heading.textContent = `${label}: ${percent}% ${tone}`;
+
+        const meter = document.createElement('progress');
+        meter.classList.add('need-meter');
+        meter.max = 100;
+        meter.value = percent;
+        meter.style.width = '100%';
+
+        wrapper.append(heading, meter);
+        container.append(wrapper);
+    }
+
+    renderMyteNeeds(otherInfo, myte) {
+        const snapshot = myte.ai?.getNeedsSnapshot?.({ live: true });
+        if (!snapshot) {
+            return;
+        }
+
+        const vitals = snapshot.vitals ?? {};
+        this.appendInfoRow(otherInfo, 'Energy', `${vitals.energy ?? 0}%`);
+        this.appendInfoRow(otherInfo, 'Mood', `${myte.stats.getMoodStatus()} (${vitals.mood ?? 0}%)`);
+        this.appendInfoRow(otherInfo, 'Fun', `${vitals.fun ?? 0}%`);
+        this.appendInfoRow(otherInfo, 'Comfort', `${vitals.comfort ?? 0}%`);
+        this.appendInfoRow(otherInfo, 'Confidence', `${vitals.confidence ?? 0}%`);
+
+        if (snapshot.topNeed) {
+            this.appendInfoRow(
+                otherInfo,
+                'Top Need',
+                `${snapshot.topNeed.label} (${snapshot.topNeed.percent}%)`
+            );
+        }
+
+        const needsTitle = document.createElement('div');
+        needsTitle.classList.add('state-info', 'needs-title');
+        needsTitle.textContent = 'Needs';
+        otherInfo.append(needsTitle);
+
+        snapshot.needs.slice(0, 5).forEach(need => {
+            this.appendNeedMeter(
+                otherInfo,
+                need.label,
+                need.percent,
+                this.getNeedUrgencyLabel(need.percent)
+            );
+        });
+
+        const environment = snapshot.environment ?? {};
+        this.appendInfoRow(otherInfo, 'Light Need', `${environment.lightNeed ?? 0}%`);
+        this.appendInfoRow(otherInfo, 'Music Need', `${environment.musicNeed ?? 0}%`);
+
+        if (snapshot.lastDecisionLabel) {
+            this.appendInfoRow(otherInfo, 'Last AI Choice', snapshot.lastDecisionLabel);
+        }
+    }
+
+    renderOtherInfo(selectedObject) {
+        const otherInfo = this.actionControls.querySelector('.other-info');
+        if (!otherInfo) {
+            return;
+        }
+
+        otherInfo.innerHTML = '';
+        if (!selectedObject) {
+            otherInfo.classList.remove('visible');
+            return;
+        }
+
+        const gridCoords = this.parent.parent.gameMap.gridSystem.worldToGrid(selectedObject.posX, selectedObject.posY);
+        this.appendInfoRow(otherInfo, 'Coords', `[${gridCoords.x}, ${gridCoords.y}]`, 'position-info');
+        this.appendInfoRow(
+            otherInfo,
+            'World',
+            `(${selectedObject.posX.toFixed(0)}, ${selectedObject.posY.toFixed(0)})`,
+            'position-info'
+        );
+
+        if (selectedObject instanceof DoorMapObject) {
+            this.appendInfoRow(otherInfo, 'State', selectedObject.isOpen ? 'Open' : 'Closed');
+        }
+
+        if (selectedObject instanceof Myte) {
+            this.renderMyteNeeds(otherInfo, selectedObject);
+        }
+
+        const debugInfo = selectedObject.getSelectionDebugInfo?.() || [];
+        debugInfo.forEach(({ label, value }) => {
+            this.appendInfoRow(otherInfo, label, value);
+        });
+
+        otherInfo.classList.add('visible');
+    }
+
     updateActions(selectedObject) {
         const selectedInfo = this.actionControls.querySelector('.selected-info');
         if (!selectedInfo) return;
@@ -724,8 +855,8 @@ class ActionSidebarManager extends UIComponent {
         const interactionType = selectedInfo.querySelector('.interaction-type .type');
         const targetType = selectedInfo.querySelector('.target-info .type');
         const targetName = selectedInfo.querySelector('.target-info .name');
-
-        const otherInfo = this.actionControls.querySelector('.other-info');
+        this.currentSelectedObject = selectedObject;
+        this.lastInfoRefreshAt = 0;
 
 
         // Remove all state classes first
@@ -733,37 +864,7 @@ class ActionSidebarManager extends UIComponent {
         this.emptyActionList();
 
         if (selectedObject) {
-
-            // make div in otherInfo
-            const positionInfo = document.createElement('div');
-            positionInfo.classList.add('position-info');
-
-            // convert to grid coordinates
-            let gridCoords = this.parent.parent.gameMap.gridSystem.worldToGrid(selectedObject.posX, selectedObject.posY);
-
-            // add position info
-            positionInfo.innerHTML =`Coords: [${gridCoords.x}, ${gridCoords.y}]`;
-            positionInfo.innerHTML += `<br>World: (${selectedObject.posX.toFixed(0)}, ${selectedObject.posY.toFixed(0)})`;
-            otherInfo.append(positionInfo);
-
-            // add state info
-            if(selectedObject instanceof DoorMapObject) {
-                const stateInfo = document.createElement('div');
-                stateInfo.classList.add('state-info');
-                stateInfo.innerHTML = `State: ${selectedObject.isOpen ? 'Open' : 'Closed'}`;
-                otherInfo.append(stateInfo);
-            }
-
-            const debugInfo = selectedObject.getSelectionDebugInfo?.() || [];
-            debugInfo.forEach(({ label, value }) => {
-                const info = document.createElement('div');
-                info.classList.add('state-info');
-                info.innerHTML = `${label}: ${value}`;
-                otherInfo.append(info);
-            });
-
-            // make visible
-            otherInfo.classList.add('visible');
+            this.renderOtherInfo(selectedObject);
 
             // Determine interaction type based on selected object
             if (selectedObject === this.parent.getActiveMyte()) {
@@ -782,7 +883,7 @@ class ActionSidebarManager extends UIComponent {
                 } else if (selectedObject instanceof MapObject) {
                     selectedInfo.classList.add('map-interaction');
                     targetType.textContent = "Object";
-                    targetName.textContent = selectedObject.type;
+                    targetName.textContent = selectedObject.getDisplayName?.() || selectedObject.type;
                 } else if (selectedObject instanceof Element) {
                     selectedInfo.classList.add('element-interaction');
                     targetType.textContent = "Element";
@@ -984,6 +1085,14 @@ class HUDManager extends UIComponent {
         };
     }
 
+    getEnergyLabel(ratio) {
+        if (ratio <= 0.1) return 'Critical';
+        if (ratio <= 0.3) return 'Low';
+        if (ratio <= 0.55) return 'Okay';
+        if (ratio <= 0.8) return 'Good';
+        return 'Full';
+    }
+
     update() {
         if (!this.hudElement) return;
         
@@ -1003,7 +1112,8 @@ class HUDManager extends UIComponent {
         }
 
         const mood = activeMyte.stats.getMoodStatus();
-        const energy = 'Full';
+        const energyRatio = activeMyte.stats.getEnergyRatio();
+        const energy = `${this.getEnergyLabel(energyRatio)} ${Math.round(energyRatio * 100)}%`;
         const currentAction = activeMyte.queue.getCurrentAction();
         const actionMetadata = currentAction?.constructor?.metadata;
         const moodEffectText = actionMetadata?.affectsMood
@@ -1215,6 +1325,7 @@ class UserInterface {
     update() {
         this.debug.update();
         this.cursorManager.update();
+        this.actionSidebarManager.update();
         this.hudManager.update();
     }
 

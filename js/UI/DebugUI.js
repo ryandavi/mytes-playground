@@ -203,6 +203,9 @@ getZoneDebugMessages() {
         let status = activeMyte.stats.getStatus();
         return [
             { label: "Mood", value: `${activeMyte.stats.mood.toFixed(1)} (${activeMyte.stats.getMoodStatus()})` },
+            { label: "Boredom", value: activeMyte.stats.boredom.toFixed(1) },
+            { label: "Comfort", value: activeMyte.stats.comfort.toFixed(1) },
+            { label: "Confidence", value: activeMyte.stats.confidence.toFixed(1) },
             { label: "Speed", value: activeMyte.stats.getSpeed() },
 
             {label: "Health", value: status.health},
@@ -214,6 +217,31 @@ getZoneDebugMessages() {
         ];
 
 
+    }
+
+    getMyteAiMessages() {
+        const activeMyte = this.parent.activeMyte;
+        const aiState = activeMyte?.ai?.getDebugState?.();
+        if (!activeMyte || !aiState) return [];
+
+        const needs = aiState.context?.needs || {};
+        const topCandidates = (aiState.candidates || [])
+            .slice(0, 3)
+            .map(candidate => `${candidate.label} (${candidate.score})`)
+            .join(', ');
+
+        return [
+            { label: "Last Decision", value: aiState.lastDecisionLabel || 'N/A' },
+            { label: "Need Rest", value: needs.rest ?? 'N/A' },
+            { label: "Need Social", value: needs.social ?? 'N/A' },
+            { label: "Need Enrichment", value: needs.enrichment ?? 'N/A' },
+            { label: "Need Play", value: needs.play ?? 'N/A' },
+            { label: "Need Comfort", value: needs.comfort ?? 'N/A' },
+            { label: "Light Need", value: aiState.context?.lightNeed ?? 'N/A' },
+            { label: "Music Need", value: aiState.context?.musicNeed ?? 'N/A' },
+            { label: "Local Light", value: aiState.context?.localLightLevel ?? 'N/A' },
+            { label: "Candidates", value: topCandidates || 'N/A' }
+        ];
     }
 
     getActiveEntitiesCount() {
@@ -310,7 +338,8 @@ drawDebugColliders() {
             { name: "Map", messages: this.getMapMessages() },
             { name: "Camera", messages: this.getCameraMessages() },
             { name: "Myte", messages: this.getMyteMessages() },
-            { name: "Myte Stats", messages: this.getMyteStats() }
+            { name: "Myte Stats", messages: this.getMyteStats() },
+            { name: "Myte AI", messages: this.getMyteAiMessages() }
         ];
 
         this.drawDebugColliders();

@@ -100,6 +100,24 @@ class AStarMoveAction extends MyteAction {
         this._prevPosY = null;
     }
 
+    getQueueTitle() {
+        const target = this.target;
+        if (target?.posX != null || (target?.type && target?.variant)) {
+            return `Move To ${this.getQueueTargetLabel(target)}`;
+        }
+
+        return 'Move To Point';
+    }
+
+    getQueueDescription() {
+        const target = this.getTargetPosition();
+        if (!target) {
+            return '';
+        }
+
+        return `(${Math.round(target.x)}, ${Math.round(target.y)})`;
+    }
+
     getTargetPosition() {
         if (!this.target) return null;
 
@@ -300,6 +318,8 @@ class GoToObjectAction extends PositionableAction {
         affectsMood: false,
         defaultOptions: {
             // approachConfig: null — pass a string key or partial config to override target's default
+            allowStuckSuccess: true,
+            stuckCompletionDistance: 18
         }
     };
 
@@ -314,6 +334,15 @@ class GoToObjectAction extends PositionableAction {
 
     constructor(myte, options) {
         super(myte, { ...GoToObjectAction.metadata.defaultOptions, ...options });
+    }
+
+    getQueueTitle() {
+        const targetLabel = this.getQueueTargetLabel(this.target);
+        return targetLabel ? `${this.constructor.metadata.label} ${targetLabel}` : this.constructor.metadata.label;
+    }
+
+    getQueueDescription() {
+        return '';
     }
 
     static canPerform(selected, active) {
@@ -548,6 +577,31 @@ class GoToObjectAction extends PositionableAction {
         this.myte.faceTowardsPoint(this.targetCenter.x, this.targetCenter.y, 1);
     }
 
+    getTargetColliderGap() {
+        if (!this.target) return Infinity;
+
+        if (typeof this.target.getColliderGapTo === 'function') {
+            return this.target.getColliderGapTo(this.myte);
+        }
+
+        const myteRect = {
+            left: this.myte.posX + (this.myte.collider?.offsetX ?? 0),
+            top: this.myte.posY + (this.myte.collider?.offsetY ?? 0),
+            right: this.myte.posX + (this.myte.collider?.offsetX ?? 0) + (this.myte.collider?.width ?? this.myte.size.width),
+            bottom: this.myte.posY + (this.myte.collider?.offsetY ?? 0) + (this.myte.collider?.height ?? this.myte.size.height)
+        };
+        const targetRect = {
+            left: this.target.posX + (this.target.collider?.offsetX ?? 0),
+            top: this.target.posY + (this.target.collider?.offsetY ?? 0),
+            right: this.target.posX + (this.target.collider?.offsetX ?? 0) + (this.target.collider?.width ?? this.target.size?.width ?? 0),
+            bottom: this.target.posY + (this.target.collider?.offsetY ?? 0) + (this.target.collider?.height ?? this.target.size?.height ?? 0)
+        };
+
+        const gapX = Math.max(0, myteRect.left - targetRect.right, targetRect.left - myteRect.right);
+        const gapY = Math.max(0, myteRect.top - targetRect.bottom, targetRect.top - myteRect.bottom);
+        return Math.hypot(gapX, gapY);
+    }
+
 
     update() {
         const now = performance.now();
@@ -565,15 +619,10 @@ class GoToObjectAction extends PositionableAction {
         this._stuckFrames = moved < 0.1 ? this._stuckFrames + 1 : 0;
 
         if (this._stuckFrames > 45) {
-            const finalTarget = this.targetPoints?.length
-                ? this.targetPoints[this.targetPoints.length - 1]
-                : this.targetPos;
-            if (finalTarget) {
-                const dist = Math.hypot(this.myte.posX - finalTarget.x, this.myte.posY - finalTarget.y);
-                if (dist < 80) {
-                    this.faceTarget();
-                    return true;
-                }
+            const colliderGap = this.getTargetColliderGap();
+            if (this.allowStuckSuccess !== false && colliderGap <= this.stuckCompletionDistance) {
+                this.faceTarget();
+                return true;
             }
             this._stuckFrames = 0;
             this.buildApproachPlan();
@@ -636,6 +685,140 @@ class FollowMouseAction extends MyteAction {
     }
 }
 
+// Shared safety helpers for legacy patterned movement actions.
+class PatternMovementAction extends PositionableAction {
+    constructor(myte, options = {}) {
+        super(myte, options);
+        this._patternLastPos = null;
+        this._patternStuckFrames = 0;
+        this._patternRecoveryCount = 0;
+    }
+
+    start() {
+        super.start();
+        this.resetPatternMovementState();
+    }
+
+    resetPatternMovementState() {
+        this._patternLastPos = { x: this.myte.posX, y: this.myte.posY };
+        this._patternStuckFrames = 0;
+        this._patternRecoveryCount = 0;
+    }
+
+    notePatternProgress() {
+        this._patternLastPos = { x: this.myte.posX, y: this.myte.posY };
+        this._patternStuckFrames = 0;
+        this._patternRecoveryCount = 0;
+    }
+
+    trackPatternMovementProgress(minDistance = 0.2) {
+        if (!this._patternLastPos) {
+            this._patternLastPos = { x: this.myte.posX, y: this.myte.posY };
+            return 0;
+        }
+
+        const moved = Math.hypot(
+            this.myte.posX - this._patternLastPos.x,
+            this.myte.posY - this._patternLastPos.y
+        );
+
+        this._patternLastPos = { x: this.myte.posX, y: this.myte.posY };
+
+        if (moved >= minDistance) {
+            this._patternStuckFrames = 0;
+            if (moved >= 0.45) {
+                this._patternRecoveryCount = Math.max(0, this._patternRecoveryCount - 1);
+            }
+        } else {
+            this._patternStuckFrames++;
+        }
+
+        return this._patternStuckFrames;
+    }
+
+    resolvePatternTarget(x, y, maxRadius = this.safeTargetRadius ?? 10) {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            return null;
+        }
+
+        const clamped = this.myte.parent?.clampEntityPosition?.(this.myte, x, y, {
+            rect: this.myte.getRect?.() ?? null
+        }) ?? { x, y };
+        const gridSystem = this.myte.parent?.gameMap?.gridSystem;
+        return gridSystem?.findNearestValidPositionForEntity?.(
+            this.myte,
+            clamped.x,
+            clamped.y,
+            maxRadius
+        ) ?? clamped;
+    }
+
+    setPatternTarget(x, y, { maxRadius = this.safeTargetRadius ?? 10 } = {}) {
+        const safe = this.resolvePatternTarget(x, y, maxRadius);
+        if (!safe) {
+            return false;
+        }
+
+        this.myte.setTarget(safe.x, safe.y);
+        return true;
+    }
+
+    getResolvedPatternCandidates(candidates, { maxRadius = this.safeTargetRadius ?? 10 } = {}) {
+        const seen = new Set();
+        const resolved = [];
+
+        for (const candidate of candidates) {
+            const safe = this.resolvePatternTarget(candidate.x, candidate.y, maxRadius);
+            if (!safe) {
+                continue;
+            }
+
+            const key = `${Math.round(safe.x)},${Math.round(safe.y)}`;
+            if (seen.has(key)) {
+                continue;
+            }
+
+            seen.add(key);
+            resolved.push(safe);
+        }
+
+        resolved.sort((a, b) =>
+            Math.hypot(a.x - this.myte.posX, a.y - this.myte.posY) -
+            Math.hypot(b.x - this.myte.posX, b.y - this.myte.posY)
+        );
+
+        return resolved;
+    }
+
+    handlePatternStuck() {
+        const threshold = this.stuckThresholdFrames ?? 40;
+        if (this.trackPatternMovementProgress() < threshold) {
+            return false;
+        }
+
+        this._patternStuckFrames = 0;
+        this._patternRecoveryCount++;
+
+        const recovered = this.recoverFromStuck?.(this._patternRecoveryCount) === true;
+        if (recovered) {
+            return false;
+        }
+
+        if (this.failOnUnrecoverableStuck === false) {
+            this._patternRecoveryCount = 0;
+            return false;
+        }
+
+        if (this._patternRecoveryCount < (this.maxPatternRecoveries ?? 4)) {
+            return false;
+        }
+
+        this.myte.queue.addExpression('surprise', 24, 1);
+        this.myte.queue.addIdle(18);
+        return true;
+    }
+}
+
 // Follow another Myte or MapObject continuously
 class FollowObjectAction extends PositionableAction {
     static metadata = {
@@ -690,7 +873,7 @@ class FollowObjectAction extends PositionableAction {
 }
 
 // Run laps around an object
-class RunLapsAction extends PositionableAction {
+class RunLapsAction extends PatternMovementAction {
     static metadata = {
         id: 'run_laps',
         label: 'Run Laps',
@@ -705,7 +888,11 @@ class RunLapsAction extends PositionableAction {
         moodEffect: 5,
         defaultOptions: {
             repeat: 5,
-            currentTargetIndex: 0
+            currentTargetIndex: 0,
+            lapGap: 12,
+            safeTargetRadius: 14,
+            stuckThresholdFrames: 42,
+            maxPatternRecoveries: 4
         }
     };
 
@@ -715,27 +902,65 @@ class RunLapsAction extends PositionableAction {
 
     constructor(myte, options) {
         super(myte, { ...RunLapsAction.metadata.defaultOptions, ...options });
+        this._lapGap = this.lapGap;
     }
 
     start() {
         super.start();
-
-        const targetRect = this.getRect(this.target);
-        const myteRect   = this.myte.getRect();
-
-        this.targetPoints = [
-            this.calculatePosition(myteRect, targetRect, 'left',   { gap: -5, align: 'bottom-edge' }),
-            this.calculatePosition(myteRect, targetRect, 'right',  { gap: -5, align: 'bottom-edge' }),
-            this.calculatePosition(myteRect, targetRect, 'right',  { gap: -5, align: 'top-edge' }),
-            this.calculatePosition(myteRect, targetRect, 'left',   { gap: -5, align: 'top-edge' })
-        ];
-
-        this.myte.setTarget(this.targetPoints[this.currentTargetIndex].x, this.targetPoints[this.currentTargetIndex].y);
+        this.currentTargetIndex = 0;
         this.myte.reset();
+        this.buildLapTargets();
+    }
+
+    buildLapTargets() {
+        if (!this.target) {
+            this.targetPoints = [];
+            return false;
+        }
+
+        const targetRect = this.getTargetRect(this.target, 'collider');
+        const myteRect = this.myte.getRect();
+        if (!targetRect || !myteRect) {
+            this.targetPoints = [];
+            return false;
+        }
+
+        const candidates = [
+            this.calculatePosition(myteRect, targetRect, 'left', { gap: this._lapGap, align: 'bottom-edge' }),
+            this.calculatePosition(myteRect, targetRect, 'right', { gap: this._lapGap, align: 'bottom-edge' }),
+            this.calculatePosition(myteRect, targetRect, 'right', { gap: this._lapGap, align: 'top-edge' }),
+            this.calculatePosition(myteRect, targetRect, 'left', { gap: this._lapGap, align: 'top-edge' })
+        ];
+        const resolved = this.getResolvedPatternCandidates(candidates, {
+            maxRadius: Math.max(this.safeTargetRadius ?? 14, this._lapGap + 6)
+        });
+
+        this.targetPoints = resolved;
+        if (!this.targetPoints.length) {
+            return false;
+        }
+
+        this.currentTargetIndex %= this.targetPoints.length;
+        const targetPoint = this.targetPoints[this.currentTargetIndex];
+        this.myte.setTarget(targetPoint.x, targetPoint.y);
+        return true;
+    }
+
+    recoverFromStuck() {
+        this._lapGap = Math.min(this._lapGap + 6, 44);
+        if (this.targetPoints?.length) {
+            this.currentTargetIndex = (this.currentTargetIndex + 1) % this.targetPoints.length;
+        }
+        return this.buildLapTargets();
     }
 
     update() {
+        if (!this.target || !this.targetPoints?.length) {
+            return true;
+        }
+
         if (this.myte.isAtTarget()) {
+            this.notePatternProgress();
             this.currentTargetIndex = (this.currentTargetIndex + 1) % this.targetPoints.length;
 
             if (this.currentTargetIndex === 0) {
@@ -743,15 +968,17 @@ class RunLapsAction extends PositionableAction {
                 if (this.repeat <= 0) return true;
             }
 
-            this.myte.setTarget(this.targetPoints[this.currentTargetIndex].x, this.targetPoints[this.currentTargetIndex].y);
+            const nextTarget = this.targetPoints[this.currentTargetIndex];
+            this.myte.setTarget(nextTarget.x, nextTarget.y);
         }
+
         this.myte.moveTowardsTarget();
-        return false;
+        return this.handlePatternStuck();
     }
 }
 
 // Move in a circular pattern
-class CircleAction extends MyteAction {
+class CircleAction extends PatternMovementAction {
     static metadata = {
         id: 'circle',
         label: 'Circle',
@@ -768,7 +995,10 @@ class CircleAction extends MyteAction {
             radius: 50,
             speed: 0.01,
             centerX: null,
-            centerY: null
+            centerY: null,
+            safeTargetRadius: 12,
+            stuckThresholdFrames: 32,
+            maxPatternRecoveries: 5
         }
     };
 
@@ -789,22 +1019,46 @@ class CircleAction extends MyteAction {
 
     start() {
         super.start();
+        const safeCenter = this.resolvePatternTarget(this.centerX, this.centerY, Math.max(this.safeTargetRadius ?? 12, 12));
+        if (safeCenter) {
+            this.centerX = safeCenter.x;
+            this.centerY = safeCenter.y;
+        }
+    }
+
+    recoverFromStuck(recoveryCount) {
+        this.centerX = this.myte.posX;
+        this.centerY = this.myte.posY;
+        this.radius = Math.max(Math.round(this.radius * 0.78), 18);
+        if (recoveryCount % 2 === 0) {
+            this.speed *= -1;
+        }
+
+        const targetX = this.centerX + Math.cos(this.angle + this.speed) * this.radius;
+        const targetY = this.centerY + Math.sin(this.angle + this.speed) * this.radius;
+        return this.setPatternTarget(targetX, targetY, {
+            maxRadius: Math.max(this.safeTargetRadius ?? 12, Math.round(this.radius * 0.8))
+        });
     }
 
     update() {
         this.angle += this.speed;
-        this.myte.setTarget(
+        this.setPatternTarget(
             this.centerX + Math.cos(this.angle) * this.radius,
-            this.centerY + Math.sin(this.angle) * this.radius
+            this.centerY + Math.sin(this.angle) * this.radius,
+            { maxRadius: Math.max(this.safeTargetRadius ?? 12, Math.round(this.radius * 0.8)) }
         );
         this.myte.moveTowardsTarget();
         this.currentDuration--;
+        if (this.handlePatternStuck()) {
+            return true;
+        }
         return this.currentDuration <= 0;
     }
 }
 
 // Move in a zigzag pattern
-class ZigzagAction extends MyteAction {
+class ZigzagAction extends PatternMovementAction {
     static metadata = {
         id: 'zigzag',
         label: 'Zigzag',
@@ -820,7 +1074,10 @@ class ZigzagAction extends MyteAction {
         defaultOptions: {
             amplitude: 100,
             frequency: 0.05,
-            direction: { x: 1, y: 0 }
+            direction: { x: 1, y: 0 },
+            safeTargetRadius: 12,
+            stuckThresholdFrames: 34,
+            maxPatternRecoveries: 4
         }
     };
 
@@ -830,6 +1087,12 @@ class ZigzagAction extends MyteAction {
 
     constructor(myte, options) {
         super(myte, { ...ZigzagAction.metadata.defaultOptions, duration: ZigzagAction.metadata.defaultDuration, ...options });
+        const direction = this.direction ?? { x: 1, y: 0 };
+        const magnitude = Math.hypot(direction.x ?? 0, direction.y ?? 0) || 1;
+        this.direction = {
+            x: (direction.x ?? 1) / magnitude,
+            y: (direction.y ?? 0) / magnitude
+        };
         this.startX = myte.posX;
         this.startY = myte.posY;
         this.distance = 0;
@@ -837,17 +1100,45 @@ class ZigzagAction extends MyteAction {
 
     start() {
         super.start();
+        this.startX = this.myte.posX;
+        this.startY = this.myte.posY;
+        this.distance = 0;
+    }
+
+    recoverFromStuck(recoveryCount) {
+        this.startX = this.myte.posX;
+        this.startY = this.myte.posY;
+        this.distance = 0;
+        this.amplitude = Math.max(Math.round(this.amplitude * 0.76), 24);
+
+        if (recoveryCount % 2 === 0) {
+            this.direction = {
+                x: this.direction.y || 1,
+                y: -this.direction.x || 0
+            };
+        }
+
+        const zigzag = Math.sin(this.distance * this.frequency) * this.amplitude;
+        const targetX = this.startX + this.distance * this.direction.x - zigzag * this.direction.y;
+        const targetY = this.startY + this.distance * this.direction.y + zigzag * this.direction.x;
+        return this.setPatternTarget(targetX, targetY, {
+            maxRadius: Math.max(this.safeTargetRadius ?? 12, Math.round(this.amplitude * 0.35))
+        });
     }
 
     update() {
-        this.distance += 1;
+        this.distance += Math.max(this.myte.stats?.getSpeed?.() ?? 1, 1);
         const zigzag = Math.sin(this.distance * this.frequency) * this.amplitude;
-        this.myte.setTarget(
+        this.setPatternTarget(
             this.startX + this.distance * this.direction.x - zigzag * this.direction.y,
-            this.startY + this.distance * this.direction.y + zigzag * this.direction.x
+            this.startY + this.distance * this.direction.y + zigzag * this.direction.x,
+            { maxRadius: Math.max(this.safeTargetRadius ?? 12, Math.round(this.amplitude * 0.35)) }
         );
         this.myte.moveTowardsTarget();
         this.currentDuration--;
+        if (this.handlePatternStuck()) {
+            return true;
+        }
         return this.currentDuration <= 0;
     }
 }

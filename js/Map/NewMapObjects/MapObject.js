@@ -83,6 +83,21 @@ class MapObject {
 		return !!this.getShadowConfig();
 	}
 
+	getDisplayName() {
+		const explicitName = this.getConfig('displayName', null);
+		if (typeof explicitName === 'string' && explicitName.trim()) {
+			return explicitName.trim();
+		}
+
+		const raw = String(this.variant || this.type || 'Object');
+		return raw
+			.toLowerCase()
+			.split(/[_\s-]+/)
+			.filter(Boolean)
+			.map(part => part.charAt(0).toUpperCase() + part.slice(1))
+			.join(' ');
+	}
+
 	// ── Simulation contract ───────────────────────────────────────────────────
 
 	// Override to return true for autonomous objects (AI, physics) that must
@@ -199,6 +214,66 @@ class MapObject {
 
 	getInteractionRadius(defaultValue = 100) {
 		return this.getConfig('interactionRadius', defaultValue);
+	}
+
+	getAiAffordances(context = {}, actor = null) {
+		const configuredAffordances = this.getConfig('ai.affordances', []);
+		const affordances = configuredAffordances.map(entry =>
+			typeof entry === 'string'
+				? { actionId: entry }
+				: { ...entry }
+		);
+		const interactionType = this.getConfig('interactionType');
+
+		if (this.isReadyToHarvest?.()) {
+			affordances.push({ actionId: 'harvest', purpose: 'harvest' });
+		} else if (this.canWater?.() && (context.energy ?? 1) > 0.4) {
+			affordances.push({ actionId: 'water_plant', purpose: 'tend' });
+		}
+
+		if ((this.type?.toUpperCase?.() === 'FOOD' || this.getConfig('consumable', false)) && !actor?.queue?.isCarrying?.()) {
+			affordances.push({ actionId: 'eat_element', purpose: 'consume' });
+		}
+
+		if (interactionType === 'light' && typeof this.isEnabled === 'function' && !this.isEnabled()) {
+			affordances.push({ actionId: 'interact_object', purpose: 'light_on' });
+		} else if (interactionType === 'dance' && this.isMusicSource?.() && !this.isActiveMusicSource?.()) {
+			affordances.push({ actionId: 'interact_object', purpose: 'start_music' });
+		} else if (interactionType === 'toggle') {
+			affordances.push({ actionId: 'interact_object', purpose: 'toggle' });
+		}
+
+		if (this.canBeInspectedByAi()) {
+			affordances.push({ actionId: 'inspect', purpose: 'inspect' });
+		}
+
+		if (
+			this.canBeInspectedByAi() &&
+			(context.curiosity ?? 0) > 0.78 &&
+			(context.boredom ?? 0) > 0.42 &&
+			(context.getNoveltyScore?.(this) ?? 0.4) > 0.55
+		) {
+			affordances.push({ actionId: 'deep_inspect', purpose: 'inspect' });
+		}
+
+		return affordances.filter((affordance, index, list) => {
+			const key = `${affordance.actionId}:${affordance.purpose ?? ''}`;
+			return list.findIndex(item => `${item.actionId}:${item.purpose ?? ''}` === key) === index;
+		});
+	}
+
+	canBeInspectedByAi() {
+		return this.getConfig('canInspect', true) !== false &&
+			this.getConfig('interactionType') !== 'teleport' &&
+			this.type?.toUpperCase?.() !== 'PORTAL';
+	}
+
+	isMusicSource() {
+		return this.getConfig('ai.musicSource', false) === true;
+	}
+
+	isActiveMusicSource() {
+		return false;
 	}
 
 	getDistanceTo(target) {
@@ -493,14 +568,27 @@ class MapObject {
 				if (this.getConfig('snapToGrid', false)) this.snapToGrid();
 				const isValid = this.checkDropValidity(this.posX, this.posY);
 				if (!isValid) {
-					this.posX = this._dragOriginX;
-					this.posY = this._dragOriginY;
-					if (this._dragOriginDirection !== null &&
-						this._dragOriginDirection !== this.getConfig('facingDirection', null)) {
-						this.applyFacingDirection(this._dragOriginDirection);
+					const safePosition = this.gameMap?.gridSystem?.findNearestValidPositionForEntity?.(
+						this,
+						this.posX,
+						this.posY,
+						12
+					);
+					if (safePosition) {
+						this.posX = safePosition.x;
+						this.posY = safePosition.y;
+						this.updatePosition();
+						this.playConfiguredSound?.('drop');
+					} else {
+						this.posX = this._dragOriginX;
+						this.posY = this._dragOriginY;
+						if (this._dragOriginDirection !== null &&
+							this._dragOriginDirection !== this.getConfig('facingDirection', null)) {
+							this.applyFacingDirection(this._dragOriginDirection);
+						}
+						this.updatePosition();
+						this.playConfiguredSound?.('drop_error');
 					}
-					this.updatePosition();
-					this.playConfiguredSound?.('drop_error');
 				} else {
 					this.playConfiguredSound?.('drop');
 				}
@@ -814,8 +902,11 @@ class MapObject {
 		const snappedPos = this.getConfig('snapToGrid', false)
 			? gridSystem.snapToGrid(this.posX, this.posY, this.size.width, this.size.height, gridSystem.config.cellSize)
 			: { x: this.posX, y: this.posY };
-		this._dropTargetEl.style.left = `${snappedPos.x}px`;
-		this._dropTargetEl.style.top = `${snappedPos.y}px`;
+		const bounds = this.getDropValidationBounds(snappedPos.x, snappedPos.y);
+		this._dropTargetEl.style.width = `${bounds.width}px`;
+		this._dropTargetEl.style.height = `${bounds.height}px`;
+		this._dropTargetEl.style.left = `${bounds.x}px`;
+		this._dropTargetEl.style.top = `${bounds.y}px`;
 
 		const isValid = this.checkDropValidity(snappedPos.x, snappedPos.y);
 		this._dropTargetEl.classList.toggle('valid-drop', isValid);
@@ -827,15 +918,34 @@ class MapObject {
 		if (this._dropTargetEl) this._dropTargetEl.style.display = 'none';
 	}
 
+	getDropValidationBounds(x = this.posX, y = this.posY) {
+		if (this.collider) {
+			return {
+				x: x + (this.collider.offsetX ?? 0),
+				y: y + (this.collider.offsetY ?? 0),
+				width: this.collider.width ?? this.size.width,
+				height: this.collider.height ?? this.size.height
+			};
+		}
+
+		return {
+			x,
+			y,
+			width: this.size.width,
+			height: this.size.height
+		};
+	}
+
 	checkDropValidity(x, y) {
 		const gridSystem = this.gameMap?.gridSystem;
 		if (!gridSystem) return true;
 
 		const thisOverlappable = this.getConfig('overlappable', false);
-		const startGridX = Math.floor(x / gridSystem.config.cellSize);
-		const startGridY = Math.floor(y / gridSystem.config.cellSize);
-		const endGridX = Math.ceil((x + this.size.width) / gridSystem.config.cellSize);
-		const endGridY = Math.ceil((y + this.size.height) / gridSystem.config.cellSize);
+		const bounds = this.getDropValidationBounds(x, y);
+		const startGridX = Math.floor(bounds.x / gridSystem.config.cellSize);
+		const startGridY = Math.floor(bounds.y / gridSystem.config.cellSize);
+		const endGridX = Math.ceil((bounds.x + bounds.width) / gridSystem.config.cellSize);
+		const endGridY = Math.ceil((bounds.y + bounds.height) / gridSystem.config.cellSize);
 
 		for (let gx = startGridX; gx < endGridX; gx++) {
 			for (let gy = startGridY; gy < endGridY; gy++) {

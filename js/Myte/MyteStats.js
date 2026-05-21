@@ -27,10 +27,28 @@ class MyteStats {
         this.energy = Math.max(this.minEnergy, Math.min(this.maxEnergy, statConfig.energy ?? 75));
         this.energyDecayRate = statConfig.energyDecayRate ?? 0.0005;
         this.energyRegenRate = statConfig.energyRegenRate ?? 0.005;
+        this.fullChargeAnnounceCooldown = statConfig.fullChargeAnnounceCooldown ?? 30000;
+        this.fullChargeResetThreshold = statConfig.fullChargeResetThreshold ?? 0.94;
+        this.lastFullChargeAnnouncementAt = 0;
+        this.hasAnnouncedFullCharge = this.energy >= this.maxEnergy;
+
+        // Behavioral drives
+        this.minBoredom = 0;
+        this.maxBoredom = 100;
+        this.boredom = Math.max(this.minBoredom, Math.min(this.maxBoredom, statConfig.boredom ?? 28));
+
+        this.minComfort = 0;
+        this.maxComfort = 100;
+        this.comfort = Math.max(this.minComfort, Math.min(this.maxComfort, statConfig.comfort ?? 72));
+
+        this.minConfidence = 0;
+        this.maxConfidence = 100;
+        this.confidence = Math.max(this.minConfidence, Math.min(this.maxConfidence, statConfig.confidence ?? 58));
 
         this.batteryLevel = -1;
         this.batteryVisible = false;
         this.batteryHideTimeout = null;
+        this.chargingClassTimeout = null;
         this.batteryThresholds = [
             { name: 'empty',  threshold: 0 },
             { name: 'low',    threshold: 30 },
@@ -40,10 +58,17 @@ class MyteStats {
 
         this.isRapidCharging = false;
         this.rapidChargingThreshold = 0.01;
+        this.exhaustionRecoveryThreshold = statConfig.exhaustionRecoveryThreshold ?? 12;
+        this.isExhausted = false;
         this.lastEnergyChange = 0;
         this.lastBatterySound = null;
         this.soundCooldown = 8000;
         this.lastSoundTime = {};
+        this.needSignalCooldown = statConfig.needSignalCooldown ?? 45000;
+        this.lastNeedSignalTimes = {};
+        this.behaviorDriveRate = statConfig.behaviorDriveRate ?? 0.42;
+        this.noteBehaviorScale = statConfig.noteBehaviorScale ?? 0.55;
+        this.moodSyncRate = statConfig.moodSyncRate ?? 0.00016;
 
 
         const traitConfig = statConfig.traits || {};
@@ -106,6 +131,18 @@ class MyteStats {
         this.handleMoodEffects();
     }
 
+    updateBoredom(amount) {
+        this.boredom = Math.max(this.minBoredom, Math.min(this.maxBoredom, this.boredom + amount));
+    }
+
+    updateComfort(amount) {
+        this.comfort = Math.max(this.minComfort, Math.min(this.maxComfort, this.comfort + amount));
+    }
+
+    updateConfidence(amount) {
+        this.confidence = Math.max(this.minConfidence, Math.min(this.maxConfidence, this.confidence + amount));
+    }
+
     handleMoodEffects() {
         if (this.mood <= 20) {
             if (Math.random() < 0.1) {
@@ -152,6 +189,18 @@ class MyteStats {
 
     getHealthRatio() {
         return this.health / this.maxHealth;
+    }
+
+    getBoredomRatio() {
+        return this.boredom / this.maxBoredom;
+    }
+
+    getComfortRatio() {
+        return this.comfort / this.maxComfort;
+    }
+
+    getConfidenceRatio() {
+        return this.confidence / this.maxConfidence;
     }
 
     getTrait(name) {
@@ -209,6 +258,26 @@ class MyteStats {
         return this.energy > 0;
     }
 
+    restoreEnergy(amount) {
+        const previousEnergy = this.energy;
+        this.energy = Math.max(this.minEnergy, Math.min(this.maxEnergy, this.energy + amount));
+
+        if (this.energy > this.exhaustionRecoveryThreshold) {
+            this.clearExhaustionEffects();
+        }
+
+        const previousThresholdIndex = this.getThresholdIndex(previousEnergy);
+        const currentThresholdIndex = this.getThresholdIndex(this.energy);
+
+        if (previousThresholdIndex !== currentThresholdIndex) {
+            this.updateBatteryDisplay();
+        }
+
+        this.maybeHandleEnergyFull(previousEnergy);
+
+        return this.energy;
+    }
+
     regenerateEnergy(delta) {
         const previousEnergy = this.energy;
         if (this.energy < this.maxEnergy) {
@@ -219,15 +288,20 @@ class MyteStats {
             
             // Calculate energy change rate
             const energyChange = this.energy - energyBefore;
-            this.lastEnergyChange = energyChange / delta;
+            this.lastEnergyChange = delta > 0 ? (energyChange / delta) : 0;
             
             // Detect rapid charging
-            this.isRapidCharging = this.lastEnergyChange > (this.rapidChargingThreshold * delta);
+            this.isRapidCharging = this.lastEnergyChange > this.rapidChargingThreshold;
             
             // If rapid charging detected, show visual feedback (formerly showBatteryRecharging)
             if (this.isRapidCharging && this.myte.battery) {
                 this.myte.battery.classList.add('charging');
                 this.showBattery();
+                this.clearManagedTimeout(this.chargingClassTimeout, 'chargingClassTimeout');
+            }
+
+            if (this.energy > this.exhaustionRecoveryThreshold) {
+                this.clearExhaustionEffects();
             }
     
             // If energy crosses a threshold, update the display
@@ -239,9 +313,7 @@ class MyteStats {
             }
     
             // If energy just reached full, show full animation
-            if (previousEnergy < this.maxEnergy && this.energy >= this.maxEnergy) {
-                this.onEnergyFull();
-            }
+            this.maybeHandleEnergyFull(previousEnergy);
         } else {
             // Not charging when full
             this.isRapidCharging = false;
@@ -250,8 +322,10 @@ class MyteStats {
         // If no longer rapid charging, remove the class
         if (!this.isRapidCharging && this.myte.battery && this.myte.battery.classList.contains('charging')) {
             // Keep the animation for a moment before removing
-            this.setManagedTimeout(() => {
+            this.clearManagedTimeout(this.chargingClassTimeout, 'chargingClassTimeout');
+            this.chargingClassTimeout = this.setManagedTimeout(() => {
                 this.myte.battery.classList.remove('charging');
+                this.chargingClassTimeout = null;
                 // Recheck visibility rules after animation ends
                 this.handleBatteryVisibility();
             }, 2000);
@@ -276,6 +350,15 @@ class MyteStats {
 
     // Handle when energy is filled to maximum
     onEnergyFull() {
+        const now = Date.now();
+        if (this.hasAnnouncedFullCharge &&
+            now - this.lastFullChargeAnnouncementAt < this.fullChargeAnnounceCooldown) {
+            return;
+        }
+
+        this.hasAnnouncedFullCharge = true;
+        this.lastFullChargeAnnouncementAt = now;
+
         // Show full battery with charging effect
         if (this.myte.battery) {
             this.myte.battery.classList.add('charging');
@@ -293,21 +376,37 @@ class MyteStats {
         }
     
         // Improve mood slightly when fully recharged
-        this.updateMood(5);
+        this.updateMood(2);
+    }
+
+    maybeHandleEnergyFull(previousEnergy) {
+        if (this.energy <= this.maxEnergy * this.fullChargeResetThreshold) {
+            this.hasAnnouncedFullCharge = false;
+        }
+
+        if (previousEnergy < this.maxEnergy && this.energy >= this.maxEnergy) {
+            this.onEnergyFull();
+        }
     }
 
     // Apply effects when the myte is exhausted
     applyExhaustionEffects() {
         // Myte moves much slower when exhausted
+        this.isExhausted = true;
         this.exhaustionSpeedMultiplier = 0.4;
+    }
 
-        // Schedule recovery
-        this.setManagedTimeout(() => {
-            this.exhaustionSpeedMultiplier = 1.0;
-            if (this.myte.battery) {
-                this.myte.battery.classList.remove('critical-pulse');
-            }
-        }, 10000); // Effects last for 10 seconds
+    clearExhaustionEffects() {
+        if (!this.isExhausted) {
+            return;
+        }
+
+        this.isExhausted = false;
+        this.exhaustionSpeedMultiplier = 1.0;
+
+        if (this.myte.battery && this.energy > 0) {
+            this.myte.battery.classList.remove('critical-pulse');
+        }
     }
 
     // Battery Display Methods
@@ -409,15 +508,13 @@ class MyteStats {
     // Handle battery visibility based on energy level
     handleBatteryVisibility() {
         // Clear any existing hide timeout
-        if (this.batteryHideTimeout) {
-            clearTimeout(this.batteryHideTimeout);
-            this.batteryHideTimeout = null;
-        }
+        this.clearManagedTimeout(this.batteryHideTimeout, 'batteryHideTimeout');
     
         const batteryStatus = this.batteryThresholds[this.batteryLevel].name;
     
         // Update blinking class based on battery level
         this.myte.battery.classList.remove('blinking');
+        this.myte.battery.classList.remove('critical-pulse');
     
         // Energy is depleted or low - show and possibly blink
         if (batteryStatus === 'empty') {
@@ -466,6 +563,216 @@ class MyteStats {
         return timeoutId;
     }
 
+    clearManagedTimeout(timeoutId, propertyName = null) {
+        if (!timeoutId) {
+            if (propertyName) {
+                this[propertyName] = null;
+            }
+            return;
+        }
+
+        clearTimeout(timeoutId);
+        this.pendingTimeouts.delete(timeoutId);
+
+        if (propertyName) {
+            this[propertyName] = null;
+        }
+    }
+
+    getCurrentActionId() {
+        return this.myte.queue.getCurrentAction()?.constructor?.metadata?.id ?? null;
+    }
+
+    noteBehavior({
+        category = 'idle',
+        novelty = 0.4,
+        soothing = 0,
+        social = 0,
+        accomplishment = 0,
+        exertion = 0
+    } = {}) {
+        const normalizedNovelty = Utility.clamp(novelty, 0, 1);
+        const normalizedSoothing = Utility.clamp(soothing, 0, 1);
+        const normalizedSocial = Utility.clamp(social, 0, 1);
+        const normalizedAccomplishment = Utility.clamp(accomplishment, 0, 1);
+        const normalizedExertion = Utility.clamp(exertion, 0, 1);
+
+        let boredomDelta = -((normalizedNovelty * 10) + (normalizedSocial * 6) + (normalizedAccomplishment * 5));
+        let comfortDelta = (normalizedSoothing * 8) + (category === 'rest' ? 10 : 0) - (normalizedExertion * 3);
+        let confidenceDelta = (normalizedAccomplishment * 7) + (normalizedSocial * 4) + (normalizedNovelty * 3);
+
+        if (category === 'play') {
+            boredomDelta -= 8;
+            confidenceDelta += 2;
+        } else if (category === 'social') {
+            boredomDelta -= 4;
+            comfortDelta += 2;
+        } else if (category === 'idle') {
+            boredomDelta += 3;
+            confidenceDelta -= 1;
+        }
+
+        this.updateBoredom(boredomDelta * this.noteBehaviorScale);
+        this.updateComfort(comfortDelta * this.noteBehaviorScale);
+        this.updateConfidence(confidenceDelta * this.noteBehaviorScale);
+    }
+
+    updateBehaviorDrives(deltaTime) {
+        const actionId = this.getCurrentActionId();
+        const home = this.myte.getHomePosition?.();
+        const distanceFromHome = home
+            ? this.myte.getDistanceToPoint(home.x, home.y)
+            : 0;
+        const comfortRadius = this.myte.ai?.homeComfortRadius ?? 140;
+        const homeComfort = home
+            ? Utility.clamp(1 - (distanceFromHome / Math.max(comfortRadius * 2, 1)), 0, 1)
+            : 0.5;
+
+        const isIdle = !actionId || actionId === 'idle';
+        const isResting = actionId === 'sleep' || actionId === 'simple_sleep' || actionId === 'rest_on_bed';
+        const isStimulating = [
+            'inspect',
+            'deep_inspect',
+            'smell_flower',
+            'drink_fountain',
+            'water_plant',
+            'harvest',
+            'interact_object',
+            'open_chest',
+            'eat_element'
+        ].includes(actionId);
+        const isPlayful = [
+            'run_laps',
+            'circle',
+            'zigzag',
+            'jump',
+            'dance',
+            'play_tag',
+            'play_fetch',
+            'nudge_ball'
+        ].includes(actionId);
+        const isSocial = [
+            'show_affection',
+            'greet',
+            'greet_receive',
+            'watch',
+            'play_tag'
+        ].includes(actionId);
+        const rateScale = this.behaviorDriveRate;
+
+        let boredomDelta = 0;
+        if (isResting) {
+            boredomDelta -= 0.0022 * deltaTime * rateScale;
+        } else if (isStimulating || isPlayful || isSocial) {
+            boredomDelta -= 0.0034 * deltaTime * rateScale;
+        } else if (isIdle) {
+            boredomDelta += 0.0042 * deltaTime * rateScale;
+        } else {
+            boredomDelta += 0.0008 * deltaTime * rateScale;
+        }
+
+        if (this.myte.isMoving() && !isPlayful && !isStimulating && !isSocial) {
+            boredomDelta += 0.0004 * deltaTime * rateScale;
+        }
+
+        this.updateBoredom(boredomDelta);
+
+        const comfortTarget = (
+            (this.getMoodRatio() * 0.35) +
+            (this.getEnergyRatio() * 0.22) +
+            (this.getHealthRatio() * 0.13) +
+            (homeComfort * 0.3)
+        ) * this.maxComfort;
+        const comfortBlend = (comfortTarget - this.comfort) * 0.0016 * deltaTime * rateScale;
+        this.updateComfort(comfortBlend);
+
+        if (isResting) {
+            this.updateComfort(0.0025 * deltaTime * rateScale);
+        } else if (distanceFromHome > (comfortRadius * 1.8) && this.energy < 40) {
+            this.updateComfort(-0.0018 * deltaTime * rateScale);
+        }
+
+        const confidenceTarget = (
+            ((this.getMoodRatio() + this.getEnergyRatio() + this.getHealthRatio()) / 3) * 0.72 +
+            (homeComfort * 0.28)
+        ) * this.maxConfidence;
+        const confidenceBlend = (confidenceTarget - this.confidence) * 0.0013 * deltaTime * rateScale;
+        this.updateConfidence(confidenceBlend);
+
+        if (isSocial || isPlayful) {
+            this.updateConfidence(0.001 * deltaTime * rateScale);
+        } else if (this.mood < 25 || this.energy < 18) {
+            this.updateConfidence(-0.0011 * deltaTime * rateScale);
+        }
+
+        const moodTarget = (
+            ((1 - this.getBoredomRatio()) * 0.34) +
+            (this.getComfortRatio() * 0.26) +
+            (this.getEnergyRatio() * 0.22) +
+            (this.getConfidenceRatio() * 0.18)
+        ) * this.maxMood;
+        const moodBlend = (moodTarget - this.mood) * this.moodSyncRate * deltaTime;
+        this.updateMood(moodBlend);
+    }
+
+    maybeSignalNeeds() {
+        const dialogue = this.myte.dialogue;
+        if (!dialogue || !this.myte.queue.isEmpty() || this.myte.isDragging) {
+            return;
+        }
+
+        const signals = [
+            {
+                id: 'energy_low',
+                condition: this.energy <= 14,
+                text: 'sleepy...',
+                style: 'thought',
+                expression: 'sleep'
+            },
+            {
+                id: 'boredom_high',
+                condition: this.boredom >= 82,
+                text: 'bored...',
+                style: 'thought',
+                expression: 'surprise'
+            },
+            {
+                id: 'comfort_low',
+                condition: this.comfort <= 24,
+                text: 'cozy?',
+                style: 'thought',
+                expression: 'peek'
+            },
+            {
+                id: 'mood_low',
+                condition: this.mood <= 20,
+                text: 'sad...',
+                style: 'whisper',
+                expression: 'peek'
+            }
+        ];
+
+        const now = Date.now();
+        const signal = signals.find(entry => {
+            if (!entry.condition) {
+                return false;
+            }
+
+            const lastTime = this.lastNeedSignalTimes[entry.id] ?? 0;
+            return now - lastTime >= this.needSignalCooldown;
+        });
+
+        if (!signal) {
+            return;
+        }
+
+        this.lastNeedSignalTimes[signal.id] = now;
+        dialogue.showMessage(signal.text, signal.style);
+        if (signal.expression) {
+            this.myte.queue.addExpression(signal.expression, 45, 1);
+        }
+    }
+
     // Update function called each frame
     update(deltaTime) {
         // Natural mood decay
@@ -478,6 +785,9 @@ class MyteStats {
             // Energy regeneration
             this.regenerateEnergy(deltaTime);
         }
+
+        this.updateBehaviorDrives(deltaTime);
+        this.maybeSignalNeeds();
 
         // Update battery display
         this.updateBatteryDisplay();
@@ -513,6 +823,11 @@ class MyteStats {
                 current: this.energy,
                 max: this.maxEnergy
             },
+            drives: {
+                boredom: this.boredom,
+                comfort: this.comfort,
+                confidence: this.confidence
+            },
             level: this.level,
             experience: this.experience,
             speed: this.getSpeed(),
@@ -529,10 +844,8 @@ class MyteStats {
             this.moodTimeout = null;
         }
 
-        if (this.batteryHideTimeout) {
-            clearTimeout(this.batteryHideTimeout);
-            this.batteryHideTimeout = null;
-        }
+        this.clearManagedTimeout(this.batteryHideTimeout, 'batteryHideTimeout');
+        this.clearManagedTimeout(this.chargingClassTimeout, 'chargingClassTimeout');
 
         this.pendingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
         this.pendingTimeouts.clear();

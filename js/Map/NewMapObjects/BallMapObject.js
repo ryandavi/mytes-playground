@@ -118,16 +118,16 @@ class BallMapObject extends AnimatedMapObject {
     // Get the center of the collider
     getColliderCenter() {
         return {
-            x: this.posX + this.collider.offsetX,
-            y: this.posY + this.collider.offsetY
+            x: this.posX + (this.collider.offsetX ?? 0) + ((this.collider.width ?? this.size.width) / 2),
+            y: this.posY + (this.collider.offsetY ?? 0) + ((this.collider.height ?? this.size.height) / 2)
         };
     }
 
     // Get the center of a myte's collider
     getMyteColliderCenter(myte) {
         return {
-            x: myte.posX + (myte.collider?.offsetX || myte.size.width / 2),
-            y: myte.posY + (myte.collider?.offsetY || myte.size.height / 2)
+            x: myte.posX + (myte.collider?.offsetX ?? 0) + ((myte.collider?.width ?? myte.size.width) / 2),
+            y: myte.posY + (myte.collider?.offsetY ?? 0) + ((myte.collider?.height ?? myte.size.height) / 2)
         };
     }
 
@@ -213,6 +213,65 @@ class BallMapObject extends AnimatedMapObject {
                 console.log(`Ball pushed! Velocity X: ${this.velocity.x.toFixed(2)}, Y: ${this.velocity.y.toFixed(2)}`);
             }
         }
+    }
+
+    nudgeBy(myte, forceMultiplier = 1) {
+        if (!myte || this.isDragging || this.isPickedUp || this.pendingPickup) {
+            return false;
+        }
+
+        const now = performance.now();
+        if (now - this.lastPushTime < this.pushCooldown * 0.35) {
+            return false;
+        }
+
+        const ballRect = this.getColliderRectFor(this);
+        const myteRect = this.getColliderRectFor(myte);
+        const ballCenter = this.getCenterPoint();
+        const myteCenter = {
+            x: (myteRect.left + myteRect.right) / 2,
+            y: (myteRect.top + myteRect.bottom) / 2
+        };
+
+        let dx = ballCenter.x - myteCenter.x;
+        let dy = ballCenter.y - myteCenter.y;
+        let distance = Math.hypot(dx, dy);
+
+        if (!Number.isFinite(distance) || distance < 0.001) {
+            const facingMap = {
+                N: { x: 0, y: -1 },
+                S: { x: 0, y: 1 },
+                E: { x: 1, y: 0 },
+                W: { x: -1, y: 0 }
+            };
+            const fallback = facingMap[myte.direction] ?? { x: 1, y: 0 };
+            dx = fallback.x;
+            dy = fallback.y;
+            distance = 1;
+        }
+
+        const overlapX = Math.max(0, Math.min(ballRect.right, myteRect.right) - Math.max(ballRect.left, myteRect.left));
+        const overlapY = Math.max(0, Math.min(ballRect.bottom, myteRect.bottom) - Math.max(ballRect.top, myteRect.top));
+        if (overlapX > 0 || overlapY > 0) {
+            const pushOutDistance = Math.max(overlapX, overlapY, 4) + 2;
+            this.posX += (dx / distance) * pushOutDistance;
+            this.posY += (dy / distance) * pushOutDistance;
+        }
+
+        const force = this.pushForce * forceMultiplier;
+        this.velocity.x += (dx / distance) * force;
+        this.velocity.y += (dy / distance) * force;
+        this.capVelocity();
+        this.isMoving = true;
+        this.lastPushTime = now;
+        this.updateBallAnimation();
+        this.triggerArcBounce(Math.min(60, Math.max(18, force * 6)));
+        if (this.element) {
+            this.element.setAttribute('data-moving', 'true');
+        }
+
+        this.gameMap?.soundManager?.play('ball_hit');
+        return true;
     }
     
     // Cap velocity at maximum speed
