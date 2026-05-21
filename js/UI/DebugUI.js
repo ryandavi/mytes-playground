@@ -5,22 +5,269 @@ class DebugUI {
         this.cameraEnabled = false;
         this.camera = null;
         this.wasDebugEnabled = false;
-        this.lastDebugMarkup = '';
+        this.debugSectionState = {
+            system: { x: null, y: null },
+            myte: { x: null, y: null }
+        };
+        this.debugDomRefs = new Map();
+        this.debugMenuSetup = false;
+        this.dragState = null;
+        this.handleDebugPointerDown = this.onDebugPointerDown.bind(this);
+        this.handleDebugPointerMove = this.onDebugPointerMove.bind(this);
+        this.handleDebugPointerUp = this.onDebugPointerUp.bind(this);
+        this.handleDebugSummaryClick = this.onDebugSummaryClick.bind(this);
 
         this.queueUI = new QueueUI(parent);
     }
 
-    generateDebugGroup(groupName, messages) {
-        return `
-            <div class='debug-group ${groupName.toLowerCase()}'>
-                <h3>${groupName}</h3>
-                ${messages.map(item => this.generateDebugMessage(item.label, item.value)).join("")}
-            </div>
-        `;
+    getDebugSections(debugGroups) {
+        return [
+            {
+                key: 'system',
+                title: 'System',
+                groups: debugGroups.filter(g => ['System', 'Input', 'Time', 'Map', 'Camera'].includes(g.name))
+            },
+            {
+                key: 'myte',
+                title: 'Myte',
+                groups: [
+                    { name: 'Overview', messages: this.getMyteSummaryMessages() },
+                    ...debugGroups.filter(g => ['Myte', 'Myte Stats', 'Myte AI'].includes(g.name))
+                ]
+            }
+        ];
     }
 
-    generateDebugMessage(label, value) {
-        return `<div class='debug'>${label}: ${value}</div>`;
+    getMyteSummaryMessages() {
+        const mytes = this.parent.mytes || [];
+        const active = mytes.filter(m => m?.isActive);
+        const inactive = mytes.filter(m => m && !m.isActive);
+        const messages = [
+            { label: "Total", value: mytes.length },
+            { label: "Active", value: active.length },
+            { label: "Inactive", value: inactive.length }
+        ];
+        if (active.length > 0) {
+            messages.push({ label: "Selected", value: this.parent.activeMyte?.name || '—' });
+        }
+        return messages;
+    }
+
+    groupCssClass(groupName) {
+        return groupName.toLowerCase().replace(/\s+/g, '-');
+    }
+
+    reconcileSection(sectionKey, title, groupsData) {
+        if (!this.debug) return;
+
+        let refs = this.debugDomRefs.get(sectionKey);
+        if (!refs) {
+            const sectionEl = document.createElement('details');
+            sectionEl.className = `debug-section ${sectionKey}`;
+            sectionEl.dataset.sectionKey = sectionKey;
+            sectionEl.open = true;
+
+            const summary = document.createElement('summary');
+            summary.textContent = title;
+            sectionEl.appendChild(summary);
+
+            const body = document.createElement('div');
+            body.className = 'debug-section-body';
+            sectionEl.appendChild(body);
+
+            this.debug.appendChild(sectionEl);
+
+            const state = this.debugSectionState[sectionKey];
+            if (state) {
+                if (state.x === null) {
+                    const def = this.getDefaultSectionPosition(sectionKey);
+                    state.x = def.x;
+                    state.y = def.y;
+                }
+                sectionEl.style.left = `${state.x}px`;
+                sectionEl.style.top = `${state.y}px`;
+            }
+
+            refs = { sectionEl, bodyEl: body, groupMap: new Map() };
+            this.debugDomRefs.set(sectionKey, refs);
+        }
+
+        const activeGroups = new Set();
+
+        for (const { name, messages } of groupsData) {
+            const hasData = messages.length > 0;
+            let groupRefs = refs.groupMap.get(name);
+
+            if (!groupRefs) {
+                const groupEl = document.createElement('details');
+                groupEl.className = `debug-group ${this.groupCssClass(name)}`;
+                groupEl.open = true;
+
+                const summary = document.createElement('summary');
+                summary.className = 'debug-group-summary';
+                summary.textContent = name;
+                groupEl.appendChild(summary);
+
+                const table = document.createElement('table');
+                table.className = 'debug-table';
+                groupEl.appendChild(table);
+
+                refs.bodyEl.appendChild(groupEl);
+                groupRefs = { groupEl, tableEl: table, rowMap: new Map() };
+                refs.groupMap.set(name, groupRefs);
+            }
+
+            groupRefs.groupEl.style.display = hasData ? '' : 'none';
+            if (!hasData) continue;
+
+            activeGroups.add(name);
+            const activeLabels = new Set();
+
+            for (const { label, value } of messages) {
+                activeLabels.add(label);
+                let valueCell = groupRefs.rowMap.get(label);
+
+                if (!valueCell) {
+                    const tr = document.createElement('tr');
+                    const labelCell = document.createElement('td');
+                    labelCell.className = 'debug-label';
+                    labelCell.textContent = label;
+                    tr.appendChild(labelCell);
+
+                    valueCell = document.createElement('td');
+                    valueCell.className = 'debug-value';
+                    tr.appendChild(valueCell);
+
+                    groupRefs.tableEl.appendChild(tr);
+                    groupRefs.rowMap.set(label, valueCell);
+                }
+
+                const str = String(value ?? 'N/A');
+                if (valueCell.textContent !== str) {
+                    valueCell.textContent = str;
+                }
+            }
+
+            for (const [label, valueCell] of groupRefs.rowMap) {
+                if (!activeLabels.has(label)) {
+                    valueCell.closest('tr')?.remove();
+                    groupRefs.rowMap.delete(label);
+                }
+            }
+        }
+    }
+
+    getDefaultSectionPosition(key) {
+        const margin = 10;
+        const panelWidth = 350;
+        if (key === 'myte') {
+            return { x: Math.max(margin, window.innerWidth - panelWidth - margin), y: 60 };
+        }
+        return { x: margin, y: 60 };
+    }
+
+    ensureDebugMenuSetup() {
+        if (!this.debug || this.debugMenuSetup) {
+            return;
+        }
+
+        this.debug.addEventListener('pointerdown', this.handleDebugPointerDown);
+        // Capture all clicks on section summaries so we can control toggle ourselves
+        this.debug.addEventListener('click', this.handleDebugSummaryClick, true);
+        this.debugMenuSetup = true;
+    }
+
+    onDebugSummaryClick(event) {
+        const summary = event.target.closest('.debug-section > summary');
+        if (!summary || !this.debug?.contains(summary)) return;
+        // Always prevent native <details> toggle on section summaries —
+        // we handle it manually in onDebugPointerUp so drag doesn't trigger it.
+        event.preventDefault();
+    }
+
+    onDebugPointerDown(event) {
+        if (event.button !== 0) {
+            return;
+        }
+
+        const summary = event.target.closest('.debug-section > summary');
+        if (!summary || !this.debug?.contains(summary)) {
+            return;
+        }
+
+        const section = summary.closest('.debug-section[data-section-key]');
+        if (!section) return;
+
+        const sectionKey = section.dataset.sectionKey;
+        const state = this.debugSectionState[sectionKey];
+
+        this.dragState = {
+            sectionKey,
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            originLeft: state?.x ?? section.getBoundingClientRect().left,
+            originTop: state?.y ?? section.getBoundingClientRect().top,
+            moved: false
+        };
+
+        window.addEventListener('pointermove', this.handleDebugPointerMove);
+        window.addEventListener('pointerup', this.handleDebugPointerUp);
+        window.addEventListener('pointercancel', this.handleDebugPointerUp);
+    }
+
+    onDebugPointerMove(event) {
+        if (!this.dragState || event.pointerId !== this.dragState.pointerId) {
+            return;
+        }
+
+        const deltaX = event.clientX - this.dragState.startX;
+        const deltaY = event.clientY - this.dragState.startY;
+
+        if (!this.dragState.moved && Math.abs(deltaX) < 4 && Math.abs(deltaY) < 4) {
+            return;
+        }
+
+        const section = this.debug?.querySelector(`.debug-section[data-section-key="${this.dragState.sectionKey}"]`);
+        if (!section) return;
+
+        this.dragState.moved = true;
+        section.classList.add('dragging');
+        event.preventDefault();
+
+        const maxLeft = Math.max(8, window.innerWidth - section.offsetWidth - 8);
+        const maxTop = Math.max(8, window.innerHeight - section.offsetHeight - 8);
+        const nextLeft = Math.min(Math.max(8, this.dragState.originLeft + deltaX), maxLeft);
+        const nextTop = Math.min(Math.max(8, this.dragState.originTop + deltaY), maxTop);
+
+        section.style.left = `${Math.round(nextLeft)}px`;
+        section.style.top = `${Math.round(nextTop)}px`;
+
+        const state = this.debugSectionState[this.dragState.sectionKey];
+        if (state) {
+            state.x = Math.round(nextLeft);
+            state.y = Math.round(nextTop);
+        }
+    }
+
+    onDebugPointerUp(event) {
+        if (!this.dragState || event.pointerId !== this.dragState.pointerId) {
+            return;
+        }
+
+        const section = this.debug?.querySelector(`.debug-section[data-section-key="${this.dragState.sectionKey}"]`);
+
+        if (this.dragState.moved) {
+            section?.classList.remove('dragging');
+        } else if (section) {
+            // It was a tap/click with no drag — toggle the section
+            section.open = !section.open;
+        }
+
+        this.dragState = null;
+        window.removeEventListener('pointermove', this.handleDebugPointerMove);
+        window.removeEventListener('pointerup', this.handleDebugPointerUp);
+        window.removeEventListener('pointercancel', this.handleDebugPointerUp);
     }
 
     getSystemMessages() {
@@ -76,7 +323,8 @@ getMapMessages() {
         
         // Check if dimensions exist
         if (this.parent.gameMap.dimensions) {
-            messages.push({ label: "Dimensions", value: `${this.parent.gameMap.dimensions.width}x${this.parent.gameMap.dimensions.height}px` });
+            const { width, height } = this.parent.gameMap.dimensions;
+            messages.push({ label: "Size", value: `${width} × ${height} px` });
         }
         
         // Check if particleSystem exists
@@ -110,39 +358,28 @@ getZoneDebugMessages() {
         return messages;
     }
     
-    // Add total zones count
-    messages.push({
-        label: "Total Zones",
-        value: zoneManager.zones.size
-    });
-
-    // Add information for each zone
     try {
         zoneManager.zones.forEach((zone, zoneId) => {
-            // Skip if zone is invalid
             if (!zone || !zone.mytesInZone) return;
-            
+
             try {
-                const mytesInZone = Array.from(zone.mytesInZone)
-                    .map(myteId => this.parent.mytes?.find(m => m && m.id === myteId))
+                const names = Array.from(zone.mytesInZone)
+                    .map(id => this.parent.mytes?.find(m => m && m.id === id))
                     .filter(Boolean)
-                    .map(myte => myte.name)
+                    .map(m => m.name)
                     .join(', ');
-            
+
+                const type = zone.type || 'zone';
                 messages.push({
-                    label: `Zone ${zoneId} (${zone.type || 'Unknown'})`,
-                    value: mytesInZone || 'Empty'
+                    label: `${type} ${zoneId}`,
+                    value: names || '—'
                 });
-            } catch (error) {
-                // Silently handle errors during transitions
-                messages.push({
-                    label: `Zone ${zoneId}`,
-                    value: 'Error'
-                });
+            } catch {
+                messages.push({ label: `Zone ${zoneId}`, value: 'Error' });
             }
         });
-    } catch (error) {
-        // Silently handle errors during transitions
+    } catch {
+        // silently handle errors during transitions
     }
 
     return messages;
@@ -225,22 +462,23 @@ getZoneDebugMessages() {
         if (!activeMyte || !aiState) return [];
 
         const needs = aiState.context?.needs || {};
-        const topCandidates = (aiState.candidates || [])
-            .slice(0, 3)
-            .map(candidate => `${candidate.label} (${candidate.score})`)
-            .join(', ');
+        const fmt = v => (v == null ? 'N/A' : Number(v).toFixed(2));
+
+        const candidateRows = (aiState.candidates || [])
+            .slice(0, 5)
+            .map((c, i) => ({ label: `  #${i + 1} ${c.label}`, value: fmt(c.score) }));
 
         return [
-            { label: "Last Decision", value: aiState.lastDecisionLabel || 'N/A' },
-            { label: "Need Rest", value: needs.rest ?? 'N/A' },
-            { label: "Need Social", value: needs.social ?? 'N/A' },
-            { label: "Need Enrichment", value: needs.enrichment ?? 'N/A' },
-            { label: "Need Play", value: needs.play ?? 'N/A' },
-            { label: "Need Comfort", value: needs.comfort ?? 'N/A' },
-            { label: "Light Need", value: aiState.context?.lightNeed ?? 'N/A' },
-            { label: "Music Need", value: aiState.context?.musicNeed ?? 'N/A' },
-            { label: "Local Light", value: aiState.context?.localLightLevel ?? 'N/A' },
-            { label: "Candidates", value: topCandidates || 'N/A' }
+            { label: "Decision", value: aiState.lastDecisionLabel || 'N/A' },
+            { label: "Rest", value: fmt(needs.rest) },
+            { label: "Social", value: fmt(needs.social) },
+            { label: "Enrichment", value: fmt(needs.enrichment) },
+            { label: "Play", value: fmt(needs.play) },
+            { label: "Comfort", value: fmt(needs.comfort) },
+            { label: "Light need", value: fmt(aiState.context?.lightNeed) },
+            { label: "Music need", value: fmt(aiState.context?.musicNeed) },
+            { label: "Local light", value: fmt(aiState.context?.localLightLevel) },
+            ...candidateRows
         ];
     }
 
@@ -344,21 +582,17 @@ drawDebugColliders() {
 
         this.drawDebugColliders();
 
-        const markup = debugGroups
-            .filter(group => group.messages.length > 0)
-            .map(group => this.generateDebugGroup(group.name, group.messages))
-            .join("");
-
-        if (markup !== this.lastDebugMarkup) {
-            this.debug.innerHTML = markup;
-            this.lastDebugMarkup = markup;
+        for (const { key, title, groups } of this.getDebugSections(debugGroups)) {
+            this.reconcileSection(key, title, groups);
         }
+
+        this.ensureDebugMenuSetup();
     }
 
     clearDebugVisuals() {
-        if (this.debug && this.lastDebugMarkup) {
-            this.debug.innerHTML = '';
-            this.lastDebugMarkup = '';
+        if (this.debug) {
+            this.debugDomRefs.forEach(refs => refs.sectionEl?.remove());
+            this.debugDomRefs.clear();
         }
 
         const debugLayer = this.parent?.gameMap?.layers?.debug;
@@ -396,6 +630,15 @@ drawDebugColliders() {
 
     dispose() {
         this.clearDebugVisuals();
+        if (this.debugMenuSetup && this.debug) {
+            this.debug.removeEventListener('pointerdown', this.handleDebugPointerDown);
+            this.debug.removeEventListener('click', this.handleDebugSummaryClick, true);
+        }
+        window.removeEventListener('pointermove', this.handleDebugPointerMove);
+        window.removeEventListener('pointerup', this.handleDebugPointerUp);
+        window.removeEventListener('pointercancel', this.handleDebugPointerUp);
+        this.debugMenuSetup = false;
+        this.dragState = null;
         this.queueUI?.dispose?.();
         this.queueUI = null;
     }

@@ -658,6 +658,12 @@ class MyteStats {
             'watch',
             'play_tag'
         ].includes(actionId);
+        const isPurposefulMovement = [
+            'go_to_object',
+            'astar-move',
+            'move',
+            'follow_object'
+        ].includes(actionId);
         const rateScale = this.behaviorDriveRate;
 
         let boredomDelta = 0;
@@ -665,6 +671,8 @@ class MyteStats {
             boredomDelta -= 0.0022 * deltaTime * rateScale;
         } else if (isStimulating || isPlayful || isSocial) {
             boredomDelta -= 0.0034 * deltaTime * rateScale;
+        } else if (isPurposefulMovement) {
+            boredomDelta -= 0.0006 * deltaTime * rateScale;
         } else if (isIdle) {
             boredomDelta += 0.0042 * deltaTime * rateScale;
         } else {
@@ -672,7 +680,7 @@ class MyteStats {
         }
 
         if (this.myte.isMoving() && !isPlayful && !isStimulating && !isSocial) {
-            boredomDelta += 0.0004 * deltaTime * rateScale;
+            boredomDelta -= 0.0002 * deltaTime * rateScale;
         }
 
         this.updateBoredom(boredomDelta);
@@ -721,6 +729,12 @@ class MyteStats {
             return;
         }
 
+        const lastAiDecisionAge = Date.now() - (this.myte.ai?.lastDecisionTime ?? 0);
+        const isBoredEnoughToComplain =
+            this.boredom >= 92 &&
+            this.mood <= 68 &&
+            lastAiDecisionAge >= 20000;
+
         const signals = [
             {
                 id: 'energy_low',
@@ -731,7 +745,7 @@ class MyteStats {
             },
             {
                 id: 'boredom_high',
-                condition: this.boredom >= 82,
+                condition: isBoredEnoughToComplain,
                 text: 'bored...',
                 style: 'thought',
                 expression: 'surprise'

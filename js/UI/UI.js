@@ -742,11 +742,12 @@ class ActionSidebarManager extends UIComponent {
         return info;
     }
 
-    getNeedUrgencyLabel(percent) {
-        if (percent >= 80) return 'Urgent';
-        if (percent >= 60) return 'High';
-        if (percent >= 35) return 'Medium';
-        return 'Low';
+    getNeedFulfillmentLabel(percent) {
+        if (percent <= 15) return 'Critical';
+        if (percent <= 35) return 'Low';
+        if (percent <= 65) return 'Okay';
+        if (percent <= 85) return 'Good';
+        return 'Full';
     }
 
     appendNeedMeter(container, label, percent, tone) {
@@ -794,11 +795,12 @@ class ActionSidebarManager extends UIComponent {
         otherInfo.append(needsTitle);
 
         snapshot.needs.slice(0, 5).forEach(need => {
+            const fulfilledPercent = Math.max(0, 100 - need.percent);
             this.appendNeedMeter(
                 otherInfo,
                 need.label,
-                need.percent,
-                this.getNeedUrgencyLabel(need.percent)
+                fulfilledPercent,
+                this.getNeedFulfillmentLabel(fulfilledPercent)
             );
         });
 
@@ -1158,49 +1160,11 @@ class ScreenManager extends UIComponent {
         super(parent);
         this.headerElement = this.parent.containerWrapper.querySelector('.header');
         this.fullscreenButton = this.parent.containerWrapper.querySelector('.fullscreen-btn');
-        this.cameraControls = null;
         this.listenerCleanup = [];
     }
 
     init() {
-        this.initializeCameraControls();
         this.initializeButtons();
-    }
-
-    initializeCameraControls() {
-        if (!this.headerElement || this.cameraControls) return;
-
-        this.cameraControls = document.createElement('div');
-        this.cameraControls.className = 'camera-controls';
-
-        const controlConfigs = [
-            { label: '-', title: 'Zoom out', action: () => this.parent.parent.camera?.zoomOut({ immediate: true }) },
-            { label: '1x', title: 'Reset zoom', action: () => this.parent.parent.camera?.resetZoom(true) },
-            { label: 'Me', title: 'Center on active myte', action: () => this.parent.parent.camera?.centerOnActiveMyte(true) },
-            { label: 'Fit', title: 'Fit entire map', action: () => this.parent.parent.camera?.fitMap('contain', true) },
-            { label: '+', title: 'Zoom in', action: () => this.parent.parent.camera?.zoomIn({ immediate: true }) }
-        ];
-
-        controlConfigs.forEach(config => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'camera-control-btn';
-            button.textContent = config.label;
-            button.title = config.title;
-            button.setAttribute('aria-label', config.title);
-            const handleClick = () => {
-                config.action();
-            };
-            button.addEventListener('click', handleClick);
-            this.listenerCleanup.push(() => button.removeEventListener('click', handleClick));
-            this.cameraControls.appendChild(button);
-        });
-
-        if (this.fullscreenButton) {
-            this.headerElement.insertBefore(this.cameraControls, this.fullscreenButton);
-        } else {
-            this.headerElement.appendChild(this.cameraControls);
-        }
     }
 
     initializeButtons() {
@@ -1233,8 +1197,6 @@ class ScreenManager extends UIComponent {
     destroy() {
         this.listenerCleanup.forEach(cleanup => cleanup());
         this.listenerCleanup = [];
-        this.cameraControls?.remove();
-        this.cameraControls = null;
     }
 }
 
@@ -1268,6 +1230,7 @@ class UserInterface {
         // Initialize additional menus
         this.soundMenu = new SoundMenu(this);
         this.settingsMenu = new SettingsMenu(this);
+        this.viewMenu = new ViewMenu(this);
         this.debugMenu = new DebugMenu(this);
     }
 
