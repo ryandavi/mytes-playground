@@ -990,10 +990,6 @@ class MyteListManager extends UIComponent {
         thumbnail.classList.add('myte-thumbnail');
         thumbnail.classList.add('button');
 
-        if (myte === this.parent.getActiveMyte()) {
-            thumbnail.classList.add('active');
-        }
-
         thumbnail.setAttribute('data-myte-id', myte.id);
         thumbnail.setAttribute('data-myte-species', myte.species);
 
@@ -1012,18 +1008,64 @@ class MyteListManager extends UIComponent {
         name.className = 'myte-name';
         name.textContent = myte.name;
 
+        const details = document.createElement('div');
+        details.className = 'myte-details';
+        details.appendChild(name);
+
+        const state = document.createElement('span');
+        state.className = 'myte-state';
+        details.appendChild(state);
+
         // Build thumbnail
         thumbnail.appendChild(spriteContainer);
-        thumbnail.appendChild(name);
+        thumbnail.appendChild(details);
 
         // Add click handler
         thumbnail.addEventListener('click', () => {
-            if (myte !== this.parent.getActiveMyte()) {
-                this.parent.setActiveMyte(myte);
+            if (myte === this.parent.getActiveMyte()) {
+                this.parent.parent.deactivateActiveMyte?.(myte);
+                return;
             }
+
+            this.parent.setActiveMyte(myte);
         });
 
+        this.applyThumbnailState(thumbnail, myte);
+
         return thumbnail;
+    }
+
+    getMyteStateLabel(myte) {
+        if (!myte?.isActive) {
+            return 'Inactive';
+        }
+
+        if (myte === this.parent.getActiveMyte()) {
+            return 'Following';
+        }
+
+        if (myte.goal === MOVE_TYPES.FREEROAM) {
+            return 'Free Roam';
+        }
+
+        return 'Deployed';
+    }
+
+    applyThumbnailState(thumbnail, myte) {
+        if (!thumbnail || !myte) return;
+
+        const isActiveMyte = myte === this.parent.getActiveMyte();
+        const isFreeRoam = myte.isActive && myte.goal === MOVE_TYPES.FREEROAM;
+        const isInSlot = !myte.isActive;
+        const stateLabel = this.getMyteStateLabel(myte);
+
+        thumbnail.classList.toggle('active', isActiveMyte);
+        thumbnail.classList.toggle('deployed', myte.isActive);
+        thumbnail.classList.toggle('free-roam', isFreeRoam);
+        thumbnail.classList.toggle('in-slot', isInSlot);
+        thumbnail.dataset.myteState = stateLabel;
+        thumbnail.querySelector('.myte-state').textContent = stateLabel;
+        thumbnail.title = `${myte.name}: ${stateLabel}`;
     }
 
     initMytesList() {
@@ -1051,21 +1093,16 @@ class MyteListManager extends UIComponent {
     }
 
     updateMytesList(activeMyte) {
-        // Update mytes list
         if (!this.myteListContainer) return;
 
-        // remove active
-        this.myteListContainer.querySelectorAll('.myte-thumbnail').forEach(thumbnail => {
-            thumbnail.classList.remove('active');
-        });
+        const mytesById = new Map((this.parent.getMytes() || []).map(myte => [String(myte.id), myte]));
 
-        // set current as active
-        if (activeMyte) {
-            const activeThumb = this.myteListContainer.querySelector(`[data-myte-id="${activeMyte.id}"]`);
-            if (activeThumb) {
-                activeThumb.classList.add('active');
-            }
-        }
+        this.myteListContainer.querySelectorAll('.myte-thumbnail').forEach(thumbnail => {
+            const myte = mytesById.get(thumbnail.dataset.myteId);
+            if (!myte) return;
+
+            this.applyThumbnailState(thumbnail, myte);
+        });
     }
 }
 
@@ -1155,6 +1192,238 @@ class HUDManager extends UIComponent {
     }
 }
 
+class OffscreenMyteIndicatorManager extends UIComponent {
+    constructor(parent) {
+        super(parent);
+        this.overlay = null;
+        this.markers = new Map();
+        this.edgePadding = 14;
+        this.preferredGap = 18;
+    }
+
+    init() {
+        const containerElement = this.parent.parent?.element;
+        if (!containerElement) return;
+
+        this.overlay = document.createElement('div');
+        this.overlay.className = 'myte-offscreen-indicators';
+        this.overlay.setAttribute('aria-hidden', 'true');
+        containerElement.appendChild(this.overlay);
+    }
+
+    getMarker(myte) {
+        const markerId = String(myte?.id ?? '');
+        if (!markerId || !this.overlay) return null;
+
+        if (!this.markers.has(markerId)) {
+            const marker = document.createElement('div');
+            marker.className = 'myte-offscreen-indicator hidden';
+            marker.dataset.myteId = markerId;
+            this.overlay.appendChild(marker);
+            this.markers.set(markerId, marker);
+        }
+
+        return this.markers.get(markerId);
+    }
+
+    hideMarker(marker) {
+        if (!marker) return;
+        marker.classList.add('hidden');
+    }
+
+    hideAllMarkers() {
+        this.markers.forEach(marker => this.hideMarker(marker));
+    }
+
+    isBoundsVisible(bounds, viewportWidth, viewportHeight) {
+        return !(
+            bounds.right < 0 ||
+            bounds.left > viewportWidth ||
+            bounds.bottom < 0 ||
+            bounds.top > viewportHeight
+        );
+    }
+
+    clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    getViewportWorldBounds(camera, viewportWidth, viewportHeight) {
+        const safeZoom = Number.isFinite(camera?.zoomLevel) && camera.zoomLevel > 0
+            ? camera.zoomLevel
+            : 1;
+        const left = Number.isFinite(camera?.posX) ? -camera.posX : 0;
+        const top = Number.isFinite(camera?.posY) ? -camera.posY : 0;
+        const width = viewportWidth / safeZoom;
+        const height = viewportHeight / safeZoom;
+
+        return {
+            left,
+            top,
+            right: left + width,
+            bottom: top + height,
+            width,
+            height
+        };
+    }
+
+    projectWorldPointToViewport(point, viewportBounds, viewportWidth, viewportHeight) {
+        const normalizedX = viewportBounds.width > 0
+            ? (point.x - viewportBounds.left) / viewportBounds.width
+            : 0.5;
+        const normalizedY = viewportBounds.height > 0
+            ? (point.y - viewportBounds.top) / viewportBounds.height
+            : 0.5;
+
+        return {
+            x: normalizedX * viewportWidth,
+            y: normalizedY * viewportHeight
+        };
+    }
+
+    isPointInsideViewport(point, viewportBounds) {
+        return (
+            point.x >= viewportBounds.left &&
+            point.x <= viewportBounds.right &&
+            point.y >= viewportBounds.top &&
+            point.y <= viewportBounds.bottom
+        );
+    }
+
+    getMarkerEdge(x, y, viewportWidth, viewportHeight) {
+        const touchesTop = y <= this.edgePadding;
+        const touchesBottom = y >= viewportHeight - this.edgePadding;
+        const touchesLeft = x <= this.edgePadding;
+        const touchesRight = x >= viewportWidth - this.edgePadding;
+
+        if (touchesTop && touchesLeft) return 'top-left';
+        if (touchesTop && touchesRight) return 'top-right';
+        if (touchesBottom && touchesLeft) return 'bottom-left';
+        if (touchesBottom && touchesRight) return 'bottom-right';
+        if (touchesTop) return 'top';
+        if (touchesBottom) return 'bottom';
+        if (touchesLeft) return 'left';
+        if (touchesRight) return 'right';
+        return 'inside';
+    }
+
+    resolveEdgeOverlap(markers, axis, min, max) {
+        if (!Array.isArray(markers) || markers.length <= 1) return;
+
+        markers.sort((a, b) => a[axis] - b[axis]);
+
+        const availableSpace = Math.max(0, max - min);
+        const gap = Math.max(
+            0,
+            Math.min(
+                this.preferredGap,
+                markers.length > 1 ? availableSpace / (markers.length - 1) : this.preferredGap
+            )
+        );
+
+        let nextPosition = min;
+        markers.forEach(marker => {
+            marker[axis] = Math.max(marker[axis], nextPosition);
+            nextPosition = marker[axis] + gap;
+        });
+
+        markers[markers.length - 1][axis] = Math.min(markers[markers.length - 1][axis], max);
+
+        for (let i = markers.length - 2; i >= 0; i -= 1) {
+            markers[i][axis] = Math.min(markers[i][axis], markers[i + 1][axis] - gap);
+        }
+
+        for (let i = 0; i < markers.length; i += 1) {
+            markers[i][axis] = this.clamp(markers[i][axis], min, max);
+        }
+
+        for (let i = 1; i < markers.length; i += 1) {
+            markers[i][axis] = Math.max(markers[i][axis], markers[i - 1][axis] + gap);
+            markers[i][axis] = this.clamp(markers[i][axis], min, max);
+        }
+    }
+
+    updateMarker(markerData, activeMyte) {
+        const marker = this.getMarker(markerData.myte);
+        if (!marker) return;
+
+        marker.classList.remove('hidden');
+        marker.classList.toggle('active-myte', markerData.myte === activeMyte);
+        marker.dataset.edge = markerData.edge;
+        marker.title = markerData.myte?.name || 'Myte';
+        marker.style.left = `${Math.round(markerData.x)}px`;
+        marker.style.top = `${Math.round(markerData.y)}px`;
+    }
+
+    update() {
+        if (!this.overlay) return;
+
+        const container = this.parent.parent;
+        const viewport = container?.getContainerRect?.();
+        const camera = container?.camera;
+
+        if (!camera || !viewport?.width || !viewport?.height) {
+            this.hideAllMarkers();
+            return;
+        }
+
+        const viewportWidth = viewport.width;
+        const viewportHeight = viewport.height;
+        const viewportBounds = this.getViewportWorldBounds(camera, viewportWidth, viewportHeight);
+        const activeMyte = this.parent.getActiveMyte();
+        const markerData = [];
+        const visibleMarkerIds = new Set();
+
+        (this.parent.getMytes() || []).forEach(myte => {
+            const marker = this.getMarker(myte);
+
+            if (!myte?.isActive) {
+                this.hideMarker(marker);
+                return;
+            }
+
+            const worldCenter = {
+                x: (Number.isFinite(myte.posX) ? myte.posX : 0) + ((myte.size?.width || 0) / 2),
+                y: (Number.isFinite(myte.posY) ? myte.posY : 0) + ((myte.size?.height || 0) / 2)
+            };
+
+            if (this.isPointInsideViewport(worldCenter, viewportBounds)) {
+                this.hideMarker(marker);
+                return;
+            }
+
+            const projectedCenter = this.projectWorldPointToViewport(
+                worldCenter,
+                viewportBounds,
+                viewportWidth,
+                viewportHeight
+            );
+
+            let x = this.clamp(projectedCenter.x, this.edgePadding, viewportWidth - this.edgePadding);
+            let y = this.clamp(projectedCenter.y, this.edgePadding, viewportHeight - this.edgePadding);
+            const edge = this.getMarkerEdge(x, y, viewportWidth, viewportHeight);
+
+            visibleMarkerIds.add(String(myte.id));
+            markerData.push({ myte, edge, x, y });
+        });
+
+        markerData.forEach(marker => this.updateMarker(marker, activeMyte));
+
+        this.markers.forEach((marker, markerId) => {
+            if (!visibleMarkerIds.has(markerId)) {
+                this.hideMarker(marker);
+            }
+        });
+    }
+
+    dispose() {
+        this.markers.forEach(marker => marker.remove());
+        this.markers.clear();
+        this.overlay?.remove();
+        this.overlay = null;
+    }
+}
+
 class ScreenManager extends UIComponent {
     constructor(parent) {
         super(parent);
@@ -1214,8 +1483,15 @@ class UserInterface {
         this.actionSidebarManager = new ActionSidebarManager(this);
         this.myteListManager = new MyteListManager(this);
         this.hudManager = new HUDManager(this);
+        this.offscreenMyteIndicatorManager = new OffscreenMyteIndicatorManager(this);
         this.screenManager = new ScreenManager(this);
         this.cursorManager = new CursorManager(this);
+        this.compactQueueUI = new QueueUI(parent, {
+            element: document.getElementById('myte_queue_overlay'),
+            mode: 'compact',
+            allowControls: false,
+            maxItems: 5
+        });
     }
 
     init() {
@@ -1225,6 +1501,7 @@ class UserInterface {
         this.actionSidebarManager.init();
         this.myteListManager.init();
         this.hudManager.init();
+        this.offscreenMyteIndicatorManager.init();
         this.screenManager.init();
 
         // Initialize additional menus
@@ -1290,6 +1567,8 @@ class UserInterface {
         this.cursorManager.update();
         this.actionSidebarManager.update();
         this.hudManager.update();
+        this.offscreenMyteIndicatorManager.update();
+        this.compactQueueUI?.update?.();
     }
 
     dispose() {
@@ -1305,9 +1584,13 @@ class UserInterface {
         this.screenManager?.destroy?.();
         this.toolManager?.destroy?.();
         this.cursorManager?.destroy?.();
+        this.offscreenMyteIndicatorManager?.dispose?.();
 
         this.screenManager = null;
         this.toolManager = null;
         this.cursorManager = null;
+        this.offscreenMyteIndicatorManager = null;
+        this.compactQueueUI?.dispose?.();
+        this.compactQueueUI = null;
     }
 }

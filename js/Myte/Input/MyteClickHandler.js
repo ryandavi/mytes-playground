@@ -74,6 +74,7 @@ class MyteClickHandler extends MyteBaseHandler {
 
 		if (!this.myte.isActiveMyte) {
 			this.myte.parent.setActiveMyte(this.myte);
+			return;
 		}
 
 		if (this.myte.isAtHomePosition?.(1)) {

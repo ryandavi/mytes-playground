@@ -153,6 +153,7 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         }
 
         const container = this.container;
+        const transitionCopy = this.getPortalTransitionCopy();
 
         if (container.transitionManager) {
             container.transitionManager.startTransition({
@@ -162,6 +163,9 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
                 sourceMapId: this.gameMap?.id ?? null,
                 sourcePortalId: this.getPortalReferenceId(),
                 duration: this.transitionDuration,
+                message: transitionCopy.message,
+                transitionTitle: transitionCopy.title,
+                transitionDescription: transitionCopy.description,
                 myte,
                 sourcePortal: this,
                 onComplete: () => {
@@ -197,6 +201,40 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         });
     }
 
+    getPortalWindowTitle() {
+        if (this.targetMap) {
+            const mapLoader = this.core?.mapLoader;
+            return mapLoader?.getCachedMapDisplayName?.(this.targetMap) ||
+                mapLoader?.humanizeMapId?.(this.targetMap) ||
+                String(this.targetMap);
+        }
+
+        const displayName = this.getDisplayName?.();
+        if (typeof displayName === 'string' && displayName.trim()) {
+            return displayName.trim();
+        }
+
+        return 'Travel';
+    }
+
+    getPortalTransitionMessage() {
+        return `Traveling to ${this.getPortalWindowTitle()}...`;
+    }
+
+    getPortalTransitionDescription() {
+        return this.targetMap
+            ? `Traveling to ${this.getPortalWindowTitle()}...`
+            : 'Traveling...';
+    }
+
+    getPortalTransitionCopy() {
+        return {
+            title: this.getPortalWindowTitle(),
+            message: this.getPortalTransitionMessage(),
+            description: this.getPortalTransitionDescription()
+        };
+    }
+
     updatePortalStateClasses() {
         if (!this.element) return;
         this.element.classList.toggle('active', this.isActive);
@@ -211,7 +249,8 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
 
         const title = document.createElement('div');
         title.className = 'title';
-        title.innerHTML = '&nbsp;';
+        title.textContent = this.getPortalWindowTitle();
+        title.title = this.getPortalWindowTitle();
 
         const content = document.createElement('div');
         content.className = 'content';
@@ -220,6 +259,32 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         portal.appendChild(title);
         portal.appendChild(content);
         this.element.appendChild(portal);
+        this.refreshPortalWindowTitle();
+    }
+
+    refreshPortalWindowTitle() {
+        const titleElement = this.element?.querySelector('.portal-window .title');
+        const nextTitle = this.getPortalWindowTitle();
+        if (titleElement) {
+            titleElement.textContent = nextTitle;
+            titleElement.title = nextTitle;
+        }
+
+        if (!this.targetMap || !this.core?.mapLoader?.getMapDisplayName) {
+            return;
+        }
+
+        this.core.mapLoader.getMapDisplayName(this.targetMap).then(displayName => {
+            if (!displayName) return;
+
+            const liveTitleElement = this.element?.querySelector('.portal-window .title');
+            if (!liveTitleElement) return;
+
+            liveTitleElement.textContent = displayName;
+            liveTitleElement.title = displayName;
+        }).catch(error => {
+            console.warn(`[PortalMapObject] Failed to refresh portal title for ${this.targetMap}:`, error);
+        });
     }
 
     render(container, parent) {
@@ -228,6 +293,7 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
 
         this.updatePortalStateClasses();
         this.ensurePortalWindow();
+        this.refreshPortalWindowTitle();
 
         if (this.targetMap) {
             element.dataset.targetMap = this.targetMap;

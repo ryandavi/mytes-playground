@@ -100,6 +100,32 @@ class AStarMoveAction extends MyteAction {
         this._prevPosY = null;
     }
 
+    getDebugPathfinder() {
+        return this.myte?.pathfinder || this.myte?.parent?.gameMap?.gridSystem?.pathfinder || null;
+    }
+
+    shouldVisualizeDebugPath() {
+        const gameMap = this.myte?.parent?.gameMap;
+        return !!(document.body.classList.contains('debug') && gameMap?.layers?.debug && this.getDebugPathfinder());
+    }
+
+    renderDebugPath(path) {
+        const pathfinder = this.getDebugPathfinder();
+        const debugLayer = this.myte?.parent?.gameMap?.layers?.debug;
+        if (!pathfinder || !debugLayer) return;
+
+        pathfinder.setDebugMode(this.shouldVisualizeDebugPath());
+        pathfinder.visualizePath(debugLayer, path || [], this.myte.size.width, this.myte.size.height, this.myte.collider);
+    }
+
+    clearDebugPath() {
+        const pathfinder = this.getDebugPathfinder();
+        const debugLayer = this.myte?.parent?.gameMap?.layers?.debug;
+        if (!pathfinder || !debugLayer) return;
+
+        pathfinder.clearVisualization(debugLayer);
+    }
+
     getQueueTitle() {
         const target = this.target;
         if (target?.posX != null || (target?.type && target?.variant)) {
@@ -182,8 +208,12 @@ class AStarMoveAction extends MyteAction {
         const myte = this.myte;
         const effectiveOptions = { ...myte.pathfindingOptions, ...(this.pathfindingOptions || {}) };
         const path = myte.pathfinder.findPath(myte, fromX, fromY, to.x, to.y, effectiveOptions);
+        if (path?.length) {
+            this.renderDebugPath(path);
+        }
 
         if (!path?.length) {
+            this.clearDebugPath();
             console.warn(`[ASTAR] _buildPath: pathfinder returned no path from=(${fromX.toFixed(1)},${fromY.toFixed(1)}) to=(${to.x.toFixed(1)},${to.y.toFixed(1)}) — completing`);
             this._actionComplete = true;
             return;
@@ -205,6 +235,7 @@ class AStarMoveAction extends MyteAction {
         }
 
         if (this.targetPoints.length === 0) {
+            this.clearDebugPath();
             console.warn(`[ASTAR] _buildPath: targetPoints empty after filtering — completing`);
             this._actionComplete = true;
             return;
@@ -229,6 +260,7 @@ class AStarMoveAction extends MyteAction {
                 this.myte.setPosition(fp.x, fp.y);
                 this.myte.setSpritePosition(fp.x, fp.y);
                 this.myte.setTarget(fp.x, fp.y);
+                this.clearDebugPath();
                 this._actionComplete = true;
                 return true;
             }
@@ -269,10 +301,12 @@ class AStarMoveAction extends MyteAction {
 
     interrupt() {
         super.interrupt();
+        this.clearDebugPath();
         this._actionComplete = true;
     }
 
     cancel() {
+        this.clearDebugPath();
         this._actionComplete = true;
     }
 }
@@ -625,6 +659,7 @@ class GoToObjectAction extends PositionableAction {
                 return true;
             }
             this._stuckFrames = 0;
+            this.currentTargetIndex = 0;
             this.buildApproachPlan();
             this._lastTargetSnapshot = this._captureTargetSnapshot();
             this._lastTargetReplanAt = performance.now();
@@ -640,6 +675,7 @@ class GoToObjectAction extends PositionableAction {
                 }
             }
             const wp = this.targetPoints[this.currentTargetIndex];
+            if (!wp) { this.faceTarget(); return true; }
             this.myte.setTarget(wp.x, wp.y);
             this.myte.moveTowardsTarget();
             return false;

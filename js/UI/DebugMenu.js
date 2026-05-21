@@ -25,6 +25,8 @@ class DebugMenu extends ModalWindow {
                 getValue: () => document.body.classList.contains('debug'),
                 action: (button, value) => {
                     document.body.classList.toggle('debug');
+                    const gridSystem = this.parent?.parent?.gameMap?.gridSystem;
+                    if (gridSystem) gridSystem.toggleDebug();
                     this.updateButton('toggleDebug');
                 }
             },

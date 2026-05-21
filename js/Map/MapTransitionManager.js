@@ -4,6 +4,7 @@ class MapTransitionManager {
         this.core = container.core;
         this.transitionElement = document.querySelector('.map-transition');
         this.messageElement = this.transitionElement?.querySelector('.transition-message');
+        this.tipElement = this.transitionElement?.querySelector('.transition-tip');
 
         console.log('[MapTransitionManager] Initializing');
 
@@ -29,6 +30,10 @@ class MapTransitionManager {
         const transitionLoader = document.createElement('div');
         transitionLoader.className = 'transition-loader';
         this.transitionElement.appendChild(transitionLoader);
+
+        this.tipElement = document.createElement('div');
+        this.tipElement.className = 'transition-tip';
+        this.transitionElement.appendChild(this.tipElement);
 
         this.container.element.appendChild(this.transitionElement);
     }
@@ -152,7 +157,6 @@ class MapTransitionManager {
             myte.portalCooldownUntil = Date.now() + (
                 arrival.portal.getPortalCooldownDuration?.() || 1500
             );
-            arrival.portal.playPortalSound?.('arrive');
         }
     }
 
@@ -165,6 +169,16 @@ class MapTransitionManager {
     _centerCameraOnMyte(myte) {
         if (!myte || !this.container.camera) return;
         this.container.camera.centerToPosition(myte.posX, myte.posY, myte.size, true);
+        this.container.camera.updateTransform(
+            this.container.camera.posX,
+            this.container.camera.posY,
+            this.container.camera.zoomLevel
+        );
+    }
+
+    async _waitForRevealReadiness(map, mapId) {
+        if (!map) return;
+        await map.waitForRevealReady?.();
     }
 
     _completeTransitionUi(isInitialLoad) {
@@ -188,6 +202,23 @@ class MapTransitionManager {
         return true;
     }
 
+    _buildTransitionCopy(options = {}, mapId = null) {
+        const fallbackName = this.core?.mapLoader?.getCachedMapDisplayName?.(mapId) ||
+            this.core?.mapLoader?.humanizeMapId?.(mapId) ||
+            String(mapId || 'Travel');
+        const defaultMessage = mapId ? `Traveling to ${fallbackName}...` : 'Traveling...';
+
+        return {
+            message: options.message || defaultMessage,
+            title: options.transitionTitle || fallbackName,
+            description: options.transitionDescription || defaultMessage,
+            tip: options.transitionTip || this.core?.mapLoader?.getRandomTransitionTip?.() || '',
+            minVisibleTime: Number.isFinite(options.minVisibleTime)
+                ? Math.max(0, options.minVisibleTime)
+                : 1650
+        };
+    }
+
     async startTransition(options = {}) {
         const sourceMapId = options.sourceMapId || (this.container.gameMap?.id ?? null);
         const mapId = options.targetMap || sourceMapId;
@@ -197,6 +228,7 @@ class MapTransitionManager {
         const sourcePortal = options.sourcePortal || null;
         const sourcePortalId = options.sourcePortalId || sourcePortal?.getPortalReferenceId?.() || null;
         const sameMapTransition = !isInitialLoad && !!mapId && mapId === sourceMapId;
+        const transitionCopy = this._buildTransitionCopy(options, mapId);
 
         if (!isInitialLoad) {
             if (this.container.inputHandler && this.container.inputHandler.disable) {
@@ -205,7 +237,9 @@ class MapTransitionManager {
                 console.warn('InputHandler disable method not available');
             }
 
-            await this.showTransition(options.message || `Loading Map`);
+            if (!sameMapTransition) {
+                await this.showTransition(transitionCopy.message || `Loading...`, transitionCopy.tip || '');
+            }
         }
 
         if (sameMapTransition) {
@@ -239,6 +273,11 @@ class MapTransitionManager {
             } else {
                 newMap = await this.core.mapLoader.loadMapWithTransition(mapId, this.container, {
                     ...options,
+                    message: transitionCopy.message,
+                    transitionTitle: transitionCopy.title,
+                    transitionDescription: transitionCopy.description,
+                    transitionTip: transitionCopy.tip,
+                    minVisibleTime: transitionCopy.minVisibleTime,
                     isInitialLoad: false
                 });
             }
@@ -315,6 +354,8 @@ class MapTransitionManager {
                 this._centerCameraOnMyte(firstMyte);
             }
 
+            await this._waitForRevealReadiness(newMap, mapId);
+
             return this._finishSuccessfulTransition(options, isInitialLoad);
         }
 
@@ -367,10 +408,13 @@ class MapTransitionManager {
         return false;
     }
 
-    showTransition(message) {
+    showTransition(message, tip = '') {
         this.transitionStartTime = Date.now();
         if (this.messageElement) {
             this.messageElement.textContent = message;
+        }
+        if (this.tipElement) {
+            this.tipElement.textContent = tip;
         }
 
         this.transitionElement.classList.add('active');

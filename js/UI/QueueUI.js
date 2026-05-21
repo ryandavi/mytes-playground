@@ -1,13 +1,20 @@
 class QueueUI {
-    constructor(parent) {
+    constructor(parent, options = {}) {
         this.parent = parent;
-        this.queue = document.querySelector('.queueMenu');
+        this.mode = options.mode || 'debug';
+        this.queue = options.element || document.querySelector('.queueMenu');
         this.elements = new Map();
         this.previousValues = new Map();
-        this.allowControls = true;
+        this.allowControls = options.allowControls ?? this.mode !== 'compact';
+        this.maxItems = Number.isFinite(options.maxItems) ? options.maxItems : Infinity;
+        this.holdDelay = Number.isFinite(options.holdDelay) ? options.holdDelay : 550;
     }
 
     createQueueItem(item) {
+        if (this.mode === 'compact') {
+            return this.createCompactQueueItem();
+        }
+
         const element = document.createElement('div');
         element.className = 'queue-item';
 
@@ -101,6 +108,85 @@ class QueueUI {
         return element;
     }
 
+    createCompactQueueItem() {
+        const element = document.createElement('button');
+        element.className = 'queue-item compact';
+        element.type = 'button';
+
+        const icon = document.createElement('span');
+        icon.className = 'queue-icon';
+
+        const order = document.createElement('span');
+        order.className = 'queue-order';
+
+        const tooltip = document.createElement('span');
+        tooltip.className = 'queue-tooltip';
+
+        element.appendChild(order);
+        element.appendChild(icon);
+        element.appendChild(tooltip);
+        element._holdTimer = null;
+        element._holdTriggered = false;
+
+        const clearHoldTimer = () => {
+            if (element._holdTimer) {
+                clearTimeout(element._holdTimer);
+                element._holdTimer = null;
+            }
+
+            if (!element._holdTriggered) {
+                element.classList.remove('holding');
+            }
+        };
+
+        const cancelQueuedAction = () => {
+            const index = Number(element.dataset.index);
+            if (!Number.isFinite(index)) return;
+
+            const activeMyte = this.parent.activeMyte;
+            if (!activeMyte?.queue) return;
+
+            if (index === 0) {
+                activeMyte.queue.removeCurrentAction?.();
+            } else if (Array.isArray(activeMyte.queue.queue)) {
+                activeMyte.queue.queue.splice(index, 1);
+            }
+        };
+
+        element.addEventListener('pointerdown', (event) => {
+            event.preventDefault();
+            element._holdTriggered = false;
+            clearHoldTimer();
+            element.classList.add('holding');
+            element._holdTimer = setTimeout(() => {
+                element._holdTriggered = true;
+                element.classList.remove('holding');
+                cancelQueuedAction();
+            }, this.holdDelay);
+        });
+
+        ['pointerup', 'pointerleave', 'pointercancel', 'lostpointercapture'].forEach(eventName => {
+            element.addEventListener(eventName, clearHoldTimer);
+        });
+
+        element.addEventListener('click', (event) => {
+            if (element._holdTriggered) {
+                event.preventDefault();
+                event.stopPropagation();
+                element._holdTriggered = false;
+                return;
+            }
+
+            element.classList.toggle('show-tooltip');
+            window.setTimeout(() => {
+                element.classList.remove('show-tooltip');
+            }, 1500);
+        });
+
+        element._refs = { icon, order, tooltip };
+        return element;
+    }
+
     getTargetIdentifier(target) {
         if (!target) return null;
 
@@ -111,7 +197,32 @@ class QueueUI {
         return target.constructor?.name || 'Unknown';
     }
 
+    getQueueTitle(item) {
+        return item.getQueueTitle?.() || item.constructor.metadata?.label || item.constructor.name.replace('Action', '');
+    }
+
+    getQueueDescription(item) {
+        return item.getQueueDescription?.() || '';
+    }
+
+    getCompactLabel(item) {
+        const title = this.getQueueTitle(item);
+        const words = String(title)
+            .trim()
+            .split(/[^a-zA-Z0-9]+/)
+            .filter(Boolean);
+
+        if (words.length === 0) return 'Q';
+        if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+        return `${words[0][0]}${words[1][0]}`.toUpperCase();
+    }
+
     updateQueueItem(element, item, index) {
+        if (this.mode === 'compact') {
+            this.updateCompactQueueItem(element, item, index);
+            return;
+        }
+
         const key = `queue-${index}`;
         const refs = element._refs;
         element.dataset.index = String(index);
@@ -121,8 +232,8 @@ class QueueUI {
             targetId,
             repeat: item.repeat,
             name: item.constructor.name,
-            queueTitle: item.getQueueTitle?.() || item.constructor.metadata?.label || item.constructor.name,
-            queueDescription: item.getQueueDescription?.() || '',
+            queueTitle: this.getQueueTitle(item),
+            queueDescription: this.getQueueDescription(item),
             isCurrent: index === 0,
             hasProgress: !!(item.duration && item.duration > 0),
             expressionType: item.type || null
@@ -133,11 +244,11 @@ class QueueUI {
             element.className = `queue-item ${item.constructor.metadata?.category || ''}${index === 0 ? ' current' : ''}`;
 
             refs.number.textContent = `#${index + 1}`;
-            refs.name.textContent = item.getQueueTitle?.() || item.constructor.metadata?.label || item.constructor.name.replace('Action', '');
+            refs.name.textContent = this.getQueueTitle(item);
             refs.description.innerHTML = '';
             refs.status = null;
 
-            const queueDescription = item.getQueueDescription?.();
+            const queueDescription = this.getQueueDescription(item);
             if (queueDescription) {
                 const detail = document.createElement('span');
                 detail.className = 'target';
@@ -188,6 +299,29 @@ class QueueUI {
         }
     }
 
+    updateCompactQueueItem(element, item, index) {
+        const refs = element._refs;
+        const title = this.getQueueTitle(item);
+        const description = this.getQueueDescription(item);
+        const tooltipParts = [title];
+
+        if (description) {
+            tooltipParts.push(description);
+        }
+
+        tooltipParts.push(`Hold to cancel${index === 0 ? ' current action' : ''}.`);
+
+        element.className = `queue-item compact ${item.constructor.metadata?.category || ''}${index === 0 ? ' current' : ''}`;
+        element.dataset.index = String(index);
+        element.dataset.queueTitle = title;
+        element.dataset.queueDescription = description;
+        element.dataset.queueState = index === 0 ? 'now' : 'next';
+        // element.title = `${index === 0 ? 'Now' : `Next ${index}`}: ${title}${description ? ` - ${description}` : ''}`;
+        refs.icon.textContent = this.getCompactLabel(item);
+        refs.order.textContent = index === 0 ? 'NOW' : String(index);
+        refs.tooltip.textContent = tooltipParts.join(' · ');
+    }
+
     calculateProgress(item) {
         if (item.currentDuration === -1) return 0;
         return Math.round(100 - (item.currentDuration / item.duration * 100));
@@ -203,7 +337,7 @@ class QueueUI {
             return;
         }
 
-        const queueItems = this.parent.activeMyte.queue.queue;
+        const queueItems = (this.parent.activeMyte.queue.queue || []).slice(0, this.maxItems);
 
         while (this.elements.size > queueItems.length) {
             const key = `queue-${this.elements.size - 1}`;

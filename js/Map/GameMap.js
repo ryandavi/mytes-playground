@@ -47,6 +47,7 @@ class GameMap {
 
         // Flag to track initialization state
         this.initialized = false;
+        this.backgroundReadyPromise = Promise.resolve();
     }
 
     get container() {
@@ -152,7 +153,7 @@ class GameMap {
     
         // show debug
         this.gridSystem.pathfinder.setDebugMode(true);
-        this.gridSystem.pathfinder.options.visualizeSearch = true;
+        this.gridSystem.pathfinder.options.visualizeSearch = false;
     
         // --- MODIFIED CALL to findPath ---
         const path = this.gridSystem.pathfinder.findPath(
@@ -608,14 +609,70 @@ class GameMap {
     setBackground(background) {
         if (!this.layers.background) return;
 
+        this.backgroundReadyPromise = Promise.resolve();
+
         if (background.color) {
             // this.layers.background.style.backgroundColor = background.color;
         }
 
         if (background.url) {
+            const bgUrl = background.url;
             this.layers.background.style.backgroundImage = `url(${background.url})`;
             this.layers.background.style.backgroundSize = 'fill';
+
+            this.backgroundReadyPromise = new Promise(resolve => {
+                const img = new Image();
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+                img.src = bgUrl;
+
+                if (typeof img.decode === 'function') {
+                    img.decode().then(resolve).catch(() => resolve());
+                }
+            });
         }
+    }
+
+    _waitForAnimationFrame() {
+        return new Promise(resolve => requestAnimationFrame(() => resolve()));
+    }
+
+    async waitForRevealReady() {
+        await Promise.resolve(this.backgroundReadyPromise).catch(() => {});
+
+        const camera = this.parent?.camera || null;
+
+        await this._waitForAnimationFrame();
+
+        if (camera) {
+            camera.updateTransform(camera.posX, camera.posY, camera.zoomLevel);
+        }
+
+        if (this.gridSystem) {
+            if (camera) {
+                this.gridSystem.verifyActiveObjects(camera);
+                this.gridSystem.updateCulling(camera);
+            }
+
+            for (const object of this.gridSystem.activeObjects || []) {
+                if (object.update && !object.sleeping) {
+                    object.update(0);
+                }
+            }
+
+            this.renderer.flush(this.gridSystem.activeObjects || []);
+        } else {
+            for (const object of this.objects) {
+                if (object.update) {
+                    object.update(0);
+                }
+            }
+
+            this.renderer.flush(this.objects);
+        }
+
+        await this._waitForAnimationFrame();
+        await this._waitForAnimationFrame();
     }
 
     add(object, properties = {}) {

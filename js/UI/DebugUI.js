@@ -456,6 +456,34 @@ getZoneDebugMessages() {
 
     }
 
+    prettifyAiToken(token) {
+        return String(token || '')
+            .replace(/[_-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/\b\w/g, char => char.toUpperCase());
+    }
+
+    prettifyAiPath(path) {
+        return String(path || '')
+            .split(':')
+            .filter(Boolean)
+            .map(segment => this.prettifyAiToken(segment))
+            .join(' / ');
+    }
+
+    formatAiCandidate(candidate, index) {
+        const rawLabel = String(candidate?.label || 'candidate');
+        const segments = rawLabel.split(':').filter(Boolean);
+        const primary = this.prettifyAiToken(segments.shift() || rawLabel);
+        const detail = segments.map(segment => this.prettifyAiToken(segment)).join(' / ');
+
+        return {
+            label: `#${index + 1} ${primary}`,
+            value: detail ? `${detail} · ${Number(candidate?.score ?? 0).toFixed(2)}` : Number(candidate?.score ?? 0).toFixed(2)
+        };
+    }
+
     getMyteAiMessages() {
         const activeMyte = this.parent.activeMyte;
         const aiState = activeMyte?.ai?.getDebugState?.();
@@ -466,10 +494,10 @@ getZoneDebugMessages() {
 
         const candidateRows = (aiState.candidates || [])
             .slice(0, 5)
-            .map((c, i) => ({ label: `  #${i + 1} ${c.label}`, value: fmt(c.score) }));
+            .map((candidate, index) => this.formatAiCandidate(candidate, index));
 
         return [
-            { label: "Decision", value: aiState.lastDecisionLabel || 'N/A' },
+            { label: "Decision", value: aiState.lastDecisionLabel ? this.prettifyAiPath(aiState.lastDecisionLabel) : 'N/A' },
             { label: "Rest", value: fmt(needs.rest) },
             { label: "Social", value: fmt(needs.social) },
             { label: "Enrichment", value: fmt(needs.enrichment) },

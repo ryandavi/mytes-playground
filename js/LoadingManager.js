@@ -6,11 +6,14 @@ class LoadingManager {
         CONTAINER: 'container',
     });
 
-    constructor(options = {}) {
+	constructor(options = {}) {
 		this.loadingScreen = document.getElementById('loading-screen');
 		this.window         = this.loadingScreen?.querySelector('#loading-modal')         ?? null;
+		this.titleText      = this.loadingScreen?.querySelector('.modal-title .text')     ?? null;
+		this.descriptionText = this.loadingScreen?.querySelector('.loading-message p')    ?? null;
 		this.progressBar    = this.loadingScreen?.querySelector('.loading-progress')       ?? null;
 		this.loadingText    = this.loadingScreen?.querySelector('.loading-status')         ?? null;
+		this.tipText        = this.loadingScreen?.querySelector('.loading-tip')            ?? null;
 		this.loadingIcon    = this.loadingScreen?.querySelector('.loading-icon')           ?? null;
 		this.skipIcon       = this.loadingScreen?.querySelector('.modal-close-btn')        ?? null;
 		this.progressContainer = this.loadingScreen?.querySelector('.loading-progress-container') ?? null;
@@ -34,6 +37,7 @@ class LoadingManager {
             finalMessage: "Ready to play!",
             hideDelay: 100,
             showWindowDelay: 150,
+            transitionFadeDuration: 450,
             ...options.settings,
         };
 
@@ -54,8 +58,16 @@ class LoadingManager {
         this.hideTimer = null;
         this.finalHideTimer = null;
         this.manualProgress = null;
+        this.overlayShownAt = 0;
+        this.overlayMinVisibleTime = 0;
         this._containerWidth = 0;
         this.boundHandleResize = null;
+        this.currentVariant = 'default';
+        this.defaultOverlayCopy = {
+            title: this.titleText?.textContent || 'Loading Mytes...',
+            description: this.descriptionText?.textContent || 'Please wait while your Mytes are being prepared.',
+            tip: ''
+        };
     }
 
     createStages(stageDefinitions = null) {
@@ -93,14 +105,38 @@ class LoadingManager {
         const {
             progress = 0,
             message = null,
+            variant = 'default',
+            title = null,
+            description = null,
+            tip = null,
+            minVisibleTime = 0,
         } = options;
+
+        if (this.messageTimer) {
+            clearTimeout(this.messageTimer);
+            this.messageTimer = null;
+        }
+
+        this.messageQueue = [];
+        this.currentMessage = null;
+        this.overlayShownAt = Date.now();
+        this.overlayMinVisibleTime = Math.max(0, minVisibleTime);
+
+        this.applyOverlayVariant({
+            variant,
+            title,
+            description,
+            tip
+        });
 
         this.manualProgress = Math.min(100, Math.max(0, progress));
         this.show();
         this.cacheProgressMeasurements();
         this.updateProgressUI(this.manualProgress);
 
-        if (message) {
+        if (variant === 'transition') {
+            this.showMessage(message || title || 'Traveling...');
+        } else if (message) {
             this.setMessage(message);
         }
 
@@ -285,7 +321,22 @@ class LoadingManager {
         this.isLoading = true;
         this.isComplete = false;
         if (this.loadingScreen) {
+            if (this.currentVariant === 'transition') {
+                this.loadingScreen.style.transition = 'none';
+                this.loadingScreen.style.opacity = '1';
+            } else {
+                this.loadingScreen.style.transition = '';
+                this.loadingScreen.style.opacity = '';
+            }
             this.loadingScreen.classList.remove('hidden');
+
+            if (this.currentVariant === 'transition') {
+                requestAnimationFrame(() => {
+                    if (this.loadingScreen && this.currentVariant === 'transition') {
+                        this.loadingScreen.style.transition = '';
+                    }
+                });
+            }
         }
         
         const canvas = document.querySelector('.canvas');
@@ -300,8 +351,22 @@ class LoadingManager {
 
         this.isLoading = false;
         this.manualProgress = null;
+        const isTransition = this.currentVariant === 'transition';
+        const fadeDuration = isTransition
+            ? Math.max(0, this.settings.transitionFadeDuration)
+            : Math.max(0, this.settings.hideDelay);
+
+        const canvas = document.querySelector('.canvas');
+        if (isTransition && canvas) {
+            canvas.style.visibility = 'visible';
+        }
 
         if (this.loadingScreen) {
+            if (isTransition) {
+                this.loadingScreen.style.transition = `opacity ${fadeDuration}ms ease-out`;
+            } else {
+                this.loadingScreen.style.transition = '';
+            }
             this.loadingScreen.classList.add('hidden');
         }
         
@@ -325,13 +390,48 @@ class LoadingManager {
             clearTimeout(this.hideTimer);
         }
 
+        const elapsed = this.overlayShownAt ? Date.now() - this.overlayShownAt : 0;
+        const remainingVisibleTime = Math.max(0, this.overlayMinVisibleTime - elapsed);
+
         this.hideTimer = setTimeout(() => {
-            const canvas = document.querySelector('.canvas');
-            if (canvas) {
+            if (!isTransition && canvas) {
                 canvas.style.visibility = 'visible';
             }
             this.window?.classList.remove('visible');
-        }, this.settings.hideDelay);
+            this.applyOverlayVariant({ variant: 'default' });
+            if (this.loadingScreen) {
+                this.loadingScreen.style.transition = '';
+                this.loadingScreen.style.opacity = '';
+            }
+            this.overlayShownAt = 0;
+            this.overlayMinVisibleTime = 0;
+        }, remainingVisibleTime + fadeDuration);
+    }
+
+    applyOverlayVariant(options = {}) {
+        const {
+            variant = 'default',
+            title = null,
+            description = null,
+            tip = null
+        } = options;
+
+        const isTransition = variant === 'transition';
+        this.currentVariant = variant;
+        this.loadingScreen?.classList.toggle('transition-mode', isTransition);
+        this.window?.classList.toggle('transition-mode', isTransition);
+
+        if (this.titleText) {
+            this.titleText.textContent = title || this.defaultOverlayCopy.title;
+        }
+
+        if (this.descriptionText) {
+            this.descriptionText.textContent = description || this.defaultOverlayCopy.description;
+        }
+
+        if (this.tipText) {
+            this.tipText.textContent = isTransition ? (tip || '') : this.defaultOverlayCopy.tip;
+        }
     }
     
     updateProgressUI(percent) {

@@ -4,7 +4,97 @@ class GameMapLoader {
         this.core = core;
         this.maps = new Map();
         this.currentMap = null;
+        this.mapDisplayNames = new Map();
+        this.mapDisplayNamePromises = new Map();
         console.log(`[GameMapLoader] Initialized`);
+    }
+
+    normalizeMapId(mapId) {
+        return String(mapId || '').replace(/\.tmx$/i, '');
+    }
+
+    humanizeMapId(mapId) {
+        const normalized = this.normalizeMapId(mapId);
+        return normalized
+            .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+            .replace(/[_-]+/g, ' ')
+            .trim() || 'Unknown';
+    }
+
+    getCachedMapDisplayName(mapId) {
+        const normalized = this.normalizeMapId(mapId);
+        return this.mapDisplayNames.get(normalized) || null;
+    }
+
+    async getMapDisplayName(mapId) {
+        const normalized = this.normalizeMapId(mapId);
+        if (!normalized) {
+            return 'Unknown';
+        }
+
+        const cached = this.getCachedMapDisplayName(normalized);
+        if (cached) {
+            return cached;
+        }
+
+        if (this.mapDisplayNamePromises.has(normalized)) {
+            return this.mapDisplayNamePromises.get(normalized);
+        }
+
+        const promise = (async () => {
+            const fallback = this.humanizeMapId(normalized);
+            const paths = [
+                `data/spritesheets/${normalized}.tmx`,
+                `data/maps/${normalized}.tmx`,
+                `assets/maps/${normalized}.tmx`,
+                `${normalized}.tmx`
+            ];
+
+            for (const path of paths) {
+                try {
+                    const response = await fetch(path);
+                    if (!response.ok) continue;
+
+                    const xmlText = await response.text();
+                    const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
+                    const propertyNode = xml.querySelector('map > properties > property[name="displayName"]');
+                    const displayName = propertyNode?.getAttribute('value')?.trim();
+
+                    if (displayName) {
+                        this.mapDisplayNames.set(normalized, displayName);
+                        return displayName;
+                    }
+                } catch (error) {
+                    console.warn(`[GameMapLoader] Could not resolve display name for ${normalized} from ${path}:`, error);
+                }
+            }
+
+            return fallback;
+        })();
+
+        this.mapDisplayNamePromises.set(normalized, promise);
+
+        try {
+            const displayName = await promise;
+            if (displayName) {
+                this.mapDisplayNames.set(normalized, displayName);
+            }
+            return displayName || this.humanizeMapId(normalized);
+        } finally {
+            this.mapDisplayNamePromises.delete(normalized);
+        }
+    }
+
+    getRandomTransitionTip() {
+        const tips = [
+            'You can long-press a queue badge in the top-left to cancel it.',
+            'Free-roaming mytes can be tapped again to bring them back into follow mode.',
+            'Dragging a myte onto its slot sends it home.',
+            'Different maps can have their own zones for resting, wandering, and social behavior.',
+            'Double-click the map to queue an A* move for your active myte.'
+        ];
+
+        return tips[Math.floor(Math.random() * tips.length)];
     }
 
     updateTransitionOverlay(progress, message = null) {
@@ -54,6 +144,9 @@ class GameMapLoader {
             }
 
             this.currentMap = map;
+            if (map?.displayName) {
+                this.mapDisplayNames.set(this.normalizeMapId(mapId), map.displayName);
+            }
             console.log(`[GameMapLoader] Map ${mapId} loaded successfully`);
             return map;
         } catch (error) {
@@ -62,36 +155,10 @@ class GameMapLoader {
         }
     }
 
-    // Update the loadMapWithTransition method to pass the isInitialLoad flag
     async loadMapWithTransition(mapId, container, options = {}) {
-        // Store the current map for rollback if needed
         const previousMap = this.currentMap;
 
-        // Show loading screen
-        if (this.core && this.core.loadingManager) {
-            this.core.loadingManager.beginOverlay({
-                progress: 10,
-                message: options.message || `Traveling to ${mapId}...`
-            });
-        }
-
         try {
-            // Prepare for map change
-            if (this.currentMap) {
-                // Update progress
-                if (this.core && this.core.loadingManager) {
-                    this.updateTransitionOverlay(30, `Unloading current map...`);
-                }
-
-                // Don't dispose the current map yet - keep it in case we need to roll back
-            }
-
-            // Update progress
-            if (this.core && this.core.loadingManager) {
-                this.updateTransitionOverlay(50, `Loading ${mapId}...`);
-            }
-
-            // Load the new map
             const map = await this.loadMap(mapId, container, {
                 isInitialLoad: options.isInitialLoad || false
             });
@@ -100,46 +167,15 @@ class GameMapLoader {
                 throw new Error(`Failed to load map: ${mapId}`);
             }
 
-            // Update progress
-            if (this.core && this.core.loadingManager) {
-                this.updateTransitionOverlay(90, `Almost ready...`);
-            }
-
-            // Now that we have successfully loaded the new map, we can safely dispose the old one
             if (previousMap) {
                 previousMap.dispose();
             }
 
-            // Final setup
             this.currentMap = map;
-
-            // Complete loading and hide loading screen
-            if (this.core && this.core.loadingManager) {
-                this.updateTransitionOverlay(100, `Welcome to ${mapId}!`);
-
-                // Wait a short moment before hiding
-                setTimeout(() => {
-                    this.core.loadingManager.hide();
-                }, 200);
-            }
-
             return map;
         } catch (error) {
             console.error(`Error loading map ${mapId}:`, error);
-
-            // Show error in loading screen
-            if (this.core && this.core.loadingManager) {
-                this.core.loadingManager.setMessage(`Error loading map: ${error.message}`);
-
-                // Wait a little longer to show the error message
-                setTimeout(() => {
-                    this.core.loadingManager.hide();
-                }, 2000);
-            }
-
-            // Important: keep the current map active since loading failed
             this.currentMap = previousMap;
-
             return null;
         }
     }

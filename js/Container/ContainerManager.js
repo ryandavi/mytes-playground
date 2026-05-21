@@ -677,6 +677,33 @@ class ContainerManager {
         this.eventManager?.emit('container:active_myte_changed', { myte });
     }
 
+    deactivateActiveMyte(myte = this.activeMyte) {
+        if (!myte || this.activeMyte !== myte) {
+            this.setActiveMyte(null);
+            return;
+        }
+
+        myte.cancelInactivityFreeRoam?.();
+
+        if (myte.isDeployed) {
+            myte.setMode(MOVE_TYPES.FREEROAM);
+        }
+
+        this.activeMyte = null;
+        this.camera.setMode(this.settings.defaultMyteCamera);
+
+        this.mytes.forEach(m => {
+            m.syncSelectionState();
+        });
+
+        this.ui.myteListManager.updateMytesList(null);
+        this.ui.debugMenu.updateButtons();
+        this.ui.hudManager.update();
+        this.ui.setSelected(null);
+
+        this.eventManager?.emit('container:active_myte_changed', { myte: null });
+    }
+
     update(deltaTime) {
         this.drawTargetDot();
         this.updateUserActivity();

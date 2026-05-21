@@ -32,7 +32,7 @@ class AStarPathfinder {
             pathEdgePenaltyFactor: 0.3,
             avoidDifficultTerrain: true,
             allowEntityOutOfBounds: true,
-            visualizeSearch: true,
+            visualizeSearch: false,
             visualizeRejectedNodes: false,
             maxVisualizedNodes: 250,
 
@@ -380,66 +380,39 @@ class AStarPathfinder {
 
         if (!path || path.length === 0) return;
 
-        const nodeSize = 6; // Smaller default size
-        const endNodeSize = 10;
-
-        // Visualize path segments (lines between entity centers)
         for (let i = 0; i < path.length - 1; i++) {
-            const startPoint = path[i]; // Entity center
-            const endPoint = path[i + 1]; // Next entity center
-
-            const line = document.createElement('div');
-            line.className = 'pathfinder-node path-line debug';
+            const startPoint = path[i];
+            const endPoint = path[i + 1];
 
             const dx = endPoint.x - startPoint.x;
             const dy = endPoint.y - startPoint.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             const angle = Math.atan2(dy, dx) * 180 / Math.PI;
 
-            Object.assign(line.style, {
-                position: 'absolute',
-                left: `${startPoint.x}px`,
-                top: `${startPoint.y}px`,
-                width: `${distance}px`,
-                height: '2px',
-                backgroundColor: 'rgba(0, 100, 255, 0.6)',
-                transformOrigin: '0 0',
-                transform: `rotate(${angle}deg)`,
-                zIndex: 990 + i
-            });
+            const line = document.createElement('div');
+            line.className = 'pathfinder-node path-line debug';
+            line.style.left = `${startPoint.x}px`;
+            line.style.top = `${startPoint.y}px`;
+            line.style.width = `${distance}px`;
+            line.style.transform = `rotate(${angle}deg)`;
+            line.style.zIndex = 990 + i;
             container.appendChild(line);
 
-            // Add waypoint dots (centers)
             const waypointNode = document.createElement('div');
-            waypointNode.className = `pathfinder-node waypoint-node debug`;
-            Object.assign(waypointNode.style, {
-                left: `${startPoint.x - nodeSize / 2}px`,
-                top: `${startPoint.y - nodeSize / 2}px`,
-                width: `${nodeSize}px`,
-                height: `${nodeSize}px`,
-                position: 'absolute',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(0, 100, 255, 0.8)',
-                zIndex: 1000 + i
-            });
+            waypointNode.className = 'pathfinder-node waypoint-node debug';
+            waypointNode.style.left = `${startPoint.x}px`;
+            waypointNode.style.top = `${startPoint.y}px`;
+            waypointNode.style.zIndex = 1000 + i;
             container.appendChild(waypointNode);
         }
 
-        // Add final waypoint dot
         if (path.length > 0) {
             const endPoint = path[path.length - 1];
             const endNode = document.createElement('div');
-            endNode.className = `pathfinder-node end-node debug`;
-            Object.assign(endNode.style, {
-                left: `${endPoint.x - endNodeSize / 2}px`,
-                top: `${endPoint.y - endNodeSize / 2}px`,
-                width: `${endNodeSize}px`,
-                height: `${endNodeSize}px`,
-                position: 'absolute',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(255, 0, 0, 0.8)',
-                zIndex: 1000 + path.length
-            });
+            endNode.className = 'pathfinder-node end-node debug';
+            endNode.style.left = `${endPoint.x}px`;
+            endNode.style.top = `${endPoint.y}px`;
+            endNode.style.zIndex = 1000 + path.length;
             container.appendChild(endNode);
         }
 
@@ -1294,33 +1267,26 @@ class AStarPathfinder {
         const entityX = centerPoint.x - entityWidth / 2;
         const entityY = centerPoint.y - entityHeight / 2;
 
-        // --- Visualize Entity Bounding Box ---
         const entity = document.createElement('div');
         entity.className = `pathfinder-node entity-box debug ${nodeType}-entity`;
-        Object.assign(entity.style, {
-            position: 'absolute',
-            left: `${entityX}px`, top: `${entityY}px`,
-            width: `${entityWidth}px`, height: `${entityHeight}px`,
-            border: `1px dashed ${nodeType === 'start' ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)'}`,
-            zIndex: 979
-        });
+        entity.style.left = `${entityX}px`;
+        entity.style.top = `${entityY}px`;
+        entity.style.width = `${entityWidth}px`;
+        entity.style.height = `${entityHeight}px`;
+        entity.style.zIndex = 979;
         container.appendChild(entity);
 
-        // --- Visualize Collider ---
         if (entityCollider) {
             const colliderLeft = entityX + entityCollider.offsetX;
             const colliderTop = entityY + entityCollider.offsetY;
 
             const colliderEl = document.createElement('div');
             colliderEl.className = `pathfinder-node entity-collider debug ${nodeType}-collider`;
-            Object.assign(colliderEl.style, {
-                position: 'absolute',
-                left: `${colliderLeft}px`, top: `${colliderTop}px`,
-                width: `${entityCollider.width}px`, height: `${entityCollider.height}px`,
-                border: `1px solid ${nodeType === 'start' ? 'rgba(0, 255, 0, 0.8)' : 'rgba(255, 0, 0, 0.8)'}`,
-                backgroundColor: `${nodeType === 'start' ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255, 0, 0, 0.2)'}`,
-                zIndex: 980
-            });
+            colliderEl.style.left = `${colliderLeft}px`;
+            colliderEl.style.top = `${colliderTop}px`;
+            colliderEl.style.width = `${entityCollider.width}px`;
+            colliderEl.style.height = `${entityCollider.height}px`;
+            colliderEl.style.zIndex = 980;
             container.appendChild(colliderEl);
         }
     }
@@ -1345,17 +1311,11 @@ class AStarPathfinder {
             const center = this.gridSystem.gridToWorld(gridX, gridY);
             const node = document.createElement('div');
             node.className = `pathfinder-node ${className} debug`;
-            Object.assign(node.style, {
-                position: 'absolute',
-                left: `${center.x - size / 2}px`,
-                top: `${center.y - size / 2}px`,
-                width: `${size}px`,
-                height: `${size}px`,
-                borderRadius: '50%',
-                backgroundColor: color,
-                zIndex: 985,
-                pointerEvents: 'none'
-            });
+            node.style.left = `${center.x - size / 2}px`;
+            node.style.top = `${center.y - size / 2}px`;
+            node.style.width = `${size}px`;
+            node.style.height = `${size}px`;
+            node.style.zIndex = 985;
             container.appendChild(node);
         }
     }
