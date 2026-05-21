@@ -108,16 +108,7 @@ class SettingsMenu extends ModalWindow {
     }
     
     applyGraphicsSettings() {
-        // Apply graphics settings to the game
-        console.log('Applying graphics settings:', this.settings.graphics);
-        
-        // Example implementation:
-        const gameRenderer = this.parent.renderer;
-        if (gameRenderer) {
-            gameRenderer.setQuality(this.settings.graphics.quality);
-            gameRenderer.setEffectsEnabled(this.settings.graphics.effects);
-            gameRenderer.setAnimationsEnabled(this.settings.graphics.animations);
-        }
+        // No renderer target exists yet — placeholder for future graphics service.
     }
     
     saveSettings() {

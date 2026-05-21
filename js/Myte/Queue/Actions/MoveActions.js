@@ -26,23 +26,6 @@ class MoveAction extends MyteAction {
 
     start() {
         super.start();
-
-        if (this.myte.checkForCollisions && this.myte.parent.gameMap) {
-            const path = this.myte.parent.gameMap.gridSystem.pathfinder.findPath(
-                this.myte.posX,
-                this.myte.posY,
-                this.targets[this.targetIndex].x,
-                this.targets[this.targetIndex].y,
-                this.myte.collider.width,
-                this.myte.collider.height
-            );
-
-            if (path) {
-                this.targets = path;
-                this.targetIndex = 0;
-            }
-        }
-
         this.setNextTarget();
         this.myte.reset();
     }

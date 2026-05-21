@@ -31,6 +31,8 @@ class MyteAI {
 
         this.lastContextSnapshot = null;
         this.lastCandidateSnapshot = [];
+
+        this._tickTime = 0;
     }
 
     resolveMode(mode) {
@@ -58,6 +60,8 @@ class MyteAI {
     }
 
     tickUpdate(tickDelta) {
+        this._tickTime++;
+
         if (!this.canPlan()) {
             this.resetThinking();
             return;
@@ -827,40 +831,63 @@ class MyteAI {
         }
     }
 
+    _sortByDistance(items) {
+        return items
+            .map(item => ({ item, d: this.myte.getDistanceTo(item) }))
+            .sort((a, b) => a.d - b.d)
+            .map(entry => entry.item);
+    }
+
     getNearbyMytes(radius) {
-        return (this.myte.parent?.mytes || [])
-            .filter(target =>
-                target &&
-                target !== this.myte &&
-                target.isActive &&
-                !target.isDragging &&
-                this.myte.getDistanceTo(target) <= radius
+        if (this._nearbyMytesCache && this._nearbyMytesRadius === radius &&
+            this._nearbyMytesTime === this._tickTime) {
+            return this._nearbyMytesCache;
+        }
+        const result = this._sortByDistance(
+            (this.myte.parent?.mytes || []).filter(target =>
+                target && target !== this.myte && target.isActive &&
+                !target.isDragging && this.myte.getDistanceTo(target) <= radius
             )
-            .sort((a, b) => this.myte.getDistanceTo(a) - this.myte.getDistanceTo(b));
+        );
+        this._nearbyMytesCache = result;
+        this._nearbyMytesRadius = radius;
+        this._nearbyMytesTime = this._tickTime;
+        return result;
     }
 
     getNearbyObjects(radius) {
-        return (this.myte.parent?.gameMap?.objects || [])
-            .filter(target =>
-                target &&
-                target.active &&
-                !target.isDragging &&
-                Number.isFinite(target.posX) &&
-                Number.isFinite(target.posY) &&
+        if (this._nearbyObjectsCache && this._nearbyObjectsRadius === radius &&
+            this._nearbyObjectsTime === this._tickTime) {
+            return this._nearbyObjectsCache;
+        }
+        const result = this._sortByDistance(
+            (this.myte.parent?.gameMap?.objects || []).filter(target =>
+                target && target.active && !target.isDragging &&
+                Number.isFinite(target.posX) && Number.isFinite(target.posY) &&
                 this.myte.getDistanceTo(target) <= radius
             )
-            .sort((a, b) => this.myte.getDistanceTo(a) - this.myte.getDistanceTo(b));
+        );
+        this._nearbyObjectsCache = result;
+        this._nearbyObjectsRadius = radius;
+        this._nearbyObjectsTime = this._tickTime;
+        return result;
     }
 
     getNearbyDroppedItems(radius) {
-        return (this.myte.parent?.gameMap?.droppedItems || [])
-            .filter(item =>
-                item &&
-                item.active &&
-                !item.collected &&
+        if (this._nearbyItemsCache && this._nearbyItemsRadius === radius &&
+            this._nearbyItemsTime === this._tickTime) {
+            return this._nearbyItemsCache;
+        }
+        const result = this._sortByDistance(
+            (this.myte.parent?.gameMap?.droppedItems || []).filter(item =>
+                item && item.active && !item.collected &&
                 this.myte.getDistanceTo(item) <= radius
             )
-            .sort((a, b) => this.myte.getDistanceTo(a) - this.myte.getDistanceTo(b));
+        );
+        this._nearbyItemsCache = result;
+        this._nearbyItemsRadius = radius;
+        this._nearbyItemsTime = this._tickTime;
+        return result;
     }
 
     getAffordancesForTarget(target, context) {

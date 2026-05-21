@@ -192,53 +192,38 @@ class CursorManager extends UIComponent {
     setupEventListeners() {
         if (this.listenersAttached) return;
 
+        const input = InputSystem.getInstance();
+        const throttledMove = this.throttle((data) => {
+            if (!this.config.enabled) return;
+            this.position.x = data.position.clientX;
+            this.position.y = data.position.clientY;
+            this.updateCursorPosition();
+            if (!this.isVisible) this.showCursor();
+        }, this.config.throttleDelay);
+
+        this._inputUnsubs = [
+            input.on('mouse.move', throttledMove),
+            input.on('mouse.down', () => this.handleMouseDown()),
+            input.on('mouse.up',   () => this.handleMouseUp()),
+        ];
+
+        // mouseleave/mouseenter/focusin are not in InputSystem — keep as direct DOM listeners
         this.boundHandlers = {
-            mouseMove: this.throttle((event) => {
-                this.handleMouseMove(event);
-            }, this.config.throttleDelay),
-            mouseDown: this.handleMouseDown.bind(this),
-            mouseUp: this.handleMouseUp.bind(this),
             mouseLeave: this.hideCursor.bind(this),
             mouseEnter: this.showCursor.bind(this),
             focusIn: (event) => {
-                // Show native cursor on focusable elements for accessibility
-                if (this.config.accessibility.showNativeCursorForScreenReaders && 
+                if (this.config.accessibility.showNativeCursorForScreenReaders &&
                     event.target.tabIndex >= 0) {
                     event.target.style.cursor = 'auto';
                 }
             }
         };
-
-        // Use throttled mousemove for performance
-        document.addEventListener('mousemove', this.boundHandlers.mouseMove);
-        
-        // Track mouse state
-        document.addEventListener('mousedown', this.boundHandlers.mouseDown);
-        document.addEventListener('mouseup', this.boundHandlers.mouseUp);
-        
-        // Handle visibility
         document.addEventListener('mouseleave', this.boundHandlers.mouseLeave);
         document.addEventListener('mouseenter', this.boundHandlers.mouseEnter);
-        
-        // Handle focus for accessibility
-        document.addEventListener('focusin', this.boundHandlers.focusIn);
+        document.addEventListener('focusin',    this.boundHandlers.focusIn);
         this.listenersAttached = true;
     }
 
-    handleMouseMove(event) {
-        if (!this.config.enabled) return;
-        
-        this.position.x = event.clientX;
-        this.position.y = event.clientY;
-        
-        this.updateCursorPosition();
-        
-        // Make sure cursor is visible when mouse moves
-        if (!this.isVisible) {
-            this.showCursor();
-        }
-    }
-    
     handleMouseDown() {
         if (!this.config.enabled) return;
         
@@ -461,14 +446,15 @@ class CursorManager extends UIComponent {
     }
     
     destroy() {
-        // Clean up event listeners
+        // Unsubscribe from InputSystem
+        this._inputUnsubs?.forEach(s => s.unsubscribe());
+        this._inputUnsubs = null;
+
+        // Clean up remaining direct DOM listeners
         if (this.boundHandlers) {
-            document.removeEventListener('mousemove', this.boundHandlers.mouseMove);
-            document.removeEventListener('mousedown', this.boundHandlers.mouseDown);
-            document.removeEventListener('mouseup', this.boundHandlers.mouseUp);
             document.removeEventListener('mouseleave', this.boundHandlers.mouseLeave);
             document.removeEventListener('mouseenter', this.boundHandlers.mouseEnter);
-            document.removeEventListener('focusin', this.boundHandlers.focusIn);
+            document.removeEventListener('focusin',    this.boundHandlers.focusIn);
             this.boundHandlers = null;
         }
         this.listenersAttached = false;

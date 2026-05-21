@@ -116,25 +116,7 @@ class GridSystem {
     }
 
     invalidatePathfinderCaches() {
-        if (this.pathfinder?.validationCache) {
-            this.pathfinder.validationCache.clear();
-        }
-
-        const mytes = this.parent?.mytes || [];
-        mytes.forEach(myte => {
-            if (myte?.pathfinder?.validationCache) {
-                myte.pathfinder.validationCache.clear();
-            }
-        });
-
-        // Also clear caches for any map objects that have their own pathfinder
-        // (e.g. NpcMapObject). Covers doors opening, gates toggling, etc.
-        const objects = this.parent?.objects || [];
-        objects.forEach(obj => {
-            if (obj?.pathfinder?.validationCache) {
-                obj.pathfinder.validationCache.clear();
-            }
-        });
+        this.pathfinder?.validationCache?.clear();
     }
 
     // Add this method to update grid cells with terrain data

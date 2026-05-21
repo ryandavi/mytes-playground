@@ -105,7 +105,7 @@ class MyteQueue {
     }
 
     // Update loop
-    update() {
+    update(deltaTime) {
         if (this.queue.length === 0) return;
 
         const currentAction = this.queue[0];
@@ -115,7 +115,7 @@ class MyteQueue {
             this.isDoingAction = true;
         }
 
-        if (currentAction.update()) {
+        if (currentAction.update(deltaTime)) {
             this.queue.shift();
             this.isDoingAction = false;
             currentAction.complete();

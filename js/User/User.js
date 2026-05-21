@@ -167,14 +167,14 @@ class User {
     addMyte(myte) {
         this.activeMytes.push(myte);
         this.stats.mytesHatched++;
-        this.saveUserData();
+        this._scheduleSave();
     }
 
     removeMyte(myteId) {
         const index = this.activeMytes.findIndex(myte => myte.id === myteId);
         if (index !== -1) {
             this.activeMytes.splice(index, 1);
-            this.saveUserData();
+            this._scheduleSave();
             return true;
         }
         return false;
@@ -184,7 +184,7 @@ class User {
     addCurrency(type, amount) {
         if (this.currency.hasOwnProperty(type)) {
             this.currency[type] += amount;
-            this.saveUserData();
+            this._scheduleSave();
             return true;
         }
         return false;
@@ -193,7 +193,7 @@ class User {
     spendCurrency(type, amount) {
         if (this.currency.hasOwnProperty(type) && this.currency[type] >= amount) {
             this.currency[type] -= amount;
-            this.saveUserData();
+            this._scheduleSave();
             return true;
         }
         return false;
@@ -203,7 +203,7 @@ class User {
     setPreference(key, value) {
         if (this.preferences.hasOwnProperty(key)) {
             this.preferences[key] = value;
-            this.saveUserData();
+            this._scheduleSave();
             return true;
         }
         return false;
@@ -217,7 +217,7 @@ class User {
                 claimed: false
             });
             this.stats.achievementsUnlocked++;
-            this.saveUserData();
+            this._scheduleSave();
             return true;
         }
         return false;
@@ -260,6 +260,16 @@ class User {
         if (lastUserIdKey) {
             localStorage.setItem(lastUserIdKey, this.userId);
         }
+    }
+
+    // Debounced save — use this for frequent mutations (myte add/remove, currency, prefs).
+    // Flushes at most once per 2 seconds; logout/unload calls saveUserData() directly.
+    _scheduleSave() {
+        if (this._saveTimer) return;
+        this._saveTimer = setTimeout(() => {
+            this._saveTimer = null;
+            this.saveUserData();
+        }, 2000);
     }
 
     loadUserData() {

@@ -346,10 +346,6 @@ class MapTransitionManager {
                     firstMyte = activeMyte;
                 }
 
-                const newGridSystem = this.container.gameMap.gridSystem;
-                this.container.mytes.forEach(myte => {
-                    myte.updatePathfinder(newGridSystem);
-                });
 
                 this._centerCameraOnMyte(firstMyte);
             }

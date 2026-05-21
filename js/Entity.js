@@ -21,23 +21,10 @@ const EntityDefaults = {
 
 const EntityMethods = {
 
-	// Creates (or recreates) the AStarPathfinder for this entity.
-	// Call this once the gridSystem is available.
-	initPathfinder(gridSystem) {
-		if (!gridSystem) return;
-		if (this.pathfinder) this.pathfinder.dispose?.();
-		this.pathfinder = new AStarPathfinder(gridSystem);
-	},
-
-	// Replaces the pathfinder when the map changes.
-	updatePathfinder(gridSystem) {
-		this.initPathfinder(gridSystem);
-	},
-
-	// Clears the position-validation cache so stale walkability data
-	// doesn't persist after a door opens or a blocker moves.
-	invalidatePathfinderCache() {
-		this.pathfinder?.validationCache?.clear();
+	// Returns the map's shared AStarPathfinder. All pathfinding goes through
+	// one instance per map — no per-entity copies needed.
+	get pathfinder() {
+		return this.parent?.gameMap?.gridSystem?.pathfinder ?? null;
 	},
 
 	// Returns true when this entity is allowed to auto-open the given collider.

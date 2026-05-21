@@ -44,8 +44,6 @@ class NpcMapObject extends MovingMapObject {
 			...this.getConfig('capabilities', {})
 		};
 
-		// Pathfinder is created in render() once the gridSystem is ready.
-		this.pathfinder = null;
 		this.pathfindingOptions = {
 			likedTerrain:              this.getConfig('likedTerrain', []),
 			dislikedTerrain:           this.getConfig('dislikedTerrain', []),
@@ -92,11 +90,6 @@ class NpcMapObject extends MovingMapObject {
 		const element = super.render(container, parent);
 		element.classList.add('npc-entity', `npc-${this.aiState}`);
 
-		// Build pathfinder now that the map and gridSystem are guaranteed ready.
-		if (this.map?.gridSystem) {
-			this.initPathfinder(this.map.gridSystem);
-		}
-
 		return element;
 	}
 
@@ -107,10 +100,7 @@ class NpcMapObject extends MovingMapObject {
 	// MovingMapObject's setTarget / moveToward expect.
 	// Returns true when a valid path was found.
 	_computePath(targetCenterX, targetCenterY) {
-		if (!this.pathfinder) {
-			if (this.map?.gridSystem) this.initPathfinder(this.map.gridSystem);
-			if (!this.pathfinder) return false;
-		}
+		if (!this.pathfinder) return false;
 
 		const path = this.pathfinder.findPath(
 			this,

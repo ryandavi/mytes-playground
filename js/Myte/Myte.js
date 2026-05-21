@@ -73,7 +73,6 @@ class Myte {
 		// bools
 		this.checkForCollisions = true;
 
-		this.pathfinder = null; // Initialize pathfinder property
 
 
 
@@ -210,11 +209,6 @@ class Myte {
 			console.error(`Myte ${this.id}: Cannot initialize particle effects - ParticleSystem not found.`);
 		}
 
-		if (this.parent?.gameMap?.gridSystem) {
-            this.initPathfinder(this.parent.gameMap.gridSystem);
-        } else {
-            console.error(`Myte ${this.id}: Cannot initialize pathfinder - GridSystem not found.`);
-        }
 		this.setStartTime();
 	}
 
@@ -1228,14 +1222,14 @@ class Myte {
 	doJump()        { return this.physicsController.doJump(); }
 	doLandFromFall() { this.physicsController.doLandFromFall(); }
 
-	doMovementLogic() {
+	doMovementLogic(deltaTime) {
 		if (this.isDragging) {
 			return;
 		}
 
 		if (this.goal === MOVE_TYPES.GRAVITY) {
 			if (!this.queue.isEmpty()) {
-				this.queue.update();
+				this.queue.update(deltaTime);
 			} else {
 				// Handle random jumping when appropriate
 				if (!this.isCurrentlyJumping()) {
@@ -1267,7 +1261,7 @@ class Myte {
 				this.setTarget(home.x, home.y);
 
 				if (!this.queue.isEmpty()) {
-					this.queue.update();
+					this.queue.update(deltaTime);
 					this.goHomePathState.directFallbackFrames = 0;
 				} else {
 					const distanceToHome = this.getDistanceToPoint(home.x, home.y);
@@ -1295,7 +1289,7 @@ class Myte {
 			if (this.queue.isEmpty()) {
 				this.watchCursor();
 			} else {
-				this.queue.update();
+				this.queue.update(deltaTime);
 			}
 		}
 	}
@@ -1509,7 +1503,7 @@ class Myte {
 		this.updateTargetDot();
 
 		// movement logic
-		this.doMovementLogic();
+		this.doMovementLogic(deltaTime);
 		this.tryResolveColliderOverlap();
 		this.ensureFiniteCoordinates('update:end');
 

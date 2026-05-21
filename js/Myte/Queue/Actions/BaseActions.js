@@ -262,7 +262,7 @@ class PositionableAction extends MyteAction {
     }
 }
 
-// Pause in place for a fixed number of frames
+// Pause in place for a fixed duration (ms)
 class IdleAction extends MyteAction {
     static metadata = {
         id: 'idle',
@@ -271,7 +271,7 @@ class IdleAction extends MyteAction {
         priority: 0,
         isMovementAction: false,
         isInterruptible: true,
-        defaultDuration: 200,
+        defaultDuration: 3000,
         description: 'Stay in place for a moment',
         requiresTarget: false,
         affectsMood: false
@@ -288,8 +288,8 @@ class IdleAction extends MyteAction {
         }
     }
 
-    update() {
-        this.currentDuration--;
+    update(deltaTime) {
+        this.currentDuration -= deltaTime;
         return this.currentDuration <= 0;
     }
 }
@@ -303,7 +303,7 @@ class ExpressionAction extends MyteAction {
         priority: 2,
         isMovementAction: false,
         isInterruptible: false,
-        defaultDuration: 50,
+        defaultDuration: 800,
         description: 'Show an emotion or expression overlay',
         requiresTarget: false,
         affectsMood: true,
@@ -327,8 +327,8 @@ class ExpressionAction extends MyteAction {
         }
     }
 
-    update() {
-        this.currentDuration--;
+    update(deltaTime) {
+        this.currentDuration -= deltaTime;
 
         if (this.currentDuration <= 0) {
             this.repeat--;

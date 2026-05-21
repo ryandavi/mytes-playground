@@ -483,7 +483,7 @@ getZoneDebugMessages() {
             { label: "Speed", value: activeMyte.stats.getSpeed() },
 
             {label: "Health", value: status.health},
-            {label: "Energy", value: status.energy.current},
+            {label: "Energy", value: status.energy.current.toFixed(1)},
             
             {label: "Level", value: status.level},
             {label: "Experience", value: status.experience},

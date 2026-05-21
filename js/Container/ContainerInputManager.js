@@ -10,7 +10,6 @@ class ContainerInputManager {
 
     // Track input state
     this.isEnabled = true;
-    this.lastActiveTime = Date.now();
     this.inactivityTimeout = this.container?.core?.config?.inactiveTimeout ?? 60000;
     this.longTapTimer = null;
     this.longTapStartX = 0;
@@ -72,7 +71,6 @@ class ContainerInputManager {
    * This is used to track user activity
    */
   setLastActive() {
-    this.lastActiveTime = Date.now();
     this.inputSystem.recordActivity?.();
   }
 
@@ -86,12 +84,7 @@ class ContainerInputManager {
       this.inactivityTimeout = timeout;
     }
 
-    const didChange = this.inputSystem.checkInactivity(this.inactivityTimeout);
-    if (this.inputSystem.isUserActive()) {
-      this.lastActiveTime = Date.now();
-    }
-
-    return didChange;
+    return this.inputSystem.checkInactivity(this.inactivityTimeout);
   }
 
   /**
@@ -110,11 +103,6 @@ class ContainerInputManager {
     this.inputSystem.checkInactivity(this.inactivityTimeout);
     const isActive = this.inputSystem.isUserActive();
 
-    if (isActive) {
-      this.lastActiveTime = Date.now();
-    }
-
-    // If activity state changed
     if (wasActive !== isActive) {
       if (isActive) {
         // User became active
