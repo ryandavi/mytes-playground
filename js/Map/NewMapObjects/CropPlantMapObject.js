@@ -52,6 +52,10 @@ class CropPlantMapObject extends GrowingPlantMapObject {
         }
     }
 
+    isReadyToHarvest() {
+        return !!this.harvestable;
+    }
+
     harvest() {
         if (!this.harvestable) return null;
 
@@ -100,6 +104,10 @@ class CropPlantMapObject extends GrowingPlantMapObject {
         const myte = this.activeMyte;
         if (!myte) return false;
 
+        const queueVerb = this.harvestable
+            ? 'Harvest'
+            : (this.canWater() ? 'Water Plant' : 'Tend');
+
         return this.runInteractionWhenInRange(() => {
             if (this.harvestable) {
                 this.performHarvest(parent, myte);
@@ -109,7 +117,10 @@ class CropPlantMapObject extends GrowingPlantMapObject {
             if (this.canWater()) {
                 this.water();
             }
-        }, myte);
+        }, myte, {
+            queueVerb,
+            userInitiated: true
+        });
     }
     
     performHarvest(parent, myte) {
@@ -117,6 +128,7 @@ class CropPlantMapObject extends GrowingPlantMapObject {
         const inventory = this.gameMap?.inventory || parent?.inventory;
 
         if (harvest && inventory) {
+            this.playConfiguredSound?.('harvest');
             inventory.addItem(harvest.variant, harvest.quantity, harvest.type);
             
             // Boost myte mood

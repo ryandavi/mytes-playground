@@ -278,6 +278,22 @@
                         border-top: 1px solid var(--border-subtle);
                     }
 
+                    &.major-action {
+                        @include neutral-info-panel;
+                        margin-bottom: var(--padding);
+                        border: 1px solid var(--border-subtle);
+
+                        +.action-group {
+                            margin-top: 0;
+                            border-top: none;
+                        }
+
+                        .primary-action {
+                            width: 100%;
+                            font-weight: 700;
+                        }
+                    }
+
                     h3 {
                         font-size: 0.8em;
                         text-transform: uppercase;

@@ -40,6 +40,7 @@ class ContainerInputManager {
 
     this.isEnabled = false;
     console.log('Input manager disabled');
+    this.clearLongTapTimer();
 
     // You might want to add a visual indicator that inputs are disabled
     document.body.classList.add('inputs-disabled');
@@ -60,6 +61,7 @@ class ContainerInputManager {
 
     // Reset last active time when re-enabling
     this.setLastActive();
+    this.container?.handleUserActive?.();
   }
 
   //==================================================
@@ -80,6 +82,10 @@ class ContainerInputManager {
    * @returns {boolean} Whether the user's status has changed
    */
   checkInactive(timeout = this.inactivityTimeout) {
+    if (!this.isEnabled) {
+      return false;
+    }
+
     if (Number.isFinite(timeout) && timeout > 0) {
       this.inactivityTimeout = timeout;
     }
@@ -99,6 +105,10 @@ class ContainerInputManager {
    * Check for user inactivity and notify container
    */
   checkInactivity() {
+    if (!this.isEnabled) {
+      return;
+    }
+
     const wasActive = this.inputSystem.isUserActive();
     this.inputSystem.checkInactivity(this.inactivityTimeout);
     const isActive = this.inputSystem.isUserActive();
@@ -223,7 +233,10 @@ class ContainerInputManager {
     if (!myte?.isActive || !myte.pathfinder || myte.queue.isCarrying()) return;
     if (!this.container.ui?.isTool(UIToolModes.SELECT)) return;
     const world = this.screenToWorldCoordinates(screenX, screenY);
-    myte.queue.add('astar-move', { target: { x: world.x, y: world.y } });
+    myte.queue.add('astar-move', {
+      target: { x: world.x, y: world.y },
+      userInitiated: true
+    });
   }
 
   /**

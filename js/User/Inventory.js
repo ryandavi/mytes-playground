@@ -490,11 +490,15 @@ class Inventory {
         myte.stats.updateMood(itemConfig.moodBoost);
 
         // Emit particles or other visual effects if system exists
-        if (this.parent.particleSystem) {
-            this.parent.particleSystem.emit(
-                itemType, 
-                myte.posX + myte.size.width / 2, 
-                myte.posY + myte.size.height / 2
+        const particleSystem = this.parent?.gameMap?.particleSystem || null;
+        if (particleSystem) {
+            particleSystem.emit(
+                'SPARKLE',
+                myte.posX + myte.size.width / 2,
+                myte.posY + myte.size.height / 2,
+                {
+                    debugLabel: `inventory_${itemType}`
+                }
             );
         }
     }

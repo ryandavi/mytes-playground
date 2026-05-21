@@ -75,10 +75,13 @@ class RangeInteractiveAnimatedMapObject extends withAnimation(MapObject) {
         return 'side';
     }
 
-    enqueueApproach(myte, onComplete = null) {
+    enqueueApproach(myte, onComplete = null, options = {}) {
         if (!myte?.queue) return false;
 
-        const payload = { target: this };
+        const payload = {
+            target: this,
+            ...options
+        };
         if (onComplete) {
             payload.onComplete = onComplete;
         }
@@ -97,8 +100,11 @@ class RangeInteractiveAnimatedMapObject extends withAnimation(MapObject) {
         const {
             interactionRadius = this.getInteractionRadius(),
             queueIfOutOfRange = true,
-            allowUnlimitedRange = interactionRadius === -1
+            allowUnlimitedRange = interactionRadius === -1,
+            queueVerb = null,
+            userInitiated = false
         } = options;
+        const resolvedQueueVerb = queueVerb || (userInitiated ? this.getBestInteractionAction?.(myte)?.label ?? null : null);
 
         if (allowUnlimitedRange || this.isInInteractionRange(myte, interactionRadius)) {
             action(myte);
@@ -106,7 +112,10 @@ class RangeInteractiveAnimatedMapObject extends withAnimation(MapObject) {
         }
 
         if (!queueIfOutOfRange) return false;
-        return this.enqueueApproach(myte, () => action(myte));
+        return this.enqueueApproach(myte, () => action(myte), {
+            queueVerb: resolvedQueueVerb,
+            userInitiated
+        });
     }
 }
 

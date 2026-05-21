@@ -105,13 +105,20 @@ class AStarMoveAction extends MyteAction {
         pathfinder.clearVisualization(debugLayer);
     }
 
-    getQueueTitle() {
-        const target = this.target;
-        if (target?.posX != null || (target?.type && target?.variant)) {
-            return `Move To ${this.getQueueTargetLabel(target)}`;
+    refreshDebugVisualization() {
+        if (!this.targetPoints?.length) {
+            this.clearDebugPath();
+            return;
         }
 
-        return 'Move To Point';
+        this.renderDebugPath(this.targetPoints.map(point => ({
+            x: point.x + this.myte.size.width / 2,
+            y: point.y + this.myte.size.height / 2
+        })));
+    }
+
+    getQueueTitle() {
+        return 'Move To';
     }
 
     getQueueDescription() {
@@ -350,12 +357,49 @@ class GoToObjectAction extends PositionableAction {
     }
 
     getQueueTitle() {
-        const targetLabel = this.getQueueTargetLabel(this.target);
-        return targetLabel ? `${this.constructor.metadata.label} ${targetLabel}` : this.constructor.metadata.label;
+        return this.queueVerb || this.constructor.metadata.label;
     }
 
     getQueueDescription() {
-        return '';
+        return this.getQueueTargetLabel(this.target);
+    }
+
+    getDebugPathfinder() {
+        return this.myte?.pathfinder || this.myte?.parent?.gameMap?.gridSystem?.pathfinder || null;
+    }
+
+    shouldVisualizeDebugPath() {
+        const gameMap = this.myte?.parent?.gameMap;
+        return !!(document.body.classList.contains('debug') && gameMap?.layers?.debug && this.getDebugPathfinder());
+    }
+
+    renderDebugPath(path) {
+        const pathfinder = this.getDebugPathfinder();
+        const debugLayer = this.myte?.parent?.gameMap?.layers?.debug;
+        if (!pathfinder || !debugLayer) return;
+
+        pathfinder.setDebugMode(this.shouldVisualizeDebugPath());
+        pathfinder.visualizePath(debugLayer, path || [], this.myte.size.width, this.myte.size.height, this.myte.collider);
+    }
+
+    clearDebugPath() {
+        const pathfinder = this.getDebugPathfinder();
+        const debugLayer = this.myte?.parent?.gameMap?.layers?.debug;
+        if (!pathfinder || !debugLayer) return;
+
+        pathfinder.clearVisualization(debugLayer);
+    }
+
+    refreshDebugVisualization() {
+        if (!this.targetPoints?.length) {
+            this.clearDebugPath();
+            return;
+        }
+
+        this.renderDebugPath(this.targetPoints.map(point => ({
+            x: point.x + this.myte.size.width / 2,
+            y: point.y + this.myte.size.height / 2
+        })));
     }
 
     static canPerform(selected, active) {
@@ -482,15 +526,15 @@ class GoToObjectAction extends PositionableAction {
             return;
         }
 
-        const myteRect = this.myte.getRect();
-        console.log(`[APPROACH] buildApproachPlan target="${this.target?.constructor?.name ?? this.target?.id}" alignTo="${cfg.alignTo}" targetRect=`, {...targetRect}, `myteRect=`, {...myteRect}, `mytePos=(${this.myte.posX.toFixed(1)},${this.myte.posY.toFixed(1)})`);
+        const myteApproachRect = this.getMyteApproachRect(cfg.myteAlignTo);
+        console.log(`[APPROACH] buildApproachPlan target="${this.target?.constructor?.name ?? this.target?.id}" alignTo="${cfg.alignTo}" myteAlignTo="${cfg.myteAlignTo ?? 'sprite'}" targetRect=`, {...targetRect}, `myteApproachRect=`, {...myteApproachRect}, `mytePos=(${this.myte.posX.toFixed(1)},${this.myte.posY.toFixed(1)})`);
 
         this.targetCenter = {
             x: spriteRect.x + spriteRect.width  / 2,
             y: spriteRect.y + spriteRect.height / 2
         };
 
-        const candidates = this.getCandidatePositions(targetRect, myteRect, cfg);
+        const candidates = this.getCandidatePositions(targetRect, myteApproachRect, cfg);
         console.log(`[APPROACH] candidates (${candidates.length}):`, candidates.map((c, i) => `[${i}] (${c.x.toFixed(1)},${c.y.toFixed(1)})`).join('  '));
         const bestPath   = this.findBestPath(candidates);
 
@@ -498,15 +542,39 @@ class GoToObjectAction extends PositionableAction {
             console.log(`[APPROACH] bestPath → targetPos=(${bestPath.targetPos.x.toFixed(1)},${bestPath.targetPos.y.toFixed(1)}) score=${bestPath.score.toFixed(1)} waypoints=${bestPath.targetPoints.length}`);
             this.targetPos    = bestPath.targetPos;
             this.targetPoints = bestPath.targetPoints;
+            this.refreshDebugVisualization();
             return;
         }
 
         this.targetPos = candidates[0] ?? {
-            x: this.targetCenter.x - myteRect.width  / 2,
-            y: this.targetCenter.y - myteRect.height / 2
+            x: this.targetCenter.x - (this.myte.size.width / 2),
+            y: this.targetCenter.y - (this.myte.size.height / 2)
         };
         console.log(`[APPROACH] no path found — falling back to candidate[0] targetPos=(${this.targetPos.x.toFixed(1)},${this.targetPos.y.toFixed(1)})`);
         this.targetPoints = null;
+        this.clearDebugPath();
+    }
+
+    getMyteApproachRect(alignTo = 'sprite') {
+        if (alignTo === 'collider' && this.myte?.collider) {
+            return {
+                x: this.myte.posX + (this.myte.collider.offsetX ?? 0),
+                y: this.myte.posY + (this.myte.collider.offsetY ?? 0),
+                width: this.myte.collider.width ?? this.myte.size.width,
+                height: this.myte.collider.height ?? this.myte.size.height,
+                offsetX: this.myte.collider.offsetX ?? 0,
+                offsetY: this.myte.collider.offsetY ?? 0
+            };
+        }
+
+        return {
+            x: this.myte.posX,
+            y: this.myte.posY,
+            width: this.myte.size.width,
+            height: this.myte.size.height,
+            offsetX: 0,
+            offsetY: 0
+        };
     }
 
     getCandidatePositions(targetRect, myteRect, cfg) {
@@ -514,14 +582,19 @@ class GoToObjectAction extends PositionableAction {
         const posOpts  = { gap: cfg.gap, align: cfg.align };
         const seen     = new Set();
         const candidates = [];
+        const myteSpriteRect = this.myte.getRect();
 
         console.log(`[APPROACH] sides order: [${sides.join(', ')}]`);
         for (const side of sides) {
-            const raw      = this.calculatePosition(myteRect, targetRect, side, posOpts);
-            const clamped  = this.adjustPositionToBounds(raw, myteRect);
+            const rawCollider = this.calculatePosition(myteRect, targetRect, side, posOpts);
+            const raw = {
+                x: rawCollider.x - (myteRect.offsetX ?? 0),
+                y: rawCollider.y - (myteRect.offsetY ?? 0)
+            };
+            const clamped  = this.adjustPositionToBounds(raw, myteSpriteRect);
             const key      = `${Math.round(clamped.x)},${Math.round(clamped.y)}`;
             const dup = seen.has(key);
-            console.log(`[APPROACH]   side=${side} raw=(${raw.x.toFixed(1)},${raw.y.toFixed(1)}) clamped=(${clamped.x.toFixed(1)},${clamped.y.toFixed(1)})${dup ? ' [DUPLICATE - skipped]' : ''}`);
+            console.log(`[APPROACH]   side=${side} rawCollider=(${rawCollider.x.toFixed(1)},${rawCollider.y.toFixed(1)}) rawMyte=(${raw.x.toFixed(1)},${raw.y.toFixed(1)}) clamped=(${clamped.x.toFixed(1)},${clamped.y.toFixed(1)})${dup ? ' [DUPLICATE - skipped]' : ''}`);
             if (dup) continue;
             seen.add(key);
             candidates.push(clamped);
@@ -615,6 +688,32 @@ class GoToObjectAction extends PositionableAction {
         return Math.hypot(gapX, gapY);
     }
 
+    getEffectiveStuckCompletionDistance() {
+        const targetThreshold = Number(this.target?.getConfig?.('interactionTouchThreshold', NaN));
+        if (Number.isFinite(targetThreshold) && targetThreshold > 0) {
+            return Math.min(this.stuckCompletionDistance, targetThreshold);
+        }
+
+        return this.stuckCompletionDistance;
+    }
+
+    getInteractionCompletionThreshold() {
+        const targetThreshold = Number(this.target?.getConfig?.('interactionTouchThreshold', NaN));
+        if (Number.isFinite(targetThreshold) && targetThreshold >= 0) {
+            return targetThreshold;
+        }
+
+        return null;
+    }
+
+    hasReachedInteractionThreshold() {
+        const threshold = this.getInteractionCompletionThreshold();
+        if (threshold === null) {
+            return null;
+        }
+
+        return this.getTargetColliderGap() <= threshold;
+    }
 
     update() {
         const now = performance.now();
@@ -633,7 +732,7 @@ class GoToObjectAction extends PositionableAction {
 
         if (this._stuckFrames > 45) {
             const colliderGap = this.getTargetColliderGap();
-            if (this.allowStuckSuccess !== false && colliderGap <= this.stuckCompletionDistance) {
+            if (this.allowStuckSuccess !== false && colliderGap <= this.getEffectiveStuckCompletionDistance()) {
                 this.faceTarget();
                 return true;
             }
@@ -649,15 +748,21 @@ class GoToObjectAction extends PositionableAction {
             if (this.myte.isAtTarget()) {
                 this.currentTargetIndex++;
                 if (this.currentTargetIndex >= this.targetPoints.length) {
-                    this.faceTarget();
-                    return true;
+                    this.targetPoints = null;
+                    this.currentTargetIndex = 0;
                 }
             }
-            const wp = this.targetPoints[this.currentTargetIndex];
-            if (!wp) { this.faceTarget(); return true; }
-            this.myte.setTarget(wp.x, wp.y);
-            this.myte.moveTowardsTarget();
-            return false;
+
+            if (this.targetPoints?.length) {
+                const wp = this.targetPoints[this.currentTargetIndex];
+                if (!wp) {
+                    this.targetPoints = null;
+                } else {
+                    this.myte.setTarget(wp.x, wp.y);
+                    this.myte.moveTowardsTarget();
+                    return false;
+                }
+            }
         }
 
         if (!this.targetPos) return true;
@@ -666,11 +771,28 @@ class GoToObjectAction extends PositionableAction {
         this.myte.moveTowardsTarget();
 
         if (this.myte.isAtTarget()) {
+            const withinInteractionThreshold = this.hasReachedInteractionThreshold();
+            if (withinInteractionThreshold === false) {
+                this.buildApproachPlan();
+                this._lastTargetSnapshot = this._captureTargetSnapshot();
+                this._lastTargetReplanAt = performance.now();
+
+                if (this.targetPoints?.length || this.targetPos) {
+                    return false;
+                }
+            }
+
             this.faceTarget();
+            this.clearDebugPath();
             return true;
         }
 
         return false;
+    }
+
+    interrupt() {
+        super.interrupt();
+        this.clearDebugPath();
     }
 }
 

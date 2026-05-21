@@ -252,6 +252,16 @@ class ContainerManager {
     }
 
     updateUserActivity() {
+        if (!this.inputHandler?.isEnabled) {
+            return;
+        }
+
+        if (this.activeMyte?.queue?.hasUserInitiatedAction?.()) {
+            this.inputHandler.setLastActive?.();
+            this.handleUserActive();
+            return;
+        }
+
         const statusChanged = this.inputHandler.checkInactive(this.core.config.inactiveTimeout);
         if (statusChanged) {
             if (this.inputHandler.isUserActive()) {

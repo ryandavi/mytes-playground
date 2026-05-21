@@ -1,887 +1,869 @@
-const PARTICLE_CONFIG = {
-	// Base configurations for different effect types
-	SPARKLE: {
-	  type: 'sparkle',
-	  interval: 200,
-	  colors: ['#ffffff', '#ffff99'],
-	  size: 5,
-	  sizeEnd: 1,
-	  life: 50,
-	  opacity: 0.9,
-	  opacityEnd: 0,
-	  count: 1,
-	  randomizePosition: true,
-	  randomizeFactor: 15,
-	  speed: 0.8,
-	  gravity: -0.01,
-	  friction: 0.95
-	},
-	
-	SPARKLE_SPRITE: {
-	  type: 'sparkle',
-	  useSprite: true,
-	  sprite: 'images/particles/sparkle_2.gif',
-	  spriteFrames: [
-		[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0], [8, 0], [9,0]
-	  ],
-	  size: 16,
-	  sizeEnd: 16,
-	  life: 40,
-	  count: 1,
-	  interval: 300,
-	  frameDelay: 3
-	},
-	
-	TRAIL: {
-	  type: 'trail',
-	  interval: 50,
-	  colors: ['#ffcc00', '#ff9900', '#ff6600'],
-	  size: 8,
-	  sizeEnd: 2,
-	  life: 30,
-	  count: 2,
-	  emitWhenMoving: true,
-	  movementThreshold: 0.2
-	},
-	
-	DUST: {
-	  type: 'dust',
-	  interval: 100,
-	  colors: ['#e0e0e0', '#d0d0d0', '#c0c0c0'],
-	  size: 5,
-	  sizeEnd: 8,
-	  life: 40,
-	  count: 2,
-	  gravity: -0.01,
-	  friction: 0.99,
-	  emitWhenMoving: true,
-	  movementThreshold: 0.5,
-	  randomizePosition: true,
-	  randomizeFactor: 10
-	},
+const MAP_PARTICLE_PRESETS = {
+    SPARKLE: {
+        extends: 'SPARKLE',
+        renderLayer: 'overlay'
+    },
 
-	DUST_SPRITE: {
-		type: 'dust',
-		interval: 100,
-		colors: ['#e0e0e0', '#d0d0d0', '#c0c0c0'],
-		size: 5,
-		sizeEnd: 8,
-		life: 40,
-		count: 2,
-		gravity: -0.01,
-		friction: 0.99,
-		emitWhenMoving: true,
-		movementThreshold: 0.5,
-		randomizePosition: true,
-		randomizeFactor: 10,
+    SPARKLE_SPRITE: {
+        extends: 'SPARKLE',
+        emissionMode: 'continuous',
+        interval: 300,
+        count: 1,
+        useSprite: true,
+        sprite: 'images/particles/sparkle_2.gif',
+        spriteFrames: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0], [8, 0], [9, 0]],
+        spriteFrameWidth: 16,
+        spriteFrameHeight: 16,
+        size: 16,
+        sizeEnd: 16,
+        life: 640,
+        speedMin: 0.05,
+        speedMax: 0.3,
+        randomizePosition: true,
+        randomizeFactor: 12,
+        frameDuration: 50,
+        renderLayer: 'overlay'
+    },
 
-		useSprite: true,
-		sprite: 'images/particles/dust-spritesheet.png',
-		spriteFrames: [
-		  [0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0]
-		],
-		size: 32,
-		sizeEnd: 32,
+    TRAIL: {
+        extends: 'TRAIL',
+        renderLayer: 'ground'
+    },
 
-	  },
+    DUST: {
+        extends: 'DUST',
+        renderLayer: 'ground'
+    },
 
-	  LANDING_DUST: {
-		type: 'dust',
-		useSprite: true,
-		sprite: 'images/particles/dust-spritesheet.png',
-		spriteFrames: [
-		  [0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0]
-		],
-		size: 32,
-		sizeEnd: 32,
-		count: 16,          // More particles for impact
-		life: 40,          // How long particles last
-		emitWhenMoving: false,  // Important! Don't trail
-		// randomizePosition: true,
-		randomizeFactor: 15,    // Spread particles more
-		positionAtFeet: true,   // Position at feet
-	  },
-	
-	EMOTION: {
-	  type: 'emotion',
-	  interval: 500,
-	  count: 1,
-	  colors: ['#ff5555'],
-	  size: 15,
-	  sizeEnd: 8,
-	  life: 80,
-	  offsetY: -30,
-	  gravity: -0.05
-	},
-	
-	AURA: {
-	  type: 'aura',
-	  interval: 100,
-	  colors: ['#7788ff', '#aabbff'],
-	  size: 10,
-	  sizeEnd: 5,
-	  life: 40,
-	  opacity: 0.6,
-	  spread: 20,
-	  randomizePosition: true,
-	  randomizeFactor: 15
-	},
-	
-	GLOW: {
-	  type: 'glow',
-	  interval: 100,
-	  colors: ['#ffffcc', '#ffff88', '#ffff44'],
-	  size: 8,
-	  sizeEnd: 4,
-	  life: 60,
-	  opacity: 0.5,
-	  randomizeFactor: 20,
-	  orbitalMotion: true,
-	  orbitalSpeed: 0.02,
-	  pulseEffect: true,
-	  pulseFrequency: 0.05,
-	  gravity: 0,
-	  friction: 1.0
-	},
-	
-	SLIME: {
-	  type: 'slime',
-	  interval: 80,
-	  colors: ['#a0e8c8', '#80d0b0'],
-	  size: 3,
-	  sizeEnd: 4,
-	  opacity: 0.7,
-	  opacityEnd: 0.1,
-	  life: 60,
-	  count: 1,
-	  friction: 0.999,
-	  emitWhenMoving: true,
-	  movementThreshold: 0.1
-	},
-	
-	RAIN: {
-	  type: 'rain',
-	  interval: 100,
-	  colors: ['#a0c8ff'],
-	  size: 3,
-	  sizeEnd: 2,
-	  life: 100,
-	  count: 10,
-	  gravity: 0.1,
-	  windSpeed: -1,
-	  speed: 10
-	},
-	
-	SNOW: {
-	  type: 'snow',
-	  interval: 200,
-	  colors: ['#ffffff'],
-	  size: 4,
-	  life: 500,
-	  count: 10,
-	  gravity: 0.05,
-	  speed: 1,
-	  accumulate: false
-	},
-	
-	FIREWORK: {
-	  type: 'firework',
-	  interval: 1000,
-	  colors: ['#ffcc00'],
-	  explosionColors: [
-		'#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#ff00ff', '#ffffff'
-	  ],
-	  size: 4,
-	  life: 100,
-	  particleCount: 100,
-	  gravity: 0.05
-	},
-	
-	SMOKE: {
-	  type: 'smoke',
-	  interval: 200,
-	  colors: ['#bbbbbb', '#aaaaaa', '#999999'],
-	  size: 15,
-	  sizeEnd: 40,
-	  life: 100,
-	  count: 1,
-	  gravity: -0.05
-	},
+    DUST_SPRITE: {
+        extends: 'DUST',
+        useSprite: true,
+        sprite: 'images/particles/dust-spritesheet.png',
+        spriteFrames: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0]],
+        spriteFrameWidth: 32,
+        spriteFrameHeight: 32,
+        size: 32,
+        sizeEnd: 32,
+        life: 700,
+        frameDuration: 55,
+        renderLayer: 'ground'
+    },
 
-		
-	SMOKE_SPRITE: {
-		type: 'smoke',
-		interval: 200,
-		colors: ['#bbbbbb', '#aaaaaa', '#999999'],
-		size: 15,
-		sizeEnd: 40,
-		life: 100,
-		count: 1,
-		gravity: -0.05,
+    LANDING_DUST: {
+        extends: 'DUST_SPRITE',
+        emissionMode: 'event',
+        count: 16,
+        oneShot: false,
+        life: 700,
+        size: 32,
+        sizeEnd: 32,
+        speedMin: 0.1,
+        speedMax: 0.85,
+        gravity: -0.01,
+        randomizePosition: true,
+        randomizeFactor: 15,
+        spreadX: 20,
+        spreadY: 10,
+        attachmentPoint: 'feet',
+        positionAtFeet: true,
+        renderLayer: 'ground'
+    },
 
-		useSprite: true,
-		sprite: 'images/particles/smoke-spritesheet.png',
-		spriteFrames: [
-			[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0]
-		],
-		size: 64,
-		sizeEnd: 64,
+    EMOTION: {
+        extends: 'EMOTION',
+        renderLayer: 'overlay'
+    },
 
+    AURA: {
+        extends: 'AURA',
+        renderLayer: 'overlay'
+    },
 
+    GLOW: {
+        extends: 'GLOW',
+        renderLayer: 'overlay'
+    },
 
-	  },
+    SLIME: {
+        extends: 'SLIME',
+        renderLayer: 'ground'
+    },
 
+    RAIN: {
+        extends: 'RAIN',
+        renderLayer: 'overlay',
+        emitWhileVisible: true
+    },
 
-	
-	SWARM: {
-	  type: 'swarm',
-	  interval: 300,
-	  colors: ['#eeee22', '#ddcc11'],
-	  size: 3,
-	  sizeEnd: 2,
-	  life: 500,
-	  count: 20
-	}
-  };
+    SNOW: {
+        extends: 'SNOW',
+        renderLayer: 'overlay',
+        emitWhileVisible: true
+    },
+
+    FIREWORK: {
+        extends: 'FIREWORK',
+        renderLayer: 'overlay'
+    },
+
+    SMOKE: {
+        extends: 'SMOKE',
+        renderLayer: 'object'
+    },
+
+    MOTES: {
+        extends: 'MOTES',
+        renderLayer: 'overlay',
+        emitWhileVisible: true
+    },
+
+    EMBER: {
+        extends: 'EMBER',
+        renderLayer: 'object'
+    },
+
+    IMPACT_SPARK: {
+        extends: 'IMPACT_SPARK',
+        renderLayer: 'overlay'
+    },
+
+    POLLEN: {
+        extends: 'POLLEN',
+        renderLayer: 'overlay',
+        emitWhileVisible: true
+    },
+
+    BUBBLE: {
+        extends: 'BUBBLE',
+        renderLayer: 'object'
+    },
+
+    HEAL: {
+        extends: 'HEAL',
+        renderLayer: 'overlay'
+    },
+
+    SMOKE_SPRITE: {
+        extends: 'SMOKE',
+        useSprite: true,
+        sprite: 'images/particles/smoke-spritesheet.png',
+        spriteFrames: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0]],
+        spriteFrameWidth: 64,
+        spriteFrameHeight: 64,
+        size: 64,
+        sizeEnd: 64,
+        frameDuration: 70,
+        renderLayer: 'object'
+    },
+
+    SWARM: {
+        extends: 'SWARM',
+        renderLayer: 'overlay'
+    }
+};
+
+class WorldParticleUtilities {
+    static getDirectionVector(direction) {
+        const raw = String(direction || '').toUpperCase();
+
+        switch (raw) {
+            case 'N':
+            case 'NORTH':
+            case 'UP':
+                return { x: 0, y: -1 };
+            case 'S':
+            case 'SOUTH':
+            case 'DOWN':
+                return { x: 0, y: 1 };
+            case 'E':
+            case 'EAST':
+            case 'RIGHT':
+                return { x: 1, y: 0 };
+            case 'W':
+            case 'WEST':
+            case 'LEFT':
+                return { x: -1, y: 0 };
+            case 'NE':
+            case 'NORTHEAST':
+                return { x: Math.SQRT1_2, y: -Math.SQRT1_2 };
+            case 'NW':
+            case 'NORTHWEST':
+                return { x: -Math.SQRT1_2, y: -Math.SQRT1_2 };
+            case 'SE':
+            case 'SOUTHEAST':
+                return { x: Math.SQRT1_2, y: Math.SQRT1_2 };
+            case 'SW':
+            case 'SOUTHWEST':
+                return { x: -Math.SQRT1_2, y: Math.SQRT1_2 };
+            default:
+                return { x: 0, y: 1 };
+        }
+    }
+
+    static isSourceActive(source) {
+        if (!source) return false;
+        if ('active' in source && source.active === false) return false;
+        return true;
+    }
+
+    static isSourceSelected(map, source) {
+        if (!map?.ui || !source) return false;
+
+        if (typeof map.ui.getSelected === 'function') {
+            return map.ui.getSelected() === source;
+        }
+
+        return !!source.element?.classList?.contains('selected-object');
+    }
+
+    static isSourceAirborne(source) {
+        if (!source) return false;
+        if ('isOnSolidGround' in source) {
+            return source.isOnSolidGround === false;
+        }
+        if ('isFalling' in source && source.isFalling) return true;
+        if ('isJumping' in source && source.isJumping) return true;
+        return false;
+    }
+
+    static isSourceGrounded(source) {
+        if (!source) return false;
+        if ('isOnSolidGround' in source) {
+            return source.isOnSolidGround === true;
+        }
+        return !WorldParticleUtilities.isSourceAirborne(source);
+    }
+
+    static getWorldBounds(map) {
+        if (map?.container?.getWorldBounds) {
+            return map.container.getWorldBounds();
+        }
+
+        const width = ParticleDataUtils.toFiniteNumber(map?.dimensions?.width, 0);
+        const height = ParticleDataUtils.toFiniteNumber(map?.dimensions?.height, 0);
+
+        return {
+            left: 0,
+            top: 0,
+            right: width,
+            bottom: height,
+            width,
+            height
+        };
+    }
+
+    static getCameraBounds(map) {
+        const camera = map?.camera;
+        const container = map?.container;
+
+        if (!camera || !container) {
+            return WorldParticleUtilities.getWorldBounds(map);
+        }
+
+        const viewportRect = container.getContainerRect?.() || { width: 0, height: 0 };
+        const zoom = Math.max(0.0001, ParticleDataUtils.toFiniteNumber(camera.zoomLevel, 1));
+        const left = -ParticleDataUtils.toFiniteNumber(camera.posX, 0);
+        const top = -ParticleDataUtils.toFiniteNumber(camera.posY, 0);
+        const width = viewportRect.width / zoom;
+        const height = viewportRect.height / zoom;
+
+        return {
+            left,
+            top,
+            right: left + width,
+            bottom: top + height,
+            width,
+            height
+        };
+    }
+
+    static isPointVisible(map, x, y, margin = 0) {
+        const bounds = WorldParticleUtilities.getCameraBounds(map);
+        return x >= bounds.left - margin &&
+            x <= bounds.right + margin &&
+            y >= bounds.top - margin &&
+            y <= bounds.bottom + margin;
+    }
+
+    static matchesEventSource(source, payload, filter = null) {
+        if (typeof filter === 'function') {
+            return !!filter(payload, source);
+        }
+
+        if (!payload) return true;
+        if (payload.myte === source || payload.object === source || payload.source === source || payload.target === source) {
+            return true;
+        }
+
+        return false;
+    }
+
+    static resolveEventOrigin(system, source, payload = {}, emitter = null) {
+        if (payload.position && Number.isFinite(payload.position.x) && Number.isFinite(payload.position.y)) {
+            return {
+                x: payload.position.x,
+                y: payload.position.y,
+                z: ParticleDataUtils.toFiniteNumber(payload.position.z, 0)
+            };
+        }
+
+        if (Number.isFinite(payload.x) && Number.isFinite(payload.y)) {
+            return {
+                x: payload.x,
+                y: payload.y,
+                z: ParticleDataUtils.toFiniteNumber(payload.z, 0)
+            };
+        }
+
+        const target = payload.myte || payload.object || payload.source || source;
+        if (target) {
+            const point = AttachmentPointResolver.resolve(target, emitter?.options || {});
+            return {
+                x: point.x,
+                y: point.y,
+                z: point.z
+            };
+        }
+
+        return {
+            x: emitter?.x || 0,
+            y: emitter?.y || 0,
+            z: emitter?.z || 0
+        };
+    }
+}
+
+class AttachmentPointResolver {
+    static resolve(object, options = {}) {
+        if (!object) {
+            return { x: 0, y: 0, z: 0 };
+        }
+
+        const size = object.size || { width: 0, height: 0 };
+        const collider = object.collider || null;
+        const posX = ParticleDataUtils.toFiniteNumber(object.posX, object.x || 0);
+        const posY = ParticleDataUtils.toFiniteNumber(object.posY, object.y || 0);
+        const point = options.attachmentPoint || (options.positionAtFeet ? 'feet' : 'center');
+
+        const colliderWidth = collider?.width ?? size.width;
+        const colliderHeight = collider?.height ?? size.height;
+        const colliderOffsetX = collider?.offsetX ?? 0;
+        const colliderOffsetY = collider?.offsetY ?? 0;
+
+        const bounds = {
+            left: posX,
+            top: posY,
+            right: posX + size.width,
+            bottom: posY + size.height,
+            centerX: posX + size.width * 0.5,
+            centerY: posY + size.height * 0.5,
+            colliderLeft: posX + colliderOffsetX,
+            colliderTop: posY + colliderOffsetY,
+            colliderRight: posX + colliderOffsetX + colliderWidth,
+            colliderBottom: posY + colliderOffsetY + colliderHeight,
+            colliderCenterX: posX + colliderOffsetX + colliderWidth * 0.5,
+            colliderCenterY: posY + colliderOffsetY + colliderHeight * 0.5
+        };
+
+        const direction = object.direction || object.facingDirection || object.getConfig?.('facingDirection', null);
+        const directionVector = WorldParticleUtilities.getDirectionVector(direction);
+        const directionalDistance = ParticleDataUtils.toFiniteNumber(options.directionalDistance, Math.max(8, Math.min(colliderWidth, colliderHeight) * 0.45));
+        const elevation = options.followElevation
+            ? ParticleDataUtils.toFiniteNumber(object.posZ, 0)
+            : 0;
+
+        let x = bounds.centerX;
+        let y = bounds.centerY;
+
+        switch (point) {
+            case 'feet':
+                x = bounds.colliderCenterX;
+                y = bounds.colliderBottom;
+                break;
+            case 'head':
+                x = bounds.colliderCenterX;
+                y = bounds.colliderTop;
+                break;
+            case 'body':
+                x = bounds.centerX;
+                y = bounds.centerY;
+                break;
+            case 'colliderCenter':
+                x = bounds.colliderCenterX;
+                y = bounds.colliderCenterY;
+                break;
+            case 'front':
+                x = bounds.colliderCenterX + directionVector.x * directionalDistance;
+                y = bounds.colliderCenterY + directionVector.y * directionalDistance;
+                break;
+            case 'back':
+                x = bounds.colliderCenterX - directionVector.x * directionalDistance;
+                y = bounds.colliderCenterY - directionVector.y * directionalDistance;
+                break;
+            case 'left':
+                x = bounds.left;
+                y = bounds.centerY;
+                break;
+            case 'right':
+                x = bounds.right;
+                y = bounds.centerY;
+                break;
+            case 'top':
+                x = bounds.centerX;
+                y = bounds.top;
+                break;
+            case 'bottom':
+                x = bounds.centerX;
+                y = bounds.bottom;
+                break;
+            case 'center':
+            default:
+                x = bounds.centerX;
+                y = bounds.centerY;
+                break;
+        }
+
+        x += ParticleDataUtils.toFiniteNumber(options.offsetX, 0);
+        y += ParticleDataUtils.toFiniteNumber(options.offsetY, 0) - elevation;
+
+        return {
+            x,
+            y,
+            z: ParticleDataUtils.toFiniteNumber(object.posZ, 0)
+        };
+    }
+}
+
+class ObjectTracker extends ParticlePointTracker {
+    constructor(system, object, options = {}) {
+        super(0, 0, 0);
+        this.system = system;
+        this.object = object;
+        this.options = options;
+        this.direction = null;
+        this._initialized = false;
+        this.update();
+    }
+
+    update() {
+        const point = AttachmentPointResolver.resolve(this.object, this.options);
+
+        if (!this._initialized) {
+            this.x = point.x;
+            this.y = point.y;
+            this.z = point.z;
+            this.lastX = this.x;
+            this.lastY = this.y;
+            this.dx = 0;
+            this.dy = 0;
+            this.speed = 0;
+            this._initialized = true;
+        } else {
+            this.dx = point.x - this.x;
+            this.dy = point.y - this.y;
+            this.speed = Math.hypot(this.dx, this.dy);
+            this.lastX = this.x;
+            this.lastY = this.y;
+            this.x = point.x;
+            this.y = point.y;
+            this.z = point.z;
+        }
+
+        this.direction = this.object?.direction ||
+            this.object?.facingDirection ||
+            this.object?.getConfig?.('facingDirection', null) ||
+            null;
+        this.active = WorldParticleUtilities.isSourceActive(this.object);
+        this.visible = this.system?.isSourceVisible(this.object, this.x, this.y) ?? true;
+
+        return this;
+    }
+}
+
+class DirectionalTracker extends ObjectTracker {
+    constructor(system, object, options = {}) {
+        super(system, object, {
+            attachmentPoint: options.attachmentPoint || 'front',
+            directionalDistance: options.directionalDistance,
+            offsetX: options.offsetX,
+            offsetY: options.offsetY
+        });
+    }
+}
+
+class MapParticleHelpers {
+    static resolveEffectKey(effectType, resolvedConfig, options = {}) {
+        if (options.effectKey) {
+            return String(options.effectKey);
+        }
+
+        if (typeof effectType === 'string') {
+            return String(effectType).toUpperCase();
+        }
+
+        return String(resolvedConfig?.name || resolvedConfig?.type || 'CUSTOM').toUpperCase();
+    }
+}
 
 class GameMapParticleSystem extends ParticleSystem {
-	constructor(map) {
-		super(map);
-		this.map = map;
-		this.objectEffects = new Map(); // Store effects by object ID
-	}
-
-	// Generic method to create object tracker for any type of object
-	createObjectTracker(object, options = {}) {
-
-		// Create a definite variable to reference
-		const trackerOptions = JSON.parse(JSON.stringify(options));
-
-		
-		const tracker = {
-			x: object.posX + (object.size?.width || 0) / 2,
-			y: object.posY + (object.size?.height || 0) / 2,
-			lastX: object.posX + (object.size?.width || 0) / 2,
-			lastY: object.posY + (object.size?.height || 0) / 2,
-			// Store options directly on the tracker object
-			_options: trackerOptions,
-			
-			update: function() {
-				if (!object) return;
-				
-
-				this.lastX = this.x;
-				this.lastY = this.y;
-				
-				// Position at center of object by default
-				this.x = object.posX + (object.size?.width || 0) / 2;
-				this.y = object.posY + (object.size?.height || 0) / 2;
-				
-				// Apply any offsets
-				if (this._options.offsetX) this.x += this._options.offsetX;
-				if (this._options.offsetY) this.y += this._options.offsetY;
-				
-				// Position at feet if specified
-				if (this._options.positionAtFeet) {
-					console.log('Positioning at feet:', object.posY, object.size?.height);
-					this.y = object.posY + (object.collider?.height + object.collider?.offsetY || 0);
-				}
-				
-				// Add randomization if specified
-				if (this._options.randomizePosition) {
-					const randomFactor = this._options.randomizeFactor || 10;
-					this.x += (Math.random() - 0.5) * randomFactor;
-					this.y += (Math.random() - 0.5) * randomFactor;
-				}
-			}
-		};
-		
-		return tracker;
-	}
-
-	// Directional tracker for objects with direction and movement properties
-	createDirectionalTracker(object, options = {}) {
-		// For collider-aware positioning
-		let defaultOffsets;
-
-		// If the object has a collider, create intelligent default offsets
-		if (object.collider) {
-			defaultOffsets = {
-				// North (moving up): Position at bottom center of collider
-				[DIRECTION.NORTH]: {
-					x: object.collider.offsetX + object.collider.width / 2,
-					y: object.collider.offsetY + object.collider.height
-				},
-
-				// South (moving down): Position at top center of collider
-				[DIRECTION.SOUTH]: {
-					x: object.collider.offsetX + object.collider.width / 2,
-					y: object.collider.offsetY
-				},
-
-				// East (moving right): Position at center left of collider
-				[DIRECTION.EAST]: {
-					x: object.collider.offsetX,
-					y: object.collider.offsetY + object.collider.height / 2
-				},
-
-				// West (moving left): Position at center right of collider
-				[DIRECTION.WEST]: {
-					x: object.collider.offsetX + object.collider.width,
-					y: object.collider.offsetY + object.collider.height / 2
-				},
-
-				// Default offset (centered at bottom of collider)
-				default: {
-					x: object.collider.offsetX + object.collider.width / 2,
-					y: object.collider.offsetY + object.collider.height
-				}
-			};
-		} else {
-			// Simple default offsets for objects without colliders
-			defaultOffsets = {
-				[DIRECTION.NORTH]: { x: 0, y: 0 },
-				[DIRECTION.SOUTH]: { x: 0, y: 0 },
-				[DIRECTION.EAST]: { x: 0, y: 0 },
-				[DIRECTION.WEST]: { x: 0, y: 0 },
-				default: { x: 0, y: 0 }
-			};
-		}
-
-		// Get directional offsets based on options or use defaults
-		const offsets = options.offsets || defaultOffsets;
-
-		return {
-			x: object.posX,
-			y: object.posY,
-			lastX: object.posX,
-			lastY: object.posY,
-			// This gets called by the emitter during updates
-			update: function () {
-				if (!object) return;
-
-				this.lastX = this.x;
-				this.lastY = this.y;
-
-				// Get current offset based on direction
-				const offset = offsets[object.direction] || offsets.default;
-
-				// Base position - at the object's position (not centered)
-				this.x = object.posX;
-				this.y = object.posY;
-
-				// Apply directional offset if moving
-				const isStationary = object.isMoving ? !object.isMoving() : false;
-
-				if (!isStationary) {
-					this.x += offset.x;
-					this.y += offset.y;
-				} else if (options.stationaryOffset) {
-					// Apply stationary offset if defined
-					this.x += options.stationaryOffset.x;
-					this.y += options.stationaryOffset.y;
-				} else {
-					// Apply default offset when stationary
-					this.x += offsets.default.x;
-					this.y += offsets.default.y;
-				}
-
-				// Apply any additional custom offsets from options
-				if (options.additionalOffset) {
-					this.x += options.additionalOffset.x;
-					this.y += options.additionalOffset.y;
-				}
-
-				// Add randomization if specified
-				if (options.randomizePosition) {
-					const randomFactor = options.randomizeFactor || 10;
-					this.x += (Math.random() - 0.5) * randomFactor;
-					this.y += (Math.random() - 0.5) * randomFactor;
-				}
-			}
-		};
-	}
-
-	// Main method to create particle effects for any object using the configuration
-	addEffect(object, effectType, customOptions = {}) {
-		// Skip if no valid object
-		if (!object || typeof object.posX === 'undefined' || typeof object.posY === 'undefined') {
-			console.warn('Cannot attach particles: Invalid object');
-			return null;
-		}
-
-
-		// Auto-generate an ID if the object doesn't have one
-		const objectId = object.id || ('obj_' + Math.random().toString(36).substr(2, 9));
-
-		// Look up the effect config by name in PARTICLE_CONFIG
-		let baseConfig = null;
-
-		if (typeof effectType === 'string') {
-			// Try direct lookup in PARTICLE_CONFIG 
-			baseConfig = PARTICLE_CONFIG[effectType];
-
-			if (!baseConfig) {
-				// Try finding by type match (lowercase comparison)
-				const matchingConfig = Object.values(PARTICLE_CONFIG).find(config =>
-					config.type === effectType.toLowerCase()
-				);
-
-				if (matchingConfig) {
-					baseConfig = matchingConfig;
-				}
-			}
-		} else if (typeof effectType === 'object') {
-			// If it's an object, use it directly as the config
-			baseConfig = effectType;
-			effectType = baseConfig.type || 'custom';
-		}
-
-		// If still no valid config, create a minimal default
-		if (!baseConfig) {
-			baseConfig = {
-				type: (typeof effectType === 'string') ? effectType.toLowerCase() : 'custom',
-				interval: 100,
-				life: 50,
-				colors: ['#ffffff'],
-				size: 5,
-				sizeEnd: 1,
-				count: 1
-			};
-		}
-
-		// Get the actual effect type from the config
-		const actualEffectType = baseConfig.type || 'custom';
-
-		// Remove any existing effect of this type if it exists
-		this.detachEffectFromObject(object, objectId, actualEffectType);
-
-		// Merge the base config with custom options
-		const mergedOptions = { ...baseConfig, ...customOptions };
-
-
-
-		// Create a position tracker for this object
-		const tracker = this.createObjectTracker(object, mergedOptions);
-
-
-		// Create the emitter based on the configuration
-		const emitter = this.createConfiguredEmitter(tracker, actualEffectType, mergedOptions);
-
-		// Store reference to this effect in our tracking Map
-		if (!this.objectEffects.has(objectId)) {
-			this.objectEffects.set(objectId, new Map());
-		}
-		this.objectEffects.get(objectId).set(actualEffectType, emitter);
-
-		// Also store on the object if requested
-		if (mergedOptions.storeReference) {
-			if (!object.particleEmitters) {
-				object.particleEmitters = {};
-			}
-			object.particleEmitters[actualEffectType] = emitter;
-		}
-
-		return emitter;
-	}
-
-	// Create an emitter based on the provided configuration
-	createConfiguredEmitter(tracker, effectType, options) {
-		// Define the base emitter structure
-		const emitter = {
-			type: effectType,
-			options: options,
-			active: true,
-			x: tracker.x,
-			y: tracker.y,
-			interval: options.interval || 100,
-			lastEmit: 0,
-			particles: [],
-			lastX: tracker.x,
-			lastY: tracker.y
-		};
-
-		// Add appropriate update behavior based on effect type
-		if (effectType === 'glow') {
-			this.addGlowBehavior(emitter, tracker, options);
-		}
-		else if (effectType === 'trail' || effectType === 'dust') {
-			this.addMovementBasedBehavior(emitter, tracker, options);
-		}
-		else {
-			this.addStandardBehavior(emitter, tracker, options);
-		}
-
-		// Add to emitters array
-		this.emitters.push(emitter);
-
-		return emitter;
-	}
-
-	// Add standard particle emission behavior
-	addStandardBehavior(emitter, tracker, options) {
-		emitter.update = (now) => {
-			// Update position from tracker
-			tracker.update();
-			emitter.x = tracker.x;
-			emitter.y = tracker.y;
-
-			// Time to emit?
-			if (now - emitter.lastEmit >= emitter.interval) {
-				emitter.lastEmit = now;
-
-				// Create particles
-				for (let i = 0; i < options.count; i++) {
-					const color = options.colors && options.colors.length > 0
-						? options.colors[Math.floor(Math.random() * options.colors.length)]
-						: '#ffffff';
-					const angle = Math.random() * Math.PI * 2;
-					const speed = options.speed || 0.5;
-
-					// Create with sprite if specified
-					if (options.useSprite && options.sprite) {
-						this.addParticle({
-							x: emitter.x,
-							y: emitter.y,
-							vx: Math.cos(angle) * speed,
-							vy: Math.sin(angle) * speed,
-							size: options.size,
-							sizeEnd: options.sizeEnd,
-							opacity: options.opacity || 0.8,
-							opacityEnd: options.opacityEnd || 0,
-							life: options.life + Math.random() * 20,
-							sprite: options.sprite,
-							spriteFrames: options.spriteFrames,
-							frameDelay: options.frameDelay || 5,
-							gravity: options.gravity || 0,
-							friction: options.friction || 0.98,
-							loop: options.loop || true
-						});
-
-					} else {
-						// Standard colored particle
-						this.addParticle({
-							x: emitter.x,
-							y: emitter.y,
-							vx: Math.cos(angle) * speed,
-							vy: Math.sin(angle) * speed,
-							size: options.size * (0.8 + Math.random() * 0.4),
-							sizeEnd: options.sizeEnd,
-							color: color,
-							opacity: options.opacity || 0.8,
-							opacityEnd: options.opacityEnd || 0,
-							life: options.life + Math.random() * 20,
-							rotationSpeed: (Math.random() - 0.5) * 0.5,
-							gravity: options.gravity || 0,
-							friction: options.friction || 0.98
-						});
-					}
-				}
-			}
-		};
-	}
-
-	// For effects that depend on object movement (dust, trails)
-	addMovementBasedBehavior(emitter, tracker, options) {
-		emitter.update = (now) => {
-			// Update position from tracker
-			tracker.update();
-			
-			// Calculate movement distance
-			const dx = tracker.x - tracker.lastX;
-			const dy = tracker.y - tracker.lastY;
-			const distance = Math.sqrt(dx * dx + dy * dy);
-	
-			// Update emitter position
-			emitter.x = tracker.x;
-			emitter.y = tracker.y;
-	
-			// Check if we should emit particles
-			const shouldEmit = !options.emitWhenMoving || 
-							  distance > (options.movementThreshold || 0.5);
-	
-			// For one-time emission, only emit once then deactivate
-			if (options.oneTimeEmission && !emitter.hasEmitted) {
-				// Force emission regardless of movement
-				if (now - emitter.lastEmit >= emitter.interval) {
-					emitter.lastEmit = now;
-					
-					// Create particles (same as original code)
-					for (let i = 0; i < options.count; i++) {
-						const color = options.colors && options.colors.length > 0 
-							? options.colors[Math.floor(Math.random() * options.colors.length)] 
-							: '#ffffff';
-						
-						// Create particle with same properties as before
-						this.addParticle({
-							x: emitter.x + (Math.random() - 0.5) * (options.randomizeFactor || 10),
-							y: emitter.y + (Math.random() - 0.5) * (options.randomizeFactor || 10),
-							vx: (Math.random() - 0.5) * 0.5,
-							vy: (Math.random() - 0.5) * 0.3 - 0.2,
-							size: options.size + (Math.random() - 0.5) * 2,
-							sizeEnd: options.sizeEnd + (Math.random() - 0.5) * 2,
-							color: color,
-							opacity: options.opacity || 0.7,
-							opacityEnd: options.opacityEnd || 0,
-							life: options.life + (Math.random() - 0.5) * 10,
-							rotationSpeed: (Math.random() - 0.5) * 0.2,
-							gravity: options.gravity || 0,
-							friction: options.friction || 0.98,
-							sprite: options.sprite,
-							spriteFrames: options.spriteFrames,
-							frameDelay: options.frameDelay,
-							loop: options.loop
-						});
-
-					}
-					
-					// Mark as emitted and deactivate for one-time emissions
-					emitter.hasEmitted = true;
-					
-					// Delay deactivation slightly to ensure particles are processed
-					setTimeout(() => {
-						emitter.active = false;
-					}, 100);
-				}
-			} 
-			// Regular emission for continuous emitters (original behavior)
-			else if (shouldEmit && now - emitter.lastEmit >= emitter.interval) {
-				// Original emission code here...
-			}
-	
-			// Update last position
-			tracker.lastX = tracker.x;
-			tracker.lastY = tracker.y;
-		};
-	}
-
-	// For glow effect with orbital behavior
-	addGlowBehavior(emitter, tracker, options) {
-		emitter.orbPhase = 0;
-		emitter.pulsePhase = 0;
-
-		emitter.update = (now) => {
-			// Update position from tracker
-			tracker.update();
-			emitter.x = tracker.x;
-			emitter.y = tracker.y;
-
-			// Update orbital and pulse phases
-			emitter.orbPhase += options.orbitalSpeed || 0.02;
-			emitter.pulsePhase += options.pulseFrequency || 0.05;
-
-			// Time to emit?
-			if (now - emitter.lastEmit >= emitter.interval) {
-				emitter.lastEmit = now;
-
-				// Create particles with orbital behavior
-				for (let i = 0; i < options.count; i++) {
-					const color = options.colors[Math.floor(Math.random() * options.colors.length)];
-					const angle = Math.random() * Math.PI * 2;
-					const distance = 20 * (0.8 + Math.random() * 0.4);  // Default size if object size unavailable
-
-					// Calculate initial position based on orbit
-					const px = emitter.x + Math.cos(angle) * distance;
-					const py = emitter.y + Math.sin(angle) * distance;
-
-					const particle = this.addParticle({
-						x: px,
-						y: py,
-						vx: 0,
-						vy: 0,
-						size: options.size * (0.8 + Math.random() * 0.4),
-						sizeEnd: options.sizeEnd,
-						color: color,
-						opacity: options.opacity || 0.5,
-						opacityEnd: options.opacityEnd || 0,
-						life: options.life + Math.random() * 20,
-						rotationSpeed: (Math.random() - 0.5) * 0.2,
-						gravity: 0,
-						friction: 1.0
-					});
-
-					// Add orbital behavior to particle
-					if (options.orbitalMotion) {
-						// Store orbital info for this particle
-						particle.orbitData = {
-							center: { x: emitter.x, y: emitter.y },
-							angle: angle,
-							distance: distance,
-							speed: 0.01 + Math.random() * 0.02,
-							pulseAmount: 0.2 + Math.random() * 0.3
-						};
-
-						// Override particle update to add orbital motion
-						const originalUpdate = particle.update;
-						particle.update = function () {
-							// Call original update first
-							const active = originalUpdate.call(this);
-							if (!active) return false;
-
-							// Update the center position as object moves
-							this.orbitData.center.x = tracker.x;
-							this.orbitData.center.y = tracker.y;
-
-							// Apply orbital motion
-							this.orbitData.angle += this.orbitData.speed;
-							this.x = this.orbitData.center.x + Math.cos(this.orbitData.angle) * this.orbitData.distance;
-							this.y = this.orbitData.center.y + Math.sin(this.orbitData.angle) * this.orbitData.distance;
-
-							// Apply pulse effect if enabled
-							if (options.pulseEffect) {
-								const pulseScale = 1 + Math.sin(emitter.pulsePhase) * this.orbitData.pulseAmount;
-								this.size = (options.size + (options.sizeEnd - options.size) *
-									(1 - this.life / this.lifeMax)) * pulseScale;
-							}
-
-							return true;
-						};
-					}
-				}
-			}
-		};
-	}
-
-	// Helper method to detach effects from an object
-	detachEffectFromObject(object, objectId, effectType) {
-		// Detach from objectEffects tracking
-		if (this.objectEffects.has(objectId)) {
-			const effects = this.objectEffects.get(objectId);
-
-			if (effectType && effects.has(effectType)) {
-				// Deactivate the specific emitter
-				const emitter = effects.get(effectType);
-				emitter.active = false;
-				effects.delete(effectType);
-			} else if (!effectType) {
-				// Deactivate all emitters for this object
-				effects.forEach(emitter => emitter.active = false);
-				this.objectEffects.delete(objectId);
-			}
-		}
-
-		// Also clean up from object.particleEmitters if it exists
-		if (object && object.particleEmitters) {
-			if (effectType && object.particleEmitters[effectType]) {
-				object.particleEmitters[effectType].active = false;
-				delete object.particleEmitters[effectType];
-			} else if (!effectType) {
-				Object.values(object.particleEmitters).forEach(emitter => {
-					if (emitter) emitter.active = false;
-				});
-				object.particleEmitters = {};
-			}
-		}
-	}
-
-	// Add methods to objects to make particle management easier
-	addParticleMethodsToObject(object) {
-		if (!object) return;
-
-		// Initialize the particleEmitters property if it doesn't exist
-		if (!object.particleEmitters) {
-			object.particleEmitters = {};
-		}
-
-		// Add the main addEffect method
-		object.addEffect = (effectType, options = {}) => {
-			return this.addEffect(object, effectType, {
-				...options,
-				storeReference: true
-			});
-		};
-
-		// Remove a specific effect
-		object.removeEffect = (effectType) => {
-			if (!object.particleEmitters || !object.particleEmitters[effectType]) return;
-
-			object.particleEmitters[effectType].active = false;
-			delete object.particleEmitters[effectType];
-		};
-
-		// Remove all effects
-		object.removeAllEffects = () => {
-			if (!object.particleEmitters) return;
-
-			Object.values(object.particleEmitters).forEach(emitter => {
-				if (emitter) emitter.active = false;
-			});
-
-			object.particleEmitters = {};
-		};
-
-		// Check if an effect exists
-		object.hasEffect = (effectType) => {
-			return object.particleEmitters &&
-				object.particleEmitters[effectType] &&
-				object.particleEmitters[effectType].active;
-		};
-	}
-
-	// Override updateEmitters to handle custom emitters with update methods
-	updateEmitters(now) {
-		if (!this.emitters || this.emitters.length === 0) return;
-
-		for (let i = this.emitters.length - 1; i >= 0; i--) {
-			const emitter = this.emitters[i];
-			if (!emitter.active) {
-				this.emitters.splice(i, 1);
-				continue;
-			}
-
-			// Call the custom update function for our emitters
-			if (typeof emitter.update === 'function') {
-				emitter.update(now);
-			}
-			// Use standard emitter update for base ParticleSystem emitters
-			else if (now - emitter.lastEmit > emitter.interval) {
-				emitter.lastEmit = now;
-
-				// Update position if it's a moving target
-				if (emitter.options && emitter.options.target &&
-					typeof emitter.options.target.update === 'function') {
-					emitter.options.target.update();
-					emitter.x = emitter.options.target.x || 0;
-					emitter.y = emitter.options.target.y || 0;
-				}
-
-				// Create particles based on emitter type
-				switch (emitter.type) {
-					case 'trail':
-						this.addTrail(emitter.options.target, emitter.options);
-						break;
-					case 'rain':
-						this.addRain(emitter.options);
-						break;
-					case 'snow':
-						this.addSnow(emitter.options);
-						break;
-					case 'smoke':
-						this.addSmoke(emitter.options.x, emitter.options.y, emitter.options);
-						break;
-					case 'butterfly':
-						this.addButterfly(emitter.options.x, emitter.options.y, emitter.options);
-						break;
-					case 'firework':
-						this.addFirework(emitter.options.x, emitter.options.y, emitter.options);
-						break;
-					case 'swarm':
-						this.addSwarm(emitter.options.x, emitter.options.y, emitter.options);
-						break;
-				}
-			}
-		}
-	}
-
-	// Override the dispose method to clean up all effects
-	dispose() {
-		// Clear all object effects
-		this.objectEffects.forEach(effects => {
-			effects.forEach(emitter => emitter.active = false);
-		});
-		this.objectEffects.clear();
-
-		// Call parent dispose method
-		super.dispose();
-	}
+    constructor(map, options = {}) {
+        super(map, {
+            ...options,
+            container: options.container || map?.layers?.particles || null,
+            maxParticles: options.maxParticles ?? 900,
+            poolSize: options.poolSize ?? 220
+        });
+
+        this.map = map;
+        this.objectEffects = new Map();
+
+        this.registerPresets(MAP_PARTICLE_PRESETS);
+    }
+
+    getSimulationBounds() {
+        return WorldParticleUtilities.getWorldBounds(this.map);
+    }
+
+    getViewportBounds() {
+        return WorldParticleUtilities.getCameraBounds(this.map);
+    }
+
+    isPointVisible(x, y, margin = 0) {
+        return WorldParticleUtilities.isPointVisible(this.map, x, y, margin);
+    }
+
+    isSourceVisible(source, x, y) {
+        if (!source) return this.isPointVisible(x, y, 0);
+
+        if (source.sleeping && !source.shouldSimulateOffScreen?.()) {
+            return false;
+        }
+
+        return this.isPointVisible(x, y, 0);
+    }
+
+    resolveEffectConfig(configOrPreset, overrides = {}) {
+        if (typeof configOrPreset === 'string' && !this.configResolver.has(configOrPreset)) {
+            const normalized = String(configOrPreset).toLowerCase();
+            const match = [...this.configResolver.presets.keys()].find(key => {
+                const preset = this.configResolver.getRawPreset(key);
+                return preset?.type === normalized;
+            });
+
+            if (match) {
+                return super.resolveEffectConfig(match, overrides);
+            }
+        }
+
+        return super.resolveEffectConfig(configOrPreset, overrides);
+    }
+
+    createTrackerForSource(source, options = {}) {
+        if (!source) {
+            return this.createPointTracker(0, 0, 0);
+        }
+
+        if (source instanceof ParticlePointTracker || source instanceof ObjectTracker || source instanceof DirectionalTracker) {
+            return source;
+        }
+
+        if (Number.isFinite(source.posX) || Number.isFinite(source.posY)) {
+            if ((options.attachmentPoint || '').toLowerCase() === 'front') {
+                return new DirectionalTracker(this, source, options);
+            }
+            return new ObjectTracker(this, source, options);
+        }
+
+        return this.createPointTracker(
+            ParticleDataUtils.toFiniteNumber(source.x, 0),
+            ParticleDataUtils.toFiniteNumber(source.y, 0),
+            ParticleDataUtils.toFiniteNumber(source.z, 0)
+        );
+    }
+
+    getObjectRecord(object, create = false) {
+        if (!object) return null;
+
+        if (this.objectEffects.has(object)) {
+            return this.objectEffects.get(object);
+        }
+
+        if (!create) return null;
+
+        const record = {
+            emitters: new Map(),
+            cleanups: new Set()
+        };
+
+        this.objectEffects.set(object, record);
+        return record;
+    }
+
+    registerObjectCleanup(object, cleanup) {
+        if (typeof cleanup !== 'function') return;
+        const record = this.getObjectRecord(object, true);
+        record.cleanups.add(cleanup);
+    }
+
+    runObjectCleanups(object) {
+        const record = this.getObjectRecord(object, false);
+        if (!record) return;
+
+        record.cleanups.forEach(cleanup => {
+            try {
+                cleanup();
+            } catch (error) {
+                console.warn('[GameMapParticleSystem] Cleanup failed:', error);
+            }
+        });
+        record.cleanups.clear();
+    }
+
+    addEffect(object, effectType, customOptions = {}) {
+        if (!object) {
+            console.warn('[GameMapParticleSystem] Cannot add effect without a source object.');
+            return null;
+        }
+
+        const resolvedConfig = this.resolveEffectConfig(effectType, customOptions);
+        const effectKey = MapParticleHelpers.resolveEffectKey(effectType, resolvedConfig, customOptions);
+
+        this.detachEffectFromObject(object, effectKey);
+
+        const tracker = this.createTrackerForSource(object, resolvedConfig);
+        const emitter = this.createEmitter(resolvedConfig, {
+            tracker,
+            target: tracker,
+            sourceObject: object,
+            enabled: customOptions.enabled !== false
+        });
+
+        if (resolvedConfig.eventName) {
+            this.bindEmitterToEvent(object, emitter, resolvedConfig.eventName, customOptions);
+        }
+
+        const record = this.getObjectRecord(object, true);
+        record.emitters.set(effectKey, emitter);
+
+        if (!object.particleEmitters) {
+            object.particleEmitters = {};
+        }
+
+        if (customOptions.storeReference !== false) {
+            object.particleEmitters[effectKey] = emitter;
+        }
+
+        return emitter;
+    }
+
+    addEventEffect(object, eventName, effectType, options = {}) {
+        return this.addEffect(object, effectType, {
+            ...options,
+            emissionMode: 'event',
+            eventName
+        });
+    }
+
+    burstEffectAtObject(object, effectType, options = {}) {
+        if (!object) return;
+
+        const tracker = this.createTrackerForSource(object, options);
+        tracker.update();
+
+        this.spawnBurst(
+            effectType,
+            tracker.x,
+            tracker.y,
+            {
+                ...options,
+                z: tracker.z
+            }
+        );
+    }
+
+    bindEmitterToEvent(object, emitter, eventName, options = {}) {
+        const eventManager = options.eventManager || this.map?.eventManager || this.map?.container?.eventManager;
+        if (!eventManager?.on || !eventName) return emitter;
+
+        const off = eventManager.on(eventName, payload => {
+            if (!WorldParticleUtilities.matchesEventSource(object, payload, options.eventFilter)) {
+                return;
+            }
+
+            const origin = WorldParticleUtilities.resolveEventOrigin(this, object, payload, emitter);
+            emitter.requestBurst({
+                count: options.count || emitter.options.count,
+                origin,
+                overrides: options.burstOverrides || null
+            });
+        });
+
+        emitter.addCleanup(off);
+        this.registerObjectCleanup(object, off);
+        return emitter;
+    }
+
+    detachEffectFromObject(object, effectKey = null) {
+        if (!object) return;
+
+        const record = this.getObjectRecord(object, false);
+        if (!record) return;
+
+        if (effectKey) {
+            const normalizedKey = String(effectKey).toUpperCase();
+            const emitter = record.emitters.get(normalizedKey);
+            if (emitter) {
+                emitter.destroy();
+                record.emitters.delete(normalizedKey);
+            }
+
+            if (object.particleEmitters) {
+                delete object.particleEmitters[normalizedKey];
+            }
+        } else {
+            record.emitters.forEach(emitter => emitter.destroy());
+            record.emitters.clear();
+
+            if (object.particleEmitters) {
+                object.particleEmitters = {};
+            }
+        }
+
+        if (record.emitters.size === 0) {
+            this.runObjectCleanups(object);
+            this.objectEffects.delete(object);
+        }
+    }
+
+    addParticleMethodsToObject(object) {
+        if (!object) return;
+        if (object._particleMethodsInstalled && object._particleMethodOwner === this) return;
+
+        if (!object.particleEmitters) {
+            object.particleEmitters = {};
+        }
+
+        object.addEffect = (effectType, options = {}) => {
+            return this.addEffect(object, effectType, {
+                ...options,
+                storeReference: options.storeReference !== false
+            });
+        };
+
+        object.addEventEffect = (eventName, effectType, options = {}) => {
+            return this.addEventEffect(object, eventName, effectType, {
+                ...options,
+                storeReference: options.storeReference !== false
+            });
+        };
+
+        object.burstEffect = (effectType, options = {}) => {
+            this.burstEffectAtObject(object, effectType, options);
+        };
+
+        object.removeEffect = (effectKey) => {
+            this.detachEffectFromObject(object, effectKey);
+        };
+
+        object.removeAllEffects = () => {
+            this.detachEffectFromObject(object, null);
+        };
+
+        object.hasEffect = (effectKey) => {
+            const normalizedKey = String(effectKey).toUpperCase();
+            return !!object.particleEmitters?.[normalizedKey]?.active;
+        };
+
+        object._particleMethodsInstalled = true;
+        object._particleMethodOwner = this;
+    }
+
+    evaluateEmitterConditions(emitter) {
+        if (!super.evaluateEmitterConditions(emitter)) {
+            return false;
+        }
+
+        const source = emitter.sourceObject;
+        const options = emitter.options;
+
+        if (options.emitWhileAlive && !WorldParticleUtilities.isSourceActive(source)) {
+            return false;
+        }
+
+        if (options.emitWhileActive && source && 'isActive' in source && source.isActive === false) {
+            return false;
+        }
+
+        if (options.emitWhileAirborne && !WorldParticleUtilities.isSourceAirborne(source)) {
+            return false;
+        }
+
+        if (options.emitWhileGrounded && !WorldParticleUtilities.isSourceGrounded(source)) {
+            return false;
+        }
+
+        if (options.emitWhileSelected && !WorldParticleUtilities.isSourceSelected(this.map, source)) {
+            return false;
+        }
+
+        if (typeof options.condition === 'function' && options.condition({
+            source,
+            emitter,
+            tracker: emitter.tracker,
+            map: this.map
+        }) === false) {
+            return false;
+        }
+
+        return true;
+    }
+
+    pruneObjectEffects() {
+        for (const [object, record] of this.objectEffects.entries()) {
+            if (!object) {
+                this.objectEffects.delete(object);
+                continue;
+            }
+
+            for (const [effectKey, emitter] of record.emitters.entries()) {
+                if (emitter?.active) continue;
+                record.emitters.delete(effectKey);
+                if (object.particleEmitters) {
+                    delete object.particleEmitters[effectKey];
+                }
+            }
+
+            const shouldRemoveRecord = ('active' in object && object.active === false) || record.emitters.size === 0;
+            if (shouldRemoveRecord) {
+                this.runObjectCleanups(object);
+                this.objectEffects.delete(object);
+            }
+        }
+    }
+
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
+        this.pruneObjectEffects();
+    }
+
+    update(deltaTime) {
+        super.update(deltaTime);
+    }
+
+    getDebugStats() {
+        const stats = super.getDebugStats();
+        return {
+            ...stats,
+            objectBindings: this.objectEffects.size
+        };
+    }
+
+    dispose() {
+        for (const [object] of this.objectEffects.entries()) {
+            this.detachEffectFromObject(object, null);
+        }
+
+        this.objectEffects.clear();
+        super.dispose();
+    }
 }

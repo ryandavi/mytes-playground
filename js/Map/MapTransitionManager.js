@@ -303,18 +303,18 @@ class MapTransitionManager {
 
             this.container.gameMap = newMap;
 
-            if (newMap.gridSystem) {
-                const wasDebugMode = newMap.gridSystem.debugMode;
+            if (newMap.gridSystem && document.body.classList.contains('debug')) {
+                console.log('[MapTransitionManager] Reinitializing GridSystem debug mode');
 
-                if (wasDebugMode) {
-                    console.log('[MapTransitionManager] Reinitializing GridSystem debug mode');
-
-                    setTimeout(() => {
-                        newMap.gridSystem.debugInitialized = false;
+                setTimeout(() => {
+                    newMap.gridSystem.debugInitialized = false;
+                    if (!newMap.gridSystem.debugMode) {
+                        newMap.gridSystem.toggleDebug();
+                    } else {
                         newMap.gridSystem.toggleDebug();
                         newMap.gridSystem.toggleDebug();
-                    }, 200);
-                }
+                    }
+                }, 200);
             }
 
             this.container.ui.setSelected(null);

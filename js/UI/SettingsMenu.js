@@ -1,16 +1,8 @@
 class SettingsMenu extends ModalWindow {
-    constructor(parent) {
-        super(parent, {
-            id: 'game-settings-panel',
-            buttonId: 'settings-toggle',
-            closeOnOutsideClick: false,
-            // position: 'center',
-            position: 'top-right',
-            draggable: true,  // Make this modal draggable
-            closeButtonSelector: '.modal-close-btn'
-        });
-        
-        this.settings = {
+    static STORAGE_KEY = 'gameSettings';
+
+    static getDefaultSettings() {
+        return {
             graphics: {
                 quality: 'medium',
                 effects: true,
@@ -26,36 +18,63 @@ class SettingsMenu extends ModalWindow {
                 notifications: true
             }
         };
-        
-        this.init();
-        this.setupSettingsControls();
     }
 
-    buttonLeftClick(e){
+    static normalizeSettings(settings = {}) {
+        const defaults = SettingsMenu.getDefaultSettings();
+        return {
+            graphics: {
+                ...defaults.graphics,
+                ...(settings.graphics || {})
+            },
+            gameplay: {
+                ...defaults.gameplay,
+                ...(settings.gameplay || {})
+            },
+            misc: {
+                ...defaults.misc,
+                ...(settings.misc || {})
+            }
+        };
+    }
+
+    constructor(parent) {
+        super(parent, {
+            id: 'game-settings-panel',
+            buttonId: 'settings-toggle',
+            closeOnOutsideClick: false,
+            // position: 'center',
+            position: 'top-right',
+            draggable: true,
+            closeButtonSelector: '.modal-close-btn'
+        });
+
+        this.settings = SettingsMenu.getDefaultSettings();
+        this.loadSettings();
+
+        this.init();
+        this.setupSettingsControls();
+        this.applyGraphicsSettings();
+    }
+
+    buttonLeftClick(e) {
         e.preventDefault();
         e.stopPropagation();
-        this.toggle(); // Use the toggle method inherited from ModalWindow
+        this.toggle();
         return false;
     }
 
-    buttonRightClick(e){
+    buttonRightClick(e) {
         this.buttonLeftClick(e);
     }
-    
+
     setupSettingsControls() {
         if (!this.modalElement) return;
-        
-        // Setup graphics settings
+
         this.setupGraphicsSettings();
-        
-        // Setup gameplay settings
         this.setupGameplaySettings();
-        
-        // Setup misc settings
         this.setupMiscSettings();
 
-        
-        // Setup save button
         const saveButton = this.modalElement.querySelector('#save-settings');
         if (saveButton) {
             saveButton.onclick = () => {
@@ -64,9 +83,8 @@ class SettingsMenu extends ModalWindow {
             };
         }
     }
-    
+
     setupGraphicsSettings() {
-        // Quality dropdown
         const qualitySelect = this.modalElement.querySelector('#graphics-quality');
         if (qualitySelect) {
             qualitySelect.value = this.settings.graphics.quality;
@@ -75,8 +93,7 @@ class SettingsMenu extends ModalWindow {
                 this.applyGraphicsSettings();
             };
         }
-        
-        // Effects toggle
+
         const effectsToggle = this.modalElement.querySelector('#effects-toggle');
         if (effectsToggle) {
             effectsToggle.checked = this.settings.graphics.effects;
@@ -85,8 +102,7 @@ class SettingsMenu extends ModalWindow {
                 this.applyGraphicsSettings();
             };
         }
-        
-        // Animations toggle
+
         const animationsToggle = this.modalElement.querySelector('#animations-toggle');
         if (animationsToggle) {
             animationsToggle.checked = this.settings.graphics.animations;
@@ -96,52 +112,65 @@ class SettingsMenu extends ModalWindow {
             };
         }
     }
-    
+
     setupGameplaySettings() {
         // Implement gameplay settings controls
         // Similar to setupGraphicsSettings but for gameplay options
     }
-    
+
     setupMiscSettings() {
         // Implement miscellaneous settings controls
         // Similar to setupGraphicsSettings but for misc options
     }
-    
-    applyGraphicsSettings() {
-        // No renderer target exists yet — placeholder for future graphics service.
+
+    isEffectsEnabled() {
+        return this.settings?.graphics?.effects !== false;
     }
-    
+
+    applyGraphicsSettings() {
+        const container = this.parent?.parent || null;
+        const particleSystem = container?.gameMap?.particleSystem || null;
+
+        if (particleSystem?.setEffectsEnabled) {
+            particleSystem.setEffectsEnabled(this.isEffectsEnabled());
+        }
+    }
+
     saveSettings() {
-        // Save settings to local storage or server
         console.log('Saving settings:', this.settings);
-        
+
         try {
-            localStorage.setItem('gameSettings', JSON.stringify(this.settings));
+            localStorage.setItem(
+                SettingsMenu.STORAGE_KEY,
+                JSON.stringify(SettingsMenu.normalizeSettings(this.settings))
+            );
             this.playSound('success');
         } catch (error) {
             console.error('Failed to save settings:', error);
             this.playSound('error');
         }
     }
-    
+
     loadSettings() {
-        // Load settings from local storage or server
         try {
-            const savedSettings = localStorage.getItem('gameSettings');
+            const savedSettings = localStorage.getItem(SettingsMenu.STORAGE_KEY);
             if (savedSettings) {
-                this.settings = JSON.parse(savedSettings);
+                this.settings = SettingsMenu.normalizeSettings(JSON.parse(savedSettings));
                 console.log('Loaded settings:', this.settings);
                 return true;
             }
         } catch (error) {
             console.error('Failed to load settings:', error);
         }
+
+        this.settings = SettingsMenu.getDefaultSettings();
         return false;
     }
-    
-    // Override the open method to load current settings before opening
+
     open() {
         this.loadSettings();
+        this.setupSettingsControls();
+        this.applyGraphicsSettings();
         super.open();
     }
 }

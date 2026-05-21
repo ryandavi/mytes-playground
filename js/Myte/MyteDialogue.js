@@ -65,7 +65,7 @@ class MyteDialogue {
         // Update text and show dialogue
         this.textElement.textContent = text;
         await this.wait(50); // Small delay before showing
-        this.dialogue.classList.add('visible');
+        this.dialogue.classList.add('is-visible');
 
         // Calculate display duration based on text length
         const duration = this.calculateDisplayDuration(text);
@@ -121,7 +121,7 @@ class MyteDialogue {
     // Handle transition end events
     handleTransitionEnd(event) {
         // Only handle transition end for the dialogue element itself
-        if (event.target === this.dialogue && !this.dialogue.classList.contains('visible')) {
+        if (event.target === this.dialogue && !this.dialogue.classList.contains('is-visible')) {
             this.isDisplaying = false;
         }
     }
@@ -135,7 +135,7 @@ class MyteDialogue {
             }
 
             // Remove visible class to trigger fade out
-            this.dialogue.classList.remove('visible');
+            this.dialogue.classList.remove('is-visible');
 
             // Wait for transition duration before resolving
             const timeoutId = setTimeout(() => {

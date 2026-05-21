@@ -91,6 +91,13 @@
         }
     }
 
+    &.is-queue-target {
+        .sprite {
+            box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
+            border-radius: 5px;
+        }
+    }
+
     &.world-myte.is-deactivated {
         display: none;
     }
@@ -243,7 +250,6 @@
                     border-radius: 50%;
                 }
 
-                &.visible,
                 &.is-visible {
                     animation: thoughtBubblePop 0.5s ease-out;
                 }
@@ -268,7 +274,6 @@
                     justify-content: center;
                 }
 
-                &.visible,
                 &.is-visible {
                     animation: emojiPop 0.4s ease-out;
                 }
@@ -278,7 +283,6 @@
                 --dialogue-background-color: #ffe1e1;
                 --dialogue-border-color: #ff4444;
 
-                &.visible,
                 &.is-visible {
                     animation: alertShake 0.7s cubic-bezier(0.36, 0, 0.66, -0.56);
                     animation-fill-mode: forwards;
@@ -296,7 +300,6 @@
                 font-size: 8px;
                 filter: blur(0);
 
-                &.visible,
                 &.is-visible {
                     opacity: 0.8;
                     animation: whisperFloat 3s ease-out forwards;

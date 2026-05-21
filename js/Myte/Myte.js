@@ -164,6 +164,13 @@ class Myte {
 		
 		// Add particle control methods to this Myte
 		particleSystem.addParticleMethodsToObject(this);
+
+		this.addEventEffect('myte:landed', 'LANDING_DUST', {
+			storeReference: false,
+			attachmentPoint: 'feet',
+			positionAtFeet: true,
+			eventFilter: ({ myte }) => myte === this
+		});
 		
 
 		// Dust for regular movement

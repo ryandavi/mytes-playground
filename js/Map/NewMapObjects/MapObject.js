@@ -1219,8 +1219,45 @@ class MapObject {
 	// ── Event handlers ────────────────────────────────────────────────────────
 
 	getBestInteractionAction(myte) {
-		const SKIP = new Set(['inspect', 'deep_inspect']);
-		return ActionManager.getAvailableActions(this, myte).find(a => !SKIP.has(a.id)) ?? null;
+		const actions = ActionManager.getAvailableActions(this, myte);
+		return this.getMajorAction(myte, actions)
+			?? this.getFallbackInteractionAction(actions);
+	}
+
+	getMajorActionPreferenceIds() {
+		const configured = this.getConfig('majorActionId', null);
+		if (Array.isArray(configured)) {
+			return configured.filter(Boolean);
+		}
+
+		return configured ? [configured] : [];
+	}
+
+	getMajorAction(myte, availableActions = ActionManager.getAvailableActions(this, myte)) {
+		const preferredIds = this.getMajorActionPreferenceIds(myte);
+		for (const actionId of preferredIds) {
+			const preferred = availableActions.find(action => action.id === actionId);
+			if (preferred) {
+				return preferred;
+			}
+		}
+
+		const interactive = availableActions.filter(action =>
+			action.category !== 'movement' &&
+			!['inspect', 'deep_inspect'].includes(action.id)
+		);
+
+		return interactive[0] ?? null;
+	}
+
+	getFallbackInteractionAction(availableActions = []) {
+		const nonMovement = availableActions.find(action => action.category !== 'movement');
+		if (nonMovement) {
+			return nonMovement;
+		}
+
+		const nonInspect = availableActions.find(action => !['inspect', 'deep_inspect'].includes(action.id));
+		return nonInspect ?? availableActions[0] ?? null;
 	}
 
 	handleDoubleClick(event) {
@@ -1232,13 +1269,24 @@ class MapObject {
 		const myte = this.activeMyte;
 		if (!myte?.queue) return;
 
-		const best = this.getBestInteractionAction(myte);
-		if (best) {
-			myte.queue.interrupt(best.id, ActionManager.getActionOptions(best.id, this, myte));
-		} else {
-			myte.queue.interrupt('go_to_object', { target: this });
-		}
-	}
+        const best = this.getBestInteractionAction(myte);
+        if (best) {
+            const actionOptions = ActionManager.getActionOptions(best.id, this, myte);
+            if (!actionOptions) {
+                return;
+            }
+
+            myte.queue.interrupt(best.id, {
+                ...actionOptions,
+                userInitiated: true
+            });
+        } else {
+            myte.queue.interrupt('go_to_object', {
+                target: this,
+                userInitiated: true
+            });
+        }
+    }
 
 	handleLongPress(event) {
 		const fn = this.getConfig('longPressAction');

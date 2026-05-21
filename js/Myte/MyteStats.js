@@ -495,14 +495,14 @@ class MyteStats {
     showBattery() {
         if (!this.myte.battery) return;
         this.batteryVisible = true;
-        this.myte.battery.classList.add('visible');
+        this.myte.battery.classList.add('is-visible');
     }
 
     // Hide the battery icon
     hideBattery() {
         if (!this.myte.battery) return;
         this.batteryVisible = false;
-        this.myte.battery.classList.remove('visible');
+        this.myte.battery.classList.remove('is-visible');
     }
 
     // Handle battery visibility based on energy level

@@ -398,8 +398,7 @@ body.debug .map-object > .interactive-hitbox {
 .dragging {
   cursor: grabbing;
   touch-action: none;
-  -moz-user-select: none;
-       user-select: none;
+  user-select: none;
   -webkit-user-select: none;
 }
 
@@ -913,11 +912,11 @@ body.debug .map-object > .interactive-hitbox {
   will-change: transform, opacity, height;
   cursor: pointer;
 }
-.toast.visible {
+.toast.is-visible {
   transform: translateX(0);
   opacity: 1;
 }
-.toast.visible:hover {
+.toast.is-visible:hover {
   opacity: 0.9;
 }
 .toast.removing {
@@ -1036,9 +1035,7 @@ body.debug .map-object > .interactive-hitbox {
   justify-content: space-between;
   list-style: none;
   padding: 6px var(--padding);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .debug-panel .debug-section > summary::-webkit-details-marker {
   display: none;
@@ -1107,9 +1104,7 @@ body.debug .map-object > .interactive-hitbox {
   cursor: pointer;
   font-weight: 600;
   font-size: 0.85em;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .debug-panel .debug-group > .debug-group-summary::-webkit-details-marker {
   display: none;
@@ -1141,11 +1136,11 @@ body.debug .map-object > .interactive-hitbox {
 .debug-panel .debug-table .debug-label {
   color: rgba(0, 0, 0, 0.55);
   padding-right: 6px;
-  width: 70%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: inline-block;
+  width: 100%;
 }
 .debug-panel .debug-table .debug-value {
   font-weight: 500;
@@ -1230,7 +1225,6 @@ body.debug .map-object > .interactive-hitbox {
   margin-right: 10px;
   position: fixed;
   display: none;
-  height: -moz-fit-content;
   height: fit-content;
   right: 0;
   top: 50%;
@@ -1351,7 +1345,6 @@ body.debug .map-object > .interactive-hitbox {
   z-index: var(--z-debug);
   flex-direction: column;
   transform: translate(calc(-100% - 40px), 0);
-  width: -moz-fit-content;
   width: fit-content;
 }
 .app-shell > .hand-controls input[type=radio] {
@@ -1499,6 +1492,21 @@ body.debug .map-object > .interactive-hitbox {
   margin-top: var(--padding);
   border-top: 1px solid var(--border-subtle);
 }
+.app-shell > .sidebar > .action-controls > .action-groups .action-group.major-action {
+  background: var(--surface-panel-muted, #f5f5f5);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  margin-bottom: var(--padding);
+  border: 1px solid var(--border-subtle);
+}
+.app-shell > .sidebar > .action-controls > .action-groups .action-group.major-action + .action-group {
+  margin-top: 0;
+  border-top: none;
+}
+.app-shell > .sidebar > .action-controls > .action-groups .action-group.major-action .primary-action {
+  width: 100%;
+  font-weight: 700;
+}
 .app-shell > .sidebar > .action-controls > .action-groups .action-group h3 {
   font-size: 0.8em;
   text-transform: uppercase;
@@ -1609,9 +1617,7 @@ body.debug .map-object > .interactive-hitbox {
 .window-panel > .window-panel__header > .window-panel__controls {
   display: flex;
   gap: var(--gap);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .window-panel > .window-panel__header > .window-panel__controls > button {
   width: 30px;
@@ -1713,12 +1719,9 @@ body.debug .map-object > .interactive-hitbox {
   color: var(--button-text-color);
   box-shadow: none;
   padding: 0;
-  color: var(--black);
   overflow: visible;
   touch-action: manipulation;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   font-family: inherit;
 }
 .myte-queue-overlay .queue-item.compact.is-current {
@@ -1812,9 +1815,7 @@ body.debug .map-object > .interactive-hitbox {
   position: absolute;
   top: 0;
   transition: opacity var(--motion-slower) var(--ease-emphasis);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   width: 100%;
   z-index: var(--z-loading);
 }
@@ -2069,6 +2070,10 @@ body.debug .map-object > .interactive-hitbox {
   outline: 2px dashed green;
   border-radius: 5px;
 }
+.interactive-myte.is-queue-target .sprite {
+  box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
+  border-radius: 5px;
+}
 .interactive-myte.world-myte.is-deactivated {
   display: none;
 }
@@ -2103,7 +2108,6 @@ body.debug .map-object > .interactive-hitbox {
   display: flex;
   gap: var(--border-width);
   align-items: center;
-  width: -moz-fit-content;
   width: fit-content;
   left: 50%;
   transform: translate(-50%, -115%);
@@ -2210,7 +2214,7 @@ body.debug .map-object > .interactive-hitbox {
   border: var(--dialogue-border-width) solid var(--dialogue-border-color);
   border-radius: 50%;
 }
-.interactive-myte > .inner-wrapper > .dialogue.thought.visible, .interactive-myte > .inner-wrapper > .dialogue.thought.is-visible {
+.interactive-myte > .inner-wrapper > .dialogue.thought.is-visible {
   animation: thoughtBubblePop 0.5s ease-out;
 }
 .interactive-myte > .inner-wrapper > .dialogue.emoji {
@@ -2229,14 +2233,14 @@ body.debug .map-object > .interactive-hitbox {
   align-items: center;
   justify-content: center;
 }
-.interactive-myte > .inner-wrapper > .dialogue.emoji.visible, .interactive-myte > .inner-wrapper > .dialogue.emoji.is-visible {
+.interactive-myte > .inner-wrapper > .dialogue.emoji.is-visible {
   animation: emojiPop 0.4s ease-out;
 }
 .interactive-myte > .inner-wrapper > .dialogue.alert {
   --dialogue-background-color: #ffe1e1;
   --dialogue-border-color: #ff4444;
 }
-.interactive-myte > .inner-wrapper > .dialogue.alert.visible, .interactive-myte > .inner-wrapper > .dialogue.alert.is-visible {
+.interactive-myte > .inner-wrapper > .dialogue.alert.is-visible {
   animation: alertShake 0.7s cubic-bezier(0.36, 0, 0.66, -0.56);
   animation-fill-mode: forwards;
 }
@@ -2250,7 +2254,7 @@ body.debug .map-object > .interactive-hitbox {
   font-size: 8px;
   filter: blur(0);
 }
-.interactive-myte > .inner-wrapper > .dialogue.whisper.visible, .interactive-myte > .inner-wrapper > .dialogue.whisper.is-visible {
+.interactive-myte > .inner-wrapper > .dialogue.whisper.is-visible {
   opacity: 0.8;
   animation: whisperFloat 3s ease-out forwards;
 }
@@ -2272,9 +2276,7 @@ body.debug .map-object > .interactive-hitbox {
 }
 .interactive-myte.is-dragging {
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   cursor: grab;
   z-index: var(--z-drag) !important;
 }
@@ -2541,9 +2543,7 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.debug {
   z-index: 100;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   width: 100%;
   height: 100%;
   visibility: hidden;
@@ -2553,9 +2553,7 @@ body.debug .map-object > .interactive-hitbox {
   border: 1px solid rgba(255, 0, 0, 0.5);
   pointer-events: none;
   position: absolute;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   z-index: 9999;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .debug-collider.myte-collider {
@@ -2573,9 +2571,7 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.debug .pathfinder-node {
   position: absolute;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .path-line {
   height: 2px;
@@ -2625,9 +2621,7 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.effects {
   z-index: 2;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer > .zone {
   outline: 1px dashed red;
@@ -2706,9 +2700,7 @@ body.debug .map-object > .interactive-hitbox {
   z-index: 1;
   image-rendering: pixelated;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .map-object > .sprite > .front,
 .map-object > .sprite .back {
@@ -2749,6 +2741,10 @@ body.debug .map-object > .interactive-hitbox {
   outline: 2px dashed green;
   border-radius: 5px;
 }
+.map-object.is-queue-target {
+  box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
+  border-radius: 5px;
+}
 .map-object.draggable {
   pointer-events: all;
 }
@@ -2763,9 +2759,7 @@ body[data-tool-mode=drag] .map-object.draggable {
 }
 .map-object.is-dragging {
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   cursor: grabbing;
   z-index: var(--z-drag) !important;
 }
@@ -2976,7 +2970,7 @@ body[data-tool-mode=drag] .map-object.draggable {
   opacity: 0;
   transition: opacity 0.2s ease;
 }
-.debug.layer .cursor-tile.visible {
+.debug.layer .cursor-tile.is-visible {
   opacity: 1;
 }
 .debug.layer .cursor-tile .coords {
@@ -2994,7 +2988,7 @@ body[data-tool-mode=drag] .map-object.draggable {
   opacity: 0;
   transition: opacity 0.2s ease;
 }
-.debug.layer .myte-front-tile.visible {
+.debug.layer .myte-front-tile.is-visible {
   opacity: 1;
 }
 .debug.layer .culling-bounds {
@@ -3088,8 +3082,7 @@ body[data-tool-mode=drag] .map-object.draggable {
   text-align: center;
 }
 
-.drop-target,
-.map-object-drop-target {
+.drop-target {
   position: absolute;
   pointer-events: none;
   border-radius: 4px;
@@ -3097,14 +3090,12 @@ body[data-tool-mode=drag] .map-object.draggable {
   transition: background var(--motion-instant), border-color var(--motion-instant);
   z-index: 99999;
 }
-.drop-target.valid-drop,
-.map-object-drop-target.valid-drop {
+.drop-target.valid-drop {
   background: rgba(60, 200, 100, 0.2);
   border: 2px solid rgba(60, 200, 100, 0.9);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
-.drop-target.invalid-drop,
-.map-object-drop-target.invalid-drop {
+.drop-target.invalid-drop {
   background: rgba(220, 50, 50, 0.2);
   border: 2px solid rgba(220, 50, 50, 0.9);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
@@ -3167,4 +3158,6 @@ body[data-tool-mode=drag] .map-object.draggable {
   100% {
     transform: scale(0.9);
   }
-}/*# sourceMappingURL=style.css.map */
+}
+
+/*# sourceMappingURL=style.css.map */

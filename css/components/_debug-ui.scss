@@ -131,11 +131,11 @@
         .debug-label {
             color: rgba(0, 0, 0, 0.55);
             padding-right: 6px;
-            width: 70%;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             display: inline-block;
+            width: 100%;
         }
 
         .debug-value {

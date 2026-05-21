@@ -12,10 +12,22 @@ class ActionManager {
         actionClasses.forEach(ActionClass => this.registerAction(ActionClass));
     }
 
+    static canPerformAction(actionId, selected, active) {
+        const ActionClass = this.actions.get(actionId);
+        if (!ActionClass || typeof ActionClass.canPerform !== 'function') {
+            return false;
+        }
+
+        return !!ActionClass.canPerform(selected, active);
+    }
+
     // Resolve options for an action from a UI selection context
     static getActionOptions(actionId, selected, active) {
         const ActionClass = this.actions.get(actionId);
         if (!ActionClass) return null;
+        if (!this.canPerformAction(actionId, selected, active)) {
+            return null;
+        }
 
         // Only use getRequiredOptions if the action defines its own (not the base no-op)
         if (Object.prototype.hasOwnProperty.call(ActionClass, 'getRequiredOptions')) {
@@ -41,7 +53,7 @@ class ActionManager {
     static getAvailableActions(selected, active) {
         const available = [];
         for (const [id, ActionClass] of this.actions) {
-            if (ActionClass.canPerform(selected, active)) {
+            if (this.canPerformAction(id, selected, active)) {
                 available.push({ ...ActionClass.metadata, ActionClass });
             }
         }

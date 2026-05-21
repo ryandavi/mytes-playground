@@ -672,6 +672,67 @@ class SelectionManager extends UIComponent {
     }
 }
 
+class QueueTargetManager extends UIComponent {
+    constructor(parent) {
+        super(parent);
+        this.currentTarget = null;
+    }
+
+    getHighlightElement(target) {
+        if (!target) return null;
+
+        if (target instanceof Myte) {
+            return target.duplicate || null;
+        }
+
+        if (target instanceof MapObject) {
+            return target.element || null;
+        }
+
+        if (target instanceof Element) {
+            return target;
+        }
+
+        return null;
+    }
+
+    clearTarget(target = this.currentTarget) {
+        const element = this.getHighlightElement(target);
+        element?.classList?.remove('is-queue-target');
+    }
+
+    setTarget(target) {
+        if (this.currentTarget === target) {
+            return;
+        }
+
+        this.clearTarget(this.currentTarget);
+        this.currentTarget = target || null;
+
+        const element = this.getHighlightElement(this.currentTarget);
+        element?.classList?.add('is-queue-target');
+    }
+
+    update() {
+        const activeMyte = this.parent.getActiveMyte();
+        const currentAction = activeMyte?.queue?.getCurrentAction?.() || null;
+        const target = currentAction?.target || null;
+        const highlightElement = this.getHighlightElement(target);
+
+        if (!highlightElement || target?.active === false) {
+            this.setTarget(null);
+            return;
+        }
+
+        this.setTarget(target);
+    }
+
+    dispose() {
+        this.clearTarget();
+        this.currentTarget = null;
+    }
+}
+
 class ActionSidebarManager extends UIComponent {
     constructor(parent) {
         super(parent);
@@ -696,14 +757,68 @@ class ActionSidebarManager extends UIComponent {
         return titles[category] || category;
     }
 
+    getMajorAction(selectedObject, activeMyte, availableActions = []) {
+        if (!selectedObject || !activeMyte || selectedObject === activeMyte) {
+            return null;
+        }
+
+        if (typeof selectedObject.getMajorAction === 'function') {
+            return selectedObject.getMajorAction(activeMyte, availableActions);
+        }
+
+        const skip = new Set(['go_to_object', 'follow_object', 'inspect', 'deep_inspect']);
+        return availableActions.find(action => !skip.has(action.id)) ?? null;
+    }
+
+    createActionButton(action, selectedObject, activeMyte, { prominent = false } = {}) {
+        const button = document.createElement('button');
+        button.textContent = action.label;
+        if (action.description) {
+            button.title = action.description;
+        }
+        if (prominent) {
+            button.classList.add('primary-action');
+        }
+
+        button.addEventListener('click', () => {
+            if (action.id === 'carry_putdown') {
+                activeMyte.queue.addPutDownMyte();
+                this.updateActions(selectedObject);
+                return;
+            }
+
+            if (action.id === 'drop_item') {
+                activeMyte.queue.addDropHeldItem();
+                this.updateActions(selectedObject);
+                return;
+            }
+
+            const options = ActionManager.getActionOptions(
+                action.id,
+                selectedObject,
+                activeMyte
+            );
+
+            if (options) {
+                activeMyte.queue.add(action.id, {
+                    ...options,
+                    userInitiated: true
+                });
+                this.updateActions(selectedObject);
+            }
+        });
+
+        return button;
+    }
+
     emptyActionList() {
         const actionGroups = this.actionControls.querySelector('.action-groups');
         actionGroups.innerHTML = '';
-        this.actionControls.classList.remove('visible');
+        this.actionControls.classList.remove('is-visible');
 
         // empty other info
         this.actionControls.querySelector('.other-info').innerHTML = '';
-        this.actionControls.querySelector('.other-info').classList.remove('visible');
+        this.actionControls.querySelector('.other-info').classList.remove('is-visible');
 
 
     }
@@ -803,9 +918,9 @@ class ActionSidebarManager extends UIComponent {
         if (!otherInfo) return;
 
         if (!selectedObject) {
-            if (otherInfo.classList.contains('visible')) {
+            if (otherInfo.classList.contains('is-visible')) {
                 otherInfo.innerHTML = '';
-                otherInfo.classList.remove('visible');
+                otherInfo.classList.remove('is-visible');
                 this._otherInfoCache = null;
                 this._otherInfoRowMap.clear();
             }
@@ -868,7 +983,7 @@ class ActionSidebarManager extends UIComponent {
 
         otherInfo.innerHTML = '';
         otherInfo.appendChild(fragment);
-        otherInfo.classList.add('visible');
+        otherInfo.classList.add('is-visible');
         this._otherInfoRowMap = newRowMap;
     }
 
@@ -921,14 +1036,14 @@ class ActionSidebarManager extends UIComponent {
                 }
             }
 
-            selectedInfo.classList.add('visible');
+            selectedInfo.classList.add('is-visible');
             this.updateActionList(selectedObject);
         } else {
             // default
             interactionType.textContent = "Not Selected";
             targetType.textContent = "-";
             targetName.textContent = "None";
-            selectedInfo.classList.remove('visible');
+            selectedInfo.classList.remove('is-visible');
         }
     }
 
@@ -936,8 +1051,34 @@ class ActionSidebarManager extends UIComponent {
         const actionGroups = this.actionControls.querySelector('.action-groups');
         const activeMyte = this.parent.getActiveMyte();
 
-        // Get actions grouped by category from global ActionManager
-        const groupedActions = ActionManager.getActionsByCategory(selectedObject, activeMyte);
+        const availableActions = ActionManager.getAvailableActions(selectedObject, activeMyte);
+        const majorAction = this.getMajorAction(selectedObject, activeMyte, availableActions);
+        const groupedActions = availableActions
+            .filter(action => action.id !== majorAction?.id)
+            .reduce((groups, action) => {
+                const cat = action.category;
+                if (!groups[cat]) groups[cat] = [];
+                groups[cat].push(action);
+                return groups;
+            }, {});
+
+        if (majorAction) {
+            const majorActionElement = document.createElement('div');
+            majorActionElement.className = 'action-group major-action';
+
+            const title = document.createElement('h3');
+            title.textContent = 'Major Action';
+            majorActionElement.appendChild(title);
+
+            const actionList = document.createElement('ul');
+            const li = document.createElement('li');
+            li.appendChild(this.createActionButton(majorAction, selectedObject, activeMyte, {
+                prominent: true
+            }));
+            actionList.appendChild(li);
+            majorActionElement.appendChild(actionList);
+            actionGroups.appendChild(majorActionElement);
+        }
 
         // Create elements for each group
         Object.entries(groupedActions).forEach(([category, actions]) => {
@@ -953,39 +1094,7 @@ class ActionSidebarManager extends UIComponent {
             const actionList = document.createElement('ul');
             actions.forEach(action => {
                 const li = document.createElement('li');
-                const button = document.createElement('button');
-                button.textContent = action.label;
-                if (action.description) {
-                    button.title = action.description;
-                }
-
-                // click event for actions
-                button.addEventListener('click', () => {
-                    if (action.id === 'carry_putdown') {
-                        activeMyte.queue.addPutDownMyte();
-                        this.updateActions(selectedObject);
-                        return;
-                    }
-
-                    if (action.id === 'drop_item') {
-                        activeMyte.queue.addDropHeldItem();
-                        this.updateActions(selectedObject);
-                        return;
-                    }
-
-                    const options = ActionManager.getActionOptions(
-                        action.id,
-                        selectedObject,
-                        activeMyte
-                    );
-
-                    if (options) {
-                        activeMyte.queue.add(action.id, options);
-                        this.updateActions(selectedObject);
-                    }
-                });
-
-                li.appendChild(button);
+                li.appendChild(this.createActionButton(action, selectedObject, activeMyte));
                 actionList.appendChild(li);
             });
 
@@ -994,7 +1103,7 @@ class ActionSidebarManager extends UIComponent {
         });
 
         if (actionGroups.children.length > 0) {
-            this.actionControls.classList.add('visible');
+            this.actionControls.classList.add('is-visible');
         }
     }
 }
@@ -1163,14 +1272,14 @@ class HUDManager extends UIComponent {
 
         if (!activeMyte) {
             if (this.lastRenderedState.visible) {
-                this.hudElement.classList.remove('visible');
+                this.hudElement.classList.remove('is-visible');
                 this.lastRenderedState.visible = false;
             }
             return;
         }
 
         if (!this.lastRenderedState.visible) {
-            this.hudElement.classList.add('visible');
+            this.hudElement.classList.add('is-visible');
             this.lastRenderedState.visible = true;
         }
 
@@ -1504,6 +1613,7 @@ class UserInterface {
         // Initialize all UI components
         this.toolManager = new ToolManager(this);
         this.selectionManager = new SelectionManager(this);
+        this.queueTargetManager = new QueueTargetManager(this);
         this.actionSidebarManager = new ActionSidebarManager(this);
         this.myteListManager = new MyteListManager(this);
         this.hudManager = new HUDManager(this);
@@ -1590,6 +1700,7 @@ class UserInterface {
     update() {
         this.debug.update();
         this.cursorManager.update();
+        this.queueTargetManager.update();
         this.actionSidebarManager.update();
         this.hudManager.update();
         this.offscreenMyteIndicatorManager.update();
@@ -1611,11 +1722,13 @@ class UserInterface {
         this.screenManager?.destroy?.();
         this.toolManager?.destroy?.();
         this.cursorManager?.destroy?.();
+        this.queueTargetManager?.dispose?.();
         this.offscreenMyteIndicatorManager?.dispose?.();
 
         this.screenManager = null;
         this.toolManager = null;
         this.cursorManager = null;
+        this.queueTargetManager = null;
         this.offscreenMyteIndicatorManager = null;
         this.compactQueueUI?.dispose?.();
         this.compactQueueUI = null;

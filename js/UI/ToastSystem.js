@@ -149,7 +149,7 @@ class ToastSystem {
 	  
 	  // Trigger visibility after a frame to ensure transition works
 	  requestAnimationFrame(() => {
-		toastEl.classList.add('visible');
+		toastEl.classList.add('is-visible');
 		
 		// Setup progress bar animation
 		if (config.progress && config.autoClose) {

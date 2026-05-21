@@ -95,6 +95,24 @@ class GameMap {
         };
     }
 
+    getParticleEffectsEnabledSetting() {
+        const liveSetting = this.ui?.settingsMenu?.isEffectsEnabled?.();
+        if (typeof liveSetting === 'boolean') {
+            return liveSetting;
+        }
+
+        try {
+            const savedSettings = localStorage.getItem('gameSettings');
+            if (!savedSettings) return true;
+
+            return JSON.parse(savedSettings)?.graphics?.effects !== false;
+        } catch (error) {
+            console.warn('[GameMap] Failed to read saved particle settings:', error);
+        }
+
+        return true;
+    }
+
     getZIndex(y, height) {
         return this.parent?.getZIndex?.(y, height) ?? 0;
     }
@@ -190,8 +208,16 @@ class GameMap {
 
             // Initialize particle system first to avoid dependency issues
             console.log(`[GameMap] Creating particle system`);
-            this.particleSystem = new GameMapParticleSystem(this);
+            this.particleSystem = new GameMapParticleSystem(this, {
+                effectsEnabled: this.getParticleEffectsEnabledSetting()
+            });
             this.particleSystem.start();
+
+            for (const myte of this.mytes || []) {
+                if (typeof myte.initParticleEffects === 'function') {
+                    myte.initParticleEffects();
+                }
+            }
 
             // Initialize tile map loader
             if (!this.tileMapLoader) {
@@ -336,6 +362,9 @@ class GameMap {
             }
 
             console.log(`[GameMap] Map ${mapId} initialization completed successfully`);
+            if (this.gridSystem && document.body.classList.contains('debug') && !this.gridSystem.debugMode) {
+                this.gridSystem.toggleDebug();
+            }
             this.initialized = true;
             return true;
         } catch (error) {
@@ -863,6 +892,10 @@ class GameMap {
             if (object.sleeping && !object.shouldSimulateOffScreen?.()) continue;
             object.tickUpdate(tickDelta);
         }
+
+        if (this.particleSystem) {
+            this.particleSystem.tickUpdate(tickDelta);
+        }
     }
 
     update(deltaTime) {
@@ -920,6 +953,10 @@ class GameMap {
         // Periodic cleanup
         if (this.updateFrameSkip === 0) {
             this.removeInactiveObjects();
+        }
+
+        if (this.particleSystem) {
+            this.particleSystem.update(deltaTime);
         }
     }
 

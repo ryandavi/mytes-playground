@@ -344,9 +344,26 @@ getMapMessages() {
 
         messages.push({ label: "Objects", value: (gm.objects && gm.objects.length) || 0 });
 
+        const cullingStats = gm.gridSystem?.getCullingDebugStats?.();
+        if (cullingStats) {
+            messages.push({ label: "Visible Cells", value: cullingStats.visibleCells });
+            messages.push({ label: "Active Objects", value: cullingStats.activeObjects });
+            messages.push({ label: "Total Cells", value: cullingStats.totalCells });
+            messages.push({ label: "Culling Ratio", value: `${cullingStats.cullingRatio}%` });
+        }
+
         if (gm.particleSystem) {
-            messages.push({ label: "Particles", value: `${gm.particleSystem.particles?.length || 0}` });
-            messages.push({ label: "Particle Emitters", value: `${gm.particleSystem.emitters?.length || 0}` });
+            const particleStats = gm.particleSystem.getDebugStats?.() || null;
+            if (particleStats) {
+                messages.push({ label: "Particle Effects", value: particleStats.effectsEnabled ? 'On' : 'Off' });
+                messages.push({ label: "Particles", value: `${particleStats.activeParticles} active / ${particleStats.pooledParticles} pooled` });
+                messages.push({ label: "Particle Emitters", value: `${particleStats.activeEmitters}` });
+                messages.push({ label: "Particle Bindings", value: `${particleStats.objectBindings || 0}` });
+                messages.push({ label: "Particle Culling", value: `${particleStats.culledThisFrame} culled` });
+            } else {
+                messages.push({ label: "Particles", value: `${gm.particleSystem.particles?.length || 0}` });
+                messages.push({ label: "Particle Emitters", value: `${gm.particleSystem.emitters?.length || 0}` });
+            }
         }
     }
 
@@ -652,6 +669,7 @@ drawDebugColliders() {
         ];
 
         this.drawDebugColliders();
+        this.parent.activeMyte?.queue?.getCurrentAction?.()?.refreshDebugVisualization?.();
 
         for (const { key, title, groups } of this.getDebugSections(debugGroups)) {
             this.reconcileSection(key, title, groups);
@@ -668,12 +686,17 @@ drawDebugColliders() {
 
         const debugLayer = this.parent?.gameMap?.layers?.debug;
         if (debugLayer) {
-            debugLayer.querySelectorAll('.debug-collider').forEach(collider => collider.remove());
+            debugLayer.querySelectorAll('.debug-collider, .pathfinder-node').forEach(node => node.remove());
         }
     }
 
     update() {
         const debugEnabled = document.body.classList.contains('debug');
+        const gridSystem = this.parent?.gameMap?.gridSystem;
+
+        if (debugEnabled && gridSystem && !gridSystem.debugMode) {
+            gridSystem.toggleDebug();
+        }
 
         // Check if debug element exists
         if (debugEnabled && this.debug) {

@@ -18,6 +18,10 @@ class MyteQueue {
         return this.queue[0] ?? null;
     }
 
+    hasUserInitiatedAction() {
+        return this.queue.some(action => action?.userInitiated);
+    }
+
     // Add an action to the end of the queue
     add(actionId, options = {}) {
         const ActionClass = ActionManager.actions.get(actionId);

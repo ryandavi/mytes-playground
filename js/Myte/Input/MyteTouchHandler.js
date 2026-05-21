@@ -101,8 +101,16 @@ class MyteTouchHandler extends DragHandler {
                     if (dropObj) {
                         const best = dropObj.getBestInteractionAction?.(myte);
                         if (best) {
+                            const actionOptions = ActionManager.getActionOptions(best.id, dropObj, myte);
+                            if (!actionOptions) {
+                                return;
+                            }
+
                             myte.queue.clear();
-                            myte.queue.add(best.id, ActionManager.getActionOptions(best.id, dropObj, myte));
+                            myte.queue.add(best.id, {
+                                ...actionOptions,
+                                userInitiated: true
+                            });
                         }
                     }
                 }

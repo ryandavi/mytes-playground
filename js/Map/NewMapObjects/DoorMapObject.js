@@ -284,7 +284,9 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
         if (myte?.queue) {
             myte.queue.add('go_to_object', {
                 target: this,
-                onComplete: interact
+                onComplete: interact,
+                queueVerb: desiredState === 'open' ? 'Open Door' : 'Close Door',
+                userInitiated: true
             });
             return true;
         }

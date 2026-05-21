@@ -50,7 +50,14 @@ class ButterflyMapObject extends AnimatedMapObject {
         this.initializeVelocity();
 
         this.parent.particleSystem.addParticleMethodsToObject(this);
-        this.addEffect('SPARKLE_SPRITE');
+        this.addEffect('SPARKLE_SPRITE', {
+            attachmentPoint: 'back',
+            directionalDistance: Math.max(8, this.size.width * 0.18),
+            followElevation: true,
+            randomizePosition: true,
+            randomizeFactor: 10,
+            offsetY: this.size.height * 0.05
+        });
     }
 
     shouldSimulateOffScreen() { return true; }

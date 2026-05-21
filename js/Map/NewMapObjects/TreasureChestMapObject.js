@@ -209,7 +209,7 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         return this.getColliderGapTo(myte) <= this.getConfig('interactionTouchThreshold', 12);
     }
 
-    runChestInteraction(action, myte = this.activeMyte) {
+    runChestInteraction(action, myte = this.activeMyte, options = {}) {
         if (!this.active || !myte || typeof action !== 'function') return false;
 
         this.selectInUi?.();
@@ -223,7 +223,7 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
             if (this.isWithinChestInteractionRange(myte)) {
                 action(myte);
             }
-        });
+        }, options);
     }
 
     press(parent, actor = this.activeMyte) {
@@ -233,13 +233,19 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         if (this.state === 'closed') {
             return this.runChestInteraction(() => {
                 this.open(parent);
-            }, myte);
+            }, myte, {
+                queueVerb: 'Open Chest',
+                userInitiated: true
+            });
         }
 
         if (this.state === 'opened' && this.canClose) {
             return this.runChestInteraction(() => {
                 this.close(parent);
-            }, myte);
+            }, myte, {
+                queueVerb: 'Close Chest',
+                userInitiated: true
+            });
         }
 
         return false;
@@ -262,8 +268,14 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
 
             if (!droppedItem?.element) return;
 
+            if (droppedItem.shadowElement) {
+                foregroundLayer.appendChild(droppedItem.shadowElement);
+            }
             foregroundLayer.appendChild(droppedItem.element);
             this.droppedItems.push(droppedItem);
+            if (!this.gameMap?.droppedItems?.includes(droppedItem)) {
+                this.gameMap?.droppedItems?.push(droppedItem);
+            }
         });
 
         this.playConfiguredSound('drop');
@@ -318,13 +330,8 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
     }
     
     updateDroppedItems() {
-        const activeMyte = this.activeMyte;
         this.droppedItems = this.droppedItems.filter(item => {
-            if (!item.collected) {
-                item.update(activeMyte);
-                return true;
-            }
-            return false;
+            return !!item && item.active && !item.collected;
         });
     }
 

@@ -213,31 +213,7 @@ class GridSystem {
         }
 
         // Create debug stats display if it doesn't exist or lost its parent
-        if (!this.debugElements.debugStats || !this.debugElements.debugStats.parentNode) {
-            // Remove any existing element first (cleanup)
-            if (this.debugElements.debugStats && this.debugElements.debugStats.parentNode) {
-                this.debugElements.debugStats.parentNode.removeChild(this.debugElements.debugStats);
-            }
-
-            // Create new element
-            const debugStats = document.createElement('div');
-            debugStats.className = 'debug-stats debug';
-            debugStats.innerHTML = `
-            <div class="stat"><span class="label">Visible Cells:</span><span class="value" id="visible-cells-count">0</span></div>
-            <div class="stat"><span class="label">Active Objects:</span><span class="value" id="active-objects-count">0</span></div>
-            <div class="stat"><span class="label">Total Cells:</span><span class="value" id="total-cells-count">${this.gridWidth * this.gridHeight}</span></div>
-            <div class="stat"><span class="label">Culling Ratio:</span><span class="value" id="culling-ratio">0%</span></div>
-        `;
-
-            if (this.parent.parent && this.parent.parent.element) {
-                this.parent.parent.element.appendChild(debugStats);
-                console.log('[GridSystem] Created debug stats element');
-            } else {
-                console.warn('[GridSystem] Could not find parent element for debug stats');
-            }
-
-            this.debugElements.debugStats = debugStats;
-        }
+        this.debugElements.debugStats = null;
     }
 
     // Method to initialize debug DOM elements
@@ -513,11 +489,11 @@ class GridSystem {
             const coordsElement = this.debugElements.cursorTile.querySelector('.coords');
             coordsElement.innerText = `${cell.terrainType}: ${gridPos.x}, ${gridPos.y}`;
 
-            if (!this.debugElements.cursorTile.classList.contains('visible')) {
-                this.debugElements.cursorTile.classList.add('visible');
+            if (!this.debugElements.cursorTile.classList.contains('is-visible')) {
+                this.debugElements.cursorTile.classList.add('is-visible');
             }
         } else {
-            this.debugElements.cursorTile.classList.remove('visible');
+            this.debugElements.cursorTile.classList.remove('is-visible');
         }
     }
 
@@ -661,15 +637,15 @@ class GridSystem {
             this.debugElements.myteFrontTile.style.top = `${cell.posY}px`;
 
             // Make sure it's visible
-            if (!this.debugElements.myteFrontTile.classList.contains('visible')) {
-                this.debugElements.myteFrontTile.classList.add('visible');
+            if (!this.debugElements.myteFrontTile.classList.contains('is-visible')) {
+                this.debugElements.myteFrontTile.classList.add('is-visible');
             }
 
             // Optionally, you could add a data attribute to show which direction it's in
             this.debugElements.myteFrontTile.dataset.direction = direction;
         } else {
             // Hide the indicator if outside the grid
-            this.debugElements.myteFrontTile.classList.remove('visible');
+            this.debugElements.myteFrontTile.classList.remove('is-visible');
         }
     }
 
@@ -1418,40 +1394,22 @@ class GridSystem {
             }
         });
 
-        // Update stats display
-        if (!this.debugElements.debugStats || !this.debugElements.debugStats.parentNode) {
-            // If the debug stats element is missing, recreate it
-            this.initializeCullingDebug();
-        }
+    }
 
-        if (this.debugElements.debugStats) {
-            const visibleCellsCount = this.visibleCells.length;
-            const activeObjectsCount = this.activeObjects.size;
-            const totalCellsCount = this.gridWidth * this.gridHeight;
-            const cullingRatio = Math.round((1 - (visibleCellsCount / totalCellsCount)) * 100);
+    getCullingDebugStats() {
+        const totalCells = this.gridWidth * this.gridHeight;
+        const visibleCells = this.visibleCells.length;
+        const activeObjects = this.activeObjects.size;
+        const cullingRatio = totalCells > 0
+            ? Math.round((1 - (visibleCells / totalCells)) * 100)
+            : 0;
 
-            const visibleCellsElement = this.debugElements.debugStats.querySelector('#visible-cells-count');
-            const activeObjectsElement = this.debugElements.debugStats.querySelector('#active-objects-count');
-            const cullingRatioElement = this.debugElements.debugStats.querySelector('#culling-ratio');
-
-            if (visibleCellsElement) visibleCellsElement.textContent = visibleCellsCount;
-            if (activeObjectsElement) activeObjectsElement.textContent = activeObjectsCount;
-            if (cullingRatioElement) {
-                cullingRatioElement.textContent = `${cullingRatio}%`;
-
-                // Color based on effectiveness
-                cullingRatioElement.className = 'value';
-                if (cullingRatio > 80) {
-                    cullingRatioElement.classList.add('good');
-                } else if (cullingRatio > 50) {
-                    cullingRatioElement.classList.add('warning');
-                } else {
-                    cullingRatioElement.classList.add('bad');
-                }
-            }
-        } else {
-            console.warn('[GridSystem] Debug stats element not available for update');
-        }
+        return {
+            visibleCells,
+            activeObjects,
+            totalCells,
+            cullingRatio
+        };
     }
     // Update from tile grid with terrain support
     updateFromTileGrid(tileGridData) {
@@ -1598,13 +1556,6 @@ class GridSystem {
             console.log(`[GridSystem] Corrected active objects: Added ${missingCount}, Removed ${extraCount}`);
             this.parent.activeObjectsCount = this.activeObjects.size;
 
-            // Update debug visualization if enabled
-            if (this.debugMode && this.debugInitialized && this.debugElements.debugStats) {
-                const activeObjectsElement = this.debugElements.debugStats.querySelector('#active-objects-count');
-                if (activeObjectsElement) {
-                    activeObjectsElement.textContent = this.activeObjects.size;
-                }
-            }
         }
 
         return missingCount + extraCount; // Return total corrections

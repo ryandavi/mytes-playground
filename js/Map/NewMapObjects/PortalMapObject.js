@@ -98,7 +98,11 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
 
     initializePortalEffects() {
         if (this.gameMap?.particleSystem && this.getConfig('particleEffects', true)) {
-            this.particleSystem = this.gameMap.particleSystem.addEffect(this, 'GLOW', {
+            const particleConfig = this.getConfig('particleConfig', {});
+            const effectName = particleConfig.particleEffect || 'GLOW';
+
+            this.particleSystem = this.gameMap.particleSystem.addEffect(this, effectName, {
+                ...particleConfig,
                 colors: [
                     this.getConfig('particleStartColor', '#8A2BE2'),
                     this.getConfig('particleEndColor', '#4B0082')
@@ -202,6 +206,10 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
     }
 
     getPortalWindowTitle() {
+        return this.getDisplayName();
+    }
+
+    getDisplayName() {
         if (this.targetMap) {
             const mapLoader = this.core?.mapLoader;
             return mapLoader?.getCachedMapDisplayName?.(this.targetMap) ||
@@ -209,12 +217,17 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
                 String(this.targetMap);
         }
 
-        const displayName = this.getDisplayName?.();
-        if (typeof displayName === 'string' && displayName.trim()) {
-            return displayName.trim();
+        const explicitName = this.getConfig('displayName', null);
+        if (typeof explicitName === 'string' && explicitName.trim()) {
+            return explicitName.trim();
         }
 
-        return 'Travel';
+        const fallback = super.getDisplayName?.();
+        if (fallback && fallback !== 'Default') {
+            return fallback;
+        }
+
+        return 'Portal';
     }
 
     getPortalTransitionMessage() {
@@ -263,7 +276,7 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
     }
 
     refreshPortalWindowTitle() {
-        const titleElement = this.element?.querySelector('.portal-window .title');
+        const titleElement = this.element?.querySelector('.portal-window .portal-panel__title');
         const nextTitle = this.getPortalWindowTitle();
         if (titleElement) {
             titleElement.textContent = nextTitle;
@@ -277,7 +290,7 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         this.core.mapLoader.getMapDisplayName(this.targetMap).then(displayName => {
             if (!displayName) return;
 
-            const liveTitleElement = this.element?.querySelector('.portal-window .title');
+            const liveTitleElement = this.element?.querySelector('.portal-window .portal-panel__title');
             if (!liveTitleElement) return;
 
             liveTitleElement.textContent = displayName;
@@ -314,14 +327,20 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         super.update(deltaTime);
         this.updatePortalStateClasses();
 
-        if (this.particleSystem?.options) {
-            this.particleSystem.options.count = this.isActive ? 1 : 0;
+        if (this.particleSystem?.setEnabled) {
+            this.particleSystem.setEnabled(this.isActive);
+        } else if (this.particleSystem) {
+            this.particleSystem.active = this.isActive;
         }
     }
 
     remove() {
         if (this.particleSystem) {
-            this.particleSystem.active = false;
+            if (typeof this.particleSystem.destroy === 'function') {
+                this.particleSystem.destroy();
+            } else {
+                this.particleSystem.active = false;
+            }
             this.particleSystem = null;
         }
 

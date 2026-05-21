@@ -128,14 +128,19 @@ const TYPE_CONFIGS = {
 		renderType: 'sprite',
 		renderPriority: 2,
 		interactionType: 'open',
+		majorActionId: ['open_chest'],
 		size: { width: 32, height: 32 },
 		scale: 2,
 		collider: { width: 56, height: 24, offsetX: 4, offsetY: 36 },
 		interactiveCollider: { width: 88, height: 88, offsetX: -12, offsetY: -12 },
+		interactionTouchThreshold: 1,
 		approachConfig: {
+			allowedSides: ['bottom'],
+			preferredSide: 'bottom',
 			alignTo: 'collider',
+			myteAlignTo: 'collider',
 			align: 'center',
-			gap: 8
+			gap: 0
 		},
 		spriteConfig: {
 			default: 'closed',
@@ -250,6 +255,7 @@ const TYPE_CONFIGS = {
 	CROP: {
 		baseType: 'GROWING_PLANT',
 		category: 'crop',
+		majorActionId: ['harvest', 'water_plant'],
 		variants: ['tomato', 'carrot', 'wheat', 'berry'],
 		interactionType: 'tend',
 		renderType: 'animated',
@@ -262,6 +268,14 @@ const TYPE_CONFIGS = {
 			offsetY: 84,
 			width: 32,
 			height: 32
+		},
+		approachConfig: {
+			alignTo: 'collider',
+			align: 'center',
+			gap: 4
+		},
+		soundEffects: {
+			harvest: 'obj_crop_harvest'
 		},
 		growthConfig: {
 			baseGrowthTime: 3000,
@@ -773,6 +787,7 @@ const TYPE_CONFIGS = {
 		walkable: true,
 		renderPriority: 2,
 		interactionType: 'teleport',
+		majorActionId: ['interact_object'],
 		interactionOnly: true,
 		interactionRadius: 150,
 		canToggle: true,

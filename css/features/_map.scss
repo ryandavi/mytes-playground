@@ -319,6 +319,11 @@
         border-radius: 5px;
     }
 
+    &.is-queue-target {
+        box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
+        border-radius: 5px;
+    }
+
     &.draggable {
         pointer-events: all;
     }
@@ -527,7 +532,7 @@
         opacity: 0;
         transition: opacity 0.2s ease;
 
-        &.visible { opacity: 1; }
+        &.is-visible { opacity: 1; }
 
         .coords {
             font-size: 10px;
@@ -546,7 +551,7 @@
         opacity: 0;
         transition: opacity 0.2s ease;
 
-        &.visible { opacity: 1; }
+        &.is-visible { opacity: 1; }
     }
 
     .culling-bounds {
@@ -642,8 +647,7 @@
 
 // ─── Drop Targets ─────────────────────────────────────────────────────────
 
-.drop-target,
-.map-object-drop-target {
+.drop-target {
     position: absolute;
     pointer-events: none;
     border-radius: 4px;

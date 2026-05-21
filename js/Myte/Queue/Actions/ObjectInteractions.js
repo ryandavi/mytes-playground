@@ -36,8 +36,7 @@ class InspectAction extends GoToObjectAction {
     }
 
     getQueueTitle() {
-        const targetLabel = this.getQueueTargetLabel(this.target);
-        return targetLabel ? `Inspect ${targetLabel}` : 'Inspect';
+        return 'Inspect';
     }
 
     start() {
@@ -116,8 +115,7 @@ class DeepInspectAction extends PositionableAction {
     }
 
     getQueueTitle() {
-        const targetLabel = this.getQueueTargetLabel(this.target);
-        return targetLabel ? `Inspect ${targetLabel} Oddly` : 'Inspect Oddly';
+        return 'Inspect Oddly';
     }
 
     start() {
@@ -183,6 +181,12 @@ class InteractObjectAction extends GoToObjectAction {
         }
 
         const interactionType = selected.getConfig?.('interactionType');
+        if (interactionType === 'teleport') {
+            return !!selected.hasTransitionDestination?.() &&
+                selected.active !== false &&
+                selected.isActive !== false;
+        }
+
         return interactionType === 'dance' || interactionType === 'light' || interactionType === 'toggle';
     }
 
@@ -409,7 +413,9 @@ class NudgeBallAction extends GoToObjectAction {
                 alignTo: 'collider'
             },
             allowStuckSuccess: false,
-            stuckCompletionDistance: 10
+            stuckCompletionDistance: 10,
+            repeat: 1,
+            postNudgeIdleDuration: 20
         }
     };
 
@@ -429,6 +435,21 @@ class NudgeBallAction extends GoToObjectAction {
         super.complete();
         this.myte.queue.addExpression('excited', 30, 1);
         this.myte.queue.addIdle(28);
+
+        const remainingRepeats = Math.max(0, (Number(this.repeat) || 1) - 1);
+        if (remainingRepeats > 0 && this.target?.active) {
+            const idleDuration = Math.max(0, Number(this.postNudgeIdleDuration) || 0);
+            if (idleDuration > 0) {
+                this.myte.queue.add('idle', { duration: idleDuration });
+            }
+
+            this.myte.queue.add('nudge_ball', {
+                target: this.target,
+                repeat: remainingRepeats,
+                postNudgeIdleDuration: this.postNudgeIdleDuration,
+                userInitiated: this.userInitiated
+            });
+        }
     }
 }
 
@@ -452,11 +473,23 @@ class EatElementAction extends GoToObjectAction {
     };
 
     static canPerform(selected, active) {
-        return active && selected instanceof MapObject && !active.queue.isCarrying();
+        if (!active || !(selected instanceof MapObject) || active.queue.isCarrying()) {
+            return false;
+        }
+
+        const interactionType = selected.getConfig?.('interactionType');
+        return (selected.type?.toUpperCase?.() === 'FOOD' ||
+            selected.getConfig?.('consumable', false) === true ||
+            interactionType === 'consume') &&
+            selected.active !== false;
     }
 
     complete() {
         super.complete();
+        if (!EatElementAction.canPerform(this.target, this.myte)) {
+            return;
+        }
+
         this.target?.remove?.();
     }
 }
@@ -634,7 +667,9 @@ class HarvestAction extends GoToObjectAction {
 
     complete() {
         super.complete();
-        if (this.target?.harvest) {
+        if (typeof this.target?.performHarvest === 'function') {
+            this.target.performHarvest(this.myte.parent, this.myte);
+        } else if (this.target?.harvest) {
             this.target.harvest(this.myte);
         }
         this.myte.queue.addExpression('excited', 300, 1);

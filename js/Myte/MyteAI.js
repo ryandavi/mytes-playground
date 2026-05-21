@@ -389,6 +389,13 @@ class MyteAI {
 
         const targetBall = this.findTargetWithAffordance(context.nearbyObjects, 'nudge_ball', context);
         const targetAnchor = targetBall ?? this.getPlayAnchorTarget(context.nearbyObjects);
+        const playMomentum = Utility.clamp(
+            (context.needs.play * 0.5) +
+            (context.activity * 0.28) +
+            (context.energy * 0.22),
+            0,
+            1
+        );
         let score = 10 + (context.needs.play * 54) + (context.boredom * 10);
         score += context.activity * 12;
         score -= context.needs.rest * 18;
@@ -419,7 +426,10 @@ class MyteAI {
                 }
 
                 if (actionId === 'nudge_ball' && targetBall) {
-                    this.enqueueTargetedAction('nudge_ball', targetBall, {}, {
+                    this.enqueueTargetedAction('nudge_ball', targetBall, {
+                        repeat: playMomentum > 0.9 ? 3 : (playMomentum > 0.72 ? 2 : 1),
+                        postNudgeIdleDuration: 18 + Math.round(context.activity * 16)
+                    }, {
                         label: 'play:nudge_ball',
                         category: 'play',
                         novelty: this.getNoveltyScore(targetBall),
@@ -431,7 +441,7 @@ class MyteAI {
 
                 if (actionId === 'play_fetch' && targetBall) {
                     this.enqueueTargetedAction('play_fetch', targetBall, {
-                        roundTrips: context.activity > 0.82 ? 2 : 1,
+                        roundTrips: Math.max(1, Math.min(4, 1 + Math.round((playMomentum * 2.4) + (context.boredom * 0.8)))),
                         throwStrength: 8 + Math.round(context.activity * 6)
                     }, {
                         label: 'play:play_fetch',
