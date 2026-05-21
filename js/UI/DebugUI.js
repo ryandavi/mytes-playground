@@ -1,7 +1,7 @@
 class DebugUI {
     constructor(parent) {
         this.parent = parent;
-        this.debug = document.querySelector(".debugMenu");
+        this.debug = document.querySelector(".debug-panel, .debugMenu");
         this.cameraEnabled = false;
         this.camera = null;
         this.wasDebugEnabled = false;

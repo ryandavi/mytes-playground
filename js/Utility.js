@@ -43,7 +43,7 @@ class Utility {
      * find elements
     ********************************************/
 	static findableElementsSelector = 'img, iframe, select, table, textarea, input, h1, h2, h3, h4, h5, h6';
-	static ignoreElementsSelector = 'body, html, .ignore, .particle, .interactableObject, .interactive-myte, .myte, button, .myteWrapper, .container-wrapper, .container,#controls, .canvas, .canvas > .layer, #inventory';
+	static ignoreElementsSelector = 'body, html, .ignore, .particle, .interactableObject, .interactive-myte, .myte, button, .myte-slot, .myteWrapper, .app-shell, .container-wrapper, .app-stage, .container, #controls, .canvas, .canvas > .layer, #inventory';
 
 	static numToReturn = 3; // Number of closest elements to return
 	static maxDistance = 200; // Maximum distance to include an element

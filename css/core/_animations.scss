@@ -1,0 +1,121 @@
+@keyframes drop-indicator-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.35;
+    }
+}
+
+@keyframes pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.7;
+    }
+
+    50% {
+        transform: translate(-50%, -50%) scale(1.1);
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.7;
+    }
+}
+
+@keyframes consume {
+    0% {
+        transform: scale(0.5);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+
+@keyframes sway {
+    0% {
+        transform: skewX(0deg);
+    }
+
+    20% {
+        transform: skewX(3deg);
+    }
+
+    50% {
+        transform: skewX(-3deg);
+    }
+
+    80% {
+        transform: skewX(3deg);
+    }
+
+    100% {
+        transform: skewX(0deg);
+    }
+}
+
+@keyframes highlight {
+    from {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+
+    to {
+        background-color: transparent;
+    }
+}
+
+@keyframes wiggle {
+    0% {
+        transform: rotate(5deg);
+        animation-timing-function: ease-in;
+    }
+
+    50% {
+        transform: rotate(-5deg);
+        animation-timing-function: ease-out;
+    }
+}
+
+@keyframes wiggle2 {
+    0% {
+        transform: rotate(4deg);
+        animation-timing-function: cubic-bezier(0.36, 0.07, 0.19, 0.97);
+    }
+
+    25% {
+        transform: rotate(0deg);
+    }
+
+    50% {
+        transform: rotate(-4deg);
+        animation-timing-function: cubic-bezier(0.36, 0.07, 0.19, 0.97);
+    }
+
+    75% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(4deg);
+    }
+}
+
+@keyframes floating {
+    0% {
+        transform: translate(0, 0);
+    }
+
+    50% {
+        transform: translate(0, 10px);
+    }
+
+    100% {
+        transform: translate(0, 0);
+    }
+}

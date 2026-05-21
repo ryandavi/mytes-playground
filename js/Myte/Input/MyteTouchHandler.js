@@ -24,8 +24,8 @@ class MyteTouchHandler extends DragHandler {
                 this.dragStartPosition = { x: myte.posX, y: myte.posY };
                 myte.parent.camera.beginTemporaryFollow(myte, CAMERA_FOLLOW_MODES.CHARACTER);
                 myte.reset();
-                myte.targetDot.classList.add('hidden');
-                myte.duplicate.classList.add('dragging');
+                myte.targetDot.classList.add('hidden', 'is-hidden');
+                myte.duplicate.classList.add('dragging', 'is-dragging');
                 myte.dropTarget.classList.add("valid-drop-target");
 
                 // Mark portals as valid drop targets
@@ -69,7 +69,7 @@ class MyteTouchHandler extends DragHandler {
                     myte.setMode(myte.previousGoal);
                 }
                 myte.isDragging = false;
-                myte.duplicate.classList.remove('dragging');
+                myte.duplicate.classList.remove('dragging', 'is-dragging');
 
                 // Check if dropped on home target
                 if (myte.dropTarget.classList.contains("on-target")) {
@@ -110,7 +110,7 @@ class MyteTouchHandler extends DragHandler {
                 // Reset drop target states
                 myte.dropTarget.classList.remove('valid-drop-target', 'on-target');
                 this._getPortalElements(myte).forEach(el => el.classList.remove('valid-drop-target', 'on-target'));
-                myte.targetDot.classList.remove('hidden');
+                myte.targetDot.classList.remove('hidden', 'is-hidden');
                 myte.logVisualDebug('drag_end');
 
                 // Reset auto-pickup flag

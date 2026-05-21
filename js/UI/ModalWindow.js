@@ -85,7 +85,7 @@ constructor(parent, options = {}) {
 			}
 
 			if(this.options.floating) {
-				this.modalElement.classList.add('floating');
+				this.modalElement.classList.add('floating', 'is-floating');
 			}
 
 			if(this.options.buttonId) {
@@ -113,7 +113,7 @@ constructor(parent, options = {}) {
 			this.closeButton = this.modalElement.querySelector(this.options.closeButtonSelector);
 			this.minimizeButton = this.modalElement.querySelector(this.options.minimizeButtonSelector);
 			this.fullscreenButton = this.modalElement.querySelector(this.options.fullscreenButtonSelector);
-            this.headerElement = this.modalElement.querySelector('.modal-header');
+            this.headerElement = this.modalElement.querySelector('.window-panel__header, .modal-header');
 
 			// Store original size for restoring from fullscreen/minimize
 			const rect = this.modalElement.getBoundingClientRect();
@@ -176,7 +176,7 @@ constructor(parent, options = {}) {
 
 		// Draggable setup
 		if (this.options.draggable && this.modalElement) {
-			const header = this.modalElement.querySelector('.modal-header') || this.modalElement;
+			const header = this.modalElement.querySelector('.window-panel__header, .modal-header') || this.modalElement;
 			header.style.cursor = 'move';
 			header.onmousedown = this.handleDragStart;
 		}
@@ -241,7 +241,7 @@ constructor(parent, options = {}) {
 
 		// Toggle fullscreen class
 		if (this.isFullscreen) {
-			this.modalElement.classList.remove('fullscreen');
+			this.modalElement.classList.remove('fullscreen', 'is-fullscreen');
 			this.isFullscreen = false;
 			
 			// Restore original position if we had one
@@ -264,11 +264,11 @@ constructor(parent, options = {}) {
 				};
 			}
 			
-			this.modalElement.classList.add('fullscreen');
+			this.modalElement.classList.add('fullscreen', 'is-fullscreen');
 			
 			// When going fullscreen, ensure we're not minimized
 			if (this.isMinimized) {
-				this.modalElement.classList.remove('minimize');
+				this.modalElement.classList.remove('minimize', 'is-minimized');
 				this.isMinimized = false;
 			}
 			
@@ -292,7 +292,7 @@ constructor(parent, options = {}) {
 
 		// Toggle minimize class
 		if (this.isMinimized) {
-			this.modalElement.classList.remove('minimize');
+			this.modalElement.classList.remove('minimize', 'is-minimized');
 			this.isMinimized = false;
 			
 			// Restore original position if we had one
@@ -315,11 +315,11 @@ constructor(parent, options = {}) {
 				};
 			}
 			
-			this.modalElement.classList.add('minimize');
+			this.modalElement.classList.add('minimize', 'is-minimized');
 			
 			// When minimizing, ensure we're not fullscreen
 			if (this.isFullscreen) {
-				this.modalElement.classList.remove('fullscreen');
+				this.modalElement.classList.remove('fullscreen', 'is-fullscreen');
 				this.isFullscreen = false;
 			}
 			
@@ -498,12 +498,12 @@ constructor(parent, options = {}) {
 		
 		// Reset window state to normal before showing
 		// (ensures we don't have remnants of previous minimize/fullscreen state)
-		this.modalElement.classList.remove('fullscreen', 'minimize');
+		this.modalElement.classList.remove('fullscreen', 'is-fullscreen', 'minimize', 'is-minimized');
 		this.isFullscreen = false;
 		this.isMinimized = false;
 	
 		// Add visible class to show the modal
-		this.modalElement.classList.add('visible');
+		this.modalElement.classList.add('visible', 'is-visible');
 		this.isVisible = true;
 	
 		// Add document click listener for outside clicks
@@ -545,14 +545,14 @@ constructor(parent, options = {}) {
 		this.isMinimized = false;
 		
 		// Remove visible class to hide the modal (keeping fullscreen/minimize classes for animation)
-		this.modalElement.classList.remove('visible');
+		this.modalElement.classList.remove('visible', 'is-visible');
 		
 		// Set up a delayed removal of state classes after animation completes
 		if (wasFullscreen || wasMinimized) {
 			setTimeout(() => {
 				// Only remove classes if the modal is still not visible
 				if (!this.isVisible) {
-					this.modalElement.classList.remove('fullscreen', 'minimize');
+					this.modalElement.classList.remove('fullscreen', 'is-fullscreen', 'minimize', 'is-minimized');
 				}
 			}, this.options.animationDuration);
 		}
@@ -662,7 +662,7 @@ constructor(parent, options = {}) {
 		document.removeEventListener('keydown', this.handleKeyDown);
 
 		if (this.options.draggable && this.modalElement) {
-			const header = this.modalElement.querySelector('.modal-header') || this.modalElement;
+			const header = this.modalElement.querySelector('.window-panel__header, .modal-header') || this.modalElement;
 			header.onmousedown = null;
 		}
 

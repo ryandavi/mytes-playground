@@ -12,7 +12,7 @@ class ContainerManager {
         this.mytes = [];
 
         this.element = document.getElementById(elementId);
-        this.containerWrapper = this.element.closest('.container-wrapper');
+        this.containerWrapper = this.element.closest('.app-shell, .container-wrapper');
         this.canvas = this.element.querySelector('.canvas');
 
         this.activeMyte = null;
@@ -485,19 +485,18 @@ class ContainerManager {
     }
 
     getLocalOffset(el) {
-        let rect = this.getOffset(el);
-        let container = this.getContainerRect();
+        const rect = this.getOffset(el);
+        const container = this.getOffset(this.element);
 
-        rect.y -= container.top;
-        rect.x -= container.left;
+        const x = rect.x - container.x;
+        const y = rect.y - container.y;
 
         return {
-            x: rect.x,
-            y: rect.y,
-            left: rect.x,
-            top: rect.y,
-            right: rect.x + rect.width,
-            bottom: rect.y + rect.height,
+            x, y,
+            left: x,
+            top: y,
+            right: x + rect.width,
+            bottom: y + rect.height,
             width: rect.width,
             height: rect.height
         };
@@ -505,7 +504,7 @@ class ContainerManager {
 
     // Myte management methods
     async setupMytes() {
-        const wrappers = this.element.querySelectorAll('.myteWrapper');
+        const wrappers = this.element.querySelectorAll('.myte-slot, .myteWrapper');
 
         if (wrappers.length === 0) {
             throw new Error("No Myte elements found.");
@@ -645,6 +644,7 @@ class ContainerManager {
 
         this.ui.myteListManager.updateMytesList(myte);
         this.ui.debugMenu.updateButtons();
+        this.ui.viewMenu?.updateButtonStates();
         this.ui.setSelected(null);
 
         this.eventManager?.emit('container:active_myte_changed', { myte });
@@ -672,6 +672,7 @@ class ContainerManager {
         this.ui.myteListManager.updateMytesList(null);
         this.ui.debugMenu.updateButtons();
         this.ui.hudManager.update();
+        this.ui.viewMenu?.updateButtonStates();
         this.ui.setSelected(null);
 
         this.eventManager?.emit('container:active_myte_changed', { myte: null });

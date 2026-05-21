@@ -1,0 +1,331 @@
+@use '../primitives/ui' as *;
+
+.action-queue-panel,
+.queueMenu {
+    visibility: hidden;
+    margin-right: 10px;
+    position: fixed;
+    display: none;
+    height: fit-content;
+    right: 0;
+    top: 50%;
+    transform: translate(0, -50%);
+    z-index: var(--z-debug);
+    width: 300px;
+    font-size: 0.9em;
+
+    &:not(:empty) {
+        display: inline-block;
+    }
+
+    .queue-item {
+        background-color: rgba(255, 255, 255);
+        border-radius: 4px;
+        transition: background-color 0.2s;
+        padding: var(--padding);
+        border-radius: var(--border-width);
+
+        +.queue-item {
+            margin-top: 4px;
+        }
+
+        .content {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            width: 100%;
+
+            .number {
+                min-width: 2em;
+                font-weight: 500;
+                color: var(--text-muted);
+            }
+
+            .information {
+                flex-grow: 1;
+
+                .title {
+                    display: flex;
+                    gap: 4px;
+                    align-items: center;
+
+                    .name {
+                        font-weight: 500;
+                    }
+
+                    .controls {
+                        display: flex;
+                        gap: 2px;
+                        margin-left: auto;
+
+                        button {
+                            cursor: pointer;
+                            border: none;
+                            background: none;
+                            padding: 2px;
+                            font-size: 0.8em;
+                            line-height: 1;
+
+                            &.skip {
+                                color: #3498db;
+                            }
+
+                            &.remove {
+                                color: #e74c3c;
+                            }
+                        }
+                    }
+                }
+
+                .description {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    font-size: 0.8em;
+
+                    .arrow {
+                        opacity: 0.5;
+                    }
+
+                    .target {
+                        opacity: 0.7;
+                    }
+
+                    .repeats {
+                        background: rgba(0, 0, 0, 0.05);
+                        padding: 0 4px;
+                        border-radius: 2px;
+                    }
+
+                    .status {
+                        margin-left: auto;
+                        opacity: 0.7;
+                    }
+                }
+            }
+
+            .progress {
+                height: 3px;
+                background: rgba(0, 0, 0, 0.05);
+                margin-top: 4px;
+                border-radius: 1px;
+                overflow: hidden;
+                flex: 0 0 100%;
+                display: none;
+
+                .bar {
+                    height: 100%;
+                    width: 0;
+                    transition: width 0.1s linear;
+                    background: rgba(0, 128, 0, 0.2);
+                }
+            }
+        }
+
+        &.current,
+        &.is-current {
+            background-color: rgba(235, 255, 235);
+
+            .content {
+                font-weight: 500;
+            }
+        }
+    }
+}
+
+.app-shell,
+.container-wrapper {
+    >.hand-controls {
+        @include surface-raised;
+        padding: var(--padding);
+        margin: 0 auto;
+        display: flex;
+        gap: var(--padding);
+        position: absolute;
+        top: 0;
+        z-index: var(--z-debug);
+        flex-direction: column;
+        transform: translate(calc(-100% - 40px), 0);
+        width: fit-content;
+
+        input[type="radio"] {
+            display: none;
+        }
+
+        button.hand-control-btn,
+        label.button {
+            width: 60px;
+            height: 60px;
+            padding: 0;
+            font-size: 80%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            cursor: pointer;
+
+            &:hover {
+                background-color: var(--surface-ui-pressed);
+                outline: 4px solid var(--button-active-border-color);
+            }
+
+            >.icon {
+                fill: var(--button-icon-color);
+                max-height: 24px;
+                max-width: 24px;
+            }
+
+            >.text {
+                font-size: 85%;
+            }
+        }
+
+        button.hand-control-btn.active,
+        input[type="radio"]:checked+label.button {
+            &:not(:checked),
+            &:not(:active) {
+                @include surface-pressed;
+
+                >.icon {
+                    fill: var(--button-active-icon-color);
+                }
+            }
+        }
+
+        input[type="radio"]:checked+label.button {
+            outline: 4px solid var(--button-active-border-color);
+        }
+
+        button.hand-control-btn#sound-toggle {
+            &.muted .icon-sound-on,
+            &:not(.muted) .icon-sound-off {
+                display: none;
+            }
+        }
+    }
+
+    >.sidebar {
+        width: var(--size-sidebar-width);
+        max-height: var(--size-stage-height);
+        position: absolute;
+        right: 0;
+        top: 0;
+        transform: translate(calc(100% + 20px), 0);
+        display: flex;
+        overflow: hidden;
+
+        >.action-controls {
+            display: none;
+            width: 100%;
+            max-width: var(--size-sidebar-width);
+            height: var(--size-stage-height);
+            min-height: 0;
+            overflow: hidden;
+            grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+            @include surface-raised;
+
+            &.visible,
+            &.is-visible {
+                display: grid;
+            }
+
+            >.other-info {
+                @include neutral-info-panel;
+                margin: var(--padding);
+                display: none;
+                flex-direction: column;
+                gap: 8px;
+                font-size: 0.8em;
+                text-transform: uppercase;
+                color: var(--text-muted);
+                margin-top: 0;
+                min-height: 0;
+                overflow-y: auto;
+
+                &.visible,
+                &.is-visible {
+                    display: flex;
+                }
+            }
+
+            >.selected-info {
+                @include neutral-info-panel;
+                margin: var(--padding);
+
+                .interaction-type {
+                    font-size: 0.8em;
+                    text-transform: uppercase;
+                    color: var(--text-muted);
+                    margin-bottom: 0.25rem;
+                }
+
+                .target-info {
+                    display: flex;
+                    gap: 0.5rem;
+                    align-items: center;
+
+                    .type {
+                        font-size: 0.8em;
+                        @include pill-label;
+                    }
+
+                    .name {
+                        font-weight: 500;
+                    }
+                }
+
+                &.self-selected {
+                    background: var(--surface-state-self);
+                }
+
+                &.myte-interaction {
+                    background: var(--surface-state-myte);
+                }
+
+                &.map-interaction {
+                    background: var(--surface-state-map);
+                }
+
+                &.element-interaction {
+                    background: var(--surface-state-element);
+                }
+            }
+
+            >.action-groups {
+                overflow-y: auto;
+                scrollbar-width: thin;
+                min-height: 0;
+                padding: var(--padding);
+                padding-top: 0;
+
+                .action-group {
+                    +.action-group {
+                        margin-top: var(--padding);
+                        border-top: 1px solid var(--border-subtle);
+                    }
+
+                    h3 {
+                        font-size: 0.8em;
+                        text-transform: uppercase;
+                        color: var(--text-muted);
+                        margin: 0 0 0.5rem 0;
+                    }
+
+                    ul {
+                        list-style: none;
+                        padding: 0;
+                        margin: 0;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 0.5rem;
+                    }
+
+                    button {
+                        width: 100%;
+                        padding: 0.5rem;
+                    }
+                }
+            }
+        }
+    }
+}

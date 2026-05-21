@@ -193,7 +193,7 @@ class Inventory {
         this.inventoryElement.addEventListener('dragend', this.boundHandlers.dragEnd);
 
         // Container events
-        this.containerElements = Array.from(document.querySelectorAll('.container'));
+        this.containerElements = Array.from(document.querySelectorAll('.app-stage, .container'));
         this.containerElements.forEach(container => {
             container.addEventListener('dragover', this.boundHandlers.containerDragOver);
             container.addEventListener('dragleave', this.boundHandlers.containerDragLeave);
@@ -201,7 +201,7 @@ class Inventory {
         });
 
         // Add Myte events to existing Mytes
-        this.addMyteListeners(document.querySelectorAll('.duplicate'));
+        this.addMyteListeners(document.querySelectorAll('.world-myte, .duplicate'));
     }
 
     handleDragStart(e) {
@@ -230,7 +230,7 @@ class Inventory {
         // Play lift sound
         this.parent.soundManager?.play('ui_drag_item');
 
-        document.querySelectorAll('.duplicate').forEach(myte => {
+        document.querySelectorAll('.world-myte, .duplicate').forEach(myte => {
             myte.classList.add('droppable');
         });
 
@@ -244,11 +244,11 @@ class Inventory {
         this.state.isDragging = false;
         this.state.draggedItem = null;
 
-        document.querySelectorAll('.container').forEach(container => {
+        document.querySelectorAll('.app-stage, .container').forEach(container => {
             container.classList.remove('on-target');
         });
 
-        document.querySelectorAll('.duplicate').forEach(myte => {
+        document.querySelectorAll('.world-myte, .duplicate').forEach(myte => {
             myte.classList.remove('droppable', 'on-target');
         });
 
@@ -353,7 +353,7 @@ class Inventory {
         if (!this.state.draggedItem) return;
 
         // Check if we dropped on a Myte first
-        const myteElement = e.target.closest('.duplicate');
+        const myteElement = e.target.closest('.world-myte, .duplicate');
         if (myteElement) {
             // Handle Myte drop separately
             return;
@@ -549,7 +549,7 @@ class Inventory {
         this.mutationObserver = new MutationObserver(mutations => {
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
-                    if (node.classList?.contains('duplicate')) {
+                    if (node.classList?.contains('world-myte') || node.classList?.contains('duplicate')) {
                         this.addMyteListeners([node]);
                     }
                 });
@@ -570,7 +570,7 @@ class Inventory {
         });
         this.containerElements = [];
 
-        document.querySelectorAll('.duplicate').forEach(myte => {
+        document.querySelectorAll('.world-myte, .duplicate').forEach(myte => {
             myte.removeEventListener('dragover', this.boundHandlers.myteDragOver);
             myte.removeEventListener('dragleave', this.boundHandlers.myteDragLeave);
             myte.removeEventListener('drop', this.boundHandlers.myteDrop);

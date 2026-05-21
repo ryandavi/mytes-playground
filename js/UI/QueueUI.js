@@ -2,7 +2,7 @@ class QueueUI {
     constructor(parent, options = {}) {
         this.parent = parent;
         this.mode = options.mode || 'debug';
-        this.queue = options.element || document.querySelector('.queueMenu');
+        this.queue = options.element || document.querySelector('.action-queue-panel, .queueMenu');
         this.elements = new Map();
         this.previousValues = new Map();
         this.allowControls = options.allowControls ?? this.mode !== 'compact';

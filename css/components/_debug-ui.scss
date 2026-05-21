@@ -1,0 +1,266 @@
+.debug-panel,
+.debugMenu {
+    --debug-color-system: rgba(255, 235, 235, 0.7);
+    --debug-color-input: rgba(235, 255, 235, 0.7);
+    --debug-color-time: rgba(235, 235, 255, 0.7);
+    --debug-color-map: rgba(255, 255, 235, 0.7);
+    --debug-color-camera: rgba(255, 235, 255, 0.7);
+    --debug-color-myte: rgba(235, 255, 255, 0.7);
+    --debug-color-myte-stats: rgba(235, 255, 241, 0.7);
+
+    line-height: 0.85em;
+    font-size: 0.7em;
+    position: fixed;
+    inset: 0;
+    visibility: hidden;
+    z-index: var(--z-debug);
+    pointer-events: none;
+
+    .debug-section {
+        position: absolute;
+        width: min(400px, calc(100vw - 16px));
+        pointer-events: auto;
+        margin: 0;
+        backdrop-filter: blur(4px);
+
+        >summary {
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.65);
+            border-radius: var(--border-width);
+            cursor: grab;
+            display: flex;
+            font-weight: 600;
+            justify-content: space-between;
+            list-style: none;
+            padding: 6px var(--padding);
+            user-select: none;
+
+            &::-webkit-details-marker {
+                display: none;
+            }
+
+            &::after {
+                content: "v";
+                font-size: 0.9em;
+            }
+        }
+
+        &:not([open]) >summary::after {
+            content: ">";
+        }
+
+        &.dragging >summary {
+            cursor: grabbing;
+        }
+    }
+
+    .debug-section-body {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-top: 4px;
+    }
+
+    .debug-group {
+        padding: var(--padding);
+        border-radius: var(--border-width);
+
+        h3 {
+            margin: 0 0 4px 0;
+            padding-bottom: 2px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        &.system {
+            background-color: var(--debug-color-system);
+            --badge-bg: var(--debug-color-system);
+        }
+
+        &.input {
+            background-color: var(--debug-color-input);
+            --badge-bg: var(--debug-color-input);
+        }
+
+        &.time {
+            background-color: var(--debug-color-time);
+            --badge-bg: var(--debug-color-time);
+        }
+
+        &.map {
+            background-color: var(--debug-color-map);
+            --badge-bg: var(--debug-color-map);
+        }
+
+        &.camera {
+            background-color: var(--debug-color-camera);
+            --badge-bg: var(--debug-color-camera);
+        }
+
+        &.overview,
+        &.myte,
+        &.myte-ai {
+            background-color: var(--debug-color-myte);
+            --badge-bg: var(--debug-color-myte);
+        }
+
+        &.myte-stats {
+            background-color: var(--debug-color-myte-stats);
+            --badge-bg: var(--debug-color-myte-stats);
+        }
+
+        .badge {
+            background-color: color-mix(in oklch, var(--badge-bg) 70%, #ff4400 30%);
+        }
+
+        >.debug-group-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            list-style: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85em;
+            user-select: none;
+
+            &::-webkit-details-marker {
+                display: none;
+            }
+
+            &::after {
+                content: "v";
+                font-size: 0.85em;
+                opacity: 0.5;
+            }
+        }
+
+        &:not([open]) > .debug-group-summary::after {
+            content: ">";
+        }
+    }
+
+    .debug-group[open] > .debug-group-summary {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        margin-bottom: 4px;
+        padding-bottom: 4px;
+    }
+
+    .debug-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: inherit;
+        table-layout: fixed;
+
+        td {
+            padding: 1px 0;
+            vertical-align: top;
+            line-height: 1.3em;
+        }
+
+        .debug-label {
+            color: rgba(0, 0, 0, 0.55);
+            padding-right: 6px;
+            width: 70%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: inline-block;
+        }
+
+        .debug-value {
+            font-weight: 500;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+    }
+}
+
+#view-panel {
+    .window-panel__content,
+    .modal-content {
+        .settings-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 5px;
+            width: 100%;
+
+            >.settings-group-title {
+                width: 100%;
+                margin: 0 0 5px 0;
+            }
+
+            button {
+                padding: 0.5rem;
+                flex: 1 1 calc(50% - calc(var(--gap) / 2));
+            }
+
+            #view-zoom-out,
+            #view-zoom-in {
+                flex: 0 0 auto;
+                min-width: 36px;
+            }
+        }
+
+        .view-zoom-label {
+            min-width: 40px;
+            text-align: center;
+            font-weight: 600;
+        }
+    }
+}
+
+#game-debug-panel {
+    .modal-content {
+        max-width: 500px;
+        margin: 0 auto;
+
+        .button-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            width: 100%;
+        }
+
+        .settings-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 5px;
+            width: 100%;
+
+            >.settings-group-title {
+                width: 100%;
+                margin: 0 0 5px 0;
+            }
+
+            button {
+                padding: 0.5rem;
+                flex: 1 1 calc(50% - calc(var(--gap) / 2));
+            }
+
+            #toggleDebug,
+            #cycleFollowGoal,
+            #cycleCamera {
+                flex: 1 1 100%;
+            }
+
+            #adjustSpeed {
+                flex: 1;
+            }
+
+            #adjustSpeed-down,
+            #adjustSpeed-up {
+                flex: 0;
+                min-width: 50px;
+            }
+
+            &:first-child {
+                border-top: none;
+                margin-top: 0;
+                padding-top: 0;
+            }
+        }
+    }
+}

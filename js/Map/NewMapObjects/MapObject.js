@@ -885,7 +885,7 @@ class MapObject {
 				}
 			}
 
-			const interactiveEl = this.element.querySelector('.interactive-collider');
+			const interactiveEl = this.element.querySelector('.interactive-hitbox, .interactive-collider');
 			if (interactiveEl) {
 				const interactiveCollider = this.getConfig('interactiveCollider');
 				if (interactiveCollider) {
@@ -1037,7 +1037,7 @@ class MapObject {
 
 	render(container, parent) {
 		const divElement = document.createElement('div');
-		divElement.classList.add('mapObject', this.variant);
+		divElement.classList.add('map-object', 'mapObject', this.variant);
 		divElement.dataset.objectType = this.type;
 		divElement.dataset.objectId = this.id || '';
 		divElement.dataset.renderLayer = this.getRenderLayerKey();
@@ -1059,7 +1059,7 @@ class MapObject {
 			divElement.classList.add('interactive');
 			if (this.getConfig('interactiveCollider')) {
 				const interactiveElement = document.createElement('div');
-				interactiveElement.classList.add('interactive-collider');
+				interactiveElement.classList.add('interactive-hitbox', 'interactive-collider');
 				interactiveElement.style.width = `${this.getConfig('interactiveCollider.width')}px`;
 				interactiveElement.style.height = `${this.getConfig('interactiveCollider.height')}px`;
 				interactiveElement.style.top = `${this.getConfig('interactiveCollider.offsetY')}px`;

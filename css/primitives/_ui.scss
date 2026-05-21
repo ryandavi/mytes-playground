@@ -1,0 +1,152 @@
+@mixin dither-pattern {
+    background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+    background-size: var(--dither-size, 6px);
+}
+
+@mixin dither-fill {
+    @include dither-pattern;
+    background-color: var(--dither-fill-color, var(--button-hover));
+}
+
+@mixin surface-raised {
+    background-color: var(--surface-ui-raised, var(--button-mid));
+    border: var(--border-width) solid var(--button-dark);
+    border-top-color: var(--button-light);
+    border-left-color: var(--button-light);
+    border-radius: var(--border-radius-outer);
+}
+
+@mixin surface-inset {
+    background-color: var(--surface-ui-inset, var(--button-mid));
+    border: var(--border-width) solid var(--button-dark);
+    border-bottom-color: var(--button-light);
+    border-right-color: var(--button-light);
+    border-radius: var(--border-radius);
+}
+
+@mixin surface-pressed {
+    background-color: var(--surface-ui-pressed, var(--button-hover));
+    border-top-color: var(--button-dark);
+    border-left-color: var(--button-dark);
+    border-right-color: var(--button-light);
+    border-bottom-color: var(--button-light);
+}
+
+@mixin frame-sunken {
+    border-top: var(--border-width) solid var(--button-dark);
+    border-left: var(--border-width) solid var(--button-dark);
+    border-right: var(--border-width) solid var(--button-light);
+    border-bottom: var(--border-width) solid var(--button-light);
+    border-radius: var(--border-radius-outer);
+}
+
+@mixin button-base {
+    @include surface-raised;
+}
+
+@mixin button-pressed {
+    --dither-fill-color: var(--surface-ui-pressed);
+    @include surface-pressed;
+    @include dither-fill;
+    color: var(--button-active-text-color, var(--text-base));
+}
+
+@mixin button-disabled {
+    background-color: var(--surface-ui-disabled, var(--button-mid));
+    border-top-color: var(--button-light);
+    border-left-color: var(--button-light);
+    border-right-color: var(--button-dark);
+    border-bottom-color: var(--button-dark);
+    color: var(--button-disabled-text-color, var(--button-text-color));
+    text-shadow: 1px 1px 0 var(--button-disabled-highlight, var(--button-light));
+    cursor: default;
+    filter: saturate(0.72);
+
+    .icon,
+    svg {
+        fill: var(--button-disabled-icon-color, var(--button-icon-color));
+        color: var(--button-disabled-icon-color, var(--button-icon-color));
+    }
+}
+
+@mixin field-base {
+    padding: var(--padding);
+    border-radius: var(--border-radius-inner);
+    border: var(--border-width) solid var(--button-dark);
+    border-style: solid;
+    background-color: white;
+}
+
+@mixin window-shell {
+    border: var(--border-width) solid var(--header-dark);
+    border-top: 0;
+    border-radius: var(--border-radius);
+    filter: var(--shadow);
+    background-color: var(--surface-window, var(--button-mid));
+}
+
+@mixin window-titlebar {
+    color: var(--text-on-accent, white);
+    border-bottom: var(--border-width) solid var(--header-dark);
+    box-shadow: 0 var(--border-width) 0 0 var(--header-light) inset, 0 var(--border-width) 0 0 rgba(0, 0, 0, 0.1);
+    background-color: var(--header-mid);
+}
+
+@mixin window-footer-divider {
+    border-top: var(--border-width) solid var(--button-dark);
+    box-shadow: inset 0 var(--border-width) 0 var(--button-light);
+}
+
+@mixin help-paper-frame {
+    color: var(--black);
+    border-radius: var(--help-paper-radius, var(--radius-xs));
+    filter: var(--shadow-tooltip, drop-shadow(2px 2px 0 #00000020));
+}
+
+@mixin help-paper {
+    @include help-paper-frame;
+    background-color: var(--surface-tooltip, #ffffe1);
+    outline: 1px solid var(--black);
+    padding: var(--help-paper-padding, var(--space-2xs));
+    font-size: var(--help-paper-font-size, 9px);
+    line-height: var(--help-paper-line-height, 1.3);
+    text-transform: var(--help-paper-transform, uppercase);
+}
+
+@mixin floating-help-paper {
+    @include help-paper;
+    position: absolute;
+    top: var(--floating-help-paper-top, calc(100% + 8px));
+    left: var(--floating-help-paper-left, 0);
+    min-width: var(--floating-help-paper-min-width, 180px);
+    max-width: var(--floating-help-paper-max-width, min(240px, 60vw));
+    text-align: left;
+    opacity: 0;
+    transform: translateY(var(--floating-help-paper-offset, -4px));
+    pointer-events: none;
+    transition: opacity var(--motion-base) var(--ease-ui), transform var(--motion-base) var(--ease-ui);
+}
+
+@mixin neutral-info-panel {
+    background: var(--surface-panel-muted, #f5f5f5);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem;
+}
+
+@mixin pill-label {
+    background: var(--surface-pill-muted, #e0e0e0);
+    border-radius: 3px;
+    color: var(--text-subtle, #555);
+    padding: 0.25rem 0.5rem;
+}
+
+@mixin drop-target-outline {
+    outline: var(--border-width) solid var(--drop-target);
+}
+
+@mixin layer-fill {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}

@@ -1,0 +1,114 @@
+:root {
+    --myteDragRotation: 0deg;
+
+    --space-2xs: 2px;
+    --space-xs: 4px;
+    --space-sm: 6px;
+    --space-md: 8px;
+    --space-base: 10px;
+    --space-lg: 12px;
+    --space-xl: 16px;
+    --space-2xl: 20px;
+    --space-3xl: 24px;
+
+    --border-width: 5px;
+    --padding: var(--space-base);
+    --padding-outer: var(--space-2xl);
+    --gap: var(--space-base);
+
+    --radius-xs: 1px;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-round: 999px;
+
+    --border-radius: var(--radius-sm);
+    --border-radius-outer: var(--radius-md);
+    --border-radius-inner: var(--radius-sm);
+
+    --drop-target: rgba(2, 141, 255, 0.5);
+    --on-target: green;
+    --drop-target-invalid: rgba(220, 50, 50, 0.9);
+
+    --button-dark: #d3d1c2;
+    --button-light: white;
+    --button-mid: #ece9d8;
+    --button-hover: #e6e4d4;
+
+    --surface-app: var(--button-mid);
+    --surface-ui-raised: var(--button-mid);
+    --surface-ui-inset: var(--button-mid);
+    --surface-ui-pressed: var(--button-hover);
+    --surface-ui-disabled: #e4e1d3;
+    --surface-window: var(--button-mid);
+    --surface-tooltip: #ffffe1;
+    --surface-stage: #eee;
+    --surface-panel-muted: #f5f5f5;
+    --surface-pill-muted: #e0e0e0;
+    --surface-state-self: #e8f0fe;
+    --surface-state-myte: #fef6e0;
+    --surface-state-map: #e6f4ea;
+    --surface-state-element: #fce8e6;
+    --surface-toast-info: #e8f0fe;
+    --surface-toast-success: #e6f4ea;
+    --surface-toast-warning: #fef6e0;
+    --surface-toast-error: #fce8e6;
+
+    --black: rgb(25, 24, 20);
+    --text-base: rgb(25, 24, 20);
+    --text-muted: #666;
+    --text-on-accent: white;
+    --text-subtle: #555;
+
+    --state-info-accent: #4285f4;
+    --state-success-accent: #34a853;
+    --state-warning-accent: #fbbc04;
+    --state-error-accent: #ea4335;
+    --border-subtle: #eee;
+
+    --button-outline-color: rgb(25, 24, 20);
+    --button-text-color: #5b5a51;
+    --button-icon-color: #c0beb0;
+    --button-active-text-color: #5b5a51;
+    --button-active-icon-color: #5b5a51;
+    --button-disabled-text-color: #8f8b79;
+    --button-disabled-icon-color: #a7a393;
+    --button-disabled-highlight: rgba(255, 255, 255, 0.92);
+    --button-active-border-color: rgba(0, 128, 0, 0);
+    --primary-color: var(--header-mid);
+
+    --header-light: #3493ff;
+    --header-mid: #0166fb;
+    --header-dark: #0631d6;
+
+    --shadow: drop-shadow(var(--border-width) var(--border-width) 0 rgba(0, 0, 0, 0.06));
+    --shadow-tooltip: drop-shadow(2px 2px 0 #00000020);
+
+    --motion-instant: 0.08s;
+    --motion-fast: 0.1s;
+    --motion-base: 0.15s;
+    --motion-slow: 0.3s;
+    --motion-slower: 0.5s;
+    --ease-ui: ease;
+    --ease-emphasis: ease-in-out;
+    --ease-linear: linear;
+
+    --z-cursor: 9999;
+    --z-debug: 1000;
+    --z-overlay: 1200;
+    --z-crosshair: 10000;
+    --z-loading: 5000;
+    --z-toast: 9000;
+    --z-drag: 100000;
+    --z-floating-debug: 1000000;
+
+    --size-shell-width: 635px;
+    --size-stage-height: 500px;
+    --size-sidebar-width: 250px;
+    --size-modal-width: 400px;
+    --size-myte: 192px;
+    --size-item: 48px;
+    --size-tool-button: 60px;
+    --size-queue-chip: 38px;
+    --page-edge-space: var(--space-2xl);
+    --item-size: var(--size-item);
+}

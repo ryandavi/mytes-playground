@@ -73,5 +73,5 @@ const EntityMethods = {
 };
 
 function applyEntityMixin(cls) {
-	Object.assign(cls.prototype, EntityMethods);
+	Object.defineProperties(cls.prototype, Object.getOwnPropertyDescriptors(EntityMethods));
 }

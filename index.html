@@ -4,19 +4,16 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 	<meta charset="UTF-8">
 	<link rel="stylesheet" href="css/style.css">
-	<link rel="stylesheet" href="css/map.css">
-	<link rel="stylesheet" href="css/ui.css">
-	<link rel="stylesheet" href="css/myte.css">
 </head>
 
 <body class="debug">
 	<div class="test"></div>
 	<div id="customCursor"></div>
 
-	<section class="debugMenu ignore"></section>
-	<section class="queueMenu ignore"></section>
+	<section class="debug-panel debugMenu ignore"></section>
+	<section class="action-queue-panel queueMenu ignore"></section>
 	<!-- MAIN SCREEN -->
-	<div class="container-wrapper styled">
+	<div class="app-shell container-wrapper styled">
 		<!-- HEADER-->
 		<div class="ignore header">
 			<div class="logo"><img src="images/logo.svg"></div>
@@ -31,7 +28,7 @@
 			<div class="user">
 				<div class="username">Ryan</div>
 			</div>
-			<button class="fullscreen-btn">⛶</button>
+			<button class="app-fullscreen-btn fullscreen-btn">⛶</button>
 		</div>
 		<!-- END HEADER -->
 		<!-- HAND CONTROLS -->
@@ -110,10 +107,10 @@
 		</div>
 		<!-- END HAND CONTROLS -->
 		<!-- CANVAS CONTAINER -->
-		<section class="container" id="container-1">
+		<section class="app-stage container" id="container-1">
 			<!-- CROSSHAIR -->
 			<div class="container-inset ignore debug"></div>
-			<section class="myteQueueOverlay ignore" id="myte_queue_overlay"></section>
+			<section class="myte-queue-overlay myteQueueOverlay ignore" id="myte_queue_overlay"></section>
 			<div class="crosshair ignore debug">
 				<div class="horizontal"></div>
 				<div class="vertical"></div>
@@ -121,17 +118,17 @@
 			<!-- END CROSSHAIR -->
 			<!-- LOADING SCREEN -->
 			<div class="loading-screen" id="loading-screen">
-				<div id="loading-modal" class="modal-window">
-					<div class="modal-header">
-						<div class="modal-title">
+				<div id="loading-modal" class="window-panel modal-window">
+					<div class="window-panel__header modal-header">
+						<div class="window-panel__title modal-title">
 							<div class="icon">📂</div>
 							<div class="text">Loading Mytes...</div>
 						</div>
-						<div class="modal-controls">
+						<div class="window-panel__controls modal-controls">
 							<button class="modal-close-btn">&times;</button>
 						</div>
 					</div>
-					<div class="modal-content">
+					<div class="window-panel__content modal-content">
 						<div class="loading-message">
 							<p>Please wait while your Mytes are being prepared.</p>
 						</div>
@@ -145,7 +142,7 @@
 						<div class="loading-tip"></div>
 					</div>
 					<!--
-					<div class="modal-footer">
+					<div class="window-panel__footer modal-footer">
 						<div class="button" id="loading-skip-button">Skip Loading</div>
 					</div>
 					-->
@@ -166,12 +163,12 @@
 				<div class="layer foreground">
 					<!-- MYTE CONTAINER -->
 					
-						<div id="myteWrapper-1" class="myteWrapper snail" data-myte-species="snail">
+						<div id="myteWrapper-1" class="myte-slot myteWrapper snail" data-myte-species="snail">
 							<!-- HOME -->
-							<div class="home-name">
+							<div class="myte-home-label home-name">
 								<div class="name tooltip">Lentil's Slot</div>
 							</div>
-							<div class="home-wrapper"></div>
+							<div class="myte-home-slot home-wrapper"></div>
 							<!-- END HOME -->
 							<!-- MYTE START-->
 							<div id="myte-pookie" class="interactive-myte" data-myte-name="Lentil" data-myte-species="snail" draggable="false">
@@ -259,27 +256,27 @@
 		<!-- END ACTION CONTROLS MENU -->
 		<div class="bottom">
 			<!-- ALL MYTES -->
-			<div class="allMytes inset" id="all_mytes"></div>
+			<div class="myte-roster allMytes" id="all_mytes"></div>
 			<!-- END MYTES -->
 			<!-- INVENTORY -->
-			<div class="inventory inset" id="inventory"></div>
+			<div class="inventory inventory-grid" id="inventory"></div>
 			<!-- END INVENTORY -->
 		</div>
 	</div>
 	<!-- SOUND SETTINGS -->
-	<div id="sound-settings-panel" class="modal-window">
-		<div class="modal-header">
-			<h2 class="modal-title">
+	<div id="sound-settings-panel" class="window-panel modal-window">
+		<div class="window-panel__header modal-header">
+			<h2 class="window-panel__title modal-title">
 				<span class="icon">🔊</span>
 				<span class="text">Sounds Settings</span>
 			</h2>
-			<div class="modal-controls">
+			<div class="window-panel__controls modal-controls">
 				<button class="modal-minimize-btn">&#128469;</button>
 				<button class="modal-fullscreen-btn">&#x26F6;</button>
 				<button class="modal-close-btn">&times;</button>
 			</div>
 		</div>
-		<div class="modal-content">
+		<div class="window-panel__content modal-content">
 			<div class="settings-group">
 				<div class="setting-item">
 					<label for="master-volume">Master Volume</label>
@@ -320,19 +317,19 @@
 	</div>
 	<!-- END SOUND SETTINGS -->
 	<!-- GAME SETTINGS PANEL -->
-	<div id="game-settings-panel" class="modal-window">
-		<div class="modal-header">
-			<h2 class="modal-title">
+	<div id="game-settings-panel" class="window-panel modal-window">
+		<div class="window-panel__header modal-header">
+			<h2 class="window-panel__title modal-title">
 				<span class="icon">⚙️</span>
 				<span class="text">Game Settings</span>
 			</h2>
-			<div class="modal-controls">
+			<div class="window-panel__controls modal-controls">
 				<button class="modal-minimize-btn">&#128469;</button>
 				<button class="modal-fullscreen-btn">&#x26F6;</button>
 				<button class="modal-close-btn">&times;</button>
 			</div>
 		</div>
-		<div class="modal-content">
+		<div class="window-panel__content modal-content">
 			<!-- Graphics Settings -->
 			<div class="settings-group">
 				<h3 class="settings-group-title">Graphics</h3>
@@ -404,7 +401,7 @@
 				</div>
 			</div>
 		</div>
-		<div class="modal-footer">
+		<div class="window-panel__footer modal-footer">
 			<button id="restore-defaults" class="secondary">Restore Defaults</button>
 			<button id="save-settings" class="primary">Save</button>
 		</div>
@@ -412,18 +409,18 @@
 	<!-- END GAME SETTINGS PANEL -->
 
 	<!-- VIEW PANEL -->
-	<div id="view-panel" class="modal-window">
-		<div class="modal-header">
-			<h2 class="modal-title">
+	<div id="view-panel" class="window-panel modal-window">
+		<div class="window-panel__header modal-header">
+			<h2 class="window-panel__title modal-title">
 				<span class="icon">🔍</span>
 				<span class="text">View</span>
 			</h2>
-			<div class="modal-controls">
+			<div class="window-panel__controls modal-controls">
 				<button class="modal-minimize-btn">&#128469;</button>
 				<button class="modal-close-btn">&times;</button>
 			</div>
 		</div>
-		<div class="modal-content">
+		<div class="window-panel__content modal-content">
 			<div class="settings-group">
 				<h3 class="settings-group-title">Zoom</h3>
 				<button id="view-zoom-out" title="Zoom out">−</button>
@@ -445,19 +442,19 @@
 	</div>
 	<!-- END VIEW PANEL -->
 	<!-- GAME SETTINGS PANEL -->
-	<div id="game-debug-panel" class="modal-window">
-		<div class="modal-header">
-			<h2 class="modal-title">
+	<div id="game-debug-panel" class="window-panel modal-window">
+		<div class="window-panel__header modal-header">
+			<h2 class="window-panel__title modal-title">
 				<span class="icon">⚙️</span>
 				<span class="text">Debug Menu</span>
 			</h2>
-			<div class="modal-controls">
+			<div class="window-panel__controls modal-controls">
 				<button class="modal-minimize-btn">&#128469;</button>
 				<button class="modal-fullscreen-btn">&#x26F6;</button>
 				<button class="modal-close-btn">&times;</button>
 			</div>
 		</div>
-		<div class="modal-content">
+		<div class="window-panel__content modal-content">
 
 		</div>
 	</div>

@@ -1,0 +1,201 @@
+@use '../primitives/ui' as *;
+
+.window-panel,
+.modal-window {
+    --modal-page-margin: 20px;
+
+    position: absolute;
+    pointer-events: none;
+    z-index: var(--z-debug);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: var(--size-stage-height);
+    width: var(--size-modal-width);
+    @include window-shell;
+    opacity: 0;
+    transform: translateY(5px);
+    transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
+
+    &.floating,
+    &.is-floating {
+        position: fixed;
+    }
+
+    &.visible,
+    &.is-visible {
+        pointer-events: all;
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    &.position-center {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+
+    &.position-top-right {
+        top: var(--modal-page-margin);
+        right: var(--modal-page-margin);
+    }
+
+    &.position-top-left {
+        top: var(--modal-page-margin);
+        left: var(--modal-page-margin);
+    }
+
+    &.position-bottom-right {
+        bottom: var(--modal-page-margin);
+        right: var(--modal-page-margin);
+    }
+
+    &.position-bottom-left {
+        bottom: var(--modal-page-margin);
+        left: var(--modal-page-margin);
+    }
+
+    &.fullscreen,
+    &.is-fullscreen {
+        width: calc(100% - (var(--modal-page-margin) * 2)) !important;
+        height: calc(100% - (var(--modal-page-margin) * 2)) !important;
+        top: var(--modal-page-margin) !important;
+        left: var(--modal-page-margin) !important;
+        right: auto !important;
+        bottom: auto !important;
+        min-width: calc(100% - (var(--modal-page-margin) * 2)) !important;
+        max-height: calc(100% - (var(--modal-page-margin) * 2)) !important;
+        transform: none !important;
+    }
+
+    &.minimize,
+    &.is-minimized {
+        >.window-panel__header,
+        >.modal-header {
+            border-bottom: 0;
+        }
+
+        >.window-panel__content,
+        >.window-panel__footer,
+        >.modal-content,
+        >.modal-footer {
+            display: none;
+        }
+    }
+
+    >.window-panel__header,
+    >.modal-header {
+        align-items: center;
+        padding: 7.5px;
+        flex: 1;
+        gap: 15px;
+        position: relative;
+        z-index: 2;
+        @include window-titlebar;
+        padding-top: 11.5px;
+        display: flex;
+        justify-content: space-between;
+        flex-grow: 0;
+
+        .window-panel__title,
+        .modal-title {
+            font-size: 16px;
+            margin: 0;
+            display: flex;
+            gap: var(--gap);
+        }
+
+        >.window-panel__controls,
+        >.modal-controls {
+            display: flex;
+            gap: var(--gap);
+            user-select: none;
+
+            >button {
+                width: 30px;
+                height: 30px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 22px;
+                margin-left: auto;
+            }
+        }
+    }
+
+    >.window-panel__content,
+    >.modal-content {
+        padding: var(--padding);
+        padding-top: calc(var(--padding) + var(--border-width));
+        flex: 1;
+        overflow-y: auto;
+        scrollbar-color: var(--button-dark) transparent;
+
+        .text-content {
+            margin: var(--border-width);
+            @include frame-sunken;
+            margin-top: calc(var(--border-width) * 2);
+            background-color: white;
+        }
+
+        .settings-group {
+            h3.settings-group-title {
+                margin: 0 0 10px 0;
+            }
+
+            +.settings-group {
+                margin-top: 20px;
+            }
+        }
+
+        .setting-item {
+            +.setting-item {
+                margin-top: 10px;
+            }
+
+            &:last-child {
+                margin-bottom: 0;
+            }
+
+            label {
+                display: block;
+            }
+
+            label+input {
+                margin-top: 8px;
+            }
+
+            .checkbox-wrapper {
+                align-items: center;
+                display: flex;
+
+                label {
+                    margin-left: 8px;
+                }
+            }
+
+            &.dropdown {
+                label {
+                    margin-bottom: 8px;
+                }
+
+                select {
+                    width: 100%;
+                }
+            }
+        }
+    }
+
+    >.window-panel__footer,
+    >.modal-footer {
+        padding: var(--padding);
+        flex-grow: 0;
+        margin-top: auto;
+        display: flex;
+        gap: var(--gap);
+        justify-content: flex-end;
+        @include window-footer-divider;
+        padding-top: calc(var(--padding) + var(--border-width));
+    }
+}

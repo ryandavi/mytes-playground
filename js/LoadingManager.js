@@ -9,7 +9,7 @@ class LoadingManager {
 	constructor(options = {}) {
 		this.loadingScreen = document.getElementById('loading-screen');
 		this.window         = this.loadingScreen?.querySelector('#loading-modal')         ?? null;
-		this.titleText      = this.loadingScreen?.querySelector('.modal-title .text')     ?? null;
+		this.titleText      = this.loadingScreen?.querySelector('.window-panel__title .text, .modal-title .text') ?? null;
 		this.descriptionText = this.loadingScreen?.querySelector('.loading-message p')    ?? null;
 		this.progressBar    = this.loadingScreen?.querySelector('.loading-progress')       ?? null;
 		this.loadingText    = this.loadingScreen?.querySelector('.loading-status')         ?? null;

@@ -1,0 +1,471 @@
+@use '../primitives/ui' as *;
+
+// ─── Myte Slot / Home Wrapper ──────────────────────────────────────────────
+
+.myte-slot,
+.myteWrapper {
+    display: inline-block;
+    cursor: pointer;
+    position: absolute;
+
+    > .myte-home-slot,
+    > .home-wrapper {
+        @include surface-raised;
+        border-radius: var(--border-radius);
+        transition: opacity, .15s, background-color .15s, box-shadow .15s, outline-width .15s, outline-color .5s;
+        width: var(--size-myte);
+        height: var(--size-myte);
+        position: absolute;
+        z-index: var(--z-drag);
+        filter: var(--shadow);
+    }
+
+    > .myte-home-label,
+    > .home-name {
+        z-index: var(--z-floating-debug);
+        width: var(--size-myte);
+        height: var(--size-myte);
+        position: absolute;
+        pointer-events: none;
+
+        > .name {
+            display: inline-block;
+            top: 10px;
+            position: absolute;
+            right: 50%;
+            transform: translate(50%, 0);
+        }
+    }
+
+    &:hover {
+        > .myte-home-slot,
+        > .home-wrapper {
+            outline: var(--border-width) solid darkgrey;
+        }
+    }
+
+    &.empty {
+        &:hover {
+            > .myte-home-slot,
+            > .home-wrapper {
+                outline: unset;
+            }
+        }
+
+        > .myte-home-slot,
+        > .home-wrapper {
+            opacity: 0.75;
+            z-index: 0;
+            @include surface-pressed;
+            background-color: var(--button-mid);
+            filter: unset;
+            box-shadow: inset var(--border-width) var(--border-width) #0000000d;
+        }
+
+        &.valid-drop-target {
+            > .myte-home-slot,
+            > .home-wrapper {
+                z-index: 100000;
+                opacity: 1;
+                display: block;
+                outline: var(--border-width) solid var(--drop-target) !important;
+            }
+
+            &.on-target {
+                > .myte-home-slot,
+                > .home-wrapper {
+                    outline-color: var(--on-target) !important;
+                }
+            }
+        }
+    }
+}
+
+// ─── Interactive Myte ─────────────────────────────────────────────────────
+
+.interactive-myte {
+    --myte-species-filter: none;
+    width: var(--size-myte);
+    height: var(--size-myte);
+    color: var(--button-light);
+    margin: 0 auto;
+    position: relative;
+    z-index: var(--z-drag);
+
+    &.selected,
+    &.is-selected {
+        .sprite {
+            outline: 2px dashed green;
+            border-radius: 5px;
+        }
+    }
+
+    &.world-myte.is-deactivated,
+    &.duplicate.deactivated {
+        display: none;
+    }
+
+    > .inner-wrapper {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: inherit;
+        height: inherit;
+
+        > .sprite {
+            width: inherit;
+            height: inherit;
+            image-rendering: pixelated;
+            background: url(../images/snail/spritesheet.png);
+            filter: var(--myte-species-filter);
+            transform-origin: center;
+            transition: filter 0.2s ease-out, transform 0.2s ease-out;
+        }
+
+        > .above-wrapper {
+            display: flex;
+            gap: var(--border-width);
+            align-items: center;
+            left: 50%;
+            top: 10px;
+            transform: translate(-50%, 100%);
+            position: absolute;
+            transition: opacity var(--motion-slower);
+            flex-direction: column;
+        }
+
+        > .name-wrapper {
+            display: flex;
+            gap: var(--border-width);
+            align-items: center;
+            width: fit-content;
+            left: 50%;
+            transform: translate(-50%, -115%);
+            position: relative;
+            transition: opacity var(--motion-slower);
+
+            &::before {
+                content: 'x';
+                position: absolute;
+                left: calc(-1 * var(--border-width));
+                transform: translate(-100%, 0);
+                color: red;
+                visibility: hidden;
+            }
+
+            &.bottom {
+                top: 25%;
+                transform: translate(50%, 0);
+            }
+
+            > .before {
+                display: none;
+            }
+        }
+
+        > .dialogue {
+            --dialogue-background-color: #ffffe1;
+            --dialogue-border-color: var(--black);
+            --dialogue-border-width: 2px;
+            --dialogue-arrow-size: 7px;
+            --dialogue-bubble-size: 10px;
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+            justify-content: center;
+            left: 50%;
+            top: 17.5%;
+            z-index: 1;
+            transform: translate(-50%, -100%);
+            position: absolute;
+            max-width: 100px;
+            border: var(--dialogue-border-width) solid var(--dialogue-border-color);
+            background-color: var(--dialogue-background-color);
+            @include help-paper-frame;
+            padding: 4px 6px;
+            font-size: 10px;
+            text-transform: uppercase;
+            border-radius: var(--dialogue-border-width);
+            opacity: 0;
+            transition: opacity var(--motion-slower) ease-in-out;
+
+            &.visible,
+            &.is-visible {
+                opacity: 1;
+            }
+
+            &::before {
+                content: '';
+                width: 0;
+                height: 0;
+                position: absolute;
+                border-left: var(--dialogue-arrow-size) solid transparent;
+                border-right: var(--dialogue-arrow-size) solid transparent;
+                border-top: var(--dialogue-arrow-size) solid var(--dialogue-background-color);
+                border-bottom: var(--dialogue-arrow-size) solid transparent;
+                bottom: calc(var(--dialogue-border-width) + 1px);
+                transform: translate(0, 100%);
+            }
+
+            &::after {
+                content: '';
+                width: 0;
+                height: 0;
+                position: absolute;
+                border-left: var(--dialogue-arrow-size) solid transparent;
+                border-right: var(--dialogue-arrow-size) solid transparent;
+                border-top: var(--dialogue-arrow-size) solid var(--dialogue-border-color);
+                border-bottom: var(--dialogue-arrow-size) solid transparent;
+                bottom: 0;
+                transform: translate(0, 100%);
+                z-index: -1;
+            }
+
+            &.thought {
+                --bubble-color: var(--dialogue-background-color);
+                border-radius: 20px;
+
+                &::before,
+                &::after {
+                    all: unset;
+                }
+
+                &::before {
+                    content: '';
+                    position: absolute;
+                    bottom: calc(-1 * var(--dialogue-bubble-size));
+                    left: 40%;
+                    width: var(--dialogue-bubble-size);
+                    height: var(--dialogue-bubble-size);
+                    background: var(--bubble-color);
+                    border: var(--dialogue-border-width) solid var(--dialogue-border-color);
+                    border-radius: 50%;
+                }
+
+                &::after {
+                    content: '';
+                    position: absolute;
+                    bottom: calc(-1.8 * var(--dialogue-bubble-size));
+                    left: 35%;
+                    width: calc(var(--dialogue-bubble-size) * 0.6);
+                    height: calc(var(--dialogue-bubble-size) * 0.6);
+                    background: var(--bubble-color);
+                    border: var(--dialogue-border-width) solid var(--dialogue-border-color);
+                    border-radius: 50%;
+                }
+
+                &.visible,
+                &.is-visible {
+                    animation: thoughtBubblePop 0.5s ease-out;
+                }
+            }
+
+            &.emoji {
+                --emoji-padding: 5px;
+                border-radius: 50%;
+                padding: var(--emoji-padding);
+                min-width: calc(var(--emoji-padding) * 2 + 1em);
+                min-height: calc(var(--emoji-padding) * 2 + 1em);
+                font-size: 200%;
+
+                &::before,
+                &::after {
+                    content: none;
+                }
+
+                .text {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                &.visible,
+                &.is-visible {
+                    animation: emojiPop 0.4s ease-out;
+                }
+            }
+
+            &.alert {
+                --dialogue-background-color: #ffe1e1;
+                --dialogue-border-color: #ff4444;
+
+                &.visible,
+                &.is-visible {
+                    animation: alertShake 0.7s cubic-bezier(0.36, 0, 0.66, -0.56);
+                    animation-fill-mode: forwards;
+                }
+            }
+
+            &.question {
+                --dialogue-background-color: #e1f5ff;
+                --dialogue-border-color: #44aaff;
+            }
+
+            &.whisper {
+                --dialogue-background-color: rgba(255, 255, 255, 0.9);
+                --dialogue-border-color: #ccc;
+                font-size: 8px;
+                filter: blur(0);
+
+                &.visible,
+                &.is-visible {
+                    opacity: 0.8;
+                    animation: whisperFloat 3s ease-out forwards;
+                }
+
+                .text {
+                    font-style: italic;
+                    letter-spacing: 0.5px;
+                    color: var(--text-muted);
+                }
+            }
+        }
+    }
+
+    &.active,
+    &.is-active {
+        > .inner-wrapper > .name-wrapper > .name {
+            background-color: #3269c4;
+            color: white;
+            outline-color: white;
+        }
+    }
+
+    &:not(.world-myte):not(.duplicate) {
+        > .inner-wrapper > .above-wrapper {
+            display: none;
+        }
+
+        > .inner-wrapper > .name-wrapper {
+            display: none;
+        }
+    }
+
+    &.dragging,
+    &.is-dragging {
+        pointer-events: none;
+        user-select: none;
+        cursor: grab;
+        z-index: var(--z-drag) !important;
+
+        > .inner-wrapper > .sprite {
+            animation-name: wiggle2;
+            animation-duration: 0.6s;
+            animation-iteration-count: infinite;
+            transform-origin: 50% 65%;
+            animation-timing-function: ease-in-out;
+            filter: var(--myte-species-filter) drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
+            will-change: transform;
+        }
+    }
+
+    &.deactivated,
+    &.is-deactivated {
+        visibility: hidden;
+        opacity: 0;
+    }
+
+    &.freemode,
+    &.world-myte {
+        position: absolute;
+        cursor: grab;
+
+        > .inner-wrapper > .sprite {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    }
+
+    &[data-myte-species='worm'] {
+        --myte-species-filter: hue-rotate(38deg) saturate(1.15) brightness(1.03);
+    }
+}
+
+// ─── Battery ──────────────────────────────────────────────────────────────
+
+.interactive-myte > .inner-wrapper > .above-wrapper > .battery {
+    --icon-scale: 2;
+    --battery-size: 13px;
+    width: var(--battery-size);
+    height: 8px;
+    scale: var(--icon-scale);
+    image-rendering: pixelated;
+    filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.125));
+    transition: scale 0.3s ease-in-out, top 0.3s ease-in-out, filter 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    background-image: url(../images/icons/battery.png);
+    opacity: 0;
+    top: 12px;
+    position: relative;
+
+    &.visible,
+    &.is-visible {
+        opacity: 1;
+        top: 0;
+    }
+
+    &[data-level='3'], &.full     { background-position: calc(var(--battery-size) * -3) 0; }
+    &[data-level='2'], &.medium   { background-position: calc(var(--battery-size) * -2) 0; }
+    &[data-level='1'], &.low      { background-position: calc(var(--battery-size) * -1) 0; }
+    &[data-level='0'], &.empty    { --icon-scale: 2.5; background-position: 0 0; }
+
+    &.blinking       { animation: battery-blink 0.5s infinite alternate; }
+    &.critical-pulse { animation: battery-pulse 0.2s infinite alternate; }
+    &.charging       { animation: battery-charging 2s infinite; }
+    &.rapid-charging { animation: rapid-pulse 0.8s infinite alternate; }
+}
+
+// ─── Dialogue Keyframes ────────────────────────────────────────────────────
+
+@keyframes thoughtBubblePop {
+    0%   { transform: translate(-50%, -100%) scale(0); }
+    70%  { transform: translate(-50%, -100%) scale(1.1); }
+    100% { transform: translate(-50%, -100%) scale(1); }
+}
+
+@keyframes whisperFloat {
+    0%   { transform: translate(-50%, -90%) scale(0.8); opacity: 0; filter: blur(2px); }
+    20%  { transform: translate(-50%, -95%) scale(0.9); opacity: 0.4; filter: blur(1px); }
+    40%  { transform: translate(-50%, -100%) scale(0.95); opacity: 0.6; filter: blur(0); }
+    60%  { transform: translate(-50%, -98%) scale(1); opacity: 0.7; }
+    80%  { transform: translate(-50%, -100%) scale(1); opacity: 0.8; }
+    90%  { transform: translate(-50%, -99%) scale(1); }
+    100% { transform: translate(-50%, -100%) scale(1); opacity: 0.8; }
+}
+
+@keyframes emojiPop {
+    0%   { transform: translate(-50%, -100%) scale(0) rotate(-20deg); }
+    60%  { transform: translate(-50%, -100%) scale(1.2) rotate(10deg); }
+    100% { transform: translate(-50%, -100%) scale(1) rotate(0deg); }
+}
+
+@keyframes alertShake {
+    0%            { transform: translate(-50%, -100%) scale(1); }
+    10%           { transform: translate(-50%, -100%) scale(1.5); }
+    20%, 40%, 60% { transform: translate(-52%, -100%) scale(1.5); }
+    30%, 50%, 70% { transform: translate(-48%, -100%) scale(1.5); }
+    80%           { transform: translate(-50%, -100%) scale(1.5); }
+    100%          { transform: translate(-50%, -100%) scale(1); }
+}
+
+// ─── Battery Keyframes ─────────────────────────────────────────────────────
+
+@keyframes rapid-pulse {
+    0%   { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+@keyframes battery-blink {
+    from { opacity: 1; }
+    to   { opacity: 0.3; }
+}
+
+@keyframes battery-pulse {
+    from { opacity: 1; filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.125)); }
+    to   { opacity: 0.3; filter: drop-shadow(0 0 3% rgb(255, 0, 0)); }
+}
+
+@keyframes battery-charging {
+    0%, 100% { filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.125)); }
+    50%      { filter: drop-shadow(0 0 3px rgba(0, 255, 0, 0.5)); }
+}

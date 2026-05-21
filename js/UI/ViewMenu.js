@@ -44,8 +44,8 @@ class ViewMenu extends ModalWindow {
         if (zoomIn) zoomIn.onclick = () => this.getCamera()?.zoomIn({ immediate: true });
 
         // Jump / reset buttons
-        const jumpMyte = q('#view-jump-myte');
-        if (jumpMyte) jumpMyte.onclick = () => this.getCamera()?.centerOnActiveMyte(true);
+        this._jumpMyte = q('#view-jump-myte');
+        if (this._jumpMyte) this._jumpMyte.onclick = () => this.getCamera()?.centerOnActiveMyte(true);
 
         const jumpFit = q('#view-jump-fit');
         if (jumpFit) jumpFit.onclick = () => this.getCamera()?.fitMap('contain', true);
@@ -62,6 +62,14 @@ class ViewMenu extends ModalWindow {
                 this.updateFollowMode();
             };
         });
+
+        this._followMytBtn = this.modalElement.querySelector('.follow-mode-btn[data-mode="0"]');
+    }
+
+    updateButtonStates() {
+        const hasActiveMyte = !!this.parent.getActiveMyte();
+        if (this._jumpMyte) this._jumpMyte.disabled = !hasActiveMyte;
+        if (this._followMytBtn) this._followMytBtn.disabled = !hasActiveMyte;
     }
 
     dispose() {
@@ -100,6 +108,7 @@ class ViewMenu extends ModalWindow {
     open() {
         this.updateZoomLabel();
         this.updateFollowMode();
+        this.updateButtonStates();
         super.open();
     }
 }

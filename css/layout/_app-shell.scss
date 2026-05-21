@@ -1,0 +1,190 @@
+@use '../primitives/ui' as *;
+
+.app-shell,
+.container-wrapper {
+    background-color: var(--surface-app);
+    border-radius: var(--border-radius-outer);
+    width: var(--size-shell-width);
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--padding);
+    position: relative;
+
+    &.styled {
+        @include surface-raised;
+        padding: var(--padding-outer);
+        filter: var(--shadow);
+
+        >.app-stage,
+        >.container {
+            @include surface-inset;
+            background-color: var(--surface-stage);
+        }
+    }
+
+    >.app-stage,
+    >.container {
+        height: var(--size-stage-height);
+        user-select: none;
+        position: relative;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        touch-action: none;
+        -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+
+        &.on-target {
+            outline: var(--border-width) solid var(--on-target) !important;
+        }
+    }
+
+    >.header {
+        flex: 0 0 100%;
+        display: flex;
+        gap: 20px;
+        align-items: center;
+
+        >.logo {
+            display: flex;
+            align-items: center;
+
+            >img {
+                height: 1.2em;
+                top: 0.125em;
+                position: relative;
+            }
+        }
+
+        >.fullscreen-btn,
+        >.app-fullscreen-btn {
+            padding: 0;
+            width: 40px;
+            height: 40px;
+        }
+
+        >.active-pet {
+            gap: 10px;
+            display: none;
+
+            &.visible,
+            &.is-visible {
+                display: flex;
+            }
+        }
+
+        >.username,
+        >.date-time {
+            margin-left: auto;
+        }
+    }
+
+    .bottom {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        >.myte-roster,
+        >.allMytes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            @include surface-inset;
+            padding: var(--padding);
+
+            .myte-list {
+                display: flex;
+                flex-direction: column;
+                gap: var(--gap);
+            }
+
+            .myte-thumbnail {
+                display: flex;
+                align-items: center;
+                gap: var(--gap);
+                cursor: pointer;
+                padding: 8px 12px;
+                position: relative;
+                transition: opacity 0.15s ease, transform 0.15s ease, outline-color 0.15s ease;
+
+                &.in-slot {
+                    opacity: 0.72;
+                }
+
+                &.deployed:not(.active):not(.is-active) {
+                    outline: 1px solid rgba(255, 255, 255, 0.25);
+                }
+
+                &.free-roam:not(.active):not(.is-active) {
+                    outline: 1px solid rgba(255, 209, 102, 0.8);
+                }
+
+                &.active,
+                &.is-active {
+                    transform: translateY(-1px);
+                }
+
+                .myte-sprite {
+                    --myte-species-filter: none;
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 50%;
+                    background: white;
+                    position: relative;
+                    overflow: hidden;
+
+                    &-inner {
+                        position: absolute;
+                        width: 192px;
+                        height: 192px;
+                        background: url('../images/snail/spritesheet.png');
+                        background-position: 0 0;
+                        transform: scale(0.25);
+                        transform-origin: top left;
+                        image-rendering: pixelated;
+                        filter: var(--myte-species-filter);
+                    }
+
+                    &[data-myte-species="worm"] {
+                        --myte-species-filter: hue-rotate(38deg) saturate(1.15) brightness(1.03);
+                    }
+                }
+
+                .myte-details {
+                    display: flex;
+                    flex-direction: column;
+                    min-width: 0;
+                }
+
+                .myte-name {
+                    line-height: 1.1;
+                }
+
+                .myte-state {
+                    font-size: 0.72rem;
+                    letter-spacing: 0.02em;
+                    line-height: 1.1;
+                    margin-top: 2px;
+                    opacity: 0.82;
+                }
+            }
+        }
+
+        >.inventory,
+        >.inventory-grid {
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            width: 100%;
+            @include surface-inset;
+            padding: var(--padding);
+
+            >.item {
+                cursor: pointer;
+            }
+        }
+    }
+}

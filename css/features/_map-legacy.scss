@@ -1,0 +1,1096 @@
+/* LAYERS */
+.app-shell > .app-stage.noScroll,
+.app-shell > .container.noScroll,
+.container-wrapper > .app-stage.noScroll,
+.container-wrapper > .container.noScroll {
+  overflow: hidden;
+}
+.app-shell > .app-stage.noScroll > .container-inset,
+.app-shell > .container.noScroll > .container-inset,
+.container-wrapper > .app-stage.noScroll > .container-inset,
+.container-wrapper > .container.noScroll > .container-inset {
+  visibility: visible;
+}
+.app-shell > .app-stage.noScroll > .canvas > .layer,
+.app-shell > .container.noScroll > .canvas > .layer,
+.container-wrapper > .app-stage.noScroll > .canvas > .layer,
+.container-wrapper > .container.noScroll > .canvas > .layer {
+  width: 100%;
+  height: 100%;
+}
+.app-shell > .app-stage,
+.app-shell > .container,
+.container-wrapper > .app-stage,
+.container-wrapper > .container {
+  --dither-size: 12px;
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
+}
+.app-shell > .app-stage > .crosshair,
+.app-shell > .container > .crosshair,
+.container-wrapper > .app-stage > .crosshair,
+.container-wrapper > .container > .crosshair {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: var(--z-crosshair);
+  pointer-events: none;
+  visibility: hidden;
+}
+.app-shell > .app-stage > .crosshair .horizontal,
+.app-shell > .app-stage > .crosshair .vertical,
+.app-shell > .container > .crosshair .horizontal,
+.app-shell > .container > .crosshair .vertical,
+.container-wrapper > .app-stage > .crosshair .horizontal,
+.container-wrapper > .app-stage > .crosshair .vertical,
+.container-wrapper > .container > .crosshair .horizontal,
+.container-wrapper > .container > .crosshair .vertical {
+  position: absolute;
+  background-color: red;
+  pointer-events: none;
+  opacity: 0.25;
+}
+.app-shell > .app-stage > .crosshair .horizontal,
+.app-shell > .container > .crosshair .horizontal,
+.container-wrapper > .app-stage > .crosshair .horizontal,
+.container-wrapper > .container > .crosshair .horizontal {
+  width: 100%;
+  height: 1px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.app-shell > .app-stage > .crosshair .vertical,
+.app-shell > .container > .crosshair .vertical,
+.container-wrapper > .app-stage > .crosshair .vertical,
+.container-wrapper > .container > .crosshair .vertical {
+  height: 100%;
+  width: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.app-shell > .app-stage > .container-inset,
+.app-shell > .container > .container-inset,
+.container-wrapper > .app-stage > .container-inset,
+.container-wrapper > .container > .container-inset {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: var(--z-crosshair);
+  pointer-events: none;
+  visibility: hidden;
+  box-shadow: inset var(--border-width) var(--border-width) 0px 0px rgba(0, 0, 0, 0.05);
+}
+.app-shell > .app-stage > .canvas,
+.app-shell > .container > .canvas,
+.container-wrapper > .app-stage > .canvas,
+.container-wrapper > .container > .canvas {
+  width: 100%;
+  height: 100%;
+  filter: var(--shadow);
+}
+.app-shell > .app-stage > .canvas > .layer,
+.app-shell > .container > .canvas > .layer,
+.container-wrapper > .app-stage > .canvas > .layer,
+.container-wrapper > .container > .canvas > .layer {
+  min-width: 100%;
+  min-height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.app-shell > .app-stage > .canvas > .layer.tile-map > .tile-layer,
+.app-shell > .container > .canvas > .layer.tile-map > .tile-layer,
+.container-wrapper > .app-stage > .canvas > .layer.tile-map > .tile-layer,
+.container-wrapper > .container > .canvas > .layer.tile-map > .tile-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.app-shell > .app-stage > .canvas > .layer.tile-map > .tile-layer > .tile,
+.app-shell > .container > .canvas > .layer.tile-map > .tile-layer > .tile,
+.container-wrapper > .app-stage > .canvas > .layer.tile-map > .tile-layer > .tile,
+.container-wrapper > .container > .canvas > .layer.tile-map > .tile-layer > .tile {
+  position: absolute;
+}
+.app-shell > .app-stage > .canvas > .layer.background,
+.app-shell > .container > .canvas > .layer.background,
+.container-wrapper > .app-stage > .canvas > .layer.background,
+.container-wrapper > .container > .canvas > .layer.background {
+  z-index: 0;
+  background-repeat: no-repeat;
+}
+.app-shell > .app-stage > .canvas > .layer.ground-decor,
+.app-shell > .container > .canvas > .layer.ground-decor,
+.container-wrapper > .app-stage > .canvas > .layer.ground-decor,
+.container-wrapper > .container > .canvas > .layer.ground-decor {
+  z-index: 0;
+}
+.app-shell > .app-stage > .canvas > .layer.debug,
+.app-shell > .container > .canvas > .layer.debug,
+.container-wrapper > .app-stage > .canvas > .layer.debug,
+.container-wrapper > .container > .canvas > .layer.debug {
+  z-index: 100;
+  pointer-events: none;
+  user-select: none;
+  width: 100%;
+  height: 100%;
+  visibility: hidden;
+}
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider,
+.app-shell > .container > .canvas > .layer.debug .debug-collider,
+.container-wrapper > .app-stage > .canvas > .layer.debug .debug-collider,
+.container-wrapper > .container > .canvas > .layer.debug .debug-collider {
+  background-color: rgba(255, 0, 0, 0.2);
+  border: 1px solid rgba(255, 0, 0, 0.5);
+  pointer-events: none;
+  position: absolute;
+  user-select: none;
+  z-index: 9999;
+}
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider.myte-collider,
+.app-shell > .container > .canvas > .layer.debug .debug-collider.myte-collider,
+.container-wrapper > .app-stage > .canvas > .layer.debug .debug-collider.myte-collider,
+.container-wrapper > .container > .canvas > .layer.debug .debug-collider.myte-collider {
+  background-color: rgba(0, 255, 0, 0.2);
+  border-color: rgba(0, 255, 0, 0.5);
+}
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider.object-collider,
+.app-shell > .container > .canvas > .layer.debug .debug-collider.object-collider,
+.container-wrapper > .app-stage > .canvas > .layer.debug .debug-collider.object-collider,
+.container-wrapper > .container > .canvas > .layer.debug .debug-collider.object-collider {
+  background-color: rgba(255, 0, 0, 0.2);
+  border-color: rgba(255, 0, 0, 0.5);
+}
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider.walkable-object,
+.app-shell > .container > .canvas > .layer.debug .debug-collider.walkable-object,
+.container-wrapper > .app-stage > .canvas > .layer.debug .debug-collider.walkable-object,
+.container-wrapper > .container > .canvas > .layer.debug .debug-collider.walkable-object {
+  background-color: rgba(0, 0, 255, 0.2);
+  border-color: rgba(0, 0, 255, 0.5);
+}
+.app-shell > .app-stage > .canvas > .layer.debug .pathfinder-node,
+.app-shell > .container > .canvas > .layer.debug .pathfinder-node,
+.container-wrapper > .app-stage > .canvas > .layer.debug .pathfinder-node,
+.container-wrapper > .container > .canvas > .layer.debug .pathfinder-node {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+}
+.app-shell > .app-stage > .canvas > .layer.debug .path-line,
+.app-shell > .container > .canvas > .layer.debug .path-line,
+.container-wrapper > .app-stage > .canvas > .layer.debug .path-line,
+.container-wrapper > .container > .canvas > .layer.debug .path-line {
+  height: 2px;
+  background-color: rgba(0, 100, 255, 0.6);
+  transform-origin: 0 0;
+}
+.app-shell > .app-stage > .canvas > .layer.debug .waypoint-node,
+.app-shell > .container > .canvas > .layer.debug .waypoint-node,
+.container-wrapper > .app-stage > .canvas > .layer.debug .waypoint-node,
+.container-wrapper > .container > .canvas > .layer.debug .waypoint-node {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: rgba(0, 100, 255, 0.8);
+  transform: translate(-50%, -50%);
+}
+.app-shell > .app-stage > .canvas > .layer.debug .end-node,
+.app-shell > .container > .canvas > .layer.debug .end-node,
+.container-wrapper > .app-stage > .canvas > .layer.debug .end-node,
+.container-wrapper > .container > .canvas > .layer.debug .end-node {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: rgba(255, 0, 0, 0.8);
+  transform: translate(-50%, -50%);
+}
+.app-shell > .app-stage > .canvas > .layer.debug .entity-box.start-entity,
+.app-shell > .container > .canvas > .layer.debug .entity-box.start-entity,
+.container-wrapper > .app-stage > .canvas > .layer.debug .entity-box.start-entity,
+.container-wrapper > .container > .canvas > .layer.debug .entity-box.start-entity {
+  border: 1px dashed rgba(0, 255, 0, 0.5);
+}
+.app-shell > .app-stage > .canvas > .layer.debug .entity-box.end-entity,
+.app-shell > .container > .canvas > .layer.debug .entity-box.end-entity,
+.container-wrapper > .app-stage > .canvas > .layer.debug .entity-box.end-entity,
+.container-wrapper > .container > .canvas > .layer.debug .entity-box.end-entity {
+  border: 1px dashed rgba(255, 0, 0, 0.5);
+}
+.app-shell > .app-stage > .canvas > .layer.debug .entity-collider.start-collider,
+.app-shell > .container > .canvas > .layer.debug .entity-collider.start-collider,
+.container-wrapper > .app-stage > .canvas > .layer.debug .entity-collider.start-collider,
+.container-wrapper > .container > .canvas > .layer.debug .entity-collider.start-collider {
+  border: 1px solid rgba(0, 255, 0, 0.8);
+  background-color: rgba(0, 255, 0, 0.2);
+}
+.app-shell > .app-stage > .canvas > .layer.debug .entity-collider.end-collider,
+.app-shell > .container > .canvas > .layer.debug .entity-collider.end-collider,
+.container-wrapper > .app-stage > .canvas > .layer.debug .entity-collider.end-collider,
+.container-wrapper > .container > .canvas > .layer.debug .entity-collider.end-collider {
+  border: 1px solid rgba(255, 0, 0, 0.8);
+  background-color: rgba(255, 0, 0, 0.2);
+}
+.app-shell > .app-stage > .canvas > .layer.debug .search-node,
+.app-shell > .container > .canvas > .layer.debug .search-node,
+.container-wrapper > .app-stage > .canvas > .layer.debug .search-node,
+.container-wrapper > .container > .canvas > .layer.debug .search-node {
+  border-radius: 50%;
+  background-color: rgba(64, 156, 255, 0.22);
+}
+.app-shell > .app-stage > .canvas > .layer.debug .rejected-node,
+.app-shell > .container > .canvas > .layer.debug .rejected-node,
+.container-wrapper > .app-stage > .canvas > .layer.debug .rejected-node,
+.container-wrapper > .container > .canvas > .layer.debug .rejected-node {
+  border-radius: 50%;
+  background-color: rgba(255, 80, 80, 0.18);
+}
+.app-shell > .app-stage > .canvas > .layer.foreground,
+.app-shell > .container > .canvas > .layer.foreground,
+.container-wrapper > .app-stage > .canvas > .layer.foreground,
+.container-wrapper > .container > .canvas > .layer.foreground {
+  z-index: 1;
+  padding: 0;
+}
+.app-shell > .app-stage > .canvas > .layer.effects,
+.app-shell > .container > .canvas > .layer.effects,
+.container-wrapper > .app-stage > .canvas > .layer.effects,
+.container-wrapper > .container > .canvas > .layer.effects {
+  z-index: 2;
+  pointer-events: none;
+  user-select: none;
+}
+.app-shell > .app-stage > .canvas > .layer > .zone,
+.app-shell > .container > .canvas > .layer > .zone,
+.container-wrapper > .app-stage > .canvas > .layer > .zone,
+.container-wrapper > .container > .canvas > .layer > .zone {
+  outline: 1px dashed red;
+  background-color: rgba(255, 0, 0, 0.089);
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+  border-radius: 3px;
+  visibility: hidden;
+}
+.app-shell > .app-stage > .canvas > .layer > .zone > .name,
+.app-shell > .container > .canvas > .layer > .zone > .name,
+.container-wrapper > .app-stage > .canvas > .layer > .zone > .name,
+.container-wrapper > .container > .canvas > .layer > .zone > .name {
+  font-size: 70%;
+  color: white;
+  background-color: red;
+  border-radius: 5px;
+  padding: 2px 5px;
+  opacity: 0.75;
+  align-self: flex-start;
+  /* Prevent stretching */
+}
+
+/* MAP OBJECTS */
+.app-shell > .app-stage > .canvas,
+.app-shell > .container > .canvas,
+.container-wrapper > .app-stage > .canvas,
+.container-wrapper > .container > .canvas {
+  border-radius: var(--border-radius);
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object,
+.app-shell > .app-stage > .canvas > .layer > .mapObject,
+.app-shell > .container > .canvas > .layer > .map-object,
+.app-shell > .container > .canvas > .layer > .mapObject,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject,
+.container-wrapper > .container > .canvas > .layer > .map-object,
+.container-wrapper > .container > .canvas > .layer > .mapObject {
+  position: fixed;
+  pointer-events: none;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object .sway,
+.app-shell > .app-stage > .canvas > .layer > .mapObject .sway,
+.app-shell > .container > .canvas > .layer > .map-object .sway,
+.app-shell > .container > .canvas > .layer > .mapObject .sway,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object .sway,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject .sway,
+.container-wrapper > .container > .canvas > .layer > .map-object .sway,
+.container-wrapper > .container > .canvas > .layer > .mapObject .sway {
+  animation-delay: inherit;
+  transform-origin: bottom;
+  animation: sway 5s ease-in-out infinite;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object > .sprite,
+.app-shell > .app-stage > .canvas > .layer > .mapObject > .sprite,
+.app-shell > .container > .canvas > .layer > .map-object > .sprite,
+.app-shell > .container > .canvas > .layer > .mapObject > .sprite,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object > .sprite,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject > .sprite,
+.container-wrapper > .container > .canvas > .layer > .map-object > .sprite,
+.container-wrapper > .container > .canvas > .layer > .mapObject > .sprite {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object > .sprite > .front,
+.app-shell > .app-stage > .canvas > .layer > .map-object > .sprite .back,
+.app-shell > .app-stage > .canvas > .layer > .mapObject > .sprite > .front,
+.app-shell > .app-stage > .canvas > .layer > .mapObject > .sprite .back,
+.app-shell > .container > .canvas > .layer > .map-object > .sprite > .front,
+.app-shell > .container > .canvas > .layer > .map-object > .sprite .back,
+.app-shell > .container > .canvas > .layer > .mapObject > .sprite > .front,
+.app-shell > .container > .canvas > .layer > .mapObject > .sprite .back,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object > .sprite > .front,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object > .sprite .back,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject > .sprite > .front,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject > .sprite .back,
+.container-wrapper > .container > .canvas > .layer > .map-object > .sprite > .front,
+.container-wrapper > .container > .canvas > .layer > .map-object > .sprite .back,
+.container-wrapper > .container > .canvas > .layer > .mapObject > .sprite > .front,
+.container-wrapper > .container > .canvas > .layer > .mapObject > .sprite .back {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object > .ground-shadow,
+.app-shell > .app-stage > .canvas > .layer > .mapObject > .ground-shadow,
+.app-shell > .container > .canvas > .layer > .map-object > .ground-shadow,
+.app-shell > .container > .canvas > .layer > .mapObject > .ground-shadow,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object > .ground-shadow,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject > .ground-shadow,
+.container-wrapper > .container > .canvas > .layer > .map-object > .ground-shadow,
+.container-wrapper > .container > .canvas > .layer > .mapObject > .ground-shadow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  transform-origin: center;
+  z-index: 0;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.interactive,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.interactive,
+.app-shell > .container > .canvas > .layer > .map-object.interactive,
+.app-shell > .container > .canvas > .layer > .mapObject.interactive,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.interactive,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.interactive,
+.container-wrapper > .container > .canvas > .layer > .map-object.interactive,
+.container-wrapper > .container > .canvas > .layer > .mapObject.interactive {
+  pointer-events: all;
+  cursor: pointer;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object > .interactive-hitbox,
+.app-shell > .app-stage > .canvas > .layer > .map-object > .interactive-collider,
+.app-shell > .app-stage > .canvas > .layer > .mapObject > .interactive-hitbox,
+.app-shell > .app-stage > .canvas > .layer > .mapObject > .interactive-collider,
+.app-shell > .container > .canvas > .layer > .map-object > .interactive-hitbox,
+.app-shell > .container > .canvas > .layer > .map-object > .interactive-collider,
+.app-shell > .container > .canvas > .layer > .mapObject > .interactive-hitbox,
+.app-shell > .container > .canvas > .layer > .mapObject > .interactive-collider,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object > .interactive-hitbox,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object > .interactive-collider,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject > .interactive-hitbox,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject > .interactive-collider,
+.container-wrapper > .container > .canvas > .layer > .map-object > .interactive-hitbox,
+.container-wrapper > .container > .canvas > .layer > .map-object > .interactive-collider,
+.container-wrapper > .container > .canvas > .layer > .mapObject > .interactive-hitbox,
+.container-wrapper > .container > .canvas > .layer > .mapObject > .interactive-collider {
+  pointer-events: all;
+  cursor: inherit;
+  outline: none;
+  background: transparent;
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.selected, .app-shell > .app-stage > .canvas > .layer > .map-object.is-selected,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.selected,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.is-selected,
+.app-shell > .container > .canvas > .layer > .map-object.selected,
+.app-shell > .container > .canvas > .layer > .map-object.is-selected,
+.app-shell > .container > .canvas > .layer > .mapObject.selected,
+.app-shell > .container > .canvas > .layer > .mapObject.is-selected,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.selected,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.is-selected,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.selected,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.is-selected,
+.container-wrapper > .container > .canvas > .layer > .map-object.selected,
+.container-wrapper > .container > .canvas > .layer > .map-object.is-selected,
+.container-wrapper > .container > .canvas > .layer > .mapObject.selected,
+.container-wrapper > .container > .canvas > .layer > .mapObject.is-selected {
+  outline: 2px dashed green;
+  border-radius: 5px;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.draggable,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.draggable,
+.app-shell > .container > .canvas > .layer > .map-object.draggable,
+.app-shell > .container > .canvas > .layer > .mapObject.draggable,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.draggable,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.draggable,
+.container-wrapper > .container > .canvas > .layer > .map-object.draggable,
+.container-wrapper > .container > .canvas > .layer > .mapObject.draggable {
+  pointer-events: all;
+}
+body[data-tool-mode=select] .app-shell > .app-stage > .canvas > .layer > .map-object.inspectable,
+body[data-tool-mode=select] .app-shell > .app-stage > .canvas > .layer > .mapObject.inspectable,
+body[data-tool-mode=select] .app-shell > .container > .canvas > .layer > .map-object.inspectable,
+body[data-tool-mode=select] .app-shell > .container > .canvas > .layer > .mapObject.inspectable,
+body[data-tool-mode=select] .container-wrapper > .app-stage > .canvas > .layer > .map-object.inspectable,
+body[data-tool-mode=select] .container-wrapper > .app-stage > .canvas > .layer > .mapObject.inspectable,
+body[data-tool-mode=select] .container-wrapper > .container > .canvas > .layer > .map-object.inspectable,
+body[data-tool-mode=select] .container-wrapper > .container > .canvas > .layer > .mapObject.inspectable {
+  cursor: pointer;
+}
+body[data-tool-mode=select] .app-shell > .app-stage > .canvas > .layer > .map-object.draggable.drag-in-select-mode,
+body[data-tool-mode=select] .app-shell > .app-stage > .canvas > .layer > .mapObject.draggable.drag-in-select-mode,
+body[data-tool-mode=select] .app-shell > .container > .canvas > .layer > .map-object.draggable.drag-in-select-mode,
+body[data-tool-mode=select] .app-shell > .container > .canvas > .layer > .mapObject.draggable.drag-in-select-mode,
+body[data-tool-mode=select] .container-wrapper > .app-stage > .canvas > .layer > .map-object.draggable.drag-in-select-mode,
+body[data-tool-mode=select] .container-wrapper > .app-stage > .canvas > .layer > .mapObject.draggable.drag-in-select-mode,
+body[data-tool-mode=select] .container-wrapper > .container > .canvas > .layer > .map-object.draggable.drag-in-select-mode,
+body[data-tool-mode=select] .container-wrapper > .container > .canvas > .layer > .mapObject.draggable.drag-in-select-mode {
+  cursor: grab;
+}
+body[data-tool-mode=drag] .app-shell > .app-stage > .canvas > .layer > .map-object.draggable,
+body[data-tool-mode=drag] .app-shell > .app-stage > .canvas > .layer > .mapObject.draggable,
+body[data-tool-mode=drag] .app-shell > .container > .canvas > .layer > .map-object.draggable,
+body[data-tool-mode=drag] .app-shell > .container > .canvas > .layer > .mapObject.draggable,
+body[data-tool-mode=drag] .container-wrapper > .app-stage > .canvas > .layer > .map-object.draggable,
+body[data-tool-mode=drag] .container-wrapper > .app-stage > .canvas > .layer > .mapObject.draggable,
+body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .map-object.draggable,
+body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .mapObject.draggable {
+  cursor: grab;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.dragging, .app-shell > .app-stage > .canvas > .layer > .map-object.is-dragging,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.dragging,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.is-dragging,
+.app-shell > .container > .canvas > .layer > .map-object.dragging,
+.app-shell > .container > .canvas > .layer > .map-object.is-dragging,
+.app-shell > .container > .canvas > .layer > .mapObject.dragging,
+.app-shell > .container > .canvas > .layer > .mapObject.is-dragging,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.dragging,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.is-dragging,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.dragging,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.is-dragging,
+.container-wrapper > .container > .canvas > .layer > .map-object.dragging,
+.container-wrapper > .container > .canvas > .layer > .map-object.is-dragging,
+.container-wrapper > .container > .canvas > .layer > .mapObject.dragging,
+.container-wrapper > .container > .canvas > .layer > .mapObject.is-dragging {
+  pointer-events: none;
+  user-select: none;
+  cursor: grabbing;
+  z-index: var(--z-drag) !important;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.dragging > .sprite, .app-shell > .app-stage > .canvas > .layer > .map-object.is-dragging > .sprite,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.dragging > .sprite,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.is-dragging > .sprite,
+.app-shell > .container > .canvas > .layer > .map-object.dragging > .sprite,
+.app-shell > .container > .canvas > .layer > .map-object.is-dragging > .sprite,
+.app-shell > .container > .canvas > .layer > .mapObject.dragging > .sprite,
+.app-shell > .container > .canvas > .layer > .mapObject.is-dragging > .sprite,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.dragging > .sprite,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.is-dragging > .sprite,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.dragging > .sprite,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.is-dragging > .sprite,
+.container-wrapper > .container > .canvas > .layer > .map-object.dragging > .sprite,
+.container-wrapper > .container > .canvas > .layer > .map-object.is-dragging > .sprite,
+.container-wrapper > .container > .canvas > .layer > .mapObject.dragging > .sprite,
+.container-wrapper > .container > .canvas > .layer > .mapObject.is-dragging > .sprite {
+  animation-name: wiggle2;
+  animation-duration: 0.6s;
+  animation-iteration-count: infinite;
+  transform-origin: 50% 65%;
+  animation-timing-function: ease-in-out;
+  filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.1));
+  will-change: transform;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.light-object[data-state=on],
+.app-shell > .app-stage > .canvas > .layer > .mapObject.light-object[data-state=on],
+.app-shell > .container > .canvas > .layer > .map-object.light-object[data-state=on],
+.app-shell > .container > .canvas > .layer > .mapObject.light-object[data-state=on],
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.light-object[data-state=on],
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.light-object[data-state=on],
+.container-wrapper > .container > .canvas > .layer > .map-object.light-object[data-state=on],
+.container-wrapper > .container > .canvas > .layer > .mapObject.light-object[data-state=on] {
+  /* Add glow effect when on */
+  filter: drop-shadow(0 0 5px rgba(255, 200, 100, 0.5));
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.light-object[data-state=off],
+.app-shell > .app-stage > .canvas > .layer > .mapObject.light-object[data-state=off],
+.app-shell > .container > .canvas > .layer > .map-object.light-object[data-state=off],
+.app-shell > .container > .canvas > .layer > .mapObject.light-object[data-state=off],
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.light-object[data-state=off],
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.light-object[data-state=off],
+.container-wrapper > .container > .canvas > .layer > .map-object.light-object[data-state=off],
+.container-wrapper > .container > .canvas > .layer > .mapObject.light-object[data-state=off] {
+  /* Darker appearance when off */
+  filter: brightness(0.7);
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.fountain,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.fountain,
+.app-shell > .container > .canvas > .layer > .map-object.fountain,
+.app-shell > .container > .canvas > .layer > .mapObject.fountain,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.fountain,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.fountain,
+.container-wrapper > .container > .canvas > .layer > .map-object.fountain,
+.container-wrapper > .container > .canvas > .layer > .mapObject.fountain {
+  transition: filter 0.3s ease;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.fountain[data-active=true],
+.app-shell > .app-stage > .canvas > .layer > .mapObject.fountain[data-active=true],
+.app-shell > .container > .canvas > .layer > .map-object.fountain[data-active=true],
+.app-shell > .container > .canvas > .layer > .mapObject.fountain[data-active=true],
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.fountain[data-active=true],
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.fountain[data-active=true],
+.container-wrapper > .container > .canvas > .layer > .map-object.fountain[data-active=true],
+.container-wrapper > .container > .canvas > .layer > .mapObject.fountain[data-active=true] {
+  filter: drop-shadow(0 0 5px rgba(100, 200, 255, 0.3));
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.fountain[data-active=false],
+.app-shell > .app-stage > .canvas > .layer > .mapObject.fountain[data-active=false],
+.app-shell > .container > .canvas > .layer > .map-object.fountain[data-active=false],
+.app-shell > .container > .canvas > .layer > .mapObject.fountain[data-active=false],
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.fountain[data-active=false],
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.fountain[data-active=false],
+.container-wrapper > .container > .canvas > .layer > .map-object.fountain[data-active=false],
+.container-wrapper > .container > .canvas > .layer > .mapObject.fountain[data-active=false] {
+  filter: brightness(0.8);
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.animated-map-object.ball-object,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.animated-map-object.ball-object,
+.app-shell > .container > .canvas > .layer > .map-object.animated-map-object.ball-object,
+.app-shell > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.animated-map-object.ball-object,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.animated-map-object.ball-object,
+.container-wrapper > .container > .canvas > .layer > .map-object.animated-map-object.ball-object,
+.container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.ball-object {
+  pointer-events: all;
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.animated-map-object.butterfly.blue > .sprite,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.animated-map-object.butterfly.blue > .sprite,
+.app-shell > .container > .canvas > .layer > .map-object.animated-map-object.butterfly.blue > .sprite,
+.app-shell > .container > .canvas > .layer > .mapObject.animated-map-object.butterfly.blue > .sprite,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.animated-map-object.butterfly.blue > .sprite,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.animated-map-object.butterfly.blue > .sprite,
+.container-wrapper > .container > .canvas > .layer > .map-object.animated-map-object.butterfly.blue > .sprite,
+.container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.butterfly.blue > .sprite {
+  filter: hue-rotate(156deg);
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.animated-map-object.butterfly.green > .sprite,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.animated-map-object.butterfly.green > .sprite,
+.app-shell > .container > .canvas > .layer > .map-object.animated-map-object.butterfly.green > .sprite,
+.app-shell > .container > .canvas > .layer > .mapObject.animated-map-object.butterfly.green > .sprite,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.animated-map-object.butterfly.green > .sprite,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.animated-map-object.butterfly.green > .sprite,
+.container-wrapper > .container > .canvas > .layer > .map-object.animated-map-object.butterfly.green > .sprite,
+.container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.butterfly.green > .sprite {
+  filter: hue-rotate(60deg);
+}
+.app-shell > .app-stage > .canvas > .layer > .map-object.animated-map-object.butterfly.purple > .sprite,
+.app-shell > .app-stage > .canvas > .layer > .mapObject.animated-map-object.butterfly.purple > .sprite,
+.app-shell > .container > .canvas > .layer > .map-object.animated-map-object.butterfly.purple > .sprite,
+.app-shell > .container > .canvas > .layer > .mapObject.animated-map-object.butterfly.purple > .sprite,
+.container-wrapper > .app-stage > .canvas > .layer > .map-object.animated-map-object.butterfly.purple > .sprite,
+.container-wrapper > .app-stage > .canvas > .layer > .mapObject.animated-map-object.butterfly.purple > .sprite,
+.container-wrapper > .container > .canvas > .layer > .map-object.animated-map-object.butterfly.purple > .sprite,
+.container-wrapper > .container > .canvas > .layer > .mapObject.animated-map-object.butterfly.purple > .sprite {
+  filter: hue-rotate(270deg);
+}
+.app-shell > .app-stage > .canvas > .layer > .dropped-item-shadow,
+.app-shell > .container > .canvas > .layer > .dropped-item-shadow,
+.container-wrapper > .app-stage > .canvas > .layer > .dropped-item-shadow,
+.container-wrapper > .container > .canvas > .layer > .dropped-item-shadow {
+  position: absolute;
+  width: 24px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 50%;
+  filter: blur(2px);
+  pointer-events: none;
+  transform-origin: center;
+}
+.app-shell > .app-stage > .canvas > .layer > .dropped-item,
+.app-shell > .container > .canvas > .layer > .dropped-item,
+.container-wrapper > .app-stage > .canvas > .layer > .dropped-item,
+.container-wrapper > .container > .canvas > .layer > .dropped-item {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  transition: none;
+  pointer-events: none;
+}
+.app-shell > .app-stage > .canvas > .layer > .dropped-item.collected,
+.app-shell > .container > .canvas > .layer > .dropped-item.collected,
+.container-wrapper > .app-stage > .canvas > .layer > .dropped-item.collected,
+.container-wrapper > .container > .canvas > .layer > .dropped-item.collected {
+  animation: collect 0.5s ease-out forwards;
+}
+.app-shell > .app-stage > .canvas > .layer > .dropped-item.food,
+.app-shell > .container > .canvas > .layer > .dropped-item.food,
+.container-wrapper > .app-stage > .canvas > .layer > .dropped-item.food,
+.container-wrapper > .container > .canvas > .layer > .dropped-item.food {
+  width: var(--item-sprite-width, 32px);
+  height: var(--item-sprite-height, 32px);
+  background-image: url("../images/items/items.png");
+  background-repeat: no-repeat;
+  background-position: var(--item-sprite-x, 0px) var(--item-sprite-y, 0px);
+  image-rendering: pixelated;
+}
+.app-shell > .app-stage > .canvas > .layer > .dropped-item.coin,
+.app-shell > .container > .canvas > .layer > .dropped-item.coin,
+.container-wrapper > .app-stage > .canvas > .layer > .dropped-item.coin,
+.container-wrapper > .container > .canvas > .layer > .dropped-item.coin {
+  border-radius: 50%;
+}
+.app-shell > .app-stage > .canvas > .layer > .dropped-item.coin.gold,
+.app-shell > .container > .canvas > .layer > .dropped-item.coin.gold,
+.container-wrapper > .app-stage > .canvas > .layer > .dropped-item.coin.gold,
+.container-wrapper > .container > .canvas > .layer > .dropped-item.coin.gold {
+  background-color: yellow;
+}
+.app-shell > .app-stage > .canvas > .layer > .dropped-item.health.potion,
+.app-shell > .container > .canvas > .layer > .dropped-item.health.potion,
+.container-wrapper > .app-stage > .canvas > .layer > .dropped-item.health.potion,
+.container-wrapper > .container > .canvas > .layer > .dropped-item.health.potion {
+  background-color: green;
+}
+.app-shell > .app-stage > .canvas > .layer > .dropped-item.equipment.sword,
+.app-shell > .container > .canvas > .layer > .dropped-item.equipment.sword,
+.container-wrapper > .app-stage > .canvas > .layer > .dropped-item.equipment.sword,
+.container-wrapper > .container > .canvas > .layer > .dropped-item.equipment.sword {
+  background-color: red;
+}
+
+.particle {
+  position: absolute;
+  pointer-events: none;
+  background-size: cover;
+  will-change: transform, opacity;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes collect {
+  0% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0) translateY(-20px);
+    opacity: 0;
+  }
+}
+.debug.layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1000;
+}
+.debug.layer .grid-cell {
+  position: absolute;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+  transition: opacity 0.2s ease-in-out;
+}
+.debug.layer .grid-cell.culled {
+  opacity: 0.2;
+}
+.debug.layer .grid-cell.active {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.debug.layer .grid-cell.unwalkable {
+  background-color: rgba(255, 0, 0, 0.2);
+  border-color: rgba(255, 0, 0, 0.6);
+}
+.debug.layer .grid-cell.tile-unwalkable {
+  background-color: rgba(255, 0, 0, 0.1);
+  border-color: rgba(255, 100, 0, 0.6);
+}
+.debug.layer .grid-cell.object-unwalkable {
+  background-color: rgba(255, 0, 0, 0.1);
+  border-color: rgba(255, 0, 100, 0.6);
+}
+.debug.layer .cursor-tile {
+  position: absolute;
+  border: 2px solid yellow;
+  background-color: rgba(255, 255, 0, 0.1);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.debug.layer .cursor-tile.visible {
+  opacity: 1;
+}
+.debug.layer .cursor-tile .coords {
+  font-size: 10px;
+  position: absolute;
+  top: -2em;
+  white-space: nowrap;
+  color: white;
+}
+.debug.layer .myte-front-tile {
+  position: absolute;
+  border: 2px solid red;
+  background-color: rgba(255, 0, 0, 0.1);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.debug.layer .myte-front-tile.visible {
+  opacity: 1;
+}
+.debug.layer .culling-bounds {
+  position: absolute;
+  border: 2px dashed rgba(0, 255, 255, 0.7);
+  background-color: rgba(0, 255, 255, 0.05);
+  pointer-events: none;
+  z-index: 1001;
+}
+
+.debug-stats {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-family: monospace;
+  font-size: 12px;
+  padding: 8px;
+  border-radius: 4px;
+  z-index: 1002;
+  visibility: hidden;
+}
+.debug-stats .stat {
+  margin-bottom: 4px;
+}
+.debug-stats .stat:last-child {
+  margin-bottom: 0;
+}
+.debug-stats .stat .label {
+  color: #aaa;
+  margin-right: 5px;
+}
+.debug-stats .stat .value {
+  color: #fff;
+}
+.debug-stats .stat .value.good {
+  color: #4caf50;
+}
+.debug-stats .stat .value.warning {
+  color: #ffc107;
+}
+.debug-stats .stat .value.bad {
+  color: #f44336;
+}
+
+/* Portal styling */
+.map-object.portal,
+.mapObject.portal {
+  overflow: visible;
+  transform-origin: center;
+}
+.map-object.portal > .portal-window,
+.map-object.portal > .portal-panel,
+.mapObject.portal > .portal-window,
+.mapObject.portal > .portal-panel {
+  border: var(--border-width) solid var(--header-dark);
+  border-top: 0;
+  border-radius: var(--border-radius);
+  filter: var(--shadow);
+  background-color: var(--surface-window, var(--button-mid));
+  width: 100%;
+  height: 100%;
+}
+.map-object.portal > .portal-window > .title,
+.map-object.portal > .portal-window > .portal-panel__title,
+.map-object.portal > .portal-panel > .title,
+.map-object.portal > .portal-panel > .portal-panel__title,
+.mapObject.portal > .portal-window > .title,
+.mapObject.portal > .portal-window > .portal-panel__title,
+.mapObject.portal > .portal-panel > .title,
+.mapObject.portal > .portal-panel > .portal-panel__title {
+  color: var(--text-on-accent, white);
+  border-bottom: var(--border-width) solid var(--header-dark);
+  box-shadow: 0 var(--border-width) 0 0 var(--header-light) inset, 0 var(--border-width) 0 0 rgba(0, 0, 0, 0.1);
+  background-color: var(--header-mid);
+  padding: 0.25em;
+  font-size: 0.9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.map-object.portal.active,
+.mapObject.portal.active {
+  animation: portal-pulse 4s infinite ease-in-out;
+}
+.map-object.portal.inactive,
+.mapObject.portal.inactive {
+  opacity: 0.6;
+  filter: grayscale(70%);
+}
+.map-object.portal.valid-drop-target > .portal-window,
+.map-object.portal.valid-drop-target > .portal-panel,
+.mapObject.portal.valid-drop-target > .portal-window,
+.mapObject.portal.valid-drop-target > .portal-panel {
+  outline: var(--border-width) solid var(--drop-target);
+}
+.map-object.portal.on-target > .portal-window,
+.map-object.portal.on-target > .portal-panel,
+.mapObject.portal.on-target > .portal-window,
+.mapObject.portal.on-target > .portal-panel {
+  outline: var(--border-width) solid var(--on-target) !important;
+}
+.map-object.portal.on-target,
+.mapObject.portal.on-target {
+  animation: portal-pulse 0.4s infinite ease-in-out;
+}
+.map-object.portal,
+.mapObject.portal {
+  /* Portal variants */
+}
+.map-object.portal.blue_portal .sprite,
+.mapObject.portal.blue_portal .sprite {
+  box-shadow: 0 0 20px rgba(0, 191, 255, 0.7);
+}
+.map-object.portal.red_portal .sprite,
+.mapObject.portal.red_portal .sprite {
+  box-shadow: 0 0 20px rgba(255, 69, 0, 0.7);
+}
+.map-object.portal.ancient_portal .sprite,
+.mapObject.portal.ancient_portal .sprite {
+  box-shadow: 0 0 20px rgba(218, 165, 32, 0.7);
+}
+.map-object.portal.magic_circle .sprite,
+.mapObject.portal.magic_circle .sprite {
+  box-shadow: 0 0 20px rgba(153, 50, 204, 0.7);
+}
+.map-object.portal,
+.mapObject.portal {
+  /* Portal interaction hint */
+}
+.map-object.portal .interactive-hitbox,
+.map-object.portal .interactive-collider,
+.mapObject.portal .interactive-hitbox,
+.mapObject.portal .interactive-collider {
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.25) 50%, rgba(255, 255, 255, 0) 70%);
+  animation: portal-hint 2s infinite ease-in-out;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.map-object.portal:hover .interactive-hitbox, .map-object.portal:hover .interactive-collider,
+.mapObject.portal:hover .interactive-hitbox,
+.mapObject.portal:hover .interactive-collider {
+  opacity: 1;
+}
+.map-object.portal,
+.mapObject.portal {
+  /* Portal pulse animation */
+}
+@keyframes portal-pulse {
+  0% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+.map-object.portal,
+.mapObject.portal {
+  /* Portal interaction hint animation */
+}
+@keyframes portal-hint {
+  0% {
+    transform: scale(0.9);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(0.9);
+  }
+}
+
+.mapObject {
+  /* Fence Styles */
+}
+.mapObject .fence {
+  position: absolute;
+  pointer-events: auto;
+  z-index: 1;
+}
+.mapObject .fence .sprite {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+.mapObject .fence-connections.debug-visible {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  background-color: rgba(0, 255, 0, 0.5);
+  color: white;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.mapObject {
+  /* Gate Styles */
+}
+.mapObject .gate {
+  position: absolute;
+  pointer-events: auto;
+  z-index: 2;
+  transition: opacity 0.3s ease;
+}
+.mapObject .gate .sprite {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  transition: transform 0.3s ease;
+}
+.mapObject .gate.open .sprite {
+  opacity: 0.8;
+}
+.mapObject .gate.closed .sprite {
+  opacity: 1;
+}
+.mapObject .gate .interactive-zone.debug-visible {
+  position: absolute;
+  border: 1px dashed rgba(255, 0, 0, 0.5);
+  background-color: rgba(255, 0, 0, 0.1);
+  pointer-events: none;
+}
+
+.map-transition {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  background-color: var(--black);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-in-out;
+  gap: var(--gap);
+}
+.map-transition.active {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.08s ease-in;
+}
+.map-transition .transition-message {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  text-align: center;
+  animation: pulse 2s infinite;
+}
+.map-transition .transition-loader {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  border-top-color: rgba(255, 255, 255, 0.7);
+  animation: spin 0.9s linear infinite;
+}
+.map-transition .transition-tip {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+.map-object.rug_default > .sprite,
+.mapObject.rug_default > .sprite {
+  width: 100%;
+  height: 100%;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+.drop-target,
+.map-object-drop-target {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 4px;
+  box-sizing: border-box;
+  transition: background 0.08s, border-color 0.08s;
+  z-index: 99999;
+}
+.drop-target.valid-drop,
+.map-object-drop-target.valid-drop {
+  background: rgba(60, 200, 100, 0.2);
+  border: 2px solid rgba(60, 200, 100, 0.9);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+.drop-target.invalid-drop,
+.map-object-drop-target.invalid-drop {
+  background: rgba(220, 50, 50, 0.2);
+  border: 2px solid rgba(220, 50, 50, 0.9);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.terrain-legend {
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 5px;
+  border-radius: 5px;
+  font-size: 10px;
+  z-index: 1000;
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  visibility: hidden;
+}
+

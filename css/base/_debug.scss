@@ -1,0 +1,136 @@
+@use '../primitives/ui' as *;
+
+body.debug {
+    .target.dot,
+    .debug-panel,
+    .debugMenu,
+    .cursor-dot.dot,
+    .crosshair,
+    .action-queue-panel,
+    .queueMenu,
+    .zone,
+    .debug-stats,
+    .terrain-legend,
+    .layer.debug {
+        visibility: visible !important;
+    }
+
+    .interactive-myte .sprite {
+        outline: 1px solid red;
+    }
+
+    .map-object,
+    .mapObject {
+        outline: 1px dashed rgba(255, 230, 0, 0.85);
+
+        &:hover {
+            z-index: 100000 !important;
+
+            >img.back {
+                visibility: hidden;
+            }
+        }
+
+        >div.interact {
+            &:hover {
+                @include help-paper;
+                outline: 2px solid var(--black);
+                border-radius: 2px;
+            }
+        }
+    }
+
+    .map-object > .interactive-hitbox,
+    .map-object > .interactive-collider,
+    .mapObject > .interactive-hitbox,
+    .mapObject > .interactive-collider {
+        outline: 1px dashed rgba(255, 165, 0, 0.95);
+        background: rgba(255, 165, 0, 0.08);
+        opacity: 1;
+    }
+}
+
+.dot {
+    transform: translate(-100%, -100%);
+    width: 10px;
+    height: 10px;
+    position: fixed;
+    border-radius: 20px;
+    opacity: 0.5;
+    pointer-events: none;
+    top: -1000px;
+    left: -1000px;
+    outline: 1px solid white;
+    z-index: 1000000;
+    visibility: hidden;
+
+    &.hidden,
+    &.is-hidden {
+        visibility: hidden !important;
+    }
+
+    &.cursor-dot {
+        background-color: blueviolet;
+        transform: translate(-100%, -100%);
+    }
+
+    &.target {
+        position: absolute;
+        background-color: green;
+        transform: translate(-50%, -50%);
+
+        &:after {
+            position: absolute;
+            top: -2em;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: white;
+            padding: 2px 5px;
+            border-radius: 5px;
+            font-size: 9px;
+            text-transform: uppercase;
+            content: attr(data-name) " target";
+            display: inline-block;
+            white-space: nowrap;
+        }
+    }
+}
+
+.debug-value-changed {
+    animation: highlight 0.5s ease-out;
+}
+
+.tooltip {
+    @include help-paper;
+}
+
+.inset {
+    @include dither-fill;
+}
+
+#customCursor {
+    position: fixed;
+    pointer-events: none;
+    z-index: var(--z-cursor);
+    width: var(--item-sprite-width, 32px);
+    height: var(--item-sprite-height, 32px);
+    background-image: url('../images/cursor/hand2.png');
+    background-size: cover;
+    transform: translate(-50%, -50%);
+    display: none;
+
+    &.clicking {
+        background-image: url('../images/cursor/hand3.png');
+    }
+}
+
+.dragging {
+    cursor: grabbing;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.draggable {
+    cursor: grab;
+}

@@ -1,0 +1,77 @@
+@use '../primitives/ui' as *;
+
+select,
+input,
+textarea {
+    @include field-base;
+    width: 70%;
+    max-width: 500px;
+
+    &:focus {
+        outline: 1px dotted var(--button-text-color);
+    }
+}
+
+.button,
+input[type=submit],
+input[type=button],
+button {
+    @include button-base;
+    padding: calc(var(--padding) * 2);
+    color: var(--button-text-color);
+
+    &:not(:disabled):not(.disabled) {
+        cursor: pointer;
+    }
+
+    &:not(:disabled):not(.disabled):hover {
+        background-color: var(--surface-ui-pressed);
+    }
+
+    &.selected,
+    &.active,
+    &:active:not(:disabled):not(.disabled) {
+        @include button-pressed;
+    }
+
+    &:active:not(:disabled) {
+        outline: 1px dotted var(--button-text-color);
+    }
+
+    &.disabled,
+    &:disabled {
+        @include button-disabled;
+        pointer-events: none;
+    }
+}
+
+input[type="range"] {
+    width: 100%;
+    padding: 0;
+    margin: 0;
+}
+
+input[type="checkbox"] {
+    border: 2px solid rgb(204, 204, 204);
+    border-radius: 4px;
+    cursor: pointer;
+    outline-style: none;
+    position: relative;
+    width: 20px;
+    height: 20px;
+
+    &:checked {
+        background-color: var(--primary-color);
+
+        &::after {
+            color: white;
+            content: "\2713";
+            font-size: 12px;
+            left: 50%;
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+    }
+}
+

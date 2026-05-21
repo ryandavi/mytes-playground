@@ -14,7 +14,7 @@ class MyteRenderer {
 	initInteractiveMyte() {
 		const m = this.myte;
 		this.duplicate = m.element.cloneNode(true);
-		this.duplicate.classList.add('freemode', 'duplicate');
+		this.duplicate.classList.add('freemode', 'world-myte', 'duplicate');
 		this.duplicate.id = `duplicate-${this.duplicate.id}`;
 		this.duplicate.dataset.myteSpecies = m.species;
 		m.element.dataset.myteSpecies = m.species;
@@ -25,13 +25,13 @@ class MyteRenderer {
 		this.sprite = this.duplicate.querySelector('.sprite');
 		this.battery = this.duplicate.querySelector('.battery');
 
-		this.duplicate.classList.add('deactivated');
+		this.duplicate.classList.add('deactivated', 'is-deactivated');
 	}
 
 	createTargetDot() {
 		const m = this.myte;
 		const el = document.createElement('div');
-		el.className = 'ignore dot target debug hidden';
+		el.className = 'ignore dot target debug hidden is-hidden';
 		el.id = `target-dot-${m.id}`;
 		el.dataset.name = m.name;
 

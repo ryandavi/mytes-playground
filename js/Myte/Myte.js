@@ -8,7 +8,7 @@ class Myte {
 		this.element = element;
 		this.species = MyteDefinitionRegistry.normalizeSpeciesId(
 			element?.dataset?.myteSpecies ||
-			element?.closest('.myteWrapper')?.dataset?.myteSpecies ||
+			element?.closest('.myte-slot, .myteWrapper')?.dataset?.myteSpecies ||
 			definition?.id ||
 			'snail'
 		);
@@ -22,7 +22,7 @@ class Myte {
 		this.diagonalMovement = false;
 
 		this.elements = {
-			wrapper: this.element.closest(".myteWrapper"),
+			wrapper: this.element.closest(".myte-slot, .myteWrapper"),
 		};
 
 		this.capabilities = {
@@ -185,7 +185,7 @@ class Myte {
 		this.renderer = new MyteRenderer(this);
 		this.renderer.initInteractiveMyte();
 		this.renderer.createTargetDot();
-		this.dropTarget = this.element.closest('.myteWrapper');
+		this.dropTarget = this.element.closest('.myte-slot, .myteWrapper');
 
 		this.queue = new MyteQueue(this);
 		this.stateMachine = new StateMachine(this, DEFAULT_STATE);
@@ -231,6 +231,7 @@ class Myte {
 	stop() {
 		this.isActive = false;
 		this.atOriginal = true;
+		this.queue.clear();
 		this.clearHomeSlotHold();
 		this.cancelInactivityFreeRoam();
 		this.resetGoHomeState();
@@ -247,12 +248,12 @@ class Myte {
 		this.setSpritePosition(home.x, home.y);
 
 		// hide it
-		this.element.classList.remove("deactivated");
-		this.duplicate.classList.remove("active");
-		this.duplicate.classList.add('deactivated');
+		this.element.classList.remove("deactivated", "is-deactivated");
+		this.duplicate.classList.remove("active", "is-active");
+		this.duplicate.classList.add('deactivated', 'is-deactivated');
 		this.elements.wrapper.classList.remove('empty');
 
-		this.targetDot.classList.add('hidden');
+		this.targetDot.classList.add('hidden', 'is-hidden');
 
 		// set next as active
 		this.playSlotEnterSound();
@@ -279,9 +280,9 @@ class Myte {
 
 		this.isActive = true;
 
-		this.element.classList.add("deactivated"); // hide the original element
+		this.element.classList.add("deactivated", "is-deactivated"); // hide the original element
 		this.elements.wrapper.classList.add('empty');
-		this.duplicate.classList.remove("deactivated"); // show the duplicate element
+		this.duplicate.classList.remove("deactivated", "is-deactivated"); // show the duplicate element
 
 		// modes
 		this.setAutonomyMode(autonomyGoal);
@@ -409,7 +410,12 @@ class Myte {
 	}
 
 	getHomeSlotRect() {
-		const rect = this.parent.getLocalOffset(this.element);
+		const slotElement =
+			this.dropTarget?.querySelector?.('.myte-home-slot, .home-wrapper') ||
+			this.dropTarget ||
+			this.elements.wrapper ||
+			this.element;
+		const rect = this.parent.getLocalOffset(slotElement);
 		return {
 			x: rect.left,
 			y: rect.top,
@@ -540,7 +546,10 @@ class Myte {
 
 		this.queue.clear();
 		if (gridSystem && needsPath) {
-			this.queue.add('astar-move', { target: safeHome });
+			this.queue.add('astar-move', { target: {
+				x: safeHome.x + this.size.width / 2,
+				y: safeHome.y + this.size.height / 2
+			} });
 			this.goHomePathState.hasPlannedPath = true;
 			return true;
 		}
@@ -610,7 +619,9 @@ class Myte {
 		}
 
 		this.duplicate.classList.toggle('active', this.isActiveMyte);
+		this.duplicate.classList.toggle('is-active', this.isActiveMyte);
 		this.targetDot.classList.toggle('hidden', !this.isActiveMyte);
+		this.targetDot.classList.toggle('is-hidden', !this.isActiveMyte);
 	}
 
 	/********************************************
@@ -1091,7 +1102,7 @@ class Myte {
 		this.setSpritePosition(x, y, this.limitToContainer);
 
 		// Add the "dragging" class to the draggable element when dragging
-		this.duplicate.classList.add("dragging");
+		this.duplicate.classList.add("dragging", "is-dragging");
 
 		// Check if the draggable element is touching the drop target
 		const dropTargetRect = this.parent.getRect(this.dropTarget);
@@ -1243,7 +1254,7 @@ class Myte {
 			}
 		}
 		else if (this.goal === MOVE_TYPES.FREEROAM) {
-			this.queue.update();
+			this.queue.update(deltaTime);
 		}
 		else if (this.goal === MOVE_TYPES.FOLLOW) {
 			if (this.queue.isEmpty()) {
@@ -1253,17 +1264,17 @@ class Myte {
 
 
 			}
-			this.queue.update();
+			this.queue.update(deltaTime);
 		}
 		else if (this.goal === MOVE_TYPES.GOHOME) {
 			if (this.atOriginal === false) {
-				const home = this.getHomePosition();
-				this.setTarget(home.x, home.y);
-
 				if (!this.queue.isEmpty()) {
 					this.queue.update(deltaTime);
 					this.goHomePathState.directFallbackFrames = 0;
 				} else {
+					const home = this.getHomePosition();
+					this.setTarget(home.x, home.y);
+
 					const distanceToHome = this.getDistanceToPoint(home.x, home.y);
 
 					if (
@@ -1280,7 +1291,7 @@ class Myte {
 					}
 				}
 
-				if (this.isAtHomePosition(1) || this.isAtTarget()) {
+				if (this.isAtHomePosition(1)) {
 					this.stop();
 				}
 			}

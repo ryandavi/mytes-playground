@@ -634,11 +634,11 @@ class SelectionManager extends UIComponent {
             if (!object) return; // Check if object exists
             
             if (object instanceof Myte) {
-                if (object.duplicate) object.duplicate.classList.remove('selected');
+                if (object.duplicate) object.duplicate.classList.remove('selected', 'is-selected');
             } else if (object instanceof MapObject) {
-                if (object.element) object.element.classList.remove('selected');
+                if (object.element) object.element.classList.remove('selected', 'is-selected');
             } else if (object) {
-                object.classList.remove('selected');
+                object.classList.remove('selected', 'is-selected');
             }
         };
 
@@ -646,11 +646,11 @@ class SelectionManager extends UIComponent {
             if (!object) return; // Check if object exists
             
             if (object instanceof Myte) {
-                if (object.duplicate) object.duplicate.classList.add('selected');
+                if (object.duplicate) object.duplicate.classList.add('selected', 'is-selected');
             } else if (object instanceof MapObject) {
-                if (object.element) object.element.classList.add('selected');
+                if (object.element) object.element.classList.add('selected', 'is-selected');
             } else if (object) {
-                object.classList.add('selected');
+                object.classList.add('selected', 'is-selected');
             }
         };
 
@@ -1452,7 +1452,7 @@ class ScreenManager extends UIComponent {
     constructor(parent) {
         super(parent);
         this.headerElement = this.parent.containerWrapper.querySelector('.header');
-        this.fullscreenButton = this.parent.containerWrapper.querySelector('.fullscreen-btn');
+        this.fullscreenButton = this.parent.containerWrapper.querySelector('.app-fullscreen-btn, .fullscreen-btn');
         this.listenerCleanup = [];
     }
 
@@ -1476,6 +1476,7 @@ class ScreenManager extends UIComponent {
 
         // toggle class on container
         this.parent.containerWrapper.classList.toggle('fullscreen');
+        this.parent.containerWrapper.classList.toggle('is-fullscreen');
         if (this.fullscreenButton) {
             this.fullscreenButton.classList.toggle('active');
         }
@@ -1562,6 +1563,7 @@ class UserInterface {
         this.parent.setActiveMyte(myte);
         this.myteListManager.updateMytesList(myte);
         this.hudManager.update();
+        this.viewMenu?.updateButtonStates();
     }
 
     playSound(sound) {
