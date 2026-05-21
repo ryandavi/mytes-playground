@@ -293,6 +293,15 @@ class GridSystem {
         // Attach mouse move listener for cursor tile tracking
         this.parent.parent.element.addEventListener('mousemove', this.boundMouseMoveHandler);
 
+        // Rebuild grid cells whenever the container is resized (fullscreen, window resize, etc.)
+        if (this._debugResizeObserver) {
+            this._debugResizeObserver.disconnect();
+        }
+        this._debugResizeObserver = new ResizeObserver(() => {
+            this.createGridCellElements();
+        });
+        this._debugResizeObserver.observe(this.parent.parent.element);
+
         console.log('[GridSystem] Debug DOM initialization complete');
     }
     // Create grid cell elements for the visible viewport only
@@ -301,10 +310,14 @@ class GridSystem {
         this.debugElements.gridCells.forEach(cell => cell.element.remove());
         this.debugElements.gridCells = [];
 
-        // Only allocate cells that fit in the current viewport
+        // Account for zoom: visible world area = viewport size / zoom
         const viewport = this.parent.parent.getContainerRect();
-        const cols = Math.min(Math.ceil(viewport.width / this.config.cellSize) + 1, this.gridWidth);
-        const rows = Math.min(Math.ceil(viewport.height / this.config.cellSize) + 1, this.gridHeight);
+        const zoom = this.parent.parent.camera?.zoomLevel || 1;
+        this._lastDebugZoom = zoom;
+        const visibleWorldW = viewport.width / zoom;
+        const visibleWorldH = viewport.height / zoom;
+        const cols = Math.min(Math.ceil(visibleWorldW / this.config.cellSize) + 2, this.gridWidth);
+        const rows = Math.min(Math.ceil(visibleWorldH / this.config.cellSize) + 2, this.gridHeight);
 
         for (let x = 0; x < cols; x++) {
             for (let y = 0; y < rows; y++) {
@@ -334,8 +347,15 @@ class GridSystem {
 
         // Get viewport bounds
         const viewport = this.parent.parent.getContainerRect();
-        const visibleCellsX = Math.ceil(viewport.width / this.config.cellSize) + 1;
-        const visibleCellsY = Math.ceil(viewport.height / this.config.cellSize) + 1;
+        const zoom = camera?.zoomLevel || 1;
+
+        // Recreate grid cells if zoom changed since last creation
+        if (Math.abs(zoom - (this._lastDebugZoom ?? zoom)) > 0.01) {
+            this.createGridCellElements();
+        }
+
+        const visibleCellsX = Math.ceil(viewport.width / zoom / this.config.cellSize) + 2;
+        const visibleCellsY = Math.ceil(viewport.height / zoom / this.config.cellSize) + 2;
 
         // Update grid cells if not showing the entire grid
         if (this.debugElements.gridCells.length < this.gridWidth * this.gridHeight) {

@@ -398,7 +398,8 @@ body.debug .map-object > .interactive-hitbox {
 .dragging {
   cursor: grabbing;
   touch-action: none;
-  user-select: none;
+  -moz-user-select: none;
+       user-select: none;
   -webkit-user-select: none;
 }
 
@@ -1035,7 +1036,9 @@ body.debug .map-object > .interactive-hitbox {
   justify-content: space-between;
   list-style: none;
   padding: 6px var(--padding);
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .debug-panel .debug-section > summary::-webkit-details-marker {
   display: none;
@@ -1104,7 +1107,9 @@ body.debug .map-object > .interactive-hitbox {
   cursor: pointer;
   font-weight: 600;
   font-size: 0.85em;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .debug-panel .debug-group > .debug-group-summary::-webkit-details-marker {
   display: none;
@@ -1225,6 +1230,7 @@ body.debug .map-object > .interactive-hitbox {
   margin-right: 10px;
   position: fixed;
   display: none;
+  height: -moz-fit-content;
   height: fit-content;
   right: 0;
   top: 50%;
@@ -1345,6 +1351,7 @@ body.debug .map-object > .interactive-hitbox {
   z-index: var(--z-debug);
   flex-direction: column;
   transform: translate(calc(-100% - 40px), 0);
+  width: -moz-fit-content;
   width: fit-content;
 }
 .app-shell > .hand-controls input[type=radio] {
@@ -1617,7 +1624,9 @@ body.debug .map-object > .interactive-hitbox {
 .window-panel > .window-panel__header > .window-panel__controls {
   display: flex;
   gap: var(--gap);
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .window-panel > .window-panel__header > .window-panel__controls > button {
   width: 30px;
@@ -1721,7 +1730,9 @@ body.debug .map-object > .interactive-hitbox {
   padding: 0;
   overflow: visible;
   touch-action: manipulation;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   font-family: inherit;
 }
 .myte-queue-overlay .queue-item.compact.is-current {
@@ -1815,7 +1826,9 @@ body.debug .map-object > .interactive-hitbox {
   position: absolute;
   top: 0;
   transition: opacity var(--motion-slower) var(--ease-emphasis);
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   width: 100%;
   z-index: var(--z-loading);
 }
@@ -2108,6 +2121,7 @@ body.debug .map-object > .interactive-hitbox {
   display: flex;
   gap: var(--border-width);
   align-items: center;
+  width: -moz-fit-content;
   width: fit-content;
   left: 50%;
   transform: translate(-50%, -115%);
@@ -2276,7 +2290,9 @@ body.debug .map-object > .interactive-hitbox {
 }
 .interactive-myte.is-dragging {
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   cursor: grab;
   z-index: var(--z-drag) !important;
 }
@@ -2543,7 +2559,9 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.debug {
   z-index: 100;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   width: 100%;
   height: 100%;
   visibility: hidden;
@@ -2553,7 +2571,9 @@ body.debug .map-object > .interactive-hitbox {
   border: 1px solid rgba(255, 0, 0, 0.5);
   pointer-events: none;
   position: absolute;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   z-index: 9999;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .debug-collider.myte-collider {
@@ -2571,7 +2591,9 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.debug .pathfinder-node {
   position: absolute;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .path-line {
   height: 2px;
@@ -2621,7 +2643,9 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.effects {
   z-index: 2;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer > .zone {
   outline: 1px dashed red;
@@ -2700,7 +2724,9 @@ body.debug .map-object > .interactive-hitbox {
   z-index: 1;
   image-rendering: pixelated;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .map-object > .sprite > .front,
 .map-object > .sprite .back {
@@ -2759,7 +2785,9 @@ body[data-tool-mode=drag] .map-object.draggable {
 }
 .map-object.is-dragging {
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   cursor: grabbing;
   z-index: var(--z-drag) !important;
 }
@@ -3158,6 +3186,4 @@ body[data-tool-mode=drag] .map-object.draggable {
   100% {
     transform: scale(0.9);
   }
-}
-
-/*# sourceMappingURL=style.css.map */
+}/*# sourceMappingURL=style.css.map */

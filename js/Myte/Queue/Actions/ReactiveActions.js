@@ -62,7 +62,9 @@ class RunAwayAction extends MyteAction {
     }
 }
 
-// Hide behind an object from something scary — occasionally peeks out
+// Hide behind an object from something scary — occasionally peeks out.
+// Not user-triggered; queued internally by AI when the Myte is scared.
+// Requires options: { hideTarget: MapObject, scaryObject: MapObject|Myte }
 class HideAction extends MyteAction {
     static metadata = {
         id: 'hide',
@@ -81,11 +83,7 @@ class HideAction extends MyteAction {
         }
     };
 
-    static canPerform(selected, active) {
-        return selected &&
-               !(selected instanceof Myte) &&
-               !active?.queue.isCarrying();
-    }
+    static canPerform() { return false; }
 
     constructor(myte, options) {
         super(myte, {
@@ -125,6 +123,64 @@ class HideAction extends MyteAction {
             }
         }
 
+        this.currentDuration--;
+        return this.currentDuration <= 0;
+    }
+}
+
+// Run away from a MapObject (animals, scary objects, etc.)
+class RunFromAction extends MyteAction {
+    static metadata = {
+        id: 'run_from',
+        label: 'Run Away',
+        category: 'reactive',
+        priority: 5,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 3000,
+        description: 'Run away from an object',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: -3,
+        defaultOptions: {
+            panicDistance: 500,
+            runDistance: 300
+        }
+    };
+
+    static canPerform(selected, active) {
+        return selected instanceof MapObject &&
+               selected.getConfig?.('scary', false) === true &&
+               !active?.queue.isCarrying();
+    }
+
+    constructor(myte, options) {
+        super(myte, { ...RunFromAction.metadata.defaultOptions, ...options });
+    }
+
+    update() {
+        const target = this.target;
+        if (!target) return true;
+
+        const dx = target.posX - this.myte.posX;
+        const dy = target.posY - this.myte.posY;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance < this.panicDistance) {
+            const angle = Math.atan2(dy, dx) + Math.PI;
+            const clamped = this.myte.parent.clampEntityPosition(
+                this.myte,
+                this.myte.posX + Math.cos(angle) * this.runDistance,
+                this.myte.posY + Math.sin(angle) * this.runDistance
+            );
+            this.myte.setTarget(clamped.x, clamped.y);
+
+            if (Math.random() < 0.02) {
+                this.myte.queue.addExpression('panic', 200);
+            }
+        }
+
+        this.myte.moveTowardsTarget();
         this.currentDuration--;
         return this.currentDuration <= 0;
     }

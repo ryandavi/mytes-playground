@@ -1,3 +1,5 @@
+// Set to true to re-enable verbose A* validation logs
+const PATHFINDER_VERBOSE = false;
 
 class AStarPathfinder {
     constructor(gridSystem) {
@@ -124,7 +126,7 @@ class AStarPathfinder {
         };
         const entityCapabilities = entity.capabilities || {};
 
-        const effectiveOptions = { ...this.options, ...pathOptions };
+        const effectiveOptions = { ...this.options, ...pathOptions, debug: (this.options.debug || pathOptions?.debug) && PATHFINDER_VERBOSE };
         const cellSize = this.gridSystem.config.cellSize;
 
         // --- Calculate Start Center from Input Top-Left ---
@@ -205,6 +207,34 @@ class AStarPathfinder {
             if (effectiveOptions.debug) { console.error(`End position remains invalid after adjustment attempt.`); }
             return null;
         }
+
+        // --- VALIDATE TARGET GRID CELL ---
+        // The exact-world-coords check above can pass while the grid-snapped version fails.
+        // This happens when a large collider offsetY means the cell's snapped position
+        // (gridY * cellSize) overlaps an obstacle even though the sub-pixel exact position doesn't.
+        // A* validates neighbors using grid-snapped coords, so a cell that fails here is unreachable.
+        if (!this._canEntityFitAt(entity, endGrid.x, endGrid.y, entityWidth, entityHeight, collider, entityCapabilities)) {
+            if (effectiveOptions.debug) {
+                const snappedY = endGrid.y * cellSize;
+                const snappedColliderY = snappedY + collider.offsetY;
+                console.warn(`Target grid cell (${endGrid.x},${endGrid.y}) is unreachable by A* — grid-snapped collider Y=${snappedColliderY.toFixed(0)} differs from exact Y=${(endEntityY + collider.offsetY).toFixed(0)}. Searching for nearest valid cell.`);
+            }
+            const searchRadius = 12;
+            const validEndGrid = this._findNearestValidGridPos(entity, endGrid.x, endGrid.y, searchRadius, entityWidth, entityHeight, collider, entityCapabilities);
+            if (!validEndGrid) {
+                if (effectiveOptions.debug) console.error(`No valid grid cell found near (${endGrid.x},${endGrid.y}).`);
+                return null;
+            }
+            endGrid = validEndGrid;
+            endEntityX = endGrid.x * cellSize;
+            endEntityY = endGrid.y * cellSize;
+            effectiveEndCenterX = endEntityX + (entityWidth / 2);
+            effectiveEndCenterY = endEntityY + (entityHeight / 2);
+            if (effectiveOptions.debug) {
+                console.log(`Adjusted target grid to (${endGrid.x},${endGrid.y}). New center: (${effectiveEndCenterX.toFixed(0)},${effectiveEndCenterY.toFixed(0)})`);
+            }
+        }
+        // --- END VALIDATE TARGET GRID CELL ---
 
 
         // --- OPTIMIZATION: Fast direct path check (use EFFECTIVE end point) ---
@@ -303,11 +333,13 @@ class AStarPathfinder {
             // Goal check against the potentially adjusted endKey
             if (current.key === endKey) {
                 if (effectiveOptions.debug) { console.log(`Path found in ${steps} steps (${(performance.now() - startTime).toFixed(2)}ms)`); }
-                // Pass the EFFECTIVE end center coordinates for path reconstruction
+                // Always pass the TRUE original end center so _reconstructPath forces the
+                // last path point to the exact requested position, even when the A* grid
+                // goal was adjusted to a nearby valid cell (effectiveEnd != originalEnd).
                 const path = this._reconstructPath(
                     entity, cameFrom, current, startGrid, endGrid,
-                    startCenterX, startCenterY, // Original start center
-                    effectiveEndCenterX, effectiveEndCenterY, // Use potentially adjusted end center
+                    startCenterX, startCenterY,
+                    originalEndCenterX, originalEndCenterY,
                     entityWidth, entityHeight, collider, entityCapabilities,
                     effectiveOptions
                 );
@@ -633,7 +665,7 @@ class AStarPathfinder {
      */
     _validatePosition(entity, entityX, entityY, entityWidth, entityHeight, collider, entityCapabilities) {
         // --- Options ---
-        const debug = this.options.debug;
+        const debug = this.options.debug && PATHFINDER_VERBOSE;
         const allowEntityOB = this.options.allowEntityOutOfBounds ?? true; // Default to true
 
         // --- Optional Toggle Logic: Check Entity Bounds First if Required ---

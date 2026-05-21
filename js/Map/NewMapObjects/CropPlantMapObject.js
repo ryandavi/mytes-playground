@@ -125,19 +125,44 @@ class CropPlantMapObject extends GrowingPlantMapObject {
     
     performHarvest(parent, myte) {
         const harvest = this.harvest();
-        const inventory = this.gameMap?.inventory || parent?.inventory;
+        if (!harvest) return false;
 
-        if (harvest && inventory) {
-            this.playConfiguredSound?.('harvest');
-            inventory.addItem(harvest.variant, harvest.quantity, harvest.type);
-            
-            // Boost myte mood
-            myte.stats.updateMood(5);
-            
-            // Play harvest animation on myte
-            myte.queue.addExpression('happy');
-        }
+        this.playConfiguredSound?.('harvest');
+        this._spawnHarvestedItem(harvest, parent);
+        myte?.stats?.updateMood?.(5);
         return true;
+    }
+
+    _spawnHarvestedItem(harvest, parent) {
+        const foregroundLayer = this.gameMap?.layers?.objects || parent?.canvas?.querySelector('.layer.foreground');
+        if (!foregroundLayer) return;
+
+        const spawnX = this.posX + this.size.width / 2;
+        const spawnY = this.posY + this.size.height / 2;
+
+        const dropped = new DroppedMapItem(
+            this.gameMap,
+            harvest.type,
+            harvest.variant,
+            spawnX,
+            spawnY
+        );
+        dropped.quantity = harvest.quantity;
+        dropped.inventoryVariant = harvest.variant;
+        dropped.inventoryType = harvest.type;
+        dropped.inventoryName = harvest.variant;
+
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * (Math.PI / 3);
+        dropped.velocityX = Math.cos(angle) * 4;
+        dropped.velocityY = Math.sin(angle) * 4;
+        dropped.velocityZ = 4 + Math.random() * 2;
+
+        if (dropped.shadowElement) foregroundLayer.appendChild(dropped.shadowElement);
+        foregroundLayer.appendChild(dropped.element);
+
+        if (!this.gameMap?.droppedItems?.includes(dropped)) {
+            this.gameMap?.droppedItems?.push(dropped);
+        }
     }
 
     render(container, parent) {

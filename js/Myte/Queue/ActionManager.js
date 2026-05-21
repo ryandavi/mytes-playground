@@ -95,6 +95,9 @@ ActionManager.registerActions([
     RunLapsAction,
     CircleAction,
     ZigzagAction,
+    PatrolAction,
+    WanderAction,
+    GuardAction,
     JumpAction,
     GoToObjectAction,
 
@@ -112,6 +115,9 @@ ActionManager.registerActions([
     NudgeBallAction,
     EatElementAction,
     OpenChestAction,
+    CloseChestAction,
+    PickFlowerAction,
+    TrampleFlowerAction,
     SmellFlowerAction,
     DrinkFromFountainAction,
     WaterPlantAction,
@@ -122,6 +128,8 @@ ActionManager.registerActions([
     GreetAction,
     GreetReceiveAction,
     WatchAction,
+    ChaseAction,
+    EmoteAtAction,
     PlayTagAction,
     PlayFetchAction,
 
@@ -133,8 +141,10 @@ ActionManager.registerActions([
     PickupItemAction,
     HoldItemAction,
     DropItemAction,
+    GiveItemAction,
 
     // Reactive
     RunAwayAction,
+    RunFromAction,
     HideAction,
 ]);

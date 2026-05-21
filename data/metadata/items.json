@@ -64,6 +64,46 @@
 			"name": "Berry",
 			"type": "crop",
 			"description": "A sweet berry harvest."
+		},
+		{
+			"id": "grass_1",
+			"name": "Flower",
+			"type": "flower",
+			"aliases": ["flower"],
+			"description": "A small wild flower."
+		},
+		{
+			"id": "grass_2",
+			"name": "Flower",
+			"type": "flower",
+			"description": "A small wild flower."
+		},
+		{
+			"id": "grass_3",
+			"name": "Flower",
+			"type": "flower",
+			"description": "A small wild flower."
+		},
+		{
+			"id": "flower_red",
+			"name": "Red Flower",
+			"type": "flower",
+			"aliases": ["red_flower"],
+			"description": "A vivid red flower."
+		},
+		{
+			"id": "flower_yellow",
+			"name": "Yellow Flower",
+			"type": "flower",
+			"aliases": ["yellow_flower"],
+			"description": "A bright yellow flower."
+		},
+		{
+			"id": "flower_blue",
+			"name": "Blue Flower",
+			"type": "flower",
+			"aliases": ["blue_flower"],
+			"description": "A delicate blue flower."
 		}
 	]
 }

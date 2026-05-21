@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="11" nextobjectid="114">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="11" nextobjectid="118">
  <properties>
   <property name="description" value="A cozy place for your Mytes"/>
   <property name="displayName" value="Your Home"/>
@@ -219,6 +219,26 @@
 {FOOD, apple},
 {HEALTH, 10}</property>
     <property name="variant" value="wooden_chest"/>
+   </properties>
+  </object>
+  <object id="114" name="Crop" x="64" y="608" width="64" height="128">
+   <properties>
+    <property name="variant" value="tomato"/>
+   </properties>
+  </object>
+  <object id="115" name="Crop" x="128" y="608" width="64" height="128">
+   <properties>
+    <property name="variant" value="carrot"/>
+   </properties>
+  </object>
+  <object id="116" name="Crop" x="192" y="608" width="64" height="128">
+   <properties>
+    <property name="variant" value="wheat"/>
+   </properties>
+  </object>
+  <object id="117" name="Crop" x="256" y="608" width="64" height="128">
+   <properties>
+    <property name="variant" value="berry"/>
    </properties>
   </object>
  </objectgroup>

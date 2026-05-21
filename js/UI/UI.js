@@ -742,6 +742,7 @@ class ActionSidebarManager extends UIComponent {
         this.infoRefreshInterval = 250;
         this._otherInfoCache = null;
         this._otherInfoRowMap = new Map();
+        this._lastAvailableActionsKey = null;
     }
 
     // Helper method to get category titles
@@ -773,8 +774,17 @@ class ActionSidebarManager extends UIComponent {
     createActionButton(action, selectedObject, activeMyte, { prominent = false } = {}) {
         const button = document.createElement('button');
         button.textContent = action.label;
+        const isBusy = activeMyte?.queue?.count() > 0;
+        const titleParts = [];
         if (action.description) {
-            button.title = action.description;
+            titleParts.push(action.description);
+        }
+        if (isBusy) {
+            button.disabled = true;
+            titleParts.push('Busy with current action');
+        }
+        if (titleParts.length) {
+            button.title = titleParts.join('\n');
         }
         if (prominent) {
             button.classList.add('primary-action');
@@ -828,6 +838,13 @@ class ActionSidebarManager extends UIComponent {
             return;
         }
 
+        const activeMyte = this.parent.getActiveMyte();
+        const availableKey = this._buildAvailableActionsKey(this.currentSelectedObject, activeMyte);
+        if (availableKey !== this._lastAvailableActionsKey) {
+            this._lastAvailableActionsKey = availableKey;
+            this.updateActionList(this.currentSelectedObject);
+        }
+
         const now = performance.now();
         if (now - this.lastInfoRefreshAt < this.infoRefreshInterval) {
             return;
@@ -835,6 +852,15 @@ class ActionSidebarManager extends UIComponent {
 
         this.lastInfoRefreshAt = now;
         this.renderOtherInfo(this.currentSelectedObject);
+    }
+
+    _buildAvailableActionsKey(selectedObject, activeMyte) {
+        if (!selectedObject) return '';
+        const availableActions = ActionManager.getAvailableActions(selectedObject, activeMyte);
+        const currentActionId = activeMyte?.queue?.getCurrentAction()?.constructor?.metadata?.id ?? '';
+        const busyCount = activeMyte?.queue?.count() ?? 0;
+        const subjectId = selectedObject?.id ?? selectedObject?.constructor?.name ?? 'selected';
+        return `${subjectId}|busy=${busyCount}|current=${currentActionId}|actions=${availableActions.map(a => a.id).join(',')}`;
     }
 
     appendInfoRow(container, label, value, className = 'state-info') {
@@ -904,6 +930,35 @@ class ActionSidebarManager extends UIComponent {
                 if (snapshot.lastDecisionLabel) {
                     rows.push({ label: 'Last AI Choice', value: snapshot.lastDecisionLabel });
                 }
+            }
+        }
+
+        if (selectedObject instanceof MapObject) {
+            const interactionType = selectedObject.getConfig?.('interactionType');
+            const deflowered = selectedObject.getConfig?.('deflowered', false);
+            if (interactionType) {
+                rows.push({ label: 'Interaction', value: interactionType });
+            }
+            if (deflowered) {
+                rows.push({ label: 'Flower', value: 'Deflowered' });
+            }
+            if (typeof selectedObject.isReadyToHarvest === 'function') {
+                rows.push({ label: 'Harvest Ready', value: selectedObject.isReadyToHarvest() ? 'Yes' : 'No' });
+            }
+            if (selectedObject.growthStage != null) {
+                rows.push({ label: 'Growth Stage', value: selectedObject.growthStage });
+            }
+            if (selectedObject.isWatered != null) {
+                rows.push({ label: 'Watered', value: selectedObject.isWatered ? 'Yes' : 'No' });
+            }
+            if (selectedObject.fullyGrown != null) {
+                rows.push({ label: 'Fully Grown', value: selectedObject.fullyGrown ? 'Yes' : 'No' });
+            }
+            if (selectedObject.constructor?.name === 'CropPlantMapObject') {
+                rows.push({ label: 'Crop Quality', value: selectedObject.quality ?? 'N/A' });
+            }
+            if (typeof selectedObject.isActive === 'boolean') {
+                rows.push({ label: 'Active', value: selectedObject.isActive ? 'Yes' : 'No' });
             }
         }
 
@@ -998,6 +1053,7 @@ class ActionSidebarManager extends UIComponent {
         this.lastInfoRefreshAt = 0;
         this._otherInfoCache = null;
         this._otherInfoRowMap.clear();
+        this._lastAvailableActionsKey = null;
 
 
         // Remove all state classes first

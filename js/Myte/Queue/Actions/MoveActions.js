@@ -1,3 +1,11 @@
+// Set to true to re-enable verbose pathfinding diagnostics
+const APPROACH_DEBUG = true;
+const ASTAR_DEBUG = false;
+const _alog  = APPROACH_DEBUG ? console.log.bind(console)  : () => {};
+const _awarn = APPROACH_DEBUG ? console.warn.bind(console) : () => {};
+const _slog  = ASTAR_DEBUG    ? console.log.bind(console)  : () => {};
+const _swarn = ASTAR_DEBUG    ? console.warn.bind(console) : () => {};
+
 // Direct movement to coordinates with optional A* pathfinding
 class MoveAction extends MyteAction {
     static metadata = {
@@ -172,20 +180,20 @@ class AStarMoveAction extends MyteAction {
         this._actionComplete = false;
 
         if (!this.myte?.pathfinder) {
-            console.warn(`[ASTAR] start: no pathfinder — completing immediately`);
+            _swarn(`[ASTAR] start: no pathfinder — completing immediately`);
             this._actionComplete = true;
             return;
         }
 
         const target = this.getTargetPosition();
         if (!target) {
-            console.warn(`[ASTAR] start: could not resolve target position from`, this.target, `— completing immediately`);
+            _swarn(`[ASTAR] start: could not resolve target position from`, this.target, `— completing immediately`);
             console.trace('[ASTAR] null target call stack');
             this._actionComplete = true;
             return;
         }
 
-        console.log(`[ASTAR] start: from=(${this.myte.posX.toFixed(1)},${this.myte.posY.toFixed(1)}) to=(${target.x.toFixed(1)},${target.y.toFixed(1)})`);
+        _slog(`[ASTAR] start: from=(${this.myte.posX.toFixed(1)},${this.myte.posY.toFixed(1)}) to=(${target.x.toFixed(1)},${target.y.toFixed(1)})`);
         this._finalTarget = target;
         this._buildPath(this.myte.posX, this.myte.posY, target);
     }
@@ -200,7 +208,7 @@ class AStarMoveAction extends MyteAction {
 
         if (!path?.length) {
             this.clearDebugPath();
-            console.warn(`[ASTAR] _buildPath: pathfinder returned no path from=(${fromX.toFixed(1)},${fromY.toFixed(1)}) to=(${to.x.toFixed(1)},${to.y.toFixed(1)}) — completing`);
+            _swarn(`[ASTAR] _buildPath: pathfinder returned no path from=(${fromX.toFixed(1)},${fromY.toFixed(1)}) to=(${to.x.toFixed(1)},${to.y.toFixed(1)}) — completing`);
             this._actionComplete = true;
             return;
         }
@@ -216,26 +224,26 @@ class AStarMoveAction extends MyteAction {
         if (this.targetPoints.length > 0 &&
             Math.abs((this.targetPoints[0].x + myte.size.width  / 2) - cx) < 1 &&
             Math.abs((this.targetPoints[0].y + myte.size.height / 2) - cy) < 1) {
-            console.log(`[ASTAR] _buildPath: dropped first waypoint (already there)`);
+            _slog(`[ASTAR] _buildPath: dropped first waypoint (already there)`);
             this.targetPoints.shift();
         }
 
         if (this.targetPoints.length === 0) {
             this.clearDebugPath();
-            console.warn(`[ASTAR] _buildPath: targetPoints empty after filtering — completing`);
+            _swarn(`[ASTAR] _buildPath: targetPoints empty after filtering — completing`);
             this._actionComplete = true;
             return;
         }
 
-        console.log(`[ASTAR] _buildPath: ${path.length} raw pts → ${this.targetPoints.length} waypoints. First=(${this.targetPoints[0].x.toFixed(1)},${this.targetPoints[0].y.toFixed(1)}) Last=(${this.targetPoints[this.targetPoints.length-1].x.toFixed(1)},${this.targetPoints[this.targetPoints.length-1].y.toFixed(1)})`);
+        _slog(`[ASTAR] _buildPath: ${path.length} raw pts → ${this.targetPoints.length} waypoints. First=(${this.targetPoints[0].x.toFixed(1)},${this.targetPoints[0].y.toFixed(1)}) Last=(${this.targetPoints[this.targetPoints.length-1].x.toFixed(1)},${this.targetPoints[this.targetPoints.length-1].y.toFixed(1)})`);
         this.currentTargetIndex = 0;
         myte.setTarget(this.targetPoints[0].x, this.targetPoints[0].y);
     }
 
     update() {
         if (this._actionComplete) return true;
-        if (!this.myte?.isActive) { console.warn(`[ASTAR] update: myte inactive — completing`); return true; }
-        if (!this.targetPoints?.length) { console.warn(`[ASTAR] update: no targetPoints — completing`); return true; }
+        if (!this.myte?.isActive) { _swarn(`[ASTAR] update: myte inactive — completing`); return true; }
+        if (!this.targetPoints?.length) { _swarn(`[ASTAR] update: no targetPoints — completing`); return true; }
 
         if (this.myte.isAtTarget()) {
             this._stuckCount = 0;
@@ -301,16 +309,26 @@ class AStarMoveAction extends MyteAction {
 // Full approach config schema:
 // {
 //   allowedSides: 'any'              — all four cardinal sides (default)
-//              | string[]            — only these sides, e.g. ['left', 'right']
+//              | string[]            — only these sides, e.g. ['bottom'] for front-only
 //              | { exclude: string[] } — all except listed
 //              | 'front'            — resolved at runtime from target.facingDirection
 //   preferredSide: null | string     — tried first if set; others used as fallback
-//   gap: number                      — px from target edge. + = clear space, - = overlap
+//   gap: number                      — px between the two aligned edges. + = clear space, - = overlap
 //   align: string                    — cross-axis alignment for the approach side:
 //                                      left/right → 'top-edge' | 'center' | 'bottom-edge'
 //                                      top/bottom → 'left-edge' | 'center' | 'right-edge'
-//   alignTo: 'sprite' | 'collider'  — which target rect to use for positioning
+//   alignTo: 'sprite' | 'collider'  — which rect of the TARGET defines the approach boundary
+//   myteAlignTo: 'sprite'|'collider'— which rect of the MYTE touches that boundary
+//                                      'sprite'   → myte's sprite edge aligns to target boundary
+//                                      'collider' → myte's collider edge aligns to target boundary
+//                                      omit → defaults to 'sprite'
 // }
+//
+// For edge-to-edge collider contact (e.g. chest front approach):
+//   alignTo: 'collider', myteAlignTo: 'collider', gap: 0
+// If myteAlignTo is omitted when alignTo:'collider', the myte's sprite top lands at the
+// target's collider edge — the myte's actual collider (lower in the sprite) will overlap
+// the target, causing the pathfinder to snap to a grid cell further away.
 //
 // Objects declare their approach config via:
 //   getApproachConfig() → a string key below, or a partial/full config object
@@ -351,6 +369,7 @@ class GoToObjectAction extends PositionableAction {
     _lastPos = null;
     _lastTargetSnapshot = null;
     _lastTargetReplanAt = 0;
+    _replanCount = 0;
 
     constructor(myte, options) {
         super(myte, { ...GoToObjectAction.metadata.defaultOptions, ...options });
@@ -412,28 +431,33 @@ class GoToObjectAction extends PositionableAction {
 
     // Merge a string key or partial config object into a full ApproachConfig.
     _normalizeConfig(raw) {
-        if (typeof raw === 'string') {
-            return { ...APPROACH_CONFIGS[raw] ?? APPROACH_CONFIGS.side };
+        const config = typeof raw === 'string'
+            ? { ...APPROACH_CONFIGS[raw] ?? APPROACH_CONFIGS.side }
+            : { ...APPROACH_CONFIGS.side, ...raw };
+
+        if (config.alignTo === 'collider' && config.myteAlignTo == null) {
+            config.myteAlignTo = 'collider';
         }
-        return { ...APPROACH_CONFIGS.side, ...raw };
+
+        return config;
     }
 
     // Priority: action-level override → target.getApproachConfig() → target.getApproachMode() → 'side'
     _resolveApproachConfig() {
         if (this.approachConfig != null) {
             const cfg = this._normalizeConfig(this.approachConfig);
-            console.log(`[APPROACH] config source=action-override`, cfg);
+            _alog(`[APPROACH] config source=action-override`, cfg);
             return cfg;
         }
         const targetCfg = this.target?.getApproachConfig?.();
         if (targetCfg != null) {
             const cfg = this._normalizeConfig(targetCfg);
-            console.log(`[APPROACH] config source=getApproachConfig raw=`, targetCfg, `resolved=`, cfg);
+            _alog(`[APPROACH] config source=getApproachConfig raw=`, targetCfg, `resolved=`, cfg);
             return cfg;
         }
         const mode = this.target?.getApproachMode?.() ?? 'side';
         const cfg = { ...APPROACH_CONFIGS[mode] ?? APPROACH_CONFIGS.side };
-        console.log(`[APPROACH] config source=getApproachMode mode="${mode}"`, cfg);
+        _alog(`[APPROACH] config source=getApproachMode mode="${mode}"`, cfg);
         return cfg;
     }
 
@@ -520,14 +544,14 @@ class GoToObjectAction extends PositionableAction {
         const spriteRect = this.getTargetRect(this.target, 'sprite');
 
         if (!targetRect) {
-            console.warn(`[APPROACH] buildApproachPlan: no targetRect — alignTo="${cfg.alignTo}" target=`, this.target);
+            _awarn(`[APPROACH] buildApproachPlan: no targetRect — alignTo="${cfg.alignTo}" target=`, this.target);
             this.targetPos = null;
             this.targetPoints = null;
             return;
         }
 
         const myteApproachRect = this.getMyteApproachRect(cfg.myteAlignTo);
-        console.log(`[APPROACH] buildApproachPlan target="${this.target?.constructor?.name ?? this.target?.id}" alignTo="${cfg.alignTo}" myteAlignTo="${cfg.myteAlignTo ?? 'sprite'}" targetRect=`, {...targetRect}, `myteApproachRect=`, {...myteApproachRect}, `mytePos=(${this.myte.posX.toFixed(1)},${this.myte.posY.toFixed(1)})`);
+        _alog(`[APPROACH] buildApproachPlan target="${this.target?.constructor?.name ?? this.target?.id}" alignTo="${cfg.alignTo}" myteAlignTo="${cfg.myteAlignTo ?? 'sprite'}" targetRect=`, {...targetRect}, `myteApproachRect=`, {...myteApproachRect}, `mytePos=(${this.myte.posX.toFixed(1)},${this.myte.posY.toFixed(1)})`);
 
         this.targetCenter = {
             x: spriteRect.x + spriteRect.width  / 2,
@@ -535,11 +559,11 @@ class GoToObjectAction extends PositionableAction {
         };
 
         const candidates = this.getCandidatePositions(targetRect, myteApproachRect, cfg);
-        console.log(`[APPROACH] candidates (${candidates.length}):`, candidates.map((c, i) => `[${i}] (${c.x.toFixed(1)},${c.y.toFixed(1)})`).join('  '));
+        _alog(`[APPROACH] candidates (${candidates.length}):`, candidates.map((c, i) => `[${i}] (${c.x.toFixed(1)},${c.y.toFixed(1)})`).join('  '));
         const bestPath   = this.findBestPath(candidates);
 
         if (bestPath) {
-            console.log(`[APPROACH] bestPath → targetPos=(${bestPath.targetPos.x.toFixed(1)},${bestPath.targetPos.y.toFixed(1)}) score=${bestPath.score.toFixed(1)} waypoints=${bestPath.targetPoints.length}`);
+            _alog(`[APPROACH] bestPath → targetPos=(${bestPath.targetPos.x.toFixed(1)},${bestPath.targetPos.y.toFixed(1)}) score=${bestPath.score.toFixed(1)} waypoints=${bestPath.targetPoints.length}`);
             this.targetPos    = bestPath.targetPos;
             this.targetPoints = bestPath.targetPoints;
             this.refreshDebugVisualization();
@@ -550,7 +574,7 @@ class GoToObjectAction extends PositionableAction {
             x: this.targetCenter.x - (this.myte.size.width / 2),
             y: this.targetCenter.y - (this.myte.size.height / 2)
         };
-        console.log(`[APPROACH] no path found — falling back to candidate[0] targetPos=(${this.targetPos.x.toFixed(1)},${this.targetPos.y.toFixed(1)})`);
+        _alog(`[APPROACH] no path found — falling back to candidate[0] targetPos=(${this.targetPos.x.toFixed(1)},${this.targetPos.y.toFixed(1)})`);
         this.targetPoints = null;
         this.clearDebugPath();
     }
@@ -584,7 +608,7 @@ class GoToObjectAction extends PositionableAction {
         const candidates = [];
         const myteSpriteRect = this.myte.getRect();
 
-        console.log(`[APPROACH] sides order: [${sides.join(', ')}]`);
+        _alog(`[APPROACH] sides order: [${sides.join(', ')}]`);
         for (const side of sides) {
             const rawCollider = this.calculatePosition(myteRect, targetRect, side, posOpts);
             const raw = {
@@ -594,7 +618,7 @@ class GoToObjectAction extends PositionableAction {
             const clamped  = this.adjustPositionToBounds(raw, myteSpriteRect);
             const key      = `${Math.round(clamped.x)},${Math.round(clamped.y)}`;
             const dup = seen.has(key);
-            console.log(`[APPROACH]   side=${side} rawCollider=(${rawCollider.x.toFixed(1)},${rawCollider.y.toFixed(1)}) rawMyte=(${raw.x.toFixed(1)},${raw.y.toFixed(1)}) clamped=(${clamped.x.toFixed(1)},${clamped.y.toFixed(1)})${dup ? ' [DUPLICATE - skipped]' : ''}`);
+            _alog(`[APPROACH]   side=${side} rawCollider=(${rawCollider.x.toFixed(1)},${rawCollider.y.toFixed(1)}) rawMyte=(${raw.x.toFixed(1)},${raw.y.toFixed(1)}) clamped=(${clamped.x.toFixed(1)},${clamped.y.toFixed(1)})${dup ? ' [DUPLICATE - skipped]' : ''}`);
             if (dup) continue;
             seen.add(key);
             candidates.push(clamped);
@@ -605,11 +629,11 @@ class GoToObjectAction extends PositionableAction {
 
     findBestPath(candidates) {
         if (!this.myte?.pathfinder) {
-            console.warn(`[APPROACH] findBestPath: no pathfinder on myte`);
+            _awarn(`[APPROACH] findBestPath: no pathfinder on myte`);
             return null;
         }
         if (!candidates.length) {
-            console.warn(`[APPROACH] findBestPath: no candidates`);
+            _awarn(`[APPROACH] findBestPath: no candidates`);
             return null;
         }
 
@@ -619,10 +643,17 @@ class GoToObjectAction extends PositionableAction {
             const candidate = candidates[i];
             const endCX = candidate.x + (this.myte.size.width  / 2);
             const endCY = candidate.y + (this.myte.size.height / 2);
+            const col = this.myte.collider;
+            const cellSize = this.myte.pathfinder?.gridSystem?.config?.cellSize ?? 32;
+            const endGridX = Math.floor(candidate.x / cellSize);
+            const endGridY = Math.floor(candidate.y / cellSize);
+            const snappedColliderY = endGridY * cellSize + (col?.offsetY ?? 0);
+            const exactColliderY   = candidate.y   + (col?.offsetY ?? 0);
+            _alog(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) endGrid=(${endGridX},${endGridY}) snappedColliderY=${snappedColliderY.toFixed(0)} exactColliderY=${exactColliderY.toFixed(0)}`);
             const path  = this.myte.pathfinder.findPath(this.myte, this.myte.posX, this.myte.posY, endCX, endCY);
 
             if (!path?.length) {
-                console.log(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) → no path`);
+                _alog(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) → no path`);
                 continue;
             }
 
@@ -638,7 +669,7 @@ class GoToObjectAction extends PositionableAction {
                 });
 
             const score = this.getPathScore(targetPoints);
-            console.log(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) → path ok rawPts=${path.length} filteredPts=${targetPoints.length} score=${score.toFixed(1)}${(!bestPath || score < bestPath.score) ? ' ← best so far' : ''}`);
+            _alog(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) → path ok rawPts=${path.length} filteredPts=${targetPoints.length} score=${score.toFixed(1)}${(!bestPath || score < bestPath.score) ? ' ← best so far' : ''}`);
             if (!bestPath || score < bestPath.score) {
                 bestPath = { targetPos: candidate, targetPoints, score };
             }
@@ -722,9 +753,10 @@ class GoToObjectAction extends PositionableAction {
             this.buildApproachPlan();
             this._lastTargetSnapshot = this._captureTargetSnapshot();
             this._lastTargetReplanAt = now;
+            this._progressWindow = null;
         }
 
-        // Stuck detection
+        // Per-frame stuck detection (true stillness)
         if (!this._lastPos) this._lastPos = { x: this.myte.posX, y: this.myte.posY };
         const moved = Math.hypot(this.myte.posX - this._lastPos.x, this.myte.posY - this._lastPos.y);
         this._lastPos = { x: this.myte.posX, y: this.myte.posY };
@@ -737,15 +769,58 @@ class GoToObjectAction extends PositionableAction {
                 return true;
             }
             this._stuckFrames = 0;
+            this._progressWindow = null;
             this.currentTargetIndex = 0;
+            this._replanCount++;
+            if (this._replanCount >= (this.maxReplanAttempts ?? 6)) {
+                this.faceTarget();
+                this.clearDebugPath();
+                return true;
+            }
             this.buildApproachPlan();
             this._lastTargetSnapshot = this._captureTargetSnapshot();
             this._lastTargetReplanAt = performance.now();
             if (!this.targetPos && !this.targetPoints) return true;
         }
 
+        // Oscillation detection: check net displacement over a 60-frame window.
+        // Catches the case where the myte is bouncing against a collider and
+        // moved > 0.1 every frame (so _stuckFrames never accumulates).
+        if (!this._progressWindow) {
+            this._progressWindow = { startX: this.myte.posX, startY: this.myte.posY, frames: 0 };
+        }
+        this._progressWindow.frames++;
+        if (this._progressWindow.frames >= 60) {
+            const netDisp = Math.hypot(
+                this.myte.posX - this._progressWindow.startX,
+                this.myte.posY - this._progressWindow.startY
+            );
+            this._progressWindow = { startX: this.myte.posX, startY: this.myte.posY, frames: 0 };
+            if (netDisp < 5) {
+                const colliderGap = this.getTargetColliderGap();
+                if (this.allowStuckSuccess !== false && colliderGap <= this.getEffectiveStuckCompletionDistance()) {
+                    this.faceTarget();
+                    this.clearDebugPath();
+                    return true;
+                }
+                this._stuckFrames = 0;
+                this.currentTargetIndex = 0;
+                this._replanCount++;
+                if (this._replanCount >= (this.maxReplanAttempts ?? 6)) {
+                    this.faceTarget();
+                    this.clearDebugPath();
+                    return true;
+                }
+                this.buildApproachPlan();
+                this._lastTargetSnapshot = this._captureTargetSnapshot();
+                this._lastTargetReplanAt = performance.now();
+                if (!this.targetPos && !this.targetPoints) return true;
+            }
+        }
+
         if (this.targetPoints?.length) {
             if (this.myte.isAtTarget()) {
+                this._replanCount = 0;
                 this.currentTargetIndex++;
                 if (this.currentTargetIndex >= this.targetPoints.length) {
                     this.targetPoints = null;
@@ -773,6 +848,12 @@ class GoToObjectAction extends PositionableAction {
         if (this.myte.isAtTarget()) {
             const withinInteractionThreshold = this.hasReachedInteractionThreshold();
             if (withinInteractionThreshold === false) {
+                this._replanCount++;
+                if (this._replanCount >= (this.maxReplanAttempts ?? 6)) {
+                    this.faceTarget();
+                    this.clearDebugPath();
+                    return true;
+                }
                 this.buildApproachPlan();
                 this._lastTargetSnapshot = this._captureTargetSnapshot();
                 this._lastTargetReplanAt = performance.now();
@@ -956,7 +1037,8 @@ class PatternMovementAction extends PositionableAction {
     }
 }
 
-// Follow another Myte or MapObject continuously
+// Follow another Myte or a MapObject that has followable:true in its config.
+// Trails behind the target's facing direction with a gap, replanning when the target moves.
 class FollowObjectAction extends PositionableAction {
     static metadata = {
         id: 'follow_object',
@@ -966,45 +1048,66 @@ class FollowObjectAction extends PositionableAction {
         isMovementAction: true,
         isInterruptible: true,
         defaultDuration: -1,
-        description: 'Follow another object or Myte',
+        description: 'Follow another Myte or creature',
         requiresTarget: true,
         affectsMood: false,
         defaultOptions: {
-            gap: -5,
-            align: 'bottom-edge'
+            trailGap: 28,
+            minFollowDistance: 8,
+            replanThreshold: 12
         }
     };
 
     static canPerform(selected, active) {
-        const isFollowable = selected instanceof Myte || selected instanceof MapObject;
-        return active && selected && selected !== active && isFollowable && !active?.queue.isCarrying();
+        const isFollowable = selected instanceof Myte ||
+            (selected instanceof MapObject && selected.getConfig?.('followable', false));
+        return active && selected !== active && isFollowable && !active?.queue.isCarrying();
     }
 
     constructor(myte, options) {
         super(myte, { ...FollowObjectAction.metadata.defaultOptions, ...options });
+        this._trailPos = null;
+        this._lastTargetPos = null;
+    }
+
+    // Opposite of target's facing direction — stand here to trail behind them
+    _getTrailSide() {
+        if (!(this.target instanceof Myte)) return 'bottom';
+        const opposite = { N: 'bottom', S: 'top', E: 'left', W: 'right' };
+        return opposite[this.target.direction] ?? 'bottom';
+    }
+
+    _recomputeTrailPos() {
+        const targetRect = this.getRect(this.target);
+        const myteRect   = this.myte.getRect();
+        return this.calculatePosition(myteRect, targetRect, this._getTrailSide(), {
+            gap: this.trailGap,
+            align: 'center'
+        });
     }
 
     update() {
         if (!this.target) return true;
 
-        const targetRect  = this.getRect(this.target);
-        const myteRect    = this.myte.getRect();
-        const posOpts     = { gap: this.gap, align: this.align };
+        const targetMoved = !this._lastTargetPos ||
+            Math.hypot(
+                this.target.posX - this._lastTargetPos.x,
+                this.target.posY - this._lastTargetPos.y
+            ) >= this.replanThreshold;
 
-        let horizontal = this.getClosestSideHorizontal(targetRect, myteRect);
-        let rawTargetPos = this.calculatePosition(myteRect, targetRect, horizontal, posOpts);
-        let targetPos = this.adjustPositionToBounds(rawTargetPos, myteRect);
-
-        if (Math.abs(targetPos.x - rawTargetPos.x) > 0.01) {
-            horizontal = rawTargetPos.x < targetPos.x ? 'right' : 'left';
-            rawTargetPos = this.calculatePosition(myteRect, targetRect, horizontal, posOpts);
-            targetPos = this.adjustPositionToBounds(rawTargetPos, myteRect);
+        if (targetMoved || !this._trailPos) {
+            this._trailPos = this._recomputeTrailPos();
+            this._lastTargetPos = { x: this.target.posX, y: this.target.posY };
         }
 
-        this.myte.setTarget(targetPos.x, targetPos.y);
+        const dist = Math.hypot(
+            this.myte.posX - this._trailPos.x,
+            this.myte.posY - this._trailPos.y
+        );
+        if (dist <= this.minFollowDistance) return false;
 
+        this.myte.setTarget(this._trailPos.x, this._trailPos.y);
         this.myte.moveTowardsTarget();
-
         return false;
     }
 }
@@ -1044,9 +1147,16 @@ class RunLapsAction extends PatternMovementAction {
 
     start() {
         super.start();
+        this._totalLaps = this.repeat;
         this.currentTargetIndex = 0;
         this.myte.reset();
         this.buildLapTargets();
+    }
+
+    getProgress() {
+        if (!this._totalLaps || !this.targetPoints?.length) return 0;
+        const done = (this._totalLaps - this.repeat) + (this.currentTargetIndex / this.targetPoints.length);
+        return Math.min(1, done / this._totalLaps);
     }
 
     buildLapTargets() {
@@ -1114,7 +1224,8 @@ class RunLapsAction extends PatternMovementAction {
     }
 }
 
-// Move in a circular pattern
+// Move in a circular pattern using discrete waypoints (like RunLapsAction).
+// Pre-generates numPoints evenly-spaced positions around the circle and walks through them.
 class CircleAction extends PatternMovementAction {
     static metadata = {
         id: 'circle',
@@ -1123,19 +1234,21 @@ class CircleAction extends PatternMovementAction {
         priority: 3,
         isMovementAction: true,
         isInterruptible: true,
-        defaultDuration: 3000,
+        defaultDuration: 0,
         description: 'Move in a circular pattern',
         requiresTarget: false,
         affectsMood: true,
         moodEffect: 3,
         defaultOptions: {
             radius: 50,
-            speed: 0.01,
+            numPoints: 8,
+            repeat: 2,
+            clockwise: true,
             centerX: null,
             centerY: null,
             safeTargetRadius: 12,
-            stuckThresholdFrames: 32,
-            maxPatternRecoveries: 5
+            stuckThresholdFrames: 42,
+            maxPatternRecoveries: 4
         }
     };
 
@@ -1148,53 +1261,82 @@ class CircleAction extends PatternMovementAction {
             ...CircleAction.metadata.defaultOptions,
             centerX: options.centerX ?? myte.posX,
             centerY: options.centerY ?? myte.posY,
-            duration: CircleAction.metadata.defaultDuration,
             ...options
         });
-        this.angle = 0;
+        this.waypoints = [];
+        this.waypointIndex = 0;
     }
 
     start() {
         super.start();
-        const safeCenter = this.resolvePatternTarget(this.centerX, this.centerY, Math.max(this.safeTargetRadius ?? 12, 12));
-        if (safeCenter) {
-            this.centerX = safeCenter.x;
-            this.centerY = safeCenter.y;
+        this._totalLaps = this.repeat;
+        this.waypointIndex = 0;
+        this._buildWaypoints();
+    }
+
+    getProgress() {
+        if (!this._totalLaps || !this.waypoints?.length) return 0;
+        const done = (this._totalLaps - this.repeat) + (this.waypointIndex / this.waypoints.length);
+        return Math.min(1, done / this._totalLaps);
+    }
+
+    _buildWaypoints() {
+        const n   = this.numPoints ?? 8;
+        const dir = this.clockwise ? 1 : -1;
+        const candidates = [];
+        for (let i = 0; i < n; i++) {
+            const angle = dir * (i / n) * Math.PI * 2;
+            candidates.push({
+                x: this.centerX + Math.cos(angle) * this.radius,
+                y: this.centerY + Math.sin(angle) * this.radius
+            });
         }
+        const resolved = this.getResolvedPatternCandidates(candidates, {
+            maxRadius: Math.max(this.safeTargetRadius ?? 12, Math.round(this.radius * 0.5))
+        });
+        this.waypoints = resolved.length >= 3 ? resolved : candidates;
+
+        // Start from the waypoint closest to the Myte's current position
+        let closestIdx = 0, closestDist = Infinity;
+        for (let i = 0; i < this.waypoints.length; i++) {
+            const d = Math.hypot(this.waypoints[i].x - this.myte.posX, this.waypoints[i].y - this.myte.posY);
+            if (d < closestDist) { closestDist = d; closestIdx = i; }
+        }
+        this.waypointIndex = closestIdx;
+        this.myte.setTarget(this.waypoints[this.waypointIndex].x, this.waypoints[this.waypointIndex].y);
     }
 
     recoverFromStuck(recoveryCount) {
         this.centerX = this.myte.posX;
         this.centerY = this.myte.posY;
-        this.radius = Math.max(Math.round(this.radius * 0.78), 18);
-        if (recoveryCount % 2 === 0) {
-            this.speed *= -1;
-        }
-
-        const targetX = this.centerX + Math.cos(this.angle + this.speed) * this.radius;
-        const targetY = this.centerY + Math.sin(this.angle + this.speed) * this.radius;
-        return this.setPatternTarget(targetX, targetY, {
-            maxRadius: Math.max(this.safeTargetRadius ?? 12, Math.round(this.radius * 0.8))
-        });
+        this.radius  = Math.max(Math.round(this.radius * 0.78), 18);
+        if (recoveryCount % 2 === 0) this.clockwise = !this.clockwise;
+        this._buildWaypoints();
+        return this.waypoints.length >= 3;
     }
 
     update() {
-        this.angle += this.speed;
-        this.setPatternTarget(
-            this.centerX + Math.cos(this.angle) * this.radius,
-            this.centerY + Math.sin(this.angle) * this.radius,
-            { maxRadius: Math.max(this.safeTargetRadius ?? 12, Math.round(this.radius * 0.8)) }
-        );
-        this.myte.moveTowardsTarget();
-        this.currentDuration--;
-        if (this.handlePatternStuck()) {
-            return true;
+        if (!this.waypoints?.length) return true;
+
+        if (this.myte.isAtTarget()) {
+            this.notePatternProgress();
+            this.waypointIndex = (this.waypointIndex + 1) % this.waypoints.length;
+            if (this.waypointIndex === 0) {
+                this.repeat--;
+                if (this.repeat <= 0) return true;
+            }
+            const next = this.waypoints[this.waypointIndex];
+            this.myte.setTarget(next.x, next.y);
         }
-        return this.currentDuration <= 0;
+
+        this.myte.moveTowardsTarget();
+        return this.handlePatternStuck();
     }
 }
 
-// Move in a zigzag pattern
+// Move in a zigzag pattern using discrete turning-point waypoints.
+// Pre-generates numLegs alternating-side waypoints and walks them sequentially.
+// Each leg ends at a peak (sin = ±1), computed from frequency and amplitude.
 class ZigzagAction extends PatternMovementAction {
     static metadata = {
         id: 'zigzag',
@@ -1203,15 +1345,17 @@ class ZigzagAction extends PatternMovementAction {
         priority: 3,
         isMovementAction: true,
         isInterruptible: true,
-        defaultDuration: 2000,
+        defaultDuration: 0,
         description: 'Move in a zigzag pattern',
         requiresTarget: false,
         affectsMood: true,
         moodEffect: 4,
         defaultOptions: {
-            amplitude: 100,
+            amplitude: 80,
             frequency: 0.05,
+            numLegs: 6,
             direction: { x: 1, y: 0 },
+            repeat: 1,
             safeTargetRadius: 12,
             stuckThresholdFrames: 34,
             maxPatternRecoveries: 4
@@ -1223,60 +1367,330 @@ class ZigzagAction extends PatternMovementAction {
     }
 
     constructor(myte, options) {
-        super(myte, { ...ZigzagAction.metadata.defaultOptions, duration: ZigzagAction.metadata.defaultDuration, ...options });
-        const direction = this.direction ?? { x: 1, y: 0 };
-        const magnitude = Math.hypot(direction.x ?? 0, direction.y ?? 0) || 1;
-        this.direction = {
-            x: (direction.x ?? 1) / magnitude,
-            y: (direction.y ?? 0) / magnitude
-        };
-        this.startX = myte.posX;
-        this.startY = myte.posY;
-        this.distance = 0;
+        super(myte, { ...ZigzagAction.metadata.defaultOptions, ...options });
+        this.waypoints = [];
+        this.waypointIndex = 0;
+        this._normalizeDirection();
+    }
+
+    _normalizeDirection() {
+        const d   = this.direction ?? { x: 1, y: 0 };
+        const mag = Math.hypot(d.x ?? 1, d.y ?? 0) || 1;
+        this.direction = { x: (d.x ?? 1) / mag, y: (d.y ?? 0) / mag };
     }
 
     start() {
         super.start();
+        this._totalRepeat = this.repeat;
         this.startX = this.myte.posX;
         this.startY = this.myte.posY;
-        this.distance = 0;
+        this.waypointIndex = 0;
+        this._buildWaypoints();
+    }
+
+    getProgress() {
+        if (!this._totalRepeat || !this.waypoints?.length) return 0;
+        const completedReps = this._totalRepeat - this.repeat;
+        const partial = this.waypointIndex / this.waypoints.length;
+        return Math.min(1, (completedReps + partial) / this._totalRepeat);
+    }
+
+    // Turning points occur where sin(dist * freq) = ±1, i.e. dist = (π/2 + i*π) / freq
+    _buildWaypoints() {
+        const n    = this.numLegs ?? 6;
+        const freq = this.frequency ?? 0.05;
+        const amp  = this.amplitude ?? 80;
+        const candidates = [];
+        for (let i = 0; i < n; i++) {
+            const dist   = (Math.PI / 2 + i * Math.PI) / freq;
+            const zigzag = Math.sin(dist * freq) * amp; // alternates ±amp
+            candidates.push({
+                x: this.startX + dist * this.direction.x - zigzag * this.direction.y,
+                y: this.startY + dist * this.direction.y + zigzag * this.direction.x
+            });
+        }
+        const resolved = this.getResolvedPatternCandidates(candidates, {
+            maxRadius: Math.max(this.safeTargetRadius ?? 12, Math.round(amp * 0.4))
+        });
+        this.waypoints = resolved.length >= 2 ? resolved : candidates;
+        this.waypointIndex = 0;
+        if (this.waypoints.length > 0) {
+            this.myte.setTarget(this.waypoints[0].x, this.waypoints[0].y);
+        }
     }
 
     recoverFromStuck(recoveryCount) {
-        this.startX = this.myte.posX;
-        this.startY = this.myte.posY;
-        this.distance = 0;
-        this.amplitude = Math.max(Math.round(this.amplitude * 0.76), 24);
-
+        this.startX    = this.myte.posX;
+        this.startY    = this.myte.posY;
+        this.amplitude = Math.max(Math.round(this.amplitude * 0.75), 24);
         if (recoveryCount % 2 === 0) {
-            this.direction = {
-                x: this.direction.y || 1,
-                y: -this.direction.x || 0
-            };
+            this.direction = { x: this.direction.y || 1, y: -this.direction.x || 0 };
         }
-
-        const zigzag = Math.sin(this.distance * this.frequency) * this.amplitude;
-        const targetX = this.startX + this.distance * this.direction.x - zigzag * this.direction.y;
-        const targetY = this.startY + this.distance * this.direction.y + zigzag * this.direction.x;
-        return this.setPatternTarget(targetX, targetY, {
-            maxRadius: Math.max(this.safeTargetRadius ?? 12, Math.round(this.amplitude * 0.35))
-        });
+        this._buildWaypoints();
+        return this.waypoints.length >= 2;
     }
 
     update() {
-        this.distance += Math.max(this.myte.stats?.getSpeed?.() ?? 1, 1);
-        const zigzag = Math.sin(this.distance * this.frequency) * this.amplitude;
+        if (!this.waypoints?.length) return true;
+
+        if (this.myte.isAtTarget()) {
+            this.notePatternProgress();
+            this.waypointIndex++;
+
+            if (this.waypointIndex >= this.waypoints.length) {
+                this.repeat--;
+                if (this.repeat <= 0) return true;
+                // Reverse direction and rebuild from current position
+                this.startX    = this.myte.posX;
+                this.startY    = this.myte.posY;
+                this.direction = { x: -this.direction.x, y: -this.direction.y };
+                this._buildWaypoints();
+                return false;
+            }
+
+            const next = this.waypoints[this.waypointIndex];
+            this.myte.setTarget(next.x, next.y);
+        }
+
+        this.myte.moveTowardsTarget();
+        return this.handlePatternStuck();
+    }
+}
+
+// Walk back and forth between two points a fixed distance apart
+class PatrolAction extends PatternMovementAction {
+    static metadata = {
+        id: 'patrol',
+        label: 'Patrol',
+        category: 'movement',
+        priority: 3,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Walk back and forth between two points',
+        requiresTarget: false,
+        affectsMood: true,
+        moodEffect: 2,
+        defaultOptions: {
+            distance: 120,
+            direction: { x: 1, y: 0 },
+            repeat: 4,
+            pauseDuration: 30,
+            safeTargetRadius: 14,
+            stuckThresholdFrames: 40,
+            maxPatternRecoveries: 3
+        }
+    };
+
+    static canPerform(selected, active) {
+        return active === selected && !active?.queue.isCarrying();
+    }
+
+    constructor(myte, options) {
+        super(myte, { ...PatrolAction.metadata.defaultOptions, ...options });
+        this.patrolPoints = [];
+        this.patrolIndex  = 0;
+        this.pauseTimer   = 0;
+    }
+
+    start() {
+        super.start();
+        this._totalRepeat = this.repeat;
+        this._buildPatrolPoints();
+    }
+
+    getProgress() {
+        if (!this._totalRepeat) return 0;
+        const done = (this._totalRepeat - this.repeat) + (this.patrolIndex / 2);
+        return Math.min(1, done / this._totalRepeat);
+    }
+
+    _buildPatrolPoints() {
+        const d   = this.direction ?? { x: 1, y: 0 };
+        const mag = Math.hypot(d.x ?? 1, d.y ?? 0) || 1;
+        const dx  = (d.x ?? 1) / mag;
+        const dy  = (d.y ?? 0) / mag;
+        const half = (this.distance ?? 120) / 2;
+        const candidates = [
+            { x: this.myte.posX - dx * half, y: this.myte.posY - dy * half },
+            { x: this.myte.posX + dx * half, y: this.myte.posY + dy * half }
+        ];
+        const resolved = this.getResolvedPatternCandidates(candidates, { maxRadius: this.safeTargetRadius ?? 14 });
+        this.patrolPoints = resolved.length >= 2 ? resolved : candidates;
+        this.patrolIndex  = 0;
+        this.myte.setTarget(this.patrolPoints[0].x, this.patrolPoints[0].y);
+    }
+
+    recoverFromStuck() {
+        this.patrolIndex = (this.patrolIndex + 1) % this.patrolPoints.length;
+        const pt = this.patrolPoints[this.patrolIndex];
+        return this.setPatternTarget(pt.x, pt.y);
+    }
+
+    update() {
+        if (this.pauseTimer > 0) {
+            this.pauseTimer--;
+            return false;
+        }
+
+        if (this.myte.isAtTarget()) {
+            this.notePatternProgress();
+            this.patrolIndex = (this.patrolIndex + 1) % this.patrolPoints.length;
+            if (this.patrolIndex === 0) {
+                this.repeat--;
+                if (this.repeat <= 0) return true;
+            }
+            this.pauseTimer = this.pauseDuration ?? 30;
+            const next = this.patrolPoints[this.patrolIndex];
+            this.myte.setTarget(next.x, next.y);
+        }
+
+        this.myte.moveTowardsTarget();
+        return this.handlePatternStuck();
+    }
+}
+
+// Wander randomly within a radius of the starting position
+class WanderAction extends PatternMovementAction {
+    static metadata = {
+        id: 'wander',
+        label: 'Wander',
+        category: 'movement',
+        priority: 2,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 5000,
+        description: 'Wander randomly within a radius',
+        requiresTarget: false,
+        affectsMood: true,
+        moodEffect: 2,
+        defaultOptions: {
+            wanderRadius: 100,
+            pauseMin: 30,
+            pauseMax: 90,
+            safeTargetRadius: 14,
+            stuckThresholdFrames: 40,
+            maxPatternRecoveries: 5
+        }
+    };
+
+    static canPerform(selected, active) {
+        return active === selected && !active?.queue.isCarrying();
+    }
+
+    constructor(myte, options) {
+        super(myte, { ...WanderAction.metadata.defaultOptions, duration: WanderAction.metadata.defaultDuration, ...options });
+        this.originX    = myte.posX;
+        this.originY    = myte.posY;
+        this.pauseTimer = 0;
+    }
+
+    start() {
+        super.start();
+        this.originX = this.myte.posX;
+        this.originY = this.myte.posY;
+        this._pickNextTarget();
+    }
+
+    _pickNextTarget() {
+        const angle = Math.random() * Math.PI * 2;
+        const dist  = Math.random() * (this.wanderRadius ?? 100);
         this.setPatternTarget(
-            this.startX + this.distance * this.direction.x - zigzag * this.direction.y,
-            this.startY + this.distance * this.direction.y + zigzag * this.direction.x,
-            { maxRadius: Math.max(this.safeTargetRadius ?? 12, Math.round(this.amplitude * 0.35)) }
+            this.originX + Math.cos(angle) * dist,
+            this.originY + Math.sin(angle) * dist,
+            { maxRadius: this.safeTargetRadius ?? 14 }
         );
+    }
+
+    recoverFromStuck() {
+        this._pickNextTarget();
+        return true;
+    }
+
+    update() {
+        if (this.pauseTimer > 0) {
+            this.pauseTimer--;
+            this.currentDuration--;
+            return this.currentDuration <= 0;
+        }
+
+        if (this.myte.isAtTarget()) {
+            this.notePatternProgress();
+            const min = this.pauseMin ?? 30;
+            const max = this.pauseMax ?? 90;
+            this.pauseTimer = min + Math.floor(Math.random() * (max - min));
+            this._pickNextTarget();
+        }
+
         this.myte.moveTowardsTarget();
         this.currentDuration--;
-        if (this.handlePatternStuck()) {
-            return true;
-        }
+        if (this.handlePatternStuck()) return true;
         return this.currentDuration <= 0;
+    }
+}
+
+// Stay near a guard post; return to it whenever the Myte drifts too far
+class GuardAction extends PatternMovementAction {
+    static metadata = {
+        id: 'guard',
+        label: 'Guard',
+        category: 'movement',
+        priority: 3,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: -1,
+        description: 'Guard a position, returning if wandered too far',
+        requiresTarget: false,
+        affectsMood: false,
+        defaultOptions: {
+            returnThreshold: 80,
+            safeTargetRadius: 14,
+            stuckThresholdFrames: 40,
+            failOnUnrecoverableStuck: false
+        }
+    };
+
+    static canPerform(selected, active) {
+        return active === selected && !active?.queue.isCarrying();
+    }
+
+    constructor(myte, options) {
+        super(myte, { ...GuardAction.metadata.defaultOptions, ...options });
+        this.guardX     = myte.posX;
+        this.guardY     = myte.posY;
+        this._returning = false;
+    }
+
+    start() {
+        super.start();
+        this.guardX = this.myte.posX;
+        this.guardY = this.myte.posY;
+    }
+
+    recoverFromStuck() {
+        // If stuck while returning, nudge slightly and try again
+        this.setPatternTarget(this.guardX, this.guardY, { maxRadius: (this.safeTargetRadius ?? 14) * 2 });
+        return true;
+    }
+
+    update() {
+        const distFromPost = Math.hypot(this.myte.posX - this.guardX, this.myte.posY - this.guardY);
+
+        if (!this._returning && distFromPost > (this.returnThreshold ?? 80)) {
+            this._returning = true;
+            this.setPatternTarget(this.guardX, this.guardY, { maxRadius: this.safeTargetRadius ?? 14 });
+        }
+
+        if (this._returning) {
+            this.myte.moveTowardsTarget();
+            this.handlePatternStuck();
+            if (distFromPost < 10) {
+                this._returning = false;
+                this.notePatternProgress();
+            }
+        }
+
+        return false; // infinite — interrupted externally
     }
 }
 

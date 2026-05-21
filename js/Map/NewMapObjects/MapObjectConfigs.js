@@ -68,7 +68,19 @@ const TYPE_CONFIGS = {
 		renderType: 'split',
 		walkable: true,
 		overlappable: true,
-		animation: 'sway'
+		animation: 'sway',
+		canInspect: false,
+		regrowthTime: 120000, // 2 minutes
+		approachConfig: {
+			alignTo: 'collider',
+			align: 'center',
+			gap: 4
+		},
+		variantConfigs: {
+			grass_1: { displayName: 'Flower' },
+			grass_2: { displayName: 'Flower' },
+			grass_3: { displayName: 'Flower' }
+		}
 	},
 
 	FLOWER: {
@@ -76,8 +88,11 @@ const TYPE_CONFIGS = {
 		variants: ['flower_red', 'flower_yellow', 'flower_blue'],
 		walkable: true,
 		overlappable: true,
+		canInspect: false,
 		interactionType: 'mood_boost',
 		moodBoostAmount: 5,
+		majorActionId: ['pick_flower'],
+		regrowthTime: 120000, // 2 minutes
 		ai: {
 			affordances: [
 				{ actionId: 'smell_flower', purpose: 'soothe' }
@@ -133,10 +148,9 @@ const TYPE_CONFIGS = {
 		scale: 2,
 		collider: { width: 56, height: 24, offsetX: 4, offsetY: 36 },
 		interactiveCollider: { width: 88, height: 88, offsetX: -12, offsetY: -12 },
-		interactionTouchThreshold: 1,
+		interactionTouchThreshold: 16,
 		approachConfig: {
 			allowedSides: ['bottom'],
-			preferredSide: 'bottom',
 			alignTo: 'collider',
 			myteAlignTo: 'collider',
 			align: 'center',

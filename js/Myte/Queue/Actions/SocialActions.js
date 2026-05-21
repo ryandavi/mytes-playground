@@ -294,6 +294,133 @@ class PlayTagAction extends PositionableAction {
     }
 }
 
+// Chase another Myte — move toward them at speed; complete when close enough
+class ChaseAction extends PositionableAction {
+    static metadata = {
+        id: 'chase',
+        label: 'Chase',
+        category: 'social',
+        priority: 4,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 5000,
+        description: 'Chase another Myte',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: 6,
+        defaultOptions: {
+            catchDistance: 30
+        }
+    };
+
+    static canPerform(selected, active) {
+        return selected instanceof Myte && selected !== active && !active?.queue.isCarrying();
+    }
+
+    static getRequiredOptions(selected) {
+        return { target: selected };
+    }
+
+    constructor(myte, options) {
+        super(myte, { ...ChaseAction.metadata.defaultOptions, duration: ChaseAction.metadata.defaultDuration, ...options });
+    }
+
+    update() {
+        if (!this.target) return true;
+
+        const dist = Math.hypot(this.target.posX - this.myte.posX, this.target.posY - this.myte.posY);
+
+        if (dist < this.catchDistance) {
+            this.myte.queue.addExpression('excited', 400, 2);
+            return true;
+        }
+
+        this.myte.setTarget(this.target.posX, this.target.posY);
+        this.myte.moveTowardsTarget();
+        this.currentDuration--;
+        return this.currentDuration <= 0;
+    }
+}
+
+// Approach any target and show an expression on arrival
+class EmoteAtAction extends GoToObjectAction {
+    static metadata = {
+        id: 'emote_at',
+        label: 'Emote At',
+        category: 'social',
+        priority: 3,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Approach a target and show an expression',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: 3,
+        defaultOptions: {
+            expressionType: 'heart',
+            expressionDuration: 400,
+            expressionRepeat: 2
+        }
+    };
+
+    static canPerform(selected, active) {
+        return active && selected instanceof Myte && selected !== active && !active?.queue.isCarrying();
+    }
+
+    static getRequiredOptions(selected) {
+        return { target: selected };
+    }
+
+    complete() {
+        this.faceTarget();
+        super.complete();
+        this.myte.queue.addExpression(this.expressionType, this.expressionDuration, this.expressionRepeat);
+        this.myte.queue.addIdle(60);
+    }
+}
+
+// Approach another Myte and transfer the held item to them
+class GiveItemAction extends GoToObjectAction {
+    static metadata = {
+        id: 'give_item',
+        label: 'Give Item',
+        category: 'carry',
+        priority: 3,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Give the held item to another Myte',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: 4,
+        defaultOptions: {}
+    };
+
+    static canPerform(selected, active) {
+        return selected instanceof Myte &&
+               selected !== active &&
+               active?.queue?.isCarryingItem?.();
+    }
+
+    static getRequiredOptions(selected) {
+        return { target: selected };
+    }
+
+    complete() {
+        this.faceTarget();
+        super.complete();
+        const item = this.myte.queue.getHeldItem?.();
+        if (!item || item.carrier !== this.myte) return;
+
+        // Drop item at the recipient's feet and let them pick it up
+        item.drop?.(0, 0);
+        item.setPosition?.(this.target.posX, this.target.posY);
+        item.setSpritePosition?.(this.target.posX, this.target.posY);
+        this.target.queue.add('pickup_item', { target: item });
+        this.myte.queue.addExpression('heart', 300, 1);
+    }
+}
+
 const FetchStates = {
     PICKUP: 'pickup',
     THROW: 'throw',

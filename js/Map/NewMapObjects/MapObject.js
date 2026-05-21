@@ -216,6 +216,23 @@ class MapObject {
 		return this.getConfig('interactionRadius', defaultValue);
 	}
 
+	// Mark this plant/flower as deflowered (no flower to pick until regrowth).
+	// Sets a runtime config flag and a CSS class; schedules regrowth if regrowthTime is configured.
+	setDeflowered(regrowthTime = null) {
+		if (this.config) this.config.deflowered = true;
+		this.element?.classList.add('deflowered');
+
+		const ms = regrowthTime ?? this.getConfig('regrowthTime', 0);
+		if (ms > 0) {
+			setTimeout(() => this.clearDeflowered(), ms);
+		}
+	}
+
+	clearDeflowered() {
+		if (this.config) this.config.deflowered = false;
+		this.element?.classList.remove('deflowered');
+	}
+
 	getAiAffordances(context = {}, actor = null) {
 		const configuredAffordances = this.getConfig('ai.affordances', []);
 		const affordances = configuredAffordances.map(entry =>
@@ -502,10 +519,8 @@ class MapObject {
 			element: this.element,
 			enabled: true,
 			canClick: () => this.active,
-			onClick: () => this.press(this.parent),
-			onDoubleClick: (event) => {
-				if (this.getConfig('doubleClickAction')) this.handleDoubleClick(event);
-			},
+			onClick: () => this.handleSingleClick(),
+			onDoubleClick: (event) => this.handleDoubleClick(event),
 			onLongPress: (event) => {
 				if (this.canStartSelectModeDrag()) {
 					this.parent?.ui?.changeToolMode(UIToolModes.DRAG);
@@ -515,6 +530,11 @@ class MapObject {
 				}
 			}
 		});
+	}
+
+	handleSingleClick() {
+		if (!this.active) return;
+		this.selectInUi();
 	}
 
 	initDragComponent() {
@@ -1266,6 +1286,9 @@ class MapObject {
 			fn(this, event);
 			return;
 		}
+
+		if (!this.container?.ui?.isTool?.(UIToolModes.SELECT)) return;
+
 		const myte = this.activeMyte;
 		if (!myte?.queue) return;
 

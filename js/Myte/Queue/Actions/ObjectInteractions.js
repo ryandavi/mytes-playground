@@ -494,7 +494,7 @@ class EatElementAction extends GoToObjectAction {
     }
 }
 
-// Open a TreasureChestMapObject — queued by the chest's press() or directly
+// Open a TreasureChestMapObject — approach, animate "prying open", then chest opens and drops items
 class OpenChestAction extends GoToObjectAction {
     static metadata = {
         id: 'open_chest',
@@ -509,7 +509,8 @@ class OpenChestAction extends GoToObjectAction {
         affectsMood: true,
         moodEffect: 10,
         defaultOptions: {
-            // Overridden: chest defines its own approach mode ('side')
+            openAnimationDuration: 40,
+            receiveIdleDuration: 60
         }
     };
 
@@ -524,12 +525,204 @@ class OpenChestAction extends GoToObjectAction {
         return { target: selected };
     }
 
+    constructor(myte, options) {
+        super(myte, { ...OpenChestAction.metadata.defaultOptions, ...options });
+        this.phase = 'approach';
+        this.animationTimer = 0;
+    }
+
+    update() {
+        if (this.phase === 'approach') {
+            const arrived = super.update();
+            if (!arrived) return false;
+            this.phase = 'open';
+            this.animationTimer = this.openAnimationDuration;
+            this.faceTarget();
+            return false;
+        }
+
+        if (this.phase === 'open') {
+            this.faceTarget();
+            this.animationTimer--;
+            return this.animationTimer <= 0;
+        }
+
+        return true;
+    }
+
+    complete() {
+        this.faceTarget();
+        super.complete();
+        this.target?.open?.(this.myte.parent);
+        this.myte.queue.addExpression('excited', 300, 2);
+        if (this.receiveIdleDuration > 0) {
+            this.myte.queue.addIdle(this.receiveIdleDuration);
+        }
+    }
+}
+
+// Close a TreasureChestMapObject — queued by double-clicking an open chest
+class CloseChestAction extends GoToObjectAction {
+    static metadata = {
+        id: 'close_chest',
+        label: 'Close Chest',
+        category: 'interactions',
+        priority: 3,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Approach and close a treasure chest',
+        requiresTarget: true,
+        affectsMood: false,
+        defaultOptions: {}
+    };
+
+    static canPerform(selected, active) {
+        return active &&
+               selected?.constructor?.name === 'TreasureChestMapObject' &&
+               selected.state === 'opened' &&
+               selected.canClose === true &&
+               !active.queue.isCarrying();
+    }
+
+    static getRequiredOptions(selected, active) {
+        return { target: selected };
+    }
+
+    complete() {
+        this.faceTarget();
+        super.complete();
+        this.target?.close?.(this.myte.parent);
+    }
+}
+
+// Pick a flower — animates a pick, drops the flower item on the ground, marks plant as deflowered
+class PickFlowerAction extends GoToObjectAction {
+    static metadata = {
+        id: 'pick_flower',
+        label: 'Pick Flower',
+        category: 'interactions',
+        priority: 2,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Pick a flower from a plant',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: 4,
+        defaultOptions: {
+            pickAnimationDuration: 45
+        }
+    };
+
+    static _isFlower(obj) {
+        const name = obj?.constructor?.name ?? '';
+        if (name.includes('Flower') || name.includes('Plant') || name.includes('Bloom')) return true;
+        return obj?.type?.toUpperCase?.() === 'GRASS';
+    }
+
+    static canPerform(selected, active) {
+        if (!active || !PickFlowerAction._isFlower(selected) || active.queue.isCarrying()) return false;
+        return selected.getConfig?.('deflowered', false) !== true;
+    }
+
+    static getRequiredOptions(selected) {
+        return { target: selected };
+    }
+
+    constructor(myte, options) {
+        super(myte, { ...PickFlowerAction.metadata.defaultOptions, ...options });
+        this.phase = 'approach';
+        this.animationTimer = 0;
+    }
+
+    update() {
+        if (this.phase === 'approach') {
+            const arrived = super.update();
+            if (!arrived) return false;
+            this.phase = 'pick';
+            this.animationTimer = this.pickAnimationDuration;
+            this.faceTarget();
+            return false;
+        }
+
+        if (this.phase === 'pick') {
+            this.faceTarget();
+            this.animationTimer--;
+            return this.animationTimer <= 0;
+        }
+
+        return true;
+    }
+
+    complete() {
+        this.faceTarget();
+        super.complete();
+        this._dropFlowerItem();
+        this.target?.setDeflowered?.();
+        this.myte.queue.addExpression('heart', 300, 1);
+        this.myte.queue.addIdle(40);
+    }
+
+    _dropFlowerItem() {
+        const gameMap = this.target?.gameMap ?? this.myte?.parent?.gameMap;
+        const foregroundLayer = gameMap?.layers?.objects;
+        if (!foregroundLayer) return;
+
+        const variant = this.target?.variant ?? 'flower';
+        const spawnX  = (this.target?.posX ?? this.myte.posX) + (this.target?.size?.width ?? 32) / 2;
+        const spawnY  = (this.target?.posY ?? this.myte.posY) + (this.target?.size?.height ?? 32) / 2;
+
+        const dropped = new DroppedMapItem(gameMap, 'FLOWER', variant, spawnX, spawnY);
+        dropped.quantity = 1;
+        dropped.inventoryType = 'FLOWER';
+        dropped.inventoryVariant = variant;
+        dropped.inventoryName = this.target?.getDisplayName?.() ?? 'Flower';
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * (Math.PI / 3);
+        dropped.velocityX = Math.cos(angle) * 3;
+        dropped.velocityY = Math.sin(angle) * 3;
+        dropped.velocityZ = 4 + Math.random() * 2;
+
+        if (dropped.shadowElement) foregroundLayer.appendChild(dropped.shadowElement);
+        foregroundLayer.appendChild(dropped.element);
+        if (!gameMap?.droppedItems?.includes(dropped)) {
+            gameMap?.droppedItems?.push(dropped);
+        }
+    }
+}
+
+// Trample a flower — stomps through it, negative mood
+class TrampleFlowerAction extends GoToObjectAction {
+    static metadata = {
+        id: 'trample_flower',
+        label: 'Trample',
+        category: 'interactions',
+        priority: 2,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Trample a flower',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: -3,
+        defaultOptions: {
+            approachConfig: 'center'
+        }
+    };
+
+    static canPerform(selected, active) {
+        return active && PickFlowerAction._isFlower(selected) && !active.queue.isCarrying();
+    }
+
+    static getRequiredOptions(selected) {
+        return { target: selected };
+    }
+
     complete() {
         super.complete();
-        if (this.target?.press) {
-            this.target.press(this.myte.parent, this.myte);
-        }
-        this.myte.queue.addExpression('excited', 300, 2);
+        this.target?.remove?.();
+        this.myte.queue.addExpression('surprise', 200, 1);
+        this.myte.queue.addIdle(20);
     }
 }
 
@@ -551,9 +744,7 @@ class SmellFlowerAction extends GoToObjectAction {
     };
 
     static canPerform(selected, active) {
-        const name = selected?.constructor?.name ?? '';
-        const isFlower = name.includes('Flower') || name.includes('Plant') || name.includes('Bloom');
-        return active && isFlower && !active.queue.isCarrying();
+        return active && PickFlowerAction._isFlower(selected) && !active.queue.isCarrying();
     }
 
     static getRequiredOptions(selected, active) {
@@ -561,14 +752,14 @@ class SmellFlowerAction extends GoToObjectAction {
     }
 
     complete() {
+        this.faceTarget();
         super.complete();
-        // Placeholder for 'smell' animation when available
         this.myte.queue.addExpression('heart', 400, 1);
         this.myte.queue.addIdle(60);
     }
 }
 
-// Drink from a FountainMapObject — approach adjacent, lean in
+// Drink from a FountainMapObject — approach adjacent, drink
 class DrinkFromFountainAction extends GoToObjectAction {
     static metadata = {
         id: 'drink_fountain',
@@ -596,6 +787,7 @@ class DrinkFromFountainAction extends GoToObjectAction {
     }
 
     complete() {
+        this.faceTarget();
         super.complete();
         this.myte.queue.addIdle(80);
     }
@@ -629,6 +821,7 @@ class WaterPlantAction extends GoToObjectAction {
     }
 
     complete() {
+        this.faceTarget();
         super.complete();
         if (this.target?.water) {
             this.target.water();
@@ -637,7 +830,7 @@ class WaterPlantAction extends GoToObjectAction {
     }
 }
 
-// Harvest a CropPlantMapObject
+// Harvest a CropPlantMapObject — approach, animate, then harvest drops to ground
 class HarvestAction extends GoToObjectAction {
     static metadata = {
         id: 'harvest',
@@ -651,7 +844,9 @@ class HarvestAction extends GoToObjectAction {
         requiresTarget: true,
         affectsMood: true,
         moodEffect: 8,
-        defaultOptions: {}
+        defaultOptions: {
+            harvestAnimationDuration: 50
+        }
     };
 
     static canPerform(selected, active) {
@@ -665,7 +860,33 @@ class HarvestAction extends GoToObjectAction {
         return { target: selected };
     }
 
+    constructor(myte, options) {
+        super(myte, { ...HarvestAction.metadata.defaultOptions, ...options });
+        this.phase = 'approach';
+        this.animationTimer = 0;
+    }
+
+    update() {
+        if (this.phase === 'approach') {
+            const arrived = super.update();
+            if (!arrived) return false;
+            this.phase = 'harvest';
+            this.animationTimer = this.harvestAnimationDuration;
+            this.faceTarget();
+            return false;
+        }
+
+        if (this.phase === 'harvest') {
+            this.faceTarget();
+            this.animationTimer--;
+            return this.animationTimer <= 0;
+        }
+
+        return true;
+    }
+
     complete() {
+        this.faceTarget();
         super.complete();
         if (typeof this.target?.performHarvest === 'function') {
             this.target.performHarvest(this.myte.parent, this.myte);

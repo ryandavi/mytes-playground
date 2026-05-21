@@ -83,7 +83,7 @@ class QueueUI {
 
         let progress = null;
         let bar = null;
-        if (item.duration && item.duration > 0) {
+        if ((item.duration && item.duration > 0) || typeof item.getProgress === 'function') {
             progress = document.createElement('div');
             progress.className = 'progress';
             bar = document.createElement('div');
@@ -288,7 +288,8 @@ class QueueUI {
         }
 
         if (refs.progress) {
-            if (index === 0 && item.duration && item.duration > 0) {
+            const hasProgress = index === 0 && ((item.duration && item.duration > 0) || typeof item.getProgress === 'function');
+            if (hasProgress) {
                 refs.progress.style.display = 'block';
                 const percentage = this.calculateProgress(item);
                 if (refs.bar) refs.bar.style.width = `${percentage}%`;
@@ -323,6 +324,9 @@ class QueueUI {
     }
 
     calculateProgress(item) {
+        if (typeof item.getProgress === 'function') {
+            return Math.round(item.getProgress() * 100);
+        }
         if (item.currentDuration === -1) return 0;
         return Math.round(100 - (item.currentDuration / item.duration * 100));
     }
