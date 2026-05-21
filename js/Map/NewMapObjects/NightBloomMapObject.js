@@ -18,7 +18,7 @@ class NightBloomMapObject extends BreedingFlowerMapObject {
     }
 
     updateDayNightState() {
-        const currentHour = new Date().getHours();
+        const currentHour = this.gameMap?.parent?.timeManager?.getCurrentHour() ?? new Date().getHours();
         const shouldBeOpen = this.shouldBeOpen(currentHour);
 
         if (shouldBeOpen && this.bloomState === 'closed') {

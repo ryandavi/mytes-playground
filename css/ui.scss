@@ -1164,10 +1164,7 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        border: var(--border-width) solid var(--button-dark);
-        border-bottom-color: var(--button-light);
-        border-right-color: var(--button-light);
-        border-radius: var(--border-radius);
+
         background: var(--button-mid);
         box-shadow: none;
         padding: 0;
@@ -1178,11 +1175,22 @@
         font-family: inherit;
         opacity: 0.75;
 
+        border-radius: var(--border-radius);
+     
+        border-style: solid;
+        border-width: var(--border-width);
+        border-top-color: var(--button-light);
+        border-right-color: var(--button-dark);
+        border-bottom-color: var(--button-dark);
+        background-color: var(--button-mid);
+
         &.current {
-            background: var(--button-hover);
-            border-color: #fff6c4;
-            box-shadow: 0 0 0 1px rgba(255, 246, 196, 0.65);
             opacity: 1;
+
+            border: var(--border-width) solid var(--button-dark);
+            border-bottom-color: var(--button-light);
+            border-right-color: var(--button-light);
+
         }
 
         &.holding {

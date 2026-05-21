@@ -337,25 +337,19 @@ class GridSystem {
 
         console.log('[GridSystem] Debug DOM initialization complete');
     }
-    // Create grid cell elements (only create what's visible)
+    // Create grid cell elements for the visible viewport only
     createGridCellElements() {
         // Clear existing grid cells
         this.debugElements.gridCells.forEach(cell => cell.element.remove());
         this.debugElements.gridCells = [];
 
-        // Get viewport bounds
+        // Only allocate cells that fit in the current viewport
         const viewport = this.parent.parent.getContainerRect();
-        const visibleCellsX = Math.ceil(viewport.width / this.config.cellSize) + 1;
-        const visibleCellsY = Math.ceil(viewport.height / this.config.cellSize) + 1;
+        const cols = Math.min(Math.ceil(viewport.width / this.config.cellSize) + 1, this.gridWidth);
+        const rows = Math.min(Math.ceil(viewport.height / this.config.cellSize) + 1, this.gridHeight);
 
-        // Limit to a reasonable number to prevent performance issues
-        const maxCells = 1000; // Adjust based on performance testing
-        const totalCells = visibleCellsX * visibleCellsY;
-        const createAll = totalCells <= maxCells;
-
-        // Create cells for visible area only
-        for (let x = 0; x < this.gridWidth; x++) { // Use full gridWidth
-            for (let y = 0; y < this.gridHeight; y++) { // Use full gridHeight
+        for (let x = 0; x < cols; x++) {
+            for (let y = 0; y < rows; y++) {
                 const cellElement = document.createElement('div');
                 cellElement.className = 'grid-cell';
 

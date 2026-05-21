@@ -107,7 +107,7 @@ class GameTime {
 	getCurrentGameMinutes() {
 		const gameMinuteToRealSeconds = this._getGameMinuteToRealSecondsRatio();
 		const realToGameScalingFactor = 1 / gameMinuteToRealSeconds;
-		return Math.floor(this.totalElapsedSeconds * realToGameScalingFactor / 60);
+		return Math.floor(this.totalElapsedSeconds * realToGameScalingFactor);
 	}
 
 	getCurrentMinute() {
@@ -317,7 +317,7 @@ class GameTime {
 	update(deltaTime) {
 		if (this.isPaused) return;
 
-		this.totalElapsedSeconds += 1;
+		this.totalElapsedSeconds += deltaTime / 1000;
 		this.checkAndNotifyChanges();
 	}
 
@@ -360,8 +360,8 @@ class GameTime {
 		const hourMinutes = hour * 60;
 		const totalGameMinutes = yearMinutes + seasonMinutes + dayMinutes + hourMinutes + minute;
 
-		let scale = this.config.dayDurationInMinutes * 2.5; // i don't know why 2.5 tbh
-		this.totalElapsedSeconds = totalGameMinutes * scale;
+		// Convert game minutes back to real seconds: 1 game-min = dayDurationInMinutes/24 real seconds
+		this.totalElapsedSeconds = totalGameMinutes * this._getGameMinuteToRealSecondsRatio();
 
 		this.checkAndNotifyChanges();
 	}

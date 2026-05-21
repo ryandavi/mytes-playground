@@ -1199,6 +1199,7 @@ class MapObject {
 	// ── Lifecycle ─────────────────────────────────────────────────────────────
 
 	remove() {
+		this.removeAllEffects?.();
 		Object.values(this.inputComponents).forEach(c => c.destroy());
 		this.inputComponents = {};
 		this._selectDragCleanup?.();

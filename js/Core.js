@@ -61,6 +61,7 @@ class MyteCore {
 
         // Core systems
         this.containers = new Map();
+        this.gameTime = new GameTime();
         this.eventManager = new EventManager(this);
         this.resourceManager = new ResourceManager(this);
 

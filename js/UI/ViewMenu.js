@@ -31,37 +31,51 @@ class ViewMenu extends ModalWindow {
     setupControls() {
         if (!this.modalElement) return;
 
+        const q = (id) => this.modalElement.querySelector(id);
+
         // Zoom buttons
-        this.modalElement.querySelector('#view-zoom-out')?.addEventListener('click', () => {
-            this.getCamera()?.zoomOut({ immediate: true });
-        });
-        this.modalElement.querySelector('#view-zoom-reset')?.addEventListener('click', () => {
-            this.getCamera()?.resetZoom(true);
-            this.updateZoomLabel();
-        });
-        this.modalElement.querySelector('#view-zoom-in')?.addEventListener('click', () => {
-            this.getCamera()?.zoomIn({ immediate: true });
-        });
+        const zoomOut = q('#view-zoom-out');
+        if (zoomOut) zoomOut.onclick = () => this.getCamera()?.zoomOut({ immediate: true });
+
+        const zoomReset = q('#view-zoom-reset');
+        if (zoomReset) zoomReset.onclick = () => { this.getCamera()?.resetZoom(true); this.updateZoomLabel(); };
+
+        const zoomIn = q('#view-zoom-in');
+        if (zoomIn) zoomIn.onclick = () => this.getCamera()?.zoomIn({ immediate: true });
 
         // Jump / reset buttons
-        this.modalElement.querySelector('#view-jump-myte')?.addEventListener('click', () => {
-            this.getCamera()?.centerOnActiveMyte(true);
-        });
-        this.modalElement.querySelector('#view-jump-fit')?.addEventListener('click', () => {
-            this.getCamera()?.fitMap('contain', true);
-        });
-        this.modalElement.querySelector('#view-reset-camera')?.addEventListener('click', () => {
-            this.getCamera()?.reset();
-        });
+        const jumpMyte = q('#view-jump-myte');
+        if (jumpMyte) jumpMyte.onclick = () => this.getCamera()?.centerOnActiveMyte(true);
 
-        // Follow mode buttons
-        this.modalElement.querySelectorAll('.follow-mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+        const jumpFit = q('#view-jump-fit');
+        if (jumpFit) jumpFit.onclick = () => this.getCamera()?.fitMap('contain', true);
+
+        const resetCamera = q('#view-reset-camera');
+        if (resetCamera) resetCamera.onclick = () => this.getCamera()?.reset();
+
+        // Follow mode buttons — store references for disposal
+        this._followModeBtns = this.modalElement.querySelectorAll('.follow-mode-btn');
+        this._followModeBtns.forEach(btn => {
+            btn.onclick = () => {
                 const mode = parseInt(btn.dataset.mode, 10);
                 this.getCamera()?.setMode(mode);
                 this.updateFollowMode();
-            });
+            };
         });
+    }
+
+    dispose() {
+        if (this.modalElement) {
+            const q = (id) => this.modalElement.querySelector(id);
+            ['#view-zoom-out', '#view-zoom-reset', '#view-zoom-in',
+             '#view-jump-myte', '#view-jump-fit', '#view-reset-camera'].forEach(id => {
+                const el = q(id);
+                if (el) el.onclick = null;
+            });
+            this._followModeBtns?.forEach(btn => { btn.onclick = null; });
+        }
+        this._followModeBtns = null;
+        super.dispose();
     }
 
     updateZoomLabel() {

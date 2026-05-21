@@ -1618,6 +1618,8 @@ class UserInterface {
         this.settingsMenu = null;
         this.soundMenu?.dispose?.();
         this.soundMenu = null;
+        this.viewMenu?.dispose?.();
+        this.viewMenu = null;
 
         this.screenManager?.destroy?.();
         this.toolManager?.destroy?.();

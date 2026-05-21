@@ -13,10 +13,6 @@ class MoveAction extends MyteAction {
         affectsMood: false
     };
 
-    static canPerform(selected, active) {
-        return false;
-    }
-
     constructor(myte, options) {
         super(myte, options);
 

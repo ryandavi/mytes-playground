@@ -21,7 +21,7 @@ class ContainerManager {
         // Systems and managers
         this.ui = new UserInterface(this);
         this.inputHandler = new ContainerInputManager(this);
-        this.timeManager = new GameTime();  // Add time manager here
+        this.timeManager = GameTime.instance;
 
         // map
         this.gameMap;
@@ -478,33 +478,6 @@ class ContainerManager {
                 Math.min(y, worldBounds.bottom - entityBounds.offsetY - entityBounds.height)
             )
         };
-    }
-
-    getVisibleElements() {
-        const allElements = document.getElementsByTagName('*');
-        const visibleElements = [];
-        const containerRect = this.getContainerRect();
-        const canvasRect = this.getCanvasRect();
-
-        for (let element of allElements) {
-            if (this.canvas.contains(element)) {
-                const elementRect = element.getBoundingClientRect();
-                const relativeLeft = elementRect.left - canvasRect.left + this.camera.posX;
-                const relativeTop = elementRect.top - canvasRect.top + this.camera.posY;
-
-                if (
-                    relativeLeft + elementRect.width > 0 &&
-                    relativeLeft < containerRect.width &&
-                    relativeTop + elementRect.height > 0 &&
-                    relativeTop < containerRect.height
-                ) {
-                    continue;
-                }
-            }
-            visibleElements.push(element);
-        }
-
-        return visibleElements;
     }
 
     getContainerRect() {
