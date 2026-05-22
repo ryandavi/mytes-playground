@@ -218,6 +218,7 @@ button:disabled {
   text-shadow: 1px 1px 0 var(--button-disabled-highlight, var(--button-light));
   cursor: default;
   filter: saturate(0.72);
+  pointer-events: none;
 }
 .button.disabled .icon,
 .button.disabled svg, .button:disabled .icon,
@@ -236,15 +237,6 @@ button:disabled .icon,
 button:disabled svg {
   fill: var(--button-disabled-icon-color, var(--button-icon-color));
   color: var(--button-disabled-icon-color, var(--button-icon-color));
-}
-.button.disabled, .button:disabled,
-input[type=submit].disabled,
-input[type=submit]:disabled,
-input[type=button].disabled,
-input[type=button]:disabled,
-button.disabled,
-button:disabled {
-  pointer-events: none;
 }
 
 input[type=range] {
@@ -398,8 +390,7 @@ body.debug .map-object > .interactive-hitbox {
 .dragging {
   cursor: grabbing;
   touch-action: none;
-  -moz-user-select: none;
-       user-select: none;
+  user-select: none;
   -webkit-user-select: none;
 }
 
@@ -1036,9 +1027,7 @@ body.debug .map-object > .interactive-hitbox {
   justify-content: space-between;
   list-style: none;
   padding: 6px var(--padding);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .debug-panel .debug-section > summary::-webkit-details-marker {
   display: none;
@@ -1107,9 +1096,7 @@ body.debug .map-object > .interactive-hitbox {
   cursor: pointer;
   font-weight: 600;
   font-size: 0.85em;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .debug-panel .debug-group > .debug-group-summary::-webkit-details-marker {
   display: none;
@@ -1230,7 +1217,6 @@ body.debug .map-object > .interactive-hitbox {
   margin-right: 10px;
   position: fixed;
   display: none;
-  height: -moz-fit-content;
   height: fit-content;
   right: 0;
   top: 50%;
@@ -1351,7 +1337,6 @@ body.debug .map-object > .interactive-hitbox {
   z-index: var(--z-debug);
   flex-direction: column;
   transform: translate(calc(-100% - 40px), 0);
-  width: -moz-fit-content;
   width: fit-content;
 }
 .app-shell > .hand-controls input[type=radio] {
@@ -1646,9 +1631,7 @@ body.debug .map-object > .interactive-hitbox {
 .window-panel > .window-panel__header > .window-panel__controls {
   display: flex;
   gap: var(--gap);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .window-panel > .window-panel__header > .window-panel__controls > button {
   width: 30px;
@@ -1752,9 +1735,7 @@ body.debug .map-object > .interactive-hitbox {
   padding: 0;
   overflow: visible;
   touch-action: manipulation;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   font-family: inherit;
 }
 .myte-queue-overlay .queue-item.compact.is-current {
@@ -1848,9 +1829,7 @@ body.debug .map-object > .interactive-hitbox {
   position: absolute;
   top: 0;
   transition: opacity var(--motion-slower) var(--ease-emphasis);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   width: 100%;
   z-index: var(--z-loading);
 }
@@ -2068,10 +2047,10 @@ body.debug .map-object > .interactive-hitbox {
   right: 50%;
   transform: translate(50%, 0);
 }
-.myte-slot:hover > .myte-home-slot {
+.myte-slot:hover > .myte-home-slot:not(.is-queue-target) {
   outline: var(--border-width) solid darkgrey;
 }
-.myte-slot.empty:hover > .myte-home-slot {
+.myte-slot.empty:hover > .myte-home-slot:not(.is-queue-target) {
   outline: unset;
 }
 .myte-slot.empty > .myte-home-slot {
@@ -2085,6 +2064,12 @@ body.debug .map-object > .interactive-hitbox {
   background-color: var(--button-mid);
   filter: unset;
   box-shadow: inset var(--border-width) var(--border-width) rgba(0, 0, 0, 0.0509803922);
+}
+.myte-slot.empty > .myte-home-slot.is-queue-target {
+  opacity: 1;
+  z-index: var(--z-drag);
+  outline: 2px solid #ffb000;
+  box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
 }
 .myte-slot.empty.valid-drop-target > .myte-home-slot {
   z-index: 100000;
@@ -2147,7 +2132,6 @@ body.debug .map-object > .interactive-hitbox {
   display: flex;
   gap: var(--border-width);
   align-items: center;
-  width: -moz-fit-content;
   width: fit-content;
   left: 50%;
   transform: translate(-50%, -115%);
@@ -2316,9 +2300,7 @@ body.debug .map-object > .interactive-hitbox {
 }
 .interactive-myte.is-dragging {
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   cursor: grab;
   z-index: var(--z-drag) !important;
 }
@@ -2500,6 +2482,11 @@ body.debug .map-object > .interactive-hitbox {
     filter: drop-shadow(0 0 3px rgba(0, 255, 0, 0.5));
   }
 }
+.app-shell > .app-stage {
+  --dither-size: 12px;
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
+}
 .app-shell > .app-stage.noScroll {
   overflow: hidden;
 }
@@ -2509,11 +2496,6 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage.noScroll > .canvas > .layer {
   width: 100%;
   height: 100%;
-}
-.app-shell > .app-stage {
-  --dither-size: 12px;
-  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
-  background-size: var(--dither-size, 6px);
 }
 .app-shell > .app-stage > .crosshair {
   position: absolute;
@@ -2585,9 +2567,7 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.debug {
   z-index: 100;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   width: 100%;
   height: 100%;
   visibility: hidden;
@@ -2597,9 +2577,7 @@ body.debug .map-object > .interactive-hitbox {
   border: 1px solid rgba(255, 0, 0, 0.5);
   pointer-events: none;
   position: absolute;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   z-index: 9999;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .debug-collider.myte-collider {
@@ -2617,9 +2595,7 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.debug .pathfinder-node {
   position: absolute;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .path-line {
   height: 2px;
@@ -2669,9 +2645,7 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.effects {
   z-index: 2;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer > .zone {
   outline: 1px dashed red;
@@ -2750,9 +2724,7 @@ body.debug .map-object > .interactive-hitbox {
   z-index: 1;
   image-rendering: pixelated;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .map-object > .sprite > .front,
 .map-object > .sprite .back {
@@ -2811,9 +2783,7 @@ body[data-tool-mode=drag] .map-object.draggable {
 }
 .map-object.is-dragging {
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   cursor: grabbing;
   z-index: var(--z-drag) !important;
 }
@@ -3219,4 +3189,6 @@ body[data-tool-mode=drag] .map-object.draggable {
   100% {
     transform: scale(0.9);
   }
-}/*# sourceMappingURL=style.css.map */
+}
+
+/*# sourceMappingURL=style.css.map */

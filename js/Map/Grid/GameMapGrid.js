@@ -339,6 +339,8 @@ class GridSystem {
         // Account for zoom: visible world area = viewport size / zoom
         const viewport = this.parent.parent.getContainerRect();
         if (!viewport) {
+            this._debugGridCols = 0;
+            this._debugGridRows = 0;
             return;
         }
         const zoom = this.parent.parent.camera?.zoomLevel || 1;
@@ -347,8 +349,8 @@ class GridSystem {
         this._debugGridCols = cols;
         this._debugGridRows = rows;
 
-        for (let x = 0; x < cols; x++) {
-            for (let y = 0; y < rows; y++) {
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
                 const cellElement = document.createElement('div');
                 cellElement.className = 'grid-cell';
 
@@ -356,6 +358,7 @@ class GridSystem {
                 cellElement.style.height = `${this.config.cellSize - 1}px`;
                 cellElement.style.left = `${x * this.config.cellSize}px`;
                 cellElement.style.top = `${y * this.config.cellSize}px`;
+                cellElement.style.display = 'none';
 
                 this.parent.layers.debug.appendChild(cellElement);
 
@@ -378,13 +381,18 @@ class GridSystem {
         if (!viewport) return;
         const zoom = camera?.zoomLevel || 1;
 
-        // Recreate grid cells if zoom changed since last creation
-        if (Math.abs(zoom - (this._lastDebugZoom ?? zoom)) > 0.01) {
+        const { cols: neededCols, rows: neededRows } = this.getDebugVisibleCellCounts(viewport, zoom);
+
+        // Recreate grid cells if zoom changed significantly OR if pool was built with wrong dimensions
+        // (e.g. pool created before container had its final size, giving cols/rows too small)
+        const zoomChanged = Math.abs(zoom - (this._lastDebugZoom ?? zoom)) > 0.01;
+        const poolWrong = neededCols !== this._debugGridCols || neededRows !== this._debugGridRows;
+        if (zoomChanged || poolWrong) {
             this.createGridCellElements();
         }
 
-        const visibleCellsX = this._debugGridCols || this.getDebugVisibleCellCounts(viewport, zoom).cols;
-        const visibleCellsY = this._debugGridRows || this.getDebugVisibleCellCounts(viewport, zoom).rows;
+        const visibleCellsX = this._debugGridCols || neededCols;
+        const visibleCellsY = this._debugGridRows || neededRows;
 
         // Update grid cells if not showing the entire grid
         if (this.debugElements.gridCells.length < this.gridWidth * this.gridHeight) {
@@ -415,18 +423,21 @@ class GridSystem {
                 }
             });
         } else {
-            // Just update classes for full grid view
+            // Full grid view — all cells are at their correct world positions from creation.
+            // Always re-apply display so stale display:none from a prior windowed frame is cleared.
             this.debugElements.gridCells.forEach(cell => {
                 const x = cell.gridX;
                 const y = cell.gridY;
 
                 if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
+                    cell.element.style.display = 'block';
                     this.updateCellClass(cell.element, x, y);
 
-                    // Update cell color based on terrain type if enabled
                     if (this.config.showTerrainColors) {
                         this.updateGridCellVisuals(x, y);
                     }
+                } else {
+                    cell.element.style.display = 'none';
                 }
             });
         }
