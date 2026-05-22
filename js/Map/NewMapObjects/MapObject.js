@@ -98,6 +98,73 @@ class MapObject {
 			.join(' ');
 	}
 
+	isSidebarFlowerObject() {
+		const name = this.constructor?.name ?? '';
+		return name.includes('Flower') ||
+			name.includes('Bloom') ||
+			this.type?.toUpperCase?.() === 'GRASS';
+	}
+
+	getSidebarStatusRows() {
+		const rows = [];
+		const interactionType = this.getConfig('interactionType');
+		const deflowered = this.getConfig('deflowered', false) === true;
+
+		if (typeof this.isEnabled === 'function') {
+			rows.push({ label: 'Enabled', value: this.isEnabled() ? 'Yes' : 'No' });
+		}
+
+		if (this.isMusicSource?.() && typeof this.isActiveMusicSource === 'function') {
+			rows.push({ label: 'Music Active', value: this.isActiveMusicSource() ? 'Yes' : 'No' });
+		}
+
+		if (this.isSidebarFlowerObject()) {
+			rows.push(
+				{ label: 'Flower Available', value: deflowered ? 'No' : 'Yes' },
+				{ label: 'Flower State', value: deflowered ? 'Deflowered' : null }
+			);
+		}
+
+		if (this.growthStage != null) {
+			rows.push({ label: 'Stage', value: this.growthStage });
+		}
+
+		if (typeof this.isReadyToHarvest === 'function') {
+			rows.push({ label: 'Ready to Harvest', value: this.isReadyToHarvest() ? 'Yes' : 'No' });
+		}
+
+		if (this.isWatered != null) {
+			rows.push({ label: 'Watered', value: this.isWatered ? 'Yes' : 'No' });
+		}
+
+		if (typeof this.canWater === 'function' && !this.isWatered) {
+			rows.push({ label: 'Needs Water', value: this.canWater() ? 'Yes' : 'No' });
+		}
+
+		if (this.pollinationState != null) {
+			rows.push({ label: 'Pollination', value: this.pollinationState });
+		}
+
+		if (typeof this.isEnabled !== 'function' && rows.length === 0 && interactionType) {
+			rows.push({ label: 'Interaction', value: interactionType });
+		}
+
+		return rows;
+	}
+
+	getSidebarDetailRows() {
+		const rows = [];
+
+		if (this.growthStage != null && this.growthProgress != null) {
+			rows.push({
+				label: 'Growth',
+				value: `${Math.round((this.growthProgress || 0) * 100)}%`
+			});
+		}
+
+		return rows;
+	}
+
 	// ── Simulation contract ───────────────────────────────────────────────────
 
 	// Override to return true for autonomous objects (AI, physics) that must

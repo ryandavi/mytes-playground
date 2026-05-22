@@ -231,6 +231,30 @@
                 &.is-visible {
                     display: flex;
                 }
+
+                .state-info {
+                    text-transform: none;
+                    color: var(--text-default);
+                }
+
+                .state-info.info-section-title,
+                .state-info.needs-title {
+                    font-size: 0.78em;
+                    font-weight: 700;
+                    letter-spacing: 0.08em;
+                    text-transform: uppercase;
+                    color: var(--text-muted);
+                    padding-top: 0.4rem;
+                    margin-top: 0.2rem;
+                    border-top: 1px solid var(--border-subtle);
+                }
+
+                .state-info.info-section-title:first-child,
+                .state-info.needs-title:first-child {
+                    border-top: none;
+                    padding-top: 0;
+                    margin-top: 0;
+                }
             }
 
             >.selected-info {
@@ -282,6 +306,7 @@
                         @include neutral-info-panel;
                         margin-bottom: var(--padding);
                         border: 1px solid var(--border-subtle);
+                        padding: 0.35rem;
 
                         +.action-group {
                             margin-top: 0;

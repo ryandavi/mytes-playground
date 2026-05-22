@@ -2757,6 +2757,32 @@
 .container-wrapper > .sidebar > .action-controls > .other-info.is-visible {
   display: flex;
 }
+.app-shell > .sidebar > .action-controls > .other-info .state-info,
+.container-wrapper > .sidebar > .action-controls > .other-info .state-info {
+  text-transform: none;
+  color: var(--text-default);
+}
+.app-shell > .sidebar > .action-controls > .other-info .state-info.info-section-title,
+.app-shell > .sidebar > .action-controls > .other-info .state-info.needs-title,
+.container-wrapper > .sidebar > .action-controls > .other-info .state-info.info-section-title,
+.container-wrapper > .sidebar > .action-controls > .other-info .state-info.needs-title {
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-top: 0.4rem;
+  margin-top: 0.2rem;
+  border-top: 1px solid var(--border-subtle);
+}
+.app-shell > .sidebar > .action-controls > .other-info .state-info.info-section-title:first-child,
+.app-shell > .sidebar > .action-controls > .other-info .state-info.needs-title:first-child,
+.container-wrapper > .sidebar > .action-controls > .other-info .state-info.info-section-title:first-child,
+.container-wrapper > .sidebar > .action-controls > .other-info .state-info.needs-title:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
 .app-shell > .sidebar > .action-controls > .selected-info,
 .container-wrapper > .sidebar > .action-controls > .selected-info {
   background: var(--surface-panel-muted, #f5f5f5);

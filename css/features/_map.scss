@@ -391,6 +391,15 @@
             }
         }
 
+        &.is-queue-target {
+            box-shadow: none;
+
+            > .portal-window {
+                outline: 2px solid #ffb000;
+                box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
+            }
+        }
+
         &.active   { animation: portal-pulse 4s infinite ease-in-out; }
         &.inactive { opacity: 0.6; filter: grayscale(70%); }
 

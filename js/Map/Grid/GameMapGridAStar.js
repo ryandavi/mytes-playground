@@ -113,6 +113,7 @@ class AStarPathfinder {
      */
     findPath(entity, startX, startY, endCenterX, endCenterY, pathOptions = {}) {
         const startTime = performance.now();
+        const exactEndMode = pathOptions?.exactEndMode ?? 'always';
 
         // --- Entity Properties ---
         const entityWidth = entity.size?.width || 0;
@@ -236,6 +237,15 @@ class AStarPathfinder {
         }
         // --- END VALIDATE TARGET GRID CELL ---
 
+        const endWasAdjusted =
+            effectiveEndCenterX !== originalEndCenterX ||
+            effectiveEndCenterY !== originalEndCenterY;
+        const shouldPreserveExactEnd =
+            exactEndMode === 'always' ||
+            (exactEndMode === 'if-reachable' && !endWasAdjusted);
+        const finalEndCenterX = shouldPreserveExactEnd ? originalEndCenterX : effectiveEndCenterX;
+        const finalEndCenterY = shouldPreserveExactEnd ? originalEndCenterY : effectiveEndCenterY;
+
 
         // --- OPTIMIZATION: Fast direct path check (use EFFECTIVE end point) ---
         const dx = effectiveEndCenterX - startCenterX;
@@ -339,7 +349,7 @@ class AStarPathfinder {
                 const path = this._reconstructPath(
                     entity, cameFrom, current, startGrid, endGrid,
                     startCenterX, startCenterY,
-                    originalEndCenterX, originalEndCenterY,
+                    finalEndCenterX, finalEndCenterY,
                     entityWidth, entityHeight, collider, entityCapabilities,
                     effectiveOptions
                 );

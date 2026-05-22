@@ -46,6 +46,11 @@ class GridSystem {
         };
 
         this.debugInitialized = false;
+        this._debugResizeObserver = null;
+        this._lastDebugZoom = 1;
+        this._debugGridCols = 0;
+        this._debugGridRows = 0;
+        this._debugGridBuffer = 4;
 
         // Initialize terrain colors for visualization
         this.terrainColors = {
@@ -76,6 +81,14 @@ class GridSystem {
         if (config.debugMode === true) {
             this.toggleDebug();
         }
+    }
+
+    getDebugVisibleCellCounts(viewport, zoom) {
+        const safeZoom = zoom || 1;
+        return {
+            cols: Math.min(Math.ceil(viewport.width / safeZoom / this.config.cellSize) + this._debugGridBuffer, this.gridWidth),
+            rows: Math.min(Math.ceil(viewport.height / safeZoom / this.config.cellSize) + this._debugGridBuffer, this.gridHeight)
+        };
     }
 
     // Default terrain movement cost multipliers
@@ -280,44 +293,59 @@ class GridSystem {
         // Initialize culling visualization
         this.initializeCullingDebug();
 
+        const mapView = this.parent?.parent;
+        const mapElement = mapView?.element;
+        if (!mapElement || !this.parent?.layers?.debug) {
+            return;
+        }
+
         this.debugInitialized = true;
 
         // Remove any existing listener to prevent duplicates
         if (this.boundMouseMoveHandler) {
-            this.parent.parent.element.removeEventListener('mousemove', this.boundMouseMoveHandler);
+            mapElement.removeEventListener('mousemove', this.boundMouseMoveHandler);
         }
 
         // Create a bound version of the handler to use for both adding and removing
         this.boundMouseMoveHandler = this.handleMouseMove.bind(this);
 
         // Attach mouse move listener for cursor tile tracking
-        this.parent.parent.element.addEventListener('mousemove', this.boundMouseMoveHandler);
+        mapElement.addEventListener('mousemove', this.boundMouseMoveHandler);
 
         // Rebuild grid cells whenever the container is resized (fullscreen, window resize, etc.)
         if (this._debugResizeObserver) {
             this._debugResizeObserver.disconnect();
         }
         this._debugResizeObserver = new ResizeObserver(() => {
+            if (!this.debugMode || !this.parent?.parent?.element || !this.parent?.layers?.debug) {
+                return;
+            }
             this.createGridCellElements();
         });
-        this._debugResizeObserver.observe(this.parent.parent.element);
+        this._debugResizeObserver.observe(mapElement);
 
         console.log('[GridSystem] Debug DOM initialization complete');
     }
     // Create grid cell elements for the visible viewport only
     createGridCellElements() {
+        if (!this.debugMode || !this.parent?.parent || !this.parent?.layers?.debug) {
+            return;
+        }
+
         // Clear existing grid cells
-        this.debugElements.gridCells.forEach(cell => cell.element.remove());
+        this.debugElements.gridCells.forEach(cell => cell.element?.remove());
         this.debugElements.gridCells = [];
 
         // Account for zoom: visible world area = viewport size / zoom
         const viewport = this.parent.parent.getContainerRect();
+        if (!viewport) {
+            return;
+        }
         const zoom = this.parent.parent.camera?.zoomLevel || 1;
         this._lastDebugZoom = zoom;
-        const visibleWorldW = viewport.width / zoom;
-        const visibleWorldH = viewport.height / zoom;
-        const cols = Math.min(Math.ceil(visibleWorldW / this.config.cellSize) + 2, this.gridWidth);
-        const rows = Math.min(Math.ceil(visibleWorldH / this.config.cellSize) + 2, this.gridHeight);
+        const { cols, rows } = this.getDebugVisibleCellCounts(viewport, zoom);
+        this._debugGridCols = cols;
+        this._debugGridRows = rows;
 
         for (let x = 0; x < cols; x++) {
             for (let y = 0; y < rows; y++) {
@@ -343,10 +371,11 @@ class GridSystem {
     // Update grid cell positions and visibility
     // Enhanced version of the existing updateGridDebug method
     updateGridDebug(camera) {
-        if (!this.debugMode || !this.debugInitialized) return;
+        if (!this.debugMode || !this.debugInitialized || !this.parent?.parent) return;
 
         // Get viewport bounds
         const viewport = this.parent.parent.getContainerRect();
+        if (!viewport) return;
         const zoom = camera?.zoomLevel || 1;
 
         // Recreate grid cells if zoom changed since last creation
@@ -354,8 +383,8 @@ class GridSystem {
             this.createGridCellElements();
         }
 
-        const visibleCellsX = Math.ceil(viewport.width / zoom / this.config.cellSize) + 2;
-        const visibleCellsY = Math.ceil(viewport.height / zoom / this.config.cellSize) + 2;
+        const visibleCellsX = this._debugGridCols || this.getDebugVisibleCellCounts(viewport, zoom).cols;
+        const visibleCellsY = this._debugGridRows || this.getDebugVisibleCellCounts(viewport, zoom).rows;
 
         // Update grid cells if not showing the entire grid
         if (this.debugElements.gridCells.length < this.gridWidth * this.gridHeight) {
@@ -1623,7 +1652,7 @@ class GridSystem {
             }
 
             // Handle individual elements
-            ['cursorTile', 'myteFrontTile', 'cullingBounds', 'debugStats'].forEach(elemName => {
+            ['cursorTile', 'myteFrontTile', 'cullingBounds', 'debugStats', 'terrainLegend'].forEach(elemName => {
                 const elem = this.debugElements[elemName];
                 if (elem && elem.parentNode) {
                     elem.parentNode.removeChild(elem);
@@ -1642,10 +1671,17 @@ class GridSystem {
 
         // Reset debug initialization flag
         this.debugInitialized = false;
+        this._debugGridCols = 0;
+        this._debugGridRows = 0;
 
         // Remove any event listeners
         if (this.parent && this.parent.parent && this.parent.parent.element && this.boundMouseMoveHandler) {
             this.parent.parent.element.removeEventListener('mousemove', this.boundMouseMoveHandler);
+        }
+
+        if (this._debugResizeObserver) {
+            this._debugResizeObserver.disconnect();
+            this._debugResizeObserver = null;
         }
 
         // Clean up pathfinder

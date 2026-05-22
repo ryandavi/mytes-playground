@@ -172,7 +172,10 @@ class InteractObjectAction extends GoToObjectAction {
         requiresTarget: true,
         affectsMood: true,
         moodEffect: 4,
-        defaultOptions: {}
+        defaultOptions: {
+            interactionAnimationDuration: 32,
+            postActionIdleDuration: 24
+        }
     };
 
     static canPerform(selected, active) {
@@ -194,7 +197,33 @@ class InteractObjectAction extends GoToObjectAction {
         return { target: selected };
     }
 
+    constructor(myte, options) {
+        super(myte, { ...InteractObjectAction.metadata.defaultOptions, ...options });
+        this.phase = 'approach';
+        this.animationTimer = 0;
+    }
+
+    update() {
+        if (this.phase === 'approach') {
+            const arrived = super.update();
+            if (!arrived) return false;
+            this.phase = 'interact';
+            this.animationTimer = this.interactionAnimationDuration;
+            this.faceTarget();
+            return false;
+        }
+
+        if (this.phase === 'interact') {
+            this.faceTarget();
+            this.animationTimer--;
+            return this.animationTimer <= 0;
+        }
+
+        return true;
+    }
+
     complete() {
+        this.faceTarget();
         super.complete();
 
         const hasCustomPress = typeof this.target?.press === 'function' && this.target.press !== MapObject.prototype.press;
@@ -208,7 +237,9 @@ class InteractObjectAction extends GoToObjectAction {
         if (interactionType === 'dance') {
             this.myte.queue.addDance(90);
         } else if (interactionType === 'light') {
-            this.myte.queue.addIdle(35);
+            this.myte.queue.addIdle(Math.max(35, this.postActionIdleDuration || 0));
+        } else if (this.postActionIdleDuration > 0) {
+            this.myte.queue.addIdle(this.postActionIdleDuration);
         }
     }
 }
@@ -574,7 +605,10 @@ class CloseChestAction extends GoToObjectAction {
         description: 'Approach and close a treasure chest',
         requiresTarget: true,
         affectsMood: false,
-        defaultOptions: {}
+        defaultOptions: {
+            closeAnimationDuration: 28,
+            postActionIdleDuration: 20
+        }
     };
 
     static canPerform(selected, active) {
@@ -589,10 +623,38 @@ class CloseChestAction extends GoToObjectAction {
         return { target: selected };
     }
 
+    constructor(myte, options) {
+        super(myte, { ...CloseChestAction.metadata.defaultOptions, ...options });
+        this.phase = 'approach';
+        this.animationTimer = 0;
+    }
+
+    update() {
+        if (this.phase === 'approach') {
+            const arrived = super.update();
+            if (!arrived) return false;
+            this.phase = 'close';
+            this.animationTimer = this.closeAnimationDuration;
+            this.faceTarget();
+            return false;
+        }
+
+        if (this.phase === 'close') {
+            this.faceTarget();
+            this.animationTimer--;
+            return this.animationTimer <= 0;
+        }
+
+        return true;
+    }
+
     complete() {
         this.faceTarget();
         super.complete();
         this.target?.close?.(this.myte.parent);
+        if (this.postActionIdleDuration > 0) {
+            this.myte.queue.addIdle(this.postActionIdleDuration);
+        }
     }
 }
 
@@ -611,7 +673,8 @@ class PickFlowerAction extends GoToObjectAction {
         affectsMood: true,
         moodEffect: 4,
         defaultOptions: {
-            pickAnimationDuration: 45
+            pickAnimationDuration: 45,
+            approachConfig: 'adjacent'
         }
     };
 
@@ -706,7 +769,9 @@ class TrampleFlowerAction extends GoToObjectAction {
         affectsMood: true,
         moodEffect: -3,
         defaultOptions: {
-            approachConfig: 'center'
+            approachConfig: 'adjacent',
+            trampleAnimationDuration: 22,
+            postActionIdleDuration: 20
         }
     };
 
@@ -718,11 +783,39 @@ class TrampleFlowerAction extends GoToObjectAction {
         return { target: selected };
     }
 
+    constructor(myte, options) {
+        super(myte, { ...TrampleFlowerAction.metadata.defaultOptions, ...options });
+        this.phase = 'approach';
+        this.animationTimer = 0;
+    }
+
+    update() {
+        if (this.phase === 'approach') {
+            const arrived = super.update();
+            if (!arrived) return false;
+            this.phase = 'trample';
+            this.animationTimer = this.trampleAnimationDuration;
+            this.faceTarget();
+            return false;
+        }
+
+        if (this.phase === 'trample') {
+            this.faceTarget();
+            this.animationTimer--;
+            return this.animationTimer <= 0;
+        }
+
+        return true;
+    }
+
     complete() {
+        this.faceTarget();
         super.complete();
         this.target?.remove?.();
         this.myte.queue.addExpression('surprise', 200, 1);
-        this.myte.queue.addIdle(20);
+        if (this.postActionIdleDuration > 0) {
+            this.myte.queue.addIdle(this.postActionIdleDuration);
+        }
     }
 }
 
@@ -740,7 +833,9 @@ class SmellFlowerAction extends GoToObjectAction {
         requiresTarget: true,
         affectsMood: true,
         moodEffect: 6,
-        defaultOptions: {}
+        defaultOptions: {
+            approachConfig: 'adjacent'
+        }
     };
 
     static canPerform(selected, active) {
@@ -807,17 +902,46 @@ class WaterPlantAction extends GoToObjectAction {
         requiresTarget: true,
         affectsMood: true,
         moodEffect: 4,
-        defaultOptions: {}
+        defaultOptions: {
+            waterAnimationDuration: 36,
+            postActionIdleDuration: 40
+        }
     };
 
     static canPerform(selected, active) {
         return active &&
                selected?.constructor?.name === 'CropPlantMapObject' &&
+               (typeof selected.canWater !== 'function' || selected.canWater()) &&
                !active.queue.isCarrying();
     }
 
     static getRequiredOptions(selected, active) {
         return { target: selected };
+    }
+
+    constructor(myte, options) {
+        super(myte, { ...WaterPlantAction.metadata.defaultOptions, ...options });
+        this.phase = 'approach';
+        this.animationTimer = 0;
+    }
+
+    update() {
+        if (this.phase === 'approach') {
+            const arrived = super.update();
+            if (!arrived) return false;
+            this.phase = 'water';
+            this.animationTimer = this.waterAnimationDuration;
+            this.faceTarget();
+            return false;
+        }
+
+        if (this.phase === 'water') {
+            this.faceTarget();
+            this.animationTimer--;
+            return this.animationTimer <= 0;
+        }
+
+        return true;
     }
 
     complete() {
@@ -826,7 +950,9 @@ class WaterPlantAction extends GoToObjectAction {
         if (this.target?.water) {
             this.target.water();
         }
-        this.myte.queue.addIdle(40);
+        if (this.postActionIdleDuration > 0) {
+            this.myte.queue.addIdle(this.postActionIdleDuration);
+        }
     }
 }
 
@@ -845,7 +971,8 @@ class HarvestAction extends GoToObjectAction {
         affectsMood: true,
         moodEffect: 8,
         defaultOptions: {
-            harvestAnimationDuration: 50
+            harvestAnimationDuration: 50,
+            postActionIdleDuration: 45
         }
     };
 
@@ -894,5 +1021,8 @@ class HarvestAction extends GoToObjectAction {
             this.target.harvest(this.myte);
         }
         this.myte.queue.addExpression('excited', 300, 1);
+        if (this.postActionIdleDuration > 0) {
+            this.myte.queue.addIdle(this.postActionIdleDuration);
+        }
     }
 }

@@ -89,11 +89,8 @@ class BallMapObject extends AnimatedMapObject {
 
     getApproachConfig() {
         return {
-            allowedSides: ['center'],
-            preferredSide: 'center',
-            gap: 0,
-            align: 'center',
-            alignTo: 'collider'
+            gap: 8,
+            align: 'center'
         };
     }
 

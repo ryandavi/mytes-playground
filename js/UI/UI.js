@@ -716,7 +716,13 @@ class QueueTargetManager extends UIComponent {
     update() {
         const activeMyte = this.parent.getActiveMyte();
         const currentAction = activeMyte?.queue?.getCurrentAction?.() || null;
-        const target = currentAction?.target || null;
+        const target = currentAction?.target ||
+            (
+                activeMyte?.goal === MOVE_TYPES.GOHOME &&
+                !activeMyte?.isAtHomePosition?.(1)
+                    ? activeMyte.getHomeSlotElement?.() ?? null
+                    : null
+            );
         const highlightElement = this.getHighlightElement(target);
 
         if (!highlightElement || target?.active === false) {
@@ -743,6 +749,7 @@ class ActionSidebarManager extends UIComponent {
         this._otherInfoCache = null;
         this._otherInfoRowMap = new Map();
         this._lastAvailableActionsKey = null;
+        this._pendingSelectionReset = null;
     }
 
     // Helper method to get category titles
@@ -771,17 +778,37 @@ class ActionSidebarManager extends UIComponent {
         return availableActions.find(action => !skip.has(action.id)) ?? null;
     }
 
+    getCurrentActionContext(selectedObject, activeMyte) {
+        const currentAction = activeMyte?.queue?.getCurrentAction?.() ?? null;
+        const currentActionId = currentAction?.constructor?.metadata?.id ?? '';
+        const currentTarget = currentAction?.target ?? null;
+        return {
+            currentAction,
+            currentActionId,
+            currentTarget,
+            isDoingAction: !!activeMyte?.queue?.isDoingAction,
+            matchesSelection: !!selectedObject && currentTarget === selectedObject
+        };
+    }
+
     createActionButton(action, selectedObject, activeMyte, { prominent = false } = {}) {
         const button = document.createElement('button');
         button.textContent = action.label;
-        const isBusy = activeMyte?.queue?.count() > 0;
+        const actionContext = this.getCurrentActionContext(selectedObject, activeMyte);
         const titleParts = [];
         if (action.description) {
             titleParts.push(action.description);
         }
-        if (isBusy) {
+
+        const isCurrentSelectionAction =
+            actionContext.isDoingAction &&
+            actionContext.matchesSelection &&
+            actionContext.currentActionId === action.id;
+
+        if (isCurrentSelectionAction) {
             button.disabled = true;
-            titleParts.push('Busy with current action');
+            button.classList.add('is-in-progress');
+            titleParts.push('Action in progress');
         }
         if (titleParts.length) {
             button.title = titleParts.join('\n');
@@ -814,6 +841,9 @@ class ActionSidebarManager extends UIComponent {
                     ...options,
                     userInitiated: true
                 });
+                if (options.target === selectedObject) {
+                    this._pendingSelectionReset = { selectedObject };
+                }
                 this.updateActions(selectedObject);
             }
         });
@@ -834,11 +864,21 @@ class ActionSidebarManager extends UIComponent {
     }
 
     update() {
+        const activeMyte = this.parent.getActiveMyte();
+        if (this._syncPendingSelectionReset(activeMyte)) {
+            return;
+        }
+
         if (!this.currentSelectedObject) {
             return;
         }
 
-        const activeMyte = this.parent.getActiveMyte();
+        if (this.currentSelectedObject instanceof MapObject &&
+            (this.currentSelectedObject.active === false || !this.currentSelectedObject.element)) {
+            this.parent.selectionManager.setSelected(null);
+            return;
+        }
+
         const availableKey = this._buildAvailableActionsKey(this.currentSelectedObject, activeMyte);
         if (availableKey !== this._lastAvailableActionsKey) {
             this._lastAvailableActionsKey = availableKey;
@@ -854,13 +894,36 @@ class ActionSidebarManager extends UIComponent {
         this.renderOtherInfo(this.currentSelectedObject);
     }
 
+    _syncPendingSelectionReset(activeMyte) {
+        const pending = this._pendingSelectionReset;
+        if (!pending?.selectedObject) {
+            return false;
+        }
+
+        if (this.parent.selectionManager.getSelectedObject?.() !== pending.selectedObject) {
+            this._pendingSelectionReset = null;
+            return false;
+        }
+
+        const queuedActions = activeMyte?.queue?.queue ?? [];
+        const stillQueued = queuedActions.some(action => action?.target === pending.selectedObject);
+        if (stillQueued) {
+            return false;
+        }
+
+        this._pendingSelectionReset = null;
+        this.parent.selectionManager.setSelected(null);
+        return true;
+    }
+
     _buildAvailableActionsKey(selectedObject, activeMyte) {
         if (!selectedObject) return '';
         const availableActions = ActionManager.getAvailableActions(selectedObject, activeMyte);
-        const currentActionId = activeMyte?.queue?.getCurrentAction()?.constructor?.metadata?.id ?? '';
+        const actionContext = this.getCurrentActionContext(selectedObject, activeMyte);
         const busyCount = activeMyte?.queue?.count() ?? 0;
         const subjectId = selectedObject?.id ?? selectedObject?.constructor?.name ?? 'selected';
-        return `${subjectId}|busy=${busyCount}|current=${currentActionId}|actions=${availableActions.map(a => a.id).join(',')}`;
+        const targetId = actionContext.currentTarget?.id ?? actionContext.currentTarget?.constructor?.name ?? '';
+        return `${subjectId}|busy=${busyCount}|current=${actionContext.currentActionId}|target=${targetId}|phase=${actionContext.currentAction?.phase ?? ''}|actions=${availableActions.map(a => a.id).join(',')}`;
     }
 
     appendInfoRow(container, label, value, className = 'state-info') {
@@ -897,36 +960,88 @@ class ActionSidebarManager extends UIComponent {
         container.append(wrapper);
     }
 
+    appendSectionHeader(rows, key, title, className = 'info-section-title') {
+        rows.push({
+            label: `__header_${key}`,
+            value: title,
+            className
+        });
+    }
+
+    appendInfoRows(rows, entries = [], defaultClassName = 'state-info') {
+        entries.forEach(({ label, value, type, meta, className }) => {
+            if (value == null || value === '') return;
+            rows.push({
+                label,
+                value,
+                type,
+                meta,
+                className: className ?? defaultClassName
+            });
+        });
+    }
+
+    getObjectStateRows(selectedObject) {
+        const rows = [];
+        const statusRows = [];
+
+        if (selectedObject instanceof DoorMapObject) {
+            statusRows.push(
+                { label: 'Door State', value: selectedObject.isOpen ? 'Open' : 'Closed' },
+                { label: 'Animating', value: typeof selectedObject.isAnimating === 'boolean' && selectedObject.isAnimating ? 'Yes' : null }
+            );
+        }
+
+        this.appendInfoRows(statusRows, selectedObject.getSidebarStatusRows?.() ?? []);
+
+        if (statusRows.length) {
+            this.appendSectionHeader(rows, 'status', 'Status');
+            rows.push(...statusRows);
+        }
+
+        const detailsRows = [];
+        this.appendInfoRows(detailsRows, selectedObject.getSidebarDetailRows?.() ?? []);
+        if (detailsRows.length) {
+            this.appendSectionHeader(rows, 'details', 'Details');
+            rows.push(...detailsRows);
+        }
+
+        return rows;
+    }
+
     _buildOtherInfoRows(selectedObject) {
         const rows = [];
         const gridCoords = this.parent.parent.gameMap.gridSystem.worldToGrid(selectedObject.posX, selectedObject.posY);
-        rows.push({ label: 'Coords', value: `[${gridCoords.x}, ${gridCoords.y}]`, className: 'position-info' });
-        rows.push({ label: 'World', value: `(${selectedObject.posX.toFixed(0)}, ${selectedObject.posY.toFixed(0)})`, className: 'position-info' });
+        const debugMode = document.body.classList.contains('debug');
 
-        if (selectedObject instanceof DoorMapObject) {
-            rows.push({ label: 'State', value: selectedObject.isOpen ? 'Open' : 'Closed' });
+        const activeMyte = this.parent.getActiveMyte();
+        const actionContext = this.getCurrentActionContext(selectedObject, activeMyte);
+        if (actionContext.matchesSelection && actionContext.currentAction) {
+            this.appendSectionHeader(rows, 'current_action', 'Current Action');
+            this.appendInfoRows(rows, [
+                { label: 'Action', value: actionContext.currentAction.getQueueTitle?.() ?? actionContext.currentAction.constructor?.metadata?.label ?? actionContext.currentAction.constructor?.name ?? 'Action' },
+                { label: 'Phase', value: actionContext.currentAction.phase ?? null }
+            ]);
         }
 
         if (selectedObject instanceof Myte) {
             const snapshot = selectedObject.ai?.getNeedsSnapshot?.({ live: true });
             if (snapshot) {
                 const vitals = snapshot.vitals ?? {};
-                rows.push({ label: 'Energy', value: `${vitals.energy ?? 0}%` });
-                rows.push({ label: 'Mood', value: `${selectedObject.stats.getMoodStatus()} (${vitals.mood ?? 0}%)` });
-                rows.push({ label: 'Fun', value: `${vitals.fun ?? 0}%` });
-                rows.push({ label: 'Comfort', value: `${vitals.comfort ?? 0}%` });
-                rows.push({ label: 'Confidence', value: `${vitals.confidence ?? 0}%` });
+                this.appendSectionHeader(rows, 'status', 'Status');
+                this.appendInfoRows(rows, [
+                    { label: 'Energy', value: `${vitals.energy ?? 0}%` },
+                    { label: 'Mood', value: `${selectedObject.stats.getMoodStatus()} (${vitals.mood ?? 0}%)` },
+                    { label: 'Mode', value: selectedObject.goal ?? null }
+                ]);
                 if (snapshot.topNeed) {
                     rows.push({ label: 'Top Need', value: `${snapshot.topNeed.label} (${snapshot.topNeed.percent}%)` });
                 }
                 rows.push({ label: '__header_needs', value: 'Needs', className: 'needs-title' });
-                snapshot.needs.slice(0, 5).forEach(need => {
+                snapshot.needs.slice(0, 3).forEach(need => {
                     const pct = Math.max(0, 100 - need.percent);
                     rows.push({ label: `need_${need.label}`, value: pct, meta: { label: need.label, tone: this.getNeedFulfillmentLabel(pct) }, type: 'meter' });
                 });
-                const environment = snapshot.environment ?? {};
-                rows.push({ label: 'Light Need', value: `${environment.lightNeed ?? 0}%` });
-                rows.push({ label: 'Music Need', value: `${environment.musicNeed ?? 0}%` });
                 if (snapshot.lastDecisionLabel) {
                     rows.push({ label: 'Last AI Choice', value: snapshot.lastDecisionLabel });
                 }
@@ -934,36 +1049,20 @@ class ActionSidebarManager extends UIComponent {
         }
 
         if (selectedObject instanceof MapObject) {
-            const interactionType = selectedObject.getConfig?.('interactionType');
-            const deflowered = selectedObject.getConfig?.('deflowered', false);
-            if (interactionType) {
-                rows.push({ label: 'Interaction', value: interactionType });
-            }
-            if (deflowered) {
-                rows.push({ label: 'Flower', value: 'Deflowered' });
-            }
-            if (typeof selectedObject.isReadyToHarvest === 'function') {
-                rows.push({ label: 'Harvest Ready', value: selectedObject.isReadyToHarvest() ? 'Yes' : 'No' });
-            }
-            if (selectedObject.growthStage != null) {
-                rows.push({ label: 'Growth Stage', value: selectedObject.growthStage });
-            }
-            if (selectedObject.isWatered != null) {
-                rows.push({ label: 'Watered', value: selectedObject.isWatered ? 'Yes' : 'No' });
-            }
-            if (selectedObject.fullyGrown != null) {
-                rows.push({ label: 'Fully Grown', value: selectedObject.fullyGrown ? 'Yes' : 'No' });
-            }
-            if (selectedObject.constructor?.name === 'CropPlantMapObject') {
-                rows.push({ label: 'Crop Quality', value: selectedObject.quality ?? 'N/A' });
-            }
-            if (typeof selectedObject.isActive === 'boolean') {
-                rows.push({ label: 'Active', value: selectedObject.isActive ? 'Yes' : 'No' });
-            }
+            rows.push(...this.getObjectStateRows(selectedObject));
         }
 
-        const debugInfo = selectedObject.getSelectionDebugInfo?.() || [];
-        debugInfo.forEach(({ label, value }) => rows.push({ label, value: String(value) }));
+        this.appendSectionHeader(rows, 'location', 'Location');
+        this.appendInfoRows(rows, [
+            { label: 'Coords', value: `[${gridCoords.x}, ${gridCoords.y}]`, className: 'position-info' },
+            { label: 'World', value: debugMode ? `(${selectedObject.posX.toFixed(0)}, ${selectedObject.posY.toFixed(0)})` : null, className: 'position-info' }
+        ]);
+
+        const debugInfo = debugMode ? (selectedObject.getSelectionDebugInfo?.() || []) : [];
+        if (debugInfo.length) {
+            this.appendSectionHeader(rows, 'debug', 'Debug');
+            debugInfo.forEach(({ label, value }) => rows.push({ label, value: String(value) }));
+        }
 
         return rows;
     }
@@ -1054,6 +1153,9 @@ class ActionSidebarManager extends UIComponent {
         this._otherInfoCache = null;
         this._otherInfoRowMap.clear();
         this._lastAvailableActionsKey = null;
+        if (this._pendingSelectionReset?.selectedObject && this._pendingSelectionReset.selectedObject !== selectedObject) {
+            this._pendingSelectionReset = null;
+        }
 
 
         // Remove all state classes first
@@ -1105,6 +1207,7 @@ class ActionSidebarManager extends UIComponent {
 
     updateActionList(selectedObject) {
         const actionGroups = this.actionControls.querySelector('.action-groups');
+        actionGroups.innerHTML = '';
         const activeMyte = this.parent.getActiveMyte();
 
         const availableActions = ActionManager.getAvailableActions(selectedObject, activeMyte);
@@ -1121,10 +1224,6 @@ class ActionSidebarManager extends UIComponent {
         if (majorAction) {
             const majorActionElement = document.createElement('div');
             majorActionElement.className = 'action-group major-action';
-
-            const title = document.createElement('h3');
-            title.textContent = 'Major Action';
-            majorActionElement.appendChild(title);
 
             const actionList = document.createElement('ul');
             const li = document.createElement('li');

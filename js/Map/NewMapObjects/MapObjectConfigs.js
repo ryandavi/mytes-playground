@@ -72,9 +72,7 @@ const TYPE_CONFIGS = {
 		canInspect: false,
 		regrowthTime: 120000, // 2 minutes
 		approachConfig: {
-			alignTo: 'collider',
-			align: 'center',
-			gap: 4
+			gap: 10
 		},
 		variantConfigs: {
 			grass_1: { displayName: 'Flower' },
@@ -93,6 +91,9 @@ const TYPE_CONFIGS = {
 		moodBoostAmount: 5,
 		majorActionId: ['pick_flower'],
 		regrowthTime: 120000, // 2 minutes
+		approachConfig: {
+			gap: 10
+		},
 		ai: {
 			affordances: [
 				{ actionId: 'smell_flower', purpose: 'soothe' }
@@ -151,8 +152,6 @@ const TYPE_CONFIGS = {
 		interactionTouchThreshold: 16,
 		approachConfig: {
 			allowedSides: ['bottom'],
-			alignTo: 'collider',
-			myteAlignTo: 'collider',
 			align: 'center',
 			gap: 0
 		},
@@ -284,7 +283,6 @@ const TYPE_CONFIGS = {
 			height: 32
 		},
 		approachConfig: {
-			alignTo: 'collider',
 			align: 'center',
 			gap: 4
 		},

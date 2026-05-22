@@ -417,11 +417,7 @@ class Myte {
 	}
 
 	getHomeSlotRect() {
-		const slotElement =
-			this.dropTarget?.querySelector?.('.myte-home-slot') ||
-			this.dropTarget ||
-			this.elements.wrapper ||
-			this.element;
+		const slotElement = this.getHomeSlotElement();
 		const rect = this.parent.getLocalOffset(slotElement);
 		return {
 			x: rect.left,
@@ -433,6 +429,13 @@ class Myte {
 			width: rect.width,
 			height: rect.height
 		};
+	}
+
+	getHomeSlotElement() {
+		return this.dropTarget?.querySelector?.('.myte-home-slot') ||
+			this.dropTarget ||
+			this.elements.wrapper ||
+			this.element;
 	}
 
 	getHomePosition() {

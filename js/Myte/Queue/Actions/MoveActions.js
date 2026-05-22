@@ -357,7 +357,9 @@ class GoToObjectAction extends PositionableAction {
         defaultOptions: {
             // approachConfig: null — pass a string key or partial config to override target's default
             allowStuckSuccess: true,
-            stuckCompletionDistance: 18
+            stuckCompletionDistance: 18,
+            finalApproachSkipDistance: 48,
+            maxFinalAdjustmentDistance: 48
         }
     };
 
@@ -563,7 +565,8 @@ class GoToObjectAction extends PositionableAction {
         const bestPath   = this.findBestPath(candidates);
 
         if (bestPath) {
-            _alog(`[APPROACH] bestPath → targetPos=(${bestPath.targetPos.x.toFixed(1)},${bestPath.targetPos.y.toFixed(1)}) score=${bestPath.score.toFixed(1)} waypoints=${bestPath.targetPoints.length}`);
+            const routeTarget = bestPath.resolvedTargetPos ?? bestPath.targetPos;
+            _alog(`[APPROACH] bestPath → routeTarget=(${routeTarget.x.toFixed(1)},${routeTarget.y.toFixed(1)}) finalTarget=(${bestPath.targetPos.x.toFixed(1)},${bestPath.targetPos.y.toFixed(1)}) score=${bestPath.score.toFixed(1)} waypoints=${bestPath.targetPoints.length}`);
             this.targetPos    = bestPath.targetPos;
             this.targetPoints = bestPath.targetPoints;
             this.refreshDebugVisualization();
@@ -638,6 +641,8 @@ class GoToObjectAction extends PositionableAction {
         }
 
         let bestPath = null;
+        let fallbackPath = null;
+        const maxAdjustmentDistance = this.getMaxFinalAdjustmentDistance();
 
         for (let i = 0; i < candidates.length; i++) {
             const candidate = candidates[i];
@@ -650,12 +655,27 @@ class GoToObjectAction extends PositionableAction {
             const snappedColliderY = endGridY * cellSize + (col?.offsetY ?? 0);
             const exactColliderY   = candidate.y   + (col?.offsetY ?? 0);
             _alog(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) endGrid=(${endGridX},${endGridY}) snappedColliderY=${snappedColliderY.toFixed(0)} exactColliderY=${exactColliderY.toFixed(0)}`);
-            const path  = this.myte.pathfinder.findPath(this.myte, this.myte.posX, this.myte.posY, endCX, endCY);
+            const path  = this.myte.pathfinder.findPath(
+                this.myte,
+                this.myte.posX,
+                this.myte.posY,
+                endCX,
+                endCY,
+                { exactEndMode: 'never' }
+            );
 
             if (!path?.length) {
                 _alog(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) → no path`);
                 continue;
             }
+
+            const finalPathPoint = path[path.length - 1];
+            const resolvedTargetPos = finalPathPoint
+                ? {
+                    x: finalPathPoint.x - this.myte.size.width / 2,
+                    y: finalPathPoint.y - this.myte.size.height / 2
+                }
+                : candidate;
 
             const targetPoints = path
                 .map(wp => ({
@@ -668,14 +688,51 @@ class GoToObjectAction extends PositionableAction {
                     return Math.hypot(pt.x - prev.x, pt.y - prev.y) > 0.5;
                 });
 
-            const score = this.getPathScore(targetPoints);
-            _alog(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) → path ok rawPts=${path.length} filteredPts=${targetPoints.length} score=${score.toFixed(1)}${(!bestPath || score < bestPath.score) ? ' ← best so far' : ''}`);
+            const adjustmentDistance = Math.hypot(
+                candidate.x - resolvedTargetPos.x,
+                candidate.y - resolvedTargetPos.y
+            );
+            const score = this.getPathScore(targetPoints) + adjustmentDistance;
+            const pathInfo = { targetPos: candidate, resolvedTargetPos, targetPoints, score, adjustmentDistance };
+
+            if (!fallbackPath || adjustmentDistance < fallbackPath.adjustmentDistance || (adjustmentDistance === fallbackPath.adjustmentDistance && score < fallbackPath.score)) {
+                fallbackPath = pathInfo;
+            }
+
+            if (adjustmentDistance > maxAdjustmentDistance) {
+                _alog(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) → rejected adjust=${adjustmentDistance.toFixed(1)} > max=${maxAdjustmentDistance.toFixed(1)}`);
+                continue;
+            }
+
+            _alog(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) → path ok rawPts=${path.length} filteredPts=${targetPoints.length} adjust=${adjustmentDistance.toFixed(1)} score=${score.toFixed(1)}${(!bestPath || score < bestPath.score) ? ' ← best so far' : ''}`);
             if (!bestPath || score < bestPath.score) {
-                bestPath = { targetPos: candidate, targetPoints, score };
+                bestPath = pathInfo;
             }
         }
 
-        return bestPath;
+        if (bestPath) {
+            return bestPath;
+        }
+
+        if (fallbackPath) {
+            _awarn(`[APPROACH] no candidates within max final adjustment ${maxAdjustmentDistance.toFixed(1)}; falling back to least-bad candidate adjust=${fallbackPath.adjustmentDistance.toFixed(1)}`);
+        }
+
+        return fallbackPath;
+    }
+
+    getMaxFinalAdjustmentDistance() {
+        const explicit = Number(this.maxFinalAdjustmentDistance);
+        if (Number.isFinite(explicit) && explicit > 0) {
+            return explicit;
+        }
+
+        const touchThreshold = Number(this.target?.getConfig?.('interactionTouchThreshold', NaN));
+        if (Number.isFinite(touchThreshold) && touchThreshold > 0) {
+            return Math.max(24, touchThreshold + 16);
+        }
+
+        return 48;
     }
 
     getPathScore(points) {
@@ -744,6 +801,27 @@ class GoToObjectAction extends PositionableAction {
         }
 
         return this.getTargetColliderGap() <= threshold;
+    }
+
+    shouldSkipLastWaypoint(waypoint) {
+        if (!waypoint || !this.targetPos || !this.targetPoints?.length) {
+            return false;
+        }
+
+        const isLastWaypoint = this.currentTargetIndex === this.targetPoints.length - 1;
+        if (!isLastWaypoint) {
+            return false;
+        }
+
+        const skipDistance = Number(this.finalApproachSkipDistance ?? 48);
+        if (!Number.isFinite(skipDistance) || skipDistance <= 0) {
+            return false;
+        }
+
+        return Math.hypot(
+            waypoint.x - this.targetPos.x,
+            waypoint.y - this.targetPos.y
+        ) <= skipDistance;
     }
 
     update() {
@@ -832,6 +910,10 @@ class GoToObjectAction extends PositionableAction {
                 const wp = this.targetPoints[this.currentTargetIndex];
                 if (!wp) {
                     this.targetPoints = null;
+                } else if (this.shouldSkipLastWaypoint(wp)) {
+                    _alog(`[APPROACH] skipping terminal waypoint (${wp.x.toFixed(1)},${wp.y.toFixed(1)}) and switching to exact final target (${this.targetPos.x.toFixed(1)},${this.targetPos.y.toFixed(1)})`);
+                    this.targetPoints = null;
+                    this.currentTargetIndex = 0;
                 } else {
                     this.myte.setTarget(wp.x, wp.y);
                     this.myte.moveTowardsTarget();

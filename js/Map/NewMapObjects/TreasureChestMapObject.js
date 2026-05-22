@@ -17,6 +17,64 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         this.items = this.normalizeItems(items);
     }
 
+    humanizeSidebarToken(value) {
+        return String(value || '')
+            .trim()
+            .split(/[_\s-]+/)
+            .filter(Boolean)
+            .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ');
+    }
+
+    formatSidebarQuantity(quantity) {
+        if (Array.isArray(quantity) && quantity.length >= 2) {
+            return `${quantity[0]}-${quantity[1]}`;
+        }
+
+        const numericQuantity = Number(quantity);
+        if (Number.isFinite(numericQuantity)) {
+            return String(numericQuantity);
+        }
+
+        return null;
+    }
+
+    getChestStateLabel() {
+        return this.humanizeSidebarToken(this.state || 'closed');
+    }
+
+    getContainedLootSummary(maxEntries = 3) {
+        const items = this.normalizeItems(this.items);
+        if (!items.length) {
+            return 'Empty';
+        }
+
+        const summary = items.slice(0, maxEntries).map(item => {
+            const itemDefinition = ItemRegistry.getItemSync(item.variant);
+            const label = itemDefinition?.name ||
+                this.humanizeSidebarToken(item.variant || item.type || 'Loot');
+            const quantity = this.formatSidebarQuantity(item.quantity);
+            const probability = Number(item.probability);
+            const parts = [label];
+
+            if (quantity && quantity !== '1') {
+                parts.push(`x${quantity}`);
+            }
+
+            if (Number.isFinite(probability) && probability > 0 && probability < 1) {
+                parts.push(`(${Math.round(probability * 100)}%)`);
+            }
+
+            return parts.join(' ');
+        });
+
+        if (items.length > maxEntries) {
+            summary.push(`+${items.length - maxEntries} more`);
+        }
+
+        return summary.join(', ');
+    }
+
     applyRuntimeProperties(properties = {}) {
         if (Object.prototype.hasOwnProperty.call(properties, 'items')) {
             this.items = this.normalizeItems(properties.items);
@@ -172,6 +230,20 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
             quantity,
             probability
         };
+    }
+
+    getSidebarStatusRows() {
+        return [
+            { label: 'Chest State', value: this.getChestStateLabel() },
+            ...super.getSidebarStatusRows()
+        ];
+    }
+
+    getSidebarDetailRows() {
+        return [
+            { label: 'Contains', value: this.getContainedLootSummary() },
+            ...super.getSidebarDetailRows()
+        ];
     }
 
     _sanitizeItemToken(value) {

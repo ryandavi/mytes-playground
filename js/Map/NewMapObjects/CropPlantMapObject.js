@@ -56,6 +56,15 @@ class CropPlantMapObject extends GrowingPlantMapObject {
         return !!this.harvestable;
     }
 
+    getSidebarDetailRows() {
+        return [
+            ...super.getSidebarDetailRows(),
+            { label: 'Crop Quality', value: this.quality ?? 'N/A' },
+            { label: 'Regrows', value: this.canRegrow ? 'Yes' : 'No' },
+            { label: 'Yield', value: `${this.minYield}-${this.maxYield}` }
+        ];
+    }
+
     harvest() {
         if (!this.harvestable) return null;
 
