@@ -102,6 +102,14 @@ $item-color-medicine: #98fb98;
     }
 }
 
+.item-tooltip {
+    @include floating-help-paper;
+    position: fixed;
+    z-index: 99999;
+    min-width: 100px;
+    white-space: normal;
+}
+
 .consumption-effect {
     position: absolute;
     width: var(--item-size);

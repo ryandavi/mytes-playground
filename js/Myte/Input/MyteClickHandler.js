@@ -14,7 +14,9 @@ class MyteClickHandler extends MyteBaseHandler {
 		};
 
 		this.lastClickTime = 0;
+		this.lastHomeClickTime = 0;
 		this.longPressTimer = null;
+		this._homeLongPressTimer = null;
 		this.isPressed = false;
 		this.dragStartX = 0;
 		this.dragStartY = 0;
@@ -32,6 +34,9 @@ class MyteClickHandler extends MyteBaseHandler {
 		this._on(document,              'mouseup',     this._onPressEnd.bind(this));
 		this._on(document,              'mousemove',   this._onMouseMove.bind(this));
 		this._on(this.myte.dropTarget,  'click',       this._onHomeClick.bind(this));
+		this._on(this.myte.dropTarget,  'pointerdown', this._onHomePointerDown.bind(this));
+		this._on(this.myte.dropTarget,  'pointerup',   this._onHomePointerUp.bind(this));
+		this._on(this.myte.dropTarget,  'pointercancel', this._onHomePointerUp.bind(this));
 		this._on(this.myte.duplicate,   'contextmenu', this._onContextMenu.bind(this));
 	}
 
@@ -64,6 +69,16 @@ class MyteClickHandler extends MyteBaseHandler {
 		event.preventDefault();
 	}
 
+	_sendMyteHome() {
+		if (this.myte.isAtHomePosition?.(1)) {
+			this.myte.stop?.();
+			return;
+		}
+		this.myte.clearHomeSlotHold?.();
+		this.myte.queue.clear();
+		this.myte.setMode(MOVE_TYPES.GOHOME);
+	}
+
 	_onHomeClick(event) {
 		event?.stopPropagation?.();
 
@@ -77,14 +92,32 @@ class MyteClickHandler extends MyteBaseHandler {
 			return;
 		}
 
-		if (this.myte.isAtHomePosition?.(1)) {
-			this.myte.stop?.();
+		// Double click or long press → go home immediately
+		const now = Date.now();
+		if (now - this.lastHomeClickTime < this.config.doubleClickTimeout) {
+			this.lastHomeClickTime = 0;
+			this._sendMyteHome();
 			return;
 		}
+		this.lastHomeClickTime = now;
 
-		this.myte.clearHomeSlotHold?.();
-		this.myte.queue.clear();
-		this.myte.setMode(MOVE_TYPES.GOHOME);
+		// Single click → show slot info in sidebar (click the myte sprite for myte info)
+		this.myte.parent.ui?.setSelected?.(this.myte.dropTarget);
+	}
+
+	_onHomePointerDown(event) {
+		if (!this.myte.isActive || !this.myte.isActiveMyte) return;
+		this._homeLongPressTimer = setTimeout(() => {
+			this._homeLongPressTimer = null;
+			this._sendMyteHome();
+		}, this.config.longPressTimeout);
+	}
+
+	_onHomePointerUp(event) {
+		if (this._homeLongPressTimer) {
+			clearTimeout(this._homeLongPressTimer);
+			this._homeLongPressTimer = null;
+		}
 	}
 
 	_activateFromHomeSlot(event) {
@@ -214,6 +247,9 @@ class MyteClickHandler extends MyteBaseHandler {
 	dispose() {
 		if (this.longPressTimer) {
 			clearTimeout(this.longPressTimer);
+		}
+		if (this._homeLongPressTimer) {
+			clearTimeout(this._homeLongPressTimer);
 		}
 		super.dispose();
 	}

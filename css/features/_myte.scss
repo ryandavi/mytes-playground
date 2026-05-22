@@ -39,6 +39,13 @@
         }
     }
 
+    &.is-selected {
+        > .myte-home-slot {
+            outline: 2px dashed green;
+            border-radius: var(--border-radius);
+        }
+    }
+
     &:hover {
         > .myte-home-slot:not(.is-queue-target) {
             outline: var(--border-width) solid darkgrey;

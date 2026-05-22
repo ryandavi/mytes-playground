@@ -879,6 +879,12 @@ class ActionSidebarManager extends UIComponent {
             return;
         }
 
+        if (this.currentSelectedObject instanceof DroppedMapItem &&
+            (this.currentSelectedObject.collected || !this.currentSelectedObject.active)) {
+            this.parent.selectionManager.setSelected(null);
+            return;
+        }
+
         const availableKey = this._buildAvailableActionsKey(this.currentSelectedObject, activeMyte);
         if (availableKey !== this._lastAvailableActionsKey) {
             this._lastAvailableActionsKey = availableKey;
@@ -918,6 +924,9 @@ class ActionSidebarManager extends UIComponent {
 
     _buildAvailableActionsKey(selectedObject, activeMyte) {
         if (!selectedObject) return '';
+        if (selectedObject instanceof DroppedMapItem) {
+            return `dropped:${selectedObject.variant}|collected=${selectedObject.collected}|busy=${activeMyte?.queue?.count() ?? 0}`;
+        }
         const availableActions = ActionManager.getAvailableActions(selectedObject, activeMyte);
         const actionContext = this.getCurrentActionContext(selectedObject, activeMyte);
         const busyCount = activeMyte?.queue?.count() ?? 0;
@@ -1011,7 +1020,9 @@ class ActionSidebarManager extends UIComponent {
 
     _buildOtherInfoRows(selectedObject) {
         const rows = [];
-        const gridCoords = this.parent.parent.gameMap.gridSystem.worldToGrid(selectedObject.posX, selectedObject.posY);
+        const gridSystem = this.parent.parent.gameMap?.gridSystem;
+        const hasPosition = typeof selectedObject?.posX === 'number' && typeof selectedObject?.posY === 'number';
+        const gridCoords = hasPosition ? (gridSystem?.worldToGrid(selectedObject.posX, selectedObject.posY) ?? { x: 0, y: 0 }) : null;
         const debugMode = document.body.classList.contains('debug');
 
         const activeMyte = this.parent.getActiveMyte();
@@ -1052,11 +1063,13 @@ class ActionSidebarManager extends UIComponent {
             rows.push(...this.getObjectStateRows(selectedObject));
         }
 
-        this.appendSectionHeader(rows, 'location', 'Location');
-        this.appendInfoRows(rows, [
-            { label: 'Coords', value: `[${gridCoords.x}, ${gridCoords.y}]`, className: 'position-info' },
-            { label: 'World', value: debugMode ? `(${selectedObject.posX.toFixed(0)}, ${selectedObject.posY.toFixed(0)})` : null, className: 'position-info' }
-        ]);
+        if (hasPosition) {
+            this.appendSectionHeader(rows, 'location', 'Location');
+            this.appendInfoRows(rows, [
+                { label: 'Coords', value: `[${gridCoords.x}, ${gridCoords.y}]`, className: 'position-info' },
+                { label: 'World', value: debugMode ? `(${selectedObject.posX.toFixed(0)}, ${selectedObject.posY.toFixed(0)})` : null, className: 'position-info' }
+            ]);
+        }
 
         const debugInfo = debugMode ? (selectedObject.getSelectionDebugInfo?.() || []) : [];
         if (debugInfo.length) {
@@ -1183,6 +1196,17 @@ class ActionSidebarManager extends UIComponent {
                     selectedInfo.classList.add('map-interaction');
                     targetType.textContent = "Object";
                     targetName.textContent = selectedObject.getDisplayName?.() || selectedObject.type;
+                } else if (selectedObject instanceof DroppedMapItem) {
+                    selectedInfo.classList.add('element-interaction');
+                    targetType.textContent = "Item";
+                    const itemDef = ItemRegistry.getItemSync?.(selectedObject.variant);
+                    targetName.textContent = itemDef?.name || selectedObject.variant || 'Item';
+                } else if (selectedObject?.classList?.contains('myte-slot')) {
+                    selectedInfo.classList.add('map-interaction');
+                    targetType.textContent = "Slot";
+                    targetName.textContent = selectedObject.querySelector('.myte-home-label .name')?.textContent?.trim()
+                        || selectedObject.id
+                        || 'Home Slot';
                 } else if (selectedObject instanceof Element) {
                     selectedInfo.classList.add('element-interaction');
                     targetType.textContent = "Element";
@@ -1205,10 +1229,75 @@ class ActionSidebarManager extends UIComponent {
         }
     }
 
+    _createDroppedItemPickupButton(selectedObject, activeMyte) {
+        const button = document.createElement('button');
+        button.textContent = 'Pick Up';
+        button.classList.add('primary-action');
+        button.addEventListener('click', () => {
+            if (!activeMyte || selectedObject.collected) return;
+            const myteCenter = {
+                x: activeMyte.posX + (activeMyte.size.width / 2),
+                y: activeMyte.posY + (activeMyte.size.height / 2)
+            };
+            const itemCenter = {
+                x: selectedObject.posX + (selectedObject.size.width / 2),
+                y: selectedObject.posY + (selectedObject.size.height / 2)
+            };
+            const dist = Math.hypot(itemCenter.x - myteCenter.x, itemCenter.y - myteCenter.y);
+            if (dist < selectedObject.minimumCollectDistance) {
+                selectedObject.collect(activeMyte);
+            } else {
+                activeMyte.queue.interrupt('astar_move', {
+                    waypoints: [{ x: itemCenter.x, y: itemCenter.y }],
+                    userInitiated: true
+                });
+            }
+        });
+        return button;
+    }
+
     updateActionList(selectedObject) {
         const actionGroups = this.actionControls.querySelector('.action-groups');
         actionGroups.innerHTML = '';
         const activeMyte = this.parent.getActiveMyte();
+
+        if (selectedObject instanceof DroppedMapItem) {
+            if (activeMyte && !selectedObject.collected) {
+                const groupEl = document.createElement('div');
+                groupEl.className = 'action-group major-action';
+                const ul = document.createElement('ul');
+                const li = document.createElement('li');
+                li.appendChild(this._createDroppedItemPickupButton(selectedObject, activeMyte));
+                ul.appendChild(li);
+                groupEl.appendChild(ul);
+                actionGroups.appendChild(groupEl);
+                this.actionControls.classList.add('is-visible');
+            }
+            return;
+        }
+
+        if (selectedObject?.classList?.contains('myte-slot')) {
+            const slotMyte = this.parent.parent.mytes?.find?.(m => m.dropTarget === selectedObject);
+            if (slotMyte && slotMyte === activeMyte && !slotMyte.isAtHomePosition?.(1)) {
+                const groupEl = document.createElement('div');
+                groupEl.className = 'action-group major-action';
+                const ul = document.createElement('ul');
+                const li = document.createElement('li');
+                const btn = document.createElement('button');
+                btn.textContent = 'Go Home';
+                btn.addEventListener('click', () => {
+                    slotMyte.clearHomeSlotHold?.();
+                    slotMyte.queue.clear();
+                    slotMyte.setMode(MOVE_TYPES.GOHOME);
+                });
+                li.appendChild(btn);
+                ul.appendChild(li);
+                groupEl.appendChild(ul);
+                actionGroups.appendChild(groupEl);
+                this.actionControls.classList.add('is-visible');
+            }
+            return;
+        }
 
         const availableActions = ActionManager.getAvailableActions(selectedObject, activeMyte);
         const majorAction = this.getMajorAction(selectedObject, activeMyte, availableActions);
@@ -1256,6 +1345,28 @@ class ActionSidebarManager extends UIComponent {
             groupElement.appendChild(actionList);
             actionGroups.appendChild(groupElement);
         });
+
+        // Self-selected myte: show Go Home button
+        if (selectedObject === activeMyte && activeMyte && !activeMyte.isAtHomePosition?.(1)) {
+            const groupEl = document.createElement('div');
+            groupEl.className = 'action-group movement';
+            const h3 = document.createElement('h3');
+            h3.textContent = 'Movement';
+            const ul = document.createElement('ul');
+            const li = document.createElement('li');
+            const btn = document.createElement('button');
+            btn.textContent = 'Go Home';
+            btn.addEventListener('click', () => {
+                activeMyte.clearHomeSlotHold?.();
+                activeMyte.queue.clear();
+                activeMyte.setMode(MOVE_TYPES.GOHOME);
+            });
+            li.appendChild(btn);
+            ul.appendChild(li);
+            groupEl.appendChild(h3);
+            groupEl.appendChild(ul);
+            actionGroups.appendChild(groupEl);
+        }
 
         if (actionGroups.children.length > 0) {
             this.actionControls.classList.add('is-visible');

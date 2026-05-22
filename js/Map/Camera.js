@@ -194,7 +194,7 @@ class Camera {
 		this.followMode = i;
 		// this.parent.ui.debugMenu.updateCycleCamera(document.getElementById("cycleCamera"));
 
-		this.parent.ui.debugMenu.updateButton('cycleCamera');
+		this.parent.ui?.debugMenu?.updateButton('cycleCamera');
 	}
 	
 	setToPreviousMode() {
@@ -668,14 +668,7 @@ class Camera {
 	// ========== RESET METHODS ==========
 	
 	reset() {
-		if (this.isScrollable.x) {
-			this.setTarget(0, this.targetY);
-		}
-		
-		if (this.isScrollable.y) {
-			this.setTarget(this.targetX, 0);
-		}
-		
+		this.resetView(true);
 		this.setZoomLevel(1);
 	}
 	

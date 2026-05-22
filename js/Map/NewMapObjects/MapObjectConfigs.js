@@ -74,6 +74,10 @@ const TYPE_CONFIGS = {
 		approachConfig: {
 			gap: 10
 		},
+		soundEffects: {
+			pick: 'obj_flower_pick',
+			trample: 'obj_flower_trample'
+		},
 		variantConfigs: {
 			grass_1: { displayName: 'Flower' },
 			grass_2: { displayName: 'Flower' },
@@ -93,6 +97,10 @@ const TYPE_CONFIGS = {
 		regrowthTime: 120000, // 2 minutes
 		approachConfig: {
 			gap: 10
+		},
+		soundEffects: {
+			pick: 'obj_flower_pick',
+			trample: 'obj_flower_trample'
 		},
 		ai: {
 			affordances: [

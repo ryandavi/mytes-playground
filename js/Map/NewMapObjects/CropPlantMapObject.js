@@ -149,17 +149,21 @@ class CropPlantMapObject extends GrowingPlantMapObject {
         const spawnX = this.posX + this.size.width / 2;
         const spawnY = this.posY + this.size.height / 2;
 
+        const itemDef = ItemRegistry.getItemSync(harvest.variant);
+        const itemType = itemDef?.type?.toUpperCase() || 'FOOD';
+
         const dropped = new DroppedMapItem(
             this.gameMap,
-            harvest.type,
+            itemType,
             harvest.variant,
             spawnX,
             spawnY
         );
         dropped.quantity = harvest.quantity;
-        dropped.inventoryVariant = harvest.variant;
-        dropped.inventoryType = harvest.type;
-        dropped.inventoryName = harvest.variant;
+        dropped.inventoryVariant = itemDef?.id || harvest.variant;
+        dropped.inventoryType = itemType;
+        dropped.inventoryName = itemDef?.name || harvest.variant;
+        dropped.description = itemDef?.description || '';
 
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * (Math.PI / 3);
         dropped.velocityX = Math.cos(angle) * 4;

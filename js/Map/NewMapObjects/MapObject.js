@@ -792,6 +792,18 @@ class MapObject {
 			if (event.button !== 0 || !this.active || this.isDragging || !this.canStartSelectModeDrag()) {
 				return;
 			}
+			const rect = this.element?.getBoundingClientRect?.();
+			if (!rect) {
+				return;
+			}
+			const isInside =
+				event.clientX >= rect.left &&
+				event.clientX <= rect.right &&
+				event.clientY >= rect.top &&
+				event.clientY <= rect.bottom;
+			if (!isInside) {
+				return;
+			}
 
 			pressStart = {
 				x: event.clientX,
@@ -882,12 +894,12 @@ class MapObject {
 			}
 		};
 
-		this.element.addEventListener('mousedown', onMouseDown);
+		document.addEventListener('mousedown', onMouseDown);
 		document.addEventListener('mousemove', onMouseMove);
 		document.addEventListener('mouseup', onMouseUp);
 
 		this._selectDragCleanup = () => {
-			this.element?.removeEventListener('mousedown', onMouseDown);
+			document.removeEventListener('mousedown', onMouseDown);
 			document.removeEventListener('mousemove', onMouseMove);
 			document.removeEventListener('mouseup', onMouseUp);
 			this._selectDragCleanup = null;
@@ -1011,23 +1023,43 @@ class MapObject {
 		if (!this._dropTargetEl) {
 			this._dropTargetEl = document.createElement('div');
 			this._dropTargetEl.className = 'drop-target';
-			this._dropTargetEl.style.width = `${this.size.width}px`;
-			this._dropTargetEl.style.height = `${this.size.height}px`;
 			this.gameMap.layers.objects.appendChild(this._dropTargetEl);
 		}
 
 		const snappedPos = this.getConfig('snapToGrid', false)
-			? gridSystem.snapToGrid(this.posX, this.posY, this.size.width, this.size.height, gridSystem.config.cellSize)
+			? gridSystem.snapToGrid(
+				this.posX,
+				this.posY,
+				this.size.width,
+				this.size.height,
+				gridSystem.config.cellSize,
+				{ useCenter: false }
+			)
 			: { x: this.posX, y: this.posY };
-		const bounds = this.getDropValidationBounds(snappedPos.x, snappedPos.y);
-		this._dropTargetEl.style.width = `${bounds.width}px`;
-		this._dropTargetEl.style.height = `${bounds.height}px`;
-		this._dropTargetEl.style.left = `${bounds.x}px`;
-		this._dropTargetEl.style.top = `${bounds.y}px`;
+
+		// Outer container always uses sprite size (grid-aligned)
+		this._dropTargetEl.style.width = `${this.size.width}px`;
+		this._dropTargetEl.style.height = `${this.size.height}px`;
+		this._dropTargetEl.style.left = `${snappedPos.x}px`;
+		this._dropTargetEl.style.top = `${snappedPos.y}px`;
 
 		const isValid = this.checkDropValidity(snappedPos.x, snappedPos.y);
 		this._dropTargetEl.classList.toggle('valid-drop', isValid);
 		this._dropTargetEl.classList.toggle('invalid-drop', !isValid);
+
+		// Show collider bounds as inner indicator when collider differs from sprite size
+		if (this.collider) {
+			if (!this._dropTargetColliderEl) {
+				this._dropTargetColliderEl = document.createElement('div');
+				this._dropTargetColliderEl.className = 'drop-target-collider';
+				this._dropTargetEl.appendChild(this._dropTargetColliderEl);
+			}
+			this._dropTargetColliderEl.style.left = `${this.collider.offsetX ?? 0}px`;
+			this._dropTargetColliderEl.style.top = `${this.collider.offsetY ?? 0}px`;
+			this._dropTargetColliderEl.style.width = `${this.collider.width ?? this.size.width}px`;
+			this._dropTargetColliderEl.style.height = `${this.collider.height ?? this.size.height}px`;
+		}
+
 		this._dropTargetEl.style.display = '';
 	}
 
@@ -1293,6 +1325,7 @@ class MapObject {
 		if (this._dropTargetEl) {
 			this._dropTargetEl.remove();
 			this._dropTargetEl = null;
+			this._dropTargetColliderEl = null;
 		}
 		if (this.element) {
 			this.element.remove();
@@ -1354,8 +1387,6 @@ class MapObject {
 			return;
 		}
 
-		if (!this.container?.ui?.isTool?.(UIToolModes.SELECT)) return;
-
 		const myte = this.activeMyte;
 		if (!myte?.queue) return;
 
@@ -1380,7 +1411,11 @@ class MapObject {
 
 	handleLongPress(event) {
 		const fn = this.getConfig('longPressAction');
-		if (typeof fn === 'function') fn(this, event);
+		if (typeof fn === 'function') {
+			fn(this, event);
+		} else {
+			this.handleDoubleClick(event);
+		}
 	}
 
 	handleMovedEvent() {

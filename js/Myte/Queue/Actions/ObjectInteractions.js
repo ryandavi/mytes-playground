@@ -723,6 +723,7 @@ class PickFlowerAction extends GoToObjectAction {
         super.complete();
         this._dropFlowerItem();
         this.target?.setDeflowered?.();
+        this.target?.playConfiguredSound?.('pick');
         this.myte.queue.addExpression('heart', 300, 1);
         this.myte.queue.addIdle(40);
     }
@@ -736,11 +737,15 @@ class PickFlowerAction extends GoToObjectAction {
         const spawnX  = (this.target?.posX ?? this.myte.posX) + (this.target?.size?.width ?? 32) / 2;
         const spawnY  = (this.target?.posY ?? this.myte.posY) + (this.target?.size?.height ?? 32) / 2;
 
-        const dropped = new DroppedMapItem(gameMap, 'FLOWER', variant, spawnX, spawnY);
+        const itemDef = ItemRegistry.getItemSync(variant);
+        const itemType = itemDef?.type?.toUpperCase() || 'FLOWER';
+
+        const dropped = new DroppedMapItem(gameMap, itemType, variant, spawnX, spawnY);
         dropped.quantity = 1;
-        dropped.inventoryType = 'FLOWER';
-        dropped.inventoryVariant = variant;
-        dropped.inventoryName = this.target?.getDisplayName?.() ?? 'Flower';
+        dropped.inventoryType = itemType;
+        dropped.inventoryVariant = itemDef?.id || variant;
+        dropped.inventoryName = itemDef?.name ?? this.target?.getDisplayName?.() ?? 'Flower';
+        dropped.description = itemDef?.description || '';
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * (Math.PI / 3);
         dropped.velocityX = Math.cos(angle) * 3;
         dropped.velocityY = Math.sin(angle) * 3;
@@ -811,6 +816,7 @@ class TrampleFlowerAction extends GoToObjectAction {
     complete() {
         this.faceTarget();
         super.complete();
+        this.target?.playConfiguredSound?.('trample');
         this.target?.remove?.();
         this.myte.queue.addExpression('surprise', 200, 1);
         if (this.postActionIdleDuration > 0) {

@@ -145,8 +145,8 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
                 return this.normalizeItemDefinition({
                     type: parts[0],
                     variant: parts[1] ?? 'default',
-                    quantity: parts[2] ?? 1,
-                    probability: parts[3] ?? 1
+                    quantity: parts.length > 2 ? parts[2] : undefined,
+                    probability: parts.length > 3 ? parts[3] : undefined
                 });
             })
             .filter(Boolean);
@@ -180,12 +180,12 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
             return null;
         }
 
-        // Chest shorthand like {"COIN", 100} uses the second slot as the amount.
+        // Chest shorthand like {COIN, 100} or {HEALTH, 10} — second slot is the amount, not a variant.
         if ((normalizedType === 'COIN' || normalizedType === 'HEALTH') &&
             (typeof parsedVariant === 'number' || Array.isArray(parsedVariant)) &&
             (item.quantity === undefined || item.quantity === null)) {
             quantity = parsedVariant;
-            variant = 'default';
+            variant = normalizedType === 'COIN' ? 'coin' : 'health_orb';
         }
 
         if (typeof variant === 'string') {
@@ -386,6 +386,9 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         droppedItem.quantity = resolvedQuantity;
 
         const itemDefinition = ItemRegistry.getItemSync(item.variant);
+        if (!itemDefinition) {
+            console.warn(`[TreasureChestMapObject] Spawning dropped item with no registry entry: "${item.variant}"`);
+        }
         droppedItem.inventoryVariant = itemDefinition?.id || ItemRegistry.resolveIdSync(item.variant) || item.variant;
         droppedItem.inventoryType = itemDefinition?.type
             ? String(itemDefinition.type).toUpperCase()

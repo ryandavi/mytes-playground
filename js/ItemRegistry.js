@@ -59,14 +59,19 @@ class ItemRegistry {
         const id = this.normalizeId(item.id);
         if (!id) return;
 
-        const sprite = item.sprite
-            ? {
-                x: Number(item.sprite.x) || 0,
-                y: Number(item.sprite.y) || 0,
-                width: Number(item.sprite.width) || this.defaultSpriteSize.width,
-                height: Number(item.sprite.height) || this.defaultSpriteSize.height
-            }
-            : null;
+        let sprite = null;
+        if (item.sprite) {
+            const w = Number(item.sprite.width) || this.defaultSpriteSize.width;
+            const h = Number(item.sprite.height) || this.defaultSpriteSize.height;
+            // Accept grid coords { col, row } or raw pixel offsets { x, y }
+            const x = ('col' in item.sprite)
+                ? -(Number(item.sprite.col) * w)
+                : (Number(item.sprite.x) || 0);
+            const y = ('row' in item.sprite)
+                ? -(Number(item.sprite.row) * h)
+                : (Number(item.sprite.y) || 0);
+            sprite = { x, y, width: w, height: h };
+        }
 
         const normalized = {
             ...item,
@@ -104,12 +109,15 @@ class ItemRegistry {
         const definition = this.getItemSync(requestedVariant);
         const canonicalVariant = definition?.id || this.resolveIdSync(requestedVariant) || this.normalizeId(requestedVariant);
 
+        // Registry type wins over saved type — it is the source of truth for what an item IS.
+        const type = definition?.type || rawItem.type || 'item';
+
         return {
-            name: rawItem.name || definition?.name || canonicalVariant,
+            name: definition?.name || rawItem.name || canonicalVariant,
             quantity: Number(rawItem.quantity) || 1,
-            type: String(rawItem.type || definition?.type || 'item'),
+            type: String(type),
             variant: canonicalVariant,
-            description: rawItem.description || definition?.description || ''
+            description: definition?.description || rawItem.description || ''
         };
     }
 

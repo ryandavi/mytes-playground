@@ -229,12 +229,13 @@
                         animation: collect 0.5s ease-out forwards;
                     }
 
-                    &.food {
+                    // All dropped items that come from the item sprite sheet
+                    &.food, &.crop, &.flower, &.toy, &.medicine, &.item {
                         width: var(--item-sprite-width, 32px);
                         height: var(--item-sprite-height, 32px);
                         background-image: url('../images/items/items.png');
                         background-repeat: no-repeat;
-                        background-position: var(--item-sprite-x, 0) var(--item-sprite-y, 0);
+                        background-position: var(--item-sprite-x, 0px) var(--item-sprite-y, 0px);
                         image-rendering: pixelated;
                     }
 
@@ -675,6 +676,22 @@
         background: rgba(220, 50, 50, 0.2);
         border: 2px solid rgba(220, 50, 50, 0.9);
         box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+    }
+
+    .drop-target-collider {
+        position: absolute;
+        box-sizing: border-box;
+        border: 1px dashed rgba(255, 255, 255, 0.45);
+        border-radius: 2px;
+        pointer-events: none;
+    }
+
+    &.valid-drop .drop-target-collider {
+        border-color: rgba(60, 200, 100, 0.55);
+    }
+
+    &.invalid-drop .drop-target-collider {
+        border-color: rgba(220, 50, 50, 0.55);
     }
 }
 

@@ -215,9 +215,9 @@
   </object>
   <object id="107" name="Treasure Chest" x="64" y="160" width="64" height="64">
    <properties>
-    <property name="items">{COIN, 100},
+    <property name="items">{COIN, coin, 100},
 {FOOD, apple},
-{HEALTH, 10}</property>
+{HEALTH, health_orb, 10}</property>
     <property name="variant" value="wooden_chest"/>
    </properties>
   </object>

@@ -128,12 +128,26 @@
         }
 
         .settings-group {
-            h3.settings-group-title {
-                margin: 0 0 10px 0;
+            >.settings-group-title {
+                width: 100%;
+                margin: 0;
+                flex: 1 1 100%;
             }
+
 
             +.settings-group {
                 margin-top: 20px;
+            }
+            >.settings-subgroup {
+                >.settings-subgroup-title {
+                    margin: 0;
+                    margin-bottom: 4px;
+                    flex: 1 1 100%;
+                }
+                +.settings-subgroup {
+                    margin-top: 10px;
+                }
+
             }
         }
 
@@ -184,5 +198,116 @@
         justify-content: flex-end;
         @include window-footer-divider;
         padding-top: calc(var(--padding) + var(--border-width));
+    }
+}
+
+
+#view-panel {
+    .window-panel__content {
+        .settings-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            width: 100%;
+
+            button {
+                padding: 0.5rem;
+                flex: 1 1 calc(50% - calc(var(--gap) / 2));
+            }
+
+            #view-zoom-out,
+            #view-zoom-in {
+                flex: 0 0 auto;
+                min-width: 36px;
+            }
+        }
+
+        .view-zoom-label {
+            min-width: 40px;
+            text-align: center;
+            font-weight: 600;
+        }
+    }
+}
+
+// ── Debug panel (ModalWindow) ─────────────────────────────────────────────────
+#game-debug-panel {
+    .window-panel__content {
+        max-width: 500px;
+        margin: 0 auto;
+
+        .button-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+        }
+
+        // Top-level Map / Myte sections
+        .settings-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+
+            +.settings-group {
+                margin-top: 20px;
+            }
+        }
+
+        // Subgroup (Controls / Overlays / Stats)
+        .settings-subgroup {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
+
+            // Button row inside a subgroup
+            .debug-button,
+            .button-group {
+                width: 100%;
+            }
+
+            // Wrap buttons in a subgroup into a flex row
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+
+            button.debug-button {
+                padding: 0.5rem;
+                flex: 1 1 calc(50% - 6px);
+            }
+
+            .button-group {
+                flex: 1 1 calc(50% - 6px);
+
+                button {
+                    padding: 0.5rem;
+                }
+            }
+
+            // Full-width overrides
+            #toggleDebug,
+            #cycleFollowGoal,
+            #cycleCamera {
+                flex: 1 1 100%;
+            }
+
+            // Overlay toggles — half width each
+            #overlayGrid,
+            #overlayCursorTile,
+            #overlayMyteFrontTile,
+            #overlayColliders {
+                flex: 1 1 calc(50% - 6px);
+            }
+
+            #adjustSpeed       { flex: 1; }
+            #adjustSpeed-down,
+            #adjustSpeed-up    { flex: 0; min-width: 50px; }
+        }
     }
 }

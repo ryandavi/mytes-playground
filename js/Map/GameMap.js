@@ -961,6 +961,10 @@ class GameMap {
     }
 
     dispose() {
+        // Clean up dropped items (their DOM elements live in the shared layer)
+        this.droppedItems.forEach(item => item.remove());
+        this.droppedItems = [];
+
         // Clean up objects
         this.objects.forEach(obj => {
             if (obj.remove) {

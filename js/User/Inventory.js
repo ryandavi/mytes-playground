@@ -78,6 +78,17 @@ class Inventory {
         };
     }
 
+    static _getTooltipEl() {
+        if (!Inventory._tooltipEl) {
+            const el = document.createElement('div');
+            el.className = 'item-tooltip';
+            el.style.display = 'none';
+            document.body.appendChild(el);
+            Inventory._tooltipEl = el;
+        }
+        return Inventory._tooltipEl;
+    }
+
     createItemElement(itemData) {
         const { name, quantity, type, variant, description = '' } = this.normalizeItemData(itemData);
         const itemElement = document.createElement('div');
@@ -91,9 +102,17 @@ class Inventory {
 
         ItemRegistry.applySpriteStyles(itemElement, variant);
 
-        if (description) {
-            itemElement.title = `${name}\n${description}`;
-        }
+        itemElement.addEventListener('mouseenter', () => {
+            const tooltip = Inventory._getTooltipEl();
+            tooltip.innerHTML = `<strong>${name}</strong>${description ? `<br>${description}` : ''}`;
+            tooltip.style.display = 'block';
+            const rect = itemElement.getBoundingClientRect();
+            tooltip.style.left = `${rect.left}px`;
+            tooltip.style.top = `${rect.bottom + 6}px`;
+        });
+        itemElement.addEventListener('mouseleave', () => {
+            Inventory._getTooltipEl().style.display = 'none';
+        });
 
         return itemElement;
     }
@@ -122,6 +141,11 @@ class Inventory {
         if (this.items.length >= this.config.maxItems) {
             console.warn('Inventory is full!');
             return false;
+        }
+
+        const rawVariant = variantOverride || name;
+        if (rawVariant && !ItemRegistry.getItemSync(rawVariant)) {
+            console.warn(`[Inventory] Adding item with no registry entry: "${rawVariant}". It will appear without a sprite.`);
         }
 
         const normalizedItem = this.normalizeItemData({
@@ -299,7 +323,14 @@ class Inventory {
         let snappedY = worldPos.y - itemSize / 2;
 
         if (gridSystem) {
-            const s = gridSystem.snapToGrid(snappedX, snappedY, itemSize, itemSize, gridSystem.config.cellSize);
+            const s = gridSystem.snapToGrid(
+                snappedX,
+                snappedY,
+                itemSize,
+                itemSize,
+                gridSystem.config.cellSize,
+                { useCenter: false }
+            );
             snappedX = s.x;
             snappedY = s.y;
         }
@@ -384,10 +415,18 @@ class Inventory {
 
         let success = false;
 
-        // Food items spawn as dropped world items with physics
-        if (type?.toUpperCase() === 'FOOD') {
+        // Droppable items (food, crops, picked flowers, etc.) spawn as physics world items.
+        // The item registry's droppable flag controls this — map-placeable objects (e.g. music_box)
+        // go through resolveDroppedMapObject instead.
+        const itemDef = ItemRegistry.getItemSync(variant || name);
+        if (itemDef?.droppable) {
             const itemVariant = variant || name;
-            const dropped = this.parent.gameMap.addDroppedItem('FOOD', itemVariant, posX, posY);
+            const dropped = this.parent.gameMap.addDroppedItem(
+                itemDef.type?.toUpperCase() || 'ITEM',
+                itemVariant,
+                posX,
+                posY
+            );
             // Store the inventory name so collect() adds back to the correct stack
             if (dropped) dropped.inventoryName = name;
             success = !!dropped;

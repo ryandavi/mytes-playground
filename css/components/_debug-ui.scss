@@ -1,3 +1,44 @@
+@mixin debug-collapsible-shell($width: min(400px, calc(100vw - 16px))) {
+    width: $width;
+    max-width: calc(100vw - 16px);
+    pointer-events: auto;
+    margin: 0;
+    backdrop-filter: blur(4px);
+
+        line-height: 0.85em;
+    font-size: 0.7em;
+
+    >summary {
+        align-items: center;
+        background-color: rgb(213 213 213 / 30%);
+        border-radius: var(--border-width);
+        cursor: grab;
+        display: flex;
+        font-weight: 600;
+        justify-content: space-between;
+        list-style: none;
+        padding: 6px var(--padding);
+        user-select: none;
+
+        &::-webkit-details-marker {
+            display: none;
+        }
+
+        &::after {
+            content: "v";
+            font-size: 0.9em;
+        }
+    }
+
+    &:not([open]) >summary::after {
+        content: ">";
+    }
+
+    &.dragging >summary {
+        cursor: grabbing;
+    }
+}
+
 .debug-panel {
     --debug-color-system: rgba(255, 235, 235, 0.7);
     --debug-color-input: rgba(235, 255, 235, 0.7);
@@ -7,8 +48,7 @@
     --debug-color-myte: rgba(235, 255, 255, 0.7);
     --debug-color-myte-stats: rgba(235, 255, 241, 0.7);
 
-    line-height: 0.85em;
-    font-size: 0.7em;
+
     position: fixed;
     inset: 0;
     visibility: hidden;
@@ -16,41 +56,9 @@
     pointer-events: none;
 
     .debug-section {
+        @include debug-collapsible-shell();
+
         position: absolute;
-        width: min(400px, calc(100vw - 16px));
-        pointer-events: auto;
-        margin: 0;
-        backdrop-filter: blur(4px);
-
-        >summary {
-            align-items: center;
-            background-color: rgba(255, 255, 255, 0.65);
-            border-radius: var(--border-width);
-            cursor: grab;
-            display: flex;
-            font-weight: 600;
-            justify-content: space-between;
-            list-style: none;
-            padding: 6px var(--padding);
-            user-select: none;
-
-            &::-webkit-details-marker {
-                display: none;
-            }
-
-            &::after {
-                content: "v";
-                font-size: 0.9em;
-            }
-        }
-
-        &:not([open]) >summary::after {
-            content: ">";
-        }
-
-        &.dragging >summary {
-            cursor: grabbing;
-        }
     }
 
     .debug-section-body {
@@ -146,86 +154,143 @@
     }
 }
 
-#view-panel {
-    .window-panel__content {
-        .settings-group {
+// ── Action Queue panel (debug draggable) ──────────────────────────────────────
+
+.action-queue-panel {
+ 
+   visibility: hidden;
+    position: fixed;
+
+    z-index: var(--z-debug);
+    width: 300px;
+
+    pointer-events: auto;
+
+    
+    .queue-panel-shell {
+        @include debug-collapsible-shell(100%);
+    }
+
+    .queue-panel-body {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-top: 4px;
+    }
+
+
+    &:not(.has-items) {
+        .queue-panel-body {
+            display: none;
+            margin-top: 0;
+        }
+    }
+
+    .queue-empty-state {
+        display: none;
+        font-size: 10px;
+        opacity: 0.55;
+        padding: 4px 2px;
+        font-style: italic;
+    }
+
+    .queue-item {
+        background-color: rgb(255 255 255 / 85%);
+        transition: background-color 0.2s;
+        padding: var(--padding);
+        border-radius: var(--border-width);
+        backdrop-filter: blur(4px);
+
+        .content {
             display: flex;
-            align-items: center;
-            justify-content: center;
+            gap: 4px;
             flex-wrap: wrap;
-            gap: 5px;
             width: 100%;
 
-            >.settings-group-title {
-                width: 100%;
-                margin: 0 0 5px 0;
+            .number {
+                min-width: 2em;
+                font-weight: 500;
+                color: var(--text-muted);
             }
 
-            button {
-                padding: 0.5rem;
-                flex: 1 1 calc(50% - calc(var(--gap) / 2));
+            .information {
+                flex-grow: 1;
+
+                .title {
+                    display: flex;
+                    gap: 4px;
+                    align-items: center;
+
+                    .name {
+                        font-weight: 500;
+                    }
+
+                    .controls {
+                        display: flex;
+                        gap: 2px;
+                        margin-left: auto;
+
+                        button {
+                            cursor: pointer;
+                            border: none;
+                            background: none;
+                            padding: 2px;
+                            font-size: 0.8em;
+                            line-height: 1;
+
+                            &.skip   { color: #3498db; }
+                            &.remove { color: #e74c3c; }
+                        }
+                    }
+                }
+
+                .description {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    font-size: 0.8em;
+
+                    .arrow  { opacity: 0.5; }
+                    .target { opacity: 0.7; }
+
+                    .repeats {
+                        background: rgba(0, 0, 0, 0.05);
+                        padding: 0 4px;
+                        border-radius: 2px;
+                    }
+
+                    .status {
+                        margin-left: auto;
+                        opacity: 0.7;
+                    }
+                }
             }
 
-            #view-zoom-out,
-            #view-zoom-in {
-                flex: 0 0 auto;
-                min-width: 36px;
+            .progress {
+                height: 3px;
+                background: rgba(0, 0, 0, 0.05);
+                margin-top: 4px;
+                border-radius: 1px;
+                overflow: hidden;
+                flex: 0 0 100%;
+                display: none;
+
+                .bar {
+                    height: 100%;
+                    width: 0;
+                    transition: width 0.1s linear;
+                    background: rgba(0, 128, 0, 0.2);
+                }
             }
         }
 
-        .view-zoom-label {
-            min-width: 40px;
-            text-align: center;
-            font-weight: 600;
+        &.is-current {
+            background-color: rgb(235 255 235 / 85%);
+
+            .content {
+                font-weight: 500;
+            }
         }
     }
 }
 
-#game-debug-panel {
-    .window-panel__content {
-        max-width: 500px;
-        margin: 0 auto;
-
-        .button-group {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            width: 100%;
-        }
-
-        .settings-group {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 5px;
-            width: 100%;
-
-            >.settings-group-title {
-                width: 100%;
-                margin: 0 0 5px 0;
-            }
-
-            button {
-                padding: 0.5rem;
-                flex: 1 1 calc(50% - calc(var(--gap) / 2));
-            }
-
-            #toggleDebug,
-            #cycleFollowGoal,
-            #cycleCamera {
-                flex: 1 1 100%;
-            }
-
-            #adjustSpeed       { flex: 1; }
-            #adjustSpeed-down,
-            #adjustSpeed-up    { flex: 0; min-width: 50px; }
-
-            &:first-child {
-                border-top: none;
-                margin-top: 0;
-                padding-top: 0;
-            }
-        }
-    }
-}

@@ -218,7 +218,6 @@ button:disabled {
   text-shadow: 1px 1px 0 var(--button-disabled-highlight, var(--button-light));
   cursor: default;
   filter: saturate(0.72);
-  pointer-events: none;
 }
 .button.disabled .icon,
 .button.disabled svg, .button:disabled .icon,
@@ -237,6 +236,15 @@ button:disabled .icon,
 button:disabled svg {
   fill: var(--button-disabled-icon-color, var(--button-icon-color));
   color: var(--button-disabled-icon-color, var(--button-icon-color));
+}
+.button.disabled, .button:disabled,
+input[type=submit].disabled,
+input[type=submit]:disabled,
+input[type=button].disabled,
+input[type=button]:disabled,
+button.disabled,
+button:disabled {
+  pointer-events: none;
 }
 
 input[type=range] {
@@ -390,7 +398,8 @@ body.debug .map-object > .interactive-hitbox {
 .dragging {
   cursor: grabbing;
   touch-action: none;
-  user-select: none;
+  -moz-user-select: none;
+       user-select: none;
   -webkit-user-select: none;
 }
 
@@ -490,6 +499,24 @@ body.debug .map-object > .interactive-hitbox {
 .inventory-drop-indicator.invalid {
   border-color: var(--color-danger);
   background-color: var(--color-danger-tint);
+}
+
+.item-tooltip {
+  position: fixed;
+  z-index: 99999;
+  pointer-events: none;
+  color: var(--black);
+  border-radius: var(--help-paper-radius, var(--radius-xs));
+  filter: var(--shadow-tooltip, drop-shadow(2px 2px 0 #00000020));
+  background-color: var(--surface-tooltip, #ffffe1);
+  outline: 1px solid var(--black);
+  padding: var(--help-paper-padding, var(--space-2xs));
+  font-size: 9px;
+  line-height: 1.3;
+  text-transform: uppercase;
+  min-width: 100px;
+  max-width: min(220px, 60vw);
+  white-space: normal;
 }
 
 .consumption-effect {
@@ -1002,8 +1029,6 @@ body.debug .map-object > .interactive-hitbox {
   --debug-color-camera: rgba(255, 235, 255, 0.7);
   --debug-color-myte: rgba(235, 255, 255, 0.7);
   --debug-color-myte-stats: rgba(235, 255, 241, 0.7);
-  line-height: 0.85em;
-  font-size: 0.7em;
   position: fixed;
   inset: 0;
   visibility: hidden;
@@ -1011,15 +1036,17 @@ body.debug .map-object > .interactive-hitbox {
   pointer-events: none;
 }
 .debug-panel .debug-section {
-  position: absolute;
   width: min(400px, 100vw - 16px);
+  max-width: calc(100vw - 16px);
   pointer-events: auto;
   margin: 0;
   backdrop-filter: blur(4px);
+  line-height: 0.85em;
+  font-size: 0.7em;
 }
 .debug-panel .debug-section > summary {
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.65);
+  background-color: rgba(213, 213, 213, 0.3);
   border-radius: var(--border-width);
   cursor: grab;
   display: flex;
@@ -1027,7 +1054,9 @@ body.debug .map-object > .interactive-hitbox {
   justify-content: space-between;
   list-style: none;
   padding: 6px var(--padding);
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .debug-panel .debug-section > summary::-webkit-details-marker {
   display: none;
@@ -1041,6 +1070,9 @@ body.debug .map-object > .interactive-hitbox {
 }
 .debug-panel .debug-section.dragging > summary {
   cursor: grabbing;
+}
+.debug-panel .debug-section {
+  position: absolute;
 }
 .debug-panel .debug-section-body {
   display: flex;
@@ -1096,7 +1128,9 @@ body.debug .map-object > .interactive-hitbox {
   cursor: pointer;
   font-weight: 600;
   font-size: 0.85em;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .debug-panel .debug-group > .debug-group-summary::-webkit-details-marker {
   display: none;
@@ -1140,103 +1174,72 @@ body.debug .map-object > .interactive-hitbox {
   overflow-wrap: anywhere;
 }
 
-#view-panel .window-panel__content .settings-group {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 5px;
-  width: 100%;
-}
-#view-panel .window-panel__content .settings-group > .settings-group-title {
-  width: 100%;
-  margin: 0 0 5px 0;
-}
-#view-panel .window-panel__content .settings-group button {
-  padding: 0.5rem;
-  flex: 1 1 calc(50% - var(--gap) / 2);
-}
-#view-panel .window-panel__content .settings-group #view-zoom-out,
-#view-panel .window-panel__content .settings-group #view-zoom-in {
-  flex: 0 0 auto;
-  min-width: 36px;
-}
-#view-panel .window-panel__content .view-zoom-label {
-  min-width: 40px;
-  text-align: center;
-  font-weight: 600;
-}
-
-#game-debug-panel .window-panel__content {
-  max-width: 500px;
-  margin: 0 auto;
-}
-#game-debug-panel .window-panel__content .button-group {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  width: 100%;
-}
-#game-debug-panel .window-panel__content .settings-group {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 5px;
-  width: 100%;
-}
-#game-debug-panel .window-panel__content .settings-group > .settings-group-title {
-  width: 100%;
-  margin: 0 0 5px 0;
-}
-#game-debug-panel .window-panel__content .settings-group button {
-  padding: 0.5rem;
-  flex: 1 1 calc(50% - var(--gap) / 2);
-}
-#game-debug-panel .window-panel__content .settings-group #toggleDebug,
-#game-debug-panel .window-panel__content .settings-group #cycleFollowGoal,
-#game-debug-panel .window-panel__content .settings-group #cycleCamera {
-  flex: 1 1 100%;
-}
-#game-debug-panel .window-panel__content .settings-group #adjustSpeed {
-  flex: 1;
-}
-#game-debug-panel .window-panel__content .settings-group #adjustSpeed-down,
-#game-debug-panel .window-panel__content .settings-group #adjustSpeed-up {
-  flex: 0;
-  min-width: 50px;
-}
-#game-debug-panel .window-panel__content .settings-group:first-child {
-  border-top: none;
-  margin-top: 0;
-  padding-top: 0;
-}
-
 .action-queue-panel {
   visibility: hidden;
-  margin-right: 10px;
   position: fixed;
-  display: none;
-  height: fit-content;
-  right: 0;
-  top: 50%;
-  transform: translate(0, -50%);
   z-index: var(--z-debug);
   width: 300px;
+  pointer-events: auto;
+}
+.action-queue-panel .queue-panel-shell {
+  width: 100%;
+  max-width: calc(100vw - 16px);
+  pointer-events: auto;
+  margin: 0;
+  backdrop-filter: blur(4px);
+  line-height: 0.85em;
+  font-size: 0.7em;
+}
+.action-queue-panel .queue-panel-shell > summary {
+  align-items: center;
+  background-color: rgba(213, 213, 213, 0.3);
+  border-radius: var(--border-width);
+  cursor: grab;
+  display: flex;
+  font-weight: 600;
+  justify-content: space-between;
+  list-style: none;
+  padding: 6px var(--padding);
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+}
+.action-queue-panel .queue-panel-shell > summary::-webkit-details-marker {
+  display: none;
+}
+.action-queue-panel .queue-panel-shell > summary::after {
+  content: "v";
   font-size: 0.9em;
 }
-.action-queue-panel:not(:empty) {
-  display: inline-block;
+.action-queue-panel .queue-panel-shell:not([open]) > summary::after {
+  content: ">";
+}
+.action-queue-panel .queue-panel-shell.dragging > summary {
+  cursor: grabbing;
+}
+.action-queue-panel .queue-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.action-queue-panel:not(.has-items) .queue-panel-body {
+  display: none;
+  margin-top: 0;
+}
+.action-queue-panel .queue-empty-state {
+  display: none;
+  font-size: 10px;
+  opacity: 0.55;
+  padding: 4px 2px;
+  font-style: italic;
 }
 .action-queue-panel .queue-item {
-  background-color: rgb(255, 255, 255);
-  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.85);
   transition: background-color 0.2s;
   padding: var(--padding);
   border-radius: var(--border-width);
-}
-.action-queue-panel .queue-item + .queue-item {
-  margin-top: 4px;
+  backdrop-filter: blur(4px);
 }
 .action-queue-panel .queue-item .content {
   display: flex;
@@ -1316,7 +1319,7 @@ body.debug .map-object > .interactive-hitbox {
   background: rgba(0, 128, 0, 0.2);
 }
 .action-queue-panel .queue-item.is-current {
-  background-color: rgb(235, 255, 235);
+  background-color: rgba(235, 255, 235, 0.85);
 }
 .action-queue-panel .queue-item.is-current .content {
   font-weight: 500;
@@ -1337,6 +1340,7 @@ body.debug .map-object > .interactive-hitbox {
   z-index: var(--z-debug);
   flex-direction: column;
   transform: translate(calc(-100% - 40px), 0);
+  width: -moz-fit-content;
   width: fit-content;
 }
 .app-shell > .hand-controls input[type=radio] {
@@ -1631,7 +1635,9 @@ body.debug .map-object > .interactive-hitbox {
 .window-panel > .window-panel__header > .window-panel__controls {
   display: flex;
   gap: var(--gap);
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .window-panel > .window-panel__header > .window-panel__controls > button {
   width: 30px;
@@ -1660,11 +1666,21 @@ body.debug .map-object > .interactive-hitbox {
   margin-top: calc(var(--border-width) * 2);
   background-color: white;
 }
-.window-panel > .window-panel__content .settings-group h3.settings-group-title {
-  margin: 0 0 10px 0;
+.window-panel > .window-panel__content .settings-group > .settings-group-title {
+  width: 100%;
+  margin: 0;
+  flex: 1 1 100%;
 }
 .window-panel > .window-panel__content .settings-group + .settings-group {
   margin-top: 20px;
+}
+.window-panel > .window-panel__content .settings-group > .settings-subgroup > .settings-subgroup-title {
+  margin: 0;
+  margin-bottom: 4px;
+  flex: 1 1 100%;
+}
+.window-panel > .window-panel__content .settings-group > .settings-subgroup + .settings-subgroup {
+  margin-top: 10px;
 }
 .window-panel > .window-panel__content .setting-item + .setting-item {
   margin-top: 10px;
@@ -1703,6 +1719,95 @@ body.debug .map-object > .interactive-hitbox {
   padding-top: calc(var(--padding) + var(--border-width));
 }
 
+#view-panel .window-panel__content .settings-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+#view-panel .window-panel__content .settings-group button {
+  padding: 0.5rem;
+  flex: 1 1 calc(50% - var(--gap) / 2);
+}
+#view-panel .window-panel__content .settings-group #view-zoom-out,
+#view-panel .window-panel__content .settings-group #view-zoom-in {
+  flex: 0 0 auto;
+  min-width: 36px;
+}
+#view-panel .window-panel__content .view-zoom-label {
+  min-width: 40px;
+  text-align: center;
+  font-weight: 600;
+}
+
+#game-debug-panel .window-panel__content {
+  max-width: 500px;
+  margin: 0 auto;
+}
+#game-debug-panel .window-panel__content .button-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+#game-debug-panel .window-panel__content .settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+#game-debug-panel .window-panel__content .settings-group + .settings-group {
+  margin-top: 20px;
+}
+#game-debug-panel .window-panel__content .settings-subgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+#game-debug-panel .window-panel__content .settings-subgroup .debug-button,
+#game-debug-panel .window-panel__content .settings-subgroup .button-group {
+  width: 100%;
+}
+#game-debug-panel .window-panel__content .settings-subgroup {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+#game-debug-panel .window-panel__content .settings-subgroup button.debug-button {
+  padding: 0.5rem;
+  flex: 1 1 calc(50% - 6px);
+}
+#game-debug-panel .window-panel__content .settings-subgroup .button-group {
+  flex: 1 1 calc(50% - 6px);
+}
+#game-debug-panel .window-panel__content .settings-subgroup .button-group button {
+  padding: 0.5rem;
+}
+#game-debug-panel .window-panel__content .settings-subgroup #toggleDebug,
+#game-debug-panel .window-panel__content .settings-subgroup #cycleFollowGoal,
+#game-debug-panel .window-panel__content .settings-subgroup #cycleCamera {
+  flex: 1 1 100%;
+}
+#game-debug-panel .window-panel__content .settings-subgroup #overlayGrid,
+#game-debug-panel .window-panel__content .settings-subgroup #overlayCursorTile,
+#game-debug-panel .window-panel__content .settings-subgroup #overlayMyteFrontTile,
+#game-debug-panel .window-panel__content .settings-subgroup #overlayColliders {
+  flex: 1 1 calc(50% - 6px);
+}
+#game-debug-panel .window-panel__content .settings-subgroup #adjustSpeed {
+  flex: 1;
+}
+#game-debug-panel .window-panel__content .settings-subgroup #adjustSpeed-down,
+#game-debug-panel .window-panel__content .settings-subgroup #adjustSpeed-up {
+  flex: 0;
+  min-width: 50px;
+}
+
 .myte-queue-overlay {
   position: absolute;
   top: var(--space-lg);
@@ -1735,7 +1840,9 @@ body.debug .map-object > .interactive-hitbox {
   padding: 0;
   overflow: visible;
   touch-action: manipulation;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   font-family: inherit;
 }
 .myte-queue-overlay .queue-item.compact.is-current {
@@ -1829,7 +1936,9 @@ body.debug .map-object > .interactive-hitbox {
   position: absolute;
   top: 0;
   transition: opacity var(--motion-slower) var(--ease-emphasis);
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   width: 100%;
   z-index: var(--z-loading);
 }
@@ -2047,6 +2156,10 @@ body.debug .map-object > .interactive-hitbox {
   right: 50%;
   transform: translate(50%, 0);
 }
+.myte-slot.is-selected > .myte-home-slot {
+  outline: 2px dashed green;
+  border-radius: var(--border-radius);
+}
 .myte-slot:hover > .myte-home-slot:not(.is-queue-target) {
   outline: var(--border-width) solid darkgrey;
 }
@@ -2132,6 +2245,7 @@ body.debug .map-object > .interactive-hitbox {
   display: flex;
   gap: var(--border-width);
   align-items: center;
+  width: -moz-fit-content;
   width: fit-content;
   left: 50%;
   transform: translate(-50%, -115%);
@@ -2300,7 +2414,9 @@ body.debug .map-object > .interactive-hitbox {
 }
 .interactive-myte.is-dragging {
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   cursor: grab;
   z-index: var(--z-drag) !important;
 }
@@ -2482,11 +2598,6 @@ body.debug .map-object > .interactive-hitbox {
     filter: drop-shadow(0 0 3px rgba(0, 255, 0, 0.5));
   }
 }
-.app-shell > .app-stage {
-  --dither-size: 12px;
-  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
-  background-size: var(--dither-size, 6px);
-}
 .app-shell > .app-stage.noScroll {
   overflow: hidden;
 }
@@ -2496,6 +2607,11 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage.noScroll > .canvas > .layer {
   width: 100%;
   height: 100%;
+}
+.app-shell > .app-stage {
+  --dither-size: 12px;
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
 }
 .app-shell > .app-stage > .crosshair {
   position: absolute;
@@ -2539,6 +2655,7 @@ body.debug .map-object > .interactive-hitbox {
   width: 100%;
   height: 100%;
   filter: var(--shadow);
+  position: relative;
   border-radius: var(--border-radius);
 }
 .app-shell > .app-stage > .canvas > .layer {
@@ -2567,7 +2684,9 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.debug {
   z-index: 100;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   width: 100%;
   height: 100%;
   visibility: hidden;
@@ -2577,7 +2696,9 @@ body.debug .map-object > .interactive-hitbox {
   border: 1px solid rgba(255, 0, 0, 0.5);
   pointer-events: none;
   position: absolute;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   z-index: 9999;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .debug-collider.myte-collider {
@@ -2595,7 +2716,9 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.debug .pathfinder-node {
   position: absolute;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .path-line {
   height: 2px;
@@ -2645,7 +2768,9 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.effects {
   z-index: 2;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer > .zone {
   outline: 1px dashed red;
@@ -2685,12 +2810,12 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer > .dropped-item.collected {
   animation: collect 0.5s ease-out forwards;
 }
-.app-shell > .app-stage > .canvas > .layer > .dropped-item.food {
+.app-shell > .app-stage > .canvas > .layer > .dropped-item.food, .app-shell > .app-stage > .canvas > .layer > .dropped-item.crop, .app-shell > .app-stage > .canvas > .layer > .dropped-item.flower, .app-shell > .app-stage > .canvas > .layer > .dropped-item.toy, .app-shell > .app-stage > .canvas > .layer > .dropped-item.medicine, .app-shell > .app-stage > .canvas > .layer > .dropped-item.item {
   width: var(--item-sprite-width, 32px);
   height: var(--item-sprite-height, 32px);
   background-image: url("../images/items/items.png");
   background-repeat: no-repeat;
-  background-position: var(--item-sprite-x, 0) var(--item-sprite-y, 0);
+  background-position: var(--item-sprite-x, 0px) var(--item-sprite-y, 0px);
   image-rendering: pixelated;
 }
 .app-shell > .app-stage > .canvas > .layer > .dropped-item.coin {
@@ -2724,7 +2849,9 @@ body.debug .map-object > .interactive-hitbox {
   z-index: 1;
   image-rendering: pixelated;
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .map-object > .sprite > .front,
 .map-object > .sprite .back {
@@ -2783,7 +2910,9 @@ body[data-tool-mode=drag] .map-object.draggable {
 }
 .map-object.is-dragging {
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   cursor: grabbing;
   z-index: var(--z-drag) !important;
 }
@@ -3131,6 +3260,19 @@ body[data-tool-mode=drag] .map-object.draggable {
   border: 2px solid rgba(220, 50, 50, 0.9);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
+.drop-target .drop-target-collider {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dashed rgba(255, 255, 255, 0.45);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.drop-target.valid-drop .drop-target-collider {
+  border-color: rgba(60, 200, 100, 0.55);
+}
+.drop-target.invalid-drop .drop-target-collider {
+  border-color: rgba(220, 50, 50, 0.55);
+}
 
 .terrain-legend {
   background-color: rgba(0, 0, 0, 0.5);
@@ -3189,6 +3331,4 @@ body[data-tool-mode=drag] .map-object.draggable {
   100% {
     transform: scale(0.9);
   }
-}
-
-/*# sourceMappingURL=style.css.map */
+}/*# sourceMappingURL=style.css.map */

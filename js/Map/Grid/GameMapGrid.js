@@ -36,21 +36,24 @@ class GridSystem {
         // OPTIMIZATION: Make debug mode off by default
         this.debugMode = false;
 
+        this.overlayFlags = {
+            grid: true,
+            cursorTile: true,
+            myteFrontTile: true
+        };
+
         this.debugElements = {
-            gridCells: [],
             cursorTile: null,
             myteFrontTile: null,
             cullingBounds: null,
-            debugStats: null,
             terrainLegend: null
         };
 
         this.debugInitialized = false;
         this._debugResizeObserver = null;
-        this._lastDebugZoom = 1;
-        this._debugGridCols = 0;
-        this._debugGridRows = 0;
-        this._debugGridBuffer = 4;
+        this._debugCanvas = null;
+        this._debugCtx = null;
+        this._debugDirty = false;
 
         // Initialize terrain colors for visualization
         this.terrainColors = {
@@ -81,14 +84,6 @@ class GridSystem {
         if (config.debugMode === true) {
             this.toggleDebug();
         }
-    }
-
-    getDebugVisibleCellCounts(viewport, zoom) {
-        const safeZoom = zoom || 1;
-        return {
-            cols: Math.min(Math.ceil(viewport.width / safeZoom / this.config.cellSize) + this._debugGridBuffer, this.gridWidth),
-            rows: Math.min(Math.ceil(viewport.height / safeZoom / this.config.cellSize) + this._debugGridBuffer, this.gridHeight)
-        };
     }
 
     // Default terrain movement cost multipliers
@@ -147,9 +142,8 @@ class GridSystem {
         // Update the terrain type
         this.grid[gridX][gridY].terrainType = terrainType;
 
-        // Update visual representation if in debug mode
-        if (this.debugMode && this.debugInitialized && this.config.showTerrainColors) {
-            this.updateGridCellVisuals(gridX, gridY);
+        if (this.debugMode && this.debugInitialized) {
+            this._debugDirty = true;
         }
 
         this.invalidatePathfinderCaches();
@@ -157,375 +151,200 @@ class GridSystem {
         return true;
     }
 
-    updateGridCellVisuals(gridX, gridY) {
-        // Find the cell element in the debug grid
-        const cellElement = this.debugElements.gridCells.find(
-            cell => cell.gridX === gridX && cell.gridY === gridY
-        )?.element;
-
-        if (!cellElement) return;
-
-        // Get the terrain type for this cell
-        const terrainType = this.grid[gridX][gridY].terrainType || GridSystem.defaultTerrain;
-
-        // Update the cell background color based on terrain
-        if (this.terrainColors[terrainType]) {
-            cellElement.style.backgroundColor = this.terrainColors[terrainType];
-
-            // Add a data attribute for terrain type
-            cellElement.dataset.terrainType = terrainType;
-
-            // Add cost label if debugging terrain costs
-            if (this.pathfinder && this.config.showTerrainCosts) {
-                const cost = GridSystem.terrainCosts[terrainType] || GridSystem.defaultTerrainCost;
-
-                // Add or update cost label
-                let costLabel = cellElement.querySelector('.terrain-cost');
-                if (!costLabel) {
-                    costLabel = document.createElement('span');
-                    costLabel.className = 'terrain-cost';
-                    costLabel.style.fontSize = '8px';
-                    costLabel.style.position = 'absolute';
-                    costLabel.style.top = '2px';
-                    costLabel.style.left = '2px';
-                    costLabel.style.color = 'white';
-                    costLabel.style.textShadow = '1px 1px 1px black';
-                    cellElement.appendChild(costLabel);
-                }
-
-                costLabel.textContent = cost.toFixed(1) + 'x';
-            }
-        }
+    updateGridCellVisuals() {
+        this._debugDirty = true;
     }
 
 
-    // Initialize culling visualization elements
     initializeCullingDebug() {
-        console.log('[GridSystem] Initializing culling debug elements');
-
-        // Make sure the debug layer exists
-        if (!this.parent || !this.parent.layers || !this.parent.layers.debug) {
-            console.error('[GridSystem] Debug layer not available for culling visualization');
-            return;
-        }
-
-        // Create culling bounds visualization if it doesn't exist or lost its parent
+        if (!this.parent?.layers?.debug) return;
         if (!this.debugElements.cullingBounds || !this.debugElements.cullingBounds.parentNode) {
-            // Remove any existing element first (cleanup)
-            if (this.debugElements.cullingBounds && this.debugElements.cullingBounds.parentNode) {
-                this.debugElements.cullingBounds.parentNode.removeChild(this.debugElements.cullingBounds);
-            }
-
-            // Create new element
-            const cullingBounds = document.createElement('div');
-            cullingBounds.className = 'culling-bounds';
-            this.parent.layers.debug.appendChild(cullingBounds);
-            this.debugElements.cullingBounds = cullingBounds;
-
-            console.log('[GridSystem] Created culling bounds element');
+            this.debugElements.cullingBounds?.remove();
+            const el = document.createElement('div');
+            el.className = 'culling-bounds';
+            el.classList.add('ignore');
+            el.setAttribute('aria-hidden', 'true');
+            this.parent.layers.debug.appendChild(el);
+            this.debugElements.cullingBounds = el;
         }
-
-        // Create debug stats display if it doesn't exist or lost its parent
-        this.debugElements.debugStats = null;
     }
 
-    // Method to initialize debug DOM elements
     initializeDebugDOM() {
-        if (this.debugInitialized) {
-            console.log('[GridSystem] Debug DOM already initialized, refreshing elements');
-            // Instead of returning, we'll refresh the elements to ensure they're properly created
-        } else {
-            console.log('[GridSystem] Initializing debug DOM elements');
-        }
+        if (!this.parent?.layers?.debug) return;
 
-        // Make sure we have access to the debug layer
-        if (!this.parent || !this.parent.layers || !this.parent.layers.debug) {
-            console.error('[GridSystem] Debug layer not available for DOM elements');
-            return;
-        }
+        const debugLayer = this.parent.layers.debug;
 
-        // Create cursor tile indicator
-        if (!this.debugElements.cursorTile || !this.debugElements.cursorTile.parentNode) {
-            // Remove any existing element first (cleanup)
-            if (this.debugElements.cursorTile && this.debugElements.cursorTile.parentNode) {
-                this.debugElements.cursorTile.parentNode.removeChild(this.debugElements.cursorTile);
-            }
+        // Cursor tile
+        this.debugElements.cursorTile?.remove();
+        const cursorTile = document.createElement('div');
+        cursorTile.className = 'cursor-tile ignore';
+        cursorTile.setAttribute('aria-hidden', 'true');
+        cursorTile.style.width = `${this.config.cellSize}px`;
+        cursorTile.style.height = `${this.config.cellSize}px`;
+        const cursorCoords = document.createElement('div');
+        cursorCoords.className = 'coords';
+        cursorCoords.innerText = '0, 0';
+        cursorTile.appendChild(cursorCoords);
+        debugLayer.appendChild(cursorTile);
+        this.debugElements.cursorTile = cursorTile;
 
-            const cursorTile = document.createElement('div');
-            cursorTile.className = 'cursor-tile';
+        // Myte front tile
+        this.debugElements.myteFrontTile?.remove();
+        const myteFrontTile = document.createElement('div');
+        myteFrontTile.className = 'myte-front-tile ignore';
+        myteFrontTile.setAttribute('aria-hidden', 'true');
+        myteFrontTile.style.width = `${this.config.cellSize}px`;
+        myteFrontTile.style.height = `${this.config.cellSize}px`;
+        debugLayer.appendChild(myteFrontTile);
+        this.debugElements.myteFrontTile = myteFrontTile;
 
-            cursorTile.style.width = `${this.config.cellSize}px`;
-            cursorTile.style.height = `${this.config.cellSize}px`;
+        // Canvas for grid rendering
+        this._createDebugCanvas();
 
-            // Add text element for coordinates
-            const cursorCoords = document.createElement('div');
-            cursorCoords.className = 'coords';
-            cursorCoords.innerText = '0, 0';
-            cursorTile.appendChild(cursorCoords);
-
-            this.parent.layers.debug.appendChild(cursorTile);
-            this.debugElements.cursorTile = cursorTile;
-
-            console.log('[GridSystem] Created cursor tile element');
-        }
-
-        // Create myte front tile indicator
-        if (!this.debugElements.myteFrontTile || !this.debugElements.myteFrontTile.parentNode) {
-            // Remove any existing element first (cleanup)
-            if (this.debugElements.myteFrontTile && this.debugElements.myteFrontTile.parentNode) {
-                this.debugElements.myteFrontTile.parentNode.removeChild(this.debugElements.myteFrontTile);
-            }
-
-            const myteFrontTile = document.createElement('div');
-            myteFrontTile.className = 'myte-front-tile';
-            this.parent.layers.debug.appendChild(myteFrontTile);
-            this.debugElements.myteFrontTile = myteFrontTile;
-
-            myteFrontTile.style.width = `${this.config.cellSize}px`;
-            myteFrontTile.style.height = `${this.config.cellSize}px`;
-
-            console.log('[GridSystem] Created myte front tile element');
-        }
-
-        // Create grid cell elements (only for visible area)
-        this.createGridCellElements();
-
-        // Initialize culling visualization
+        // Culling bounds div
         this.initializeCullingDebug();
 
-        const mapView = this.parent?.parent;
-        const mapElement = mapView?.element;
-        if (!mapElement || !this.parent?.layers?.debug) {
-            return;
-        }
+        const mapElement = this.parent?.parent?.element;
+        if (!mapElement) return;
 
-        this.debugInitialized = true;
-
-        // Remove any existing listener to prevent duplicates
         if (this.boundMouseMoveHandler) {
             mapElement.removeEventListener('mousemove', this.boundMouseMoveHandler);
         }
-
-        // Create a bound version of the handler to use for both adding and removing
         this.boundMouseMoveHandler = this.handleMouseMove.bind(this);
-
-        // Attach mouse move listener for cursor tile tracking
         mapElement.addEventListener('mousemove', this.boundMouseMoveHandler);
 
-        // Rebuild grid cells whenever the container is resized (fullscreen, window resize, etc.)
-        if (this._debugResizeObserver) {
-            this._debugResizeObserver.disconnect();
-        }
+        if (this._debugResizeObserver) this._debugResizeObserver.disconnect();
         this._debugResizeObserver = new ResizeObserver(() => {
-            if (!this.debugMode || !this.parent?.parent?.element || !this.parent?.layers?.debug) {
-                return;
-            }
-            this.createGridCellElements();
+            if (this.debugMode) this._createDebugCanvas();
         });
         this._debugResizeObserver.observe(mapElement);
 
-        console.log('[GridSystem] Debug DOM initialization complete');
+        this.debugInitialized = true;
     }
-    // Create grid cell elements for the visible viewport only
-    createGridCellElements() {
-        if (!this.debugMode || !this.parent?.parent || !this.parent?.layers?.debug) {
-            return;
-        }
 
-        // Clear existing grid cells
-        this.debugElements.gridCells.forEach(cell => cell.element?.remove());
-        this.debugElements.gridCells = [];
+    _createDebugCanvas() {
+        if (!this.parent?.layers?.debug) return;
 
-        // Account for zoom: visible world area = viewport size / zoom
-        const viewport = this.parent.parent.getContainerRect();
-        if (!viewport) {
-            this._debugGridCols = 0;
-            this._debugGridRows = 0;
-            return;
-        }
-        const zoom = this.parent.parent.camera?.zoomLevel || 1;
-        this._lastDebugZoom = zoom;
-        const { cols, rows } = this.getDebugVisibleCellCounts(viewport, zoom);
-        this._debugGridCols = cols;
-        this._debugGridRows = rows;
+        // Remove old canvas
+        this._debugCanvas?.remove();
+        this._debugCanvas = null;
+        this._debugCtx = null;
 
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols; x++) {
-                const cellElement = document.createElement('div');
-                cellElement.className = 'grid-cell';
+        const w = this.parent.dimensions.width;
+        const h = this.parent.dimensions.height;
 
-                cellElement.style.width = `${this.config.cellSize - 1}px`;
-                cellElement.style.height = `${this.config.cellSize - 1}px`;
-                cellElement.style.left = `${x * this.config.cellSize}px`;
-                cellElement.style.top = `${y * this.config.cellSize}px`;
-                cellElement.style.display = 'none';
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.className = 'debug-grid-canvas ignore';
+        canvas.setAttribute('aria-hidden', 'true');
+        canvas.tabIndex = -1;
+        canvas.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
+        this.parent.layers.debug.appendChild(canvas);
 
-                this.parent.layers.debug.appendChild(cellElement);
+        this._debugCanvas = canvas;
+        this._debugCtx = canvas.getContext('2d');
+        this._debugDirty = true;
+    }
 
-                this.debugElements.gridCells.push({
-                    element: cellElement,
-                    gridX: x,
-                    gridY: y
-                });
+    drawDebugGrid() {
+        const ctx = this._debugCtx;
+        if (!ctx) return;
+        if (!this.overlayFlags.grid) return;
+
+        const w = this._debugCanvas.width;
+        const h = this._debugCanvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        const cs = this.config.cellSize;
+        const showTerrain = this.config.showTerrainColors;
+
+        for (let x = 0; x < this.gridWidth; x++) {
+            for (let y = 0; y < this.gridHeight; y++) {
+                const cell = this.grid[x][y];
+                const px = x * cs;
+                const py = y * cs;
+                const s = cs - 1;
+
+                if (!cell.walkable) {
+                    ctx.fillStyle = 'rgba(255,0,0,0.2)';
+                    ctx.fillRect(px, py, s, s);
+                } else if (!cell.tileWalkable) {
+                    ctx.fillStyle = 'rgba(255,100,0,0.1)';
+                    ctx.fillRect(px, py, s, s);
+                } else if (!cell.objectWalkable) {
+                    ctx.fillStyle = 'rgba(255,0,100,0.1)';
+                    ctx.fillRect(px, py, s, s);
+                } else if (showTerrain) {
+                    const tc = this.terrainColors[cell.terrainType];
+                    if (tc) {
+                        ctx.fillStyle = tc;
+                        ctx.fillRect(px, py, s, s);
+                    }
+                }
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(px + 0.5, py + 0.5, s, s);
             }
         }
+
+        this._debugDirty = false;
     }
 
-    // Update grid cell positions and visibility
-    // Enhanced version of the existing updateGridDebug method
     updateGridDebug(camera) {
-        if (!this.debugMode || !this.debugInitialized || !this.parent?.parent) return;
+        if (!this.debugMode || !this.debugInitialized) return;
 
-        // Get viewport bounds
-        const viewport = this.parent.parent.getContainerRect();
-        if (!viewport) return;
-        const zoom = camera?.zoomLevel || 1;
-
-        const { cols: neededCols, rows: neededRows } = this.getDebugVisibleCellCounts(viewport, zoom);
-
-        // Recreate grid cells if zoom changed significantly OR if pool was built with wrong dimensions
-        // (e.g. pool created before container had its final size, giving cols/rows too small)
-        const zoomChanged = Math.abs(zoom - (this._lastDebugZoom ?? zoom)) > 0.01;
-        const poolWrong = neededCols !== this._debugGridCols || neededRows !== this._debugGridRows;
-        if (zoomChanged || poolWrong) {
-            this.createGridCellElements();
+        if (this._debugDirty) {
+            this.drawDebugGrid();
         }
 
-        const visibleCellsX = this._debugGridCols || neededCols;
-        const visibleCellsY = this._debugGridRows || neededRows;
-
-        // Update grid cells if not showing the entire grid
-        if (this.debugElements.gridCells.length < this.gridWidth * this.gridHeight) {
-            const startX = Math.floor(-camera.posX / this.config.cellSize);
-            const startY = Math.floor(-camera.posY / this.config.cellSize);
-
-            this.debugElements.gridCells.forEach((cell, index) => {
-                const x = startX + (index % visibleCellsX);
-                const y = startY + Math.floor(index / visibleCellsX);
-
-                if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
-                    cell.element.style.left = `${x * this.config.cellSize}px`;
-                    cell.element.style.top = `${y * this.config.cellSize}px`;
-                    cell.gridX = x;
-                    cell.gridY = y;
-
-                    // Update cell class based on walkability
-                    this.updateCellClass(cell.element, x, y);
-
-                    // Update cell color based on terrain type if enabled
-                    if (this.config.showTerrainColors) {
-                        this.updateGridCellVisuals(x, y);
-                    }
-
-                    cell.element.style.display = 'block';
-                } else {
-                    cell.element.style.display = 'none';
-                }
-            });
-        } else {
-            // Full grid view — all cells are at their correct world positions from creation.
-            // Always re-apply display so stale display:none from a prior windowed frame is cleared.
-            this.debugElements.gridCells.forEach(cell => {
-                const x = cell.gridX;
-                const y = cell.gridY;
-
-                if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
-                    cell.element.style.display = 'block';
-                    this.updateCellClass(cell.element, x, y);
-
-                    if (this.config.showTerrainColors) {
-                        this.updateGridCellVisuals(x, y);
-                    }
-                } else {
-                    cell.element.style.display = 'none';
-                }
-            });
-        }
-
-        // Update terrain legend if showing terrain colors
         this.updateTerrainLegend();
     }
 
-    // New method to update or create terrain legend
     updateTerrainLegend() {
         if (!this.debugMode || !this.config.showTerrainColors) {
-            // Hide legend if not showing terrain colors
             if (this.debugElements.terrainLegend) {
                 this.debugElements.terrainLegend.style.display = 'none';
             }
             return;
         }
 
-        // Create legend if it doesn't exist
         if (!this.debugElements.terrainLegend) {
             const legend = document.createElement('div');
             legend.className = 'terrain-legend debug';
-
-
-
-            // Add to parent container
-            if (this.parent && this.parent.parent && this.parent.parent.element) {
+            if (this.parent?.parent?.element) {
                 this.parent.parent.element.appendChild(legend);
                 this.debugElements.terrainLegend = legend;
             }
         }
 
-        // Ensure legend is visible
         if (this.debugElements.terrainLegend) {
             this.debugElements.terrainLegend.style.display = 'block';
-
-            // Update legend content
-            let html = '<div style="font-weight: bold; margin-bottom: 5px">Terrain Types</div>';
-
-            // Add entries for each terrain type
+            let html = '<div style="font-weight:bold;margin-bottom:5px">Terrain Types</div>';
             Object.entries(this.terrainColors).forEach(([type, color]) => {
                 const cost = GridSystem.terrainCosts[type] || GridSystem.defaultTerrainCost;
-                html += `
-            <div style="display: flex; align-items: center; margin-bottom: 2px">
-                <div style="width: 12px; height: 12px; background-color: ${color}; margin-right: 5px; border: 1px solid white;"></div>
-                <span>${type}: ${cost.toFixed(1)}x</span>
-            </div>`;
+                html += `<div style="display:flex;align-items:center;margin-bottom:2px">
+                    <div style="width:12px;height:12px;background-color:${color};margin-right:5px;border:1px solid white;"></div>
+                    <span>${type}: ${cost.toFixed(1)}x</span></div>`;
             });
-
             this.debugElements.terrainLegend.innerHTML = html;
         }
     }
 
-    // Toggle showing terrain colors in debug mode
     toggleTerrainColors() {
         this.config.showTerrainColors = !this.config.showTerrainColors;
-
         if (this.debugMode && this.debugInitialized) {
-            // Update all grid cells
-            this.updateGridDebug(this.parent.parent.camera);
+            this._debugDirty = true;
+            this.drawDebugGrid();
         }
-
         return this.config.showTerrainColors;
-    }
-
-
-    // Helper method to update cell class based on walkability
-    updateCellClass(cellElement, x, y) {
-        // First, remove any existing walkability classes
-        cellElement.classList.remove(
-            'unwalkable',
-            'tile-unwalkable',
-            'object-unwalkable'
-        );
-
-        const gridCell = this.grid[x][y];
-        if (!gridCell.walkable) {
-            cellElement.classList.add('unwalkable');
-        } else if (!gridCell.tileWalkable) {
-            cellElement.classList.add('tile-unwalkable');
-        } else if (!gridCell.objectWalkable) {
-            cellElement.classList.add('object-unwalkable');
-        }
     }
 
     // Handle mouse movement to update cursor tile
     handleMouseMove(event) {
         if (!this.debugMode || !this.debugInitialized) return;
+        if (!this.overlayFlags.cursorTile) return;
 
         const inputHandler = this.parent.parent.inputHandler;
         const mouse = inputHandler?.getMouseWorldPosition
@@ -561,6 +380,7 @@ class GridSystem {
     // Update the tile in front of a myte based on direction and collider
     updateMyteFrontTile(myte) {
         if (!this.debugMode || !this.debugInitialized || !myte) return;
+        if (!this.overlayFlags.myteFrontTile) return;
 
         // Get myte's direction
         const direction = myte.direction || DIRECTION.SOUTH;
@@ -719,23 +539,22 @@ class GridSystem {
 
         if (this.debugMode) {
             if (!this.debugInitialized) {
-                console.log("[GridSystem] Initializing debug mode...");
                 this.initializeDebugDOM();
             }
 
             if (this.parent.layers.debug) {
                 this.parent.layers.debug.style.display = 'block';
+                this._debugDirty = true;
+                this.drawDebugGrid();
 
-                // Force an immediate update of the debug visualization
-                if (this.parent.parent && this.parent.parent.camera) {
-                    this.updateGridDebug(this.parent.parent.camera);
-
-                    if (this.lastCullingBounds) {
-                        const startGrid = this.worldToGrid(this.lastCullingBounds.left, this.lastCullingBounds.top);
-                        const endGrid = this.worldToGrid(this.lastCullingBounds.right, this.lastCullingBounds.bottom);
-                        this.updateCullingVisualization(this.lastCullingBounds, startGrid, endGrid);
-                    }
+                if (this.parent.parent?.camera && this.lastCullingBounds) {
+                    this.updateCullingVisualization(this.lastCullingBounds);
                 }
+            }
+
+            const camera = this.parent.parent?.camera;
+            if (camera) {
+                this.forceDebugRefresh(camera);
             }
         } else {
             if (this.parent.layers.debug) {
@@ -749,6 +568,48 @@ class GridSystem {
         }
 
         return this.debugMode;
+    }
+
+    forceDebugRefresh(camera = this.parent?.parent?.camera) {
+        if (!camera) return;
+
+        if (this.debugMode && !this.debugInitialized) {
+            this.initializeDebugDOM();
+        }
+
+        this.lastCameraPos = { x: -9999, y: -9999 };
+        this.lastCameraZoom = -1;
+        this._debugDirty = true;
+        this.updateCulling(camera);
+    }
+
+    setOverlayFlag(key, enabled) {
+        if (!(key in this.overlayFlags)) return;
+        this.overlayFlags[key] = enabled;
+
+        if (!this.debugInitialized) return;
+
+        if (key === 'grid') {
+            if (this._debugCanvas) {
+                this._debugCanvas.style.display = enabled ? '' : 'none';
+                if (enabled) {
+                    this._debugDirty = true;
+                    this.drawDebugGrid();
+                }
+            }
+        } else if (key === 'cursorTile') {
+            if (this.debugElements.cursorTile) {
+                if (!enabled) {
+                    this.debugElements.cursorTile.classList.remove('is-visible');
+                }
+            }
+        } else if (key === 'myteFrontTile') {
+            if (this.debugElements.myteFrontTile) {
+                if (!enabled) {
+                    this.debugElements.myteFrontTile.classList.remove('is-visible');
+                }
+            }
+        }
     }
 
     // Convert world coordinates to grid coordinates
@@ -1083,6 +944,7 @@ class GridSystem {
         obj._gridOccupancyX = obj.posX;
         obj._gridOccupancyY = obj.posY;
         this.invalidatePathfinderCaches();
+        if (this.debugMode && !obj.config.walkable) this._debugDirty = true;
     }
 
     // Helper method to check if an object is within visible bounds
@@ -1119,6 +981,7 @@ class GridSystem {
         delete obj._gridOccupancyX;
         delete obj._gridOccupancyY;
         this.invalidatePathfinderCaches();
+        if (this.debugMode && !obj.config.walkable) this._debugDirty = true;
     }
 
     // IMPROVED: Update object's position in grid - more efficient implementation
@@ -1229,6 +1092,7 @@ class GridSystem {
         obj._gridOccupancyX = obj.posX;
         obj._gridOccupancyY = obj.posY;
         this.invalidatePathfinderCaches();
+        if (this.debugMode && !obj.config.walkable) this._debugDirty = true;
     }
     // Get objects in an area
     getObjectsInArea(x, y, width, height) {
@@ -1409,51 +1273,20 @@ class GridSystem {
             }
 
             this.updateGridDebug(camera);
-            this.updateCullingVisualization(bounds, startGrid, endGrid);
+            this.updateCullingVisualization(bounds);
         }
     }
-    // Add a new method for updating the culling visualization
-    // Add a new method for updating the culling visualization
-    updateCullingVisualization(bounds, startGrid, endGrid) {
-        // Update culling bounds visualization
+    updateCullingVisualization(bounds) {
         if (!this.debugElements.cullingBounds || !this.debugElements.cullingBounds.parentNode) {
-            // If the culling bounds element is missing, recreate it
             this.initializeCullingDebug();
         }
-
-        const cullingBounds = this.debugElements.cullingBounds;
-        if (cullingBounds) {
-            cullingBounds.style.left = `${bounds.left}px`;
-            cullingBounds.style.top = `${bounds.top}px`;
-            cullingBounds.style.width = `${bounds.right - bounds.left}px`;
-            cullingBounds.style.height = `${bounds.bottom - bounds.top}px`;
-        } else {
-            console.warn('[GridSystem] Culling bounds element not available for update');
+        const el = this.debugElements.cullingBounds;
+        if (el) {
+            el.style.left = `${bounds.left}px`;
+            el.style.top = `${bounds.top}px`;
+            el.style.width = `${bounds.right - bounds.left}px`;
+            el.style.height = `${bounds.bottom - bounds.top}px`;
         }
-
-        // Mark grid cells as active or culled
-        this.debugElements.gridCells.forEach(cell => {
-            if (!cell || !cell.element || !cell.element.parentNode) return;
-
-            const x = cell.gridX;
-            const y = cell.gridY;
-
-            // Check if the cell is within the visible range
-            const isVisible = x >= startGrid.x && x <= endGrid.x &&
-                y >= startGrid.y && y <= endGrid.y &&
-                x >= 0 && x < this.gridWidth &&
-                y >= 0 && y < this.gridHeight;
-
-            // Update cell classes based on visibility
-            if (isVisible) {
-                cell.element.classList.add('active');
-                cell.element.classList.remove('culled');
-            } else {
-                cell.element.classList.remove('active');
-                cell.element.classList.add('culled');
-            }
-        });
-
     }
 
     getCullingDebugStats() {
@@ -1564,6 +1397,7 @@ class GridSystem {
         // Force culling update on next frame
         this.lastCameraPos = { x: -9999, y: -9999 };
         this.invalidatePathfinderCaches();
+        if (this.debugMode) this._debugDirty = true;
 
         console.log(`[GridSystem] Grid system updated: ${this.gridWidth}x${this.gridHeight} cells`);
     }
@@ -1653,37 +1487,22 @@ class GridSystem {
 
         // Clean up debug elements
         if (this.debugElements) {
-            // Handle grid cells array
-            if (Array.isArray(this.debugElements.gridCells)) {
-                this.debugElements.gridCells.forEach(cell => {
-                    if (cell && cell.element && cell.element.parentNode) {
-                        cell.element.parentNode.removeChild(cell.element);
-                    }
-                });
-            }
-
-            // Handle individual elements
-            ['cursorTile', 'myteFrontTile', 'cullingBounds', 'debugStats', 'terrainLegend'].forEach(elemName => {
-                const elem = this.debugElements[elemName];
-                if (elem && elem.parentNode) {
-                    elem.parentNode.removeChild(elem);
-                }
+            ['cursorTile', 'myteFrontTile', 'cullingBounds', 'terrainLegend'].forEach(name => {
+                this.debugElements[name]?.remove();
             });
-
-            // Reset debug elements references
             this.debugElements = {
-                gridCells: [],
                 cursorTile: null,
                 myteFrontTile: null,
                 cullingBounds: null,
-                debugStats: null
+                terrainLegend: null
             };
         }
 
-        // Reset debug initialization flag
+        this._debugCanvas?.remove();
+        this._debugCanvas = null;
+        this._debugCtx = null;
+        this._debugDirty = false;
         this.debugInitialized = false;
-        this._debugGridCols = 0;
-        this._debugGridRows = 0;
 
         // Remove any event listeners
         if (this.parent && this.parent.parent && this.parent.parent.element && this.boundMouseMoveHandler) {

@@ -29,6 +29,10 @@ class DroppedMapItem {
         this.parent = parent;
         this.type = type;
         this.variant = ItemRegistry.resolveIdSync(variant) || variant;
+
+        if (!ItemRegistry.getItemSync(this.variant)) {
+            console.warn(`[DroppedMapItem] No item registry entry for variant: "${this.variant}". It will render without a sprite.`);
+        }
         this.posX = posX;
         this.posY = posY;
         this.posZ = 0;
@@ -71,6 +75,19 @@ class DroppedMapItem {
 
         this.shadowElement = this.createShadowElement();
         this.element = this.createItemElement();
+        this._setupClickHandling();
+    }
+
+    _setupClickHandling() {
+        if (!this.element) return;
+        let pressStartTime = 0;
+        this.element.addEventListener('pointerdown', () => { pressStartTime = Date.now(); });
+        this.element.addEventListener('pointerup', (e) => {
+            if (e.button !== 0) return;
+            if (Date.now() - pressStartTime > 400) return; // ignore long press
+            const container = this.parent?.parent;
+            container?.ui?.setSelected?.(this);
+        });
     }
 
 

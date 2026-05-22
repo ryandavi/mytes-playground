@@ -8,102 +8,200 @@
 			"id": "acorn",
 			"name": "Acorn",
 			"type": "food",
-			"sprite": { "x": 0, "y": 0 },
+			"droppable": true,
+			"sprite": { "col": 0, "row": 0 },
 			"description": "A small acorn. Mytes love to snack on these."
 		},
 		{
 			"id": "turnip",
 			"name": "Turnip",
 			"type": "food",
+			"droppable": true,
 			"aliases": ["yellow_turnip"],
-			"sprite": { "x": -32, "y": 0 },
+			"sprite": { "col": 1, "row": 0 },
 			"description": "A crunchy yellow turnip."
 		},
 		{
 			"id": "apple",
 			"name": "Apple",
 			"type": "food",
+			"droppable": true,
 			"aliases": ["red_apple"],
-			"sprite": { "x": -128, "y": 0 },
+			"sprite": { "col": 4, "row": 0 },
 			"description": "A crisp red apple."
 		},
 		{
 			"id": "cherries",
 			"name": "Cherries",
 			"type": "food",
-			"sprite": { "x": -160, "y": 0 },
+			"droppable": true,
+			"sprite": { "col": 5, "row": 0 },
 			"description": "Sweet red cherries."
 		},
 		{
 			"id": "music_box",
 			"name": "Music Box",
 			"type": "toy",
-			"sprite": { "x": 0, "y": -64 },
+			"droppable": false,
+			"sprite": { "col": 0, "row": 2 },
 			"description": "A magical music box. Mytes love to play with it."
 		},
 		{
 			"id": "tomato",
 			"name": "Tomato",
-			"type": "crop",
-			"description": "A ripe tomato crop."
+			"type": "food",
+			"droppable": true,
+			"sprite": { "col": 3, "row": 2 },
+			"description": "A ripe tomato fresh from the garden."
 		},
 		{
 			"id": "carrot",
 			"name": "Carrot",
-			"type": "crop",
-			"description": "A crisp carrot crop."
+			"type": "food",
+			"droppable": true,
+			"sprite": { "col": 2, "row": 2 },
+			"description": "A crisp carrot, freshly pulled."
 		},
 		{
 			"id": "wheat",
 			"name": "Wheat",
-			"type": "crop",
+			"type": "food",
+			"droppable": true,
+			"sprite": { "col": 1, "row": 2 },
 			"description": "A bundle of wheat."
 		},
 		{
 			"id": "berry",
 			"name": "Berry",
-			"type": "crop",
-			"description": "A sweet berry harvest."
+			"type": "food",
+			"droppable": true,
+			"sprite": { "col": 4, "row": 2 },
+			"description": "Sweet berries, perfect for snacking."
 		},
 		{
 			"id": "grass_1",
 			"name": "Flower",
 			"type": "flower",
+			"droppable": true,
 			"aliases": ["flower"],
+			"sprite": { "col": 0, "row": 1 },
 			"description": "A small wild flower."
 		},
 		{
 			"id": "grass_2",
 			"name": "Flower",
 			"type": "flower",
+			"droppable": true,
+			"sprite": { "col": 1, "row": 1 },
 			"description": "A small wild flower."
 		},
 		{
 			"id": "grass_3",
 			"name": "Flower",
 			"type": "flower",
+			"droppable": true,
+			"sprite": { "col": 2, "row": 1 },
 			"description": "A small wild flower."
 		},
 		{
 			"id": "flower_red",
 			"name": "Red Flower",
 			"type": "flower",
+			"droppable": true,
 			"aliases": ["red_flower"],
+			"sprite": { "col": 3, "row": 1 },
 			"description": "A vivid red flower."
 		},
 		{
 			"id": "flower_yellow",
 			"name": "Yellow Flower",
 			"type": "flower",
+			"droppable": true,
 			"aliases": ["yellow_flower"],
+			"sprite": { "col": 4, "row": 1 },
 			"description": "A bright yellow flower."
 		},
 		{
 			"id": "flower_blue",
 			"name": "Blue Flower",
 			"type": "flower",
+			"droppable": true,
 			"aliases": ["blue_flower"],
+			"sprite": { "col": 5, "row": 1 },
 			"description": "A delicate blue flower."
+		},
+		{
+			"id": "rose",
+			"name": "Rose",
+			"type": "flower",
+			"droppable": true,
+			"sprite": { "col": 6, "row": 1 },
+			"description": "A beautiful rose, carefully cultivated."
+		},
+		{
+			"id": "tulip",
+			"name": "Tulip",
+			"type": "flower",
+			"droppable": true,
+			"sprite": { "col": 7, "row": 1 },
+			"description": "A cheerful tulip bloom."
+		},
+		{
+			"id": "lily",
+			"name": "Lily",
+			"type": "flower",
+			"droppable": true,
+			"sprite": { "col": 5, "row": 2 },
+			"description": "A graceful lily flower."
+		},
+		{
+			"id": "orchid",
+			"name": "Orchid",
+			"type": "flower",
+			"droppable": true,
+			"sprite": { "col": 6, "row": 2 },
+			"description": "An exotic orchid blossom."
+		},
+		{
+			"id": "blue_moon",
+			"name": "Blue Moon",
+			"type": "flower",
+			"droppable": true,
+			"sprite": { "col": 7, "row": 2 },
+			"description": "A rare night-blooming flower with a soft blue glow."
+		},
+		{
+			"id": "evening_star",
+			"name": "Evening Star",
+			"type": "flower",
+			"droppable": true,
+			"sprite": { "col": 0, "row": 3 },
+			"description": "A night bloom that opens only after dusk."
+		},
+		{
+			"id": "night_whisper",
+			"name": "Night Whisper",
+			"type": "flower",
+			"droppable": true,
+			"sprite": { "col": 1, "row": 3 },
+			"description": "A mysterious night-blooming flower with a delicate scent."
+		},
+		{
+			"id": "coin",
+			"name": "Coin",
+			"type": "currency",
+			"droppable": false,
+			"sprite": { "col": 2, "row": 3 },
+			"description": "Shiny coins. Adds to your coin total when collected."
+		},
+		{
+			"id": "health_orb",
+			"name": "Health Orb",
+			"type": "health",
+			"droppable": false,
+			"aliases": ["health", "health_potion"],
+			"sprite": { "col": 3, "row": 3 },
+			"description": "A healing orb. Restores your myte's health when collected."
 		}
 	]
 }

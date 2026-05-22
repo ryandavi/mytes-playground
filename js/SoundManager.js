@@ -1637,6 +1637,42 @@ class SoundManager {
 						durations: ["32n", "32n"]
 					};
 				}
+			},
+			"obj_flower_pick": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.Synth({
+						oscillator: { type: "triangle" },
+						envelope: {
+							attack: 0.005,
+							decay: 0.12,
+							sustain: 0,
+							release: 0.25
+						}
+					}).toDestination();
+					synth.volume.value = Tone.gainToDb(0.35);
+					return {
+						synth,
+						notes: ["E5", "G5"],
+						durations: ["32n", "16n"]
+					};
+				}
+			},
+			"obj_flower_trample": {
+				type: "sfx",
+				create: () => {
+					const synth = new Tone.NoiseSynth({
+						noise: { type: "brown" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.15,
+							sustain: 0,
+							release: 0.08
+						}
+					}).toDestination();
+					synth.volume.value = Tone.gainToDb(0.3);
+					return { synth, duration: "8n" };
+				}
 			}
 		};
 	}

@@ -8,6 +8,42 @@ class QueueUI {
         this.allowControls = options.allowControls ?? this.mode !== 'compact';
         this.maxItems = Number.isFinite(options.maxItems) ? options.maxItems : Infinity;
         this.holdDelay = Number.isFinite(options.holdDelay) ? options.holdDelay : 550;
+        this.panelShell = null;
+        this.panelSummary = null;
+        this.itemsHost = this.queue;
+        this.isCollapsed = false;
+
+        if (this.mode === 'debug' && this.queue) {
+            this._buildPanelShell();
+        }
+    }
+
+    _buildPanelShell() {
+        this.panelShell = document.createElement('details');
+        this.panelShell.className = 'queue-panel-shell';
+        this.panelShell.open = true;
+
+        this.panelSummary = document.createElement('summary');
+        this.panelSummary.textContent = 'Debug – Action Queue';
+
+        this.itemsHost = document.createElement('div');
+        this.itemsHost.className = 'queue-panel-body';
+
+        this._emptyState = document.createElement('div');
+        this._emptyState.className = 'queue-empty-state';
+        this._emptyState.textContent = 'No actions queued';
+
+        this.panelShell.appendChild(this.panelSummary);
+        this.panelShell.appendChild(this.itemsHost);
+        this.panelShell.appendChild(this._emptyState);
+        this.queue.replaceChildren(this.panelShell);
+    }
+
+    setCollapsed(collapsed) {
+        this.isCollapsed = collapsed;
+        if (this.panelShell) {
+            this.panelShell.open = !collapsed;
+        }
     }
 
     createQueueItem(item) {
@@ -63,7 +99,10 @@ class QueueUI {
             removeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const index = Number(element.dataset.index);
-                if (Number.isFinite(index)) {
+                if (!Number.isFinite(index)) return;
+                if (index === 0) {
+                    this.parent.activeMyte?.queue?.removeCurrentAction?.();
+                } else {
                     this.parent.activeMyte?.queue?.queue?.splice(index, 1);
                 }
             });
@@ -334,14 +373,18 @@ class QueueUI {
     update() {
         if (!this.parent.activeMyte || !this.queue) {
             if (this.queue) {
-                this.queue.innerHTML = '';
+                this.elements.forEach(el => el.remove());
                 this.elements.clear();
                 this.previousValues.clear();
+                this.queue.classList.remove('has-items');
+                if (this._emptyState) this._emptyState.style.display = 'none';
             }
             return;
         }
 
         const queueItems = (this.parent.activeMyte.queue.queue || []).slice(0, this.maxItems);
+        this.queue.classList.toggle('has-items', queueItems.length > 0);
+        if (this._emptyState) this._emptyState.style.display = queueItems.length === 0 ? 'block' : 'none';
 
         while (this.elements.size > queueItems.length) {
             const key = `queue-${this.elements.size - 1}`;
@@ -358,7 +401,7 @@ class QueueUI {
             if (!element) {
                 element = this.createQueueItem(item);
                 this.elements.set(key, element);
-                this.queue.appendChild(element);
+                this.itemsHost.appendChild(element);
             }
 
             this.updateQueueItem(element, item, index);
@@ -371,8 +414,12 @@ class QueueUI {
     }
 
     dispose() {
-        this.queue?.replaceChildren();
+        this.elements.forEach(el => el.remove());
         this.elements.clear();
         this.previousValues.clear();
+        this.panelShell?.remove();
+        this.panelShell = null;
+        this.panelSummary = null;
+        this.itemsHost = this.queue;
     }
 }
