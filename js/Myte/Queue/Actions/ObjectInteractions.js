@@ -194,7 +194,12 @@ class InteractObjectAction extends GoToObjectAction {
     }
 
     static getRequiredOptions(selected) {
-        return { target: selected };
+        const options = { target: selected };
+        if (selected instanceof PortalMapObject) {
+            options.interactionAnimationDuration = 0;
+            options.postActionIdleDuration = 0;
+        }
+        return options;
     }
 
     constructor(myte, options) {
@@ -679,9 +684,15 @@ class PickFlowerAction extends GoToObjectAction {
     };
 
     static _isFlower(obj) {
+        if (!obj) return false;
+        if (typeof obj.isSidebarFlowerObject === 'function') {
+            return obj.isSidebarFlowerObject();
+        }
+
         const name = obj?.constructor?.name ?? '';
-        if (name.includes('Flower') || name.includes('Plant') || name.includes('Bloom')) return true;
-        return obj?.type?.toUpperCase?.() === 'GRASS';
+        if (name.includes('Flower') || name.includes('Bloom')) return true;
+        const type = obj?.type?.toUpperCase?.();
+        return type === 'FLOWER' || type === 'GRASS';
     }
 
     static canPerform(selected, active) {
@@ -997,6 +1008,10 @@ class HarvestAction extends GoToObjectAction {
         super(myte, { ...HarvestAction.metadata.defaultOptions, ...options });
         this.phase = 'approach';
         this.animationTimer = 0;
+    }
+
+    getQueueTitle() {
+        return 'Harvest Crop';
     }
 
     update() {

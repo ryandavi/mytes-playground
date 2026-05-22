@@ -818,10 +818,16 @@ class GoToObjectAction extends PositionableAction {
             return false;
         }
 
-        return Math.hypot(
-            waypoint.x - this.targetPos.x,
-            waypoint.y - this.targetPos.y
-        ) <= skipDistance;
+        if (Math.hypot(waypoint.x - this.targetPos.x, waypoint.y - this.targetPos.y) <= skipDistance) {
+            return true;
+        }
+
+        // Also skip if the waypoint overshoots the final target along either axis
+        const myteX = this.myte.posX;
+        const myteY = this.myte.posY;
+        const xOvershoot = (waypoint.x - this.targetPos.x) * (this.targetPos.x - myteX) < 0;
+        const yOvershoot = (waypoint.y - this.targetPos.y) * (this.targetPos.y - myteY) < 0;
+        return xOvershoot || yOvershoot;
     }
 
     update() {

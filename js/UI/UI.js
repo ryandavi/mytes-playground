@@ -749,7 +749,6 @@ class ActionSidebarManager extends UIComponent {
         this._otherInfoCache = null;
         this._otherInfoRowMap = new Map();
         this._lastAvailableActionsKey = null;
-        this._pendingSelectionReset = null;
     }
 
     // Helper method to get category titles
@@ -763,6 +762,192 @@ class ActionSidebarManager extends UIComponent {
             carrying: 'Active Actions'
         };
         return titles[category] || category;
+    }
+
+    humanizeLabel(value, { uppercase = false } = {}) {
+        const text = String(value || '')
+            .replace(/MapObject$/i, '')
+            .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+            .split(/[_\s-]+/)
+            .filter(Boolean)
+            .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+            .join(' ');
+
+        return uppercase ? text.toUpperCase() : text;
+    }
+
+    getMyteTypeLabel(myte) {
+        return this.humanizeLabel(myte?.species || 'Myte', { uppercase: true });
+    }
+
+    getMapObjectTypeLabel(mapObject) {
+        if (!mapObject) {
+            return 'OBJECT';
+        }
+
+        const configured = mapObject.getConfig?.('sidebarTypeLabel', null);
+        if (configured) {
+            return this.humanizeLabel(configured, { uppercase: true });
+        }
+
+        const rawType = mapObject.type ||
+            mapObject.constructor?.name?.replace(/MapObject$/i, '') ||
+            'Object';
+        return this.humanizeLabel(rawType, { uppercase: true });
+    }
+
+    getSlotMyte(slotElement) {
+        return this.parent.parent.mytes?.find?.(myte => myte.dropTarget === slotElement) ?? null;
+    }
+
+    getTargetTypeLabel(selectedObject, activeMyte) {
+        if (selectedObject instanceof Myte) {
+            return this.getMyteTypeLabel(selectedObject);
+        }
+
+        if (selectedObject instanceof MapObject) {
+            return this.getMapObjectTypeLabel(selectedObject);
+        }
+
+        if (selectedObject instanceof DroppedMapItem) {
+            const itemDef = ItemRegistry.getItemSync?.(selectedObject.variant);
+            return this.humanizeLabel(itemDef?.type || 'Item', { uppercase: true });
+        }
+
+        if (selectedObject?.classList?.contains('myte-slot')) {
+            return 'SLOT';
+        }
+
+        if (selectedObject === activeMyte) {
+            return this.getMyteTypeLabel(activeMyte);
+        }
+
+        return 'ELEMENT';
+    }
+
+    getMyteBehaviorLabel(myte) {
+        const goalKey = myte?.getMoveType?.(myte.goal) || '';
+        const labels = {
+            FOLLOW: 'Following',
+            FREEROAM: 'Free Roam',
+            GRAVITY: 'Gravity',
+            GOHOME: 'Going Home',
+            QUEUE_ONLY: 'Queued'
+        };
+
+        return labels[goalKey] || this.humanizeLabel(goalKey || 'Unknown');
+    }
+
+    getMyteBehaviorDetail(myte) {
+        const goalKey = myte?.getMoveType?.(myte.goal) || '';
+        if (goalKey === 'FOLLOW') {
+            return {
+                label: 'Follow Style',
+                value: this.humanizeLabel(myte?.getMoveFollowType?.(myte.followGoal) || 'Normal')
+            };
+        }
+
+        if (goalKey === 'FREEROAM') {
+            return {
+                label: 'Autonomy',
+                value: this.humanizeLabel(myte?.getMoveAutonomyType?.(myte.autonomyGoal) || 'Interact')
+            };
+        }
+
+        return null;
+    }
+
+    getMyteActivityLabel(myte) {
+        const currentAction = myte?.queue?.getCurrentAction?.() ?? null;
+        if (currentAction) {
+            return currentAction.getQueueTitle?.() ||
+                currentAction.constructor?.metadata?.label ||
+                currentAction.constructor?.name?.replace(/Action$/, '') ||
+                'Busy';
+        }
+
+        const goalKey = myte?.getMoveType?.(myte.goal) || '';
+        if (goalKey === 'GOHOME') {
+            return 'Returning Home';
+        }
+
+        if (goalKey === 'FOLLOW') {
+            return 'Following Cursor';
+        }
+
+        return 'Idle';
+    }
+
+    getSlotStateLabel(myte) {
+        if (!myte) {
+            return 'Empty';
+        }
+
+        if (!myte.isActive) {
+            return 'At Home';
+        }
+
+        if (myte.goal === MOVE_TYPES.FREEROAM) {
+            return 'Free Roam';
+        }
+
+        if (myte.goal === MOVE_TYPES.GOHOME) {
+            return 'Returning';
+        }
+
+        return 'Deployed';
+    }
+
+    getSelectionPositionInfo(selectedObject) {
+        if (typeof selectedObject?.posX === 'number' && typeof selectedObject?.posY === 'number') {
+            return {
+                posX: selectedObject.posX,
+                posY: selectedObject.posY
+            };
+        }
+
+        if (selectedObject?.classList?.contains('myte-slot')) {
+            const slotMyte = this.getSlotMyte(selectedObject);
+            const home = slotMyte?.getHomePosition?.();
+            if (home && Number.isFinite(home.x) && Number.isFinite(home.y)) {
+                return {
+                    posX: home.x,
+                    posY: home.y
+                };
+            }
+        }
+
+        return null;
+    }
+
+    getActionLabel(action, selectedObject) {
+        if (!action) {
+            return '';
+        }
+
+        if (selectedObject?.constructor?.name === 'CropPlantMapObject' && action.id === 'harvest') {
+            return 'Harvest Crop';
+        }
+
+        if (selectedObject instanceof PortalMapObject && action.id === 'interact_object') {
+            return 'Use Portal';
+        }
+
+        if (selectedObject instanceof DoorMapObject && action.id === 'interact_object') {
+            return `${selectedObject.isOpen ? 'Close' : 'Open'} Door`;
+        }
+
+        if (selectedObject?.type?.toUpperCase?.() === 'GATE' && action.id === 'interact_object') {
+            return `${selectedObject.isOpen ? 'Close' : 'Open'} Gate`;
+        }
+
+        if (selectedObject?.getConfig?.('interactionType') === 'light' && action.id === 'interact_object') {
+            const objectLabel = selectedObject.getDisplayName?.() || selectedObject.type || 'Light';
+            const isEnabled = selectedObject.isEnabled?.();
+            return `${isEnabled ? 'Turn Off' : 'Turn On'} ${objectLabel}`;
+        }
+
+        return action.label;
     }
 
     getMajorAction(selectedObject, activeMyte, availableActions = []) {
@@ -793,7 +978,7 @@ class ActionSidebarManager extends UIComponent {
 
     createActionButton(action, selectedObject, activeMyte, { prominent = false } = {}) {
         const button = document.createElement('button');
-        button.textContent = action.label;
+        button.textContent = this.getActionLabel(action, selectedObject);
         const actionContext = this.getCurrentActionContext(selectedObject, activeMyte);
         const titleParts = [];
         if (action.description) {
@@ -817,7 +1002,10 @@ class ActionSidebarManager extends UIComponent {
             button.classList.add('primary-action');
         }
 
-        button.addEventListener('click', () => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
             if (action.id === 'carry_putdown') {
                 activeMyte.queue.addPutDownMyte();
                 this.updateActions(selectedObject);
@@ -837,12 +1025,19 @@ class ActionSidebarManager extends UIComponent {
             );
 
             if (options) {
-                activeMyte.queue.add(action.id, {
+                const payload = {
                     ...options,
                     userInitiated: true
-                });
-                if (options.target === selectedObject) {
-                    this._pendingSelectionReset = { selectedObject };
+                };
+                const shouldInterrupt =
+                    prominent ||
+                    activeMyte?.goal === MOVE_TYPES.FREEROAM ||
+                    activeMyte?.queue?.hasUserInitiatedAction?.();
+
+                if (shouldInterrupt) {
+                    activeMyte.queue.interrupt(action.id, payload);
+                } else {
+                    activeMyte.queue.add(action.id, payload);
                 }
                 this.updateActions(selectedObject);
             }
@@ -865,10 +1060,6 @@ class ActionSidebarManager extends UIComponent {
 
     update() {
         const activeMyte = this.parent.getActiveMyte();
-        if (this._syncPendingSelectionReset(activeMyte)) {
-            return;
-        }
-
         if (!this.currentSelectedObject) {
             return;
         }
@@ -898,28 +1089,6 @@ class ActionSidebarManager extends UIComponent {
 
         this.lastInfoRefreshAt = now;
         this.renderOtherInfo(this.currentSelectedObject);
-    }
-
-    _syncPendingSelectionReset(activeMyte) {
-        const pending = this._pendingSelectionReset;
-        if (!pending?.selectedObject) {
-            return false;
-        }
-
-        if (this.parent.selectionManager.getSelectedObject?.() !== pending.selectedObject) {
-            this._pendingSelectionReset = null;
-            return false;
-        }
-
-        const queuedActions = activeMyte?.queue?.queue ?? [];
-        const stillQueued = queuedActions.some(action => action?.target === pending.selectedObject);
-        if (stillQueued) {
-            return false;
-        }
-
-        this._pendingSelectionReset = null;
-        this.parent.selectionManager.setSelected(null);
-        return true;
     }
 
     _buildAvailableActionsKey(selectedObject, activeMyte) {
@@ -995,10 +1164,7 @@ class ActionSidebarManager extends UIComponent {
         const statusRows = [];
 
         if (selectedObject instanceof DoorMapObject) {
-            statusRows.push(
-                { label: 'Door State', value: selectedObject.isOpen ? 'Open' : 'Closed' },
-                { label: 'Animating', value: typeof selectedObject.isAnimating === 'boolean' && selectedObject.isAnimating ? 'Yes' : null }
-            );
+            statusRows.push({ label: 'State', value: selectedObject.isOpen ? 'Open' : 'Closed' });
         }
 
         this.appendInfoRows(statusRows, selectedObject.getSidebarStatusRows?.() ?? []);
@@ -1021,8 +1187,9 @@ class ActionSidebarManager extends UIComponent {
     _buildOtherInfoRows(selectedObject) {
         const rows = [];
         const gridSystem = this.parent.parent.gameMap?.gridSystem;
-        const hasPosition = typeof selectedObject?.posX === 'number' && typeof selectedObject?.posY === 'number';
-        const gridCoords = hasPosition ? (gridSystem?.worldToGrid(selectedObject.posX, selectedObject.posY) ?? { x: 0, y: 0 }) : null;
+        const positionInfo = this.getSelectionPositionInfo(selectedObject);
+        const hasPosition = !!positionInfo;
+        const gridCoords = hasPosition ? (gridSystem?.worldToGrid(positionInfo.posX, positionInfo.posY) ?? { x: 0, y: 0 }) : null;
         const debugMode = document.body.classList.contains('debug');
 
         const activeMyte = this.parent.getActiveMyte();
@@ -1039,11 +1206,14 @@ class ActionSidebarManager extends UIComponent {
             const snapshot = selectedObject.ai?.getNeedsSnapshot?.({ live: true });
             if (snapshot) {
                 const vitals = snapshot.vitals ?? {};
+                const behaviorDetail = this.getMyteBehaviorDetail(selectedObject);
                 this.appendSectionHeader(rows, 'status', 'Status');
                 this.appendInfoRows(rows, [
                     { label: 'Energy', value: `${vitals.energy ?? 0}%` },
                     { label: 'Mood', value: `${selectedObject.stats.getMoodStatus()} (${vitals.mood ?? 0}%)` },
-                    { label: 'Mode', value: selectedObject.goal ?? null }
+                    { label: 'Behavior', value: this.getMyteBehaviorLabel(selectedObject) },
+                    { label: behaviorDetail?.label, value: behaviorDetail?.value },
+                    { label: 'Activity', value: this.getMyteActivityLabel(selectedObject) }
                 ]);
                 if (snapshot.topNeed) {
                     rows.push({ label: 'Top Need', value: `${snapshot.topNeed.label} (${snapshot.topNeed.percent}%)` });
@@ -1059,6 +1229,15 @@ class ActionSidebarManager extends UIComponent {
             }
         }
 
+        if (selectedObject?.classList?.contains('myte-slot')) {
+            const slotMyte = this.getSlotMyte(selectedObject);
+            this.appendSectionHeader(rows, 'status', 'Status');
+            this.appendInfoRows(rows, [
+                { label: 'Myte', value: slotMyte?.name ?? null },
+                { label: 'State', value: this.getSlotStateLabel(slotMyte) }
+            ]);
+        }
+
         if (selectedObject instanceof MapObject) {
             rows.push(...this.getObjectStateRows(selectedObject));
         }
@@ -1067,7 +1246,7 @@ class ActionSidebarManager extends UIComponent {
             this.appendSectionHeader(rows, 'location', 'Location');
             this.appendInfoRows(rows, [
                 { label: 'Coords', value: `[${gridCoords.x}, ${gridCoords.y}]`, className: 'position-info' },
-                { label: 'World', value: debugMode ? `(${selectedObject.posX.toFixed(0)}, ${selectedObject.posY.toFixed(0)})` : null, className: 'position-info' }
+                { label: 'World', value: debugMode ? `(${positionInfo.posX.toFixed(0)}, ${positionInfo.posY.toFixed(0)})` : null, className: 'position-info' }
             ]);
         }
 
@@ -1161,14 +1340,12 @@ class ActionSidebarManager extends UIComponent {
         const interactionType = selectedInfo.querySelector('.interaction-type .type');
         const targetType = selectedInfo.querySelector('.target-info .type');
         const targetName = selectedInfo.querySelector('.target-info .name');
+        const activeMyte = this.parent.getActiveMyte();
         this.currentSelectedObject = selectedObject;
         this.lastInfoRefreshAt = 0;
         this._otherInfoCache = null;
         this._otherInfoRowMap.clear();
         this._lastAvailableActionsKey = null;
-        if (this._pendingSelectionReset?.selectedObject && this._pendingSelectionReset.selectedObject !== selectedObject) {
-            this._pendingSelectionReset = null;
-        }
 
 
         // Remove all state classes first
@@ -1182,7 +1359,7 @@ class ActionSidebarManager extends UIComponent {
             if (selectedObject === this.parent.getActiveMyte()) {
                 interactionType.textContent = "Selected Self";
                 selectedInfo.classList.add('self-selected');
-                targetType.textContent = "Myte";
+                targetType.textContent = this.getTargetTypeLabel(selectedObject, activeMyte);
                 targetName.textContent = selectedObject.name;
             } else {
                 interactionType.textContent = "Interacting with";
@@ -1190,20 +1367,20 @@ class ActionSidebarManager extends UIComponent {
                 // Set target type and name based on object type
                 if (selectedObject instanceof Myte) {
                     selectedInfo.classList.add('myte-interaction');
-                    targetType.textContent = "Myte";
+                    targetType.textContent = this.getTargetTypeLabel(selectedObject, activeMyte);
                     targetName.textContent = selectedObject.name;
                 } else if (selectedObject instanceof MapObject) {
                     selectedInfo.classList.add('map-interaction');
-                    targetType.textContent = "Object";
+                    targetType.textContent = this.getTargetTypeLabel(selectedObject, activeMyte);
                     targetName.textContent = selectedObject.getDisplayName?.() || selectedObject.type;
                 } else if (selectedObject instanceof DroppedMapItem) {
                     selectedInfo.classList.add('element-interaction');
-                    targetType.textContent = "Item";
+                    targetType.textContent = this.getTargetTypeLabel(selectedObject, activeMyte);
                     const itemDef = ItemRegistry.getItemSync?.(selectedObject.variant);
                     targetName.textContent = itemDef?.name || selectedObject.variant || 'Item';
                 } else if (selectedObject?.classList?.contains('myte-slot')) {
                     selectedInfo.classList.add('map-interaction');
-                    targetType.textContent = "Slot";
+                    targetType.textContent = this.getTargetTypeLabel(selectedObject, activeMyte);
                     targetName.textContent = selectedObject.querySelector('.myte-home-label .name')?.textContent?.trim()
                         || selectedObject.id
                         || 'Home Slot';
@@ -1233,7 +1410,10 @@ class ActionSidebarManager extends UIComponent {
         const button = document.createElement('button');
         button.textContent = 'Pick Up';
         button.classList.add('primary-action');
-        button.addEventListener('click', () => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
             if (!activeMyte || selectedObject.collected) return;
             const myteCenter = {
                 x: activeMyte.posX + (activeMyte.size.width / 2),
@@ -1285,7 +1465,9 @@ class ActionSidebarManager extends UIComponent {
                 const li = document.createElement('li');
                 const btn = document.createElement('button');
                 btn.textContent = 'Go Home';
-                btn.addEventListener('click', () => {
+                btn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
                     slotMyte.clearHomeSlotHold?.();
                     slotMyte.queue.clear();
                     slotMyte.setMode(MOVE_TYPES.GOHOME);
@@ -1356,7 +1538,9 @@ class ActionSidebarManager extends UIComponent {
             const li = document.createElement('li');
             const btn = document.createElement('button');
             btn.textContent = 'Go Home';
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
                 activeMyte.clearHomeSlotHold?.();
                 activeMyte.queue.clear();
                 activeMyte.setMode(MOVE_TYPES.GOHOME);

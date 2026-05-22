@@ -19,6 +19,7 @@ class MyteTouchHandler extends DragHandler {
                     myte.parent.setActiveMyte(myte);
                 }
 
+                this.dragStartedInFreeRoam = myte.goal === MOVE_TYPES.FREEROAM;
                 myte.playSound('ui_pickup_item');
                 myte.isDragging = true;
                 this.dragStartPosition = { x: myte.posX, y: myte.posY };
@@ -76,6 +77,10 @@ class MyteTouchHandler extends DragHandler {
                     myte.stop();
                 }
 
+                if (this.dragStartedInFreeRoam && myte.isActive && !myte.dropTarget.classList.contains("on-target")) {
+                    myte.setMode(MOVE_TYPES.FOLLOW);
+                }
+
                 // Check if dropped on a portal
                 const droppedPortal = this._getPortals(myte).find(p => p.element?.classList.contains('on-target'));
                 if (droppedPortal && !myte.dropTarget.classList.contains("on-target")) {
@@ -102,15 +107,13 @@ class MyteTouchHandler extends DragHandler {
                         const best = dropObj.getBestInteractionAction?.(myte);
                         if (best) {
                             const actionOptions = ActionManager.getActionOptions(best.id, dropObj, myte);
-                            if (!actionOptions) {
-                                return;
+                            if (actionOptions) {
+                                myte.queue.clear();
+                                myte.queue.add(best.id, {
+                                    ...actionOptions,
+                                    userInitiated: true
+                                });
                             }
-
-                            myte.queue.clear();
-                            myte.queue.add(best.id, {
-                                ...actionOptions,
-                                userInitiated: true
-                            });
                         }
                     }
                 }
@@ -124,6 +127,7 @@ class MyteTouchHandler extends DragHandler {
                 // Reset auto-pickup flag
                 this.autoPickup = false;
                 this.dragStartPosition = null;
+                this.dragStartedInFreeRoam = false;
 
                 // If this was started via click handler auto-drag, let it handle mode switching back
                 if (myte.inputHandler?.clickHandler?.isDragging) {
@@ -136,6 +140,7 @@ class MyteTouchHandler extends DragHandler {
         // Add auto-pickup flag
         this.autoPickup = false;
         this.dragStartPosition = null;
+        this.dragStartedInFreeRoam = false;
     }
 
     _findObjectAtMyte(myte) {

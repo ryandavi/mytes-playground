@@ -43,6 +43,10 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         return this.humanizeSidebarToken(this.state || 'closed');
     }
 
+    hasLoot() {
+        return this.normalizeItems(this.items).length > 0;
+    }
+
     getContainedLootSummary(maxEntries = 3) {
         const items = this.normalizeItems(this.items);
         if (!items.length) {
@@ -234,14 +238,14 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
 
     getSidebarStatusRows() {
         return [
-            { label: 'Chest State', value: this.getChestStateLabel() },
+            { label: 'State', value: this.getChestStateLabel() },
             ...super.getSidebarStatusRows()
         ];
     }
 
     getSidebarDetailRows() {
         return [
-            { label: 'Contains', value: this.getContainedLootSummary() },
+            { label: 'Contents', value: this.hasLoot() ? 'Has Loot' : 'Empty' },
             ...super.getSidebarDetailRows()
         ];
     }
