@@ -33,6 +33,9 @@ class ContainerManager {
         this.transitionManager = new MapTransitionManager(this);
         this.userIsActive = true;
 
+        this._cachedCanvasRect = null;
+        this._boundInvalidateCanvasRect = () => { this._cachedCanvasRect = null; };
+
         this.settings = {
             limitMap: true,
             defaultMyteCamera: CAMERA_FOLLOW_MODES.CHARACTER,
@@ -77,12 +80,8 @@ class ContainerManager {
             console.log('[ContainerManager] Initializing camera');
             this.camera = new Camera(this, this.canvas, this.element);
             this.camera.limitToBounds = this.settings.limitMap;
+            window.addEventListener('resize', this._boundInvalidateCanvasRect);
 
-            // Ensure the input handler is initialized
-            if (!this.inputHandler) {
-                console.log('[ContainerManager] Initializing input handler');
-                this.inputHandler = new ContainerInputManager(this);
-            }
 
 
             // Set up inventory
@@ -114,12 +113,6 @@ class ContainerManager {
             this.updateContainerLoading(ContainerManager.INIT_PROGRESS.INVENTORY);
 
 
-
-            // Initialize transition manager
-            if (!this.transitionManager) {
-                console.log('[ContainerManager] Initializing transition manager');
-                this.transitionManager = new MapTransitionManager(this);
-            }
 
             // Check if core exists
             if (!this.core) {
@@ -357,14 +350,15 @@ class ContainerManager {
       }
 
     getOffset(el) {
-        let rect = el.getBoundingClientRect();
-        var _x = window.scrollX;
-        var _y = window.scrollY;
+        const rect = el.getBoundingClientRect();
+        let _x = window.scrollX;
+        let _y = window.scrollY;
+        let current = el;
 
-        while (el && !isNaN(el.offsetLeft) && !isNaN(el.offsetTop)) {
-            _x += el.offsetLeft - el.scrollLeft;
-            _y += el.offsetTop - el.scrollTop;
-            el = el.offsetParent;
+        while (current && !isNaN(current.offsetLeft) && !isNaN(current.offsetTop)) {
+            _x += current.offsetLeft - current.scrollLeft;
+            _y += current.offsetTop - current.scrollTop;
+            current = current.offsetParent;
         }
 
         return {
@@ -398,7 +392,12 @@ class ContainerManager {
         };
     }
 
+    invalidateCanvasRect() {
+        this._cachedCanvasRect = null;
+    }
+
     getCanvasRect() {
+        if (this._cachedCanvasRect) return this._cachedCanvasRect;
         let rect = this.getRect(this.canvas);
         const configuredWidth = Number.isFinite(this.gameMap?.dimensions?.width)
             ? this.gameMap.dimensions.width
@@ -429,12 +428,13 @@ class ContainerManager {
             ? configuredHeight
             : fallbackHeight;
 
-        return {
+        this._cachedCanvasRect = {
             left: rect.left,
             top: rect.top,
             width: contentWidth,
             height: contentHeight
         };
+        return this._cachedCanvasRect;
     }
 
     getWorldBounds() {
@@ -450,44 +450,12 @@ class ContainerManager {
     }
 
     getEntityBoundsAt(entity, x = 0, y = 0, options = {}) {
-        const useCollider = options.useCollider !== false && !!entity?.collider;
-        const collider = entity?.collider || {};
-        const rect = options.rect || entity?.getOffsetRect?.() || entity?.getRect?.() || entity?.size || {
-            width: 0,
-            height: 0
-        };
-
-        const offsetX = useCollider ? (collider.offsetX ?? 0) : 0;
-        const offsetY = useCollider ? (collider.offsetY ?? 0) : 0;
-        const width = useCollider ? (collider.width ?? rect.width ?? 0) : (rect.width ?? entity?.size?.width ?? 0);
-        const height = useCollider ? (collider.height ?? rect.height ?? 0) : (rect.height ?? entity?.size?.height ?? 0);
-
-        return {
-            left: x + offsetX,
-            top: y + offsetY,
-            right: x + offsetX + width,
-            bottom: y + offsetY + height,
-            width,
-            height,
-            offsetX,
-            offsetY
-        };
+        return RectUtils.getEntityBoundsAt(entity, x, y, options);
     }
 
     clampEntityPosition(entity, x = 0, y = 0, options = {}) {
         const worldBounds = options.bounds || this.getWorldBounds();
-        const entityBounds = this.getEntityBoundsAt(entity, x, y, options);
-
-        return {
-            x: Math.max(
-                worldBounds.left - entityBounds.offsetX,
-                Math.min(x, worldBounds.right - entityBounds.offsetX - entityBounds.width)
-            ),
-            y: Math.max(
-                worldBounds.top - entityBounds.offsetY,
-                Math.min(y, worldBounds.bottom - entityBounds.offsetY - entityBounds.height)
-            )
-        };
+        return RectUtils.clampEntityPosition(entity, x, y, worldBounds, options);
     }
 
     getContainerRect() {
@@ -497,10 +465,8 @@ class ContainerManager {
     getLocalOffset(el) {
         const rect = this.getOffset(el);
         const container = this.getOffset(this.element);
-
         const x = rect.x - container.x;
         const y = rect.y - container.y;
-
         return {
             x, y,
             left: x,
@@ -585,37 +551,16 @@ class ContainerManager {
         this.core.eventManager.emit('collision', { entityA, entityB });
     }
 
+    getEntityColliderBounds(entity, x = entity?.posX ?? 0, y = entity?.posY ?? 0) {
+        return RectUtils.getEntityColliderBounds(entity, x, y);
+    }
+
     getColliderBounds(entity) {
-        return {
-            left: entity.posX + (entity.collider?.offsetX || 0),
-            top: entity.posY + (entity.collider?.offsetY || 0),
-            right: entity.posX + (entity.collider?.offsetX || 0) + (entity.collider?.width || entity.size.width),
-            bottom: entity.posY + (entity.collider?.offsetY || 0) + (entity.collider?.height || entity.size.height)
-        };
+        return RectUtils.getColliderBounds(entity);
     }
 
     checkBoxCollision(entityA, entityB, options = {}) {
-        const boundsA = this.getColliderBounds(entityA);
-        const boundsB = this.getColliderBounds(entityB);
-
-        // Basic collision check
-        const isColliding = !(
-            boundsA.right < boundsB.left ||
-            boundsA.left > boundsB.right ||
-            boundsA.bottom < boundsB.top ||
-            boundsA.top > boundsB.bottom
-        );
-
-        // Handle one-way platforms
-        if (isColliding && entityB.config?.oneWayPlatform) {
-            // Only collide if entityA is above entityB and moving downward
-            const isAbove = entityA.posY + entityA.size.height <= entityB.posY + 5; // Small tolerance
-            const isMovingDown = entityA.velocity > 0;
-
-            return isAbove && isMovingDown;
-        }
-
-        return isColliding;
+        return RectUtils.checkBoxCollision(entityA, entityB, options);
     }
 
     setActiveMyte(myte) {
@@ -692,8 +637,6 @@ class ContainerManager {
         this.drawTargetDot();
         this.updateUserActivity();
 
-        this.timeManager.update(deltaTime);  // Add time manager update
-
         // Update components
         this.mytes.forEach(myte => {
             if (myte.isActive) {
@@ -724,6 +667,9 @@ class ContainerManager {
 
 
     dispose() {
+        window.removeEventListener('resize', this._boundInvalidateCanvasRect);
+        this._cachedCanvasRect = null;
+
         this.mytes.forEach(myte => myte.dispose());
         this.mytes = [];
         this.activeMyte = null;

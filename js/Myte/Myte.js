@@ -190,6 +190,7 @@ class Myte {
 
 	init() {
 		this.physicsController = new MytePhysics(this);
+		this.movementController = new MyteMovementController(this);
 		this.renderer = new MyteRenderer(this);
 		this.renderer.initInteractiveMyte();
 		this.renderer.createTargetDot();
@@ -322,95 +323,15 @@ class Myte {
 
 	}
 
-	setFollowMode(newGoal = null) {
-
-		if (newGoal == null) {
-			newGoal = this.followGoal;
-		}
-
-		this.followGoal = newGoal;
-
-		// this.parent.ui.debugMenu.updateFollowMode(document.getElementById("cycleFollowGoal"));
-
-		this.parent.ui?.debugMenu?.updateButton?.('cycleFollowGoal');
-
-		this.runAway = this.followGoal === MOVE_FOLLOW_TYPES.RUNAWAY;
-		this.goingInCircles = this.followGoal === MOVE_FOLLOW_TYPES.CIRCLES;
-	}
-
-	setAutonomyMode(newGoal = null) {
-		if (newGoal == null) {
-			newGoal = this.autonomyGoal;
-		}
-
-		this.autonomyGoal = newGoal;
-		this.ai?.setMode(newGoal);
-		this.parent.ui?.debugMenu?.updateButton?.('cycleAutonomyGoal');
-	}
+	setFollowMode(newGoal = null) { this.movementController.setFollowMode(newGoal); }
+	setAutonomyMode(newGoal = null) { this.movementController.setAutonomyMode(newGoal); }
 
 	isIndependent(){
 		return !this.isDragging;
 	}
 
-	setMode(newGoal = null) {
-		if (newGoal == null) {
-			newGoal = this.goal;
-		}
-
-		const previousGoal = this.goal;
-		if (newGoal !== this.goal) {
-			this.previousGoal = this.goal;
-			this.goal = newGoal;
-			this.unsetTarget();
-			this.queue.clear();
-		}
-
-		this.parent.ui?.debugMenu?.updateButton?.('cycleGoal');
-
-		const modeConfig = {
-			[MOVE_TYPES.FOLLOW]: { isFreeRoam: false, followMouse: true, isGravity: false },
-			[MOVE_TYPES.GRAVITY]: { isFreeRoam: false, followMouse: true, isGravity: true },
-			[MOVE_TYPES.FREEROAM]: { isFreeRoam: true, followMouse: false, isGravity: false },
-			[MOVE_TYPES.GOHOME]: { isFreeRoam: false, followMouse: false, isGravity: false },
-			[MOVE_TYPES.QUEUE_ONLY]: { isFreeRoam: false, followMouse: false, isGravity: false }
-		}[this.goal];
-
-		if (!modeConfig) {
-			return;
-		}
-
-		this.atOriginal = false;
-		this.isFreeRoam = modeConfig.isFreeRoam;
-		this.followMouse = modeConfig.followMouse;
-		this.isGravity = modeConfig.isGravity;
-		this.isDragging = false;
-		this.unsetTarget();
-		this.queue.clear();
-		this.handleModeTransition(previousGoal, this.goal);
-
-		if (this.goal === MOVE_TYPES.GOHOME) {
-			this.beginGoHomeJourney(true);
-		} else {
-			this.resetGoHomeState();
-		}
-
-		this.parent?.eventManager?.emit('myte:mode_changed', { myte: this, mode: this.goal });
-	}
-
-	handleModeTransition(previousGoal, nextGoal) {
-		if (!this.physicsController) {
-			return;
-		}
-
-		if (nextGoal === MOVE_TYPES.GRAVITY) {
-			this.physicsController.syncGroundState();
-			return;
-		}
-
-		if (previousGoal === MOVE_TYPES.GRAVITY) {
-			this.physicsController.reset();
-		}
-	}
+	setMode(newGoal = null) { this.movementController.setMode(newGoal); }
+	handleModeTransition(previousGoal, nextGoal) { this.movementController.handleModeTransition(previousGoal, nextGoal); }
 
 	unsetTarget() {
 		this.targetX = this.posX;
@@ -461,14 +382,9 @@ class Myte {
 		return home;
 	}
 
-	holdInHomeSlotUntilPointerLeaves() {
-		this.holdAtHomeSlotWhilePointerInside = true;
-		return this.snapToHomePosition();
-	}
-
-	clearHomeSlotHold() {
-		this.holdAtHomeSlotWhilePointerInside = false;
-	}
+	holdInHomeSlotUntilPointerLeaves() { return this.movementController.holdInHomeSlotUntilPointerLeaves(); }
+	clearHomeSlotHold() { this.movementController.clearHomeSlotHold(); }
+	shouldHoldInHomeSlot() { return this.movementController.shouldHoldInHomeSlot(); }
 
 	isPointerInsideHomeSlot() {
 		if (!this.dropTarget || !this.parent?.inputHandler) {
@@ -480,32 +396,14 @@ class Myte {
 		return Utility.isCoordTouchingElement(mouse.x, mouse.y, slotRect);
 	}
 
-	shouldHoldInHomeSlot() {
-		if (!this.holdAtHomeSlotWhilePointerInside) {
-			return false;
-		}
-
-		if (!this.isActive || this.isDragging) {
-			this.clearHomeSlotHold();
-			return false;
-		}
-
-		if (this.isPointerInsideHomeSlot()) {
-			return true;
-		}
-
-		this.clearHomeSlotHold();
-		return false;
-	}
-
 	moveTowardsTargetDirect(doXAxis = true, doYAxis = true) {
 		this.ensureFiniteCoordinates('moveTowardsTargetDirect:start');
 		const dx = this.targetX - this.posX;
 		const dy = this.targetY - this.posY;
-		const distance = Math.sqrt(dx * dx + dy * dy);
+		const distance = Math.hypot(dx, dy);
 
+		const step = this.stats.getSpeed() * ((this._dt ?? 16.667) / 16.667);
 		if (Number.isFinite(distance) && distance !== 0) {
-			const step = this.stats.getSpeed();
 			const moveX = (dx / distance) * step;
 			const moveY = (dy / distance) * step;
 
@@ -518,7 +416,7 @@ class Myte {
 			}
 		}
 
-		if (distance < this.stats.getSpeed()) {
+		if (distance < step) {
 			this.snapPositionToTarget(doXAxis, doYAxis);
 		}
 
@@ -534,91 +432,12 @@ class Myte {
 		this.targetY = home.y;
 	}
 
-	resetGoHomeState() {
-		this.goHomePathState.hasPlannedPath = false;
-		this.goHomePathState.directFallbackFrames = 0;
-		this.goHomePathState.lastPlanAt = 0;
-	}
+	resetGoHomeState() { this.movementController.resetGoHomeState(); }
+	beginGoHomeJourney(forceReplan = false) { return this.movementController.beginGoHomeJourney(forceReplan); }
 
-	beginGoHomeJourney(forceReplan = false) {
-		const home = this.getHomePosition();
-		const gridSystem = this.parent?.gameMap?.gridSystem;
-
-		this.setTarget(home.x, home.y);
-		this.goHomePathState.lastPlanAt = Date.now();
-		this.goHomePathState.directFallbackFrames = 0;
-
-		if (!forceReplan && !this.queue.isEmpty()) {
-			return false;
-		}
-
-		const safeHome = gridSystem?.findNearestValidPositionForEntity?.(this, home.x, home.y, 12) ?? home;
-		const needsPath = Math.hypot(safeHome.x - this.posX, safeHome.y - this.posY) > Math.max(24, this.stats?.getSpeed?.() ?? 1);
-
-		this.queue.clear();
-		if (gridSystem && needsPath) {
-			this.queue.add('astar-move', { target: {
-				x: safeHome.x + this.size.width / 2,
-				y: safeHome.y + this.size.height / 2
-			} });
-			this.goHomePathState.hasPlannedPath = true;
-			return true;
-		}
-
-		this.goHomePathState.hasPlannedPath = false;
-		return false;
-	}
-
-	enterInactivityFreeRoam() {
-		if (!this.isActive || this.isDragging || this.goal !== MOVE_TYPES.FOLLOW) {
-			return false;
-		}
-
-		if (this.inactivityState.isFreeRoaming) {
-			return true;
-		}
-
-		this.inactivityState = {
-			isFreeRoaming: true,
-			goal: this.goal,
-			followGoal: this.followGoal,
-			autonomyGoal: this.autonomyGoal
-		};
-
-		this.setMode(MOVE_TYPES.FREEROAM);
-		return true;
-	}
-
-	restoreFromInactivityFreeRoam() {
-		if (!this.inactivityState.isFreeRoaming) {
-			return false;
-		}
-
-		const restoreGoal = this.inactivityState.goal ?? DEFAULT_MODE;
-		const restoreFollowGoal = this.inactivityState.followGoal ?? this.followGoal;
-		const restoreAutonomyGoal = this.inactivityState.autonomyGoal ?? this.autonomyGoal;
-
-		this.inactivityState = {
-			isFreeRoaming: false,
-			goal: null,
-			followGoal: null,
-			autonomyGoal: null
-		};
-
-		this.setFollowMode(restoreFollowGoal);
-		this.setAutonomyMode(restoreAutonomyGoal);
-		this.setMode(restoreGoal);
-		return true;
-	}
-
-	cancelInactivityFreeRoam() {
-		this.inactivityState = {
-			isFreeRoaming: false,
-			goal: null,
-			followGoal: null,
-			autonomyGoal: null
-		};
-	}
+	enterInactivityFreeRoam() { return this.movementController.enterInactivityFreeRoam(); }
+	restoreFromInactivityFreeRoam() { return this.movementController.restoreFromInactivityFreeRoam(); }
+	cancelInactivityFreeRoam() { this.movementController.cancelInactivityFreeRoam(); }
 
 	get isActiveMyte() {
 		return this === this.parent.activeMyte;
@@ -720,17 +539,8 @@ class Myte {
 	}
 
 	isMoving() {
-
 		if (this.isAtTarget()) return false;
-		var dx = this.targetX - this.posX;
-		var dy = this.targetY - this.posY;
-		var distance = Math.sqrt(dx * dx + dy * dy);
-
-		if (distance > 0) {
-			return true;
-		}
-
-		return false;
+		return this.getDistanceToPoint(this.targetX, this.targetY) > 0;
 	}
 
 
@@ -739,11 +549,7 @@ class Myte {
 			!Number.isFinite(this.targetX) || !Number.isFinite(this.targetY)) {
 			return false;
 		}
-
-		var dx = this.targetX - this.posX;
-		var dy = this.targetY - this.posY;
-		var distance = Math.sqrt(dx * dx + dy * dy);
-		return distance <= 0.5;
+		return this.getDistanceToPoint(this.targetX, this.targetY) <= 0.5;
 	}
 
 	setDirection(direction) {
@@ -755,7 +561,7 @@ class Myte {
 	faceTowardsPoint(x, y, directionWeight = 2) {
 		const dx = x - (this.posX + this.size.width / 2);
 		const dy = y - (this.posY + this.size.height / 2);
-		const distance = Math.sqrt(dx * dx + dy * dy);
+		const distance = Math.hypot(dx, dy);
 
 		if (!Number.isFinite(distance) || distance === 0) {
 			return this.direction;
@@ -776,7 +582,7 @@ class Myte {
 	getDirection(directionWeight = 2) {
 		let dx = this.targetX - this.posX;
 		let dy = this.targetY - this.posY;
-		let distance = Math.sqrt(dx * dx + dy * dy);
+		let distance = Math.hypot(dx, dy);
 
 		if (!Number.isFinite(distance) || distance === 0) {
 			return this.direction;
@@ -804,24 +610,11 @@ class Myte {
 		this.ensureFiniteCoordinates('snapPositionToTarget');
 	}
 	get distanceFromTarget() {
-		var d = {
-			x: this.targetX - this.posX,
-			y: this.targetY - this.posY
-		};
-		var distance2 = Math.sqrt(d.x * d.x + d.y * d.y);
-		return distance2.toFixed(2);
+		return this.getDistanceToPoint(this.targetX, this.targetY).toFixed(2);
 	}
 
 	get distanceFromMouse() {
-		let mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
-
-		var d = {
-			x: mouse.x - this.posX,
-			y: mouse.y - this.posY
-		};
-
-		var distance2 = Math.sqrt(d.x * d.x + d.y * d.y);
-		return distance2.toFixed(2);
+		return this.getDistanceFromMouse().toFixed(2);
 	}
 
 	// canAutoOpenCollider and tryOpenCollider are provided by EntityMixin (Entity.js).
@@ -830,15 +623,16 @@ class Myte {
 		this.ensureFiniteCoordinates('moveTowardsTarget:start');
 		const dx = this.targetX - this.posX;
 		const dy = this.targetY - this.posY;
-		const distance = Math.sqrt(dx * dx + dy * dy);
-	
+		const distance = Math.hypot(dx, dy);
+		const step = this.stats.getSpeed() * ((this._dt ?? 16.667) / 16.667);
+
 		// Store original position
 		const originalX = this.posX;
 		const originalY = this.posY;
-	
+
 		if (Number.isFinite(distance) && distance !== 0) {
-			const moveX = (dx / distance) * this.stats.getSpeed();
-			const moveY = (dy / distance) * this.stats.getSpeed();
+			const moveX = (dx / distance) * step;
+			const moveY = (dy / distance) * step;
 			const gridSystem = this.parent?.gameMap?.gridSystem;
 			
 			let xBlocked = false;
@@ -935,8 +729,7 @@ class Myte {
 			}
 		}
 	
-		// If the distance is small enough, snap to the target
-		if (distance < this.stats.getSpeed()) {
+		if (distance < step) {
 			this.snapPositionToTarget(doXAxis, doYAxis);
 		}
 
@@ -1128,56 +921,6 @@ class Myte {
 
 
 
-	doFreeRoamLogic() {
-
-		var inWhere = this.limitToContainer ? this.parent.element : null;
-
-		let random = Math.random();
-
-		if (random < 0.1 && Date.now() - this.startTime > 10000) {
-			// idle
-			// this.queue.addIdle(500);
-
-		} else if (random < 0.3) {
-			// jump
-			this.doJump();
-
-		} else if (random < 0.5) {
-			// move to random element
-			let e = Utility.findClosestElementToMouse(this.parent.mousePosX, this.parent.mousePosY, inWhere, 3, 250, true);
-
-			if (e) {
-				this.queue.addMoveToElement(e);
-			} else {
-				// go somewhere random (optional logic here)
-			}
-
-			// take a rest after moving
-			// this.queue.addIdle(500);
-
-		} else if (random < 0.7) {
-			// get random mapObject
-			let e = this.getRandomNearbyObject(500, true);
-			if (e) {
-				e.press(this.parent);
-			}
-
-
-		} else {
-			// run laps
-			let e = Utility.findClosestElementToMouse(this.parent.mousePosX, this.parent.mousePosY, inWhere, 3, 250, true);
-
-			if (e) {
-				this.queue.addRunLaps(e);
-				this.queue.addMoveToElement(e);
-			} else {
-				// go somewhere random (optional logic here)
-			}
-
-			// take a longer rest after moving
-			// this.queue.addIdle(1000);
-		}
-	}
 
 
 	getRandomNearbyObject(range, returnClosest = false) {
@@ -1242,127 +985,12 @@ class Myte {
 	doJump()        { return this.physicsController.doJump(); }
 	doLandFromFall() { this.physicsController.doLandFromFall(); }
 
-	doMovementLogic(deltaTime) {
-		if (this.isDragging) {
-			return;
-		}
-
-		if (this.goal === MOVE_TYPES.GRAVITY) {
-			if (!this.queue.isEmpty()) {
-				this.queue.update(deltaTime);
-			} else {
-				// Handle random jumping when appropriate
-				if (!this.isCurrentlyJumping()) {
-					if (Math.random() < 0.2 &&
-						this.parent.isMouseInContainer() &&
-						this.parent.inputHandler.getMouseWorldPosition().y < this.posY) {
-						this.doJump();
-					}
-				}
-				this.moveGravity();
-			}
-		}
-		else if (this.goal === MOVE_TYPES.FREEROAM) {
-			this.queue.update(deltaTime);
-		}
-		else if (this.goal === MOVE_TYPES.FOLLOW) {
-			if (this.queue.isEmpty()) {
-				// If no other actions, follow the mouse
-				this.updateTargetToFollowMouse();
-				this.moveTowardsTarget();
-
-
-			}
-			this.queue.update(deltaTime);
-		}
-		else if (this.goal === MOVE_TYPES.GOHOME) {
-			if (this.atOriginal === false) {
-				if (!this.queue.isEmpty()) {
-					this.queue.update(deltaTime);
-					this.goHomePathState.directFallbackFrames = 0;
-				} else {
-					const home = this.getHomePosition();
-					this.setTarget(home.x, home.y);
-
-					const distanceToHome = this.getDistanceToPoint(home.x, home.y);
-
-					if (
-						!this.goHomePathState.hasPlannedPath &&
-						distanceToHome > 96 &&
-						Date.now() - this.goHomePathState.lastPlanAt > 300
-					) {
-						this.beginGoHomeJourney(true);
-					}
-
-					this.goHomePathState.directFallbackFrames++;
-					if (distanceToHome <= 96 || this.goHomePathState.directFallbackFrames > 20) {
-						this.moveTowardsTargetDirect();
-					}
-				}
-
-				if (this.isAtHomePosition(1)) {
-					this.stop();
-				}
-			}
-		}
-		else if (this.goal === MOVE_TYPES.QUEUE_ONLY) {
-			if (this.queue.isEmpty()) {
-				this.watchCursor();
-			} else {
-				this.queue.update(deltaTime);
-			}
-		}
-	}
-
-	watchCursor() {
-		const mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
-		const dx = mouse.x - this.posX;
-		const dy = mouse.y - this.posY;
-		const distanceFromMouse = Math.sqrt(dx * dx + dy * dy);
-
-		// Configuration
-		const innerRadius = 80;
-		const outerRadius = 300;
-		const diagonalThreshold = 0.5;
-
-		if (distanceFromMouse >= outerRadius) {
-			// Outside the outer radius, do nothing
-			return;
-		}
-
-		let newDirection;
-
-		if (distanceFromMouse < innerRadius) {
-			newDirection = DIRECTION.SOUTH;
-		} else {
-			const absX = Math.abs(dx);
-			const absY = Math.abs(dy);
-
-			if (this.diagonalMovement &&
-				absX > absY * diagonalThreshold &&
-				absY > absX * diagonalThreshold) {
-				// Diagonal movement
-				if (dx > 0 && dy > 0) newDirection = DIRECTION.SOUTHEAST;
-				else if (dx > 0 && dy < 0) newDirection = DIRECTION.NORTHEAST;
-				else if (dx < 0 && dy > 0) newDirection = DIRECTION.SOUTHWEST;
-				else newDirection = DIRECTION.NORTHWEST;
-			} else if (absX > absY) {
-				// Horizontal movement
-				newDirection = dx > 0 ? DIRECTION.EAST : DIRECTION.WEST;
-			} else {
-				// Vertical movement
-				newDirection = dy > 0 ? DIRECTION.SOUTH : DIRECTION.NORTH;
-			}
-		}
-
-		this.setDirection(newDirection);
-	}
+	doMovementLogic(deltaTime) { this.movementController.doMovementLogic(deltaTime); }
+	watchCursor() { this.movementController.watchCursor(); }
 
 	getDistanceFromMouse() {
 		const mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
-		const dx = mouse.x - this.posX;
-		const dy = mouse.y - this.posY;
-		return Math.sqrt(dx * dx + dy * dy);
+		return this.getDistanceToPoint(mouse.x, mouse.y);
 	}
 
 	getDistanceTo(target) {
@@ -1387,115 +1015,10 @@ class Myte {
 	}
 
 
-	updateTargetToFollowMouse(doXAxis = true, doYAxis = true) {
-		if (this.shouldHoldInHomeSlot()) {
-			const home = this.getHomePosition();
-			this.setTarget(
-				doXAxis ? home.x : null,
-				doYAxis ? home.y : null,
-				false
-			);
-			return;
-		}
-
-		const mouseDistance = this.getDistanceFromMouse();
-		const mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
-
-		switch (this.followGoal) {
-			case MOVE_FOLLOW_TYPES.CIRCLES:
-				this.doCircleFollow(mouse, mouseDistance, doXAxis, doYAxis);
-				break;
-			case MOVE_FOLLOW_TYPES.RUNAWAY:
-				this.doRunAway(doXAxis, doYAxis);
-				break;
-			case MOVE_FOLLOW_TYPES.LEASH:
-				this.doLeashFollow(mouse, mouseDistance, doXAxis, doYAxis);
-				break;
-			case MOVE_FOLLOW_TYPES.NORMAL:
-			default:
-				if (mouseDistance > this.followRadius.min && mouseDistance < this.followRadius.max) {
-					this.setTarget(
-						doXAxis ? mouse.x : null,
-						doYAxis ? mouse.y : null,
-						false
-					);
-				}
-				break;
-		}
-	}
-
-	doCircleFollow(mouse, mouseDistance, doXAxis = true, doYAxis = true) {
-		if (mouseDistance > this.followRadius.max * 1.15) {
-			this.setTarget(
-				doXAxis ? mouse.x : null,
-				doYAxis ? mouse.y : null,
-				false
-			);
-			return;
-		}
-
-		this.followOrbitAngle += this.followOrbitSpeed;
-		const orbitRadius = Utility.clamp(
-			(this.followRadius.min + this.followRadius.max) / 3,
-			this.followRadius.min,
-			this.followRadius.max - 24
-		);
-
-		this.setTarget(
-			doXAxis ? mouse.x + Math.cos(this.followOrbitAngle) * orbitRadius : null,
-			doYAxis ? mouse.y + Math.sin(this.followOrbitAngle) * orbitRadius : null,
-			false
-		);
-	}
-
-	doLeashFollow(mouse, mouseDistance, doXAxis = true, doYAxis = true) {
-		if (mouseDistance <= this.followRadius.min || mouseDistance >= this.followRadius.max) {
-			return;
-		}
-
-		const dx = mouse.x - this.posX;
-		const dy = mouse.y - this.posY;
-		const distance = Math.max(mouseDistance, 1);
-		const leashDistance = Utility.clamp(
-			this.followLeashDistance,
-			this.followRadius.min,
-			this.followRadius.max - 16
-		);
-
-		this.setTarget(
-			doXAxis ? mouse.x - (dx / distance) * leashDistance : null,
-			doYAxis ? mouse.y - (dy / distance) * leashDistance : null,
-			false
-		);
-	}
-
-	doRunAway(doXAxis = true, doYAxis = true) {
-
-		const mouseDistance = this.getDistanceFromMouse();
-		let rect = this.getRect();
-
-		if (mouseDistance < this.runAwayAngleDistance) { // don't move target unless we're a little far away
-
-			let currentX = this.posX;
-			let currentY = this.posY;
-
-			const mouse = this.parent.inputHandler.getMouseWorldPosition({ element: this });
-
-			var dx3 = mouse.x - currentX;
-			var dy3 = mouse.y - currentY;
-
-			var angle = Math.atan2(dy3, dx3) + Math.PI; // Calculate the angle between the mouse cursor and the element
-			mouse.x += this.runAwayAngleDistance * Math.cos(angle);
-			mouse.y += this.runAwayAngleDistance * Math.sin(angle);
-
-			this.setTarget(
-				doXAxis ? mouse.x : null,
-				doYAxis ? mouse.y : null,
-				true
-			);
-
-		}
-	}
+	updateTargetToFollowMouse(doXAxis = true, doYAxis = true) { this.movementController.updateTargetToFollowMouse(doXAxis, doYAxis); }
+	doCircleFollow(mouse, mouseDistance, doXAxis = true, doYAxis = true) { this.movementController.doCircleFollow(mouse, mouseDistance, doXAxis, doYAxis); }
+	doLeashFollow(mouse, mouseDistance, doXAxis = true, doYAxis = true) { this.movementController.doLeashFollow(mouse, mouseDistance, doXAxis, doYAxis); }
+	doRunAway(doXAxis = true, doYAxis = true) { this.movementController.doRunAway(doXAxis, doYAxis); }
 
 
 	dispose() {
@@ -1507,38 +1030,26 @@ class Myte {
 		this.duplicate?.remove?.();
 	}
 
-	updateFrame() {
-		if (!this.isActive) return;
-		this.stateMachine.update();
-
-
-
-	}
-
 	update(deltaTime) {
 		if (!this.isActive) return;
+		this._dt = deltaTime; // stored so movement helpers can read it without threading it through every call site
 		this.ensureFiniteCoordinates('update:start');
 
-		// personal target dot
 		this.updateTargetDot();
-
-		// movement logic
 		this.doMovementLogic(deltaTime);
 		this.tryResolveColliderOverlap();
 		this.ensureFiniteCoordinates('update:end');
 
 		this.stats.update(deltaTime);
 
-		// Rate-limit animation/state updates to ~8fps using an accumulator
-		this._animElapsed = (this._animElapsed || 0) + deltaTime;
-		const frameInterval = this.parent?.core?.config?.frameInterval ?? 125;
-		if (this._animElapsed >= frameInterval) {
-			this._animElapsed -= frameInterval;
-			if (this._animElapsed >= frameInterval) this._animElapsed = 0;
+		// StateMachine self-paces its own frame timing per-animation.
+		this.stateMachine.update(deltaTime);
 
-			this.updateFrame();
-
-			if (this.parent && this.parent.gameMap && this.parent.gameMap.gridSystem) {
+		// Grid front-tile update: only needs ~8fps, keep a lightweight throttle here.
+		this._gridElapsed = (this._gridElapsed || 0) + deltaTime;
+		if (this._gridElapsed >= 125) {
+			this._gridElapsed -= 125;
+			if (this.parent?.gameMap?.gridSystem) {
 				this.parent.gameMap.gridSystem.updateMyteFrontTile(this);
 			}
 		}

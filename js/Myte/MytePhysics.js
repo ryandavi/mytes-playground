@@ -75,7 +75,7 @@ class MytePhysics {
 		return { posX: x, posY: y, collider: m.collider, size: m.size };
 	}
 
-	applyGravity() {
+	applyGravity(dt = 16.667) {
 		const m = this.myte;
 		let v = m.physics.velocity;
 
@@ -83,8 +83,9 @@ class MytePhysics {
 			return 0;
 		}
 
+		const dtScale = dt / 16.667;
 		const multiplier = v > 0 ? 1.1 : 0.9;
-		v += m.physics.gravity * multiplier;
+		v += m.physics.gravity * multiplier * dtScale;
 		return Math.min(v, m.physics.terminalVelocity);
 	}
 
@@ -227,6 +228,8 @@ class MytePhysics {
 
 	moveGravity() {
 		const m = this.myte;
+		const dt = m._dt ?? 16.667;
+		const dtScale = dt / 16.667;
 		const limitGround = m.parent.getWorldBounds().bottom;
 		const limitCeiling = 0;
 
@@ -237,12 +240,13 @@ class MytePhysics {
 		const wasFalling = this.isFalling;
 		const wasOnSolidGround = this.isOnSolidGround;
 
-		m.physics.velocity = this.applyGravity();
-		let newY = m.posY + m.physics.velocity;
+		m.physics.velocity = this.applyGravity(dt);
+		let newY = m.posY + m.physics.velocity * dtScale;
 
 		m.updateTargetToFollowMouse(true, true);
 		const dx = m.targetX - m.posX;
 		const controlFactor = this.isOnSolidGround ? 1.0 : m.physics.airControl;
+		// getSpeed() already scales by _dt, so no extra dtScale here.
 		const moveDistance = m.stats.getSpeed() * controlFactor;
 
 		let newX = m.posX;

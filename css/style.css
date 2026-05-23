@@ -103,6 +103,11 @@
   --item-size: var(--size-item);
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* dark mode token overrides go here */
+  }
+}
 *,
 *::before,
 *::after {
@@ -132,6 +137,17 @@ select {
   font-optical-sizing: auto;
   font-weight: 500;
   font-style: normal;
+}
+
+.custom-cursor {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  will-change: transform;
+  transform-origin: center center;
+}
+.custom-cursor.is-hidden {
+  opacity: 0;
 }
 
 select,

@@ -194,6 +194,8 @@ class MapTransitionManager {
     }
 
     _finishSuccessfulTransition(options, isInitialLoad) {
+        this.container.invalidateCanvasRect?.();
+
         if (typeof options.onComplete === 'function') {
             options.onComplete(true);
         }

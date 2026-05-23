@@ -945,7 +945,7 @@ class GameMap {
                     item.remove();
                     return false;
                 }
-                item.update(activeMyte);
+                item.update(activeMyte, deltaTime);
                 return true;
             });
         }

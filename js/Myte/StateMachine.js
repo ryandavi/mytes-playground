@@ -144,6 +144,8 @@ class StateMachine {
 		);
 
 		this.currentFrameIndex = 0;
+		this._animElapsed = 0;
+		this._currentFrameElapsed = 0; // tracks time on current frame (for per-frame durations)
 		this.applySpeciesDefinition(this.parent.definition);
 		this.stateController.transitionTo(initialState);
 	}
@@ -446,8 +448,17 @@ class StateMachine {
 		this.animator.setSpriteConfig(spriteSets || {});
 	}
 
-	update() {
-		// Get current context
+	// Returns the interval (ms) to wait before advancing from the current frame.
+	// Checks stateConfig.frameDurations[frameIndex] first, then stateConfig.fps, then default 8fps.
+	_getFrameInterval(state) {
+		const cfg = this.stateConfig[state];
+		if (cfg?.frameDurations) {
+			return cfg.frameDurations[this.currentFrameIndex] ?? (1000 / (cfg.fps ?? 8));
+		}
+		return 1000 / (cfg?.fps ?? 8);
+	}
+
+	update(deltaTime) {
 		const context = {
 			isDragging: this.parent.isDragging,
 			isGravity: this.parent.isGravity,
@@ -457,38 +468,58 @@ class StateMachine {
 			isDoingAction: (action) => this.parent.isDoingAction(action),
 			isMoving: () => this.parent.isMoving(),
 			queue: this.parent.queue,
-			stateController: this.stateController // Add this line
+			stateController: this.stateController
 		};
 
-		// Determine and set new state
 		const newState = this.stateController.determineNextState(context);
 		if (this.stateController.transitionTo(newState)) {
 			this.currentFrameIndex = 0;
+			this._currentFrameElapsed = 0;
+			// Show the first frame of the new state immediately.
+			this._renderCurrentFrame();
 		}
 
-		// Update animation
-		this.updateAnimation();
+		// Accumulate time and advance one frame at a time so fast deltaTime
+		// doesn't skip multiple frames in a single update.
+		this._currentFrameElapsed += deltaTime;
+		const interval = this._getFrameInterval(this.stateController.currentState);
+		if (this._currentFrameElapsed >= interval) {
+			this._currentFrameElapsed -= interval;
+			// Clamp so a stall doesn't cause runaway catch-up.
+			if (this._currentFrameElapsed >= interval) this._currentFrameElapsed = 0;
+			this._advanceFrame();
+		}
 	}
 
-	updateAnimation() {
+	// Write the current frame to the DOM without advancing the index.
+	_renderCurrentFrame() {
+		const animKey = this.getAnimationKey(this.stateController.currentState);
+		if (!animKey) return;
+		this.animator.updateSprite(animKey, this.currentFrameIndex);
+		this.parent.duplicate.setAttribute("sprite", animKey);
+	}
+
+	// Advance one sprite frame and handle looping / completion.
+	_advanceFrame() {
 		const currentState = this.stateController.currentState;
 		const animationKey = this.getAnimationKey(currentState);
-
 		if (!animationKey) return;
 
-		// Update sprite
 		const updated = this.animator.updateSprite(animationKey, this.currentFrameIndex);
 		if (!updated) return;
 
-		// Set sprite attribute
 		this.parent.duplicate.setAttribute("sprite", animationKey);
 
-		// Handle frame updates
 		if (this.isAtLastFrame(animationKey)) {
 			this.handleAnimationComplete(currentState);
 		} else {
 			this.currentFrameIndex++;
 		}
+	}
+
+	// Kept for backwards compatibility — calls _advanceFrame.
+	updateAnimation() {
+		this._advanceFrame();
 	}
 
 	getAnimationKey(state) {

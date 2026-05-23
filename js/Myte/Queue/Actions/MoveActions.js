@@ -1,5 +1,5 @@
 // Set to true to re-enable verbose pathfinding diagnostics
-const APPROACH_DEBUG = true;
+const APPROACH_DEBUG = false;
 const ASTAR_DEBUG = false;
 const _alog  = APPROACH_DEBUG ? console.log.bind(console)  : () => {};
 const _awarn = APPROACH_DEBUG ? console.warn.bind(console) : () => {};
@@ -1563,7 +1563,7 @@ class PatrolAction extends PatternMovementAction {
             distance: 120,
             direction: { x: 1, y: 0 },
             repeat: 4,
-            pauseDuration: 30,
+            pauseDuration: 500, // ms (was 30 frames)
             safeTargetRadius: 14,
             stuckThresholdFrames: 40,
             maxPatternRecoveries: 3
@@ -1615,9 +1615,9 @@ class PatrolAction extends PatternMovementAction {
         return this.setPatternTarget(pt.x, pt.y);
     }
 
-    update() {
+    update(deltaTime = 16.667) {
         if (this.pauseTimer > 0) {
-            this.pauseTimer--;
+            this.pauseTimer -= deltaTime;
             return false;
         }
 
@@ -1628,7 +1628,7 @@ class PatrolAction extends PatternMovementAction {
                 this.repeat--;
                 if (this.repeat <= 0) return true;
             }
-            this.pauseTimer = this.pauseDuration ?? 30;
+            this.pauseTimer = this.pauseDuration ?? 500;
             const next = this.patrolPoints[this.patrolIndex];
             this.myte.setTarget(next.x, next.y);
         }
@@ -1654,8 +1654,8 @@ class WanderAction extends PatternMovementAction {
         moodEffect: 2,
         defaultOptions: {
             wanderRadius: 100,
-            pauseMin: 30,
-            pauseMax: 90,
+            pauseMin: 500,  // ms (was 30 frames)
+            pauseMax: 1500, // ms (was 90 frames)
             safeTargetRadius: 14,
             stuckThresholdFrames: 40,
             maxPatternRecoveries: 5
@@ -1695,23 +1695,23 @@ class WanderAction extends PatternMovementAction {
         return true;
     }
 
-    update() {
+    update(deltaTime = 16.667) {
         if (this.pauseTimer > 0) {
-            this.pauseTimer--;
-            this.currentDuration--;
+            this.pauseTimer -= deltaTime;
+            this.currentDuration -= deltaTime;
             return this.currentDuration <= 0;
         }
 
         if (this.myte.isAtTarget()) {
             this.notePatternProgress();
-            const min = this.pauseMin ?? 30;
-            const max = this.pauseMax ?? 90;
-            this.pauseTimer = min + Math.floor(Math.random() * (max - min));
+            const min = this.pauseMin ?? 500;
+            const max = this.pauseMax ?? 1500;
+            this.pauseTimer = min + Math.random() * (max - min);
             this._pickNextTarget();
         }
 
         this.myte.moveTowardsTarget();
-        this.currentDuration--;
+        this.currentDuration -= deltaTime;
         if (this.handlePatternStuck()) return true;
         return this.currentDuration <= 0;
     }
@@ -1820,9 +1820,10 @@ class JumpAction extends MyteAction {
         this.maxHeight = this.groundY - this.height;
     }
 
-    update() {
-        this.velocity    += this.gravity;
-        this.myte.posY   += this.velocity;
+    update(deltaTime = 16.667) {
+        const dt = deltaTime / 16.667;
+        this.velocity  += this.gravity * dt;
+        this.myte.posY += this.velocity * dt;
 
         if (this.myte.posY >= this.groundY) {
             this.myte.posY = this.groundY;

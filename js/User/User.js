@@ -1,3 +1,5 @@
+const USER_DATA_VERSION = 1;
+
 class User {
     constructor(core) {
         this.core = core;
@@ -70,6 +72,7 @@ class User {
             }));
 
         return {
+            data_version: USER_DATA_VERSION,
             username: this.username,
             userId: this.userId,
             lastLogin: this.lastLogin,
@@ -137,6 +140,26 @@ class User {
         });
     }
 
+    _migrateUserData(data) {
+        const version = data?.data_version ?? 0;
+        if (version === USER_DATA_VERSION) return data;
+
+        let migrated = { ...data };
+
+        if (version < 1) {
+            // v0 → v1: data_version field added; all other fields are compatible
+            migrated.data_version = 1;
+        }
+
+        if (migrated.data_version === USER_DATA_VERSION) {
+            console.log(`[User] Migrated save data from v${version} to v${USER_DATA_VERSION}.`);
+            return migrated;
+        }
+
+        console.warn(`[User] Save data v${version} could not be migrated to v${USER_DATA_VERSION}, resetting.`);
+        return null;
+    }
+
     loadUserDataFromStorage(userId = this.userId) {
         const storageKey = this.getStorageKey(userId);
         if (!storageKey) return false;
@@ -144,7 +167,19 @@ class User {
         const savedData = localStorage.getItem(storageKey);
         if (!savedData) return false;
 
-        this.applyUserData(JSON.parse(savedData));
+        let parsed;
+        try {
+            parsed = JSON.parse(savedData);
+        } catch (e) {
+            console.warn('[User] Corrupted save data, resetting.', e);
+            localStorage.removeItem(storageKey);
+            return false;
+        }
+
+        const migrated = this._migrateUserData(parsed);
+        if (!migrated) return false;
+
+        this.applyUserData(migrated);
         return true;
     }
 

@@ -116,3 +116,9 @@
     --page-edge-space: var(--space-2xl);
     --item-size: var(--size-item);
 }
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        /* dark mode token overrides go here */
+    }
+}

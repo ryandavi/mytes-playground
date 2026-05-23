@@ -62,7 +62,7 @@ class DroppedMapItem {
         // collecting
         this.magnetSpeed = 0.2;
         this.collected = false;
-        this.minimumCollectDistance = 192 / 2;
+        this.minimumCollectDistance = 192;
         this.quantity = 1;
         this.inventoryType = null;
         this.inventoryVariant = null;
@@ -150,26 +150,21 @@ class DroppedMapItem {
         }
     }
 
-    update(myte = null) {
+    update(myte = null, deltaTime = 16.667) {
         if (this.collected) return;
 
-        
+        const dt = deltaTime / 16.667;
 
         if (!this.grounded) {
-            // Update positions
-            this.posX += this.velocityX;
+            this.posX += this.velocityX * dt;
+            this.velocityY += this.gravity * dt;
+            this.posY += this.velocityY * dt;
 
-            // Apply gravity to Y velocity
-            this.velocityY += this.gravity;
-            this.posY += this.velocityY;
-
-            // Check if item has landed at the ground position
             if (this.posY >= this.groundY) {
                 this.posY = this.groundY;
                 if (this.bounceCount < this.maxBounces) {
-                    // Bounce with reduced velocity
                     this.velocityY = -this.velocityY * 0.4;
-                    this.velocityX *= 0.8;  // Add some friction
+                    this.velocityX *= 0.8;
                     this.bounceCount++;
                 } else {
                     this.grounded = true;
@@ -180,7 +175,6 @@ class DroppedMapItem {
         } else if (myte) {
             const activeMyte = this.parent?.activeMyte || myte.parent?.activeMyte;
             if (activeMyte === myte) {
-                // Magnet effect when grounded
                 const myteCenter = {
                     x: myte.posX + (myte.size.width / 2),
                     y: myte.posY + (myte.size.height / 2)
@@ -191,16 +185,14 @@ class DroppedMapItem {
                     y: this.posY + (this.size.height / 2)
                 };
 
-
                 const dx = myteCenter.x - center.x;
                 const dy = myteCenter.y - center.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
-                // if within collection distance
                 if (myte.isIndependent() && distance < this.minimumCollectDistance) {
                     const magnetStrength = 1 - (distance / this.minimumCollectDistance);
-                    this.posX += dx * this.magnetSpeed * magnetStrength;
-                    this.posY += dy * this.magnetSpeed * magnetStrength;
+                    this.posX += dx * this.magnetSpeed * magnetStrength * dt;
+                    this.posY += dy * this.magnetSpeed * magnetStrength * dt;
 
                     if (distance < 20) {
                         this.collect(myte);
@@ -210,7 +202,7 @@ class DroppedMapItem {
         }
 
         if (this.grounded) {
-            this.hoverOffset += this.hoverSpeed;
+            this.hoverOffset += this.hoverSpeed * dt;
         }
 
         this.updatePosition();

@@ -184,3 +184,15 @@
     border: 2px dashed var(--color-danger);
     background-color: var(--color-danger-tint);
 }
+
+.custom-cursor {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    will-change: transform;
+    transform-origin: center center;
+
+    &.is-hidden {
+        opacity: 0;
+    }
+}

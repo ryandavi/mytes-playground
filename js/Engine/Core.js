@@ -271,21 +271,35 @@ class MyteCore {
     }
 
     handleVisibilityChange() {
-        if (document.hidden) return;
-
-        this.tickAccumulator = 0;
-        this.lastFrameTime = performance.now();
+        if (document.hidden) {
+            // Cancel the pending RAF so no stale callbacks fire while hidden.
+            if (this._rafHandle) {
+                cancelAnimationFrame(this._rafHandle);
+                this._rafHandle = null;
+            }
+        } else {
+            // Reset timing so the first frame after returning doesn't get a huge deltaTime.
+            this.tickAccumulator = 0;
+            this.lastFrameTime = performance.now();
+            // Only restart if the loop is actually dead (guard against double-start).
+            if (!this._rafHandle) {
+                this._rafHandle = requestAnimationFrame(this._updateFrame);
+            }
+        }
     }
 
     startUpdateLoop() {
         document.removeEventListener('visibilitychange', this.boundHandleVisibilityChange);
         document.addEventListener('visibilitychange', this.boundHandleVisibilityChange);
 
-        const updateFrame = (timestamp) => {
+        this._rafHandle = null;
+
+        this._updateFrame = (timestamp) => {
+            // Clear handle first — if we bail early, the loop is cleanly stopped.
+            this._rafHandle = null;
             if (!this.isInitialized) return;
 
             // Cap deltaTime to 100ms to prevent spiral-of-death after tab focus loss.
-            // Always update lastFrameTime so the accumulator stays accurate.
             const deltaTime = Math.min(timestamp - this.lastFrameTime, 100);
             this.lastFrameTime = timestamp;
 
@@ -301,11 +315,13 @@ class MyteCore {
             // Variable-rate render/animation update
             this.update(deltaTime);
 
-            requestAnimationFrame(updateFrame);
+            this._rafHandle = requestAnimationFrame(this._updateFrame);
         };
 
         this.lastFrameTime = performance.now();
-        requestAnimationFrame(updateFrame);
+        // Cancel any stale handle before starting (e.g. hot-reload / re-init).
+        if (this._rafHandle) cancelAnimationFrame(this._rafHandle);
+        this._rafHandle = requestAnimationFrame(this._updateFrame);
     }
 
 
@@ -323,7 +339,8 @@ class MyteCore {
 
 
     dispose() {
-        this.isInitialized = false; // Stop the RAF loop first
+        this.isInitialized = false;
+        if (this._rafHandle) { cancelAnimationFrame(this._rafHandle); this._rafHandle = null; }
 
         this.user?.saveUserData();
         this.user = null;

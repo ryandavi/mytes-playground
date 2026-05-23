@@ -463,20 +463,21 @@
 	<!-- EXTERNAL -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
 	<!-- CORE -->
-	<script src="js/Utility.js"></script>
-	<script src="js/TooltipSystem.js"></script>
-	<script src="js/ItemRegistry.js"></script>
-	<script src="js/BaseInputHandler.js"></script>
-	<script src="js/BaseDragHandler.js"></script>
-	<script src="js/ResourceManager.js"></script>
-	<script src="js/SoundManager.js"></script>
-	<script src="js/EventManager.js"></script>
-	<script src="js/LoadingManager.js"></script>
-		
+	<script src="js/Utility/Utility.js"></script>
+	<script src="js/Utility/RectUtils.js"></script>
+	<script src="js/UI/TooltipSystem.js"></script>
+	<script src="js/Engine/ItemRegistry.js"></script>
+	<script src="js/Input/BaseInputHandler.js"></script>
+	<script src="js/Input/BaseDragHandler.js"></script>
+	<script src="js/Engine/ResourceManager.js"></script>
+	<script src="js/Engine/SoundManager.js"></script>
+	<script src="js/Engine/EventManager.js"></script>
+	<script src="js/Engine/LoadingManager.js"></script>
+
 	<script src="js/UI/ToastSystem.js"></script>
-	<script src="js/Core.js"></script>
-	<script src="js/GameTime.js"></script>
-	<script src="js/ParticleSystem.js"></script>
+	<script src="js/Engine/Core.js"></script>
+	<script src="js/Engine/GameTime.js"></script>
+	<script src="js/Effects/ParticleSystem.js"></script>
 
 	<!-- INPUT -->
 	<script src="js/Input/InputSystem.js"></script>
@@ -491,10 +492,11 @@
 	<script src="js/Container/ContainerManager.js"></script>
 	<script src="js/Container/ContainerInputManager.js"></script>
 	<!-- SHARED ENTITY MIXIN (must load before Myte and any NPC class) -->
-	<script src="js/Entity.js"></script>
+	<script src="js/Engine/Entity.js"></script>
 	<!-- MYTE -->
 	<script src="js/Myte/MyteDefinitions.js"></script>
 	<script src="js/Myte/MytePhysics.js"></script>
+	<script src="js/Myte/MyteMovementController.js"></script>
 	<script src="js/Myte/MyteRenderer.js"></script>
 	<script src="js/Myte/Myte.js"></script>
 	<script src="js/Myte/MyteStats.js"></script>
@@ -560,7 +562,17 @@
 	<script src="js/Map/Grid/GameMapGrid.js"></script>
 	<script src="js/Map/Grid/GameMapGridAStar.js"></script>
 	<!-- UI -->
-	<script src="js/UI/UI.js"></script>
+	<script src="js/UI/UIComponent.js"></script>
+	<script src="js/UI/CursorManager.js"></script>
+	<script src="js/UI/ToolManager.js"></script>
+	<script src="js/UI/SelectionManager.js"></script>
+	<script src="js/UI/QueueTargetManager.js"></script>
+	<script src="js/UI/ActionSidebarManager.js"></script>
+	<script src="js/UI/MyteListManager.js"></script>
+	<script src="js/UI/HUDManager.js"></script>
+	<script src="js/UI/OffscreenMyteIndicatorManager.js"></script>
+	<script src="js/UI/ScreenManager.js"></script>
+	<script src="js/UI/UserInterface.js"></script>
 	<script src="js/UI/ModalWindow.js"></script>
 	<script src="js/UI/DebugUI.js"></script>
 	<script src="js/UI/QueueUI.js"></script>
