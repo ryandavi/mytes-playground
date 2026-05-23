@@ -316,15 +316,7 @@
         image-rendering: pixelated;
     }
 
-    &.is-selected {
-        outline: 2px dashed green;
-        border-radius: 5px;
-    }
 
-    &.is-queue-target {
-        box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
-        border-radius: 5px;
-    }
 
     &.draggable {
         pointer-events: all;

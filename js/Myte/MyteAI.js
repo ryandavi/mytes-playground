@@ -199,7 +199,7 @@ class MyteAI {
             1
         );
         const homeNeed = Utility.clamp(
-            (distanceFromHome - (this.homeRadius * 0.35)) / Math.max(this.homeRadius, 1),
+            (distanceFromHome - (this.homeRadius * 0.55)) / Math.max(this.homeRadius * 1.35, 1),
             0,
             1
         );
@@ -1140,11 +1140,11 @@ class MyteAI {
             percent: Math.round(Utility.clamp(entry.value, 0, 1) * 100)
         }));
 
-        entries.sort((a, b) => b.value - a.value);
+        const topNeed = [...entries].sort((a, b) => b.value - a.value)[0] ?? null;
 
         return {
             needs: entries,
-            topNeed: entries[0] ?? null,
+            topNeed,
             vitals: {
                 energy: Math.round((snapshot?.energy ?? 0) * 100),
                 mood: Math.round((snapshot?.mood ?? 0) * 100),

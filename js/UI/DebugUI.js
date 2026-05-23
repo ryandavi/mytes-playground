@@ -1,5 +1,8 @@
 class DebugUI {
     static PERSIST_KEY = 'neko.debug';
+    static FLOATING_MARGIN = 8;
+    static MIN_VISIBLE_WIDTH = 120;
+    static MIN_VISIBLE_HEIGHT = 40;
 
     constructor(parent) {
         this.parent = parent;
@@ -29,6 +32,7 @@ class DebugUI {
         this.handleDebugPointerUp     = this.onDebugPointerUp.bind(this);
         this.handleDebugSummaryClick  = this.onDebugSummaryClick.bind(this);
         this.handleQueuePointerDown   = this.onQueuePointerDown.bind(this);
+        this.handleWindowResize       = this.onWindowResize.bind(this);
 
         this.queueUI = new QueueUI(parent);
         this.lastDebugUpdate = 0;
@@ -36,11 +40,20 @@ class DebugUI {
         this.gridBootstrapAttempts = 0;
         this.lastBootstrappedGridSystem = null;
 
+        this._mountFloatingPanels();
+
         // Load persisted state and apply
         this._applyPersistedState();
+        window.addEventListener('resize', this.handleWindowResize);
     }
 
     // ─── persistence helpers ─────────────────────────────────────────────────
+
+    _mountFloatingPanels() {
+        const queueEl = this.queueUI?.queue;
+        if (!this.debug || !queueEl || queueEl.parentElement === this.debug) return;
+        this.debug.appendChild(queueEl);
+    }
 
     _loadState() {
         try {
@@ -127,6 +140,8 @@ class DebugUI {
             Object.assign(this.overlayState, state.overlays);
         }
 
+        this._mountFloatingPanels();
+
         // Apply queue panel position
         this._applyQueuePosition();
     }
@@ -135,26 +150,113 @@ class DebugUI {
         const queueEl = this.queueUI?.queue;
         if (!queueEl) return;
         const q = this.debugSectionState.queue;
+        this._mountFloatingPanels();
         queueEl.style.right = 'auto';
+        queueEl.style.bottom = 'auto';
         queueEl.style.transform = 'none';
-        if (q.x != null && q.y != null) {
-            queueEl.style.position = 'fixed';
-            queueEl.style.left = `${q.x}px`;
-            queueEl.style.top  = `${q.y}px`;
-        } else {
-            // Default: bottom-left
-            const def = this._getDefaultQueuePosition();
-            q.x = def.x;
-            q.y = def.y;
-            queueEl.style.position = 'fixed';
-            queueEl.style.left = `${def.x}px`;
-            queueEl.style.top  = `${def.y}px`;
-        }
+        queueEl.style.position = 'absolute';
+        this._applyFloatingPosition(queueEl, q, () => this._getDefaultQueuePosition(), {
+            handle: this.queueUI?.panelSummary
+        });
     }
 
     _getDefaultQueuePosition() {
-        const margin = 10;
+        const margin = DebugUI.FLOATING_MARGIN;
         return { x: margin, y: Math.max(margin, window.innerHeight - 300) };
+    }
+
+    _getStoredFloatingPosition(state, getDefaultPosition) {
+        if (state && Number.isFinite(state.x) && Number.isFinite(state.y)) {
+            return { x: state.x, y: state.y };
+        }
+
+        const fallback = getDefaultPosition();
+        if (state) {
+            state.x = Math.round(fallback.x);
+            state.y = Math.round(fallback.y);
+        }
+
+        return fallback;
+    }
+
+    _getFloatingConstraintOptions(handle = null) {
+        const handleHeight = handle ? Math.ceil(handle.getBoundingClientRect().height || 0) : 0;
+        return {
+            margin: DebugUI.FLOATING_MARGIN,
+            minVisibleWidth: DebugUI.MIN_VISIBLE_WIDTH,
+            minVisibleHeight: Math.max(DebugUI.MIN_VISIBLE_HEIGHT, handleHeight || 0)
+        };
+    }
+
+    _getFloatingBounds(element, options = {}) {
+        const margin = options.margin ?? DebugUI.FLOATING_MARGIN;
+        const rect = element.getBoundingClientRect();
+        const width = Math.max(0, rect.width || element.offsetWidth || 0);
+        const height = Math.max(0, rect.height || element.offsetHeight || 0);
+        const maxVisibleWidth = Math.max(24, window.innerWidth - (margin * 2));
+        const maxVisibleHeight = Math.max(24, window.innerHeight - (margin * 2));
+        const minVisibleWidth = Math.min(options.minVisibleWidth ?? DebugUI.MIN_VISIBLE_WIDTH, width || maxVisibleWidth, maxVisibleWidth);
+        const minVisibleHeight = Math.min(options.minVisibleHeight ?? DebugUI.MIN_VISIBLE_HEIGHT, height || maxVisibleHeight, maxVisibleHeight);
+        const minLeft = Math.round(margin + minVisibleWidth - width);
+        const maxLeft = Math.round(window.innerWidth - margin - minVisibleWidth);
+        const minTop = margin;
+        const maxTop = Math.round(window.innerHeight - margin - minVisibleHeight);
+
+        return {
+            minLeft: Math.min(minLeft, maxLeft),
+            maxLeft: Math.max(minLeft, maxLeft),
+            minTop: Math.min(minTop, maxTop),
+            maxTop: Math.max(minTop, maxTop)
+        };
+    }
+
+    _clampFloatingPosition(element, position, options = {}) {
+        const bounds = this._getFloatingBounds(element, options);
+        return {
+            x: Math.min(Math.max(position.x, bounds.minLeft), bounds.maxLeft),
+            y: Math.min(Math.max(position.y, bounds.minTop), bounds.maxTop)
+        };
+    }
+
+    _applyFloatingPosition(element, state, getDefaultPosition, options = {}) {
+        if (!element) return null;
+
+        const rawPosition = this._getStoredFloatingPosition(state, getDefaultPosition);
+        const safePosition = this._clampFloatingPosition(
+            element,
+            rawPosition,
+            this._getFloatingConstraintOptions(options.handle)
+        );
+
+        element.style.left = `${Math.round(safePosition.x)}px`;
+        element.style.top = `${Math.round(safePosition.y)}px`;
+
+        return safePosition;
+    }
+
+    _applySectionPosition(sectionKey) {
+        const refs = this.debugDomRefs.get(sectionKey);
+        const state = this.debugSectionState[sectionKey];
+        if (!refs?.sectionEl || !state) return;
+
+        const handle = refs.sectionEl.querySelector(':scope > summary');
+        this._applyFloatingPosition(refs.sectionEl, state, () => this.getDefaultSectionPosition(sectionKey), {
+            handle
+        });
+    }
+
+    _refreshFloatingPositions() {
+        this.debugDomRefs.forEach((refs, sectionKey) => {
+            if (refs?.sectionEl) {
+                this._applySectionPosition(sectionKey);
+            }
+        });
+
+        this._applyQueuePosition();
+    }
+
+    onWindowResize() {
+        this._refreshFloatingPositions();
     }
 
     // ─── debug section DOM ───────────────────────────────────────────────────
@@ -217,16 +319,6 @@ class DebugUI {
             sectionEl.appendChild(body);
 
             this.debug.appendChild(sectionEl);
-
-            if (state) {
-                if (state.x === null) {
-                    const def = this.getDefaultSectionPosition(sectionKey);
-                    state.x = def.x;
-                    state.y = def.y;
-                }
-                sectionEl.style.left = `${state.x}px`;
-                sectionEl.style.top  = `${state.y}px`;
-            }
 
             refs = { sectionEl, bodyEl: body, groupMap: new Map() };
             this.debugDomRefs.set(sectionKey, refs);
@@ -297,10 +389,12 @@ class DebugUI {
                 }
             }
         }
+
+        this._applySectionPosition(sectionKey);
     }
 
     getDefaultSectionPosition(key) {
-        const margin    = 10;
+        const margin    = DebugUI.FLOATING_MARGIN;
         const panelWidth = 350;
         if (key === 'myte') {
             return { x: Math.max(margin, window.innerWidth - panelWidth - margin), y: 60 };
@@ -313,6 +407,7 @@ class DebugUI {
     ensureDebugMenuSetup() {
         if (!this.debug || this.debugMenuSetup) return;
 
+        this._mountFloatingPanels();
         this.debug.addEventListener('pointerdown', this.handleDebugPointerDown);
         this.debug.addEventListener('click', this.handleDebugSummaryClick, true);
         this.debugMenuSetup = true;
@@ -344,7 +439,7 @@ class DebugUI {
         if (!section) return;
 
         const sectionKey = section.dataset.sectionKey;
-        const state      = this.debugSectionState[sectionKey];
+        const rect = section.getBoundingClientRect();
 
         this.dragState = {
             type: 'section',
@@ -352,8 +447,8 @@ class DebugUI {
             pointerId:   event.pointerId,
             startX:      event.clientX,
             startY:      event.clientY,
-            originLeft:  state?.x ?? section.getBoundingClientRect().left,
-            originTop:   state?.y ?? section.getBoundingClientRect().top,
+            originLeft:  rect.left,
+            originTop:   rect.top,
             moved: false
         };
 
@@ -370,7 +465,6 @@ class DebugUI {
         const queueEl = this.queueUI?.queue;
         if (!queueEl) return;
 
-        const q = this.debugSectionState.queue;
         const rect = queueEl.getBoundingClientRect();
 
         this.dragState = {
@@ -378,8 +472,8 @@ class DebugUI {
             pointerId:  event.pointerId,
             startX:     event.clientX,
             startY:     event.clientY,
-            originLeft: q.x ?? rect.left,
-            originTop:  q.y ?? rect.top,
+            originLeft: rect.left,
+            originTop:  rect.top,
             moved: false
         };
 
@@ -411,18 +505,23 @@ class DebugUI {
 
             section.classList.add('dragging');
 
-            const maxLeft = Math.max(8, window.innerWidth  - section.offsetWidth  - 8);
-            const maxTop  = Math.max(8, window.innerHeight - section.offsetHeight - 8);
-            const nextLeft = Math.min(Math.max(8, this.dragState.originLeft + deltaX), maxLeft);
-            const nextTop  = Math.min(Math.max(8, this.dragState.originTop  + deltaY), maxTop);
+            const handle = section.querySelector(':scope > summary');
+            const nextPosition = this._clampFloatingPosition(
+                section,
+                {
+                    x: this.dragState.originLeft + deltaX,
+                    y: this.dragState.originTop + deltaY
+                },
+                this._getFloatingConstraintOptions(handle)
+            );
 
-            section.style.left = `${Math.round(nextLeft)}px`;
-            section.style.top  = `${Math.round(nextTop)}px`;
+            section.style.left = `${Math.round(nextPosition.x)}px`;
+            section.style.top  = `${Math.round(nextPosition.y)}px`;
 
             const state = this.debugSectionState[this.dragState.sectionKey];
             if (state) {
-                state.x = Math.round(nextLeft);
-                state.y = Math.round(nextTop);
+                state.x = Math.round(nextPosition.x);
+                state.y = Math.round(nextPosition.y);
             }
 
         } else if (this.dragState.type === 'queue') {
@@ -432,16 +531,20 @@ class DebugUI {
 
             queueShell.classList.add('dragging');
 
-            const maxLeft = Math.max(8, window.innerWidth  - queueEl.offsetWidth  - 8);
-            const maxTop  = Math.max(8, window.innerHeight - queueEl.offsetHeight - 8);
-            const nextLeft = Math.min(Math.max(8, this.dragState.originLeft + deltaX), maxLeft);
-            const nextTop  = Math.min(Math.max(8, this.dragState.originTop  + deltaY), maxTop);
+            const nextPosition = this._clampFloatingPosition(
+                queueEl,
+                {
+                    x: this.dragState.originLeft + deltaX,
+                    y: this.dragState.originTop + deltaY
+                },
+                this._getFloatingConstraintOptions(this.queueUI?.panelSummary)
+            );
 
-            queueEl.style.left = `${Math.round(nextLeft)}px`;
-            queueEl.style.top  = `${Math.round(nextTop)}px`;
+            queueEl.style.left = `${Math.round(nextPosition.x)}px`;
+            queueEl.style.top  = `${Math.round(nextPosition.y)}px`;
 
-            this.debugSectionState.queue.x = Math.round(nextLeft);
-            this.debugSectionState.queue.y = Math.round(nextTop);
+            this.debugSectionState.queue.x = Math.round(nextPosition.x);
+            this.debugSectionState.queue.y = Math.round(nextPosition.y);
         }
     }
 
@@ -922,6 +1025,7 @@ class DebugUI {
         window.removeEventListener('pointermove', this.handleDebugPointerMove);
         window.removeEventListener('pointerup',   this.handleDebugPointerUp);
         window.removeEventListener('pointercancel', this.handleDebugPointerUp);
+        window.removeEventListener('resize', this.handleWindowResize);
 
         this.debugMenuSetup = false;
         this.dragState = null;

@@ -698,6 +698,8 @@ class ContainerManager {
         this.mytes.forEach(myte => {
             if (myte.isActive) {
                 myte.update(deltaTime);
+            } else {
+                myte.updateInactive?.(deltaTime);
             }
         });
 

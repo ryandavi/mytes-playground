@@ -31,12 +31,24 @@ class QueueUI {
 
         this._emptyState = document.createElement('div');
         this._emptyState.className = 'queue-empty-state';
-        this._emptyState.textContent = 'No actions queued';
+        this._emptyState.textContent = 'No active myte';
 
         this.panelShell.appendChild(this.panelSummary);
         this.panelShell.appendChild(this.itemsHost);
         this.panelShell.appendChild(this._emptyState);
         this.queue.replaceChildren(this.panelShell);
+    }
+
+    setEmptyStateMessage(message) {
+        if (this._emptyState) {
+            this._emptyState.textContent = message;
+        }
+    }
+
+    clearItems() {
+        this.elements.forEach(el => el.remove());
+        this.elements.clear();
+        this.previousValues.clear();
     }
 
     setCollapsed(collapsed) {
@@ -371,20 +383,21 @@ class QueueUI {
     }
 
     update() {
-        if (!this.parent.activeMyte || !this.queue) {
-            if (this.queue) {
-                this.elements.forEach(el => el.remove());
-                this.elements.clear();
-                this.previousValues.clear();
-                this.queue.classList.remove('has-items');
-                if (this._emptyState) this._emptyState.style.display = 'none';
-            }
-            return;
-        }
+        if (!this.queue) return;
 
-        const queueItems = (this.parent.activeMyte.queue.queue || []).slice(0, this.maxItems);
+        const activeMyte = this.parent.activeMyte;
+        const queueItems = activeMyte?.queue?.queue
+            ? activeMyte.queue.queue.slice(0, this.maxItems)
+            : [];
+
+        this.setEmptyStateMessage(activeMyte ? 'No actions queued' : 'No active myte');
         this.queue.classList.toggle('has-items', queueItems.length > 0);
         if (this._emptyState) this._emptyState.style.display = queueItems.length === 0 ? 'block' : 'none';
+
+        if (!activeMyte) {
+            this.clearItems();
+            return;
+        }
 
         while (this.elements.size > queueItems.length) {
             const key = `queue-${this.elements.size - 1}`;

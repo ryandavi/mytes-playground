@@ -51,14 +51,16 @@
 
     position: fixed;
     inset: 0;
+    width: 100dvw;
+    height: 100dvh;
+    overflow: clip;
     visibility: hidden;
     z-index: var(--z-debug);
     pointer-events: none;
 
     .debug-section {
-        @include debug-collapsible-shell();
-
         position: absolute;
+        @include debug-collapsible-shell();
     }
 
     .debug-section-body {
@@ -159,7 +161,7 @@
 .action-queue-panel {
  
    visibility: hidden;
-    position: fixed;
+    position: absolute;
 
     z-index: var(--z-debug);
     width: 300px;
@@ -190,8 +192,11 @@
         display: none;
         font-size: 10px;
         opacity: 0.55;
-        padding: 4px 2px;
+        padding: var(--padding);
         font-style: italic;
+        background-color: rgb(255 255 255 / 85%);
+        border-radius: var(--border-width);
+        backdrop-filter: blur(4px);
     }
 
     .queue-item {
@@ -293,4 +298,3 @@
         }
     }
 }
-

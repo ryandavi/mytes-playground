@@ -6,6 +6,7 @@ class MyteRenderer {
 		this.duplicate = null;
 		this.sprite = null;
 		this.battery = null;
+		this.homeBattery = null;
 		this.targetDot = null;
 	}
 
@@ -24,6 +25,7 @@ class MyteRenderer {
 
 		this.sprite = this.duplicate.querySelector('.sprite');
 		this.battery = this.duplicate.querySelector('.battery');
+		this.homeBattery = m.element.querySelector('.battery');
 
 		this.duplicate.classList.add('is-deactivated');
 	}

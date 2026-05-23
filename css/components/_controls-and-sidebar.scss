@@ -118,6 +118,65 @@
                     color: var(--text-default);
                 }
 
+                .need-info {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.35rem;
+                    --need-meter-color: #6fcf97;
+
+                    &[data-state='critical'] { --need-meter-color: #d45454; }
+                    &[data-state='low']      { --need-meter-color: #df8a3b; }
+                    &[data-state='okay']     { --need-meter-color: #d8bf4c; }
+                    &[data-state='good']     { --need-meter-color: #78b764; }
+                    &[data-state='full']     { --need-meter-color: #54c6a9; }
+
+                    .need-label {
+                        font-size: 0.85em;
+                        line-height: 1.2;
+                    }
+
+                    .need-meter {
+                        width: 100%;
+                        height: 0.5rem;
+                        accent-color: var(--need-meter-color);
+                    }
+                }
+
+                .ai-choice-info {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.45rem;
+                    padding: 0.65rem 0.75rem;
+                    border-radius: var(--border-radius);
+                    border: 1px solid var(--border-subtle);
+                    background: var(--surface-ui-pressed);
+                }
+
+                .ai-choice-label {
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    letter-spacing: 0.08em;
+                    text-transform: uppercase;
+                    color: var(--text-muted);
+                }
+
+                .ai-choice-body {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.35rem;
+                }
+
+                .ai-choice-chip {
+                    @include pill-label;
+                    text-transform: none;
+                    font-size: 0.72rem;
+
+                    &.primary {
+                        background: var(--surface-state-myte);
+                        color: var(--text-default);
+                    }
+                }
+
                 .state-info.info-section-title,
                 .state-info.needs-title {
                     font-size: 0.78em;

@@ -27,6 +27,11 @@ class MyteStats {
         this.energy = Math.max(this.minEnergy, Math.min(this.maxEnergy, statConfig.energy ?? 75));
         this.energyDecayRate = statConfig.energyDecayRate ?? 0.0005;
         this.energyRegenRate = statConfig.energyRegenRate ?? 0.005;
+        this.homeSlotEnergyRegenMultiplier = statConfig.homeSlotEnergyRegenMultiplier ?? 1.65;
+        this.homeSlotMoodDecayMultiplier = statConfig.homeSlotMoodDecayMultiplier ?? 0.18;
+        this.homeSlotBehaviorRateMultiplier = statConfig.homeSlotBehaviorRateMultiplier ?? 0.55;
+        this.homeSlotComfortBoostRate = statConfig.homeSlotComfortBoostRate ?? 0.0011;
+        this.homeSlotConfidenceBoostRate = statConfig.homeSlotConfidenceBoostRate ?? 0.00055;
         this.fullChargeAnnounceCooldown = statConfig.fullChargeAnnounceCooldown ?? 30000;
         this.fullChargeResetThreshold = statConfig.fullChargeResetThreshold ?? 0.94;
         this.lastFullChargeAnnouncementAt = 0;
@@ -420,52 +425,68 @@ class MyteStats {
                 return i;
             }
         }
-    
+
         return 1; // If not matched, default to 'low'
+    }
+
+    applyBatteryLevelClasses(batteryElement, currentThresholdIndex, batteryStatus) {
+        if (!batteryElement) return;
+
+        this.batteryThresholds.forEach(threshold => {
+            batteryElement.classList.remove(threshold.name);
+        });
+
+        batteryElement.classList.add(batteryStatus);
+        batteryElement.setAttribute('data-level', currentThresholdIndex);
+    }
+
+    syncSlotBatteryDisplay(currentThresholdIndex, batteryStatus) {
+        const slotBattery = this.myte.slotBattery;
+        if (!slotBattery) return;
+
+        this.applyBatteryLevelClasses(slotBattery, currentThresholdIndex, batteryStatus);
+        slotBattery.classList.add('is-visible', 'slot-battery');
+        slotBattery.classList.remove('blinking', 'critical-pulse', 'charging', 'rapid-charging');
     }
 
     // Update battery display based on current energy
     updateBatteryDisplay() {
-        if (!this.myte.battery) return;
-    
+        if (!this.myte.battery && !this.myte.slotBattery) return;
+
         // Calculate what battery level should be shown
         const currentThresholdIndex = this.getThresholdIndex(this.energy);
         const batteryStatus = this.batteryThresholds[currentThresholdIndex].name;
-    
+
         // Only update if the level has changed
         if (currentThresholdIndex !== this.batteryLevel) {
             // Play appropriate sound once
             this.playBatterySound(currentThresholdIndex);
-            
+
             this.batteryLevel = currentThresholdIndex;
-    
-            // Remove all battery level classes
-            this.batteryThresholds.forEach(threshold => {
-                this.myte.battery.classList.remove(threshold.name);
-            });
-    
-            // Add current level class
-            this.myte.battery.classList.add(batteryStatus);
-    
-            // Update data attribute for position
-            this.myte.battery.setAttribute('data-level', currentThresholdIndex);
-    
-            // Show battery element
-            this.showBattery();
-    
-            // Handle visibility logic based on battery level
-            this.handleBatteryVisibility();
+            if (this.myte.battery) {
+                this.applyBatteryLevelClasses(this.myte.battery, currentThresholdIndex, batteryStatus);
+                this.showBattery();
+                this.handleBatteryVisibility();
+            }
+        } else if (this.myte.battery) {
+            this.applyBatteryLevelClasses(this.myte.battery, currentThresholdIndex, batteryStatus);
         }
-        
+
+        this.syncSlotBatteryDisplay(currentThresholdIndex, batteryStatus);
+
         // If rapid charging is active, add visual indication
-        if (this.isRapidCharging) {
+        if (this.isRapidCharging && this.myte.battery) {
             this.myte.battery.classList.add('rapid-charging');
-        } else {
+        } else if (this.myte.battery) {
             this.myte.battery.classList.remove('rapid-charging');
         }
     }
 
     playBatterySound(currentThresholdIndex) {
+        if (!this.myte.isActive) {
+            return;
+        }
+
         const now = Date.now();
         let soundToPlay = null;
         
@@ -581,6 +602,72 @@ class MyteStats {
 
     getCurrentActionId() {
         return this.myte.queue.getCurrentAction()?.constructor?.metadata?.id ?? null;
+    }
+
+    getCurrentAction() {
+        return this.myte.queue.getCurrentAction?.() ?? null;
+    }
+
+    getCurrentActionMetadata() {
+        return this.getCurrentAction()?.constructor?.metadata ?? {};
+    }
+
+    isRestingAction(actionId = this.getCurrentActionId()) {
+        return actionId === 'sleep' ||
+            actionId === 'simple_sleep' ||
+            actionId === 'rest_on_bed';
+    }
+
+    getEnergyActivityMultiplier() {
+        const metadata = this.getCurrentActionMetadata();
+        const actionId = metadata.id ?? this.getCurrentActionId();
+        const category = metadata.category ?? '';
+
+        if (this.isRestingAction(actionId)) {
+            return 0;
+        }
+
+        if ([
+            'play_fetch',
+            'run_laps',
+            'zigzag',
+            'circle',
+            'play_tag',
+            'nudge_ball',
+            'jump'
+        ].includes(actionId)) {
+            return 1.85;
+        }
+
+        if (actionId === 'dance') {
+            return 1.65;
+        }
+
+        if (category === 'play') {
+            return 1.6;
+        }
+
+        if (category === 'reactive') {
+            return 1.45;
+        }
+
+        if (category === 'carrying') {
+            return 1.3;
+        }
+
+        if (category === 'movement') {
+            return 1.2;
+        }
+
+        if (category === 'social') {
+            return 1.05;
+        }
+
+        if (category === 'interactions') {
+            return 0.95;
+        }
+
+        return 1;
     }
 
     noteBehavior({
@@ -794,16 +881,25 @@ class MyteStats {
 
         if (this.myte.isMoving()) {
             // Energy decay
-            this.useEnergy(this.energyDecayRate * deltaTime);
+            this.useEnergy(this.energyDecayRate * deltaTime * this.getEnergyActivityMultiplier());
         } else {
             // Energy regeneration
-            this.regenerateEnergy(deltaTime);
+            this.regenerateEnergy(deltaTime * (this.isRestingAction() ? 1.35 : 1));
         }
 
         this.updateBehaviorDrives(deltaTime);
         this.maybeSignalNeeds();
 
         // Update battery display
+        this.updateBatteryDisplay();
+    }
+
+    updateInHomeSlot(deltaTime) {
+        this.updateMood(-this.moodDecayRate * deltaTime * this.homeSlotMoodDecayMultiplier);
+        this.regenerateEnergy(deltaTime * this.homeSlotEnergyRegenMultiplier);
+        this.updateBehaviorDrives(deltaTime * this.homeSlotBehaviorRateMultiplier);
+        this.updateComfort(this.homeSlotComfortBoostRate * deltaTime);
+        this.updateConfidence(this.homeSlotConfidenceBoostRate * deltaTime);
         this.updateBatteryDisplay();
     }
 

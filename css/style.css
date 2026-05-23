@@ -447,7 +447,7 @@ body.debug .map-object > .interactive-hitbox {
   background-repeat: no-repeat;
   background-position: var(--item-sprite-x, 0px) var(--item-sprite-y, 0px);
   image-rendering: pixelated;
-  zoom: 2;
+  zoom: 1.5;
   border-radius: var(--inventory-slot-radius, var(--border-radius));
   cursor: grab;
   transition: transform 0.2s var(--ease-ui), filter 0.2s var(--ease-ui);
@@ -502,21 +502,33 @@ body.debug .map-object > .interactive-hitbox {
 }
 
 .item-tooltip {
-  position: fixed;
-  z-index: 99999;
-  pointer-events: none;
   color: var(--black);
   border-radius: var(--help-paper-radius, var(--radius-xs));
-  filter: var(--shadow-tooltip, drop-shadow(2px 2px 0 #00000020));
+  filter: var(--shadow-tooltip, drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.1254901961)));
   background-color: var(--surface-tooltip, #ffffe1);
   outline: 1px solid var(--black);
   padding: var(--help-paper-padding, var(--space-2xs));
-  font-size: 9px;
-  line-height: 1.3;
-  text-transform: uppercase;
-  min-width: 100px;
-  max-width: min(220px, 60vw);
+  font-size: var(--help-paper-font-size, 9px);
+  line-height: var(--help-paper-line-height, 1.3);
+  text-transform: var(--help-paper-transform, uppercase);
+  position: absolute;
+  top: var(--floating-help-paper-top, calc(100% + 8px));
+  left: var(--floating-help-paper-left, 0);
+  min-width: var(--floating-help-paper-min-width, 180px);
+  max-width: var(--floating-help-paper-max-width, min(240px, 60vw));
+  text-align: left;
+  opacity: 0;
+  transform: translateY(var(--floating-help-paper-offset, -4px));
+  pointer-events: none;
+  transition: opacity var(--motion-base) var(--ease-ui), transform var(--motion-base) var(--ease-ui);
+  position: fixed;
+  z-index: 99999;
+  width: 100px;
   white-space: normal;
+}
+.item-tooltip.is-visible {
+  display: block;
+  opacity: 1;
 }
 
 .consumption-effect {
@@ -1031,11 +1043,15 @@ body.debug .map-object > .interactive-hitbox {
   --debug-color-myte-stats: rgba(235, 255, 241, 0.7);
   position: fixed;
   inset: 0;
+  width: 100dvw;
+  height: 100dvh;
+  overflow: clip;
   visibility: hidden;
   z-index: var(--z-debug);
   pointer-events: none;
 }
 .debug-panel .debug-section {
+  position: absolute;
   width: min(400px, 100vw - 16px);
   max-width: calc(100vw - 16px);
   pointer-events: auto;
@@ -1070,9 +1086,6 @@ body.debug .map-object > .interactive-hitbox {
 }
 .debug-panel .debug-section.dragging > summary {
   cursor: grabbing;
-}
-.debug-panel .debug-section {
-  position: absolute;
 }
 .debug-panel .debug-section-body {
   display: flex;
@@ -1176,7 +1189,7 @@ body.debug .map-object > .interactive-hitbox {
 
 .action-queue-panel {
   visibility: hidden;
-  position: fixed;
+  position: absolute;
   z-index: var(--z-debug);
   width: 300px;
   pointer-events: auto;
@@ -1231,8 +1244,11 @@ body.debug .map-object > .interactive-hitbox {
   display: none;
   font-size: 10px;
   opacity: 0.55;
-  padding: 4px 2px;
+  padding: var(--padding);
   font-style: italic;
+  background-color: rgba(255, 255, 255, 0.85);
+  border-radius: var(--border-width);
+  backdrop-filter: blur(4px);
 }
 .action-queue-panel .queue-item {
   background-color: rgba(255, 255, 255, 0.85);
@@ -1440,6 +1456,69 @@ body.debug .map-object > .interactive-hitbox {
 }
 .app-shell > .sidebar > .action-controls > .other-info .state-info {
   text-transform: none;
+  color: var(--text-default);
+}
+.app-shell > .sidebar > .action-controls > .other-info .need-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  --need-meter-color: #6fcf97;
+}
+.app-shell > .sidebar > .action-controls > .other-info .need-info[data-state=critical] {
+  --need-meter-color: #d45454;
+}
+.app-shell > .sidebar > .action-controls > .other-info .need-info[data-state=low] {
+  --need-meter-color: #df8a3b;
+}
+.app-shell > .sidebar > .action-controls > .other-info .need-info[data-state=okay] {
+  --need-meter-color: #d8bf4c;
+}
+.app-shell > .sidebar > .action-controls > .other-info .need-info[data-state=good] {
+  --need-meter-color: #78b764;
+}
+.app-shell > .sidebar > .action-controls > .other-info .need-info[data-state=full] {
+  --need-meter-color: #54c6a9;
+}
+.app-shell > .sidebar > .action-controls > .other-info .need-info .need-label {
+  font-size: 0.85em;
+  line-height: 1.2;
+}
+.app-shell > .sidebar > .action-controls > .other-info .need-info .need-meter {
+  width: 100%;
+  height: 0.5rem;
+  accent-color: var(--need-meter-color);
+}
+.app-shell > .sidebar > .action-controls > .other-info .ai-choice-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-ui-pressed);
+}
+.app-shell > .sidebar > .action-controls > .other-info .ai-choice-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.app-shell > .sidebar > .action-controls > .other-info .ai-choice-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.app-shell > .sidebar > .action-controls > .other-info .ai-choice-chip {
+  background: var(--surface-pill-muted, #e0e0e0);
+  border-radius: 3px;
+  color: var(--text-subtle, #555);
+  padding: 0.25rem 0.5rem;
+  text-transform: none;
+  font-size: 0.72rem;
+}
+.app-shell > .sidebar > .action-controls > .other-info .ai-choice-chip.primary {
+  background: var(--surface-state-myte);
   color: var(--text-default);
 }
 .app-shell > .sidebar > .action-controls > .other-info .state-info.info-section-title,
@@ -2138,10 +2217,6 @@ body.debug .map-object > .interactive-hitbox {
   z-index: var(--z-drag);
   filter: var(--shadow);
 }
-.myte-slot > .myte-home-slot.is-queue-target {
-  outline: 2px solid #ffb000;
-  box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
-}
 .myte-slot > .myte-home-label {
   z-index: var(--z-floating-debug);
   width: var(--size-myte);
@@ -2156,16 +2231,6 @@ body.debug .map-object > .interactive-hitbox {
   right: 50%;
   transform: translate(50%, 0);
 }
-.myte-slot.is-selected > .myte-home-slot {
-  outline: 2px dashed green;
-  border-radius: var(--border-radius);
-}
-.myte-slot:hover > .myte-home-slot:not(.is-queue-target) {
-  outline: var(--border-width) solid darkgrey;
-}
-.myte-slot.empty:hover > .myte-home-slot:not(.is-queue-target) {
-  outline: unset;
-}
 .myte-slot.empty > .myte-home-slot {
   opacity: 0.75;
   z-index: 0;
@@ -2177,12 +2242,6 @@ body.debug .map-object > .interactive-hitbox {
   background-color: var(--button-mid);
   filter: unset;
   box-shadow: inset var(--border-width) var(--border-width) rgba(0, 0, 0, 0.0509803922);
-}
-.myte-slot.empty > .myte-home-slot.is-queue-target {
-  opacity: 1;
-  z-index: var(--z-drag);
-  outline: 2px solid #ffb000;
-  box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
 }
 .myte-slot.empty.valid-drop-target > .myte-home-slot {
   z-index: 100000;
@@ -2407,10 +2466,20 @@ body.debug .map-object > .interactive-hitbox {
   outline-color: white;
 }
 .interactive-myte:not(.world-myte) > .inner-wrapper > .above-wrapper {
-  display: none;
+  display: flex;
+  top: 12px;
+  right: 14px;
+  left: auto;
+  transform: none;
+  align-items: flex-end;
+  pointer-events: none;
 }
 .interactive-myte:not(.world-myte) > .inner-wrapper > .name-wrapper {
   display: none;
+}
+.interactive-myte:not(.world-myte) > .inner-wrapper > .above-wrapper > .battery {
+  --icon-scale: 1.65;
+  top: 0;
 }
 .interactive-myte.is-dragging {
   pointer-events: none;
@@ -2891,10 +2960,12 @@ body.debug .map-object > .interactive-hitbox {
 .map-object.is-selected {
   outline: 2px dashed green;
   border-radius: 5px;
+  outline-offset: 4px;
 }
 .map-object.is-queue-target {
-  box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
+  outline: 2px dashed #ffb000;
   border-radius: 5px;
+  outline-offset: 4px;
 }
 .map-object.draggable {
   pointer-events: all;

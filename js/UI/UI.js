@@ -764,6 +764,18 @@ class ActionSidebarManager extends UIComponent {
         return titles[category] || category;
     }
 
+    getNeedDisplayOrder() {
+        return ['rest', 'social', 'enrichment', 'play', 'comfort', 'home'];
+    }
+
+    getMeterState(percent) {
+        if (percent <= 15) return 'critical';
+        if (percent <= 35) return 'low';
+        if (percent <= 65) return 'okay';
+        if (percent <= 85) return 'good';
+        return 'full';
+    }
+
     humanizeLabel(value, { uppercase = false } = {}) {
         const text = String(value || '')
             .replace(/MapObject$/i, '')
@@ -774,6 +786,23 @@ class ActionSidebarManager extends UIComponent {
             .join(' ');
 
         return uppercase ? text.toUpperCase() : text;
+    }
+
+    prettifyAiToken(token) {
+        return this.humanizeLabel(String(token || '').replace(/[_-]+/g, ' '));
+    }
+
+    getAiDecisionDisplay(label) {
+        const segments = String(label || '')
+            .split(':')
+            .filter(Boolean)
+            .map(segment => this.prettifyAiToken(segment))
+            .filter((segment, index, items) => segment && segment !== items[index - 1]);
+
+        return {
+            primary: segments[0] ?? 'Idle',
+            details: segments.slice(1)
+        };
     }
 
     getMyteTypeLabel(myte) {
@@ -1194,6 +1223,15 @@ class ActionSidebarManager extends UIComponent {
 
         const activeMyte = this.parent.getActiveMyte();
         const actionContext = this.getCurrentActionContext(selectedObject, activeMyte);
+
+        if (hasPosition) {
+            this.appendSectionHeader(rows, 'location', 'Location');
+            this.appendInfoRows(rows, [
+                { label: 'Coords', value: `[${gridCoords.x}, ${gridCoords.y}]`, className: 'position-info' },
+                { label: 'World', value: debugMode ? `(${positionInfo.posX.toFixed(0)}, ${positionInfo.posY.toFixed(0)})` : null, className: 'position-info' }
+            ]);
+        }
+
         if (actionContext.matchesSelection && actionContext.currentAction) {
             this.appendSectionHeader(rows, 'current_action', 'Current Action');
             this.appendInfoRows(rows, [
@@ -1209,22 +1247,44 @@ class ActionSidebarManager extends UIComponent {
                 const behaviorDetail = this.getMyteBehaviorDetail(selectedObject);
                 this.appendSectionHeader(rows, 'status', 'Status');
                 this.appendInfoRows(rows, [
-                    { label: 'Energy', value: `${vitals.energy ?? 0}%` },
                     { label: 'Mood', value: `${selectedObject.stats.getMoodStatus()} (${vitals.mood ?? 0}%)` },
                     { label: 'Behavior', value: this.getMyteBehaviorLabel(selectedObject) },
                     { label: behaviorDetail?.label, value: behaviorDetail?.value },
                     { label: 'Activity', value: this.getMyteActivityLabel(selectedObject) }
                 ]);
-                if (snapshot.topNeed) {
-                    rows.push({ label: 'Top Need', value: `${snapshot.topNeed.label} (${snapshot.topNeed.percent}%)` });
-                }
-                rows.push({ label: '__header_needs', value: 'Needs', className: 'needs-title' });
-                snapshot.needs.slice(0, 3).forEach(need => {
-                    const pct = Math.max(0, 100 - need.percent);
-                    rows.push({ label: `need_${need.label}`, value: pct, meta: { label: need.label, tone: this.getNeedFulfillmentLabel(pct) }, type: 'meter' });
+                rows.push({ label: '__header_needs', value: 'Vitals', className: 'needs-title' });
+                rows.push({
+                    label: 'vital_energy',
+                    value: vitals.energy ?? 0,
+                    meta: { label: 'Energy', id: 'energy' },
+                    type: 'meter',
+                    cacheValue: `energy:${vitals.energy ?? 0}`
                 });
+
+                const needsById = new Map((snapshot.needs || []).map(need => [need.id, need]));
+                this.getNeedDisplayOrder().forEach(needId => {
+                    const need = needsById.get(needId);
+                    if (!need) return;
+
+                    const pct = Math.max(0, 100 - need.percent);
+                    rows.push({
+                        label: `need_${need.id}`,
+                        value: pct,
+                        meta: { label: need.label, id: need.id },
+                        type: 'meter',
+                        cacheValue: `${need.id}:${pct}`
+                    });
+                });
+
                 if (snapshot.lastDecisionLabel) {
-                    rows.push({ label: 'Last AI Choice', value: snapshot.lastDecisionLabel });
+                    this.appendSectionHeader(rows, 'ai', 'AI');
+                    rows.push({
+                        label: 'Last AI Choice',
+                        value: snapshot.lastDecisionLabel,
+                        type: 'ai-choice',
+                        className: 'ai-choice-info',
+                        cacheValue: snapshot.lastDecisionLabel
+                    });
                 }
             }
         }
@@ -1240,14 +1300,6 @@ class ActionSidebarManager extends UIComponent {
 
         if (selectedObject instanceof MapObject) {
             rows.push(...this.getObjectStateRows(selectedObject));
-        }
-
-        if (hasPosition) {
-            this.appendSectionHeader(rows, 'location', 'Location');
-            this.appendInfoRows(rows, [
-                { label: 'Coords', value: `[${gridCoords.x}, ${gridCoords.y}]`, className: 'position-info' },
-                { label: 'World', value: debugMode ? `(${positionInfo.posX.toFixed(0)}, ${positionInfo.posY.toFixed(0)})` : null, className: 'position-info' }
-            ]);
         }
 
         const debugInfo = debugMode ? (selectedObject.getSelectionDebugInfo?.() || []) : [];
@@ -1274,7 +1326,7 @@ class ActionSidebarManager extends UIComponent {
         }
 
         const rows = this._buildOtherInfoRows(selectedObject);
-        const cacheKey = rows.map(r => `${r.label}=${r.value}`).join('|');
+        const cacheKey = rows.map(r => `${r.label}=${r.cacheValue ?? r.value}`).join('|');
 
         if (cacheKey === this._otherInfoCache) return;
         this._otherInfoCache = cacheKey;
@@ -1302,9 +1354,47 @@ class ActionSidebarManager extends UIComponent {
                 const heading = el.querySelector('.need-label');
                 const meter = el.querySelector('progress');
                 const pct = row.value;
-                const text = `${row.meta.label}: ${pct}% ${row.meta.tone}`;
+                const text = `${row.meta.label}: ${pct}%`;
                 if (heading.textContent !== text) heading.textContent = text;
                 if (meter.value !== pct) meter.value = pct;
+                el.dataset.state = this.getMeterState(pct);
+                el.dataset.metricId = row.meta.id ?? '';
+            } else if (row.type === 'ai-choice') {
+                if (!el) {
+                    el = document.createElement('div');
+                    el.classList.add('state-info', 'ai-choice-info');
+                    if (row.className) el.classList.add(row.className);
+
+                    const label = document.createElement('div');
+                    label.classList.add('ai-choice-label');
+                    label.textContent = row.label;
+
+                    const body = document.createElement('div');
+                    body.classList.add('ai-choice-body');
+                    el.append(label, body);
+                }
+
+                const body = el.querySelector('.ai-choice-body');
+                const decision = this.getAiDecisionDisplay(row.value);
+                const decisionKey = `${decision.primary}|${decision.details.join('|')}`;
+
+                if (body && body.dataset.decisionKey !== decisionKey) {
+                    body.innerHTML = '';
+
+                    const primaryChip = document.createElement('span');
+                    primaryChip.classList.add('ai-choice-chip', 'primary');
+                    primaryChip.textContent = decision.primary;
+                    body.appendChild(primaryChip);
+
+                    decision.details.forEach(detail => {
+                        const chip = document.createElement('span');
+                        chip.classList.add('ai-choice-chip');
+                        chip.textContent = detail;
+                        body.appendChild(chip);
+                    });
+
+                    body.dataset.decisionKey = decisionKey;
+                }
             } else if (row.label.startsWith('__header_')) {
                 if (!el) {
                     el = document.createElement('div');
@@ -1438,6 +1528,7 @@ class ActionSidebarManager extends UIComponent {
 
     updateActionList(selectedObject) {
         const actionGroups = this.actionControls.querySelector('.action-groups');
+        const previousScrollTop = actionGroups.scrollTop;
         actionGroups.innerHTML = '';
         const activeMyte = this.parent.getActiveMyte();
 
@@ -1453,6 +1544,7 @@ class ActionSidebarManager extends UIComponent {
                 actionGroups.appendChild(groupEl);
                 this.actionControls.classList.add('is-visible');
             }
+            actionGroups.scrollTop = previousScrollTop;
             return;
         }
 
@@ -1478,6 +1570,7 @@ class ActionSidebarManager extends UIComponent {
                 actionGroups.appendChild(groupEl);
                 this.actionControls.classList.add('is-visible');
             }
+            actionGroups.scrollTop = previousScrollTop;
             return;
         }
 
@@ -1555,6 +1648,8 @@ class ActionSidebarManager extends UIComponent {
         if (actionGroups.children.length > 0) {
             this.actionControls.classList.add('is-visible');
         }
+
+        actionGroups.scrollTop = previousScrollTop;
     }
 }
 

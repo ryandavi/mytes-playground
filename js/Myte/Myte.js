@@ -155,6 +155,7 @@ class Myte {
 	get sprite()    { return this.renderer?.sprite ?? null; }
 	get targetDot() { return this.renderer?.targetDot ?? null; }
 	get battery()   { return this.renderer?.battery ?? null; }
+	get slotBattery() { return this.renderer?.homeBattery ?? null; }
 	get isDeployed() { return this.isActive; }
 	get isControlled() { return this.isActiveMyte; }
 	get isInSlot() { return !this.isDeployed; }
@@ -1541,6 +1542,11 @@ class Myte {
 				this.parent.gameMap.gridSystem.updateMyteFrontTile(this);
 			}
 		}
+	}
+
+	updateInactive(deltaTime) {
+		if (this.isActive) return;
+		this.stats?.updateInHomeSlot?.(deltaTime);
 	}
 
 	tickUpdate(tickDelta) {

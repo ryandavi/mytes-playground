@@ -1,3 +1,5 @@
+@use '../primitives/ui' as *;
+
 $item-color-food:     #f0e68c;
 $item-color-toy:      #87ceeb;
 $item-color-medicine: #98fb98;
@@ -47,7 +49,7 @@ $item-color-medicine: #98fb98;
     background-repeat: no-repeat;
     background-position: var(--item-sprite-x, 0px) var(--item-sprite-y, 0px);
     image-rendering: pixelated;
-    zoom: 2;
+    zoom: 1.5;
     border-radius: var(--inventory-slot-radius, var(--border-radius));
     cursor: grab;
     transition: transform 0.2s var(--ease-ui), filter 0.2s var(--ease-ui);
@@ -106,8 +108,9 @@ $item-color-medicine: #98fb98;
     @include floating-help-paper;
     position: fixed;
     z-index: 99999;
-    min-width: 100px;
+    width: 100px;
     white-space: normal;
+
 }
 
 .consumption-effect {
