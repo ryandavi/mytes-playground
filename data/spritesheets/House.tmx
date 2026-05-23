@@ -158,7 +158,7 @@
    <properties>
     <property name="claimedBy" value="Lentil"/>
     <property name="direction" value="S"/>
-    <property name="variant" value="large_bed"/>
+    <property name="variant" value="bed_big_long"/>
    </properties>
   </object>
   <object id="65" name="Portal" x="544" y="192" width="128" height="128">
@@ -173,24 +173,24 @@
     <property name="variant" value="red_ball"/>
    </properties>
   </object>
-  <object id="69" name="Grass" x="768" y="256" width="64" height="64">
+  <object id="69" name="Flower" x="768" y="256" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_1"/>
    </properties>
   </object>
-  <object id="71" name="Grass" x="768" y="96" width="64" height="64">
+  <object id="71" name="Flower" x="768" y="96" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_1"/>
    </properties>
   </object>
-  <object id="72" name="Grass" x="448" y="384" width="64" height="64">
+  <object id="72" name="Flower" x="448" y="384" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_2"/>
+    <property name="variant" value="flower_2"/>
    </properties>
   </object>
-  <object id="76" name="Grass" x="448" y="576" width="64" height="64">
+  <object id="76" name="Flower" x="448" y="576" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_2"/>
+    <property name="variant" value="flower_2"/>
    </properties>
   </object>
   <object id="78" name="Door" x="96" y="448" width="128" height="32">
@@ -208,9 +208,9 @@
     <property name="direction" value="Left"/>
    </properties>
   </object>
-  <object id="106" name="Grass" x="62" y="316" width="64" height="64">
+  <object id="106" name="Flower" x="62" y="316" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_3"/>
    </properties>
   </object>
   <object id="107" name="Treasure Chest" x="64" y="160" width="64" height="64">

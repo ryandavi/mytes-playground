@@ -29,9 +29,9 @@ class AStarPathfinder {
             maxSearchSteps: 8000,
             smoothPaths: true,
             debug: false,
-            useDirectPathFallback: true,
             preferPaths: true,
             pathEdgePenaltyFactor: 0.3,
+            wallClearancePenalty: 0.05,
             avoidDifficultTerrain: true,
             allowEntityOutOfBounds: true,
             visualizeSearch: false,
@@ -40,6 +40,11 @@ class AStarPathfinder {
 
             // Smoothing related options
             maxSmoothingDistance: 3,
+            // Extra px added to the collider during LOS checks in path smoothing.
+            // Shortcuts are only taken when the path has this much clearance from walls,
+            // preventing diagonal corner-grazing. Has no effect in tight corridors
+            // (the buffered check fails there too, so waypoints are preserved).
+            smoothingBuffer: 2,
 
             // Movement normalization
             normalizeSmallMovements: true,
@@ -294,16 +299,8 @@ class AStarPathfinder {
                 return null;
             }
             if (effectiveOptions.debug) { console.log(`Adjusted start grid position to (${validStartGrid.x}, ${validStartGrid.y})`); }
-            // IMPORTANT: If start is adjusted, we should ideally update startCenterX/Y as well,
-            // but for simplicity, we'll keep the original start center and let the path correct itself.
-            // A* will start from the adjusted grid.
             startGrid.x = validStartGrid.x;
             startGrid.y = validStartGrid.y;
-            // TODO: Optionally recalculate startCenterX/Y based on adjusted startGrid for perfect start point.
-            // const adjustedStartX = startGrid.x * cellSize;
-            // const adjustedStartY = startGrid.y * cellSize;
-            // startCenterX = adjustedStartX + entityWidth / 2;
-            // startCenterY = adjustedStartY + entityHeight / 2;
         }
 
         // --- Initialize A* Data Structures ---
@@ -931,16 +928,8 @@ class AStarPathfinder {
             // through the intermediate cardinal positions without collision.
             // We use the same robust _canEntityFitAt check for these intermediate steps.
             if (isDiagonal) {
-                // Check intermediate position 1 (moves vertically first: same X, new Y)
-                if (!this._canEntityFitAt(entity, x, newY, entityWidth, entityHeight, collider, entityCapabilities)) {
-                    if (debug) { /* Optional log */ }
-                    continue; // Blocked moving vertically first
-                }
-                // Check intermediate position 2 (moves horizontally first: new X, same Y)
-                if (!this._canEntityFitAt(entity, newX, y, entityWidth, entityHeight, collider, entityCapabilities)) {
-                    if (debug) { /* Optional log */ }
-                    continue; // Blocked moving horizontally first
-                }
+                if (!this._canEntityFitAt(entity, x, newY, entityWidth, entityHeight, collider, entityCapabilities)) continue;
+                if (!this._canEntityFitAt(entity, newX, y, entityWidth, entityHeight, collider, entityCapabilities)) continue;
             }
 
             // --- If all checks pass, the neighbor is valid ---
@@ -1021,6 +1010,26 @@ class AStarPathfinder {
 
         terrainMultiplier *= this._getEntityTerrainCostMultiplier(terrainType, entityCapabilities);
 
+        // Wall-clearance penalty: cells adjacent to walls cost slightly more so A*
+        // prefers paths through the center of open space when cost is otherwise equal.
+        // In a tight corridor the penalty applies equally to all viable cells, so routing
+        // through tight spaces is unaffected — the planner still uses them when necessary.
+        const wallClearancePenalty = effectiveOptions.wallClearancePenalty ?? this.options.wallClearancePenalty;
+        if (wallClearancePenalty > 0) {
+            let wallCount = 0;
+            for (const dir of this.cardinalDirections) {
+                const nx = toNode.x + dir.x;
+                const ny = toNode.y + dir.y;
+                if (nx < 0 || nx >= this.gridSystem.gridWidth || ny < 0 || ny >= this.gridSystem.gridHeight) {
+                    wallCount++;
+                } else {
+                    const nc = this.gridSystem.grid[nx]?.[ny];
+                    if (!nc?.tileWalkable) wallCount++;
+                }
+            }
+            terrainMultiplier += wallClearancePenalty * wallCount;
+        }
+
         return baseMoveCost * terrainMultiplier;
     }
 
@@ -1032,13 +1041,12 @@ class AStarPathfinder {
         const D2 = Math.SQRT2; // Cost of diagonal move
         // Octile distance
         return D * (dx + dy) + (D2 - 2 * D) * Math.min(dx, dy);
-        // Alternative: return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy); // Similar result
     }
 
     /**
      * Check line of sight between two entity *center* points, considering the collider.
      */
-    _hasLineOfSight(entity, startCenter, endCenter, entityWidth, entityHeight, collider, entityCapabilities) {
+    _hasLineOfSight(entity, startCenter, endCenter, entityWidth, entityHeight, collider, entityCapabilities, buffer = 0) {
         const dx = endCenter.x - startCenter.x;
         const dy = endCenter.y - startCenter.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -1046,8 +1054,17 @@ class AStarPathfinder {
 
         if (distance < cellSize * 0.5) return true;
 
-        const checksPerCell = 1.5;
-        const numChecks = Math.max(2, Math.min(15, Math.ceil(distance / (cellSize / checksPerCell))));
+        // When a buffer is requested, inflate the collider so shortcuts are only
+        // approved when the path has genuine clearance from walls.
+        const effectiveCollider = buffer > 0 ? {
+            offsetX: collider.offsetX - buffer,
+            offsetY: collider.offsetY - buffer,
+            width:   collider.width  + buffer * 2,
+            height:  collider.height + buffer * 2,
+        } : collider;
+
+        const checksPerCell = 2;
+        const numChecks = Math.max(2, Math.min(20, Math.ceil(distance / (cellSize / checksPerCell))));
 
         for (let i = 1; i < numChecks; i++) {
             const ratio = i / numChecks;
@@ -1056,18 +1073,15 @@ class AStarPathfinder {
             const entityX = checkCenterX - (entityWidth / 2);
             const entityY = checkCenterY - (entityHeight / 2);
 
-            // Validate the position - PASS ENTITY
-            if (!this._validatePosition(entity, entityX, entityY, entityWidth, entityHeight, collider, entityCapabilities)) {
-                // if(this.options.debug) { console.log(`LOS blocked at step ${i}/${numChecks}...`); } // Use effectiveOptions if debugging here
+            if (!this._validatePosition(entity, entityX, entityY, entityWidth, entityHeight, effectiveCollider, entityCapabilities)) {
                 return false;
             }
         }
 
-        // Check the end point itself - PASS ENTITY
+        // Check the end point itself
         const endEntityX = endCenter.x - (entityWidth / 2);
         const endEntityY = endCenter.y - (entityHeight / 2);
-        if (!this._validatePosition(entity, endEntityX, endEntityY, entityWidth, entityHeight, collider, entityCapabilities)) {
-            // if(this.options.debug) { console.log(`LOS blocked at final end point.`); }
+        if (!this._validatePosition(entity, endEntityX, endEntityY, entityWidth, entityHeight, effectiveCollider, entityCapabilities)) {
             return false;
         }
         return true;
@@ -1181,8 +1195,7 @@ class AStarPathfinder {
             finalPath = this._smoothPath(entity, finalPath, entityWidth, entityHeight, collider, entityCapabilities, effectiveOptions);
         }
         if (effectiveOptions.normalizeSmallMovements && finalPath.length > 2) {
-            // _normalizePathMovements doesn't call validation, so doesn't strictly need entity
-            finalPath = this._normalizePathMovements(finalPath, entityWidth, entityHeight, effectiveOptions);
+            finalPath = this._normalizePathMovements(finalPath, effectiveOptions);
         }
 
         if (effectiveOptions.debug) { this.debugElements.path = [...finalPath]; }
@@ -1229,9 +1242,9 @@ class AStarPathfinder {
             let furthestVisibleIndex = currentIndex + 1;
             const maxLookAheadIndex = Math.min(currentIndex + 1 + effectiveOptions.maxSmoothingDistance, path.length - 1);
 
+            const losBuffer = effectiveOptions.smoothingBuffer ?? 0;
             for (let i = currentIndex + 2; i <= maxLookAheadIndex; i++) {
-                // PASS ENTITY to _hasLineOfSight
-                if (this._hasLineOfSight(entity, smoothed[smoothed.length - 1], path[i], entityWidth, entityHeight, collider, entityCapabilities)) {
+                if (this._hasLineOfSight(entity, smoothed[smoothed.length - 1], path[i], entityWidth, entityHeight, collider, entityCapabilities, losBuffer)) {
                     furthestVisibleIndex = i;
                 } else {
                     break;
@@ -1257,7 +1270,7 @@ class AStarPathfinder {
      * Operates on world center coordinates.
      * @private
      */
-    _normalizePathMovements(path, entityWidth, entityHeight, effectiveOptions) { // Added options param
+    _normalizePathMovements(path, effectiveOptions) {
         if (path.length <= 2) return path;
 
         const normalized = [path[0]];

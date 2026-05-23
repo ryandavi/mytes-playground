@@ -638,6 +638,8 @@ class Myte {
 			let xBlocked = false;
 			let yBlocked = false;
 	
+			const CORNER_SLIP = 1.0; // px — small enough to not squeeze through real gaps
+
 			// Try to move on X axis
 			if (doXAxis) {
 				const newX = this.posX + moveX;
@@ -661,14 +663,24 @@ class Myte {
 						}
 					}
 				} else {
-					xBlocked = true;
-					// Grid cell is blocked — temporarily step into it to find door colliders there.
-					if (this.checkForCollisions && gridSystem) {
+					// Corner slip: a tiny perpendicular nudge may let us clear a corner edge
+					const slipDir = moveY !== 0 ? Math.sign(moveY) : 1;
+					if (this.canMoveToPosition(newX, this.posY + slipDir * CORNER_SLIP)) {
 						this.posX = newX;
-						const potentialColliders = gridSystem.getPotentialColliders(this);
-						this.posX = originalX;
-						for (const collider of potentialColliders) {
-							this.tryOpenCollider(collider, 'x');
+						this.posY += slipDir * CORNER_SLIP;
+					} else if (this.canMoveToPosition(newX, this.posY - slipDir * CORNER_SLIP)) {
+						this.posX = newX;
+						this.posY -= slipDir * CORNER_SLIP;
+					} else {
+						xBlocked = true;
+						// Grid cell is blocked — temporarily step into it to find door colliders there.
+						if (this.checkForCollisions && gridSystem) {
+							this.posX = newX;
+							const potentialColliders = gridSystem.getPotentialColliders(this);
+							this.posX = originalX;
+							for (const collider of potentialColliders) {
+								this.tryOpenCollider(collider, 'x');
+							}
 						}
 					}
 				}
@@ -697,14 +709,24 @@ class Myte {
 						}
 					}
 				} else {
-					yBlocked = true;
-					// Grid cell is blocked — temporarily step into it to find door colliders there.
-					if (this.checkForCollisions && gridSystem) {
+					// Corner slip: a tiny perpendicular nudge may let us clear a corner edge
+					const slipDir = moveX !== 0 ? Math.sign(moveX) : 1;
+					if (this.canMoveToPosition(this.posX + slipDir * CORNER_SLIP, newY)) {
 						this.posY = newY;
-						const potentialColliders = gridSystem.getPotentialColliders(this);
-						this.posY = originalY;
-						for (const collider of potentialColliders) {
-							this.tryOpenCollider(collider, 'y');
+						this.posX += slipDir * CORNER_SLIP;
+					} else if (this.canMoveToPosition(this.posX - slipDir * CORNER_SLIP, newY)) {
+						this.posY = newY;
+						this.posX -= slipDir * CORNER_SLIP;
+					} else {
+						yBlocked = true;
+						// Grid cell is blocked — temporarily step into it to find door colliders there.
+						if (this.checkForCollisions && gridSystem) {
+							this.posY = newY;
+							const potentialColliders = gridSystem.getPotentialColliders(this);
+							this.posY = originalY;
+							for (const collider of potentialColliders) {
+								this.tryOpenCollider(collider, 'y');
+							}
 						}
 					}
 				}

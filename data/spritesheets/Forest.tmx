@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="37">
+ <properties>
+  <property name="description" value="A quiet pine forest with a flower-filled clearing at its center."/>
+  <property name="displayName" value="Forest Clearing"/>
+  <property name="location" value="outside"/>
+  <property name="name" value="Forest"/>
+ </properties>
+ <tileset firstgid="1" source="walls3.tsx"/>
+ <layer id="1" name="Grass" width="30" height="30">
+  <data encoding="csv">
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85
+</data>
+ </layer>
+ <layer id="2" name="Collider" width="30" height="30">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <objectgroup id="3" name="Zones">
+  <object id="1" name="Zone" x="0" y="0" width="960" height="960">
+   <properties>
+    <property name="displayName" value="Forest Clearing"/>
+    <property name="type" value="social"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="4" name="Objects">
+  <object id="2" name="Portal" x="416" y="800" width="128" height="128">
+   <properties>
+    <property name="portalId" value="forest_outside"/>
+    <property name="targetMap" value="Outside"/>
+    <property name="targetPortalId" value="outside_forest"/>
+    <property name="variant" value="blue_portal"/>
+   </properties>
+  </object>
+  <object id="3" name="Spawn" x="384" y="448" width="192" height="192">
+   <properties>
+    <property name="displayName" value="Forest Clearing"/>
+    <property name="type" value="myte"/>
+   </properties>
+  </object>
+  <object id="4" name="Tree" x="96" y="96" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="5" name="Tree" x="224" y="64" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="6" name="Tree" x="352" y="96" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="7" name="Tree" x="544" y="64" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="8" name="Tree" x="704" y="96" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="9" name="Tree" x="800" y="192" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="10" name="Tree" x="832" y="352" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="11" name="Tree" x="800" y="544" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="12" name="Tree" x="704" y="736" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="13" name="Tree" x="544" y="768" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="14" name="Tree" x="352" y="768" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="15" name="Tree" x="192" y="736" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="16" name="Tree" x="64" y="576" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="17" name="Tree" x="64" y="352" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="18" name="Tree" x="192" y="224" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="19" name="Tree" x="704" y="224" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="20" name="Tree" x="192" y="608" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="21" name="Tree" x="704" y="608" width="64" height="128">
+   <properties><property name="variant" value="tree_pine"/></properties>
+  </object>
+  <object id="22" name="Flower" x="288" y="352" width="64" height="64">
+   <properties><property name="variant" value="flower_1"/></properties>
+  </object>
+  <object id="23" name="Flower" x="352" y="320" width="64" height="64">
+   <properties><property name="variant" value="flower_2"/></properties>
+  </object>
+  <object id="24" name="Flower" x="448" y="320" width="64" height="64">
+   <properties><property name="variant" value="flower_3"/></properties>
+  </object>
+  <object id="25" name="Flower" x="544" y="352" width="64" height="64">
+   <properties><property name="variant" value="flower_1"/></properties>
+  </object>
+  <object id="26" name="Flower" x="608" y="416" width="64" height="64">
+   <properties><property name="variant" value="flower_2"/></properties>
+  </object>
+  <object id="27" name="Flower" x="544" y="512" width="64" height="64">
+   <properties><property name="variant" value="flower_3"/></properties>
+  </object>
+  <object id="28" name="Flower" x="448" y="576" width="64" height="64">
+   <properties><property name="variant" value="flower_1"/></properties>
+  </object>
+  <object id="29" name="Flower" x="352" y="544" width="64" height="64">
+   <properties><property name="variant" value="flower_2"/></properties>
+  </object>
+  <object id="30" name="Flower" x="256" y="480" width="64" height="64">
+   <properties><property name="variant" value="flower_3"/></properties>
+  </object>
+  <object id="31" name="Flower" x="128" y="288" width="64" height="64">
+   <properties><property name="variant" value="flower_1"/></properties>
+  </object>
+  <object id="32" name="Flower" x="736" y="480" width="64" height="64">
+   <properties><property name="variant" value="flower_2"/></properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="5" name="Mobs">
+  <object id="33" name="Butterfly" x="384" y="384" width="64" height="64">
+   <properties><property name="variant" value="small"/></properties>
+  </object>
+  <object id="34" name="Butterfly" x="544" y="384" width="64" height="64">
+   <properties><property name="variant" value="yellow_butterfly"/></properties>
+  </object>
+  <object id="35" name="Butterfly" x="448" y="512" width="64" height="64">
+   <properties><property name="variant" value="blue_butterfly"/></properties>
+  </object>
+  <object id="36" name="Butterfly" x="608" y="544" width="64" height="64">
+   <properties><property name="variant" value="small"/></properties>
+  </object>
+ </objectgroup>
+</map>

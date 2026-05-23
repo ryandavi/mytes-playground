@@ -79,29 +79,31 @@
 			"description": "Sweet berries, perfect for snacking."
 		},
 		{
-			"id": "grass_1",
-			"name": "Flower",
+			"id": "flower_1",
+			"name": "Wildflower",
 			"type": "flower",
 			"droppable": true,
-			"aliases": ["flower"],
+			"aliases": ["flower", "grass_1"],
 			"sprite": { "col": 0, "row": 1 },
-			"description": "A small wild flower."
+			"description": "A small wildflower gathered from the meadow."
 		},
 		{
-			"id": "grass_2",
-			"name": "Flower",
+			"id": "flower_2",
+			"name": "Wildflower",
 			"type": "flower",
 			"droppable": true,
+			"aliases": ["grass_2"],
 			"sprite": { "col": 1, "row": 1 },
-			"description": "A small wild flower."
+			"description": "A small wildflower gathered from the meadow."
 		},
 		{
-			"id": "grass_3",
-			"name": "Flower",
+			"id": "flower_3",
+			"name": "Wildflower",
 			"type": "flower",
 			"droppable": true,
+			"aliases": ["grass_3"],
 			"sprite": { "col": 2, "row": 1 },
-			"description": "A small wild flower."
+			"description": "A small wildflower gathered from the meadow."
 		},
 		{
 			"id": "flower_red",

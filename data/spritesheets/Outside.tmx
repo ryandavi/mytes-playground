@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="40" tilewidth="32" tileheight="32" infinite="0" nextlayerid="10" nextobjectid="19">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="40" tilewidth="32" tileheight="32" infinite="0" nextlayerid="10" nextobjectid="20">
  <properties>
   <property name="description" value="Bliss"/>
   <property name="location" value="outside"/>
@@ -235,54 +235,54 @@
   </object>
  </objectgroup>
  <objectgroup id="4" name="Objects">
-  <object id="1" name="Grass" x="480" y="256" width="64" height="64">
+  <object id="1" name="Flower" x="480" y="256" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_1"/>
    </properties>
   </object>
-  <object id="2" name="Grass" x="128" y="416" width="64" height="64">
+  <object id="2" name="Flower" x="128" y="416" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_2"/>
    </properties>
   </object>
-  <object id="3" name="Grass" x="736" y="320" width="64" height="64">
+  <object id="3" name="Flower" x="736" y="320" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_3"/>
    </properties>
   </object>
-  <object id="4" name="Grass" x="736" y="160" width="64" height="64">
+  <object id="4" name="Flower" x="736" y="160" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_1"/>
    </properties>
   </object>
-  <object id="5" name="Grass" x="448" y="448" width="64" height="64">
+  <object id="5" name="Flower" x="448" y="448" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_2"/>
    </properties>
   </object>
-  <object id="6" name="Grass" x="32" y="96" width="64" height="64">
+  <object id="6" name="Flower" x="32" y="96" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_3"/>
    </properties>
   </object>
-  <object id="7" name="Grass" x="64" y="544" width="64" height="64">
+  <object id="7" name="Flower" x="64" y="544" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_1"/>
    </properties>
   </object>
-  <object id="8" name="Grass" x="192" y="192" width="64" height="64">
+  <object id="8" name="Flower" x="192" y="192" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_2"/>
    </properties>
   </object>
-  <object id="9" name="Grass" x="352" y="96" width="64" height="64">
+  <object id="9" name="Flower" x="352" y="96" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_3"/>
    </properties>
   </object>
-  <object id="10" name="Grass" x="736" y="512" width="64" height="64">
+  <object id="10" name="Flower" x="736" y="512" width="64" height="64">
    <properties>
-    <property name="variant" value="grass_1"/>
+    <property name="variant" value="flower_1"/>
    </properties>
   </object>
   <object id="11" name="Portal" x="256" y="448" width="128" height="128">
@@ -298,6 +298,14 @@
     <property name="targetMap" value="FieldTest"/>
     <property name="targetPortalId" value="field_outside"/>
     <property name="variant" value="red_portal"/>
+   </properties>
+  </object>
+  <object id="19" name="Portal" x="96" y="896" width="128" height="128">
+   <properties>
+    <property name="portalId" value="outside_forest"/>
+    <property name="targetMap" value="Forest"/>
+    <property name="targetPortalId" value="forest_outside"/>
+    <property name="variant" value="blue_portal"/>
    </properties>
   </object>
   <object id="16" name="Spawn" x="544" y="224" width="192" height="192">

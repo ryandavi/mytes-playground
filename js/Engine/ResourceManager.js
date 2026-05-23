@@ -13,6 +13,7 @@ class ResourceManager {
         'grass_2_front': { path: 'images/MapObjects/grass_2_front.png'            },
         'grass_3_back':  { path: 'images/MapObjects/grass_3_back.png'             },
         'grass_3_front': { path: 'images/MapObjects/grass_3_front.png'            },
+        'tree_tree_pine': { path: 'images/MapObjects/tree_pine.gif'               },
     };
 
     static CURSORS = {

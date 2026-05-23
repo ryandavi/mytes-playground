@@ -50,9 +50,11 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
             }
         }
 
-        if (gridSystem.pathfinder?.options?.debug && this.gameMap.testPathfinding) {
+        if (gridSystem.pathfinder?.options?.debug) {
             setTimeout(() => {
-                this.gameMap.testPathfinding();
+                // Keep the active action's debug overlay in sync with the new door state
+                // without temporarily replacing it with the mouse-preview path.
+                this.gameMap?.parent?.activeMyte?.queue?.getCurrentAction?.()?.refreshDebugVisualization?.();
             }, 50);
         }
     }

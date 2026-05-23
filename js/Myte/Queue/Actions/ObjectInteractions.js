@@ -729,7 +729,18 @@ class PickFlowerAction extends GoToObjectAction {
         return true;
     }
 
+    interrupt() {
+        this._interrupted = true;
+        super.interrupt();
+    }
+
+    cancel() {
+        this._interrupted = true;
+        super.cancel?.();
+    }
+
     complete() {
+        if (this._interrupted) return;
         this.faceTarget();
         super.complete();
         this._dropFlowerItem();

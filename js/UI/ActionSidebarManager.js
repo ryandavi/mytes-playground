@@ -316,16 +316,7 @@ class ActionSidebarManager extends UIComponent {
                     ...options,
                     userInitiated: true
                 };
-                const shouldInterrupt =
-                    prominent ||
-                    activeMyte?.goal === MOVE_TYPES.FREEROAM ||
-                    activeMyte?.queue?.hasUserInitiatedAction?.();
-
-                if (shouldInterrupt) {
-                    activeMyte.queue.interrupt(action.id, payload);
-                } else {
-                    activeMyte.queue.add(action.id, payload);
-                }
+                activeMyte.queue.interrupt(action.id, payload);
                 this.updateActions(selectedObject);
             }
         });

@@ -2932,12 +2932,14 @@ body[data-tool-mode=select] .app-shell > .app-stage > .canvas > .layer > .droppe
 
 .map-object {
   position: fixed;
-  pointer-events: none;
 }
 .map-object .sway {
   animation-delay: inherit;
   transform-origin: bottom;
   animation: sway 5s ease-in-out infinite;
+}
+.map-object:hover > .sprite {
+  filter: brightness(1.2);
 }
 .map-object > .sprite {
   position: absolute;
@@ -2951,6 +2953,7 @@ body[data-tool-mode=select] .app-shell > .app-stage > .canvas > .layer > .droppe
   -webkit-user-select: none;
      -moz-user-select: none;
           user-select: none;
+  transition: filter 0.2s ease;
 }
 .map-object > .sprite > .front,
 .map-object > .sprite .back {

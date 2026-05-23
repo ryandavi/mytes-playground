@@ -266,13 +266,28 @@
 
 .map-object {
     position: fixed;
-    pointer-events: none;
+
 
     .sway {
         animation-delay: inherit;
         transform-origin: bottom;
         animation: sway 5s ease-in-out infinite;
     }
+
+    &:not(.inspectable):not(.interactive):not(.draggable) {
+        pointer-events: none;
+    }
+
+    &.inspectable {
+        pointer-events: auto;
+    }
+
+    &.inspectable:hover {
+        >.sprite {
+            filter: brightness(1.2);
+        }
+    }
+
 
     > .sprite {
         position: absolute;
@@ -284,6 +299,7 @@
         image-rendering: pixelated;
         pointer-events: none;
         user-select: none;
+        transition: filter 0.2s ease;
 
         > .front,
         .back {

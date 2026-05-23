@@ -70,6 +70,7 @@ const TYPE_CONFIGS = {
 		overlappable: true,
 		animation: 'sway',
 		canInspect: false,
+		majorActionId: ['pick_flower'],
 		regrowthTime: 120000, // 2 minutes
 		approachConfig: {
 			gap: 10
@@ -87,7 +88,7 @@ const TYPE_CONFIGS = {
 
 	FLOWER: {
 		category: 'nature',
-		variants: ['flower_red', 'flower_yellow', 'flower_blue'],
+		variants: ['flower_1', 'flower_2', 'flower_3', 'flower_red', 'flower_yellow', 'flower_blue'],
 		walkable: true,
 		overlappable: true,
 		canInspect: false,
@@ -102,10 +103,73 @@ const TYPE_CONFIGS = {
 			pick: 'obj_flower_pick',
 			trample: 'obj_flower_trample'
 		},
+		variantConfigs: {
+			flower_1: {
+				renderType: 'split',
+				animation: 'sway',
+				displayName: 'Wildflower',
+				splitSpritePrefix: 'grass_1'
+			},
+			flower_2: {
+				renderType: 'split',
+				animation: 'sway',
+				displayName: 'Wildflower',
+				splitSpritePrefix: 'grass_2'
+			},
+			flower_3: {
+				renderType: 'split',
+				animation: 'sway',
+				displayName: 'Wildflower',
+				splitSpritePrefix: 'grass_3'
+			},
+			flower_red: {
+				renderType: 'split',
+				animation: 'sway',
+				splitSpritePrefix: 'grass_1'
+			},
+			flower_yellow: {
+				renderType: 'split',
+				animation: 'sway',
+				splitSpritePrefix: 'grass_2'
+			},
+			flower_blue: {
+				renderType: 'split',
+				animation: 'sway',
+				splitSpritePrefix: 'grass_3'
+			}
+		},
 		ai: {
 			affordances: [
 				{ actionId: 'smell_flower', purpose: 'soothe' }
 			]
+		}
+	},
+
+	TREE: {
+		category: 'nature',
+		variants: ['tree_pine'],
+		renderType: 'single',
+		collision: true,
+		canInspect: true,
+		displayName: 'Pine Tree',
+		size: { width: 64, height: 128 },
+		collider: { width: 24, height: 28, offsetX: 20, offsetY: 94 },
+		interactiveCollider: { width: 96, height: 96, offsetX: -16, offsetY: 32 },
+		shadow: {
+			enabled: true,
+			widthRatio: 0.5,
+			heightRatio: 0.12,
+			anchorX: 0.5,
+			anchorY: 0.92,
+			maxOpacity: 0.22,
+			minOpacity: 0.08,
+			minScale: 0.78,
+			blur: 3
+		},
+		spriteConfig: {
+			spriteSheet: {
+				url: 'images/MapObjects/tree_pine.gif'
+			}
 		}
 	},
 
@@ -703,7 +767,7 @@ const TYPE_CONFIGS = {
 
 	BED: {
 		category: 'static',
-		variants: ['bed', 'large_bed', 'bunk_bed'],
+		variants: ['bed', 'bed_long', 'bed_big', 'bed_big_long', 'large_bed', 'bunk_bed'],
 		renderType: 'sprite',
 		collision: true,
 		draggable: true,
@@ -717,55 +781,177 @@ const TYPE_CONFIGS = {
 				{ actionId: 'rest_on_bed', purpose: 'rest' }
 			]
 		},
-		spriteConfig: {
-			spriteSheet: {
-				url: 'images/MapObjects/bed_default.png',
-				size: { width: 128, height: 256 }
-			}
-		},
-		directionConfigs: {
-			S: {
-				size: { width: 128, height: 256 },
-				collider: { width: 104, height: 168, offsetX: 12, offsetY: 68 },
-				interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: 256 },
-				transformStyle: '',
-				mytePosition: { xFactor: 0.5, yFactor: 0.75 },
-				myteFacing: 'S'
-			},
-			N: {
-				size: { width: 128, height: 256 },
-				collider: { width: 104, height: 168, offsetX: 12, offsetY: 20 },
-				interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: -64 },
-				transformStyle: 'scaleY(-1)',
-				mytePosition: { xFactor: 0.5, yFactor: 0.25 },
-				myteFacing: 'N'
-			},
-			E: {
-				size: { width: 256, height: 128 },
-				collider: { width: 168, height: 104, offsetX: 68, offsetY: 12 },
-				interactiveCollider: { width: 64, height: 192, offsetX: 256, offsetY: -32 },
-				transformStyle: 'rotate(90deg)',
-				mytePosition: { xFactor: 0.75, yFactor: 0.5 },
-				myteFacing: 'E'
-			},
-			W: {
-				size: { width: 256, height: 128 },
-				collider: { width: 168, height: 104, offsetX: 20, offsetY: 12 },
-				interactiveCollider: { width: 64, height: 192, offsetX: -64, offsetY: -32 },
-				transformStyle: 'rotate(-90deg)',
-				mytePosition: { xFactor: 0.25, yFactor: 0.5 },
-				myteFacing: 'W'
-			}
-		},
 		variantConfigs: {
-			bed: {},
-			large_bed: {
-				size: { width: 192, height: 256 },
+			bed: {
+				displayName: 'Bed',
+				spriteConfig: {
+					spriteSheet: { url: 'images/MapObjects/bed.gif' }
+				},
 				directionConfigs: {
-					S: { size: { width: 192, height: 256 }, collider: { width: 168, height: 176, offsetX: 12, offsetY: 68 } },
-					N: { size: { width: 192, height: 256 }, collider: { width: 168, height: 176, offsetX: 12, offsetY: 20 } },
-					E: { size: { width: 256, height: 192 }, collider: { width: 176, height: 168, offsetX: 68, offsetY: 12 } },
-					W: { size: { width: 256, height: 192 }, collider: { width: 176, height: 168, offsetX: 20, offsetY: 12 } }
+					S: {
+						size: { width: 64, height: 128 },
+						collider: { width: 48, height: 78, offsetX: 8, offsetY: 42 },
+						interactiveCollider: { width: 128, height: 64, offsetX: -32, offsetY: 128 },
+						transformStyle: 'rotate(90deg)',
+						mytePosition: { xFactor: 0.5, yFactor: 0.72 },
+						myteFacing: 'S'
+					},
+					N: {
+						size: { width: 64, height: 128 },
+						collider: { width: 48, height: 78, offsetX: 8, offsetY: 8 },
+						interactiveCollider: { width: 128, height: 64, offsetX: -32, offsetY: -64 },
+						transformStyle: 'rotate(-90deg)',
+						mytePosition: { xFactor: 0.5, yFactor: 0.28 },
+						myteFacing: 'N'
+					},
+					E: {
+						size: { width: 128, height: 64 },
+						collider: { width: 78, height: 48, offsetX: 42, offsetY: 8 },
+						interactiveCollider: { width: 64, height: 128, offsetX: 128, offsetY: -32 },
+						transformStyle: '',
+						mytePosition: { xFactor: 0.72, yFactor: 0.5 },
+						myteFacing: 'E'
+					},
+					W: {
+						size: { width: 128, height: 64 },
+						collider: { width: 78, height: 48, offsetX: 8, offsetY: 8 },
+						interactiveCollider: { width: 64, height: 128, offsetX: -64, offsetY: -32 },
+						transformStyle: 'scaleX(-1)',
+						mytePosition: { xFactor: 0.28, yFactor: 0.5 },
+						myteFacing: 'W'
+					}
+				}
+			},
+			bed_long: {
+				displayName: 'Long Bed',
+				spriteConfig: {
+					spriteSheet: { url: 'images/MapObjects/bed_long.gif' }
+				},
+				directionConfigs: {
+					S: {
+						size: { width: 64, height: 128 },
+						collider: { width: 48, height: 78, offsetX: 8, offsetY: 42 },
+						interactiveCollider: { width: 128, height: 64, offsetX: -32, offsetY: 128 },
+						transformStyle: '',
+						mytePosition: { xFactor: 0.5, yFactor: 0.72 },
+						myteFacing: 'S'
+					},
+					N: {
+						size: { width: 64, height: 128 },
+						collider: { width: 48, height: 78, offsetX: 8, offsetY: 8 },
+						interactiveCollider: { width: 128, height: 64, offsetX: -32, offsetY: -64 },
+						transformStyle: 'scaleY(-1)',
+						mytePosition: { xFactor: 0.5, yFactor: 0.28 },
+						myteFacing: 'N'
+					},
+					E: {
+						size: { width: 128, height: 64 },
+						collider: { width: 78, height: 48, offsetX: 42, offsetY: 8 },
+						interactiveCollider: { width: 64, height: 128, offsetX: 128, offsetY: -32 },
+						transformStyle: 'rotate(90deg)',
+						mytePosition: { xFactor: 0.72, yFactor: 0.5 },
+						myteFacing: 'E'
+					},
+					W: {
+						size: { width: 128, height: 64 },
+						collider: { width: 78, height: 48, offsetX: 8, offsetY: 8 },
+						interactiveCollider: { width: 64, height: 128, offsetX: -64, offsetY: -32 },
+						transformStyle: 'rotate(-90deg)',
+						mytePosition: { xFactor: 0.28, yFactor: 0.5 },
+						myteFacing: 'W'
+					}
+				}
+			},
+			bed_big: {
+				displayName: 'Big Bed',
+				spriteConfig: {
+					spriteSheet: { url: 'images/MapObjects/bed_big.png' }
+				},
+				directionConfigs: {
+					S: {
+						size: { width: 128, height: 256 },
+						collider: { width: 96, height: 158, offsetX: 16, offsetY: 82 },
+						interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: 256 },
+						transformStyle: 'rotate(90deg)',
+						mytePosition: { xFactor: 0.5, yFactor: 0.75 },
+						myteFacing: 'S'
+					},
+					N: {
+						size: { width: 128, height: 256 },
+						collider: { width: 96, height: 158, offsetX: 16, offsetY: 16 },
+						interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: -64 },
+						transformStyle: 'rotate(-90deg)',
+						mytePosition: { xFactor: 0.5, yFactor: 0.25 },
+						myteFacing: 'N'
+					},
+					E: {
+						size: { width: 256, height: 128 },
+						collider: { width: 158, height: 96, offsetX: 82, offsetY: 16 },
+						interactiveCollider: { width: 64, height: 192, offsetX: 256, offsetY: -32 },
+						transformStyle: '',
+						mytePosition: { xFactor: 0.75, yFactor: 0.5 },
+						myteFacing: 'E'
+					},
+					W: {
+						size: { width: 256, height: 128 },
+						collider: { width: 158, height: 96, offsetX: 16, offsetY: 16 },
+						interactiveCollider: { width: 64, height: 192, offsetX: -64, offsetY: -32 },
+						transformStyle: 'scaleX(-1)',
+						mytePosition: { xFactor: 0.25, yFactor: 0.5 },
+						myteFacing: 'W'
+					}
+				}
+			},
+			bed_big_long: {
+				displayName: 'Big Long Bed',
+				spriteConfig: {
+					spriteSheet: { url: 'images/MapObjects/bed_big_long.png' }
+				},
+				directionConfigs: {
+					S: {
+						size: { width: 128, height: 256 },
+						collider: { width: 96, height: 158, offsetX: 16, offsetY: 82 },
+						interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: 256 },
+						transformStyle: '',
+						mytePosition: { xFactor: 0.5, yFactor: 0.75 },
+						myteFacing: 'S'
+					},
+					N: {
+						size: { width: 128, height: 256 },
+						collider: { width: 96, height: 158, offsetX: 16, offsetY: 16 },
+						interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: -64 },
+						transformStyle: 'scaleY(-1)',
+						mytePosition: { xFactor: 0.5, yFactor: 0.25 },
+						myteFacing: 'N'
+					},
+					E: {
+						size: { width: 256, height: 128 },
+						collider: { width: 158, height: 96, offsetX: 82, offsetY: 16 },
+						interactiveCollider: { width: 64, height: 192, offsetX: 256, offsetY: -32 },
+						transformStyle: 'rotate(90deg)',
+						mytePosition: { xFactor: 0.75, yFactor: 0.5 },
+						myteFacing: 'E'
+					},
+					W: {
+						size: { width: 256, height: 128 },
+						collider: { width: 158, height: 96, offsetX: 16, offsetY: 16 },
+						interactiveCollider: { width: 64, height: 192, offsetX: -64, offsetY: -32 },
+						transformStyle: 'rotate(-90deg)',
+						mytePosition: { xFactor: 0.25, yFactor: 0.5 },
+						myteFacing: 'W'
+					}
+				}
+			},
+			large_bed: {
+				spriteConfig: {
+					spriteSheet: { url: 'images/MapObjects/bed_big_long.png' }
+				},
+				size: { width: 128, height: 256 },
+				directionConfigs: {
+					S: { size: { width: 128, height: 256 }, collider: { width: 96, height: 158, offsetX: 16, offsetY: 82 }, interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: 256 }, transformStyle: '', mytePosition: { xFactor: 0.5, yFactor: 0.75 }, myteFacing: 'S' },
+					N: { size: { width: 128, height: 256 }, collider: { width: 96, height: 158, offsetX: 16, offsetY: 16 }, interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: -64 }, transformStyle: 'scaleY(-1)', mytePosition: { xFactor: 0.5, yFactor: 0.25 }, myteFacing: 'N' },
+					E: { size: { width: 256, height: 128 }, collider: { width: 158, height: 96, offsetX: 82, offsetY: 16 }, interactiveCollider: { width: 64, height: 192, offsetX: 256, offsetY: -32 }, transformStyle: 'rotate(90deg)', mytePosition: { xFactor: 0.75, yFactor: 0.5 }, myteFacing: 'E' },
+					W: { size: { width: 256, height: 128 }, collider: { width: 158, height: 96, offsetX: 16, offsetY: 16 }, interactiveCollider: { width: 64, height: 192, offsetX: -64, offsetY: -32 }, transformStyle: 'rotate(-90deg)', mytePosition: { xFactor: 0.25, yFactor: 0.5 }, myteFacing: 'W' }
 				}
 			},
 			bunk_bed: {

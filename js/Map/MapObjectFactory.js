@@ -214,6 +214,7 @@ class MapObjectFactory {
 MapObjectFactory.registry
     .register('GRASS', MapObject)
     .register('FLOWER', MapObject)
+    .register('TREE', MapObject)
     .register('MUSIC_BOX', MusicBoxMapObject)
     .register('TREASURE_CHEST', TreasureChestMapObject)
     .register('FOUNTAIN', FountainMapObject)

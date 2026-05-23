@@ -1,3 +1,36 @@
+/**
+ * Catmull-Rom spline interpolation between two control points.
+ * p0/p3 are the outer neighbours used only to shape the curve; the output
+ * segment runs from p1 to p2.
+ */
+function _catmullRomPoint(p0, p1, p2, p3, t) {
+    const t2 = t * t, t3 = t2 * t;
+    return {
+        x: 0.5 * ((2*p1.x) + (-p0.x + p2.x)*t + (2*p0.x - 5*p1.x + 4*p2.x - p3.x)*t2 + (-p0.x + 3*p1.x - 3*p2.x + p3.x)*t3),
+        y: 0.5 * ((2*p1.y) + (-p0.y + p2.y)*t + (2*p0.y - 5*p1.y + 4*p2.y - p3.y)*t2 + (-p0.y + 3*p1.y - 3*p2.y + p3.y)*t3),
+    };
+}
+
+/**
+ * Expand a waypoint array into a smooth Catmull-Rom curve.
+ * Requires ≥3 points; returns the original array unchanged for shorter paths.
+ * First and last points are preserved exactly.
+ */
+function _splineWaypoints(points, resolution = 3) {
+    if (points.length < 3) return points;
+    const out = [points[0]];
+    for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[Math.max(0, i - 1)];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[Math.min(points.length - 1, i + 2)];
+        for (let j = 1; j <= resolution; j++) {
+            out.push(_catmullRomPoint(p0, p1, p2, p3, j / resolution));
+        }
+    }
+    return out;
+}
+
 // Set to true to re-enable verbose pathfinding diagnostics
 const APPROACH_DEBUG = false;
 const ASTAR_DEBUG = false;
@@ -114,6 +147,7 @@ class AStarMoveAction extends MyteAction {
     }
 
     refreshDebugVisualization() {
+        if (this._suppressDebugOnStart) return;
         if (!this.targetPoints?.length) {
             this.clearDebugPath();
             return;
@@ -178,6 +212,7 @@ class AStarMoveAction extends MyteAction {
         this.targetPoints = null;
         this.currentTargetIndex = 0;
         this._actionComplete = false;
+        this._suppressDebugOnStart = true;
 
         if (!this.myte?.pathfinder) {
             _swarn(`[ASTAR] start: no pathfinder — completing immediately`);
@@ -202,7 +237,7 @@ class AStarMoveAction extends MyteAction {
         const myte = this.myte;
         const effectiveOptions = { ...myte.pathfindingOptions, ...(this.pathfindingOptions || {}) };
         const path = myte.pathfinder.findPath(myte, fromX, fromY, to.x, to.y, effectiveOptions);
-        if (path?.length) {
+        if (path?.length && !this._suppressDebugOnStart) {
             this.renderDebugPath(path);
         }
 
@@ -235,6 +270,12 @@ class AStarMoveAction extends MyteAction {
             return;
         }
 
+        // Smooth the waypoints into a Catmull-Rom curve so the myte arcs through
+        // turns rather than pivoting at each grid-cell centre.
+        if (this.targetPoints.length >= 3) {
+            this.targetPoints = _splineWaypoints(this.targetPoints);
+        }
+
         _slog(`[ASTAR] _buildPath: ${path.length} raw pts → ${this.targetPoints.length} waypoints. First=(${this.targetPoints[0].x.toFixed(1)},${this.targetPoints[0].y.toFixed(1)}) Last=(${this.targetPoints[this.targetPoints.length-1].x.toFixed(1)},${this.targetPoints[this.targetPoints.length-1].y.toFixed(1)})`);
         this.currentTargetIndex = 0;
         myte.setTarget(this.targetPoints[0].x, this.targetPoints[0].y);
@@ -244,6 +285,10 @@ class AStarMoveAction extends MyteAction {
         if (this._actionComplete) return true;
         if (!this.myte?.isActive) { _swarn(`[ASTAR] update: myte inactive — completing`); return true; }
         if (!this.targetPoints?.length) { _swarn(`[ASTAR] update: no targetPoints — completing`); return true; }
+        if (this._suppressDebugOnStart) {
+            this._suppressDebugOnStart = false;
+            this.refreshDebugVisualization();
+        }
 
         if (this.myte.isAtTarget()) {
             this._stuckCount = 0;
@@ -568,7 +613,9 @@ class GoToObjectAction extends PositionableAction {
             const routeTarget = bestPath.resolvedTargetPos ?? bestPath.targetPos;
             _alog(`[APPROACH] bestPath → routeTarget=(${routeTarget.x.toFixed(1)},${routeTarget.y.toFixed(1)}) finalTarget=(${bestPath.targetPos.x.toFixed(1)},${bestPath.targetPos.y.toFixed(1)}) score=${bestPath.score.toFixed(1)} waypoints=${bestPath.targetPoints.length}`);
             this.targetPos    = bestPath.targetPos;
-            this.targetPoints = bestPath.targetPoints;
+            this.targetPoints = bestPath.targetPoints.length >= 3
+                ? _splineWaypoints(bestPath.targetPoints)
+                : bestPath.targetPoints;
             this.refreshDebugVisualization();
             return;
         }

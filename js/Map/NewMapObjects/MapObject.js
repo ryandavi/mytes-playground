@@ -102,7 +102,8 @@ class MapObject {
 		const name = this.constructor?.name ?? '';
 		return name.includes('Flower') ||
 			name.includes('Bloom') ||
-			this.type?.toUpperCase?.() === 'GRASS';
+			this.type?.toUpperCase?.() === 'GRASS' ||
+			this.type?.toUpperCase?.() === 'FLOWER';
 	}
 
 	getSidebarStatusRows() {
@@ -752,7 +753,8 @@ class MapObject {
 	canShowSelectPointer() {
 		return this.getConfig('canInspect', true) !== false ||
 			this.getConfig('canPickUp', false) ||
-			this.getConfig('interactionType') != null;
+			this.getConfig('interactionType') != null ||
+			this.getMajorActionPreferenceIds().length > 0;
 	}
 
 	startDrag() {
@@ -1258,10 +1260,11 @@ class MapObject {
 	renderSplitObject(container) {
 		const div = document.createElement('div');
 		div.classList.add('sprite');
+		const spritePrefix = this.getConfig('splitSpritePrefix', this.variant);
 		['back', 'front'].forEach(part => {
 			const partDiv = document.createElement('div');
 			partDiv.classList.add(part);
-			partDiv.style.backgroundImage = `url('images/MapObjects/${this.variant}_${part}.png')`;
+			partDiv.style.backgroundImage = `url('images/MapObjects/${spritePrefix}_${part}.png')`;
 			partDiv.style.backgroundSize = 'cover';
 			if (part === 'front' && this.getConfig('animation') === 'sway') {
 				partDiv.classList.add('sway');

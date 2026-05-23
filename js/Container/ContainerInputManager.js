@@ -169,30 +169,31 @@ class ContainerInputManager {
   setupClickHandling() {
     // Handle clicks on the container
     this.subscribe('mouse.click', (event) => {
-      if (!this.isEnabled) return; // Ignore when disabled
-
-      // Don't handle clicks if they've been handled by a specific element
-      if (event.originalEvent && event.originalEvent.defaultPrevented) {
-        return;
-      }
-
-      // Double-click on the map → A* move active myte to clicked world position
-      if (event.isDoubleClick) {
-        this._tryAStarToClick(event.position.x, event.position.y);
-        return;
-      }
+      if (!this.isEnabled) return;
+      if (event.originalEvent && event.originalEvent.defaultPrevented) return;
 
       // Handle element click for active Myte
       if (this.container.activeMyte &&
         this.container.activeMyte.isActive &&
         this.container.ui.isTool(UIToolModes.SELECT)) {
 
-        // Check if we clicked on a valid element
         const element = event.originalEvent?.target;
         if (element && this.isClickableElement(element)) {
           // this.container.ui.setSelected(element);
         }
       }
+    });
+
+    // Double-click on the map → A* move active myte to clicked world position.
+    // Uses native dblclick (separate DOM event) so it fires reliably even when
+    // individual click events are stopped by child elements (e.g. myte overlay).
+    this.subscribe('mouse.dblclick', (event) => {
+      if (!this.isEnabled) { console.log('[dblclick] blocked: ContainerInputManager disabled'); return; }
+      if (event.originalEvent && event.originalEvent.defaultPrevented) { console.log('[dblclick] blocked: defaultPrevented'); return; }
+      const target = event.originalEvent?.target;
+      console.log('[dblclick] target:', target?.className || target?.tagName, 'closest world-myte/map-object:', target?.closest('.world-myte, .map-object')?.className);
+      if (target?.closest('.world-myte, .map-object')) { console.log('[dblclick] blocked: myte or map-object'); return; }
+      this._tryAStarToClick(event.position.x, event.position.y);
     });
   }
 
@@ -230,12 +231,19 @@ class ContainerInputManager {
    */
   _tryAStarToClick(screenX, screenY) {
     const myte = this.container.activeMyte;
-    if (!myte?.isActive || !myte.pathfinder || myte.queue.isCarrying()) return;
-    if (!this.container.ui?.isTool(UIToolModes.SELECT)) return;
+    if (!myte?.isActive || !myte.pathfinder || myte.queue.isCarrying()) {
+      console.log('[astar] blocked: isActive=%s pathfinder=%s carrying=%s', myte?.isActive, !!myte?.pathfinder, myte?.queue.isCarrying());
+      return;
+    }
+    if (!this.container.ui?.isTool(UIToolModes.SELECT)) {
+      console.log('[astar] blocked: tool is not SELECT, current tool:', this.container.ui?.currentTool);
+      return;
+    }
     const world = this.screenToWorldCoordinates(screenX, screenY);
-    if (!myte.canMoveToPosition?.(world.x, world.y)) return;
+    console.log('[astar] queuing astar-move to world', world);
     myte.queue.add('astar-move', {
       target: { x: world.x, y: world.y },
+      pathfindingOptions: { exactEndMode: 'if-reachable' },
       userInitiated: true
     });
   }

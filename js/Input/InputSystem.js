@@ -84,6 +84,7 @@ class InputSystem {
 		mouseDown: this.handleMouseDown.bind(this),
 		mouseUp: this.handleMouseUp.bind(this),
 		click: this.handleClick.bind(this),
+		dblclick: this.handleDoubleClick.bind(this),
 		contextMenu: this.handleContextMenu.bind(this),
 		touchStart: this.handleTouchStart.bind(this),
 		touchMove: this.handleTouchMove.bind(this),
@@ -106,6 +107,7 @@ class InputSystem {
 	  document.addEventListener('mousedown', this.boundHandlers.mouseDown);
 	  document.addEventListener('mouseup', this.boundHandlers.mouseUp);
 	  document.addEventListener('click', this.boundHandlers.click);
+	  document.addEventListener('dblclick', this.boundHandlers.dblclick);
 	  document.addEventListener('contextmenu', this.boundHandlers.contextMenu);
 	  
 	  // Touch events (with passive for better performance where possible)
@@ -131,6 +133,7 @@ class InputSystem {
 	  document.removeEventListener('mousedown', this.boundHandlers.mouseDown);
 	  document.removeEventListener('mouseup', this.boundHandlers.mouseUp);
 	  document.removeEventListener('click', this.boundHandlers.click);
+	  document.removeEventListener('dblclick', this.boundHandlers.dblclick);
 	  document.removeEventListener('contextmenu', this.boundHandlers.contextMenu);
 	  
 	  // Touch events
@@ -336,8 +339,29 @@ class InputSystem {
 	}
 	
 	/**
+	 * Handle native dblclick events.
+	 * Fired as a separate DOM event so it bubbles independently of stopPropagation
+	 * on individual click events — this is the reliable path for map double-click navigation.
+	 * @param {MouseEvent} event
+	 */
+	handleDoubleClick(event) {
+	  console.log('[InputSystem] native dblclick on:', event.target?.className || event.target?.tagName, 'pageX/Y:', event.pageX, event.pageY);
+	  this.notifyListeners('mouse.dblclick', {
+		originalEvent: event,
+		position: {
+		  x: event.pageX,
+		  y: event.pageY,
+		  clientX: event.clientX,
+		  clientY: event.clientY
+		},
+		button: event.button,
+	  });
+	  this.recordActivity();
+	}
+
+	/**
 	 * Handle context menu events
-	 * @param {MouseEvent} event 
+	 * @param {MouseEvent} event
 	 */
 	handleContextMenu(event) {
 	  this.notifyListeners('mouse.contextmenu', {
