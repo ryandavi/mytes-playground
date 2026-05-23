@@ -6,7 +6,7 @@
   <property name="location" value="outside"/>
   <property name="name" value="Forest"/>
  </properties>
- <tileset firstgid="1" source="walls3.tsx"/>
+ <tileset firstgid="1" source="../tilesets/walls3.tsx"/>
  <layer id="1" name="Grass" width="30" height="30">
   <data encoding="csv">
 85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,

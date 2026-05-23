@@ -227,8 +227,8 @@ class GameMap {
 
             // Build the TMX path - check if it already has the extension
             let tmxPath = mapId.endsWith('.tmx')
-                ? `data/spritesheets/${mapId}`
-                : `data/spritesheets/${mapId}.tmx`;
+                ? `data/maps/${mapId}`
+                : `data/maps/${mapId}.tmx`;
 
             console.log(`[GameMap] Loading TMX from: ${tmxPath}`);
 
@@ -251,6 +251,7 @@ class GameMap {
 
                 // Try alternative paths
                 const altPaths = [
+                    `data/spritesheets/${mapId}.tmx`,
                     `data/maps/${mapId}.tmx`,
                     `assets/maps/${mapId}.tmx`,
                     `${mapId}.tmx`

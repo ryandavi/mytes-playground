@@ -44,8 +44,8 @@ class GameMapLoader {
         const promise = (async () => {
             const fallback = this.humanizeMapId(normalized);
             const paths = [
-                `data/spritesheets/${normalized}.tmx`,
                 `data/maps/${normalized}.tmx`,
+                `data/spritesheets/${normalized}.tmx`,
                 `assets/maps/${normalized}.tmx`,
                 `${normalized}.tmx`
             ];

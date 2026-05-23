@@ -6,7 +6,7 @@
   <property name="location" value="outside"/>
   <property name="name" value="Your Home"/>
  </properties>
- <tileset firstgid="1" source="walls3.tsx"/>
+ <tileset firstgid="1" source="../tilesets/walls3.tsx"/>
  <layer id="3" name="Base Floor" width="30" height="30">
   <data encoding="csv">
 7,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,9,

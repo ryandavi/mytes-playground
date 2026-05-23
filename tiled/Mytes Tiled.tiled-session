@@ -3,7 +3,7 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "House.tmx",
+    "activeFile": "../data/maps/House.tmx",
     "expandedProjectPaths": [
         "."
     ],
@@ -12,7 +12,7 @@
         "": {
             "scaleInDock": 1
         },
-        "House.tmx": {
+        "../data/maps/House.tmx": {
             "scale": 0.75,
             "selectedLayer": 2,
             "viewCenter": {
@@ -20,18 +20,7 @@
                 "y": 121.33333333333337
             }
         },
-        "HouseNew.tmx": {
-            "expandedObjectLayers": [
-                7
-            ],
-            "scale": 1.5,
-            "selectedLayer": 3,
-            "viewCenter": {
-                "x": 407.3333333333333,
-                "y": 428
-            }
-        },
-        "Outside.tmx": {
+        "../data/maps/Outside.tmx": {
             "expandedObjectLayers": [
                 7,
                 4
@@ -43,31 +32,30 @@
                 "y": 417
             }
         },
-        "house.tsx": {
+        "../data/tilesets/house.tsx": {
             "dynamicWrapping": false,
             "scaleInDock": 1,
             "scaleInEditor": 2
         },
-        "walls3.tsx": {
+        "../data/tilesets/walls3.tsx": {
             "scaleInDock": 1,
             "scaleInEditor": 3
         }
     },
-    "last.imagePath": "C:/xampp/htdocs/genes/chat/neko/images/MapObjects",
+    "last.imagePath": "C:/xampp/htdocs/genes/chat/neko/images/tilesets",
     "map.lastUsedFormat": "tmx",
     "openFiles": [
-        "walls3.tsx",
-        "Outside.tmx",
-        "House.tmx"
+        "../data/tilesets/walls3.tsx",
+        "../data/maps/Outside.tmx",
+        "../data/maps/House.tmx"
     ],
-    "project": "Mytes Spritesheets.tiled-project",
+    "project": "Mytes Tiled.tiled-project",
     "property.type": "string",
     "recentFiles": [
-        "walls3.tsx",
-        "Outside.tmx",
-        "House.tmx",
-        "HouseNew.tmx",
-        "house.tsx"
+        "../data/tilesets/walls3.tsx",
+        "../data/maps/Outside.tmx",
+        "../data/maps/House.tmx",
+        "../data/tilesets/house.tsx"
     ],
     "tileset.lastUsedFormat": "tsx"
 }
