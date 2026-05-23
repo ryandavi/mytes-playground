@@ -368,10 +368,10 @@ class RestOnBedAction extends GoToObjectAction {
     }
 
     finishRestingPlacement() {
-        if (this._restingWithCollisionDisabled) {
-            this.myte.checkForCollisions = true;
-            this._restingWithCollisionDisabled = false;
-        }
+        if (!this._restingWithCollisionDisabled) return;
+
+        this.myte.checkForCollisions = true;
+        this._restingWithCollisionDisabled = false;
 
         const exitPosition = this.getBedExitPosition();
         this.myte.setPosition(exitPosition.x, exitPosition.y);

@@ -50,6 +50,22 @@ class MyteClickHandler extends MyteBaseHandler {
 
 	_onActiveClick(event) {
 		if (this.myte.isActive && !this.isDragging) {
+			// In SELECT mode, prefer map objects that sit under the cursor.
+			// The myte sprite is large; without this the myte swallows all
+			// clicks within its bounding box even when a map object is the
+			// intended target.
+			if (this.myte.parent.ui.isTool(UIToolModes.SELECT)) {
+				const mapObjectEl = this._findMapObjectAt(event.clientX, event.clientY);
+				if (mapObjectEl) {
+					mapObjectEl.dispatchEvent(new MouseEvent('click', {
+						bubbles: true, cancelable: true,
+						clientX: event.clientX, clientY: event.clientY,
+						view: window
+					}));
+					return;
+				}
+			}
+
 			event.stopPropagation();
 			if (!this.myte.isActiveMyte) {
 				this.myte.parent.setActiveMyte(this.myte);
@@ -63,6 +79,17 @@ class MyteClickHandler extends MyteBaseHandler {
 				}
 			}
 		}
+	}
+
+	_findMapObjectAt(clientX, clientY) {
+		const elements = document.elementsFromPoint(clientX, clientY);
+		for (const el of elements) {
+			if (this.myte.duplicate?.contains(el)) continue;
+			const mapEl = el.classList?.contains('map-object') ? el
+			            : el.closest?.('.map-object');
+			if (mapEl) return mapEl;
+		}
+		return null;
 	}
 
 	_onContextMenu(event) {

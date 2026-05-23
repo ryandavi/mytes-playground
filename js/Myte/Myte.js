@@ -1116,12 +1116,12 @@ class Myte {
 		// Check if the draggable element is touching the drop target
 		const dropTargetRect = this.parent.getRect(this.dropTarget);
 		if (Utility.isCoordTouchingElement(this.parent.mousePosX, this.parent.mousePosY, dropTargetRect)) {
-			this.dropTarget.classList.add("on-target");
+			this.dropTarget.classList.add("is-drag-over");
 		} else {
-			this.dropTarget.classList.remove("on-target");
+			this.dropTarget.classList.remove("is-drag-over");
 		}
 
-		this.dropTarget.classList.add("valid-drop-target");
+		this.dropTarget.classList.add("is-droppable");
 
 	}
 

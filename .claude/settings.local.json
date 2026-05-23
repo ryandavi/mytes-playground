@@ -4,7 +4,10 @@
       "Bash(cd /c/xampp/htdocs/genes/chat/neko/js && grep -n \"setTarget\\\\|moveTowardsTarget\" Myte/Myte.js | head -20)",
       "Read(//c/c/xampp/htdocs/genes/chat/neko/js/Myte/**)",
       "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\" -Recurse -Directory)",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(node_modules/.bin/sass css/style.scss css/style.css --no-source-map)",
+      "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\" -Recurse -File)",
+      "Bash(Sort-Object)"
     ]
   }
 }

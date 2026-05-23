@@ -29,10 +29,9 @@
             @include is-selected;
         }
     }
-    &.is-queue-target {
-        > .myte-home-slot {
-            @include is-queue-target;
-        }
+    &.is-queue-target > .myte-home-slot,
+    > .myte-home-slot.is-queue-target {
+        @include is-queue-target;
     }
 
     > .myte-home-label {
@@ -71,17 +70,17 @@
             }
         }
 
-        &.valid-drop-target {
+        &.is-droppable {
             > .myte-home-slot {
                 z-index: 100000;
                 opacity: 1;
                 display: block;
-                @include on-target;
+                @include is-drag-over;
             }
 
-            &.on-target {
+            &.is-drag-over {
                 > .myte-home-slot {
-                    @include on-target;
+                    @include is-drag-over;
                 }
             }
         }
@@ -386,12 +385,12 @@
         position: absolute;
         cursor: grab;
 
-        &.droppable {
+        &.is-droppable {
             transition: outline var(--motion-fast) var(--ease-ui);
         }
 
-        &.on-target {
-            @include on-target;
+        &.is-drag-over {
+            @include is-drag-over;
         }
 
         &.is-drop-rejected {

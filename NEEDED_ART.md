@@ -1,8 +1,8 @@
-# Needed Animations And Art Audit
+# Needed Art Audit
 
-Audit updated: 2026-05-19
+Audit updated: 2026-05-23
 
-This file now tracks both:
+This file tracks:
 
 1. Myte animation backlog
 2. World/item art still needed or still using placeholder/shared data
@@ -107,24 +107,12 @@ These are not map objects or inventory items, but they are still visible art gap
 | `images/MapBackgrounds/bliss.gif` | map background | Missing | `outside.json` | viewport/background sized | Outside map points to a background file that does not exist. |
 | portal preview image default `red.gif` | portal UI support art | Missing | Portal window UI | flexible | `PortalMapObject` defaults portal window content to `red.gif`, which is also missing. Either add per-portal preview art or remove the image dependency. |
 
-## Data Cleanup Suggestions
+## Data Cleanup Still Open
 
-- Make `MapObjectConfigs.js` the single source of truth and either retire or sync `data/metadata/mapObjects.json`.
-- Add `variantConfigs` for any object family that should have truly different art: chests, crops, doors, balls, butterflies, NPCs, portals, fences, gates.
-- Mark `GROWING_PLANT` as abstract until it has its own variant list and sprite source.
-- Normalize item IDs across all systems. Recommended canonical set:
-  - `acorn`
-  - `turnip`
-  - `apple`
-  - `cherries`
-  - `music_box`
-  - `tomato`
-  - `carrot`
-  - `wheat`
-  - `berry`
-- If `FOOD` should appear on the map, point it at `items.png` or route all food drops through `DroppedMapItem` instead of blank `MapObject` rendering.
-- Rename or remap legacy bed files so config matches the actual chosen art files.
-- Add explicit `spriteSheet.url` entries for lanterns, fountains, breeding flowers, night blooms, and patrol guards before more variants are added.
+- **Item IDs:** `acorn`/`turnip`/`apple`/`cherries` are canonical in `items.json` (aliases exist). Crop items `tomato`, `carrot`, `wheat`, `berry` are still missing item sheet entries and CSS classes entirely.
+- **FOOD map objects:** If `FOOD` should appear on the map, point it at `items.png`; otherwise route all food drops through `DroppedMapItem` instead of spawning a blank `MapObject`.
+- **Bed files:** Config expects `bed_default.png` / `bunk_bed.png` but repo has legacy `bed.gif` / `bed_big.png`. Pick canonical file names and rename or remap.
+- **Missing spritesheet URLs:** `LANTERN`, `FOUNTAIN`, `BREEDING_FLOWER`, `NIGHT_BLOOM`, and `PATROL_GUARD` have no `spriteSheet.url` in `MapObjectConfigs.js`. Add URLs once art exists.
 
 ## Suggested Production Order
 

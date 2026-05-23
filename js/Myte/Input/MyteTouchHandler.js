@@ -27,10 +27,10 @@ class MyteTouchHandler extends DragHandler {
                 myte.reset();
                 myte.targetDot.classList.add('is-hidden');
                 myte.duplicate.classList.add('is-dragging');
-                myte.dropTarget.classList.add("valid-drop-target");
+                myte.dropTarget.classList.add("is-droppable");
 
                 // Mark portals as valid drop targets
-                this._getPortalElements(myte).forEach(el => el.classList.add('valid-drop-target'));
+                this._getPortalElements(myte).forEach(el => el.classList.add('is-droppable'));
             },
             onDragUpdate: (position) => {
                 const world = myte.parent.inputHandler.screenToWorldCoordinates(position.x, position.y, {
@@ -48,18 +48,18 @@ class MyteTouchHandler extends DragHandler {
                 // Update home drop target
                 const dropTargetRect = myte.parent.getRect(myte.dropTarget);
                 if (Utility.isCoordTouchingElement(position.x, position.y, dropTargetRect)) {
-                    myte.dropTarget.classList.add("on-target");
+                    myte.dropTarget.classList.add("is-drag-over");
                 } else {
-                    myte.dropTarget.classList.remove("on-target");
+                    myte.dropTarget.classList.remove("is-drag-over");
                 }
 
                 // Update portal drop targets
                 this._getPortalElements(myte).forEach(el => {
                     const rect = myte.parent.getRect(el);
                     if (Utility.isCoordTouchingElement(position.x, position.y, rect)) {
-                        el.classList.add('on-target');
+                        el.classList.add('is-drag-over');
                     } else {
-                        el.classList.remove('on-target');
+                        el.classList.remove('is-drag-over');
                     }
                 });
             },
@@ -73,35 +73,36 @@ class MyteTouchHandler extends DragHandler {
                 myte.duplicate.classList.remove('is-dragging');
 
                 // Check if dropped on home target
-                if (myte.dropTarget.classList.contains("on-target")) {
+                if (myte.dropTarget.classList.contains("is-drag-over")) {
                     myte.stop();
                 }
 
-                if (this.dragStartedInFreeRoam && myte.isActive && !myte.dropTarget.classList.contains("on-target")) {
+                if (this.dragStartedInFreeRoam && myte.isActive && !myte.dropTarget.classList.contains("is-drag-over")) {
                     myte.setMode(MOVE_TYPES.FOLLOW);
                 }
 
                 // Check if dropped on a portal
-                const droppedPortal = this._getPortals(myte).find(p => p.element?.classList.contains('on-target'));
-                if (droppedPortal && !myte.dropTarget.classList.contains("on-target")) {
+                const droppedPortal = this._getPortals(myte).find(p => p.element?.classList.contains('is-drag-over'));
+                if (droppedPortal && !myte.dropTarget.classList.contains("is-drag-over")) {
                     myte.playSound('ui_drop_item');
                     droppedPortal.beginTransition(myte);
-                } else if (!myte.dropTarget.classList.contains("on-target")) {
+                } else if (!myte.dropTarget.classList.contains("is-drag-over")) {
                     myte.playSound('ui_drop_item');
                     const safePosition = myte.parent?.gameMap?.gridSystem?.findNearestValidPositionForEntity(
                         myte,
                         myte.posX,
                         myte.posY,
                         10
-                    ) || this.dragStartPosition || { x: myte.posX, y: myte.posY };
+                    ) ?? { x: myte.posX, y: myte.posY };
 
                     myte.setTarget(safePosition.x, safePosition.y, true);
                     myte.setPosition(safePosition.x, safePosition.y, true);
                     myte.setSpritePosition(safePosition.x, safePosition.y, true);
+                    myte.physicsController?.reset?.();
                 }
 
                 // If dropped on a normal map position, check for an underlying object to interact with
-                if (!myte.dropTarget.classList.contains("on-target") && !droppedPortal) {
+                if (!myte.dropTarget.classList.contains("is-drag-over") && !droppedPortal) {
                     const dropObj = this._findObjectAtMyte(myte);
                     if (dropObj) {
                         const best = dropObj.getBestInteractionAction?.(myte);
@@ -119,8 +120,8 @@ class MyteTouchHandler extends DragHandler {
                 }
 
                 // Reset drop target states
-                myte.dropTarget.classList.remove('valid-drop-target', 'on-target');
-                this._getPortalElements(myte).forEach(el => el.classList.remove('valid-drop-target', 'on-target'));
+                myte.dropTarget.classList.remove('is-droppable', 'is-drag-over');
+                this._getPortalElements(myte).forEach(el => el.classList.remove('is-droppable', 'is-drag-over'));
                 myte.targetDot.classList.remove('is-hidden');
                 myte.logVisualDebug('drag_end');
 

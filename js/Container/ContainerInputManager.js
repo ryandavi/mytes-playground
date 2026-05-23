@@ -233,6 +233,7 @@ class ContainerInputManager {
     if (!myte?.isActive || !myte.pathfinder || myte.queue.isCarrying()) return;
     if (!this.container.ui?.isTool(UIToolModes.SELECT)) return;
     const world = this.screenToWorldCoordinates(screenX, screenY);
+    if (!myte.canMoveToPosition?.(world.x, world.y)) return;
     myte.queue.add('astar-move', {
       target: { x: world.x, y: world.y },
       userInitiated: true

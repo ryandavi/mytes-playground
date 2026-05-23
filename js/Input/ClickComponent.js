@@ -85,19 +85,23 @@ class ClickComponent extends InputComponent {
     
     // Check if click is within the element
     if (this.element) {
-      const localPos = this.getLocalCoordinates(event.position.x, event.position.y);
-      const isInside = localPos.x >= 0 && localPos.y >= 0 && 
-                      localPos.x <= this.element.offsetWidth && 
-                      localPos.y <= this.element.offsetHeight;
-      
+      const rect = this.element.getBoundingClientRect();
+      const localPos = {
+        x: event.position.x - rect.left - window.scrollX,
+        y: event.position.y - rect.top - window.scrollY
+      };
+      const isInside = localPos.x >= 0 && localPos.y >= 0 &&
+                      localPos.x <= rect.width &&
+                      localPos.y <= rect.height;
+
       if (!isInside) return;
     }
-    
+
     // Stop propagation if needed
     if (this.options.stopPropagation && event.originalEvent) {
       event.originalEvent.stopPropagation();
     }
-    
+
     // Store press information
     this.isPressed = true;
     this.pressStartTime = Date.now();
@@ -205,19 +209,23 @@ class ClickComponent extends InputComponent {
     
     // Check if click is within the element
     if (this.element) {
-      const localPos = this.getLocalCoordinates(event.position.x, event.position.y);
-      const isInside = localPos.x >= 0 && localPos.y >= 0 && 
-                      localPos.x <= this.element.offsetWidth && 
-                      localPos.y <= this.element.offsetHeight;
-      
+      const rect = this.element.getBoundingClientRect();
+      const localPos = {
+        x: event.position.x - rect.left - window.scrollX,
+        y: event.position.y - rect.top - window.scrollY
+      };
+      const isInside = localPos.x >= 0 && localPos.y >= 0 &&
+                      localPos.x <= rect.width &&
+                      localPos.y <= rect.height;
+
       if (!isInside) return;
     }
-    
+
     // Stop propagation if needed
     if (this.options.stopPropagation && event.originalEvent) {
       event.originalEvent.stopPropagation();
     }
-    
+
     // Check if it's a right click
     if (event.button === 2) {
       if (this.options.onRightClick) {

@@ -163,7 +163,7 @@
 }
 
 
-@mixin on-target {
+@mixin is-drag-over {
     outline: var(--border-width) solid var(--on-target) !important;
 }
 
@@ -171,16 +171,16 @@
     outline: var(--border-width) solid var(--color-danger) !important;
 }
 
-@mixin valid-drop-target {
+@mixin is-droppable {
     outline: var(--border-width) solid var(--drop-target) !important;
 }
 
-@mixin valid-inventory-drop {
+@mixin inventory-drop-valid {
     border-radius: 4px;
     border: 2px dashed var(--on-target);
 }
 
-@mixin invalid-inventory-drop {
+@mixin inventory-drop-invalid {
     border: 2px dashed var(--color-danger);
     background-color: var(--color-danger-tint);
 }

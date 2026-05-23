@@ -631,25 +631,29 @@ class SelectionManager extends UIComponent {
 
     setSelected(obj) {
         const deselect = (object) => {
-            if (!object) return; // Check if object exists
-            
+            if (!object) return;
+
             if (object instanceof Myte) {
                 if (object.duplicate) object.duplicate.classList.remove('is-selected');
             } else if (object instanceof MapObject) {
                 if (object.element) object.element.classList.remove('is-selected');
-            } else if (object) {
+            } else if (object instanceof DroppedMapItem) {
+                if (object.element) object.element.classList.remove('is-selected');
+            } else if (object instanceof Element) {
                 object.classList.remove('is-selected');
             }
         };
 
         const select = (object) => {
-            if (!object) return; // Check if object exists
-            
+            if (!object) return;
+
             if (object instanceof Myte) {
                 if (object.duplicate) object.duplicate.classList.add('is-selected');
             } else if (object instanceof MapObject) {
                 if (object.element) object.element.classList.add('is-selected');
-            } else if (object) {
+            } else if (object instanceof DroppedMapItem) {
+                if (object.element) object.element.classList.add('is-selected');
+            } else if (object instanceof Element) {
                 object.classList.add('is-selected');
             }
         };
@@ -715,14 +719,14 @@ class QueueTargetManager extends UIComponent {
 
     update() {
         const activeMyte = this.parent.getActiveMyte();
-        const currentAction = activeMyte?.queue?.getCurrentAction?.() || null;
-        const target = currentAction?.target ||
-            (
-                activeMyte?.goal === MOVE_TYPES.GOHOME &&
-                !activeMyte?.isAtHomePosition?.(1)
-                    ? activeMyte.getHomeSlotElement?.() ?? null
-                    : null
-            );
+        let target = null;
+
+        if (activeMyte?.goal === MOVE_TYPES.GOHOME && !activeMyte?.isAtHomePosition?.(1)) {
+            target = activeMyte.getHomeSlotElement?.() ?? null;
+        } else {
+            target = activeMyte?.queue?.getCurrentAction?.()?.target ?? null;
+        }
+
         const highlightElement = this.getHighlightElement(target);
 
         if (!highlightElement || target?.active === false) {
@@ -1298,6 +1302,19 @@ class ActionSidebarManager extends UIComponent {
             ]);
         }
 
+        if (selectedObject instanceof DroppedMapItem) {
+            const itemDef = ItemRegistry.getItemSync?.(selectedObject.variant);
+            const name = itemDef?.name || selectedObject.variant;
+            const description = itemDef?.description || selectedObject.description || null;
+            const quantity = selectedObject.quantity ?? 1;
+            this.appendSectionHeader(rows, 'item', 'Item');
+            this.appendInfoRows(rows, [
+                { label: 'Name', value: name },
+                { label: 'Quantity', value: quantity > 1 ? String(quantity) : null },
+                { label: 'Description', value: description }
+            ]);
+        }
+
         if (selectedObject instanceof MapObject) {
             rows.push(...this.getObjectStateRows(selectedObject));
         }
@@ -1468,6 +1485,7 @@ class ActionSidebarManager extends UIComponent {
                     targetType.textContent = this.getTargetTypeLabel(selectedObject, activeMyte);
                     const itemDef = ItemRegistry.getItemSync?.(selectedObject.variant);
                     targetName.textContent = itemDef?.name || selectedObject.variant || 'Item';
+                    this.actionControls.classList.add('is-visible');
                 } else if (selectedObject?.classList?.contains('myte-slot')) {
                     selectedInfo.classList.add('map-interaction');
                     targetType.textContent = this.getTargetTypeLabel(selectedObject, activeMyte);
@@ -1505,23 +1523,14 @@ class ActionSidebarManager extends UIComponent {
             event.stopPropagation();
 
             if (!activeMyte || selectedObject.collected) return;
-            const myteCenter = {
-                x: activeMyte.posX + (activeMyte.size.width / 2),
-                y: activeMyte.posY + (activeMyte.size.height / 2)
-            };
             const itemCenter = {
                 x: selectedObject.posX + (selectedObject.size.width / 2),
                 y: selectedObject.posY + (selectedObject.size.height / 2)
             };
-            const dist = Math.hypot(itemCenter.x - myteCenter.x, itemCenter.y - myteCenter.y);
-            if (dist < selectedObject.minimumCollectDistance) {
-                selectedObject.collect(activeMyte);
-            } else {
-                activeMyte.queue.interrupt('astar_move', {
-                    waypoints: [{ x: itemCenter.x, y: itemCenter.y }],
-                    userInitiated: true
-                });
-            }
+            activeMyte.queue.interrupt('astar-move', {
+                target: { x: itemCenter.x, y: itemCenter.y },
+                userInitiated: true
+            });
         });
         return button;
     }
@@ -1533,6 +1542,7 @@ class ActionSidebarManager extends UIComponent {
         const activeMyte = this.parent.getActiveMyte();
 
         if (selectedObject instanceof DroppedMapItem) {
+            this.actionControls.classList.add('is-visible');
             if (activeMyte && !selectedObject.collected) {
                 const groupEl = document.createElement('div');
                 groupEl.className = 'action-group major-action';
@@ -1542,7 +1552,6 @@ class ActionSidebarManager extends UIComponent {
                 ul.appendChild(li);
                 groupEl.appendChild(ul);
                 actionGroups.appendChild(groupEl);
-                this.actionControls.classList.add('is-visible');
             }
             actionGroups.scrollTop = previousScrollTop;
             return;

@@ -225,6 +225,15 @@
                     transition: none;
                     pointer-events: none;
 
+                    body[data-tool-mode='select'] & {
+                        pointer-events: all;
+                        cursor: pointer;
+                    }
+
+                    &.is-selected {
+                        @include is-selected;
+                    }
+
                     &.collected {
                         animation: collect 0.5s ease-out forwards;
                     }
@@ -386,10 +395,13 @@
             > .portal-panel__title {
                 @include window-titlebar;
                 padding: 0.25em;
-                font-size: 0.9em;
+                font-size: 0.6em;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
+                min-height:30px;
+                display:flex;
+                align-items:center;
             }
         }
 
@@ -398,17 +410,17 @@
         &.active   { animation: portal-pulse 4s infinite ease-in-out; }
         &.inactive { opacity: 0.6; filter: grayscale(70%); }
 
-        &.valid-drop-target {
+        &.is-droppable {
             > .portal-window {
-                @include valid-drop-target;
+                @include is-droppable;
             }
         }
 
-        &.on-target {
+        &.is-drag-over {
             animation: portal-pulse 0.4s infinite ease-in-out;
 
             > .portal-window {
-                @include on-target;
+                @include is-drag-over;
             }
         }
 
@@ -659,13 +671,13 @@
     transition: background var(--motion-instant), border-color var(--motion-instant);
     z-index: 99999;
 
-    &.valid-drop {
+    &.is-drop-valid {
         background: rgba(60, 200, 100, 0.2);
         border: 2px solid rgba(60, 200, 100, 0.9);
         box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
     }
 
-    &.invalid-drop {
+    &.is-drop-invalid {
         background: rgba(220, 50, 50, 0.2);
         border: 2px solid rgba(220, 50, 50, 0.9);
         box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
@@ -679,11 +691,11 @@
         pointer-events: none;
     }
 
-    &.valid-drop .drop-target-collider {
+    &.is-drop-valid .drop-target-collider {
         border-color: rgba(60, 200, 100, 0.55);
     }
 
-    &.invalid-drop .drop-target-collider {
+    &.is-drop-invalid .drop-target-collider {
         border-color: rgba(220, 50, 50, 0.55);
     }
 }

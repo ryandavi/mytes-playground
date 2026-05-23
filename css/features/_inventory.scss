@@ -96,10 +96,10 @@ $item-color-medicine: #98fb98;
     z-index: 9999;
     animation: drop-indicator-pulse 0.8s ease-in-out infinite;
 
-    @include valid-inventory-drop;
+    @include inventory-drop-valid;
 
     &.invalid {
-        @include invalid-inventory-drop;
+        @include inventory-drop-invalid;
     }
 }
 

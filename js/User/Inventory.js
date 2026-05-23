@@ -293,7 +293,7 @@ class Inventory {
         this.parent.soundManager?.play('ui_drag_item');
 
         document.querySelectorAll('.world-myte').forEach(myte => {
-            myte.classList.add('droppable');
+            myte.classList.add('is-droppable');
         });
 
         // Keep indicator hidden until the first dragover tells us where we are
@@ -307,11 +307,11 @@ class Inventory {
         this.state.draggedItem = null;
 
         document.querySelectorAll('.app-stage, .container').forEach(container => {
-            container.classList.remove('on-target');
+            container.classList.remove('is-drag-over');
         });
 
         document.querySelectorAll('.world-myte').forEach(myte => {
-            myte.classList.remove('droppable', 'on-target', 'is-drop-rejected');
+            myte.classList.remove('is-droppable', 'is-drag-over', 'is-drop-rejected');
         });
 
         this._hideIndicator();
@@ -324,12 +324,12 @@ class Inventory {
         if (!this.state.isDragging || this.state.myteTarget) return;
         e.preventDefault();
         clearTimeout(this._indicatorHideTimer);
-        e.currentTarget.classList.add('on-target');
+        e.currentTarget.classList.add('is-drag-over');
         this._updateIndicator(e.clientX, e.clientY);
     }
 
     handleContainerDragLeave(e) {
-        e.currentTarget.classList.remove('on-target');
+        e.currentTarget.classList.remove('is-drag-over');
         // Small delay to avoid flicker when moving between child elements
         this._indicatorHideTimer = setTimeout(() => this._hideIndicator(), 60);
     }
@@ -511,13 +511,13 @@ class Inventory {
         this.state.myteTarget = e.currentTarget;
         const itemType = this.state.draggedItem?.dataset.type;
         const isValid = !!this.config.itemTypes[itemType];
-        e.currentTarget.classList.toggle('on-target', isValid);
+        e.currentTarget.classList.toggle('is-drag-over', isValid);
         e.currentTarget.classList.toggle('is-drop-rejected', !isValid);
-        document.querySelectorAll('.container').forEach(c => c.classList.remove('on-target'));
+        document.querySelectorAll('.container').forEach(c => c.classList.remove('is-drag-over'));
     }
 
     handleMyteDragLeave(e) {
-        e.currentTarget.classList.remove('on-target', 'is-drop-rejected');
+        e.currentTarget.classList.remove('is-drag-over', 'is-drop-rejected');
         this.state.myteTarget = null;
     }
 
@@ -552,7 +552,7 @@ class Inventory {
         // Update cooldown
         this.state.lastFeedTime[myte.id] = now;
 
-        myteElement.classList.remove('on-target');
+        myteElement.classList.remove('is-drag-over');
         this.state.myteTarget = null;
     }
 

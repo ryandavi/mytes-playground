@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "sass:build": "sass css/style.scss css/style.css --no-source-map",
+    "sass:watch": "sass --watch css/style.scss css/style.css --no-source-map"
+  },
+  "devDependencies": {
+    "sass": "^1.57.0"
+  }
+}

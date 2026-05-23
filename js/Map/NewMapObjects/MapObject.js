@@ -1044,8 +1044,8 @@ class MapObject {
 		this._dropTargetEl.style.top = `${snappedPos.y}px`;
 
 		const isValid = this.checkDropValidity(snappedPos.x, snappedPos.y);
-		this._dropTargetEl.classList.toggle('valid-drop', isValid);
-		this._dropTargetEl.classList.toggle('invalid-drop', !isValid);
+		this._dropTargetEl.classList.toggle('is-drop-valid', isValid);
+		this._dropTargetEl.classList.toggle('is-drop-invalid', !isValid);
 
 		// Show collider bounds as inner indicator when collider differs from sprite size
 		if (this.collider) {
