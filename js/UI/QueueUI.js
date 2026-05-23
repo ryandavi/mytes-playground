@@ -12,6 +12,7 @@ class QueueUI {
         this.panelSummary = null;
         this.itemsHost = this.queue;
         this.isCollapsed = false;
+        this.lastQueueSignature = null;
 
         if (this.mode === 'debug' && this.queue) {
             this._buildPanelShell();
@@ -24,7 +25,7 @@ class QueueUI {
         this.panelShell.open = true;
 
         this.panelSummary = document.createElement('summary');
-        this.panelSummary.textContent = 'Debug – Action Queue';
+        this.panelSummary.textContent = 'Debug - Action Queue';
 
         this.itemsHost = document.createElement('div');
         this.itemsHost.className = 'queue-panel-body';
@@ -49,6 +50,7 @@ class QueueUI {
         this.elements.forEach(el => el.remove());
         this.elements.clear();
         this.previousValues.clear();
+        this.lastQueueSignature = null;
     }
 
     setCollapsed(collapsed) {
@@ -164,20 +166,34 @@ class QueueUI {
         element.className = 'queue-item compact';
         element.type = 'button';
 
+        const tooltipSystem = TooltipSystem.getInstance();
         const icon = document.createElement('span');
         icon.className = 'queue-icon';
 
         const order = document.createElement('span');
         order.className = 'queue-order';
 
-        const tooltip = document.createElement('span');
-        tooltip.className = 'queue-tooltip';
-
         element.appendChild(order);
         element.appendChild(icon);
-        element.appendChild(tooltip);
         element._holdTimer = null;
         element._holdTriggered = false;
+
+        const showTooltip = (autoHideMs = 0) => {
+            const text = element.dataset.tooltip;
+            if (!text) return;
+
+            tooltipSystem.show({
+                anchor: element,
+                text,
+                autoHideMs
+            });
+        };
+
+        const hideTooltip = () => {
+            if (tooltipSystem.isVisibleFor(element)) {
+                tooltipSystem.hide();
+            }
+        };
 
         const clearHoldTimer = () => {
             if (element._holdTimer) {
@@ -207,6 +223,7 @@ class QueueUI {
         element.addEventListener('pointerdown', (event) => {
             event.preventDefault();
             element._holdTriggered = false;
+            hideTooltip();
             clearHoldTimer();
             element.classList.add('holding');
             element._holdTimer = setTimeout(() => {
@@ -216,9 +233,14 @@ class QueueUI {
             }, this.holdDelay);
         });
 
-        ['pointerup', 'pointerleave', 'pointercancel', 'lostpointercapture'].forEach(eventName => {
+        ['pointerup', 'pointerleave', 'pointercancel', 'lostpointercapture'].forEach((eventName) => {
             element.addEventListener(eventName, clearHoldTimer);
         });
+
+        element.addEventListener('mouseenter', () => showTooltip());
+        element.addEventListener('mouseleave', hideTooltip);
+        element.addEventListener('focus', () => showTooltip());
+        element.addEventListener('blur', hideTooltip);
 
         element.addEventListener('click', (event) => {
             if (element._holdTriggered) {
@@ -228,13 +250,14 @@ class QueueUI {
                 return;
             }
 
-            element.classList.toggle('show-tooltip');
-            window.setTimeout(() => {
-                element.classList.remove('show-tooltip');
-            }, 1500);
+            tooltipSystem.toggle({
+                anchor: element,
+                text: element.dataset.tooltip || '',
+                autoHideMs: 1500
+            });
         });
 
-        element._refs = { icon, order, tooltip };
+        element._refs = { icon, order };
         return element;
     }
 
@@ -266,6 +289,44 @@ class QueueUI {
         if (words.length === 0) return 'Q';
         if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
         return `${words[0][0]}${words[1][0]}`.toUpperCase();
+    }
+
+    getQueueSignature(activeMyte, queueItems) {
+        return JSON.stringify({
+            mode: this.mode,
+            activeMyteId: activeMyte?.id ?? null,
+            controls: this.allowControls,
+            items: queueItems.map((item, index) => ({
+                index,
+                action: item.constructor?.name || '',
+                category: item.constructor?.metadata?.category || '',
+                title: this.getQueueTitle(item),
+                description: this.getQueueDescription(item),
+                repeat: item.repeat ?? null,
+                expressionType: item.type || null,
+                targetId: this.getTargetIdentifier(item.target),
+                isCurrent: index === 0
+            }))
+        });
+    }
+
+    updateCurrentProgress(item) {
+        const currentElement = this.elements.get('queue-0');
+        if (!currentElement?._refs || !item) return;
+
+        const refs = currentElement._refs;
+        if (!refs.progress) return;
+
+        const hasProgress = !!((item.duration && item.duration > 0) || typeof item.getProgress === 'function');
+        if (hasProgress) {
+            refs.progress.style.display = 'block';
+            const percentage = this.calculateProgress(item);
+            if (refs.bar) refs.bar.style.width = `${percentage}%`;
+            if (refs.status) refs.status.textContent = `${percentage}%`;
+        } else {
+            refs.progress.style.display = 'none';
+            if (refs.status) refs.status.textContent = 'in progress';
+        }
     }
 
     updateQueueItem(element, item, index) {
@@ -368,10 +429,9 @@ class QueueUI {
         element.dataset.queueTitle = title;
         element.dataset.queueDescription = description;
         element.dataset.queueState = index === 0 ? 'now' : 'next';
-        // element.title = `${index === 0 ? 'Now' : `Next ${index}`}: ${title}${description ? ` - ${description}` : ''}`;
+        element.dataset.tooltip = tooltipParts.join(' - ');
+        element.setAttribute('aria-label', element.dataset.tooltip);
         refs.icon.textContent = this.getCompactLabel(item);
-        // refs.order.textContent = index === 0 ? 'NOW' : String(index);
-        refs.tooltip.textContent = tooltipParts.join(' · ');
     }
 
     calculateProgress(item) {
@@ -389,6 +449,7 @@ class QueueUI {
         const queueItems = activeMyte?.queue?.queue
             ? activeMyte.queue.queue.slice(0, this.maxItems)
             : [];
+        const queueSignature = this.getQueueSignature(activeMyte, queueItems);
 
         this.setEmptyStateMessage(activeMyte ? 'No actions queued' : 'No active myte');
         this.queue.classList.toggle('has-items', queueItems.length > 0);
@@ -398,6 +459,15 @@ class QueueUI {
             this.clearItems();
             return;
         }
+
+        if (this.lastQueueSignature === queueSignature) {
+            if (this.mode !== 'compact' && queueItems[0]) {
+                this.updateCurrentProgress(queueItems[0]);
+            }
+            return;
+        }
+
+        this.lastQueueSignature = queueSignature;
 
         while (this.elements.size > queueItems.length) {
             const key = `queue-${this.elements.size - 1}`;
@@ -419,10 +489,15 @@ class QueueUI {
 
             this.updateQueueItem(element, item, index);
         });
+
+        if (this.mode !== 'compact' && queueItems[0]) {
+            this.updateCurrentProgress(queueItems[0]);
+        }
     }
 
     setControlsEnabled(enabled) {
         this.allowControls = enabled;
+        this.lastQueueSignature = null;
         this.update();
     }
 
@@ -430,6 +505,7 @@ class QueueUI {
         this.elements.forEach(el => el.remove());
         this.elements.clear();
         this.previousValues.clear();
+        this.lastQueueSignature = null;
         this.panelShell?.remove();
         this.panelShell = null;
         this.panelSummary = null;

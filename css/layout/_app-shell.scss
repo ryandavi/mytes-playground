@@ -34,7 +34,7 @@
         -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 
         &.on-target {
-            outline: var(--border-width) solid var(--on-target) !important;
+            @include on-target;
         }
     }
 

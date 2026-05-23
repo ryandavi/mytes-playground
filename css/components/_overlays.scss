@@ -1,5 +1,30 @@
 @use '../primitives/ui' as *;
 
+.ui-tooltip {
+    @include floating-help-paper;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 99999;
+    white-space: normal;
+    visibility: hidden;
+
+    &.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+        visibility: visible;
+    }
+
+    .ui-tooltip__title,
+    .ui-tooltip__body {
+        display: block;
+    }
+
+    .ui-tooltip__body {
+        margin-top: 2px;
+    }
+}
+
 .myte-queue-overlay {
     position: absolute;
     top: var(--space-lg);
@@ -71,17 +96,6 @@
             color: #6d4f00;
             opacity: 1;
         }
-
-        .queue-tooltip {
-            @include floating-help-paper;
-        }
-
-        &:hover .queue-tooltip,
-        &:focus-visible .queue-tooltip,
-        &.show-tooltip .queue-tooltip {
-            opacity: 1;
-            transform: translateY(0);
-        }
     }
 }
 
@@ -95,12 +109,6 @@
             .queue-item.compact {
                 width: 36px;
                 height: 36px;
-
-                .queue-tooltip {
-                    left: auto;
-                    right: 0;
-                    max-width: min(220px, 75vw);
-                }
             }
         }
     }

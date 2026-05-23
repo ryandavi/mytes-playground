@@ -78,15 +78,54 @@ class Inventory {
         };
     }
 
-    static _getTooltipEl() {
-        if (!Inventory._tooltipEl) {
-            const el = document.createElement('div');
-            el.className = 'item-tooltip';
-            el.style.display = 'none';
-            document.body.appendChild(el);
-            Inventory._tooltipEl = el;
+    get tooltipSystem() {
+        return TooltipSystem.getInstance();
+    }
+
+    createTooltipContent(name, description = '') {
+        const content = document.createElement('div');
+
+        const title = document.createElement('strong');
+        title.className = 'ui-tooltip__title';
+        title.textContent = name;
+        content.appendChild(title);
+
+        if (description) {
+            const body = document.createElement('span');
+            body.className = 'ui-tooltip__body';
+            body.textContent = description;
+            content.appendChild(body);
         }
-        return Inventory._tooltipEl;
+
+        return content;
+    }
+
+    showItemTooltip(itemElement, autoHideMs = 0) {
+        this.tooltipSystem.show({
+            anchor: itemElement,
+            content: this.createTooltipContent(
+                itemElement.dataset.name || '',
+                itemElement.dataset.description || ''
+            ),
+            autoHideMs
+        });
+    }
+
+    hideItemTooltip(itemElement) {
+        if (this.tooltipSystem.isVisibleFor(itemElement)) {
+            this.tooltipSystem.hide();
+        }
+    }
+
+    toggleItemTooltip(itemElement, autoHideMs = 1500) {
+        this.tooltipSystem.toggle({
+            anchor: itemElement,
+            content: this.createTooltipContent(
+                itemElement.dataset.name || '',
+                itemElement.dataset.description || ''
+            ),
+            autoHideMs
+        });
     }
 
     createItemElement(itemData) {
@@ -98,21 +137,18 @@ class Inventory {
         itemElement.dataset.quantity = quantity;
         itemElement.dataset.type = type;
         itemElement.dataset.variant = variant;
+        itemElement.dataset.description = description;
         itemElement.draggable = true;
+        itemElement.tabIndex = 0;
+        itemElement.setAttribute('aria-label', description ? `${name}. ${description}` : name);
 
         ItemRegistry.applySpriteStyles(itemElement, variant);
 
-        itemElement.addEventListener('mouseenter', () => {
-            const tooltip = Inventory._getTooltipEl();
-            tooltip.innerHTML = `<strong>${name}</strong>${description ? `<br>${description}` : ''}`;
-            tooltip.style.display = 'block';
-            const rect = itemElement.getBoundingClientRect();
-            tooltip.style.left = `${rect.left}px`;
-            tooltip.style.top = `${rect.bottom + 6}px`;
-        });
-        itemElement.addEventListener('mouseleave', () => {
-            Inventory._getTooltipEl().style.display = 'none';
-        });
+        itemElement.addEventListener('mouseenter', () => this.showItemTooltip(itemElement));
+        itemElement.addEventListener('mouseleave', () => this.hideItemTooltip(itemElement));
+        itemElement.addEventListener('focus', () => this.showItemTooltip(itemElement));
+        itemElement.addEventListener('blur', () => this.hideItemTooltip(itemElement));
+        itemElement.addEventListener('click', () => this.toggleItemTooltip(itemElement));
 
         return itemElement;
     }
@@ -186,6 +222,7 @@ class Inventory {
         const newQuantity = Math.max(0, parseInt(item.quantity) - quantity);
 
         if (newQuantity === 0) {
+            this.hideItemTooltip(item.element);
             this.inventoryElement.removeChild(item.element);
             this.items = this.items.filter(i => i !== item);
         } else {
@@ -233,6 +270,7 @@ class Inventory {
 
         this.state.draggedItem = e.target;
         this.state.isDragging = true;
+        this.tooltipSystem.hide();
 
         if (e.dataTransfer) {
             e.dataTransfer.effectAllowed = 'move';
@@ -273,7 +311,7 @@ class Inventory {
         });
 
         document.querySelectorAll('.world-myte').forEach(myte => {
-            myte.classList.remove('droppable', 'on-target');
+            myte.classList.remove('droppable', 'on-target', 'is-drop-rejected');
         });
 
         this._hideIndicator();
@@ -471,13 +509,15 @@ class Inventory {
         e.preventDefault();
         e.stopPropagation();
         this.state.myteTarget = e.currentTarget;
-        e.currentTarget.classList.add('on-target');
-        // Clear container outline — Myte is the only target
+        const itemType = this.state.draggedItem?.dataset.type;
+        const isValid = !!this.config.itemTypes[itemType];
+        e.currentTarget.classList.toggle('on-target', isValid);
+        e.currentTarget.classList.toggle('is-drop-rejected', !isValid);
         document.querySelectorAll('.container').forEach(c => c.classList.remove('on-target'));
     }
 
     handleMyteDragLeave(e) {
-        e.currentTarget.classList.remove('on-target');
+        e.currentTarget.classList.remove('on-target', 'is-drop-rejected');
         this.state.myteTarget = null;
     }
 
@@ -624,6 +664,7 @@ class Inventory {
         clearTimeout(this._indicatorHideTimer);
 
         this.dropIndicator?.remove();
+        this.tooltipSystem.hide();
         this.items = [];
         this.state = {};
     }

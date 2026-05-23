@@ -7,17 +7,32 @@
     cursor: pointer;
     position: absolute;
 
+
+
+
     > .myte-home-slot {
         @include surface-raised;
         border-radius: var(--border-radius);
-        transition: opacity, .15s, background-color .15s, box-shadow .15s, outline-width .15s, outline-color .5s;
+        transition: opacity, .15s, background-color .15s, box-shadow .15s, outline-width .15s;
         width: var(--size-myte);
         height: var(--size-myte);
         position: absolute;
         z-index: var(--z-drag);
         filter: var(--shadow);
+        outline-color: transparent;
+    }
 
+  
 
+    &.is-selected {
+        > .myte-home-slot {
+            @include is-selected;
+        }
+    }
+    &.is-queue-target {
+        > .myte-home-slot {
+            @include is-queue-target;
+        }
     }
 
     > .myte-home-label {
@@ -41,7 +56,6 @@
 
     &.empty {
  
-
         > .myte-home-slot {
             opacity: 0.75;
             z-index: 0;
@@ -49,8 +63,12 @@
             background-color: var(--button-mid);
             filter: unset;
             box-shadow: inset var(--border-width) var(--border-width) #0000000d;
+        }
 
-
+        &:hover {
+            > .myte-home-slot {
+                opacity: 1;
+            }
         }
 
         &.valid-drop-target {
@@ -58,12 +76,12 @@
                 z-index: 100000;
                 opacity: 1;
                 display: block;
-                outline: var(--border-width) solid var(--drop-target) !important;
+                @include on-target;
             }
 
             &.on-target {
                 > .myte-home-slot {
-                    outline-color: var(--on-target) !important;
+                    @include on-target;
                 }
             }
         }
@@ -81,19 +99,21 @@
     position: relative;
     z-index: var(--z-drag);
 
+
+
+
     &.is-selected {
         .sprite {
-            outline: 2px dashed green;
-            border-radius: 5px;
+            @include is-selected;
+        }
+    }
+    &.is-queue-target {
+        .sprite {
+            @include is-queue-target;
         }
     }
 
-    &.is-queue-target {
-        .sprite {
-            box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
-            border-radius: 5px;
-        }
-    }
+
 
     &.world-myte.is-deactivated {
         display: none;
@@ -365,6 +385,18 @@
     &.world-myte {
         position: absolute;
         cursor: grab;
+
+        &.droppable {
+            transition: outline var(--motion-fast) var(--ease-ui);
+        }
+
+        &.on-target {
+            @include on-target;
+        }
+
+        &.is-drop-rejected {
+            @include is-drop-rejected;
+        }
 
         > .inner-wrapper > .sprite {
             position: absolute;

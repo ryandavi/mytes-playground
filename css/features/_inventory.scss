@@ -91,26 +91,16 @@ $item-color-medicine: #98fb98;
 
 .inventory-drop-indicator {
     position: absolute;
-    border: 2px dashed var(--on-target);
-    border-radius: 4px;
     pointer-events: none;
     display: none;
     z-index: 9999;
     animation: drop-indicator-pulse 0.8s ease-in-out infinite;
 
+    @include valid-inventory-drop;
+
     &.invalid {
-        border-color: var(--color-danger);
-        background-color: var(--color-danger-tint);
+        @include invalid-inventory-drop;
     }
-}
-
-.item-tooltip {
-    @include floating-help-paper;
-    position: fixed;
-    z-index: 99999;
-    width: 100px;
-    white-space: normal;
-
 }
 
 .consumption-effect {
@@ -125,23 +115,15 @@ $item-color-medicine: #98fb98;
     &.medicine { background: radial-gradient(circle, $item-color-medicine, transparent); }
 }
 
-.world-myte {
-    &.droppable {
-        transition: outline var(--motion-fast) var(--ease-ui);
-    }
 
-    &.on-target {
-        outline: var(--border-width) solid var(--on-target) !important;
-    }
-}
-
+/*
 .app-stage {
     &.valid-drop-target {
         &::after {
             content: '';
             position: absolute;
             inset: 0;
-            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border: 2px dashed black;
             border-radius: var(--border-radius);
             pointer-events: none;
         }
@@ -151,3 +133,4 @@ $item-color-medicine: #98fb98;
         border-color: rgba(255, 255, 255, 0.8);
     }
 }
+*/

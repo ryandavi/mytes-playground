@@ -489,46 +489,16 @@ body.debug .map-object > .interactive-hitbox {
 
 .inventory-drop-indicator {
   position: absolute;
-  border: 2px dashed var(--on-target);
-  border-radius: 4px;
   pointer-events: none;
   display: none;
   z-index: 9999;
   animation: drop-indicator-pulse 0.8s ease-in-out infinite;
+  border-radius: 4px;
+  border: 2px dashed var(--on-target);
 }
 .inventory-drop-indicator.invalid {
-  border-color: var(--color-danger);
+  border: 2px dashed var(--color-danger);
   background-color: var(--color-danger-tint);
-}
-
-.item-tooltip {
-  color: var(--black);
-  border-radius: var(--help-paper-radius, var(--radius-xs));
-  filter: var(--shadow-tooltip, drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.1254901961)));
-  background-color: var(--surface-tooltip, #ffffe1);
-  outline: 1px solid var(--black);
-  padding: var(--help-paper-padding, var(--space-2xs));
-  font-size: var(--help-paper-font-size, 9px);
-  line-height: var(--help-paper-line-height, 1.3);
-  text-transform: var(--help-paper-transform, uppercase);
-  position: absolute;
-  top: var(--floating-help-paper-top, calc(100% + 8px));
-  left: var(--floating-help-paper-left, 0);
-  min-width: var(--floating-help-paper-min-width, 180px);
-  max-width: var(--floating-help-paper-max-width, min(240px, 60vw));
-  text-align: left;
-  opacity: 0;
-  transform: translateY(var(--floating-help-paper-offset, -4px));
-  pointer-events: none;
-  transition: opacity var(--motion-base) var(--ease-ui), transform var(--motion-base) var(--ease-ui);
-  position: fixed;
-  z-index: 99999;
-  width: 100px;
-  white-space: normal;
-}
-.item-tooltip.is-visible {
-  display: block;
-  opacity: 1;
 }
 
 .consumption-effect {
@@ -555,18 +525,24 @@ body.debug .map-object > .interactive-hitbox {
   outline: var(--border-width) solid var(--on-target) !important;
 }
 
-.app-stage.valid-drop-target::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 2px dashed rgba(255, 255, 255, 0.3);
-  border-radius: var(--border-radius);
-  pointer-events: none;
-}
-.app-stage.on-target::after {
-  border-color: rgba(255, 255, 255, 0.8);
-}
+/*
+.app-stage {
+    &.valid-drop-target {
+        &::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 2px dashed black;
+            border-radius: var(--border-radius);
+            pointer-events: none;
+        }
+    }
 
+    &.on-target::after {
+        border-color: rgba(255, 255, 255, 0.8);
+    }
+}
+*/
 @keyframes drop-indicator-pulse {
   0%, 100% {
     opacity: 1;
@@ -1887,6 +1863,46 @@ body.debug .map-object > .interactive-hitbox {
   min-width: 50px;
 }
 
+.ui-tooltip {
+  color: var(--black);
+  border-radius: var(--help-paper-radius, var(--radius-xs));
+  filter: var(--shadow-tooltip, drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.1254901961)));
+  background-color: var(--surface-tooltip, #ffffe1);
+  outline: 1px solid var(--black);
+  padding: var(--help-paper-padding, var(--space-2xs));
+  font-size: var(--help-paper-font-size, 9px);
+  line-height: var(--help-paper-line-height, 1.3);
+  text-transform: var(--help-paper-transform, uppercase);
+  position: absolute;
+  top: var(--floating-help-paper-top, calc(100% + 8px));
+  left: var(--floating-help-paper-left, 0);
+  min-width: var(--floating-help-paper-min-width, 180px);
+  max-width: var(--floating-help-paper-max-width, min(240px, 60vw));
+  text-align: left;
+  opacity: 0;
+  transform: translateY(var(--floating-help-paper-offset, -4px));
+  pointer-events: none;
+  transition: opacity var(--motion-base) var(--ease-ui), transform var(--motion-base) var(--ease-ui);
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 99999;
+  white-space: normal;
+  visibility: hidden;
+}
+.ui-tooltip.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+.ui-tooltip .ui-tooltip__title,
+.ui-tooltip .ui-tooltip__body {
+  display: block;
+}
+.ui-tooltip .ui-tooltip__body {
+  margin-top: 2px;
+}
+
 .myte-queue-overlay {
   position: absolute;
   top: var(--space-lg);
@@ -1962,31 +1978,6 @@ body.debug .map-object > .interactive-hitbox {
   color: #6d4f00;
   opacity: 1;
 }
-.myte-queue-overlay .queue-item.compact .queue-tooltip {
-  color: var(--black);
-  border-radius: var(--help-paper-radius, var(--radius-xs));
-  filter: var(--shadow-tooltip, drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.1254901961)));
-  background-color: var(--surface-tooltip, #ffffe1);
-  outline: 1px solid var(--black);
-  padding: var(--help-paper-padding, var(--space-2xs));
-  font-size: var(--help-paper-font-size, 9px);
-  line-height: var(--help-paper-line-height, 1.3);
-  text-transform: var(--help-paper-transform, uppercase);
-  position: absolute;
-  top: var(--floating-help-paper-top, calc(100% + 8px));
-  left: var(--floating-help-paper-left, 0);
-  min-width: var(--floating-help-paper-min-width, 180px);
-  max-width: var(--floating-help-paper-max-width, min(240px, 60vw));
-  text-align: left;
-  opacity: 0;
-  transform: translateY(var(--floating-help-paper-offset, -4px));
-  pointer-events: none;
-  transition: opacity var(--motion-base) var(--ease-ui), transform var(--motion-base) var(--ease-ui);
-}
-.myte-queue-overlay .queue-item.compact:hover .queue-tooltip, .myte-queue-overlay .queue-item.compact:focus-visible .queue-tooltip, .myte-queue-overlay .queue-item.compact.show-tooltip .queue-tooltip {
-  opacity: 1;
-  transform: translateY(0);
-}
 
 @media (max-width: 700px) {
   .app-stage .myte-queue-overlay {
@@ -1997,11 +1988,6 @@ body.debug .map-object > .interactive-hitbox {
   .app-stage .myte-queue-overlay .queue-item.compact {
     width: 36px;
     height: 36px;
-  }
-  .app-stage .myte-queue-overlay .queue-item.compact .queue-tooltip {
-    left: auto;
-    right: 0;
-    max-width: min(220px, 75vw);
   }
 }
 
@@ -2210,12 +2196,23 @@ body.debug .map-object > .interactive-hitbox {
   border-left-color: var(--button-light);
   border-radius: var(--border-radius-outer);
   border-radius: var(--border-radius);
-  transition: opacity, 0.15s, background-color 0.15s, box-shadow 0.15s, outline-width 0.15s, outline-color 0.5s;
+  transition: opacity, 0.15s, background-color 0.15s, box-shadow 0.15s, outline-width 0.15s;
   width: var(--size-myte);
   height: var(--size-myte);
   position: absolute;
   z-index: var(--z-drag);
   filter: var(--shadow);
+  outline-color: transparent;
+}
+.myte-slot.is-selected > .myte-home-slot {
+  outline: 2px dashed green;
+  border-radius: 5px;
+  outline-offset: 4px;
+}
+.myte-slot.is-queue-target > .myte-home-slot {
+  outline: 2px dashed #ffb000;
+  border-radius: 5px;
+  outline-offset: 4px;
 }
 .myte-slot > .myte-home-label {
   z-index: var(--z-floating-debug);
@@ -2243,14 +2240,17 @@ body.debug .map-object > .interactive-hitbox {
   filter: unset;
   box-shadow: inset var(--border-width) var(--border-width) rgba(0, 0, 0, 0.0509803922);
 }
+.myte-slot.empty:hover > .myte-home-slot {
+  opacity: 1;
+}
 .myte-slot.empty.valid-drop-target > .myte-home-slot {
   z-index: 100000;
   opacity: 1;
   display: block;
-  outline: var(--border-width) solid var(--drop-target) !important;
+  outline: var(--border-width) solid var(--on-target) !important;
 }
 .myte-slot.empty.valid-drop-target.on-target > .myte-home-slot {
-  outline-color: var(--on-target) !important;
+  outline: var(--border-width) solid var(--on-target) !important;
 }
 
 .interactive-myte {
@@ -2265,10 +2265,12 @@ body.debug .map-object > .interactive-hitbox {
 .interactive-myte.is-selected .sprite {
   outline: 2px dashed green;
   border-radius: 5px;
+  outline-offset: 4px;
 }
 .interactive-myte.is-queue-target .sprite {
-  box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
+  outline: 2px dashed #ffb000;
   border-radius: 5px;
+  outline-offset: 4px;
 }
 .interactive-myte.world-myte.is-deactivated {
   display: none;
@@ -2505,6 +2507,15 @@ body.debug .map-object > .interactive-hitbox {
 .interactive-myte.world-myte {
   position: absolute;
   cursor: grab;
+}
+.interactive-myte.world-myte.droppable {
+  transition: outline var(--motion-fast) var(--ease-ui);
+}
+.interactive-myte.world-myte.on-target {
+  outline: var(--border-width) solid var(--on-target) !important;
+}
+.interactive-myte.world-myte.is-drop-rejected {
+  outline: var(--border-width) solid var(--color-danger) !important;
 }
 .interactive-myte.world-myte > .inner-wrapper > .sprite {
   position: absolute;
@@ -2944,6 +2955,16 @@ body.debug .map-object > .interactive-hitbox {
   pointer-events: all;
   cursor: pointer;
 }
+.map-object.is-selected {
+  outline: 2px dashed green;
+  border-radius: 5px;
+  outline-offset: 4px;
+}
+.map-object.is-queue-target {
+  outline: 2px dashed #ffb000;
+  border-radius: 5px;
+  outline-offset: 4px;
+}
 .map-object > .interactive-hitbox {
   pointer-events: all;
   cursor: inherit;
@@ -2956,16 +2977,6 @@ body.debug .map-object > .interactive-hitbox {
   width: 100%;
   height: 100%;
   image-rendering: pixelated;
-}
-.map-object.is-selected {
-  outline: 2px dashed green;
-  border-radius: 5px;
-  outline-offset: 4px;
-}
-.map-object.is-queue-target {
-  outline: 2px dashed #ffb000;
-  border-radius: 5px;
-  outline-offset: 4px;
 }
 .map-object.draggable {
   pointer-events: all;
@@ -3047,13 +3058,6 @@ body[data-tool-mode=drag] .map-object.draggable {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.map-object.portal.is-queue-target {
-  box-shadow: none;
-}
-.map-object.portal.is-queue-target > .portal-window {
-  outline: 2px solid #ffb000;
-  box-shadow: 0 0 0 2px #ffb000, 0 0 12px rgba(255, 176, 0, 0.45);
-}
 .map-object.portal.active {
   animation: portal-pulse 4s infinite ease-in-out;
 }
@@ -3062,7 +3066,7 @@ body[data-tool-mode=drag] .map-object.draggable {
   filter: grayscale(70%);
 }
 .map-object.portal.valid-drop-target > .portal-window {
-  outline: var(--border-width) solid var(--drop-target);
+  outline: var(--border-width) solid var(--drop-target) !important;
 }
 .map-object.portal.on-target {
   animation: portal-pulse 0.4s infinite ease-in-out;
