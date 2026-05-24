@@ -254,7 +254,7 @@
   </object>
   <object id="20" name="Bed" x="928" y="416" width="256" height="128">
    <properties>
-    <property name="direction" value="E"/>
+    <property name="direction" value="S"/>
     <property name="variant" value="bed_big"/>
    </properties>
   </object>
@@ -432,6 +432,12 @@
   <object id="64" name="Lantern" x="1184" y="768" width="64" height="64">
    <properties>
     <property name="variant" value="paper"/>
+   </properties>
+  </object>
+  <object id="65" name="Couch" x="896" y="544" width="256" height="128">
+   <properties>
+    <property name="direction" value="S"/>
+    <property name="variant" value="test_couch"/>
    </properties>
   </object>
  </objectgroup>

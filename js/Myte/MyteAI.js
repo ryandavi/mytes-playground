@@ -6,15 +6,15 @@ class MyteAI {
         this.mode = this.resolveMode(aiConfig.defaultMode);
         this.enabled = aiConfig.enabled !== false;
 
-        this.baseThinkInterval = aiConfig.thinkInterval ?? 900;
-        this.minThinkInterval = aiConfig.minThinkInterval ?? 450;
-        this.maxThinkInterval = aiConfig.maxThinkInterval ?? 1800;
-        this.wanderRadius = aiConfig.wanderRadius ?? 220;
-        this.homeRadius = aiConfig.homeRadius ?? 320;
-        this.objectSearchRadius = aiConfig.objectSearchRadius ?? 280;
-        this.socialRadius = aiConfig.socialRadius ?? 240;
-        this.playRadius = aiConfig.playRadius ?? 220;
-        this.homeComfortRadius = aiConfig.homeComfortRadius ?? 140;
+        this.baseThinkInterval = aiConfig.thinkInterval ?? SiteConfig.ai.timing.baseThinkInterval;
+        this.minThinkInterval = aiConfig.minThinkInterval ?? SiteConfig.ai.timing.minThinkInterval;
+        this.maxThinkInterval = aiConfig.maxThinkInterval ?? SiteConfig.ai.timing.maxThinkInterval;
+        this.wanderRadius = aiConfig.wanderRadius ?? SiteConfig.ai.radii.wander;
+        this.homeRadius = aiConfig.homeRadius ?? SiteConfig.ai.radii.home;
+        this.objectSearchRadius = aiConfig.objectSearchRadius ?? SiteConfig.ai.radii.objectSearch;
+        this.socialRadius = aiConfig.socialRadius ?? SiteConfig.ai.radii.social;
+        this.playRadius = aiConfig.playRadius ?? SiteConfig.ai.radii.play;
+        this.homeComfortRadius = aiConfig.homeComfortRadius ?? SiteConfig.ai.radii.homeComfort;
 
         this.elapsedSinceThink = 0;
         this.lastDecisionLabel = null;
@@ -24,10 +24,10 @@ class MyteAI {
 
         this.recentHistory = [];
         this.objectMemories = new Map();
-        this.memoryDuration = aiConfig.memoryDuration ?? 120000;
-        this.targetCooldownDuration = aiConfig.targetCooldownDuration ?? 30000;
-        this.repeatWindow = aiConfig.repeatWindow ?? 90000;
-        this.minCandidateScore = aiConfig.minCandidateScore ?? 12;
+        this.memoryDuration = aiConfig.memoryDuration ?? SiteConfig.ai.timing.memoryDuration;
+        this.targetCooldownDuration = aiConfig.targetCooldownDuration ?? SiteConfig.ai.timing.targetCooldownDuration;
+        this.repeatWindow = aiConfig.repeatWindow ?? SiteConfig.ai.timing.repeatWindow;
+        this.minCandidateScore = aiConfig.minCandidateScore ?? SiteConfig.ai.scoring.minCandidateScore;
 
         this.lastContextSnapshot = null;
         this.lastCandidateSnapshot = [];
@@ -107,11 +107,23 @@ class MyteAI {
         );
     }
 
+    handleEnergyDepleted() {
+        if (!this.enabled ||
+            !this.myte?.isActive ||
+            this.myte.goal !== MOVE_TYPES.FREEROAM ||
+            this.myte.isDragging) {
+            return false;
+        }
+
+        return this.executeEmergencyHomeReturn(this.buildContext());
+    }
+
     planNextAction() {
         this.pruneMemory();
 
         const context = this.buildContext();
         const candidates = [
+            this.buildEmergencyHomeCandidate(context),
             this.buildRestCandidate(context),
             this.buildHomeComfortCandidate(context),
             this.buildSocialCandidate(context),
@@ -146,7 +158,7 @@ class MyteAI {
     selectCandidate(candidates) {
         const bestScore = candidates[0]?.score ?? 0;
         const shortlist = candidates
-            .filter(candidate => candidate.score >= bestScore - 12)
+            .filter(candidate => candidate.score >= bestScore - SiteConfig.ai.scoring.shortlistScoreWindow)
             .slice(0, 4);
 
         let chosen = shortlist[0] ?? candidates[0];
@@ -249,6 +261,54 @@ class MyteAI {
         };
     }
 
+    buildEmergencyHomeCandidate(context) {
+        if (context.energy > 0) {
+            return null;
+        }
+
+        return {
+            label: 'emergency:go_home',
+            targetKey: 'home',
+            commitmentMs: 3200,
+            score: 999,
+            execute: () => {
+                this.executeEmergencyHomeReturn(context);
+            }
+        };
+    }
+
+    executeEmergencyHomeReturn(context) {
+        const safeHome = this.findHomeComfortTarget(context?.home ?? this.getHomePosition());
+        if (!safeHome) {
+            return false;
+        }
+
+        const distanceToHome = this.myte.getDistanceToPoint(safeHome.x, safeHome.y);
+        this.myte.queue.clear();
+
+        if (distanceToHome > 8) {
+            this.myte.queue.addAStarMove(safeHome);
+            this.setDecisionLock(3200);
+            this.lastDecisionLabel = 'emergency:go_home';
+            this.lastDecisionTime = Date.now();
+            this.lastDecisionTargetKey = 'home';
+            return true;
+        }
+
+        this.enqueueAction('sleep', { duration: 220 }, {
+            label: 'emergency:sleep',
+            category: 'rest',
+            novelty: 0,
+            soothing: 1,
+            accomplishment: 0.05
+        });
+        this.setDecisionLock(2200);
+        this.lastDecisionLabel = 'emergency:sleep';
+        this.lastDecisionTime = Date.now();
+        this.lastDecisionTargetKey = 'home';
+        return true;
+    }
+
     getAIPreferences() {
         const preferences = this.myte.definition?.ai?.preferences ?? {};
         return {
@@ -264,7 +324,7 @@ class MyteAI {
             return null;
         }
 
-        const nearbyBed = this.findTargetWithAffordance(context.nearbyObjects, 'rest_on_bed', context);
+        const nearbySurface = this.findTargetWithAffordance(context.nearbyObjects, 'use_surface_slot', context);
         let score = 16 + (context.needs.rest * 84) + (context.needs.comfort * 18);
         if (this.mode === MOVE_AUTONOMY_TYPES.REST) score += 36;
         if (context.distanceFromHome > this.homeComfortRadius) score += context.needs.home * 14;
@@ -274,23 +334,23 @@ class MyteAI {
             return null;
         }
 
-        const actionId = nearbyBed
-            ? 'rest_on_bed'
+        const actionId = nearbySurface
+            ? 'use_surface_slot'
             : (context.energy < 0.18 || context.health < 0.4 ? 'sleep' : context.energy < 0.44 ? 'simple_sleep' : 'idle');
-        const label = nearbyBed ? 'rest:bed' : `rest:${actionId}`;
-        const targetKey = nearbyBed ? this.getTargetKey(nearbyBed) : null;
+        const label = nearbySurface ? 'rest:surface' : `rest:${actionId}`;
+        const targetKey = nearbySurface ? this.getTargetKey(nearbySurface) : null;
 
         return {
             label,
             targetKey,
-            commitmentMs: nearbyBed ? 2400 : 1600,
+            commitmentMs: nearbySurface ? 2400 : 1600,
             score: this.applyRepeatPenalty(score, label, targetKey),
             execute: () => {
-                if (nearbyBed && actionId === 'rest_on_bed') {
-                    this.enqueueTargetedAction('rest_on_bed', nearbyBed, {}, {
+                if (nearbySurface && actionId === 'use_surface_slot') {
+                    this.enqueueTargetedAction('use_surface_slot', nearbySurface, {}, {
                         label,
                         category: 'rest',
-                        novelty: Math.max(0.2, this.getNoveltyScore(nearbyBed) * 0.4),
+                        novelty: Math.max(0.2, this.getNoveltyScore(nearbySurface) * 0.4),
                         soothing: 1,
                         accomplishment: 0.2
                     });
@@ -527,7 +587,7 @@ class MyteAI {
         let score = 6 + Math.max(0, 140 - distance) * 0.12;
 
         switch (affordance.actionId) {
-            case 'rest_on_bed':
+            case 'use_surface_slot':
                 score += (context.needs.rest * 32) + (context.needs.comfort * 24) + (context.preferences.coziness * 12);
                 score -= context.boredom * 6;
                 break;
@@ -703,15 +763,15 @@ class MyteAI {
 
         if (this.lastDecisionLabel === label) {
             const elapsed = Date.now() - this.lastDecisionTime;
-            if (elapsed <= 6000) {
-                adjustedScore *= 0.68;
+            if (elapsed <= SiteConfig.ai.scoring.repeatLabelWindow) {
+                adjustedScore *= SiteConfig.ai.scoring.repeatLabelMultiplier;
             }
         }
 
         if (targetKey && this.lastDecisionTargetKey === targetKey) {
             const elapsed = Date.now() - this.lastDecisionTime;
-            if (elapsed <= 12000) {
-                adjustedScore *= 0.74;
+            if (elapsed <= SiteConfig.ai.scoring.repeatTargetWindow) {
+                adjustedScore *= SiteConfig.ai.scoring.repeatTargetMultiplier;
             }
         }
 
@@ -724,11 +784,11 @@ class MyteAI {
 
             const ageFactor = 1 - (age / this.repeatWindow);
             if (entry.label === label) {
-                adjustedScore -= 12 * ageFactor;
+                adjustedScore -= SiteConfig.ai.scoring.historyLabelPenalty * ageFactor;
             }
 
             if (targetKey && entry.targetKey === targetKey) {
-                adjustedScore -= 18 * ageFactor;
+                adjustedScore -= SiteConfig.ai.scoring.historyTargetPenalty * ageFactor;
             }
         }
 
@@ -934,6 +994,42 @@ class MyteAI {
         return gridSystem?.findNearestValidPositionForEntity?.(this.myte, home.x, home.y, 10) ?? home;
     }
 
+    getWanderBounds(worldBounds) {
+        if (!worldBounds) {
+            return null;
+        }
+
+        const gridSystem = this.myte.parent?.gameMap?.gridSystem;
+        const cellSize = gridSystem?.config?.cellSize ?? 32;
+        const paddingX = Math.max(cellSize, Math.round(this.myte.size.width * 0.25));
+        const paddingY = Math.max(cellSize, Math.round(this.myte.size.height * 0.25));
+        const left = worldBounds.left + paddingX;
+        const top = worldBounds.top + paddingY;
+        const right = worldBounds.right - this.myte.size.width - paddingX;
+        const bottom = worldBounds.bottom - this.myte.size.height - paddingY;
+
+        if (right < left || bottom < top) {
+            return null;
+        }
+
+        return { left, top, right, bottom };
+    }
+
+    isWithinWanderBounds(target, bounds) {
+        if (!target) {
+            return false;
+        }
+
+        if (!bounds) {
+            return Number.isFinite(target.x) && Number.isFinite(target.y);
+        }
+
+        return target.x >= bounds.left &&
+            target.x <= bounds.right &&
+            target.y >= bounds.top &&
+            target.y <= bounds.bottom;
+    }
+
     findWanderTarget(context = null) {
         const worldBounds = this.myte.parent?.getWorldBounds?.();
         if (!worldBounds) {
@@ -941,8 +1037,10 @@ class MyteAI {
         }
 
         const localContext = context ?? this.buildContext();
+        const gridSystem = this.myte.parent?.gameMap?.gridSystem;
+        const wanderBounds = this.getWanderBounds(worldBounds);
         const curiosityWander = this.findCuriosityWanderTarget(localContext);
-        if (curiosityWander) {
+        if (this.isWithinWanderBounds(curiosityWander, wanderBounds)) {
             return curiosityWander;
         }
 
@@ -952,22 +1050,33 @@ class MyteAI {
         const maxRadius = this.mode === MOVE_AUTONOMY_TYPES.WANDER
             ? this.wanderRadius
             : this.homeRadius;
+        const safeOrigin = gridSystem?.findNearestValidPositionForEntity?.(this.myte, origin.x, origin.y, 8) ?? origin;
 
-        for (let attempt = 0; attempt < 12; attempt++) {
+        for (let attempt = 0; attempt < 18; attempt++) {
             const angle = Math.random() * Math.PI * 2;
             const distance = 48 + Math.random() * maxRadius;
-            const desiredX = origin.x + Math.cos(angle) * distance;
-            const desiredY = origin.y + Math.sin(angle) * distance;
-            const x = Utility.clamp(desiredX, worldBounds.left, worldBounds.right - this.myte.size.width);
-            const y = Utility.clamp(desiredY, worldBounds.top, worldBounds.bottom - this.myte.size.height);
-            const safe = this.myte.parent?.gameMap?.gridSystem?.findNearestValidPositionForEntity?.(this.myte, x, y, 8);
+            const candidate = {
+                x: safeOrigin.x + Math.cos(angle) * distance,
+                y: safeOrigin.y + Math.sin(angle) * distance
+            };
 
-            if (safe && this.myte.canMoveToPosition(safe.x, safe.y)) {
+            if (!this.isWithinWanderBounds(candidate, wanderBounds)) {
+                continue;
+            }
+
+            const safe = gridSystem?.findNearestValidPositionForEntity?.(this.myte, candidate.x, candidate.y, 8);
+
+            if (safe &&
+                this.isWithinWanderBounds(safe, wanderBounds) &&
+                this.myte.canMoveToPosition(safe.x, safe.y)) {
                 return safe;
             }
         }
 
-        return null;
+        return this.isWithinWanderBounds(safeOrigin, wanderBounds) &&
+            this.myte.canMoveToPosition(safeOrigin.x, safeOrigin.y)
+            ? safeOrigin
+            : null;
     }
 
     findCuriosityWanderTarget(context) {
@@ -1023,7 +1132,7 @@ class MyteAI {
 
     getBehaviorCategoryForAction(actionId, interactionType = null, affordance = null) {
         if (actionId === 'play_fetch') return 'play';
-        if (actionId === 'rest_on_bed') return 'rest';
+        if (actionId === 'use_surface_slot') return 'rest';
         if (actionId === 'nudge_ball') return 'play';
         if (actionId === 'inspect' || actionId === 'deep_inspect' || actionId === 'open_chest' || actionId === 'harvest' || actionId === 'water_plant') {
             return 'world';
@@ -1038,7 +1147,7 @@ class MyteAI {
     }
 
     getSoothingValueForAction(actionId, interactionType = null, affordance = null) {
-        if (actionId === 'rest_on_bed') return 1;
+        if (actionId === 'use_surface_slot') return 1;
         if (actionId === 'smell_flower' || actionId === 'drink_fountain') return 0.85;
         if (actionId === 'eat_element') return 0.55;
         if (actionId === 'interact_object' && affordance?.purpose === 'start_music') return 0.45;
@@ -1057,7 +1166,7 @@ class MyteAI {
                 return 0.45;
             case 'play_fetch':
                 return 0.6;
-            case 'rest_on_bed':
+            case 'use_surface_slot':
                 return 0.25;
             case 'inspect':
             case 'deep_inspect':
@@ -1073,7 +1182,7 @@ class MyteAI {
 
     getExertionValueForAction(actionId, affordance = null) {
         switch (actionId) {
-            case 'rest_on_bed':
+            case 'use_surface_slot':
                 return 0;
             case 'nudge_ball':
                 return 0.55;

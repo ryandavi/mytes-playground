@@ -2539,13 +2539,17 @@ body.debug .map-object > .interactive-hitbox {
 .interactive-myte > .inner-wrapper > .above-wrapper > .battery {
   --icon-scale: 2;
   --battery-size: 13px;
+  display: block;
+  flex: 0 0 auto;
   width: var(--battery-size);
   height: 8px;
   scale: var(--icon-scale);
+  transform-origin: right top;
   image-rendering: pixelated;
   filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.125));
   transition: scale 0.3s ease-in-out, top 0.3s ease-in-out, filter 0.3s ease-in-out, opacity 0.3s ease-in-out;
   background-image: url(../images/icons/battery.png);
+  background-repeat: no-repeat;
   opacity: 0;
   top: 12px;
   position: relative;

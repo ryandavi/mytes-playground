@@ -34,6 +34,8 @@ class MapObject {
 			activeInteractions: new Set(),
 			interactionTimes: new Map()
 		};
+		this.actionOccupancy = new Map();
+		this.actionSlotOccupancy = new Map();
 
 		this.inputComponents = {};
 		this.isDragging = false;
@@ -217,6 +219,46 @@ class MapObject {
 		return Number.isFinite(parsed) ? parsed : defaultValue;
 	}
 
+	getActionConfig(actionId, defaultValue = null) {
+		if (!actionId) {
+			return defaultValue;
+		}
+
+		return this.getConfig(`actionConfigs.${actionId}`, defaultValue);
+	}
+
+	getApproachConfig(actionId = null) {
+		const actionConfig = actionId ? this.getActionConfig(actionId, null) : null;
+		if (actionConfig && Object.prototype.hasOwnProperty.call(actionConfig, 'approachConfig')) {
+			return actionConfig.approachConfig;
+		}
+
+		return this.getConfig('approachConfig', null);
+	}
+
+	getActionSlotDefinitions(actionId) {
+		const actionConfig = this.getActionConfig(actionId, {}) ?? {};
+		const facing = this.getConfig('facingDirection', this.facingDirection ?? 'S');
+		let slots = [];
+
+		if (Array.isArray(actionConfig.slots)) {
+			slots = actionConfig.slots;
+		} else if (actionConfig.slotsByFacing && typeof actionConfig.slotsByFacing === 'object') {
+			slots = actionConfig.slotsByFacing[facing] ??
+				actionConfig.slotsByFacing.default ??
+				[];
+		}
+
+		if (!Array.isArray(slots) || slots.length === 0) {
+			return [];
+		}
+
+		return slots.map((slot, index) => ({
+			id: slot?.id ?? `${actionId}_slot_${index}`,
+			...slot
+		}));
+	}
+
 	// ── Direction helpers ─────────────────────────────────────────────────────
 
 	static processDirectionConfig(baseConfig, direction) {
@@ -355,7 +397,7 @@ class MapObject {
 		return affordances.filter((affordance, index, list) => {
 			const key = `${affordance.actionId}:${affordance.purpose ?? ''}`;
 			return list.findIndex(item => `${item.actionId}:${item.purpose ?? ''}` === key) === index;
-		});
+		}).filter(affordance => !this.isActionOccupied(affordance.actionId, actor));
 	}
 
 	canBeInspectedByAi() {
@@ -618,6 +660,183 @@ class MapObject {
 		return true;
 	}
 
+	getActionOccupant(actionId) {
+		return actionId ? (this.actionOccupancy.get(actionId) ?? null) : null;
+	}
+
+	getActionSlotOccupants(actionId) {
+		if (!actionId) {
+			return null;
+		}
+
+		let slotOccupants = this.actionSlotOccupancy.get(actionId);
+		if (!slotOccupants) {
+			slotOccupants = new Map();
+			this.actionSlotOccupancy.set(actionId, slotOccupants);
+		}
+
+		return slotOccupants;
+	}
+
+	getActionSlotOccupant(actionId, slotId) {
+		if (!actionId || !slotId) {
+			return null;
+		}
+
+		return this.actionSlotOccupancy.get(actionId)?.get(slotId) ?? null;
+	}
+
+	isActionSlotOccupied(actionId, slotId, actor = null) {
+		const occupant = this.getActionSlotOccupant(actionId, slotId);
+		return !!occupant && occupant !== actor;
+	}
+
+	getAvailableActionSlots(actionId, actor = null) {
+		return this.getActionSlotDefinitions(actionId)
+			.filter(slot => !this.isActionSlotOccupied(actionId, slot.id, actor));
+	}
+
+	isActionOccupied(actionId, actor = null) {
+		const slots = this.getActionSlotDefinitions(actionId);
+		if (slots.length > 0) {
+			return this.getAvailableActionSlots(actionId, actor).length === 0;
+		}
+
+		const occupant = this.getActionOccupant(actionId);
+		return !!occupant && occupant !== actor;
+	}
+
+	claimActionSlot(actionId, slotId, actor = null) {
+		if (!actionId || !slotId) {
+			return false;
+		}
+
+		const slots = this.getActionSlotDefinitions(actionId);
+		if (!slots.some(slot => slot.id === slotId)) {
+			return false;
+		}
+
+		const occupant = this.getActionSlotOccupant(actionId, slotId);
+		if (occupant && occupant !== actor) {
+			return false;
+		}
+
+		if (actor) {
+			this.getActionSlotOccupants(actionId).set(slotId, actor);
+		}
+
+		return true;
+	}
+
+	claimActionOccupancy(actionId, actor = null) {
+		if (!actionId) {
+			return true;
+		}
+
+		if (this.getActionSlotDefinitions(actionId).length > 0) {
+			return !this.isActionOccupied(actionId, actor);
+		}
+
+		const actionConfig = this.getActionConfig(actionId, {}) ?? {};
+		const exclusive = actionConfig.exclusive !== false;
+		const occupant = this.getActionOccupant(actionId);
+
+		if (exclusive && occupant && occupant !== actor) {
+			return false;
+		}
+
+		if (actor) {
+			this.actionOccupancy.set(actionId, actor);
+		}
+
+		return true;
+	}
+
+	releaseActionOccupancy(actionId, actor = null) {
+		if (!actionId) {
+			return false;
+		}
+
+		if (this.getActionSlotDefinitions(actionId).length > 0) {
+			let released = false;
+			const slotOccupants = this.actionSlotOccupancy.get(actionId);
+			if (!slotOccupants) {
+				return false;
+			}
+
+			for (const [slotId, occupant] of slotOccupants.entries()) {
+				if (!actor || occupant === actor) {
+					slotOccupants.delete(slotId);
+					released = true;
+				}
+			}
+
+			if (slotOccupants.size === 0) {
+				this.actionSlotOccupancy.delete(actionId);
+			}
+
+			return released;
+		}
+
+		const occupant = this.getActionOccupant(actionId);
+		if (!occupant) {
+			return false;
+		}
+
+		if (actor && occupant !== actor) {
+			return false;
+		}
+
+		this.actionOccupancy.delete(actionId);
+		return true;
+	}
+
+	releaseActionSlot(actionId, slotId, actor = null) {
+		if (!actionId || !slotId) {
+			return false;
+		}
+
+		const slotOccupants = this.actionSlotOccupancy.get(actionId);
+		if (!slotOccupants) {
+			return false;
+		}
+
+		const occupant = slotOccupants.get(slotId);
+		if (!occupant) {
+			return false;
+		}
+
+		if (actor && occupant !== actor) {
+			return false;
+		}
+
+		slotOccupants.delete(slotId);
+		if (slotOccupants.size === 0) {
+			this.actionSlotOccupancy.delete(actionId);
+		}
+
+		return true;
+	}
+
+	isInUse(actionId = null) {
+		if (actionId) {
+			const slotOccupants = this.actionSlotOccupancy.get(actionId);
+			return this.getActionOccupant(actionId) != null || (slotOccupants?.size ?? 0) > 0;
+		}
+
+		if (this.actionOccupancy.size > 0) {
+			return true;
+		}
+
+		for (const slotOccupants of this.actionSlotOccupancy.values()) {
+			if ((slotOccupants?.size ?? 0) > 0) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	// ── Input components ──────────────────────────────────────────────────────
 
 	initializeInputComponents() {
@@ -677,7 +896,7 @@ class MapObject {
 				this.container?.camera?.beginTemporaryFollow?.(this);
 				if (this.container?.ui) this.container.ui.setSelected(this);
 				this.playConfiguredSound?.('pickup');
-				if (this.getConfig('directionConfigs', null)) {
+				if (this.getConfig('directionConfigs', null) && SiteConfig.objects.canRotate) {
 					this._rotateKeyHandler = (e) => {
 						if ((e.key === 'r' || e.key === 'R') && this.isDragging) {
 							e.preventDefault();
@@ -779,6 +998,7 @@ class MapObject {
 
 	canBeDragged() {
 		if (!this.getConfig('draggable', false)) return false;
+		if (this.isInUse()) return false;
 		const isDragMode = this.parent?.ui?.isTool(UIToolModes.DRAG);
 		if (isDragMode) {
 			return true;
@@ -1059,6 +1279,7 @@ class MapObject {
 	}
 
 	_rotateDuringDrag() {
+		if (!SiteConfig.objects.canRotate) return;
 		const directionConfigs = this.getConfig('directionConfigs', null);
 		if (!directionConfigs) return;
 

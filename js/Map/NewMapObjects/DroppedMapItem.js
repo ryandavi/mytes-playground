@@ -198,6 +198,8 @@ class DroppedMapItem {
                     const magnetStrength = 1 - (distance / this.minimumCollectDistance);
                     this.posX += dx * this.magnetSpeed * magnetStrength * dt;
                     this.posY += dy * this.magnetSpeed * magnetStrength * dt;
+                    // Keep shadow anchored beneath the item as it slides toward the myte
+                    this.groundY = this.posY;
 
                     if (distance < 20) {
                         this.collect(myte);

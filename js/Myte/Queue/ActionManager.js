@@ -1,6 +1,24 @@
 class ActionManager {
     static actions = new Map();
 
+    static getActionPresentation(actionId, selected) {
+        const targetConfig = selected?.getActionConfig?.(actionId, null);
+        if (!targetConfig || typeof targetConfig !== 'object') {
+            return {};
+        }
+
+        const presentation = {};
+        if (targetConfig.label) presentation.label = targetConfig.label;
+        if (targetConfig.description) presentation.description = targetConfig.description;
+
+        const priority = Number(targetConfig.priority);
+        if (Number.isFinite(priority)) {
+            presentation.priority = priority;
+        }
+
+        return presentation;
+    }
+
     static registerAction(ActionClass) {
         if (!ActionClass.metadata?.id) {
             throw new Error(`Action class ${ActionClass.name} must have an id in metadata`);
@@ -54,7 +72,11 @@ class ActionManager {
         const available = [];
         for (const [id, ActionClass] of this.actions) {
             if (this.canPerformAction(id, selected, active)) {
-                available.push({ ...ActionClass.metadata, ActionClass });
+                available.push({
+                    ...ActionClass.metadata,
+                    ...this.getActionPresentation(id, selected),
+                    ActionClass
+                });
             }
         }
         return available.sort((a, b) => a.priority - b.priority);
@@ -111,7 +133,7 @@ ActionManager.registerActions([
     InspectAction,
     DeepInspectAction,
     InteractObjectAction,
-    RestOnBedAction,
+    SurfaceSlotAction,
     NudgeBallAction,
     EatElementAction,
     OpenChestAction,

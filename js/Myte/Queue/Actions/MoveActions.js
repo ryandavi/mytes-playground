@@ -16,8 +16,8 @@ function _catmullRomPoint(p0, p1, p2, p3, t) {
  * Requires ≥3 points; returns the original array unchanged for shorter paths.
  * First and last points are preserved exactly.
  */
-function _splineWaypoints(points, resolution = 3) {
-    if (points.length < 3) return points;
+function _splineWaypoints(points, resolution = 3, minPoints = 3) {
+    if (points.length < minPoints) return points;
     const out = [points[0]];
     for (let i = 0; i < points.length - 1; i++) {
         const p0 = points[Math.max(0, i - 1)];
@@ -29,6 +29,41 @@ function _splineWaypoints(points, resolution = 3) {
         }
     }
     return out;
+}
+
+function _pruneWaypointClusters(points, minSpacing = 10) {
+    if (points.length <= 2) return points;
+
+    const minSpacingSq = minSpacing * minSpacing;
+    const pruned = [points[0]];
+
+    for (let i = 1; i < points.length - 1; i++) {
+        const point = points[i];
+        const previous = pruned[pruned.length - 1];
+        const dx = point.x - previous.x;
+        const dy = point.y - previous.y;
+
+        if ((dx * dx) + (dy * dy) < minSpacingSq) {
+            // Keep the furthest point along the path when the spline bunches points together.
+            pruned[pruned.length - 1] = point;
+            continue;
+        }
+
+        pruned.push(point);
+    }
+
+    const lastPoint = points[points.length - 1];
+    const tail = pruned[pruned.length - 1];
+    const dx = lastPoint.x - tail.x;
+    const dy = lastPoint.y - tail.y;
+
+    if ((dx * dx) + (dy * dy) < minSpacingSq) {
+        pruned[pruned.length - 1] = lastPoint;
+    } else {
+        pruned.push(lastPoint);
+    }
+
+    return pruned;
 }
 
 // Set to true to re-enable verbose pathfinding diagnostics
@@ -275,6 +310,7 @@ class AStarMoveAction extends MyteAction {
         if (this.targetPoints.length >= 3) {
             this.targetPoints = _splineWaypoints(this.targetPoints);
         }
+        this.targetPoints = _pruneWaypointClusters(this.targetPoints);
 
         _slog(`[ASTAR] _buildPath: ${path.length} raw pts → ${this.targetPoints.length} waypoints. First=(${this.targetPoints[0].x.toFixed(1)},${this.targetPoints[0].y.toFixed(1)}) Last=(${this.targetPoints[this.targetPoints.length-1].x.toFixed(1)},${this.targetPoints[this.targetPoints.length-1].y.toFixed(1)})`);
         this.currentTargetIndex = 0;
@@ -496,7 +532,7 @@ class GoToObjectAction extends PositionableAction {
             _alog(`[APPROACH] config source=action-override`, cfg);
             return cfg;
         }
-        const targetCfg = this.target?.getApproachConfig?.();
+        const targetCfg = this.target?.getApproachConfig?.(this.constructor.metadata?.id, this);
         if (targetCfg != null) {
             const cfg = this._normalizeConfig(targetCfg);
             _alog(`[APPROACH] config source=getApproachConfig raw=`, targetCfg, `resolved=`, cfg);

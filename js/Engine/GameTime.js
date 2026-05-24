@@ -11,8 +11,8 @@ class GameTime {
 
 		// Configuration
 		this.config = {
-			dayDurationInMinutes: 5, // Real-time minutes for one game day
-			daysPerSeason: 28,
+			dayDurationInMinutes: SiteConfig.time.dayDurationInMinutes,
+			daysPerSeason: SiteConfig.time.daysPerSeason,
 			seasons: ['spring', 'summer', 'autumn', 'winter'],
 			daysOfTheWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
 

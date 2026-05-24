@@ -249,16 +249,16 @@ class InteractObjectAction extends GoToObjectAction {
     }
 }
 
-class RestOnBedAction extends GoToObjectAction {
+class SurfaceSlotAction extends GoToObjectAction {
     static metadata = {
-        id: 'rest_on_bed',
-        label: 'Rest',
+        id: 'use_surface_slot',
+        label: 'Use Surface',
         category: 'interactions',
         priority: 2,
         isMovementAction: true,
         isInterruptible: true,
-        defaultDuration: 180,
-        description: 'Settle onto a bed and rest for a while',
+        defaultDuration: 5000,
+        description: 'Use a slotted surface and settle into position',
         requiresTarget: true,
         affectsMood: true,
         moodEffect: 7,
@@ -269,63 +269,370 @@ class RestOnBedAction extends GoToObjectAction {
             healthRestore: 5,
             comfortBoost: 14,
             moodBoost: 8,
-            approachConfig: {
-                allowedSides: ['center'],
-                preferredSide: 'center',
-                gap: 0,
-                align: 'center',
-                alignTo: 'sprite'
-            }
+            settleDuration: 260,
+            dismountDuration: 220,
+            entryGap: 10,
+            exitGap: 16,
+            exitSearchRadius: 20,
+            returnToEntry: true,
+            stuckCompletionDistance: 14,
+            finalApproachSkipDistance: 24,
+            maxFinalAdjustmentDistance: 20,
+            approachConfig: null
         }
     };
 
     static canPerform(selected, active) {
         return active &&
             selected instanceof MapObject &&
-            selected.type?.toUpperCase?.() === 'BED' &&
-            !active.queue.isCarrying();
+            !!selected.getActionConfig?.('use_surface_slot') &&
+            !active.queue.isCarrying() &&
+            !selected.isActionOccupied?.('use_surface_slot', active);
     }
 
     static getRequiredOptions(selected) {
         return { target: selected };
     }
 
+    getQueueTitle() {
+        return this.getTargetActionConfig().label || super.getQueueTitle();
+    }
+
     constructor(myte, options) {
+        const target = options?.target ?? null;
+        const targetActionConfig = target?.getActionConfig?.('use_surface_slot', {}) ?? {};
+        const duration = SurfaceSlotAction.resolveDuration(target, targetActionConfig, options?.duration);
+        const approachConfig = options?.approachConfig ??
+            targetActionConfig.approachConfig ??
+            SurfaceSlotAction.buildDefaultApproachConfig(
+                target,
+                targetActionConfig,
+                options?.entryGap ?? targetActionConfig.entryGap
+            );
+
         super(myte, {
-            ...RestOnBedAction.metadata.defaultOptions,
-            duration: RestOnBedAction.metadata.defaultDuration,
-            ...options
+            ...SurfaceSlotAction.metadata.defaultOptions,
+            ...targetActionConfig,
+            ...options,
+            duration,
+            approachConfig
         });
+
         this.phase = 'approach';
         this.bobPhase = 0;
         this.baseY = myte.posY;
+        this.baseRestPosition = { x: myte.posX, y: myte.posY };
         this._benefitsApplied = false;
+        this._blocked = false;
+        this._finishedPlacement = false;
+        this._reserved = false;
+        this._entryPosition = null;
+        this._entrySide = null;
+        this._transition = null;
+        this._previousCollisionSetting = myte.checkForCollisions;
         this._restingWithCollisionDisabled = false;
+        this._selectedSlot = null;
+        this._selectedSlotId = null;
     }
 
-    update() {
+    static resolveDuration(target, targetActionConfig = {}, explicitDuration = null) {
+        const rawDuration = explicitDuration ??
+            targetActionConfig.duration ??
+            target?.getConfig?.('restDuration', SurfaceSlotAction.metadata.defaultDuration) ??
+            SurfaceSlotAction.metadata.defaultDuration;
+        const duration = Number(rawDuration);
+        return Number.isFinite(duration) && duration > 0
+            ? duration
+            : SurfaceSlotAction.metadata.defaultDuration;
+    }
+
+    static getRestFacing(target, targetActionConfig = {}) {
+        return targetActionConfig.restFacing ??
+            targetActionConfig.facing ??
+            target?.getConfig?.('myteFacing') ??
+            target?.getConfig?.('facingDirection') ??
+            'S';
+    }
+
+    static buildDefaultApproachConfig(target, targetActionConfig = {}, gap = 10) {
+        const facing = SurfaceSlotAction.getRestFacing(target, targetActionConfig);
+        const normalizedGap = Number.isFinite(Number(gap)) ? Number(gap) : 10;
+        const allowedSides = facing === 'E' || facing === 'W'
+            ? ['top', 'bottom']
+            : ['left', 'right'];
+
+        return {
+            allowedSides,
+            preferredSide: null,
+            gap: normalizedGap,
+            align: 'center',
+            alignTo: 'collider',
+            myteAlignTo: 'collider'
+        };
+    }
+
+    start() {
+        if (!this.resolveAndClaimSlot()) {
+            this._blocked = true;
+            this.clearDebugPath();
+            return;
+        }
+
+        super.start();
+        this.currentDuration = this.duration;
+    }
+
+    update(deltaTime = 16.667) {
+        const dt = Number.isFinite(deltaTime) && deltaTime > 0 ? deltaTime : 16.667;
+        if (this._blocked) {
+            return true;
+        }
+
         if (this.phase === 'approach') {
-            const arrived = super.update();
+            const arrived = super.update(dt);
             if (!arrived) {
                 return false;
             }
 
-            this.phase = 'rest';
-            this.currentDuration = this.duration;
-            const bedPosition = this.getBedRestPosition();
-            this.myte.setPosition(bedPosition.x, bedPosition.y);
-            this.myte.setTarget(bedPosition.x, bedPosition.y);
-            this.myte.setSpritePosition(bedPosition.x, bedPosition.y);
-            this.baseY = bedPosition.y;
+            this.clearDebugPath();
+            this._entryPosition = { x: this.myte.posX, y: this.myte.posY };
+            this._entrySide = this.getNearestSideForPosition(this._entryPosition);
+            this.applyRestFacing();
+            this.beginTransition(
+                'settle',
+                this._entryPosition,
+                this.getSurfaceRestPosition(),
+                this.settleDuration
+            );
+            return false;
+        }
+
+        if (this.phase === 'settle' || this.phase === 'dismount') {
+            return this.updateTransition(dt);
+        }
+
+        if (this.phase !== 'rest') {
+            return true;
+        }
+
+        this.bobPhase += (dt / 16.667) * this.bobSpeed;
+        const bobY = this.baseRestPosition.y + Math.sin(this.bobPhase) * this.bobHeight;
+        this.setMyteWorldPosition(this.baseRestPosition.x, bobY);
+
+        const restUntilFull = this.getTargetActionConfig().restUntilFull ?? false;
+        if (restUntilFull) {
+            // Stay resting until energy is fully restored; AI can still interrupt
+            if (this.myte.stats.energy < this.myte.stats.maxEnergy) {
+                return false;
+            }
+        } else {
+            this.currentDuration -= dt;
+            if (this.currentDuration > 0) {
+                return false;
+            }
+        }
+
+        this.beginTransition(
+            'dismount',
+            { x: this.myte.posX, y: this.myte.posY },
+            this.getSurfaceExitPosition(),
+            this.dismountDuration
+        );
+        return false;
+    }
+
+    complete() {
+        this.finishSurfacePlacement({ snapToExit: this.phase !== 'done' });
+        super.complete();
+    }
+
+    interrupt() {
+        this.finishSurfacePlacement({ snapToExit: true });
+        super.interrupt();
+    }
+
+    getTargetActionConfig() {
+        return this.target?.getActionConfig?.('use_surface_slot', {}) ?? {};
+    }
+
+    getConfiguredSlots() {
+        const configured = this.target?.getActionSlotDefinitions?.('use_surface_slot') ?? [];
+        if (configured.length > 0) {
+            return configured;
+        }
+
+        return [{
+            id: 'default',
+            restPosition: this.getTargetActionConfig().restPosition ?? this.target?.getConfig?.('mytePosition', {}) ?? {},
+            restFacing: SurfaceSlotAction.getRestFacing(this.target, this.getTargetActionConfig())
+        }];
+    }
+
+    hasExplicitTargetSlots() {
+        return (this.target?.getActionSlotDefinitions?.('use_surface_slot')?.length ?? 0) > 0;
+    }
+
+    getSlotDefinition(slotId = this._selectedSlotId) {
+        if (!slotId) {
+            return this._selectedSlot;
+        }
+
+        return this.getConfiguredSlots().find(slot => slot.id === slotId) ?? null;
+    }
+
+    getSlotRestFacing(slot = this._selectedSlot) {
+        return slot?.restFacing ??
+            slot?.facing ??
+            SurfaceSlotAction.getRestFacing(this.target, this.getTargetActionConfig());
+    }
+
+    buildSlotApproachConfig(slot) {
+        if (slot?.approachConfig) {
+            return slot.approachConfig;
+        }
+
+        const facing = this.getSlotRestFacing(slot);
+        const gap = slot?.entryGap ?? this.entryGap;
+        const baseConfig = SurfaceSlotAction.buildDefaultApproachConfig(
+            this.target,
+            {
+                ...this.getTargetActionConfig(),
+                restFacing: facing
+            },
+            gap
+        );
+
+        if (slot?.approachAlign) {
+            baseConfig.align = slot.approachAlign;
+        }
+
+        if (slot?.allowedSides) {
+            baseConfig.allowedSides = slot.allowedSides;
+        }
+
+        if (slot?.preferredSide) {
+            baseConfig.preferredSide = slot.preferredSide;
+        }
+
+        return baseConfig;
+    }
+
+    evaluateSlot(slot) {
+        const approachConfig = this._normalizeConfig(this.buildSlotApproachConfig(slot));
+        const targetRect = this.getTargetRect(this.target, approachConfig.alignTo);
+        if (!targetRect) {
+            return null;
+        }
+
+        const myteApproachRect = this.getMyteApproachRect(approachConfig.myteAlignTo);
+        const candidates = this.getCandidatePositions(targetRect, myteApproachRect, approachConfig);
+        if (!candidates.length) {
+            return null;
+        }
+
+        const path = this.findBestPath(candidates);
+        if (!path) {
+            return null;
+        }
+
+        return {
+            slot,
+            approachConfig,
+            path,
+            score: path.score + this.toFiniteNumber(slot?.priority, 0)
+        };
+    }
+
+    chooseBestAvailableSlot() {
+        const availableSlots = this.hasExplicitTargetSlots()
+            ? (this.target?.getAvailableActionSlots?.('use_surface_slot', this.myte) ?? [])
+            : this.getConfiguredSlots();
+        if (availableSlots.length === 0) {
+            return null;
+        }
+
+        let best = null;
+        for (const slot of availableSlots) {
+            const evaluated = this.evaluateSlot(slot);
+            if (!evaluated) {
+                continue;
+            }
+
+            if (!best || evaluated.score < best.score) {
+                best = evaluated;
+            }
+        }
+
+        return best ?? {
+            slot: availableSlots[0],
+            approachConfig: this._normalizeConfig(this.buildSlotApproachConfig(availableSlots[0]))
+        };
+    }
+
+    applySelectedSlot(slot, approachConfig = null) {
+        this._selectedSlot = slot ?? null;
+        this._selectedSlotId = slot?.id ?? null;
+
+        if (!slot) {
+            return;
+        }
+
+        const selectedApproachConfig = approachConfig ?? this._normalizeConfig(this.buildSlotApproachConfig(slot));
+        this.approachConfig = selectedApproachConfig;
+        this.returnToEntry = slot?.returnToEntry ?? this.getTargetActionConfig().returnToEntry ?? this.returnToEntry;
+
+        const slotDuration = this.toFiniteNumber(slot?.duration, null);
+        if (slotDuration != null) {
+            this.duration = slotDuration;
+        }
+    }
+
+    resolveAndClaimSlot() {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const selection = this.chooseBestAvailableSlot();
+            if (!selection?.slot) {
+                return false;
+            }
+
+            this.applySelectedSlot(selection.slot, selection.approachConfig);
+            const claimed = this.hasExplicitTargetSlots()
+                ? this.target?.claimActionSlot?.('use_surface_slot', this._selectedSlotId, this.myte)
+                : this.target?.claimActionOccupancy?.('use_surface_slot', this.myte);
+            if (claimed !== false) {
+                this._reserved = true;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    toFiniteNumber(value, fallback) {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    setMyteWorldPosition(x, y) {
+        this.myte.setPosition(x, y);
+        this.myte.setTarget(x, y);
+        this.myte.setSpritePosition(x, y);
+    }
+
+    beginTransition(phase, from, to, duration) {
+        const safeFrom = {
+            x: this.toFiniteNumber(from?.x, this.myte.posX),
+            y: this.toFiniteNumber(from?.y, this.myte.posY)
+        };
+        const safeTo = {
+            x: this.toFiniteNumber(to?.x, safeFrom.x),
+            y: this.toFiniteNumber(to?.y, safeFrom.y)
+        };
+
+        if (phase === 'settle') {
+            this._previousCollisionSetting = this.myte.checkForCollisions;
             this.myte.checkForCollisions = false;
             this._restingWithCollisionDisabled = true;
-
-            const facing = this.target?.getConfig?.('myteFacing');
-            if (facing) {
-                this.myte.setDirection(facing);
-            } else {
-                this.faceTarget();
-            }
+            this.baseRestPosition = { ...safeTo };
 
             if (!this._benefitsApplied) {
                 this._benefitsApplied = true;
@@ -334,58 +641,187 @@ class RestOnBedAction extends GoToObjectAction {
                 this.myte.stats.updateComfort(this.comfortBoost);
                 this.myte.stats.updateMood(this.moodBoost);
             }
-
-            this.myte.queue.addExpression('sleep', 45, 3);
         }
 
-        this.bobPhase += this.bobSpeed;
-        const bobY = this.baseY + Math.sin(this.bobPhase) * this.bobHeight;
-        this.myte.setPosition(null, bobY);
-        this.myte.setSpritePosition(null, bobY);
+        this.phase = phase;
+        this._transition = {
+            from: safeFrom,
+            to: safeTo,
+            elapsed: 0,
+            duration: Math.max(1, this.toFiniteNumber(duration, 1))
+        };
 
-        this.currentDuration--;
-        return this.currentDuration <= 0;
+        this.setMyteWorldPosition(safeFrom.x, safeFrom.y);
     }
 
-    complete() {
-        super.complete();
-        this.finishRestingPlacement();
+    updateTransition(deltaTime) {
+        if (!this._transition) {
+            return false;
+        }
+
+        this._transition.elapsed += deltaTime;
+        const progress = Math.min(1, this._transition.elapsed / this._transition.duration);
+        const eased = progress * progress * (3 - (2 * progress));
+        const x = this._transition.from.x + ((this._transition.to.x - this._transition.from.x) * eased);
+        const y = this._transition.from.y + ((this._transition.to.y - this._transition.from.y) * eased);
+        this.setMyteWorldPosition(x, y);
+
+        if (progress < 1) {
+            return false;
+        }
+
+        this.setMyteWorldPosition(this._transition.to.x, this._transition.to.y);
+
+        if (this.phase === 'settle') {
+            this.phase = 'rest';
+            this.baseY = this._transition.to.y;
+            this.baseRestPosition = { ...this._transition.to };
+            this.currentDuration = this.duration;
+            this._transition = null;
+            return false;
+        }
+
+        if (this.phase === 'dismount') {
+            this.phase = 'done';
+            this._transition = null;
+            this.finishSurfacePlacement({ snapToExit: false });
+            return true;
+        }
+
+        this._transition = null;
+        return false;
     }
 
-    interrupt() {
-        super.interrupt();
-        this.finishRestingPlacement();
+    applyRestFacing() {
+        const facing = this.getSlotRestFacing(this._selectedSlot);
+        if (facing) {
+            this.myte.setDirection(facing);
+        } else {
+            this.faceTarget();
+        }
     }
 
-    getBedRestPosition() {
-        const targetXFactor = this.target?.getConfig?.('mytePosition.xFactor', 0.5) ?? 0.5;
-        const targetYFactor = this.target?.getConfig?.('mytePosition.yFactor', 0.5) ?? 0.5;
+    resolveTargetSlotPosition(positionConfig = {}, fallbackXFactor = 0.5, fallbackYFactor = 0.5) {
+        const slot = positionConfig && typeof positionConfig === 'object' ? positionConfig : {};
+        const xFactor = this.toFiniteNumber(slot.xFactor, fallbackXFactor);
+        const yFactor = this.toFiniteNumber(slot.yFactor, fallbackYFactor);
+        const offsetX = this.toFiniteNumber(slot.offsetX, 0);
+        const offsetY = this.toFiniteNumber(slot.offsetY, 0);
 
         return {
-            x: this.target.posX + (this.target.size.width * targetXFactor) - (this.myte.size.width / 2),
-            y: this.target.posY + (this.target.size.height * targetYFactor) - (this.myte.size.height / 2)
+            x: this.target.posX + (this.target.size.width * xFactor) - (this.myte.size.width / 2) + offsetX,
+            y: this.target.posY + (this.target.size.height * yFactor) - (this.myte.size.height / 2) + offsetY
         };
     }
 
-    finishRestingPlacement() {
-        if (!this._restingWithCollisionDisabled) return;
-
-        this.myte.checkForCollisions = true;
-        this._restingWithCollisionDisabled = false;
-
-        const exitPosition = this.getBedExitPosition();
-        this.myte.setPosition(exitPosition.x, exitPosition.y);
-        this.myte.setTarget(exitPosition.x, exitPosition.y);
-        this.myte.setSpritePosition(exitPosition.x, exitPosition.y);
-        this.myte.physicsController?.reset?.();
+    getSurfaceRestPosition() {
+        const actionConfig = this.getTargetActionConfig();
+        const slot = this.getSlotDefinition();
+        return this.resolveTargetSlotPosition(
+            slot?.restPosition ?? actionConfig.restPosition ?? this.target?.getConfig?.('mytePosition', {}) ?? {},
+            this.target?.getConfig?.('mytePosition.xFactor', 0.5) ?? 0.5,
+            this.target?.getConfig?.('mytePosition.yFactor', 0.5) ?? 0.5
+        );
     }
 
-    getBedExitPosition() {
+    getNearestSideForPosition(position) {
+        const targetRect = this.getTargetRect(this.target, 'collider');
+        if (!targetRect || !position) {
+            return null;
+        }
+
+        const centerX = position.x + (this.myte.size.width / 2);
+        const centerY = position.y + (this.myte.size.height / 2);
+        const distances = [
+            { side: 'left', value: Math.abs(centerX - targetRect.x) },
+            { side: 'right', value: Math.abs(centerX - (targetRect.x + targetRect.width)) },
+            { side: 'top', value: Math.abs(centerY - targetRect.y) },
+            { side: 'bottom', value: Math.abs(centerY - (targetRect.y + targetRect.height)) }
+        ];
+
+        distances.sort((a, b) => a.value - b.value);
+        return distances[0]?.side ?? null;
+    }
+
+    finishSurfacePlacement({ snapToExit = true } = {}) {
+        if (this._finishedPlacement) return;
+
+        this._finishedPlacement = true;
+        this.clearDebugPath();
+
+        if (this._blocked) {
+            return;
+        }
+
+        if (this._restingWithCollisionDisabled) {
+            this.myte.checkForCollisions = this._previousCollisionSetting;
+            this._restingWithCollisionDisabled = false;
+        }
+
+        if (snapToExit) {
+            const exitPosition = this.getSurfaceExitPosition();
+            this.setMyteWorldPosition(exitPosition.x, exitPosition.y);
+        }
+
+        this.myte.physicsController?.reset?.();
+        if (this._reserved) {
+            if (this._selectedSlotId && this.hasExplicitTargetSlots()) {
+                this.target?.releaseActionSlot?.('use_surface_slot', this._selectedSlotId, this.myte);
+            } else {
+                this.target?.releaseActionOccupancy?.('use_surface_slot', this.myte);
+            }
+            this._reserved = false;
+        }
+    }
+
+    getExitCandidates(targetRect, myteRect) {
+        const configuredApproach = this.approachConfig ??
+            this.getTargetActionConfig().approachConfig ??
+            SurfaceSlotAction.buildDefaultApproachConfig(this.target, this.getTargetActionConfig(), this.entryGap);
+        const normalizedApproach = this._normalizeConfig(configuredApproach);
+        const candidateSides = this._getAllowedSides(normalizedApproach, targetRect).filter(side => side !== 'center');
+        const orderedSides = [
+            this._entrySide,
+            ...candidateSides
+        ].filter((side, index, list) => side && list.indexOf(side) === index);
+
+        return orderedSides.map(side => this.calculatePosition(myteRect, targetRect, side, {
+            gap: this.toFiniteNumber(this.exitGap, 16),
+            align: 'center'
+        }));
+    }
+
+    getSurfaceExitPosition() {
+        const gridSystem = this.myte.parent?.gameMap?.gridSystem;
+        const exitSearchRadius = this.toFiniteNumber(this.exitSearchRadius, 20);
+        const actionConfig = this.getTargetActionConfig();
+        const slot = this.getSlotDefinition();
+
+        if (slot?.exitPosition || actionConfig.exitPosition) {
+            const desired = this.resolveTargetSlotPosition(slot?.exitPosition ?? actionConfig.exitPosition, 0.5, 0.5);
+            const safe = gridSystem?.findNearestValidPositionForEntity?.(this.myte, desired.x, desired.y, exitSearchRadius) ?? desired;
+            if (safe && this.myte.canMoveToPosition?.(safe.x, safe.y)) {
+                return safe;
+            }
+        }
+
+        if (this.returnToEntry !== false && this._entryPosition) {
+            const safeEntry = gridSystem?.findNearestValidPositionForEntity?.(
+                this.myte,
+                this._entryPosition.x,
+                this._entryPosition.y,
+                exitSearchRadius
+            ) ?? this._entryPosition;
+            if (safeEntry && this.myte.canMoveToPosition?.(safeEntry.x, safeEntry.y)) {
+                return safeEntry;
+            }
+        }
+
         const fallback = this.myte.parent?.gameMap?.gridSystem?.findNearestValidPositionForEntity?.(
             this.myte,
-            this.myte.posX,
-            this.baseY,
-            20
+            this._entryPosition?.x ?? this.myte.posX,
+            this._entryPosition?.y ?? this.baseY,
+            exitSearchRadius
         ) ?? { x: this.myte.posX, y: this.baseY };
 
         if (!this.target) {
@@ -398,22 +834,13 @@ class RestOnBedAction extends GoToObjectAction {
             return fallback;
         }
 
-        const facing = this.target?.getConfig?.('myteFacing') ?? 'S';
-        const preferredSideByFacing = {
-            N: 'top',
-            S: 'bottom',
-            E: 'right',
-            W: 'left'
-        };
-        const preferred = preferredSideByFacing[facing] ?? 'bottom';
-        const sides = [preferred, 'left', 'right', 'top', 'bottom'].filter((side, index, list) => list.indexOf(side) === index);
-        const candidates = sides.map(side => this.calculatePosition(myteRect, targetRect, side, {
-            gap: 18,
-            align: side === 'left' || side === 'right' ? 'center' : 'center'
-        }));
-        const gridSystem = this.myte.parent?.gameMap?.gridSystem;
-        for (const candidate of candidates) {
-            const safe = gridSystem?.findNearestValidPositionForEntity?.(this.myte, candidate.x, candidate.y, 20) ?? candidate;
+        for (const candidate of this.getExitCandidates(targetRect, myteRect)) {
+            const safe = gridSystem?.findNearestValidPositionForEntity?.(
+                this.myte,
+                candidate.x,
+                candidate.y,
+                exitSearchRadius
+            ) ?? candidate;
             if (!safe) {
                 continue;
             }
@@ -526,6 +953,16 @@ class EatElementAction extends GoToObjectAction {
             return;
         }
 
+        // Apply nutritional benefits when the eating animation finishes
+        const energyRestore = this.target.getConfig?.('energyRestore', SiteConfig.food.energyRestore) ?? SiteConfig.food.energyRestore;
+        const moodBoost     = this.target.getConfig?.('moodBoost',     SiteConfig.food.moodBoost)     ?? SiteConfig.food.moodBoost;
+        const healthRestore = this.target.getConfig?.('healthRestore', SiteConfig.food.healthRestore) ?? SiteConfig.food.healthRestore;
+
+        if (energyRestore > 0) this.myte.stats.restoreEnergy(energyRestore);
+        if (moodBoost     > 0) this.myte.stats.updateMood(moodBoost);
+        if (healthRestore > 0) this.myte.stats.heal(healthRestore);
+
+        this.myte.queue.addExpression('heart', 300, 1);
         this.target?.remove?.();
     }
 }

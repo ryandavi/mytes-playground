@@ -17,61 +17,59 @@ class MyteStats {
         this.minMood = 0;
         this.maxMood = 100;
         this.mood = Math.max(this.minMood, Math.min(this.maxMood, statConfig.mood ?? 100));
-        this.moodDecayRate = statConfig.moodDecayRate ?? 0.0005;
+        this.moodDecayRate = statConfig.moodDecayRate ?? SiteConfig.stats.moodDecayRate;
         this.currentMood = 'neutral';
         this.moodTimeout = null;
 
         // Energy system
         this.minEnergy = 0;
         this.maxEnergy = 100;
-        this.energy = Math.max(this.minEnergy, Math.min(this.maxEnergy, statConfig.energy ?? 75));
-        this.energyDecayRate = statConfig.energyDecayRate ?? 0.0005;
-        this.energyRegenRate = statConfig.energyRegenRate ?? 0.005;
-        this.homeSlotEnergyRegenMultiplier = statConfig.homeSlotEnergyRegenMultiplier ?? 1.65;
-        this.homeSlotMoodDecayMultiplier = statConfig.homeSlotMoodDecayMultiplier ?? 0.18;
-        this.homeSlotBehaviorRateMultiplier = statConfig.homeSlotBehaviorRateMultiplier ?? 0.55;
-        this.homeSlotComfortBoostRate = statConfig.homeSlotComfortBoostRate ?? 0.0011;
-        this.homeSlotConfidenceBoostRate = statConfig.homeSlotConfidenceBoostRate ?? 0.00055;
-        this.fullChargeAnnounceCooldown = statConfig.fullChargeAnnounceCooldown ?? 30000;
-        this.fullChargeResetThreshold = statConfig.fullChargeResetThreshold ?? 0.94;
+        this.energy = Math.max(this.minEnergy, Math.min(this.maxEnergy, statConfig.energy ?? SiteConfig.myte.initialStats.energy));
+        this.energyDecayRate = statConfig.energyDecayRate ?? SiteConfig.stats.energyDecayRate;
+        this.energyRegenRate = statConfig.energyRegenRate ?? SiteConfig.stats.energyRegenRate;
+        // Rate used while actively resting on a bed/couch (per ms); multiplied by the object's restEnergyRegenMultiplier
+        this.bedRestEnergyRegenRate = statConfig.bedRestEnergyRegenRate ?? SiteConfig.stats.bedRestEnergyRegenRate;
+        // Rate used while parked in home slot (per ms)
+        this.homeSlotEnergyRegenRate = statConfig.homeSlotEnergyRegenRate ?? SiteConfig.stats.homeSlotEnergyRegenRate;
+        this.homeSlotMoodDecayMultiplier = statConfig.homeSlotMoodDecayMultiplier ?? SiteConfig.stats.homeSlotMoodDecayMultiplier;
+        this.homeSlotBehaviorRateMultiplier = statConfig.homeSlotBehaviorRateMultiplier ?? SiteConfig.stats.homeSlotBehaviorRateMultiplier;
+        this.homeSlotComfortBoostRate = statConfig.homeSlotComfortBoostRate ?? SiteConfig.stats.homeSlotComfortBoostRate;
+        this.homeSlotConfidenceBoostRate = statConfig.homeSlotConfidenceBoostRate ?? SiteConfig.stats.homeSlotConfidenceBoostRate;
+        this.fullChargeAnnounceCooldown = statConfig.fullChargeAnnounceCooldown ?? SiteConfig.stats.fullChargeAnnounceCooldown;
+        this.fullChargeResetThreshold = statConfig.fullChargeResetThreshold ?? SiteConfig.stats.fullChargeResetThreshold;
         this.lastFullChargeAnnouncementAt = 0;
         this.hasAnnouncedFullCharge = this.energy >= this.maxEnergy;
 
         // Behavioral drives
         this.minBoredom = 0;
         this.maxBoredom = 100;
-        this.boredom = Math.max(this.minBoredom, Math.min(this.maxBoredom, statConfig.boredom ?? 28));
+        this.boredom = Math.max(this.minBoredom, Math.min(this.maxBoredom, statConfig.boredom ?? SiteConfig.myte.initialStats.boredom));
 
         this.minComfort = 0;
         this.maxComfort = 100;
-        this.comfort = Math.max(this.minComfort, Math.min(this.maxComfort, statConfig.comfort ?? 72));
+        this.comfort = Math.max(this.minComfort, Math.min(this.maxComfort, statConfig.comfort ?? SiteConfig.myte.initialStats.comfort));
 
         this.minConfidence = 0;
         this.maxConfidence = 100;
-        this.confidence = Math.max(this.minConfidence, Math.min(this.maxConfidence, statConfig.confidence ?? 58));
+        this.confidence = Math.max(this.minConfidence, Math.min(this.maxConfidence, statConfig.confidence ?? SiteConfig.myte.initialStats.confidence));
 
         this.batteryLevel = -1;
         this.batteryVisible = false;
         this.batteryHideTimeout = null;
         this.chargingClassTimeout = null;
-        this.batteryThresholds = [
-            { name: 'empty',  threshold: 0 },
-            { name: 'low',    threshold: 30 },
-            { name: 'medium', threshold: 60 },
-            { name: 'full',   threshold: 90 }
-        ];
+        this.batteryThresholds = SiteConfig.myte.thresholds.batteryLevels.map(t => ({ ...t }));
 
         this.isRapidCharging = false;
-        this.rapidChargingThreshold = 0.01;
-        this.exhaustionRecoveryThreshold = statConfig.exhaustionRecoveryThreshold ?? 12;
+        this.rapidChargingThreshold = SiteConfig.myte.thresholds.rapidCharging;
+        this.exhaustionRecoveryThreshold = statConfig.exhaustionRecoveryThreshold ?? SiteConfig.stats.exhaustionRecoveryThreshold;
         this.isExhausted = false;
         this.lastEnergyChange = 0;
         this.lastBatterySound = null;
-        this.soundCooldown = 8000;
+        this.soundCooldown = SiteConfig.myte.cooldowns.sound;
         this.lastSoundTime = {};
-        this.needSignalCooldown = statConfig.needSignalCooldown ?? 45000;
+        this.needSignalCooldown = statConfig.needSignalCooldown ?? SiteConfig.stats.needSignalCooldown;
         this.lastNeedSignalTimes = {};
-        this.behaviorDriveRate = statConfig.behaviorDriveRate ?? 0.42;
+        this.behaviorDriveRate = statConfig.behaviorDriveRate ?? SiteConfig.stats.behaviorDriveRate;
         this.noteBehaviorScale = statConfig.noteBehaviorScale ?? 0.55;
         this.moodSyncRate = statConfig.moodSyncRate ?? 0.00016;
 
@@ -84,16 +82,9 @@ class MyteStats {
         };
 
         this.lastInteractionTime = 0;
-        this.interactionCooldown = 5000;
+        this.interactionCooldown = SiteConfig.myte.cooldowns.interaction;
 
-        this.moods = statConfig.moods ?? {
-            happy:   { duration: 10000, speedMultiplier: 1.2, expression: 'happy' },
-            sad:     { duration: 15000, speedMultiplier: 0.8, expression: 'sad' },
-            excited: { duration: 8000,  speedMultiplier: 1.5, expression: 'excited' },
-            sleepy:  { duration: 12000, speedMultiplier: 0.7, expression: 'sleepy' },
-            grumpy:  { duration: 10000, speedMultiplier: 0.9, expression: 'grumpy' },
-            neutral: { duration: 5000,  speedMultiplier: 1.0, expression: 'neutral' }
-        };
+        this.moods = statConfig.moods ?? SiteConfig.myte.moods;
 
         // Initialize battery display
         this.updateBatteryDisplay();
@@ -149,11 +140,11 @@ class MyteStats {
     }
 
     handleMoodEffects() {
-        if (this.mood <= 20) {
+        if (this.mood <= SiteConfig.myte.thresholds.moodLow) {
             if (Math.random() < 0.1) {
                 this.setMood('sad');
             }
-        } else if (this.mood >= 80) {
+        } else if (this.mood >= SiteConfig.myte.thresholds.moodHigh) {
             if (Math.random() < 0.1) {
                 this.setMood('happy');
             }
@@ -221,7 +212,7 @@ class MyteStats {
         let speedMultiplier = this.moods[this.currentMood].speedMultiplier;
 
         // Energy affects speed
-        if (this.energy < 20) speedMultiplier *= 0.7;
+        if (this.energy < SiteConfig.myte.thresholds.lowEnergyThreshold) speedMultiplier *= SiteConfig.myte.thresholds.lowEnergySpeedMultiplier;
 
         // Exhaustion effect
         if (this.exhaustionSpeedMultiplier) {
@@ -283,13 +274,21 @@ class MyteStats {
         return this.energy;
     }
 
-    regenerateEnergy(delta) {
+    // Resolve the bed-rest regen rate, factoring in the quality of the surface
+    _getBedRestRate() {
+        const action = this.getCurrentAction();
+        const multiplier = action?.target?.getConfig?.('restEnergyRegenMultiplier', 1.0) ?? 1.0;
+        return this.bedRestEnergyRegenRate * multiplier;
+    }
+
+    regenerateEnergy(delta, rate = null) {
+        const effectiveRate = rate ?? this.energyRegenRate;
         const previousEnergy = this.energy;
         if (this.energy < this.maxEnergy) {
             // Store the energy change for rapid charging detection
             const energyBefore = this.energy;
-            
-            this.energy = Math.min(this.maxEnergy, this.energy + (this.energyRegenRate * delta));
+
+            this.energy = Math.min(this.maxEnergy, this.energy + (effectiveRate * delta));
             
             // Calculate energy change rate
             const energyChange = this.energy - energyBefore;
@@ -351,6 +350,9 @@ class MyteStats {
         // Slow down the myte
         this.applyExhaustionEffects();
 
+        // Free-roam should immediately head home instead of selecting another activity.
+        this.myte.ai?.handleEnergyDepleted?.();
+
     }
 
     // Handle when energy is filled to maximum
@@ -398,7 +400,7 @@ class MyteStats {
     applyExhaustionEffects() {
         // Myte moves much slower when exhausted
         this.isExhausted = true;
-        this.exhaustionSpeedMultiplier = 0.4;
+        this.exhaustionSpeedMultiplier = SiteConfig.myte.thresholds.exhaustionSpeedMultiplier;
     }
 
     clearExhaustionEffects() {
@@ -545,32 +547,29 @@ class MyteStats {
         else if (batteryStatus === 'low') {
             this.showBattery();
             this.myte.battery.classList.add('blinking');
-    
-            // Hide after 5 seconds
+
             this.batteryHideTimeout = this.setManagedTimeout(() => {
                 this.myte.battery.classList.remove('blinking');
                 this.batteryHideTimeout = null;
-            }, 5000);
+            }, SiteConfig.myte.cooldowns.batteryHideLow);
         }
         // Medium energy - show continuously
         else if (batteryStatus === 'medium') {
             this.showBattery();
-    
-            // Hide after 6 seconds
+
             this.batteryHideTimeout = this.setManagedTimeout(() => {
                 this.hideBattery();
                 this.batteryHideTimeout = null;
-            }, 6000);
+            }, SiteConfig.myte.cooldowns.batteryHideMedium);
         }
         // Full energy - show temporarily then hide
         else if (batteryStatus === 'full') {
             this.showBattery();
-    
-            // Hide after 3 seconds
+
             this.batteryHideTimeout = this.setManagedTimeout(() => {
                 this.hideBattery();
                 this.batteryHideTimeout = null;
-            }, 3000);
+            }, SiteConfig.myte.cooldowns.batteryHideFull);
         }
     }
 
@@ -615,7 +614,7 @@ class MyteStats {
     isRestingAction(actionId = this.getCurrentActionId()) {
         return actionId === 'sleep' ||
             actionId === 'simple_sleep' ||
-            actionId === 'rest_on_bed';
+            actionId === 'use_surface_slot';
     }
 
     getEnergyActivityMultiplier() {
@@ -716,7 +715,7 @@ class MyteStats {
             : 0.5;
 
         const isIdle = !actionId || actionId === 'idle';
-        const isResting = actionId === 'sleep' || actionId === 'simple_sleep' || actionId === 'rest_on_bed';
+        const isResting = actionId === 'sleep' || actionId === 'simple_sleep' || actionId === 'use_surface_slot';
         const isStimulating = [
             'inspect',
             'deep_inspect',
@@ -818,14 +817,14 @@ class MyteStats {
 
         const lastAiDecisionAge = Date.now() - (this.myte.ai?.lastDecisionTime ?? 0);
         const isBoredEnoughToComplain =
-            this.boredom >= 92 &&
-            this.mood <= 68 &&
-            lastAiDecisionAge >= 20000;
+            this.boredom >= SiteConfig.myte.needSignals.boredomHigh &&
+            this.mood <= SiteConfig.myte.needSignals.boredomMoodCap &&
+            lastAiDecisionAge >= SiteConfig.myte.needSignals.boredomDecisionAge;
 
         const signals = [
             {
                 id: 'energy_low',
-                condition: this.energy <= 14,
+                condition: this.energy <= SiteConfig.myte.needSignals.energyLow,
                 text: 'sleepy...',
                 style: 'thought',
                 expression: 'sleep'
@@ -839,14 +838,14 @@ class MyteStats {
             },
             {
                 id: 'comfort_low',
-                condition: this.comfort <= 24,
+                condition: this.comfort <= SiteConfig.myte.needSignals.comfortLow,
                 text: 'cozy?',
                 style: 'thought',
                 expression: 'peek'
             },
             {
                 id: 'mood_low',
-                condition: this.mood <= 20,
+                condition: this.mood <= SiteConfig.myte.needSignals.moodLow,
                 text: 'sad...',
                 style: 'whisper',
                 expression: 'peek'
@@ -876,27 +875,26 @@ class MyteStats {
 
     // Update function called each frame
     update(deltaTime) {
-        // Natural mood decay
         this.updateMood(-this.moodDecayRate * deltaTime);
 
         if (this.myte.isMoving()) {
-            // Energy decay
             this.useEnergy(this.energyDecayRate * deltaTime * this.getEnergyActivityMultiplier());
+        } else if (this.isRestingAction()) {
+            // Bed/couch rest — slow, quality-dependent regen handled here.
+            // SurfaceSlotAction also drives the "rest until full" loop condition.
+            this.regenerateEnergy(deltaTime, this._getBedRestRate());
         } else {
-            // Energy regeneration
-            this.regenerateEnergy(deltaTime * (this.isRestingAction() ? 1.35 : 1));
+            this.regenerateEnergy(deltaTime);
         }
 
         this.updateBehaviorDrives(deltaTime);
         this.maybeSignalNeeds();
-
-        // Update battery display
         this.updateBatteryDisplay();
     }
 
     updateInHomeSlot(deltaTime) {
         this.updateMood(-this.moodDecayRate * deltaTime * this.homeSlotMoodDecayMultiplier);
-        this.regenerateEnergy(deltaTime * this.homeSlotEnergyRegenMultiplier);
+        this.regenerateEnergy(deltaTime, this.homeSlotEnergyRegenRate);
         this.updateBehaviorDrives(deltaTime * this.homeSlotBehaviorRateMultiplier);
         this.updateComfort(this.homeSlotComfortBoostRate * deltaTime);
         this.updateConfidence(this.homeSlotConfidenceBoostRate * deltaTime);

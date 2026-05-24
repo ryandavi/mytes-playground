@@ -89,6 +89,98 @@ const TYPE_CONFIGS = {
 		}
 	},
 
+	COUCH: {
+		category: 'static',
+		variants: ['test_couch'],
+		renderType: 'sprite',
+		collision: true,
+		draggable: true,
+		snapToGrid: true,
+		interactionType: 'rest',
+		restDuration: 4200,
+		restHealAmount: 6,
+		restMoodBoost: 10,
+		majorActionId: ['use_surface_slot'],
+		ai: {
+			affordances: [
+				{ actionId: 'use_surface_slot', purpose: 'rest' }
+			]
+		},
+		actionConfigs: {
+			use_surface_slot: {
+				label: 'Rest',
+				description: 'Settle onto the couch and rest for a while',
+				exclusive: false,
+				duration: 4200,
+				settleDuration: 220,
+				dismountDuration: 200,
+				entryGap: 10,
+				exitGap: 14,
+				exitSearchRadius: 20,
+				returnToEntry: true,
+				bobHeight: 1.5,
+				bobSpeed: 0.08,
+				restUntilFull: true,
+				stuckCompletionDistance: 22,
+				maxFinalAdjustmentDistance: 36,
+				slotsByFacing: {
+					S: [
+						{ id: 'left_seat', restPosition: { xFactor: 0.35, yFactor: 0.5 }, restFacing: 'S', approachConfig: { allowedSides: ['bottom'], preferredSide: 'bottom', gap: 10, align: 'left-edge', alignTo: 'collider', myteAlignTo: 'collider' } },
+						{ id: 'right_seat', restPosition: { xFactor: 0.65, yFactor: 0.5 }, restFacing: 'S', approachConfig: { allowedSides: ['bottom'], preferredSide: 'bottom', gap: 10, align: 'right-edge', alignTo: 'collider', myteAlignTo: 'collider' } }
+					],
+					N: [
+						{ id: 'left_seat', restPosition: { xFactor: 0.35, yFactor: 0.5 }, restFacing: 'N', approachConfig: { allowedSides: ['top'], preferredSide: 'top', gap: 10, align: 'left-edge', alignTo: 'collider', myteAlignTo: 'collider' } },
+						{ id: 'right_seat', restPosition: { xFactor: 0.65, yFactor: 0.5 }, restFacing: 'N', approachConfig: { allowedSides: ['top'], preferredSide: 'top', gap: 10, align: 'right-edge', alignTo: 'collider', myteAlignTo: 'collider' } }
+					],
+					E: [
+						{ id: 'top_seat', restPosition: { xFactor: 0.5, yFactor: 0.35 }, restFacing: 'E', approachConfig: { allowedSides: ['right'], preferredSide: 'right', gap: 10, align: 'top-edge', alignTo: 'collider', myteAlignTo: 'collider' } },
+						{ id: 'bottom_seat', restPosition: { xFactor: 0.5, yFactor: 0.65 }, restFacing: 'E', approachConfig: { allowedSides: ['right'], preferredSide: 'right', gap: 10, align: 'bottom-edge', alignTo: 'collider', myteAlignTo: 'collider' } }
+					],
+					W: [
+						{ id: 'top_seat', restPosition: { xFactor: 0.5, yFactor: 0.35 }, restFacing: 'W', approachConfig: { allowedSides: ['left'], preferredSide: 'left', gap: 10, align: 'top-edge', alignTo: 'collider', myteAlignTo: 'collider' } },
+						{ id: 'bottom_seat', restPosition: { xFactor: 0.5, yFactor: 0.65 }, restFacing: 'W', approachConfig: { allowedSides: ['left'], preferredSide: 'left', gap: 10, align: 'bottom-edge', alignTo: 'collider', myteAlignTo: 'collider' } }
+					]
+				}
+			}
+		},
+		variantConfigs: {
+			test_couch: {
+				displayName: 'Test Couch',
+				// Couch is less restful than a proper bed
+				restEnergyRegenMultiplier: 0.7,
+				spriteConfig: {
+					spriteSheet: { url: 'images/MapObjects/bed_big.png' }
+				},
+				directionConfigs: {
+					S: {
+						size: { width: 256, height: 128 },
+						collider: { width: 176, height: 52, offsetX: 40, offsetY: 54 },
+						interactiveCollider: { width: 256, height: 96, offsetX: 0, offsetY: 96 },
+						transformStyle: ''
+					},
+					N: {
+						size: { width: 256, height: 128 },
+						collider: { width: 176, height: 52, offsetX: 40, offsetY: 22 },
+						interactiveCollider: { width: 256, height: 96, offsetX: 0, offsetY: -64 },
+						transformStyle: 'scaleY(-1)'
+					},
+					E: {
+						size: { width: 128, height: 256 },
+						collider: { width: 52, height: 176, offsetX: 54, offsetY: 40 },
+						interactiveCollider: { width: 96, height: 256, offsetX: 96, offsetY: 0 },
+						transformStyle: 'rotate(90deg)'
+					},
+					W: {
+						size: { width: 128, height: 256 },
+						collider: { width: 52, height: 176, offsetX: 22, offsetY: 40 },
+						interactiveCollider: { width: 96, height: 256, offsetX: -64, offsetY: 0 },
+						transformStyle: 'rotate(-90deg)'
+					}
+				}
+			}
+		}
+	},
+
 	FLOWER: {
 		category: 'nature',
 		variants: ['flower_1', 'flower_2', 'flower_3', 'flower_red', 'flower_yellow', 'flower_blue'],
@@ -206,7 +298,16 @@ const TYPE_CONFIGS = {
 		walkable: true,
 		interactionType: 'consume',
 		interactionRadius: 50,
-		consumable: true
+		consumable: true,
+		// Stat boosts applied when eating completes. Variants override these.
+		energyRestore: 20,
+		moodBoost: 8,
+		healthRestore: 3,
+		variantConfigs: {
+			apple:  { displayName: 'Apple',  energyRestore: 22, moodBoost: 10, healthRestore: 5 },
+			turnip: { displayName: 'Turnip', energyRestore: 14, moodBoost: 4,  healthRestore: 2 },
+			acorn:  { displayName: 'Acorn',  energyRestore: 9,  moodBoost: 6,  healthRestore: 1 },
+		}
 	},
 
 	// ── Containers ────────────────────────────────────────────────────────────
@@ -781,22 +882,46 @@ const TYPE_CONFIGS = {
 		restMoodBoost: 15,
 		ai: {
 			affordances: [
-				{ actionId: 'rest_on_bed', purpose: 'rest' }
+				{ actionId: 'use_surface_slot', purpose: 'rest' }
 			]
+		},
+		actionConfigs: {
+			use_surface_slot: {
+				label: 'Rest',
+				description: 'Settle onto the bed and rest for a while',
+				exclusive: true,
+				duration: 5000,
+				settleDuration: 260,
+				dismountDuration: 220,
+				entryGap: 10,
+				exitGap: 16,
+				exitSearchRadius: 20,
+				returnToEntry: true,
+				bobHeight: 2.5,
+				bobSpeed: 0.1,
+				// Myte rests until energy is fully restored rather than a fixed timer
+				restUntilFull: true,
+				// More forgiving stuck-detection so grid rounding near collider edges resolves
+				stuckCompletionDistance: 22,
+				maxFinalAdjustmentDistance: 36
+			}
 		},
 		variantConfigs: {
 			bed: {
 				displayName: 'Bed',
+				// Standard bed — baseline regen quality
+				restEnergyRegenMultiplier: 1.0,
 				spriteConfig: {
 					spriteSheet: { url: 'images/MapObjects/bed.gif' }
 				},
 				directionConfigs: {
 					S: {
 						size: { width: 64, height: 128 },
-						collider: { width: 48, height: 78, offsetX: 8, offsetY: 42 },
+						// Collider shifted up one tile (32px) vs original to center on mattress
+						collider: { width: 48, height: 78, offsetX: 8, offsetY: 10 },
 						interactiveCollider: { width: 128, height: 64, offsetX: -32, offsetY: 128 },
 						transformStyle: 'rotate(90deg)',
-						mytePosition: { xFactor: 0.5, yFactor: 0.72 },
+						mytePosition: { xFactor: 0.5, yFactor: 0.47 },
 						myteFacing: 'S'
 					},
 					N: {
@@ -827,16 +952,17 @@ const TYPE_CONFIGS = {
 			},
 			bed_long: {
 				displayName: 'Long Bed',
+				restEnergyRegenMultiplier: 1.0,
 				spriteConfig: {
 					spriteSheet: { url: 'images/MapObjects/bed_long.gif' }
 				},
 				directionConfigs: {
 					S: {
 						size: { width: 64, height: 128 },
-						collider: { width: 48, height: 78, offsetX: 8, offsetY: 42 },
+						collider: { width: 48, height: 78, offsetX: 8, offsetY: 10 },
 						interactiveCollider: { width: 128, height: 64, offsetX: -32, offsetY: 128 },
 						transformStyle: '',
-						mytePosition: { xFactor: 0.5, yFactor: 0.72 },
+						mytePosition: { xFactor: 0.5, yFactor: 0.47 },
 						myteFacing: 'S'
 					},
 					N: {
@@ -867,16 +993,19 @@ const TYPE_CONFIGS = {
 			},
 			bed_big: {
 				displayName: 'Big Bed',
+				// Higher quality — recovers energy ~30% faster than a standard bed
+				restEnergyRegenMultiplier: 1.3,
 				spriteConfig: {
 					spriteSheet: { url: 'images/MapObjects/bed_big.png' }
 				},
 				directionConfigs: {
 					S: {
 						size: { width: 128, height: 256 },
-						collider: { width: 96, height: 158, offsetX: 16, offsetY: 82 },
+						// Collider shifted up one tile (32px)
+						collider: { width: 96, height: 158, offsetX: 16, offsetY: 50 },
 						interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: 256 },
 						transformStyle: 'rotate(90deg)',
-						mytePosition: { xFactor: 0.5, yFactor: 0.75 },
+						mytePosition: { xFactor: 0.5, yFactor: 0.625 },
 						myteFacing: 'S'
 					},
 					N: {
@@ -907,16 +1036,17 @@ const TYPE_CONFIGS = {
 			},
 			bed_big_long: {
 				displayName: 'Big Long Bed',
+				restEnergyRegenMultiplier: 1.3,
 				spriteConfig: {
 					spriteSheet: { url: 'images/MapObjects/bed_big_long.png' }
 				},
 				directionConfigs: {
 					S: {
 						size: { width: 128, height: 256 },
-						collider: { width: 96, height: 158, offsetX: 16, offsetY: 82 },
+						collider: { width: 96, height: 158, offsetX: 16, offsetY: 50 },
 						interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: 256 },
 						transformStyle: '',
-						mytePosition: { xFactor: 0.5, yFactor: 0.75 },
+						mytePosition: { xFactor: 0.5, yFactor: 0.625 },
 						myteFacing: 'S'
 					},
 					N: {
@@ -946,18 +1076,21 @@ const TYPE_CONFIGS = {
 				}
 			},
 			large_bed: {
+				restEnergyRegenMultiplier: 1.3,
 				spriteConfig: {
 					spriteSheet: { url: 'images/MapObjects/bed_big_long.png' }
 				},
 				size: { width: 128, height: 256 },
 				directionConfigs: {
-					S: { size: { width: 128, height: 256 }, collider: { width: 96, height: 158, offsetX: 16, offsetY: 82 }, interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: 256 }, transformStyle: '', mytePosition: { xFactor: 0.5, yFactor: 0.75 }, myteFacing: 'S' },
+					S: { size: { width: 128, height: 256 }, collider: { width: 96, height: 158, offsetX: 16, offsetY: 50 }, interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: 256 }, transformStyle: '', mytePosition: { xFactor: 0.5, yFactor: 0.625 }, myteFacing: 'S' },
 					N: { size: { width: 128, height: 256 }, collider: { width: 96, height: 158, offsetX: 16, offsetY: 16 }, interactiveCollider: { width: 192, height: 64, offsetX: -32, offsetY: -64 }, transformStyle: 'scaleY(-1)', mytePosition: { xFactor: 0.5, yFactor: 0.25 }, myteFacing: 'N' },
 					E: { size: { width: 256, height: 128 }, collider: { width: 158, height: 96, offsetX: 82, offsetY: 16 }, interactiveCollider: { width: 64, height: 192, offsetX: 256, offsetY: -32 }, transformStyle: 'rotate(90deg)', mytePosition: { xFactor: 0.75, yFactor: 0.5 }, myteFacing: 'E' },
 					W: { size: { width: 256, height: 128 }, collider: { width: 158, height: 96, offsetX: 16, offsetY: 16 }, interactiveCollider: { width: 64, height: 192, offsetX: -64, offsetY: -32 }, transformStyle: 'rotate(-90deg)', mytePosition: { xFactor: 0.25, yFactor: 0.5 }, myteFacing: 'W' }
 				}
 			},
 			bunk_bed: {
+				// Less comfortable than a full bed
+				restEnergyRegenMultiplier: 0.85,
 				spriteConfig: {
 					spriteSheet: { url: 'images/MapObjects/bunk_bed.png' }
 				}
