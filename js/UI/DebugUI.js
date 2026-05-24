@@ -913,6 +913,28 @@ class DebugUI {
                     }
 
                     this.parent.gameMap.layers.debug.appendChild(collider);
+
+                    // Draw slot rest-position markers for surface-slot objects
+                    const slotConfig = obj.getActionConfig?.('use_surface_slot');
+                    if (slotConfig) {
+                        const slots = obj.getActionSlotDefinitions?.('use_surface_slot') ?? [];
+                        slots.forEach(slot => {
+                            if (!slot?.restPosition) return;
+                            const cb = this.parent.getColliderBounds(obj);
+                            const cw = cb.right - cb.left;
+                            const ch = cb.bottom - cb.top;
+                            const sx = cb.left + cw * (slot.restPosition.xFactor ?? 0.5);
+                            const sy = cb.top  + ch * (slot.restPosition.yFactor ?? 0.5);
+                            const dot = document.createElement('div');
+                            dot.classList.add('debug-collider', 'slot-marker');
+                            dot.style.position = 'absolute';
+                            dot.style.left   = `${sx - 4}px`;
+                            dot.style.top    = `${sy - 4}px`;
+                            dot.style.width  = '8px';
+                            dot.style.height = '8px';
+                            this.parent.gameMap.layers.debug.appendChild(dot);
+                        });
+                    }
                 } catch {}
             });
         } catch {}

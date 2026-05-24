@@ -1275,6 +1275,7 @@ class MapObject {
 			this._dropTargetEl.style.height = `${this.size.height}px`;
 		}
 
+		this._createSurfaceSlotElements();
 		this.updatePosition();
 	}
 
@@ -1439,6 +1440,10 @@ class MapObject {
 		divElement.dataset.objectId = this.id || '';
 		divElement.dataset.renderLayer = this.getRenderLayerKey();
 
+		if (this.getActionConfig?.('use_surface_slot')) {
+			divElement.classList.add('has-surface-slot');
+		}
+
 		if (this.getConfig('draggable', false)) {
 			divElement.classList.add('draggable');
 			if (this.getConfig('dragInSelectMode', false)) {
@@ -1492,7 +1497,74 @@ class MapObject {
 		this.updateShadowVisual();
 		this.initializeInputComponents();
 		this._initSelectDragHandler();
+		this._createSurfaceSlotElements();
 		return divElement;
+	}
+
+	_createSurfaceSlotElements() {
+		if (!this.element) return;
+		this.element.querySelectorAll('.map-object-slot').forEach(el => el.remove());
+		this.slotElements = new Map();
+
+		if (!this.getActionConfig?.('use_surface_slot')) return;
+
+		const cOffX = this.collider?.offsetX ?? 0;
+		const cOffY = this.collider?.offsetY ?? 0;
+		const cw    = this.collider?.width  ?? this.size.width;
+		const ch    = this.collider?.height ?? this.size.height;
+
+		const slots = this.getActionSlotDefinitions('use_surface_slot');
+
+		if (!slots.length) {
+			// Single-occupancy object (e.g. BED) — one element covering the full collider
+			const el = document.createElement('div');
+			el.classList.add('map-object-slot');
+			el.dataset.slotId = 'default';
+			el.style.cssText = `position:absolute;left:${cOffX}px;top:${cOffY}px;width:${cw}px;height:${ch}px;pointer-events:none;`;
+			this.element.appendChild(el);
+			this.slotElements.set('default', el);
+			return;
+		}
+
+		// Determine primary split axis from slot positions
+		const useXAxis = slots.every(s => s.restPosition?.xFactor != null);
+		const factors = slots.map(s => useXAxis
+			? (s.restPosition?.xFactor ?? 0.5)
+			: (s.restPosition?.yFactor ?? 0.5)
+		);
+		// Sort slots by their axis factor to build non-overlapping boundary zones
+		const sorted = slots.map((slot, i) => ({ slot, factor: factors[i] }))
+			.sort((a, b) => a.factor - b.factor);
+
+		// Build zone boundaries: 0 … midpoint … midpoint … 1
+		const boundaries = [0];
+		for (let i = 0; i < sorted.length - 1; i++) {
+			boundaries.push((sorted[i].factor + sorted[i + 1].factor) / 2);
+		}
+		boundaries.push(1);
+
+		sorted.forEach(({ slot }, i) => {
+			const lo = boundaries[i];
+			const hi = boundaries[i + 1];
+			let left, top, width, height;
+			if (useXAxis) {
+				left   = cOffX + cw * lo;
+				top    = cOffY;
+				width  = cw * (hi - lo);
+				height = ch;
+			} else {
+				left   = cOffX;
+				top    = cOffY + ch * lo;
+				width  = cw;
+				height = ch * (hi - lo);
+			}
+			const el = document.createElement('div');
+			el.classList.add('map-object-slot');
+			el.dataset.slotId = slot.id;
+			el.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;pointer-events:none;`;
+			this.element.appendChild(el);
+			this.slotElements.set(slot.id, el);
+		});
 	}
 
 	updateShadowVisual() {

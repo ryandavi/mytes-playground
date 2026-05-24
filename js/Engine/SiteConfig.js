@@ -24,7 +24,7 @@ const SiteConfig = Object.freeze({
 
         // Energy regen rate while parked in home slot (per ms).
         // Slower than bed rest — home slot is passive recovery, not active sleep.
-        homeSlotEnergyRegenRate: 0.001,
+        homeSlotEnergyRegenRate: 0.003,
 
         // Mood decay rate while active (per ms)
         moodDecayRate: 0.0005,
@@ -51,6 +51,14 @@ const SiteConfig = Object.freeze({
         // Full-charge announcement cooldown (ms) and reset threshold
         fullChargeAnnounceCooldown: 30000,
         fullChargeResetThreshold: 0.94,
+
+        // Energy must be below this value (0–100) to initiate resting on a surface.
+        // Prevents mytes from using rest slots when they don't need recovery.
+        restEnergyThreshold: 90,
+
+        // Minimum time (ms) a myte must stay on a rest surface before it can exit,
+        // even if restUntilFull is true and energy is already full.
+        minRestDuration: 2000,
     }),
 
     // ── Food defaults ─────────────────────────────────────────────────────────

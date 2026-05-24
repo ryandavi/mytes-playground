@@ -465,8 +465,11 @@ class Inventory {
                 posX,
                 posY
             );
-            // Store the inventory name so collect() adds back to the correct stack
-            if (dropped) dropped.inventoryName = name;
+            // Store variant so collect() resolves back to the correct registry entry
+            if (dropped) {
+                dropped.inventoryVariant = itemVariant;
+                dropped.inventoryName = name;
+            }
             success = !!dropped;
         } else {
             const resolvedObject = this.resolveDroppedMapObject({ name, type, variant });
@@ -485,6 +488,7 @@ class Inventory {
         }
 
         this._hideIndicator();
+        document.querySelectorAll('.app-stage, .container').forEach(el => el.classList.remove('is-drag-over'));
 
         if (success) {
             this.removeItem(variant || name);

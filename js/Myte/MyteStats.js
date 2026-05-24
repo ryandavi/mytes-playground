@@ -277,6 +277,11 @@ class MyteStats {
     // Resolve the bed-rest regen rate, factoring in the quality of the surface
     _getBedRestRate() {
         const action = this.getCurrentAction();
+        const actionConfig = action?.target?.getActionConfig?.('use_surface_slot', {}) ?? {};
+        const benefit = actionConfig.benefit ?? 'energy';
+        if (benefit !== 'energy') {
+            return this.energyRegenRate;
+        }
         const multiplier = action?.target?.getConfig?.('restEnergyRegenMultiplier', 1.0) ?? 1.0;
         return this.bedRestEnergyRegenRate * multiplier;
     }

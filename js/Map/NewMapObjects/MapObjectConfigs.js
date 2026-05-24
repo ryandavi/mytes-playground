@@ -108,10 +108,19 @@ const TYPE_CONFIGS = {
 		},
 		actionConfigs: {
 			use_surface_slot: {
-				label: 'Rest',
-				description: 'Settle onto the couch and rest for a while',
+				label: 'Sit',
+				description: 'Sit on the couch for a bit',
+				benefit: 'comfort',
+				// No energy threshold gate — any myte can sit regardless of energy level.
+				// Duration depends on myte mode: follow → stays until removed, AI → random.
+				randomDuration: true,
+				minDuration: 12000,
+				maxDuration: 28000,
+				energyRestore: 8,
+				healthRestore: 2,
+				comfortBoost: 18,
+				moodBoost: 12,
 				exclusive: false,
-				duration: 4200,
 				settleDuration: 220,
 				dismountDuration: 200,
 				entryGap: 10,
@@ -120,7 +129,6 @@ const TYPE_CONFIGS = {
 				returnToEntry: true,
 				bobHeight: 1.5,
 				bobSpeed: 0.08,
-				restUntilFull: true,
 				stuckCompletionDistance: 22,
 				maxFinalAdjustmentDistance: 36,
 				slotsByFacing: {
@@ -146,8 +154,6 @@ const TYPE_CONFIGS = {
 		variantConfigs: {
 			test_couch: {
 				displayName: 'Test Couch',
-				// Couch is less restful than a proper bed
-				restEnergyRegenMultiplier: 0.7,
 				spriteConfig: {
 					spriteSheet: { url: 'images/MapObjects/bed_big.png' }
 				},
@@ -889,6 +895,7 @@ const TYPE_CONFIGS = {
 			use_surface_slot: {
 				label: 'Rest',
 				description: 'Settle onto the bed and rest for a while',
+				benefit: 'energy',
 				exclusive: true,
 				duration: 5000,
 				settleDuration: 260,

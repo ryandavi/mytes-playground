@@ -5,14 +5,14 @@ class MyteTouchHandler extends DragHandler {
             element: myte.sprite,
             parent: myte,
             canDrag: () => {
-                
-                return (myte.parent.ui.isTool(UIToolModes.DRAG) && 
-                       myte.isActive && 
-                       myte.canDrag()) || 
-                       (myte.inputHandler && myte.inputHandler.clickHandler && 
+
+                return (myte.parent.ui.isTool(UIToolModes.DRAG) &&
+                       myte.isActive &&
+                       myte.canDrag()) ||
+                       (myte.inputHandler && myte.inputHandler.clickHandler &&
                         myte.inputHandler.clickHandler.isDragging);
             },
-            
+
             onDragStart: () => {
                 // Set this Myte as active if coming from auto-pickup
                 if (this.autoPickup && !myte.isActiveMyte) {
@@ -31,6 +31,10 @@ class MyteTouchHandler extends DragHandler {
 
                 // Mark portals as valid drop targets
                 this._getPortalElements(myte).forEach(el => el.classList.add('is-droppable'));
+
+                // Mark surface slot objects as potential drop targets
+                this._hoveredSlotEntry = null;
+                this._getSurfaceSlotEntries(myte).forEach(({ el }) => el?.classList.add('is-droppable'));
             },
             onDragUpdate: (position) => {
                 const world = myte.parent.inputHandler.screenToWorldCoordinates(position.x, position.y, {
@@ -62,6 +66,20 @@ class MyteTouchHandler extends DragHandler {
                         el.classList.remove('is-drag-over');
                     }
                 });
+
+                // Update surface slot hover with live validity feedback
+                const hitSlotEntry = this._findNearestSlotAt(myte, newX, newY);
+                const slotChanged = hitSlotEntry?.slot?.id !== this._hoveredSlotEntry?.slot?.id ||
+                    hitSlotEntry?.obj !== this._hoveredSlotEntry?.obj;
+                if (slotChanged) {
+                    this._hoveredSlotEntry?.el?.classList.remove('is-drag-over', 'is-drop-rejected');
+                    this._hoveredSlotEntry = hitSlotEntry;
+                }
+                if (this._hoveredSlotEntry) {
+                    const valid = this._isSlotValid(this._hoveredSlotEntry, myte);
+                    this._hoveredSlotEntry.el?.classList.toggle('is-drag-over', valid);
+                    this._hoveredSlotEntry.el?.classList.toggle('is-drop-rejected', !valid);
+                }
             },
             onDragEnd: () => {
                 myte.queue.clear();
@@ -71,6 +89,10 @@ class MyteTouchHandler extends DragHandler {
                 }
                 myte.isDragging = false;
                 myte.duplicate.classList.remove('is-dragging');
+
+                // Capture the hovered slot entry before cleanup
+                const droppedSlotEntry = this._hoveredSlotEntry;
+                this._hoveredSlotEntry = null;
 
                 // Check if dropped on home target
                 if (myte.dropTarget.classList.contains("is-drag-over")) {
@@ -101,19 +123,26 @@ class MyteTouchHandler extends DragHandler {
                     myte.physicsController?.reset?.();
                 }
 
-                // If dropped on a normal map position, check for an underlying object to interact with
+                // If dropped on a surface slot object or a general map object, queue the interaction
                 if (!myte.dropTarget.classList.contains("is-drag-over") && !droppedPortal) {
-                    const dropObj = this._findObjectAtMyte(myte);
+                    const dropObj = droppedSlotEntry?.obj ?? this._findObjectAtMyte(myte);
                     if (dropObj) {
-                        const best = dropObj.getBestInteractionAction?.(myte);
+                        const isSurfaceSlotDrop = !!droppedSlotEntry;
+                        const best = isSurfaceSlotDrop
+                            ? { id: 'use_surface_slot' }
+                            : dropObj.getBestInteractionAction?.(myte);
                         if (best) {
                             const actionOptions = ActionManager.getActionOptions(best.id, dropObj, myte);
                             if (actionOptions) {
-                                myte.queue.clear();
                                 myte.queue.add(best.id, {
                                     ...actionOptions,
-                                    userInitiated: true
+                                    userInitiated: true,
+                                    immediate: isSurfaceSlotDrop,
+                                    ...(isSurfaceSlotDrop ? { settleDuration: 1 } : {})
                                 });
+                            } else if (isSurfaceSlotDrop) {
+                                // Can't use slot (occupied, etc.) — show rejection on slot element
+                                this._rejectSlotDrop(droppedSlotEntry);
                             }
                         }
                     }
@@ -122,6 +151,7 @@ class MyteTouchHandler extends DragHandler {
                 // Reset drop target states
                 myte.dropTarget.classList.remove('is-droppable', 'is-drag-over');
                 this._getPortalElements(myte).forEach(el => el.classList.remove('is-droppable', 'is-drag-over'));
+                this._getSurfaceSlotEntries(myte).forEach(({ el }) => el?.classList.remove('is-droppable', 'is-drag-over', 'is-drop-rejected'));
                 myte.targetDot.classList.remove('is-hidden');
                 myte.logVisualDebug('drag_end');
 
@@ -138,10 +168,76 @@ class MyteTouchHandler extends DragHandler {
         });
 
         this.myte = myte;
-        // Add auto-pickup flag
         this.autoPickup = false;
         this.dragStartPosition = null;
         this.dragStartedInFreeRoam = false;
+        this._hoveredSlotEntry = null;
+    }
+
+    _rejectSlotDrop(entry) {
+        if (!entry?.el) return;
+        entry.el.classList.add('is-drop-rejected');
+        setTimeout(() => entry.el?.classList.remove('is-drop-rejected'), 600);
+    }
+
+    _getSurfaceSlotEntries(myte) {
+        const objects = myte.parent?.gameMap?.gridSystem?.activeObjects;
+        if (!objects) return [];
+        const entries = [];
+        for (const obj of objects) {
+            if (!(obj instanceof MapObject) || !obj.active || !obj.element) continue;
+            if (!obj.getActionConfig?.('use_surface_slot')) continue;
+            const slots = obj.getActionSlotDefinitions?.('use_surface_slot') ?? [];
+            if (slots.length) {
+                for (const slot of slots) {
+                    entries.push({ obj, slot, el: obj.slotElements?.get(slot.id) ?? null });
+                }
+            } else {
+                // Single-occupancy object (no explicit slot definitions)
+                entries.push({ obj, slot: { id: 'default' }, el: obj.slotElements?.get('default') ?? null });
+            }
+        }
+        return entries;
+    }
+
+    _isSlotValid(entry, myte) {
+        const { obj, slot } = entry;
+        if (!obj || !slot) return false;
+        if (myte.queue.isCarrying?.()) return false;
+        if (slot.id === 'default') {
+            return !obj.isActionOccupied?.('use_surface_slot', myte);
+        }
+        return !obj.isActionSlotOccupied?.('use_surface_slot', slot.id, myte);
+    }
+
+    _findNearestSlotAt(myte, worldX, worldY) {
+        const objects = myte.parent?.gameMap?.gridSystem?.activeObjects;
+        if (!objects) return null;
+
+        // Test using the myte's center point
+        const mCX = worldX + (myte.size?.width  ?? 32) / 2;
+        const mCY = worldY + (myte.size?.height ?? 32) / 2;
+
+        for (const obj of objects) {
+            if (!(obj instanceof MapObject) || !obj.active) continue;
+            if (!obj.getActionConfig?.('use_surface_slot')) continue;
+            if (!obj.slotElements?.size) continue;
+
+            for (const [slotId, slotEl] of obj.slotElements) {
+                const sLeft   = obj.posX + parseFloat(slotEl.style.left);
+                const sTop    = obj.posY + parseFloat(slotEl.style.top);
+                const sRight  = sLeft + parseFloat(slotEl.style.width);
+                const sBottom = sTop  + parseFloat(slotEl.style.height);
+
+                if (mCX >= sLeft && mCX <= sRight && mCY >= sTop && mCY <= sBottom) {
+                    const slots = obj.getActionSlotDefinitions?.('use_surface_slot') ?? [];
+                    const slot  = slots.find(s => s.id === slotId) ?? { id: slotId };
+                    return { obj, slot, el: slotEl };
+                }
+            }
+        }
+
+        return null;
     }
 
     _findObjectAtMyte(myte) {

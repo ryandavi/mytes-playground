@@ -324,6 +324,11 @@ class MyteAI {
             return null;
         }
 
+        const restThreshold = SiteConfig.stats.restEnergyThreshold ?? 90;
+        if ((context.stats.energy ?? 100) >= restThreshold) {
+            return null;
+        }
+
         const nearbySurface = this.findTargetWithAffordance(context.nearbyObjects, 'use_surface_slot', context);
         let score = 16 + (context.needs.rest * 84) + (context.needs.comfort * 18);
         if (this.mode === MOVE_AUTONOMY_TYPES.REST) score += 36;

@@ -29,7 +29,11 @@
             @include is-selected;
         }
     }
-    &.is-queue-target > .myte-home-slot,
+    &.is-queue-target > .myte-home-slot {
+        @include is-queue-target;
+
+    }
+
     > .myte-home-slot.is-queue-target {
         @include is-queue-target;
     }
@@ -75,15 +79,17 @@
                 z-index: 100000;
                 opacity: 1;
                 display: block;
-                @include is-drag-over;
-            }
-
-            &.is-drag-over {
-                > .myte-home-slot {
-                    @include is-drag-over;
-                }
+                @include is-droppable;
             }
         }
+
+        &.is-droppable.is-drag-over {
+            > .myte-home-slot {
+                @include is-drag-over;
+            }
+        }
+
+
     }
 }
 

@@ -2218,7 +2218,11 @@ body.debug .map-object > .interactive-hitbox {
   border-radius: 5px;
   outline-offset: 4px;
 }
-.myte-slot.is-queue-target > .myte-home-slot,
+.myte-slot.is-queue-target > .myte-home-slot {
+  outline: 2px dashed #ffb000;
+  border-radius: 5px;
+  outline-offset: 4px;
+}
 .myte-slot > .myte-home-slot.is-queue-target {
   outline: 2px dashed #ffb000;
   border-radius: 5px;
@@ -2257,7 +2261,7 @@ body.debug .map-object > .interactive-hitbox {
   z-index: 100000;
   opacity: 1;
   display: block;
-  outline: var(--border-width) solid var(--on-target) !important;
+  outline: var(--border-width) solid var(--drop-target) !important;
 }
 .myte-slot.empty.is-droppable.is-drag-over > .myte-home-slot {
   outline: var(--border-width) solid var(--on-target) !important;
@@ -2807,6 +2811,11 @@ body.debug .map-object > .interactive-hitbox {
   background-color: rgba(0, 0, 255, 0.2);
   border-color: rgba(0, 0, 255, 0.5);
 }
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider.slot-marker {
+  background-color: rgba(255, 0, 255, 0.9);
+  border-color: rgb(255, 0, 255);
+  border-radius: 50%;
+}
 .app-shell > .app-stage > .canvas > .layer.debug .pathfinder-node {
   position: absolute;
   pointer-events: none;
@@ -2942,7 +2951,13 @@ body[data-tool-mode=select] .app-shell > .app-stage > .canvas > .layer > .droppe
   transform-origin: bottom;
   animation: sway 5s ease-in-out infinite;
 }
-.map-object:hover > .sprite {
+.map-object:not(.inspectable):not(.interactive):not(.draggable) {
+  pointer-events: none;
+}
+.map-object.inspectable {
+  pointer-events: auto;
+}
+.map-object.inspectable:hover > .sprite {
   filter: brightness(1.2);
 }
 .map-object > .sprite {
@@ -3006,6 +3021,29 @@ body[data-tool-mode=select] .app-shell > .app-stage > .canvas > .layer > .droppe
 }
 .map-object.draggable {
   pointer-events: all;
+}
+.map-object.is-droppable:not(.has-surface-slot) {
+  outline: var(--border-width) solid var(--drop-target) !important;
+}
+.map-object.is-drag-over:not(.has-surface-slot) {
+  outline: var(--border-width) solid var(--on-target) !important;
+}
+.map-object.is-drop-rejected:not(.has-surface-slot) {
+  outline: var(--border-width) solid var(--color-danger) !important;
+}
+.map-object .map-object-slot {
+  position: absolute;
+  pointer-events: none;
+  z-index: 10000;
+}
+.map-object .map-object-slot.is-droppable {
+  outline: var(--border-width) solid var(--drop-target) !important;
+}
+.map-object .map-object-slot.is-drag-over {
+  outline: var(--border-width) solid var(--on-target) !important;
+}
+.map-object .map-object-slot.is-drop-rejected {
+  outline: var(--border-width) solid var(--color-danger) !important;
 }
 body[data-tool-mode=select] .map-object.inspectable {
   cursor: pointer;
@@ -3094,14 +3132,8 @@ body[data-tool-mode=drag] .map-object.draggable {
   opacity: 0.6;
   filter: grayscale(70%);
 }
-.map-object.portal.is-droppable > .portal-window {
-  outline: var(--border-width) solid var(--drop-target) !important;
-}
 .map-object.portal.is-drag-over {
   animation: portal-pulse 0.4s infinite ease-in-out;
-}
-.map-object.portal.is-drag-over > .portal-window {
-  outline: var(--border-width) solid var(--on-target) !important;
 }
 .map-object.portal.blue_portal .sprite {
   box-shadow: 0 0 20px rgba(0, 191, 255, 0.7);

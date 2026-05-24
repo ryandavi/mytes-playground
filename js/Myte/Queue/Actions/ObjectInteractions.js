@@ -283,11 +283,24 @@ class SurfaceSlotAction extends GoToObjectAction {
     };
 
     static canPerform(selected, active) {
-        return active &&
-            selected instanceof MapObject &&
-            !!selected.getActionConfig?.('use_surface_slot') &&
-            !active.queue.isCarrying() &&
-            !selected.isActionOccupied?.('use_surface_slot', active);
+        if (!active ||
+            !(selected instanceof MapObject) ||
+            !selected.getActionConfig?.('use_surface_slot') ||
+            active.queue.isCarrying() ||
+            selected.isActionOccupied?.('use_surface_slot', active)) {
+            return false;
+        }
+
+        const actionConfig = selected.getActionConfig('use_surface_slot', {});
+        const benefit = actionConfig.benefit ?? 'energy';
+        if (benefit === 'energy') {
+            const threshold = SiteConfig.stats.restEnergyThreshold ?? 90;
+            if ((active.stats?.energy ?? 0) >= threshold) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     static getRequiredOptions(selected) {
@@ -378,8 +391,37 @@ class SurfaceSlotAction extends GoToObjectAction {
             return;
         }
 
+        const config = this.getTargetActionConfig();
+        const benefit = config.benefit ?? 'energy';
+
+        if (benefit !== 'energy' && config.randomDuration) {
+            if (this.myte.isActive) {
+                this.currentDuration = Infinity;
+            } else {
+                const min = config.minDuration ?? 10000;
+                const max = config.maxDuration ?? min + 15000;
+                this.currentDuration = min + Math.random() * (max - min);
+            }
+        } else {
+            this.currentDuration = this.duration;
+        }
+        this._restElapsed = 0;
+
+        if (this.immediate) {
+            // Skip the approach walk — jump straight to settle from current position
+            this._entryPosition = { x: this.myte.posX, y: this.myte.posY };
+            this._entrySide = this.getNearestSideForPosition(this._entryPosition);
+            this.applyRestFacing();
+            this.beginTransition(
+                'settle',
+                this._entryPosition,
+                this.getSurfaceRestPosition(),
+                this.settleDuration
+            );
+            return;
+        }
+
         super.start();
-        this.currentDuration = this.duration;
     }
 
     update(deltaTime = 16.667) {
@@ -415,14 +457,20 @@ class SurfaceSlotAction extends GoToObjectAction {
             return true;
         }
 
+        this._restElapsed = (this._restElapsed ?? 0) + dt;
+
         this.bobPhase += (dt / 16.667) * this.bobSpeed;
         const bobY = this.baseRestPosition.y + Math.sin(this.bobPhase) * this.bobHeight;
         this.setMyteWorldPosition(this.baseRestPosition.x, bobY);
 
-        const restUntilFull = this.getTargetActionConfig().restUntilFull ?? false;
+        const actionConfig = this.getTargetActionConfig();
+        const benefit = actionConfig.benefit ?? 'energy';
+        const minDuration = SiteConfig.stats.minRestDuration ?? 2000;
+        const restUntilFull = benefit === 'energy' && (actionConfig.restUntilFull ?? false);
+
         if (restUntilFull) {
-            // Stay resting until energy is fully restored; AI can still interrupt
-            if (this.myte.stats.energy < this.myte.stats.maxEnergy) {
+            // Stay resting until energy is fully restored and min duration has elapsed
+            if (this.myte.stats.energy < this.myte.stats.maxEnergy || this._restElapsed < minDuration) {
                 return false;
             }
         } else {
@@ -447,7 +495,11 @@ class SurfaceSlotAction extends GoToObjectAction {
     }
 
     interrupt() {
-        this.finishSurfacePlacement({ snapToExit: true });
+        const isDragInterrupt = !!this.myte.isDragging;
+        if (this.phase === 'rest' || this.phase === 'settle' || isDragInterrupt) {
+            this.myte.stats?.setMood?.('grumpy');
+        }
+        this.finishSurfacePlacement({ snapToExit: !isDragInterrupt });
         super.interrupt();
     }
 
@@ -791,6 +843,37 @@ class SurfaceSlotAction extends GoToObjectAction {
         }));
     }
 
+    getSlotFrontExitPosition(slot, exitSearchRadius) {
+        if (!slot?.restPosition || !slot?.approachConfig) return null;
+        const targetRect = this.getTargetRect(this.target, 'collider');
+        const myteRect   = this.myte.getRect();
+        if (!targetRect || !myteRect) return null;
+
+        const xFactor = slot.restPosition.xFactor ?? 0.5;
+        const yFactor = slot.restPosition.yFactor ?? 0.5;
+        const slotCX  = targetRect.x + targetRect.width  * xFactor;
+        const slotCY  = targetRect.y + targetRect.height * yFactor;
+        const gap     = this.toFiniteNumber(this.exitGap, 16);
+
+        const sides   = Array.isArray(slot.approachConfig.allowedSides)
+            ? slot.approachConfig.allowedSides
+            : [slot.approachConfig.preferredSide ?? 'bottom'];
+        const exitSide = this._entrySide ?? sides[0] ?? 'bottom';
+
+        let x, y;
+        switch (exitSide) {
+            case 'bottom': x = slotCX - myteRect.width / 2;  y = targetRect.y + targetRect.height + gap; break;
+            case 'top':    x = slotCX - myteRect.width / 2;  y = targetRect.y - myteRect.height - gap;  break;
+            case 'left':   x = targetRect.x - myteRect.width - gap;          y = slotCY - myteRect.height / 2; break;
+            case 'right':  x = targetRect.x + targetRect.width + gap;         y = slotCY - myteRect.height / 2; break;
+            default: return null;
+        }
+
+        const gridSystem = this.myte.parent?.gameMap?.gridSystem;
+        const safe = gridSystem?.findNearestValidPositionForEntity?.(this.myte, x, y, exitSearchRadius) ?? { x, y };
+        return (safe && this.myte.canMoveToPosition?.(safe.x, safe.y)) ? safe : null;
+    }
+
     getSurfaceExitPosition() {
         const gridSystem = this.myte.parent?.gameMap?.gridSystem;
         const exitSearchRadius = this.toFiniteNumber(this.exitSearchRadius, 20);
@@ -804,6 +887,10 @@ class SurfaceSlotAction extends GoToObjectAction {
                 return safe;
             }
         }
+
+        // Slots with explicit approach sides exit directly in front of their rest position
+        const slotFront = this.getSlotFrontExitPosition(slot, exitSearchRadius);
+        if (slotFront) return slotFront;
 
         if (this.returnToEntry !== false && this._entryPosition) {
             const safeEntry = gridSystem?.findNearestValidPositionForEntity?.(
