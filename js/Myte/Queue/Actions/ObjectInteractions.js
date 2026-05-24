@@ -1109,7 +1109,7 @@ class OpenChestAction extends GoToObjectAction {
         moodEffect: 10,
         defaultOptions: {
             openAnimationDuration: 40,
-            receiveIdleDuration: 60
+            receiveIdleDuration: 1000
         }
     };
 
@@ -1310,7 +1310,7 @@ class PickFlowerAction extends GoToObjectAction {
         this.target?.setDeflowered?.();
         this.target?.playConfiguredSound?.('pick');
         this.myte.queue.addExpression('heart', 300, 1);
-        this.myte.queue.addIdle(40);
+        this.myte.queue.addIdle(800);
     }
 
     _dropFlowerItem() {
@@ -1543,7 +1543,7 @@ class HarvestAction extends GoToObjectAction {
         moodEffect: 8,
         defaultOptions: {
             harvestAnimationDuration: 50,
-            postActionIdleDuration: 45
+            postActionIdleDuration: 800
         }
     };
 

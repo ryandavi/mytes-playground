@@ -132,6 +132,15 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
     getEntityIntentPoint(entity) {
         if (!entity) return null;
 
+        // Prefer the action's final destination (set by GoToObjectAction / AStarMoveAction).
+        // The current waypoint (targetX/Y) may still be on the approach side of the door
+        // while the true goal is past it, which would cause a false crossesDoor=false.
+        if (entity._movementDestination &&
+            Number.isFinite(entity._movementDestination.x) &&
+            Number.isFinite(entity._movementDestination.y)) {
+            return { x: entity._movementDestination.x, y: entity._movementDestination.y };
+        }
+
         if (Array.isArray(entity.currentPath) && Number.isFinite(entity.pathIndex) && entity.currentPath[entity.pathIndex]) {
             const next = entity.currentPath[entity.pathIndex];
             return {
@@ -170,8 +179,8 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
             const actorSide = actorCenter.x < (doorCenter.x - margin) ? -1 : actorCenter.x > (doorCenter.x + margin) ? 1 : 0;
             const intentSide = intent.x < (doorCenter.x - margin) ? -1 : intent.x > (doorCenter.x + margin) ? 1 : 0;
             const crossesDoor = actorSide !== 0 && intentSide !== 0 && actorSide !== intentSide;
-            const movingTowardDoor = Math.abs(doorOffset) <= margin || Math.sign(motion) === Math.sign(doorOffset);
-            return crossesDoor || movingTowardDoor;
+            const atDoor = Math.abs(doorOffset) <= margin;
+            return crossesDoor || atDoor;
         }
 
         if (axis === 'y') {
@@ -182,8 +191,8 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
             const actorSide = actorCenter.y < (doorCenter.y - margin) ? -1 : actorCenter.y > (doorCenter.y + margin) ? 1 : 0;
             const intentSide = intent.y < (doorCenter.y - margin) ? -1 : intent.y > (doorCenter.y + margin) ? 1 : 0;
             const crossesDoor = actorSide !== 0 && intentSide !== 0 && actorSide !== intentSide;
-            const movingTowardDoor = Math.abs(doorOffset) <= margin || Math.sign(motion) === Math.sign(doorOffset);
-            return crossesDoor || movingTowardDoor;
+            const atDoor = Math.abs(doorOffset) <= margin;
+            return crossesDoor || atDoor;
         }
 
         return false;

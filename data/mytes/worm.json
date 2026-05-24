@@ -1,4 +1,5 @@
 {
+  "schemaVersion": 1,
   "id": "worm",
   "displayName": "Worm",
   "movement": {
@@ -9,12 +10,16 @@
     },
     "runAwayDistance": 220
   },
-  "collider": {
-    "type": "box",
-    "width": 88,
-    "height": 48,
-    "offsetX": 52,
-    "offsetY": 122
+  "spatial": {
+    "regions": {
+      "collider": {
+        "type": "box",
+        "x": 52,
+        "y": 122,
+        "width": 88,
+        "height": 48
+      }
+    }
   },
   "physics": {
     "gravity": 0.18,
@@ -24,11 +29,7 @@
     "stepHeight": 2
   },
   "capabilities": {
-    "can_open_doors": false,
-    "can_swim": false,
-    "can_wade": true,
-    "follows_paths": true,
-    "fire_resistance": false
+    "canOpenDoors": false
   },
   "stats": {
     "energy": 90,
@@ -36,10 +37,8 @@
     "speed": 0.85
   },
   "visual": {
-    "cssClass": "worm",
-    "frameSize": {
-      "width": 192,
-      "height": 192
+    "spriteSheet": {
+      "filter": "hue-rotate(38deg) saturate(1.15) brightness(1.03)"
     },
     "spriteSets": {
       "E": [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0]],

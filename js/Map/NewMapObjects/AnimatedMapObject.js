@@ -5,18 +5,18 @@ const withAnimation = (BaseClass) => class extends BaseClass {
         super(parent, type, variant, posX, posY, config, options);
 
         const animConfig = {
-            frameWidth:  this.getConfig('spriteConfig.frameWidth',  this.getConfig('size.width')),
-            frameHeight: this.getConfig('spriteConfig.frameHeight', this.getConfig('size.height')),
-            scale:       this.getConfig('spriteConfig.scale',       this.getConfig('scale')),
-            spriteSheet: this.getConfig('spriteConfig.spriteSheet.url', this.getConfig('spriteSheet.url')),
-            frameDelay:  options.frameDelay || this.getConfig('spriteConfig.frameDelay'),
-            animations:  this.getConfig('spriteConfig.animations') || {},
-            default:     this.getConfig('spriteConfig.default', this.getConfig('default'))
+            frameWidth:  this.getVisualFrameWidth(),
+            frameHeight: this.getVisualFrameSize()?.height ?? this.getConfig('size.height'),
+            scale:       this.getVisualScale(),
+            spriteSheet: this.getVisualSpriteSheet().url || this.getConfig('spriteSheet.url'),
+            frameDelay:  options.frameDelay || this.getVisualFrameDelay(),
+            animations:  this.getVisualAnimations(),
+            default:     this.getDefaultVisualState('idle')
         };
 
         this.animation = new AnimationController(this, animConfig);
         this.currentAnimation = null;
-        this.defaultAnimation = this.getConfig('spriteConfig.default', 'idle');
+        this.defaultAnimation = this.getDefaultVisualState('idle');
     }
 
     playAnimation(animationName, onComplete) {
@@ -59,7 +59,8 @@ const withAnimation = (BaseClass) => class extends BaseClass {
         const element = super.render(container, parent);
         element.classList.add('animated-map-object');
 
-        if (this.getConfig('renderType') === 'animated' || this.getConfig('renderType') === 'sprite') {
+        const renderType = this.getVisualRenderType();
+        if (renderType === 'animated' || renderType === 'sprite') {
             this._setupAnimation(element);
             this.playAnimation(this.defaultAnimation);
         }

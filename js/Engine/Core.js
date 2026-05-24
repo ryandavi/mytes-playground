@@ -63,7 +63,7 @@ class MyteCore {
         this.containers = new Map();
         this.gameTime = new GameTime();
         this.eventManager = new EventManager(this);
-        this.resourceManager = new ResourceManager(this);
+        this.resourceManager = new ResourceManager();
 
         this.loadingManager = new LoadingManager(this.config.loading);
         this.boundUnlockAudio = null;
@@ -89,11 +89,15 @@ class MyteCore {
         try {
             this.loadingManager.initialize();
 
-            this.loadingManager.setMessage("Loading assets...");
-            await this.resourceManager.preloadEssentialResources();
-
             this.loadingManager.setMessage("Loading item data...");
             await ItemRegistry.preload();
+
+            this.loadingManager.setMessage("Loading action data...");
+            const actionDataLoaded = await ActionDefinitionRegistry.preload();
+            if (!actionDataLoaded) {
+                throw new Error('Failed to load action metadata.');
+            }
+            ActionManager.validateDefinitions();
 
             this.loadingManager.setMessage("Loading user data...");
             await this.initializeUser();
@@ -107,16 +111,10 @@ class MyteCore {
             this.initializeAudio();
             this.loadingManager.updateStageProgress(LoadingManager.STAGES.CORE, 1);
 
-            // Load remaining resources in background; complete loading when done
-            this.resourceManager.loadResources()
-                .catch(error => console.warn('Some resources failed to load:', error))
-                .finally(() => {
-                    this.loadingManager.updateStageProgress(LoadingManager.STAGES.RESOURCES, 1);
-                    this.loadingManager.completeLoading();
-                });
-
             this.isInitialized = true;
             this.startUpdateLoop();
+            this.loadingManager.updateStageProgress(LoadingManager.STAGES.RESOURCES, 1);
+            this.loadingManager.completeLoading();
 
             this.toastManager = new ToastSystem(document.body);
 

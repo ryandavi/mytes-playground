@@ -58,6 +58,7 @@ class MapObjectFactory {
     static BASE_CONFIG = {};
     static TYPE_CONFIGS = {};
     static CONFIG_LOADED = false;
+    static configSource = null;
 
     static normalizeType(type) {
         return String(type || '')
@@ -67,10 +68,137 @@ class MapObjectFactory {
     }
 
     static initialize(baseConfig = {}, typeConfigs = {}) {
-        this.BASE_CONFIG = baseConfig || {};
-        this.TYPE_CONFIGS = typeConfigs || {};
+        this.BASE_CONFIG = this.normalizeCanonicalConfig(baseConfig || {});
+        this.TYPE_CONFIGS = this.normalizeCanonicalConfig(typeConfigs || {});
         this.CONFIG_LOADED = true;
+        this.configSource = this.configSource || 'initialize';
         this.parent = null;
+    }
+
+    static normalizeCanonicalConfig(value) {
+        if (Array.isArray(value)) {
+            return value.map(entry => this.normalizeCanonicalConfig(entry));
+        }
+
+        if (!this.isPlainObject(value)) {
+            return value;
+        }
+
+        const normalized = {};
+        Object.entries(value).forEach(([key, childValue]) => {
+            normalized[key] = this.normalizeCanonicalConfig(childValue);
+        });
+
+        const visual = this.isPlainObject(normalized.visual) ? normalized.visual : null;
+        const regions = this.isPlainObject(normalized.spatial?.regions) ? normalized.spatial.regions : null;
+
+        if (visual) {
+            const inferredDefaultState = this.inferVisualDefaultState(visual);
+            if (normalized.renderType === undefined && visual.renderType !== undefined) {
+                normalized.renderType = visual.renderType;
+            }
+            if (normalized.default === undefined && (visual.defaultState !== undefined || inferredDefaultState !== null)) {
+                normalized.default = visual.defaultState ?? inferredDefaultState;
+            }
+            if (normalized.states === undefined && visual.states !== undefined) {
+                normalized.states = this.cloneValue(visual.states);
+            }
+            if (normalized.animates === undefined && visual.animates !== undefined) {
+                normalized.animates = visual.animates;
+            }
+            if (normalized.frameDelay === undefined && visual.frameDelay !== undefined) {
+                normalized.frameDelay = visual.frameDelay;
+            }
+            if (normalized.shadow === undefined && visual.shadow !== undefined) {
+                normalized.shadow = this.cloneValue(visual.shadow);
+            }
+
+            if (normalized.spriteConfig === undefined) {
+                const spriteConfig = {};
+                if (visual.defaultState !== undefined || inferredDefaultState !== null) {
+                    spriteConfig.default = visual.defaultState ?? inferredDefaultState;
+                }
+                if (visual.frameDelay !== undefined) {
+                    spriteConfig.frameDelay = visual.frameDelay;
+                }
+                if (visual.frameWidth !== undefined) {
+                    spriteConfig.frameWidth = visual.frameWidth;
+                }
+                if (visual.scale !== undefined) {
+                    spriteConfig.scale = visual.scale;
+                }
+                if (visual.spriteSheet !== undefined) {
+                    spriteConfig.spriteSheet = this.cloneValue(visual.spriteSheet);
+                }
+                if (visual.animations !== undefined) {
+                    spriteConfig.animations = this.cloneValue(visual.animations);
+                }
+
+                if (Object.keys(spriteConfig).length > 0) {
+                    normalized.spriteConfig = spriteConfig;
+                }
+            }
+        }
+
+        if (regions) {
+            if (normalized.collider === undefined && regions.collider !== undefined) {
+                normalized.collider = this.regionToLegacyCollider(regions.collider);
+            }
+            if (normalized.interactionRegion === undefined && regions.interaction !== undefined) {
+                normalized.interactionRegion = this.regionToLegacyCollider(regions.interaction);
+            }
+            if (normalized.hitbox === undefined && regions.hit !== undefined) {
+                normalized.hitbox = this.regionToLegacyCollider(regions.hit);
+            }
+            if (normalized.selectbox === undefined && regions.select !== undefined) {
+                normalized.selectbox = this.regionToLegacyCollider(regions.select);
+            }
+            if (normalized.pickupbox === undefined && regions.pickup !== undefined) {
+                normalized.pickupbox = this.regionToLegacyCollider(regions.pickup);
+            }
+        }
+
+        return normalized;
+    }
+
+    static inferVisualDefaultState(visual = {}) {
+        const animations = visual?.animations;
+        if (!this.isPlainObject(animations)) {
+            return null;
+        }
+
+        const animationIds = Object.keys(animations);
+        if (!animationIds.length) {
+            return null;
+        }
+
+        const preferredIds = ['default', 'idle', 'closed', 'off', 'seed', 'active', 'opened', 'open'];
+        for (const preferredId of preferredIds) {
+            if (animationIds.includes(preferredId)) {
+                return preferredId;
+            }
+        }
+
+        return animationIds[0] || null;
+    }
+
+    static regionToLegacyCollider(region) {
+        if (region == null) {
+            return null;
+        }
+
+        if (!this.isPlainObject(region)) {
+            return region;
+        }
+
+        const legacyRegion = this.cloneValue(region);
+        if (legacyRegion.x !== undefined && legacyRegion.offsetX === undefined) {
+            legacyRegion.offsetX = legacyRegion.x;
+        }
+        if (legacyRegion.y !== undefined && legacyRegion.offsetY === undefined) {
+            legacyRegion.offsetY = legacyRegion.y;
+        }
+        return legacyRegion;
     }
 
     static async loadConfig(configUrl) {
@@ -82,9 +210,38 @@ class MapObjectFactory {
             
             const config = await response.json();
             this.initialize(config.baseConfig, config.types);
+            this.configSource = configUrl;
             return true;
         } catch (error) {
             console.error('Error loading map object configuration:', error);
+            return false;
+        }
+    }
+
+    static async loadConfigFiles(baseConfigUrl, typeConfigUrl) {
+        try {
+            const [baseResponse, typeResponse] = await Promise.all([
+                fetch(baseConfigUrl),
+                fetch(typeConfigUrl)
+            ]);
+
+            if (!baseResponse.ok) {
+                throw new Error(`Failed to load base map object configuration: ${baseResponse.statusText}`);
+            }
+            if (!typeResponse.ok) {
+                throw new Error(`Failed to load map object type configuration: ${typeResponse.statusText}`);
+            }
+
+            const [baseConfig, typeConfigs] = await Promise.all([
+                baseResponse.json(),
+                typeResponse.json()
+            ]);
+
+            this.initialize(baseConfig, typeConfigs);
+            this.configSource = `${baseConfigUrl} + ${typeConfigUrl}`;
+            return true;
+        } catch (error) {
+            console.error('Error loading map object configuration files:', error);
             return false;
         }
     }
@@ -144,13 +301,24 @@ class MapObjectFactory {
         return result;
     }
 
+    static cloneValue(value) {
+        if (Array.isArray(value)) {
+            return value.map(entry => this.cloneValue(entry));
+        }
+
+        if (this.isPlainObject(value)) {
+            const cloned = {};
+            Object.entries(value).forEach(([key, childValue]) => {
+                cloned[key] = this.cloneValue(childValue);
+            });
+            return cloned;
+        }
+
+        return value;
+    }
+
     static getTypeConfig(type) {
         type = this.normalizeType(type);
-
-        // Fallback to hardcoded MAP_OBJECT_TYPES if config not loaded
-        if (!this.CONFIG_LOADED && typeof MAP_OBJECT_TYPES !== 'undefined') {
-            return MAP_OBJECT_TYPES[type];
-        }
         
         return this.TYPE_CONFIGS[type];
     }
@@ -187,11 +355,8 @@ class MapObjectFactory {
     }
 
     static getAvailableTypes() {
-        // Use loaded configs or fallback to hardcoded types
         if (this.CONFIG_LOADED) {
             return Object.keys(this.TYPE_CONFIGS);
-        } else if (typeof MAP_OBJECT_TYPES !== 'undefined') {
-            return Object.keys(MAP_OBJECT_TYPES);
         }
         return [];
     }
@@ -234,5 +399,3 @@ MapObjectFactory.registry
     .register('GATE', GateMapObject)
     .register('FENCE', FenceMapObject)	
     .setDefaultConstructor(MapObject);
-
-MapObjectFactory.initialize(BASE_CONFIG, TYPE_CONFIGS);

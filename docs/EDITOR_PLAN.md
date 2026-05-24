@@ -45,22 +45,21 @@ We should not make "edit `.js` files directly" the primary long-term strategy. F
 - Items are loaded from `data/metadata/items.json` via `js/Engine/ItemRegistry.js`
 - Mytes are loaded from `data/mytes/myte.json` plus species files like `data/mytes/snail.json` via `js/Myte/MyteDefinitions.js`
 
-### Semi-hardcoded lists that should become data-driven
+### Recently migrated catalog data
 
-- available Myte species are still declared in `MyteDefinitionRegistry.definitionFiles`
+- available Myte species should come from `data/mytes/species.json` rather than hardcoded loader lists
 
 ### Still code-driven
 
-- Map object definitions live in `js/Map/NewMapObjects/MapObjectConfigs.js`
 - Object behavior/class wiring lives in `js/Map/MapObjectFactory.js`
-- Actions data exists only as `data/metadata/actions.json.deprecated`; runtime behavior is now code-based in queue/action classes
+- Action behavior/queue execution still lives in JS queue/action classes, but canonical action metadata now lives in `data/metadata/actions.json`
 
 ### Useful existing pieces we can build on
 
 - `MapObject` already renders colliders, interactive hit areas, and slot surfaces
 - `DebugUI` already draws collider overlays and slot markers
 - `ModalWindow`, `ScreenManager`, and the current shell/window CSS already give us a native-looking UI system
-- `index.html` still contains old `selectbox`/`hitbox` remnants, which suggests those concepts should be restored as proper data concepts rather than ignored
+- legacy `selectbox`/`hitbox` ideas already existed in the project, which confirms they should be restored as proper data concepts rather than ignored
 
 ## Product Direction
 
@@ -99,6 +98,58 @@ That means:
 - runtime should load authored values from the same files the editor writes
 - the editor should preview through the same loaders the game uses
 - compatibility should be protected by schemas, adapters, and validation, not manual discipline
+
+Consistency rule:
+
+- the same concept should use the same authored path across domains
+- not every domain needs every section, but shared concepts should not get different names just because they live in different files
+- for example, sprite-sheet and sprite presentation data should live under `visual` whether the record is a Myte, map object, or item
+
+## Inheritance Policy
+
+Inherited data should stay sparse and clean.
+
+Canonical rule:
+
+- child definition files store overrides only
+- if a child value is the same as its parent, it should not be written into the child file
+- if a child field is removed, the effective value should come from the parent automatically
+- the editor should show the effective merged value and the inherited parent value for reference
+- the editor should also show where a value comes from, such as `base` or `species override`
+
+This means the authored child JSON stays minimal, while the editor can still be informative.
+
+Recommended save behavior for inherited fields:
+
+- if a user changes a field back to the same value as its parent, the override should be removed on save
+- do not serialize duplicated parent values just because the user touched the field
+- inherited reference values belong in the editor UI, not in the child JSON
+- the inspector should show the inherited parent value inline for reference without writing it into the child record
+
+## Schema-Driven Editor
+
+The editor should not be hardcoded around today's exact field list.
+
+Recommended approach:
+
+- field layout and validation come from schema definitions
+- inheritance and source-of-value display come from schema-aware data adapters
+- previews use runtime loaders/renderers, not duplicated editor-only logic
+- special domains can still have custom panels, but they should sit on top of shared schema-driven forms
+
+If we add a new field later:
+
+- update the canonical schema
+- update the loader/adapter
+- update any domain-specific preview or custom control only if needed
+
+Practical implication:
+
+- the editor should be schema-driven, not a giant hardcoded list of today's fields
+- shared concepts like `spatial` and `visual` should render automatically from schema metadata
+- custom controls should exist only where the experience needs something more visual, like geometry and animation editing
+
+That keeps structure changes manageable instead of forcing us to rewrite the editor every time data grows.
 
 ## Why Not Edit JS Directly
 
@@ -177,6 +228,7 @@ Reuse targets:
 - `js/Map/NewMapObjects/MapObject.js`
 - `js/Utility/RectUtils.js`
 - `js/UI/ModalWindow.js`
+- `js/Myte/Queue/ActionDefinitionRegistry.js`
 - existing `window-panel`, `app-shell`, and token CSS
 
 Do not duplicate object rendering logic in the editor if the game already knows how to render the thing.
@@ -221,7 +273,7 @@ Then add:
 - `data/mytes/species.json`
 - `data/metadata/actions.json`
 - `data/map-objects/base.json`
-- `data/map-objects/types/*.json`
+- `data/map-objects/types.json`
 
 ## Species Registry
 
@@ -242,14 +294,14 @@ Recommended shape:
   "species": [
     {
       "id": "snail",
-      "definition": "data/mytes/snail.json",
+      "definitionFile": "snail.json",
       "label": "Snail",
       "enabled": true,
       "sortOrder": 10
     },
     {
       "id": "worm",
-      "definition": "data/mytes/worm.json",
+      "definitionFile": "worm.json",
       "label": "Worm",
       "enabled": true,
       "sortOrder": 20
@@ -258,17 +310,17 @@ Recommended shape:
 }
 ```
 
-Then `MyteDefinitionRegistry` should load this catalog instead of keeping a hardcoded `definitionFiles` array.
+Then `MyteDefinitionRegistry` should load this catalog instead of relying on a hardcoded species list.
 
 ## Map Object Migration Strategy
 
-Map objects are the hardest part because definitions are currently mixed into `MapObjectConfigs.js`.
+Map objects should use canonical JSON definition files plus JS behavior classes.
 
 Recommended migration:
 
 ### Step A
 
-Create a JSON format for map object definitions that mirrors the current config structure:
+Create a JSON format for map object definitions that mirrors Myte structure where the concepts overlap:
 
 - base config
 - type config
@@ -278,14 +330,16 @@ Create a JSON format for map object definitions that mirrors the current config 
 - slot config
 - geometry config
 - sprite/animation config
+- shared `spatial.anchors` and `spatial.regions`
+- shared `visual` section for sprite, animation, and shadow data
 
 ### Step B
 
-Teach `MapObjectFactory` to initialize from JSON-loaded configs instead of only globals.
+Teach `MapObjectFactory` to initialize from JSON-loaded configs before maps are created.
 
 ### Step C
 
-Keep `MapObjectFactory` class registrations in JS, but move editable values out of `MapObjectConfigs.js`.
+Keep `MapObjectFactory` class registrations in JS, but move editable values out of JS-authored config tables.
 
 ### Step D
 
@@ -295,12 +349,7 @@ This gives us editable config without weakening the behavior model.
 
 ### Step E
 
-Once the JSON loader is stable, shrink `MapObjectConfigs.js` into either:
-
-- a compatibility bridge during migration, or
-- a fully removed legacy file
-
-The end goal is that runtime and editor both read the same map object definition files.
+Use the JSON files as the runtime source of truth and remove legacy JS-authored config sources from the load path.
 
 ## Action System Strategy
 
@@ -376,6 +425,7 @@ For Mytes:
 - switch species
 - switch direction
 - preview any sprite set/state
+- preview sprite sheet source and visual filter
 - scrub frame sequences
 - preview named anchors and named regions
 - preview collider/select/hit geometry
@@ -387,6 +437,7 @@ For Map Objects:
 - switch facing direction
 - preview state transitions
 - preview animated sprite sequences
+- preview shadow placement, opacity, scale, and offsets
 - preview collider, interaction area, selection area, hit area, and pickup area
 - preview select box and hit box
 - preview slot regions and slot rest points
@@ -407,11 +458,11 @@ Geometry editing should prioritize exact numeric editing in the inspector, with 
 Editable geometry concepts:
 
 - `size`
-- `collider`
-- `interactionRegion`
-- `hitbox`
-- `selectbox`
-- `pickupbox`
+- `spatial.regions.collider`
+- `spatial.regions.interaction`
+- `spatial.regions.hit`
+- `spatial.regions.select`
+- `spatial.regions.pickup`
 - slot bounds
 - slot anchor points
 - approach positions
@@ -425,7 +476,7 @@ Recommended interaction model:
 - optionally support drag rectangles and resize handles as a secondary helper, not the primary source of truth
 - toggle overlays independently
 
-Important: restore `hitbox` and `selectbox` as explicit schema concepts, even if runtime currently uses mainly `collider` and `interactiveCollider`.
+Important: restore `hitbox` and `selectbox` as explicit schema concepts, even if runtime currently uses mainly `collider` and interaction-region geometry.
 
 Recommended rule:
 
@@ -436,21 +487,19 @@ Recommended naming and semantics:
 
 - `collider`
   Used for physical blocking, pathing, overlap checks, and world collision.
-- `interactionRegion`
+- `interaction`
   Used for "can I interact with this thing" pointer or proximity targeting.
-  This is the current role most closely matching `interactiveCollider`.
-- `selectbox`
+- `select`
   Used for click/touch selection in the UI.
-- `hitbox`
+- `hit`
   Used for taking hits from attacks, hazards, projectiles, or damage effects.
-- `pickupbox`
+- `pickup`
   Used for grab/pickup targeting when pickup should be more specific than general selection.
 
 Recommended migration:
 
-- keep reading `interactiveCollider` temporarily
-- normalize it internally to `interactionRegion`
-- migrate authored data to the new naming before editor work starts
+- authored data should use `spatial.regions.interaction`
+- runtime loaders may normalize that into older internal fields until every consumer is fully migrated
 
 ## Spatial Anchors And Regions
 
@@ -546,10 +595,9 @@ Why this structure:
 
 Recommended migration path:
 
-- keep existing `carryOffsets` working temporarily
 - add `spatial.anchors` and `spatial.regions`
-- adapt runtime to derive old carry behavior from the new anchor model
-- gradually retire old one-off fields
+- move one-off spatial fields into that shared model
+- keep new authored data centered on the shared spatial schema instead of inventing new special-case fields
 
 ## Animation Editing
 
@@ -560,11 +608,27 @@ For any animation/state editor, support:
 - remove frame
 - change duration/frame delay
 - set loop on/off
+- set per-animation loop behavior explicitly
 - assign preview state
 - play/pause/step
 - reorder states
 - rename state
 - mark default state
+- edit sprite-sheet source, frame size, and animation membership
+- preview one-shot animations versus looping idle states clearly
+
+State naming best practice:
+
+- keep one consistent field for startup state: `visual.defaultState`
+- keep actual state ids semantic, such as `closed`, `opened`, `idle`, `seed`, `off`, or `active`
+- do not rename meaningful gameplay states to a generic `default` label just for cross-object consistency
+- use `default` only when an object truly has a generic unnamed state and no better semantic label
+
+Why:
+
+- `defaultState` answers which state the object starts in
+- the state id answers what real gameplay or visual mode the object is in
+- semantic state ids are clearer for runtime, editor UX, debugging, and future content work
 
 If possible, frame editing should use the existing sprite-sheet logic rather than inventing a new rendering path.
 
@@ -584,6 +648,7 @@ Should edit:
 - stats and decay/regeneration values
 - mood definitions
 - visual frame size
+- sprite sheet metadata
 - sprite sets
 - named anchors and named regions
 - expression aliases
@@ -604,6 +669,7 @@ Should edit:
 - render type
 - sprite sheets and states
 - animation sequences
+- shadow config
 - collision and interaction geometry
 - named anchors and named regions
 - action config
@@ -731,8 +797,8 @@ Recommended protections:
 
 ### 3. Adapters at boundaries
 
-- if runtime needs an older shape, use an adapter layer
-- do not leak temporary legacy shapes into the canonical data
+- if runtime preview needs normalized computed data, produce it from canonical authored data
+- do not leak duplicate authored shapes into the canonical data
 
 ### 4. Contract tests
 
@@ -759,7 +825,7 @@ These are the highest-value prep changes to make first.
 ### 1. Choose canonical authored files now
 
 - keep Mytes and Items on JSON
-- migrate map object authored config out of `MapObjectConfigs.js`
+- keep map object authored config in `data/map-objects/base.json` and `data/map-objects/types.json`
 - revive Actions as JSON definitions plus JS implementations
 
 ### 2. Formalize geometry concepts
@@ -767,8 +833,7 @@ These are the highest-value prep changes to make first.
 - add explicit `hitbox`
 - add explicit `selectbox`
 - add explicit `pickupbox`
-- rename authored `interactiveCollider` to `interactionRegion`
-- keep a temporary runtime adapter for old `interactiveCollider`
+- use `spatial.regions.interaction` as the canonical authored name
 - make runtime tolerate missing optional regions cleanly
 
 ### 3. Add a shared spatial schema
@@ -776,7 +841,14 @@ These are the highest-value prep changes to make first.
 - introduce named `anchors`
 - introduce named `regions`
 - support per-direction overrides
-- plan to migrate `carryOffsets` into this system
+- keep carry-style attachment data in this system instead of separate per-feature fields
+
+### 3.5. Bring domain parity to authored visuals
+
+- map objects and Mytes should both use a `visual` section as the authored source of truth
+- items should also use `visual` for sprite-sheet and icon data
+- sprite-sheet metadata, animation definitions, default state, and shadow data should live there
+- runtime loaders can normalize authored `visual` data into any older runtime fields still needed internally
 
 ### 4. Add stable ids and references
 
@@ -796,10 +868,11 @@ Renames should be deliberate migrations, not casual text edits.
 - save-time validation
 - migration hooks if formats change later
 
-### 6. Add compatibility loaders before removing legacy fields
+### 6. Remove legacy load paths once canonical data is in place
 
-- keep old fields working briefly through adapters
-- only remove them after the new source of truth is proven
+- runtime should load only canonical authored data files
+- older JS-authored config sources should be removed from the load path, not left as hidden fallbacks
+- internal normalization is acceptable only when it is derived from canonical data at load time
 
 ### 7. Separate authored config from behavior code everywhere possible
 
@@ -807,6 +880,12 @@ Renames should be deliberate migrations, not casual text edits.
 - behavior branches and algorithms stay in JS
 
 If we do these first, the editor becomes much simpler and less brittle.
+
+### 6.5. Add validation so compatibility is enforced automatically
+
+- add repo-level content validation for Mytes, items, actions, and map objects
+- validate ids, references, canonical file presence, and action implementation parity
+- run validation during migration work and before editor changes so drift is caught immediately
 
 ## Future Map Editor Relationship
 
@@ -856,11 +935,10 @@ These are the things the plan must handle up front.
 
 ## Migration Edge Cases
 
-- current game still expecting `MapObjectConfigs.js`
-- old `actions.json.deprecated` not matching current action runtime
+- stale action metadata drifting away from current queue/action implementations
 - existing maps referencing object types/variants that get renamed
-- old `selectbox`/`hitbox` concepts not yet wired everywhere in runtime
-- objects that currently use `interactiveCollider` but should also expose separate interaction, selection, hit, or pickup regions
+- selection, hit, and pickup regions need to stay semantically distinct in every consuming runtime path
+- objects that need separate interaction, selection, hit, or pickup regions instead of one overloaded area
 
 ## Technical Constraints
 
@@ -897,6 +975,19 @@ The editor should feel like a workshop, not a spreadsheet.
 - reuse tokens and panel styles
 - implement read-only loaders for mytes/items/map object configs
 - add `data/mytes/species.json`
+- keep map object authored config in JSON files loaded before map initialization
+
+Already completed in prep work:
+
+- `data/mytes/species.json`
+- sparse base/species Myte JSON inheritance
+- item catalog parity under `data/metadata/items.json` with canonical `visual` data
+- canonical `data/map-objects/base.json`
+- canonical `data/map-objects/types.json`
+- runtime loading from the canonical map object JSON files
+- shared runtime normalization path so map object authored data can use `spatial` and `visual` structure
+- canonical `data/metadata/actions.json`
+- runtime action metadata loading through `js/Myte/Queue/ActionDefinitionRegistry.js`
 
 ## Phase 1: Read-Only Preview Explorer
 
@@ -913,17 +1004,16 @@ This de-risks the preview layer before write support.
 - species catalog loading from `species.json`
 - PHP save/backup/validation pipeline
 
-## Phase 3: Map Object Data Migration
+## Phase 3: Map Object Editor Layer
 
-- define JSON schema for map objects
-- create import adapter from `MapObjectConfigs.js`
+- build schema-aware inspector UI on top of canonical map object JSON
 - load preview from normalized editor model
-- save new/edited object definitions as JSON
+- save edited object definitions back to the canonical JSON files
 - keep JS class registrations intact
 
 ## Phase 4: Actions and Slot System
 
-- define `actions.json`
+- extend `data/metadata/actions.json` and validate it against registered implementations
 - add map-object slot editing inside the Map Object Editor
 - add validation for slot ids, regions, and rest points
 
@@ -972,11 +1062,11 @@ Why this first:
 2. PHP handles save/load/backup validation for editable files.
 3. JSON becomes the canonical content source for editable domains.
 4. JS remains the canonical source for behavior implementations and class registration.
-5. Map object definitions get migrated out of `MapObjectConfigs.js` in phases.
+5. Map object authored definitions live in canonical JSON, not JS config tables.
 6. Geometry editing is inspector-first: exact numeric fields update preview live.
 7. Saving is explicit: live preview plus explicit `Save` to disk.
 8. `hitbox`, `selectbox`, and `pickupbox` become explicit editable geometry concepts.
-9. `interactiveCollider` should be migrated to a clearer authored name: `interactionRegion`.
+9. `spatial.regions.interaction` is the canonical authored interaction region.
 10. A shared `anchors` and `regions` schema becomes the spatial source of truth.
 11. Direction overrides inherit from base unless explicitly overridden.
 12. ID renames should update references automatically through the tool.

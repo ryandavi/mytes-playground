@@ -77,9 +77,10 @@ class AnimationController {
 
         let { frameWidth, frameHeight = frameWidth, scale = 1 } = this.config;
 
-        if (this.host.getConfig('spriteConfig.spriteSheet.frameSize')) {
-            frameWidth = this.host.getConfig('spriteConfig.spriteSheet.frameSize.width');
-            frameHeight = this.host.getConfig('spriteConfig.spriteSheet.frameSize.height');
+        const frameSize = this.host.getVisualFrameSize?.();
+        if (frameSize) {
+            frameWidth = frameSize.width;
+            frameHeight = frameSize.height;
         }
 
         const frame = this.currentAnimation.frames[this.framePosition];
@@ -109,9 +110,10 @@ class AnimationController {
 
         let { frameWidth, frameHeight = frameWidth, scale = 1 } = this.config;
 
-        if (this.host.getConfig('spriteConfig.spriteSheet.frameSize')) {
-            frameWidth = this.host.getConfig('spriteConfig.spriteSheet.frameSize.width');
-            frameHeight = this.host.getConfig('spriteConfig.spriteSheet.frameSize.height');
+        const frameSize = this.host.getVisualFrameSize?.();
+        if (frameSize) {
+            frameWidth = frameSize.width;
+            frameHeight = frameSize.height;
         }
 
         const frame = this.currentAnimation.frames[this.framePosition];

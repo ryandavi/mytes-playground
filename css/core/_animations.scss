@@ -106,6 +106,26 @@
     }
 }
 
+@keyframes loadingAnimation {
+    from {
+        background-position: 0 0;
+    }
+
+    to {
+        background-position: 100% 0;
+    }
+}
+
+@keyframes block-move {
+    from {
+        background-position: 20px 0;
+    }
+
+    to {
+        background-position: 0 0;
+    }
+}
+
 @keyframes floating {
     0% {
         transform: translate(0, 0);

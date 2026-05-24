@@ -1,0 +1,937 @@
+{
+  "schemaVersion": 1,
+  "actions": [
+    {
+      "id": "astar-move",
+      "label": "A* Move To",
+      "category": "movement",
+      "priority": 1,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Move to a location using A* pathfinding",
+      "requiresTarget": true,
+      "defaultOptions": {
+        "target": null,
+        "pathfindingOptions": {},
+        "currentTargetIndex": 0
+      },
+      "implementationClass": "AStarMoveAction"
+    },
+    {
+      "id": "being_carried",
+      "label": "Being Carried",
+      "category": "carry",
+      "priority": 1,
+      "isMovementAction": false,
+      "isInterruptible": false,
+      "defaultDuration": -1,
+      "description": "Being carried by another Myte",
+      "requiresTarget": false,
+      "affectsMood": true,
+      "moodEffect": 1,
+      "implementationClass": "BeingCarriedAction"
+    },
+    {
+      "id": "carry",
+      "label": "Carry",
+      "category": "carry",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": -1,
+      "description": "Carry another Myte around",
+      "requiresTarget": true,
+      "affectsMood": false,
+      "implementationClass": "CarryAction"
+    },
+    {
+      "id": "carry_pickup",
+      "label": "Pick Up",
+      "category": "carry",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": false,
+      "defaultDuration": 100,
+      "description": "Pick up another Myte",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 2,
+      "implementationClass": "CarryPickupAction"
+    },
+    {
+      "id": "carry_putdown",
+      "label": "Put Down",
+      "category": "carry",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": false,
+      "defaultDuration": 100,
+      "description": "Put down a carried Myte",
+      "requiresTarget": true,
+      "affectsMood": false,
+      "implementationClass": "CarryPutdownAction"
+    },
+    {
+      "id": "chase",
+      "label": "Chase",
+      "category": "social",
+      "priority": 4,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 5000,
+      "description": "Chase another Myte",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 6,
+      "defaultOptions": {
+        "catchDistance": 30
+      },
+      "implementationClass": "ChaseAction"
+    },
+    {
+      "id": "circle",
+      "label": "Circle",
+      "category": "movement",
+      "priority": 3,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Move in a circular pattern",
+      "requiresTarget": false,
+      "affectsMood": true,
+      "moodEffect": 3,
+      "defaultOptions": {
+        "radius": 50,
+        "numPoints": 8,
+        "repeat": 2,
+        "clockwise": true,
+        "centerX": null,
+        "centerY": null,
+        "safeTargetRadius": 12,
+        "stuckThresholdFrames": 42,
+        "maxPatternRecoveries": 4
+      },
+      "implementationClass": "CircleAction"
+    },
+    {
+      "id": "close_chest",
+      "label": "Close Chest",
+      "category": "interactions",
+      "priority": 3,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Approach and close a treasure chest",
+      "requiresTarget": true,
+      "affectsMood": false,
+      "defaultOptions": {
+        "closeAnimationDuration": 28,
+        "postActionIdleDuration": 20
+      },
+      "implementationClass": "CloseChestAction"
+    },
+    {
+      "id": "dance",
+      "label": "Dance",
+      "category": "state",
+      "priority": 3,
+      "isMovementAction": true,
+      "isInterruptible": false,
+      "defaultDuration": 2000,
+      "description": "Perform a happy dance",
+      "requiresTarget": false,
+      "affectsMood": true,
+      "moodEffect": 10,
+      "defaultOptions": {
+        "stepDuration": 250
+      },
+      "implementationClass": "DanceAction"
+    },
+    {
+      "id": "deep_inspect",
+      "label": "Inspect Oddly",
+      "category": "interactions",
+      "priority": 3,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 150,
+      "description": "Investigate an object from several odd angles",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 3,
+      "defaultOptions": {
+        "pointDuration": 24,
+        "numPoints": 3,
+        "expressionType": "surprise",
+        "expressionDuration": 30
+      },
+      "implementationClass": "DeepInspectAction"
+    },
+    {
+      "id": "drink_fountain",
+      "label": "Drink",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Drink from a fountain",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 5,
+      "defaultOptions": {},
+      "implementationClass": "DrinkFromFountainAction"
+    },
+    {
+      "id": "drop_item",
+      "label": "Drop Item",
+      "category": "carry",
+      "priority": 2,
+      "isMovementAction": false,
+      "isInterruptible": false,
+      "defaultDuration": 0,
+      "description": "Drop the item currently being carried",
+      "requiresTarget": true,
+      "affectsMood": false,
+      "implementationClass": "DropItemAction"
+    },
+    {
+      "id": "eat_element",
+      "label": "Eat",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": false,
+      "isInterruptible": false,
+      "defaultDuration": 0,
+      "description": "Consume an edible object",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 5,
+      "defaultOptions": {
+        "targetPosition": {
+          "vertical": "bottom",
+          "insideHorizontal": false,
+          "insideVertical": true
+        }
+      },
+      "implementationClass": "EatElementAction"
+    },
+    {
+      "id": "emote_at",
+      "label": "Emote At",
+      "category": "social",
+      "priority": 3,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Approach a target and show an expression",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 3,
+      "defaultOptions": {
+        "expressionType": "heart",
+        "expressionDuration": 400,
+        "expressionRepeat": 2
+      },
+      "implementationClass": "EmoteAtAction"
+    },
+    {
+      "id": "expression",
+      "label": "Express",
+      "category": "state",
+      "priority": 2,
+      "isMovementAction": false,
+      "isInterruptible": false,
+      "defaultDuration": 800,
+      "description": "Show an emotion or expression overlay",
+      "requiresTarget": false,
+      "affectsMood": true,
+      "moodEffect": 5,
+      "implementationClass": "ExpressionAction"
+    },
+    {
+      "id": "follow_mouse",
+      "label": "Follow Mouse",
+      "category": "movement",
+      "priority": 1,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": -1,
+      "description": "Follow the mouse cursor",
+      "requiresTarget": false,
+      "affectsMood": false,
+      "implementationClass": "FollowMouseAction"
+    },
+    {
+      "id": "follow_object",
+      "label": "Follow",
+      "category": "movement",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": -1,
+      "description": "Follow another Myte or creature",
+      "requiresTarget": true,
+      "affectsMood": false,
+      "defaultOptions": {
+        "trailGap": 28,
+        "minFollowDistance": 8,
+        "replanThreshold": 12
+      },
+      "implementationClass": "FollowObjectAction"
+    },
+    {
+      "id": "give_item",
+      "label": "Give Item",
+      "category": "carry",
+      "priority": 3,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Give the held item to another Myte",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 4,
+      "defaultOptions": {},
+      "implementationClass": "GiveItemAction"
+    },
+    {
+      "id": "go_to_object",
+      "label": "Go To",
+      "category": "movement",
+      "priority": 1,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Move to a specific object or Myte",
+      "requiresTarget": true,
+      "affectsMood": false,
+      "defaultOptions": {
+        "allowStuckSuccess": true,
+        "stuckCompletionDistance": 18,
+        "finalApproachSkipDistance": 48,
+        "maxFinalAdjustmentDistance": 48
+      },
+      "implementationClass": "GoToObjectAction"
+    },
+    {
+      "id": "greet",
+      "label": "Greet",
+      "category": "social",
+      "priority": 3,
+      "isMovementAction": false,
+      "isInterruptible": true,
+      "defaultDuration": 120,
+      "description": "Greet another Myte with a wave",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 5,
+      "defaultOptions": {
+        "expressionType": "wave",
+        "expressionDuration": 400,
+        "expressionRepeat": 2
+      },
+      "implementationClass": "GreetAction"
+    },
+    {
+      "id": "greet_receive",
+      "label": "Greet (receive)",
+      "category": "social",
+      "priority": 3,
+      "isMovementAction": false,
+      "isInterruptible": true,
+      "defaultDuration": 120,
+      "description": "Respond to a greeting from another Myte",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 5,
+      "defaultOptions": {
+        "expressionType": "wave",
+        "expressionDuration": 400,
+        "expressionRepeat": 2
+      },
+      "implementationClass": "GreetReceiveAction"
+    },
+    {
+      "id": "guard",
+      "label": "Guard",
+      "category": "movement",
+      "priority": 3,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": -1,
+      "description": "Guard a position, returning if wandered too far",
+      "requiresTarget": false,
+      "affectsMood": false,
+      "defaultOptions": {
+        "returnThreshold": 80,
+        "safeTargetRadius": 14,
+        "stuckThresholdFrames": 40,
+        "failOnUnrecoverableStuck": false
+      },
+      "implementationClass": "GuardAction"
+    },
+    {
+      "id": "harvest",
+      "label": "Harvest",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Harvest a ready crop",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 8,
+      "defaultOptions": {
+        "harvestAnimationDuration": 50,
+        "postActionIdleDuration": 45
+      },
+      "implementationClass": "HarvestAction"
+    },
+    {
+      "id": "hide",
+      "label": "Hide",
+      "category": "reactive",
+      "priority": 4,
+      "isMovementAction": true,
+      "isInterruptible": false,
+      "defaultDuration": 5000,
+      "description": "Hide behind an object from something scary",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": -2,
+      "defaultOptions": {
+        "peekInterval": 2000
+      },
+      "implementationClass": "HideAction"
+    },
+    {
+      "id": "hold_item",
+      "label": "Carry Item",
+      "category": "carry",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": -1,
+      "description": "Carry an item",
+      "requiresTarget": true,
+      "affectsMood": false,
+      "implementationClass": "HoldItemAction"
+    },
+    {
+      "id": "idle",
+      "label": "Idle",
+      "category": "state",
+      "priority": 0,
+      "isMovementAction": false,
+      "isInterruptible": true,
+      "defaultDuration": 3000,
+      "description": "Stay in place for a moment",
+      "requiresTarget": false,
+      "affectsMood": false,
+      "implementationClass": "IdleAction"
+    },
+    {
+      "id": "inspect",
+      "label": "Inspect",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 90,
+      "description": "Pause beside an object and inspect it naturally",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 2,
+      "defaultOptions": {
+        "expressionType": "curious",
+        "expressionDuration": 40,
+        "lookInterval": 22
+      },
+      "implementationClass": "InspectAction"
+    },
+    {
+      "id": "interact_object",
+      "label": "Use",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Approach an object and use its main interaction",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 4,
+      "defaultOptions": {
+        "interactionAnimationDuration": 32,
+        "postActionIdleDuration": 24
+      },
+      "implementationClass": "InteractObjectAction"
+    },
+    {
+      "id": "jump",
+      "label": "Jump",
+      "category": "movement",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": false,
+      "defaultDuration": 0,
+      "description": "Jump with physics-based movement",
+      "requiresTarget": false,
+      "affectsMood": true,
+      "moodEffect": 3,
+      "defaultOptions": {
+        "height": 100,
+        "gravity": 0.5,
+        "initialVelocity": -12,
+        "bounceReduction": 0.5,
+        "minBounceVelocity": 2
+      },
+      "implementationClass": "JumpAction"
+    },
+    {
+      "id": "move",
+      "label": "Move To",
+      "category": "movement",
+      "priority": 1,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Move to a specific location",
+      "requiresTarget": true,
+      "affectsMood": false,
+      "implementationClass": "MoveAction"
+    },
+    {
+      "id": "nudge_ball",
+      "label": "Nudge Ball",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Run into a ball to get it rolling",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 6,
+      "defaultOptions": {
+        "approachConfig": {
+          "allowedSides": "any",
+          "preferredSide": null,
+          "gap": 10,
+          "align": "center",
+          "alignTo": "collider"
+        },
+        "allowStuckSuccess": false,
+        "stuckCompletionDistance": 10,
+        "repeat": 1,
+        "postNudgeIdleDuration": 20
+      },
+      "implementationClass": "NudgeBallAction"
+    },
+    {
+      "id": "open_chest",
+      "label": "Open Chest",
+      "category": "interactions",
+      "priority": 3,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Approach and open a treasure chest",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 10,
+      "defaultOptions": {
+        "openAnimationDuration": 40,
+        "receiveIdleDuration": 60
+      },
+      "implementationClass": "OpenChestAction"
+    },
+    {
+      "id": "patrol",
+      "label": "Patrol",
+      "category": "movement",
+      "priority": 3,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Walk back and forth between two points",
+      "requiresTarget": false,
+      "affectsMood": true,
+      "moodEffect": 2,
+      "defaultOptions": {
+        "distance": 120,
+        "direction": {
+          "x": 1,
+          "y": 0
+        },
+        "repeat": 4,
+        "pauseDuration": 500,
+        "safeTargetRadius": 14,
+        "stuckThresholdFrames": 40,
+        "maxPatternRecoveries": 3
+      },
+      "implementationClass": "PatrolAction"
+    },
+    {
+      "id": "pick_flower",
+      "label": "Pick Flower",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Pick a flower from a plant",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 4,
+      "defaultOptions": {
+        "pickAnimationDuration": 45,
+        "approachConfig": "adjacent"
+      },
+      "implementationClass": "PickFlowerAction"
+    },
+    {
+      "id": "pickup_item",
+      "label": "Pick Up",
+      "category": "carry",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Pick up an item and carry it",
+      "requiresTarget": true,
+      "affectsMood": false,
+      "implementationClass": "PickupItemAction"
+    },
+    {
+      "id": "play_fetch",
+      "label": "Play Fetch",
+      "category": "social",
+      "priority": 4,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Play fetch with a throwable object",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 8,
+      "defaultOptions": {
+        "throwStrength": 10,
+        "maxThrowDistance": 300,
+        "fetchState": "pickup",
+        "arcHeight": 100,
+        "pickupDistance": 10,
+        "catchDistance": 10,
+        "roundTrips": 1,
+        "expressionType": "excited",
+        "expressionDuration": 500
+      },
+      "implementationClass": "PlayFetchAction"
+    },
+    {
+      "id": "play_tag",
+      "label": "Play Tag",
+      "category": "social",
+      "priority": 4,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 5000,
+      "description": "Play tag with another Myte",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 10,
+      "defaultOptions": {
+        "catchDistance": 30,
+        "runDistance": 100,
+        "isIt": true
+      },
+      "implementationClass": "PlayTagAction"
+    },
+    {
+      "id": "run_away",
+      "label": "Run Away",
+      "category": "reactive",
+      "priority": 5,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": -1,
+      "description": "Run away from a scary object or Myte",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": -5,
+      "defaultOptions": {
+        "panicDistance": 400,
+        "runDistance": 350
+      },
+      "implementationClass": "RunAwayAction"
+    },
+    {
+      "id": "run_from",
+      "label": "Run Away",
+      "category": "reactive",
+      "priority": 5,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 3000,
+      "description": "Run away from an object",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": -3,
+      "defaultOptions": {
+        "panicDistance": 500,
+        "runDistance": 300
+      },
+      "implementationClass": "RunFromAction"
+    },
+    {
+      "id": "run_laps",
+      "label": "Run Laps",
+      "category": "movement",
+      "priority": 3,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Run laps around a target",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 5,
+      "defaultOptions": {
+        "repeat": 5,
+        "currentTargetIndex": 0,
+        "lapGap": 12,
+        "safeTargetRadius": 14,
+        "stuckThresholdFrames": 42,
+        "maxPatternRecoveries": 4
+      },
+      "implementationClass": "RunLapsAction"
+    },
+    {
+      "id": "show_affection",
+      "label": "Show Affection",
+      "category": "social",
+      "priority": 3,
+      "isMovementAction": false,
+      "isInterruptible": false,
+      "defaultDuration": 1500,
+      "description": "Show affection to another Myte",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 8,
+      "defaultOptions": {
+        "emitDelay": 200,
+        "expressionType": "heart",
+        "expressionDuration": 300,
+        "expressionRepeat": 3
+      },
+      "implementationClass": "ShowAffectionAction"
+    },
+    {
+      "id": "simple_sleep",
+      "label": "Take a Nap",
+      "category": "state",
+      "priority": 2,
+      "isMovementAction": false,
+      "isInterruptible": true,
+      "defaultDuration": 5000,
+      "description": "Take a quick nap with gentle floating animation",
+      "requiresTarget": false,
+      "affectsMood": true,
+      "moodEffect": 5,
+      "defaultOptions": {
+        "zSpeed": 0.1
+      },
+      "implementationClass": "SimpleSleepAction"
+    },
+    {
+      "id": "sleep",
+      "label": "Sleep",
+      "category": "state",
+      "priority": 2,
+      "isMovementAction": false,
+      "isInterruptible": true,
+      "defaultDuration": 5000,
+      "description": "Take a deep sleep with bobbing animation",
+      "requiresTarget": false,
+      "affectsMood": true,
+      "moodEffect": 8,
+      "defaultOptions": {
+        "bobHeight": 5,
+        "zInterval": 1000
+      },
+      "implementationClass": "SleepAction"
+    },
+    {
+      "id": "smell_flower",
+      "label": "Smell Flower",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Approach and smell a flower",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 6,
+      "defaultOptions": {
+        "approachConfig": "adjacent"
+      },
+      "implementationClass": "SmellFlowerAction"
+    },
+    {
+      "id": "spin",
+      "label": "Spin",
+      "category": "state",
+      "priority": 3,
+      "isMovementAction": false,
+      "isInterruptible": false,
+      "defaultDuration": 1000,
+      "description": "Spin around in place",
+      "requiresTarget": false,
+      "affectsMood": true,
+      "moodEffect": 3,
+      "defaultOptions": {
+        "rotations": 2,
+        "frameDelay": 16
+      },
+      "implementationClass": "SpinAction"
+    },
+    {
+      "id": "trample_flower",
+      "label": "Trample",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Trample a flower",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": -3,
+      "defaultOptions": {
+        "approachConfig": "adjacent",
+        "trampleAnimationDuration": 22,
+        "postActionIdleDuration": 20
+      },
+      "implementationClass": "TrampleFlowerAction"
+    },
+    {
+      "id": "use_surface_slot",
+      "label": "Use Surface",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 5000,
+      "description": "Use a slotted surface and settle into position",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 7,
+      "defaultOptions": {
+        "bobHeight": 3,
+        "bobSpeed": 0.12,
+        "energyRestore": 18,
+        "healthRestore": 5,
+        "comfortBoost": 14,
+        "moodBoost": 8,
+        "settleDuration": 260,
+        "dismountDuration": 220,
+        "entryGap": 10,
+        "exitGap": 16,
+        "exitSearchRadius": 20,
+        "returnToEntry": true,
+        "stuckCompletionDistance": 14,
+        "finalApproachSkipDistance": 24,
+        "maxFinalAdjustmentDistance": 20,
+        "approachConfig": null
+      },
+      "implementationClass": "SurfaceSlotAction"
+    },
+    {
+      "id": "wander",
+      "label": "Wander",
+      "category": "movement",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 5000,
+      "description": "Wander randomly within a radius",
+      "requiresTarget": false,
+      "affectsMood": true,
+      "moodEffect": 2,
+      "defaultOptions": {
+        "wanderRadius": 100,
+        "pauseMin": 500,
+        "pauseMax": 1500,
+        "safeTargetRadius": 14,
+        "stuckThresholdFrames": 40,
+        "maxPatternRecoveries": 5
+      },
+      "implementationClass": "WanderAction"
+    },
+    {
+      "id": "watch",
+      "label": "Watch",
+      "category": "social",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 5000,
+      "description": "Watch another Myte from nearby",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 2,
+      "defaultOptions": {
+        "watchDistance": 60
+      },
+      "implementationClass": "WatchAction"
+    },
+    {
+      "id": "water_plant",
+      "label": "Water Plant",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Water a crop plant",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 4,
+      "defaultOptions": {
+        "waterAnimationDuration": 36,
+        "postActionIdleDuration": 40
+      },
+      "implementationClass": "WaterPlantAction"
+    },
+    {
+      "id": "zigzag",
+      "label": "Zigzag",
+      "category": "movement",
+      "priority": 3,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 0,
+      "description": "Move in a zigzag pattern",
+      "requiresTarget": false,
+      "affectsMood": true,
+      "moodEffect": 4,
+      "defaultOptions": {
+        "amplitude": 80,
+        "frequency": 0.05,
+        "numLegs": 6,
+        "direction": {
+          "x": 1,
+          "y": 0
+        },
+        "repeat": 1,
+        "safeTargetRadius": 12,
+        "stuckThresholdFrames": 34,
+        "maxPatternRecoveries": 4
+      },
+      "implementationClass": "ZigzagAction"
+    }
+  ]
+}

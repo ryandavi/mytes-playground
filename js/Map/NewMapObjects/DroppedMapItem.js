@@ -141,6 +141,38 @@ class DroppedMapItem {
         shadow.style.opacity   = `${Math.max(0.1, scale * 0.55)}`;
     }
 
+    getRegionRect(regionId = 'collider') {
+        const x = this.posX - (this.size.width / 2);
+        const y = this.posY - (this.size.height / 2);
+        return {
+            x,
+            y,
+            left: x,
+            top: y,
+            right: x + this.size.width,
+            bottom: y + this.size.height,
+            width: this.size.width,
+            height: this.size.height,
+            type: 'box'
+        };
+    }
+
+    getSelectionRect() {
+        return this.getRegionRect('select');
+    }
+
+    getPickupRect() {
+        return this.getRegionRect('pickup');
+    }
+
+    getCenterPoint() {
+        const rect = this.getRegionRect('collider');
+        return {
+            x: rect.left + (rect.width / 2),
+            y: rect.top + (rect.height / 2)
+        };
+    }
+
     updatePosition() {
         if (!this.element) return;
 

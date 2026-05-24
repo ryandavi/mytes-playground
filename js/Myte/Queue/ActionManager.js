@@ -1,5 +1,23 @@
 class ActionManager {
     static actions = new Map();
+    static fallbackMetadata = new Map();
+
+    static cloneMetadata(value) {
+        return ActionDefinitionRegistry.cloneValue(value);
+    }
+
+    static getMetadata(actionId, ActionClass = null) {
+        const fallback = this.fallbackMetadata.get(actionId) ||
+            (ActionClass?.metadata ? this.cloneMetadata(ActionClass.metadata) : null);
+        return ActionDefinitionRegistry.getDefinitionSync(actionId, fallback) || fallback || null;
+    }
+
+    static attachMetadataGetter(ActionClass, actionId) {
+        Object.defineProperty(ActionClass, 'metadata', {
+            configurable: true,
+            get: () => this.getMetadata(actionId, ActionClass)
+        });
+    }
 
     static getActionPresentation(actionId, selected) {
         const targetConfig = selected?.getActionConfig?.(actionId, null);
@@ -20,10 +38,20 @@ class ActionManager {
     }
 
     static registerAction(ActionClass) {
-        if (!ActionClass.metadata?.id) {
+        const fallbackMetadata = this.cloneMetadata(ActionClass.metadata || {});
+        const actionId = ActionDefinitionRegistry.normalizeActionId(
+            fallbackMetadata.id || ActionClass.actionId || ActionClass.name
+        );
+
+        if (!actionId) {
             throw new Error(`Action class ${ActionClass.name} must have an id in metadata`);
         }
-        this.actions.set(ActionClass.metadata.id, ActionClass);
+
+        fallbackMetadata.id = actionId;
+        this.fallbackMetadata.set(actionId, fallbackMetadata);
+        ActionClass.actionId = actionId;
+        this.attachMetadataGetter(ActionClass, actionId);
+        this.actions.set(actionId, ActionClass);
     }
 
     static registerActions(actionClasses) {
@@ -51,17 +79,19 @@ class ActionManager {
             return null;
         }
 
+        const metadata = this.getMetadata(actionId, ActionClass);
+
         // Only use getRequiredOptions if the action defines its own (not the base no-op)
         if (Object.prototype.hasOwnProperty.call(ActionClass, 'getRequiredOptions')) {
-            return { ...ActionClass.metadata.defaultOptions, ...ActionClass.getRequiredOptions(selected, active) };
+            return { ...metadata.defaultOptions, ...ActionClass.getRequiredOptions(selected, active) };
         }
 
         const options = {};
-        if (ActionClass.metadata.requiresTarget) {
+        if (metadata.requiresTarget) {
             options.target = selected;
         }
 
-        return { ...ActionClass.metadata.defaultOptions, ...options };
+        return { ...metadata.defaultOptions, ...options };
     }
 
     // One-call helper: resolve options and enqueue on a Myte
@@ -77,7 +107,7 @@ class ActionManager {
         for (const [id, ActionClass] of this.actions) {
             if (this.canPerformAction(id, selected, active)) {
                 available.push({
-                    ...ActionClass.metadata,
+                    ...this.getMetadata(id, ActionClass),
                     ...this.getActionPresentation(id, selected),
                     ActionClass
                 });
@@ -96,15 +126,38 @@ class ActionManager {
     }
 
     static getMovementActions() {
-        return Array.from(this.actions.values()).filter(A => A.metadata.isMovementAction);
+        return Array.from(this.actions.entries())
+            .filter(([id, ActionClass]) => this.getMetadata(id, ActionClass)?.isMovementAction)
+            .map(([, ActionClass]) => ActionClass);
     }
 
     static getInterruptibleActions() {
-        return Array.from(this.actions.values()).filter(A => A.metadata.isInterruptible);
+        return Array.from(this.actions.entries())
+            .filter(([id, ActionClass]) => this.getMetadata(id, ActionClass)?.isInterruptible)
+            .map(([, ActionClass]) => ActionClass);
     }
 
     static getMoodAffectingActions() {
-        return Array.from(this.actions.values()).filter(A => A.metadata.affectsMood);
+        return Array.from(this.actions.entries())
+            .filter(([id, ActionClass]) => this.getMetadata(id, ActionClass)?.affectsMood)
+            .map(([, ActionClass]) => ActionClass);
+    }
+
+    static validateDefinitions() {
+        const registeredIds = new Set(this.actions.keys());
+        const definitionIds = new Set(ActionDefinitionRegistry.getActionIds());
+
+        for (const actionId of registeredIds) {
+            if (!definitionIds.has(actionId)) {
+                console.warn(`[ActionManager] Missing canonical action definition for "${actionId}".`);
+            }
+        }
+
+        for (const actionId of definitionIds) {
+            if (!registeredIds.has(actionId)) {
+                console.warn(`[ActionManager] Canonical action definition "${actionId}" has no registered implementation class.`);
+            }
+        }
     }
 }
 

@@ -25,6 +25,7 @@ class MyteListManager extends UIComponent {
         const spriteInner = document.createElement('div');
         spriteInner.className = 'myte-sprite-inner';
         spriteContainer.appendChild(spriteInner);
+        this.applyThumbnailVisuals(spriteContainer, spriteInner, myte);
 
         // Create name element
         const name = document.createElement('span');
@@ -56,6 +57,24 @@ class MyteListManager extends UIComponent {
         this.applyThumbnailState(thumbnail, myte);
 
         return thumbnail;
+    }
+
+    applyThumbnailVisuals(spriteContainer, spriteInner, myte) {
+        if (!spriteContainer || !spriteInner || !myte?.definition) return;
+
+        const frameSize = myte.definition?.visual?.frameSize || {};
+        const width = Number(frameSize.width) || 192;
+        const height = Number(frameSize.height) || 192;
+        const thumbSize = 48;
+        const scale = Math.min(thumbSize / width, thumbSize / height);
+        const spriteSheet = MyteDefinitionRegistry.getSpriteSheetConfig(myte.definition);
+
+        spriteInner.style.width = `${width}px`;
+        spriteInner.style.height = `${height}px`;
+        spriteInner.style.backgroundImage = spriteSheet.url ? `url('${spriteSheet.url}')` : '';
+        spriteInner.style.filter = spriteSheet.filter || 'none';
+        spriteInner.style.transform = `scale(${scale})`;
+        spriteInner.style.transformOrigin = 'top left';
     }
 
     getMyteStateLabel(myte) {

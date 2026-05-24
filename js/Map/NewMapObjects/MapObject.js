@@ -1,4 +1,4 @@
-// BASE_CONFIG and TYPE_CONFIGS are defined in MapObjectConfigs.js, loaded before this file.
+// Config is provided by MapObjectFactory after loading canonical map object data.
 
 class MapObject {
 	static nextObjectId = 1;
@@ -78,8 +78,58 @@ class MapObject {
 	}
 
 	getShadowConfig() {
-		const shadow = this.getConfig('shadow', null);
+		const shadow = this.getVisualValue('shadow', this.getConfig('shadow', null));
 		return shadow?.enabled ? shadow : null;
+	}
+
+	getVisualConfig() {
+		return this.getConfig('visual', {}) || {};
+	}
+
+	getVisualValue(path, defaultValue = null) {
+		const keys = String(path || '').split('.').filter(Boolean);
+		let current = this.getVisualConfig();
+		for (const key of keys) {
+			if (current === undefined || current === null || !Object.prototype.hasOwnProperty.call(current, key)) {
+				return defaultValue;
+			}
+			current = current[key];
+		}
+
+		return current !== undefined ? current : defaultValue;
+	}
+
+	getVisualRenderType() {
+		return this.getVisualValue('renderType', this.getConfig('renderType', 'single'));
+	}
+
+	getDefaultVisualState(defaultValue = 'default') {
+		return this.getVisualValue('defaultState', this.getConfig('default', defaultValue));
+	}
+
+	getVisualSpriteSheet() {
+		return this.getVisualValue('spriteSheet', this.getConfig('spriteConfig.spriteSheet', {})) || {};
+	}
+
+	getVisualFrameSize() {
+		const spriteSheet = this.getVisualSpriteSheet();
+		return spriteSheet.frameSize || this.getConfig('spriteConfig.spriteSheet.frameSize', null);
+	}
+
+	getVisualAnimations() {
+		return this.getVisualValue('animations', this.getConfig('spriteConfig.animations', {})) || {};
+	}
+
+	getVisualFrameDelay(defaultValue = 100) {
+		return this.getVisualValue('frameDelay', this.getConfig('spriteConfig.frameDelay', defaultValue));
+	}
+
+	getVisualScale() {
+		return this.getVisualValue('scale', this.getConfig('spriteConfig.scale', this.getConfig('scale', 1)));
+	}
+
+	getVisualFrameWidth() {
+		return this.getVisualValue('frameWidth', this.getConfig('spriteConfig.frameWidth', this.getConfig('size.width')));
 	}
 
 	shouldRenderShadow() {
@@ -236,6 +286,110 @@ class MapObject {
 		return Number.isFinite(parsed) ? parsed : defaultValue;
 	}
 
+	normalizeRegionId(regionId = 'collider') {
+		switch (String(regionId || '').trim().toLowerCase()) {
+			case 'interactionregion':
+			case 'interaction':
+				return 'interaction';
+			case 'selectbox':
+			case 'select':
+				return 'select';
+			case 'hitbox':
+			case 'hit':
+				return 'hit';
+			case 'pickupbox':
+			case 'pickup':
+				return 'pickup';
+			case 'collider':
+			default:
+				return 'collider';
+		}
+	}
+
+	getRegionConfig(regionId = 'collider') {
+		const normalizedRegionId = this.normalizeRegionId(regionId);
+		const canonicalRegion = this.getConfig(`spatial.regions.${normalizedRegionId}`, undefined);
+		if (canonicalRegion !== undefined) {
+			return canonicalRegion;
+		}
+
+		switch (normalizedRegionId) {
+			case 'interaction':
+				return this.getConfig('interactionRegion', null);
+			case 'select':
+				return this.getConfig('selectbox', null);
+			case 'hit':
+				return this.getConfig('hitbox', null);
+			case 'pickup':
+				return this.getConfig('pickupbox', null);
+			case 'collider':
+			default:
+				return this.getConfig('collider', null);
+		}
+	}
+
+	getRegionRect(regionId = 'collider') {
+		const region = this.getRegionConfig(regionId);
+		if (!region) {
+			return null;
+		}
+
+		const x = this.posX + (region.x ?? region.offsetX ?? 0);
+		const y = this.posY + (region.y ?? region.offsetY ?? 0);
+		const width = region.width ?? this.size.width;
+		const height = region.height ?? this.size.height;
+		return {
+			x,
+			y,
+			left: x,
+			top: y,
+			right: x + width,
+			bottom: y + height,
+			width,
+			height,
+			type: region.type ?? 'box'
+		};
+	}
+
+	getLocalRegionRect(regionId = 'collider') {
+		const region = this.getRegionConfig(regionId);
+		if (!region) {
+			return null;
+		}
+
+		const x = region.x ?? region.offsetX ?? 0;
+		const y = region.y ?? region.offsetY ?? 0;
+		const width = region.width ?? this.size.width;
+		const height = region.height ?? this.size.height;
+		return {
+			x,
+			y,
+			left: x,
+			top: y,
+			right: x + width,
+			bottom: y + height,
+			width,
+			height,
+			type: region.type ?? 'box'
+		};
+	}
+
+	getSelectionRect() {
+		return this.getRegionRect('select') ||
+			this.getRegionRect('interaction') ||
+			this.getRegionRect('collider');
+	}
+
+	getHitRect() {
+		return this.getRegionRect('hit') || this.getRegionRect('collider');
+	}
+
+	getPickupRect() {
+		return this.getRegionRect('pickup') ||
+			this.getSelectionRect() ||
+			this.getRegionRect('collider');
+	}
+
 	getActionConfig(actionId, defaultValue = null) {
 		if (!actionId) {
 			return defaultValue;
@@ -288,13 +442,19 @@ class MapObject {
 
 		if (dirConfig.size) config.size = dirConfig.size;
 		if (dirConfig.collider) config.collider = dirConfig.collider;
-		if (dirConfig.interactiveCollider) config.interactiveCollider = dirConfig.interactiveCollider;
+		if (dirConfig.interactionRegion) config.interactionRegion = dirConfig.interactionRegion;
+		if (dirConfig.spatial) {
+			config.spatial = MapObjectFactory.deepMerge({}, config.spatial || {}, dirConfig.spatial);
+		}
+		if (dirConfig.visual) {
+			config.visual = MapObjectFactory.deepMerge({}, config.visual || {}, dirConfig.visual);
+		}
 
 		config.facingDirection = normalizedDirection;
 		config.transformStyle = dirConfig.transformStyle || '';
 
 		for (const key in dirConfig) {
-			if (!['size', 'collider', 'interactiveCollider', 'transformStyle'].includes(key)) {
+			if (!['size', 'collider', 'interactionRegion', 'transformStyle', 'spatial', 'visual'].includes(key)) {
 				config[key] = dirConfig[key];
 			}
 		}
@@ -437,6 +597,14 @@ class MapObject {
 	}
 
 	getCenterPoint() {
+		const colliderRect = this.getRegionRect('collider');
+		if (colliderRect) {
+			return {
+				x: colliderRect.left + (colliderRect.width / 2),
+				y: colliderRect.top + (colliderRect.height / 2)
+			};
+		}
+
 		return {
 			x: this.posX + (this.collider?.offsetX ?? 0) + ((this.collider?.width ?? this.size.width) / 2),
 			y: this.posY + (this.collider?.offsetY ?? 0) + ((this.collider?.height ?? this.size.height) / 2)
@@ -715,6 +883,13 @@ class MapObject {
 	getColliderRectFor(entity = this) {
 		if (!entity) return null;
 
+		if (typeof entity.getRegionRect === 'function') {
+			const colliderRect = entity.getRegionRect('collider');
+			if (colliderRect) {
+				return colliderRect;
+			}
+		}
+
 		const width = entity.collider?.width ?? entity.size?.width ?? 0;
 		const height = entity.collider?.height ?? entity.size?.height ?? 0;
 		return {
@@ -744,7 +919,8 @@ class MapObject {
 		}
 
 		const myteReach = Math.max(myte?.collider?.width ?? 0, myte?.collider?.height ?? 0) * 0.5;
-		const objectReach = Math.max(this.collider?.width ?? 0, this.collider?.height ?? 0) * 0.5;
+		const pickupRect = this.getPickupRect() || this.getRegionRect('collider');
+		const objectReach = Math.max(pickupRect?.width ?? 0, pickupRect?.height ?? 0) * 0.5;
 		return Math.max(24, myteReach + objectReach + 8);
 	}
 
@@ -759,16 +935,43 @@ class MapObject {
 		if (!myte) return false;
 
 		const touchThreshold = this.getConfig('pickupTouchThreshold', 12);
-		if (this.getColliderGapTo(myte) <= touchThreshold) {
+		const myteRect = this.getColliderRectFor(myte);
+		const pickupRect = this.getPickupRect() || this.getRegionRect('collider');
+		if (pickupRect && myteRect) {
+			const gapX = Math.max(0, pickupRect.left - myteRect.right, myteRect.left - pickupRect.right);
+			const gapY = Math.max(0, pickupRect.top - myteRect.bottom, myteRect.top - pickupRect.bottom);
+			if (Math.hypot(gapX, gapY) <= touchThreshold) {
+				return true;
+			}
+		} else if (this.getColliderGapTo(myte) <= touchThreshold) {
 			return true;
 		}
 
-		const myteCenter = {
-			x: myte.posX + (myte.collider?.offsetX ?? 0) + ((myte.collider?.width ?? myte.size.width) / 2),
-			y: myte.posY + (myte.collider?.offsetY ?? 0) + ((myte.collider?.height ?? myte.size.height) / 2)
-		};
-		const objectCenter = this.getCenterPoint();
+		const myteCenter = typeof myte.getCenterPoint === 'function'
+			? myte.getCenterPoint('collider')
+			: {
+				x: myte.posX + (myte.collider?.offsetX ?? 0) + ((myte.collider?.width ?? myte.size.width) / 2),
+				y: myte.posY + (myte.collider?.offsetY ?? 0) + ((myte.collider?.height ?? myte.size.height) / 2)
+			};
+		const objectCenter = pickupRect
+			? {
+				x: pickupRect.left + (pickupRect.width / 2),
+				y: pickupRect.top + (pickupRect.height / 2)
+			}
+			: this.getCenterPoint();
 		return Math.hypot(objectCenter.x - myteCenter.x, objectCenter.y - myteCenter.y) <= this.getPickupRange(myte);
+	}
+
+	getPickupTargetPoint(myte = null) {
+		const pickupRect = this.getPickupRect();
+		if (pickupRect) {
+			return {
+				x: pickupRect.left + (pickupRect.width / 2),
+				y: pickupRect.top + (pickupRect.height / 2)
+			};
+		}
+
+		return this.getCenterPoint();
 	}
 
 	getCarriedPosition(carrier) {
@@ -1510,17 +1713,32 @@ class MapObject {
 		if (dirConfig.size) {
 			this.size = { width: dirConfig.size.width, height: dirConfig.size.height };
 		}
+		if (dirConfig.spatial) {
+			this.config.spatial = MapObjectFactory.deepMerge({}, this.config.spatial || {}, dirConfig.spatial);
+		}
+		if (dirConfig.visual) {
+			this.config.visual = MapObjectFactory.deepMerge({}, this.config.visual || {}, dirConfig.visual);
+		}
 		if (dirConfig.collider) {
 			this.collider = dirConfig.collider;
+		} else {
+			const colliderRegion = this.getRegionConfig('collider');
+			if (colliderRegion) {
+				this.collider = {
+					...colliderRegion,
+					offsetX: colliderRegion.x ?? colliderRegion.offsetX ?? 0,
+					offsetY: colliderRegion.y ?? colliderRegion.offsetY ?? 0
+				};
+			}
 		}
-		this.config.interactiveCollider = dirConfig.interactiveCollider || null;
+		this.config.interactionRegion = dirConfig.interactionRegion || null;
 
 		this.config.facingDirection = normalizedDir;
 		this.config.transformStyle = dirConfig.transformStyle || '';
 		this.config.spriteFrameOffset = dirConfig.spriteFrameOffset || null;
 
 		for (const key in dirConfig) {
-			if (!['size', 'collider', 'interactiveCollider', 'transformStyle', 'spriteFrameOffset'].includes(key)) {
+			if (!['size', 'collider', 'interactionRegion', 'transformStyle', 'spriteFrameOffset', 'spatial', 'visual'].includes(key)) {
 				this.config[key] = dirConfig[key];
 			}
 		}
@@ -1538,7 +1756,7 @@ class MapObject {
 			if (spriteEl) {
 				spriteEl.style.transform = dirConfig.transformStyle || '';
 
-				const frameSize = this.getConfig('spriteConfig.spriteSheet.frameSize');
+				const frameSize = this.getVisualFrameSize();
 				if (frameSize) {
 					const offsetOverride = this.getConfig('spriteFrameOffset');
 					const offsetX = offsetOverride?.offsetX ?? frameSize.offsetX;
@@ -1552,12 +1770,12 @@ class MapObject {
 
 			const interactiveEl = this.element.querySelector('.interactive-hitbox');
 			if (interactiveEl) {
-				const interactiveCollider = this.getConfig('interactiveCollider');
-				if (interactiveCollider) {
-					interactiveEl.style.width = `${interactiveCollider.width}px`;
-					interactiveEl.style.height = `${interactiveCollider.height}px`;
-					interactiveEl.style.left = `${interactiveCollider.offsetX}px`;
-					interactiveEl.style.top = `${interactiveCollider.offsetY}px`;
+				const interactionRegion = this.getLocalRegionRect('interaction');
+				if (interactionRegion) {
+					interactiveEl.style.width = `${interactionRegion.width}px`;
+					interactiveEl.style.height = `${interactionRegion.height}px`;
+					interactiveEl.style.left = `${interactionRegion.x}px`;
+					interactiveEl.style.top = `${interactionRegion.y}px`;
 				}
 			}
 		}
@@ -1751,13 +1969,14 @@ class MapObject {
 
 		if (this.getConfig('category') === 'interactive') {
 			divElement.classList.add('interactive');
-			if (this.getConfig('interactiveCollider')) {
+			const interactionRegion = this.getLocalRegionRect('interaction');
+			if (interactionRegion) {
 				const interactiveElement = document.createElement('div');
 				interactiveElement.classList.add('interactive-hitbox');
-				interactiveElement.style.width = `${this.getConfig('interactiveCollider.width')}px`;
-				interactiveElement.style.height = `${this.getConfig('interactiveCollider.height')}px`;
-				interactiveElement.style.top = `${this.getConfig('interactiveCollider.offsetY')}px`;
-				interactiveElement.style.left = `${this.getConfig('interactiveCollider.offsetX')}px`;
+				interactiveElement.style.width = `${interactionRegion.width}px`;
+				interactiveElement.style.height = `${interactionRegion.height}px`;
+				interactiveElement.style.top = `${interactionRegion.y}px`;
+				interactiveElement.style.left = `${interactionRegion.x}px`;
 				divElement.appendChild(interactiveElement);
 			}
 		}
@@ -1777,7 +1996,7 @@ class MapObject {
 			divElement.appendChild(this.shadowElement);
 		}
 
-		const renderType = this.getConfig('renderType', 'single');
+		const renderType = this.getVisualRenderType();
 		if (renderType === 'split') {
 			this.renderSplitObject(divElement);
 		} else {
@@ -1920,12 +2139,13 @@ class MapObject {
 		const div = document.createElement('div');
 		div.classList.add('sprite');
 
-		if (this.getConfig('spriteConfig.spriteSheet.url')) {
-			div.style.backgroundImage = `url(${this.getConfig('spriteConfig.spriteSheet.url')})`;
+		const spriteSheet = this.getVisualSpriteSheet();
+		if (spriteSheet.url) {
+			div.style.backgroundImage = `url(${spriteSheet.url})`;
 		}
 
-		if (this.getConfig('spriteConfig.spriteSheet.frameSize')) {
-			const frameSize = this.getConfig('spriteConfig.spriteSheet.frameSize');
+		const frameSize = this.getVisualFrameSize();
+		if (frameSize) {
 			const offsetOverride = this.getConfig('spriteFrameOffset');
 			const offsetX = offsetOverride?.offsetX ?? frameSize.offsetX;
 			const offsetY = offsetOverride?.offsetY ?? frameSize.offsetY;

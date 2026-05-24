@@ -320,11 +320,12 @@ class PickupItemAction extends MyteAction {
             return Infinity;
         }
 
-        const targetCenter = this.target.getCenterPoint?.() || {
+        const targetCenter = this.target.getPickupTargetPoint?.(this.myte) ||
+            this.target.getCenterPoint?.() || {
             x: this.target.posX + ((this.target.size?.width ?? 0) / 2),
             y: this.target.posY + ((this.target.size?.height ?? 0) / 2)
         };
-        const myteCenter = {
+        const myteCenter = this.myte.getCenterPoint?.('collider') || {
             x: this.myte.posX + (this.myte.collider?.offsetX ?? 0) + ((this.myte.collider?.width ?? this.myte.size.width) / 2),
             y: this.myte.posY + (this.myte.collider?.offsetY ?? 0) + ((this.myte.collider?.height ?? this.myte.size.height) / 2)
         };

@@ -148,6 +148,7 @@ The safest mechanical steps:
 - **`EventManager`** — pure domain event bus (`on/emit/off`). Zero DOM listeners. Do not add DOM listeners here.
 - **`get pathfinder()` on Entity** — returns `this.parent?.gameMap?.gridSystem?.pathfinder ?? null`. No per-entity `AStarPathfinder` instances exist. One pathfinder per map on `gridSystem`.
 - **Action system files:** `BaseActions.js` | `MoveActions.js` | `ObjectInteractions.js` | `SocialActions.js` | `StateActions.js` | `CarryActions.js` | `ReactiveActions.js`. New two-Myte interactions share `ActionSync`. New sequences use `MyteQueue.addSequence()`.
-- **MapObject hierarchy:** `MapObjectConfigs.js` → `MapObject.js` → `MapObjectBases.js` → `AnimatedMapObject` → `MovingMapObject`. To add a new object type: edit `MapObjectConfigs.js`, write the class, register in factory.
+- **MapObject hierarchy:** canonical map object JSON -> `MapObject.js` -> `MapObjectBases.js` -> `AnimatedMapObject` -> `MovingMapObject`. To add a new object type: edit `data/map-objects/base.json` / `data/map-objects/types.json`, write the class if needed, and register it in the factory.
 - **`MyteAI._tickTime`** — incremented at the start of every `tickUpdate()`. Used as a cache key for `getNearbyMytes/Objects/DroppedItems`. Per-tick caching avoids redundant spatial scans within the same tick.
 - **`User._scheduleSave()`** — debounced 2s write to localStorage. Use this for all frequent mutations. `saveUserData()` directly is only for flush-on-exit (called in `logout()` and `saveUserData()`).
+

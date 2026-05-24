@@ -5,6 +5,7 @@ class MyteRenderer {
 		// DOM elements owned by the renderer
 		this.duplicate = null;
 		this.sprite = null;
+		this.homeSprite = null;
 		this.battery = null;
 		this.homeBattery = null;
 		this.targetDot = null;
@@ -23,11 +24,26 @@ class MyteRenderer {
 
 		m.elements.wrapper.parentNode.appendChild(this.duplicate);
 
+		this.homeSprite = m.element.querySelector('.sprite');
 		this.sprite = this.duplicate.querySelector('.sprite');
 		this.battery = this.duplicate.querySelector('.battery');
 		this.homeBattery = m.element.querySelector('.battery');
+		this.applyVisualDefinition(m.definition);
 
 		this.duplicate.classList.add('is-deactivated');
+	}
+
+	applyVisualDefinition(definition) {
+		const spriteSheet = MyteDefinitionRegistry.getSpriteSheetConfig(definition);
+		const applyToSprite = (element) => {
+			if (!element) return;
+
+			element.style.backgroundImage = spriteSheet.url ? `url('${spriteSheet.url}')` : '';
+			element.style.filter = spriteSheet.filter || 'none';
+		};
+
+		applyToSprite(this.homeSprite);
+		applyToSprite(this.sprite);
 	}
 
 	createTargetDot() {

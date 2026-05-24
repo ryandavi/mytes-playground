@@ -1,0 +1,49 @@
+{
+  "renderPriority": 1,
+  "scale": 1,
+  "size": {
+    "width": 64,
+    "height": 64
+  },
+  "walkable": false,
+  "collision": false,
+  "direction": "S",
+  "interactive": true,
+  "interactionType": null,
+  "interactionRadius": 100,
+  "interactionCooldown": 5000,
+  "draggable": false,
+  "dragInSelectMode": false,
+  "rubbable": false,
+  "canInspect": true,
+  "canPickUp": false,
+  "interactionSide": null,
+  "canToggle": false,
+  "particleEffects": false,
+  "lightEmission": false,
+  "overlappable": false,
+  "renderLayer": "objects",
+  "depthOffset": null,
+  "depthLine": null,
+  "depthPriority": 0,
+  "soundEffects": {
+    "pickup": "ui_pickup_item",
+    "drop": "ui_drop_item",
+    "drop_error": "ui_error"
+  },
+  "lootable": false,
+  "consumable": false,
+  "storable": false,
+  "saveable": false,
+  "respawns": false,
+  "respawnTime": 300000,
+  "visual": {
+    "renderType": "single",
+    "defaultState": "default",
+    "states": [
+      "default"
+    ],
+    "animates": false,
+    "frameDelay": 100
+  }
+}

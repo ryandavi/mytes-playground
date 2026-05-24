@@ -270,6 +270,7 @@ class AStarMoveAction extends MyteAction {
 
     _buildPath(fromX, fromY, to) {
         const myte = this.myte;
+        myte._movementDestination = { x: to.x, y: to.y };
         const effectiveOptions = { ...myte.pathfindingOptions, ...(this.pathfindingOptions || {}) };
         const path = myte.pathfinder.findPath(myte, fromX, fromY, to.x, to.y, effectiveOptions);
         if (path?.length && !this._suppressDebugOnStart) {
@@ -378,11 +379,13 @@ class AStarMoveAction extends MyteAction {
         super.interrupt();
         this.clearDebugPath();
         this._actionComplete = true;
+        this.myte._movementDestination = null;
     }
 
     cancel() {
         this.clearDebugPath();
         this._actionComplete = true;
+        this.myte._movementDestination = null;
     }
 }
 
@@ -640,6 +643,7 @@ class GoToObjectAction extends PositionableAction {
             x: spriteRect.x + spriteRect.width  / 2,
             y: spriteRect.y + spriteRect.height / 2
         };
+        this.myte._movementDestination = this.targetCenter;
 
         const candidates = this.getCandidatePositions(targetRect, myteApproachRect, cfg);
         _alog(`[APPROACH] candidates (${candidates.length}):`, candidates.map((c, i) => `[${i}] (${c.x.toFixed(1)},${c.y.toFixed(1)})`).join('  '));
@@ -1045,6 +1049,7 @@ class GoToObjectAction extends PositionableAction {
     interrupt() {
         super.interrupt();
         this.clearDebugPath();
+        this.myte._movementDestination = null;
     }
 }
 

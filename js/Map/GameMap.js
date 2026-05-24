@@ -442,7 +442,6 @@ class GameMap {
 
 		// Add zones
 		if (mapData.zones) {
-			console.log("mapData.zones", mapData.zones);
 			for (const zoneData of mapData.zones) {
 				this.zoneManager.addZone(zoneData);
 			}

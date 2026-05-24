@@ -86,12 +86,13 @@ class Myte {
 			height: this.definition.size?.height ?? 192
 		};
 
+		const colliderRegion = MyteDefinitionRegistry.getSpatialRegion(this.definition, 'collider');
 		this.collider = {
-			type: this.definition.collider?.type ?? 'box',
-			width: this.definition.collider?.width ?? this.size.width * 0.5,
-			height: this.definition.collider?.height ?? this.size.height * 0.3,
-			offsetX: this.definition.collider?.offsetX ?? this.size.width * 0.25,
-			offsetY: this.definition.collider?.offsetY ?? this.size.height * 0.6
+			type: colliderRegion?.type ?? 'box',
+			width: colliderRegion?.width ?? this.size.width * 0.5,
+			height: colliderRegion?.height ?? this.size.height * 0.3,
+			offsetX: colliderRegion?.x ?? this.size.width * 0.25,
+			offsetY: colliderRegion?.y ?? this.size.height * 0.6
 		};
 
 		this.physics = {
@@ -461,6 +462,87 @@ class Myte {
 
 	getRect()       { return this.parent.getRect(this.duplicate); }
 	getOffsetRect() { return this.parent.getLocalOffset(this.duplicate); }
+
+	normalizeRegionId(regionId = 'collider') {
+		switch (String(regionId || '').trim().toLowerCase()) {
+			case 'interactionregion':
+			case 'interaction':
+				return 'interaction';
+			case 'selectbox':
+			case 'select':
+				return 'select';
+			case 'hitbox':
+			case 'hit':
+				return 'hit';
+			case 'pickupbox':
+			case 'pickup':
+				return 'pickup';
+			case 'collider':
+			default:
+				return 'collider';
+		}
+	}
+
+	getRegionConfig(regionId = 'collider', direction = this.direction) {
+		return MyteDefinitionRegistry.getSpatialRegion(
+			this.definition,
+			this.normalizeRegionId(regionId),
+			direction
+		);
+	}
+
+	getRegionRect(regionId = 'collider', direction = this.direction) {
+		const region = this.getRegionConfig(regionId, direction);
+		if (!region) {
+			return null;
+		}
+
+		const x = this.posX + (region.x ?? region.offsetX ?? 0);
+		const y = this.posY + (region.y ?? region.offsetY ?? 0);
+		const width = region.width ?? this.size.width;
+		const height = region.height ?? this.size.height;
+		return {
+			x,
+			y,
+			left: x,
+			top: y,
+			right: x + width,
+			bottom: y + height,
+			width,
+			height,
+			type: region.type ?? 'box'
+		};
+	}
+
+	getSelectionRect() {
+		return this.getRegionRect('select') ||
+			this.getRegionRect('interaction') ||
+			this.getRegionRect('collider');
+	}
+
+	getHitRect() {
+		return this.getRegionRect('hit') || this.getRegionRect('collider');
+	}
+
+	getPickupRect() {
+		return this.getRegionRect('pickup') ||
+			this.getSelectionRect();
+	}
+
+	getCenterPoint(regionId = 'collider') {
+		const rect = this.getRegionRect(regionId) || this.getRegionRect('collider');
+		if (!rect) {
+			return {
+				x: this.posX + (this.size.width / 2),
+				y: this.posY + (this.size.height / 2)
+			};
+		}
+
+		return {
+			x: rect.left + (rect.width / 2),
+			y: rect.top + (rect.height / 2)
+		};
+	}
 
 	reset() { this.physicsController.reset(); }
 
@@ -887,19 +969,17 @@ class Myte {
 	}
 
 	getCarriedItemPosition(itemSize = {}) {
-		const carryConfig = this.definition?.carryOffsets?.item || {};
+		const carryAnchor = MyteDefinitionRegistry.getSpatialAnchor(this.definition, 'carry.item', this.direction) || {};
 		const itemWidth = itemSize.width ?? 0;
 		const itemHeight = itemSize.height ?? 0;
-		const anchorX = carryConfig.anchorX ?? 0.5;
-		const anchorY = carryConfig.anchorY ?? 0.12;
-		const itemAnchorX = carryConfig.itemAnchorX ?? 0.5;
-		const itemAnchorY = carryConfig.itemAnchorY ?? 1;
-		const offsetX = carryConfig.offsetX ?? 0;
-		const offsetY = carryConfig.offsetY ?? -8;
+		const anchorX = carryAnchor.x ?? Math.round(this.size.width * 0.5);
+		const anchorY = carryAnchor.y ?? Math.round(this.size.height * 0.12);
+		const itemAnchorX = carryAnchor.itemAnchorX ?? 0.5;
+		const itemAnchorY = carryAnchor.itemAnchorY ?? 1;
 
 		return {
-			x: this.posX + (this.size.width * anchorX) - (itemWidth * itemAnchorX) + offsetX,
-			y: this.posY + (this.size.height * anchorY) - (itemHeight * itemAnchorY) + offsetY
+			x: this.posX + anchorX - (itemWidth * itemAnchorX),
+			y: this.posY + anchorY - (itemHeight * itemAnchorY)
 		};
 	}
 

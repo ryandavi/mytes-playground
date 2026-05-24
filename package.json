@@ -1,6 +1,7 @@
 {
   "private": true,
   "scripts": {
+    "validate:content": "node scripts/validate-content-data.js",
     "sass:build": "sass css/style.scss css/style.css --no-source-map",
     "sass:watch": "sass --watch css/style.scss css/style.css --no-source-map"
   },

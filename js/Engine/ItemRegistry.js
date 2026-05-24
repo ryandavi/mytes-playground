@@ -41,14 +41,15 @@ class ItemRegistry {
         this.items.clear();
         this.aliases.clear();
 
-        if (data.itemSheet?.url) {
-            this.itemSheetUrl = data.itemSheet.url;
+        const spriteSheet = data.visual?.spriteSheet || {};
+        if (spriteSheet.url) {
+            this.itemSheetUrl = spriteSheet.url;
         }
 
-        if (data.itemSheet?.spriteSize) {
+        if (spriteSheet.frameSize) {
             this.defaultSpriteSize = {
-                width: Number(data.itemSheet.spriteSize.width) || this.defaultSpriteSize.width,
-                height: Number(data.itemSheet.spriteSize.height) || this.defaultSpriteSize.height
+                width: Number(spriteSheet.frameSize.width) || this.defaultSpriteSize.width,
+                height: Number(spriteSheet.frameSize.height) || this.defaultSpriteSize.height
             };
         }
 
@@ -59,17 +60,19 @@ class ItemRegistry {
         const id = this.normalizeId(item.id);
         if (!id) return;
 
+        const itemSpriteSheet = item.visual?.spriteSheet || {};
+        const itemSprite = item.visual?.sprite || null;
         let sprite = null;
-        if (item.sprite) {
-            const w = Number(item.sprite.width) || this.defaultSpriteSize.width;
-            const h = Number(item.sprite.height) || this.defaultSpriteSize.height;
-            // Accept grid coords { col, row } or raw pixel offsets { x, y }
-            const x = ('col' in item.sprite)
-                ? -(Number(item.sprite.col) * w)
-                : (Number(item.sprite.x) || 0);
-            const y = ('row' in item.sprite)
-                ? -(Number(item.sprite.row) * h)
-                : (Number(item.sprite.y) || 0);
+        if (itemSprite) {
+            const spriteFrameSize = itemSpriteSheet.frameSize || {};
+            const w = Number(itemSprite.width) || Number(spriteFrameSize.width) || this.defaultSpriteSize.width;
+            const h = Number(itemSprite.height) || Number(spriteFrameSize.height) || this.defaultSpriteSize.height;
+            const x = ('col' in itemSprite)
+                ? -(Number(itemSprite.col) * w)
+                : (Number(itemSprite.x) || 0);
+            const y = ('row' in itemSprite)
+                ? -(Number(itemSprite.row) * h)
+                : (Number(itemSprite.y) || 0);
             sprite = { x, y, width: w, height: h };
         }
 
@@ -79,10 +82,20 @@ class ItemRegistry {
             aliases: Array.isArray(item.aliases)
                 ? item.aliases.map(alias => this.normalizeId(alias)).filter(Boolean)
                 : [],
-            name: item.name || id,
+            displayName: item.displayName || id,
+            name: item.displayName || id,
             type: String(item.type || 'item').toLowerCase(),
             description: item.description || '',
-            sprite
+            droppable: item.capabilities?.droppable === true,
+            visual: {
+                ...(item.visual || {}),
+                sprite: itemSprite,
+                spriteSheet: {
+                    ...itemSpriteSheet
+                }
+            },
+            sprite,
+            spriteSheetUrl: itemSpriteSheet.url || this.itemSheetUrl
         };
 
         this.items.set(id, normalized);
@@ -133,7 +146,7 @@ class ItemRegistry {
         element.style.setProperty('--item-sprite-height', `${item.sprite.height}px`);
         element.style.setProperty('--item-sprite-x', `${item.sprite.x}px`);
         element.style.setProperty('--item-sprite-y', `${item.sprite.y}px`);
-        element.style.backgroundImage = `url('${this.itemSheetUrl}')`;
+        element.style.backgroundImage = `url('${item.spriteSheetUrl || this.itemSheetUrl}')`;
         return true;
     }
 }

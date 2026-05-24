@@ -1,11 +1,28 @@
 class MyteDefinitionRegistry {
     static baseDefinition = null;
     static speciesDefinitions = new Map();
+    static speciesCatalog = [];
     static loadPromise = null;
-    static definitionFiles = ['snail', 'worm'];
+    static defaultSpeciesId = 'snail';
 
     static normalizeSpeciesId(speciesId) {
-        return String(speciesId || 'snail').trim().toLowerCase();
+        return String(speciesId || this.defaultSpeciesId || 'snail').trim().toLowerCase();
+    }
+
+    static normalizeSpeciesCatalogEntry(entry = {}) {
+        const id = this.normalizeSpeciesId(entry.id || entry.speciesId);
+        if (!id) return null;
+
+        const parsedSortOrder = Number(entry.sortOrder);
+        return {
+            ...entry,
+            id,
+            definitionFile: String(entry.definitionFile || `${id}.json`).trim(),
+            label: entry.label || id,
+            enabled: entry.enabled !== false,
+            essential: entry.essential === true,
+            sortOrder: Number.isFinite(parsedSortOrder) ? parsedSortOrder : 0
+        };
     }
 
     static async preload() {
@@ -17,46 +34,109 @@ class MyteDefinitionRegistry {
     }
 
     static async loadDefinitions() {
-        const baseResponse = await fetch('data/mytes/myte.json');
+        const [baseResponse, speciesCatalogResponse] = await Promise.all([
+            fetch('data/mytes/myte.json'),
+            fetch('data/mytes/species.json')
+        ]);
+
         if (!baseResponse.ok) {
             throw new Error('Failed to load base Myte definition.');
         }
+        if (!speciesCatalogResponse.ok) {
+            throw new Error('Failed to load Myte species catalog.');
+        }
 
         this.baseDefinition = await baseResponse.json();
+        const speciesCatalogData = await speciesCatalogResponse.json();
+        const speciesEntries = (speciesCatalogData.species || [])
+            .map(entry => this.normalizeSpeciesCatalogEntry(entry))
+            .filter(Boolean)
+            .filter(entry => entry.enabled)
+            .sort((a, b) => {
+                if (a.sortOrder !== b.sortOrder) {
+                    return a.sortOrder - b.sortOrder;
+                }
+                return a.id.localeCompare(b.id);
+            });
+
+        if (speciesEntries.length === 0) {
+            throw new Error('No enabled Myte species were found in data/mytes/species.json.');
+        }
+
+        this.speciesCatalog = speciesEntries.map(entry => this.cloneValue(entry));
+        this.defaultSpeciesId = this.normalizeSpeciesId(
+            speciesCatalogData.defaultSpeciesId || speciesEntries[0].id
+        );
 
         const speciesResponses = await Promise.all(
-            this.definitionFiles.map(async (speciesId) => {
-                const response = await fetch(`data/mytes/${speciesId}.json`);
+            speciesEntries.map(async (entry) => {
+                const response = await fetch(`data/mytes/${entry.definitionFile}`);
                 if (!response.ok) {
-                    throw new Error(`Failed to load species definition "${speciesId}".`);
+                    throw new Error(`Failed to load species definition "${entry.id}".`);
                 }
 
-                return response.json();
+                return {
+                    entry,
+                    definition: await response.json()
+                };
             })
         );
 
         this.speciesDefinitions.clear();
-        speciesResponses.forEach((definition) => {
-            const speciesId = this.normalizeSpeciesId(definition.id);
-            this.speciesDefinitions.set(speciesId, definition);
+        speciesResponses.forEach(({ entry, definition }) => {
+            const speciesId = this.normalizeSpeciesId(definition.id || entry.id);
+            this.speciesDefinitions.set(entry.id, {
+                ...definition,
+                id: speciesId
+            });
         });
     }
 
     static getSpeciesIds() {
-        return [...this.speciesDefinitions.keys()];
+        return this.speciesCatalog.map(entry => entry.id);
     }
 
-    static getSpeciesSync(speciesId = 'snail') {
+    static getSpeciesCatalogSync() {
+        return this.cloneValue(this.speciesCatalog);
+    }
+
+    static getSpeciesLayersSync(speciesId = this.defaultSpeciesId) {
+        const resolvedSpeciesId = this.resolveSpeciesId(speciesId);
+        const speciesDefinition = this.speciesDefinitions.get(resolvedSpeciesId);
+        if (!this.baseDefinition || !speciesDefinition) {
+            throw new Error(`MyteDefinitionRegistry is not ready for species "${resolvedSpeciesId}".`);
+        }
+
+        return {
+            baseDefinition: this.cloneValue(this.baseDefinition),
+            speciesDefinition: this.cloneValue(speciesDefinition),
+            mergedDefinition: this.getSpeciesSync(resolvedSpeciesId)
+        };
+    }
+
+    static resolveSpeciesId(speciesId = this.defaultSpeciesId) {
         const normalizedSpeciesId = this.normalizeSpeciesId(speciesId);
-        const fallbackDefinition = this.speciesDefinitions.get('snail');
-        const speciesDefinition = this.speciesDefinitions.get(normalizedSpeciesId) || fallbackDefinition;
+        if (this.speciesDefinitions.has(normalizedSpeciesId)) {
+            return normalizedSpeciesId;
+        }
+
+        if (this.speciesDefinitions.has(this.defaultSpeciesId)) {
+            return this.defaultSpeciesId;
+        }
+
+        return this.speciesDefinitions.keys().next().value || this.defaultSpeciesId;
+    }
+
+    static getSpeciesSync(speciesId = this.defaultSpeciesId) {
+        const resolvedSpeciesId = this.resolveSpeciesId(speciesId);
+        const speciesDefinition = this.speciesDefinitions.get(resolvedSpeciesId);
 
         if (!this.baseDefinition || !speciesDefinition) {
-            throw new Error(`MyteDefinitionRegistry is not ready for species "${normalizedSpeciesId}".`);
+            throw new Error(`MyteDefinitionRegistry is not ready for species "${resolvedSpeciesId}".`);
         }
 
         const mergedDefinition = this.deepMerge(this.baseDefinition, speciesDefinition);
-        mergedDefinition.id = this.normalizeSpeciesId(mergedDefinition.id || normalizedSpeciesId);
+        mergedDefinition.id = this.normalizeSpeciesId(mergedDefinition.id || resolvedSpeciesId);
         return mergedDefinition;
     }
 
@@ -77,6 +157,37 @@ class MyteDefinitionRegistry {
         }
 
         return null;
+    }
+
+    static getSpatialRegion(definition, regionId, direction = null) {
+        return this.getSpatialValue(definition, 'regions', regionId, direction);
+    }
+
+    static getSpatialAnchor(definition, anchorId, direction = null) {
+        return this.getSpatialValue(definition, 'anchors', anchorId, direction);
+    }
+
+    static getSpatialValue(definition, section, valueId, direction = null) {
+        const baseValue = definition?.spatial?.[section]?.[valueId];
+        if (!direction) {
+            return baseValue == null ? null : this.cloneValue(baseValue);
+        }
+
+        const normalizedDirection = String(direction || '').trim().toUpperCase();
+        const directionalValue = definition?.spatial?.directions?.[normalizedDirection]?.[section]?.[valueId];
+        if (baseValue == null && directionalValue == null) {
+            return null;
+        }
+
+        return this.deepMerge(baseValue, directionalValue);
+    }
+
+    static getSpriteSheetConfig(definition) {
+        const spriteSheet = definition?.visual?.spriteSheet || {};
+        return {
+            url: spriteSheet.url || '',
+            filter: spriteSheet.filter || 'none'
+        };
     }
 
     static deepMerge(baseValue, overrideValue) {

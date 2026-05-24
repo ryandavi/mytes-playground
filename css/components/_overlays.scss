@@ -249,8 +249,9 @@
             }
 
             .loading-icon {
+                --frames: 8;
                 --size: 100px;
-                animation: loadingAnimation 1s steps(7) infinite;
+                animation: loadingAnimation 1s steps(calc(var(--frames) - 1)) infinite;
                 background-size: 800%;
                 background-image: url(../images/snail/spritesheet.png);
                 height: var(--size);
@@ -259,16 +260,6 @@
                 width: var(--size);
                 z-index: 100;
                 filter: var(--shadow);
-            }
-
-            @keyframes loadingAnimation {
-                from {
-                    background-position: 0 0;
-                }
-
-                to {
-                    background-position: 100% 0;
-                }
             }
 
             .loading-progress-container {
@@ -282,7 +273,6 @@
                     height: 100%;
                     overflow: hidden;
                     position: relative;
-                    transition: width 0.1s linear;
                     width: 0%;
 
                     .loading-progress-blocks {

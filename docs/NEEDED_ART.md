@@ -112,7 +112,7 @@ These are not map objects or inventory items, but they are still visible art gap
 - **Item IDs:** `acorn`/`turnip`/`apple`/`cherries` are canonical in `items.json` (aliases exist). Crop items `tomato`, `carrot`, `wheat`, `berry` are still missing item sheet entries and CSS classes entirely.
 - **FOOD map objects:** If `FOOD` should appear on the map, point it at `items.png`; otherwise route all food drops through `DroppedMapItem` instead of spawning a blank `MapObject`.
 - **Bed files:** Config expects `bed_default.png` / `bunk_bed.png` but repo has legacy `bed.gif` / `bed_big.png`. Pick canonical file names and rename or remap.
-- **Missing spritesheet URLs:** `LANTERN`, `FOUNTAIN`, `BREEDING_FLOWER`, `NIGHT_BLOOM`, and `PATROL_GUARD` have no `spriteSheet.url` in `MapObjectConfigs.js`. Add URLs once art exists.
+- **Missing spritesheet URLs:** `LANTERN`, `FOUNTAIN`, `BREEDING_FLOWER`, `NIGHT_BLOOM`, and `PATROL_GUARD` have no `spriteSheet.url` in `data/map-objects/types.json`. Add URLs once art exists.
 
 ## Suggested Production Order
 
@@ -120,4 +120,5 @@ These are not map objects or inventory items, but they are still visible art gap
 2. Lanterns, fountains, crops, breeding flowers, night blooms
 3. NPC trio, patrol guard, butterfly color variants, blue ball
 4. Inventory expansion: crop icons, coin/health/equipment pickups
+
 

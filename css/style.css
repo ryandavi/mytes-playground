@@ -638,6 +638,22 @@ body.debug .map-object > .interactive-hitbox {
     transform: rotate(4deg);
   }
 }
+@keyframes loadingAnimation {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 100% 0;
+  }
+}
+@keyframes block-move {
+  from {
+    background-position: 20px 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
 @keyframes floating {
   0% {
     transform: translate(0, 0);
@@ -2113,8 +2129,9 @@ body.debug .map-object > .interactive-hitbox {
   margin-top: 0.5em;
 }
 .loading-screen > .window-panel > .window-panel__content .loading-icon {
+  --frames: 8;
   --size: 100px;
-  animation: loadingAnimation 1s steps(7) infinite;
+  animation: loadingAnimation 1s steps(calc(var(--frames) - 1)) infinite;
   background-size: 800%;
   background-image: url(../images/snail/spritesheet.png);
   height: var(--size);
@@ -2123,14 +2140,6 @@ body.debug .map-object > .interactive-hitbox {
   width: var(--size);
   z-index: 100;
   filter: var(--shadow);
-}
-@keyframes loadingAnimation {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: 100% 0;
-  }
 }
 .loading-screen > .window-panel > .window-panel__content .loading-progress-container {
   background-color: var(--surface-ui-inset, var(--button-mid));
@@ -2147,7 +2156,6 @@ body.debug .map-object > .interactive-hitbox {
   height: 100%;
   overflow: hidden;
   position: relative;
-  transition: width 0.1s linear;
   width: 0%;
 }
 .loading-screen > .window-panel > .window-panel__content .loading-progress-container .loading-progress .loading-progress-blocks {

@@ -130,6 +130,14 @@ class ContainerManager {
                 }
             }
 
+            const mapObjectConfigLoaded = await MapObjectFactory.loadConfigFiles(
+                'data/map-objects/base.json',
+                'data/map-objects/types.json'
+            );
+            if (!mapObjectConfigLoaded) {
+                throw new Error('Failed to load canonical map object config data.');
+            }
+
             this.updateContainerLoading(
                 ContainerManager.INIT_PROGRESS.MAP,
                 "Loading initial map..."

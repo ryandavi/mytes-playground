@@ -24,14 +24,17 @@ const withDirectionalBehavior = (BaseClass) => class extends BaseClass {
             spriteElement.style.transform = transformStyle;
         }
 
-        if (this.getConfig('debug', false) && this.getConfig('interactiveCollider')) {
-            const interactiveCollider = this.getConfig('interactiveCollider');
+        if (this.getConfig('debug', false)) {
+            const interactionRegion = this.getLocalRegionRect?.('interaction');
+            if (!interactionRegion) {
+                return element;
+            }
             const interactiveZone = document.createElement('div');
             interactiveZone.classList.add('interactive-zone', 'debug-visible');
-            interactiveZone.style.width = `${interactiveCollider.width}px`;
-            interactiveZone.style.height = `${interactiveCollider.height}px`;
-            interactiveZone.style.left = `${interactiveCollider.offsetX}px`;
-            interactiveZone.style.top = `${interactiveCollider.offsetY}px`;
+            interactiveZone.style.width = `${interactionRegion.width}px`;
+            interactiveZone.style.height = `${interactionRegion.height}px`;
+            interactiveZone.style.left = `${interactionRegion.x}px`;
+            interactiveZone.style.top = `${interactionRegion.y}px`;
             element.appendChild(interactiveZone);
         }
 
@@ -126,7 +129,7 @@ class StatefulAnimatedMapObject extends RangeInteractiveAnimatedMapObject {
     }
 
     getDefaultState() {
-        return this.getConfig('default', 'default');
+        return this.getDefaultVisualState('default');
     }
 
     getStateAttributeName() {
@@ -219,7 +222,7 @@ class BinaryStateAnimatedMapObject extends StatefulAnimatedMapObject {
 
 class ClassStateAnimatedMapObject extends StatefulAnimatedMapObject {
     getDefaultState() {
-        return this.getConfig('spriteConfig.default', super.getDefaultState());
+        return this.getDefaultVisualState(super.getDefaultState());
     }
 
     getStateClassNames() {
@@ -269,7 +272,7 @@ class ClassStateAnimatedMapObject extends StatefulAnimatedMapObject {
 class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
-        this.isOpen = options.isOpen ?? this.getConfig('default', 'closed') === 'open';
+        this.isOpen = options.isOpen ?? this.getDefaultVisualState('closed') === 'open';
         this.isAnimating = false;
         this.updateCollisionState();
     }

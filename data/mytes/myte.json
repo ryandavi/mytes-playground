@@ -1,4 +1,5 @@
 {
+  "schemaVersion": 1,
   "id": "myte",
   "displayName": "Myte",
   "movement": {
@@ -13,12 +14,24 @@
     "width": 192,
     "height": 192
   },
-  "collider": {
-    "type": "box",
-    "width": 96,
-    "height": 58,
-    "offsetX": 48,
-    "offsetY": 115
+  "spatial": {
+    "anchors": {
+      "carry.item": {
+        "x": 96,
+        "y": 15,
+        "itemAnchorX": 0.5,
+        "itemAnchorY": 1
+      }
+    },
+    "regions": {
+      "collider": {
+        "type": "box",
+        "x": 48,
+        "y": 115,
+        "width": 96,
+        "height": 58
+      }
+    }
   },
   "physics": {
     "gravity": 0.3,
@@ -77,31 +90,23 @@
       "curiosity": 0
     },
     "moods": {
-      "happy":   { "duration": 10000, "speedMultiplier": 1.2, "expression": "happy" },
-      "sad":     { "duration": 15000, "speedMultiplier": 0.8, "expression": "sad" },
-      "excited": { "duration": 8000,  "speedMultiplier": 1.5, "expression": "excited" },
-      "sleepy":  { "duration": 12000, "speedMultiplier": 0.7, "expression": "sleepy" },
-      "grumpy":  { "duration": 10000, "speedMultiplier": 0.9, "expression": "grumpy" },
-      "neutral": { "duration": 5000,  "speedMultiplier": 1.0, "expression": "neutral" }
+      "happy": { "duration": 10000, "speedMultiplier": 1.2, "expression": "happy" },
+      "sad": { "duration": 15000, "speedMultiplier": 0.8, "expression": "sad" },
+      "excited": { "duration": 8000, "speedMultiplier": 1.5, "expression": "excited" },
+      "sleepy": { "duration": 12000, "speedMultiplier": 0.7, "expression": "sleepy" },
+      "grumpy": { "duration": 10000, "speedMultiplier": 0.9, "expression": "grumpy" },
+      "neutral": { "duration": 5000, "speedMultiplier": 1, "expression": "neutral" }
     }
   },
   "visual": {
-    "cssClass": "snail",
     "frameSize": {
       "width": 192,
       "height": 192
     },
+    "spriteSheet": {
+      "filter": "none"
+    },
     "spriteSets": null
-  },
-  "carryOffsets": {
-    "item": {
-      "anchorX": 0.5,
-      "anchorY": 0.12,
-      "itemAnchorX": 0.5,
-      "itemAnchorY": 1,
-      "offsetX": 0,
-      "offsetY": -8
-    }
   },
   "expressions": {
     "surprised": "surprise",

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "defaultSpeciesId": "snail",
+  "species": [
+    {
+      "id": "snail",
+      "label": "Snail",
+      "definitionFile": "snail.json",
+      "enabled": true,
+      "essential": true,
+      "sortOrder": 10
+    },
+    {
+      "id": "worm",
+      "label": "Worm",
+      "definitionFile": "worm.json",
+      "enabled": true,
+      "essential": false,
+      "sortOrder": 20
+    }
+  ]
+}
