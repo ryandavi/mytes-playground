@@ -215,12 +215,6 @@ class MyteAI {
             0,
             1
         );
-        const restNeed = Utility.clamp(
-            ((1 - energy) * 0.72) + ((1 - health) * 0.24) + (comfortNeed * 0.14),
-            0,
-            1
-        );
-
         return {
             stats,
             energy,
@@ -251,10 +245,9 @@ class MyteAI {
             distanceFromHome,
             getNoveltyScore: (target) => this.getNoveltyScore(target),
             needs: {
-                rest: restNeed,
                 social: Utility.clamp((neediness * 0.44) + (moodNeed * 0.22) + (boredom * 0.34), 0, 1),
                 enrichment: Utility.clamp((curiosity * 0.42) + (boredom * 0.44) + (comfortNeed * 0.14), 0, 1),
-                play: Utility.clamp((activity * 0.42) + (energy * 0.2) + (boredom * 0.38) - (restNeed * 0.24), 0, 1),
+                play: Utility.clamp((activity * 0.42) + (energy * 0.2) + (boredom * 0.38) - ((1 - energy) * 0.24), 0, 1),
                 comfort: Utility.clamp((comfortNeed * 0.52) + (homeNeed * 0.24) + (lightNeed * 0.24), 0, 1),
                 home: homeNeed
             }
@@ -330,7 +323,7 @@ class MyteAI {
         }
 
         const nearbySurface = this.findTargetWithAffordance(context.nearbyObjects, 'use_surface_slot', context);
-        let score = 16 + (context.needs.rest * 84) + (context.needs.comfort * 18);
+        let score = 16 + ((1 - context.energy) * 84) + (context.needs.comfort * 18);
         if (this.mode === MOVE_AUTONOMY_TYPES.REST) score += 36;
         if (context.distanceFromHome > this.homeComfortRadius) score += context.needs.home * 14;
         score += context.preferences.coziness * 10;
@@ -381,7 +374,7 @@ class MyteAI {
             return null;
         }
 
-        let score = 8 + (context.needs.home * 42) + (context.needs.comfort * 22) + (context.needs.rest * 10);
+        let score = 8 + (context.needs.home * 42) + (context.needs.comfort * 22) + ((1 - context.energy) * 10);
         if (context.energy < 0.35) score += 10;
 
         if (score < 24) {
@@ -463,7 +456,7 @@ class MyteAI {
         );
         let score = 10 + (context.needs.play * 54) + (context.boredom * 10);
         score += context.activity * 12;
-        score -= context.needs.rest * 18;
+        score -= (1 - context.energy) * 18;
 
         if (score < 24) {
             return null;
@@ -593,16 +586,16 @@ class MyteAI {
 
         switch (affordance.actionId) {
             case 'use_surface_slot':
-                score += (context.needs.rest * 32) + (context.needs.comfort * 24) + (context.preferences.coziness * 12);
+                score += ((1 - context.energy) * 32) + (context.needs.comfort * 24) + (context.preferences.coziness * 12);
                 score -= context.boredom * 6;
                 break;
             case 'inspect':
                 score += (context.needs.enrichment * 24) + (novelty * 18) + (context.curiosity * 10);
-                score -= context.needs.rest * 9;
+                score -= (1 - context.energy) * 9;
                 break;
             case 'deep_inspect':
                 score += (novelty * 24) + (context.curiosity * 18) + (context.boredom * 14);
-                score -= context.needs.rest * 12;
+                score -= (1 - context.energy) * 12;
                 break;
             case 'smell_flower':
             case 'drink_fountain':
@@ -748,7 +741,7 @@ class MyteAI {
             label: 'idle',
             targetKey: 'idle',
             commitmentMs: 900,
-            score: this.applyRepeatPenalty(7 + (context.needs.rest * 3) + (context.needs.comfort * 2), 'idle', 'idle'),
+            score: this.applyRepeatPenalty(7 + ((1 - context.energy) * 3) + (context.needs.comfort * 2), 'idle', 'idle'),
             execute: () => {
                 if (context.boredom > 0.68 && Math.random() < 0.22) {
                     this.myte.queue.addExpression('surprise', 30, 1);
@@ -1214,6 +1207,7 @@ class MyteAI {
     buildDebugContextSnapshot(context) {
         return {
             energy: Number(context.energy.toFixed(2)),
+            health: Number(context.health.toFixed(2)),
             mood: Number(context.mood.toFixed(2)),
             boredom: Number(context.boredom.toFixed(2)),
             comfort: Number(context.comfort.toFixed(2)),
@@ -1222,7 +1216,6 @@ class MyteAI {
             lightNeed: Number(context.lightNeed.toFixed(2)),
             musicNeed: Number(context.musicNeed.toFixed(2)),
             needs: {
-                rest: Number(context.needs.rest.toFixed(2)),
                 social: Number(context.needs.social.toFixed(2)),
                 enrichment: Number(context.needs.enrichment.toFixed(2)),
                 play: Number(context.needs.play.toFixed(2)),
@@ -1242,7 +1235,6 @@ class MyteAI {
 
         const needs = snapshot?.needs ?? {};
         const entries = [
-            { id: 'rest', label: 'Rest', value: needs.rest ?? 0 },
             { id: 'social', label: 'Social', value: needs.social ?? 0 },
             { id: 'enrichment', label: 'Enrichment', value: needs.enrichment ?? 0 },
             { id: 'play', label: 'Play', value: needs.play ?? 0 },
@@ -1261,6 +1253,7 @@ class MyteAI {
             topNeed,
             vitals: {
                 energy: Math.round((snapshot?.energy ?? 0) * 100),
+                health: Math.round((snapshot?.health ?? 0) * 100),
                 mood: Math.round((snapshot?.mood ?? 0) * 100),
                 fun: Math.round((1 - (snapshot?.boredom ?? 0)) * 100),
                 comfort: Math.round((snapshot?.comfort ?? 0) * 100),

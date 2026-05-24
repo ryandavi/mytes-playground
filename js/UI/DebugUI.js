@@ -833,7 +833,6 @@ class DebugUI {
 
         return [
             { label: 'Decision',     value: aiState.lastDecisionLabel ? this.prettifyAiPath(aiState.lastDecisionLabel) : 'N/A' },
-            { label: 'Rest',         value: fmt(needs.rest) },
             { label: 'Social',       value: fmt(needs.social) },
             { label: 'Enrichment',   value: fmt(needs.enrichment) },
             { label: 'Play',         value: fmt(needs.play) },

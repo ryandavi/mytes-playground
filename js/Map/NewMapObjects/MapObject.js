@@ -86,6 +86,28 @@ class MapObject {
 		return !!this.getShadowConfig();
 	}
 
+	humanizeLabelToken(value) {
+		return String(value || '')
+			.trim()
+			.split(/[_\s-]+/)
+			.filter(Boolean)
+			.map(part => part.charAt(0).toUpperCase() + part.slice(1))
+			.join(' ');
+	}
+
+	formatDisplayQuantity(quantity) {
+		if (Array.isArray(quantity) && quantity.length >= 2) {
+			return `${quantity[0]}-${quantity[1]}`;
+		}
+
+		const numericQuantity = Number(quantity);
+		if (Number.isFinite(numericQuantity)) {
+			return String(numericQuantity);
+		}
+
+		return null;
+	}
+
 	getDisplayName() {
 		const explicitName = this.getConfig('displayName', null);
 		if (typeof explicitName === 'string' && explicitName.trim()) {
@@ -93,12 +115,7 @@ class MapObject {
 		}
 
 		const raw = String(this.variant || this.type || 'Object');
-		return raw
-			.toLowerCase()
-			.split(/[_\s-]+/)
-			.filter(Boolean)
-			.map(part => part.charAt(0).toUpperCase() + part.slice(1))
-			.join(' ');
+		return this.humanizeLabelToken(raw.toLowerCase());
 	}
 
 	isSidebarFlowerObject() {
@@ -424,6 +441,275 @@ class MapObject {
 			x: this.posX + (this.collider?.offsetX ?? 0) + ((this.collider?.width ?? this.size.width) / 2),
 			y: this.posY + (this.collider?.offsetY ?? 0) + ((this.collider?.height ?? this.size.height) / 2)
 		};
+	}
+
+	getFacingVector() {
+		const facing = this.normalizeFacingDirection(
+			this.getConfig('facingDirection', this.facingDirection ?? 'S')
+		);
+
+		switch (facing) {
+			case 'N': return { x: 0, y: -1 };
+			case 'E': return { x: 1, y: 0 };
+			case 'W': return { x: -1, y: 0 };
+			case 'S':
+			default:
+				return { x: 0, y: 1 };
+		}
+	}
+
+	getFrontDropSpawnPoint({ distance = 18, verticalLift = 0 } = {}) {
+		const rect = this.getColliderRectFor(this) ?? {
+			left: this.posX,
+			top: this.posY,
+			right: this.posX + this.size.width,
+			bottom: this.posY + this.size.height,
+			width: this.size.width,
+			height: this.size.height
+		};
+		const facing = this.getFacingVector();
+		const centerX = rect.left + (rect.width / 2);
+		const centerY = rect.top + (rect.height / 2);
+		const halfDepth = facing.x !== 0
+			? (rect.width / 2)
+			: (rect.height / 2);
+		const frontOffset = halfDepth + distance;
+
+		return {
+			x: centerX + (facing.x * frontOffset),
+			y: centerY + (facing.y * frontOffset) - verticalLift
+		};
+	}
+
+	getDefaultItemPopOutMotionOptions() {
+		return {
+			distance: 0,
+			verticalLift: 8,
+			forwardTravelDistance: 226,
+			forwardSpeed: null,
+			forwardVariance: 4,
+			spreadDistance: 8,
+			spreadSpeed: 0.5,
+			spreadIndex: 0,
+			spreadCount: 1,
+			lateralSpeed: 0.18,
+			lateralSpawnDistance: 2,
+			lateralBias: null,
+			verticalSpeed: 8.2,
+			verticalVariance: 2.1,
+			airDrag: 0.92
+		};
+	}
+
+	getItemPopOutSpreadBias(index = 0, count = 1) {
+		const resolvedCount = Math.max(1, Math.round(Number(count) || 1));
+		if (resolvedCount <= 1) return 0;
+
+		const resolvedIndex = Utility.clamp(
+			Math.round(Number(index) || 0),
+			0,
+			resolvedCount - 1
+		);
+		const midpoint = (resolvedCount - 1) / 2;
+		return (resolvedIndex - midpoint) / Math.max(midpoint, 0.5);
+	}
+
+	getItemPopOutMotion({
+		distance,
+		verticalLift,
+		forwardTravelDistance,
+		forwardSpeed,
+		forwardVariance,
+		spreadDistance,
+		spreadSpeed,
+		spreadIndex,
+		spreadCount,
+		lateralSpeed,
+		lateralSpawnDistance,
+		lateralBias = null,
+		verticalSpeed,
+		verticalVariance,
+		airDrag
+	} = {}) {
+		const defaults = this.getDefaultItemPopOutMotionOptions();
+		const forward = this.getFacingVector();
+		const lateral = { x: -forward.y, y: forward.x };
+		const resolvedDistance = Number.isFinite(Number(distance)) ? Number(distance) : defaults.distance;
+		const resolvedVerticalLift = Number.isFinite(Number(verticalLift)) ? Number(verticalLift) : defaults.verticalLift;
+		const resolvedForwardTravelDistance = Number.isFinite(Number(forwardTravelDistance))
+			? Number(forwardTravelDistance)
+			: defaults.forwardTravelDistance;
+		const resolvedForwardVariance = Number.isFinite(Number(forwardVariance)) ? Number(forwardVariance) : defaults.forwardVariance;
+		const resolvedSpreadDistance = Number.isFinite(Number(spreadDistance))
+			? Number(spreadDistance)
+			: (
+				Number.isFinite(Number(lateralSpawnDistance))
+					? Number(lateralSpawnDistance)
+					: defaults.spreadDistance
+			);
+		const resolvedSpreadSpeed = Number.isFinite(Number(spreadSpeed))
+			? Number(spreadSpeed)
+			: (
+				Number.isFinite(Number(lateralSpeed))
+					? Number(lateralSpeed)
+					: defaults.spreadSpeed
+			);
+		const resolvedSpreadIndex = Number.isFinite(Number(spreadIndex)) ? Number(spreadIndex) : defaults.spreadIndex;
+		const resolvedSpreadCount = Number.isFinite(Number(spreadCount)) ? Number(spreadCount) : defaults.spreadCount;
+		const bias = lateralBias !== null && lateralBias !== undefined && Number.isFinite(Number(lateralBias))
+			? Utility.clamp(Number(lateralBias), -1, 1)
+			: this.getItemPopOutSpreadBias(resolvedSpreadIndex, resolvedSpreadCount);
+		const resolvedVerticalSpeed = Number.isFinite(Number(verticalSpeed)) ? Number(verticalSpeed) : defaults.verticalSpeed;
+		const resolvedVerticalVariance = Number.isFinite(Number(verticalVariance)) ? Number(verticalVariance) : defaults.verticalVariance;
+		const resolvedAirDrag = Number.isFinite(Number(airDrag))
+			? Utility.clamp(Number(airDrag), 0, 0.999)
+			: defaults.airDrag;
+		const spawnPoint = this.getFrontDropSpawnPoint({
+			distance: resolvedDistance,
+			verticalLift: resolvedVerticalLift
+		});
+		const effectiveGravity = 0.5;
+		const estimatedAirborneFrames = Math.max(
+			1,
+			Math.round(((resolvedVerticalSpeed + (resolvedVerticalVariance * 0.5)) * 2) / effectiveGravity)
+		);
+		const dragDistanceFactor = resolvedAirDrag > 0 && resolvedAirDrag < 0.999
+			? (1 - Math.pow(resolvedAirDrag, estimatedAirborneFrames)) / (1 - resolvedAirDrag)
+			: estimatedAirborneFrames;
+		const derivedForwardSpeed = resolvedForwardTravelDistance / Math.max(dragDistanceFactor, 0.001);
+		const resolvedForwardSpeed = Number.isFinite(Number(forwardSpeed))
+			? Number(forwardSpeed)
+			: (Number.isFinite(Number(defaults.forwardSpeed)) ? Number(defaults.forwardSpeed) : derivedForwardSpeed);
+		const forwardMagnitude = resolvedForwardSpeed + (Math.random() * resolvedForwardVariance);
+
+		// Rotate the forward vector by a fan angle so multiple items spread in a cone.
+		// Half-angle grows with item count so a single item always flies straight forward.
+		const fanHalfAngleDeg = resolvedSpreadCount > 1
+			? Math.min(60, 15 + (resolvedSpreadCount - 1) * 15)
+			: 0;
+		const fanAngleRad = bias * fanHalfAngleDeg * (Math.PI / 180);
+		const cos_a = Math.cos(fanAngleRad);
+		const sin_a = Math.sin(fanAngleRad);
+		const rotatedX = forward.x * cos_a - forward.y * sin_a;
+		const rotatedY = forward.x * sin_a + forward.y * cos_a;
+
+		return {
+			spawnX: spawnPoint.x + (lateral.x * bias * resolvedSpreadDistance),
+			spawnY: spawnPoint.y + (lateral.y * bias * resolvedSpreadDistance),
+			velocityX: rotatedX * forwardMagnitude,
+			velocityY: rotatedY * forwardMagnitude,
+			velocityZ: resolvedVerticalSpeed + (Math.random() * resolvedVerticalVariance),
+			airDrag: resolvedAirDrag
+		};
+	}
+
+	getDroppedItemsLayer(parent = null) {
+		return this.gameMap?.layers?.objects || parent?.canvas?.querySelector('.layer.foreground') || null;
+	}
+
+	createDroppedInventoryItem({
+		type = null,
+		variant = null,
+		quantity = 1,
+		inventoryType = null,
+		inventoryVariant = null,
+		inventoryName = null,
+		description = '',
+		motion = null,
+		motionOptions = {}
+	} = {}) {
+		const resolvedVariant = ItemRegistry.resolveIdSync(variant) || variant;
+		const itemDefinition = ItemRegistry.getItemSync(resolvedVariant);
+		const resolvedType = String(
+			inventoryType ||
+			type ||
+			itemDefinition?.type ||
+			'ITEM'
+		).toUpperCase();
+		const resolvedMotion = motion ?? this.getItemPopOutMotion(motionOptions);
+		const dropped = new DroppedMapItem(
+			this.gameMap,
+			resolvedType,
+			resolvedVariant,
+			resolvedMotion.spawnX,
+			resolvedMotion.spawnY
+		);
+
+		dropped.quantity = Math.max(1, Number(quantity) || 1);
+		dropped.inventoryType = resolvedType;
+		dropped.inventoryVariant = inventoryVariant || itemDefinition?.id || resolvedVariant;
+		dropped.inventoryName = inventoryName || itemDefinition?.name || dropped.inventoryVariant;
+		dropped.description = description || itemDefinition?.description || '';
+		dropped.velocityX = resolvedMotion.velocityX ?? 0;
+		dropped.velocityY = resolvedMotion.velocityY ?? 0;
+		dropped.velocityZ = resolvedMotion.velocityZ ?? 0;
+		dropped.airDrag = resolvedMotion.airDrag ?? dropped.airDrag ?? 0.86;
+
+		return dropped;
+	}
+
+	spawnDroppedInventoryItem(itemConfig = {}, {
+		parent = null,
+		layer = null,
+		localCollection = null
+	} = {}) {
+		const foregroundLayer = layer || this.getDroppedItemsLayer(parent);
+		if (!foregroundLayer) {
+			return null;
+		}
+
+		const dropped = this.createDroppedInventoryItem(itemConfig);
+		if (!dropped?.element) {
+			return null;
+		}
+
+		if (dropped.shadowElement) {
+			foregroundLayer.appendChild(dropped.shadowElement);
+		}
+		foregroundLayer.appendChild(dropped.element);
+
+		if (Array.isArray(localCollection)) {
+			localCollection.push(dropped);
+		}
+		if (!this.gameMap?.droppedItems?.includes(dropped)) {
+			this.gameMap?.droppedItems?.push(dropped);
+		}
+
+		return dropped;
+	}
+
+	spawnDroppedInventoryItems(itemConfigs = [], {
+		parent = null,
+		layer = null,
+		localCollection = null,
+		motionOptions = {}
+	} = {}) {
+		const entries = Array.isArray(itemConfigs)
+			? itemConfigs.filter(Boolean)
+			: [itemConfigs].filter(Boolean);
+		const totalCount = entries.length;
+
+		return entries.map((itemConfig, index) => this.spawnDroppedInventoryItem({
+			...itemConfig,
+			motionOptions: {
+				...motionOptions,
+				...(itemConfig?.motionOptions ?? {}),
+				spreadIndex: index,
+				spreadCount: totalCount
+			}
+		}, {
+			parent,
+			layer,
+			localCollection
+		})).filter(Boolean);
+	}
+
+	pruneDroppedItemCollection(collection = []) {
+		if (!Array.isArray(collection)) {
+			return [];
+		}
+
+		return collection.filter(item => !!item && item.active && !item.collected);
 	}
 
 	getColliderRectFor(entity = this) {
@@ -1064,6 +1350,12 @@ class MapObject {
 
 		const onMouseDown = (event) => {
 			if (event.button !== 0 || !this.active || this.isDragging || !this.canStartSelectModeDrag()) {
+				return;
+			}
+			const targetMapObject = event.target instanceof Element
+				? event.target.closest('.map-object')
+				: null;
+			if (targetMapObject !== this.element) {
 				return;
 			}
 			const rect = this.element?.getBoundingClientRect?.();

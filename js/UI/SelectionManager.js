@@ -10,7 +10,8 @@ class SelectionManager extends UIComponent {
             if (!object) return;
 
             if (object instanceof Myte) {
-                if (object.duplicate) object.duplicate.classList.remove('is-selected');
+                object.duplicate?.classList?.remove('is-selected');
+                object.element?.classList?.remove('is-selected');
             } else if (object instanceof MapObject) {
                 if (object.element) object.element.classList.remove('is-selected');
             } else if (object instanceof DroppedMapItem) {
@@ -24,7 +25,8 @@ class SelectionManager extends UIComponent {
             if (!object) return;
 
             if (object instanceof Myte) {
-                if (object.duplicate) object.duplicate.classList.add('is-selected');
+                const myteElement = object.isActive ? object.duplicate : object.element;
+                myteElement?.classList?.add('is-selected');
             } else if (object instanceof MapObject) {
                 if (object.element) object.element.classList.add('is-selected');
             } else if (object instanceof DroppedMapItem) {

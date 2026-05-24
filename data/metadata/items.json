@@ -193,7 +193,7 @@
 			"name": "Coin",
 			"type": "currency",
 			"droppable": false,
-			"sprite": { "col": 11, "row": 12 },
+			"sprite": { "col": 11, "row": 3 },
 			"description": "Shiny coins. Adds to your coin total when collected."
 		},
 		{

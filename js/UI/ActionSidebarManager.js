@@ -22,10 +22,6 @@ class ActionSidebarManager extends UIComponent {
         return titles[category] || category;
     }
 
-    getNeedDisplayOrder() {
-        return ['rest', 'social', 'enrichment', 'play', 'comfort', 'home'];
-    }
-
     getMeterState(percent) {
         if (percent <= 15) return 'critical';
         if (percent <= 35) return 'low';
@@ -250,6 +246,12 @@ class ActionSidebarManager extends UIComponent {
         return availableActions.find(action => !skip.has(action.id)) ?? null;
     }
 
+    isInactiveHomeMyteSelection(selectedObject) {
+        return selectedObject instanceof Myte &&
+            !selectedObject.isActive &&
+            !!selectedObject.dropTarget;
+    }
+
     getCurrentActionContext(selectedObject, activeMyte) {
         const currentAction = activeMyte?.queue?.getCurrentAction?.() ?? null;
         const currentActionId = currentAction?.constructor?.metadata?.id ?? '';
@@ -369,6 +371,9 @@ class ActionSidebarManager extends UIComponent {
 
     _buildAvailableActionsKey(selectedObject, activeMyte) {
         if (!selectedObject) return '';
+        if (this.isInactiveHomeMyteSelection(selectedObject)) {
+            return `inactive-home-myte:${selectedObject.id ?? selectedObject.name ?? 'myte'}`;
+        }
         if (selectedObject instanceof DroppedMapItem) {
             return `dropped:${selectedObject.variant}|collected=${selectedObject.collected}|busy=${activeMyte?.queue?.count() ?? 0}`;
         }
@@ -503,27 +508,35 @@ class ActionSidebarManager extends UIComponent {
                     { label: behaviorDetail?.label, value: behaviorDetail?.value },
                     { label: 'Activity', value: this.getMyteActivityLabel(selectedObject) }
                 ]);
-                rows.push({ label: '__header_needs', value: 'Vitals', className: 'needs-title' });
-                rows.push({
-                    label: 'vital_energy',
-                    value: vitals.energy ?? 0,
-                    meta: { label: 'Energy', id: 'energy' },
-                    type: 'meter',
-                    cacheValue: `energy:${vitals.energy ?? 0}`
+                rows.push({ label: '__header_vitals', value: 'Vitals', className: 'needs-title' });
+                [
+                    { id: 'energy', label: 'Energy' },
+                    { id: 'health', label: 'Health' }
+                ].forEach(({ id, label }) => {
+                    const value = vitals[id] ?? 0;
+                    rows.push({
+                        label: `vital_${id}`,
+                        value,
+                        meta: { label, id },
+                        type: 'meter',
+                        cacheValue: `${id}:${value}`
+                    });
                 });
 
-                const needsById = new Map((snapshot.needs || []).map(need => [need.id, need]));
-                this.getNeedDisplayOrder().forEach(needId => {
-                    const need = needsById.get(needId);
-                    if (!need) return;
-
-                    const pct = Math.max(0, 100 - need.percent);
+                rows.push({ label: '__header_needs', value: 'Needs', className: 'needs-title' });
+                [
+                    { id: 'mood', label: 'Mood' },
+                    { id: 'fun', label: 'Fun' },
+                    { id: 'comfort', label: 'Comfort' },
+                    { id: 'confidence', label: 'Confidence' }
+                ].forEach(({ id, label }) => {
+                    const value = vitals[id] ?? 0;
                     rows.push({
-                        label: `need_${need.id}`,
-                        value: pct,
-                        meta: { label: need.label, id: need.id },
+                        label: `vital_${id}`,
+                        value,
+                        meta: { label, id },
                         type: 'meter',
-                        cacheValue: `${need.id}:${pct}`
+                        cacheValue: `${id}:${value}`
                     });
                 });
 
@@ -782,6 +795,28 @@ class ActionSidebarManager extends UIComponent {
         return button;
     }
 
+    _createActivateMyteButton(selectedObject) {
+        const button = document.createElement('button');
+        button.textContent = 'Activate';
+        button.classList.add('primary-action');
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (!(selectedObject instanceof Myte) || selectedObject.isActive) return;
+
+            selectedObject.startWithOptions({
+                goal: DEFAULT_MODE,
+                followGoal: selectedObject.followGoal,
+                autonomyGoal: selectedObject.autonomyGoal
+            });
+            selectedObject.parent?.setActiveMyte?.(selectedObject);
+            selectedObject.holdInHomeSlotUntilPointerLeaves?.();
+            this.parent.selectionManager?.setSelected?.(selectedObject);
+        });
+        return button;
+    }
+
     updateActionList(selectedObject) {
         const actionGroups = this.actionControls.querySelector('.action-groups');
         const previousScrollTop = actionGroups.scrollTop;
@@ -800,6 +835,20 @@ class ActionSidebarManager extends UIComponent {
                 groupEl.appendChild(ul);
                 actionGroups.appendChild(groupEl);
             }
+            actionGroups.scrollTop = previousScrollTop;
+            return;
+        }
+
+        if (this.isInactiveHomeMyteSelection(selectedObject)) {
+            const groupEl = document.createElement('div');
+            groupEl.className = 'action-group major-action';
+            const ul = document.createElement('ul');
+            const li = document.createElement('li');
+            li.appendChild(this._createActivateMyteButton(selectedObject));
+            ul.appendChild(li);
+            groupEl.appendChild(ul);
+            actionGroups.appendChild(groupEl);
+            this.actionControls.classList.add('is-visible');
             actionGroups.scrollTop = previousScrollTop;
             return;
         }

@@ -15,20 +15,28 @@ class MyteClickHandler extends MyteBaseHandler {
 
 		this.lastClickTime = 0;
 		this.lastHomeClickTime = 0;
+		this.lastInactiveClickTime = 0;
 		this.longPressTimer = null;
 		this._homeLongPressTimer = null;
+		this._inactiveLongPressTimer = null;
 		this.isPressed = false;
 		this.dragStartX = 0;
 		this.dragStartY = 0;
 		this.dragStartTime = 0;
 		this.isDragging = false;
 		this.previousMode = null;
+		this._homePressState = null;
+		this._suppressNextInactiveClick = false;
 
 		this._initListeners();
 	}
 
 	_initListeners() {
 		this._on(this.myte.element,     'click',       this._onInactiveClick.bind(this));
+		this._on(this.myte.element,     'mousedown',   this._onInactivePressStart.bind(this));
+		this._on(this.myte.element,     'pointerdown', this._onInactivePointerDown.bind(this));
+		this._on(this.myte.element,     'pointerup',   this._onInactivePointerUp.bind(this));
+		this._on(this.myte.element,     'pointercancel', this._onInactivePointerUp.bind(this));
 		this._on(this.myte.duplicate,   'click',       this._onActiveClick.bind(this));
 		this._on(this.myte.duplicate,   'mousedown',   this._onPressStart.bind(this));
 		this._on(document,              'mouseup',     this._onPressEnd.bind(this));
@@ -41,10 +49,56 @@ class MyteClickHandler extends MyteBaseHandler {
 	}
 
 	_onInactiveClick(event) {
-		if (!this.myte.isActive) {
-			event?.preventDefault?.();
-			event?.stopImmediatePropagation?.();
+		if (this.myte.isActive) return;
+
+		event?.preventDefault?.();
+		event?.stopImmediatePropagation?.();
+
+		if (this._suppressNextInactiveClick) {
+			this._suppressNextInactiveClick = false;
+			return;
+		}
+
+		const now = Date.now();
+		if (now - this.lastInactiveClickTime < this.config.doubleClickTimeout) {
+			this.lastInactiveClickTime = 0;
 			this._activateFromHomeSlot(event);
+			return;
+		}
+
+		this.lastInactiveClickTime = now;
+		this.myte.parent.ui?.setSelected?.(this.myte);
+	}
+
+	_onInactivePressStart(event) {
+		if (this.myte.isActive || event?.button !== 0) return;
+
+		this.isPressed = true;
+		this.isDragging = false;
+		this.dragStartX = event.clientX;
+		this.dragStartY = event.clientY;
+		this.dragStartTime = Date.now();
+		this._homePressState = {
+			startX: event.clientX,
+			startY: event.clientY,
+			startTime: this.dragStartTime
+		};
+	}
+
+	_onInactivePointerDown(event) {
+		if (this.myte.isActive || event?.pointerType === 'mouse') return;
+
+		this._inactiveLongPressTimer = setTimeout(() => {
+			this._inactiveLongPressTimer = null;
+			this._suppressNextInactiveClick = true;
+			this._activateFromHomeSlot(event);
+		}, this.config.longPressTimeout);
+	}
+
+	_onInactivePointerUp() {
+		if (this._inactiveLongPressTimer) {
+			clearTimeout(this._inactiveLongPressTimer);
+			this._inactiveLongPressTimer = null;
 		}
 	}
 
@@ -110,7 +164,7 @@ class MyteClickHandler extends MyteBaseHandler {
 		event?.stopPropagation?.();
 
 		if (!this.myte.isActive) {
-			this._activateFromHomeSlot(event);
+			this.myte.parent.ui?.setSelected?.(this.myte.dropTarget);
 			return;
 		}
 
@@ -147,7 +201,7 @@ class MyteClickHandler extends MyteBaseHandler {
 		}
 	}
 
-	_activateFromHomeSlot(event) {
+	_activateFromHomeSlot(event, { holdInSlot = true } = {}) {
 		event?.preventDefault?.();
 		event?.stopPropagation?.();
 		this.myte.startWithOptions({
@@ -156,7 +210,11 @@ class MyteClickHandler extends MyteBaseHandler {
 			autonomyGoal: this.myte.autonomyGoal
 		});
 		this.myte.parent.setActiveMyte(this.myte);
-		this.myte.holdInHomeSlotUntilPointerLeaves?.();
+		if (holdInSlot) {
+			this.myte.holdInHomeSlotUntilPointerLeaves?.();
+		} else {
+			this.myte.clearHomeSlotHold?.();
+		}
 	}
 
 	_onClick(event) {
@@ -187,6 +245,38 @@ class MyteClickHandler extends MyteBaseHandler {
 	}
 
 	_onMouseMove(event) {
+		if (this._homePressState &&
+			!this.myte.isActive &&
+			!this.myte.isDragging &&
+			this.myte.parent.ui.isTool(UIToolModes.SELECT)) {
+			const dx = event.clientX - this._homePressState.startX;
+			const dy = event.clientY - this._homePressState.startY;
+			const distance = Math.sqrt(dx * dx + dy * dy);
+			const timeElapsed = Date.now() - this._homePressState.startTime;
+
+			const passesPickupGesture =
+				distance > this.config.dragThreshold &&
+				timeElapsed > this.config.dragTimeThreshold &&
+				event.clientY < this._homePressState.startY &&
+				this._homePressState.startY - event.clientY > this.config.dragThreshold &&
+				this._homePressState.startY - event.clientY < this.config.maxYForPickup &&
+				Math.abs(this._homePressState.startX - event.clientX) < this.config.maxXForPickup;
+
+			if (passesPickupGesture) {
+				this._suppressNextInactiveClick = true;
+				this._activateFromHomeSlot(null, { holdInSlot: false });
+				this.isDragging = true;
+				this.previousMode = UIToolModes.SELECT;
+				this._switchToDragMode(
+					{ x: this._homePressState.startX, y: this._homePressState.startY },
+					{ x: event.clientX, y: event.clientY }
+				);
+				this._homePressState = null;
+				this._onInactivePointerUp();
+				return;
+			}
+		}
+
 		if (!this.isPressed || !this.myte.isActiveMyte || this.myte.isDragging) return;
 		if (!this.myte.parent.ui.isTool(UIToolModes.SELECT)) return;
 
@@ -215,7 +305,7 @@ class MyteClickHandler extends MyteBaseHandler {
 		}
 	}
 
-	_switchToDragMode() {
+	_switchToDragMode(startPosition = null, currentPosition = null) {
 		this.myte.parent.ui.changeToolMode(UIToolModes.DRAG);
 		if (!this.myte.isActiveMyte) {
 			this.myte.parent.setActiveMyte(this.myte);
@@ -224,12 +314,27 @@ class MyteClickHandler extends MyteBaseHandler {
 		const touchHandler = this.myte.inputHandler?.touchHandler;
 		if (!touchHandler) return;
 
+		const dragStart = {
+			x: startPosition?.x ?? this.dragStartX,
+			y: startPosition?.y ?? this.dragStartY
+		};
+
+		touchHandler.autoPickup = true;
 		touchHandler.handleStart({
 			preventDefault: () => {},
-			clientX: this.dragStartX,
-			clientY: this.dragStartY,
+			clientX: dragStart.x,
+			clientY: dragStart.y,
 			type: 'mousedown'
 		});
+
+		if (currentPosition) {
+			touchHandler.handleMove({
+				preventDefault: () => {},
+				clientX: currentPosition.x,
+				clientY: currentPosition.y,
+				type: 'mousemove'
+			});
+		}
 
 		// If the mouse was released before we got here, end immediately
 		const inputSystem = InputSystem.getInstance();
@@ -242,6 +347,8 @@ class MyteClickHandler extends MyteBaseHandler {
 		if (!this.isPressed) return;
 
 		this.isPressed = false;
+		this._homePressState = null;
+		this._onInactivePointerUp();
 
 		// Safety valve: if the touch handler is still dragging (e.g. setTimeout race),
 		// force-end it now so the myte doesn't get stuck in drag state.
@@ -277,6 +384,9 @@ class MyteClickHandler extends MyteBaseHandler {
 		}
 		if (this._homeLongPressTimer) {
 			clearTimeout(this._homeLongPressTimer);
+		}
+		if (this._inactiveLongPressTimer) {
+			clearTimeout(this._inactiveLongPressTimer);
 		}
 		super.dispose();
 	}

@@ -43,15 +43,18 @@ class DroppedMapItem {
 
         // physics
         this.velocityX = 0;
-        this.velocityY = -5; // Initial upward velocity (negative is up)
-        this.velocityZ = 0;
+        this.velocityY = 0;
+        this.velocityZ = 6;
         this.gravity = 0.5;
+        this.airDrag = 0.86;
         this.bounceCount = 0;
         this.maxBounces = 1;
+        this.magnetDelayMs = 0;
 
         // grounding — shadow stays at the drop position; item bounces upward from there
         this.groundY = posY; // Shadow at the indicator center
         this.grounded = false;
+        this.groundedAt = null;
 
         this.droppedAt = Date.now();
 
@@ -122,7 +125,7 @@ class DroppedMapItem {
     _applyPosition(element, displayY) {
         element.style.left = `${this.posX - this.size.width / 2}px`;
         element.style.top  = `${displayY - this.size.height / 2}px`;
-        const sortY = this.groundY;
+        const sortY = this.posY;
         const zIndex = this.parent?.getDepthZIndex
             ? this.parent.getDepthZIndex(sortY, 25)
             : Math.round(sortY * 100) + 25;
@@ -133,7 +136,7 @@ class DroppedMapItem {
     _applyShadowPosition(shadow, heightAboveGround) {
         const scale = Math.max(0.35, 1 - heightAboveGround / 80);
         shadow.style.left   = `${this.posX - 12}px`;
-        shadow.style.top    = `${this.groundY - 2}px`;
+        shadow.style.top    = `${this.posY - 2}px`;
         shadow.style.transform = `scaleX(${scale})`;
         shadow.style.opacity   = `${Math.max(0.1, scale * 0.55)}`;
     }
@@ -150,8 +153,7 @@ class DroppedMapItem {
         this._applyPosition(this.element, displayY);
 
         if (this.shadowElement) {
-            const heightAboveGround = Math.max(0, this.groundY - this.posY);
-            this._applyShadowPosition(this.shadowElement, heightAboveGround);
+            this._applyShadowPosition(this.shadowElement, Math.max(0, this.posZ));
         }
     }
 
@@ -162,19 +164,25 @@ class DroppedMapItem {
 
         if (!this.grounded) {
             this.posX += this.velocityX * dt;
-            this.velocityY += this.gravity * dt;
             this.posY += this.velocityY * dt;
+            this.posZ += this.velocityZ * dt;
+            this.velocityX *= Math.pow(this.airDrag, dt);
+            this.velocityY *= Math.pow(this.airDrag, dt);
+            this.velocityZ -= this.gravity * dt;
 
-            if (this.posY >= this.groundY) {
-                this.posY = this.groundY;
+            if (this.posZ <= 0) {
+                this.posZ = 0;
                 if (this.bounceCount < this.maxBounces) {
-                    this.velocityY = -this.velocityY * 0.4;
-                    this.velocityX *= 0.8;
+                    this.velocityZ = Math.max(0, -this.velocityZ * 0.38);
+                    this.velocityX *= 0.82;
+                    this.velocityY *= 0.82;
                     this.bounceCount++;
                 } else {
                     this.grounded = true;
+                    this.groundedAt = Date.now();
                     this.velocityX = 0;
                     this.velocityY = 0;
+                    this.velocityZ = 0;
                 }
             }
         } else if (myte) {
@@ -193,13 +201,12 @@ class DroppedMapItem {
                 const dx = myteCenter.x - center.x;
                 const dy = myteCenter.y - center.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
+                const canMagnetize = !this.groundedAt || (Date.now() - this.groundedAt) >= this.magnetDelayMs;
 
-                if (myte.isIndependent() && distance < this.minimumCollectDistance) {
+                if (canMagnetize && myte.isIndependent() && distance < this.minimumCollectDistance) {
                     const magnetStrength = 1 - (distance / this.minimumCollectDistance);
                     this.posX += dx * this.magnetSpeed * magnetStrength * dt;
                     this.posY += dy * this.magnetSpeed * magnetStrength * dt;
-                    // Keep shadow anchored beneath the item as it slides toward the myte
-                    this.groundY = this.posY;
 
                     if (distance < 20) {
                         this.collect(myte);

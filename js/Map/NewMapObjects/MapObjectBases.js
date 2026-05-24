@@ -142,13 +142,6 @@ class StatefulAnimatedMapObject extends RangeInteractiveAnimatedMapObject {
         this.element.setAttribute(this.getStateAttributeName(), value);
     }
 
-    playConfiguredSound(type) {
-        const soundEffect = this.getConfig(`soundEffects.${type}`);
-        if (soundEffect && this.gameMap?.soundManager) {
-            this.gameMap.soundManager.play(soundEffect);
-        }
-    }
-
     transitionToState(nextState, options = {}) {
         const {
             beforeChange,
@@ -338,13 +331,6 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
             state,
             position: { x: this.posX, y: this.posY }
         });
-    }
-
-    playConfiguredSound(type) {
-        const soundEffect = this.getConfig(`soundEffects.${type}`);
-        if (soundEffect && this.gameMap?.soundManager) {
-            this.gameMap.soundManager.play(soundEffect);
-        }
     }
 
     onOpened(_context = {}) {}

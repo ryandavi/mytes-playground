@@ -31,6 +31,10 @@ class ActionManager {
     }
 
     static canPerformAction(actionId, selected, active) {
+        if (!active) {
+            return false;
+        }
+
         const ActionClass = this.actions.get(actionId);
         if (!ActionClass || typeof ActionClass.canPerform !== 'function') {
             return false;

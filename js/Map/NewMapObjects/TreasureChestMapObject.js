@@ -17,30 +17,8 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         this.items = this.normalizeItems(items);
     }
 
-    humanizeSidebarToken(value) {
-        return String(value || '')
-            .trim()
-            .split(/[_\s-]+/)
-            .filter(Boolean)
-            .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-            .join(' ');
-    }
-
-    formatSidebarQuantity(quantity) {
-        if (Array.isArray(quantity) && quantity.length >= 2) {
-            return `${quantity[0]}-${quantity[1]}`;
-        }
-
-        const numericQuantity = Number(quantity);
-        if (Number.isFinite(numericQuantity)) {
-            return String(numericQuantity);
-        }
-
-        return null;
-    }
-
     getChestStateLabel() {
-        return this.humanizeSidebarToken(this.state || 'closed');
+        return this.humanizeLabelToken(this.state || 'closed');
     }
 
     hasLoot() {
@@ -56,8 +34,8 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         const summary = items.slice(0, maxEntries).map(item => {
             const itemDefinition = ItemRegistry.getItemSync(item.variant);
             const label = itemDefinition?.name ||
-                this.humanizeSidebarToken(item.variant || item.type || 'Loot');
-            const quantity = this.formatSidebarQuantity(item.quantity);
+                this.humanizeLabelToken(item.variant || item.type || 'Loot');
+            const quantity = this.formatDisplayQuantity(item.quantity);
             const probability = Number(item.probability);
             const parts = [label];
 
@@ -331,76 +309,33 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         const itemsToSpawn = this.normalizeItems(this.items);
         if (!itemsToSpawn.length) return;
 
-        const spawnPoint = this.getSpawnPoint();
-        const spreadAngle = Math.PI / 6;
-        const baseVelocity = 5;
-        const foregroundLayer = this.gameMap?.layers?.objects || parent?.canvas?.querySelector('.layer.foreground');
-
-        if (!foregroundLayer) return;
-
-        itemsToSpawn.forEach((item, index) => {
-            const angle = this.calculateSpawnAngle(index, itemsToSpawn.length, spreadAngle);
-            const droppedItem = this.createDroppedItem(item, spawnPoint, angle, baseVelocity);
-
-            if (!droppedItem?.element) return;
-
-            if (droppedItem.shadowElement) {
-                foregroundLayer.appendChild(droppedItem.shadowElement);
+        this.spawnDroppedInventoryItems(
+            itemsToSpawn.map(item => this.createDroppedItemConfig(item)),
+            {
+                parent,
+                localCollection: this.droppedItems
             }
-            foregroundLayer.appendChild(droppedItem.element);
-            this.droppedItems.push(droppedItem);
-            if (!this.gameMap?.droppedItems?.includes(droppedItem)) {
-                this.gameMap?.droppedItems?.push(droppedItem);
-            }
-        });
+        );
 
         this.playConfiguredSound('drop');
 
         this.items = [];
     }
-    
-    getSpawnPoint() {
-        return {
-            x: this.posX + this.size.width / 2,
-            y: this.posY + this.size.height / 2
-        };
-    }
-    
-    calculateSpawnAngle(index, totalItems, spreadAngle) {
-        return totalItems === 1
-            ? -Math.PI / 2  // Single item goes straight up
-            : -Math.PI / 2 - spreadAngle / 2 + (spreadAngle * index / (totalItems - 1));
-    }
-    
-    createDroppedItem(item, spawnPoint, angle, baseVelocity) {
+
+    createDroppedItemConfig(item) {
         const resolvedQuantity = Array.isArray(item.quantity)
             ? Math.floor(Math.random() * (item.quantity[1] - item.quantity[0] + 1)) + item.quantity[0]
             : Math.max(1, Number(item.quantity) || 1);
-        const droppedItem = new DroppedMapItem(
-            this.gameMap,
-            item.type,
-            item.variant,
-            spawnPoint.x,
-            spawnPoint.y
-        );
-
-        droppedItem.velocityX = Math.cos(angle) * baseVelocity;
-        droppedItem.velocityY = Math.sin(angle) * baseVelocity;
-        droppedItem.velocityZ = baseVelocity;
-        droppedItem.quantity = resolvedQuantity;
-
         const itemDefinition = ItemRegistry.getItemSync(item.variant);
         if (!itemDefinition) {
             console.warn(`[TreasureChestMapObject] Spawning dropped item with no registry entry: "${item.variant}"`);
         }
-        droppedItem.inventoryVariant = itemDefinition?.id || ItemRegistry.resolveIdSync(item.variant) || item.variant;
-        droppedItem.inventoryType = itemDefinition?.type
-            ? String(itemDefinition.type).toUpperCase()
-            : item.type;
-        droppedItem.inventoryName = itemDefinition?.name || droppedItem.inventoryVariant;
-        droppedItem.description = itemDefinition?.description || '';
-        
-        return droppedItem;
+
+        return {
+            type: item.type,
+            variant: item.variant,
+            quantity: resolvedQuantity
+        };
     }
 
     update(deltaTime) {
@@ -409,9 +344,7 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
     }
     
     updateDroppedItems() {
-        this.droppedItems = this.droppedItems.filter(item => {
-            return !!item && item.active && !item.collected;
-        });
+        this.droppedItems = this.pruneDroppedItemCollection(this.droppedItems);
     }
 
     render(container, parent) {
@@ -481,7 +414,7 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
           return true;
         });
 
-        if (this.state === 'closed') {
+        if (this.state === 'closed' && this.hasLoot()) {
           affordances.push({ actionId: 'open_chest', purpose: 'open' });
         } else if (this.state === 'opened' && this.canClose) {
           affordances.push({ actionId: 'close_chest', purpose: 'close' });

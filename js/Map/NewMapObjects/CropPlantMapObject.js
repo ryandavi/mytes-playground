@@ -143,39 +143,11 @@ class CropPlantMapObject extends GrowingPlantMapObject {
     }
 
     _spawnHarvestedItem(harvest, parent) {
-        const foregroundLayer = this.gameMap?.layers?.objects || parent?.canvas?.querySelector('.layer.foreground');
-        if (!foregroundLayer) return;
-
-        const spawnX = this.posX + this.size.width / 2;
-        const spawnY = this.posY + this.size.height / 2;
-
-        const itemDef = ItemRegistry.getItemSync(harvest.variant);
-        const itemType = itemDef?.type?.toUpperCase() || 'FOOD';
-
-        const dropped = new DroppedMapItem(
-            this.gameMap,
-            itemType,
-            harvest.variant,
-            spawnX,
-            spawnY
-        );
-        dropped.quantity = harvest.quantity;
-        dropped.inventoryVariant = itemDef?.id || harvest.variant;
-        dropped.inventoryType = itemType;
-        dropped.inventoryName = itemDef?.name || harvest.variant;
-        dropped.description = itemDef?.description || '';
-
-        const angle = -Math.PI / 2 + (Math.random() - 0.5) * (Math.PI / 3);
-        dropped.velocityX = Math.cos(angle) * 4;
-        dropped.velocityY = Math.sin(angle) * 4;
-        dropped.velocityZ = 4 + Math.random() * 2;
-
-        if (dropped.shadowElement) foregroundLayer.appendChild(dropped.shadowElement);
-        foregroundLayer.appendChild(dropped.element);
-
-        if (!this.gameMap?.droppedItems?.includes(dropped)) {
-            this.gameMap?.droppedItems?.push(dropped);
-        }
+        this.spawnDroppedInventoryItem({
+            type: harvest.type,
+            variant: harvest.variant,
+            quantity: harvest.quantity
+        }, { parent });
     }
 
     render(container, parent) {

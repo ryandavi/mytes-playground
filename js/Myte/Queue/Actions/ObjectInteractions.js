@@ -484,7 +484,12 @@ class SurfaceSlotAction extends GoToObjectAction {
             'dismount',
             { x: this.myte.posX, y: this.myte.posY },
             this.getSurfaceExitPosition(),
-            this.dismountDuration
+            this.resolveTransitionDuration(
+                { x: this.myte.posX, y: this.myte.posY },
+                this.getSurfaceExitPosition(),
+                this.dismountDuration,
+                { minDuration: 80, maxDuration: 420, referenceDistance: 52 }
+            )
         );
         return false;
     }
@@ -670,6 +675,28 @@ class SurfaceSlotAction extends GoToObjectAction {
         this.myte.setSpritePosition(x, y);
     }
 
+    getMyteColliderMetrics() {
+        return {
+            offsetX: this.toFiniteNumber(this.myte.collider?.offsetX, 0),
+            offsetY: this.toFiniteNumber(this.myte.collider?.offsetY, 0),
+            width: this.toFiniteNumber(this.myte.collider?.width, this.myte.size.width),
+            height: this.toFiniteNumber(this.myte.collider?.height, this.myte.size.height)
+        };
+    }
+
+    resolveTransitionDuration(from, to, baseDuration, {
+        minDuration = 90,
+        maxDuration = 420,
+        referenceDistance = 64
+    } = {}) {
+        const base = Math.max(1, this.toFiniteNumber(baseDuration, 1));
+        const dx = this.toFiniteNumber(to?.x, 0) - this.toFiniteNumber(from?.x, 0);
+        const dy = this.toFiniteNumber(to?.y, 0) - this.toFiniteNumber(from?.y, 0);
+        const distance = Math.hypot(dx, dy);
+        const distanceScale = Utility.clamp(distance / Math.max(1, referenceDistance), 0.55, 1.9);
+        return Math.round(Utility.clamp(base * distanceScale, minDuration, maxDuration));
+    }
+
     beginTransition(phase, from, to, duration) {
         const safeFrom = {
             x: this.toFiniteNumber(from?.x, this.myte.posX),
@@ -846,8 +873,8 @@ class SurfaceSlotAction extends GoToObjectAction {
     getSlotFrontExitPosition(slot, exitSearchRadius) {
         if (!slot?.restPosition || !slot?.approachConfig) return null;
         const targetRect = this.getTargetRect(this.target, 'collider');
-        const myteRect   = this.myte.getRect();
-        if (!targetRect || !myteRect) return null;
+        const myteCollider = this.getMyteColliderMetrics();
+        if (!targetRect) return null;
 
         const xFactor = slot.restPosition.xFactor ?? 0.5;
         const yFactor = slot.restPosition.yFactor ?? 0.5;
@@ -862,10 +889,22 @@ class SurfaceSlotAction extends GoToObjectAction {
 
         let x, y;
         switch (exitSide) {
-            case 'bottom': x = slotCX - myteRect.width / 2;  y = targetRect.y + targetRect.height + gap; break;
-            case 'top':    x = slotCX - myteRect.width / 2;  y = targetRect.y - myteRect.height - gap;  break;
-            case 'left':   x = targetRect.x - myteRect.width - gap;          y = slotCY - myteRect.height / 2; break;
-            case 'right':  x = targetRect.x + targetRect.width + gap;         y = slotCY - myteRect.height / 2; break;
+            case 'bottom':
+                x = slotCX - myteCollider.offsetX - (myteCollider.width / 2);
+                y = targetRect.y + targetRect.height + gap - myteCollider.offsetY;
+                break;
+            case 'top':
+                x = slotCX - myteCollider.offsetX - (myteCollider.width / 2);
+                y = targetRect.y - gap - myteCollider.offsetY - myteCollider.height;
+                break;
+            case 'left':
+                x = targetRect.x - gap - myteCollider.offsetX - myteCollider.width;
+                y = slotCY - myteCollider.offsetY - (myteCollider.height / 2);
+                break;
+            case 'right':
+                x = targetRect.x + targetRect.width + gap - myteCollider.offsetX;
+                y = slotCY - myteCollider.offsetY - (myteCollider.height / 2);
+                break;
             default: return null;
         }
 
@@ -1275,33 +1314,13 @@ class PickFlowerAction extends GoToObjectAction {
     }
 
     _dropFlowerItem() {
-        const gameMap = this.target?.gameMap ?? this.myte?.parent?.gameMap;
-        const foregroundLayer = gameMap?.layers?.objects;
-        if (!foregroundLayer) return;
-
         const variant = this.target?.variant ?? 'flower';
-        const spawnX  = (this.target?.posX ?? this.myte.posX) + (this.target?.size?.width ?? 32) / 2;
-        const spawnY  = (this.target?.posY ?? this.myte.posY) + (this.target?.size?.height ?? 32) / 2;
-
-        const itemDef = ItemRegistry.getItemSync(variant);
-        const itemType = itemDef?.type?.toUpperCase() || 'FLOWER';
-
-        const dropped = new DroppedMapItem(gameMap, itemType, variant, spawnX, spawnY);
-        dropped.quantity = 1;
-        dropped.inventoryType = itemType;
-        dropped.inventoryVariant = itemDef?.id || variant;
-        dropped.inventoryName = itemDef?.name ?? this.target?.getDisplayName?.() ?? 'Flower';
-        dropped.description = itemDef?.description || '';
-        const angle = -Math.PI / 2 + (Math.random() - 0.5) * (Math.PI / 3);
-        dropped.velocityX = Math.cos(angle) * 3;
-        dropped.velocityY = Math.sin(angle) * 3;
-        dropped.velocityZ = 4 + Math.random() * 2;
-
-        if (dropped.shadowElement) foregroundLayer.appendChild(dropped.shadowElement);
-        foregroundLayer.appendChild(dropped.element);
-        if (!gameMap?.droppedItems?.includes(dropped)) {
-            gameMap?.droppedItems?.push(dropped);
-        }
+        this.target?.spawnDroppedInventoryItem?.({
+            type: 'FLOWER',
+            variant,
+            quantity: 1,
+            inventoryName: this.target?.getDisplayName?.() ?? 'Flower'
+        });
     }
 }
 
