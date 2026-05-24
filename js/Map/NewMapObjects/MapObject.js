@@ -47,6 +47,7 @@ class MapObject {
 		this.renderState = {
 			posX: posX,
 			posY: posY,
+			sortY: 0,
 			zIndex: 0,
 			bgPosition: null,
 			visible: true,
@@ -204,6 +205,16 @@ class MapObject {
 			current = current[key];
 		}
 		return current !== undefined ? current : defaultValue;
+	}
+
+	getFiniteConfigNumber(path, defaultValue = null) {
+		const value = this.getConfig(path, undefined);
+		if (value === undefined || value === null || value === '') {
+			return defaultValue;
+		}
+
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : defaultValue;
 	}
 
 	// ── Direction helpers ─────────────────────────────────────────────────────
@@ -439,6 +450,39 @@ class MapObject {
 		};
 	}
 
+	resolveDepthOffset() {
+		const explicitDepthLine = this.getFiniteConfigNumber('depthLine', null);
+		if (Number.isFinite(explicitDepthLine)) {
+			return explicitDepthLine;
+		}
+
+		const explicitDepthOffset = this.getFiniteConfigNumber('depthOffset', null);
+		if (Number.isFinite(explicitDepthOffset)) {
+			return explicitDepthOffset;
+		}
+
+		const colliderBottom = (this.collider?.offsetY ?? 0) + (this.collider?.height ?? 0);
+		if (this.getConfig('collision', false) && colliderBottom > 0) {
+			return colliderBottom;
+		}
+
+		return this.size.height;
+	}
+
+	getSortY(y = this.posY) {
+		const resolvedY = Number.isFinite(y) ? y : this.posY;
+		return resolvedY + this.resolveDepthOffset();
+	}
+
+	getDepthPriority() {
+		const explicitPriority = this.getFiniteConfigNumber('depthPriority', null);
+		if (Number.isFinite(explicitPriority)) {
+			return explicitPriority;
+		}
+
+		return this.getFiniteConfigNumber('renderPriority', 0);
+	}
+
 	updateCarriedState() {
 		if (!this.isPickedUp || !this.carrier) {
 			return false;
@@ -469,7 +513,11 @@ class MapObject {
 			return this.carrier.renderer.getZIndex(this.carrier.posY) + 2;
 		}
 
-		return this.parent?.getZIndex ? this.parent.getZIndex(this.posY, this.size.height) : 0;
+		if (this.parent?.getDepthZIndex) {
+			return this.parent.getDepthZIndex(this.getSortY(), this.getDepthPriority());
+		}
+
+		return this.parent?.getZIndex ? this.parent.getZIndex(this.posY, this.resolveDepthOffset(), this.getDepthPriority()) : 0;
 	}
 
 	getRenderLayerKey() {
@@ -527,7 +575,11 @@ class MapObject {
 	}
 
 	getSelectionDebugInfo() {
-		return [];
+		return [
+			{ label: 'Sort Y', value: `${this.getSortY().toFixed(2)}px` },
+			{ label: 'Depth Offset', value: `${this.resolveDepthOffset().toFixed(2)}px` },
+			{ label: 'Z-Index', value: `${this.getRenderZIndex()}` }
+		];
 	}
 
 	canInteract(myte) {
@@ -1127,6 +1179,7 @@ class MapObject {
 		if (this.posX !== this._prevRenderX || this.posY !== this._prevRenderY) {
 			this.renderState.posX = this.posX;
 			this.renderState.posY = this.posY;
+			this.renderState.sortY = this.getSortY();
 			this.renderState.zIndex = this.getRenderZIndex();
 			this.renderState.dirty = true;
 		}
@@ -1137,6 +1190,7 @@ class MapObject {
 		if (!this.element) return;
 		this.renderState.posX = this.posX;
 		this.renderState.posY = this.posY;
+		this.renderState.sortY = this.getSortY();
 		this.renderState.zIndex = this.getRenderZIndex();
 		this.element.style.left = `${this.posX}px`;
 		this.element.style.top = `${this.posY}px`;
@@ -1144,6 +1198,7 @@ class MapObject {
 		this._prevRenderX = this.posX;
 		this._prevRenderY = this.posY;
 		this.renderState.dirty = false;
+		this.element.dataset.sortY = `${Math.round(this.getSortY() * 100) / 100}`;
 		this.updateShadowVisual();
 	}
 
@@ -1196,6 +1251,7 @@ class MapObject {
 			height: `${this.size.height}px`,
 			zIndex: this.getRenderZIndex()
 		});
+		divElement.dataset.sortY = `${Math.round(this.getSortY() * 100) / 100}`;
 
 		if (this.shouldRenderShadow()) {
 			this.shadowElement = document.createElement('div');

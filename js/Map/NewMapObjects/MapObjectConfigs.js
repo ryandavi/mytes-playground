@@ -40,6 +40,9 @@ const BASE_CONFIG = {
 	lightEmission: false,
 	overlappable: false,
 	renderLayer: 'objects',
+	depthOffset: null,
+	depthLine: null,
+	depthPriority: 0,
 
 	soundEffects: {
 		pickup: 'ui_pickup_item',

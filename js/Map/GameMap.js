@@ -117,6 +117,10 @@ class GameMap {
         return this.parent?.getZIndex?.(y, height) ?? 0;
     }
 
+    getDepthZIndex(sortY, priority = 0) {
+        return this.parent?.getDepthZIndex?.(sortY, priority) ?? 0;
+    }
+
     getObjectRenderLayer(object) {
         const layerKey = object?.getActiveRenderLayerKey?.() || object?.getRenderLayerKey?.() || 'objects';
         return this.layers[layerKey] || this.layers.objects || this.layers.background || null;

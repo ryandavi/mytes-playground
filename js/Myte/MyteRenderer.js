@@ -71,12 +71,54 @@ class MyteRenderer {
 
 	getZIndex(y) {
 		const m = this.myte;
-		const extra = m.isCurrentlyJumping() ? m.physics.velocity : 0;
-		return m.parent.getZIndex(y, extra + m.size.height);
+		const sortY = this.getSortY(y);
+		return m.parent.getDepthZIndex(sortY, this.getDepthPriority());
 	}
 
 	setZIndex(y) {
 		this.duplicate.style.zIndex = this.getZIndex(y);
+		this.duplicate.dataset.sortY = `${Math.round(this.getSortY(y) * 100) / 100}`;
+	}
+
+	toFiniteNumber(value, defaultValue = null) {
+		if (value === undefined || value === null || value === '') {
+			return defaultValue;
+		}
+
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : defaultValue;
+	}
+
+	resolveDepthOffset() {
+		const m = this.myte;
+		const explicitDepthLine = this.toFiniteNumber(m.definition?.depthLine, null);
+		if (Number.isFinite(explicitDepthLine)) {
+			return explicitDepthLine;
+		}
+
+		const explicitDepthOffset = this.toFiniteNumber(m.definition?.depthOffset, null);
+		if (Number.isFinite(explicitDepthOffset)) {
+			return explicitDepthOffset;
+		}
+
+		const colliderBottom = (m.collider?.offsetY ?? 0) + (m.collider?.height ?? 0);
+		if (colliderBottom > 0) {
+			return colliderBottom;
+		}
+
+		return m.size.height;
+	}
+
+	getSortY(y = this.myte.posY) {
+		const m = this.myte;
+		const resolvedY = Number.isFinite(y) ? y : m.posY;
+		const jumpOffset = m.isCurrentlyJumping() ? (m.physics?.velocity ?? 0) : 0;
+		return resolvedY + this.resolveDepthOffset() + jumpOffset;
+	}
+
+	getDepthPriority() {
+		const priority = this.toFiniteNumber(this.myte.definition?.depthPriority, 50);
+		return Number.isFinite(priority) ? priority : 50;
 	}
 
 	updateTargetDot() {

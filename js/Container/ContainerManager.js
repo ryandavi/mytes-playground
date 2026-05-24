@@ -282,10 +282,19 @@ class ContainerManager {
     }
 
     // Container-specific utility methods
-    getZIndex(y, height) {
-        let maxHeight = this.getMaxDimensions().height;
-        // Consider zoom in this calculation if needed
-        return Math.floor(((y + height) / Math.max(maxHeight, 1)) * 100);
+    getDepthZIndex(sortY, priority = 0) {
+        const resolvedSortY = Number.isFinite(sortY) ? sortY : 0;
+        const resolvedPriority = Number.isFinite(priority) ? priority : 0;
+
+        // Use world-pixel depth instead of map-height normalization so layering
+        // stays consistent across maps and does not collapse into coarse buckets.
+        return Math.round(resolvedSortY * 100) + resolvedPriority;
+    }
+
+    getZIndex(y, height = 0, priority = 0) {
+        const resolvedY = Number.isFinite(y) ? y : 0;
+        const resolvedHeight = Number.isFinite(height) ? height : 0;
+        return this.getDepthZIndex(resolvedY + resolvedHeight, priority);
     }
 
     getMaxDimensions() {

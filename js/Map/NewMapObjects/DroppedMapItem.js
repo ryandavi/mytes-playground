@@ -122,7 +122,12 @@ class DroppedMapItem {
     _applyPosition(element, displayY) {
         element.style.left = `${this.posX - this.size.width / 2}px`;
         element.style.top  = `${displayY - this.size.height / 2}px`;
-        element.style.zIndex = Math.floor(this.groundY);
+        const sortY = this.groundY;
+        const zIndex = this.parent?.getDepthZIndex
+            ? this.parent.getDepthZIndex(sortY, 25)
+            : Math.round(sortY * 100) + 25;
+        element.style.zIndex = zIndex;
+        element.dataset.sortY = `${Math.round(sortY * 100) / 100}`;
     }
 
     _applyShadowPosition(shadow, heightAboveGround) {

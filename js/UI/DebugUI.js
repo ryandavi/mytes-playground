@@ -767,6 +767,7 @@ class DebugUI {
             { label: 'Falling',         value: activeMyte.isFalling },
             { label: 'Jumping',         value: activeMyte.isJumping },
             { label: 'Velocity',        value: activeMyte.physics.velocity.toFixed(3) },
+            { label: 'Sort Y',          value: Number.isFinite(activeMyte.renderer?.getSortY?.()) ? `${activeMyte.renderer.getSortY().toFixed(2)}px` : 'N/A' },
             { label: 'Z-Index',         value: activeMyte.duplicate.style.zIndex },
             { label: 'Queue Items',     value: activeMyte.queue.count() }
         ];
