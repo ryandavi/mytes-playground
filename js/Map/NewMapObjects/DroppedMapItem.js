@@ -40,6 +40,8 @@ class DroppedMapItem {
 		// Core state
 		this.active = true;
 		this.element = null;
+        this.spriteElement = null;
+        this.shadowElement = null;
 
         // physics
         this.velocityX = 0;
@@ -76,8 +78,11 @@ class DroppedMapItem {
             height: 24
         };
 
-        this.shadowElement = this.createShadowElement();
+        // Build element first (may update this.size from sprite definition),
+        // then build shadow and append it as a child of the container.
         this.element = this.createItemElement();
+        this.shadowElement = this.createShadowElement();
+        this.element.appendChild(this.shadowElement);
         this._setupClickHandling();
     }
 
@@ -95,30 +100,41 @@ class DroppedMapItem {
 
 
     createItemElement() {
-        const element = document.createElement('div');
-        element.classList.add('dropped-item', this.type.toLowerCase(), this.variant);
+        // Outer container — positioned at ground coordinates, never moves vertically
+        const container = document.createElement('div');
+        container.classList.add('dropped-item');
+        container.style.width = `${this.size.width}px`;
+        container.style.height = `${this.size.height}px`;
 
-        if (ItemRegistry.applySpriteStyles(element, this.variant)) {
+        // Sprite child — visually lifted by posZ via transform
+        const sprite = document.createElement('div');
+        sprite.classList.add('dropped-item-sprite', this.type.toLowerCase(), this.variant);
+
+        if (ItemRegistry.applySpriteStyles(sprite, this.variant)) {
             const itemDefinition = ItemRegistry.getItemSync(this.variant);
             const spriteWidth = itemDefinition?.sprite?.width || 32;
             const spriteHeight = itemDefinition?.sprite?.height || 32;
             this.size = { width: spriteWidth, height: spriteHeight };
-            element.style.backgroundRepeat = 'no-repeat';
-            element.style.backgroundPosition = 'var(--item-sprite-x) var(--item-sprite-y)';
-            element.style.imageRendering = 'pixelated';
+            container.style.width = `${this.size.width}px`;
+            container.style.height = `${this.size.height}px`;
+            sprite.style.backgroundRepeat = 'no-repeat';
+            sprite.style.backgroundPosition = 'var(--item-sprite-x) var(--item-sprite-y)';
+            sprite.style.imageRendering = 'pixelated';
         }
 
-        element.style.width = `${this.size.width}px`;
-        element.style.height = `${this.size.height}px`;
+        sprite.style.width = `${this.size.width}px`;
+        sprite.style.height = `${this.size.height}px`;
 
-        this._applyPosition(element);
-        return element;
+        container.appendChild(sprite);
+        this.spriteElement = sprite;
+        this._applyPosition(container);
+        return container;
     }
 
     createShadowElement() {
         const shadow = document.createElement('div');
         shadow.className = 'dropped-item-shadow';
-        this._applyShadowPosition(shadow, 0);
+        this._applyShadowVisuals(shadow, 0);
         return shadow;
     }
 
@@ -146,23 +162,17 @@ class DroppedMapItem {
     _applyPosition(element) {
         element.style.left = `${this.posX - this.size.width / 2}px`;
         element.style.top  = `${this.posY - this.size.height / 2}px`;
-        const sortY = this.getSortY();
         element.style.zIndex = this.getRenderZIndex();
-        element.dataset.sortY = `${Math.round(sortY * 100) / 100}`;
+        element.dataset.sortY = `${Math.round(this.getSortY() * 100) / 100}`;
     }
 
-    _applyVerticalVisuals(element, lift = 0) {
-        Utility.applyElementVerticalVisuals(element, {
-            baseTop: this.posY - (this.size.height / 2),
-            lift
-        });
+    _applyVerticalVisuals(lift = 0) {
+        if (!this.spriteElement) return;
+        this.spriteElement.style.transform = `translateY(${-lift}px)`;
     }
 
-    _applyShadowPosition(shadow, heightAboveGround) {
+    _applyShadowVisuals(shadow, heightAboveGround) {
         const scale = Math.max(0.35, 1 - heightAboveGround / 80);
-        shadow.style.left   = `${this.posX - 12}px`;
-        shadow.style.top    = `${this.posY - 2}px`;
-        shadow.style.zIndex = `${this.getRenderZIndex() - 1}`;
         shadow.style.transform = `scaleX(${scale})`;
         shadow.style.opacity   = `${Math.max(0.1, scale * 0.55)}`;
     }
@@ -203,11 +213,13 @@ class DroppedMapItem {
         if (!this.element) return;
 
         const hoverLift = this.grounded ? Math.sin(this.hoverOffset) * 5 : 0;
+        const totalLift = this.posZ + hoverLift;
+
         this._applyPosition(this.element);
-        this._applyVerticalVisuals(this.element, this.posZ + hoverLift);
+        this._applyVerticalVisuals(totalLift);
 
         if (this.shadowElement) {
-            this._applyShadowPosition(this.shadowElement, Math.max(0, this.posZ));
+            this._applyShadowVisuals(this.shadowElement, Math.max(0, totalLift));
         }
     }
 
@@ -303,7 +315,7 @@ class DroppedMapItem {
                 );
         }
 
-        this.element.classList.add('collected');
+        if (this.spriteElement) this.spriteElement.classList.add('collected');
         if (this.shadowElement) this.shadowElement.style.display = 'none';
 
         setTimeout(() => this.remove(), 500);
@@ -331,8 +343,8 @@ class DroppedMapItem {
 
     remove() {
         this.active = false;
+        // shadowElement is a child of element — removing element removes it too
         this.element?.parentNode?.removeChild(this.element);
-        this.shadowElement?.parentNode?.removeChild(this.shadowElement);
     }
 
 }

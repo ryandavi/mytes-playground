@@ -790,10 +790,8 @@ class GameMap {
 
     addDroppedItem(type, variant, posX, posY) {
         const item = new DroppedMapItem(this, type, variant, posX, posY);
-        if (this.layers.objects) {
-            // Shadow appended first so it renders behind the item
-            if (item.shadowElement) this.layers.objects.appendChild(item.shadowElement);
-            if (item.element) this.layers.objects.appendChild(item.element);
+        if (this.layers.objects && item.element) {
+            this.layers.objects.appendChild(item.element);
         }
         this.droppedItems.push(item);
         return item;

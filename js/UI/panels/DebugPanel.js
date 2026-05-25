@@ -33,8 +33,8 @@ class DebugPanel extends ModalWindow {
 
         const buildDirectInteractToggle = () => ({
             id: 'directWorldInteraction',
-            section: 'map',
-            subgroup: 'overlays',
+            section: 'user',
+            subgroup: 'modes',
             type: 'toggle',
             label: 'Direct Interact',
             states: { true: 'ON', false: 'OFF' },
@@ -578,6 +578,7 @@ class DebugPanel extends ModalWindow {
         // Build nested section → subgroup → buttons
         const layout = {
             map:  { label: 'Map',  subgroups: { overlays: 'Overlays', controls: 'Controls' } },
+            user: { label: 'User', subgroups: { modes: 'Modes' } },
             myte: { label: 'Myte', subgroups: { controls: 'Controls', stats: 'Stats' } }
         };
 

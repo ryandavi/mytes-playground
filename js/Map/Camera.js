@@ -10,18 +10,18 @@ class Camera {
 		this.posY = 0;
 		this.targetX = 0;
 		this.targetY = 0;
-		this.easing = 10;
-		this.draggingEasing = 20;
-		
+		this.easing         = SiteConfig.camera.easing;
+		this.draggingEasing = SiteConfig.camera.draggingEasing;
+
 		// Zoom properties
 		this.canZoom = true;
 		this.zoomLevel = 1;
 		this.targetZoomLevel = 1;
-		this.zoomEasing = 5;
-		this.minZoomLevel = 0.5;
-		this.maxZoomLevel = 2.5;
-		this.zoomStep = 0.1;
-		this.zoomAnchor = null;
+		this.zoomEasing   = SiteConfig.camera.zoomEasing;
+		this.minZoomLevel = SiteConfig.camera.minZoom;
+		this.maxZoomLevel = SiteConfig.camera.maxZoom;
+		this.zoomStep     = SiteConfig.camera.zoomStep;
+		this.zoomAnchor   = null;
 		
 		// Camera behavior
 		this.followMode = DEFAULT_CAMERA_FOLLOW_MODE;
@@ -190,10 +190,11 @@ class Camera {
 	// ========== MODE MANAGEMENT ==========
 	
 	setMode(i) {
+		if (this.followMode === CAMERA_FOLLOW_MODES.CURSOR_EDGE && i !== CAMERA_FOLLOW_MODES.CURSOR_EDGE) {
+			this.parent.ui?.cursorManager?.setCursor(CURSOR.POINTER);
+		}
 		this.previousFollowMode = this.followMode;
 		this.followMode = i;
-		// this.parent.ui.debugPanel.updateCycleCamera(document.getElementById("cycleCamera"));
-
 		this.parent.ui?.debugPanel?.updateButton('cycleCamera');
 	}
 	
@@ -562,9 +563,9 @@ class Camera {
 		if (!this.isScrollable.x && !this.isScrollable.y) return;
 		const viewportWorld = this._getViewportWorldSize(viewportRect);
 		
-		// Edge thresholds (20% of viewport)
-		const horizEdgeThreshold = viewportWorld.width * 0.2;
-		const vertEdgeThreshold = viewportWorld.height * 0.2;
+		const t = SiteConfig.camera.edgeThreshold;
+		const horizEdgeThreshold = viewportWorld.width * t;
+		const vertEdgeThreshold = viewportWorld.height * t;
 		
 		// Start with current position
 		let targetX = this.posX;
@@ -607,6 +608,92 @@ class Camera {
 		this.setTarget(targetX, targetY);
 	}
 	
+	_updateEdgeCursor(x, y, viewportRect) {
+		const cursorManager = this.parent.ui?.cursorManager;
+		if (!cursorManager) return;
+
+		const viewportWorld = this._getViewportWorldSize(viewportRect);
+		const t = SiteConfig.camera.edgeThreshold;
+		const hThresh = viewportWorld.width * t;
+		const vThresh = viewportWorld.height * t;
+
+		let cursor = CURSOR.POINTER;
+		if (this.isScrollable.x && x < hThresh)                              cursor = CURSOR.ARROW_LEFT;
+		else if (this.isScrollable.x && x > viewportWorld.width - hThresh)   cursor = CURSOR.ARROW_RIGHT;
+		else if (this.isScrollable.y && y < vThresh)                          cursor = CURSOR.ARROW_UP;
+		else if (this.isScrollable.y && y > viewportWorld.height - vThresh)   cursor = CURSOR.ARROW_DOWN;
+
+		if (cursorManager.currentState !== cursor) {
+			cursorManager.setCursor(cursor);
+		}
+	}
+
+	followOverview(canvasRect, viewportRect) {
+		const mytes = this.parent.mytes?.filter(m => m.isDeployed && Number.isFinite(m.posX) && Number.isFinite(m.posY)) ?? [];
+		if (mytes.length === 0) return;
+
+		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+		for (const m of mytes) {
+			minX = Math.min(minX, m.posX);
+			minY = Math.min(minY, m.posY);
+			maxX = Math.max(maxX, m.posX + (m.size?.width ?? 0));
+			maxY = Math.max(maxY, m.posY + (m.size?.height ?? 0));
+		}
+
+		const padding = SiteConfig.camera.overviewPadding;
+		const worldW = maxX - minX + padding * 2;
+		const worldH = maxY - minY + padding * 2;
+		const targetZoom = Math.max(
+			this.minZoomLevel,
+			Math.min(this.maxZoomLevel, viewportRect.width / worldW, viewportRect.height / worldH)
+		);
+
+		this.setZoomLevel(targetZoom);
+
+		const midX = (minX + maxX) / 2;
+		const midY = (minY + maxY) / 2;
+		const centerPos = this._calculateCenterPosition(midX, midY, viewportRect, { width: 0, height: 0 });
+		const clamped = this._clampToBounds(centerPos.x, centerPos.y, canvasRect, viewportRect, targetZoom);
+		this.setTarget(clamped.x, clamped.y);
+	}
+
+	followLeash(canvasRect, viewportRect) {
+		const followTarget = this.getCurrentFollowTarget();
+		if (!followTarget) return;
+
+		const viewportWorld = this._getViewportWorldSize(viewportRect);
+		const lt = SiteConfig.camera.leashThreshold;
+		const threshX = viewportWorld.width * lt;
+		const threshY = viewportWorld.height * lt;
+
+		const worldCenterX = viewportWorld.width / 2 - this.posX;
+		const worldCenterY = viewportWorld.height / 2 - this.posY;
+
+		const dx = followTarget.posX - worldCenterX;
+		const dy = followTarget.posY - worldCenterY;
+
+		if (Math.abs(dx) > threshX || Math.abs(dy) > threshY) {
+			this.followCharacter(followTarget.posX, followTarget.posY, canvasRect, viewportRect, followTarget.size);
+		}
+	}
+
+	followCinematic(canvasRect, viewportRect) {
+		const bounds = this._calculateBounds(canvasRect, viewportRect);
+		const rangeX = (bounds.maxX - bounds.minX) / 2;
+		const rangeY = (bounds.maxY - bounds.minY) / 2;
+		if (rangeX < 1 && rangeY < 1) return;
+
+		const midX = (bounds.minX + bounds.maxX) / 2;
+		const midY = (bounds.minY + bounds.maxY) / 2;
+		const t = Date.now() / 1000;
+		const speed = SiteConfig.camera.cinematicSpeed;
+
+		this.setTarget(
+			midX + Math.sin(t * speed) * rangeX,
+			midY + Math.cos(t * speed * 0.71) * rangeY
+		);
+	}
+
 	// ========== POSITION HELPERS ==========
 	
 	_calculateCenterPosition(x, y, viewportRect, elementRect) {
@@ -821,38 +908,54 @@ class Camera {
 		if (this.followMode === CAMERA_FOLLOW_MODES.DRAG_TO_PAN) {
 			return; // Handled by drag event
 		}
-		
+
 		const mouse = this.parent.inputHandler.getMouseContainerPosition();
 		const canvasRect = this.parent.getCanvasRect();
 		const containerRect = this.parent.getContainerRect();
-		
+
 		// Skip if mouse is not in container for cursor-based modes
 		const isMouseInContainer = this.parent.isMouseInContainer();
-		
+
 		switch (this.followMode) {
 			case CAMERA_FOLLOW_MODES.CURSOR:
 				if (!isMouseInContainer || !Number.isFinite(mouse.x) || !Number.isFinite(mouse.y)) return;
 				this.followCursor(mouse.x, mouse.y, canvasRect, containerRect);
 				break;
-				
+
 			case CAMERA_FOLLOW_MODES.CURSOR_EDGE:
 				if (!isMouseInContainer || !Number.isFinite(mouse.x) || !Number.isFinite(mouse.y)) return;
 				this.followCursorEdge(mouse.x, mouse.y, canvasRect, containerRect);
+				this._updateEdgeCursor(mouse.x, mouse.y, containerRect);
 				break;
-				
+
 			case CAMERA_FOLLOW_MODES.CHARACTER:
 				{
 					const followTarget = this.getCurrentFollowTarget();
 					if (followTarget) {
-					this.followCharacter(
-						followTarget.posX,
-						followTarget.posY,
-						canvasRect,
-						containerRect,
-						followTarget.size
-					);
+						this.followCharacter(
+							followTarget.posX,
+							followTarget.posY,
+							canvasRect,
+							containerRect,
+							followTarget.size
+						);
+					}
 				}
-				}
+				break;
+
+			case CAMERA_FOLLOW_MODES.LOCKED:
+				break;
+
+			case CAMERA_FOLLOW_MODES.OVERVIEW:
+				this.followOverview(canvasRect, containerRect);
+				break;
+
+			case CAMERA_FOLLOW_MODES.LEASH:
+				this.followLeash(canvasRect, containerRect);
+				break;
+
+			case CAMERA_FOLLOW_MODES.CINEMATIC:
+				this.followCinematic(canvasRect, containerRect);
 				break;
 		}
 	}

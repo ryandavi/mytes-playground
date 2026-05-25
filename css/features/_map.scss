@@ -241,22 +241,8 @@
                     }
                 }
 
-                > .dropped-item-shadow {
-                    position: absolute;
-                    width: 24px;
-                    height: 6px;
-                    background: rgba(0, 0, 0, 0.25);
-                    border-radius: 50%;
-                    filter: blur(2px);
-                    pointer-events: none;
-                    transform-origin: center;
-                }
-
                 > .dropped-item {
                     position: absolute;
-                    width: 16px;
-                    height: 16px;
-                    transition: none;
                     pointer-events: none;
 
                     body[data-tool-mode='select'] & {
@@ -264,32 +250,51 @@
                         cursor: pointer;
                     }
 
-                    &.is-selected {
+                    &.is-selected > .dropped-item-sprite {
                         @include is-selected;
                     }
 
-                    &.collected {
-                        animation: collect 0.5s ease-out forwards;
-                    }
-
-                    // All dropped items that come from the item sprite sheet
-                    &.food, &.crop, &.flower, &.toy, &.medicine, &.item {
-                        width: var(--item-sprite-width, 32px);
-                        height: var(--item-sprite-height, 32px);
-                        background-image: url('../images/items/items.png');
-                        background-repeat: no-repeat;
-                        background-position: var(--item-sprite-x, 0px) var(--item-sprite-y, 0px);
-                        image-rendering: pixelated;
-                    }
-
-                    &.coin {
+                    // Shadow stays on the ground; container never moves vertically
+                    > .dropped-item-shadow {
+                        position: absolute;
+                        width: 24px;
+                        height: 6px;
+                        left: calc(50% - 12px);
+                        bottom: 2px;
+                        background: rgba(0, 0, 0, 0.25);
                         border-radius: 50%;
-
-                        &.gold { background-color: yellow; }
+                        filter: blur(2px);
+                        pointer-events: none;
+                        transform-origin: center;
                     }
 
-                    &.health.potion    { background-color: green; }
-                    &.equipment.sword  { background-color: red; }
+                    // Sprite child — lifted vertically via transform when posZ > 0
+                    > .dropped-item-sprite {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+
+                        &.collected {
+                            animation: collect 0.5s ease-out forwards;
+                        }
+
+                        // All dropped items that come from the item sprite sheet
+                        &.food, &.crop, &.flower, &.toy, &.medicine, &.item {
+                            background-image: url('../images/items/items.png');
+                            background-repeat: no-repeat;
+                            background-position: var(--item-sprite-x, 0px) var(--item-sprite-y, 0px);
+                            image-rendering: pixelated;
+                        }
+
+                        &.coin {
+                            border-radius: 50%;
+
+                            &.gold { background-color: yellow; }
+                        }
+
+                        &.health.potion   { background-color: green; }
+                        &.equipment.sword { background-color: red; }
+                    }
                 }
             }
         }

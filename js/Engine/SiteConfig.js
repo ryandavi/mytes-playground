@@ -100,7 +100,7 @@ const SiteConfig = Object.freeze({
     // ── World defaults ────────────────────────────────────────────────────────
 
     world: Object.freeze({
-        defaultMap: 'House',
+        defaultMap: 'Outside',
     }),
 
     // ── Myte defaults ─────────────────────────────────────────────────────────
@@ -221,6 +221,35 @@ const SiteConfig = Object.freeze({
             historyLabelPenalty:    12,
             historyTargetPenalty:   18,
         }),
+    }),
+
+    // ── Camera ────────────────────────────────────────────────────────────────
+
+    camera: Object.freeze({
+        // Follow mode used when no Myte is active (e.g. after deactivation or undeploy)
+        defaultFollowMode: 'CURSOR_EDGE',   // key of CAMERA_FOLLOW_MODES
+
+        // Movement easing (higher = slower/smoother)
+        easing:         10,
+        draggingEasing: 20,
+        zoomEasing:     5,
+
+        // Zoom limits and scroll wheel step
+        minZoom:  0.5,
+        maxZoom:  2.5,
+        zoomStep: 0.1,
+
+        // CURSOR_EDGE: fraction of viewport that counts as the trigger zone (0–1)
+        edgeThreshold: 0.20,
+
+        // LEASH: myte must drift beyond this fraction of the viewport before camera moves
+        leashThreshold: 0.28,
+
+        // OVERVIEW: world-space padding (px) added around the myte bounding box
+        overviewPadding: 120,
+
+        // CINEMATIC: pan cycle speed (radians per second — lower is slower)
+        cinematicSpeed: 0.1,
     }),
 
     // ── Game time ─────────────────────────────────────────────────────────────

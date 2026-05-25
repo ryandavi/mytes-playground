@@ -909,9 +909,6 @@ class MapObject {
 			return null;
 		}
 
-		if (dropped.shadowElement) {
-			foregroundLayer.appendChild(dropped.shadowElement);
-		}
 		foregroundLayer.appendChild(dropped.element);
 
 		if (Array.isArray(localCollection)) {

@@ -272,7 +272,7 @@ class Myte {
 		this.parent.setNextMyteAsActive(this);
 		if (this.parent.activeMyte == null) {
 			this.parent.ui.debugPanel.disableButtons();
-			this.parent.camera.setMode(DEFAULT_CAMERA_FOLLOW_MODE);
+			this.parent.camera.setMode(this.parent.settings.defaultMyteCamera);
 			this.parent.camera.resetView();
 		}
 

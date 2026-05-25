@@ -38,7 +38,7 @@ class ContainerManager {
 
         this.settings = {
             limitMap: true,
-            defaultMyteCamera: CAMERA_FOLLOW_MODES.CHARACTER,
+            defaultMyteCamera: CAMERA_FOLLOW_MODES[SiteConfig.camera.defaultFollowMode] ?? CAMERA_FOLLOW_MODES.CURSOR_EDGE,
             autoDeployMytesOnLoad: false
         }
 
@@ -589,7 +589,7 @@ class ContainerManager {
             previousActiveMyte.cancelInactivityFreeRoam?.();
         }
 
-        this.camera.setMode(this.settings.defaultMyteCamera);
+        this.camera.setMode(myte !== null ? CAMERA_FOLLOW_MODES.CHARACTER : this.settings.defaultMyteCamera);
 
         //  add active if myte isnt null
         if (myte !== null) {
