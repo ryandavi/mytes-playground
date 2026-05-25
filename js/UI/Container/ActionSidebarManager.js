@@ -6,6 +6,7 @@ class ActionSidebarManager extends UIComponent {
         this.lastInfoRefreshAt = 0;
         this.infoRefreshInterval = 250;
         this._otherInfoCache = null;
+        this._otherInfoStructureKey = null;
         this._otherInfoRowMap = new Map();
         this._lastAvailableActionsKey = null;
     }
@@ -431,11 +432,17 @@ class ActionSidebarManager extends UIComponent {
         heading.classList.add('need-label');
         heading.textContent = `${label}: ${percent}% ${tone}`;
 
-        const meter = document.createElement('progress');
+        const meter = document.createElement('div');
         meter.classList.add('need-meter');
-        meter.max = 100;
-        meter.value = percent;
-        meter.style.width = '100%';
+        meter.setAttribute('role', 'progressbar');
+        meter.setAttribute('aria-valuemin', '0');
+        meter.setAttribute('aria-valuemax', '100');
+        meter.setAttribute('aria-valuenow', String(percent));
+
+        const fill = document.createElement('div');
+        fill.classList.add('need-meter-fill');
+        fill.style.width = `${Utility.clamp(percent, 0, 100)}%`;
+        meter.append(fill);
 
         wrapper.append(heading, meter);
         container.append(wrapper);
@@ -558,6 +565,19 @@ class ActionSidebarManager extends UIComponent {
                     });
                 });
 
+                if (Array.isArray(snapshot.needs) && snapshot.needs.length) {
+                    rows.push({ label: '__header_drives', value: 'Derived Drives', className: 'needs-title' });
+                    snapshot.needs.forEach(({ id, label, percent }) => {
+                        rows.push({
+                            label: `drive_${id}`,
+                            value: percent ?? 0,
+                            meta: { label, id },
+                            type: 'meter',
+                            cacheValue: `${id}:${percent ?? 0}`
+                        });
+                    });
+                }
+
                 if (snapshot.lastDecisionLabel) {
                     this.appendSectionHeader(rows, 'ai', 'AI');
                     rows.push({
@@ -615,6 +635,7 @@ class ActionSidebarManager extends UIComponent {
                 otherInfo.innerHTML = '';
                 otherInfo.classList.remove('is-visible');
                 this._otherInfoCache = null;
+                this._otherInfoStructureKey = null;
                 this._otherInfoRowMap.clear();
             }
             return;
@@ -622,13 +643,19 @@ class ActionSidebarManager extends UIComponent {
 
         const rows = this._buildOtherInfoRows(selectedObject);
         const cacheKey = rows.map(r => `${r.label}=${r.cacheValue ?? r.value}`).join('|');
+        const structureKey = rows.map(r => `${r.label}:${r.type ?? 'text'}:${r.className ?? ''}`).join('|');
 
         if (cacheKey === this._otherInfoCache) return;
         this._otherInfoCache = cacheKey;
+        const structureChanged = structureKey !== this._otherInfoStructureKey;
+        this._otherInfoStructureKey = structureKey;
 
         const prevRowMap = this._otherInfoRowMap;
         const newRowMap = new Map();
-        const fragment = document.createDocumentFragment();
+
+        if (structureChanged) {
+            otherInfo.innerHTML = '';
+        }
 
         for (const row of rows) {
             const strVal = String(row.value);
@@ -640,18 +667,25 @@ class ActionSidebarManager extends UIComponent {
                     el.classList.add('state-info', 'need-info');
                     const heading = document.createElement('div');
                     heading.classList.add('need-label');
-                    const meter = document.createElement('progress');
+                    const meter = document.createElement('div');
                     meter.classList.add('need-meter');
-                    meter.max = 100;
-                    meter.style.width = '100%';
+                    meter.setAttribute('role', 'progressbar');
+                    meter.setAttribute('aria-valuemin', '0');
+                    meter.setAttribute('aria-valuemax', '100');
+                    const fill = document.createElement('div');
+                    fill.classList.add('need-meter-fill');
+                    meter.append(fill);
                     el.append(heading, meter);
                 }
                 const heading = el.querySelector('.need-label');
-                const meter = el.querySelector('progress');
+                const meter = el.querySelector('.need-meter');
+                const fill = el.querySelector('.need-meter-fill');
                 const pct = row.value;
                 const text = `${row.meta.label}: ${pct}%`;
                 if (heading.textContent !== text) heading.textContent = text;
-                if (meter.value !== pct) meter.value = pct;
+                const width = `${Utility.clamp(pct, 0, 100)}%`;
+                if (fill.style.width !== width) fill.style.width = width;
+                meter.setAttribute('aria-valuenow', String(pct));
                 el.dataset.state = this.getMeterState(pct);
                 el.dataset.metricId = row.meta.id ?? '';
             } else if (row.type === 'ai-choice') {
@@ -714,11 +748,11 @@ class ActionSidebarManager extends UIComponent {
             }
 
             newRowMap.set(row.label, el);
-            fragment.appendChild(el);
+            if (structureChanged) {
+                otherInfo.appendChild(el);
+            }
         }
 
-        otherInfo.innerHTML = '';
-        otherInfo.appendChild(fragment);
         otherInfo.classList.add('is-visible');
         this._otherInfoRowMap = newRowMap;
     }
@@ -734,6 +768,7 @@ class ActionSidebarManager extends UIComponent {
         this.currentSelectedObject = selectedObject;
         this.lastInfoRefreshAt = 0;
         this._otherInfoCache = null;
+        this._otherInfoStructureKey = null;
         this._otherInfoRowMap.clear();
         this._lastAvailableActionsKey = null;
 

@@ -28,7 +28,7 @@ const AudioCategoryRules = {
 			case 'music':
 				return soundManager.musicEnabled;
 			case 'ambient':
-				return soundManager.soundEnabled;
+				return soundManager.soundEnabled && soundManager.ambientEnabled;
 			case 'footsteps':
 				return soundManager.soundEnabled && soundManager.footstepsEnabled;
 			default:

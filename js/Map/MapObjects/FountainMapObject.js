@@ -1,4 +1,8 @@
 class FountainMapObject extends BinaryStateAnimatedMapObject {
+    getBuffContextKey() {
+        return `fountain:${this.id ?? `${this.posX},${this.posY}`}:aura`;
+    }
+
     getApproachMode() {
         return 'adjacent';
     }
@@ -12,7 +16,6 @@ class FountainMapObject extends BinaryStateAnimatedMapObject {
         this.boostCooldown = this.getConfig('boostCooldown', 1000);
 
         // Boost tracking: myte.id → last boost timestamp (performance.now())
-        this.lastBoostTimes = new Map();
         // Only check nearby mytes every 500ms to avoid scanning every tick
         this._proximityAccumulator = 0;
         this._proximityInterval = 500;
@@ -27,29 +30,36 @@ class FountainMapObject extends BinaryStateAnimatedMapObject {
         this.toggleState();
     }
     
-    applyMoodBoost(myte) {
-        const now = performance.now();
-        const lastBoost = this.lastBoostTimes.get(myte.id) || 0;
-
-        if (now - lastBoost >= this.boostCooldown) {
-            myte.stats.updateMood(this.moodBoostAmount);
-            this.lastBoostTimes.set(myte.id, now);
-
-            // Occasional happiness expression
-            if (Math.random() < 0.1) {
-                myte.queue.addExpression('happy');
+    syncAuraBuff(myte, active) {
+        myte?.buffs?.syncContextBuff?.(
+            this.getBuffContextKey(),
+            this.getConfig('auraBuffDefinition', null) ??
+            this.getConfig('auraBuffId', 'fountain_aura'),
+            {
+                active,
+                source: 'aura',
+                payload: {
+                    objectType: this.type,
+                    objectId: this.id
+                }
             }
-        }
+        );
     }
 
     checkNearbyMytes() {
-        if (!this.isEnabled() || !this.mytes.length) return;
+        if (!this.mytes.length) return;
 
         this.mytes.forEach(myte => {
-            if (!myte.isActive) return;
+            if (!myte.isActive) {
+                this.syncAuraBuff(myte, false);
+                return;
+            }
 
-            if (this.getDistanceTo(myte) <= this.moodBoostRadius) {
-                this.applyMoodBoost(myte);
+            const inRange = this.isEnabled() && this.getDistanceTo(myte) <= this.moodBoostRadius;
+            this.syncAuraBuff(myte, inRange);
+
+            if (inRange && Math.random() < 0.1) {
+                myte.queue.addExpression('happy');
             }
         });
     }

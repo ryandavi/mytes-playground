@@ -29,6 +29,11 @@ class SoundPanel extends ModalWindow {
                 property: 'musicEnabled',
                 preference: 'musicEnabled'
             },
+            ambientEnabled: {
+                id: 'ambient-enabled',
+                property: 'ambientEnabled',
+                preference: 'ambientEnabled'
+            },
             footstepsEnabled: {
                 id: 'footsteps-enabled',
                 property: 'footstepsEnabled',
@@ -262,6 +267,13 @@ class SoundPanel extends ModalWindow {
                         soundManager.stopMusic();
                     } else {
                         soundManager.restartMusic();
+                    }
+                    break;
+                case 'ambientEnabled':
+                    if (!isChecked) {
+                        soundManager.stopAllSoundEffects();
+                    } else {
+                        soundManager.restartAmbient();
                     }
                     break;
                 case 'footstepsEnabled':

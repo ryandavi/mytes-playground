@@ -15,6 +15,7 @@ function createAudioPresetLibrary(manager) {
 							release: 1.5
 						}
 					}).toDestination();
+					synth.maxPolyphony = 4;
 					// // synth.volume.value = Tone.gainToDb(0.4);
 
 					const pattern = [];
@@ -46,13 +47,13 @@ function createAudioPresetLibrary(manager) {
 							type: "sine"
 						},
 						envelope: {
-							attack: 0.1, //.4
+							attack: 0.1,
 							decay: 0.3,
 							sustain: 0.7,
 							release: 2.5
 						}
 					}).toDestination();
-					// // synth.volume.value = Tone.gainToDb(0.1);
+					synth.maxPolyphony = 4;
 
 					const pattern = [];
 					const notes = [
@@ -83,6 +84,7 @@ function createAudioPresetLibrary(manager) {
 							release: 4
 						}
 					}).toDestination();
+					pad.maxPolyphony = 4;
 					pad.volume.value = Tone.gainToDb(0.2);
 
 					const padPattern = [
@@ -119,7 +121,7 @@ function createAudioPresetLibrary(manager) {
 							release: 2
 						}
 					}).toDestination();
-					// // synth.volume.value = Tone.gainToDb(0.35);
+					synth.maxPolyphony = 4;
 
 					const pattern = [];
 					const notes = ["G2", "B2", "D3", "F#3", "G3", "D3", "B2", "G2"];
@@ -817,13 +819,15 @@ function createAudioPresetLibrary(manager) {
 				type: "ambient",
 				baseVolume: 0.22,
 				create: () => {
-					const noise = new Tone.Noise("brown").start();
+					// Do NOT call .start() here — playAmbient starts them lazily to avoid
+					// running the audio worklet 24/7 even when the sound is inactive.
+					const noise = new Tone.Noise("brown");
 					const autoFilter = new Tone.AutoFilter({
 						frequency: 0.1,
 						depth: 0.8,
 						baseFrequency: 100,
 						octaves: 2.5
-					}).start();
+					});
 					const filter = new Tone.Filter({
 						frequency: 800,
 						type: "lowpass",
@@ -845,13 +849,13 @@ function createAudioPresetLibrary(manager) {
 				type: "ambient",
 				baseVolume: 0.12,
 				create: () => {
-					const noise = new Tone.Noise("pink").start();
+					const noise = new Tone.Noise("pink");
 					const autoFilter = new Tone.AutoFilter({
 						frequency: 0.2,
 						depth: 0.5,
 						baseFrequency: 200,
 						octaves: 1.5
-					}).start();
+					});
 					const filter = new Tone.Filter({
 						frequency: 1000,
 						type: "lowpass",
@@ -872,26 +876,25 @@ function createAudioPresetLibrary(manager) {
 				type: "ambient",
 				baseVolume: 0.14,
 				create: () => {
-					const synth = new Tone.PolySynth(Tone.FMSynth).toDestination();
-					synth.set({
-						harmonicity: 10,
-						modulationIndex: 10,
+					// Use a lightweight AMSynth instead of PolySynth(FMSynth) — bird chirps
+					// don't need polyphony and FMSynth is among the most CPU-intensive types.
+					const synth = new Tone.AMSynth({
+						harmonicity: 8,
 						oscillator: { type: "sine" },
 						envelope: {
 							attack: 0.001,
-							decay: 0.1,
-							sustain: 0.1,
-							release: 0.1
+							decay: 0.08,
+							sustain: 0,
+							release: 0.08
 						},
 						modulation: { type: "square" },
 						modulationEnvelope: {
 							attack: 0.001,
-							decay: 0.5,
-							sustain: 0.1,
+							decay: 0.3,
+							sustain: 0,
 							release: 0.1
 						}
-					});
-					// synth.volume.value = Tone.gainToDb(0.3);
+					}).toDestination();
 
 					// Generate random bird chirps periodically
 					const pattern = [];
@@ -926,31 +929,31 @@ function createAudioPresetLibrary(manager) {
 				type: "ambient",
 				baseVolume: 0.008,
 				create: () => {
-					const synth = new Tone.FMSynth({
-						harmonicity: 12,
-						modulationIndex: 20,
+					// AMSynth is much lighter than FMSynth — cricket chirps are short
+					// high-frequency pulses that don't need FM's complexity.
+					const synth = new Tone.AMSynth({
+						harmonicity: 10,
 						oscillator: { type: "square" },
 						envelope: {
-							attack: 0.01,
-							decay: 0.05,
-							sustain: 0.01,
+							attack: 0.005,
+							decay: 0.04,
+							sustain: 0,
 							release: 0.01
 						},
 						modulation: { type: "square" },
 						modulationEnvelope: {
-							attack: 0.01,
-							decay: 0.01,
-							sustain: 0.5,
+							attack: 0.005,
+							decay: 0.04,
+							sustain: 0,
 							release: 0.01
 						}
 					}).toDestination();
-					// Create cricket chirp sequences
 
+					// Reduced pattern density: 8 groups instead of 20
 					const pattern = [];
-					for (let i = 0; i < 20; i++) {
-						const time = i * 0.5 + Math.random() * 10;
-						// Groups of chirps
-						for (let j = 0; j < 3 + Math.floor(Math.random() * 3); j++) {
+					for (let i = 0; i < 8; i++) {
+						const time = i * 1.5 + Math.random() * 8;
+						for (let j = 0; j < 3; j++) {
 							pattern.push({
 								note: "A7",
 								time: time + (j * 0.08),
@@ -958,22 +961,6 @@ function createAudioPresetLibrary(manager) {
 							});
 						}
 					}
-
-
-					/*
-					const pattern = [];
-					for (let i = 0; i < 8; i++) {  // Reduced from 20 to 8 groups
-						const time = i * 1 + Math.random() * 15;  // Much longer gaps (was i * 0.5)
-						// Groups of chirps
-						for (let j = 0; j < 3 + Math.floor(Math.random() * 3); j++) {
-							pattern.push({
-								note: "A7",
-								time: time + (j * 0.08),
-								duration: "64n"
-							});
-						}
-					}
-						*/
 
 					return {
 						synth,
@@ -1163,13 +1150,13 @@ function createAudioPresetLibrary(manager) {
 				type: "ambient",
 				baseVolume: 0.16,
 				create: () => {
-					const noise = new Tone.Noise("pink").start();
+					const noise = new Tone.Noise("pink");
 					const autoFilter = new Tone.AutoFilter({
 						frequency: 0.5,
 						depth: 0.3,
 						baseFrequency: 1500,
 						octaves: 1
-					}).start();
+					});
 					const filter = new Tone.Filter({
 						frequency: 2000,
 						type: "bandpass",

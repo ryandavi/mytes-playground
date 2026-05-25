@@ -25,8 +25,9 @@ class MyteCore {
         this.boundHandleVisibilityChange = this.handleVisibilityChange.bind(this);
 
         this.soundManager = new SoundManager(this, {
-            soundEnabled: this.config.sound.enabled,
-            musicEnabled: this.config.sound.musicEnabled,
+            soundEnabled:   this.config.sound.enabled,
+            musicEnabled:   this.config.sound.musicEnabled,
+            ambientEnabled: this.config.sound.ambientEnabled,
         });
 
         // Timing state
@@ -53,6 +54,12 @@ class MyteCore {
                 throw new Error('Failed to load action metadata.');
             }
             ActionManager.validateDefinitions();
+
+            this.loadingManager.setMessage("Loading buff data...");
+            const buffDataLoaded = await BuffRegistry.preload();
+            if (!buffDataLoaded) {
+                throw new Error('Failed to load buff metadata.');
+            }
 
             this.loadingManager.setMessage("Loading user data...");
             await this.initializeUser();

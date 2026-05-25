@@ -71,6 +71,7 @@ class Myte {
 		this.physicsController;
 		this.footstepController;
 		this.ai;
+		this.buffs;
 
 		// bools
 		this.checkForCollisions = true;
@@ -205,6 +206,7 @@ class Myte {
 		this.inputHandler = new MyteInputHandler(this);
 		this.dialogue = new MyteDialogue(this);
 		this.stats = new MyteStats(this);
+		this.buffs = new MyteBuffController(this);
 		this.ai = new MyteAI(this);
 
 		const rect = this.parent.getOffset(this.element);
@@ -1197,6 +1199,7 @@ class Myte {
 		this.queue?.clear?.();
 		this.inputHandler?.dispose?.();
 		this.dialogue?.destroy?.();
+		this.buffs?.clear?.();
 		this.stats?.destroy?.();
 		this.targetDot?.remove?.();
 		this.duplicate?.remove?.();
@@ -1212,6 +1215,7 @@ class Myte {
 		this.tryResolveColliderOverlap();
 		this.ensureFiniteCoordinates('update:end');
 
+		this.buffs?.update?.(deltaTime);
 		this.stats.update(deltaTime);
 
 		// StateMachine self-paces its own frame timing per-animation.
@@ -1230,12 +1234,26 @@ class Myte {
 
 	updateInactive(deltaTime) {
 		if (this.isActive) return;
+		this.buffs?.update?.(deltaTime);
 		this.stats?.updateInHomeSlot?.(deltaTime);
 	}
 
 	tickUpdate(tickDelta) {
 		if (!this.isActive) return;
 		this.ai?.tickUpdate(tickDelta);
+		this._syncCompanionBuffs(tickDelta);
+	}
+
+	_syncCompanionBuffs(tickDelta) {
+		this._companionAccumulator = (this._companionAccumulator ?? 0) + tickDelta;
+		if (this._companionAccumulator < 500) return;
+		this._companionAccumulator = 0;
+
+		const radius = SiteConfig.myte.companionRadius;
+		const hasCompanion = (this.parent?.mytes ?? []).some(
+			other => other !== this && other.isActive && this.getDistanceTo(other) <= radius
+		);
+		this.buffs?.syncContextBuff?.('companion:nearby', 'companionship_aura', { active: hasCompanion });
 	}
 
 

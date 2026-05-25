@@ -141,6 +141,134 @@ class MyteStats {
         this.confidence = Math.max(this.minConfidence, Math.min(this.maxConfidence, this.confidence + amount));
     }
 
+    getEffectAmount(effectSource, keys = []) {
+        if (!effectSource || typeof effectSource !== 'object') {
+            return 0;
+        }
+
+        for (const key of keys) {
+            const value = effectSource[key];
+            if (Number.isFinite(value)) {
+                return value;
+            }
+        }
+
+        return 0;
+    }
+
+    normalizeStatEffects(effectSource = {}, { scale = 1, deltaTime = null } = {}) {
+        const normalizedScale = Number.isFinite(scale) ? scale : 1;
+        const timeScale = Number.isFinite(deltaTime) ? deltaTime : 1;
+        const totalScale = normalizedScale * timeScale;
+
+        const funAmount = this.getEffectAmount(effectSource, ['fun', 'funDelta', 'funBoost']);
+        const boredomAmount = this.getEffectAmount(effectSource, ['boredom', 'boredomDelta', 'boredomBoost']);
+
+        return {
+            energy: this.getEffectAmount(effectSource, ['energy', 'energyDelta', 'energyRestore', 'energyBoost']) * totalScale,
+            health: this.getEffectAmount(effectSource, ['health', 'healthDelta', 'healthRestore', 'healthBoost']) * totalScale,
+            mood: this.getEffectAmount(effectSource, ['mood', 'moodDelta', 'moodBoost']) * totalScale,
+            boredom: (boredomAmount - funAmount) * totalScale,
+            comfort: this.getEffectAmount(effectSource, ['comfort', 'comfortDelta', 'comfortBoost']) * totalScale,
+            confidence: this.getEffectAmount(effectSource, ['confidence', 'confidenceDelta', 'confidenceBoost']) * totalScale
+        };
+    }
+
+    applyStatEffects(effectSource = {}, options = {}) {
+        const deltas = this.normalizeStatEffects(effectSource, options);
+
+        if (deltas.energy > 0) {
+            this.restoreEnergy(deltas.energy);
+        } else if (deltas.energy < 0) {
+            this.useEnergy(-deltas.energy);
+        }
+
+        if (deltas.health > 0) {
+            this.heal(deltas.health);
+        } else if (deltas.health < 0) {
+            this.applyDamage(-deltas.health);
+        }
+
+        if (deltas.mood !== 0) this.updateMood(deltas.mood);
+        if (deltas.boredom !== 0) this.updateBoredom(deltas.boredom);
+        if (deltas.comfort !== 0) this.updateComfort(deltas.comfort);
+        if (deltas.confidence !== 0) this.updateConfidence(deltas.confidence);
+
+        return deltas;
+    }
+
+    applyStatEffectsPerMs(effectSource = {}, deltaTime, options = {}) {
+        return this.applyStatEffects(effectSource, {
+            ...options,
+            deltaTime
+        });
+    }
+
+    scaleNeedReward(amount, needLevel) {
+        if (!Number.isFinite(amount) || amount === 0) {
+            return 0;
+        }
+
+        if (amount > 0) {
+            return amount * (1 + (Utility.clamp(needLevel, 0, 1) * SiteConfig.stats.activityRewards.missingNeedMultiplier));
+        }
+
+        return amount;
+    }
+
+    getActivityRewardProfile(category = 'default') {
+        return SiteConfig.stats.activityRewards.categories[category] ??
+            SiteConfig.stats.activityRewards.categories.default;
+    }
+
+    resolveActivityMetadata(activityInstance) {
+        return activityInstance?.constructor?.metadata ?? activityInstance ?? {};
+    }
+
+    applyActivityEffects(activityInstance, { scale = 1 } = {}) {
+        const metadata = this.resolveActivityMetadata(activityInstance);
+        const category = metadata.category ?? 'default';
+        const rewardProfile = this.getActivityRewardProfile(category);
+        const rewardScale = Number.isFinite(scale)
+            ? Math.max(0, scale)
+            : 1;
+
+        let moodDelta = this.scaleNeedReward(
+            (rewardProfile.mood ?? 0) * rewardScale,
+            1 - this.getMoodRatio()
+        );
+        if (metadata.affectsMood && Number.isFinite(metadata.moodEffect)) {
+            moodDelta += this.scaleNeedReward(
+                metadata.moodEffect * SiteConfig.stats.activityRewards.moodEffectMultiplier * rewardScale,
+                1 - this.getMoodRatio()
+            );
+        }
+
+        const boredomDelta = this.scaleNeedReward(
+            (rewardProfile.boredom ?? 0) * rewardScale,
+            this.getBoredomRatio()
+        );
+        const comfortDelta = this.scaleNeedReward(
+            (rewardProfile.comfort ?? 0) * rewardScale,
+            1 - this.getComfortRatio()
+        );
+        const confidenceDelta = this.scaleNeedReward(
+            (rewardProfile.confidence ?? 0) * rewardScale,
+            1 - this.getConfidenceRatio()
+        );
+
+        this.applyStatEffects({
+            mood: moodDelta,
+            boredom: boredomDelta,
+            comfort: comfortDelta,
+            confidence: confidenceDelta
+        });
+    }
+
+    applyActionCompletionEffects(actionInstance) {
+        this.applyActivityEffects(actionInstance);
+    }
+
     handleMoodEffects() {
         if (this.mood <= SiteConfig.myte.thresholds.moodLow) {
             if (Math.random() < 0.1) {
@@ -209,22 +337,34 @@ class MyteStats {
         return (this.getTrait(name) + 100) / 200;
     }
 
+    getBuffMultiplier(path) {
+        return this.myte.buffs?.getEffectValue?.(path, 1) ?? 1;
+    }
+
+    getBuffFlat(path) {
+        return this.myte.buffs?.getEffectValue?.(path, 0) ?? 0;
+    }
+
+    applyContinuousBuffStatEffects(deltaTime) {
+        this.applyStatEffectsPerMs({
+            energy: this.getBuffFlat('stats.energyPerMs'),
+            health: this.getBuffFlat('stats.healthPerMs'),
+            mood: this.getBuffFlat('stats.moodPerMs'),
+            boredom: this.getBuffFlat('stats.boredomPerMs'),
+            fun: this.getBuffFlat('stats.funPerMs'),
+            comfort: this.getBuffFlat('stats.comfortPerMs'),
+            confidence: this.getBuffFlat('stats.confidencePerMs')
+        }, deltaTime);
+    }
 
     getSpeed() {
-        let speedMultiplier = this.moods[this.currentMood].speedMultiplier;
-
-        // Energy affects speed
-        if (this.energy < SiteConfig.myte.thresholds.lowEnergyThreshold) speedMultiplier *= SiteConfig.myte.thresholds.lowEnergySpeedMultiplier;
-
-        // Exhaustion effect
-        if (this.exhaustionSpeedMultiplier) {
-            speedMultiplier *= this.exhaustionSpeedMultiplier;
-        }
+        let speedMultiplier = 1;
 
         // Activity trait affects speed
         speedMultiplier *= (1 + (this.traits.activity / 200)); // -100 to 100 becomes 0.5 to 1.5
+        speedMultiplier *= this.getBuffMultiplier('movement.speedMultiplier');
 
-        return this.speed * speedMultiplier;
+        return (this.speed + this.getBuffFlat('movement.speedFlat')) * speedMultiplier;
     }
 
     // Interaction timing
@@ -289,7 +429,7 @@ class MyteStats {
     }
 
     regenerateEnergy(delta, rate = null) {
-        const effectiveRate = rate ?? this.energyRegenRate;
+        const effectiveRate = (rate ?? this.energyRegenRate) * this.getBuffMultiplier('stats.energyRegenMultiplier');
         const previousEnergy = this.energy;
         if (this.energy < this.maxEnergy) {
             // Store the energy change for rapid charging detection
@@ -389,8 +529,9 @@ class MyteStats {
             }, 2000);
         }
     
-        // Improve mood slightly when fully recharged
-        this.updateMood(2);
+        this.myte.buffs?.emitEvent?.('full_charge', {
+            energy: this.energy
+        });
     }
 
     maybeHandleEnergyFull(previousEnergy) {
@@ -405,9 +546,7 @@ class MyteStats {
 
     // Apply effects when the myte is exhausted
     applyExhaustionEffects() {
-        // Myte moves much slower when exhausted
         this.isExhausted = true;
-        this.exhaustionSpeedMultiplier = SiteConfig.myte.thresholds.exhaustionSpeedMultiplier;
     }
 
     clearExhaustionEffects() {
@@ -416,7 +555,6 @@ class MyteStats {
         }
 
         this.isExhausted = false;
-        this.exhaustionSpeedMultiplier = 1.0;
 
         if (this.myte.battery && this.energy > 0) {
             this.myte.battery.classList.remove('critical-pulse');
@@ -630,53 +768,23 @@ class MyteStats {
     getEnergyActivityMultiplier() {
         const metadata = this.getCurrentActionMetadata();
         const actionId = metadata.id ?? this.getCurrentActionId();
+
+        if (this.isRestingAction(actionId)) return 0;
+
+        if (Number.isFinite(metadata.energyCostMultiplier)) {
+            return metadata.energyCostMultiplier;
+        }
+
         const category = metadata.category ?? '';
-
-        if (this.isRestingAction(actionId)) {
-            return 0;
-        }
-
-        if ([
-            'play_fetch',
-            'run_laps',
-            'zigzag',
-            'circle',
-            'play_tag',
-            'nudge_ball',
-            'jump'
-        ].includes(actionId)) {
-            return 1.85;
-        }
-
-        if (actionId === 'dance') {
-            return 1.65;
-        }
-
-        if (category === 'play') {
-            return 1.6;
-        }
-
-        if (category === 'reactive') {
-            return 1.45;
-        }
-
-        if (category === 'carrying') {
-            return 1.3;
-        }
-
-        if (category === 'movement') {
-            return 1.2;
-        }
-
-        if (category === 'social') {
-            return 1.05;
-        }
-
-        if (category === 'interactions') {
-            return 0.95;
-        }
-
-        return 1;
+        const categoryFallbacks = {
+            play: 1.6,
+            reactive: 1.45,
+            carrying: 1.3,
+            movement: 1.2,
+            social: 1.05,
+            interactions: 0.95
+        };
+        return categoryFallbacks[category] ?? 1;
     }
 
     noteBehavior({
@@ -760,7 +868,8 @@ class MyteStats {
             'move',
             'follow_object'
         ].includes(actionId);
-        const rateScale = this.behaviorDriveRate;
+        const rateScale = this.behaviorDriveRate * this.getBuffMultiplier('stats.behaviorDriveMultiplier');
+        const liveMoodRates = SiteConfig.stats.activityRewards.liveMoodRates;
 
         let boredomDelta = 0;
         if (isResting) {
@@ -815,8 +924,23 @@ class MyteStats {
             (this.getEnergyRatio() * 0.22) +
             (this.getConfidenceRatio() * 0.18)
         ) * this.maxMood;
-        const moodBlend = (moodTarget - this.mood) * this.moodSyncRate * deltaTime;
-        this.updateMood(moodBlend);
+        const moodBlend = (moodTarget - this.mood) *
+            (this.moodSyncRate * this.getBuffMultiplier('stats.moodSyncMultiplier')) *
+            deltaTime;
+        let activityMoodDelta = 0;
+        if (isPlayful) {
+            activityMoodDelta += liveMoodRates.play;
+        } else if (isSocial) {
+            activityMoodDelta += liveMoodRates.social;
+        } else if (isStimulating || isResting) {
+            activityMoodDelta += liveMoodRates.stimulating;
+        } else if (isPurposefulMovement) {
+            activityMoodDelta += liveMoodRates.movement;
+        } else if (isIdle) {
+            activityMoodDelta += liveMoodRates.idle;
+        }
+
+        this.updateMood(moodBlend + (activityMoodDelta * deltaTime * rateScale));
     }
 
     maybeSignalNeeds() {
@@ -885,10 +1009,15 @@ class MyteStats {
 
     // Update function called each frame
     update(deltaTime) {
-        this.updateMood(-this.moodDecayRate * deltaTime);
+        this.updateMood(-this.moodDecayRate * deltaTime * this.getBuffMultiplier('stats.moodDecayMultiplier'));
 
         if (this.myte.isMoving()) {
-            this.useEnergy(this.energyDecayRate * deltaTime * this.getEnergyActivityMultiplier());
+            this.useEnergy(
+                this.energyDecayRate *
+                deltaTime *
+                this.getEnergyActivityMultiplier() *
+                this.getBuffMultiplier('stats.energyDecayMultiplier')
+            );
         } else if (this.isRestingAction()) {
             // Bed/couch rest — slow, quality-dependent regen handled here.
             // SurfaceSlotAction also drives the "rest until full" loop condition.
@@ -897,17 +1026,26 @@ class MyteStats {
             this.regenerateEnergy(deltaTime);
         }
 
+        this.applyContinuousBuffStatEffects(deltaTime);
         this.updateBehaviorDrives(deltaTime);
+        this.updateHealth(SiteConfig.stats.healthRegenRate * deltaTime);
         this.maybeSignalNeeds();
         this.updateBatteryDisplay();
     }
 
     updateInHomeSlot(deltaTime) {
-        this.updateMood(-this.moodDecayRate * deltaTime * this.homeSlotMoodDecayMultiplier);
+        this.updateMood(
+            -this.moodDecayRate *
+            deltaTime *
+            this.homeSlotMoodDecayMultiplier *
+            this.getBuffMultiplier('stats.moodDecayMultiplier')
+        );
         this.regenerateEnergy(deltaTime, this.homeSlotEnergyRegenRate);
+        this.applyContinuousBuffStatEffects(deltaTime);
         this.updateBehaviorDrives(deltaTime * this.homeSlotBehaviorRateMultiplier);
         this.updateComfort(this.homeSlotComfortBoostRate * deltaTime);
         this.updateConfidence(this.homeSlotConfidenceBoostRate * deltaTime);
+        this.updateHealth(SiteConfig.stats.healthRegenRate * 1.5 * deltaTime);
         this.updateBatteryDisplay();
     }
 

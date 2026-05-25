@@ -45,9 +45,10 @@ const AppConfig = Object.freeze({
     // User preferences override these once user data is loaded.
 
     sound: Object.freeze({
-        enabled:      true,
-        musicEnabled: true,
-        unlockDelay:  400,
+        enabled:        true,
+        musicEnabled:   true,
+        ambientEnabled: true,
+        unlockDelay:    400,
     }),
 
 });

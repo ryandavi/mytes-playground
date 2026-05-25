@@ -83,6 +83,8 @@ class MyteAction {
     }
 
     complete() {
+        this.myte.stats?.applyActionCompletionEffects?.(this);
+        this.myte.buffs?.handleActionComplete?.(this);
         if (this.onComplete !== null) {
             this.onComplete();
         }

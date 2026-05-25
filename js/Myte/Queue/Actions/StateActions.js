@@ -3,7 +3,8 @@ class DanceAction extends MyteAction {
     static metadata = {
         id: 'dance',
         label: 'Dance',
-        category: 'state',
+        category: 'play',
+        energyCostMultiplier: 1.65,
         priority: 3,
         isMovementAction: true,
         isInterruptible: false,
@@ -171,7 +172,8 @@ class SpinAction extends MyteAction {
     static metadata = {
         id: 'spin',
         label: 'Spin',
-        category: 'state',
+        category: 'play',
+        energyCostMultiplier: 1.2,
         priority: 3,
         isMovementAction: false,
         isInterruptible: false,

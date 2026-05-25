@@ -935,7 +935,7 @@ class GameMap {
         // Zone updates for active mytes
         if (this.zoneManager) {
             this.mytes.forEach(myte => {
-                if (myte.isActive) this.zoneManager.update(myte);
+                if (myte.isActive) this.zoneManager.update(myte, deltaTime);
             });
         }
 

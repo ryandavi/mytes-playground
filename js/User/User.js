@@ -2,6 +2,7 @@ const USER_DATA_VERSION = 1;
 const USER_DEFAULT_PREFERENCES = Object.freeze({
     soundEnabled: true,
     musicEnabled: true,
+    ambientEnabled: true,
     footstepsEnabled: true,
     masterVolume: 1,
     sfxVolume: 0.82,
@@ -313,8 +314,9 @@ class User {
     applyAudioSettings(soundManager) {
         if (!soundManager) return;
         const p = this.preferences;
-        soundManager.soundEnabled   = p.soundEnabled;
-        soundManager.musicEnabled   = p.musicEnabled;
+        soundManager.soundEnabled     = p.soundEnabled;
+        soundManager.musicEnabled     = p.musicEnabled;
+        soundManager.ambientEnabled   = p.ambientEnabled ?? true;
         soundManager.footstepsEnabled = p.footstepsEnabled;
         soundManager.volume.master  = p.masterVolume;
         soundManager.volume.sfx     = p.sfxVolume;
@@ -329,6 +331,7 @@ class User {
         [
             'soundEnabled',
             'musicEnabled',
+            'ambientEnabled',
             'footstepsEnabled',
             'masterVolume',
             'sfxVolume',

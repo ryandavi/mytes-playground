@@ -533,12 +533,17 @@ class SurfaceSlotAction extends GoToObjectAction {
     complete() {
         this.finishSurfacePlacement({ snapToExit: this.phase !== 'done' });
         super.complete();
+        const benefit = this.getTargetActionConfig().benefit ?? 'energy';
+        if (benefit === 'energy') {
+            this.myte.buffs?.emitEvent?.('energy_surface_complete');
+        }
     }
 
     interrupt() {
         const isDragInterrupt = !!this.myte.isDragging;
         if (this.phase === 'rest' || this.phase === 'settle' || isDragInterrupt) {
             this.myte.stats?.setMood?.('grumpy');
+            this.myte.buffs?.applyBuff?.('disturbed', { source: 'interrupt' });
         }
         this.finishSurfacePlacement({ snapToExit: !isDragInterrupt });
         super.interrupt();
@@ -546,6 +551,16 @@ class SurfaceSlotAction extends GoToObjectAction {
 
     getTargetActionConfig() {
         return this.target?.getActionConfig?.('use_surface_slot', {}) ?? {};
+    }
+
+    getSurfaceStatEffects() {
+        const actionConfig = this.getTargetActionConfig();
+        return actionConfig.effects ?? {
+            energyRestore: this.energyRestore,
+            healthRestore: this.healthRestore,
+            comfortBoost: this.comfortBoost,
+            moodBoost: this.moodBoost
+        };
     }
 
     getConfiguredSlots() {
@@ -734,10 +749,7 @@ class SurfaceSlotAction extends GoToObjectAction {
 
             if (!this._benefitsApplied) {
                 this._benefitsApplied = true;
-                this.myte.stats.restoreEnergy(this.energyRestore);
-                this.myte.stats.heal(this.healthRestore);
-                this.myte.stats.updateComfort(this.comfortBoost);
-                this.myte.stats.updateMood(this.moodBoost);
+                this.myte.stats.applyStatEffects(this.getSurfaceStatEffects());
             }
         }
 
@@ -1001,7 +1013,8 @@ class NudgeBallAction extends GoToObjectAction {
     static metadata = {
         id: 'nudge_ball',
         label: 'Nudge Ball',
-        category: 'interactions',
+        category: 'play',
+        energyCostMultiplier: 1.85,
         priority: 2,
         isMovementAction: true,
         isInterruptible: true,
@@ -1100,10 +1113,18 @@ class EatElementAction extends GoToObjectAction {
         const energyRestore = this.target.getConfig?.('energyRestore', SiteConfig.food.energyRestore) ?? SiteConfig.food.energyRestore;
         const moodBoost     = this.target.getConfig?.('moodBoost',     SiteConfig.food.moodBoost)     ?? SiteConfig.food.moodBoost;
         const healthRestore = this.target.getConfig?.('healthRestore', SiteConfig.food.healthRestore) ?? SiteConfig.food.healthRestore;
-
-        if (energyRestore > 0) this.myte.stats.restoreEnergy(energyRestore);
-        if (moodBoost     > 0) this.myte.stats.updateMood(moodBoost);
-        if (healthRestore > 0) this.myte.stats.heal(healthRestore);
+        this.myte.stats.applyStatEffects(
+            this.target.getConfig?.('effects', null) ?? {
+                energyRestore,
+                moodBoost,
+                healthRestore
+            }
+        );
+        this.myte.buffs?.handleItemConsumed?.({
+            type: this.target.type || 'food',
+            variant: this.target.variant || this.target.getConfig?.('variant') || this.target.id || 'food',
+            source: 'world_food'
+        });
 
         this.myte.queue.addExpression('heart', 300, 1);
         this.target?.remove?.();

@@ -246,7 +246,7 @@ function validateMapObjects() {
 function validateNoLegacyFiles() {
     const forbiddenFiles = [
         'data/metadata/actions.json.deprecated',
-        'js/Map/NewMapObjects/MapObjectConfigs.js'
+        'js/Map/MapObjects/MapObjectConfigs.js'
     ];
 
     forbiddenFiles.forEach((relPath) => {

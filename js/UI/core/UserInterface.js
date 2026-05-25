@@ -13,13 +13,15 @@ class UserInterface {
         this.actionSidebarManager = new ActionSidebarManager(this);
         this.myteListManager = new MyteListManager(this);
         this.hudManager = new HUDManager(this);
+        this.buffOverlayUI = new BuffOverlayUI(this, {
+            element: document.getElementById('myte_buff_overlay'),
+            maxItems: 6
+        });
         this.offscreenMyteIndicatorManager = new OffscreenMyteIndicatorManager(this);
         this.screenManager = new ScreenManager(this);
         this.cursorManager = new CursorManager(this);
-        this.compactQueueUI = new QueueUI(parent, {
+        this.compactQueueUI = new CompactQueueUI(this, {
             element: document.getElementById('myte_queue_overlay'),
-            mode: 'compact',
-            allowControls: false,
             maxItems: 5
         });
     }
@@ -103,6 +105,7 @@ class UserInterface {
         this.queueTargetManager.update();
         this.actionSidebarManager.update();
         this.hudManager.update();
+        this.buffOverlayUI.update();
         this.offscreenMyteIndicatorManager.update();
         this.compactQueueUI?.update?.();
     }
@@ -131,6 +134,7 @@ class UserInterface {
         this.offscreenMyteIndicatorManager?.dispose?.();
         this.selectionManager?.dispose?.();
         this.hudManager?.dispose?.();
+        this.buffOverlayUI?.dispose?.();
         this.actionSidebarManager?.dispose?.();
         this.myteListManager?.dispose?.();
 
@@ -141,6 +145,7 @@ class UserInterface {
         this.offscreenMyteIndicatorManager = null;
         this.selectionManager = null;
         this.hudManager = null;
+        this.buffOverlayUI = null;
         this.actionSidebarManager = null;
         this.myteListManager = null;
         this.compactQueueUI?.dispose?.();

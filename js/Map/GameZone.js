@@ -19,15 +19,10 @@ class Zone {
     constructor(data, map) {
         this.map = map;
         this.id = data.id;
-        this.type = data.type;
+        this.type = String(data.type || '').toLowerCase();
         this.bounds = data.bounds;
         this.properties = {
-            // Default properties
-            active: true,
-            visible: false,
-            strength: 1.0,
-            cooldown: 0,
-            threshold: ZONE_THRESHOLD.HALFWAY, // Default threshold
+            ...SiteConfig.zones.defaults,
             ...data.properties
         };
         
@@ -60,6 +55,113 @@ class Zone {
 		this.element.appendChild(newElement);
 
 
+	}
+
+    getTypeConfig() {
+        return SiteConfig.zones.types[this.type] ?? {};
+    }
+
+    getCenterPoint() {
+        return {
+            x: this.bounds.x + (this.bounds.width / 2),
+            y: this.bounds.y + (this.bounds.height / 2)
+        };
+    }
+
+    getBuffContextKey() {
+        return `zone:${this.id ?? this.type}:${this.type}`;
+    }
+
+    getDefaultBuffId() {
+        switch (this.type) {
+            case ZONE_TYPES.REST: return 'zone_rest';
+            case ZONE_TYPES.PLAY: return 'zone_play';
+            case ZONE_TYPES.SOCIAL: return 'zone_social';
+            case ZONE_TYPES.DANGER: return 'zone_danger';
+            default: return null;
+        }
+    }
+
+    getContextBuffDefinition() {
+        if (this.properties.buffDefinition) {
+            return this.properties.buffDefinition;
+        }
+
+        if (this.properties.buffId) {
+            return this.properties.buffId;
+        }
+
+        const defaultBuffId = this.getDefaultBuffId();
+        if (defaultBuffId) {
+            return defaultBuffId;
+        }
+
+        if (this.type !== ZONE_TYPES.BOOST) {
+            return null;
+        }
+
+        const strength = this.properties.strength ?? 1;
+        const instantEffects = this.properties.effects ?? (
+            this.properties.moodBoost != null
+                ? { moodBoost: this.properties.moodBoost * strength }
+                : {}
+        );
+        const stayConfig = this.getTypeConfig().stay ?? {};
+
+        return {
+            id: `boost_zone_${this.id ?? 'dynamic'}`,
+            label: this.properties.buffLabel || 'Boost Zone',
+            kind: 'buff',
+            category: 'zone',
+            priority: 16,
+            durationMs: 0,
+            cancellable: false,
+            icon: this.properties.buffIcon || 'BZ',
+            description: this.properties.buffDescription || 'This area is boosting your stats while you stay inside.',
+            effects: {
+                stats: {
+                    moodPerMs: this.properties.moodPerMs ?? stayConfig.moodPerMs ?? 0,
+                    boredomPerMs: this.properties.boredomPerMs ?? stayConfig.boredomPerMs ?? 0,
+                    funPerMs: this.properties.funPerMs ?? stayConfig.funPerMs ?? 0,
+                    comfortPerMs: this.properties.comfortPerMs ?? stayConfig.comfortPerMs ?? 0,
+                    confidencePerMs: this.properties.confidencePerMs ?? stayConfig.confidencePerMs ?? 0
+                }
+            },
+            instantEffects
+        };
+    }
+
+    syncZoneBuff(myte, active = true) {
+        myte.buffs?.syncContextBuff?.(
+            this.getBuffContextKey(),
+            this.getContextBuffDefinition(),
+            {
+                active,
+                source: 'zone',
+                payload: {
+                    zoneId: this.id,
+                    zoneType: this.type
+                }
+            }
+        );
+    }
+
+    getDistanceToMyte(myte) {
+        if (!myte) return Infinity;
+        const center = this.getCenterPoint();
+        const myteCenterX = myte.posX + ((myte.size?.width ?? 0) / 2);
+        const myteCenterY = myte.posY + ((myte.size?.height ?? 0) / 2);
+        return Math.hypot(center.x - myteCenterX, center.y - myteCenterY);
+    }
+
+    getTargetPointForMyte(myte) {
+        const center = this.getCenterPoint();
+        const targetX = center.x - ((myte?.size?.width ?? 0) / 2);
+        const targetY = center.y - ((myte?.size?.height ?? 0) / 2);
+        return this.map?.gridSystem?.findNearestValidPositionForEntity?.(myte, targetX, targetY, 10) ?? {
+            x: targetX,
+            y: targetY
+        };
     }
 
     // Add this method to your Zone class
@@ -99,8 +201,12 @@ class Zone {
         };
     }
 
+    containsMyte(myte) {
+        return this.doesMeetThreshold(this.getIntersectionLevel(this.getMyteRect(myte)));
+    }
+
     // Check if a Myte has entered or left the zone
-    update(myte) {
+    update(myte, deltaTime = 16) {
         const myteRect = this.getMyteRect(myte);
         const intersectionLevel = this.getIntersectionLevel(myteRect);
         
@@ -118,7 +224,7 @@ class Zone {
             this.mytesInZone.delete(myte.id);
         } else if (meetsThreshold) {
             // Myte stays in zone and still meets threshold
-            this.onMyteStay(myte);
+            this.onMyteStay(myte, deltaTime);
         }
     }
 
@@ -142,7 +248,7 @@ class Zone {
     }
 
     onMyteEnter(myte) {
-
+        this.syncZoneBuff(myte, this.type !== ZONE_TYPES.FOOD);
         
         switch (this.type) {
             case ZONE_TYPES.REST:
@@ -167,6 +273,7 @@ class Zone {
     }
 
     onMyteExit(myte) {
+        this.syncZoneBuff(myte, false);
         // Reset any temporary effects
         switch (this.type) {
             case ZONE_TYPES.REST:
@@ -181,14 +288,21 @@ class Zone {
         }
     }
 
-    onMyteStay(myte) {
+    onMyteStay(myte, deltaTime) {
+        this.syncZoneBuff(myte, this.type !== ZONE_TYPES.FOOD);
         // Continue applying effects while Myte remains in zone
         switch (this.type) {
             case ZONE_TYPES.REST:
-                this.applyContinuousRestEffects(myte);
+                this.applyContinuousRestEffects(myte, deltaTime);
+                break;
+            case ZONE_TYPES.PLAY:
+                this.applyContinuousPlayEffects(myte, deltaTime);
+                break;
+            case ZONE_TYPES.SOCIAL:
+                this.applyContinuousSocialEffects(myte, deltaTime);
                 break;
             case ZONE_TYPES.BOOST:
-                this.applyContinuousBoostEffects(myte);
+                this.applyContinuousBoostEffects(myte, deltaTime);
                 break;
         }
     }
@@ -199,23 +313,26 @@ class Zone {
         if (Math.random() < 0.3 && myte.queue.isEmpty()) {
             myte.queue.addSleep(3000);
         }
-        
-        // Increase mood recovery
-        myte.moodDecayRate *= 0.5;
     }
 
-    applyContinuousRestEffects(myte) {
-        // Slowly recover mood while in rest zone
-        myte.stats.updateMood(0.1 * this.properties.strength);
+    applyContinuousRestEffects(myte, deltaTime) {
+        this.applyContinuousStatEffects(myte, deltaTime);
     }
 
     applyPlayZoneEffects(myte) {
         // Make Myte more playful
-        if (Math.random() < 0.2 && myte.queue.isEmpty()) {
+        const chance = this.properties.enterActionChance ??
+            this.getTypeConfig().enterActionChance ??
+            0.2;
+        if (Math.random() < chance && myte.queue.isEmpty()) {
             const actions = ['dance', 'spin', 'jump'];
             const randomAction = actions[Math.floor(Math.random() * actions.length)];
             myte.queue.add(randomAction);
         }
+    }
+
+    applyContinuousPlayEffects(myte, deltaTime) {
+        this.applyContinuousStatEffects(myte, deltaTime);
     }
 
     applyFoodZoneEffects(myte) {
@@ -246,36 +363,40 @@ class Zone {
         }
     }
 
+    applyContinuousSocialEffects(myte, deltaTime) {
+        this.applyContinuousStatEffects(myte, deltaTime);
+    }
+
     applyDangerZoneEffects(myte) {
-        // Make Myte run away from the center of the danger zone
+        const now = Date.now();
+        if (!this._dangerShockTimes) this._dangerShockTimes = new Map();
+        const lastShock = this._dangerShockTimes.get(myte.id) ?? 0;
+        if (now - lastShock > 10000) {
+            this._dangerShockTimes.set(myte.id, now);
+            myte.stats?.applyStatEffects?.({ moodBoost: -5 });
+        }
+
         const centerX = this.bounds.x + this.bounds.width / 2;
         const centerY = this.bounds.y + this.bounds.height / 2;
-        
         myte.queue.clear();
         const angle = Math.atan2(myte.posY - centerY, myte.posX - centerX);
         const safeDistance = 200;
-        const safeX = myte.posX + Math.cos(angle) * safeDistance;
-        const safeY = myte.posY + Math.sin(angle) * safeDistance;
-        
-        myte.setTarget(safeX, safeY);
-        myte.stats.updateMood(-5); // Decrease mood in danger zone
+        myte.setTarget(
+            myte.posX + Math.cos(angle) * safeDistance,
+            myte.posY + Math.sin(angle) * safeDistance
+        );
     }
 
     applyBoostZoneEffects(myte) {
-        // Generic boost zone that can be configured via properties
-        if (this.properties.moodBoost) {
-            myte.stats.updateMood(this.properties.moodBoost * this.properties.strength);
-        }
-        if (this.properties.speedBoost) {
-            myte.speed *= (1 + this.properties.speedBoost * this.properties.strength);
-        }
+        this.syncZoneBuff(myte, true);
     }
 
-    applyContinuousBoostEffects(myte) {
-        // Continue applying any boost effects
-        if (this.properties.continuousMoodBoost) {
-            myte.stats.updateMood(this.properties.continuousMoodBoost * this.properties.strength);
-        }
+    applyContinuousBoostEffects(myte, deltaTime) {
+        this.applyContinuousStatEffects(myte, deltaTime);
+    }
+
+    applyContinuousStatEffects(myte, deltaTime) {
+        this.syncZoneBuff(myte, true);
     }
 
 }
@@ -308,12 +429,27 @@ class ZoneManager {
         }
     }
 
-    update(myte) {
+    update(myte, deltaTime = 16) {
         this.zones.forEach(zone => {
             if (zone.properties.active) {
-                zone.update(myte);
+                zone.update(myte, deltaTime);
             }
         });
+    }
+
+    getActiveZonesForMyte(myte) {
+        return Array.from(this.zones.values()).filter(zone =>
+            zone?.properties?.active && zone.containsMyte(myte)
+        );
+    }
+
+    getNearbyZonesForMyte(myte, radius = Infinity) {
+        return Array.from(this.zones.values())
+            .filter(zone =>
+                zone?.properties?.active &&
+                zone.getDistanceToMyte(myte) <= radius
+            )
+            .sort((a, b) => a.getDistanceToMyte(myte) - b.getDistanceToMyte(myte));
     }
 
     dispose(){

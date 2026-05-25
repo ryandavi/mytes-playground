@@ -111,6 +111,7 @@
 			<!-- CROSSHAIR -->
 			<div class="container-inset ignore debug"></div>
 			<section class="myte-queue-overlay ignore" id="myte_queue_overlay"></section>
+			<section class="myte-buff-overlay ignore" id="myte_buff_overlay"></section>
 			<div class="crosshair ignore debug">
 				<div class="horizontal"></div>
 				<div class="vertical"></div>
@@ -481,8 +482,9 @@
 	<script src="js/Engine/Config/SiteConfig.js"></script>
 	<script src="js/Utility/Utility.js"></script>
 	<script src="js/Utility/RectUtils.js"></script>
-	<script src="js/UI/TooltipSystem.js"></script>
+	<script src="js/UI/Core/TooltipSystem.js"></script>
 	<script src="js/Engine/ItemRegistry.js"></script>
+	<script src="js/Engine/BuffRegistry.js"></script>
 	<script src="js/Myte/Queue/ActionDefinitionRegistry.js"></script>
 	<script src="js/Input/BaseInputHandler.js"></script>
 	<script src="js/Input/BaseDragHandler.js"></script>
@@ -495,7 +497,7 @@
 	<script src="js/Engine/EventManager.js"></script>
 	<script src="js/Engine/LoadingManager.js"></script>
 
-	<script src="js/UI/ToastSystem.js"></script>
+	<script src="js/UI/Core/ToastSystem.js"></script>
 	<script src="js/Engine/Core.js"></script>
 	<script src="js/Engine/GameTime.js"></script>
 	<script src="js/Effects/ParticleSystem.js"></script>
@@ -522,6 +524,7 @@
 	<script src="js/Myte/MyteRenderer.js"></script>
 	<script src="js/Myte/Myte.js"></script>
 	<script src="js/Myte/MyteStats.js"></script>
+	<script src="js/Myte/MyteBuffController.js"></script>
 	<script src="js/Myte/MyteAI.js"></script>
 	<script src="js/Myte/StateMachine.js"></script>
 	<script src="js/Myte/Input/BaseInputHandler.js"></script>
@@ -551,57 +554,60 @@
 	<script src="js/Map/MapTransitionManager.js"></script>
 	<script src="js/Map/MapRenderer.js"></script>
 	<!-- BASE MAP OBJECTS-->
-	<script src="js/Map/NewMapObjects/MapObject.js"></script>
-	<script src="js/Map/NewMapObjects/DroppedMapItem.js"></script>
+	<script src="js/Map/MapObjects/MapObject.js"></script>
+	<script src="js/Map/MapObjects/DroppedMapItem.js"></script>
 	<!-- ANIMATED -->
-	<script src="js/Map/NewMapObjects/AnimationController.js"></script>
-	<script src="js/Map/NewMapObjects/AnimatedMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/MapObjectBases.js"></script>
+	<script src="js/Map/MapObjects/AnimationController.js"></script>
+	<script src="js/Map/MapObjects/AnimatedMapObject.js"></script>
+	<script src="js/Map/MapObjects/MapObjectBases.js"></script>
 	<!-- INTERACTABLE OBJECTS -->
-	<script src="js/Map/NewMapObjects/FountainMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/LightMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/TreasureChestMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/PortalMapObject.js"></script>
+	<script src="js/Map/MapObjects/FountainMapObject.js"></script>
+	<script src="js/Map/MapObjects/LightMapObject.js"></script>
+	<script src="js/Map/MapObjects/TreasureChestMapObject.js"></script>
+	<script src="js/Map/MapObjects/PortalMapObject.js"></script>
 	<!-- MOVING -->
-	<script src="js/Map/NewMapObjects/MovingMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/BallMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/AmbientCreatureMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/ButterflyMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/PatrolGuardMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/NpcMapObject.js"></script>
+	<script src="js/Map/MapObjects/MovingMapObject.js"></script>
+	<script src="js/Map/MapObjects/BallMapObject.js"></script>
+	<script src="js/Map/MapObjects/AmbientCreatureMapObject.js"></script>
+	<script src="js/Map/MapObjects/ButterflyMapObject.js"></script>
+	<script src="js/Map/MapObjects/PatrolGuardMapObject.js"></script>
+	<script src="js/Map/MapObjects/NpcMapObject.js"></script>
 	<!-- DOORS -->
-	<script src="js/Map/NewMapObjects/DoorMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/FenceMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/GateMapObject.js"></script>
+	<script src="js/Map/MapObjects/DoorMapObject.js"></script>
+	<script src="js/Map/MapObjects/FenceMapObject.js"></script>
+	<script src="js/Map/MapObjects/GateMapObject.js"></script>
 	<!-- PLANTS-->
-	<script src="js/Map/NewMapObjects/GrowingPlantMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/BreedingFlowerMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/NightBloomMapObject.js"></script>
-	<script src="js/Map/NewMapObjects/CropPlantMapObject.js"></script>
+	<script src="js/Map/MapObjects/GrowingPlantMapObject.js"></script>
+	<script src="js/Map/MapObjects/BreedingFlowerMapObject.js"></script>
+	<script src="js/Map/MapObjects/NightBloomMapObject.js"></script>
+	<script src="js/Map/MapObjects/CropPlantMapObject.js"></script>
 	<!-- MAP OBJECT FACTORY -->
 	<script src="js/Map/MapObjectFactory.js"></script>
 	<!-- MAP GRID -->
 	<script src="js/Map/Grid/GameMapGrid.js"></script>
 	<script src="js/Map/Grid/GameMapGridAStar.js"></script>
 	<!-- UI -->
-	<script src="js/UI/core/UIComponent.js"></script>
-	<script src="js/UI/CursorManager.js"></script>
-	<script src="js/UI/ToolManager.js"></script>
-	<script src="js/UI/SelectionManager.js"></script>
-	<script src="js/UI/QueueTargetManager.js"></script>
-	<script src="js/UI/ActionSidebarManager.js"></script>
-	<script src="js/UI/MyteListManager.js"></script>
-	<script src="js/UI/HUDManager.js"></script>
-	<script src="js/UI/OffscreenMyteIndicatorManager.js"></script>
-	<script src="js/UI/ScreenManager.js"></script>
-	<script src="js/UI/core/UserInterface.js"></script>
-	<script src="js/UI/core/ModalWindow.js"></script>
-	<script src="js/UI/debug/DebugOverlayUI.js"></script>
-	<script src="js/UI/debug/QueueUI.js"></script>
-	<script src="js/UI/panels/SoundPanel.js"></script>
-	<script src="js/UI/panels/SettingsPanel.js"></script>
-	<script src="js/UI/panels/ViewPanel.js"></script>
-	<script src="js/UI/panels/DebugPanel.js"></script>
+	<script src="js/UI/Core/UIComponent.js"></script>
+	<script src="js/UI/Overlays/CompactChipStripUI.js"></script>
+	<script src="js/UI/Core/CursorManager.js"></script>
+	<script src="js/UI/Container/ToolManager.js"></script>
+	<script src="js/UI/Map/SelectionManager.js"></script>
+	<script src="js/UI/Map/QueueTargetManager.js"></script>
+	<script src="js/UI/Container/ActionSidebarManager.js"></script>
+	<script src="js/UI/Overlays/CompactQueueUI.js"></script>
+	<script src="js/UI/Overlays/BuffOverlayUI.js"></script>
+	<script src="js/UI/Container/MyteListManager.js"></script>
+	<script src="js/UI/Container/HUDManager.js"></script>
+	<script src="js/UI/Map/OffscreenMyteIndicatorManager.js"></script>
+	<script src="js/UI/Container/ScreenManager.js"></script>
+	<script src="js/UI/Core/UserInterface.js"></script>
+	<script src="js/UI/Core/ModalWindow.js"></script>
+	<script src="js/UI/Debug/DebugOverlayUI.js"></script>
+	<script src="js/UI/Debug/QueueUI.js"></script>
+	<script src="js/UI/Panels/SoundPanel.js"></script>
+	<script src="js/UI/Panels/SettingsPanel.js"></script>
+	<script src="js/UI/Panels/ViewPanel.js"></script>
+	<script src="js/UI/Panels/DebugPanel.js"></script>
 </body>
 
 </html>

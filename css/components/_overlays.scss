@@ -25,7 +25,8 @@
     }
 }
 
-.myte-queue-overlay {
+.myte-queue-overlay,
+.myte-buff-overlay {
     position: absolute;
     top: var(--space-lg);
     left: var(--space-lg);
@@ -40,7 +41,7 @@
         display: none;
     }
 
-    .queue-item.compact {
+    .compact-chip {
         pointer-events: auto;
         position: relative;
         width: var(--size-queue-chip);
@@ -55,6 +56,8 @@
         touch-action: manipulation;
         user-select: none;
         font-family: inherit;
+        flex-direction: column;
+        gap: 2px;
 
         &.is-current {
             opacity: 1;
@@ -66,10 +69,30 @@
             transform: scale(0.96);
         }
 
-        .queue-order {
+        &.queue-chip.is-current .compact-chip__label {
+            font-size: 0.78rem;
+        }
+
+        &.buff-chip.kind-buff {
+            border-color: var(--border-strong);
+            background: var(--surface-state-self);
+        }
+
+        &.buff-chip.kind-debuff {
+            border-color: var(--button-remove-border-color);
+            background: var(--surface-state-map);
+        }
+
+        .compact-chip__badge {
             position: absolute;
             top: 3px;
             right: 4px;
+            min-width: 12px;
+            height: 12px;
+            padding: 0 2px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             font-size: 0.45rem;
             font-weight: 700;
             letter-spacing: 0.05em;
@@ -77,36 +100,57 @@
             opacity: 0.75;
         }
 
-        .queue-icon {
+        .compact-chip__label {
             font-size: 0.66rem;
             font-weight: 700;
             letter-spacing: 0.04em;
             text-transform: uppercase;
         }
 
-        &:not(.is-current) .queue-icon {
-            opacity: 0.82;
-        }
-
-        &.is-current .queue-icon {
-            font-size: 0.78rem;
-        }
-
-        &.is-current .queue-order {
+        &.queue-chip.is-current .compact-chip__badge {
             color: #6d4f00;
             opacity: 1;
+        }
+
+        .compact-chip__meter {
+            position: absolute;
+            left: 4px;
+            right: 4px;
+            bottom: 4px;
+            height: 4px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: var(--surface-ui-pressed);
+        }
+
+        .compact-chip__meter-fill {
+            width: 0;
+            height: 100%;
+            background: var(--button-active-border-color);
+            transition: width 140ms linear;
+        }
+
+        &.buff-chip.kind-debuff .compact-chip__meter-fill {
+            background: var(--button-remove-border-color);
         }
     }
 }
 
+.myte-buff-overlay {
+    left: auto;
+    right: var(--space-lg);
+    justify-content: flex-end;
+}
+
 .app-stage {
-    .myte-queue-overlay {
+    .myte-queue-overlay,
+    .myte-buff-overlay {
         @media (max-width: 700px) {
             max-width: calc(100% - 24px);
             gap: var(--space-sm);
             flex-wrap: wrap;
 
-            .queue-item.compact {
+            .compact-chip {
                 width: 36px;
                 height: 36px;
             }

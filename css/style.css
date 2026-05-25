@@ -1513,7 +1513,7 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .sidebar > .action-controls > .other-info .need-info {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.28rem;
   --need-meter-color: #6fcf97;
 }
 .app-shell > .sidebar > .action-controls > .other-info .need-info[data-state=critical] {
@@ -1532,13 +1532,25 @@ body.debug .map-object > .interactive-hitbox {
   --need-meter-color: #54c6a9;
 }
 .app-shell > .sidebar > .action-controls > .other-info .need-info .need-label {
-  font-size: 0.85em;
+  font-size: 0.8em;
   line-height: 1.2;
 }
 .app-shell > .sidebar > .action-controls > .other-info .need-info .need-meter {
   width: 100%;
-  height: 0.5rem;
-  accent-color: var(--need-meter-color);
+  height: 0.36rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-ui-pressed);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.app-shell > .sidebar > .action-controls > .other-info .need-info .need-meter-fill {
+  width: 0;
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  background: var(--need-meter-color);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--need-meter-color) 35%, transparent);
+  transition: width 180ms ease-out;
 }
 .app-shell > .sidebar > .action-controls > .other-info .ai-choice-info {
   display: flex;
@@ -2053,7 +2065,8 @@ body.debug .map-object > .interactive-hitbox {
   margin-top: 2px;
 }
 
-.myte-queue-overlay {
+.myte-queue-overlay,
+.myte-buff-overlay {
   position: absolute;
   top: var(--space-lg);
   left: var(--space-lg);
@@ -2064,10 +2077,12 @@ body.debug .map-object > .interactive-hitbox {
   max-width: min(70%, 420px);
   pointer-events: none;
 }
-.myte-queue-overlay:empty {
+.myte-queue-overlay:empty,
+.myte-buff-overlay:empty {
   display: none;
 }
-.myte-queue-overlay .queue-item.compact {
+.myte-queue-overlay .compact-chip,
+.myte-buff-overlay .compact-chip {
   pointer-events: auto;
   position: relative;
   width: var(--size-queue-chip);
@@ -2089,8 +2104,11 @@ body.debug .map-object > .interactive-hitbox {
      -moz-user-select: none;
           user-select: none;
   font-family: inherit;
+  flex-direction: column;
+  gap: 2px;
 }
-.myte-queue-overlay .queue-item.compact.is-current {
+.myte-queue-overlay .compact-chip.is-current,
+.myte-buff-overlay .compact-chip.is-current {
   opacity: 1;
   background-color: var(--surface-ui-pressed, var(--button-hover));
   border-top-color: var(--button-dark);
@@ -2098,44 +2116,92 @@ body.debug .map-object > .interactive-hitbox {
   border-right-color: var(--button-light);
   border-bottom-color: var(--button-light);
 }
-.myte-queue-overlay .queue-item.compact.holding {
+.myte-queue-overlay .compact-chip.holding,
+.myte-buff-overlay .compact-chip.holding {
   background: var(--button-dark);
   transform: scale(0.96);
 }
-.myte-queue-overlay .queue-item.compact .queue-order {
+.myte-queue-overlay .compact-chip.queue-chip.is-current .compact-chip__label,
+.myte-buff-overlay .compact-chip.queue-chip.is-current .compact-chip__label {
+  font-size: 0.78rem;
+}
+.myte-queue-overlay .compact-chip.buff-chip.kind-buff,
+.myte-buff-overlay .compact-chip.buff-chip.kind-buff {
+  border-color: var(--border-strong);
+  background: var(--surface-state-self);
+}
+.myte-queue-overlay .compact-chip.buff-chip.kind-debuff,
+.myte-buff-overlay .compact-chip.buff-chip.kind-debuff {
+  border-color: var(--button-remove-border-color);
+  background: var(--surface-state-map);
+}
+.myte-queue-overlay .compact-chip .compact-chip__badge,
+.myte-buff-overlay .compact-chip .compact-chip__badge {
   position: absolute;
   top: 3px;
   right: 4px;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 0.45rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   line-height: 1;
   opacity: 0.75;
 }
-.myte-queue-overlay .queue-item.compact .queue-icon {
+.myte-queue-overlay .compact-chip .compact-chip__label,
+.myte-buff-overlay .compact-chip .compact-chip__label {
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.myte-queue-overlay .queue-item.compact:not(.is-current) .queue-icon {
-  opacity: 0.82;
-}
-.myte-queue-overlay .queue-item.compact.is-current .queue-icon {
-  font-size: 0.78rem;
-}
-.myte-queue-overlay .queue-item.compact.is-current .queue-order {
+.myte-queue-overlay .compact-chip.queue-chip.is-current .compact-chip__badge,
+.myte-buff-overlay .compact-chip.queue-chip.is-current .compact-chip__badge {
   color: #6d4f00;
   opacity: 1;
 }
+.myte-queue-overlay .compact-chip .compact-chip__meter,
+.myte-buff-overlay .compact-chip .compact-chip__meter {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-ui-pressed);
+}
+.myte-queue-overlay .compact-chip .compact-chip__meter-fill,
+.myte-buff-overlay .compact-chip .compact-chip__meter-fill {
+  width: 0;
+  height: 100%;
+  background: var(--button-active-border-color);
+  transition: width 140ms linear;
+}
+.myte-queue-overlay .compact-chip.buff-chip.kind-debuff .compact-chip__meter-fill,
+.myte-buff-overlay .compact-chip.buff-chip.kind-debuff .compact-chip__meter-fill {
+  background: var(--button-remove-border-color);
+}
+
+.myte-buff-overlay {
+  left: auto;
+  right: var(--space-lg);
+  justify-content: flex-end;
+}
 
 @media (max-width: 700px) {
-  .app-stage .myte-queue-overlay {
+  .app-stage .myte-queue-overlay,
+  .app-stage .myte-buff-overlay {
     max-width: calc(100% - 24px);
     gap: var(--space-sm);
     flex-wrap: wrap;
   }
-  .app-stage .myte-queue-overlay .queue-item.compact {
+  .app-stage .myte-queue-overlay .compact-chip,
+  .app-stage .myte-buff-overlay .compact-chip {
     width: 36px;
     height: 36px;
   }

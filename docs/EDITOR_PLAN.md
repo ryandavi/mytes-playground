@@ -224,8 +224,8 @@ Reuse targets:
 - `js/Engine/ItemRegistry.js`
 - `js/Myte/MyteDefinitions.js`
 - `js/Map/MapObjectFactory.js`
-- `js/Map/NewMapObjects/AnimationController.js`
-- `js/Map/NewMapObjects/MapObject.js`
+- `js/Map/MapObjects/AnimationController.js`
+- `js/Map/MapObjects/MapObject.js`
 - `js/Utility/RectUtils.js`
 - `js/UI/ModalWindow.js`
 - `js/Myte/Queue/ActionDefinitionRegistry.js`

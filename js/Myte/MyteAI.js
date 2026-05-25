@@ -130,6 +130,7 @@ class MyteAI {
             this.buildPlayCandidate(context),
             this.buildDroppedItemCandidate(context),
             this.buildInteractionCandidate(context),
+            this.buildNeedZoneCandidate(context),
             this.buildWanderCandidate(context),
             this.buildIdleCandidate(context)
         ]
@@ -189,6 +190,9 @@ class MyteAI {
         const nearbyMytes = this.getNearbyMytes(this.socialRadius);
         const nearbyObjects = this.getNearbyObjects(this.objectSearchRadius);
         const droppedItems = this.getNearbyDroppedItems(this.objectSearchRadius);
+        const zoneManager = this.myte.parent?.gameMap?.zoneManager;
+        const nearbyZones = zoneManager?.getNearbyZonesForMyte?.(this.myte, SiteConfig.ai.zoneSeeking.searchRadius) ?? [];
+        const activeZones = zoneManager?.getActiveZonesForMyte?.(this.myte) ?? [];
         const timeData = this.myte.parent?.timeManager?.getTimeData?.() ?? {};
         const home = this.getHomePosition();
         const distanceFromHome = this.myte.getDistanceToPoint(home.x, home.y);
@@ -241,6 +245,9 @@ class MyteAI {
             nearbyMytes,
             nearbyObjects,
             droppedItems,
+            nearbyZones,
+            activeZones,
+            activeZoneTypes: activeZones.map(zone => zone.type),
             home,
             distanceFromHome,
             getNoveltyScore: (target) => this.getNoveltyScore(target),
@@ -736,6 +743,68 @@ class MyteAI {
         };
     }
 
+    buildNeedZoneCandidate(context) {
+        const nearbyZones = context.nearbyZones ?? [];
+        if (nearbyZones.length === 0) {
+            return null;
+        }
+
+        let best = null;
+        const zoneScoring = SiteConfig.ai.zoneSeeking;
+        const typeScores = zoneScoring.typeScores ?? {};
+
+        for (const zone of nearbyZones) {
+            const type = String(zone?.type || '').toLowerCase();
+            const scoreConfig = typeScores[type];
+            if (!scoreConfig || context.activeZoneTypes?.includes(type)) {
+                continue;
+            }
+
+            const primaryNeed = context.needs?.[scoreConfig.need] ?? 0;
+            if (primaryNeed < (scoreConfig.minNeed ?? 0)) {
+                continue;
+            }
+
+            const secondaryNeed = scoreConfig.secondaryNeed
+                ? (context.needs?.[scoreConfig.secondaryNeed] ?? 0)
+                : 0;
+            const distance = zone.getDistanceToMyte?.(this.myte) ?? Infinity;
+            let score = (scoreConfig.base ?? 0) +
+                (primaryNeed * (scoreConfig.weight ?? 0)) +
+                (secondaryNeed * (scoreConfig.secondaryWeight ?? 0));
+            score += Math.max(0, zoneScoring.searchRadius - distance) * zoneScoring.distanceWeight;
+
+            if (type === 'play') {
+                score += context.boredom * 14;
+            } else if (type === 'social') {
+                score += Math.min(context.nearbyMytes.length, 2) * 4;
+            } else if (type === 'rest') {
+                score += (1 - context.energy) * 12;
+            }
+
+            score = this.applyRepeatPenalty(score, `zone:${type}`, `zone:${zone.id}`);
+            if (score < 20 || (best && score <= best.score)) {
+                continue;
+            }
+
+            best = {
+                label: `zone:${type}`,
+                targetKey: `zone:${zone.id}`,
+                commitmentMs: zoneScoring.travelCommitmentMs,
+                score,
+                execute: () => {
+                    const target = zone.getTargetPointForMyte?.(this.myte);
+                    if (!target) {
+                        return;
+                    }
+                    this.myte.queue.addAStarMove(target);
+                }
+            };
+        }
+
+        return best;
+    }
+
     buildIdleCandidate(context) {
         return {
             label: 'idle',
@@ -1224,6 +1293,8 @@ class MyteAI {
             },
             nearbyMytes: context.nearbyMytes.length,
             nearbyObjects: context.nearbyObjects.length,
+            nearbyZones: context.nearbyZones.length,
+            activeZones: context.activeZoneTypes,
             nearbyActiveMusicSources: context.nearbyActiveMusicSources.length
         };
     }

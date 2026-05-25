@@ -20,6 +20,7 @@ class SoundManager {
 		this.initialized = false;
 		this.soundEnabled = options.soundEnabled !== false;
 		this.musicEnabled = options.musicEnabled !== false;
+		this.ambientEnabled = options.ambientEnabled !== false;
 		this.footstepsEnabled = options.footstepsEnabled !== false;
 		this.volume = {
 			master: options.masterVolume ?? 1,
@@ -185,9 +186,9 @@ class SoundManager {
 	resolvePlaybackModifiers(preset, soundCategory, options = {}) {
 		const variation = preset?.variation || {};
 		const defaultPitchRange = {
-			notifications: 0.012,
-			entities: 0.018,
-			world: 0.012,
+			ntities: 0.018,
+			worlotifications: 0.012,
+			end: 0.012,
 			machines: 0.01,
 			footsteps: 0,
 			ui: 0,
@@ -391,16 +392,11 @@ class SoundManager {
 				// Set up master volume
 				Tone.Destination.volume.value = Tone.gainToDb(this.volume.master);
 
-				// Create effects
+				// Reverb for environmental object sounds only (doors, chests, etc.)
+				// Kept narrow so footsteps, myte, and UI sounds bypass it.
 				this.reverb = new Tone.Reverb({
-					decay: 1.5,
-					wet: 0.2
-				}).toDestination();
-
-				this.delay = new Tone.FeedbackDelay({
-					delayTime: 0.25,
-					feedback: 0.1,
-					wet: 0.1
+					decay: 0.8,
+					wet: 0.12
 				}).toDestination();
 
 				// Preload with a delay to prevent rapid initializations
@@ -471,8 +467,10 @@ class SoundManager {
 			sound.baseVolume = 1;
 		}
 
-		// Add effects for sfx
-		if (preset.type === "sfx" && sound.synth && typeof sound.synth.connect === 'function') {
+		// Reverb only on environmental world/machine sounds — not footsteps, UI, or entity sounds
+		// because those fire too frequently for the convolution cost to be justified.
+		const synthCategory = this.resolveSoundCategory(id, preset);
+		if (['world', 'machines'].includes(synthCategory) && sound.synth && typeof sound.synth.connect === 'function') {
 			sound.synth.connect(this.reverb);
 		}
 
@@ -926,18 +924,14 @@ class SoundManager {
 			categoryVolume *
 			baseVolume;
 
-		// After muting/unmuting, we need to force recreate the sound
-		// Check if unmuting was recently done
-		//const isJustUnmuted = Date.now() - (this._lastUnmuteTime || 0) < 5000;
-
-		// If sound exists but we just unmuted, force recreate
-		/*
-		if (this.loops.has(id) && isJustUnmuted) {
-			this.fadeOutAndStop(id);
-			// Remove existing synth to force recreation
-			this.synths.delete(id);
+		// Start noise-based DSP nodes lazily — do NOT auto-start them in create().
+		// This prevents the audio worklet from running 24/7 even at -Infinity volume.
+		if (sound.synth?.noise && sound.synth.noise.state !== 'started') {
+			sound.synth.noise.start();
 		}
-			*/
+		if (sound.synth?.autoFilter && sound.synth.autoFilter.state !== 'started') {
+			sound.synth.autoFilter.start();
+		}
 
 		// If already playing, just adjust volume
 		if (this.loops.has(id)) {
@@ -1004,24 +998,21 @@ class SoundManager {
 
 		// Fade out the volume
 		this.fadeAmbientSound(sound, sound.currentVolume || 0.3, 0, duration, () => {
-			// After fade completes, actually stop the sound
+			// Stop and dispose the Tone.Part loop
 			if (this.loops.has(id)) {
 				const loop = this.loops.get(id);
 				if (loop) {
-					loop.stop();
-					loop.dispose();
+					try { loop.stop(); loop.dispose(); } catch (_) {}
 					this.loops.delete(id);
 				}
 			}
 
-			// Stop the synth too if needed
-			if (sound.synth) {
-				if (sound.synth.noise) {
-					sound.synth.noise.stop();
-				} else if (typeof sound.synth.releaseAll === 'function') {
-					sound.synth.releaseAll();
-				}
-			}
+			// Stop and fully dispose the synth so the audio worklet thread is freed.
+			// Remove from synths map so playAmbient recreates cleanly next time.
+			this.synths.delete(id);
+			try {
+				this.disposeSoundResources(sound);
+			} catch (_) {}
 		});
 	}
 
@@ -1329,7 +1320,6 @@ class SoundManager {
 
 		// Dispose effects
 		if (this.reverb) this.reverb.dispose();
-		if (this.delay) this.delay.dispose();
 
 		// Clear collections
 		this.synths.clear();

@@ -99,7 +99,7 @@ Still needs real gameplay QA:
   - upward drag
   - temporary switch to drag mode
 - Map-object select drag currently uses the newer map-object path in:
-  - `js/Map/NewMapObjects/MapObject.js`
+  - `js/Map/MapObjects/MapObject.js`
 - Even when drag mode works, select-mode drag does not yet fully match the Myte pickup feel/behavior.
 - User-facing symptom:
   - dragging the ball in drag mode works

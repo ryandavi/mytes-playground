@@ -121,7 +121,7 @@ Current foundations:
 - User-facing sliders for `master`, `ambient`, `music`, `ui`, and `sfx`
 - Myte sound triggers through `js/Myte/Myte.js`
 - UI sound triggers through `js/UI/core/UserInterface.js` and `js/UI/core/ModalWindow.js`
-- Map object sound triggers through `js/Map/NewMapObjects/MapObject.js` and related subclasses
+- Map object sound triggers through `js/Map/MapObjects/MapObject.js` and related subclasses
 - Myte animation timing in `js/Myte/StateMachine.js`
 - Terrain typing already exists in the map/grid layer, which is useful for future footstep surfaces
 

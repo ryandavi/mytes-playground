@@ -276,6 +276,14 @@ class BallMapObject extends AnimatedMapObject {
 
             // Make the creature react
             myte.queue.addExpression('happy');
+            const bumpReward = SiteConfig.stats.activityRewards.microInteractions.ballBump;
+            myte.stats?.applyActivityEffects?.(bumpReward, {
+                scale: bumpReward.rewardScale
+            });
+            myte.buffs?.handleActionLike?.(bumpReward, {
+                source: 'ballCollision',
+                target: this
+            });
             
             if (this.debug) {
                 console.log(`Ball pushed! Velocity X: ${this.velocity.x.toFixed(2)}, Y: ${this.velocity.y.toFixed(2)}`);

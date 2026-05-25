@@ -119,10 +119,17 @@ class MyteRubbingHandler extends MyteBaseHandler {
 	}
 
 	_updateMood() {
-		const boost = this.rubCounter <= this.config.maxRubs
-			? this.config.moodBoostPerRub
-			: this.config.moodPenaltyOverrub;
-		this.myte.stats.updateMood(boost);
+		this.myte.buffs?.applyBuff?.(
+			this.rubCounter <= this.config.maxRubs
+				? 'petted'
+				: 'overstimulated',
+			{
+				source: 'petting',
+				payload: {
+					rubCount: this.rubCounter
+				}
+			}
+		);
 	}
 
 	_hapticFeedback() {

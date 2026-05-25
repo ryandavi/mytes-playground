@@ -1207,7 +1207,18 @@ class MapObject {
 		const interactionType = this.getConfig('interactionType');
 		switch (interactionType) {
 			case 'mood_boost':
-				myte.stats.updateMood(this.getConfig('moodBoostAmount', 10));
+				myte.buffs?.applyBuff?.(
+					this.getConfig('interactionBuffDefinition', null) ??
+					this.getConfig('interactionBuffId', 'object_uplifted'),
+					{
+						source: 'interaction',
+						payload: {
+							objectType: this.type,
+							objectVariant: this.variant,
+							objectId: this.id
+						}
+					}
+				);
 				myte.queue.addExpression('happy');
 				break;
 			case 'dance':

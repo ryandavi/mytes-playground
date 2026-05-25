@@ -552,8 +552,15 @@ class Inventory {
             myte.queue.addExpression(expression, itemConfig.consumeTime / itemConfig.expressions.length);
         });
 
-        // Apply mood boost
-        myte.stats.updateMood(itemConfig.moodBoost);
+        // Apply configurable stat effects using a shared payload format.
+        myte.stats.applyStatEffects(itemConfig.effects ?? {
+            moodBoost: itemConfig.moodBoost
+        });
+        myte.buffs?.handleItemConsumed?.({
+            type: itemType,
+            variant: this.state.draggedItem?.dataset?.variant || this.state.draggedItem?.dataset?.name || itemType,
+            source: 'inventory'
+        });
 
         // Emit particles or other visual effects if system exists
         const particleSystem = this.parent?.gameMap?.particleSystem || null;

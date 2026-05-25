@@ -1,4 +1,42 @@
 class LightMapObject extends BinaryStateAnimatedMapObject {
+    getBuffContextKey() {
+        return `light:${this.id ?? `${this.posX},${this.posY}`}:aura`;
+    }
+
+    syncAuraBuff(myte, active) {
+        myte?.buffs?.syncContextBuff?.(
+            this.getBuffContextKey(),
+            this.getConfig('auraBuffDefinition', null) ??
+            this.getConfig('auraBuffId', 'light_aura'),
+            {
+                active,
+                source: 'aura',
+                payload: {
+                    objectType: this.type,
+                    objectId: this.id
+                }
+            }
+        );
+    }
+
+    checkNearbyMytes() {
+        const mytes = Array.isArray(this.mytes) ? this.mytes : [];
+        if (mytes.length === 0) {
+            return;
+        }
+
+        const radius = this.getConfig('moodAuraRadius', this.getConfig('moodBoostRadius', 160));
+        mytes.forEach(myte => {
+            if (!myte?.isActive) {
+                this.syncAuraBuff(myte, false);
+                return;
+            }
+
+            const inRange = this.isEnabled() && this.getDistanceTo(myte) <= radius;
+            this.syncAuraBuff(myte, inRange);
+        });
+    }
+
     press(parent) {
         if (!this.active) return false;
         return this.runInteractionWhenInRange(() => {
@@ -15,8 +53,17 @@ class LightMapObject extends BinaryStateAnimatedMapObject {
     applyEffects(parent) {
         // Apply mood boost effect when turned on
         if (this.isEnabled() && this.activeMyte) {
-            const moodBoostAmount = this.getConfig('moodBoostAmount', 5);
-            this.activeMyte.stats.updateMood(moodBoostAmount);
+            this.activeMyte.buffs?.applyBuff?.(
+                this.getConfig('interactionBuffDefinition', null) ??
+                this.getConfig('interactionBuffId', 'light_switch_delight'),
+                {
+                    source: 'interaction',
+                    payload: {
+                        objectType: this.type,
+                        objectId: this.id
+                    }
+                }
+            );
         }
     }
 
@@ -24,6 +71,15 @@ class LightMapObject extends BinaryStateAnimatedMapObject {
         const element = super.render(container, parent);
         element.classList.add('light-object');
         return element;
+    }
+
+    update(deltaTime) {
+        super.update(deltaTime);
+        this._auraCheckElapsed = (this._auraCheckElapsed ?? 0) + deltaTime;
+        if (this._auraCheckElapsed >= this.getConfig('auraCheckInterval', 500)) {
+            this._auraCheckElapsed = 0;
+            this.checkNearbyMytes();
+        }
     }
 
     getAiAffordances(context = {}, actor = null) {
@@ -67,7 +123,17 @@ class MusicBoxMapObject extends RangeInteractiveAnimatedMapObject {
         }
 
         if (this.isPlayingState && this.activeMyte) {
-            this.activeMyte.stats.updateMood(this.getConfig('startMoodBoostAmount', 4));
+            this.activeMyte.buffs?.applyBuff?.(
+                this.getConfig('startBuffDefinition', null) ??
+                this.getConfig('startBuffId', 'music_delight'),
+                {
+                    source: 'interaction',
+                    payload: {
+                        objectType: this.type,
+                        objectId: this.id
+                    }
+                }
+            );
             this.activeMyte.queue.addExpression('happy', 45, 1);
         }
     }
@@ -89,28 +155,36 @@ class MusicBoxMapObject extends RangeInteractiveAnimatedMapObject {
         return this.isPlayingState;
     }
 
-    applyMoodBoost(myte) {
-        const now = performance.now();
-        const lastBoost = this.lastBoostTimes.get(myte.id) || 0;
-
-        if (now - lastBoost >= this.boostCooldown) {
-            myte.stats.updateMood(this.moodBoostAmount);
-            this.lastBoostTimes.set(myte.id, now);
-
-            if (Math.random() < 0.12) {
-                myte.queue.addExpression('happy');
+    syncAuraBuff(myte, active) {
+        myte?.buffs?.syncContextBuff?.(
+            `music:${this.id ?? `${this.posX},${this.posY}`}:aura`,
+            this.getConfig('auraBuffDefinition', null) ??
+            this.getConfig('auraBuffId', 'music_aura'),
+            {
+                active,
+                source: 'aura',
+                payload: {
+                    objectType: this.type,
+                    objectId: this.id
+                }
             }
-        }
+        );
     }
 
     checkNearbyMytes() {
-        if (!this.isPlayingState || !this.mytes.length) return;
+        if (!this.mytes.length) return;
 
         this.mytes.forEach(myte => {
-            if (!myte?.isActive) return;
+            if (!myte?.isActive) {
+                this.syncAuraBuff(myte, false);
+                return;
+            }
 
-            if (this.getDistanceTo(myte) <= this.moodBoostRadius) {
-                this.applyMoodBoost(myte);
+            const inRange = this.isPlayingState && this.getDistanceTo(myte) <= this.moodBoostRadius;
+            this.syncAuraBuff(myte, inRange);
+
+            if (inRange && Math.random() < 0.12) {
+                myte.queue.addExpression('happy');
             }
         });
     }

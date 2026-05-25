@@ -155,7 +155,6 @@ class CropPlantMapObject extends GrowingPlantMapObject {
 
         this.playConfiguredSound?.('harvest');
         this._spawnHarvestedItem(harvest, parent);
-        myte?.stats?.updateMood?.(5);
         return true;
     }
 
