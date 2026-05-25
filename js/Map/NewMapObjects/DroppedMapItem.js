@@ -122,14 +122,32 @@ class DroppedMapItem {
         return shadow;
     }
 
+    resolveDepthOffset() {
+        // Dropped items are positioned from their visual center, but the world
+        // sorts depth from the ground-contact line at the bottom of the sprite.
+        return this.size.height / 2;
+    }
+
+    getSortY() {
+        return this.posY + this.resolveDepthOffset();
+    }
+
+    getDepthPriority() {
+        return 25;
+    }
+
+    getRenderZIndex() {
+        const sortY = this.getSortY();
+        return this.parent?.getDepthZIndex
+            ? this.parent.getDepthZIndex(sortY, this.getDepthPriority())
+            : Math.round(sortY * 100) + this.getDepthPriority();
+    }
+
     _applyPosition(element, displayY) {
         element.style.left = `${this.posX - this.size.width / 2}px`;
         element.style.top  = `${displayY - this.size.height / 2}px`;
-        const sortY = this.posY;
-        const zIndex = this.parent?.getDepthZIndex
-            ? this.parent.getDepthZIndex(sortY, 25)
-            : Math.round(sortY * 100) + 25;
-        element.style.zIndex = zIndex;
+        const sortY = this.getSortY();
+        element.style.zIndex = this.getRenderZIndex();
         element.dataset.sortY = `${Math.round(sortY * 100) / 100}`;
     }
 
@@ -137,6 +155,7 @@ class DroppedMapItem {
         const scale = Math.max(0.35, 1 - heightAboveGround / 80);
         shadow.style.left   = `${this.posX - 12}px`;
         shadow.style.top    = `${this.posY - 2}px`;
+        shadow.style.zIndex = `${this.getRenderZIndex() - 1}`;
         shadow.style.transform = `scaleX(${scale})`;
         shadow.style.opacity   = `${Math.max(0.1, scale * 0.55)}`;
     }

@@ -39,6 +39,13 @@ class BallMapObject extends AnimatedMapObject {
         this.dropBounceFactor = 0.48;
 
         // Safe defaults — overwritten by setupBoundaries() once render() has a parent
+        this.dragAnimationVelocity = { x: 0, y: 0 };
+        this.dragAnimationTargetVelocity = { x: 0, y: 0 };
+        this.dragAnimationLastInputTime = 0;
+        this.dragAnimationIdleDelay = this.getConfig('dragAnimationIdleDelay', 56);
+        this.dragAnimationResponse = this.getConfig('dragAnimationResponse', 0.4);
+        this.dragAnimationDecay = this.getConfig('dragAnimationDecay', this.settleFriction);
+
         this.bounds = { left: 0, top: 0, right: 500, bottom: 500 };
     }
 
@@ -100,6 +107,7 @@ class BallMapObject extends AnimatedMapObject {
 
     startDrag() {
         this.stopMotion();
+        this._resetDragAnimationState();
         this.isDropBouncing = false;
         this.dropZ = 0;
         this.dropVelocityZ = 0;
@@ -113,6 +121,7 @@ class BallMapObject extends AnimatedMapObject {
 
     startDragAtPosition(position = null) {
         this.stopMotion();
+        this._resetDragAnimationState();
         this.isDropBouncing = false;
         this.dropZ = 0;
         this.dropVelocityZ = 0;
@@ -332,11 +341,11 @@ class BallMapObject extends AnimatedMapObject {
     }
     
     // Update animation based on movement direction
-    updateBallAnimation() {
-        const speed = this.getSpeed();
+    updateBallAnimation(velocity = this.velocity) {
+        const speed = this.getSpeed(velocity);
 
-        // Skip if not moving significantly
-        if (speed < this.minAnimationSpeed) {
+        // Skip only once motion has effectively settled.
+        if (speed <= this.stopThreshold) {
             return;
         }
         
@@ -346,19 +355,19 @@ class BallMapObject extends AnimatedMapObject {
         }
         
         // Determine primary direction of movement
-        const absX = Math.abs(this.velocity.x);
-        const absY = Math.abs(this.velocity.y);
+        const absX = Math.abs(velocity.x);
+        const absY = Math.abs(velocity.y);
         
         // Choose animation based on direction
         let animName;
         if (absX > absY) {
             // Moving right (positive X) = rotateZ_reverse
             // Moving left (negative X) = rotateY
-            animName = this.velocity.x > 0 ? 'rotateZ_reverse' : 'rotateY';
+            animName = velocity.x > 0 ? 'rotateZ_reverse' : 'rotateY';
         } else {
             // Moving down (positive Y) = rotateX
             // Moving up (negative Y) = rotateX_reverse
-            animName = this.velocity.y > 0 ? 'rotateX' : 'rotateX_reverse';
+            animName = velocity.y > 0 ? 'rotateX' : 'rotateX_reverse';
         }
         
         this.syncAnimationSpeed(speed);
@@ -391,9 +400,9 @@ class BallMapObject extends AnimatedMapObject {
 
         const speed = this.getSpeed();
 
-        if (speed >= this.minAnimationSpeed) {
+        if (speed > this.stopThreshold) {
             this.updateBallAnimation();
-        } else if (speed <= this.stopThreshold) {
+        } else {
             this.stopMotion();
         }
         // markPositionDirty() called by base update()
@@ -527,9 +536,15 @@ class BallMapObject extends AnimatedMapObject {
         super.initDragComponent();
         const dragComp = this.inputComponents.drag;
         if (!dragComp) return;
+        const originalOnDragMove = dragComp.options.onDragMove;
         const originalOnDragEnd = dragComp.options.onDragEnd;
+        dragComp.options.onDragMove = (event) => {
+            if (originalOnDragMove) originalOnDragMove(event);
+            this._syncDragAnimation(event?.velocity);
+        };
         dragComp.options.onDragEnd = (event) => {
             if (originalOnDragEnd) originalOnDragEnd(event);
+            this._resetDragAnimationState();
             this._applyDragVelocity(event?.velocity);
         };
     }
@@ -539,16 +554,83 @@ class BallMapObject extends AnimatedMapObject {
         super.remove();
     }
 
+    _scaleDragVelocity(dragVelocity) {
+        if (!dragVelocity) {
+            return null;
+        }
+
+        const dragVelocityScale = this.getConfig('dragVelocityScale', 55);
+        const scale = (1 / dragVelocityScale) * this.getConfig('dragReleaseVelocityMultiplier', 1);
+
+        return {
+            x: dragVelocity.x * scale,
+            y: dragVelocity.y * scale
+        };
+    }
+
+    _syncDragAnimation(dragVelocity) {
+        const scaledVelocity = this._scaleDragVelocity(dragVelocity);
+        if (!scaledVelocity) {
+            return;
+        }
+
+        this.dragAnimationTargetVelocity = scaledVelocity;
+        this.dragAnimationLastInputTime = performance.now();
+        if (this.getSpeed(this.dragAnimationVelocity) <= this.stopThreshold) {
+            this.dragAnimationVelocity = { ...scaledVelocity };
+        }
+    }
+
+    _resetDragAnimationState() {
+        this.dragAnimationVelocity = { x: 0, y: 0 };
+        this.dragAnimationTargetVelocity = { x: 0, y: 0 };
+        this.dragAnimationLastInputTime = 0;
+    }
+
+    _updateDragAnimation(deltaTime = 16.67) {
+        if (!this.isDragging) {
+            return;
+        }
+
+        const now = performance.now();
+        const hasRecentInput = this.dragAnimationLastInputTime > 0 &&
+            (now - this.dragAnimationLastInputTime) <= this.dragAnimationIdleDelay;
+        const frameRatio = Math.max(0.25, deltaTime / 16.67);
+
+        if (hasRecentInput) {
+            const response = 1 - Math.pow(1 - this.dragAnimationResponse, frameRatio);
+            this.dragAnimationVelocity.x +=
+                (this.dragAnimationTargetVelocity.x - this.dragAnimationVelocity.x) * response;
+            this.dragAnimationVelocity.y +=
+                (this.dragAnimationTargetVelocity.y - this.dragAnimationVelocity.y) * response;
+        } else {
+            const decay = Math.pow(this.dragAnimationDecay, frameRatio);
+            this.dragAnimationVelocity.x *= decay;
+            this.dragAnimationVelocity.y *= decay;
+        }
+
+        if (this.getSpeed(this.dragAnimationVelocity) <= this.stopThreshold) {
+            this.dragAnimationVelocity = { x: 0, y: 0 };
+            this.pauseAnimation();
+            return;
+        }
+
+        this.updateBallAnimation(this.dragAnimationVelocity);
+    }
+
     _applyDragVelocity(dragVelocity) {
-        if (!dragVelocity) return;
+        const scaledVelocity = this._scaleDragVelocity(dragVelocity);
+        if (!scaledVelocity) {
+            this.pauseAnimation();
+            return;
+        }
+
         // Release inertia: convert pointer speed (px/s) into world units/tick.
         // dragVelocityScale = the pointer px/s that maps to 1 world unit/tick.
         // Higher value = need faster mouse for same ball speed (wider proportional range).
-        const dragVelocityScale = this.getConfig('dragVelocityScale', 55);
-        const scale = (1 / dragVelocityScale) * this.getConfig('dragReleaseVelocityMultiplier', 1);
         const dragReleaseMaxSpeed = this.getConfig('dragReleaseMaxSpeed', this.maxSpeed);
-        let vx = dragVelocity.x * scale;
-        let vy = dragVelocity.y * scale;
+        let vx = scaledVelocity.x;
+        let vy = scaledVelocity.y;
 
         const edgeTolerance = 0.5;
         const atLeftEdge = this.posX <= this.bounds.left + edgeTolerance;
@@ -571,6 +653,8 @@ class BallMapObject extends AnimatedMapObject {
             this.isMoving = true;
             this.updateBallAnimation();
             if (this.element) this.element.setAttribute('data-moving', 'true');
+        } else {
+            this.pauseAnimation();
         }
     }
 
@@ -603,8 +687,8 @@ class BallMapObject extends AnimatedMapObject {
         }
     }
 
-    getSpeed() {
-        return Math.hypot(this.velocity.x, this.velocity.y);
+    getSpeed(velocity = this.velocity) {
+        return Math.hypot(velocity.x, velocity.y);
     }
 
     syncAnimationSpeed(speed = this.getSpeed()) {
@@ -653,6 +737,9 @@ class BallMapObject extends AnimatedMapObject {
     // update: animation + dirty marking
     update(deltaTime) {
         super.update(deltaTime);
+        if (this.isDragging) {
+            this._updateDragAnimation(deltaTime);
+        }
         if (this.element) {
             this.element.setAttribute('data-moving', String(this.isMoving));
         }

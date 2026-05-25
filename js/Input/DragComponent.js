@@ -199,13 +199,13 @@ class DragComponent extends InputComponent {
 
 		if (dt > 0) {
 			this.velocity = {
-				x: (event.position.x - this.lastPosition.x) / dt,
-				y: (event.position.y - this.lastPosition.y) / dt
+				x: (event.position.x - this.currentPosition.x) / dt,
+				y: (event.position.y - this.currentPosition.y) / dt
 			};
 		}
 
 		// Store current position
-		this.lastPosition = this.currentPosition;
+		this.lastPosition = { ...this.currentPosition };
 		this.currentPosition = { ...event.position };
 		this.dragStartTime = now;
 
