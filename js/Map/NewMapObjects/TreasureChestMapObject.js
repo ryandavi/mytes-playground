@@ -304,6 +304,22 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
 
         return false;
     }
+
+    runDebugDirectInteraction(parent = this.container ?? this.parent) {
+        if (!this.active) return false;
+
+        this.selectInUi?.();
+
+        if (this.state === 'closed') {
+            return this.open(parent);
+        }
+
+        if (this.state === 'opened' && this.canClose) {
+            return this.close(parent);
+        }
+
+        return false;
+    }
     
     spawnItems(parent) {
         const itemsToSpawn = this.normalizeItems(this.items);

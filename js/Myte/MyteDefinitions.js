@@ -140,7 +140,7 @@ class MyteDefinitionRegistry {
         return mergedDefinition;
     }
 
-    static resolveExpression(expressionId, stateConfig = {}) {
+    static resolveExpression(expressionId, stateConfig = {}, definition = null) {
         if (!expressionId) {
             return null;
         }
@@ -150,7 +150,7 @@ class MyteDefinitionRegistry {
             return directMatch;
         }
 
-        const aliases = this.baseDefinition?.expressions || {};
+        const aliases = (definition ?? this.baseDefinition)?.expressions || {};
         const normalized = aliases[expressionId] || null;
         if (normalized && stateConfig[normalized]) {
             return normalized;

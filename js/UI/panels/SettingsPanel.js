@@ -1,4 +1,4 @@
-class SettingsMenu extends ModalWindow {
+class SettingsPanel extends ModalWindow {
     static STORAGE_KEY = 'gameSettings';
 
     static getDefaultSettings() {
@@ -21,7 +21,7 @@ class SettingsMenu extends ModalWindow {
     }
 
     static normalizeSettings(settings = {}) {
-        const defaults = SettingsMenu.getDefaultSettings();
+        const defaults = SettingsPanel.getDefaultSettings();
         return {
             graphics: {
                 ...defaults.graphics,
@@ -49,7 +49,7 @@ class SettingsMenu extends ModalWindow {
             closeButtonSelector: '.modal-close-btn'
         });
 
-        this.settings = SettingsMenu.getDefaultSettings();
+        this.settings = SettingsPanel.getDefaultSettings();
         this.loadSettings();
 
         this.init();
@@ -141,8 +141,8 @@ class SettingsMenu extends ModalWindow {
 
         try {
             localStorage.setItem(
-                SettingsMenu.STORAGE_KEY,
-                JSON.stringify(SettingsMenu.normalizeSettings(this.settings))
+                SettingsPanel.STORAGE_KEY,
+                JSON.stringify(SettingsPanel.normalizeSettings(this.settings))
             );
             this.playSound('success');
         } catch (error) {
@@ -153,9 +153,9 @@ class SettingsMenu extends ModalWindow {
 
     loadSettings() {
         try {
-            const savedSettings = localStorage.getItem(SettingsMenu.STORAGE_KEY);
+            const savedSettings = localStorage.getItem(SettingsPanel.STORAGE_KEY);
             if (savedSettings) {
-                this.settings = SettingsMenu.normalizeSettings(JSON.parse(savedSettings));
+                this.settings = SettingsPanel.normalizeSettings(JSON.parse(savedSettings));
                 console.log('Loaded settings:', this.settings);
                 return true;
             }
@@ -163,7 +163,7 @@ class SettingsMenu extends ModalWindow {
             console.error('Failed to load settings:', error);
         }
 
-        this.settings = SettingsMenu.getDefaultSettings();
+        this.settings = SettingsPanel.getDefaultSettings();
         return false;
     }
 

@@ -269,7 +269,7 @@ class Myte {
 		this.playSlotEnterSound();
 		this.parent.setNextMyteAsActive(this);
 		if (this.parent.activeMyte == null) {
-			this.parent.ui.debugMenu.disableButtons();
+			this.parent.ui.debugPanel.disableButtons();
 			this.parent.camera.setMode(DEFAULT_CAMERA_FOLLOW_MODE);
 			this.parent.camera.resetView();
 		}
@@ -311,7 +311,7 @@ class Myte {
 
 		this.syncSelectionState();
 		if (this.isActiveMyte) {
-			this.parent.ui?.debugMenu?.enableButtons?.();
+			this.parent.ui?.debugPanel?.enableButtons?.();
 		}
 
 		this.parent.eventManager?.emit('myte:started', { myte: this });
@@ -514,10 +514,26 @@ class Myte {
 		};
 	}
 
+	_getFullSpriteRect() {
+		return {
+			x: this.posX, y: this.posY,
+			left: this.posX, top: this.posY,
+			right: this.posX + this.size.width,
+			bottom: this.posY + this.size.height,
+			width: this.size.width, height: this.size.height,
+			type: 'box'
+		};
+	}
+
+	getInteractionRect() {
+		return this.getRegionRect('interaction') || this._getFullSpriteRect();
+	}
+
 	getSelectionRect() {
 		return this.getRegionRect('select') ||
 			this.getRegionRect('interaction') ||
-			this.getRegionRect('collider');
+			this.getRegionRect('collider') ||
+			this._getFullSpriteRect();
 	}
 
 	getHitRect() {
@@ -760,9 +776,20 @@ class Myte {
 							this.posX = newX;
 							const potentialColliders = gridSystem.getPotentialColliders(this);
 							this.posX = originalX;
+							// In cursor-follow mode the min-radius check may leave targetX stale.
+							// Temporarily set _movementDestination to the live cursor so the door
+							// can detect it is between the myte and the cursor.
+							const savedDest = this._movementDestination;
+							if (this.followMouse && !this._movementDestination) {
+								const cursor = this.parent?.inputHandler?.getMouseWorldPosition?.();
+								if (cursor && Number.isFinite(cursor.x)) {
+									this._movementDestination = { x: cursor.x, y: cursor.y };
+								}
+							}
 							for (const collider of potentialColliders) {
 								this.tryOpenCollider(collider, 'x');
 							}
+							this._movementDestination = savedDest;
 						}
 					}
 				}
@@ -806,9 +833,17 @@ class Myte {
 							this.posY = newY;
 							const potentialColliders = gridSystem.getPotentialColliders(this);
 							this.posY = originalY;
+							const savedDest = this._movementDestination;
+							if (this.followMouse && !this._movementDestination) {
+								const cursor = this.parent?.inputHandler?.getMouseWorldPosition?.();
+								if (cursor && Number.isFinite(cursor.x)) {
+									this._movementDestination = { x: cursor.x, y: cursor.y };
+								}
+							}
 							for (const collider of potentialColliders) {
 								this.tryOpenCollider(collider, 'y');
 							}
+							this._movementDestination = savedDest;
 						}
 					}
 				}

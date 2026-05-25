@@ -1,4 +1,4 @@
-class DebugUI {
+class DebugOverlayUI {
     static PERSIST_KEY = 'neko.debug';
     static FLOATING_MARGIN = 8;
     static MIN_VISIBLE_WIDTH = 120;
@@ -13,17 +13,24 @@ class DebugUI {
 
         // Per-section drag + collapse state (keyed by sectionKey + 'queue')
         this.debugSectionState = {
-            system: { x: null, y: null, open: true },
-            myte:   { x: null, y: null, open: true },
-            queue:  { x: null, y: null }
+            system:   { x: null, y: null, open: true },
+            myte:     { x: null, y: null, open: true },
+            queue:    { x: null, y: null }
         };
+        this._initializeFloatingStateMetadata();
 
         this.overlayState = {
-            colliders: true
+            colliders:   true,
+            interaction: false,
+            hit:         false,
+            select:      false,
+            pickup:      false,
+            anchors:     false
         };
+        this.directWorldInteractionEnabled = false;
 
         this.debugDomRefs = new Map();
-        this.debugMenuSetup = false;
+        this.debugOverlaySetup = false;
 
         // Drag tracking (shared for debug sections + queue panel)
         this.dragState = null;
@@ -55,9 +62,19 @@ class DebugUI {
         this.debug.appendChild(queueEl);
     }
 
+    _initializeFloatingStateMetadata() {
+        Object.values(this.debugSectionState).forEach(state => {
+            if (!state || typeof state !== 'object') return;
+            state._hasSavedPosition = false;
+            state._hasSavedOpen = false;
+            state._hasSavedCollapsed = false;
+            state._responsiveStateResolved = false;
+        });
+    }
+
     _loadState() {
         try {
-            return JSON.parse(localStorage.getItem(DebugUI.PERSIST_KEY) || '{}');
+            return JSON.parse(localStorage.getItem(DebugOverlayUI.PERSIST_KEY) || '{}');
         } catch {
             return {};
         }
@@ -67,7 +84,7 @@ class DebugUI {
         try {
             const state = this._loadState();
             Object.assign(state, patch);
-            localStorage.setItem(DebugUI.PERSIST_KEY, JSON.stringify(state));
+            localStorage.setItem(DebugOverlayUI.PERSIST_KEY, JSON.stringify(state));
         } catch {}
     }
 
@@ -77,22 +94,43 @@ class DebugUI {
         const state = this._loadState();
         if (!state.sections) state.sections = {};
         state.sections[key] = { x: s.x, y: s.y, open: s.open };
-        try { localStorage.setItem(DebugUI.PERSIST_KEY, JSON.stringify(state)); } catch {}
+        try { localStorage.setItem(DebugOverlayUI.PERSIST_KEY, JSON.stringify(state)); } catch {}
     }
 
     _saveQueueState() {
         const q = this.debugSectionState.queue;
         const state = this._loadState();
         state.queue = { x: q.x, y: q.y, collapsed: this.queueUI?.isCollapsed ?? false };
-        try { localStorage.setItem(DebugUI.PERSIST_KEY, JSON.stringify(state)); } catch {}
-    }
-
-    _saveMenuPosition(pos) {
-        this._saveState({ menu: { x: Math.round(pos.x), y: Math.round(pos.y) } });
+        try { localStorage.setItem(DebugOverlayUI.PERSIST_KEY, JSON.stringify(state)); } catch {}
     }
 
     _saveOverlayState() {
         this._saveState({ overlays: { ...this.overlayState } });
+    }
+
+    setDirectWorldInteractionEnabled(enabled) {
+        this.directWorldInteractionEnabled = !!enabled;
+        this._saveState({
+            interactionModes: {
+                directWorldInteraction: this.directWorldInteractionEnabled
+            }
+        });
+        this.parent?.ui?.debugPanel?.updateButton?.('directWorldInteraction');
+    }
+
+    isDirectWorldInteractionEnabled() {
+        return this.directWorldInteractionEnabled;
+    }
+
+    getEnabledOverlayDebugLabels() {
+        const labels = [];
+        if (this.overlayState.colliders) labels.push('Colliders');
+        if (this.overlayState.interaction) labels.push('Interaction');
+        if (this.overlayState.hit) labels.push('Hit');
+        if (this.overlayState.select) labels.push('Select');
+        if (this.overlayState.pickup) labels.push('Pickup');
+        if (this.overlayState.anchors) labels.push('Anchors');
+        return labels;
     }
 
     _saveGridOverlays() {
@@ -100,7 +138,7 @@ class DebugUI {
         if (!flags) return;
         const state = this._loadState();
         state.gridOverlays = { ...flags };
-        try { localStorage.setItem(DebugUI.PERSIST_KEY, JSON.stringify(state)); } catch {}
+        try { localStorage.setItem(DebugOverlayUI.PERSIST_KEY, JSON.stringify(state)); } catch {}
     }
 
     _applyGridOverlays(gridSystem) {
@@ -121,6 +159,12 @@ class DebugUI {
                     this.debugSectionState[key].x    = saved.x    ?? null;
                     this.debugSectionState[key].y    = saved.y    ?? null;
                     this.debugSectionState[key].open = saved.open ?? true;
+                    this.debugSectionState[key]._hasSavedPosition =
+                        Number.isFinite(saved.x) && Number.isFinite(saved.y);
+                    this.debugSectionState[key]._hasSavedOpen =
+                        typeof saved.open === 'boolean';
+                    this.debugSectionState[key]._responsiveStateResolved =
+                        this.debugSectionState[key]._hasSavedOpen;
                 }
             }
         }
@@ -130,6 +174,9 @@ class DebugUI {
             const q = this.debugSectionState.queue;
             q.x = state.queue.x ?? null;
             q.y = state.queue.y ?? null;
+            q._hasSavedPosition = Number.isFinite(state.queue.x) && Number.isFinite(state.queue.y);
+            q._hasSavedCollapsed = typeof state.queue.collapsed === 'boolean';
+            q._responsiveStateResolved = q._hasSavedCollapsed;
             if (state.queue.collapsed != null && this.queueUI) {
                 this.queueUI.setCollapsed(state.queue.collapsed);
             }
@@ -138,6 +185,10 @@ class DebugUI {
         // Overlay flags
         if (state.overlays) {
             Object.assign(this.overlayState, state.overlays);
+        }
+
+        if (state.interactionModes) {
+            this.directWorldInteractionEnabled = !!state.interactionModes.directWorldInteraction;
         }
 
         this._mountFloatingPanels();
@@ -161,7 +212,7 @@ class DebugUI {
     }
 
     _getDefaultQueuePosition() {
-        const margin = DebugUI.FLOATING_MARGIN;
+        const margin = DebugOverlayUI.FLOATING_MARGIN;
         return { x: margin, y: Math.max(margin, window.innerHeight - 300) };
     }
 
@@ -182,21 +233,21 @@ class DebugUI {
     _getFloatingConstraintOptions(handle = null) {
         const handleHeight = handle ? Math.ceil(handle.getBoundingClientRect().height || 0) : 0;
         return {
-            margin: DebugUI.FLOATING_MARGIN,
-            minVisibleWidth: DebugUI.MIN_VISIBLE_WIDTH,
-            minVisibleHeight: Math.max(DebugUI.MIN_VISIBLE_HEIGHT, handleHeight || 0)
+            margin: DebugOverlayUI.FLOATING_MARGIN,
+            minVisibleWidth: DebugOverlayUI.MIN_VISIBLE_WIDTH,
+            minVisibleHeight: Math.max(DebugOverlayUI.MIN_VISIBLE_HEIGHT, handleHeight || 0)
         };
     }
 
     _getFloatingBounds(element, options = {}) {
-        const margin = options.margin ?? DebugUI.FLOATING_MARGIN;
+        const margin = options.margin ?? DebugOverlayUI.FLOATING_MARGIN;
         const rect = element.getBoundingClientRect();
         const width = Math.max(0, rect.width || element.offsetWidth || 0);
         const height = Math.max(0, rect.height || element.offsetHeight || 0);
         const maxVisibleWidth = Math.max(24, window.innerWidth - (margin * 2));
         const maxVisibleHeight = Math.max(24, window.innerHeight - (margin * 2));
-        const minVisibleWidth = Math.min(options.minVisibleWidth ?? DebugUI.MIN_VISIBLE_WIDTH, width || maxVisibleWidth, maxVisibleWidth);
-        const minVisibleHeight = Math.min(options.minVisibleHeight ?? DebugUI.MIN_VISIBLE_HEIGHT, height || maxVisibleHeight, maxVisibleHeight);
+        const minVisibleWidth = Math.min(options.minVisibleWidth ?? DebugOverlayUI.MIN_VISIBLE_WIDTH, width || maxVisibleWidth, maxVisibleWidth);
+        const minVisibleHeight = Math.min(options.minVisibleHeight ?? DebugOverlayUI.MIN_VISIBLE_HEIGHT, height || maxVisibleHeight, maxVisibleHeight);
         const minLeft = Math.round(margin + minVisibleWidth - width);
         const maxLeft = Math.round(window.innerWidth - margin - minVisibleWidth);
         const minTop = margin;
@@ -243,6 +294,43 @@ class DebugUI {
         this._applyFloatingPosition(refs.sectionEl, state, () => this.getDefaultSectionPosition(sectionKey), {
             handle
         });
+    }
+
+    _shouldStartCollapsed(element, handle = null) {
+        if (!element) return false;
+
+        const margin = DebugOverlayUI.FLOATING_MARGIN * 2;
+        const viewportWidth = Math.max(200, window.innerWidth - margin);
+        const viewportHeight = Math.max(160, window.innerHeight - margin);
+        const handleHeight = Math.ceil(handle?.getBoundingClientRect?.().height || 0);
+        const rect = element.getBoundingClientRect();
+        const fullWidth = Math.max(rect.width || 0, element.scrollWidth || 0);
+        const fullHeight = Math.max(rect.height || 0, element.scrollHeight || 0);
+
+        return fullWidth > viewportWidth || fullHeight > Math.max(handleHeight + 48, viewportHeight);
+    }
+
+    _maybeApplyResponsiveSectionState(sectionKey) {
+        const refs = this.debugDomRefs.get(sectionKey);
+        const state = this.debugSectionState[sectionKey];
+        if (!refs?.sectionEl || !state || state._responsiveStateResolved) return;
+
+        const handle = refs.sectionEl.querySelector(':scope > summary');
+        const shouldCollapse = this._shouldStartCollapsed(refs.sectionEl, handle);
+        refs.sectionEl.open = !shouldCollapse;
+        state.open = refs.sectionEl.open;
+        state._responsiveStateResolved = true;
+    }
+
+    _maybeApplyResponsiveQueueState() {
+        const queueEl = this.queueUI?.queue;
+        const queueState = this.debugSectionState.queue;
+        if (!queueEl || !queueState || queueState._responsiveStateResolved) return;
+
+        const shouldCollapse = this._shouldStartCollapsed(queueEl, this.queueUI?.panelSummary);
+        this.queueUI?.setCollapsed?.(shouldCollapse);
+        queueState._responsiveStateResolved = true;
+        this._applyQueuePosition();
     }
 
     _refreshFloatingPositions() {
@@ -390,11 +478,12 @@ class DebugUI {
             }
         }
 
+        this._maybeApplyResponsiveSectionState(sectionKey);
         this._applySectionPosition(sectionKey);
     }
 
     getDefaultSectionPosition(key) {
-        const margin    = DebugUI.FLOATING_MARGIN;
+        const margin    = DebugOverlayUI.FLOATING_MARGIN;
         const panelWidth = 350;
         if (key === 'myte') {
             return { x: Math.max(margin, window.innerWidth - panelWidth - margin), y: 60 };
@@ -404,13 +493,13 @@ class DebugUI {
 
     // ─── drag: debug sections ────────────────────────────────────────────────
 
-    ensureDebugMenuSetup() {
-        if (!this.debug || this.debugMenuSetup) return;
+    ensureDebugOverlaySetup() {
+        if (!this.debug || this.debugOverlaySetup) return;
 
         this._mountFloatingPanels();
         this.debug.addEventListener('pointerdown', this.handleDebugPointerDown);
         this.debug.addEventListener('click', this.handleDebugSummaryClick, true);
-        this.debugMenuSetup = true;
+        this.debugOverlaySetup = true;
 
         // Wire up queue panel dragging once
         const queueEl = this.queueUI?.queue;
@@ -605,6 +694,7 @@ class DebugUI {
 
         return [
             { label: 'User Active',     value: this.parent.userIsActive },
+            { label: 'Direct Interact', value: this.directWorldInteractionEnabled ? 'On' : 'Off' },
             { label: 'Local Mouse',     value: `${localMouse.x.toFixed(2)}px, ${localMouse.y.toFixed(2)}px` },
             { label: 'Local Mouse Tile', value: localTile ? `[${localTile.x}, ${localTile.y}]` : 'N/A' },
             { label: 'Mouse',           value: `${this.parent.mousePosX.toFixed(2)}px, ${this.parent.mousePosY.toFixed(2)}px` },
@@ -651,6 +741,13 @@ class DebugUI {
             }
 
             messages.push({ label: 'Objects', value: gm.objects?.length || 0 });
+            messages.push({ label: 'Visual Debug', value: document.body.classList.contains('debug') ? 'On' : 'Off' });
+
+            const enabledOverlays = this.getEnabledOverlayDebugLabels();
+            messages.push({
+                label: 'Active Overlays',
+                value: enabledOverlays.length > 0 ? enabledOverlays.join(', ') : 'None'
+            });
 
             const cullingStats = gm.gridSystem?.getCullingDebugStats?.();
             if (cullingStats) {
@@ -863,80 +960,208 @@ class DebugUI {
         return 'N/A';
     }
 
-    // ─── collider visualization ──────────────────────────────────────────────
+    // ─── collider / region visualization ────────────────────────────────────
+
+    _appendRegionBox(layer, bounds, ...cssClasses) {
+        if (!bounds) return;
+        const el = document.createElement('div');
+        el.classList.add('debug-collider', ...cssClasses);
+        el.style.position = 'absolute';
+        el.style.left   = `${bounds.left}px`;
+        el.style.top    = `${bounds.top}px`;
+        el.style.width  = `${bounds.right !== undefined ? bounds.right - bounds.left : bounds.width}px`;
+        el.style.height = `${bounds.bottom !== undefined ? bounds.bottom - bounds.top : bounds.height}px`;
+        layer.appendChild(el);
+    }
+
+    _appendAnchorDot(layer, x, y, label) {
+        const r = 4;
+        const el = document.createElement('div');
+        el.classList.add('debug-collider', 'debug-anchor');
+        el.style.position = 'absolute';
+        el.style.left  = `${x - r}px`;
+        el.style.top   = `${y - r}px`;
+        el.title = label ?? '';
+        layer.appendChild(el);
+    }
 
     drawDebugColliders() {
         if (!this.parent?.gameMap) return;
         if (!this.parent.gameMap.layers?.debug) return;
 
-        const oldColliders = this.parent.gameMap.layers.debug.querySelectorAll('.debug-collider');
-        oldColliders.forEach(c => c.remove());
+        const layer = this.parent.gameMap.layers.debug;
+        layer.querySelectorAll('.debug-collider').forEach(c => c.remove());
 
-        if (!this.overlayState.colliders) return;
+        const anyEnabled = Object.values(this.overlayState).some(Boolean);
+        if (!anyEnabled) return;
 
-        if (this.parent.mytes) {
-            this.parent.mytes.forEach(myte => {
-                if (!myte) return;
-                try {
-                    const myteCollider = document.createElement('div');
-                    myteCollider.classList.add('debug-collider', 'myte-collider');
-                    const bounds = myte.parent.getColliderBounds(myte);
-                    myteCollider.style.left   = `${bounds.left}px`;
-                    myteCollider.style.top    = `${bounds.top}px`;
-                    myteCollider.style.width  = `${bounds.right - bounds.left}px`;
-                    myteCollider.style.height = `${bounds.bottom - bounds.top}px`;
-                    this.parent.gameMap.layers.debug.appendChild(myteCollider);
-                } catch {}
-            });
-        }
+        const mytes   = this.parent.mytes ?? [];
+        const objects = [...(this.parent.gameMap.gridSystem?.activeObjects ?? [])];
 
-        if (!this.parent.gameMap.gridSystem?.activeObjects) return;
+        mytes.forEach(myte => {
+            if (!myte) return;
+            try {
+                if (this.overlayState.colliders) {
+                    this._appendRegionBox(layer, myte.parent.getColliderBounds(myte), 'myte-collider');
+                }
+                if (this.overlayState.interaction) {
+                    const rect = myte.getRegionRect?.('interaction');
+                    if (!rect && !myte._debugRegionWarned) {
+                        myte._debugRegionWarned = true;
+                        console.warn('[DebugUI] myte interaction region is null. species:', myte.species,
+                            '| spatial.regions:', myte.definition?.spatial?.regions,
+                            '| posX:', myte.posX, 'posY:', myte.posY);
+                    }
+                    this._appendRegionBox(layer, rect, 'debug-region-interaction');
+                }
+                if (this.overlayState.hit) {
+                    this._appendRegionBox(layer, myte.getRegionRect?.('hit'), 'debug-region-hit');
+                }
+                if (this.overlayState.select) {
+                    this._appendRegionBox(layer, myte.getRegionRect?.('select'), 'debug-region-select');
+                }
+                if (this.overlayState.pickup) {
+                    this._appendRegionBox(layer, myte.getRegionRect?.('pickup'), 'debug-region-pickup');
+                }
+                if (this.overlayState.anchors) {
+                    const anchors = myte.definition?.spatial?.anchors ?? {};
+                    Object.entries(anchors).forEach(([id, anchor]) => {
+                        if (!anchor) return;
+                        this._appendAnchorDot(layer, myte.posX + (anchor.x ?? 0), myte.posY + (anchor.y ?? 0), id);
+                    });
+                }
+            } catch (e) {
+                console.error('[DebugUI] myte collider draw error:', e);
+            }
+        });
 
         try {
-            this.parent.gameMap.gridSystem.activeObjects.forEach(obj => {
-                if (!obj) return;
+            objects.forEach(obj => {
+                if (!obj || obj instanceof Myte) return;
                 try {
-                    const collider = document.createElement('div');
-                    collider.classList.add('debug-collider', 'object-collider');
-                    if (obj.config?.walkable) collider.classList.add('walkable-object');
+                    if (this.overlayState.colliders) {
+                        const bounds = this.parent.getColliderBounds(obj);
+                        const css = ['object-collider', ...(obj.config?.walkable ? ['walkable-object'] : [])];
+                        this._appendRegionBox(layer, bounds, ...css);
 
-                    const bounds = this.parent.getColliderBounds(obj);
-                    collider.style.position = 'absolute';
-                    collider.style.left     = `${bounds.left}px`;
-                    collider.style.top      = `${bounds.top}px`;
-                    collider.style.width    = `${bounds.right - bounds.left}px`;
-                    collider.style.height   = `${bounds.bottom - bounds.top}px`;
-
-                    if (obj instanceof Myte) {
-                        collider.classList.add('myte-collider');
+                        const slotConfig = obj.getActionConfig?.('use_surface_slot');
+                        if (slotConfig) {
+                            (obj.getActionSlotDefinitions?.('use_surface_slot') ?? []).forEach(slot => {
+                                if (!slot?.restPosition) return;
+                                const cb = this.parent.getColliderBounds(obj);
+                                const sx = cb.left + (cb.right - cb.left) * (slot.restPosition.xFactor ?? 0.5);
+                                const sy = cb.top  + (cb.bottom - cb.top) * (slot.restPosition.yFactor ?? 0.5);
+                                const dot = document.createElement('div');
+                                dot.classList.add('debug-collider', 'slot-marker');
+                                dot.style.position = 'absolute';
+                                dot.style.left   = `${sx - 4}px`;
+                                dot.style.top    = `${sy - 4}px`;
+                                dot.style.width  = '8px';
+                                dot.style.height = '8px';
+                                layer.appendChild(dot);
+                            });
+                        }
                     }
-
-                    this.parent.gameMap.layers.debug.appendChild(collider);
-
-                    // Draw slot rest-position markers for surface-slot objects
-                    const slotConfig = obj.getActionConfig?.('use_surface_slot');
-                    if (slotConfig) {
-                        const slots = obj.getActionSlotDefinitions?.('use_surface_slot') ?? [];
-                        slots.forEach(slot => {
-                            if (!slot?.restPosition) return;
-                            const cb = this.parent.getColliderBounds(obj);
-                            const cw = cb.right - cb.left;
-                            const ch = cb.bottom - cb.top;
-                            const sx = cb.left + cw * (slot.restPosition.xFactor ?? 0.5);
-                            const sy = cb.top  + ch * (slot.restPosition.yFactor ?? 0.5);
-                            const dot = document.createElement('div');
-                            dot.classList.add('debug-collider', 'slot-marker');
-                            dot.style.position = 'absolute';
-                            dot.style.left   = `${sx - 4}px`;
-                            dot.style.top    = `${sy - 4}px`;
-                            dot.style.width  = '8px';
-                            dot.style.height = '8px';
-                            this.parent.gameMap.layers.debug.appendChild(dot);
-                        });
+                    if (this.overlayState.interaction) {
+                        this._appendRegionBox(layer, obj.getRegionRect?.('interaction'), 'debug-region-interaction');
+                    }
+                    if (this.overlayState.hit) {
+                        this._appendRegionBox(layer, obj.getRegionRect?.('hit'), 'debug-region-hit');
+                    }
+                    if (this.overlayState.select) {
+                        this._appendRegionBox(layer, obj.getRegionRect?.('select'), 'debug-region-select');
+                    }
+                    if (this.overlayState.pickup) {
+                        this._appendRegionBox(layer, obj.getRegionRect?.('pickup'), 'debug-region-pickup');
                     }
                 } catch {}
             });
         } catch {}
+    }
+
+    reconcileOverlayControls() {
+        if (!this.debug) return;
+
+        let refs = this.debugDomRefs.get('overlays');
+        if (!refs) {
+            const sectionEl = document.createElement('details');
+            sectionEl.className = 'debug-section overlays';
+            sectionEl.dataset.sectionKey = 'overlays';
+            const state = this.debugSectionState.overlays;
+            sectionEl.open = state?.open ?? true;
+
+            const summary = document.createElement('summary');
+            summary.textContent = 'Debug – Overlays';
+            sectionEl.appendChild(summary);
+
+            const body = document.createElement('div');
+            body.className = 'debug-section-body debug-overlay-controls';
+
+            const defs = [
+                { key: 'colliders',   label: 'Colliders',    css: 'myte-collider'           },
+                { key: 'interaction', label: 'Interaction',   css: 'debug-region-interaction' },
+                { key: 'hit',         label: 'Hit',           css: 'debug-region-hit'         },
+                { key: 'select',      label: 'Select',        css: 'debug-region-select'      },
+                { key: 'pickup',      label: 'Pickup',        css: 'debug-region-pickup'      },
+                { key: 'anchors',     label: 'Anchors',       css: 'debug-anchor'             }
+            ];
+
+            const controlMap = new Map();
+            for (const { key, label, css } of defs) {
+                const row = document.createElement('label');
+                row.className = 'debug-overlay-row';
+
+                const swatch = document.createElement('span');
+                swatch.className = `debug-overlay-swatch debug-collider ${css}`;
+                row.appendChild(swatch);
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = this.overlayState[key] ?? false;
+                cb.addEventListener('change', () => {
+                    this.overlayState[key] = cb.checked;
+                    this._saveOverlayState();
+                });
+                row.appendChild(cb);
+                row.append(` ${label}`);
+                body.appendChild(row);
+                controlMap.set(key, {
+                    input: cb,
+                    getValue: () => this.overlayState[key] ?? false
+                });
+            }
+
+            const directInteractRow = document.createElement('label');
+            directInteractRow.className = 'debug-overlay-row';
+
+            const directInteractSwatch = document.createElement('span');
+            directInteractSwatch.className = 'debug-overlay-swatch';
+            directInteractRow.appendChild(directInteractSwatch);
+
+            const directInteractInput = document.createElement('input');
+            directInteractInput.type = 'checkbox';
+            directInteractInput.checked = this.isDirectWorldInteractionEnabled();
+            directInteractInput.addEventListener('change', () => {
+                this.setDirectWorldInteractionEnabled(directInteractInput.checked);
+            });
+            directInteractRow.appendChild(directInteractInput);
+            directInteractRow.append(' Direct Interact');
+            body.appendChild(directInteractRow);
+            controlMap.set('directWorldInteraction', {
+                input: directInteractInput,
+                getValue: () => this.isDirectWorldInteractionEnabled()
+            });
+
+            sectionEl.appendChild(body);
+            this.debug.appendChild(sectionEl);
+            refs = { sectionEl, controlMap };
+            this.debugDomRefs.set('overlays', refs);
+        }
+
+        for (const { input, getValue } of refs.controlMap.values()) {
+            const current = !!getValue();
+            if (input.checked !== current) input.checked = current;
+        }
     }
 
     // ─── main update ─────────────────────────────────────────────────────────
@@ -953,14 +1178,13 @@ class DebugUI {
             { name: 'Myte AI',   messages: this.getMyteAiMessages() }
         ];
 
-        this.drawDebugColliders();
         this.parent.activeMyte?.queue?.getCurrentAction?.()?.refreshDebugVisualization?.();
 
         for (const { key, title, groups } of this.getDebugSections(debugGroups)) {
             this.reconcileSection(key, title, groups);
         }
 
-        this.ensureDebugMenuSetup();
+        this.ensureDebugOverlaySetup();
     }
 
     clearDebugVisuals() {
@@ -1009,6 +1233,9 @@ class DebugUI {
         }
 
         if (debugEnabled && this.debug) {
+            // Overlay boxes run every frame so they track moving entities without lag
+            this.drawDebugColliders();
+
             const now = performance.now();
             if (now - this.lastDebugUpdate < this.debugUpdateInterval) return;
             this.lastDebugUpdate = now;
@@ -1026,6 +1253,7 @@ class DebugUI {
         if (this.queueUI) {
             try {
                 this.queueUI.update();
+                this._maybeApplyResponsiveQueueState();
             } catch {}
         }
     }
@@ -1033,7 +1261,7 @@ class DebugUI {
     dispose() {
         this.clearDebugVisuals();
 
-        if (this.debugMenuSetup && this.debug) {
+        if (this.debugOverlaySetup && this.debug) {
             this.debug.removeEventListener('pointerdown', this.handleDebugPointerDown);
             this.debug.removeEventListener('click', this.handleDebugSummaryClick, true);
         }
@@ -1049,7 +1277,7 @@ class DebugUI {
         window.removeEventListener('pointercancel', this.handleDebugPointerUp);
         window.removeEventListener('resize', this.handleWindowResize);
 
-        this.debugMenuSetup = false;
+        this.debugOverlaySetup = false;
         this.dragState = null;
         this.queueUI?.dispose?.();
         this.queueUI = null;

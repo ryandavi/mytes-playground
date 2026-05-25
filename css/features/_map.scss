@@ -124,6 +124,34 @@
                             border-color: rgba(255, 0, 255, 1);
                             border-radius: 50%;
                         }
+
+                        &.debug-region-interaction {
+                            background-color: rgba(0, 150, 255, 0.12);
+                            border-color: rgba(0, 150, 255, 0.6);
+                        }
+
+                        &.debug-region-hit {
+                            background-color: rgba(255, 100, 0, 0.15);
+                            border-color: rgba(255, 100, 0, 0.7);
+                        }
+
+                        &.debug-region-select {
+                            background-color: rgba(255, 220, 0, 0.1);
+                            border-color: rgba(255, 220, 0, 0.7);
+                        }
+
+                        &.debug-region-pickup {
+                            background-color: rgba(180, 0, 255, 0.12);
+                            border-color: rgba(180, 0, 255, 0.65);
+                        }
+
+                        &.debug-anchor {
+                            background-color: rgba(0, 230, 200, 0.7);
+                            border-color: rgba(0, 230, 200, 1);
+                            border-radius: 50%;
+                            width: 8px;
+                            height: 8px;
+                        }
                     }
 
                     .pathfinder-node {

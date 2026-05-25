@@ -195,6 +195,39 @@
   border-color: rgba(0, 0, 255, 0.5);
 }
 
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-interaction,
+.app-shell > .container > .canvas > .layer.debug .debug-collider.debug-region-interaction,
+.container-wrapper > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-interaction,
+.container-wrapper > .container > .canvas > .layer.debug .debug-collider.debug-region-interaction {
+  background-color: rgba(0, 150, 255, 0.12);
+  border-color: rgba(0, 150, 255, 0.6);
+}
+
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-hit,
+.app-shell > .container > .canvas > .layer.debug .debug-collider.debug-region-hit,
+.container-wrapper > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-hit,
+.container-wrapper > .container > .canvas > .layer.debug .debug-collider.debug-region-hit {
+  background-color: rgba(255, 100, 0, 0.15);
+  border-color: rgba(255, 100, 0, 0.7);
+}
+
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-select,
+.app-shell > .container > .canvas > .layer.debug .debug-collider.debug-region-select,
+.container-wrapper > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-select,
+.container-wrapper > .container > .canvas > .layer.debug .debug-collider.debug-region-select {
+  background-color: rgba(255, 220, 0, 0.1);
+  border-color: rgba(255, 220, 0, 0.7);
+}
+
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-pickup,
+.app-shell > .container > .canvas > .layer.debug .debug-collider.debug-region-pickup,
+.container-wrapper > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-pickup,
+.container-wrapper > .container > .canvas > .layer.debug .debug-collider.debug-region-pickup {
+  background-color: rgba(180, 0, 255, 0.12);
+  border-color: rgba(180, 0, 255, 0.65);
+}
+
+
 .app-shell > .app-stage > .canvas > .layer.debug .pathfinder-node,
 .app-shell > .container > .canvas > .layer.debug .pathfinder-node,
 .container-wrapper > .app-stage > .canvas > .layer.debug .pathfinder-node,
@@ -1383,6 +1416,39 @@ body[data-tool-mode=drag] .container-wrapper > .container > .canvas > .layer > .
   background-color: rgba(0, 0, 255, 0.2);
   border-color: rgba(0, 0, 255, 0.5);
 }
+
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-interaction,
+.app-shell > .container > .canvas > .layer.debug .debug-collider.debug-region-interaction,
+.container-wrapper > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-interaction,
+.container-wrapper > .container > .canvas > .layer.debug .debug-collider.debug-region-interaction {
+  background-color: rgba(0, 150, 255, 0.12);
+  border-color: rgba(0, 150, 255, 0.6);
+}
+
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-hit,
+.app-shell > .container > .canvas > .layer.debug .debug-collider.debug-region-hit,
+.container-wrapper > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-hit,
+.container-wrapper > .container > .canvas > .layer.debug .debug-collider.debug-region-hit {
+  background-color: rgba(255, 100, 0, 0.15);
+  border-color: rgba(255, 100, 0, 0.7);
+}
+
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-select,
+.app-shell > .container > .canvas > .layer.debug .debug-collider.debug-region-select,
+.container-wrapper > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-select,
+.container-wrapper > .container > .canvas > .layer.debug .debug-collider.debug-region-select {
+  background-color: rgba(255, 220, 0, 0.1);
+  border-color: rgba(255, 220, 0, 0.7);
+}
+
+.app-shell > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-pickup,
+.app-shell > .container > .canvas > .layer.debug .debug-collider.debug-region-pickup,
+.container-wrapper > .app-stage > .canvas > .layer.debug .debug-collider.debug-region-pickup,
+.container-wrapper > .container > .canvas > .layer.debug .debug-collider.debug-region-pickup {
+  background-color: rgba(180, 0, 255, 0.12);
+  border-color: rgba(180, 0, 255, 0.65);
+}
+
 .app-shell > .app-stage > .canvas > .layer.foreground,
 .app-shell > .container > .canvas > .layer.foreground,
 .container-wrapper > .app-stage > .canvas > .layer.foreground,

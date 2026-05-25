@@ -43,16 +43,23 @@ class AnimationController {
         }
     }
 
+    // Per-frame duration from sprite data: [col, row, durationMs]. Falls back to this.frameDelay.
+    _getFrameInterval() {
+        const frame = this.currentAnimation?.frames?.[this.framePosition];
+        if (Array.isArray(frame) && frame[2] != null) return frame[2];
+        return this.frameDelay;
+    }
+
     // deltaTime is now passed from the game loop — no wall-clock polling
     update(deltaTime) {
         if (!this.currentAnimation || this.paused) return;
         if (this.currentAnimation.frames.length <= 1) return;
 
         this._elapsed += deltaTime;
-        if (this._elapsed >= this.frameDelay) {
-            // Consume one or more frame intervals (handles very slow frames gracefully)
-            this._elapsed -= this.frameDelay;
-            if (this._elapsed >= this.frameDelay) this._elapsed = 0; // avoid runaway catch-up
+        const interval = this._getFrameInterval();
+        if (this._elapsed >= interval) {
+            this._elapsed -= interval;
+            if (this._elapsed >= interval) this._elapsed = 0; // avoid runaway catch-up
 
             this.framePosition = (this.framePosition + 1) % this.currentAnimation.frames.length;
 

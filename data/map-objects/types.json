@@ -346,6 +346,7 @@
       "renderType": "sprite"
     }
   },
+
   "FLOWER": {
     "category": "nature",
     "variants": [
@@ -2541,8 +2542,7 @@
       "bed_long",
       "bed_big",
       "bed_big_long",
-      "large_bed",
-      "bunk_bed"
+      "large_bed"
     ],
     "collision": true,
     "draggable": true,
@@ -3195,14 +3195,6 @@
         "visual": {
           "spriteSheet": {
             "url": "images/MapObjects/bed_big_long.png"
-          }
-        }
-      },
-      "bunk_bed": {
-        "restEnergyRegenMultiplier": 0.85,
-        "visual": {
-          "spriteSheet": {
-            "url": "images/MapObjects/bunk_bed.png"
           }
         }
       }

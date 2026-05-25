@@ -1,4 +1,4 @@
-class DebugMenu extends ModalWindow {
+class DebugPanel extends ModalWindow {
     constructor(parent) {
         super(parent, {
             id: 'game-debug-panel',
@@ -7,6 +7,47 @@ class DebugMenu extends ModalWindow {
             position: 'top-right',
             draggable: true,
             closeButtonSelector: '.modal-close-btn'
+        });
+
+        const buildObjectOverlayToggle = ({ id, label, key, swatchClass, colorLabel, shapeLabel }) => ({
+            id,
+            section: 'map',
+            subgroup: 'overlays',
+            type: 'toggle',
+            label,
+            states: { true: 'ON', false: 'OFF' },
+            presentation: 'overlay-detail',
+            swatchClass,
+            colorLabel,
+            shapeLabel,
+            getValue: () => this.parent?.debugOverlay?.overlayState?.[key] ?? false,
+            action: () => {
+                const debugOverlay = this.parent?.debugOverlay;
+                if (debugOverlay) {
+                    debugOverlay.overlayState[key] = !debugOverlay.overlayState[key];
+                    debugOverlay._saveOverlayState();
+                }
+                this.updateButton(id);
+            }
+        });
+
+        const buildDirectInteractToggle = () => ({
+            id: 'directWorldInteraction',
+            section: 'map',
+            subgroup: 'overlays',
+            type: 'toggle',
+            label: 'Direct Interact',
+            states: { true: 'ON', false: 'OFF' },
+            presentation: 'mode-detail',
+            detailLabel: 'Immediate object action',
+            helperLabel: 'Skips myte walk-up',
+            getValue: () => this.parent?.debugOverlay?.isDirectWorldInteractionEnabled?.() ?? false,
+            action: () => {
+                const debugOverlay = this.parent?.debugOverlay;
+                if (!debugOverlay) return;
+                debugOverlay.setDirectWorldInteractionEnabled(!debugOverlay.isDirectWorldInteractionEnabled());
+                this.updateButton('directWorldInteraction');
+            }
         });
 
         // Button configuration
@@ -41,7 +82,7 @@ class DebugMenu extends ModalWindow {
                 getValue: () => this.parent?.parent?.gameMap?.gridSystem?.overlayFlags?.grid ?? true,
                 action: (button, value) => {
                     this.parent?.parent?.gameMap?.gridSystem?.setOverlayFlag('grid', value);
-                    this.parent?.debug?._saveGridOverlays();
+                    this.parent?.debugOverlay?._saveGridOverlays();
                     this.updateButton('overlayGrid');
                 }
             },
@@ -55,7 +96,7 @@ class DebugMenu extends ModalWindow {
                 getValue: () => this.parent?.parent?.gameMap?.gridSystem?.overlayFlags?.cursorTile ?? true,
                 action: (button, value) => {
                     this.parent?.parent?.gameMap?.gridSystem?.setOverlayFlag('cursorTile', value);
-                    this.parent?.debug?._saveGridOverlays();
+                    this.parent?.debugOverlay?._saveGridOverlays();
                     this.updateButton('overlayCursorTile');
                 }
             },
@@ -69,7 +110,7 @@ class DebugMenu extends ModalWindow {
                 getValue: () => this.parent?.parent?.gameMap?.gridSystem?.overlayFlags?.myteFrontTile ?? true,
                 action: (button, value) => {
                     this.parent?.parent?.gameMap?.gridSystem?.setOverlayFlag('myteFrontTile', value);
-                    this.parent?.debug?._saveGridOverlays();
+                    this.parent?.debugOverlay?._saveGridOverlays();
                     this.updateButton('overlayMyteFrontTile');
                 }
             },
@@ -78,20 +119,65 @@ class DebugMenu extends ModalWindow {
                 section: 'map',
                 subgroup: 'overlays',
                 type: 'toggle',
-                label: 'Colliders: ',
+                label: 'Colliders',
                 states: { true: 'ON', false: 'OFF' },
-                getValue: () => this.parent?.debug?.overlayState?.colliders ?? true,
+                presentation: 'overlay-detail',
+                swatchClass: 'myte-collider',
+                colorLabel: 'Green',
+                shapeLabel: 'Box',
+                getValue: () => this.parent?.debugOverlay?.overlayState?.colliders ?? true,
                 action: (button, value) => {
-                    const debugUI = this.parent?.debug;
-                    if (debugUI) {
-                        debugUI.overlayState.colliders = value;
-                        debugUI._saveOverlayState();
+                    const debugOverlay = this.parent?.debugOverlay;
+                    if (debugOverlay) {
+                        debugOverlay.overlayState.colliders = value;
+                        debugOverlay._saveOverlayState();
                     }
                     this.updateButton('overlayColliders');
                 }
             },
 
             // ── MAP / CONTROLS ──────────────────────────────────────────
+            buildObjectOverlayToggle({
+                id: 'overlayInteractionRegions',
+                label: 'Interaction',
+                key: 'interaction',
+                swatchClass: 'debug-region-interaction',
+                colorLabel: 'Blue',
+                shapeLabel: 'Box'
+            }),
+            buildObjectOverlayToggle({
+                id: 'overlayHitRegions',
+                label: 'Hit',
+                key: 'hit',
+                swatchClass: 'debug-region-hit',
+                colorLabel: 'Orange',
+                shapeLabel: 'Box'
+            }),
+            buildObjectOverlayToggle({
+                id: 'overlaySelectRegions',
+                label: 'Select',
+                key: 'select',
+                swatchClass: 'debug-region-select',
+                colorLabel: 'Yellow',
+                shapeLabel: 'Box'
+            }),
+            buildObjectOverlayToggle({
+                id: 'overlayPickupRegions',
+                label: 'Pickup',
+                key: 'pickup',
+                swatchClass: 'debug-region-pickup',
+                colorLabel: 'Violet',
+                shapeLabel: 'Box'
+            }),
+            buildObjectOverlayToggle({
+                id: 'overlayAnchors',
+                label: 'Anchors',
+                key: 'anchors',
+                swatchClass: 'debug-anchor',
+                colorLabel: 'Cyan',
+                shapeLabel: 'Dot'
+            }),
+            buildDirectInteractToggle(),
             {
                 id: 'cycleCamera',
                 section: 'map',
@@ -327,31 +413,12 @@ class DebugMenu extends ModalWindow {
         this.buttonLeftClick(e);
     }
 
-    handleDragEnd() {
-        super.handleDragEnd();
-        // Persist position so it survives reload
-        this.parent?.debug?._saveMenuPosition(this.position);
-    }
-
     init() {
         super.init();
 
         if (this.modalElement) {
             const buttonContainer = this.modalElement.querySelector('.window-panel__content');
             this.createButtons(buttonContainer);
-        }
-
-        // Restore saved position
-        const saved = this.parent?.debug?._loadState();
-        if (saved?.menu && this.modalElement) {
-            this.modalElement.style.left = `${saved.menu.x}px`;
-            this.modalElement.style.top  = `${saved.menu.y}px`;
-            this.modalElement.classList.remove(
-                'position-center', 'position-top-right', 'position-top-left',
-                'position-bottom-right', 'position-bottom-left'
-            );
-            if (this.modalElement.style.transform) this.modalElement.style.transform = '';
-            this.position = { x: saved.menu.x, y: saved.menu.y };
         }
     }
 
@@ -418,11 +485,37 @@ class DebugMenu extends ModalWindow {
         this.updateButtonText(config, button);
     }
 
+    getToggleStateLabel(config, currentValue) {
+        if (config.states && typeof currentValue === 'boolean') {
+            return config.states[currentValue];
+        }
+
+        return currentValue ? 'ON' : 'OFF';
+    }
+
+    setDetailedButtonContent(button, config, currentValue) {
+        const title = button.querySelector('.debug-button__title');
+        const helper = button.querySelector('.debug-button__helper');
+        const state = button.querySelector('.debug-button__state');
+
+        if (title) title.textContent = config.label || '';
+        if (helper) {
+            helper.textContent = config.helperLabel || config.detailLabel || '';
+        }
+        if (state) state.textContent = this.getToggleStateLabel(config, !!currentValue);
+    }
+
     updateButtonText(config, button) {
         if (!button) return;
 
         let displayText = config.label || '';
         const currentValue = this.getCurrentValue(config);
+
+        if (config.presentation === 'overlay-detail' || config.presentation === 'mode-detail') {
+            button.classList.toggle('active', !!currentValue);
+            this.setDetailedButtonContent(button, config, currentValue);
+            return;
+        }
 
         switch (config.type) {
             case 'cycle':
@@ -534,7 +627,9 @@ class DebugMenu extends ModalWindow {
         const button = document.createElement('button');
         button.id = config.id;
         button.className = 'debug-button';
+        button.type = 'button';
         if (config.type) button.dataset.type = config.type;
+        if (config.presentation) button.dataset.presentation = config.presentation;
 
         if (config.requiresActiveMyte) {
             button.classList.add('requires-myte');
@@ -575,6 +670,43 @@ class DebugMenu extends ModalWindow {
             return group;
         }
 
+        if (config.presentation === 'overlay-detail' || config.presentation === 'mode-detail') {
+            button.classList.add('debug-button--detail');
+
+            const content = document.createElement('span');
+            content.className = 'debug-button__content';
+
+            if (config.presentation === 'overlay-detail') {
+                const swatch = document.createElement('span');
+                swatch.className = `debug-button__swatch debug-overlay-swatch ${config.swatchClass || ''}`.trim();
+                swatch.setAttribute('aria-hidden', 'true');
+                content.appendChild(swatch);
+            } else {
+                const modeBadge = document.createElement('span');
+                modeBadge.className = 'debug-button__mode-badge';
+                modeBadge.textContent = 'Mode';
+                content.appendChild(modeBadge);
+            }
+
+            const text = document.createElement('span');
+            text.className = 'debug-button__text';
+
+            const title = document.createElement('span');
+            title.className = 'debug-button__title';
+            text.appendChild(title);
+
+            const helper = document.createElement('span');
+            helper.className = 'debug-button__helper';
+            text.appendChild(helper);
+
+            content.appendChild(text);
+            button.appendChild(content);
+
+            const state = document.createElement('span');
+            state.className = 'debug-button__state';
+            button.appendChild(state);
+        }
+
         this.updateButton(config.id);
         return button;
     }
@@ -582,7 +714,17 @@ class DebugMenu extends ModalWindow {
     // Show/hide per-overlay buttons when master debug toggle is off
     _updateOverlaySubgroupVisibility() {
         const debugOn = document.body.classList.contains('debug');
-        const overlaySubIds = ['overlayGrid', 'overlayCursorTile', 'overlayMyteFrontTile', 'overlayColliders'];
+        const overlaySubIds = [
+            'overlayGrid',
+            'overlayCursorTile',
+            'overlayMyteFrontTile',
+            'overlayColliders',
+            'overlayInteractionRegions',
+            'overlayHitRegions',
+            'overlaySelectRegions',
+            'overlayPickupRegions',
+            'overlayAnchors'
+        ];
         overlaySubIds.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = debugOn ? '' : 'none';

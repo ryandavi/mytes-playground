@@ -132,6 +132,16 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         }, myte);
     }
 
+    runDebugDirectInteraction() {
+        if (!this.active || this.isAnimating || !this.isActive || !this.hasTransitionDestination()) {
+            return false;
+        }
+
+        this.selectInUi?.();
+        this.beginTransition(null);
+        return true;
+    }
+
     checkProximityActivation(myte) {
         if (!this.isActive || !myte || !this.hasTransitionDestination() || this.isAnimating || !this.canTransitionMyte(myte)) return;
 

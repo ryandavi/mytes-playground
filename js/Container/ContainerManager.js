@@ -539,7 +539,7 @@ class ContainerManager {
             });
         }
 
-        this.ui?.debugMenu?.disableButtons?.();
+        this.ui?.debugPanel?.disableButtons?.();
     }
 
     setNextMyteAsActive(previous) {
@@ -615,8 +615,8 @@ class ContainerManager {
         }
 
         this.ui.myteListManager.updateMytesList(myte);
-        this.ui.debugMenu.updateButtons();
-        this.ui.viewMenu?.updateButtonStates();
+        this.ui.debugPanel.updateButtons();
+        this.ui.viewPanel?.updateButtonStates();
         this.ui.setSelected(null);
 
         this.eventManager?.emit('container:active_myte_changed', { myte });
@@ -642,9 +642,9 @@ class ContainerManager {
         });
 
         this.ui.myteListManager.updateMytesList(null);
-        this.ui.debugMenu.updateButtons();
+        this.ui.debugPanel.updateButtons();
         this.ui.hudManager.update();
-        this.ui.viewMenu?.updateButtonStates();
+        this.ui.viewPanel?.updateButtonStates();
         this.ui.setSelected(null);
 
         this.eventManager?.emit('container:active_myte_changed', { myte: null });

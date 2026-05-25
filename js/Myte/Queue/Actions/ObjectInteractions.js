@@ -370,9 +370,8 @@ class SurfaceSlotAction extends GoToObjectAction {
     static buildDefaultApproachConfig(target, targetActionConfig = {}, gap = 10) {
         const facing = SurfaceSlotAction.getRestFacing(target, targetActionConfig);
         const normalizedGap = Number.isFinite(Number(gap)) ? Number(gap) : 10;
-        const allowedSides = facing === 'E' || facing === 'W'
-            ? ['top', 'bottom']
-            : ['left', 'right'];
+        const facingToSide = { N: 'top', S: 'bottom', E: 'right', W: 'left' };
+        const allowedSides = facingToSide[facing] ? [facingToSide[facing]] : ['bottom'];
 
         return {
             allowedSides,
@@ -513,20 +512,7 @@ class SurfaceSlotAction extends GoToObjectAction {
     }
 
     getConfiguredSlots() {
-        const configured = this.target?.getActionSlotDefinitions?.('use_surface_slot') ?? [];
-        if (configured.length > 0) {
-            return configured;
-        }
-
-        return [{
-            id: 'default',
-            restPosition: this.getTargetActionConfig().restPosition ?? this.target?.getConfig?.('mytePosition', {}) ?? {},
-            restFacing: SurfaceSlotAction.getRestFacing(this.target, this.getTargetActionConfig())
-        }];
-    }
-
-    hasExplicitTargetSlots() {
-        return (this.target?.getActionSlotDefinitions?.('use_surface_slot')?.length ?? 0) > 0;
+        return this.target?.getActionSlotDefinitions?.('use_surface_slot') ?? [];
     }
 
     getSlotDefinition(slotId = this._selectedSlotId) {
@@ -601,9 +587,7 @@ class SurfaceSlotAction extends GoToObjectAction {
     }
 
     chooseBestAvailableSlot() {
-        const availableSlots = this.hasExplicitTargetSlots()
-            ? (this.target?.getAvailableActionSlots?.('use_surface_slot', this.myte) ?? [])
-            : this.getConfiguredSlots();
+        const availableSlots = this.target?.getAvailableActionSlots?.('use_surface_slot', this.myte) ?? [];
         if (availableSlots.length === 0) {
             return null;
         }
@@ -652,9 +636,7 @@ class SurfaceSlotAction extends GoToObjectAction {
             }
 
             this.applySelectedSlot(selection.slot, selection.approachConfig);
-            const claimed = this.hasExplicitTargetSlots()
-                ? this.target?.claimActionSlot?.('use_surface_slot', this._selectedSlotId, this.myte)
-                : this.target?.claimActionOccupancy?.('use_surface_slot', this.myte);
+            const claimed = this.target?.claimActionSlot?.('use_surface_slot', this._selectedSlotId, this.myte);
             if (claimed !== false) {
                 this._reserved = true;
                 return true;
@@ -844,10 +826,8 @@ class SurfaceSlotAction extends GoToObjectAction {
 
         this.myte.physicsController?.reset?.();
         if (this._reserved) {
-            if (this._selectedSlotId && this.hasExplicitTargetSlots()) {
+            if (this._selectedSlotId) {
                 this.target?.releaseActionSlot?.('use_surface_slot', this._selectedSlotId, this.myte);
-            } else {
-                this.target?.releaseActionOccupancy?.('use_surface_slot', this.myte);
             }
             this._reserved = false;
         }

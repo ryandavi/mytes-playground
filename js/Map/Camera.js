@@ -192,9 +192,9 @@ class Camera {
 	setMode(i) {
 		this.previousFollowMode = this.followMode;
 		this.followMode = i;
-		// this.parent.ui.debugMenu.updateCycleCamera(document.getElementById("cycleCamera"));
+		// this.parent.ui.debugPanel.updateCycleCamera(document.getElementById("cycleCamera"));
 
-		this.parent.ui?.debugMenu?.updateButton('cycleCamera');
+		this.parent.ui?.debugPanel?.updateButton('cycleCamera');
 	}
 	
 	setToPreviousMode() {

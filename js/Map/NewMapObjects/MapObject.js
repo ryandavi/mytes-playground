@@ -421,7 +421,13 @@ class MapObject {
 		}
 
 		if (!Array.isArray(slots) || slots.length === 0) {
-			return [];
+			const mytePosition = this.getConfig('mytePosition', null);
+			if (!mytePosition) return [];
+			return [{
+				id: 'default',
+				restPosition: mytePosition,
+				restFacing: this.getConfig('myteFacing', null) ?? undefined
+			}];
 		}
 
 		return slots.map((slot, index) => ({
@@ -2026,17 +2032,6 @@ class MapObject {
 
 		const slots = this.getActionSlotDefinitions('use_surface_slot');
 
-		if (!slots.length) {
-			// Single-occupancy object (e.g. BED) — one element covering the full collider
-			const el = document.createElement('div');
-			el.classList.add('map-object-slot');
-			el.dataset.slotId = 'default';
-			el.style.cssText = `position:absolute;left:${cOffX}px;top:${cOffY}px;width:${cw}px;height:${ch}px;pointer-events:none;`;
-			this.element.appendChild(el);
-			this.slotElements.set('default', el);
-			return;
-		}
-
 		// Determine primary split axis from slot positions
 		const useXAxis = slots.every(s => s.restPosition?.xFactor != null);
 		const factors = slots.map(s => useXAxis
@@ -2244,6 +2239,10 @@ class MapObject {
 		return nonInspect ?? availableActions[0] ?? null;
 	}
 
+	runDebugDirectInteraction(parent = this.container ?? this.parent) {
+		return false;
+	}
+
 	handleDoubleClick(event) {
 		const fn = this.getConfig('doubleClickAction');
 		if (typeof fn === 'function') {
@@ -2251,8 +2250,18 @@ class MapObject {
 			return;
 		}
 
+		const debugOverlay = this.container?.ui?.debugOverlay;
+		if (debugOverlay?.isDirectWorldInteractionEnabled?.()) {
+			this.selectInUi();
+			if (this.runDebugDirectInteraction(this.container ?? this.parent)) {
+				return;
+			}
+		}
+
 		const myte = this.activeMyte;
-		if (!myte?.queue) return;
+		if (!myte?.queue) {
+			return;
+		}
 
         const best = this.getBestInteractionAction(myte);
         if (best) {

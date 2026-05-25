@@ -149,8 +149,8 @@ class ContainerInputManager {
     this.subscribe('keyboard.down', (event) => {
       if (!this.isEnabled) return; // Ignore when disabled
       if (event.key === 'm') {
-        // Add null check for soundMenu
-        this.container.ui?.soundMenu?.toggleSounds?.();
+        // Add null check for sound panel
+        this.container.ui?.soundPanel?.toggleSounds?.();
       }
     });
 

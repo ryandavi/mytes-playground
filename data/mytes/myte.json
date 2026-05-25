@@ -10,29 +10,6 @@
     },
     "runAwayDistance": 300
   },
-  "size": {
-    "width": 192,
-    "height": 192
-  },
-  "spatial": {
-    "anchors": {
-      "carry.item": {
-        "x": 96,
-        "y": 15,
-        "itemAnchorX": 0.5,
-        "itemAnchorY": 1
-      }
-    },
-    "regions": {
-      "collider": {
-        "type": "box",
-        "x": 48,
-        "y": 115,
-        "width": 96,
-        "height": 58
-      }
-    }
-  },
   "physics": {
     "gravity": 0.3,
     "terminalVelocity": 12,
@@ -99,24 +76,9 @@
     }
   },
   "visual": {
-    "frameSize": {
-      "width": 192,
-      "height": 192
-    },
     "spriteSheet": {
       "filter": "none"
     },
     "spriteSets": null
-  },
-  "expressions": {
-    "surprised": "surprise",
-    "happy": "surprise",
-    "excited": "surprise",
-    "panic": "surprise",
-    "dizzy": "fall",
-    "faint": "fall",
-    "peek": "sit",
-    "sleep": "sit",
-    "heart": "kiss"
   }
 }

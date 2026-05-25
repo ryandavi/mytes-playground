@@ -88,34 +88,43 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
 
     isEntityAlignedWithDoor(entity, axis, actorCenter, intent, padding = 12) {
         const bounds = this.getDoorBounds();
-        const entityBounds = this.getColliderRectFor?.(entity);
 
         if (axis === 'x') {
-            if (
-                this.isValueWithinDoorSpan(actorCenter.y, bounds.top, bounds.height, padding) ||
-                this.isValueWithinDoorSpan(intent.y, bounds.top, bounds.height, padding)
-            ) {
-                return true;
-            }
-
-            return !!entityBounds && !(
-                entityBounds.bottom < (bounds.top - padding) ||
-                entityBounds.top > (bounds.top + bounds.height + padding)
+            const minY = Math.min(actorCenter.y, intent.y);
+            const maxY = Math.max(actorCenter.y, intent.y);
+            return !(
+                maxY < (bounds.top - padding) ||
+                minY > (bounds.top + bounds.height + padding)
             );
         }
 
         if (axis === 'y') {
-            if (
-                this.isValueWithinDoorSpan(actorCenter.x, bounds.left, bounds.width, padding) ||
-                this.isValueWithinDoorSpan(intent.x, bounds.left, bounds.width, padding)
-            ) {
-                return true;
-            }
-
-            return !!entityBounds && !(
-                entityBounds.right < (bounds.left - padding) ||
-                entityBounds.left > (bounds.left + bounds.width + padding)
+            const minX = Math.min(actorCenter.x, intent.x);
+            const maxX = Math.max(actorCenter.x, intent.x);
+            return !(
+                maxX < (bounds.left - padding) ||
+                minX > (bounds.left + bounds.width + padding)
             );
+        }
+
+        return false;
+    }
+
+    isIntentAcrossDoor(axis, actorCenter, intent, bounds, margin = 4) {
+        if (axis === 'x') {
+            const actorOnLeft = actorCenter.x <= (bounds.left - margin);
+            const actorOnRight = actorCenter.x >= (bounds.left + bounds.width + margin);
+            const intentOnLeft = intent.x <= (bounds.left - margin);
+            const intentOnRight = intent.x >= (bounds.left + bounds.width + margin);
+            return (actorOnLeft && intentOnRight) || (actorOnRight && intentOnLeft);
+        }
+
+        if (axis === 'y') {
+            const actorAbove = actorCenter.y <= (bounds.top - margin);
+            const actorBelow = actorCenter.y >= (bounds.top + bounds.height + margin);
+            const intentAbove = intent.y <= (bounds.top - margin);
+            const intentBelow = intent.y >= (bounds.top + bounds.height + margin);
+            return (actorAbove && intentBelow) || (actorBelow && intentAbove);
         }
 
         return false;
@@ -164,35 +173,26 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
         const intent = this.getEntityIntentPoint(entity);
         if (!actorCenter || !intent || !axis) return false;
 
-        const doorCenter = this.getDoorCenter();
-        const margin = 4;
-
         if (!this.isEntityAlignedWithDoor(entity, axis, actorCenter, intent)) {
+            return false;
+        }
+
+        const bounds = this.getDoorBounds();
+        const margin = 4;
+        if (!this.isIntentAcrossDoor(axis, actorCenter, intent, bounds, margin)) {
             return false;
         }
 
         if (axis === 'x') {
             const motion = intent.x - actorCenter.x;
-            const doorOffset = doorCenter.x - actorCenter.x;
             if (Math.abs(motion) < 0.5) return false;
-
-            const actorSide = actorCenter.x < (doorCenter.x - margin) ? -1 : actorCenter.x > (doorCenter.x + margin) ? 1 : 0;
-            const intentSide = intent.x < (doorCenter.x - margin) ? -1 : intent.x > (doorCenter.x + margin) ? 1 : 0;
-            const crossesDoor = actorSide !== 0 && intentSide !== 0 && actorSide !== intentSide;
-            const atDoor = Math.abs(doorOffset) <= margin;
-            return crossesDoor || atDoor;
+            return true;
         }
 
         if (axis === 'y') {
             const motion = intent.y - actorCenter.y;
-            const doorOffset = doorCenter.y - actorCenter.y;
             if (Math.abs(motion) < 0.5) return false;
-
-            const actorSide = actorCenter.y < (doorCenter.y - margin) ? -1 : actorCenter.y > (doorCenter.y + margin) ? 1 : 0;
-            const intentSide = intent.y < (doorCenter.y - margin) ? -1 : intent.y > (doorCenter.y + margin) ? 1 : 0;
-            const crossesDoor = actorSide !== 0 && intentSide !== 0 && actorSide !== intentSide;
-            const atDoor = Math.abs(doorOffset) <= margin;
-            return crossesDoor || atDoor;
+            return true;
         }
 
         return false;
@@ -303,6 +303,15 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
         }
 
         return false;
+    }
+
+    runDebugDirectInteraction(parent = this.container ?? this.parent) {
+        if (!this.active || this.isAnimating) return false;
+        this.selectInUi();
+        return this.trySetOpenState(!this.isOpen, {
+            triggeredBy: 'debug',
+            parent
+        });
     }
 
     teleportMyte(myte) {

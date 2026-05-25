@@ -188,13 +188,8 @@ class MyteTouchHandler extends DragHandler {
             if (!(obj instanceof MapObject) || !obj.active || !obj.element) continue;
             if (!obj.getActionConfig?.('use_surface_slot')) continue;
             const slots = obj.getActionSlotDefinitions?.('use_surface_slot') ?? [];
-            if (slots.length) {
-                for (const slot of slots) {
-                    entries.push({ obj, slot, el: obj.slotElements?.get(slot.id) ?? null });
-                }
-            } else {
-                // Single-occupancy object (no explicit slot definitions)
-                entries.push({ obj, slot: { id: 'default' }, el: obj.slotElements?.get('default') ?? null });
+            for (const slot of slots) {
+                entries.push({ obj, slot, el: obj.slotElements?.get(slot.id) ?? null });
             }
         }
         return entries;

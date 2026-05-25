@@ -1,4 +1,4 @@
-class ViewMenu extends ModalWindow {
+class ViewPanel extends ModalWindow {
     constructor(parent) {
         super(parent, {
             id: 'view-panel',

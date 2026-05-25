@@ -2,11 +2,59 @@
   "schemaVersion": 1,
   "id": "snail",
   "displayName": "Snail",
+  "size": {
+    "width": 192,
+    "height": 192
+  },
   "physics": {
     "gravity": 0.25,
     "airControl": 0.5
   },
+  "spatial": {
+    "anchors": {
+      "carry.item": {
+        "x": 96,
+        "y": 80,
+        "itemAnchorX": 0.5,
+        "itemAnchorY": 1
+      }
+    },
+    "regions": {
+      "collider": {
+        "type": "box",
+        "x": 48,
+        "y": 115,
+        "width": 96,
+        "height": 58
+      },
+      "interaction": {
+        "type": "box",
+        "x": 8,
+        "y": 8,
+        "width": 176,
+        "height": 176
+      },
+      "hit": {
+        "type": "box",
+        "x": 32,
+        "y": 80,
+        "width": 128,
+        "height": 100
+      },
+      "select": {
+        "type": "box",
+        "x": 8,
+        "y": 8,
+        "width": 176,
+        "height": 176
+      }
+    }
+  },
   "visual": {
+    "frameSize": {
+      "width": 192,
+      "height": 192
+    },
     "spriteSheet": {
       "url": "images/snail/spritesheet.png"
     },
@@ -38,14 +86,15 @@
       "land": [[0, 3]]
     }
   },
-  "spatial": {
-    "anchors": {
-      "carry.item": {
-        "x": 96,
-        "y": 100,
-        "itemAnchorX": 0.5,
-        "itemAnchorY": 1
-      }
-    }
+  "expressions": {
+    "surprised": "surprise",
+    "happy": "surprise",
+    "excited": "surprise",
+    "panic": "surprise",
+    "dizzy": "fall",
+    "faint": "fall",
+    "peek": "sit",
+    "sleep": "sit",
+    "heart": "kiss"
   }
 }

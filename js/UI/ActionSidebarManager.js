@@ -307,6 +307,24 @@ class ActionSidebarManager extends UIComponent {
                 return;
             }
 
+            const directInteractEnabled = this.parent?.debugOverlay?.isDirectWorldInteractionEnabled?.();
+            const canRunDirectInteraction =
+                directInteractEnabled &&
+                selectedObject &&
+                typeof selectedObject.runDebugDirectInteraction === 'function' &&
+                action.category !== 'movement' &&
+                !['inspect', 'deep_inspect'].includes(action.id);
+
+            if (canRunDirectInteraction) {
+                const handled = selectedObject.runDebugDirectInteraction(
+                    selectedObject.container ?? this.parent.parent
+                );
+                if (handled) {
+                    this.updateActions(selectedObject);
+                    return;
+                }
+            }
+
             const options = ActionManager.getActionOptions(
                 action.id,
                 selectedObject,

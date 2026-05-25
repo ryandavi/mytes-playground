@@ -7,7 +7,7 @@ class MyteMovementController {
         const m = this.myte;
         if (newGoal == null) newGoal = m.followGoal;
         m.followGoal = newGoal;
-        m.parent.ui?.debugMenu?.updateButton?.('cycleFollowGoal');
+        m.parent.ui?.debugPanel?.updateButton?.('cycleFollowGoal');
         m.runAway = m.followGoal === MOVE_FOLLOW_TYPES.RUNAWAY;
         m.goingInCircles = m.followGoal === MOVE_FOLLOW_TYPES.CIRCLES;
     }
@@ -17,7 +17,7 @@ class MyteMovementController {
         if (newGoal == null) newGoal = m.autonomyGoal;
         m.autonomyGoal = newGoal;
         m.ai?.setMode(newGoal);
-        m.parent.ui?.debugMenu?.updateButton?.('cycleAutonomyGoal');
+        m.parent.ui?.debugPanel?.updateButton?.('cycleAutonomyGoal');
     }
 
     setMode(newGoal = null) {
@@ -32,7 +32,7 @@ class MyteMovementController {
             m.queue.clear();
         }
 
-        m.parent.ui?.debugMenu?.updateButton?.('cycleGoal');
+        m.parent.ui?.debugPanel?.updateButton?.('cycleGoal');
 
         const modeConfig = {
             [MOVE_TYPES.FOLLOW]: { isFreeRoam: false, followMouse: true, isGravity: false },

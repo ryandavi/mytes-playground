@@ -131,6 +131,23 @@ class CropPlantMapObject extends GrowingPlantMapObject {
             userInitiated: true
         });
     }
+
+    runDebugDirectInteraction(parent = this.container ?? this.parent) {
+        if (!this.active) return false;
+
+        this.selectInUi?.();
+
+        if (this.harvestable) {
+            return this.performHarvest(parent, null);
+        }
+
+        if (this.canWater()) {
+            this.water();
+            return true;
+        }
+
+        return false;
+    }
     
     performHarvest(parent, myte) {
         const harvest = this.harvest();

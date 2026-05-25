@@ -96,7 +96,7 @@ class GameMap {
     }
 
     getParticleEffectsEnabledSetting() {
-        const liveSetting = this.ui?.settingsMenu?.isEffectsEnabled?.();
+        const liveSetting = this.ui?.settingsPanel?.isEffectsEnabled?.();
         if (typeof liveSetting === 'boolean') {
             return liveSetting;
         }

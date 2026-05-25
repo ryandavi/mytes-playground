@@ -54,12 +54,14 @@ class MyteStats {
         this.confidence = Math.max(this.minConfidence, Math.min(this.maxConfidence, statConfig.confidence ?? SiteConfig.myte.initialStats.confidence));
 
         this.batteryLevel = -1;
+        this._slotBatteryLevel = -1;
         this.batteryVisible = false;
         this.batteryHideTimeout = null;
         this.chargingClassTimeout = null;
         this.batteryThresholds = SiteConfig.myte.thresholds.batteryLevels.map(t => ({ ...t }));
 
         this.isRapidCharging = false;
+        this._lastRapidCharging = false;
         this.rapidChargingThreshold = SiteConfig.myte.thresholds.rapidCharging;
         this.exhaustionRecoveryThreshold = statConfig.exhaustionRecoveryThreshold ?? SiteConfig.stats.exhaustionRecoveryThreshold;
         this.isExhausted = false;
@@ -475,17 +477,20 @@ class MyteStats {
                 this.showBattery();
                 this.handleBatteryVisibility();
             }
-        } else if (this.myte.battery) {
-            this.applyBatteryLevelClasses(this.myte.battery, currentThresholdIndex, batteryStatus);
         }
 
-        this.syncSlotBatteryDisplay(currentThresholdIndex, batteryStatus);
+        // Slot battery tracks independently so it initializes correctly when first shown
+        if (currentThresholdIndex !== this._slotBatteryLevel) {
+            this._slotBatteryLevel = currentThresholdIndex;
+            this.syncSlotBatteryDisplay(currentThresholdIndex, batteryStatus);
+        }
 
-        // If rapid charging is active, add visual indication
-        if (this.isRapidCharging && this.myte.battery) {
-            this.myte.battery.classList.add('rapid-charging');
-        } else if (this.myte.battery) {
-            this.myte.battery.classList.remove('rapid-charging');
+        // Only toggle rapid-charging class when the state actually changes
+        if (this.isRapidCharging !== this._lastRapidCharging) {
+            this._lastRapidCharging = this.isRapidCharging;
+            if (this.myte.battery) {
+                this.myte.battery.classList.toggle('rapid-charging', this.isRapidCharging);
+            }
         }
     }
 

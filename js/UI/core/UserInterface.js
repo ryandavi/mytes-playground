@@ -2,7 +2,8 @@ class UserInterface {
     constructor(parent) {
         this.parent = parent;
         this.containerWrapper = parent.containerWrapper;
-        this.debug = new DebugUI(parent);
+        this.debugOverlay = new DebugOverlayUI(parent);
+        this.debug = this.debugOverlay;
         this.isActive = false;
 
         // Initialize all UI components
@@ -34,10 +35,14 @@ class UserInterface {
         this.screenManager.init();
 
         // Initialize additional menus
-        this.soundMenu = new SoundMenu(this);
-        this.settingsMenu = new SettingsMenu(this);
-        this.viewMenu = new ViewMenu(this);
-        this.debugMenu = new DebugMenu(this);
+        this.soundPanel = new SoundPanel(this);
+        this.settingsPanel = new SettingsPanel(this);
+        this.viewPanel = new ViewPanel(this);
+        this.debugPanel = new DebugPanel(this);
+        this.soundMenu = this.soundPanel;
+        this.settingsMenu = this.settingsPanel;
+        this.viewMenu = this.viewPanel;
+        this.debugMenu = this.debugPanel;
     }
 
     // Methods for component communication
@@ -67,7 +72,7 @@ class UserInterface {
         this.parent.setActiveMyte(myte);
         this.myteListManager.updateMytesList(myte);
         this.hudManager.update();
-        this.viewMenu?.updateButtonStates();
+        this.viewPanel?.updateButtonStates();
     }
 
     playSound(sound) {
@@ -93,7 +98,7 @@ class UserInterface {
 
     // Update method called every frame
     update() {
-        this.debug.update();
+        this.debugOverlay.update();
         this.cursorManager.update();
         this.queueTargetManager.update();
         this.actionSidebarManager.update();
@@ -103,15 +108,20 @@ class UserInterface {
     }
 
     dispose() {
-        this.debug?.dispose?.();
+        this.debugOverlay?.dispose?.();
+        this.debugOverlay = null;
         this.debug = null;
-        this.debugMenu?.dispose?.();
+        this.debugPanel?.dispose?.();
+        this.debugPanel = null;
         this.debugMenu = null;
-        this.settingsMenu?.dispose?.();
+        this.settingsPanel?.dispose?.();
+        this.settingsPanel = null;
         this.settingsMenu = null;
-        this.soundMenu?.dispose?.();
+        this.soundPanel?.dispose?.();
+        this.soundPanel = null;
         this.soundMenu = null;
-        this.viewMenu?.dispose?.();
+        this.viewPanel?.dispose?.();
+        this.viewPanel = null;
         this.viewMenu = null;
 
         this.screenManager?.dispose?.();

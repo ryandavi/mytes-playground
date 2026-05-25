@@ -406,7 +406,8 @@ class StateMachine {
 
 		const resolvedState = MyteDefinitionRegistry.resolveExpression(
 			currentAction.actionType,
-			this.stateConfig
+			this.stateConfig,
+			this.parent?.definition
 		);
 
 		if (!resolvedState) {
@@ -449,12 +450,13 @@ class StateMachine {
 	}
 
 	// Returns the interval (ms) to wait before advancing from the current frame.
-	// Checks stateConfig.frameDurations[frameIndex] first, then stateConfig.fps, then default 8fps.
+	// Priority: sprite data [col, row, durationMs] > stateConfig.frameDurations[i] > stateConfig.fps > 8fps default.
 	_getFrameInterval(state) {
 		const cfg = this.stateConfig[state];
-		if (cfg?.frameDurations) {
-			return cfg.frameDurations[this.currentFrameIndex] ?? (1000 / (cfg.fps ?? 8));
-		}
+		const animKey = this.getAnimationKey(state);
+		const frame = this.animator.spriteConfig?.[animKey]?.[this.currentFrameIndex];
+		if (Array.isArray(frame) && frame[2] != null) return frame[2];
+		if (cfg?.frameDurations?.[this.currentFrameIndex] != null) return cfg.frameDurations[this.currentFrameIndex];
 		return 1000 / (cfg?.fps ?? 8);
 	}
 
