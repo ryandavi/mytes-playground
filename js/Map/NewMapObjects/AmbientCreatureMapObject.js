@@ -389,8 +389,7 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
     }
 
     applyBobbing() {
-        if (!this.animation?.sprite) return;
-        this.animation.sprite.style.transform = `translateY(${-this.posZ}px)`;
+        this.setSpriteVerticalLift(this.posZ);
     }
 
     render(container, parent) {
@@ -455,10 +454,9 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
     }
 
     update(deltaTime) {
-        super.update(deltaTime);
         this.updateFlightHeight();
+        super.update(deltaTime);
         this.applyBobbing();
-        this.updateShadowVisual?.();
         this.updateDebugAttributes();
     }
 

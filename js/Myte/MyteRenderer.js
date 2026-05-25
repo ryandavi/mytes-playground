@@ -4,6 +4,8 @@ class MyteRenderer {
 
 		// DOM elements owned by the renderer
 		this.duplicate = null;
+		this.visualRoot = null;
+		this.homeVisualRoot = null;
 		this.sprite = null;
 		this.homeSprite = null;
 		this.battery = null;
@@ -24,11 +26,14 @@ class MyteRenderer {
 
 		m.elements.wrapper.parentNode.appendChild(this.duplicate);
 
+		this.homeVisualRoot = m.element.querySelector('.inner-wrapper');
+		this.visualRoot = this.duplicate.querySelector('.inner-wrapper');
 		this.homeSprite = m.element.querySelector('.sprite');
 		this.sprite = this.duplicate.querySelector('.sprite');
 		this.battery = this.duplicate.querySelector('.battery');
 		this.homeBattery = m.element.querySelector('.battery');
 		this.applyVisualDefinition(m.definition);
+		this.applyVerticalVisuals();
 
 		this.duplicate.classList.add('is-deactivated');
 	}
@@ -82,6 +87,8 @@ class MyteRenderer {
 			this.setZIndex(y);
 		}
 
+		this.applyVerticalVisuals();
+
 		// this.logVisualDebug('setSpritePosition');
 	}
 
@@ -128,8 +135,21 @@ class MyteRenderer {
 	getSortY(y = this.myte.posY) {
 		const m = this.myte;
 		const resolvedY = Number.isFinite(y) ? y : m.posY;
-		const jumpOffset = m.isCurrentlyJumping() ? (m.physics?.velocity ?? 0) : 0;
-		return resolvedY + this.resolveDepthOffset() + jumpOffset;
+		return resolvedY + this.resolveDepthOffset();
+	}
+
+	getVisualElevation() {
+		const elevation = Number(this.myte.posZ);
+		return Number.isFinite(elevation) ? elevation : 0;
+	}
+
+	applyVerticalVisuals() {
+		[this.visualRoot, this.homeVisualRoot].forEach(root => {
+			Utility.applyElementVerticalVisuals(root, {
+				baseTop: 0,
+				lift: this.getVisualElevation()
+			});
+		});
 	}
 
 	getDepthPriority() {

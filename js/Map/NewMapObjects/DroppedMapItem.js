@@ -111,7 +111,7 @@ class DroppedMapItem {
         element.style.width = `${this.size.width}px`;
         element.style.height = `${this.size.height}px`;
 
-        this._applyPosition(element, this.posY);
+        this._applyPosition(element);
         return element;
     }
 
@@ -143,12 +143,19 @@ class DroppedMapItem {
             : Math.round(sortY * 100) + this.getDepthPriority();
     }
 
-    _applyPosition(element, displayY) {
+    _applyPosition(element) {
         element.style.left = `${this.posX - this.size.width / 2}px`;
-        element.style.top  = `${displayY - this.size.height / 2}px`;
+        element.style.top  = `${this.posY - this.size.height / 2}px`;
         const sortY = this.getSortY();
         element.style.zIndex = this.getRenderZIndex();
         element.dataset.sortY = `${Math.round(sortY * 100) / 100}`;
+    }
+
+    _applyVerticalVisuals(element, lift = 0) {
+        Utility.applyElementVerticalVisuals(element, {
+            baseTop: this.posY - (this.size.height / 2),
+            lift
+        });
     }
 
     _applyShadowPosition(shadow, heightAboveGround) {
@@ -195,13 +202,9 @@ class DroppedMapItem {
     updatePosition() {
         if (!this.element) return;
 
-        let displayY = this.posY;
-        if (this.grounded) {
-            displayY -= Math.sin(this.hoverOffset) * 5;
-        }
-        displayY -= this.posZ;
-
-        this._applyPosition(this.element, displayY);
+        const hoverLift = this.grounded ? Math.sin(this.hoverOffset) * 5 : 0;
+        this._applyPosition(this.element);
+        this._applyVerticalVisuals(this.element, this.posZ + hoverLift);
 
         if (this.shadowElement) {
             this._applyShadowPosition(this.shadowElement, Math.max(0, this.posZ));

@@ -44,6 +44,7 @@ class Myte {
 		// positions
 		this.posX = 0;
 		this.posY = 0;
+		this.posZ = 0;
 		this.targetX = 0;
 		this.targetY = 0;
 
@@ -254,6 +255,7 @@ class Myte {
 		const home = this.getHomePosition();
 		this.posX = home.x;
 		this.posY = home.y;
+		this.posZ = 0;
 		this.setTarget(home.x, home.y);
 		this.setSpritePosition(home.x, home.y);
 
@@ -1181,6 +1183,7 @@ class Myte {
 
 		// StateMachine self-paces its own frame timing per-animation.
 		this.stateMachine.update(deltaTime);
+		this.renderer?.applyVerticalVisuals?.();
 
 		// Grid front-tile update: only needs ~8fps, keep a lightweight throttle here.
 		this._gridElapsed = (this._gridElapsed || 0) + deltaTime;

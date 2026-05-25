@@ -57,6 +57,15 @@ class MapObject {
 		};
 		this._prevRenderX = -1;
 		this._prevRenderY = -1;
+		this._spriteElement = null;
+		this._spriteBaseTop = 0;
+		this._spriteBaseLeft = 0;
+		this._baseSpriteTransform = this.getConfig('transformStyle', '') || '';
+		this._spriteVisualState = {
+			lift: 0,
+			scaleX: 1,
+			scaleY: 1
+		};
 
 		// Sleep/wake: objects outside the culling zone skip visual update.
 		// GridSystem.updateCulling() calls wake()/sleep() on transitions.
@@ -134,6 +143,69 @@ class MapObject {
 
 	shouldRenderShadow() {
 		return !!this.getShadowConfig();
+	}
+
+	getSpriteElement() {
+		if (!this.element) {
+			return null;
+		}
+
+		if (!this._spriteElement || !this._spriteElement.isConnected) {
+			this._spriteElement = this.element.querySelector('.sprite');
+		}
+
+		return this._spriteElement;
+	}
+
+	captureSpriteBaseStyles() {
+		const sprite = this.getSpriteElement();
+		if (!sprite) {
+			return;
+		}
+
+		const parsedTop = Number.parseFloat(sprite.style.top);
+		const parsedLeft = Number.parseFloat(sprite.style.left);
+		this._spriteBaseTop = Number.isFinite(parsedTop) ? parsedTop : 0;
+		this._spriteBaseLeft = Number.isFinite(parsedLeft) ? parsedLeft : 0;
+	}
+
+	setBaseSpriteTransform(transform = '') {
+		this._baseSpriteTransform = transform || '';
+		this.applySpriteVerticalVisuals();
+	}
+
+	setSpriteVerticalLift(lift = 0) {
+		this._spriteVisualState.lift = Number.isFinite(lift) ? lift : 0;
+		this.applySpriteVerticalVisuals();
+	}
+
+	setSpriteVisualScale(scaleX = 1, scaleY = 1) {
+		this._spriteVisualState.scaleX = Number.isFinite(scaleX) ? scaleX : 1;
+		this._spriteVisualState.scaleY = Number.isFinite(scaleY) ? scaleY : 1;
+		this.applySpriteVerticalVisuals();
+	}
+
+	resetSpriteVerticalVisuals() {
+		this._spriteVisualState.lift = 0;
+		this._spriteVisualState.scaleX = 1;
+		this._spriteVisualState.scaleY = 1;
+		this.applySpriteVerticalVisuals();
+	}
+
+	applySpriteVerticalVisuals() {
+		const sprite = this.getSpriteElement();
+		if (!sprite) {
+			return;
+		}
+
+		sprite.style.left = `${this._spriteBaseLeft}px`;
+		Utility.applyElementVerticalVisuals(sprite, {
+			baseTop: this._spriteBaseTop,
+			lift: this._spriteVisualState.lift,
+			baseTransform: this._baseSpriteTransform,
+			scaleX: this._spriteVisualState.scaleX,
+			scaleY: this._spriteVisualState.scaleY
+		});
 	}
 
 	humanizeLabelToken(value) {
@@ -1760,8 +1832,6 @@ class MapObject {
 			this.element.classList.add(`facing-${normalizedDir.toLowerCase()}`);
 			const spriteEl = this.element.querySelector('.sprite');
 			if (spriteEl) {
-				spriteEl.style.transform = dirConfig.transformStyle || '';
-
 				const frameSize = this.getVisualFrameSize();
 				if (frameSize) {
 					const offsetOverride = this.getConfig('spriteFrameOffset');
@@ -1772,6 +1842,10 @@ class MapObject {
 					spriteEl.style.left = `${-offsetX}px`;
 					spriteEl.style.top = `${-offsetY}px`;
 				}
+
+				this._spriteElement = spriteEl;
+				this.captureSpriteBaseStyles();
+				this.setBaseSpriteTransform(dirConfig.transformStyle || '');
 			}
 
 			const interactiveEl = this.element.querySelector('.interactive-hitbox');
@@ -2010,7 +2084,10 @@ class MapObject {
 		}
 
 		this.element = divElement;
+		this._spriteElement = null;
 		container.appendChild(divElement);
+		this.captureSpriteBaseStyles();
+		this.setBaseSpriteTransform(this.getConfig('transformStyle', ''));
 		this.updateShadowVisual();
 		this.initializeInputComponents();
 		this._initSelectDragHandler();
@@ -2190,6 +2267,7 @@ class MapObject {
 			this.element.remove();
 			this.element = null;
 		}
+		this._spriteElement = null;
 		this.shadowElement = null;
 		this.active = false;
 		this.gameMap?.gridSystem?.removeObject(this);

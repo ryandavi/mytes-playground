@@ -30,13 +30,17 @@ class BallMapObject extends AnimatedMapObject {
         this.pendingPickup = false;
 
         // Drop bounce (Z-axis visual only — sprite translates, shadow stays grounded)
-        this.dropZ = 0;
-        this.dropVelocityZ = 0;
+        this.verticalVelocity = 0;
         this.isDropBouncing = false;
         this.dropBounceCount = 0;
-        this.maxDropBounces = 3;
-        this.dropGravity = 1.2;
-        this.dropBounceFactor = 0.48;
+        this.defaultMaxDropBounces = this.getConfig('maxDropBounces', 3);
+        this.maxDropBounces = this.defaultMaxDropBounces;
+        this.dropGravity = this.getConfig('dropGravity', 1.2);
+        this.dropBounceFactor = this.getConfig('dropBounceFactor', 0.48);
+        this.airborneFriction = this.getConfig('airborneFriction', 0.985);
+        this.landingSquash = 0;
+        this.maxLandingSquash = this.getConfig('maxLandingSquash', 0.14);
+        this.landingSquashDecay = this.getConfig('landingSquashDecay', 0.7);
 
         // Safe defaults — overwritten by setupBoundaries() once render() has a parent
         this.dragAnimationVelocity = { x: 0, y: 0 };
@@ -51,45 +55,89 @@ class BallMapObject extends AnimatedMapObject {
 
     triggerArcBounce(height = 30) {
         if (height < 2) return;
-        // Single-arc: launch upward, one small bounce, settle
-        this.dropZ = height;
-        this.dropVelocityZ = 0;
+        const clampedHeight = Math.min(this.getConfig('maxArcBounceHeight', 60), height);
+        // Launch from the ground and let gravity bring it back down.
+        this.verticalVelocity = Math.max(
+            this.verticalVelocity,
+            Math.sqrt(2 * this.dropGravity * clampedHeight)
+        );
         this.isDropBouncing = true;
         this.dropBounceCount = 0;
         this.maxDropBounces = 1;
     }
 
     triggerDropBounce(initialHeight = 90) {
-        this.dropZ = initialHeight;
-        this.dropVelocityZ = 0;
+        const clampedHeight = Math.min(this.getConfig('maxDropBounceHeight', 72), initialHeight);
+        this.verticalVelocity = Math.max(
+            this.verticalVelocity,
+            Math.sqrt(2 * this.dropGravity * clampedHeight)
+        );
         this.isDropBouncing = true;
         this.dropBounceCount = 0;
+        this.maxDropBounces = this.defaultMaxDropBounces;
     }
 
     _updateDropBounce() {
-        this.dropVelocityZ -= this.dropGravity;
-        this.dropZ += this.dropVelocityZ;
+        if (!this.isDropBouncing && this.posZ <= 0) {
+            return;
+        }
 
-        if (this.dropZ <= 0) {
-            this.dropZ = 0;
-            const speed = Math.abs(this.dropVelocityZ);
+        this.posZ += this.verticalVelocity;
+        this.verticalVelocity -= this.dropGravity;
+
+        if (this.posZ <= 0) {
+            this.posZ = 0;
+            const speed = Math.abs(this.verticalVelocity);
+            this._setLandingSquash(speed);
             if (this.dropBounceCount < this.maxDropBounces && speed > 1.5) {
-                this.dropVelocityZ = speed * this.dropBounceFactor;
+                this.verticalVelocity = speed * this.dropBounceFactor;
                 this.dropBounceCount++;
                 this.gameMap?.soundManager?.play('obj_ball_bounce');
             } else {
-                this.dropVelocityZ = 0;
+                this.verticalVelocity = 0;
                 this.isDropBouncing = false;
-                this.maxDropBounces = 3; // restore default
-                this._applySpriteDropOffset(0);
+                this.maxDropBounces = this.defaultMaxDropBounces;
             }
         }
     }
 
-    _applySpriteDropOffset(z) {
-        const sprite = this.element?.querySelector('.sprite');
-        if (!sprite) return;
-        sprite.style.transform = z > 0 ? `translateY(-${z.toFixed(1)}px)` : '';
+    _setLandingSquash(impactSpeed = 0) {
+        this.landingSquash = Math.min(
+            this.maxLandingSquash,
+            Math.max(this.landingSquash, impactSpeed * 0.015)
+        );
+    }
+
+    _applySpriteVisuals() {
+        const squash = this.landingSquash > 0.001 ? this.landingSquash : 0;
+        this.setSpriteVerticalLift(this.posZ);
+        this.setSpriteVisualScale(
+            1 + (squash * 0.85),
+            Math.max(0.82, 1 - squash)
+        );
+    }
+
+    _resetVerticalMotion() {
+        this.posZ = 0;
+        this.verticalVelocity = 0;
+        this.isDropBouncing = false;
+        this.dropBounceCount = 0;
+        this.maxDropBounces = this.defaultMaxDropBounces;
+        this.landingSquash = 0;
+        this._applySpriteVisuals();
+    }
+
+    _triggerImpactHop() {
+        if (this.posZ > 0.1) {
+            return;
+        }
+
+        const speed = this.getSpeed();
+        if (speed < 2.8) {
+            return;
+        }
+
+        this.triggerArcBounce(Math.min(18, Math.max(8, speed * 1.8)));
     }
 
     shouldSimulateOffScreen() { return true; }
@@ -108,10 +156,7 @@ class BallMapObject extends AnimatedMapObject {
     startDrag() {
         this.stopMotion();
         this._resetDragAnimationState();
-        this.isDropBouncing = false;
-        this.dropZ = 0;
-        this.dropVelocityZ = 0;
-        this._applySpriteDropOffset(0);
+        this._resetVerticalMotion();
         // If the myte is holding this ball, interrupt the hold so the ball is freed
         if (this.isPickedUp && this.carrier) {
             this.carrier.queue.clear();
@@ -122,10 +167,7 @@ class BallMapObject extends AnimatedMapObject {
     startDragAtPosition(position = null) {
         this.stopMotion();
         this._resetDragAnimationState();
-        this.isDropBouncing = false;
-        this.dropZ = 0;
-        this.dropVelocityZ = 0;
-        this._applySpriteDropOffset(0);
+        this._resetVerticalMotion();
         super.startDragAtPosition?.(position);
     }
 
@@ -150,18 +192,21 @@ class BallMapObject extends AnimatedMapObject {
             return false;
         }
         this.stopMotion();
+        this._resetVerticalMotion();
         return true;
     }
 
     drop(vx = 0, vy = 0) {
         super.drop(vx, vy);
+        this.posZ = 0;
+        this.verticalVelocity = 0;
         if (vx !== 0 || vy !== 0) {
             this.velocity.x = vx;
             this.velocity.y = vy;
             this.isMoving = true;
             this.updateBallAnimation();
         }
-        this.triggerDropBounce(Math.max(36, Math.hypot(vx, vy) * 14));
+        this.triggerDropBounce(Math.max(18, Math.hypot(vx, vy) * 6));
     }
 
     reactToNearbyCreature(myte) {
@@ -391,9 +436,11 @@ class BallMapObject extends AnimatedMapObject {
         this.checkBoundaries();
 
         const speedBeforeFriction = this.getSpeed();
-        const friction = speedBeforeFriction <= this.settleThreshold
-            ? this.settleFriction
-            : this.friction;
+        const friction = this.posZ > 0.05
+            ? this.airborneFriction
+            : speedBeforeFriction <= this.settleThreshold
+                ? this.settleFriction
+                : this.friction;
 
         this.velocity.x *= friction;
         this.velocity.y *= friction;
@@ -433,6 +480,7 @@ class BallMapObject extends AnimatedMapObject {
 
         if (bouncedX || bouncedY) {
             this.gameMap?.soundManager?.play('ball_hit');
+            this._triggerImpactHop();
             this.updateBallAnimation();
         }
     }
@@ -488,6 +536,7 @@ class BallMapObject extends AnimatedMapObject {
 
         if (bounced) {
             this.gameMap?.soundManager?.play('ball_hit');
+            this._triggerImpactHop();
             this.updateBallAnimation();
         }
     }
@@ -523,6 +572,7 @@ class BallMapObject extends AnimatedMapObject {
         }
 
         this._initSelectDragHandler();
+        this._applySpriteVisuals();
 
         return element;
     }
@@ -740,11 +790,16 @@ class BallMapObject extends AnimatedMapObject {
         if (this.isDragging) {
             this._updateDragAnimation(deltaTime);
         }
+        if (this.landingSquash > 0.001) {
+            const frameRatio = Math.max(0.25, deltaTime / 16.67);
+            this.landingSquash *= Math.pow(this.landingSquashDecay, frameRatio);
+            if (this.landingSquash < 0.001) {
+                this.landingSquash = 0;
+            }
+        }
+        this._applySpriteVisuals();
         if (this.element) {
             this.element.setAttribute('data-moving', String(this.isMoving));
-        }
-        if (this.isDropBouncing) {
-            this._applySpriteDropOffset(this.dropZ);
         }
     }
 }

@@ -14,6 +14,7 @@ class MytePhysics {
 	reset() {
 		const m = this.myte;
 		m.physics.velocity = 0;
+		m.posZ = 0;
 		this.isJumping = false;
 		this.isFalling = false;
 		this.isOnSolidGround = false;

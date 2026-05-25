@@ -283,6 +283,48 @@ class Utility {
 		return Math.max(min, Math.min(max, current));
 	}
 
+	static composeTransforms(parts = []) {
+		if (!Array.isArray(parts)) {
+			return '';
+		}
+
+		return parts
+			.map(part => typeof part === 'string' ? part.trim() : '')
+			.filter(Boolean)
+			.join(' ');
+	}
+
+	static applyElementVerticalVisuals(element, {
+		baseTop = 0,
+		lift = 0,
+		baseTransform = '',
+		scaleX = 1,
+		scaleY = 1,
+		extraTransforms = []
+	} = {}) {
+		if (!element) {
+			return;
+		}
+
+		const resolvedBaseTop = Number.isFinite(baseTop) ? baseTop : 0;
+		const resolvedLift = Number.isFinite(lift) ? lift : 0;
+		const resolvedScaleX = Number.isFinite(scaleX) ? scaleX : 1;
+		const resolvedScaleY = Number.isFinite(scaleY) ? scaleY : 1;
+		const transforms = [baseTransform];
+
+		if (Math.abs(resolvedScaleX - 1) > 0.001 || Math.abs(resolvedScaleY - 1) > 0.001) {
+			transforms.push(`scaleX(${resolvedScaleX.toFixed(3)})`);
+			transforms.push(`scaleY(${resolvedScaleY.toFixed(3)})`);
+		}
+
+		if (Array.isArray(extraTransforms)) {
+			transforms.push(...extraTransforms);
+		}
+
+		element.style.top = `${resolvedBaseTop - resolvedLift}px`;
+		element.style.transform = this.composeTransforms(transforms);
+	}
+
 	static getKeyByValue(object, value) {
 		for (const key in object) {
 			if (object[key] === value) {
