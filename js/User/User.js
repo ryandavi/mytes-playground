@@ -9,23 +9,30 @@ class User {
         this.userId = null;
         this.lastLogin = null;
         this.dateCreated = null;
-        
+
         // Reference to ContainerManager's inventory instance
         this.inventory = null;
         this.items = [];
-        
-        // Game state - track active Mytes
+
+        // Game state
         this.activeMytes = [];
-        
+        this.savedMytes = [];   // serialized myte state restored on load
+        this.currentMapId = null;
+
         // User preferences
         this.preferences = {
             soundEnabled: true,
             musicEnabled: true,
-            cameraMode: 'follow', // Default camera mode
-            containerLimit: true, // Whether Mytes stay in container by default
+            masterVolume: 1,
+            sfxVolume: 0.8,
+            musicVolume: 0,
+            uiVolume: 0.6,
+            ambientVolume: 0,
+            cameraMode: 'follow',
+            containerLimit: true,
             theme: 'light'
         };
-        
+
         // Statistics
         this.stats = {
             totalPlayTime: 0,
@@ -36,7 +43,7 @@ class User {
 
         // Achievement tracking
         this.achievements = new Map();
-        
+
         // Currency/Resources
         this.currency = {
             coins: 0,
@@ -77,7 +84,20 @@ class User {
             userId: this.userId,
             lastLogin: this.lastLogin,
             dateCreated: this.dateCreated,
+            currentMapId: this.currentMapId,
             inventory: inventoryData,
+            mytes: this.activeMytes.map(myte => ({
+                id: myte.id,
+                name: myte.name,
+                species: myte.species,
+                posX: myte.posX,
+                posY: myte.posY,
+                stats: {
+                    health: myte.stats?.health ?? 100,
+                    mood:   myte.stats?.mood   ?? 100,
+                    energy: myte.stats?.energy ?? 75,
+                },
+            })),
             preferences: this.preferences,
             stats: this.stats,
             achievements: Array.from(this.achievements.entries()),
@@ -90,6 +110,11 @@ class User {
         this.userId = userData.userId ?? this.userId;
         this.lastLogin = userData.lastLogin ? new Date(userData.lastLogin) : this.lastLogin;
         this.dateCreated = userData.dateCreated ? new Date(userData.dateCreated) : this.dateCreated;
+        this.currentMapId = userData.currentMapId ?? this.currentMapId;
+
+        if (Array.isArray(userData.mytes)) {
+            this.savedMytes = userData.mytes.map(m => ({ ...m }));
+        }
 
         if (userData.preferences) {
             this.preferences = {
@@ -280,6 +305,18 @@ class User {
 
             return false;
         }
+    }
+
+    applyAudioSettings(soundManager) {
+        if (!soundManager) return;
+        const p = this.preferences;
+        soundManager.soundEnabled   = p.soundEnabled;
+        soundManager.musicEnabled   = p.musicEnabled;
+        soundManager.volume.master  = p.masterVolume;
+        soundManager.volume.sfx     = p.sfxVolume;
+        soundManager.volume.music   = p.musicVolume;
+        soundManager.volume.ui      = p.uiVolume;
+        soundManager.volume.ambient = p.ambientVolume;
     }
 
     // Data persistence

@@ -31,15 +31,28 @@ const EntityMethods = {
 	// axis: 'x' | 'y' | undefined — when provided, doors must be perpendicular to the movement axis.
 	// E/W doors (tall, vertical) block X movement; N/S doors (wide, horizontal) block Y movement.
 	canAutoOpenCollider(collider, axis) {
-		if (!collider || !this.capabilities?.canOpenDoors) return false;
+		const dbg = window._doorDebug;
+		if (!collider || !this.capabilities?.canOpenDoors) {
+			if (dbg && collider && ['DOOR','GATE'].includes(collider.type)) console.log(`[canAutoOpenCollider] FAIL: canOpenDoors=${this.capabilities?.canOpenDoors}`);
+			return false;
+		}
 		if (!['DOOR', 'GATE'].includes(collider.type)) return false;
-		if (typeof collider.open !== 'function' || collider.isOpen) return false;
+		if (typeof collider.open !== 'function' || collider.isOpen) {
+			if (dbg) console.log(`[canAutoOpenCollider] FAIL: isOpen=${collider.isOpen} hasOpen=${typeof collider.open === 'function'}`);
+			return false;
+		}
 
 		if (axis && collider.facingDirection) {
 			const verticalDoors = ['E', 'W']; // tall doors — block X movement
 			const horizontalDoors = ['N', 'S']; // wide doors — block Y movement
-			if (axis === 'x' && !verticalDoors.includes(collider.facingDirection)) return false;
-			if (axis === 'y' && !horizontalDoors.includes(collider.facingDirection)) return false;
+			if (axis === 'x' && !verticalDoors.includes(collider.facingDirection)) {
+				if (dbg) console.log(`[canAutoOpenCollider] FAIL: axis=x but door facing=${collider.facingDirection} (need E/W)`);
+				return false;
+			}
+			if (axis === 'y' && !horizontalDoors.includes(collider.facingDirection)) {
+				if (dbg) console.log(`[canAutoOpenCollider] FAIL: axis=y but door facing=${collider.facingDirection} (need N/S)`);
+				return false;
+			}
 		}
 
 		if (typeof collider.canAutoOpenFor === 'function' && !collider.canAutoOpenFor(this, axis)) {

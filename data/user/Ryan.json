@@ -3,9 +3,15 @@
 	"userId": "uid123",
 	"lastLogin": "2024-12-20T10:00:00.000Z",
 	"dateCreated": "2024-12-01T00:00:00.000Z",
+	"currentMapId": null,
 	"preferences": {
 		"soundEnabled": true,
 		"musicEnabled": true,
+		"masterVolume": 1,
+		"sfxVolume": 0.8,
+		"musicVolume": 0,
+		"uiVolume": 0.6,
+		"ambientVolume": 0,
 		"cameraMode": "follow",
 		"containerLimit": true,
 		"theme": "light"

@@ -62,13 +62,31 @@ const SiteConfig = Object.freeze({
     }),
 
     // ── Food defaults ─────────────────────────────────────────────────────────
-    // Applied when the myte finishes eating. Individual food variants override
-    // these values in their variantConfigs.
+    // Applied when the myte finishes eating food from the ground.
+    // Inventory hand-feeding uses inventory.itemTypes below.
 
     food: Object.freeze({
         energyRestore: 20,
         moodBoost: 8,
         healthRestore: 3,
+    }),
+
+    // ── Inventory ─────────────────────────────────────────────────────────────
+
+    inventory: Object.freeze({
+        maxItems:    50,
+        stackSize:   99,
+        feedCooldown: 2000,
+
+        // Per-type effects when an item is dragged from inventory onto a Myte.
+        // moodBoost is separate from food.moodBoost (hand-feeding vs ground eating).
+        itemTypes: Object.freeze({
+            FOOD:     Object.freeze({ moodBoost: 15, expressions: ['eat'],                consumeTime: 1000 }),
+            TOY:      Object.freeze({ moodBoost: 10, expressions: ['play', 'happy'],      consumeTime: 2000 }),
+            MEDICINE: Object.freeze({ moodBoost: 5,  expressions: ['surprised', 'happy'], consumeTime: 1500 }),
+            FLOWER:   Object.freeze({ moodBoost: 6,  expressions: ['happy'],              consumeTime: 1200 }),
+            HEALTH:   Object.freeze({ moodBoost: 5,  expressions: ['surprised', 'happy'], consumeTime: 1500 }),
+        }),
     }),
 
     // ── Object interaction flags ──────────────────────────────────────────────
@@ -79,9 +97,21 @@ const SiteConfig = Object.freeze({
         canRotate: false,
     }),
 
+    // ── World defaults ────────────────────────────────────────────────────────
+
+    world: Object.freeze({
+        defaultMap: 'House',
+    }),
+
     // ── Myte defaults ─────────────────────────────────────────────────────────
 
     myte: Object.freeze({
+
+        // Default animation frame rate for sprite sheets
+        defaultAnimationFPS: 8,
+
+        // How long a myte must be motionless before becoming inactive (ms)
+        inactiveTimeout: 8000,
 
         // Starting stat values for a freshly spawned myte
         initialStats: Object.freeze({

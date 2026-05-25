@@ -751,12 +751,21 @@ class Myte {
 						const potentialColliders = gridSystem.getPotentialColliders(this);
 						for (const collider of potentialColliders) {
 							if (this.parent.checkCollision(this, collider)) {
-								if (this.tryOpenCollider(collider, 'x')) {
-									this.posX = originalX;
-									xBlocked = true;
-									break;
-								}
+								// Restore original position before tryOpenCollider so actorCenter
+								// reflects the approaching side, not a penetrated position inside the door.
 								this.posX = originalX;
+								const savedDest = this._movementDestination;
+								// Always override: stale A* destinations give wrong door-side detection.
+								// Project only along X — door sees a clear crossing regardless of Y drift.
+								this._movementDestination = {
+									x: this.posX + Math.sign(moveX) * 2000,
+									y: this.posY
+								};
+								if (window._doorDebug && ['DOOR','GATE'].includes(collider.type)) {
+									console.log(`[Door X] follow=${this.followMouse} collider=${collider.constructor?.name} dest=${JSON.stringify(this._movementDestination)} targetX=${this.targetX?.toFixed(1)}`);
+								}
+								this.tryOpenCollider(collider, 'x');
+								this._movementDestination = savedDest;
 								xBlocked = true;
 								break;
 							}
@@ -782,12 +791,10 @@ class Myte {
 							// Temporarily set _movementDestination to the live cursor so the door
 							// can detect it is between the myte and the cursor.
 							const savedDest = this._movementDestination;
-							if (this.followMouse && !this._movementDestination) {
-								const cursor = this.parent?.inputHandler?.getMouseWorldPosition?.();
-								if (cursor && Number.isFinite(cursor.x)) {
-									this._movementDestination = { x: cursor.x, y: cursor.y };
-								}
-							}
+							this._movementDestination = {
+								x: this.posX + Math.sign(moveX) * 2000,
+								y: this.posY
+							};
 							for (const collider of potentialColliders) {
 								this.tryOpenCollider(collider, 'x');
 							}
@@ -808,12 +815,21 @@ class Myte {
 						const potentialColliders = gridSystem.getPotentialColliders(this);
 						for (const collider of potentialColliders) {
 							if (this.parent.checkCollision(this, collider)) {
-								if (this.tryOpenCollider(collider, 'y')) {
-									this.posY = originalY;
-									yBlocked = true;
-									break;
-								}
+								// Restore original position before tryOpenCollider so actorCenter
+								// reflects the approaching side, not a penetrated position inside the door.
 								this.posY = originalY;
+								const savedDest = this._movementDestination;
+								// Always override: stale A* destinations give wrong door-side detection.
+								// Project only along Y — door sees a clear crossing regardless of X drift.
+								this._movementDestination = {
+									x: this.posX,
+									y: this.posY + Math.sign(moveY) * 2000
+								};
+								if (window._doorDebug && ['DOOR','GATE'].includes(collider.type)) {
+									console.log(`[Door Y] follow=${this.followMouse} collider=${collider.constructor?.name} dest=${JSON.stringify(this._movementDestination)} targetY=${this.targetY?.toFixed(1)}`);
+								}
+								this.tryOpenCollider(collider, 'y');
+								this._movementDestination = savedDest;
 								yBlocked = true;
 								break;
 							}
@@ -836,12 +852,10 @@ class Myte {
 							const potentialColliders = gridSystem.getPotentialColliders(this);
 							this.posY = originalY;
 							const savedDest = this._movementDestination;
-							if (this.followMouse && !this._movementDestination) {
-								const cursor = this.parent?.inputHandler?.getMouseWorldPosition?.();
-								if (cursor && Number.isFinite(cursor.x)) {
-									this._movementDestination = { x: cursor.x, y: cursor.y };
-								}
-							}
+							this._movementDestination = {
+								x: this.posX,
+								y: this.posY + Math.sign(moveY) * 2000
+							};
 							for (const collider of potentialColliders) {
 								this.tryOpenCollider(collider, 'y');
 							}

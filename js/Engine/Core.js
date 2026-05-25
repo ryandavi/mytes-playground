@@ -12,52 +12,7 @@ class MyteCore {
 
         this.user = null;
 
-        // System configuration
-        this.config = {
-            // Logic/physics update rate
-            tickRate: 20,
-            tickInterval: 1000 / 20,
-
-            // Default animation frame rate for sprites
-            defaultAnimationFPS: 8,
-
-            // Performance monitoring
-            targetFPS: 60,
-            fpsUpdateInterval: 1000,
-
-            // Myte/world settings
-            inactiveTimeout: 8000,
-            defaultState: "idle",
-            defaultMode: MOVE_TYPES.FOLLOW,
-            defaultFollowMode: MOVE_FOLLOW_TYPES.NORMAL,
-
-            // User data
-            userData: {
-                defaultPath: 'data/user/Ryan.json',
-                filePathTemplate: `data/user/${MyteCore.USER_DATA_ID_TOKEN}.json`,
-                localStorageKeyPrefix: 'user_',
-                lastUserIdKey: 'lastUserId',
-            },
-
-            // DOM/boot configuration
-            primaryContainerId: 'container-1',
-
-            // Loading
-            loading: {
-                stages: {
-                    [LoadingManager.STAGES.CORE]: { weight: 0.45 },
-                    [LoadingManager.STAGES.RESOURCES]: { weight: 0.10 },
-                    [LoadingManager.STAGES.CONTAINER]: { weight: 0.45 },
-                },
-            },
-
-            // Audio
-            sound: {
-                enabled: true,
-                musicEnabled: true,
-                unlockDelay: 400,
-            },
-        };
+        this.config = AppConfig;
 
         // Core systems
         this.containers = new Map();
@@ -103,7 +58,7 @@ class MyteCore {
             await this.initializeUser();
 
             this.loadingManager.setMessage("Setting up world...");
-            const container = await this.createContainer(this.config.primaryContainerId);
+            const container = await this.createContainer(this.config.container.primaryId);
             if (!container) throw new Error('Failed to create main container');
             await container.init();
 
@@ -259,7 +214,7 @@ class MyteCore {
 
     updateFPSCounter(timestamp) {
         this.frameCount++;
-        if (timestamp - this.lastFPSUpdate >= this.config.fpsUpdateInterval) {
+        if (timestamp - this.lastFPSUpdate >= this.config.engine.fpsUpdateInterval) {
             this.currentFPS = Math.round(
                 (this.frameCount * 1000) / (timestamp - this.lastFPSUpdate)
             );
@@ -305,9 +260,9 @@ class MyteCore {
 
             // Accumulate time and drain with fixed-size steps
             this.tickAccumulator += deltaTime;
-            while (this.tickAccumulator >= this.config.tickInterval) {
-                this.tickUpdate(this.config.tickInterval);
-                this.tickAccumulator -= this.config.tickInterval;
+            while (this.tickAccumulator >= this.config.engine.tickInterval) {
+                this.tickUpdate(this.config.engine.tickInterval);
+                this.tickAccumulator -= this.config.engine.tickInterval;
             }
 
             // Variable-rate render/animation update

@@ -168,34 +168,74 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
         return null;
     }
 
+    // Returns true when the actor's collider is still on the approaching side of the door
+    // and is moving toward it (not away or already through).
+    // axis='y' moving south: collider top hasn't yet passed the door's bottom edge.
+    // axis='y' moving north: collider bottom hasn't yet passed the door's top edge.
+    // axis='x' moving east:  collider left  hasn't yet passed the door's right edge.
+    // axis='x' moving west:  collider right hasn't yet passed the door's left edge.
+    isActorMovingTowardDoor(axis, entity, actorCenter, intent, bounds) {
+        const col     = entity?.collider || {};
+        const cLeft   = entity.posX + (col.offsetX || 0);
+        const cTop    = entity.posY + (col.offsetY || 0);
+        const cRight  = cLeft  + (col.width  || entity.size?.width  || 0);
+        const cBottom = cTop   + (col.height || entity.size?.height || 0);
+
+        const motionX = intent.x - actorCenter.x;
+        const motionY = intent.y - actorCenter.y;
+
+        if (axis === 'x') {
+            if (Math.abs(motionX) < 0.5) return false;
+            if (motionX > 0) return cLeft  < bounds.left + bounds.width;
+            return                        cRight > bounds.left;
+        }
+
+        if (axis === 'y') {
+            if (Math.abs(motionY) < 0.5) return false;
+            if (motionY > 0) return cTop    < bounds.top + bounds.height;
+            return                   cBottom > bounds.top;
+        }
+
+        return false;
+    }
+
     canAutoOpenFor(entity, axis) {
         const actorCenter = this.getEntityCenter(entity);
         const intent = this.getEntityIntentPoint(entity);
-        if (!actorCenter || !intent || !axis) return false;
+        const dbg = window._doorDebug;
+
+        if (!actorCenter || !intent || !axis) {
+            if (dbg) console.log(`[canAutoOpenFor] FAIL: missing actorCenter=${!!actorCenter} intent=${!!intent} axis=${axis}`);
+            return false;
+        }
+
+        if (dbg) {
+            const b = this.getDoorBounds();
+            console.log(`[canAutoOpenFor] axis=${axis} facing=${this.facingDirection} actor=(${actorCenter.x.toFixed(1)},${actorCenter.y.toFixed(1)}) intent=(${intent.x.toFixed(1)},${intent.y.toFixed(1)}) door=[${b.left.toFixed(0)},${b.top.toFixed(0)} ${b.width}x${b.height}] dest=${JSON.stringify(entity._movementDestination)}`);
+            console.trace('[canAutoOpenFor] call stack');
+        }
 
         if (!this.isEntityAlignedWithDoor(entity, axis, actorCenter, intent)) {
+            if (dbg) console.log(`[canAutoOpenFor] FAIL: not aligned with door`);
             return false;
         }
 
         const bounds = this.getDoorBounds();
-        const margin = 4;
-        if (!this.isIntentAcrossDoor(axis, actorCenter, intent, bounds, margin)) {
+
+        if (!this.isActorMovingTowardDoor(axis, entity, actorCenter, intent, bounds)) {
+            if (dbg) {
+                const col = entity?.collider || {};
+                const cTop    = entity.posY + (col.offsetY || 0);
+                const cBottom = cTop + (col.height || entity.size?.height || 0);
+                const cLeft   = entity.posX + (col.offsetX || 0);
+                const cRight  = cLeft + (col.width || entity.size?.width || 0);
+                console.log(`[canAutoOpenFor] FAIL: not moving toward door on axis=${axis} — cTop=${cTop.toFixed(1)} cBottom=${cBottom.toFixed(1)} cLeft=${cLeft.toFixed(1)} cRight=${cRight.toFixed(1)} motion=(${(intent.x-actorCenter.x).toFixed(1)},${(intent.y-actorCenter.y).toFixed(1)})`);
+            }
             return false;
         }
 
-        if (axis === 'x') {
-            const motion = intent.x - actorCenter.x;
-            if (Math.abs(motion) < 0.5) return false;
-            return true;
-        }
-
-        if (axis === 'y') {
-            const motion = intent.y - actorCenter.y;
-            if (Math.abs(motion) < 0.5) return false;
-            return true;
-        }
-
-        return false;
+        if (dbg) console.log(`[canAutoOpenFor] PASS axis=${axis}`);
+        return true;
     }
 
     isEntityInDoorway(entity, padding = 8) {

@@ -1661,7 +1661,7 @@ class ParticleSystem {
             1,
             ParticleDataUtils.toFiniteNumber(
                 options.tickInterval,
-                parent?.core?.config?.tickInterval || 1000 / 20
+                options.tickInterval || AppConfig.engine.tickInterval
             )
         );
         this.random = new ParticleRandom(options.randomFn || Math.random);

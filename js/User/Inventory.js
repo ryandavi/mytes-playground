@@ -17,31 +17,14 @@ class Inventory {
         this.boundMyteElements = new WeakSet();
         this.mutationObserver = null;
 
-        // Configuration
+        // Configuration — tunable values live in SiteConfig.inventory
         this.config = {
-            maxItems: 50,                // Maximum items in inventory
-            stackSize: 99,               // Maximum stack size per item
-            dragOffsetX: 0,              // Drag offset adjustment
+            maxItems:    SiteConfig.inventory.maxItems,
+            stackSize:   SiteConfig.inventory.stackSize,
+            feedCooldown: SiteConfig.inventory.feedCooldown,
+            dragOffsetX: 0,
             dragOffsetY: 0,
-            feedMoodBoost: 15,          // Mood boost when feeding
-            feedCooldown: 2000,         // Cooldown between feeds (ms)
-            itemTypes: {
-                FOOD: {
-                    moodBoost: 15,
-                    expressions: ['eat'],
-                    consumeTime: 1000
-                },
-                TOY: {
-                    moodBoost: 10,
-                    expressions: ['play', 'happy'],
-                    consumeTime: 2000
-                },
-                MEDICINE: {
-                    moodBoost: 5,
-                    expressions: ['surprised', 'happy'],
-                    consumeTime: 1500
-                }
-            }
+            itemTypes:   SiteConfig.inventory.itemTypes,
         };
 
         // State tracking
@@ -550,7 +533,7 @@ class Inventory {
         this.removeItem(this.state.draggedItem.dataset.variant || this.state.draggedItem.dataset.name);
 
         // Play type-appropriate sound
-        const soundMap = { FOOD: 'myte_eat', TOY: 'myte_happy', MEDICINE: 'myte_happy' };
+        const soundMap = { FOOD: 'myte_eat', TOY: 'myte_happy', MEDICINE: 'myte_happy', FLOWER: 'myte_happy', HEALTH: 'myte_happy' };
         this.parent.soundManager?.play(soundMap[itemType] || 'ui_drop_item');
 
         // Update cooldown

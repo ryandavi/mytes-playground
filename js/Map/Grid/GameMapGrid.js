@@ -767,7 +767,11 @@ class GridSystem {
                 width: entityCollider.width || entityWidth,
                 height: entityCollider.height || entityHeight
             };
-            const capabilities = entity.capabilities || {};
+            // For real-time movement validation, do NOT treat closed doors as passable.
+            // The pathfinder skips doors for entities with canOpenDoors=true so A* can
+            // route through them, but moveTowardsTarget must be blocked at closed doors
+            // so the door-opening logic in canAutoOpenFor gets a chance to run.
+            const capabilities = { ...(entity.capabilities || {}), canOpenDoors: false };
 
             return this.pathfinder._validatePosition(
                 entity,

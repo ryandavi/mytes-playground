@@ -10,7 +10,7 @@ class ContainerInputManager {
 
     // Track input state
     this.isEnabled = true;
-    this.inactivityTimeout = this.container?.core?.config?.inactiveTimeout ?? 60000;
+    this.inactivityTimeout = SiteConfig.myte.inactiveTimeout;
     this.longTapTimer = null;
     this.longTapStartX = 0;
     this.longTapStartY = 0;

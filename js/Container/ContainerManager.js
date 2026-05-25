@@ -147,7 +147,8 @@ class ContainerManager {
 
             // Get the right map ID
             // Use the default or a dev map if configured
-            const initialMapId = this.core.config?.initialMap || 'House';
+            const initialMapId = this.core.user?.currentMapId
+                || SiteConfig.world.defaultMap;
 
             // Log to see what map we're trying to load
             console.log(`[ContainerManager] Loading initial map: ${initialMapId}`);
@@ -263,7 +264,7 @@ class ContainerManager {
             return;
         }
 
-        const statusChanged = this.inputHandler.checkInactive(this.core.config.inactiveTimeout);
+        const statusChanged = this.inputHandler.checkInactive(SiteConfig.myte.inactiveTimeout);
         if (statusChanged) {
             if (this.inputHandler.isUserActive()) {
                 this.handleUserActive();
