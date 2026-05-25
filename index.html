@@ -292,6 +292,10 @@
 					<input type="range" id="sfx-volume" min="0" max="100" value="0">
 				</div>
 				<div class="setting-item">
+					<label for="footsteps-volume">Footsteps Volume</label>
+					<input type="range" id="footsteps-volume" min="0" max="100" value="0">
+				</div>
+				<div class="setting-item">
 					<label for="music-volume">Music Volume</label>
 					<input type="range" id="music-volume" min="0" max="100" value="0">
 				</div>
@@ -309,7 +313,16 @@
 						<label for="music-enabled">Background Music</label>
 					</div>
 				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" id="footsteps-enabled" checked>
+						<label for="footsteps-enabled">Footsteps</label>
+					</div>
+				</div>
 			</div>
+		</div>
+		<div class="window-panel__footer">
+			<button type="button" id="sound-reset-defaults" class="debug-button">Reset Audio Defaults</button>
 		</div>
 	</div>
 	<!-- END SOUND SETTINGS -->
@@ -464,8 +477,8 @@
 	<!-- EXTERNAL -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
 	<!-- CORE -->
-	<script src="js/Engine/AppConfig.js"></script>
-	<script src="js/Engine/SiteConfig.js"></script>
+	<script src="js/Engine/Config/AppConfig.js"></script>
+	<script src="js/Engine/Config/SiteConfig.js"></script>
 	<script src="js/Utility/Utility.js"></script>
 	<script src="js/Utility/RectUtils.js"></script>
 	<script src="js/UI/TooltipSystem.js"></script>
@@ -474,6 +487,10 @@
 	<script src="js/Input/BaseInputHandler.js"></script>
 	<script src="js/Input/BaseDragHandler.js"></script>
 	<script src="js/Engine/ResourceManager.js"></script>
+	<script src="js/Engine/Audio/AudioCategoryRules.js"></script>
+	<script src="js/Engine/Audio/AudioScheduleProfiles.js"></script>
+	<script src="js/Engine/Audio/AudioVoiceProfiles.js"></script>
+	<script src="js/Engine/Audio/AudioPresetLibrary.js"></script>
 	<script src="js/Engine/SoundManager.js"></script>
 	<script src="js/Engine/EventManager.js"></script>
 	<script src="js/Engine/LoadingManager.js"></script>
@@ -499,6 +516,7 @@
 	<script src="js/Engine/Entity.js"></script>
 	<!-- MYTE -->
 	<script src="js/Myte/MyteDefinitions.js"></script>
+	<script src="js/Myte/FootstepController.js"></script>
 	<script src="js/Myte/MytePhysics.js"></script>
 	<script src="js/Myte/MyteMovementController.js"></script>
 	<script src="js/Myte/MyteRenderer.js"></script>

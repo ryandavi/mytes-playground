@@ -1,3 +1,40 @@
+function getInteractionSoundManager(action) {
+    return action?.myte?.parent?.soundManager || action?.target?.gameMap?.soundManager || null;
+}
+
+function startInteractionSoundPulse(action, config = {}) {
+    if (!action) return;
+    action._interactionSoundPulse = {
+        soundIds: Array.isArray(config.soundIds) ? config.soundIds.slice() : [config.soundId].filter(Boolean),
+        intervalTicks: Math.max(1, config.intervalTicks ?? 10),
+        jitterTicks: Math.max(0, config.jitterTicks ?? 0),
+        volume: config.volume ?? 1,
+        nextTick: 0,
+        index: 0
+    };
+}
+
+function tickInteractionSoundPulse(action) {
+    const pulse = action?._interactionSoundPulse;
+    if (!pulse?.soundIds?.length) return;
+
+    if (pulse.nextTick > 0) {
+        pulse.nextTick--;
+        return;
+    }
+
+    const soundId = pulse.soundIds[pulse.index % pulse.soundIds.length];
+    pulse.index++;
+    pulse.nextTick = pulse.intervalTicks + (pulse.jitterTicks ? Math.floor(Math.random() * (pulse.jitterTicks + 1)) : 0);
+    getInteractionSoundManager(action)?.play?.(soundId, { volume: pulse.volume });
+}
+
+function stopInteractionSoundPulse(action) {
+    if (action) {
+        action._interactionSoundPulse = null;
+    }
+}
+
 // Pause beside an object and quietly observe it.
 class InspectAction extends GoToObjectAction {
     static metadata = {
@@ -1260,11 +1297,18 @@ class PickFlowerAction extends GoToObjectAction {
             this.phase = 'pick';
             this.animationTimer = this.pickAnimationDuration;
             this.faceTarget();
+            startInteractionSoundPulse(this, {
+                soundIds: ['obj_flower_rustle', 'obj_flower_pick'],
+                intervalTicks: 11,
+                jitterTicks: 4,
+                volume: 0.78
+            });
             return false;
         }
 
         if (this.phase === 'pick') {
             this.faceTarget();
+            tickInteractionSoundPulse(this);
             this.animationTimer--;
             return this.animationTimer <= 0;
         }
@@ -1274,16 +1318,19 @@ class PickFlowerAction extends GoToObjectAction {
 
     interrupt() {
         this._interrupted = true;
+        stopInteractionSoundPulse(this);
         super.interrupt();
     }
 
     cancel() {
         this._interrupted = true;
+        stopInteractionSoundPulse(this);
         super.cancel?.();
     }
 
     complete() {
         if (this._interrupted) return;
+        stopInteractionSoundPulse(this);
         this.faceTarget();
         super.complete();
         this._dropFlowerItem();
@@ -1346,11 +1393,18 @@ class TrampleFlowerAction extends GoToObjectAction {
             this.phase = 'trample';
             this.animationTimer = this.trampleAnimationDuration;
             this.faceTarget();
+            startInteractionSoundPulse(this, {
+                soundIds: ['obj_flower_trample_step', 'obj_flower_trample'],
+                intervalTicks: 6,
+                jitterTicks: 2,
+                volume: 0.72
+            });
             return false;
         }
 
         if (this.phase === 'trample') {
             this.faceTarget();
+            tickInteractionSoundPulse(this);
             this.animationTimer--;
             return this.animationTimer <= 0;
         }
@@ -1358,7 +1412,18 @@ class TrampleFlowerAction extends GoToObjectAction {
         return true;
     }
 
+    interrupt() {
+        stopInteractionSoundPulse(this);
+        super.interrupt?.();
+    }
+
+    cancel() {
+        stopInteractionSoundPulse(this);
+        super.cancel?.();
+    }
+
     complete() {
+        stopInteractionSoundPulse(this);
         this.faceTarget();
         super.complete();
         this.target?.playConfiguredSound?.('trample');
@@ -1483,11 +1548,18 @@ class WaterPlantAction extends GoToObjectAction {
             this.phase = 'water';
             this.animationTimer = this.waterAnimationDuration;
             this.faceTarget();
+            startInteractionSoundPulse(this, {
+                soundIds: ['obj_crop_tend', 'obj_crop_tend'],
+                intervalTicks: 9,
+                jitterTicks: 3,
+                volume: 0.64
+            });
             return false;
         }
 
         if (this.phase === 'water') {
             this.faceTarget();
+            tickInteractionSoundPulse(this);
             this.animationTimer--;
             return this.animationTimer <= 0;
         }
@@ -1495,7 +1567,18 @@ class WaterPlantAction extends GoToObjectAction {
         return true;
     }
 
+    interrupt() {
+        stopInteractionSoundPulse(this);
+        super.interrupt?.();
+    }
+
+    cancel() {
+        stopInteractionSoundPulse(this);
+        super.cancel?.();
+    }
+
     complete() {
+        stopInteractionSoundPulse(this);
         this.faceTarget();
         super.complete();
         if (this.target?.water) {
@@ -1555,11 +1638,18 @@ class HarvestAction extends GoToObjectAction {
             this.phase = 'harvest';
             this.animationTimer = this.harvestAnimationDuration;
             this.faceTarget();
+            startInteractionSoundPulse(this, {
+                soundIds: ['obj_crop_tend', 'obj_crop_harvest'],
+                intervalTicks: 10,
+                jitterTicks: 4,
+                volume: 0.72
+            });
             return false;
         }
 
         if (this.phase === 'harvest') {
             this.faceTarget();
+            tickInteractionSoundPulse(this);
             this.animationTimer--;
             return this.animationTimer <= 0;
         }
@@ -1567,7 +1657,18 @@ class HarvestAction extends GoToObjectAction {
         return true;
     }
 
+    interrupt() {
+        stopInteractionSoundPulse(this);
+        super.interrupt?.();
+    }
+
+    cancel() {
+        stopInteractionSoundPulse(this);
+        super.cancel?.();
+    }
+
     complete() {
+        stopInteractionSoundPulse(this);
         this.faceTarget();
         super.complete();
         if (typeof this.target?.performHarvest === 'function') {

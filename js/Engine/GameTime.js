@@ -8,6 +8,7 @@ class GameTime {
 		// Core time tracking
 		this.totalElapsedSeconds = 0;
 		this.isPaused = false;
+		this.timeScale = 1;
 
 		// Configuration
 		this.config = {
@@ -84,6 +85,9 @@ class GameTime {
 		this.lastHour = this.getCurrentHour();
 		this.lastDay = this.getCurrentDay();
 		this.lastSeason = this.getCurrentSeason();
+		this.lastTimeOfDay = this.getTimeOfDay();
+		this.lastLightLevel = this.getLightLevel();
+		this.lastMoonPhase = this.getMoonPhase();
 
 
 
@@ -263,7 +267,9 @@ class GameTime {
 			seasonProgress: this.getCurrentDay() / this.config.daysPerSeason,
 			dayProgress: (this.getCurrentHour() * 60 + this.getCurrentMinute()) / (24 * 60),
 			totalDays: this._getTotalGameDays(),
-			totalElapsedSeconds: this.totalElapsedSeconds
+			totalElapsedSeconds: this.totalElapsedSeconds,
+			timeScale: this.timeScale,
+			isPaused: this.isPaused
 		};
 	}
 
@@ -286,6 +292,9 @@ class GameTime {
 		const currentHour = this.getCurrentHour();
 		const currentDay = this.getCurrentDay();
 		const currentSeason = this.getCurrentSeason();
+		const currentTimeOfDay = this.getTimeOfDay();
+		const currentLightLevel = this.getLightLevel();
+		const currentMoonPhase = this.getMoonPhase();
 
 		if (currentMinute !== this.lastMinute) {
 			this.notifySubscribers('minute');
@@ -306,6 +315,21 @@ class GameTime {
 			this.notifySubscribers('season');
 			this.lastSeason = currentSeason;
 		}
+
+		if (currentTimeOfDay !== this.lastTimeOfDay) {
+			this.notifySubscribers('dayNight');
+			this.lastTimeOfDay = currentTimeOfDay;
+		}
+
+		if (Math.abs(currentLightLevel - this.lastLightLevel) >= 0.05) {
+			this.notifySubscribers('light');
+			this.lastLightLevel = currentLightLevel;
+		}
+
+		if (currentMoonPhase !== this.lastMoonPhase) {
+			this.notifySubscribers('moonPhase');
+			this.lastMoonPhase = currentMoonPhase;
+		}
 	}
 
 	notifySubscribers(event) {
@@ -317,8 +341,12 @@ class GameTime {
 	update(deltaTime) {
 		if (this.isPaused) return;
 
-		this.totalElapsedSeconds += deltaTime / 1000;
+		this.totalElapsedSeconds += (deltaTime / 1000) * this.timeScale;
 		this.checkAndNotifyChanges();
+	}
+
+	tickUpdate(deltaTime) {
+		this.update(deltaTime);
 	}
 
 	pause() {
@@ -327,6 +355,11 @@ class GameTime {
 
 	resume() {
 		this.isPaused = false;
+	}
+
+	setTimeScale(scale = 1) {
+		this.timeScale = Math.min(32, Math.max(0, Number(scale) || 0));
+		return this.timeScale;
 	}
 
 	// Set specific time

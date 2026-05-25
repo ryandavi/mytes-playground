@@ -75,6 +75,38 @@
       "neutral": { "duration": 5000, "speedMultiplier": 1, "expression": "neutral" }
     }
   },
+  "audio": {
+    "locomotion": {
+      "animationSpeedScale": {
+        "min": 0.85,
+        "max": 1.25
+      },
+      "footsteps": {
+        "enabled": true,
+        "frames": [1, 5],
+        "cooldownMs": 80,
+        "baseVolume": 0.62,
+        "volumeSteps": [0.96, 1.0],
+        "speedVolumeRange": {
+          "min": 0.88,
+          "max": 1.06
+        },
+        "surfaces": {
+          "path": "path",
+          "floor": "floor",
+          "ground": "ground",
+          "grass": "grass",
+          "sand": "sand",
+          "mud": "mud",
+          "shallow_water": "water",
+          "deep_water": "water",
+          "door_open": "path",
+          "door_closed": "path",
+          "default": "ground"
+        }
+      }
+    }
+  },
   "visual": {
     "spriteSheet": {
       "filter": "none"

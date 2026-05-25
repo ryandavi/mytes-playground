@@ -61,6 +61,7 @@ class MyteCore {
             const container = await this.createContainer(this.config.container.primaryId);
             if (!container) throw new Error('Failed to create main container');
             await container.init();
+            this.soundManager.bindTimeManager?.(container.timeManager);
 
             this.loadingManager.setMessage("Initializing audio...");
             this.initializeAudio();
@@ -150,18 +151,22 @@ class MyteCore {
             this.user.login('Guest' + Math.floor(Math.random() * 1000), 'guest_' + Date.now());
             this.rememberLastUserId();
         }
+
+        this.user?.applyAudioSettings?.(this.soundManager);
     }
 
     async loadUserData(userId) {
         try {
             // Prefer the local save because it is synchronous and reflects the latest user state.
             if (this.user.loadUserDataFromStorage(userId)) {
+                this.user.applyAudioSettings?.(this.soundManager);
                 this.rememberLastUserId(userId);
                 return true;
             }
 
             const success = await this.user.loadUserDataFromFile(this.getUserDataFilePath(userId));
             if (success) {
+                this.user.applyAudioSettings?.(this.soundManager);
                 this.rememberLastUserId();
                 return true;
             }

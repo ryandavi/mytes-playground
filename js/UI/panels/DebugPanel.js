@@ -234,6 +234,87 @@ class DebugPanel extends ModalWindow {
                     this.parent.parent.camera.reset();
                 }
             },
+            {
+                id: 'toggleTimePause',
+                section: 'time',
+                subgroup: 'controls',
+                type: 'toggle',
+                label: 'Clock: ',
+                states: { true: 'Paused', false: 'Running' },
+                getValue: () => this.getTimeManager()?.isPaused ?? false,
+                action: () => {
+                    const gameTime = this.getTimeManager();
+                    if (!gameTime) return;
+                    if (gameTime.isPaused) gameTime.resume();
+                    else gameTime.pause();
+                    this.updateButton('toggleTimePause');
+                }
+            },
+            {
+                id: 'timeScale',
+                section: 'time',
+                subgroup: 'controls',
+                type: 'value',
+                label: 'Time Speed: ',
+                min: 0,
+                max: 16,
+                step: 0.25,
+                defaultValue: 1,
+                format: (value) => `${value.toFixed(value < 1 || value % 1 ? 2 : 0)}x`,
+                getValue: () => this.getTimeManager()?.timeScale ?? 1,
+                action: (_button, value) => {
+                    this.getTimeManager()?.setTimeScale?.(value);
+                    this.updateButton('timeScale');
+                }
+            },
+            {
+                id: 'setDawn',
+                section: 'time',
+                subgroup: 'presets',
+                type: 'action',
+                label: 'Set Dawn',
+                action: () => this.applyTimePreset(6, 0)
+            },
+            {
+                id: 'setNoon',
+                section: 'time',
+                subgroup: 'presets',
+                type: 'action',
+                label: 'Set Noon',
+                action: () => this.applyTimePreset(12, 0)
+            },
+            {
+                id: 'setDusk',
+                section: 'time',
+                subgroup: 'presets',
+                type: 'action',
+                label: 'Set Dusk',
+                action: () => this.applyTimePreset(19, 30)
+            },
+            {
+                id: 'setMidnight',
+                section: 'time',
+                subgroup: 'presets',
+                type: 'action',
+                label: 'Set Midnight',
+                action: () => this.applyTimePreset(0, 0)
+            },
+            {
+                id: 'skipHour',
+                section: 'time',
+                subgroup: 'presets',
+                type: 'action',
+                label: '+1 Hour',
+                action: () => this.getTimeManager()?.skipTime?.(1, 0)
+            },
+            {
+                id: 'skipDay',
+                section: 'time',
+                subgroup: 'presets',
+                type: 'action',
+                label: '+1 Day',
+                action: () => this.getTimeManager()?.skipDays?.(1)
+            },
 
             // ── MYTE / CONTROLS ─────────────────────────────────────────
             {
@@ -402,6 +483,10 @@ class DebugPanel extends ModalWindow {
         this.setupDebugControls();
     }
 
+    getTimeManager() {
+        return this.parent?.parent?.timeManager || this.parent?.parent?.core?.gameTime || null;
+    }
+
     buttonLeftClick(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -464,6 +549,12 @@ class DebugPanel extends ModalWindow {
     }
 
     // ─── button interaction ──────────────────────────────────────────────────
+
+    applyTimePreset(hour, minute = 0) {
+        this.getTimeManager()?.setTime?.(hour, minute);
+        this.updateButton('toggleTimePause');
+        this.updateButton('timeScale');
+    }
 
     handleButtonClick(config, button) {
         if (config.action) {
@@ -578,6 +669,7 @@ class DebugPanel extends ModalWindow {
         // Build nested section → subgroup → buttons
         const layout = {
             map:  { label: 'Map',  subgroups: { overlays: 'Overlays', controls: 'Controls' } },
+            time: { label: 'Time', subgroups: { controls: 'Controls', presets: 'Presets' } },
             user: { label: 'User', subgroups: { modes: 'Modes' } },
             myte: { label: 'Myte', subgroups: { controls: 'Controls', stats: 'Stats' } }
         };
@@ -644,6 +736,8 @@ class DebugPanel extends ModalWindow {
         if (config.type === 'value') {
             const group = document.createElement('div');
             group.className = 'button-group';
+            group.id = `${config.id}-group`;
+            group.dataset.controlId = config.id;
 
             const minusBtn = document.createElement('button');
             minusBtn.id = `${config.id}-down`;

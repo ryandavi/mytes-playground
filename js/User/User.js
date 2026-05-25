@@ -1,4 +1,18 @@
 const USER_DATA_VERSION = 1;
+const USER_DEFAULT_PREFERENCES = Object.freeze({
+    soundEnabled: true,
+    musicEnabled: true,
+    footstepsEnabled: true,
+    masterVolume: 1,
+    sfxVolume: 0.82,
+    footstepsVolume: 0.72,
+    musicVolume: 0.28,
+    uiVolume: 0.72,
+    ambientVolume: 0.42,
+    cameraMode: 'follow',
+    containerLimit: true,
+    theme: 'light'
+});
 
 class User {
     constructor(core) {
@@ -20,18 +34,7 @@ class User {
         this.currentMapId = null;
 
         // User preferences
-        this.preferences = {
-            soundEnabled: true,
-            musicEnabled: true,
-            masterVolume: 1,
-            sfxVolume: 0.8,
-            musicVolume: 0,
-            uiVolume: 0.6,
-            ambientVolume: 0,
-            cameraMode: 'follow',
-            containerLimit: true,
-            theme: 'light'
-        };
+        this.preferences = User.getDefaultPreferences();
 
         // Statistics
         this.stats = {
@@ -312,11 +315,36 @@ class User {
         const p = this.preferences;
         soundManager.soundEnabled   = p.soundEnabled;
         soundManager.musicEnabled   = p.musicEnabled;
+        soundManager.footstepsEnabled = p.footstepsEnabled;
         soundManager.volume.master  = p.masterVolume;
         soundManager.volume.sfx     = p.sfxVolume;
+        soundManager.volume.footsteps = p.footstepsVolume;
         soundManager.volume.music   = p.musicVolume;
         soundManager.volume.ui      = p.uiVolume;
         soundManager.volume.ambient = p.ambientVolume;
+    }
+
+    resetAudioPreferences() {
+        const defaults = User.getDefaultPreferences();
+        [
+            'soundEnabled',
+            'musicEnabled',
+            'footstepsEnabled',
+            'masterVolume',
+            'sfxVolume',
+            'footstepsVolume',
+            'musicVolume',
+            'uiVolume',
+            'ambientVolume'
+        ].forEach((key) => {
+            this.preferences[key] = defaults[key];
+        });
+        this._scheduleSave();
+        return { ...defaults };
+    }
+
+    static getDefaultPreferences() {
+        return { ...USER_DEFAULT_PREFERENCES };
     }
 
     // Data persistence

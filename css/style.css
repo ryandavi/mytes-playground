@@ -1922,7 +1922,11 @@ body.debug .map-object > .interactive-hitbox {
 #game-debug-panel .window-panel__content .settings-subgroup #toggleDebug,
 #game-debug-panel .window-panel__content .settings-subgroup #cycleFollowGoal,
 #game-debug-panel .window-panel__content .settings-subgroup #cycleCamera,
-#game-debug-panel .window-panel__content .settings-subgroup #directWorldInteraction {
+#game-debug-panel .window-panel__content .settings-subgroup #directWorldInteraction,
+#game-debug-panel .window-panel__content .settings-subgroup #toggleTimePause {
+  flex: 1 1 100%;
+}
+#game-debug-panel .window-panel__content .settings-subgroup #timeScale-group {
   flex: 1 1 100%;
 }
 #game-debug-panel .window-panel__content .settings-subgroup #overlayGrid,
@@ -1997,11 +2001,14 @@ body.debug .map-object > .interactive-hitbox {
   background: var(--surface-state-myte);
   color: var(--text-default);
 }
-#game-debug-panel .window-panel__content .settings-subgroup #adjustSpeed {
+#game-debug-panel .window-panel__content .settings-subgroup #adjustSpeed,
+#game-debug-panel .window-panel__content .settings-subgroup #timeScale {
   flex: 1;
 }
 #game-debug-panel .window-panel__content .settings-subgroup #adjustSpeed-down,
-#game-debug-panel .window-panel__content .settings-subgroup #adjustSpeed-up {
+#game-debug-panel .window-panel__content .settings-subgroup #adjustSpeed-up,
+#game-debug-panel .window-panel__content .settings-subgroup #timeScale-down,
+#game-debug-panel .window-panel__content .settings-subgroup #timeScale-up {
   flex: 0;
   min-width: 50px;
 }

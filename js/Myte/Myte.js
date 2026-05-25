@@ -69,6 +69,7 @@ class Myte {
 		this.queue;
 		this.stateMachine;
 		this.physicsController;
+		this.footstepController;
 		this.ai;
 
 		// bools
@@ -193,6 +194,7 @@ class Myte {
 	init() {
 		this.physicsController = new MytePhysics(this);
 		this.movementController = new MyteMovementController(this);
+		this.footstepController = new FootstepController(this);
 		this.renderer = new MyteRenderer(this);
 		this.renderer.initInteractiveMyte();
 		this.renderer.createTargetDot();
@@ -243,6 +245,7 @@ class Myte {
 		this.isActive = false;
 		this.atOriginal = true;
 		this.queue.clear();
+		this.footstepController?.reset?.();
 		this.clearHomeSlotHold();
 		this.cancelInactivityFreeRoam();
 		this.resetGoHomeState();
@@ -308,6 +311,7 @@ class Myte {
 		// Start centered in the home slot rather than at the slot's top-left corner.
 		this.cancelInactivityFreeRoam();
 		this.resetGoHomeState();
+		this.footstepController?.reset?.();
 		this.snapToHomePosition();
 		this.playSlotExitSound();
 
@@ -1122,9 +1126,24 @@ class Myte {
 	isCurrentlyJumping()         { return this.physicsController.isCurrentlyJumping(); }
 
 	playSound(sound) {
-		this.parent.core.soundManager.playMyteSound(sound, {
+		if (!sound) return;
+
+		const soundManager = this.parent?.core?.soundManager;
+		if (!soundManager) return;
+
+		const normalized = String(sound).trim();
+		if (/^(ui_|obj_|env_|music_|footstep_)/.test(normalized)) {
+			soundManager.play(normalized);
+			return;
+		}
+
+		soundManager.playMyteSound(normalized, {
 			species: this.species
 		});
+	}
+
+	handleAnimationFrameEvent(event) {
+		this.footstepController?.handleAnimationEvent?.(event);
 	}
 
 	playSlotEnterSound() {

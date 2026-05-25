@@ -1,6 +1,5 @@
 class SoundPanel extends ModalWindow {
     constructor(parent) {
-        // Call parent constructor with modal-specific options
         super(parent, {
             id: 'sound-settings-panel',
             buttonId: 'sound-toggle',
@@ -9,230 +8,286 @@ class SoundPanel extends ModalWindow {
             position: 'top-right',
             closeButtonSelector: '.modal-close-btn'
         });
-        
-        this.categories = [
-            'master', 'ambient', 'music', 'ui', 'sfx',
-        ];
 
-        this.checkboxes = {
-            'soundEffects': {
-                "id": 'sound-enabled',
-                "property": 'soundEnabled',
-            },
-            'music': {
-                "id": 'music-enabled',
-                "property": 'musicEnabled',
-            },
+        this.categories = ['master', 'ui', 'ambient', 'sfx', 'footsteps', 'music'];
+        this.volumePreferenceMap = {
+            master: 'masterVolume',
+            ui: 'uiVolume',
+            ambient: 'ambientVolume',
+            sfx: 'sfxVolume',
+            footsteps: 'footstepsVolume',
+            music: 'musicVolume'
         };
-        
-        // Initialize sound settings
+        this.checkboxes = {
+            soundEnabled: {
+                id: 'sound-enabled',
+                property: 'soundEnabled',
+                preference: 'soundEnabled'
+            },
+            musicEnabled: {
+                id: 'music-enabled',
+                property: 'musicEnabled',
+                preference: 'musicEnabled'
+            },
+            footstepsEnabled: {
+                id: 'footsteps-enabled',
+                property: 'footstepsEnabled',
+                preference: 'footstepsEnabled'
+            }
+        };
+
         this.initSoundSettings();
     }
 
-    buttonLeftClick(e){
+    buttonLeftClick(e) {
         e.preventDefault();
         e.stopPropagation();
-
-        // Initialize sound system if needed
         this.toggleSounds();
-
         return false;
     }
 
-    buttonRightClick(e){
+    buttonRightClick(e) {
         e.preventDefault();
         e.stopPropagation();
-        this.toggle(); // Use the toggle method inherited from ModalWindow
+        this.toggle();
         return false;
     }
 
     initSoundSettings() {
-        // Get reference to the sound manager from Core
         const soundManager = this.getSoundManager();
         if (!soundManager) {
             console.warn('Sound manager not available');
             return;
         }
 
-        // Set initial state based on sound manager
         this.updateMuteButtonState(soundManager);
-
-        // Set up panel controls
         this.setupSoundSettingsControls(soundManager);
+        this.updateUI();
+    }
+
+    getCore() {
+        let current = this.parent;
+        while (current) {
+            if (current.core) return current.core;
+            current = current.parent;
+        }
+        return null;
+    }
+
+    getUser() {
+        return this.getCore()?.user || null;
+    }
+
+    persistPreference(key, value) {
+        this.getUser()?.setPreference?.(key, value);
     }
 
     toggleSounds() {
         const soundManager = this.getSoundManager();
         if (!soundManager) return;
 
-        // Toggle both sound and music together
         const wasEnabled = soundManager.soundEnabled || soundManager.musicEnabled;
-        soundManager.soundEnabled = !wasEnabled;
-        soundManager.musicEnabled = !wasEnabled;
+        const nextEnabled = !wasEnabled;
+
+        soundManager.soundEnabled = nextEnabled;
+        soundManager.musicEnabled = nextEnabled;
+        this.persistPreference('soundEnabled', nextEnabled);
+        this.persistPreference('musicEnabled', nextEnabled);
 
         if (wasEnabled) {
-            // We're turning everything OFF
             soundManager.stopAllSounds();
         } else {
-            // We're turning everything ON
-            // Add a small delay to ensure clean restart
             setTimeout(() => {
-                // Play UI sound first as an immediate feedback
                 soundManager.playUISound('click');
-
-                // Then restart all ongoing sounds with another small delay
                 setTimeout(() => {
                     soundManager.startAllSounds();
                 }, 200);
             }, 100);
         }
 
-        // Update UI state
         this.updateUI();
     }
 
     updateUI() {
         const soundManager = this.getSoundManager();
         if (!soundManager) return;
-        
-        
-        
-        // Update mute button state
+
         if (this.buttonElement) {
-            this.buttonElement.classList.toggle('muted', !(soundManager.soundEnabled && soundManager.musicEnabled));
+            this.buttonElement.classList.toggle('muted', !(soundManager.soundEnabled || soundManager.musicEnabled));
         }
 
-        // Update checkboxes
-        const soundCheck = document.getElementById('sound-enabled');
-        const musicCheck = document.getElementById('music-enabled');
-        if (soundCheck) soundCheck.checked = soundManager.soundEnabled;
-        if (musicCheck) musicCheck.checked = soundManager.musicEnabled;
+        this.categories.forEach((category) => {
+            const slider = document.getElementById(`${category}-volume`);
+            if (slider && soundManager.volume[category] != null) {
+                slider.value = Math.round(soundManager.volume[category] * 100);
+            }
+        });
+
+        Object.values(this.checkboxes).forEach(({ id, property }) => {
+            const checkbox = document.getElementById(id);
+            if (checkbox) {
+                checkbox.checked = Boolean(soundManager[property]);
+            }
+        });
     }
 
     setupSoundSettingsControls(soundManager) {
         if (!soundManager || !this.modalElement) return;
 
-        // Volume sliders
-        // loop through categories
         for (const category of this.categories) {
             this.setupVolumeSlider(`${category}-volume`, soundManager, category);
         }
 
-        // Toggle checkboxes using the checkboxes configuration
-        for (const [key, config] of Object.entries(this.checkboxes)) {
-            this.setupToggleCheckbox(config.id, soundManager, config.property);
-        }
+        Object.values(this.checkboxes).forEach((config) => {
+            this.setupToggleCheckbox(config, soundManager);
+        });
+
+        this.setupResetButton(soundManager);
     }
 
     setupVolumeSlider(id, soundManager, volumeType) {
         const slider = document.getElementById(id);
         if (!slider) return;
 
-        // Set initial value from sound manager
-        slider.value = soundManager.volume[volumeType] * 100;
+        slider.value = Math.round((soundManager.volume[volumeType] ?? 0) * 100);
 
-        // Store the timeout to implement debouncing
         let updateTimeout = null;
-
-        // Use direct oninput assignment to avoid duplicate listeners
-        slider.oninput = () => {
-            const value = slider.value / 100;
-
-            // Debounce the actual audio updates to prevent crackling
-            clearTimeout(updateTimeout);
-            updateTimeout = setTimeout(() => {
-
-                if (volumeType === 'master') {
-                    soundManager.setMasterVolume(value);
-                } else {
-                    soundManager.setCategoryVolume(volumeType, value);
-                }
-
-                // Play test sound only for SFX or UI volume changes
-                if (soundManager.soundEnabled) {
-                    try {
-                        if (volumeType === 'sfx') {
-                            soundManager.play('myte_happy', { volume: 0.3 });
-                        } else if (volumeType === 'ui') {
-                            soundManager.playUISound('hover');
-                        }
-                    } catch (error) {
-                        console.warn('Could not play test sound:', error);
-                    }
-                }
-            }, 50); // 50ms debounce to reduce update frequency
-        };
-
-        // Also handle change event for when slider is released
-        slider.onchange = () => {
-            const value = slider.value / 100;
-
-            // Clear any pending timeout
-            clearTimeout(updateTimeout);
-
+        const applyValue = (value) => {
             if (volumeType === 'master') {
                 soundManager.setMasterVolume(value);
             } else {
                 soundManager.setCategoryVolume(volumeType, value);
             }
+
+            const preferenceKey = this.volumePreferenceMap[volumeType];
+            if (preferenceKey) {
+                this.persistPreference(preferenceKey, value);
+            }
+        };
+
+        slider.oninput = () => {
+            const value = slider.value / 100;
+            clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(() => {
+                applyValue(value);
+                this.playVolumePreview(volumeType, soundManager);
+            }, 50);
+        };
+
+        slider.onchange = () => {
+            const value = slider.value / 100;
+            clearTimeout(updateTimeout);
+            applyValue(value);
         };
     }
 
-    setupToggleCheckbox(id, soundManager, property) {
-        const checkbox = document.getElementById(id);
-        if (!checkbox) return;
+    playVolumePreview(volumeType, soundManager) {
+        if (!soundManager.soundEnabled) return;
 
-        // Set initial state
-        checkbox.checked = soundManager[property];
+        try {
+            if (volumeType === 'sfx') {
+                soundManager.play('myte_happy', { volume: 0.25 });
+            } else if (volumeType === 'ui') {
+                soundManager.playUISound('hover');
+            } else if (volumeType === 'footsteps') {
+                soundManager.playFootstepPreview?.();
+            }
+        } catch (error) {
+            console.warn('Could not play test sound:', error);
+        }
+    }
 
-        // Use direct onchange to avoid duplicate listeners
-        checkbox.onchange = () => {
-            const isChecked = checkbox.checked;
+    setupResetButton(soundManager) {
+        const resetButton = document.getElementById('sound-reset-defaults');
+        if (!resetButton) return;
 
-            // Update sound manager state directly
-            soundManager[property] = isChecked;
-
-            // Handle the appropriate actions based on the property
-            if (property === 'soundEnabled') {
-                if (!isChecked) {
-                    // Stop all sound effects (but not music)
-                    soundManager.stopAllSoundEffects();
-                } else {
-                    // If turning sound back on, no need for immediate action
-                    // Sound effects will play as needed
-                    // We could play a test sound to confirm it's working
-                    soundManager.play('ui_click');
-                    soundManager.restartAmbient();
-                }
-            } else if (property === 'musicEnabled') {
-                if (!isChecked) {
-                    // Stop all music
-                    soundManager.stopMusic();
-                } else {
-                    // Restart music based on time of day
-                    soundManager.restartMusic();
-                }
+        resetButton.onclick = () => {
+            const user = this.getUser();
+            const defaults = user?.resetAudioPreferences?.();
+            if (!defaults) {
+                return;
             }
 
-            // Update mute button state
+            soundManager.soundEnabled = defaults.soundEnabled;
+            soundManager.musicEnabled = defaults.musicEnabled;
+            soundManager.footstepsEnabled = defaults.footstepsEnabled;
+            soundManager.setMasterVolume(defaults.masterVolume);
+            soundManager.setCategoryVolume('sfx', defaults.sfxVolume);
+            soundManager.setCategoryVolume('footsteps', defaults.footstepsVolume);
+            soundManager.setCategoryVolume('music', defaults.musicVolume);
+            soundManager.setCategoryVolume('ui', defaults.uiVolume);
+            soundManager.setCategoryVolume('ambient', defaults.ambientVolume);
+
+            if (soundManager.soundEnabled) {
+                soundManager.restartAmbient?.();
+                soundManager.playUISound('select');
+            } else {
+                soundManager.stopAllSoundEffects?.();
+            }
+
+            if (soundManager.musicEnabled) {
+                soundManager.restartMusic?.();
+            } else {
+                soundManager.stopMusic?.();
+            }
+
+            this.updateUI();
+            this.updateMuteButtonState(soundManager);
+        };
+    }
+
+    setupToggleCheckbox(config, soundManager) {
+        const checkbox = document.getElementById(config.id);
+        if (!checkbox) return;
+
+        checkbox.checked = Boolean(soundManager[config.property]);
+        checkbox.onchange = () => {
+            const isChecked = checkbox.checked;
+            soundManager[config.property] = isChecked;
+            if (config.preference) {
+                this.persistPreference(config.preference, isChecked);
+            }
+
+            switch (config.property) {
+                case 'soundEnabled':
+                    if (!isChecked) {
+                        soundManager.stopAllSoundEffects();
+                    } else {
+                        soundManager.play('ui_click');
+                        soundManager.restartAmbient();
+                    }
+                    break;
+                case 'musicEnabled':
+                    if (!isChecked) {
+                        soundManager.stopMusic();
+                    } else {
+                        soundManager.restartMusic();
+                    }
+                    break;
+                case 'footstepsEnabled':
+                    if (!isChecked) {
+                        soundManager.stopCategorySounds?.('footsteps');
+                    } else {
+                        soundManager.playFootstepPreview?.();
+                    }
+                    break;
+                default:
+                    break;
+            }
+
             this.updateMuteButtonState(soundManager);
         };
     }
 
     updateMuteButtonState(soundManager) {
-
         if (this.buttonElement) {
-            // Show muted state if either sound or music is disabled
             const shouldBeMuted = !soundManager.soundEnabled && !soundManager.musicEnabled;
             this.buttonElement.classList.toggle('muted', shouldBeMuted);
         }
     }
-    
-    // Override the open method to add our custom logic
+
     open() {
-        super.open(); // Call the parent class's open method
-        
+        super.open();
         this.updateUI();
     }
-    
 }

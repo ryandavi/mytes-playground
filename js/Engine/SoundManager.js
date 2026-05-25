@@ -20,12 +20,25 @@ class SoundManager {
 		this.initialized = false;
 		this.soundEnabled = options.soundEnabled !== false;
 		this.musicEnabled = options.musicEnabled !== false;
+		this.footstepsEnabled = options.footstepsEnabled !== false;
 		this.volume = {
-			master: options.masterVolume || 1,
-			sfx: options.sfxVolume || 0.8,
-			music: options.musicVolume || 0,
-			ui: options.uiVolume || 0.6,
-			ambient: options.ambientVolume || 0
+			master: options.masterVolume ?? 1,
+			sfx: options.sfxVolume ?? 0.82,
+			footsteps: options.footstepsVolume ?? 0.72,
+			music: options.musicVolume ?? 0.28,
+			ui: options.uiVolume ?? 0.72,
+			ambient: options.ambientVolume ?? 0.42
+		};
+		this.categoryMix = {
+			music: 0.88,
+			ambient: 0.82,
+			ui: 1.08,
+			notifications: 0.98,
+			entities: 0.9,
+			world: 0.84,
+			machines: 0.8,
+			footsteps: 1.12,
+			sfx: 0.92
 		};
 
 		this.criticalSounds = [
@@ -39,6 +52,10 @@ class SoundManager {
 		this.loops = new Map();
 		this.currentMusicSynth = null;
 		this.currentMusicPart = null;
+		this.currentMusicLayers = [];
+		this._musicStartTimer = null;
+		this.boundTimeManager = null;
+		this._handleTimeHourChange = null;
 		this.musicFadeTime = options.musicFadeTime || 2;
 
 		// Add these properties to the constructor
@@ -46,1635 +63,214 @@ class SoundManager {
 		this.minTimeBetweenSounds = 50; // ms
 		this.triggeredSounds = new Set(); // Keep track of currently triggered sounds
 
+
+
 		// Species sound profiles - defines which instrument/synth to use for each species
-		this.defaultSpeciesVoices = {
-			"snail": {
-				synthType: "FM",  // FMSynth for snails
-				settings: {
-					harmonicity: 3,
-					modulationIndex: 10,
-					oscillator: { type: "sine" },
-					envelope: {
-						attack: 0.1,
-						decay: 0.2,
-						sustain: 0.2,
-						release: 0.3
-					},
-					modulation: { type: "triangle" },
-					modulationEnvelope: {
-						attack: 0.1,
-						decay: 0.2,
-						sustain: 0.3,
-						release: 0.1
-					}
-				},
-				baseNote: "G3",  // Base note for this species
-				volume: 0.5
-			},
-			"worm": {
-				synthType: "Synth",
-				settings: {
-					oscillator: { type: "triangle" },
-					envelope: {
-						attack: 0.03,
-						decay: 0.12,
-						sustain: 0.15,
-						release: 0.22
-					}
-				},
-				baseNote: "D3",
-				volume: 0.45
-			},
-			"butterfly": {
-				synthType: "AM",  // AMSynth for butterflies
-				settings: {
-					harmonicity: 2,
-					oscillator: { type: "sine" },
-					envelope: {
-						attack: 0.01,
-						decay: 0.1,
-						sustain: 0.2,
-						release: 0.4
-					},
-					modulation: { type: "sine" },
-					modulationEnvelope: {
-						attack: 0.2,
-						decay: 0.1,
-						sustain: 0.3,
-						release: 0.2
-					}
-				},
-				baseNote: "C5",  // Higher pitched for butterflies
-				volume: 0.4
-			},
-			"frog": { // deep blips
-				synthType: "Synth",  // Simple synth for frogs
-				settings: {
-					oscillator: { type: "sawtooth" },
-					envelope: {
-						attack: 0.01,
-						decay: 0.2,
-						sustain: 0.1,
-						release: 0.4
-					}
-				},
-				baseNote: "D2",  // Low notes for frogs
-				volume: 0.6
-			},
-			"rabbit": {
-				synthType: "PluckSynth",  // Pluck synth for rabbits
-				settings: {
-					attackNoise: 1,
-					dampening: 4000,
-					resonance: 0.98,
-					release: 1.2
-				},
-				baseNote: "A4",
-				volume: 0.4
-			},
-			"bird": { // little dots
-				synthType: "FM",
-				settings: {
-					harmonicity: 8,
-					modulationIndex: 5,
-					oscillator: { type: "sine" },
-					envelope: {
-						attack: 0.001,
-						decay: 0.05,
-						sustain: 0.1,
-						release: 0.2
-					},
-					modulation: { type: "triangle" },
-					modulationEnvelope: {
-						attack: 0.01,
-						decay: 0.1,
-						sustain: 0.3,
-						release: 0.5
-					}
-				},
-				baseNote: "E5",  // High notes for birds
-				volume: 0.35
-			},
-
-			"hedgehog": {
-				synthType: "NoiseSynth",
-				settings: {
-					noise: { type: "white" },
-					envelope: {
-						attack: 0.01,
-						decay: 0.15,
-						sustain: 0.1,
-						release: 0.1
-					}
-				},
-				baseNote: "C3",  // Base note (though noise synth doesn't use notes directly)
-				volume: 0.3
-			},
-			"fox": { // shifty
-				synthType: "AM",
-				settings: {
-					harmonicity: 1.5,
-					oscillator: { type: "triangle" },
-					envelope: {
-						attack: 0.05,
-						decay: 0.3,
-						sustain: 0.4,
-						release: 0.8
-					},
-					modulation: { type: "square" },
-					modulationEnvelope: {
-						attack: 0.1,
-						decay: 0.2,
-						sustain: 0.3,
-						release: 0.4
-					}
-				},
-				baseNote: "D4",
-				volume: 0.5
-			},
-			"turtle": { // mysterious
-				synthType: "FM",
-				settings: {
-					harmonicity: 1,
-					modulationIndex: 3,
-					oscillator: { type: "sine" },
-					envelope: {
-						attack: 0.2,
-						decay: 0.5,
-						sustain: 0.5,
-						release: 1.5
-					},
-					modulation: { type: "sine" },
-					modulationEnvelope: {
-						attack: 0.5,
-						decay: 0.5,
-						sustain: 0.7,
-						release: 1
-					}
-				},
-				baseNote: "A2",  // Low, slow notes for turtles
-				volume: 0.6
-			},
-			"bee": {
-				synthType: "AMOscillator",
-				settings: {
-					type: "square",
-					modulationType: "sine",
-					harmonicity: 10,
-					volume: 0.3
-				},
-				baseNote: "A5",  // High buzzing for bees
-				volume: 0.25
-			},
-			"penguin": {
-				synthType: "Synth",
-				settings: {
-					oscillator: { type: "triangle" },
-					envelope: {
-						attack: 0.05,
-						decay: 0.1,
-						sustain: 0.3,
-						release: 0.6
-					}
-				},
-				baseNote: "F3",
-				volume: 0.5
-			},
-			"owl": {
-				synthType: "DuoSynth",
-				settings: {
-					vibratoAmount: 0.5,
-					vibratoRate: 5,
-					harmonicity: 1.5,
-					voice0: {
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.01,
-							decay: 0.4,
-							sustain: 0.2,
-							release: 0.7
-						}
-					},
-					voice1: {
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.1,
-							decay: 0.2,
-							sustain: 0.3,
-							release: 0.9
-						}
-					}
-				},
-				baseNote: "D3",
-				volume: 0.4
-			},
-			"slime": { // bass
-				synthType: "MembraneSynth",
-				settings: {
-					pitchDecay: 0.05,
-					octaves: 4,
-					oscillator: { type: "sine" },
-					envelope: {
-						attack: 0.01,
-						decay: 0.4,
-						sustain: 0.1,
-						release: 1.4,
-						attackCurve: "exponential"
-					}
-				},
-				baseNote: "C2",  // Very low notes for slime creatures
-				volume: 0.5
-			},
-			"dragon": {	// strong
-				synthType: "FMSynth",
-				settings: {
-					harmonicity: 3.01,
-					modulationIndex: 14,
-					oscillator: { type: "sawtooth" },
-					envelope: {
-						attack: 0.2,
-						decay: 0.3,
-						sustain: 0.4,
-						release: 1.2
-					},
-					modulation: { type: "square" },
-					modulationEnvelope: {
-						attack: 0.01,
-						decay: 0.5,
-						sustain: 0.2,
-						release: 0.5
-					}
-				},
-				baseNote: "G2",  // Deep roaring for dragons
-				volume: 0.7
-			},
-			"ghost": { // mysterious and cool
-				synthType: "AMSynth",
-				settings: {
-					harmonicity: 3.5,
-					oscillator: { type: "sine" },
-					envelope: {
-						attack: 0.3,
-						decay: 0.5,
-						sustain: 0.5,
-						release: 1.5
-					},
-					modulation: { type: "sine" },
-					modulationEnvelope: {
-						attack: 0.5,
-						decay: 0.5,
-						sustain: 0.7,
-						release: 2
-					}
-				},
-				baseNote: "B3",  // Spooky tone for ghosts
-				volume: 0.35
-			},
-			"blips": {
-				synthType: "PolySynth", // For those characteristic blips
-				settings: {
-					oscillator: { type: "pulse", width: 0.5 },
-					envelope: {
-						attack: 0.005,
-						decay: 0.05,
-						sustain: 0.01,
-						release: 0.1
-					}
-				},
-				modifiers: {
-					// Pitch shifting to create the fast talking effect
-					pitchShift: {
-						enabled: true,
-						pitch: 5,
-						windowSize: 0.05,
-						delayTime: 0.01
-					}
-				},
-				baseNote: "C5",  // Higher notes for the characteristic blips
-				volume: 0.4,
-				// Special random note patterns
-				notePattern: ["C5", "E5", "G5", "A5", "C6"],
-				speedMultiplier: 5 // Very fast notes
-			},
-
-			"low": {
-				synthType: "Synth",
-				settings: {
-					oscillator: { type: "square" },
-					envelope: {
-						attack: 0.01,
-						decay: 0.05,
-						sustain: 0.01,
-						release: 0.1
-					}
-				},
-				baseNote: "A3",  // Lower than villager
-				volume: 0.45,
-				notePattern: ["A3", "C4", "E4", "G3"],
-				speedMultiplier: 4
-			},
-
-			"cheerful": {
-				synthType: "PolySynth",
-				settings: {
-					oscillator: { type: "sine" },
-					envelope: {
-						attack: 0.005,
-						decay: 0.04,
-						sustain: 0.01,
-						release: 0.08
-					}
-				},
-				baseNote: "E5",  // Higher notes for cheerful character
-				volume: 0.35,
-				notePattern: ["E5", "G5", "B5", "C6", "A5"],
-				speedMultiplier: 4.5
-			},
-
-			"musician": {
-				synthType: "PolySynth",
-				settings: {
-					oscillator: { type: "sine" },
-					envelope: {
-						attack: 0.1,
-						decay: 0.2,
-						sustain: 0.3,
-						release: 0.4
-					}
-				},
-				baseNote: "D4",  // More musical character
-				volume: 0.5,
-				notePattern: ["D4", "F4", "A4", "C5", "B4"],
-				speedMultiplier: 2 // Slower for singing style
-			},
-
-			"midlow": {
-				synthType: "Synth",
-				settings: {
-					oscillator: { type: "triangle" },
-					envelope: {
-						attack: 0.02,
-						decay: 0.1,
-						sustain: 0.05,
-						release: 0.2
-					}
-				},
-				baseNote: "G3",  // Mid-low range for owl character
-				volume: 0.4,
-				notePattern: ["G3", "B3", "D4", "F3", "A3"],
-				speedMultiplier: 3.5
-			},
-
-			"high": {
-				synthType: "PolySynth",
-				settings: {
-					oscillator: { type: "triangle" },
-					envelope: {
-						attack: 0.01,
-						decay: 0.08,
-						sustain: 0.02,
-						release: 0.15
-					}
-				},
-				baseNote: "B4",  // Higher range for young owl 
-				volume: 0.35,
-				notePattern: ["B4", "D5", "F#5", "A5", "E5"],
-				speedMultiplier: 4
-			},
-
-			"highblip": {
-				synthType: "Synth",
-				settings: {
-					oscillator: { type: "pulse", width: 0.4 },
-					envelope: {
-						attack: 0.005,
-						decay: 0.04,
-						sustain: 0.01,
-						release: 0.1
-					}
-				},
-				baseNote: "F4",
-				volume: 0.4,
-				notePattern: ["F4", "A4", "C5", "E5", "D5"],
-				speedMultiplier: 4.2
-			},
-
-			"sawtooth": {
-				synthType: "Synth",
-				settings: {
-					oscillator: { type: "sawtooth" },
-					envelope: {
-						attack: 0.02,
-						decay: 0.1,
-						sustain: 0.05,
-						release: 0.2
-					}
-				},
-				baseNote: "C3",  // Lower for sailor
-				volume: 0.5,
-				notePattern: ["C3", "E3", "G3", "B3", "D4"],
-				speedMultiplier: 3
-			},
-
-			"gruff": {
-				synthType: "Synth",
-				settings: {
-					oscillator: { type: "square" },
-					envelope: {
-						attack: 0.01,
-						decay: 0.15,
-						sustain: 0.1,
-						release: 0.1
-					}
-				},
-				baseNote: "D3",  // Gruffer lower register
-				volume: 0.6, // Slightly louder
-				notePattern: ["D3", "F3", "A3", "C4", "B3"],
-				speedMultiplier: 5.5 // Very fast for angry 
-			},
-			"default": {  // Fallback for any unspecified species
-				synthType: "Synth",
-				settings: {
-					oscillator: { type: "triangle" },
-					envelope: {
-						attack: 0.01,
-						decay: 0.1,
-						sustain: 0.2,
-						release: 0.2
-					}
-				},
-				baseNote: "C4",
-				volume: 0.5
-			}
-		};
+		this.defaultSpeciesVoices = createDefaultSpeciesVoices();
 		this.speciesVoices = this._cloneVoiceData(this.defaultSpeciesVoices);
 
 		// Sound definitions using Tone.js synthesis
-		this.synthPresets = {
-			// Music synths
-			"music_main": {
-				type: "music",
-				create: () => {
-					const synth = new Tone.PolySynth(Tone.Synth, {
-						oscillator: {
-							type: "sine"
-						},
-						envelope: {
-							attack: 0.05,
-							decay: 0.2,
-							sustain: 0.8,
-							release: 1.5
-						}
-					}).toDestination();
-					// // synth.volume.value = Tone.gainToDb(0.4);
+		this.synthPresets = createAudioPresetLibrary(this);
+	}
 
-					const pattern = [];
-					const notes = ["C3", "E3", "G3", "B3", "C4", "B3", "G3", "E3"];
-					const times = [0, "0:1", "0:2", "0:3", "1:0", "1:1", "1:2", "1:3"];
+	createFootstepPreset({
+		note = "E2",
+		noiseType = "pink",
+		filterFrequency = 1400,
+		thumpVolume = 0.8,
+		textureVolume = 0.4
+	} = {}) {
+		const thump = new Tone.MembraneSynth({
+			pitchDecay: 0.015,
+			octaves: 1.2,
+			oscillator: { type: "sine" },
+			envelope: {
+				attack: 0.001,
+				decay: 0.08,
+				sustain: 0,
+				release: 0.04
+			}
+		}).toDestination();
+		const texture = new Tone.NoiseSynth({
+			noise: { type: noiseType },
+			envelope: {
+				attack: 0.001,
+				decay: 0.055,
+				sustain: 0,
+				release: 0.035
+			}
+		});
+		const filter = new Tone.Filter({
+			frequency: filterFrequency,
+			type: "lowpass",
+			rolloff: -24
+		}).toDestination();
+		texture.connect(filter);
 
-					for (let i = 0; i < notes.length; i++) {
-						pattern.push({
-							note: notes[i],
-							time: times[i],
-							duration: "4n"
-						});
-					}
-
-					return {
-						synth,
-						pattern,
-						tempo: 90,
-						loop: true
-					};
-				}
-			},
-
-			"music_sunny": {
-				"type": "music",
-				"create": () => {
-					const synth = new Tone.PolySynth(Tone.Synth, {
-						oscillator: {
-							type: "sine"
-						},
-						envelope: {
-							attack: 0.1, //.4
-							decay: 0.3,
-							sustain: 0.7,
-							release: 2.5
-						}
-					}).toDestination();
-					// // synth.volume.value = Tone.gainToDb(0.1);
-
-					const pattern = [];
-					const notes = [
-						"C4", "E4", "G4", "C5", "A4", "F4", "D4", "G4",
-						"E4", "C4", "F4", "A4", "G4", "B4", "C5", "D5"
-					];
-					const times = [
-						"0:0", "0:1", "0:2", "0:3", "1:0", "1:2", "2:0", "2:3",
-						"3:0", "3:1", "3:2", "4:0", "4:2", "5:0", "5:2", "6:0"
-					];
-
-					for (let i = 0; i < notes.length; i++) {
-						pattern.push({
-							note: notes[i],
-							time: times[i],
-							duration: "4n"
-						});
-					}
-
-					const pad = new Tone.PolySynth(Tone.Synth, {
-						oscillator: {
-							type: "sine"
-						},
-						envelope: {
-							attack: 2,
-							decay: 3,
-							sustain: 0.5,
-							release: 4
-						}
-					}).toDestination();
-					pad.volume.value = Tone.gainToDb(0.2);
-
-					const padPattern = [
-						{ note: ["C3", "G3", "C4"], time: "0:0", duration: "1m" },
-						{ note: ["F3", "A3", "C4"], time: "2:0", duration: "1m" },
-						{ note: ["G3", "B3", "D4"], time: "4:0", duration: "1m" },
-						{ note: ["C3", "E3", "G3"], time: "6:0", duration: "1m" }
-					];
-
-					return {
-						synth,
-						pad,
-						pattern,
-						padPattern,
-						tempo: 100,
-						loop: true
-					};
-				}
-			},
-
-
-
-			"music_night": {
-				type: "music",
-				create: () => {
-					const synth = new Tone.PolySynth(Tone.Synth, {
-						oscillator: {
-							type: "sine"
-						},
-						envelope: {
-							attack: 0.1,
-							decay: 0.2,
-							sustain: 0.7,
-							release: 2
-						}
-					}).toDestination();
-					// // synth.volume.value = Tone.gainToDb(0.35);
-
-					const pattern = [];
-					const notes = ["G2", "B2", "D3", "F#3", "G3", "D3", "B2", "G2"];
-					const times = [0, "0:2", "1:0", "1:2", "2:0", "2:2", "3:0", "3:2"];
-					const durations = ["2n", "2n", "2n", "2n", "2n", "2n", "2n", "2n"];
-
-					for (let i = 0; i < notes.length; i++) {
-						pattern.push({
-							note: notes[i],
-							time: times[i],
-							duration: durations[i]
-						});
-					}
-
-					return {
-						synth,
-						pattern,
-						tempo: 70,
-						loop: true
-					};
-				}
-			},
-
-			// UI sounds
-			"ui_click": {
-				type: "ui",
-				create: () => {
-					const synth = new Tone.MembraneSynth({
-						pitchDecay: 0.05,
-						octaves: 4,
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.1,
-							sustain: 0,
-							release: 0.1
-						}
-					}).toDestination();
-					// // synth.volume.value = Tone.gainToDb(0.3);
-					return { synth, note: "C5", duration: "16n" };
-				}
-			},
-			"ui_hover": {
-				type: "ui",
-				create: () => {
-					const synth = new Tone.FMSynth({
-						harmonicity: 8,
-						modulationIndex: 2,
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.1,
-							sustain: 0,
-							release: 0.1
-						},
-						modulation: { type: "square" },
-						modulationEnvelope: {
-							attack: 0.002,
-							decay: 0.1,
-							sustain: 0,
-							release: 0.1
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.2);
-					return { synth, note: "E6", duration: "32n" };
-				}
-			},
-			"ui_select": {
-				type: "ui",
-				create: () => {
-					const synth = new Tone.Synth({
-						oscillator: { type: "triangle" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.1,
-							sustain: 0.1,
-							release: 0.1
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
-					return {
-						synth,
-						notes: ["C5", "G5"],
-						durations: ["16n", "8n"]
-					};
-				}
-			},
-			"ui_error": {
-				type: "ui",
-				create: () => {
-					const synth = new Tone.AMSynth({
-						harmonicity: 3,
-						oscillator: { type: "square" },
-						envelope: {
-							attack: 0.1,
-							decay: 0.2,
-							sustain: 0.3,
-							release: 0.1
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.4);
-					return {
-						synth,
-						notes: ["C4", "B3"],
-						durations: ["16n", "8n"]
-					};
-				}
-			},
-
-
-			// Ball hit — bouncy thud
-			"ball_hit": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.MembraneSynth({
-						pitchDecay: 0.06,
-						octaves: 2.5,
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.18,
-							sustain: 0,
-							release: 0.08
-						}
-					}).toDestination();
-					return { synth, note: "C3", duration: "16n" };
-				}
-			},
-
-			// UI sounds for battery and item interactions
-			"myte_battery_charging": {
-				type: "ui",
-				create: () => {
-				const synth = new Tone.Synth({
-					oscillator: { type: "sine" },
-					envelope: {
-					attack: 0.03,
-					decay: 0.2,
-					sustain: 0.2,
-					release: 0.4
-					}
-				}).toDestination();
-				// Gentle ascending sound
-				return {
-					synth,
-					notes: ["G4", "C5", "E5"],
-					durations: ["16n", "16n", "8n"]
-				};
-				}
-			},
-			
-"myte_battery_depleting": {
-  type: "ui",
-  create: () => {
-    const synth = new Tone.Synth({
-      oscillator: { type: "triangle" },
-      envelope: {
-        attack: 0.01,
-        decay: 0.2,
-        sustain: 0.1,
-        release: 0.3
-      }
-    }).toDestination();
-    // Gentle warning sound - not alarming but noticeable
-    return {
-      synth,
-      notes: ["A4", "F4"],
-      durations: ["16n", "8n"]
-    };
-  }
-},
-
-
-"myte_battery_full": {
-  type: "ui",
-  create: () => {
-    const synth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "sine" },
-      envelope: {
-        attack: 0.02,
-        decay: 0.1,
-        sustain: 0.2,
-        release: 0.4
-      }
-    }).toDestination();
-    // Cheerful completion sound
-    return {
-      synth,
-      notes: ["C5", "E5", "G5", "C6"],
-      durations: ["16n", "16n", "16n", "8n"]
-    };
-  }
-},
-
-			"myte_battery_empty": {
-				type: "ui",
-				create: () => {
-				const synth = new Tone.Synth({
-					oscillator: { type: "triangle" },
-					envelope: {
-					attack: 0.01,
-					decay: 0.1,
-					sustain: 0.05,
-					release: 0.3
-					}
-				}).toDestination();
-				// Short descending tone
-				return {
-					synth,
-					notes: ["C4", "G3"],
-					durations: ["16n", "8n"]
-				};
-				}
-			},
-			
-			"ui_pickup_item": {
-				type: "ui",
-				create: () => {
-				const synth = new Tone.Synth({
-					oscillator: { type: "sine" },
-					envelope: {
-					attack: 0.005,
-					decay: 0.15,
-					sustain: 0,
-					release: 0.1
-					}
-				}).toDestination();
-				// Quick cheerful up note
-				return {
-					synth,
-					notes: ["E5", "A5"],
-					durations: ["32n", "8n"]
-				};
-				}
-			},
-			
-			"ui_drag_item": {
-				type: "ui",
-				create: () => {
-				const synth = new Tone.Synth({
-					oscillator: { type: "sine" },
-					envelope: {
-					attack: 0.001,
-					decay: 0.06,
-					sustain: 0,
-					release: 0.08
-					}
-				}).toDestination();
-				// Soft high tick — "lifted"
-				return { synth, note: "B5", duration: "32n" };
-				}
-			},
-
-			"ui_drop_item": {
-				type: "ui",
-				create: () => {
-				const synth = new Tone.Synth({
-					oscillator: { type: "triangle" },
-					envelope: {
-					attack: 0.001,
-					decay: 0.1,
-					sustain: 0,
-					release: 0.2
-					}
-				}).toDestination();
-				// Subtle, soft dropping sound
-				return {
-					synth,
-					notes: ["A5", "E5"],
-					durations: ["32n", "8n"]
-				};
-				}
-			},
-
-			"myte_slot_exit": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.Synth({
-						oscillator: { type: "triangle" },
-						envelope: {
-							attack: 0.003,
-							decay: 0.12,
-							sustain: 0.05,
-							release: 0.18
-						}
-					}).toDestination();
-					return {
-						synth,
-						notes: ["D5", "A5", "D6"],
-						durations: ["32n", "32n", "16n"]
-					};
-				}
-			},
-
-			"myte_slot_enter": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.Synth({
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.002,
-							decay: 0.14,
-							sustain: 0,
-							release: 0.22
-						}
-					}).toDestination();
-					return {
-						synth,
-						notes: ["G5", "D5"],
-						durations: ["32n", "8n"]
-					};
-				}
-			},
-
-
-
-			// Myte Sounds
-			"myte_happy": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.Synth({
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.01,
-							decay: 0.1,
-							sustain: 0.3,
-							release: 0.1
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
-					return {
-						synth,
-						notes: ["G5", "C6"],
-						durations: ["16n", "8n"]
-					};
-				}
-			},
-			"myte_sad": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.Synth({
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.01,
-							decay: 0.2,
-							sustain: 0.2,
-							release: 0.4
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.4);
-					return {
-						synth,
-						notes: ["C4", "A3"],
-						durations: ["8n", "8n"]
-					};
-				}
-			},
-			"myte_jump": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.Synth({
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.1,
-							sustain: 0,
-							release: 0.1
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
-					return { synth, note: "G4", duration: "16n" };
-				}
-			},
-
-			"myte_land": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.Synth({
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.1,
-							sustain: 0,
-							release: 0.1
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
-					return { synth, note: "G4", duration: "16n" };
-				}
-			},
-
-			/*
-			"myte_land": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.MembraneSynth({
-						pitchDecay: 0.05,
-						octaves: 2,
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.2,
-							sustain: 0,
-							release: 0.2
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.6);
-					return { synth, note: "C2", duration: "16n" };
-				}
-			},
-			*/
-
-			"myte_eat": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.NoiseSynth({
-						noise: { type: "pink" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.15,
-							sustain: 0,
-							release: 0.05
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.3);
-					return { synth, duration: "16n" };
-				}
-			},
-			"myte_sleep": {
-				type: "sfx",
-				create: () => {
-					// Create a breathing sound
-					const synth = new Tone.NoiseSynth({
-						noise: { type: "pink" },
-						envelope: {
-							attack: 0.2,
-							decay: 0.3,
-							sustain: 0.1,
-							release: 0.4
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.2);
-					return { synth, duration: "4n" };
-				}
-			},
-			"myte_pickup": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.Synth({
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.1,
-							sustain: 0.1,
-							release: 0.1
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
-					return {
-						synth,
-						notes: ["C4", "E4", "G4"],
-						durations: ["32n", "32n", "8n"]
-					};
-				}
-			},
-			"myte_putdown": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.Synth({
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.1,
-							sustain: 0.1,
-							release: 0.1
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
-					return {
-						synth,
-						notes: ["G4", "E4", "C4"],
-						durations: ["32n", "32n", "8n"]
-					};
-				}
-			},
-
-			// Environment Sounds
-			"env_wind": {
-				type: "ambient",
-				create: () => {
-					const noise = new Tone.Noise("brown").start();
-					const autoFilter = new Tone.AutoFilter({
-						frequency: 0.1,
-						depth: 0.8,
-						baseFrequency: 100,
-						octaves: 2.5
-					}).start();
-					const filter = new Tone.Filter({
-						frequency: 800,
-						type: "lowpass",
-						rolloff: -24
-					});
-					noise.connect(autoFilter);
-					autoFilter.connect(filter);
-					filter.toDestination();
-
-
-					return {
-						synth: { noise, autoFilter, filter },
-						loop: true,
-						volume: 1
-					};
-				}
-			},
-			"env_water": {
-				type: "ambient",
-				create: () => {
-					const noise = new Tone.Noise("pink").start();
-					const autoFilter = new Tone.AutoFilter({
-						frequency: 0.2,
-						depth: 0.5,
-						baseFrequency: 200,
-						octaves: 1.5
-					}).start();
-					const filter = new Tone.Filter({
-						frequency: 1000,
-						type: "lowpass",
-						rolloff: -24
-					});
-					noise.connect(autoFilter);
-					autoFilter.connect(filter);
-					filter.toDestination();
-
-					return {
-						synth: { noise, autoFilter, filter },
-						loop: true,
-						volume: 0.2
-					};
-				}
-			},
-			"env_birds": {
-				type: "ambient",
-				create: () => {
-					const synth = new Tone.PolySynth(Tone.FMSynth).toDestination();
-					synth.set({
-						harmonicity: 10,
-						modulationIndex: 10,
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.1,
-							sustain: 0.1,
-							release: 0.1
-						},
-						modulation: { type: "square" },
-						modulationEnvelope: {
-							attack: 0.001,
-							decay: 0.5,
-							sustain: 0.1,
-							release: 0.1
-						}
-					});
-					// synth.volume.value = Tone.gainToDb(0.3);
-
-					// Generate random bird chirps periodically
-					const pattern = [];
-					const birdNotes = ["C7", "D7", "E7", "G7", "A7"];
-
-					for (let i = 0; i < 20; i++) {
-						const time = i * 2 + Math.random() * 2;
-						const note = birdNotes[Math.floor(Math.random() * birdNotes.length)];
-						pattern.push({ note, time, duration: "32n" });
-
-						// Sometimes add a second note for a trill
-						if (Math.random() > 0.5) {
-							const trillNote = birdNotes[Math.floor(Math.random() * birdNotes.length)];
-							pattern.push({ note: trillNote, time: time + 0.1, duration: "32n" });
-						}
-					}
-
-					return {
-						synth,
-						pattern,
-						loop: true,
-						loopInterval: 30, // seconds
-						volume: 0.2
-					};
-				}
-			},
-
-
-
-
-			"env_cricket": {
-				type: "ambient",
-				baseVolume: 0.01,  // <-- Define base volume here
-				create: () => {
-					const synth = new Tone.FMSynth({
-						harmonicity: 12,
-						modulationIndex: 20,
-						oscillator: { type: "square" },
-						envelope: {
-							attack: 0.01,
-							decay: 0.05,
-							sustain: 0.01,
-							release: 0.01
-						},
-						modulation: { type: "square" },
-						modulationEnvelope: {
-							attack: 0.01,
-							decay: 0.01,
-							sustain: 0.5,
-							release: 0.01
-						}
-					}).toDestination();
-					synth.volume.value = Tone.gainToDb(0.02);
-
-					// Create cricket chirp sequences
-
-					const pattern = [];
-					for (let i = 0; i < 20; i++) {
-						const time = i * 0.5 + Math.random() * 10;
-						// Groups of chirps
-						for (let j = 0; j < 3 + Math.floor(Math.random() * 3); j++) {
-							pattern.push({
-								note: "A7",
-								time: time + (j * 0.08),
-								duration: "64n"
-							});
-						}
-					}
-
-
-					/*
-					const pattern = [];
-					for (let i = 0; i < 8; i++) {  // Reduced from 20 to 8 groups
-						const time = i * 1 + Math.random() * 15;  // Much longer gaps (was i * 0.5)
-						// Groups of chirps
-						for (let j = 0; j < 3 + Math.floor(Math.random() * 3); j++) {
-							pattern.push({
-								note: "A7",
-								time: time + (j * 0.08),
-								duration: "64n"
-							});
-						}
-					}
-						*/
-
-					return {
-						synth,
-						pattern,
-						loop: true,
-						loopInterval: 15
-					};
-				}
-			},
-
-			// Object Sounds
-			"obj_chest_open": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.MetalSynth({
-						frequency: 200,
-						envelope: {
-							attack: 0.01,
-							decay: 0.3,
-							sustain: 0,
-							release: 0.6
-						},
-						harmonicity: 3.1,
-						modulationIndex: 32,
-						resonance: 4000,
-						octaves: 1.5
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.4);
-					return { synth, note: "G3", duration: "8n" };
-				}
-			},
-			"obj_chest_close": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.MetalSynth({
-						frequency: 150,
-						envelope: {
-							attack: 0.01,
-							decay: 0.2,
-							sustain: 0,
-							release: 0.2
-						},
-						harmonicity: 3.5,
-						modulationIndex: 40,
-						resonance: 3000,
-						octaves: 1
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
-					return { synth, note: "D3", duration: "8n" };
-				}
-			},
-			"obj_door_open": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.MembraneSynth({
-						pitchDecay: 0.02,
-						octaves: 1.5,
-						oscillator: { type: "triangle" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.18,
-							sustain: 0,
-							release: 0.12
-						}
-					}).toDestination();
-					return {
-						synth,
-						notes: ["E3", "G3"],
-						durations: ["32n", "8n"]
-					};
-				}
-			},
-			"obj_door_close": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.MembraneSynth({
-						pitchDecay: 0.015,
-						octaves: 1,
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.14,
-							sustain: 0,
-							release: 0.08
-						}
-					}).toDestination();
-					return { synth, note: "C3", duration: "8n" };
-				}
-			},
-			"obj_gate_open": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.MetalSynth({
-						frequency: 120,
-						envelope: {
-							attack: 0.01,
-							decay: 0.18,
-							sustain: 0,
-							release: 0.2
-						},
-						harmonicity: 2.5,
-						modulationIndex: 18,
-						resonance: 2200,
-						octaves: 1
-					}).toDestination();
-					return { synth, note: "A2", duration: "8n" };
-				}
-			},
-			"obj_gate_close": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.MetalSynth({
-						frequency: 90,
-						envelope: {
-							attack: 0.01,
-							decay: 0.14,
-							sustain: 0,
-							release: 0.15
-						},
-						harmonicity: 2.2,
-						modulationIndex: 16,
-						resonance: 1800,
-						octaves: 0.8
-					}).toDestination();
-					return { synth, note: "F2", duration: "8n" };
-				}
-			},
-			"obj_fountain_on": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.NoiseSynth({
-						noise: { type: "pink" },
-						envelope: {
-							attack: 0.01,
-							decay: 0.35,
-							sustain: 0,
-							release: 0.1
-						}
-					});
-					const filter = new Tone.Filter({
-						frequency: 1800,
-						type: "bandpass",
-						Q: 2
-					}).toDestination();
-					synth.connect(filter);
-					return { synth, duration: "8n" };
-				}
-			},
-			"obj_fountain_off": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.NoiseSynth({
-						noise: { type: "pink" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.18,
-							sustain: 0,
-							release: 0.08
-						}
-					});
-					const filter = new Tone.Filter({
-						frequency: 900,
-						type: "lowpass",
-						Q: 1
-					}).toDestination();
-					synth.connect(filter);
-					return { synth, duration: "16n" };
-				}
-			},
-			"obj_fountain": {
-				type: "ambient",
-				create: () => {
-					const noise = new Tone.Noise("pink").start();
-					const autoFilter = new Tone.AutoFilter({
-						frequency: 0.5,
-						depth: 0.3,
-						baseFrequency: 1500,
-						octaves: 1
-					}).start();
-					const filter = new Tone.Filter({
-						frequency: 2000,
-						type: "bandpass",
-						Q: 2,
-						rolloff: -24
-					});
-					noise.connect(autoFilter);
-					autoFilter.connect(filter);
-					filter.toDestination();
-
-					return {
-						synth: { noise, autoFilter, filter },
-						loop: true,
-						volume: 0.3
-					};
-				}
-			},
-			"obj_lantern": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.AMSynth({
-						harmonicity: 2.5,
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.1,
-							decay: 0.5,
-							sustain: 0.3,
-							release: 0.5
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.3);
-					return { synth, note: "E5", duration: "8n" };
-				}
-			},
-			"obj_lantern_on": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.AMSynth({
-						harmonicity: 2.5,
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.02,
-							decay: 0.24,
-							sustain: 0.15,
-							release: 0.25
-						}
-					}).toDestination();
-					return {
-						synth,
-						notes: ["C5", "E5"],
-						durations: ["32n", "8n"]
-					};
-				}
-			},
-			"obj_lantern_off": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.AMSynth({
-						harmonicity: 1.8,
-						oscillator: { type: "triangle" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.14,
-							sustain: 0,
-							release: 0.12
-						}
-					}).toDestination();
-					return { synth, note: "B4", duration: "16n" };
-				}
-			},
-			"obj_portal_depart": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.AMSynth({
-						harmonicity: 2.2,
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.01,
-							decay: 0.18,
-							sustain: 0.08,
-							release: 0.24
-						},
-						modulation: { type: "triangle" },
-						modulationEnvelope: {
-							attack: 0.02,
-							decay: 0.15,
-							sustain: 0.05,
-							release: 0.18
-						}
-					}).toDestination();
-					return {
-						synth,
-						notes: ["E4", "B4", "E5"],
-						durations: ["32n", "32n", "16n"]
-					};
-				}
-			},
-			"obj_portal_arrive": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.AMSynth({
-						harmonicity: 1.9,
-						oscillator: { type: "triangle" },
-						envelope: {
-							attack: 0.005,
-							decay: 0.22,
-							sustain: 0.1,
-							release: 0.3
-						},
-						modulation: { type: "sine" },
-						modulationEnvelope: {
-							attack: 0.01,
-							decay: 0.18,
-							sustain: 0.06,
-							release: 0.2
-						}
-					}).toDestination();
-					return {
-						synth,
-						notes: ["B4", "E5", "G5"],
-						durations: ["32n", "32n", "8n"]
-					};
-				}
-			},
-			"obj_crop_harvest": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.NoiseSynth({
-						noise: { type: "white" },
-						envelope: {
-							attack: 0.005,
-							decay: 0.1,
-							sustain: 0,
-							release: 0.1
-						}
-					}).toDestination();
-					const filter = new Tone.Filter(3000, "lowpass").toDestination();
-					synth.connect(filter);
-					// synth.volume.value = Tone.gainToDb(0.4);
-					return { synth, duration: "16n" };
-				}
-			},
-			"obj_ball_bounce": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.MembraneSynth({
-						pitchDecay: 0.05,
-						octaves: 3,
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.2,
-							sustain: 0,
-							release: 0.2
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
-					return { synth, note: "G3", duration: "16n" };
-				}
-			},
-			"obj_butterfly": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.AMSynth({
-						harmonicity: 2,
-						oscillator: { type: "sine" },
-						envelope: {
-							attack: 0.01,
-							decay: 0.1,
-							sustain: 0,
-							release: 0.1
-						}
-					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.2);
-					return {
-						synth,
-						notes: ["A6", "C7"],
-						durations: ["32n", "32n"]
-					};
-				}
-			},
-			"obj_flower_pick": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.Synth({
-						oscillator: { type: "triangle" },
-						envelope: {
-							attack: 0.005,
-							decay: 0.12,
-							sustain: 0,
-							release: 0.25
-						}
-					}).toDestination();
-					synth.volume.value = Tone.gainToDb(0.35);
-					return {
-						synth,
-						notes: ["E5", "G5"],
-						durations: ["32n", "16n"]
-					};
-				}
-			},
-			"obj_flower_trample": {
-				type: "sfx",
-				create: () => {
-					const synth = new Tone.NoiseSynth({
-						noise: { type: "brown" },
-						envelope: {
-							attack: 0.001,
-							decay: 0.15,
-							sustain: 0,
-							release: 0.08
-						}
-					}).toDestination();
-					synth.volume.value = Tone.gainToDb(0.3);
-					return { synth, duration: "8n" };
-				}
+		return {
+			synth: { thump, texture, filter },
+			volume: 0.98,
+			trigger: ({ sound, effectiveVolume, options, manager }) => {
+				const pitchScale = options.pitchScale ?? (1 + manager.getCenteredVariation(0.03));
+				const playedNote = manager.applyPitchToNote(note, pitchScale);
+				const now = Tone.now();
+				sound.synth.thump.triggerAttackRelease(playedNote, "64n", now, effectiveVolume * thumpVolume);
+				sound.synth.texture.triggerAttackRelease("64n", now + 0.004, effectiveVolume * textureVolume);
 			}
 		};
+	}
+
+	getCenteredVariation(range = 0) {
+		if (!range) return 0;
+		const centered = ((Math.random() + Math.random() + Math.random()) / 3) - 0.5;
+		return centered * 2 * range;
+	}
+
+	applyPitchToNote(note, pitchScale = 1) {
+		if (!note || !Number.isFinite(pitchScale) || pitchScale <= 0 || pitchScale === 1) {
+			return note;
+		}
+
+		try {
+			const semitoneOffset = 12 * Math.log2(pitchScale);
+			return Tone.Frequency(note).transpose(semitoneOffset).toNote();
+		} catch (_error) {
+			return note;
+		}
+	}
+
+	resolveSoundCategory(id, preset = null) {
+		return AudioCategoryRules.resolve(id, preset || this.synthPresets[id] || {});
+	}
+
+	isCategoryEnabled(category) {
+		return AudioCategoryRules.isEnabled(this, category);
+	}
+
+	getCategoryVolume(category) {
+		const baseVolume = AudioCategoryRules.getVolume(this, category);
+		return baseVolume * (this.categoryMix[category] ?? 1);
+	}
+
+	bindTimeManager(timeManager) {
+		if (this.boundTimeManager === timeManager) {
+			return;
+		}
+
+		if (this.boundTimeManager && this._handleTimeHourChange) {
+			this.boundTimeManager.unsubscribe?.('hour', this._handleTimeHourChange);
+		}
+
+		this.boundTimeManager = timeManager || null;
+		this._handleTimeHourChange = null;
+
+		if (!this.boundTimeManager) {
+			return;
+		}
+
+		this._handleTimeHourChange = (timeData = {}) => {
+			const scheduledMusicId = this._getMusicForHour(timeData.hour);
+			if (this.initialized && this.musicEnabled && scheduledMusicId && scheduledMusicId !== this.currentMusicSynth) {
+				this.startMusic(scheduledMusicId);
+			}
+
+			if (this.initialized && this.soundEnabled) {
+				this.syncAmbientForHour(timeData.hour);
+			}
+		};
+
+		this.boundTimeManager.subscribe?.('hour', this._handleTimeHourChange);
+	}
+
+	resolvePlaybackModifiers(preset, soundCategory, options = {}) {
+		const variation = preset?.variation || {};
+		const defaultPitchRange = {
+			notifications: 0.012,
+			entities: 0.018,
+			world: 0.012,
+			machines: 0.01,
+			footsteps: 0,
+			ui: 0,
+			ambient: 0,
+			music: 0,
+			sfx: 0.01
+		}[soundCategory] ?? 0;
+		const pitchRange = variation.pitchRange ?? defaultPitchRange;
+		const pitchScale = options.pitchScale ?? (pitchRange > 0 ? 1 + this.getCenteredVariation(pitchRange) : 1);
+		const volumeSteps = Array.isArray(variation.volumeSteps) ? variation.volumeSteps : null;
+		const volumeMultiplier = options.volumeMultiplier ??
+			(volumeSteps && volumeSteps.length ? volumeSteps[Math.floor(Math.random() * volumeSteps.length)] : 1);
+
+		return {
+			pitchScale,
+			volumeMultiplier
+		};
+	}
+
+	playFootstep(surfaceTag = 'ground', options = {}) {
+		if (!this.initialized || !this.isCategoryEnabled('footsteps')) return;
+
+		const normalizedSurface = String(surfaceTag || 'ground').toLowerCase();
+		const surfacePools = {
+			grass: ['footstep_grass_1', 'footstep_grass_2'],
+			path: ['footstep_path_1', 'footstep_path_2'],
+			floor: ['footstep_floor_1', 'footstep_floor_2'],
+			sand: ['footstep_sand_1', 'footstep_sand_2'],
+			mud: ['footstep_mud_1', 'footstep_mud_2'],
+			water: ['footstep_water_1', 'footstep_water_2'],
+			ground: ['footstep_ground_1', 'footstep_ground_2'],
+			default: ['footstep_ground_1', 'footstep_ground_2']
+		};
+		const variants = surfacePools[normalizedSurface] || surfacePools.default;
+		const variantIndex = options.foot === 'left' ? 0 : 1;
+		const soundId = variants[variantIndex % variants.length];
+		const speedNormalized = Utility.clamp(options.speedNormalized ?? 1, 0.65, 1.35);
+		const pitchScale = options.pitchScale ?? (1 + this.getCenteredVariation(0.03));
+		this.play(soundId, {
+			volume: (options.volume !== undefined ? options.volume : 1) * (speedNormalized >= 1 ? 1.02 : 0.96),
+			pitchScale
+		});
+	}
+
+	playFootstepPreview() {
+		this.playFootstep('grass', {
+			foot: 'left',
+			volume: 0.95,
+			speedNormalized: 1
+		});
+	}
+
+	stopCategorySounds(category) {
+		this.synths.forEach((_sound, id) => {
+			if (this.resolveSoundCategory(id) === category) {
+				this.stop(id);
+			}
+		});
+	}
+
+	disposeSoundResources(sound) {
+		if (!sound || typeof sound !== 'object') return;
+		if (sound.synth) this.disposeSynthElements(sound.synth);
+		if (sound.pad) this.disposeSynthElements(sound.pad);
+	}
+
+	disposeSynthElements(target) {
+		if (!target || typeof target !== 'object') return;
+
+		if (typeof target.dispose === 'function') {
+			target.dispose();
+			return;
+		}
+
+		if (target.noise && typeof target.noise.dispose === 'function') {
+			target.noise.dispose();
+		}
+
+		Object.values(target).forEach((value) => {
+			if (value && typeof value === 'object' && value !== target.noise) {
+				this.disposeSynthElements(value);
+			}
+		});
 	}
 
 	_cloneVoiceData(data) {
@@ -1762,21 +358,11 @@ class SoundManager {
 	}
 
 	_getMusicForHour(hour) {
-		if (!Number.isFinite(hour)) {
-			return "music_main";
-		}
-
-		return hour >= 6 && hour < 19 ? "music_main" : "music_sunny";
+		return AudioScheduleProfiles.getMusicForHour(hour);
 	}
 
 	_getAmbientForHour(hour) {
-		const ambientTracks = ["env_wind"];
-
-		if (Number.isFinite(hour) && hour >= 7 && hour <= 12) {
-			ambientTracks.push("env_birds");
-		}
-
-		return ambientTracks;
+		return AudioScheduleProfiles.getAmbientForHour(hour);
 	}
 
 	init() {
@@ -1859,14 +445,7 @@ class SoundManager {
 			// Only dispose for non-currently-playing synths
 			if (!this.loops.has(id)) {
 				try {
-					if (oldSound.synth) {
-						// Different cleanup approach based on synth type
-						if (oldSound.synth.dispose) {
-							oldSound.synth.dispose();
-						} else if (oldSound.synth.noise) {
-							oldSound.synth.noise.dispose();
-						}
-					}
+					this.disposeSoundResources(oldSound);
 				} catch (err) {
 					console.warn('Error disposing old synth:', err);
 				}
@@ -1880,8 +459,10 @@ class SoundManager {
 
 		// Store the base volume for later volume adjustments
 
-		if (sound.volume) {
+		if (sound.volume != null) {
 			sound.baseVolume = sound.volume;
+		} else if (preset.baseVolume != null) {
+			sound.baseVolume = preset.baseVolume;
 		} else if (sound.synth && sound.synth.volume) {
 			// Extract current volume from dB
 			const volumeDb = sound.synth.volume.value;
@@ -1891,7 +472,7 @@ class SoundManager {
 		}
 
 		// Add effects for sfx
-		if (preset.type === "sfx" && sound.synth && !(sound.synth instanceof Object)) {
+		if (preset.type === "sfx" && sound.synth && typeof sound.synth.connect === 'function') {
 			sound.synth.connect(this.reverb);
 		}
 
@@ -1900,7 +481,14 @@ class SoundManager {
 	}
 
 	play(id, options = {}) {
-		if (!this.initialized || !this.soundEnabled) return;
+		const preset = this.synthPresets[id];
+		if (!preset) {
+			console.error(`Sound not found: ${id}`);
+			return;
+		}
+
+		const soundCategory = this.resolveSoundCategory(id, preset);
+		if (!this.initialized || !this.isCategoryEnabled(soundCategory)) return;
 
 		// Prevent rapid triggering of the same sound
 		const now = Date.now();
@@ -1910,77 +498,81 @@ class SoundManager {
 		}
 		this.lastPlayTimes.set(id, now);
 
-		const preset = this.synthPresets[id];
-		if (!preset) {
-			console.error(`Sound not found: ${id}`);
-			return;
-		}
-
-		// Check category enablement
-		if ((preset.type === "music" || preset.type === "ambient") && !this.musicEnabled) return;
-
 		// Create or get synth
 		const sound = this.synths.get(id) || this.createSynth(id);
 		if (!sound) return;
 
-		// Calculate the correct volume based on category
-		let categoryVolume = 1;
-		switch (preset.type) {
-			case "music":
-				categoryVolume = this.volume.music;
-				break;
-			case "ambient":
-				categoryVolume = this.volume.ambient;
-				break;
-			case "ui":
-				categoryVolume = this.volume.ui;
-				break;
-			case "sfx":
-				categoryVolume = this.volume.sfx;
-				break;
-			default:
-				categoryVolume = this.volume.sfx;
-				break;
-		}
-
-
-
-		// Apply master volume, category volume, AND base volume
-		const effectiveVolume = (options.volume || 1) * this.volume.master * categoryVolume * sound.baseVolume;
+		const categoryVolume = this.getCategoryVolume(soundCategory);
+		const requestedVolume = options.volume !== undefined ? options.volume : 1;
+		const playback = this.resolvePlaybackModifiers(preset, soundCategory, options);
+		const effectiveVolume = requestedVolume * playback.volumeMultiplier * categoryVolume * sound.baseVolume;
+		const schedulingPadding = 0.002;
+		const getSafeScheduleTime = (offsetSeconds = 0) => {
+			const baseNow = Tone.now();
+			const reservedStart = Number.isFinite(sound._nextTriggerTime)
+				? sound._nextTriggerTime + schedulingPadding
+				: baseNow;
+			return Math.max(baseNow, reservedStart) + offsetSeconds;
+		};
+		const reserveScheduleUntil = (timeSeconds) => {
+			if (Number.isFinite(timeSeconds)) {
+				sound._nextTriggerTime = timeSeconds;
+			}
+		};
 
 		try {
+			if (typeof sound.trigger === 'function') {
+				sound.trigger({
+					sound,
+					effectiveVolume,
+					options: {
+						...options,
+						pitchScale: playback.pitchScale,
+						volumeMultiplier: playback.volumeMultiplier
+					},
+					manager: this
+				});
+				return sound;
+			}
+
 			if (sound.notes) {
 				// Play multiple notes in sequence with safety checks
 				const notes = sound.notes;
 				const durations = sound.durations || notes.map(() => "8n");
+				const pitchScale = playback.pitchScale;
 
-				let time = Tone.now();
+				let time = getSafeScheduleTime();
 				for (let i = 0; i < notes.length; i++) {
 					// Add a small increment to time to prevent timing conflicts
 					time += i * 0.05;
 					sound.synth.triggerAttackRelease(
-						notes[i],
+						this.applyPitchToNote(notes[i], pitchScale),
 						durations[i],
 						time,
 						effectiveVolume // Use calculated volume
 					);
 					time += Tone.Time(durations[i]).toSeconds();
 				}
+				reserveScheduleUntil(time);
 			} else if (sound.note) {
 				// Play single note
+				const startTime = getSafeScheduleTime();
 				sound.synth.triggerAttackRelease(
-					sound.note,
+					this.applyPitchToNote(sound.note, playback.pitchScale),
 					sound.duration || "8n",
-					Tone.now(),
+					startTime,
 					effectiveVolume // Use calculated volume
 				);
+				reserveScheduleUntil(startTime + Tone.Time(sound.duration || "8n").toSeconds());
 			} else if (sound.duration) {
 				// For noise synths with no note
+				const startTime = getSafeScheduleTime();
 				sound.synth.triggerAttackRelease(
 					sound.duration,
-					Tone.now(),
+					startTime,
 					effectiveVolume // Use calculated volume
 				);
+				reserveScheduleUntil(startTime + Tone.Time(sound.duration).toSeconds());
 			}
 		} catch (error) {
 			console.warn(`Error playing sound ${id}:`, error.message);
@@ -1994,10 +586,10 @@ class SoundManager {
 		if (!sound) return;
 
 		// Different stop method depending on synth type
-		if (sound.synth.noise) {
+		if (sound.synth?.noise) {
 			// For noise-based synths
 			sound.synth.noise.stop();
-		} else if (typeof sound.synth.triggerRelease === 'function') {
+		} else if (typeof sound.synth?.triggerRelease === 'function') {
 			// For envelope-based synths
 			sound.synth.triggerRelease();
 		} else if (sound.loop && this.loops.has(id)) {
@@ -2006,29 +598,56 @@ class SoundManager {
 			loop.stop();
 			loop.dispose();
 			this.loops.delete(id);
+		} else if (sound.synth && typeof sound.synth === 'object') {
+			Object.values(sound.synth).forEach((element) => {
+				if (!element || typeof element !== 'object') return;
+				if (typeof element.triggerRelease === 'function') {
+					element.triggerRelease();
+				} else if (element.noise && typeof element.noise.stop === 'function') {
+					element.noise.stop();
+				}
+			});
 		}
 	}
 
 
 	startMusic(id, options = {}) {
-		if (!this.initialized || !this.musicEnabled) return;
+		if (!this.initialized || !this.isCategoryEnabled('music')) return;
+
+		if (this._musicStartTimer) {
+			clearTimeout(this._musicStartTimer);
+			this._musicStartTimer = null;
+		}
 
 		// Store the ID we're trying to play to prevent race conditions
 		this._pendingMusicId = id;
 
 		// If same music is already playing, just adjust volume if needed
 		if (this.currentMusicPart && this.currentMusicSynth === id) {
+			const sound = this.synths.get(id);
+			if (sound?.synth?.volume?.rampTo) {
+				sound.synth.volume.rampTo(Tone.gainToDb(0.5 * this.getCategoryVolume('music')), 0.1);
+			}
+			if (sound?.pad?.volume?.rampTo) {
+				sound.pad.volume.rampTo(Tone.gainToDb(0.3 * this.getCategoryVolume('music')), 0.1);
+			}
 			return;
 		}
 
-		// Stop current music
-		// this.stopMusic();
+		// Stop current music before scheduling a replacement on the shared transport.
+		if (this.currentMusicPart || this.currentMusicLayers.length) {
+			this.stopMusic();
+		}
 
 		// Wait a small amount of time to prevent timing conflicts
-		setTimeout(() => {
+		this._musicStartTimer = setTimeout(() => {
 			// Verify we still want to play this music (might have been changed/cancelled)
-			if (this._pendingMusicId !== id || !this.musicEnabled) return;
+			if (this._pendingMusicId !== id || !this.isCategoryEnabled('music')) {
+				this._musicStartTimer = null;
+				return;
+			}
 			this._pendingMusicId = null;
+			this._musicStartTimer = null;
 
 			try {
 				// Create music synth and pattern
@@ -2040,7 +659,7 @@ class SoundManager {
 					Tone.Transport.bpm.value = sound.tempo;
 				}
 
-				sound.synth.volume.value = Tone.gainToDb(0.5 * this.volume.music);
+				sound.synth.volume.value = Tone.gainToDb(0.5 * this.getCategoryVolume('music'));
 
 				// Create sequence with a small delay
 				const sequence = new Tone.Part((time, note) => {
@@ -2057,6 +676,23 @@ class SoundManager {
 
 				// Start AFTER a delay to avoid timing conflicts
 				sequence.start("+0.5");
+
+				this.currentMusicLayers = [];
+				if (sound.pad && Array.isArray(sound.padPattern) && sound.padPattern.length) {
+					sound.pad.volume.value = Tone.gainToDb(0.3 * this.getCategoryVolume('music'));
+					const padSequence = new Tone.Part((time, note) => {
+						sound.pad.triggerAttackRelease(
+							note.note,
+							note.duration,
+							time,
+							options.velocity || 0.55
+						);
+					}, sound.padPattern);
+					padSequence.loop = sound.loop;
+					padSequence.loopEnd = sequence.loopEnd;
+					padSequence.start("+0.5");
+					this.currentMusicLayers.push(padSequence);
+				}
 
 
 
@@ -2076,10 +712,17 @@ class SoundManager {
 
 
 	stopMusic() {
+		if (this._musicStartTimer) {
+			clearTimeout(this._musicStartTimer);
+			this._musicStartTimer = null;
+		}
+
 		// Save the current music ID before stopping
 		if (this.currentMusicSynth) {
 			this._lastMusicId = this.currentMusicSynth;
 		}
+
+		const currentSound = this.currentMusicSynth ? this.synths.get(this.currentMusicSynth) : null;
 
 		// Stop current music part
 		if (this.currentMusicPart) {
@@ -2090,6 +733,31 @@ class SoundManager {
 				console.warn("Error stopping music part:", err);
 			}
 			this.currentMusicPart = null;
+		}
+		this.currentMusicLayers.forEach((layer) => {
+			try {
+				layer.stop();
+				layer.dispose();
+			} catch (err) {
+				console.warn("Error stopping music layer:", err);
+			}
+		});
+		this.currentMusicLayers = [];
+
+		// Release any currently ringing notes so they do not smear across restarts.
+		if (currentSound?.synth && typeof currentSound.synth.releaseAll === 'function') {
+			try {
+				currentSound.synth.releaseAll();
+			} catch (err) {
+				console.warn("Error releasing music synth voices:", err);
+			}
+		}
+		if (currentSound?.pad && typeof currentSound.pad.releaseAll === 'function') {
+			try {
+				currentSound.pad.releaseAll();
+			} catch (err) {
+				console.warn("Error releasing music pad voices:", err);
+			}
 		}
 
 		// Clear current synth reference
@@ -2117,11 +785,14 @@ class SoundManager {
 		if (!this.musicEnabled || !this.initialized) return;
 
 
-		// If we have a previously saved music ID, restart that
+		const scheduledMusicId = this._getMusicForHour(this._getCurrentHour());
+		if (scheduledMusicId) {
+			this.startMusic(scheduledMusicId);
+			return;
+		}
+
 		if (this._lastMusicId) {
 			this.startMusic(this._lastMusicId);
-		} else {
-			this.startMusic(this._getMusicForHour(this._getCurrentHour()));
 		}
 	}
 
@@ -2140,7 +811,20 @@ class SoundManager {
 		if (!this.soundEnabled || !this.initialized) return;
 
 
-		this._getAmbientForHour(this._getCurrentHour()).forEach(soundId => {
+		this.syncAmbientForHour(this._getCurrentHour());
+	}
+
+	syncAmbientForHour(hour = this._getCurrentHour()) {
+		const targetAmbientIds = new Set(this._getAmbientForHour(hour));
+
+		this.loops.forEach((_loop, id) => {
+			const preset = this.synthPresets[id];
+			if (preset?.type === 'ambient' && !targetAmbientIds.has(id)) {
+				this.fadeOutAndStop(id, 1.1);
+			}
+		});
+
+		targetAmbientIds.forEach((soundId) => {
 			this.playAmbient(soundId);
 		});
 	}
@@ -2226,19 +910,21 @@ class SoundManager {
 
 
 	playAmbient(id, options = {}) {
-		if (!this.initialized || !this.musicEnabled) return;
+		if (!this.initialized || !this.isCategoryEnabled('ambient')) return;
 
 		// Get the preset first
 		const preset = this.synthPresets[id];
 		if (!preset || preset.type !== "ambient") return;
 
+		const sound = this.synths.get(id) || this.createSynth(id);
+		if (!sound) return;
+
 		// Calculate the actual volume to use
-		const baseVolume = preset.baseVolume || 1;
-		const categoryVolume = this.volume.ambient;
+		const baseVolume = sound.baseVolume || preset.baseVolume || 1;
+		const categoryVolume = this.getCategoryVolume('ambient');
 		const effectiveVolume = (options.volume !== undefined ? options.volume : 1) *
 			categoryVolume *
-			baseVolume *
-			this.volume.master;
+			baseVolume;
 
 		// After muting/unmuting, we need to force recreate the sound
 		// Check if unmuting was recently done
@@ -2266,9 +952,6 @@ class SoundManager {
 				return existingSound;
 			}
 		}
-
-		const sound = this.createSynth(id);
-		if (!sound) return;
 
 		// Start with zero volume and fade in
 		if (sound.synth) {
@@ -2427,8 +1110,12 @@ class SoundManager {
 
 
 
-	updateSynthVolume(synth, volume) {
+	updateSynthVolume(synth, volume, visited = new WeakSet()) {
 		if (!synth) return;
+		if (typeof synth === 'object') {
+			if (visited.has(synth)) return;
+			visited.add(synth);
+		}
 
 		// Safety check - ensure volume is a valid number
 		if (isNaN(volume) || volume < 0) {
@@ -2468,7 +1155,7 @@ class SoundManager {
 			// Recursively update all potential synth elements
 			Object.values(synth).forEach(element => {
 				if (element && typeof element === 'object') {
-					this.updateSynthVolume(element, volume);
+					this.updateSynthVolume(element, volume, visited);
 				}
 			});
 		}
@@ -2482,9 +1169,12 @@ class SoundManager {
 				if (this.currentMusicPart && this.currentMusicSynth) {
 					const sound = this.synths.get(this.currentMusicSynth);
 					if (sound && sound.synth) {
-						const musicVolume = this.volume.master * this.volume.music;
+						const musicVolume = this.getCategoryVolume('music');
 						// Smooth transition to avoid clicks
 						sound.synth.volume.rampTo(Tone.gainToDb(musicVolume), 0.1);
+						if (sound.pad?.volume?.rampTo) {
+							sound.pad.volume.rampTo(Tone.gainToDb(musicVolume * 0.3), 0.1);
+						}
 					}
 				}
 
@@ -2496,27 +1186,8 @@ class SoundManager {
 					const preset = this.synthPresets[id];
 					if (!preset) return;
 
-					let categoryVolume;
-					switch (preset.type) {
-						case "music":
-							categoryVolume = this.volume.music;
-							break;
-						case "ambient":
-							categoryVolume = this.volume.ambient;
-							break;
-						case "ui":
-							categoryVolume = this.volume.ui;
-							break;
-						case "sfx":
-							categoryVolume = this.volume.sfx;
-							break;
-						default:
-							categoryVolume = this.volume.sfx;
-							break;
-					}
-
-					const masterVolume = this.volume.master;
-					const finalVolume = masterVolume * categoryVolume * (sound.baseVolume || 1);
+					const categoryVolume = this.getCategoryVolume(this.resolveSoundCategory(id, preset));
+					const finalVolume = categoryVolume * (sound.baseVolume || 1);
 
 					this.updateSynthVolume(sound.synth, finalVolume);
 				});
@@ -2592,9 +1263,8 @@ class SoundManager {
 	}
 
 	playMyteSound(action, options = {}) {
-
-
-		const soundId = `myte_${action.toLowerCase()}`;
+		const normalizedAction = String(action || '').toLowerCase();
+		const soundId = normalizedAction.startsWith('myte_') ? normalizedAction : `myte_${normalizedAction}`;
 
 		// Prevent rapid UI sound triggering
 		const now = Date.now();
@@ -2606,7 +1276,7 @@ class SoundManager {
 
 		if (this.synthPresets[soundId]) {
 			try {
-				this.play(soundId);
+				this.play(soundId, options);
 			} catch (error) {
 				console.warn(`Error playing Myte sound ${soundId}:`, error.message);
 			}
@@ -2634,20 +1304,18 @@ class SoundManager {
 	}
 
 	dispose() {
+		if (this.boundTimeManager && this._handleTimeHourChange) {
+			this.boundTimeManager.unsubscribe?.('hour', this._handleTimeHourChange);
+		}
+		this.boundTimeManager = null;
+		this._handleTimeHourChange = null;
+
 		// Stop all sounds
 		this.synths.forEach((sound, id) => {
 			this.stop(id);
 
 			// Dispose synthesizers
-			if (sound.synth) {
-				if (sound.synth.dispose) {
-					sound.synth.dispose();
-				} else if (sound.synth.noise) {
-					sound.synth.noise.dispose();
-					if (sound.synth.autoFilter) sound.synth.autoFilter.dispose();
-					if (sound.synth.filter) sound.synth.filter.dispose();
-				}
-			}
+			this.disposeSoundResources(sound);
 		});
 
 		// Stop and dispose all loops

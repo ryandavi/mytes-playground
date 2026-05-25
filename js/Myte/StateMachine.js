@@ -455,9 +455,74 @@ class StateMachine {
 		const cfg = this.stateConfig[state];
 		const animKey = this.getAnimationKey(state);
 		const frame = this.animator.spriteConfig?.[animKey]?.[this.currentFrameIndex];
-		if (Array.isArray(frame) && frame[2] != null) return frame[2];
-		if (cfg?.frameDurations?.[this.currentFrameIndex] != null) return cfg.frameDurations[this.currentFrameIndex];
-		return 1000 / (cfg?.fps ?? 8);
+		let interval;
+		if (Array.isArray(frame) && frame[2] != null) {
+			interval = frame[2];
+		} else if (cfg?.frameDurations?.[this.currentFrameIndex] != null) {
+			interval = cfg.frameDurations[this.currentFrameIndex];
+		} else {
+			interval = 1000 / (cfg?.fps ?? 8);
+		}
+
+		return interval / this._getAnimationSpeedScale(state);
+	}
+
+	_getAnimationSpeedScale(state) {
+		if (!String(state || '').startsWith('moving_')) {
+			return 1;
+		}
+
+		const locomotionConfig = this.parent.definition?.audio?.locomotion ?? {};
+		const animationRange = locomotionConfig.animationSpeedScale ?? {};
+		const currentSpeed = this.parent.stats?.getSpeed?.() ?? this.parent.speed ?? 1;
+		const baseSpeed = this.parent.definition?.movement?.baseSpeed ?? this.parent.speed ?? 1;
+		const safeBaseSpeed = Math.max(0.01, baseSpeed);
+		const rawScale = currentSpeed / safeBaseSpeed;
+
+		return Utility.clamp(
+			rawScale,
+			animationRange.min ?? 0.85,
+			animationRange.max ?? 1.25
+		);
+	}
+
+	_getFrameEvents(state) {
+		const events = [];
+		if (!String(state || '').startsWith('moving_')) {
+			return events;
+		}
+
+		const footsteps = this.parent.definition?.audio?.locomotion?.footsteps ?? {};
+		if (footsteps.enabled === false) {
+			return events;
+		}
+
+		const frames = Array.isArray(footsteps.frames) && footsteps.frames.length
+			? footsteps.frames
+			: [1, 5];
+
+		frames.forEach((frameIndex, index) => {
+			events.push({
+				type: 'footstep',
+				frameIndex: Number(frameIndex),
+				foot: index % 2 === 0 ? 'left' : 'right'
+			});
+		});
+
+		return events;
+	}
+
+	_triggerFrameEvents(state, animationKey, frameIndex) {
+		const matchingEvents = this._getFrameEvents(state).filter(event => event.frameIndex === frameIndex);
+		if (!matchingEvents.length) return;
+
+		matchingEvents.forEach(event => {
+			this.parent.handleAnimationFrameEvent?.({
+				...event,
+				state,
+				animationKey
+			});
+		});
 	}
 
 	update(deltaTime) {
@@ -511,6 +576,7 @@ class StateMachine {
 		if (!updated) return;
 
 		this.parent.duplicate.setAttribute("sprite", animationKey);
+		this._triggerFrameEvents(currentState, animationKey, this.currentFrameIndex);
 
 		if (this.isAtLastFrame(animationKey)) {
 			this.handleAnimationComplete(currentState);

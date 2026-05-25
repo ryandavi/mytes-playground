@@ -9,6 +9,8 @@ class ButterflyMapObject extends AmbientCreatureMapObject {
             ...config
         };
         super(parent, type, variant, posX, posY, mergedConfig, options);
+        this.flutterSoundCooldown = 300 + Math.random() * 300;
+        this.wasRestingOnTarget = false;
 
         this.parent.particleSystem.addParticleMethodsToObject(this);
         this.addEffect('SPARKLE_SPRITE', {
@@ -75,6 +77,31 @@ class ButterflyMapObject extends AmbientCreatureMapObject {
         const element = super.render(container, parent);
         element.classList.add('butterfly', 'interactive');
         return element;
+    }
+
+    tickUpdate(tickDelta) {
+        this.flutterSoundCooldown = Math.max(0, this.flutterSoundCooldown - tickDelta);
+        const wasRestingOnTarget = this.isRestingOnTarget;
+
+        super.tickUpdate(tickDelta);
+
+        const currentSpeed = Math.hypot(this.velocity.x, this.velocity.y);
+        const soundManager = this.gameMap?.soundManager;
+        if (!soundManager) {
+            this.wasRestingOnTarget = this.isRestingOnTarget;
+            return;
+        }
+
+        if (!wasRestingOnTarget && this.isRestingOnTarget) {
+            soundManager.play('obj_butterfly_land', { volume: 0.5 });
+        } else if (!this.isIdle && !this.isRestingOnTarget && currentSpeed > 0.18 && this.flutterSoundCooldown <= 0) {
+            soundManager.play('obj_butterfly_flutter', {
+                volume: Utility.clamp(0.38 + (currentSpeed / Math.max(this.speed, 0.01)) * 0.14, 0.36, 0.56)
+            });
+            this.flutterSoundCooldown = 520 + Math.random() * 420;
+        }
+
+        this.wasRestingOnTarget = this.isRestingOnTarget;
     }
 
     getSelectionDebugInfo() {

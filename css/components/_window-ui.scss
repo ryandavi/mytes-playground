@@ -294,7 +294,12 @@
             #toggleDebug,
             #cycleFollowGoal,
             #cycleCamera,
-            #directWorldInteraction {
+            #directWorldInteraction,
+            #toggleTimePause {
+                flex: 1 1 100%;
+            }
+
+            #timeScale-group {
                 flex: 1 1 100%;
             }
 
@@ -378,9 +383,12 @@
                 }
             }
 
-            #adjustSpeed       { flex: 1; }
+            #adjustSpeed,
+            #timeScale         { flex: 1; }
             #adjustSpeed-down,
-            #adjustSpeed-up    { flex: 0; min-width: 50px; }
+            #adjustSpeed-up,
+            #timeScale-down,
+            #timeScale-up      { flex: 0; min-width: 50px; }
         }
     }
 }
