@@ -971,6 +971,98 @@ function createAudioPresetLibrary(manager) {
 				}
 			},
 
+			// Indoor ambient — soft, sheltered warmth (no wind)
+			"env_indoor_cozy": {
+				type: "ambient",
+				baseVolume: 0.09,
+				create: () => {
+					// Very gentle brown noise through a tight low-pass — the muffled hum
+					// of a quiet room. AutoFilter adds a barely-perceptible slow breath.
+					// Uses autoFilter (not Tremolo) so playAmbient starts it lazily.
+					const noise = new Tone.Noise("brown");
+					const autoFilter = new Tone.AutoFilter({
+						frequency: 0.06,
+						depth: 0.15,
+						baseFrequency: 280,
+						octaves: 0.8
+					});
+					const filter = new Tone.Filter({
+						frequency: 320,
+						type: "lowpass",
+						rolloff: -48
+					});
+					noise.connect(autoFilter);
+					autoFilter.connect(filter);
+					filter.toDestination();
+
+					return {
+						synth: { noise, autoFilter, filter },
+						loop: true,
+						volume: 0.09
+					};
+				}
+			},
+
+			// Still-water ambient — calm lake or pond surface
+			"env_water_lake": {
+				type: "ambient",
+				baseVolume: 0.14,
+				create: () => {
+					// Pink noise base with very slow, deep modulation — lapping at the shore
+					const noise = new Tone.Noise("pink");
+					const autoFilter = new Tone.AutoFilter({
+						frequency: 0.06,
+						depth: 0.55,
+						baseFrequency: 180,
+						octaves: 1.8
+					});
+					const filter = new Tone.Filter({
+						frequency: 900,
+						type: "lowpass",
+						rolloff: -24
+					});
+					noise.connect(autoFilter);
+					autoFilter.connect(filter);
+					filter.toDestination();
+
+					return {
+						synth: { noise, autoFilter, filter },
+						loop: true,
+						volume: 0.14
+					};
+				}
+			},
+
+			// Flowing-water ambient — stream or river with movement
+			"env_water_river": {
+				type: "ambient",
+				baseVolume: 0.18,
+				create: () => {
+					// Brighter, faster modulation gives the churning energy of moving water
+					const noise = new Tone.Noise("pink");
+					const autoFilter = new Tone.AutoFilter({
+						frequency: 0.28,
+						depth: 0.7,
+						baseFrequency: 350,
+						octaves: 2.2
+					});
+					const filter = new Tone.Filter({
+						frequency: 1600,
+						type: "lowpass",
+						rolloff: -12
+					});
+					noise.connect(autoFilter);
+					autoFilter.connect(filter);
+					filter.toDestination();
+
+					return {
+						synth: { noise, autoFilter, filter },
+						loop: true,
+						volume: 0.18
+					};
+				}
+			},
+
 			// Object Sounds
 			"obj_chest_open": {
 				type: "sfx",

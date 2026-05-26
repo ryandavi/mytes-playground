@@ -160,6 +160,27 @@ class MapTransitionManager {
         }
     }
 
+    // Move the .myte-slot wrapper to match a game-space position so
+    // getHomePosition() returns the correct spawn coords for the new map.
+    _syncMyteSlotToPosition(myte, position) {
+        if (!myte || !position) return;
+        const slotEl = myte.dropTarget ?? myte.element?.closest?.('.myte-slot');
+        if (!slotEl) return;
+        slotEl.style.left = `${position.x}px`;
+        slotEl.style.top  = `${position.y}px`;
+        Utility.logDebug(`[MapTransition] slot synced for ${myte.name} to (${position.x}, ${position.y})`);
+    }
+
+    // After a map change, sync every inactive myte's slot to the map spawn
+    // so that home positions are correct regardless of who is active.
+    _syncAllMyteSlotsToSpawn(map) {
+        const spawnPoint = map?.getSpawnPoint?.('myte') ?? map?.getSpawnPoint?.('default');
+        if (!spawnPoint) return;
+        for (const myte of this.container.mytes ?? []) {
+            this._syncMyteSlotToPosition(myte, spawnPoint);
+        }
+    }
+
     _prepareMyteForTransition(myte) {
         if (!myte) return;
         myte.queue?.clear?.();
@@ -333,6 +354,10 @@ class MapTransitionManager {
             if (!options.preserveCamera && this.container.camera) {
                 // Reserved for future custom camera reset behavior.
             }
+
+            // Sync all myte home slots to the new map's spawn point first,
+            // then override the active myte's position with its specific arrival.
+            this._syncAllMyteSlotsToSpawn(newMap);
 
             if (this.container.mytes && this.container.mytes.length > 0) {
                 if (activeMyte) {

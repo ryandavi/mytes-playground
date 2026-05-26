@@ -190,6 +190,7 @@
 
     .queue-empty-state {
         display: none;
+        &.is-visible { display: block; }
         font-size: 10px;
         opacity: 0.55;
         padding: var(--padding);
@@ -243,7 +244,11 @@
                             font-size: 0.8em;
                             line-height: 1;
 
-                            &.skip   { color: #3498db; }
+                            &.skip {
+                                color: #3498db;
+                                display: none;
+                                &.is-visible { display: block; }
+                            }
                             &.remove { color: #e74c3c; }
                         }
                     }
@@ -279,6 +284,10 @@
                 overflow: hidden;
                 flex: 0 0 100%;
                 display: none;
+
+                &.has-progress {
+                    display: block;
+                }
 
                 .bar {
                     height: 100%;

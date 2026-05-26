@@ -443,6 +443,10 @@ class ZoneManager {
         );
     }
 
+    getZonesOfType(type) {
+        return Array.from(this.zones.values()).filter(zone => zone.type === type);
+    }
+
     getNearbyZonesForMyte(myte, radius = Infinity) {
         return Array.from(this.zones.values())
             .filter(zone =>

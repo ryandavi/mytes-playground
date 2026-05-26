@@ -448,7 +448,13 @@ class MyteAI {
     }
 
     buildPlayCandidate(context) {
-        if (context.energy < 0.35 || context.needs.play < 0.4) {
+        // Ball play has a lower energy floor since it's exciting — only block on exhaustion.
+        const energyFloor = 0.22;
+        // When a ball is present the play need threshold is lower so the myte keeps playing
+        // while need remains elevated instead of quitting after one round.
+        const hasBall = this.findTargetWithAffordance(context.nearbyObjects, 'nudge_ball', context) != null;
+        const playNeedFloor = hasBall ? 0.28 : 0.4;
+        if (context.energy < energyFloor || context.needs.play < playNeedFloor) {
             return null;
         }
 
@@ -475,12 +481,22 @@ class MyteAI {
                 ? 'run_laps'
                 : (context.activity > 0.74 ? 'zigzag' : 'circle'));
         const targetKey = targetBall ? this.getTargetKey(targetBall) : (targetAnchor ? this.getTargetKey(targetAnchor) : null);
+        // Ball repeat penalties are softer so the myte keeps playing while need stays high.
+        const repeatPenaltyOptions = targetBall
+            ? {
+                labelMultiplier: 0.94,
+                targetMultiplier: 0.96,
+                historyLabelPenaltyScale: 0.3,
+                historyTargetPenaltyScale: 0.2,
+                historyWindowMs: Math.min(this.repeatWindow, 20000)
+            }
+            : null;
 
         return {
             label: `play:${actionId}`,
             targetKey,
             commitmentMs: actionId === 'play_fetch' ? 3200 : 2200,
-            score: this.applyRepeatPenalty(score, `play:${actionId}`, targetKey),
+            score: this.applyRepeatPenalty(score, `play:${actionId}`, targetKey, repeatPenaltyOptions),
             execute: () => {
                 if (Math.random() < 0.3) {
                     this.myte.queue.addExpression('excited', 35, 1);
@@ -825,37 +841,53 @@ class MyteAI {
         };
     }
 
-    applyRepeatPenalty(score, label, targetKey = null) {
+    applyRepeatPenalty(score, label, targetKey = null, options = {}) {
+        options = (options != null && typeof options === 'object') ? options : {};
         let adjustedScore = score;
+        const labelMultiplier = Number.isFinite(options.labelMultiplier)
+            ? options.labelMultiplier
+            : SiteConfig.ai.scoring.repeatLabelMultiplier;
+        const targetMultiplier = Number.isFinite(options.targetMultiplier)
+            ? options.targetMultiplier
+            : SiteConfig.ai.scoring.repeatTargetMultiplier;
+        const historyWindowMs = Number.isFinite(options.historyWindowMs) && options.historyWindowMs > 0
+            ? options.historyWindowMs
+            : this.repeatWindow;
+        const historyLabelPenaltyScale = Number.isFinite(options.historyLabelPenaltyScale)
+            ? options.historyLabelPenaltyScale
+            : 1;
+        const historyTargetPenaltyScale = Number.isFinite(options.historyTargetPenaltyScale)
+            ? options.historyTargetPenaltyScale
+            : 1;
 
         if (this.lastDecisionLabel === label) {
             const elapsed = SimClock.now() - this.lastDecisionTime;
             if (elapsed <= SiteConfig.ai.scoring.repeatLabelWindow) {
-                adjustedScore *= SiteConfig.ai.scoring.repeatLabelMultiplier;
+                adjustedScore *= labelMultiplier;
             }
         }
 
         if (targetKey && this.lastDecisionTargetKey === targetKey) {
             const elapsed = SimClock.now() - this.lastDecisionTime;
             if (elapsed <= SiteConfig.ai.scoring.repeatTargetWindow) {
-                adjustedScore *= SiteConfig.ai.scoring.repeatTargetMultiplier;
+                adjustedScore *= targetMultiplier;
             }
         }
 
         const now = SimClock.now();
         for (const entry of this.recentHistory) {
             const age = now - entry.time;
-            if (age > this.repeatWindow) {
+            if (age > historyWindowMs) {
                 continue;
             }
 
-            const ageFactor = 1 - (age / this.repeatWindow);
+            const ageFactor = 1 - (age / historyWindowMs);
             if (entry.label === label) {
-                adjustedScore -= SiteConfig.ai.scoring.historyLabelPenalty * ageFactor;
+                adjustedScore -= SiteConfig.ai.scoring.historyLabelPenalty * historyLabelPenaltyScale * ageFactor;
             }
 
             if (targetKey && entry.targetKey === targetKey) {
-                adjustedScore -= SiteConfig.ai.scoring.historyTargetPenalty * ageFactor;
+                adjustedScore -= SiteConfig.ai.scoring.historyTargetPenalty * historyTargetPenaltyScale * ageFactor;
             }
         }
 
@@ -1188,13 +1220,23 @@ class MyteAI {
             return 1;
         }
 
+        const isBallTarget = String(target?.type || '').toUpperCase() === 'BALL';
+        const cooldownDuration = isBallTarget
+            ? Math.max(8000, this.targetCooldownDuration * 0.4)
+            : this.targetCooldownDuration;
         const elapsed = SimClock.now() - (memory.lastCompletedAt ?? 0);
-        const recency = elapsed >= this.targetCooldownDuration
+        const recencyFloor = isBallTarget ? 0.35 : 0.1;
+        const recency = elapsed >= cooldownDuration
             ? 1
-            : Utility.clamp(elapsed / this.targetCooldownDuration, 0.1, 1);
-        const familiarityPenalty = Math.min(memory.completedCount * 0.08, 0.34);
+            : Utility.clamp(elapsed / cooldownDuration, recencyFloor, 1);
+        const familiarityPenalty = isBallTarget
+            ? Math.min(memory.completedCount * 0.04, 0.18)
+            : Math.min(memory.completedCount * 0.08, 0.34);
+        const noveltyBase = isBallTarget ? 0.68 : 0.55;
+        const noveltyRange = isBallTarget ? 0.32 : 0.45;
+        const noveltyFloor = isBallTarget ? 0.28 : 0.12;
 
-        return Utility.clamp(0.55 + (recency * 0.45) - familiarityPenalty, 0.12, 1);
+        return Utility.clamp(noveltyBase + (recency * noveltyRange) - familiarityPenalty, noveltyFloor, 1);
     }
 
     getBehaviorCategoryForAction(actionId, interactionType = null, affordance = null) {

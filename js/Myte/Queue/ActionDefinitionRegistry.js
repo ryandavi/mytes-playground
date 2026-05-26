@@ -57,6 +57,7 @@ class ActionDefinitionRegistry {
         return {
             id,
             label: definition.label || id,
+            labelShort: definition.labelShort || '',
             category: definition.category || 'basic',
             priority: Number.isFinite(Number(definition.priority)) ? Number(definition.priority) : 0,
             isMovementAction: definition.isMovementAction === true,
@@ -66,6 +67,7 @@ class ActionDefinitionRegistry {
             requiresTarget: definition.requiresTarget === true,
             affectsMood: definition.affectsMood === true,
             moodEffect: Number.isFinite(Number(definition.moodEffect)) ? Number(definition.moodEffect) : undefined,
+            icon: definition.icon || '',
             implementationClass: definition.implementationClass || '',
             defaultOptions: this.cloneValue(definition.defaultOptions || {})
         };

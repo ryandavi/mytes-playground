@@ -81,8 +81,22 @@ class TileMapLoader {
 
 			// Parse map properties to override defaults
 			if (mapData.properties) {
-				if (mapData.properties.environment) {
+				// 'location' is the canonical TMX property; 'environment' is a legacy alias
+				if (mapData.properties.location) {
+					mapData.environment.location = mapData.properties.location;
+				} else if (mapData.properties.environment) {
 					mapData.environment.location = mapData.properties.environment;
+				}
+
+				// Optional per-map ambient override — comma-separated sound IDs
+				if (mapData.properties.ambientSounds) {
+					mapData.environment.ambientOverride = String(mapData.properties.ambientSounds)
+						.split(',').map(s => s.trim()).filter(Boolean);
+				}
+
+				// Optional per-map music override — single sound ID
+				if (mapData.properties.music) {
+					mapData.environment.musicOverride = String(mapData.properties.music).trim();
 				}
 
 				if (mapData.properties.description) {

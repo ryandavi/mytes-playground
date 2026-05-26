@@ -13,8 +13,9 @@ class DebugOverlayUI {
 
         // Per-section drag + collapse state (keyed by sectionKey + 'queue')
         this.debugSectionState = {
-            system:   { x: null, y: null, open: true },
-            myte:     { x: null, y: null, open: true },
+            system:   { x: null, y: null, open: true, groups: {} },
+            myte:     { x: null, y: null, open: true, groups: {} },
+            overlays: { x: null, y: null, open: true, groups: {} },
             queue:    { x: null, y: null }
         };
         this._initializeFloatingStateMetadata();
@@ -65,6 +66,7 @@ class DebugOverlayUI {
     _initializeFloatingStateMetadata() {
         Object.values(this.debugSectionState).forEach(state => {
             if (!state || typeof state !== 'object') return;
+            state.groups ??= {};
             state._hasSavedPosition = false;
             state._hasSavedOpen = false;
             state._hasSavedCollapsed = false;
@@ -93,7 +95,12 @@ class DebugOverlayUI {
         if (!s) return;
         const state = this._loadState();
         if (!state.sections) state.sections = {};
-        state.sections[key] = { x: s.x, y: s.y, open: s.open };
+        state.sections[key] = {
+            x: s.x,
+            y: s.y,
+            open: s.open,
+            groups: { ...(s.groups || {}) }
+        };
         try { localStorage.setItem(DebugOverlayUI.PERSIST_KEY, JSON.stringify(state)); } catch {}
     }
 
@@ -106,6 +113,10 @@ class DebugOverlayUI {
 
     _saveOverlayState() {
         this._saveState({ overlays: { ...this.overlayState } });
+    }
+
+    _saveDebugEnabledState(enabled = document.body.classList.contains('debug')) {
+        this._saveState({ debugEnabled: !!enabled });
     }
 
     setDirectWorldInteractionEnabled(enabled) {
@@ -159,6 +170,10 @@ class DebugOverlayUI {
                     this.debugSectionState[key].x    = saved.x    ?? null;
                     this.debugSectionState[key].y    = saved.y    ?? null;
                     this.debugSectionState[key].open = saved.open ?? true;
+                    this.debugSectionState[key].groups =
+                        saved.groups && typeof saved.groups === 'object'
+                            ? { ...saved.groups }
+                            : {};
                     this.debugSectionState[key]._hasSavedPosition =
                         Number.isFinite(saved.x) && Number.isFinite(saved.y);
                     this.debugSectionState[key]._hasSavedOpen =
@@ -189,6 +204,11 @@ class DebugOverlayUI {
 
         if (state.interactionModes) {
             this.directWorldInteractionEnabled = !!state.interactionModes.directWorldInteraction;
+        }
+
+        // Restore visual debug body class
+        if (typeof state.debugEnabled === 'boolean') {
+            document.body.classList.toggle('debug', state.debugEnabled);
         }
 
         this._mountFloatingPanels();
@@ -354,7 +374,7 @@ class DebugOverlayUI {
             {
                 key: 'system',
                 title: 'Debug – System',
-                groups: debugGroups.filter(g => ['System', 'Input', 'Time', 'Map', 'Camera'].includes(g.name))
+                groups: debugGroups.filter(g => ['System', 'Input', 'Time', 'Map', 'Camera', 'Sound'].includes(g.name))
             },
             {
                 key: 'myte',
@@ -421,7 +441,9 @@ class DebugOverlayUI {
             if (!groupRefs) {
                 const groupEl = document.createElement('details');
                 groupEl.className = `debug-group ${this.groupCssClass(name)}`;
-                groupEl.open = true;
+                groupEl.open = refs.sectionEl
+                    ? (this.debugSectionState[sectionKey]?.groups?.[name] ?? true)
+                    : true;
 
                 const summary = document.createElement('summary');
                 summary.className = 'debug-group-summary';
@@ -433,6 +455,13 @@ class DebugOverlayUI {
                 groupEl.appendChild(table);
 
                 refs.bodyEl.appendChild(groupEl);
+                groupEl.addEventListener('toggle', () => {
+                    const sectionState = this.debugSectionState[sectionKey];
+                    if (!sectionState) return;
+                    sectionState.groups ??= {};
+                    sectionState.groups[name] = groupEl.open;
+                    this._saveSectionState(sectionKey);
+                });
                 groupRefs = { groupEl, tableEl: table, rowMap: new Map() };
                 refs.groupMap.set(name, groupRefs);
             }
@@ -487,6 +516,9 @@ class DebugOverlayUI {
         const panelWidth = 350;
         if (key === 'myte') {
             return { x: Math.max(margin, window.innerWidth - panelWidth - margin), y: 60 };
+        }
+        if (key === 'overlays') {
+            return { x: margin, y: 320 };
         }
         return { x: margin, y: 60 };
     }
@@ -941,6 +973,110 @@ class DebugOverlayUI {
         ];
     }
 
+    getSoundMessages() {
+        const sm = this.parent.core?.soundManager;
+        if (!sm) return [{ label: 'Audio', value: 'SoundManager unavailable' }];
+
+        const messages = [];
+
+        if (!sm.initialized) {
+            messages.push({ label: 'Audio', value: 'Not initialized' });
+            return messages;
+        }
+
+        // Global state
+        messages.push({ label: 'Sound',   value: sm.soundEnabled   ? 'On' : 'Off' });
+        messages.push({ label: 'Music',   value: sm.musicEnabled   ? 'On' : 'Off' });
+        messages.push({ label: 'Ambient', value: sm.ambientEnabled ? 'On' : 'Off' });
+
+        // Map context
+        const ctx = sm._mapContext;
+        if (ctx) {
+            messages.push({ label: 'Location', value: ctx.location ?? '—' });
+            if (ctx.musicOverride)   messages.push({ label: 'Music Override',   value: ctx.musicOverride });
+            if (ctx.ambientOverride?.length) {
+                messages.push({ label: 'Ambient Override', value: ctx.ambientOverride.join(', ') });
+            }
+        }
+
+        // Active music track
+        messages.push({ label: 'Music Track', value: sm.currentMusicSynth ?? '—' });
+
+        // Active ambient sounds — check synths not loops; noise-based ambient sounds
+        // (wind, indoor, water) are in synths only; only pattern-based (birds, crickets) use loops
+        const ambientLoops = [];
+        sm.synths.forEach((_sound, id) => {
+            const preset = sm.synthPresets[id];
+            if (preset?.type === 'ambient' && !(sm._proximitySounds?.has(id))) {
+                ambientLoops.push(id);
+            }
+        });
+        messages.push({
+            label: 'Ambient Loops',
+            value: ambientLoops.length ? ambientLoops.join(', ') : '—'
+        });
+
+        // Proximity sounds — shown with their current volume so distance-fade is visible
+        const proxIds = sm._proximitySounds ? [...sm._proximitySounds] : [];
+        if (proxIds.length) {
+            proxIds.forEach(id => {
+                const sound = sm.synths.get(id);
+                const vol = sound?.currentVolume != null
+                    ? ` (${(sound.currentVolume * 100).toFixed(0)}%)`
+                    : '';
+                messages.push({ label: `Proximity: ${id}`, value: `active${vol}` });
+            });
+        } else {
+            messages.push({ label: 'Proximity', value: '—' });
+        }
+
+        // Active SFX/machine loops (non-ambient, non-music — e.g. fountains)
+        const machineLoops = [];
+        sm.loops.forEach((_loop, id) => {
+            const preset = sm.synthPresets[id];
+            if (preset && preset.type !== 'ambient' && preset.type !== 'music') {
+                machineLoops.push(id);
+            }
+        });
+        if (machineLoops.length) {
+            messages.push({ label: 'Object Loops', value: machineLoops.join(', ') });
+        }
+
+        // Proximity diagnostics — directly inspect the grid near the myte so we can
+        // confirm whether water cells are present even when the sound isn't triggering
+        const gm = this.parent.gameMap;
+        const myte = this.parent.activeMyte;
+        if (gm && myte) {
+            const gs = gm.gridSystem;
+            if (gs?.grid) {
+                const cs  = gs.config.cellSize;
+                // Use collider ground-center, matching what proximity scan uses
+                const ox  = myte.collider?.offsetX ?? 0;
+                const oy  = myte.collider?.offsetY ?? 0;
+                const cw  = myte.collider?.width  ?? myte.size?.width  ?? 0;
+                const ch  = myte.collider?.height ?? myte.size?.height ?? 0;
+                const cx  = Math.floor((myte.posX + ox + cw / 2) / cs);
+                const cy  = Math.floor((myte.posY + oy + ch)     / cs);
+                const RADIUS = 192;
+                const gr  = Math.ceil(RADIUS / cs);
+                const terrainCounts = {};
+                for (let gx = Math.max(0, cx - gr); gx <= Math.min(gs.gridWidth - 1, cx + gr); gx++) {
+                    for (let gy = Math.max(0, cy - gr); gy <= Math.min(gs.gridHeight - 1, cy + gr); gy++) {
+                        const t = gs.grid[gx]?.[gy]?.terrainType;
+                        if (t && t !== 'ground') terrainCounts[t] = (terrainCounts[t] || 0) + 1;
+                    }
+                }
+                const nearby = Object.entries(terrainCounts).map(([t, n]) => `${t}×${n}`).join(', ');
+                messages.push({ label: 'Nearby Terrain', value: nearby || 'ground only' });
+                messages.push({ label: 'Myte Grid', value: `[${cx}, ${cy}]` });
+            } else {
+                messages.push({ label: 'Nearby Terrain', value: 'no grid' });
+            }
+        }
+
+        return messages;
+    }
+
     // ─── utility ─────────────────────────────────────────────────────────────
 
     pixelToTile(px, py) {
@@ -1162,6 +1298,9 @@ class DebugOverlayUI {
             const current = !!getValue();
             if (input.checked !== current) input.checked = current;
         }
+
+        this._maybeApplyResponsiveSectionState('overlays');
+        this._applySectionPosition('overlays');
     }
 
     // ─── main update ─────────────────────────────────────────────────────────
@@ -1173,6 +1312,7 @@ class DebugOverlayUI {
             { name: 'Time',      messages: this.getTimeMessages() },
             { name: 'Map',       messages: this.getMapMessages() },
             { name: 'Camera',    messages: this.getCameraMessages() },
+            { name: 'Sound',     messages: this.getSoundMessages() },
             { name: 'Myte',      messages: this.getMyteMessages() },
             { name: 'Myte Stats', messages: this.getMyteStats() },
             { name: 'Myte AI',   messages: this.getMyteAiMessages() }

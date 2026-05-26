@@ -69,6 +69,7 @@ class DebugPanel extends ModalWindow {
                     document.body.classList.toggle('debug');
                     const gridSystem = this.parent?.parent?.gameMap?.gridSystem;
                     if (gridSystem) gridSystem.toggleDebug();
+                    this.parent?.debugOverlay?._saveDebugEnabledState(document.body.classList.contains('debug'));
                     this.updateButton('toggleDebug');
                     this._updateOverlaySubgroupVisibility();
                 }

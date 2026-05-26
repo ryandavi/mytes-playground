@@ -12,18 +12,25 @@ const SiteConfig = Object.freeze({
 
     stats: Object.freeze({
         // Energy decay while moving (per ms of delta)
-        energyDecayRate: 0.0005,
+        // At 0.0009 with movement multiplier (1.2×): ~75 seconds of walking drains ~81 energy.
+        energyDecayRate: 0.0009,
 
-        // Base energy regen while idle/standing still (per ms)
-        energyRegenRate: 0.002,
+        // Drain multiplier applied to stationary active actions (inspect, eat, interact, etc.)
+        // Keeps them cheaper than walking but still meaningful. 0 = free, 1 = same as moving.
+        actionEnergyDrainFactor: 0.38,
+
+        // Base energy regen while truly idle/standing still (per ms) — very slow.
+        // Real recovery requires resting on a surface or the home slot.
+        // At 0.0003: recovering 100 energy takes ~5.5 minutes of doing nothing.
+        energyRegenRate: 0.0003,
 
         // Energy regen rate while resting on a surface (per ms).
         // Individual objects multiply this with their restEnergyRegenMultiplier.
-        // At 0.0015 a myte fills from 0→100 in ~67 seconds of bed rest.
-        bedRestEnergyRegenRate: 0.0015,
+        // At 0.002 a myte fills from 0→100 in ~50 seconds of bed rest.
+        bedRestEnergyRegenRate: 0.002,
 
         // Energy regen rate while parked in home slot (per ms).
-        // Slower than bed rest — home slot is passive recovery, not active sleep.
+        // Home slot is passive recovery — faster than idle, slower than bed rest.
         homeSlotEnergyRegenRate: 0.003,
 
         // Mood decay rate while active (per ms)
@@ -106,6 +113,10 @@ const SiteConfig = Object.freeze({
         energyRestore: 20,
         moodBoost: 8,
         healthRestore: 3,
+        // How long the Nourished buff lasts after eating world food (ms).
+        // Eating another food item replaces the timer. Better food should declare
+        // a higher saturationMs in its object config to override this default.
+        saturationMs: 90000,
     }),
 
     // ── Inventory ─────────────────────────────────────────────────────────────
@@ -118,7 +129,7 @@ const SiteConfig = Object.freeze({
         // Per-type effects when an item is dragged from inventory onto a Myte.
         // moodBoost is separate from food.moodBoost (hand-feeding vs ground eating).
         itemTypes: Object.freeze({
-            FOOD:     Object.freeze({ moodBoost: 15, expressions: ['eat'],                consumeTime: 1000 }),
+            FOOD:     Object.freeze({ moodBoost: 15, expressions: ['eat'],                consumeTime: 1000, saturationMs: 60000 }),
             TOY:      Object.freeze({ moodBoost: 10, expressions: ['play', 'happy'],      consumeTime: 2000 }),
             MEDICINE: Object.freeze({ moodBoost: 5,  expressions: ['surprised', 'happy'], consumeTime: 1500 }),
             FLOWER:   Object.freeze({ moodBoost: 6,  expressions: ['happy'],              consumeTime: 1200 }),

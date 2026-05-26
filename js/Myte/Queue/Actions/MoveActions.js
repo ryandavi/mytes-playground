@@ -73,6 +73,8 @@ const _alog  = APPROACH_DEBUG ? console.log.bind(console)  : () => {};
 const _awarn = APPROACH_DEBUG ? console.warn.bind(console) : () => {};
 const _slog  = ASTAR_DEBUG    ? console.log.bind(console)  : () => {};
 const _swarn = ASTAR_DEBUG    ? console.warn.bind(console) : () => {};
+const _approachInfo = console.log.bind(console);
+const _approachWarn = console.warn.bind(console);
 
 // Direct movement to coordinates with optional A* pathfinding
 class MoveAction extends MyteAction {
@@ -372,6 +374,10 @@ class AStarMoveAction extends MyteAction {
         this._stuckCount = 0;
         const prev = this.targetPoints?.length;
         this._buildPath(this.myte.posX, this.myte.posY, this._finalTarget);
+        if (!this.targetPoints?.length) {
+            _approachWarn(`[astar] ${this.myte.name} aborted path to (${Math.round(this._finalTarget.x)}, ${Math.round(this._finalTarget.y)}) after getting stuck near (${Math.round(this.myte.posX)}, ${Math.round(this.myte.posY)}).`);
+            return false;
+        }
         return !!this.targetPoints?.length && this.targetPoints.length !== prev;
     }
 
@@ -456,9 +462,27 @@ class GoToObjectAction extends PositionableAction {
     _lastTargetSnapshot = null;
     _lastTargetReplanAt = 0;
     _replanCount = 0;
+    _approachOutcome = 'pending';
 
     constructor(myte, options) {
         super(myte, { ...GoToObjectAction.metadata.defaultOptions, ...options });
+    }
+
+    markApproachOutcome(outcome) {
+        this._approachOutcome = outcome;
+        return outcome;
+    }
+
+    getApproachOutcome() {
+        return this._approachOutcome || 'pending';
+    }
+
+    didReachApproachTarget() {
+        return this.getApproachOutcome() === 'arrived';
+    }
+
+    didAbortApproach() {
+        return this.getApproachOutcome() === 'aborted';
     }
 
     getQueueTitle() {
@@ -596,6 +620,7 @@ class GoToObjectAction extends PositionableAction {
 
     start() {
         super.start();
+        this._approachOutcome = 'pending';
         this.currentTargetIndex  = 0;
         this._resolvedApproachConfig = this._resolveApproachConfig();
         this.buildApproachPlan();
@@ -633,6 +658,7 @@ class GoToObjectAction extends PositionableAction {
             _awarn(`[APPROACH] buildApproachPlan: no targetRect — alignTo="${cfg.alignTo}" target=`, this.target);
             this.targetPos = null;
             this.targetPoints = null;
+            _approachWarn(`[approach] ${this.myte.name} could not resolve a target rect for ${this.getQueueTargetLabel(this.target)}.`);
             return;
         }
 
@@ -667,6 +693,7 @@ class GoToObjectAction extends PositionableAction {
         _alog(`[APPROACH] no path found — falling back to candidate[0] targetPos=(${this.targetPos.x.toFixed(1)},${this.targetPos.y.toFixed(1)})`);
         this.targetPoints = null;
         this.clearDebugPath();
+        _approachWarn(`[approach] ${this.myte.name} found no clean path to ${this.getQueueTargetLabel(this.target)} and is falling back to a direct final approach.`);
     }
 
     getMyteApproachRect(alignTo = 'sprite') {
@@ -936,6 +963,8 @@ class GoToObjectAction extends PositionableAction {
         if (this._stuckFrames > 45) {
             const colliderGap = this.getTargetColliderGap();
             if (this.allowStuckSuccess !== false && colliderGap <= this.getEffectiveStuckCompletionDistance()) {
+                _approachInfo(`[approach] ${this.myte.name} accepted a stuck-complete on ${this.getQueueTargetLabel(this.target)} with collider gap ${colliderGap.toFixed(1)}.`);
+                this.markApproachOutcome('arrived');
                 this.faceTarget();
                 return true;
             }
@@ -944,14 +973,18 @@ class GoToObjectAction extends PositionableAction {
             this.currentTargetIndex = 0;
             this._replanCount++;
             if (this._replanCount >= (this.maxReplanAttempts ?? 6)) {
-                this.faceTarget();
+                _approachWarn(`[approach] ${this.myte.name} aborted ${this.constructor.metadata?.id || 'approach'} to ${this.getQueueTargetLabel(this.target)} after ${this._replanCount} stuck replans. gap=${colliderGap.toFixed(1)}`);
+                this.markApproachOutcome('aborted');
                 this.clearDebugPath();
                 return true;
             }
             this.buildApproachPlan();
             this._lastTargetSnapshot = this._captureTargetSnapshot();
             this._lastTargetReplanAt = performance.now();
-            if (!this.targetPos && !this.targetPoints) return true;
+            if (!this.targetPos && !this.targetPoints) {
+                this.markApproachOutcome('aborted');
+                return true;
+            }
         }
 
         // Oscillation detection: check net displacement over a 60-frame window.
@@ -970,6 +1003,8 @@ class GoToObjectAction extends PositionableAction {
             if (netDisp < 5) {
                 const colliderGap = this.getTargetColliderGap();
                 if (this.allowStuckSuccess !== false && colliderGap <= this.getEffectiveStuckCompletionDistance()) {
+                    _approachInfo(`[approach] ${this.myte.name} accepted an oscillation-complete on ${this.getQueueTargetLabel(this.target)} with collider gap ${colliderGap.toFixed(1)}.`);
+                    this.markApproachOutcome('arrived');
                     this.faceTarget();
                     this.clearDebugPath();
                     return true;
@@ -978,14 +1013,18 @@ class GoToObjectAction extends PositionableAction {
                 this.currentTargetIndex = 0;
                 this._replanCount++;
                 if (this._replanCount >= (this.maxReplanAttempts ?? 6)) {
-                    this.faceTarget();
+                    _approachWarn(`[approach] ${this.myte.name} aborted ${this.constructor.metadata?.id || 'approach'} to ${this.getQueueTargetLabel(this.target)} after oscillating in place. gap=${colliderGap.toFixed(1)}`);
+                    this.markApproachOutcome('aborted');
                     this.clearDebugPath();
                     return true;
                 }
                 this.buildApproachPlan();
                 this._lastTargetSnapshot = this._captureTargetSnapshot();
                 this._lastTargetReplanAt = performance.now();
-                if (!this.targetPos && !this.targetPoints) return true;
+                if (!this.targetPos && !this.targetPoints) {
+                    this.markApproachOutcome('aborted');
+                    return true;
+                }
             }
         }
 
@@ -1015,20 +1054,29 @@ class GoToObjectAction extends PositionableAction {
             }
         }
 
-        if (!this.targetPos) return true;
+        if (!this.targetPos) {
+            this.markApproachOutcome('aborted');
+            return true;
+        }
 
         this.myte.setTarget(this.targetPos.x, this.targetPos.y);
         this.myte.moveTowardsTarget();
 
         if (this.myte.isAtTarget()) {
             const withinInteractionThreshold = this.hasReachedInteractionThreshold();
+            const colliderGap = this.getTargetColliderGap?.() ?? -1;
+            console.warn(`[approach] ${this.myte.name} isAtTarget for ${this.getQueueTargetLabel(this.target)}: threshold=${withinInteractionThreshold} gap=${typeof colliderGap === 'number' ? colliderGap.toFixed(1) : colliderGap} pos=(${Math.round(this.myte.posX)},${Math.round(this.myte.posY)})`);
+
             if (withinInteractionThreshold === false) {
                 this._replanCount++;
+                const interactionDist = this._resolvedApproachConfig?.interactionDistance ?? this._resolvedApproachConfig?.maxDistance ?? '?';
                 if (this._replanCount >= (this.maxReplanAttempts ?? 6)) {
-                    this.faceTarget();
+                    _approachWarn(`[approach] ${this.myte.name} reached final tile for ${this.getQueueTargetLabel(this.target)} but threshold never met; aborting after ${this._replanCount} retries. gap=${colliderGap.toFixed(1)} required<=${interactionDist}`);
+                    this.markApproachOutcome('aborted');
                     this.clearDebugPath();
                     return true;
                 }
+                _approachWarn(`[approach] ${this.myte.name} at final tile for ${this.getQueueTargetLabel(this.target)} — threshold not met (gap=${colliderGap.toFixed(1)}, required<=${interactionDist}). Replanning (attempt ${this._replanCount}).`);
                 this.buildApproachPlan();
                 this._lastTargetSnapshot = this._captureTargetSnapshot();
                 this._lastTargetReplanAt = performance.now();
@@ -1038,6 +1086,8 @@ class GoToObjectAction extends PositionableAction {
                 }
             }
 
+            console.log(`[approach] ${this.myte.name} marking ARRIVED at ${this.getQueueTargetLabel(this.target)}`);
+            this.markApproachOutcome('arrived');
             this.faceTarget();
             this.clearDebugPath();
             return true;

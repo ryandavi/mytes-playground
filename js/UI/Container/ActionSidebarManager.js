@@ -337,7 +337,9 @@ class ActionSidebarManager extends UIComponent {
                     ...options,
                     userInitiated: true
                 };
-                activeMyte.queue.interrupt(action.id, payload);
+                // Use addToFront so the user-requested action starts immediately but
+                // any remaining queued actions are preserved rather than wiped.
+                activeMyte.queue.addToFront(action.id, payload);
                 this.updateActions(selectedObject);
             }
         });

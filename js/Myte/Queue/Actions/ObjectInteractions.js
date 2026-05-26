@@ -51,8 +51,7 @@ class InspectAction extends GoToObjectAction {
         moodEffect: 2,
         defaultOptions: {
             expressionType: 'curious',
-            expressionDuration: 40,
-            lookInterval: 22
+            expressionDuration: 40
         }
     };
 
@@ -67,17 +66,10 @@ class InspectAction extends GoToObjectAction {
             ...options
         });
         this.phase = 'approach';
-        this.lookTimer = this.lookInterval;
-        this.lookDirection = 1;
-        this.baseDirection = null;
     }
 
     getQueueTitle() {
         return 'Inspect';
-    }
-
-    start() {
-        super.start();
     }
 
     update() {
@@ -86,28 +78,20 @@ class InspectAction extends GoToObjectAction {
             if (!arrived) {
                 return false;
             }
+            if (this.didAbortApproach()) {
+                console.warn(`[inspect] ${this.myte.name} ABORTED inspect of ${this.getQueueTargetLabel(this.target)}. outcome=${this.getApproachOutcome()} replanCount=${this._replanCount} pos=(${Math.round(this.myte.posX)},${Math.round(this.myte.posY)})`);
+                return true;
+            }
 
+            console.log(`[inspect] ${this.myte.name} reached ${this.getQueueTargetLabel(this.target)}, switching to observe. gap=${this.getTargetColliderGap?.()?.toFixed(1) ?? '?'} pos=(${Math.round(this.myte.posX)},${Math.round(this.myte.posY)})`);
             this.phase = 'observe';
             this.currentDuration = this.duration;
-            this.baseDirection = this.myte.direction;
             if (this.expressionType) {
                 this.myte.queue.addExpression(this.expressionType, this.expressionDuration, 1);
             }
         }
 
         this.faceTarget();
-        this.lookTimer--;
-
-        if (this.lookTimer <= 0) {
-            this.lookTimer = this.lookInterval;
-            this.lookDirection *= -1;
-
-            if (this.baseDirection === DIRECTION.NORTH || this.baseDirection === DIRECTION.SOUTH) {
-                this.myte.setDirection(this.lookDirection > 0 ? DIRECTION.NORTH : DIRECTION.SOUTH);
-            } else {
-                this.myte.setDirection(this.lookDirection > 0 ? DIRECTION.EAST : DIRECTION.WEST);
-            }
-        }
 
         this.currentDuration--;
         return this.currentDuration <= 0;
@@ -245,6 +229,7 @@ class InteractObjectAction extends GoToObjectAction {
         if (this.phase === 'approach') {
             const arrived = super.update();
             if (!arrived) return false;
+            if (this.didAbortApproach()) return true;
             this.phase = 'interact';
             this.animationTimer = this.interactionAnimationDuration;
             this.faceTarget();
@@ -1116,11 +1101,8 @@ class EatElementAction extends GoToObjectAction {
                 healthRestore
             }
         );
-        this.myte.buffs?.handleItemConsumed?.({
-            type: this.target.type || 'food',
-            variant: this.target.variant || this.target.getConfig?.('variant') || this.target.id || 'food',
-            source: 'world_food'
-        });
+        const saturationMs = this.target.getConfig?.('saturationMs') ?? SiteConfig.food.saturationMs;
+        this.myte.buffs?.applyBuff?.('nourished', { durationMs: saturationMs, source: 'eat_element' });
 
         this.myte.queue.addExpression('heart', 300, 1);
         this.target?.remove?.();
@@ -1164,6 +1146,7 @@ class OpenChestAction extends GoToObjectAction {
         if (this.phase === 'approach') {
             const arrived = super.update();
             if (!arrived) return false;
+            if (this.didAbortApproach()) return true;
             this.phase = 'open';
             this.animationTimer = this.openAnimationDuration;
             this.faceTarget();
@@ -1227,6 +1210,7 @@ class CloseChestAction extends GoToObjectAction {
         if (this.phase === 'approach') {
             const arrived = super.update();
             if (!arrived) return false;
+            if (this.didAbortApproach()) return true;
             this.phase = 'close';
             this.animationTimer = this.closeAnimationDuration;
             this.faceTarget();
@@ -1303,6 +1287,7 @@ class PickFlowerAction extends GoToObjectAction {
         if (this.phase === 'approach') {
             const arrived = super.update();
             if (!arrived) return false;
+            if (this.didAbortApproach()) return true;
             this.phase = 'pick';
             this.animationTimer = this.pickAnimationDuration;
             this.faceTarget();
@@ -1394,6 +1379,7 @@ class TrampleFlowerAction extends GoToObjectAction {
         if (this.phase === 'approach') {
             const arrived = super.update();
             if (!arrived) return false;
+            if (this.didAbortApproach()) return true;
             this.phase = 'trample';
             this.animationTimer = this.trampleAnimationDuration;
             this.faceTarget();
@@ -1545,6 +1531,7 @@ class WaterPlantAction extends GoToObjectAction {
         if (this.phase === 'approach') {
             const arrived = super.update();
             if (!arrived) return false;
+            if (this.didAbortApproach()) return true;
             this.phase = 'water';
             this.animationTimer = this.waterAnimationDuration;
             this.faceTarget();
@@ -1631,6 +1618,7 @@ class HarvestAction extends GoToObjectAction {
         if (this.phase === 'approach') {
             const arrived = super.update();
             if (!arrived) return false;
+            if (this.didAbortApproach()) return true;
             this.phase = 'harvest';
             this.animationTimer = this.harvestAnimationDuration;
             this.faceTarget();
@@ -1696,7 +1684,7 @@ class ShakeTreeAction extends GoToObjectAction {
 
     static canPerform(selected, active) {
         return active &&
-               selected?.constructor?.name === 'TreeMapObject' &&
+               selected instanceof TreeMapObject &&
                (typeof selected.canShake !== 'function' || selected.canShake()) &&
                !active.queue.isCarrying();
     }
@@ -1715,6 +1703,7 @@ class ShakeTreeAction extends GoToObjectAction {
         if (this.phase === 'approach') {
             const arrived = super.update();
             if (!arrived) return false;
+            if (this.didAbortApproach()) return true;
             this.phase = 'shake';
             this.animationTimer = this.shakeAnimationDuration ?? 60;
             this.faceTarget();
@@ -1757,7 +1746,7 @@ class ChopTreeAction extends GoToObjectAction {
 
     static canPerform(selected, active) {
         return active &&
-               selected?.constructor?.name === 'TreeMapObject' &&
+               selected instanceof TreeMapObject &&
                (typeof selected.canChop !== 'function' || selected.canChop()) &&
                !active.queue.isCarrying();
     }
@@ -1776,6 +1765,7 @@ class ChopTreeAction extends GoToObjectAction {
         if (this.phase === 'approach') {
             const arrived = super.update();
             if (!arrived) return false;
+            if (this.didAbortApproach()) return true;
             this.phase = 'chop';
             this.animationTimer = this.chopAnimationDuration ?? 120;
             this.faceTarget();
@@ -1837,6 +1827,7 @@ class RemoveStumpAction extends GoToObjectAction {
         if (this.phase === 'approach') {
             const arrived = super.update();
             if (!arrived) return false;
+            if (this.didAbortApproach()) return true;
             this.phase = 'remove';
             this.animationTimer = this.removeAnimationDuration ?? 90;
             this.faceTarget();

@@ -119,6 +119,19 @@ class MyteQueue {
             this.isDoingAction = true;
         }
 
+        if (currentAction.isTargetValid?.() === false) {
+            Utility.logDebug(`[MyteQueue] cancelling ${currentAction.constructor?.name} — target no longer valid`);
+            this.queue.shift();
+            this.isDoingAction = false;
+            currentAction.interrupt?.();
+
+            if (this.queue.length > 0) {
+                this.queue[0].start();
+                this.isDoingAction = true;
+            }
+            return;
+        }
+
         if (currentAction.update(deltaTime)) {
             this.queue.shift();
             this.isDoingAction = false;

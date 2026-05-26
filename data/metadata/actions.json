@@ -4,6 +4,7 @@
     {
       "id": "astar-move",
       "label": "A* Move To",
+      "icon": "🏃",
       "category": "movement",
       "priority": 1,
       "isMovementAction": true,
@@ -21,6 +22,7 @@
     {
       "id": "being_carried",
       "label": "Being Carried",
+      "icon": "🪁",
       "category": "carry",
       "priority": 1,
       "isMovementAction": false,
@@ -35,6 +37,7 @@
     {
       "id": "carry",
       "label": "Carry",
+      "icon": "🫂",
       "category": "carry",
       "priority": 2,
       "isMovementAction": true,
@@ -48,6 +51,7 @@
     {
       "id": "carry_pickup",
       "label": "Pick Up",
+      "icon": "🤲",
       "category": "carry",
       "priority": 2,
       "isMovementAction": true,
@@ -62,6 +66,7 @@
     {
       "id": "carry_putdown",
       "label": "Put Down",
+      "icon": "📍",
       "category": "carry",
       "priority": 2,
       "isMovementAction": true,
@@ -75,6 +80,7 @@
     {
       "id": "chase",
       "label": "Chase",
+      "icon": "🏃",
       "category": "social",
       "priority": 4,
       "isMovementAction": true,
@@ -92,6 +98,7 @@
     {
       "id": "circle",
       "label": "Circle",
+      "icon": "🔄",
       "category": "movement",
       "priority": 3,
       "isMovementAction": true,
@@ -117,6 +124,7 @@
     {
       "id": "close_chest",
       "label": "Close Chest",
+      "icon": "🔒",
       "category": "interactions",
       "priority": 3,
       "isMovementAction": true,
@@ -134,6 +142,7 @@
     {
       "id": "dance",
       "label": "Dance",
+      "icon": "💃",
       "category": "state",
       "priority": 3,
       "isMovementAction": true,
@@ -151,6 +160,7 @@
     {
       "id": "deep_inspect",
       "label": "Inspect Oddly",
+      "icon": "🔬",
       "category": "interactions",
       "priority": 3,
       "isMovementAction": true,
@@ -171,6 +181,7 @@
     {
       "id": "drink_fountain",
       "label": "Drink",
+      "icon": "💧",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,
@@ -186,6 +197,7 @@
     {
       "id": "drop_item",
       "label": "Drop Item",
+      "icon": "📤",
       "category": "carry",
       "priority": 2,
       "isMovementAction": false,
@@ -199,6 +211,7 @@
     {
       "id": "eat_element",
       "label": "Eat",
+      "icon": "🍽️",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": false,
@@ -220,6 +233,7 @@
     {
       "id": "emote_at",
       "label": "Emote At",
+      "icon": "💬",
       "category": "social",
       "priority": 3,
       "isMovementAction": true,
@@ -239,6 +253,7 @@
     {
       "id": "expression",
       "label": "Express",
+      "icon": "😊",
       "category": "state",
       "priority": 2,
       "isMovementAction": false,
@@ -253,6 +268,7 @@
     {
       "id": "follow_mouse",
       "label": "Follow Mouse",
+      "icon": "🖱️",
       "category": "movement",
       "priority": 1,
       "isMovementAction": true,
@@ -266,6 +282,7 @@
     {
       "id": "follow_object",
       "label": "Follow",
+      "icon": "🔗",
       "category": "movement",
       "priority": 2,
       "isMovementAction": true,
@@ -284,6 +301,7 @@
     {
       "id": "give_item",
       "label": "Give Item",
+      "icon": "🎁",
       "category": "carry",
       "priority": 3,
       "isMovementAction": true,
@@ -299,6 +317,7 @@
     {
       "id": "go_to_object",
       "label": "Go To",
+      "icon": "🏃",
       "category": "movement",
       "priority": 1,
       "isMovementAction": true,
@@ -318,6 +337,7 @@
     {
       "id": "greet",
       "label": "Greet",
+      "icon": "👋",
       "category": "social",
       "priority": 3,
       "isMovementAction": false,
@@ -337,6 +357,7 @@
     {
       "id": "greet_receive",
       "label": "Greet (receive)",
+      "icon": "👋",
       "category": "social",
       "priority": 3,
       "isMovementAction": false,
@@ -356,6 +377,7 @@
     {
       "id": "guard",
       "label": "Guard",
+      "icon": "🛡️",
       "category": "movement",
       "priority": 3,
       "isMovementAction": true,
@@ -375,6 +397,7 @@
     {
       "id": "harvest",
       "label": "Harvest",
+      "icon": "🌾",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,
@@ -393,6 +416,7 @@
     {
       "id": "hide",
       "label": "Hide",
+      "icon": "🙈",
       "category": "reactive",
       "priority": 4,
       "isMovementAction": true,
@@ -410,6 +434,7 @@
     {
       "id": "hold_item",
       "label": "Carry Item",
+      "icon": "✊",
       "category": "carry",
       "priority": 2,
       "isMovementAction": true,
@@ -423,6 +448,7 @@
     {
       "id": "idle",
       "label": "Idle",
+      "icon": "💤",
       "category": "state",
       "priority": 0,
       "isMovementAction": false,
@@ -436,6 +462,7 @@
     {
       "id": "inspect",
       "label": "Inspect",
+      "icon": "🔍",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,
@@ -455,6 +482,7 @@
     {
       "id": "interact_object",
       "label": "Use",
+      "icon": "👆",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,
@@ -473,6 +501,7 @@
     {
       "id": "jump",
       "label": "Jump",
+      "icon": "⬆️",
       "category": "movement",
       "priority": 2,
       "isMovementAction": true,
@@ -494,6 +523,7 @@
     {
       "id": "move",
       "label": "Move To",
+      "icon": "🏃",
       "category": "movement",
       "priority": 1,
       "isMovementAction": true,
@@ -507,6 +537,7 @@
     {
       "id": "nudge_ball",
       "label": "Nudge Ball",
+      "icon": "⚽",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,
@@ -534,6 +565,7 @@
     {
       "id": "open_chest",
       "label": "Open Chest",
+      "icon": "📦",
       "category": "interactions",
       "priority": 3,
       "isMovementAction": true,
@@ -552,6 +584,7 @@
     {
       "id": "patrol",
       "label": "Patrol",
+      "icon": "👀",
       "category": "movement",
       "priority": 3,
       "isMovementAction": true,
@@ -578,6 +611,7 @@
     {
       "id": "pick_flower",
       "label": "Pick Flower",
+      "icon": "🌸",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,
@@ -596,6 +630,7 @@
     {
       "id": "pickup_item",
       "label": "Pick Up",
+      "icon": "🤲",
       "category": "carry",
       "priority": 2,
       "isMovementAction": true,
@@ -609,6 +644,7 @@
     {
       "id": "play_fetch",
       "label": "Play Fetch",
+      "icon": "🎾",
       "category": "social",
       "priority": 4,
       "isMovementAction": true,
@@ -634,6 +670,7 @@
     {
       "id": "play_tag",
       "label": "Play Tag",
+      "icon": "🏷️",
       "category": "social",
       "priority": 4,
       "isMovementAction": true,
@@ -653,6 +690,7 @@
     {
       "id": "run_away",
       "label": "Run Away",
+      "icon": "🏃",
       "category": "reactive",
       "priority": 5,
       "isMovementAction": true,
@@ -671,6 +709,7 @@
     {
       "id": "run_from",
       "label": "Run Away",
+      "icon": "🚪",
       "category": "reactive",
       "priority": 5,
       "isMovementAction": true,
@@ -689,6 +728,7 @@
     {
       "id": "run_laps",
       "label": "Run Laps",
+      "icon": "🔁",
       "category": "movement",
       "priority": 3,
       "isMovementAction": true,
@@ -711,6 +751,7 @@
     {
       "id": "show_affection",
       "label": "Show Affection",
+      "icon": "❤️",
       "category": "social",
       "priority": 3,
       "isMovementAction": false,
@@ -731,6 +772,7 @@
     {
       "id": "simple_sleep",
       "label": "Take a Nap",
+      "icon": "😴",
       "category": "state",
       "priority": 2,
       "isMovementAction": false,
@@ -748,6 +790,7 @@
     {
       "id": "sleep",
       "label": "Sleep",
+      "icon": "😴",
       "category": "state",
       "priority": 2,
       "isMovementAction": false,
@@ -766,6 +809,7 @@
     {
       "id": "smell_flower",
       "label": "Smell Flower",
+      "icon": "🌺",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,
@@ -783,6 +827,7 @@
     {
       "id": "spin",
       "label": "Spin",
+      "icon": "🌀",
       "category": "state",
       "priority": 3,
       "isMovementAction": false,
@@ -801,6 +846,7 @@
     {
       "id": "trample_flower",
       "label": "Trample",
+      "icon": "👟",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,
@@ -820,6 +866,7 @@
     {
       "id": "use_surface_slot",
       "label": "Use Surface",
+      "icon": "🛏️",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,
@@ -852,6 +899,7 @@
     {
       "id": "wander",
       "label": "Wander",
+      "icon": "🌀",
       "category": "movement",
       "priority": 2,
       "isMovementAction": true,
@@ -874,6 +922,7 @@
     {
       "id": "watch",
       "label": "Watch",
+      "icon": "👁️",
       "category": "social",
       "priority": 2,
       "isMovementAction": true,
@@ -891,6 +940,7 @@
     {
       "id": "water_plant",
       "label": "Water Plant",
+      "icon": "🪣",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,
@@ -909,6 +959,7 @@
     {
       "id": "zigzag",
       "label": "Zigzag",
+      "icon": "↔️",
       "category": "movement",
       "priority": 3,
       "isMovementAction": true,
@@ -936,6 +987,7 @@
     {
       "id": "shake_tree",
       "label": "Shake Tree",
+      "icon": "🌳",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,
@@ -954,6 +1006,7 @@
     {
       "id": "chop_tree",
       "label": "Chop Tree",
+      "icon": "🪓",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,
@@ -971,6 +1024,7 @@
     {
       "id": "remove_stump",
       "label": "Remove Stump",
+      "icon": "🪵",
       "category": "interactions",
       "priority": 2,
       "isMovementAction": true,

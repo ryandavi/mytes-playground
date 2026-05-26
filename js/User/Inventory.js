@@ -570,11 +570,9 @@ class Inventory {
         myte.stats.applyStatEffects(itemConfig.effects ?? {
             moodBoost: itemConfig.moodBoost
         });
-        myte.buffs?.handleItemConsumed?.({
-            type: itemType,
-            variant: this.state.draggedItem?.dataset?.variant || this.state.draggedItem?.dataset?.name || itemType,
-            source: 'inventory'
-        });
+        if (itemConfig.saturationMs) {
+            myte.buffs?.applyBuff?.('nourished', { durationMs: itemConfig.saturationMs, source: 'inventory' });
+        }
 
         // Emit particles or other visual effects if system exists
         const particleSystem = this.parent?.gameMap?.particleSystem || null;

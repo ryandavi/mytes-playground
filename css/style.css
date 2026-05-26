@@ -1243,6 +1243,11 @@ body.debug .map-object > .interactive-hitbox {
 }
 .action-queue-panel .queue-empty-state {
   display: none;
+}
+.action-queue-panel .queue-empty-state.is-visible {
+  display: block;
+}
+.action-queue-panel .queue-empty-state {
   font-size: 10px;
   opacity: 0.55;
   padding: var(--padding);
@@ -1295,6 +1300,10 @@ body.debug .map-object > .interactive-hitbox {
 }
 .action-queue-panel .queue-item .content .information .title .controls button.skip {
   color: #3498db;
+  display: none;
+}
+.action-queue-panel .queue-item .content .information .title .controls button.skip.is-visible {
+  display: block;
 }
 .action-queue-panel .queue-item .content .information .title .controls button.remove {
   color: #e74c3c;
@@ -1328,6 +1337,9 @@ body.debug .map-object > .interactive-hitbox {
   overflow: hidden;
   flex: 0 0 100%;
   display: none;
+}
+.action-queue-panel .queue-item .content .progress.has-progress {
+  display: block;
 }
 .action-queue-panel .queue-item .content .progress .bar {
   height: 100%;
@@ -2151,6 +2163,11 @@ body.debug .map-object > .interactive-hitbox {
   letter-spacing: 0.05em;
   line-height: 1;
   opacity: 0.75;
+  visibility: hidden;
+}
+.myte-queue-overlay .compact-chip.has-badge .compact-chip__badge,
+.myte-buff-overlay .compact-chip.has-badge .compact-chip__badge {
+  visibility: visible;
 }
 .myte-queue-overlay .compact-chip .compact-chip__label,
 .myte-buff-overlay .compact-chip .compact-chip__label {
@@ -2174,17 +2191,33 @@ body.debug .map-object > .interactive-hitbox {
   border-radius: 999px;
   overflow: hidden;
   background: var(--surface-ui-pressed);
+  opacity: 0;
+  transform: scaleX(0.92);
+  transform-origin: center;
+  visibility: hidden;
+  transition: opacity 140ms linear, transform 140ms linear;
+}
+.myte-queue-overlay .compact-chip.has-progress .compact-chip__meter,
+.myte-buff-overlay .compact-chip.has-progress .compact-chip__meter {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
 }
 .myte-queue-overlay .compact-chip .compact-chip__meter-fill,
 .myte-buff-overlay .compact-chip .compact-chip__meter-fill {
   width: 0;
   height: 100%;
-  background: var(--button-active-border-color);
-  transition: width 140ms linear;
+  background: var(--header-mid);
+  border-radius: inherit;
+  transition: width 200ms linear;
+}
+.myte-queue-overlay .compact-chip.buff-chip .compact-chip__meter-fill,
+.myte-buff-overlay .compact-chip.buff-chip .compact-chip__meter-fill {
+  background: var(--state-success-accent);
 }
 .myte-queue-overlay .compact-chip.buff-chip.kind-debuff .compact-chip__meter-fill,
 .myte-buff-overlay .compact-chip.buff-chip.kind-debuff .compact-chip__meter-fill {
-  background: var(--button-remove-border-color);
+  background: var(--state-error-accent);
 }
 
 .myte-buff-overlay {

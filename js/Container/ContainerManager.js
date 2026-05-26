@@ -176,7 +176,8 @@ class ContainerManager {
             );
             await this.setupMytes();
 
-
+            // Mytes now exist — apply map-defined slot positions.
+            this.transitionManager._syncAllMyteSlotsToSpawn(this.gameMap);
 
             Utility.logDebug('[ContainerManager] Initial map loaded successfully');
 
@@ -569,7 +570,8 @@ class ContainerManager {
         });
     }
 
-    normalizeRosterEntry(entry = {}, index = 0) {
+    normalizeRosterEntry(entry = {}, index = 0, options = {}) {
+        const preserveSlotPosition = options.preserveSlotPosition === true;
         const species = MyteDefinitionRegistry.normalizeSpeciesId?.(entry.species || entry.speciesId || 'snail') || 'snail';
         const name = String(entry.name || entry.displayName || `Myte ${index + 1}`).trim() || `Myte ${index + 1}`;
         const slotId = String(entry.slotId || `myte-slot-${index + 1}`);
@@ -577,8 +579,10 @@ class ContainerManager {
         const stats = entry.stats || {};
         const slotX = Number.isFinite(Number(entry.slotX)) ? Number(entry.slotX) : 0;
         const slotY = Number.isFinite(Number(entry.slotY)) ? Number(entry.slotY) : 0;
-        const hasExplicitSlotPosition = entry.hasSlotPosition === true ||
-            (entry.hasSlotPosition == null && (slotX !== 0 || slotY !== 0));
+        const hasExplicitSlotPosition = preserveSlotPosition && (
+            entry.hasSlotPosition === true ||
+            (entry.hasSlotPosition == null && (slotX !== 0 || slotY !== 0))
+        );
 
         return {
             id: String(entry.id || index + 1),
@@ -609,16 +613,22 @@ class ContainerManager {
     getInitialRosterData(existingWrappers = []) {
         const savedRoster = this.core?.user?.savedMytes;
         if (Array.isArray(savedRoster) && savedRoster.length > 0) {
-            return savedRoster.map((entry, index) => this.normalizeRosterEntry(entry, index));
+            return savedRoster.map((entry, index) => this.normalizeRosterEntry(entry, index, {
+                preserveSlotPosition: false
+            }));
         }
 
         if (existingWrappers.length > 0) {
             return this.extractRosterDataFromDom(existingWrappers)
-                .map((entry, index) => this.normalizeRosterEntry(entry, index));
+                .map((entry, index) => this.normalizeRosterEntry(entry, index, {
+                    preserveSlotPosition: true
+                }));
         }
 
         return this.createFallbackRosterData()
-            .map((entry, index) => this.normalizeRosterEntry(entry, index));
+            .map((entry, index) => this.normalizeRosterEntry(entry, index, {
+                preserveSlotPosition: false
+            }));
     }
 
     createMyteSlotElement(rosterEntry, index) {
@@ -771,13 +781,6 @@ class ContainerManager {
         });
 
         this.core.user?.trackMytes?.(this.mytes);
-
-        const myteSpawn = this.gameMap.spawnPoints.get("myte");
-        const needsSpawnedHomeSlot = !rosterData[0]?.hasSlotPosition ||
-            (rosterData[0]?.slotX === 0 && rosterData[0]?.slotY === 0);
-        if (this.mytes.length > 0 && myteSpawn && needsSpawnedHomeSlot) {
-            this.mytes[0].setWrapperPosition(myteSpawn.x, myteSpawn.y);
-        }
 
         let restoredActiveMyte = null;
         this.mytes.forEach((myte, index) => {

@@ -73,13 +73,18 @@ class FootstepController {
 
     resolveSurfaceTag(config) {
         const gridSystem = this.myte.parent?.gameMap?.gridSystem;
-        const feetPosition = this.myte.getFeetPosition?.();
-        if (!gridSystem || !feetPosition) {
-            return 'default';
-        }
+        if (!gridSystem) return 'default';
 
-        const gridPos = gridSystem.worldToGrid(feetPosition.x, feetPosition.y);
-        const terrainType = gridSystem.pathfinder?.getTerrainTypeAt?.(gridPos.x, gridPos.y) || 'default';
+        const m  = this.myte;
+        const ox = m.collider?.offsetX ?? 0;
+        const oy = m.collider?.offsetY ?? 0;
+        const cw = m.collider?.width  ?? m.size?.width  ?? 0;
+        const ch = m.collider?.height ?? m.size?.height ?? 0;
+        const feetX = m.posX + ox + cw / 2;
+        const feetY = m.posY + oy + ch;
+
+        const { x: gx, y: gy } = gridSystem.worldToGrid(feetX, feetY);
+        const terrainType = gridSystem.grid[gx]?.[gy]?.terrainType ?? 'default';
         return config.surfaces[terrainType] || terrainType || 'default';
     }
 

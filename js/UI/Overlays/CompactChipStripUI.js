@@ -150,17 +150,16 @@ class CompactChipStripUI extends UIComponent {
         element._chipConfig = config;
         element.className = `compact-chip ${config.className || ''}`.trim();
         element.classList.toggle('is-cancellable', config.cancellable === true);
+        element.classList.toggle('has-badge', !!config.badgeText);
+        element.classList.toggle('has-progress', config.progressRatio != null);
         element.setAttribute('aria-label', [config.tooltipTitle, ...(config.tooltipLines || [])].filter(Boolean).join(' - '));
 
         refs.label.textContent = config.shortLabel || '';
         refs.badge.textContent = config.badgeText || '';
-        refs.badge.style.display = config.badgeText ? 'inline-flex' : 'none';
 
         if (config.progressRatio == null) {
-            refs.meter.style.display = 'none';
             refs.meterFill.style.width = '0%';
         } else {
-            refs.meter.style.display = 'block';
             refs.meterFill.style.width = `${Math.round(Utility.clamp(config.progressRatio, 0, 1) * 100)}%`;
         }
     }

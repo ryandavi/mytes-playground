@@ -72,6 +72,13 @@ class SoundManager {
 
 		// Sound definitions using Tone.js synthesis
 		this.synthPresets = createAudioPresetLibrary(this);
+
+		// Current map audio context — updated on each map load via setMapContext()
+		this._mapContext = { location: 'outside', ambientOverride: null, musicOverride: null };
+
+		// Ambient sound IDs driven by proximity (water tiles / zones) — managed separately
+		// from the schedule so syncAmbientForHour never accidentally stops them
+		this._proximitySounds = new Set();
 	}
 
 	createFootstepPreset({
@@ -359,11 +366,13 @@ class SoundManager {
 	}
 
 	_getMusicForHour(hour) {
-		return AudioScheduleProfiles.getMusicForHour(hour);
+		if (this._mapContext?.musicOverride) return this._mapContext.musicOverride;
+		return AudioScheduleProfiles.getMusicForHour(hour, this._mapContext?.location);
 	}
 
 	_getAmbientForHour(hour) {
-		return AudioScheduleProfiles.getAmbientForHour(hour);
+		if (this._mapContext?.ambientOverride?.length) return [...this._mapContext.ambientOverride];
+		return AudioScheduleProfiles.getAmbientForHour(hour, this._mapContext?.location);
 	}
 
 	init() {
@@ -814,10 +823,14 @@ class SoundManager {
 
 	syncAmbientForHour(hour = this._getCurrentHour()) {
 		const targetAmbientIds = new Set(this._getAmbientForHour(hour));
+		const proximityIds = this._proximitySounds;
 
-		this.loops.forEach((_loop, id) => {
+		// Iterate synths (not loops) — noise-based ambient sounds are tracked in synths but
+		// never added to loops (only pattern-based Tone.Part sounds use loops).
+		// Checking loops alone would leave noise sounds running forever on map transition.
+		this.synths.forEach((_sound, id) => {
 			const preset = this.synthPresets[id];
-			if (preset?.type === 'ambient' && !targetAmbientIds.has(id)) {
+			if (preset?.type === 'ambient' && !targetAmbientIds.has(id) && !proximityIds.has(id)) {
 				this.fadeOutAndStop(id, 1.1);
 			}
 		});
@@ -825,6 +838,56 @@ class SoundManager {
 		targetAmbientIds.forEach((soundId) => {
 			this.playAmbient(soundId);
 		});
+	}
+
+	// Called by GameMap on load or map transition to update the ambient/music context.
+	// Triggers an immediate re-sync so the change is heard without waiting for the next hour tick.
+	setMapContext(context = {}) {
+		const prev = this._mapContext || {};
+		this._mapContext = {
+			location:        context.location        ?? 'outside',
+			ambientOverride: context.ambientOverride ?? null,
+			musicOverride:   context.musicOverride   ?? null
+		};
+
+		if (!this.initialized) return;
+
+		if (this.soundEnabled) {
+			this.syncAmbientForHour();
+		}
+
+		if (this.musicEnabled) {
+			const newMusic = this._getMusicForHour(this._getCurrentHour());
+			if (newMusic && newMusic !== this.currentMusicSynth) {
+				this.startMusic(newMusic);
+			}
+		}
+	}
+
+	// Called by the GameMap proximity poller with a Map<soundId, volumeMultiplier 0–1>.
+	// Volume scales with distance — 1.0 when on top of water, fading to 0 at range edge.
+	// Accepts a plain Set for callers that just need binary on/off (treated as volume 1.0).
+	setProximitySounds(sounds) {
+		const next = sounds instanceof Map
+			? sounds
+			: new Map([...(sounds || [])].map(id => [id, 1.0]));
+
+		if (!this.initialized || !this.soundEnabled) {
+			this._proximitySounds = new Set(next.keys());
+			return;
+		}
+
+		// Fade out sounds that left range
+		this._proximitySounds.forEach(id => {
+			if (!next.has(id)) this.fadeOutAndStop(id, 1.5);
+		});
+
+		// Start or re-volume sounds in range
+		next.forEach((volumeMultiplier, id) => {
+			this.playAmbient(id, { volume: volumeMultiplier });
+		});
+
+		this._proximitySounds = new Set(next.keys());
 	}
 
 	// Stop only sound effects without affecting music

@@ -98,6 +98,11 @@
             letter-spacing: 0.05em;
             line-height: 1;
             opacity: 0.75;
+            visibility: hidden;
+        }
+
+        &.has-badge .compact-chip__badge {
+            visibility: visible;
         }
 
         .compact-chip__label {
@@ -121,17 +126,33 @@
             border-radius: 999px;
             overflow: hidden;
             background: var(--surface-ui-pressed);
+            opacity: 0;
+            transform: scaleX(0.92);
+            transform-origin: center;
+            visibility: hidden;
+            transition: opacity 140ms linear, transform 140ms linear;
+        }
+
+        &.has-progress .compact-chip__meter {
+            opacity: 1;
+            transform: none;
+            visibility: visible;
         }
 
         .compact-chip__meter-fill {
             width: 0;
             height: 100%;
-            background: var(--button-active-border-color);
-            transition: width 140ms linear;
+            background: var(--header-mid);
+            border-radius: inherit;
+            transition: width 200ms linear;
+        }
+
+        &.buff-chip .compact-chip__meter-fill {
+            background: var(--state-success-accent);
         }
 
         &.buff-chip.kind-debuff .compact-chip__meter-fill {
-            background: var(--button-remove-border-color);
+            background: var(--state-error-accent);
         }
     }
 }

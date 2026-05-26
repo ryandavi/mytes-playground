@@ -385,6 +385,7 @@ MapObjectFactory.registry
     .register('GRASS', MapObject)
     .register('FLOWER', MapObject)
     .register('TREE', TreeMapObject)
+    .register('FRUIT_TREE', FruitTreeMapObject)
     .register('TREE_STUMP', TreeStumpMapObject)
     .register('MUSIC_BOX', MusicBoxMapObject)
     .register('TREASURE_CHEST', TreasureChestMapObject)

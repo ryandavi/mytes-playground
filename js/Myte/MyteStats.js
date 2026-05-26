@@ -1023,7 +1023,21 @@ class MyteStats {
             // SurfaceSlotAction also drives the "rest until full" loop condition.
             this.regenerateEnergy(deltaTime, this._getBedRestRate());
         } else {
-            this.regenerateEnergy(deltaTime);
+            const actionId = this.getCurrentActionId();
+            const isIdle = !actionId || actionId === 'idle';
+            if (isIdle) {
+                // Truly idle — very slow passive regen. Real recovery needs actual rest.
+                this.regenerateEnergy(deltaTime);
+            } else {
+                // Active but stationary (inspect, eat, interact, etc.) — costs effort.
+                this.useEnergy(
+                    this.energyDecayRate *
+                    SiteConfig.stats.actionEnergyDrainFactor *
+                    deltaTime *
+                    this.getEnergyActivityMultiplier() *
+                    this.getBuffMultiplier('stats.energyDecayMultiplier')
+                );
+            }
         }
 
         this.applyContinuousBuffStatEffects(deltaTime);

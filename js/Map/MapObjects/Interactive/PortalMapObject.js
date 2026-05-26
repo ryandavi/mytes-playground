@@ -306,7 +306,7 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         if (portalWindowBackground) {
             content.style.backgroundImage = `url(${portalWindowBackground})`;
         } else {
-            content.style.backgroundImage = 'radial-gradient(circle at center, rgba(255,255,255,0.35), rgba(138,43,226,0.65) 45%, rgba(75,0,130,0.92) 100%)';
+            // content.style.backgroundImage = 'radial-gradient(circle at center, rgba(255,255,255,0.35), rgba(138,43,226,0.65) 45%, rgba(75,0,130,0.92) 100%)';
         }
 
         portal.appendChild(title);
@@ -347,9 +347,9 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
         if (this.usesFallbackVisual) {
             const spriteElement = element.querySelector('.sprite');
             if (spriteElement) {
-                spriteElement.style.backgroundImage = 'radial-gradient(circle at center, rgba(255,255,255,0.6) 0%, rgba(173,216,230,0.55) 20%, rgba(138,43,226,0.9) 55%, rgba(75,0,130,0.95) 100%)';
-                spriteElement.style.borderRadius = '50%';
-                spriteElement.style.boxShadow = '0 0 28px rgba(138, 43, 226, 0.55), inset 0 0 18px rgba(255,255,255,0.28)';
+                // spriteElement.style.backgroundImage = 'radial-gradient(circle at center, rgba(255,255,255,0.6) 0%, rgba(173,216,230,0.55) 20%, rgba(138,43,226,0.9) 55%, rgba(75,0,130,0.95) 100%)';
+                // spriteElement.style.borderRadius = '50%';
+                // spriteElement.style.boxShadow = '0 0 28px rgba(138, 43, 226, 0.55), inset 0 0 18px rgba(255,255,255,0.28)';
             }
         }
 

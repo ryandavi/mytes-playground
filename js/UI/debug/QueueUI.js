@@ -318,13 +318,12 @@ class QueueUI {
         if (!refs.progress) return;
 
         const hasProgress = !!((item.duration && item.duration > 0) || typeof item.getProgress === 'function');
+        refs.progress.classList.toggle('has-progress', hasProgress);
         if (hasProgress) {
-            refs.progress.style.display = 'block';
             const percentage = this.calculateProgress(item);
             if (refs.bar) refs.bar.style.width = `${percentage}%`;
             if (refs.status) refs.status.textContent = `${percentage}%`;
         } else {
-            refs.progress.style.display = 'none';
             if (refs.status) refs.status.textContent = 'in progress';
         }
     }
@@ -356,7 +355,8 @@ class QueueUI {
             element.className = `queue-item ${item.constructor.metadata?.category || ''}${index === 0 ? ' is-current' : ''}`;
 
             refs.number.textContent = `#${index + 1}`;
-            refs.name.textContent = this.getQueueTitle(item);
+            const icon = item.constructor?.metadata?.icon;
+            refs.name.textContent = icon ? `${icon} ${this.getQueueTitle(item)}` : this.getQueueTitle(item);
             refs.description.innerHTML = '';
             refs.status = null;
 
@@ -396,18 +396,16 @@ class QueueUI {
         }
 
         if (this.allowControls && refs.skipBtn) {
-            refs.skipBtn.style.display = index === 0 ? 'block' : 'none';
+            refs.skipBtn.classList.toggle('is-visible', index === 0);
         }
 
         if (refs.progress) {
             const hasProgress = index === 0 && ((item.duration && item.duration > 0) || typeof item.getProgress === 'function');
+            refs.progress.classList.toggle('has-progress', hasProgress);
             if (hasProgress) {
-                refs.progress.style.display = 'block';
                 const percentage = this.calculateProgress(item);
                 if (refs.bar) refs.bar.style.width = `${percentage}%`;
                 if (refs.status) refs.status.textContent = `${percentage}%`;
-            } else {
-                refs.progress.style.display = 'none';
             }
         }
     }
@@ -453,7 +451,7 @@ class QueueUI {
 
         this.setEmptyStateMessage(activeMyte ? 'No actions queued' : 'No active myte');
         this.queue.classList.toggle('has-items', queueItems.length > 0);
-        if (this._emptyState) this._emptyState.style.display = queueItems.length === 0 ? 'block' : 'none';
+        if (this._emptyState) this._emptyState.classList.toggle('is-visible', queueItems.length === 0);
 
         if (!activeMyte) {
             this.clearItems();

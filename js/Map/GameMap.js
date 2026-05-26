@@ -461,6 +461,101 @@ class GameMap {
 
 		// Apply terrain data to pathfinding after objects have been added
 		this.applyTerrainToGameMap(mapData);
+
+		// Notify the sound system of this map's audio context and begin proximity polling
+		const sm = this.soundManager;
+		if (sm) {
+			sm.setMapContext({
+				location:        mapData.environment.location,
+				ambientOverride: mapData.environment.ambientOverride ?? null,
+				musicOverride:   mapData.environment.musicOverride   ?? null
+			});
+			this._startProximitySoundPolling();
+		}
+	}
+
+	// ── Proximity sound polling ────────────────────────────────────────────────
+
+	_startProximitySoundPolling() {
+		this._stopProximitySoundPolling();
+		this._proximitySoundInterval = setInterval(() => this._updateProximitySounds(), 500);
+	}
+
+	_stopProximitySoundPolling() {
+		if (this._proximitySoundInterval != null) {
+			clearInterval(this._proximitySoundInterval);
+			this._proximitySoundInterval = null;
+		}
+	}
+
+	_updateProximitySounds() {
+		const sm = this.soundManager;
+		const myte = this.activeMyte;
+		if (!sm || !myte) return;
+
+		// Map<soundId, volumeMultiplier 0–1> — zones give full 1.0, tiles scale by distance
+		const sounds = new Map();
+
+		// Water zones take priority — they declare lake vs river explicitly and play at full volume
+		if (this.zoneManager) {
+			for (const zone of this.zoneManager.getZonesOfType('water_lake')) {
+				if (zone.containsMyte(myte)) { sounds.set('env_water_lake', 1.0); break; }
+			}
+			for (const zone of this.zoneManager.getZonesOfType('water_river')) {
+				if (zone.containsMyte(myte)) { sounds.set('env_water_river', 1.0); break; }
+			}
+		}
+
+		// Fall back to tile scan — volume scales with proximity (louder as you get closer)
+		if (sounds.size === 0 && this.gridSystem) {
+			const { x, y } = this._myteGroundPos(myte);
+			const vol = this._getWaterTileProximity(x, y, 192);
+			if (vol > 0) sounds.set('env_water_lake', vol);
+		}
+
+		sm.setProximitySounds(sounds);
+	}
+
+	// Returns the ground-center position of a myte's collider — the best single point
+	// for terrain queries (center-X, bottom-Y of the collider, matching actual feet).
+	_myteGroundPos(myte) {
+		const ox = myte.collider?.offsetX ?? 0;
+		const oy = myte.collider?.offsetY ?? 0;
+		const cw = myte.collider?.width  ?? myte.size?.width  ?? 0;
+		const ch = myte.collider?.height ?? myte.size?.height ?? 0;
+		return {
+			x: myte.posX + ox + cw / 2,
+			y: myte.posY + oy + ch
+		};
+	}
+
+	// Returns 0 (out of range) to 1 (on top of water) based on closest water tile distance.
+	// Uses a linear falloff over the given radius so the sound fades as you walk away.
+	_getWaterTileProximity(worldX, worldY, radius) {
+		const gs = this.gridSystem;
+		if (!gs?.grid) return 0;
+		const cs  = gs.config.cellSize;
+		const cx  = Math.floor(worldX / cs);
+		const cy  = Math.floor(worldY / cs);
+		const gr  = Math.ceil(radius / cs);
+		const x0  = Math.max(0, cx - gr);
+		const x1  = Math.min(gs.gridWidth  - 1, cx + gr);
+		const y0  = Math.max(0, cy - gr);
+		const y1  = Math.min(gs.gridHeight - 1, cy + gr);
+		let closestSq = Infinity;
+		for (let gx = x0; gx <= x1; gx++) {
+			for (let gy = y0; gy <= y1; gy++) {
+				const t = gs.grid[gx]?.[gy]?.terrainType;
+				if (t === 'shallow_water' || t === 'deep_water') {
+					const dx = (gx - cx) * cs;
+					const dy = (gy - cy) * cs;
+					const dSq = dx * dx + dy * dy;
+					if (dSq < closestSq) closestSq = dSq;
+				}
+			}
+		}
+		if (closestSq === Infinity) return 0;
+		return Math.max(0, 1 - Math.sqrt(closestSq) / radius);
 	}
 
 
@@ -947,6 +1042,10 @@ class GameMap {
     }
 
     dispose() {
+        // Stop proximity polling and clear any proximity sounds before the new map takes over
+        this._stopProximitySoundPolling();
+        this.soundManager?.setProximitySounds(new Set());
+
         // Clean up dropped items (their DOM elements live in the shared layer)
         this.droppedItems.forEach(item => item.remove());
         this.droppedItems = [];

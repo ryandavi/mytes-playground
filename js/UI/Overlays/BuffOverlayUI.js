@@ -1,3 +1,15 @@
+const BUFF_CATEGORY_LABELS = Object.freeze({
+    energy: '⚡',
+    health: '❤️',
+    mood: '😊',
+    boredom: '😴',
+    comfort: '🛋️',
+    confidence: '✨',
+    social: '👥',
+    play: '🎉',
+    general: '⭐'
+});
+
 class BuffOverlayUI extends CompactChipStripUI {
     getItems() {
         const activeMyte = this.parent.getActiveMyte?.();
@@ -7,6 +19,10 @@ class BuffOverlayUI extends CompactChipStripUI {
     getShortLabel(buff) {
         if (buff.icon) {
             return buff.icon;
+        }
+
+        if (buff.category && BUFF_CATEGORY_LABELS[buff.category]) {
+            return BUFF_CATEGORY_LABELS[buff.category];
         }
 
         const words = String(buff.label || '')

@@ -93,6 +93,12 @@ class MyteAction {
 
     interrupt() {}
 
+    isTargetValid() {
+        if (!this.target) return true;
+        if (this.target instanceof Myte) return this.target.active !== false;
+        return this.target.active !== false && this.target.element !== null;
+    }
+
     getQueueTitle() {
         return this.constructor.metadata?.label || this.constructor.name.replace(/Action$/, '');
     }
@@ -187,7 +193,11 @@ class PositionableAction extends MyteAction {
             };
         }
 
-        const rect = this.myte.parent.getLocalOffset(target.element ?? target);
+        const el = target.element ?? target;
+        if (!el || typeof el.getBoundingClientRect !== 'function' || !el.isConnected) {
+            return null;
+        }
+        const rect = this.myte.parent.getLocalOffset(el);
         if (target.posX !== undefined) {
             const dx = Math.abs(rect.x - target.posX);
             const dy = Math.abs(rect.y - target.posY);

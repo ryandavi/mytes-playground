@@ -325,28 +325,24 @@
       }
     },
     {
-      "id": "snack_sated",
-      "label": "Snack Sated",
+      "id": "nourished",
+      "label": "Nourished",
       "kind": "buff",
       "category": "food",
-      "priority": 22,
-      "durationMs": 60000,
-      "reapplyCooldownMs": 20000,
+      "priority": 35,
+      "durationMs": 90000,
+      "stackMode": "replace",
       "cancellable": true,
-      "icon": "FD",
-      "description": "A fresh bite leaves a short-lived bounce in recovery and mood.",
+      "icon": "NR",
+      "description": "Well-fed and energized. Activities burn much less energy until it wears off.",
       "effects": {
         "movement": {
           "speedMultiplier": 1.05
         },
         "stats": {
-          "energyRegenMultiplier": 1.08,
-          "moodSyncMultiplier": 1.06
-        }
-      },
-      "triggers": {
-        "itemConsumed": {
-          "types": ["food"]
+          "energyDecayMultiplier": 0.35,
+          "energyRegenMultiplier": 1.12,
+          "moodSyncMultiplier": 1.05
         }
       }
     },

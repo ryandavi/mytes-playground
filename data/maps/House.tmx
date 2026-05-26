@@ -3,7 +3,7 @@
  <properties>
   <property name="description" value="A cozy place for your Mytes"/>
   <property name="displayName" value="Your Home"/>
-  <property name="location" value="outside"/>
+  <property name="location" value="inside"/>
   <property name="name" value="Your Home"/>
  </properties>
  <tileset firstgid="1" source="../tilesets/walls3.tsx"/>
