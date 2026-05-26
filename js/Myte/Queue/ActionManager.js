@@ -201,6 +201,9 @@ ActionManager.registerActions([
     DrinkFromFountainAction,
     WaterPlantAction,
     HarvestAction,
+    ShakeTreeAction,
+    ChopTreeAction,
+    RemoveStumpAction,
 
     // Social (Myte-to-Myte)
     ShowAffectionAction,

@@ -639,28 +639,60 @@ class ContainerManager {
             .toLowerCase()
             .replace(/[^a-z0-9_-]+/g, '-');
 
-        wrapper.innerHTML = `
-            <div class="myte-home-label">
-                <div class="name tooltip">${rosterEntry.slotLabel}</div>
-            </div>
-            <div class="myte-home-slot"></div>
-            <div id="interactive-myte-${safeMyteId}" class="interactive-myte" data-myte-id="${rosterEntry.id}" data-myte-name="${rosterEntry.name}" data-myte-species="${rosterEntry.species}" draggable="false">
-                <div class="inner-wrapper">
-                    <div class="sprite"></div>
-                    <div class="name-wrapper">
-                        <span class="before">x</span>
-                        <div class="name tooltip">${rosterEntry.name}</div>
-                    </div>
-                    <div class="commands"></div>
-                    <div class="dialogue">
-                        <span class="text"></span>
-                    </div>
-                    <div class="above-wrapper">
-                        <div class="battery"></div>
-                    </div>
-                </div>
-            </div>
-        `;
+        // Safe DOM construction — never use innerHTML with save-data values.
+        const homeLabel = document.createElement('div');
+        homeLabel.className = 'myte-home-label';
+        const homeLabelName = document.createElement('div');
+        homeLabelName.className = 'name tooltip';
+        homeLabelName.textContent = rosterEntry.slotLabel;
+        homeLabel.appendChild(homeLabelName);
+
+        const homeSlot = document.createElement('div');
+        homeSlot.className = 'myte-home-slot';
+
+        const interactive = document.createElement('div');
+        interactive.id = `interactive-myte-${safeMyteId}`;
+        interactive.className = 'interactive-myte';
+        interactive.dataset.myteId = String(rosterEntry.id ?? '');
+        interactive.dataset.myteName = String(rosterEntry.name ?? '');
+        interactive.dataset.myteSpecies = String(rosterEntry.species ?? '');
+        interactive.draggable = false;
+
+        const innerWrapper = document.createElement('div');
+        innerWrapper.className = 'inner-wrapper';
+
+        const sprite = document.createElement('div');
+        sprite.className = 'sprite';
+
+        const nameWrapper = document.createElement('div');
+        nameWrapper.className = 'name-wrapper';
+        const before = document.createElement('span');
+        before.className = 'before';
+        before.textContent = 'x';
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'name tooltip';
+        nameDiv.textContent = rosterEntry.name;
+        nameWrapper.appendChild(before);
+        nameWrapper.appendChild(nameDiv);
+
+        const commands = document.createElement('div');
+        commands.className = 'commands';
+
+        const dialogue = document.createElement('div');
+        dialogue.className = 'dialogue';
+        const dialogueText = document.createElement('span');
+        dialogueText.className = 'text';
+        dialogue.appendChild(dialogueText);
+
+        const aboveWrapper = document.createElement('div');
+        aboveWrapper.className = 'above-wrapper';
+        const battery = document.createElement('div');
+        battery.className = 'battery';
+        aboveWrapper.appendChild(battery);
+
+        innerWrapper.append(sprite, nameWrapper, commands, dialogue, aboveWrapper);
+        interactive.appendChild(innerWrapper);
+        wrapper.append(homeLabel, homeSlot, interactive);
 
         return wrapper;
     }
@@ -692,6 +724,15 @@ class ContainerManager {
         myte.stats.boredom = Math.max(myte.stats.minBoredom, Math.min(myte.stats.maxBoredom, stats.boredom ?? myte.stats.boredom));
         myte.stats.comfort = Math.max(myte.stats.minComfort, Math.min(myte.stats.maxComfort, stats.comfort ?? myte.stats.comfort));
         myte.stats.confidence = Math.max(myte.stats.minConfidence, Math.min(myte.stats.maxConfidence, stats.confidence ?? myte.stats.confidence));
+
+        // Restore progression and personality traits from the canonical save schema.
+        if (stats.speed != null) myte.stats.speed = stats.speed;
+        if (stats.level != null) myte.stats.level = stats.level;
+        if (stats.experience != null) myte.stats.experience = stats.experience;
+        if (stats.traits && typeof stats.traits === 'object') {
+            myte.stats.traits = { ...myte.stats.traits, ...stats.traits };
+        }
+
         myte.stats.updateBatteryDisplay?.();
     }
 
@@ -848,7 +889,7 @@ class ContainerManager {
         }
 
         this.ui.myteListManager.updateMytesList(myte);
-        this.ui.debugPanel.updateButtons();
+        this.ui.debugPanel?.updateButtons();
         this.ui.viewPanel?.updateButtonStates();
         this.ui.setSelected(null);
 

@@ -8,7 +8,8 @@
       "Bash(node_modules/.bin/sass css/style.scss css/style.css --no-source-map)",
       "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\" -Recurse -File)",
       "Bash(Sort-Object)",
-      "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\js\" -Recurse -Name)"
+      "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\js\" -Recurse -Name)",
+      "Bash(node -e ' *)"
     ]
   }
 }

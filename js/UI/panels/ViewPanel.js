@@ -9,6 +9,7 @@ class ViewPanel extends ModalWindow {
             closeButtonSelector: '.modal-close-btn'
         });
 
+        this.init(); // explicit — subclass state is ready before any virtual method call
         this.setupControls();
     }
 

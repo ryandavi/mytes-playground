@@ -15,7 +15,7 @@ constructor(parent, options = {}) {
 		buttonId: null,
 		title: 'Modal',            // Title of the modal
         closeOnOutsideClick: true, // Close when clicking outside the modal
-        autoInit: true,            // Initialize on construction
+        autoInit: false,           // Subclasses must call this.init() explicitly after their own state is ready
         animationDuration: 300,    // Animation duration in ms
         position: 'center',        // center, top-right, bottom-left, etc.
         draggable: false,          // Allow dragging the modal

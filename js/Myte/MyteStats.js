@@ -369,11 +369,11 @@ class MyteStats {
 
     // Interaction timing
     canInteract() {
-        return Date.now() - this.lastInteractionTime >= this.interactionCooldown;
+        return SimClock.now() - this.lastInteractionTime >= this.interactionCooldown;
     }
 
     startInteraction() {
-        this.lastInteractionTime = Date.now();
+        this.lastInteractionTime = SimClock.now();
     }
 
     useEnergy(amount) {
@@ -504,7 +504,7 @@ class MyteStats {
 
     // Handle when energy is filled to maximum
     onEnergyFull() {
-        const now = Date.now();
+        const now = SimClock.now();
         if (this.hasAnnouncedFullCharge &&
             now - this.lastFullChargeAnnouncementAt < this.fullChargeAnnounceCooldown) {
             return;
@@ -637,7 +637,7 @@ class MyteStats {
             return;
         }
 
-        const now = Date.now();
+        const now = SimClock.now();
         let soundToPlay = null;
         
         // Determine which sound to play
@@ -949,7 +949,7 @@ class MyteStats {
             return;
         }
 
-        const lastAiDecisionAge = Date.now() - (this.myte.ai?.lastDecisionTime ?? 0);
+        const lastAiDecisionAge = SimClock.now() - (this.myte.ai?.lastDecisionTime ?? 0);
         const isBoredEnoughToComplain =
             this.boredom >= SiteConfig.myte.needSignals.boredomHigh &&
             this.mood <= SiteConfig.myte.needSignals.boredomMoodCap &&
@@ -986,7 +986,7 @@ class MyteStats {
             }
         ];
 
-        const now = Date.now();
+        const now = SimClock.now();
         const signal = signals.find(entry => {
             if (!entry.condition) {
                 return false;

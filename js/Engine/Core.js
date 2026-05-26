@@ -271,6 +271,10 @@ class MyteCore {
             const deltaTime = Math.min(timestamp - this.lastFrameTime, 100);
             this.lastFrameTime = timestamp;
 
+            // Advance simulation clock by the same capped delta so gameplay
+            // cooldowns pause when the RAF loop is stopped (e.g. tab hidden).
+            SimClock.advance(deltaTime);
+
             this.updateFPSCounter(timestamp);
 
             // Accumulate time and drain with fixed-size steps

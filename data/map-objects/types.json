@@ -437,9 +437,43 @@
     "collision": true,
     "canInspect": true,
     "displayName": "Pine Tree",
+    "majorActionId": ["shake_tree"],
     "size": {
       "width": 64,
       "height": 128
+    },
+    "growthConfig": {
+      "baseGrowthTime": 600000,
+      "defaultStage": "seed",
+      "seasonMultiplier": {
+        "spring": 1.2,
+        "summer": 1.0,
+        "autumn": 0.7,
+        "winter": 0.3
+      },
+      "waterBoostMultiplier": 1.5
+    },
+    "shakeConfig": {
+      "cooldown": 60000,
+      "yield": { "min": 1, "max": 3 },
+      "drops": [
+        { "type": "ITEM", "variant": "pine_cone", "chance": 0.7, "quantity": 1 },
+        { "type": "ITEM", "variant": "pinecone_seed", "chance": 0.3, "quantity": 1 }
+      ]
+    },
+    "chopConfig": {
+      "yield": { "min": 2, "max": 5 },
+      "drops": [
+        { "type": "ITEM", "variant": "wood_log", "chance": 1.0, "quantity": 1 }
+      ],
+      "stumpConfig": {}
+    },
+    "soundEffects": {
+      "shake": "obj_tree_shake",
+      "chop": "obj_tree_chop"
+    },
+    "approachConfig": {
+      "gap": 16
     },
     "visual": {
       "renderType": "single",
@@ -471,6 +505,61 @@
           "height": 96,
           "x": -16,
           "y": 32
+        }
+      }
+    },
+    "ai": {
+      "affordances": [
+        { "actionId": "shake_tree", "purpose": "gather" }
+      ]
+    }
+  },
+  "TREE_STUMP": {
+    "category": "nature",
+    "variants": [
+      "tree_pine_stump",
+      "stump"
+    ],
+    "collision": true,
+    "canInspect": true,
+    "displayName": "Tree Stump",
+    "majorActionId": ["remove_stump"],
+    "size": {
+      "width": 48,
+      "height": 48
+    },
+    "removeConfig": {
+      "yield": { "min": 1, "max": 2 },
+      "drops": [
+        { "type": "ITEM", "variant": "wood_root", "chance": 0.6, "quantity": 1 },
+        { "type": "ITEM", "variant": "soil_clump", "chance": 0.4, "quantity": 1 }
+      ]
+    },
+    "soundEffects": {
+      "remove": "obj_stump_remove"
+    },
+    "approachConfig": {
+      "gap": 8
+    },
+    "visual": {
+      "renderType": "single",
+      "spriteSheet": {
+        "url": "images/MapObjects/tree_stump.png"
+      }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "width": 32,
+          "height": 20,
+          "x": 8,
+          "y": 24
+        },
+        "interaction": {
+          "width": 80,
+          "height": 80,
+          "x": -16,
+          "y": -16
         }
       }
     }

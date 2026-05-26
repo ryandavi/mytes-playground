@@ -41,6 +41,7 @@ class SoundPanel extends ModalWindow {
             }
         };
 
+        this.init(); // explicit — subclass state is ready before any virtual method call
         this.initSoundSettings();
     }
 

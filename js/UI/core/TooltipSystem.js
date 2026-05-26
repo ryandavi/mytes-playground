@@ -62,14 +62,14 @@ class TooltipSystem {
         return true;
     }
 
-    show({ anchor, content = null, text = '', html = '', autoHideMs = 0, offset = 8 } = {}) {
+    show({ anchor, content = null, text = '', autoHideMs = 0, offset = 8 } = {}) {
         if (!anchor) return;
 
         this.clearHideTimer();
         this.activeAnchor = anchor;
         this.offset = offset;
 
-        this.setContent({ content, text, html });
+        this.setContent({ content, text });
         this.element.classList.add('is-visible');
         this.reposition();
 
@@ -95,16 +95,11 @@ class TooltipSystem {
         }
     }
 
-    setContent({ content = null, text = '', html = '' } = {}) {
+    setContent({ content = null, text = '' } = {}) {
         this.contentElement.replaceChildren();
 
         if (content instanceof Node) {
             this.contentElement.appendChild(content);
-            return;
-        }
-
-        if (html) {
-            this.contentElement.innerHTML = html;
             return;
         }
 

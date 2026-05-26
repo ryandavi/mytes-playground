@@ -268,16 +268,24 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
 
         this.selectInUi?.();
 
+        const { postActionIdleDuration = 0, ...approachOptions } = options;
+        const wrappedAction = (m) => {
+            action(m);
+            if (postActionIdleDuration > 0) {
+                m?.queue?.addIdle(postActionIdleDuration);
+            }
+        };
+
         if (this.isWithinChestInteractionRange(myte)) {
-            action(myte);
+            wrappedAction(myte);
             return true;
         }
 
         return this.enqueueApproach(myte, () => {
             if (this.isWithinChestInteractionRange(myte)) {
-                action(myte);
+                wrappedAction(myte);
             }
-        }, options);
+        }, approachOptions);
     }
 
     press(parent, actor = this.activeMyte) {
@@ -289,7 +297,8 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
                 this.open(parent);
             }, myte, {
                 queueVerb: 'Open Chest',
-                userInitiated: true
+                userInitiated: true,
+                postActionIdleDuration: 350
             });
         }
 
@@ -298,7 +307,8 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
                 this.close(parent);
             }, myte, {
                 queueVerb: 'Close Chest',
-                userInitiated: true
+                userInitiated: true,
+                postActionIdleDuration: 400
             });
         }
 

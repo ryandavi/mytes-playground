@@ -208,11 +208,7 @@ class InteractObjectAction extends GoToObjectAction {
         description: 'Approach an object and use its main interaction',
         requiresTarget: true,
         affectsMood: true,
-        moodEffect: 4,
-        defaultOptions: {
-            interactionAnimationDuration: 32,
-            postActionIdleDuration: 24
-        }
+        moodEffect: 4
     };
 
     static canPerform(selected, active) {
@@ -240,7 +236,7 @@ class InteractObjectAction extends GoToObjectAction {
     }
 
     constructor(myte, options) {
-        super(myte, { ...InteractObjectAction.metadata.defaultOptions, ...options });
+        super(myte, options);
         this.phase = 'approach';
         this.animationTimer = 0;
     }
@@ -279,7 +275,7 @@ class InteractObjectAction extends GoToObjectAction {
         if (interactionType === 'dance') {
             this.myte.queue.addDance(90);
         } else if (interactionType === 'light') {
-            this.myte.queue.addIdle(Math.max(35, this.postActionIdleDuration || 0));
+            this.myte.queue.addIdle(Math.max(300, this.postActionIdleDuration || 0));
         } else if (this.postActionIdleDuration > 0) {
             this.myte.queue.addIdle(this.postActionIdleDuration);
         }
@@ -1053,7 +1049,7 @@ class NudgeBallAction extends GoToObjectAction {
         this.target?.nudgeBy?.(this.myte);
         super.complete();
         this.myte.queue.addExpression('excited', 30, 1);
-        this.myte.queue.addIdle(28);
+        this.myte.queue.addIdle(400);
 
         const remainingRepeats = Math.max(0, (Number(this.repeat) || 1) - 1);
         if (remainingRepeats > 0 && this.target?.active) {
@@ -1144,11 +1140,7 @@ class OpenChestAction extends GoToObjectAction {
         description: 'Approach and open a treasure chest',
         requiresTarget: true,
         affectsMood: true,
-        moodEffect: 10,
-        defaultOptions: {
-            openAnimationDuration: 40,
-            receiveIdleDuration: 1000
-        }
+        moodEffect: 10
     };
 
     static canPerform(selected, active) {
@@ -1163,7 +1155,7 @@ class OpenChestAction extends GoToObjectAction {
     }
 
     constructor(myte, options) {
-        super(myte, { ...OpenChestAction.metadata.defaultOptions, ...options });
+        super(myte, options);
         this.phase = 'approach';
         this.animationTimer = 0;
     }
@@ -1210,11 +1202,7 @@ class CloseChestAction extends GoToObjectAction {
         defaultDuration: 0,
         description: 'Approach and close a treasure chest',
         requiresTarget: true,
-        affectsMood: false,
-        defaultOptions: {
-            closeAnimationDuration: 28,
-            postActionIdleDuration: 20
-        }
+        affectsMood: false
     };
 
     static canPerform(selected, active) {
@@ -1230,7 +1218,7 @@ class CloseChestAction extends GoToObjectAction {
     }
 
     constructor(myte, options) {
-        super(myte, { ...CloseChestAction.metadata.defaultOptions, ...options });
+        super(myte, options);
         this.phase = 'approach';
         this.animationTimer = 0;
     }
@@ -1358,7 +1346,7 @@ class PickFlowerAction extends GoToObjectAction {
         this.target?.setDeflowered?.();
         this.target?.playConfiguredSound?.('pick');
         this.myte.queue.addExpression('heart', 300, 1);
-        this.myte.queue.addIdle(800);
+        this.myte.queue.addIdle(500);
     }
 
     _dropFlowerItem() {
@@ -1385,12 +1373,7 @@ class TrampleFlowerAction extends GoToObjectAction {
         description: 'Trample a flower',
         requiresTarget: true,
         affectsMood: true,
-        moodEffect: -3,
-        defaultOptions: {
-            approachConfig: 'adjacent',
-            trampleAnimationDuration: 22,
-            postActionIdleDuration: 20
-        }
+        moodEffect: -3
     };
 
     static canPerform(selected, active) {
@@ -1402,7 +1385,7 @@ class TrampleFlowerAction extends GoToObjectAction {
     }
 
     constructor(myte, options) {
-        super(myte, { ...TrampleFlowerAction.metadata.defaultOptions, ...options });
+        super(myte, options);
         this.phase = 'approach';
         this.animationTimer = 0;
     }
@@ -1487,7 +1470,7 @@ class SmellFlowerAction extends GoToObjectAction {
         this.faceTarget();
         super.complete();
         this.myte.queue.addExpression('heart', 400, 1);
-        this.myte.queue.addIdle(60);
+        this.myte.queue.addIdle(800);
     }
 }
 
@@ -1521,7 +1504,7 @@ class DrinkFromFountainAction extends GoToObjectAction {
     complete() {
         this.faceTarget();
         super.complete();
-        this.myte.queue.addIdle(80);
+        this.myte.queue.addIdle(800);
     }
 }
 
@@ -1538,11 +1521,7 @@ class WaterPlantAction extends GoToObjectAction {
         description: 'Water a crop plant',
         requiresTarget: true,
         affectsMood: true,
-        moodEffect: 4,
-        defaultOptions: {
-            waterAnimationDuration: 36,
-            postActionIdleDuration: 40
-        }
+        moodEffect: 4
     };
 
     static canPerform(selected, active) {
@@ -1557,7 +1536,7 @@ class WaterPlantAction extends GoToObjectAction {
     }
 
     constructor(myte, options) {
-        super(myte, { ...WaterPlantAction.metadata.defaultOptions, ...options });
+        super(myte, options);
         this.phase = 'approach';
         this.animationTimer = 0;
     }
@@ -1624,11 +1603,7 @@ class HarvestAction extends GoToObjectAction {
         description: 'Harvest a ready crop',
         requiresTarget: true,
         affectsMood: true,
-        moodEffect: 8,
-        defaultOptions: {
-            harvestAnimationDuration: 50,
-            postActionIdleDuration: 800
-        }
+        moodEffect: 8
     };
 
     static canPerform(selected, active) {
@@ -1643,7 +1618,7 @@ class HarvestAction extends GoToObjectAction {
     }
 
     constructor(myte, options) {
-        super(myte, { ...HarvestAction.metadata.defaultOptions, ...options });
+        super(myte, options);
         this.phase = 'approach';
         this.animationTimer = 0;
     }
@@ -1697,6 +1672,190 @@ class HarvestAction extends GoToObjectAction {
         } else if (this.target?.harvest) {
             this.target.harvest(this.myte);
         }
+        this.myte.queue.addExpression('excited', 300, 1);
+        if (this.postActionIdleDuration > 0) {
+            this.myte.queue.addIdle(this.postActionIdleDuration);
+        }
+    }
+}
+
+class ShakeTreeAction extends GoToObjectAction {
+    static metadata = {
+        id: 'shake_tree',
+        label: 'Shake Tree',
+        category: 'interactions',
+        priority: 2,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Shake a grown tree to collect fruit or seeds',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: 5
+    };
+
+    static canPerform(selected, active) {
+        return active &&
+               selected?.constructor?.name === 'TreeMapObject' &&
+               (typeof selected.canShake !== 'function' || selected.canShake()) &&
+               !active.queue.isCarrying();
+    }
+
+    static getRequiredOptions(selected) {
+        return { target: selected };
+    }
+
+    constructor(myte, options) {
+        super(myte, options);
+        this.phase = 'approach';
+        this.animationTimer = 0;
+    }
+
+    update() {
+        if (this.phase === 'approach') {
+            const arrived = super.update();
+            if (!arrived) return false;
+            this.phase = 'shake';
+            this.animationTimer = this.shakeAnimationDuration ?? 60;
+            this.faceTarget();
+            this.target?.shake?.();
+            return false;
+        }
+
+        if (this.phase === 'shake') {
+            this.faceTarget();
+            this.animationTimer--;
+            return this.animationTimer <= 0;
+        }
+
+        return true;
+    }
+
+    complete() {
+        this.faceTarget();
+        super.complete();
+        this.myte.queue.addExpression('excited', 300, 1);
+        if (this.postActionIdleDuration > 0) {
+            this.myte.queue.addIdle(this.postActionIdleDuration);
+        }
+    }
+}
+
+class ChopTreeAction extends GoToObjectAction {
+    static metadata = {
+        id: 'chop_tree',
+        label: 'Chop Tree',
+        category: 'interactions',
+        priority: 2,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Chop down a grown tree, turning it into a stump',
+        requiresTarget: true,
+        affectsMood: false
+    };
+
+    static canPerform(selected, active) {
+        return active &&
+               selected?.constructor?.name === 'TreeMapObject' &&
+               (typeof selected.canChop !== 'function' || selected.canChop()) &&
+               !active.queue.isCarrying();
+    }
+
+    static getRequiredOptions(selected) {
+        return { target: selected };
+    }
+
+    constructor(myte, options) {
+        super(myte, options);
+        this.phase = 'approach';
+        this.animationTimer = 0;
+    }
+
+    update() {
+        if (this.phase === 'approach') {
+            const arrived = super.update();
+            if (!arrived) return false;
+            this.phase = 'chop';
+            this.animationTimer = this.chopAnimationDuration ?? 120;
+            this.faceTarget();
+            this.target?.chop?.();
+            return false;
+        }
+
+        if (this.phase === 'chop') {
+            this.faceTarget();
+            this.animationTimer--;
+            return this.animationTimer <= 0;
+        }
+
+        return true;
+    }
+
+    complete() {
+        this.faceTarget();
+        super.complete();
+        if (this.postActionIdleDuration > 0) {
+            this.myte.queue.addIdle(this.postActionIdleDuration);
+        }
+    }
+}
+
+class RemoveStumpAction extends GoToObjectAction {
+    static metadata = {
+        id: 'remove_stump',
+        label: 'Remove Stump',
+        category: 'interactions',
+        priority: 2,
+        isMovementAction: true,
+        isInterruptible: true,
+        defaultDuration: 0,
+        description: 'Dig out and remove a tree stump',
+        requiresTarget: true,
+        affectsMood: true,
+        moodEffect: 3
+    };
+
+    static canPerform(selected, active) {
+        return active &&
+               selected?.constructor?.name === 'TreeStumpMapObject' &&
+               (typeof selected.canRemoveStump !== 'function' || selected.canRemoveStump()) &&
+               !active.queue.isCarrying();
+    }
+
+    static getRequiredOptions(selected) {
+        return { target: selected };
+    }
+
+    constructor(myte, options) {
+        super(myte, options);
+        this.phase = 'approach';
+        this.animationTimer = 0;
+    }
+
+    update() {
+        if (this.phase === 'approach') {
+            const arrived = super.update();
+            if (!arrived) return false;
+            this.phase = 'remove';
+            this.animationTimer = this.removeAnimationDuration ?? 90;
+            this.faceTarget();
+            this.target?.removeStump?.();
+            return false;
+        }
+
+        if (this.phase === 'remove') {
+            this.faceTarget();
+            this.animationTimer--;
+            return this.animationTimer <= 0;
+        }
+
+        return true;
+    }
+
+    complete() {
+        this.faceTarget();
+        super.complete();
         this.myte.queue.addExpression('excited', 300, 1);
         if (this.postActionIdleDuration > 0) {
             this.myte.queue.addIdle(this.postActionIdleDuration);

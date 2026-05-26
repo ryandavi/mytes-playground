@@ -43,12 +43,12 @@ class SettingsPanel extends ModalWindow {
             id: 'game-settings-panel',
             buttonId: 'settings-toggle',
             closeOnOutsideClick: false,
-            // position: 'center',
             position: 'top-right',
             draggable: true,
             closeButtonSelector: '.modal-close-btn'
         });
 
+        this.init(); // explicit — subclass state is ready before any virtual method call
         this.settings = SettingsPanel.getDefaultSettings();
         this.loadSettings();
         this.setupSettingsControls();

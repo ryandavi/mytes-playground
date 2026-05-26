@@ -87,7 +87,8 @@ class GameTime {
 			year: new Set(),
 			dayNight: new Set(),
 			light: new Set(),
-			moonPhase: new Set()
+			moonPhase: new Set(),
+			timeSkip: new Set()
 		};
 
 		const initialDate = SiteConfig.time.initialDate || {
@@ -299,7 +300,9 @@ class GameTime {
 	subscribe(event, callback) {
 		if (this.subscribers[event]) {
 			this.subscribers[event].add(callback);
-			callback(this.getTimeData());
+			if (event !== 'timeSkip') {
+				callback(this.getTimeData());
+			}
 		}
 	}
 
@@ -365,6 +368,11 @@ class GameTime {
 		this.subscribers[event]?.forEach(callback => callback(timeData));
 	}
 
+	_notifyTimeSkip(realMs) {
+		if (realMs <= 0) return;
+		this.subscribers.timeSkip?.forEach(cb => cb(realMs));
+	}
+
 	// Time control methods
 	update(deltaTime) {
 		if (this.isPaused) return;
@@ -395,13 +403,13 @@ class GameTime {
 		if (hour < 0 || hour > 23) throw new Error('Invalid hour');
 		if (minute < 0 || minute > 59) throw new Error('Invalid minute');
 
-		// Get current date components
 		const currentYear = this.getCurrentYear();
 		const currentSeason = this.getCurrentSeason();
-		const currentDay = this.getCurrentDay() + 1; // Adding 1 since getCurrentDay is 0-based
+		const currentDay = this.getCurrentDay() + 1;
 
-		// Use setDateTime to set the time while preserving the date
+		const before = this.totalElapsedSeconds;
 		this.setDateTime(currentYear, currentSeason, currentDay, hour, minute);
+		this._notifyTimeSkip((this.totalElapsedSeconds - before) * 1000);
 	}
 
 	// Set specific date and time
@@ -432,26 +440,25 @@ class GameTime {
 	skipTime(hours = 0, minutes = 0) {
 		const totalMinutes = hours * 60 + minutes;
 		const secondsPerGameMinute = this._getGameMinuteToRealSecondsRatio();
-		this.totalElapsedSeconds += Math.floor(totalMinutes * secondsPerGameMinute);
+		const realMs = totalMinutes * secondsPerGameMinute * 1000;
+		this.totalElapsedSeconds += totalMinutes * secondsPerGameMinute;
 		this.checkAndNotifyChanges();
+		this._notifyTimeSkip(realMs);
 	}
 
 	skipDays(days) {
 		if (days < 0) throw new Error('Cannot skip negative days');
 
-		// Get current date/time components
 		const currentYear = this.getCurrentYear();
 		const currentSeason = this.getCurrentSeason();
 		const currentDay = this.getCurrentDay() + 1;
 		const currentHour = this.getCurrentHour();
 		const currentMinute = this.getCurrentMinute();
 
-		// Calculate new date
 		let newDay = currentDay + days;
 		let newSeason = currentSeason;
 		let newYear = currentYear;
 
-		// Handle season/year rollovers
 		while (newDay > this.config.daysPerSeason) {
 			newDay -= this.config.daysPerSeason;
 			const seasonIndex = (this.config.seasons.indexOf(newSeason) + 1) % this.config.seasons.length;
@@ -461,22 +468,20 @@ class GameTime {
 			}
 		}
 
-		// Set the new date/time
+		const before = this.totalElapsedSeconds;
 		this.setDateTime(newYear, newSeason, newDay, currentHour, currentMinute);
+		this._notifyTimeSkip((this.totalElapsedSeconds - before) * 1000);
 	}
 
 	skipToNextDay() {
-		// Get current date components
 		const currentYear = this.getCurrentYear();
 		const currentSeason = this.getCurrentSeason();
 		const currentDay = this.getCurrentDay() + 1;
 
-		// Calculate next day
 		let nextDay = currentDay + 1;
 		let nextSeason = currentSeason;
 		let nextYear = currentYear;
 
-		// Handle season/year rollover
 		if (nextDay > this.config.daysPerSeason) {
 			nextDay = 1;
 			const seasonIndex = (this.config.seasons.indexOf(nextSeason) + 1) % this.config.seasons.length;
@@ -486,8 +491,9 @@ class GameTime {
 			}
 		}
 
-		// Set to beginning of next day
+		const before = this.totalElapsedSeconds;
 		this.setDateTime(nextYear, nextSeason, nextDay, 0, 0);
+		this._notifyTimeSkip((this.totalElapsedSeconds - before) * 1000);
 	}
 
 	// Change how long a day takes in real-time minutes
@@ -500,7 +506,7 @@ class GameTime {
 
 		// Recalculate totalElapsedSeconds to maintain game time
 		const newSecondsPerGameMinute = this._getGameMinuteToRealSecondsRatio();
-		this.totalElapsedSeconds = Math.floor(currentGameMinutes * newSecondsPerGameMinute);
+		this.totalElapsedSeconds = currentGameMinutes * newSecondsPerGameMinute;
 
 		this.checkAndNotifyChanges();
 	}

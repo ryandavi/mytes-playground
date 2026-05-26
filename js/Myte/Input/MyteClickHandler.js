@@ -360,9 +360,10 @@ class MyteClickHandler extends MyteBaseHandler {
 		this.isDragging = false;
 
 		if (this.previousMode && this.myte.parent.ui.isTool(UIToolModes.DRAG)) {
+			const modeToRestore = this.previousMode;
+			this.previousMode = null;
 			setTimeout(() => {
-				this.myte.parent.ui.changeToolMode(this.previousMode);
-				this.previousMode = null;
+				this.myte.parent.ui.changeToolMode(modeToRestore);
 			}, this.config.dragModeRestoreDelay);
 		}
 

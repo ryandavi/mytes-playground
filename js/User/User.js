@@ -128,6 +128,10 @@ class User {
                     boredom: myte.stats?.boredom ?? SiteConfig.myte.initialStats.boredom,
                     comfort: myte.stats?.comfort ?? SiteConfig.myte.initialStats.comfort,
                     confidence: myte.stats?.confidence ?? SiteConfig.myte.initialStats.confidence,
+                    speed: myte.stats?.speed ?? 1,
+                    level: myte.stats?.level ?? 1,
+                    experience: myte.stats?.experience ?? 0,
+                    traits: myte.stats?.traits ? { ...myte.stats.traits } : undefined,
                 },
             })),
             preferences: this.preferences,
@@ -184,6 +188,8 @@ class User {
                 ...this.preferences,
                 ...legacyPreferences
             });
+            // Delete immediately so stale legacy data never overrides canonical preferences again.
+            try { localStorage.removeItem(USER_LEGACY_SETTINGS_STORAGE_KEY); } catch (_) {}
         }
 
         this.syncInventoryFromItems();

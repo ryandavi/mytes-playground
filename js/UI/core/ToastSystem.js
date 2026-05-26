@@ -64,15 +64,36 @@ class ToastSystem {
 	  toastEl.className = `toast ${config.type}`;
 	  toastEl.id = id;
 	  
-	  // Set toast content in one operation to minimize DOM reflows
-	  toastEl.innerHTML = `
-		<div class="toast-header">
-		  <div class="toast-title">${config.title}</div>
-		  ${config.closable ? '<button class="toast-close">&times;</button>' : ''}
-		</div>
-		<div class="toast-content">${config.content}</div>
-		${config.progress && config.autoClose ? '<div class="toast-progress"><div class="toast-progress-bar"></div></div>' : ''}
-	  `;
+	  // Build toast DOM safely - never interpolate user/save data into innerHTML.
+	  const header = document.createElement('div');
+	  header.className = 'toast-header';
+	  const titleEl = document.createElement('div');
+	  titleEl.className = 'toast-title';
+	  titleEl.textContent = config.title;
+	  header.appendChild(titleEl);
+	  if (config.closable) {
+		const closeBtn = document.createElement('button');
+		closeBtn.className = 'toast-close';
+		closeBtn.textContent = '×';
+		header.appendChild(closeBtn);
+	  }
+	  const contentEl = document.createElement('div');
+	  contentEl.className = 'toast-content';
+	  if (config.content instanceof Node) {
+		contentEl.appendChild(config.content);
+	  } else {
+		contentEl.textContent = String(config.content ?? '');
+	  }
+	  toastEl.appendChild(header);
+	  toastEl.appendChild(contentEl);
+	  if (config.progress && config.autoClose) {
+		const progressWrap = document.createElement('div');
+		progressWrap.className = 'toast-progress';
+		const progressBar = document.createElement('div');
+		progressBar.className = 'toast-progress-bar';
+		progressWrap.appendChild(progressBar);
+		toastEl.appendChild(progressWrap);
+	  }
 	  
 	  fragment.appendChild(toastEl);
 	  

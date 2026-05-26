@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-23  
 **Audited by:** Claude Code  
-**Status:** In progress. Core persistence, settings, map-transition, roster bootstrap, and debug-noise fixes were implemented on 2026-05-25.
+**Status:** In progress. Core persistence, settings, map-transition, roster bootstrap, and debug-noise fixes were implemented on 2026-05-25. Second-pass security, simulation-clock, input-routing, and save-schema fixes were implemented on 2026-05-25 (second session).
 
 ---
 
@@ -43,6 +43,36 @@ The following architectural fixes from this audit are now implemented in the cod
 - `ContainerManager` is responsible for instantiating runtime myte objects from save data.
 - `MapTransitionManager` is responsible for arrival placement and persistence of the active map.
 - `MapObjectFactory` requires explicit map ownership from callers.
+
+## Implementation Update — 2026-05-25 (Second Session)
+
+The following findings from the second audit pass are now implemented:
+
+- **XSS in roster DOM** — `ContainerManager.createMyteSlotElement()` replaced `innerHTML` template with safe `createElement`/`textContent` construction. Save-data values never touch `innerHTML`.
+- **XSS in ToastSystem** — `ToastSystem.show()` replaced all `innerHTML` interpolation with explicit DOM nodes. `content` can now be a `Node` or a plain string (rendered as `textContent`).
+- **XSS in TooltipSystem** — removed the `html` branch from `setContent()` and `show()`. All callers use `text` or `content` (a Node).
+- **Legacy settings override** — `User.applyUserData()` now deletes the legacy `gameSettings` key immediately after migrating, so stale localStorage data can never silently override canonical `user.preferences` after the first migration.
+- **Complete Myte save schema** — `User.serializeUserData()` now saves `speed`, `level`, `experience`, and `traits`. `ContainerManager.applySavedMyteState()` restores all four on load, so reloads no longer change personality or progression.
+- **Deterministic simulation clock** — `SimClock` (`js/Engine/SimClock.js`) is a lightweight singleton that advances only during active game frames. `Core.js` calls `SimClock.advance(deltaMs)` each frame. `MyteAI`, `MyteBuffController`, and `MyteStats` now use `SimClock.now()` instead of `Date.now()` so cooldowns and state-aging pause when the tab is hidden.
+- **Central select-drag routing** — `MapObjectSelectDragManager` (`js/Input/MapObjectSelectDragManager.js`) installs one set of `document` listeners instead of one per draggable object. `MapObject._initSelectDragHandler()` registers with the manager; the redundant per-event element check is removed.
+- **Grid full-scans debug-only** — `GameMapGrid.ensureObjectActivation()` and the full-scan loop in `verifyActiveObjects()` are now gated behind `this.debugMode`. Grid membership is the authoritative source in production.
+- **MapTransitionManager fallback** — hardcoded `'House'` replaced with `SiteConfig?.world?.defaultMap ?? 'House'`.
+- **GameTime rounding drift** — `Math.floor()` removed from `skipTime()` and `setDayDuration()`. `totalElapsedSeconds` is now a float throughout, preventing accumulated drift in debug time controls.
+- **GrowingPlantMapObject season sync** — `currentSeason` is no longer stored at construction. A `getCurrentSeason()` helper reads `GameTime.instance.getCurrentSeason()` on demand, and the plant subscribes to the `'season'` event to recalculate its growth rate whenever the season changes. Subscription is cleaned up in `remove()`.
+- **ModalWindow constructor lifecycle** — `autoInit` default changed from `true` to `false`. `SettingsPanel`, `SoundPanel`, and `ViewPanel` now call `this.init()` explicitly after their own state is ready, eliminating the virtual-method-from-constructor footgun.
+
+### Current Ownership Rules (updated)
+
+- `User.preferences` is the source of truth for player settings.
+- `User.currentMapId` is the source of truth for the last resolved map.
+- `User.activeMytes` plus the full Myte save schema (including speed/level/experience/traits) are the source of truth for roster state.
+- `ContainerManager` is responsible for instantiating and restoring runtime Myte objects from save data.
+- `MapTransitionManager` is responsible for arrival placement and persistence; fallback map comes from `SiteConfig.world.defaultMap`.
+- `MapObjectFactory` requires explicit map ownership from callers.
+- `SimClock` is the source of truth for gameplay cooldowns and state-aging timestamps.
+- `MapObjectSelectDragManager` is the single owner of select-mode drag document listeners.
+- Grid membership (`GameMapGrid.activeObjects`) is the authoritative source for active objects in production.
+- ModalWindow subclasses are responsible for calling `this.init()` at the appropriate point in their own constructor.
 
 ### Still Deferred
 

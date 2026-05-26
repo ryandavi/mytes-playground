@@ -105,17 +105,25 @@ class RangeInteractiveAnimatedMapObject extends withAnimation(MapObject) {
             queueIfOutOfRange = true,
             allowUnlimitedRange = interactionRadius === -1,
             queueVerb = null,
-            userInitiated = false
+            userInitiated = false,
+            postActionIdleDuration = 0
         } = options;
         const resolvedQueueVerb = queueVerb || (userInitiated ? this.getBestInteractionAction?.(myte)?.label ?? null : null);
 
+        const wrappedAction = (m) => {
+            action(m);
+            if (postActionIdleDuration > 0) {
+                m.queue?.addIdle(postActionIdleDuration);
+            }
+        };
+
         if (allowUnlimitedRange || this.isInInteractionRange(myte, interactionRadius)) {
-            action(myte);
+            wrappedAction(myte);
             return true;
         }
 
         if (!queueIfOutOfRange) return false;
-        return this.enqueueApproach(myte, () => action(myte), {
+        return this.enqueueApproach(myte, () => wrappedAction(myte), {
             queueVerb: resolvedQueueVerb,
             userInitiated
         });

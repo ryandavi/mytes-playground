@@ -70,11 +70,11 @@ class MyteBuffController {
     _isOnCooldown(definition) {
         const cooldown = definition?.reapplyCooldownMs;
         if (!cooldown || cooldown <= 0) return false;
-        return Date.now() - (this._buffLastApplied.get(definition.id) ?? 0) < cooldown;
+        return SimClock.now() - (this._buffLastApplied.get(definition.id) ?? 0) < cooldown;
     }
 
     _recordApplied(definition) {
-        this._buffLastApplied.set(definition.id, Date.now());
+        this._buffLastApplied.set(definition.id, SimClock.now());
     }
 
     applyInstantEffects(definition) {
@@ -133,7 +133,7 @@ class MyteBuffController {
             stacks: 1,
             durationMs: Math.max(0, Number(options.durationMs) || definition.durationMs || 0),
             remainingMs: Math.max(0, Number(options.durationMs) || definition.durationMs || 0),
-            appliedAt: Date.now(),
+            appliedAt: SimClock.now(),
             payload: options.payload || null,
             contextKeys: new Set()
         };

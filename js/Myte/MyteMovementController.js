@@ -140,6 +140,7 @@ class MyteMovementController {
         const m = this.myte;
         if (!m.isActive || m.isDragging || m.goal !== MOVE_TYPES.FOLLOW) return false;
         if (m.inactivityState.isFreeRoaming) return true;
+        if (!m.queue.isEmpty()) return false;
 
         m.inactivityState = {
             isFreeRoaming: true,

@@ -376,7 +376,7 @@ class EmoteAtAction extends GoToObjectAction {
         this.faceTarget();
         super.complete();
         this.myte.queue.addExpression(this.expressionType, this.expressionDuration, this.expressionRepeat);
-        this.myte.queue.addIdle(60);
+        this.myte.queue.addIdle(600);
     }
 }
 

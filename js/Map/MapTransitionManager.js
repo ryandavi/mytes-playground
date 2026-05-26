@@ -382,7 +382,7 @@ class MapTransitionManager {
         } else {
             console.error(`[MapTransitionManager] Initial map load failed for ${mapId}`);
 
-            const fallbackMapId = 'House';
+            const fallbackMapId = SiteConfig?.world?.defaultMap ?? 'House';
 
             if (mapId !== fallbackMapId) {
                 Utility.logDebug(`[MapTransitionManager] Trying fallback map: ${fallbackMapId}`);

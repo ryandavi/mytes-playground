@@ -955,6 +955,30 @@ class MapObject {
 		return collection.filter(item => !!item && item.active && !item.collected);
 	}
 
+	// Rolls a weighted drop table and returns an array of drop results.
+	// dropTable entries: { type, variant, quantity, chance }
+	// chance values form a cumulative probability; if omitted, uniform distribution is used.
+	_rollDrops(dropTable, minYield, maxYield) {
+		if (!dropTable?.length) return [];
+
+		const quantity = Math.floor(Math.random() * (maxYield - minYield + 1)) + minYield;
+		const results = [];
+
+		for (let i = 0; i < quantity; i++) {
+			const roll = Math.random();
+			let cumulative = 0;
+			for (const drop of dropTable) {
+				cumulative += drop.chance ?? 1 / dropTable.length;
+				if (roll <= cumulative) {
+					results.push({ type: drop.type, variant: drop.variant, quantity: drop.quantity ?? 1 });
+					break;
+				}
+			}
+		}
+
+		return results;
+	}
+
 	getColliderRectFor(entity = this) {
 		if (!entity) return null;
 
@@ -1638,13 +1662,8 @@ class MapObject {
 		let pendingTemporaryDrag = null;
 
 		const onMouseDown = (event) => {
+			// The central manager already confirmed event.target belongs to this.element.
 			if (event.button !== 0 || !this.active || this.isDragging || !this.canStartSelectModeDrag()) {
-				return;
-			}
-			const targetMapObject = event.target instanceof Element
-				? event.target.closest('.map-object')
-				: null;
-			if (targetMapObject !== this.element) {
 				return;
 			}
 			const rect = this.element?.getBoundingClientRect?.();
@@ -1749,14 +1768,13 @@ class MapObject {
 			}
 		};
 
-		document.addEventListener('mousedown', onMouseDown);
-		document.addEventListener('mousemove', onMouseMove);
-		document.addEventListener('mouseup', onMouseUp);
+		// Register with the central manager (one document listener set for all objects).
+		const unregister = MapObjectSelectDragManager.getInstance().register(
+			this.element, onMouseDown, onMouseMove, onMouseUp
+		);
 
 		this._selectDragCleanup = () => {
-			document.removeEventListener('mousedown', onMouseDown);
-			document.removeEventListener('mousemove', onMouseMove);
-			document.removeEventListener('mouseup', onMouseUp);
+			unregister();
 			this._selectDragCleanup = null;
 		};
 	}

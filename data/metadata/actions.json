@@ -127,7 +127,7 @@
       "affectsMood": false,
       "defaultOptions": {
         "closeAnimationDuration": 28,
-        "postActionIdleDuration": 20
+        "postActionIdleDuration": 400
       },
       "implementationClass": "CloseChestAction"
     },
@@ -386,7 +386,7 @@
       "moodEffect": 8,
       "defaultOptions": {
         "harvestAnimationDuration": 50,
-        "postActionIdleDuration": 45
+        "postActionIdleDuration": 500
       },
       "implementationClass": "HarvestAction"
     },
@@ -466,7 +466,7 @@
       "moodEffect": 4,
       "defaultOptions": {
         "interactionAnimationDuration": 32,
-        "postActionIdleDuration": 24
+        "postActionIdleDuration": 500
       },
       "implementationClass": "InteractObjectAction"
     },
@@ -545,7 +545,7 @@
       "moodEffect": 10,
       "defaultOptions": {
         "openAnimationDuration": 40,
-        "receiveIdleDuration": 60
+        "receiveIdleDuration": 1000
       },
       "implementationClass": "OpenChestAction"
     },
@@ -813,7 +813,7 @@
       "defaultOptions": {
         "approachConfig": "adjacent",
         "trampleAnimationDuration": 22,
-        "postActionIdleDuration": 20
+        "postActionIdleDuration": 400
       },
       "implementationClass": "TrampleFlowerAction"
     },
@@ -902,7 +902,7 @@
       "moodEffect": 4,
       "defaultOptions": {
         "waterAnimationDuration": 36,
-        "postActionIdleDuration": 40
+        "postActionIdleDuration": 500
       },
       "implementationClass": "WaterPlantAction"
     },
@@ -932,6 +932,59 @@
         "maxPatternRecoveries": 4
       },
       "implementationClass": "ZigzagAction"
+    },
+    {
+      "id": "shake_tree",
+      "label": "Shake Tree",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 60,
+      "description": "Shake a grown tree to collect fruit or seeds",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 5,
+      "defaultOptions": {
+        "shakeAnimationDuration": 60,
+        "postActionIdleDuration": 1200
+      },
+      "implementationClass": "ShakeTreeAction"
+    },
+    {
+      "id": "chop_tree",
+      "label": "Chop Tree",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 120,
+      "description": "Chop down a grown tree, turning it into a stump",
+      "requiresTarget": true,
+      "affectsMood": false,
+      "defaultOptions": {
+        "chopAnimationDuration": 120,
+        "postActionIdleDuration": 1200
+      },
+      "implementationClass": "ChopTreeAction"
+    },
+    {
+      "id": "remove_stump",
+      "label": "Remove Stump",
+      "category": "interactions",
+      "priority": 2,
+      "isMovementAction": true,
+      "isInterruptible": true,
+      "defaultDuration": 90,
+      "description": "Dig out and remove a tree stump",
+      "requiresTarget": true,
+      "affectsMood": true,
+      "moodEffect": 3,
+      "defaultOptions": {
+        "removeAnimationDuration": 90,
+        "postActionIdleDuration": 1200
+      },
+      "implementationClass": "RemoveStumpAction"
     }
   ]
 }

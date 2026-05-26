@@ -147,6 +147,11 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
         }
     }
 
+    onTimeSkip(realMs) {
+        super.onTimeSkip(realMs);
+        this._breedingElapsed += realMs;
+    }
+
     tickUpdate(tickDelta) {
         super.tickUpdate(tickDelta);
         if (!this.fullyGrown) return;

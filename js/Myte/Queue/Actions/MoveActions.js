@@ -1208,7 +1208,7 @@ class PatternMovementAction extends PositionableAction {
         }
 
         this.myte.queue.addExpression('surprise', 24, 1);
-        this.myte.queue.addIdle(18);
+        this.myte.queue.addIdle(250);
         return true;
     }
 }

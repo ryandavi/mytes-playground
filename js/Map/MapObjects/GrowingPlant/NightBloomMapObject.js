@@ -79,6 +79,14 @@ class NightBloomMapObject extends BreedingFlowerMapObject {
         }
     }
 
+    onTimeSkip(realMs) {
+        super.onTimeSkip(realMs);
+        this._timeCheckAccumulator += realMs;
+        if (this.growthStage === 'mature') {
+            this.updateDayNightState();
+        }
+    }
+
     tickUpdate(tickDelta) {
         super.tickUpdate(tickDelta);
 

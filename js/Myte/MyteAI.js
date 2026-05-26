@@ -81,7 +81,7 @@ class MyteAI {
             this.myte.isActive &&
             this.myte.goal === MOVE_TYPES.FREEROAM &&
             !this.myte.isDragging &&
-            Date.now() >= this.decisionLockUntil &&
+            SimClock.now() >= this.decisionLockUntil &&
             this.myte.queue.isEmpty();
     }
 
@@ -90,7 +90,7 @@ class MyteAI {
             return;
         }
 
-        this.decisionLockUntil = Math.max(this.decisionLockUntil, Date.now() + durationMs);
+        this.decisionLockUntil = Math.max(this.decisionLockUntil, SimClock.now() + durationMs);
     }
 
     getThinkInterval() {
@@ -152,7 +152,7 @@ class MyteAI {
         this.setDecisionLock(chosen.commitmentMs ?? 0);
 
         this.lastDecisionLabel = chosen.label;
-        this.lastDecisionTime = Date.now();
+        this.lastDecisionTime = SimClock.now();
         this.lastDecisionTargetKey = chosen.targetKey ?? null;
     }
 
@@ -290,7 +290,7 @@ class MyteAI {
             this.myte.queue.addAStarMove(safeHome);
             this.setDecisionLock(3200);
             this.lastDecisionLabel = 'emergency:go_home';
-            this.lastDecisionTime = Date.now();
+            this.lastDecisionTime = SimClock.now();
             this.lastDecisionTargetKey = 'home';
             return true;
         }
@@ -304,7 +304,7 @@ class MyteAI {
         });
         this.setDecisionLock(2200);
         this.lastDecisionLabel = 'emergency:sleep';
-        this.lastDecisionTime = Date.now();
+        this.lastDecisionTime = SimClock.now();
         this.lastDecisionTargetKey = 'home';
         return true;
     }
@@ -684,7 +684,7 @@ class MyteAI {
             const distance = this.myte.getDistanceTo?.(item) ?? Infinity;
             let score = 8 + (context.curiosity * 16) + (context.boredom * 8) + Math.max(0, 120 - distance) * 0.1;
 
-            const age = Date.now() - (item.droppedAt ?? 0);
+            const age = SimClock.now() - (item.droppedAt ?? 0);
             if (age < 30000) score += 22 * (1 - age / 30000);
 
             if (item.type?.toUpperCase() === 'FOOD' && context.energy < 0.7) {
@@ -829,20 +829,20 @@ class MyteAI {
         let adjustedScore = score;
 
         if (this.lastDecisionLabel === label) {
-            const elapsed = Date.now() - this.lastDecisionTime;
+            const elapsed = SimClock.now() - this.lastDecisionTime;
             if (elapsed <= SiteConfig.ai.scoring.repeatLabelWindow) {
                 adjustedScore *= SiteConfig.ai.scoring.repeatLabelMultiplier;
             }
         }
 
         if (targetKey && this.lastDecisionTargetKey === targetKey) {
-            const elapsed = Date.now() - this.lastDecisionTime;
+            const elapsed = SimClock.now() - this.lastDecisionTime;
             if (elapsed <= SiteConfig.ai.scoring.repeatTargetWindow) {
                 adjustedScore *= SiteConfig.ai.scoring.repeatTargetMultiplier;
             }
         }
 
-        const now = Date.now();
+        const now = SimClock.now();
         for (const entry of this.recentHistory) {
             const age = now - entry.time;
             if (age > this.repeatWindow) {
@@ -926,7 +926,7 @@ class MyteAI {
     }
 
     rememberCompletedAction(entry) {
-        const now = Date.now();
+        const now = SimClock.now();
         this.recentHistory.push({
             label: entry.label,
             targetKey: entry.targetKey,
@@ -958,7 +958,7 @@ class MyteAI {
     }
 
     pruneMemory() {
-        const now = Date.now();
+        const now = SimClock.now();
         this.recentHistory = this.recentHistory.filter(entry => now - entry.time <= this.memoryDuration);
 
         for (const [key, memory] of this.objectMemories.entries()) {
@@ -1188,7 +1188,7 @@ class MyteAI {
             return 1;
         }
 
-        const elapsed = Date.now() - (memory.lastCompletedAt ?? 0);
+        const elapsed = SimClock.now() - (memory.lastCompletedAt ?? 0);
         const recency = elapsed >= this.targetCooldownDuration
             ? 1
             : Utility.clamp(elapsed / this.targetCooldownDuration, 0.1, 1);

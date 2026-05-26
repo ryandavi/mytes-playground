@@ -1255,11 +1255,13 @@ class GridSystem {
 
         this.activeObjects = nextActive;
 
-        // Check for any objects that might have been missed
-        const missedCount = this.ensureObjectActivation(bounds);
-
-        if (missedCount > 0) {
-            Utility.logDebug(`[GridSystem] Found ${missedCount} objects that were missed in culling`);
+        // Full-scan safety net: treat grid membership as authoritative in production.
+        // Only run the scan in debug mode to surface insertion/removal bugs.
+        if (this.debugMode) {
+            const missedCount = this.ensureObjectActivation(bounds);
+            if (missedCount > 0) {
+                Utility.logDebug(`[GridSystem] Found ${missedCount} objects that were missed in culling`);
+            }
         }
 
         // Update parent's activeObjectsCount
@@ -1423,6 +1425,10 @@ class GridSystem {
             return;
         }
 
+        // Full parent.objects scan is expensive at scale. Run it only in debug
+        // mode so the grid is the authoritative source in production.
+        if (!this.debugMode) return 0;
+
         // Count how many active objects should be visible but aren't
         let missingCount = 0;
         let extraCount = 0;
@@ -1453,10 +1459,9 @@ class GridSystem {
         if (missingCount > 0 || extraCount > 0) {
             Utility.logDebug(`[GridSystem] Corrected active objects: Added ${missingCount}, Removed ${extraCount}`);
             this.parent.activeObjectsCount = this.activeObjects.size;
-
         }
 
-        return missingCount + extraCount; // Return total corrections
+        return missingCount + extraCount;
     }
 
     // Method to get active objects - useful for GameMap to query

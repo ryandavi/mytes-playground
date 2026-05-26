@@ -18,7 +18,6 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
         
         // Growth configuration
         this.baseGrowthTime = this.getConfig('growthConfig.baseGrowthTime', 300000); // 5 minutes default
-        this.currentSeason = this.getConfig('currentSeason', 'summer'); // Should be synced with game time
         
         // Optimization flags
         this.fullyGrown = false;
@@ -27,12 +26,24 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
 
         // Cache growth stages to avoid recreating array
         this.stages = ['seed', 'sprout', 'growing', 'mature'];
+
+        // Recalculate growth rate whenever the season changes.
+        this._onSeasonChange = () => { this.growthRate = this.calculateGrowthRate(); };
+        GameTime.instance?.subscribe('season', this._onSeasonChange);
+
+        // Advance growth (and any subclass state) when debug time is skipped.
+        this._onTimeSkip = (realMs) => this.onTimeSkip(realMs);
+        GameTime.instance?.subscribe('timeSkip', this._onTimeSkip);
+    }
+
+    getCurrentSeason() {
+        return GameTime.instance?.getCurrentSeason?.() ?? this.getConfig('growthConfig.defaultSeason', 'summer');
     }
 
     calculateGrowthRate() {
         if (this.fullyGrown) return 0;
 
-        const seasonMultiplier = this.getConfig(`growthConfig.seasonMultiplier.${this.currentSeason}`, 1);
+        const seasonMultiplier = this.getConfig(`growthConfig.seasonMultiplier.${this.getCurrentSeason()}`, 1);
         const waterBoostMultiplier = this.isWatered ? this.getConfig('growthConfig.waterBoostMultiplier', 2) : 1;
         
         return this.baseGrowthTime * seasonMultiplier * waterBoostMultiplier * this.growthTimeMultiplier;
@@ -63,7 +74,8 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
         }
     }
 
-    // updateGrowth is now called from tickUpdate with the fixed tickDelta
+    // updateGrowth is called from tickUpdate (fixed delta) and onTimeSkip (large debug delta).
+    // Overflow progress carries across stage boundaries so a large delta can advance multiple stages.
     updateGrowth(tickDelta) {
         if (this.fullyGrown) return;
 
@@ -79,37 +91,42 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
         const progressMultiplier = 0.9 + (Math.random() * 0.2);
         this.growthProgress += (tickDelta / this.growthRate) * progressMultiplier;
 
-        if (this.growthProgress >= 1) {
+        while (this.growthProgress >= 1 && !this.fullyGrown) {
+            this.growthProgress -= 1;
             this.advanceGrowthStage();
         }
+
+        if (this.fullyGrown) this.growthProgress = 0;
     }
 
     advanceGrowthStage() {
         const currentIndex = this.stages.indexOf(this.growthStage);
         const isLastStage = currentIndex === this.stages.length - 1;
-        
+
         if (isLastStage) {
             this.fullyGrown = true;
             return;
         }
 
-        // Advance to next stage
         this.growthStage = this.stages[currentIndex + 1];
-        this.growthProgress = 0;
-        
-        // Generate new random growth time multiplier for next stage
+        // growthProgress carry-over is managed by the while loop in updateGrowth
+
         this.growthTimeMultiplier = 0.8 + (Math.random() * 0.4);
         this.growthRate = this.calculateGrowthRate();
-        
-        // Update visuals
+
         this.updateGrowthVisuals();
-        
-        // Check if this is the final stage
+
         if (this.growthStage === 'mature') {
             this.fullyGrown = true;
         }
 
         this.onGrowthStageComplete(this.growthStage);
+    }
+
+    // Template method — override in subclasses to advance additional time-sensitive state.
+    // Always call super.onTimeSkip(realMs) first.
+    onTimeSkip(realMs) {
+        this.updateGrowth(realMs);
     }
     
     updateGrowthVisuals() {
@@ -158,5 +175,17 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
 
     canWater() {
         return !this.isWatered && !this.fullyGrown;
+    }
+
+    remove() {
+        if (this._onSeasonChange) {
+            GameTime.instance?.unsubscribe('season', this._onSeasonChange);
+            this._onSeasonChange = null;
+        }
+        if (this._onTimeSkip) {
+            GameTime.instance?.unsubscribe('timeSkip', this._onTimeSkip);
+            this._onTimeSkip = null;
+        }
+        super.remove();
     }
 }
