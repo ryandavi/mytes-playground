@@ -2,7 +2,53 @@
 
 **Date:** 2026-05-23  
 **Audited by:** Claude Code  
-**Status:** Ready for implementation
+**Status:** In progress. Core persistence, settings, map-transition, roster bootstrap, and debug-noise fixes were implemented on 2026-05-25.
+
+---
+
+## Implementation Update â€” 2026-05-25
+
+The following architectural fixes from this audit are now implemented in the codebase:
+
+- Save/bootstrap ownership moved closer to a single source of truth.
+  Runtime user state now owns map identity, settings, and Myte roster data instead of relying on hardcoded HTML or split localStorage blobs.
+- Default bootstrap data is now generic.
+  The app now boots from `data/user/default.json` instead of a personal save path, and header placeholders are runtime-owned.
+- Myte roster setup is data-driven.
+  `ContainerManager.setupMytes()` now rebuilds slots from saved user data first, falls back to DOM only when needed, and re-registers active mytes with the user model.
+- Map transitions persist correctly.
+  Successful transitions now write `user.currentMapId` and trigger save scheduling so reloads return to the last resolved map.
+- Map object creation no longer depends on mutable global parent state.
+  `MapObjectFactory.create()` now requires an explicit `parent` from the caller, and `GameMap` passes itself directly.
+-tt Seings ownership is unified under `user.preferences`.
+  `SettingsPanel` loads/saves through user preferences, legacy `gameSettings` storage is treated as migration-only, and graphics/effects reads now consult runtime user settings.
+- Inventory stack handling was corrected.
+  Adds now merge into existing stacks before checking free slots and split overflow across multiple stacks when possible.
+- Spawn ownership is cleaner.
+  Map application no longer force-moves the first myte to a spawn point; arrival placement is handled by the transition system.
+- Time state is more deterministic and configurable.
+  `GameTime` now emits year changes, uses config-driven initial date values, and supports cleanup via `dispose()`.
+- Tooltip/time cleanup and modal initialization were hardened.
+  Duplicate modal initialization was removed from settings, view, and debug panels; tooltip and time systems now expose proper disposal paths.
+- Audio/settings consistency improved.
+  Ambient toggle behavior now only stops ambient loops, audio category defaults were corrected, and audio/settings persistence now uses the shared user model.
+- Runtime debug behavior is opt-in.
+  The app no longer starts in debug mode by default, and verbose startup/pathfinding/input logs are now gated behind runtime debug checks.
+
+### Current Ownership Rules
+
+- `User.preferences` is the source of truth for player settings.
+- `User.currentMapId` is the source of truth for the last resolved map.
+- `User.activeMytes` plus serialized myte slot metadata are the source of truth for roster/bootstrap state.
+- `ContainerManager` is responsible for instantiating runtime myte objects from save data.
+- `MapTransitionManager` is responsible for arrival placement and persistence of the active map.
+- `MapObjectFactory` requires explicit map ownership from callers.
+
+### Still Deferred
+
+- Large file splits called out later in this document are not fully complete.
+- Some older sample/content data still uses handcrafted values where full schema normalization would be a larger content migration.
+- There is still broader room to convert more magic numbers and tuning values into shared config tables, but the highest-risk ownership and persistence issues are now fixed.
 
 ---
 
@@ -353,7 +399,7 @@ update() {
 const speciesId = interactiveElement?.dataset?.myteSpecies || wrapper.dataset?.myteSpecies || 'snail';
 ```
 
-**Fix:** Move myte configuration to `data/user/Ryan.json` (which already exists). `setupMytes` reads the config array, creates Myte instances from data, and the HTML slots are anonymous containers identified only by position. The `data-myte-species` attributes become generated from data, not read as source of truth.
+**Fix:** Move myte configuration to save-backed user data such as `data/user/default.json`. `setupMytes` reads the config array, creates Myte instances from data, and the HTML slots are anonymous containers identified only by position. The `data-myte-species` attributes become generated from data, not read as source of truth.
 
 ---
 

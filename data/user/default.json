@@ -1,0 +1,76 @@
+{
+  "data_version": 1,
+  "username": "Guest",
+  "userId": "default",
+  "lastLogin": "2026-01-01T00:00:00.000Z",
+  "dateCreated": "2026-01-01T00:00:00.000Z",
+  "currentMapId": "Outside",
+  "preferences": {
+    "soundEnabled": true,
+    "musicEnabled": true,
+    "ambientEnabled": true,
+    "footstepsEnabled": true,
+    "masterVolume": 1,
+    "sfxVolume": 0.82,
+    "footstepsVolume": 0.72,
+    "musicVolume": 0.28,
+    "uiVolume": 0.72,
+    "ambientVolume": 0.42,
+    "cameraMode": "follow",
+    "containerLimit": true,
+    "theme": "light",
+    "graphicsQuality": "medium",
+    "effectsEnabled": true,
+    "animationsEnabled": true,
+    "difficulty": "normal",
+    "tutorialsEnabled": true,
+    "autoSaveEnabled": true,
+    "language": "en",
+    "notificationsEnabled": true
+  },
+  "stats": {
+    "totalPlayTime": 0,
+    "mytesHatched": 1,
+    "itemsCollected": 0,
+    "achievementsUnlocked": 0
+  },
+  "achievements": [],
+  "currency": {
+    "coins": 0,
+    "gems": 0
+  },
+  "inventory": [
+    {
+      "name": "Acorn",
+      "quantity": 3,
+      "type": "food",
+      "variant": "acorn"
+    }
+  ],
+  "mytes": [
+    {
+      "id": "1",
+      "name": "Myte",
+      "species": "snail",
+      "posX": 0,
+      "posY": 0,
+      "slotId": "myte-slot-1",
+      "slotLabel": "Myte's Slot",
+      "slotX": 0,
+      "slotY": 0,
+      "hasSlotPosition": false,
+      "isActive": false,
+      "goal": 0,
+      "followGoal": 0,
+      "autonomyGoal": 1,
+      "stats": {
+        "health": 100,
+        "mood": 100,
+        "energy": 75,
+        "boredom": 28,
+        "comfort": 72,
+        "confidence": 58
+      }
+    }
+  ]
+}

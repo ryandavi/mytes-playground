@@ -347,5 +347,12 @@ const SiteConfig = Object.freeze({
         // Real-time minutes for one full game day
         dayDurationInMinutes: 5,
         daysPerSeason:        28,
+        initialDate: Object.freeze({
+            year: 1,
+            season: 'spring',
+            day: 1,
+            hour: 8,
+            minute: 0,
+        }),
     }),
 });

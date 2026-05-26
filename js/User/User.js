@@ -1,4 +1,5 @@
 const USER_DATA_VERSION = 1;
+const USER_LEGACY_SETTINGS_STORAGE_KEY = 'gameSettings';
 const USER_DEFAULT_PREFERENCES = Object.freeze({
     soundEnabled: true,
     musicEnabled: true,
@@ -12,7 +13,15 @@ const USER_DEFAULT_PREFERENCES = Object.freeze({
     ambientVolume: 0.42,
     cameraMode: 'follow',
     containerLimit: true,
-    theme: 'light'
+    theme: 'light',
+    graphicsQuality: 'medium',
+    effectsEnabled: true,
+    animationsEnabled: true,
+    difficulty: 'normal',
+    tutorialsEnabled: true,
+    autoSaveEnabled: true,
+    language: 'en',
+    notificationsEnabled: true
 });
 
 class User {
@@ -53,11 +62,17 @@ class User {
             coins: 0,
             gems: 0
         };
+        this._saveTimer = null;
+        this._lastPlayTimeSaveAt = 0;
     }
 
     // Connect to existing inventory instance
     setInventory(inventoryInstance) {
         this.inventory = inventoryInstance;
+    }
+
+    trackMytes(mytes = []) {
+        this.activeMytes = Array.isArray(mytes) ? [...mytes] : [];
     }
 
     getStorageKey(userId = this.userId) {
@@ -66,6 +81,7 @@ class User {
     }
 
     serializeUserData() {
+        const trackedMytes = Array.isArray(this.activeMytes) ? this.activeMytes : [];
         const inventoryData = this.inventory ?
             this.inventory.items.map(item => ({
                 name: item.name,
@@ -90,16 +106,28 @@ class User {
             dateCreated: this.dateCreated,
             currentMapId: this.currentMapId,
             inventory: inventoryData,
-            mytes: this.activeMytes.map(myte => ({
+            mytes: trackedMytes.map((myte, index) => ({
                 id: myte.id,
                 name: myte.name,
                 species: myte.species,
                 posX: myte.posX,
                 posY: myte.posY,
+                slotId: myte.elements?.wrapper?.id || `myte-slot-${index + 1}`,
+                slotLabel: myte.elements?.wrapper?.querySelector?.('.myte-home-label .name')?.textContent?.trim?.() || `${myte.name}'s Slot`,
+                slotX: Number.parseFloat(myte.elements?.wrapper?.style?.left) || 0,
+                slotY: Number.parseFloat(myte.elements?.wrapper?.style?.top) || 0,
+                hasSlotPosition: myte.elements?.wrapper?.style?.left !== '' || myte.elements?.wrapper?.style?.top !== '',
+                isActive: !!myte.isActive,
+                goal: myte.goal ?? null,
+                followGoal: myte.followGoal ?? null,
+                autonomyGoal: myte.autonomyGoal ?? null,
                 stats: {
                     health: myte.stats?.health ?? 100,
                     mood:   myte.stats?.mood   ?? 100,
                     energy: myte.stats?.energy ?? 75,
+                    boredom: myte.stats?.boredom ?? SiteConfig.myte.initialStats.boredom,
+                    comfort: myte.stats?.comfort ?? SiteConfig.myte.initialStats.comfort,
+                    confidence: myte.stats?.confidence ?? SiteConfig.myte.initialStats.confidence,
                 },
             })),
             preferences: this.preferences,
@@ -121,10 +149,10 @@ class User {
         }
 
         if (userData.preferences) {
-            this.preferences = {
+            this.preferences = User.normalizePreferences({
                 ...this.preferences,
                 ...userData.preferences
-            };
+            });
         }
 
         if (userData.stats) {
@@ -133,6 +161,7 @@ class User {
                 ...userData.stats
             };
         }
+        this._lastPlayTimeSaveAt = this.stats.totalPlayTime;
 
         if (userData.achievements) {
             this.achievements = new Map(userData.achievements);
@@ -147,6 +176,14 @@ class User {
 
         if (Array.isArray(userData.inventory)) {
             this.items = userData.inventory.map(item => ({ ...item }));
+        }
+
+        const legacyPreferences = this.loadLegacyPreferencesFromStorage();
+        if (legacyPreferences) {
+            this.preferences = User.normalizePreferences({
+                ...this.preferences,
+                ...legacyPreferences
+            });
         }
 
         this.syncInventoryFromItems();
@@ -181,7 +218,7 @@ class User {
         }
 
         if (migrated.data_version === USER_DATA_VERSION) {
-            console.log(`[User] Migrated save data from v${version} to v${USER_DATA_VERSION}.`);
+            Utility.logDebug(`[User] Migrated save data from v${version} to v${USER_DATA_VERSION}.`);
             return migrated;
         }
 
@@ -295,7 +332,7 @@ class User {
             
             const responseText = await response.text(); // Extract the response text
             const userData = JSON.parse(responseText); // Parse it as JSON
-            console.log(userData);
+            Utility.logDebug('[User] Loaded user data from file:', userData);
 
             this.applyUserData(userData);
 
@@ -303,7 +340,7 @@ class User {
         } catch (error) {
 
             const inferredPath = new URL(fileName, window.location.href).href;
-            console.log('Attempting to load file from:', inferredPath);
+            Utility.logDebug('Attempting to load file from:', inferredPath);
             console.error('Error reading file:', fileName);
             console.error('Error loading user data:', error);
 
@@ -350,6 +387,41 @@ class User {
         return { ...USER_DEFAULT_PREFERENCES };
     }
 
+    static normalizePreferences(rawPreferences = {}) {
+        return {
+            ...USER_DEFAULT_PREFERENCES,
+            ...(rawPreferences || {})
+        };
+    }
+
+    static migrateLegacySettings(settings = {}) {
+        return {
+            graphicsQuality: settings.graphics?.quality,
+            effectsEnabled: settings.graphics?.effects,
+            animationsEnabled: settings.graphics?.animations,
+            difficulty: settings.gameplay?.difficulty,
+            tutorialsEnabled: settings.gameplay?.tutorials,
+            autoSaveEnabled: settings.gameplay?.autoSave,
+            language: settings.misc?.language,
+            notificationsEnabled: settings.misc?.notifications
+        };
+    }
+
+    loadLegacyPreferencesFromStorage() {
+        try {
+            const rawSettings = localStorage.getItem(USER_LEGACY_SETTINGS_STORAGE_KEY);
+            if (!rawSettings) {
+                return null;
+            }
+
+            const parsed = JSON.parse(rawSettings);
+            return User.migrateLegacySettings(parsed);
+        } catch (error) {
+            console.warn('[User] Failed to read legacy settings storage.', error);
+            return null;
+        }
+    }
+
     // Data persistence
     saveUserData() {
         if (!this.userId) return;
@@ -382,7 +454,8 @@ class User {
     // Analytics and tracking
     updatePlayTime(deltaTime) {
         this.stats.totalPlayTime += deltaTime;
-        if (this.stats.totalPlayTime % 300000 === 0) { // Save every 5 minutes
+        if (this.stats.totalPlayTime - this._lastPlayTimeSaveAt >= 300000) {
+            this._lastPlayTimeSaveAt = this.stats.totalPlayTime;
             this.saveUserData();
         }
     }
@@ -404,7 +477,7 @@ const user = new User(core);
 user.setInventory(core.containerManager.inventory);
 
 // Login
-user.login('player123', 'uid123');
+user.login('guest', 'default-user');
 
 // Update preferences
 user.setPreference('soundEnabled', false);

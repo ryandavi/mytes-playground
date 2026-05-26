@@ -157,11 +157,6 @@ class Inventory {
     }
 
     addItem(name, quantity, type, description = '', variantOverride = null) {
-        if (this.items.length >= this.config.maxItems) {
-            console.warn('Inventory is full!');
-            return false;
-        }
-
         const rawVariant = variantOverride || name;
         if (rawVariant && !ItemRegistry.getItemSync(rawVariant)) {
             console.warn(`[Inventory] Adding item with no registry entry: "${rawVariant}". It will appear without a sprite.`);
@@ -175,24 +170,43 @@ class Inventory {
             variant: variantOverride || name
         });
 
-        const existingItem = this.items.find(item => item.variant === normalizedItem.variant);
+        let remainingQuantity = Math.max(0, Number(quantity) || 0);
+        const matchingStacks = this.items.filter(item => item.variant === normalizedItem.variant);
 
-        if (existingItem) {
-            const newQuantity = Math.min(
-                parseInt(existingItem.quantity) + quantity,
-                this.config.stackSize
-            );
-            existingItem.quantity = newQuantity;
-            existingItem.element.dataset.quantity = newQuantity;
+        matchingStacks.forEach(existingItem => {
+            if (remainingQuantity <= 0) return;
+
+            const currentQuantity = Number(existingItem.quantity) || 0;
+            const availableSpace = Math.max(0, this.config.stackSize - currentQuantity);
+            if (availableSpace <= 0) return;
+
+            const quantityToAdd = Math.min(availableSpace, remainingQuantity);
+            existingItem.quantity = currentQuantity + quantityToAdd;
+            existingItem.element.dataset.quantity = existingItem.quantity;
             this.updateItemDisplay(existingItem);
-        } else {
-            const itemElement = this.createItemElement(normalizedItem);
+            remainingQuantity -= quantityToAdd;
+        });
+
+        while (remainingQuantity > 0) {
+            if (this.items.length >= this.config.maxItems) {
+                console.warn('Inventory is full!');
+                this.updateInventoryDisplay();
+                return false;
+            }
+
+            const stackQuantity = Math.min(this.config.stackSize, remainingQuantity);
+            const stackItem = {
+                ...normalizedItem,
+                quantity: stackQuantity
+            };
+            const itemElement = this.createItemElement(stackItem);
             this.inventoryElement.appendChild(itemElement);
-            this.items.push({ ...normalizedItem, element: itemElement });
+            this.items.push({ ...stackItem, element: itemElement });
+            remainingQuantity -= stackQuantity;
         }
 
         this.updateInventoryDisplay();
-        return true;
+        return remainingQuantity === 0;
     }
 
     removeItem(nameOrVariant, quantity = 1) {

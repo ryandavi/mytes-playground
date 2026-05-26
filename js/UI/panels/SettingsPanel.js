@@ -1,5 +1,5 @@
 class SettingsPanel extends ModalWindow {
-    static STORAGE_KEY = 'gameSettings';
+    static LEGACY_STORAGE_KEY = 'gameSettings';
 
     static getDefaultSettings() {
         return {
@@ -51,8 +51,6 @@ class SettingsPanel extends ModalWindow {
 
         this.settings = SettingsPanel.getDefaultSettings();
         this.loadSettings();
-
-        this.init();
         this.setupSettingsControls();
         this.applyGraphicsSettings();
     }
@@ -114,13 +112,23 @@ class SettingsPanel extends ModalWindow {
     }
 
     setupGameplaySettings() {
-        // Implement gameplay settings controls
-        // Similar to setupGraphicsSettings but for gameplay options
+        const tutorialsToggle = this.modalElement.querySelector('#tutorials-toggle');
+        if (tutorialsToggle) {
+            tutorialsToggle.checked = this.settings.gameplay.tutorials;
+            tutorialsToggle.onchange = () => {
+                this.settings.gameplay.tutorials = tutorialsToggle.checked;
+            };
+        }
     }
 
     setupMiscSettings() {
-        // Implement miscellaneous settings controls
-        // Similar to setupGraphicsSettings but for misc options
+        const notificationsToggle = this.modalElement.querySelector('#notifications-toggle');
+        if (notificationsToggle) {
+            notificationsToggle.checked = this.settings.misc.notifications;
+            notificationsToggle.onchange = () => {
+                this.settings.misc.notifications = notificationsToggle.checked;
+            };
+        }
     }
 
     isEffectsEnabled() {
@@ -136,14 +144,67 @@ class SettingsPanel extends ModalWindow {
         }
     }
 
+    getCore() {
+        let current = this.parent;
+        while (current) {
+            if (current.core) return current.core;
+            current = current.parent;
+        }
+        return null;
+    }
+
+    getUser() {
+        return this.getCore()?.user || null;
+    }
+
+    static settingsFromPreferences(preferences = {}) {
+        return SettingsPanel.normalizeSettings({
+            graphics: {
+                quality: preferences.graphicsQuality,
+                effects: preferences.effectsEnabled,
+                animations: preferences.animationsEnabled
+            },
+            gameplay: {
+                difficulty: preferences.difficulty,
+                tutorials: preferences.tutorialsEnabled,
+                autoSave: preferences.autoSaveEnabled
+            },
+            misc: {
+                language: preferences.language,
+                notifications: preferences.notificationsEnabled
+            }
+        });
+    }
+
+    static preferencesFromSettings(settings = {}) {
+        const normalized = SettingsPanel.normalizeSettings(settings);
+        return {
+            graphicsQuality: normalized.graphics.quality,
+            effectsEnabled: normalized.graphics.effects,
+            animationsEnabled: normalized.graphics.animations,
+            difficulty: normalized.gameplay.difficulty,
+            tutorialsEnabled: normalized.gameplay.tutorials,
+            autoSaveEnabled: normalized.gameplay.autoSave,
+            language: normalized.misc.language,
+            notificationsEnabled: normalized.misc.notifications
+        };
+    }
+
     saveSettings() {
-        console.log('Saving settings:', this.settings);
+        const user = this.getUser();
+        const nextPreferences = SettingsPanel.preferencesFromSettings(this.settings);
+
+        if (!user?.setPreference) {
+            console.warn('Failed to save settings: user preferences unavailable.');
+            this.playSound('error');
+            return;
+        }
 
         try {
-            localStorage.setItem(
-                SettingsPanel.STORAGE_KEY,
-                JSON.stringify(SettingsPanel.normalizeSettings(this.settings))
-            );
+            Object.entries(nextPreferences).forEach(([key, value]) => {
+                user.setPreference(key, value);
+            });
+            localStorage.removeItem(SettingsPanel.LEGACY_STORAGE_KEY);
             this.playSound('success');
         } catch (error) {
             console.error('Failed to save settings:', error);
@@ -152,11 +213,16 @@ class SettingsPanel extends ModalWindow {
     }
 
     loadSettings() {
+        const userPreferences = this.getUser()?.preferences;
+        if (userPreferences) {
+            this.settings = SettingsPanel.settingsFromPreferences(userPreferences);
+            return true;
+        }
+
         try {
-            const savedSettings = localStorage.getItem(SettingsPanel.STORAGE_KEY);
+            const savedSettings = localStorage.getItem(SettingsPanel.LEGACY_STORAGE_KEY);
             if (savedSettings) {
                 this.settings = SettingsPanel.normalizeSettings(JSON.parse(savedSettings));
-                console.log('Loaded settings:', this.settings);
                 return true;
             }
         } catch (error) {

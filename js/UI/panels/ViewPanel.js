@@ -9,7 +9,6 @@ class ViewPanel extends ModalWindow {
             closeButtonSelector: '.modal-close-btn'
         });
 
-        this.init();
         this.setupControls();
     }
 

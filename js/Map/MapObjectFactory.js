@@ -72,7 +72,6 @@ class MapObjectFactory {
         this.TYPE_CONFIGS = this.normalizeCanonicalConfig(typeConfigs || {});
         this.CONFIG_LOADED = true;
         this.configSource = this.configSource || 'initialize';
-        this.parent = null;
     }
 
     static normalizeCanonicalConfig(value) {
@@ -253,6 +252,7 @@ class MapObjectFactory {
 
     static create(type, variant, x, y, options = {}) {
         type = this.normalizeType(type);
+        const { parent: resolvedParent = null, ...factoryOptions } = options;
 
         // Get the configuration for this type
         const typeConfig = this.getTypeConfig(type);
@@ -266,13 +266,18 @@ class MapObjectFactory {
         }
 
         // Merge base config with type config and options
-        const config = this.mergeConfigs(type, variant, options);
+        const config = this.mergeConfigs(type, variant, factoryOptions);
 
         // Get the appropriate constructor
         const Constructor = this.registry.getConstructor(type);
 
         // Create and return the instance
-        return new Constructor(this.parent, type, variant, x, y, config, options);
+        if (!resolvedParent) {
+            console.error(`Cannot create object type "${type}" without a parent map.`);
+            return null;
+        }
+
+        return new Constructor(resolvedParent, type, variant, x, y, config, factoryOptions);
     }
 
     static isPlainObject(value) {

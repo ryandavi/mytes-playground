@@ -12,8 +12,33 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
 
         this.isAnimating = false;
         this.particleSystem = null;
+        this.usesFallbackVisual = false;
+
+        this.applyFallbackPortalVisualConfig();
 
         this.initializePortalEffects();
+    }
+
+    applyFallbackPortalVisualConfig() {
+        const spriteSheetUrl = this.getVisualSpriteSheet()?.url || '';
+        if (!spriteSheetUrl) {
+            this.usesFallbackVisual = true;
+            return;
+        }
+
+        if (!spriteSheetUrl.includes('portal.png')) {
+            return;
+        }
+
+        if (this.config?.visual?.spriteSheet) {
+            this.config.visual.spriteSheet.url = '';
+        }
+
+        if (this.config?.spriteConfig?.spriteSheet) {
+            this.config.spriteConfig.spriteSheet.url = '';
+        }
+
+        this.usesFallbackVisual = true;
     }
 
     getApproachActionId() {
@@ -277,7 +302,12 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
 
         const content = document.createElement('div');
         content.className = 'content';
-        content.style.backgroundImage = `url(${this.getConfig('portalWindowBackground', 'red.gif')})`;
+        const portalWindowBackground = this.getConfig('portalWindowBackground', '');
+        if (portalWindowBackground) {
+            content.style.backgroundImage = `url(${portalWindowBackground})`;
+        } else {
+            content.style.backgroundImage = 'radial-gradient(circle at center, rgba(255,255,255,0.35), rgba(138,43,226,0.65) 45%, rgba(75,0,130,0.92) 100%)';
+        }
 
         portal.appendChild(title);
         portal.appendChild(content);
@@ -313,6 +343,15 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
     render(container, parent) {
         const element = super.render(container, parent);
         element.classList.add('portal');
+
+        if (this.usesFallbackVisual) {
+            const spriteElement = element.querySelector('.sprite');
+            if (spriteElement) {
+                spriteElement.style.backgroundImage = 'radial-gradient(circle at center, rgba(255,255,255,0.6) 0%, rgba(173,216,230,0.55) 20%, rgba(138,43,226,0.9) 55%, rgba(75,0,130,0.95) 100%)';
+                spriteElement.style.borderRadius = '50%';
+                spriteElement.style.boxShadow = '0 0 28px rgba(138, 43, 226, 0.55), inset 0 0 18px rgba(255,255,255,0.28)';
+            }
+        }
 
         this.updatePortalStateClasses();
         this.ensurePortalWindow();

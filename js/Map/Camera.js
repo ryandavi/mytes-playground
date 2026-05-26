@@ -786,7 +786,7 @@ class Camera {
 	}
 	
 	resetView(immediate = false) {
-		console.log("resetting view");
+		Utility.logDebug("resetting view");
 		
 		if (!this.parent.settings.limitMap) {
 			this.resetToZero();
@@ -801,7 +801,7 @@ class Camera {
 				this.parent.activeMyte.size, 
 				immediate
 			);
-			console.log("centered to active myte");
+			Utility.logDebug("centered to active myte");
 		} else if (this.parent.mytes.length > 0) {
 			// Center to first myte
 			this.centerToPosition(

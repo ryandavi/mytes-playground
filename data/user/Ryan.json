@@ -1,6 +1,6 @@
 {
-	"username": "player123",
-	"userId": "uid123",
+	"username": "sample-user",
+	"userId": "sample-user-id",
 	"lastLogin": "2024-12-20T10:00:00.000Z",
 	"dateCreated": "2024-12-01T00:00:00.000Z",
 	"currentMapId": null,

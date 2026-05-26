@@ -152,9 +152,9 @@ class AStarPathfinder {
         let endGrid = this.gridSystem.worldToGrid(endEntityX, endEntityY); // Initial target grid
 
         if (effectiveOptions.debug) {
-            console.log(`Finding path for entity (ID: ${entity.id || 'N/A'}, ${entityWidth}x${entityHeight}, collider: ${collider.width}x${collider.height} @ ${collider.offsetX},${collider.offsetY})`);
-            console.log(`From TL (${startX.toFixed(0)},${startY.toFixed(0)}) [Center: (${startCenterX.toFixed(0)}, ${startCenterY.toFixed(0)})]`);
-            console.log(`To Requested Center (${originalEndCenterX.toFixed(0)},${originalEndCenterY.toFixed(0)}) [TL: (${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)})]`);
+            Utility.logDebug(`Finding path for entity (ID: ${entity.id || 'N/A'}, ${entityWidth}x${entityHeight}, collider: ${collider.width}x${collider.height} @ ${collider.offsetX},${collider.offsetY})`);
+            Utility.logDebug(`From TL (${startX.toFixed(0)},${startY.toFixed(0)}) [Center: (${startCenterX.toFixed(0)}, ${startCenterY.toFixed(0)})]`);
+            Utility.logDebug(`To Requested Center (${originalEndCenterX.toFixed(0)},${originalEndCenterY.toFixed(0)}) [TL: (${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)})]`);
         }
 
         // Clear debug data
@@ -201,7 +201,7 @@ class AStarPathfinder {
             isEndValid = true; // Mark as valid now
 
             if (effectiveOptions.debug) {
-                console.log(`Adjusted target to nearest valid grid: (${endGrid.x}, ${endGrid.y}). New Target Center: (${effectiveEndCenterX.toFixed(0)}, ${effectiveEndCenterY.toFixed(0)}), TL: (${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)})`);
+                Utility.logDebug(`Adjusted target to nearest valid grid: (${endGrid.x}, ${endGrid.y}). New Target Center: (${effectiveEndCenterX.toFixed(0)}, ${effectiveEndCenterY.toFixed(0)}), TL: (${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)})`);
             }
         }
         // --- END ADJUST TARGET ---
@@ -237,7 +237,7 @@ class AStarPathfinder {
             effectiveEndCenterX = endEntityX + (entityWidth / 2);
             effectiveEndCenterY = endEntityY + (entityHeight / 2);
             if (effectiveOptions.debug) {
-                console.log(`Adjusted target grid to (${endGrid.x},${endGrid.y}). New center: (${effectiveEndCenterX.toFixed(0)},${effectiveEndCenterY.toFixed(0)})`);
+                Utility.logDebug(`Adjusted target grid to (${endGrid.x},${endGrid.y}). New center: (${effectiveEndCenterX.toFixed(0)},${effectiveEndCenterY.toFixed(0)})`);
             }
         }
         // --- END VALIDATE TARGET GRID CELL ---
@@ -265,13 +265,13 @@ class AStarPathfinder {
                 entityWidth, entityHeight,
                 collider, entityCapabilities
             )) {
-                if (effectiveOptions.debug) { console.log(`Using direct path to effective target - distance: ${directDistance.toFixed(0)}px`); }
+                if (effectiveOptions.debug) { Utility.logDebug(`Using direct path to effective target - distance: ${directDistance.toFixed(0)}px`); }
                 // Return path to the potentially adjusted end point
                 return [
                     { x: startCenterX, y: startCenterY },
                     { x: effectiveEndCenterX, y: effectiveEndCenterY } // Use effective target
                 ];
-            } else if (effectiveOptions.debug) { console.log(`Direct path (${directDistance.toFixed(0)}px) to effective target blocked, proceeding with A*.`); }
+            } else if (effectiveOptions.debug) { Utility.logDebug(`Direct path (${directDistance.toFixed(0)}px) to effective target blocked, proceeding with A*.`); }
         }
 
         // --- A* Setup ---
@@ -285,7 +285,7 @@ class AStarPathfinder {
                 if (effectiveOptions.debug) { console.warn(`Start and (adjusted) end grid positions are the same, but start TL (${startX}, ${startY}) is invalid.`); }
                 return null;
             }
-            if (effectiveOptions.debug) { console.log("Start and (adjusted) end grid positions are the same and valid."); }
+            if (effectiveOptions.debug) { Utility.logDebug("Start and (adjusted) end grid positions are the same and valid."); }
             // Path goes from start center to the potentially adjusted end center
             return [{ x: startCenterX, y: startCenterY }, { x: effectiveEndCenterX, y: effectiveEndCenterY }];
         }
@@ -298,7 +298,7 @@ class AStarPathfinder {
                 console.error("No valid start grid position found near the initial one.");
                 return null;
             }
-            if (effectiveOptions.debug) { console.log(`Adjusted start grid position to (${validStartGrid.x}, ${validStartGrid.y})`); }
+            if (effectiveOptions.debug) { Utility.logDebug(`Adjusted start grid position to (${validStartGrid.x}, ${validStartGrid.y})`); }
             startGrid.x = validStartGrid.x;
             startGrid.y = validStartGrid.y;
         }
@@ -339,7 +339,7 @@ class AStarPathfinder {
 
             // Goal check against the potentially adjusted endKey
             if (current.key === endKey) {
-                if (effectiveOptions.debug) { console.log(`Path found in ${steps} steps (${(performance.now() - startTime).toFixed(2)}ms)`); }
+                if (effectiveOptions.debug) { Utility.logDebug(`Path found in ${steps} steps (${(performance.now() - startTime).toFixed(2)}ms)`); }
                 // Always pass the TRUE original end center so _reconstructPath forces the
                 // last path point to the exact requested position, even when the A* grid
                 // goal was adjusted to a nearby valid cell (effectiveEnd != originalEnd).
@@ -681,7 +681,7 @@ class AStarPathfinder {
             const mapPixelHeight = this.gridSystem.gridHeight * this.gridSystem.config.cellSize;
             if (entityX < 0 || entityX + entityWidth > mapPixelWidth ||
                 entityY < 0 || entityY + entityHeight > mapPixelHeight) {
-                if (debug) console.log(`  ❌ FAIL: Entity TL (${entityX.toFixed(1)}, ${entityY.toFixed(1)}) or BR is out of map bounds [0..${mapPixelWidth}, 0..${mapPixelHeight}] (allowEntityOutOfBounds=false)`);
+                if (debug) Utility.logDebug(`  FAIL: Entity TL (${entityX.toFixed(1)}, ${entityY.toFixed(1)}) or BR is out of map bounds X[0..${mapPixelWidth}] Y[0..${mapPixelHeight}] (allowEntityOutOfBounds=false)`);
                 return false;
             }
         }
@@ -716,7 +716,7 @@ class AStarPathfinder {
 
         // --- Log Initial Info ---
         if (debug) {
-            console.log(`_validatePosition: Checking Entity ${entity?.id} at TL (${entityX.toFixed(1)}, ${entityY.toFixed(1)}). Collider Bounds: X[${colliderWorldX.toFixed(1)}..${colliderRight.toFixed(1)}], Y[${colliderWorldY.toFixed(1)}..${colliderBottom.toFixed(1)}]`);
+            Utility.logDebug(`_validatePosition: Checking Entity ${entity?.id} at TL (${entityX.toFixed(1)}, ${entityY.toFixed(1)}). Collider Bounds: X[${colliderWorldX.toFixed(1)}..${colliderRight.toFixed(1)}], Y[${colliderWorldY.toFixed(1)}..${colliderBottom.toFixed(1)}]`);
         }
 
         // --- Grid Collision Check ---
@@ -729,7 +729,7 @@ class AStarPathfinder {
         const endGridY = Math.ceil(colliderBottom / cellSize);
 
         if (debug) {
-            console.log(`  Grid Check Loop Range: X[${startGridX}..${endGridX - 1}], Y[${startGridY}..${endGridY - 1}]`);
+            Utility.logDebug(`  Grid Check Loop Range: X[${startGridX}..${endGridX - 1}], Y[${startGridY}..${endGridY - 1}]`);
         }
 
         // Iterate through all potentially overlapping grid cells
@@ -755,7 +755,7 @@ class AStarPathfinder {
                 if (!isValidGridIndex) {
                     // Index is out of bounds. Fail ONLY if the collider overlaps this specific OOB cell space.
                     if (overlapsThisCell) { // Check using standard overlap
-                        if (debug) console.log(`  ❌ FAIL: Collider overlaps out-of-bounds grid index (${gridX}, ${gridY}) world area [${cellWorldX.toFixed(1)}..${cellWorldRight.toFixed(1)}, ${cellWorldY.toFixed(1)}..${cellWorldBottom.toFixed(1)}]`);
+                        if (debug) Utility.logDebug(`  FAIL: Collider overlaps out-of-bounds grid index (${gridX}, ${gridY}) world area [${cellWorldX.toFixed(1)}..${cellWorldRight.toFixed(1)}, ${cellWorldY.toFixed(1)}..${cellWorldBottom.toFixed(1)}]`);
                         this.validationCache.set(cacheKey, false);
                         return false;
                     }
@@ -768,13 +768,13 @@ class AStarPathfinder {
                 if (overlapsThisCell) { // Check using standard overlap
                     const cell = this.gridSystem.grid[gridX]?.[gridY];
                     if (!cell) {
-                        if (debug) console.log(`  ❌ FAIL: Valid Cell Index (${gridX}, ${gridY}) is unexpectedly null/undefined.`);
+                        if (debug) Utility.logDebug(`  FAIL: Valid Cell Index (${gridX}, ${gridY}) is unexpectedly null/undefined.`);
                         this.validationCache.set(cacheKey, false); return false;
                     }
 
                     // Check properties for this valid, overlapped cell:
                     if (!cell.tileWalkable && !this._canTraverseConditionalCell(cell, entityCapabilities)) {
-                        if (debug) console.log(`  ❌ FAIL: Collider overlaps non-walkable tile at valid grid (${gridX}, ${gridY})`);
+                        if (debug) Utility.logDebug(`  FAIL: Collider overlaps non-walkable tile at valid grid (${gridX}, ${gridY})`);
                         this.validationCache.set(cacheKey, false); return false;
                     }
                     // For objects: use precise AABB check so the entity can pass through
@@ -784,18 +784,18 @@ class AStarPathfinder {
                         for (const obj of blockingObjs) {
                             if (this._isOpenableObstacle(obj, entityCapabilities)) continue;
                             if (this._checkDetailedCollision(entityState, obj)) {
-                                if (debug) console.log(`  ❌ FAIL: Precise collider collision with obj ID ${obj.id || 'N/A'} at cell (${gridX}, ${gridY})`);
+                                if (debug) Utility.logDebug(`  FAIL: Precise collider collision with obj ID ${obj.id || 'N/A'} at cell (${gridX}, ${gridY})`);
                                 this.validationCache.set(cacheKey, false); return false;
                             }
                         }
                     }
                     if (cell.hasDoor && entityCapabilities && !entityCapabilities.canOpenDoors) {
-                        if (debug) console.log(`  ❌ FAIL: Collider overlaps door at valid grid (${gridX}, ${gridY})`);
+                        if (debug) Utility.logDebug(`  FAIL: Collider overlaps door at valid grid (${gridX}, ${gridY})`);
                         this.validationCache.set(cacheKey, false); return false;
                     }
                     const terrainType = this.getTerrainTypeAt(gridX, gridY);
                     if (!this._canTraverseTerrain(terrainType, entityCapabilities)) {
-                        if (debug) console.log(`  ❌ FAIL: Collider overlaps non-traversable terrain '${terrainType}' at valid grid (${gridX}, ${gridY})`);
+                        if (debug) Utility.logDebug(`  FAIL: Collider overlaps non-traversable terrain '${terrainType}' at valid grid (${gridX}, ${gridY})`);
                         this.validationCache.set(cacheKey, false); return false;
                     }
                 }
@@ -805,7 +805,7 @@ class AStarPathfinder {
 
         // --- World Collider Check --- (Uses separate _checkDetailedCollision)
         if (debug) {
-            console.log(`  Grid checks passed. Calling getPotentialCollidersForArea for area X[${colliderWorldX.toFixed(1)}..${colliderRight.toFixed(1)}], Y[${colliderWorldY.toFixed(1)}..${colliderBottom.toFixed(1)}]`);
+            Utility.logDebug(`  Grid checks passed. Calling getPotentialCollidersForArea for area X[${colliderWorldX.toFixed(1)}..${colliderRight.toFixed(1)}], Y[${colliderWorldY.toFixed(1)}..${colliderBottom.toFixed(1)}]`);
         }
         // Ensure getPotentialCollidersForArea NO LONGER returns tile representations
         const potentialColliders = this.gridSystem.getPotentialCollidersForArea(
@@ -815,9 +815,9 @@ class AStarPathfinder {
             // Log details ONLY if potentialColliders is not null/empty
             if (potentialColliders && potentialColliders.length > 0) {
                 const colliderDetails = potentialColliders.map(p => `ID ${p.id || 'N/A'}(Tile:${!!p.isTileCollider})@(${p.posX?.toFixed(0)},${p.posY?.toFixed(0)})`).join(', ');
-                console.log(`  Found ${potentialColliders.length} potential world colliders: [${colliderDetails}]`);
+                Utility.logDebug(`  Found ${potentialColliders.length} potential world colliders: [${colliderDetails}]`);
             } else {
-                console.log(`  Found 0 potential world colliders.`);
+                Utility.logDebug(`  Found 0 potential world colliders.`);
             }
         }
 
@@ -830,13 +830,13 @@ class AStarPathfinder {
             for (const objFromGrid of potentialColliders) {
                 // Should only be actual objects now, not synthetic tiles
                 if (debug) {
-                    console.log(`    Checking detailed collision against obj ID ${objFromGrid.id || 'N/A'} (isTile: ${!!objFromGrid.isTileCollider}, walkable: ${objFromGrid.config?.walkable})`);
+                    Utility.logDebug(`    Checking detailed collision against obj ID ${objFromGrid.id || 'N/A'} (isTile: ${!!objFromGrid.isTileCollider}, walkable: ${objFromGrid.config?.walkable})`);
                 }
                 if (this._isOpenableObstacle(objFromGrid, entityCapabilities)) {
                     continue;
                 }
                 if (this._checkDetailedCollision(entityStateForCollision, objFromGrid)) {
-                    if (debug) console.log(`  ❌ FAIL: Detailed collision with obj ID ${objFromGrid.id || 'N/A'}`);
+                    if (debug) Utility.logDebug(`  FAIL: Detailed collision with obj ID ${objFromGrid.id || 'N/A'}`);
                     this.validationCache.set(cacheKey, false);
                     return false;
                 }
@@ -845,7 +845,7 @@ class AStarPathfinder {
 
         // --- Success ---
         if (debug) {
-            console.log(`  ✅ SUCCESS: Validation passed for Entity ${entity?.id} at TL (${entityX.toFixed(1)}, ${entityY.toFixed(1)})`);
+            Utility.logDebug(`  SUCCESS: Validation passed for Entity ${entity?.id} at TL (${entityX.toFixed(1)}, ${entityY.toFixed(1)})`);
         }
         this.validationCache.set(cacheKey, true);
         return true;

@@ -345,7 +345,7 @@ class InputSystem {
 	 * @param {MouseEvent} event
 	 */
 	handleDoubleClick(event) {
-	  console.log('[InputSystem] native dblclick on:', event.target?.className || event.target?.tagName, 'pageX/Y:', event.pageX, event.pageY);
+	  Utility.logDebug('[InputSystem] native dblclick on:', event.target?.className || event.target?.tagName, 'pageX/Y:', event.pageX, event.pageY);
 	  this.notifyListeners('mouse.dblclick', {
 		originalEvent: event,
 		position: {
@@ -384,7 +384,7 @@ class InputSystem {
 	 */
 	handleTouchStart(event) {
 	  // Handle first touch if no active touch
-	  if (!this.state.activeTouchId && event.touches.length > 0) {
+	  if (this.state.activeTouchId == null && event.touches.length > 0) {
 		const touch = event.touches[0];
 		this.state.activeTouchId = touch.identifier;
 		

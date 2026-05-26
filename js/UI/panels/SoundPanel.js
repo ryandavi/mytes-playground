@@ -271,7 +271,7 @@ class SoundPanel extends ModalWindow {
                     break;
                 case 'ambientEnabled':
                     if (!isChecked) {
-                        soundManager.stopAllSoundEffects();
+                        soundManager.stopCategorySounds?.('ambient');
                     } else {
                         soundManager.restartAmbient();
                     }

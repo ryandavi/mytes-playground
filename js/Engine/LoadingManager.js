@@ -156,7 +156,7 @@ class LoadingManager {
     initialize() {
         // Check if we should skip loading screen for debugging
         if (!this.debugOptions.dontHide && this.debugOptions.skipLoading) {
-            console.log("DEBUG: Skipping loading screen");
+            Utility.logDebug("DEBUG: Skipping loading screen");
             this.isComplete = true;
             this.hide();
 

@@ -70,16 +70,16 @@ class GridSystem {
         };
 
 
-        console.log(`[GridSystem Init] Calculated Grid Dimensions: ${this.gridWidth} x ${this.gridHeight}`);
-        console.log(`[GridSystem Init] Parent Dimensions: ${this.parent.dimensions.width} x ${this.parent.dimensions.height}`);
-        console.log(`[GridSystem Init] Cell Size: ${this.config.cellSize}`);
+        Utility.logDebug(`[GridSystem Init] Calculated Grid Dimensions: ${this.gridWidth} x ${this.gridHeight}`);
+        Utility.logDebug(`[GridSystem Init] Parent Dimensions: ${this.parent.dimensions.width} x ${this.parent.dimensions.height}`);
+        Utility.logDebug(`[GridSystem Init] Cell Size: ${this.config.cellSize}`);
         
         // Initialize grid cells...
         // Check the actual created size
         if (this.grid.length !== this.gridWidth || (this.gridWidth > 0 && this.grid[0].length !== this.gridHeight)) {
             console.error(`[GridSystem Init] Mismatch! Grid created with size: ${this.grid.length} x ${this.grid[0]?.length || 0}`);
         } else {
-            console.log(`[GridSystem Init] Grid array created successfully with size: ${this.grid.length} x ${this.grid[0]?.length || 0}`);
+            Utility.logDebug(`[GridSystem Init] Grid array created successfully with size: ${this.grid.length} x ${this.grid[0]?.length || 0}`);
         }
         if (config.debugMode === true) {
             this.toggleDebug();
@@ -535,7 +535,7 @@ class GridSystem {
         const wasDebugMode = this.debugMode;
         this.debugMode = !this.debugMode;
 
-        console.log(`[GridSystem] Toggle debug mode: ${wasDebugMode} → ${this.debugMode}`);
+        Utility.logDebug(`[GridSystem] Toggle debug mode: ${wasDebugMode} -> ${this.debugMode}`);
 
         if (this.debugMode) {
             if (!this.debugInitialized) {
@@ -1259,7 +1259,7 @@ class GridSystem {
         const missedCount = this.ensureObjectActivation(bounds);
 
         if (missedCount > 0) {
-            console.log(`[GridSystem] Found ${missedCount} objects that were missed in culling`);
+            Utility.logDebug(`[GridSystem] Found ${missedCount} objects that were missed in culling`);
         }
 
         // Update parent's activeObjectsCount
@@ -1271,7 +1271,7 @@ class GridSystem {
         if (this.debugMode) {
             // Check if we need to initialize debug elements
             if (!this.debugInitialized || needsDebugRecreation) {
-                console.log('[GridSystem] Debug elements missing, reinitializing');
+                Utility.logDebug('[GridSystem] Debug elements missing, reinitializing');
                 this.debugInitialized = false; // Force reinitialization
                 this.initializeDebugDOM();
             }
@@ -1315,7 +1315,7 @@ class GridSystem {
             return;
         }
 
-        console.log('[GridSystem] Updating grid system from tile data');
+        Utility.logDebug('[GridSystem] Updating grid system from tile data');
 
         // Store objects by their position for later restoration
         const objectsByPosition = new Map();
@@ -1403,14 +1403,14 @@ class GridSystem {
         this.invalidatePathfinderCaches();
         if (this.debugMode) this._debugDirty = true;
 
-        console.log(`[GridSystem] Grid system updated: ${this.gridWidth}x${this.gridHeight} cells`);
+        Utility.logDebug(`[GridSystem] Grid system updated: ${this.gridWidth}x${this.gridHeight} cells`);
     }
 
     // Sync active objects with the parent
     syncActiveObjects() {
         // If parent has a different active object count than we do, force a culling update
         if (this.parent && this.parent.activeObjectsCount !== this.activeObjects.size) {
-            console.log(`[GridSystem] Active objects count mismatch: Grid=${this.activeObjects.size}, Map=${this.parent.activeObjectsCount}`);
+            Utility.logDebug(`[GridSystem] Active objects count mismatch: Grid=${this.activeObjects.size}, Map=${this.parent.activeObjectsCount}`);
             this.lastCameraPos = { x: -9999, y: -9999 }; // Force update on next frame
         }
     }
@@ -1451,7 +1451,7 @@ class GridSystem {
 
         // Update parent count if needed
         if (missingCount > 0 || extraCount > 0) {
-            console.log(`[GridSystem] Corrected active objects: Added ${missingCount}, Removed ${extraCount}`);
+            Utility.logDebug(`[GridSystem] Corrected active objects: Added ${missingCount}, Removed ${extraCount}`);
             this.parent.activeObjectsCount = this.activeObjects.size;
 
         }
@@ -1473,7 +1473,7 @@ class GridSystem {
 
     // Clean up resources
     dispose() {
-        console.log("[GridSystem] Disposing grid system");
+        Utility.logDebug("[GridSystem] Disposing grid system");
 
         // Clear grid cells
         for (let x = 0; x < this.gridWidth; x++) {
@@ -1526,6 +1526,6 @@ class GridSystem {
         this.pathfinder = null;
         this.parent = null;
 
-        console.log("[GridSystem] Grid system disposed successfully");
+        Utility.logDebug("[GridSystem] Grid system disposed successfully");
     }
 }

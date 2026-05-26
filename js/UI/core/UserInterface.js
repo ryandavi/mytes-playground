@@ -86,6 +86,10 @@ class UserInterface {
         this.selectionManager.setSelected(obj);
     }
 
+    getSelected() {
+        return this.selectionManager.getSelectedObject();
+    }
+
     setToolMode(mode) {
         this.toolManager.setToolMode(mode);
     }
@@ -96,6 +100,16 @@ class UserInterface {
 
     changeToolMode(mode) {
         return this.toolManager.changeToolMode(mode);
+    }
+
+    showMessage(message, type = 'info', title = '') {
+        const toastManager = this.parent?.core?.toastManager;
+        if (!toastManager || !message) {
+            return;
+        }
+
+        const method = typeof toastManager[type] === 'function' ? type : 'info';
+        toastManager[method](String(message), title || undefined);
     }
 
     // Update method called every frame

@@ -186,9 +186,9 @@ class SoundManager {
 	resolvePlaybackModifiers(preset, soundCategory, options = {}) {
 		const variation = preset?.variation || {};
 		const defaultPitchRange = {
-			ntities: 0.018,
-			worlotifications: 0.012,
-			end: 0.012,
+			entities: 0.018,
+			notifications: 0.012,
+			world: 0.012,
 			machines: 0.01,
 			footsteps: 0,
 			ui: 0,

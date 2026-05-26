@@ -34,8 +34,6 @@ class GameMap {
         // this.zones = new Map();
         this.spawnPoints = new Map();
 
-        MapObjectFactory.parent = this;
-
         this.noCache = true;
 
         // Optimization tracking
@@ -101,16 +99,7 @@ class GameMap {
             return liveSetting;
         }
 
-        try {
-            const savedSettings = localStorage.getItem('gameSettings');
-            if (!savedSettings) return true;
-
-            return JSON.parse(savedSettings)?.graphics?.effects !== false;
-        } catch (error) {
-            console.warn('[GameMap] Failed to read saved particle settings:', error);
-        }
-
-        return true;
+        return this.core?.user?.preferences?.effectsEnabled !== false;
     }
 
     getZIndex(y, height) {
@@ -196,7 +185,7 @@ class GameMap {
 
     async initialize(mapId, options = {}) {
         try {
-            console.log(`[GameMap] Initializing map: ${mapId}`);
+            Utility.logDebug(`[GameMap] Initializing map: ${mapId}`);
 
             // Get initialization options
             const isInitialLoad = options.isInitialLoad || false;
@@ -211,7 +200,7 @@ class GameMap {
             }
 
             // Initialize particle system first to avoid dependency issues
-            console.log(`[GameMap] Creating particle system`);
+            Utility.logDebug(`[GameMap] Creating particle system`);
             this.particleSystem = new GameMapParticleSystem(this, {
                 effectsEnabled: this.getParticleEffectsEnabledSetting()
             });
@@ -225,7 +214,7 @@ class GameMap {
 
             // Initialize tile map loader
             if (!this.tileMapLoader) {
-                console.log(`[GameMap] Creating new TileMapLoader`);
+                Utility.logDebug(`[GameMap] Creating new TileMapLoader`);
                 this.tileMapLoader = new TileMapLoader(this);
             }
 
@@ -234,7 +223,7 @@ class GameMap {
                 ? `data/maps/${mapId}`
                 : `data/maps/${mapId}.tmx`;
 
-            console.log(`[GameMap] Loading TMX from: ${tmxPath}`);
+            Utility.logDebug(`[GameMap] Loading TMX from: ${tmxPath}`);
 
             if (this.noCache) tmxPath = Utility.preventCache(tmxPath);
 
@@ -248,7 +237,7 @@ class GameMap {
                     throw new Error(`TMX data is null or undefined`);
                 }
 
-                console.log(`[GameMap] TMX data loaded successfully`);
+                Utility.logDebug(`[GameMap] TMX data loaded successfully`);
             } catch (tmxError) {
                 console.error(`[GameMap] Failed to load TMX data:`, tmxError);
                 tmxLoadFailed = true;
@@ -264,16 +253,16 @@ class GameMap {
                 let loaded = false;
                 for (const altPath of altPaths) {
                     try {
-                        console.log(`[GameMap] Trying alternative path: ${altPath}`);
+                        Utility.logDebug(`[GameMap] Trying alternative path: ${altPath}`);
                         mapData = await this.tileMapLoader.loadTileMap(altPath);
                         if (mapData) {
-                            console.log(`[GameMap] Successfully loaded TMX from ${altPath}`);
+                            Utility.logDebug(`[GameMap] Successfully loaded TMX from ${altPath}`);
                             loaded = true;
                             tmxLoadFailed = false;
                             break;
                         }
                     } catch (e) {
-                        console.log(`[GameMap] Failed to load from ${altPath}`);
+                        Utility.logDebug(`[GameMap] Failed to load from ${altPath}`);
                     }
                 }
 
@@ -281,7 +270,7 @@ class GameMap {
                     // If this is an initial load, create a default map
                     // Otherwise, indicate that loading failed
                     if (isInitialLoad) {
-                        console.log(`[GameMap] Creating default minimal map for initial load`);
+                        Utility.logDebug(`[GameMap] Creating default minimal map for initial load`);
                         this.createDefaultMap(mapId);
                         this.initialized = true;
                         return true;
@@ -295,12 +284,12 @@ class GameMap {
 
             // Apply the TMX data to this GameMap instance with error handling
             try {
-                console.log(`[GameMap] Applying TMX data to game map`);
+                Utility.logDebug(`[GameMap] Applying TMX data to game map`);
                 await this.applyToGameMap(mapData);
 
 
 
-                console.log(`[GameMap] TMX data applied successfully`);
+                Utility.logDebug(`[GameMap] TMX data applied successfully`);
             } catch (applyError) {
                 console.error(`[GameMap] Error applying TMX data:`, applyError);
 
@@ -308,7 +297,7 @@ class GameMap {
                 // Otherwise, return false if TMX loading failed completely
                 if (tmxLoadFailed) {
                     if (isInitialLoad) {
-                        console.log(`[GameMap] Creating default minimal map for initial load after apply error`);
+                        Utility.logDebug(`[GameMap] Creating default minimal map for initial load after apply error`);
                         this.createDefaultMap(mapId);
                         this.initialized = true;
                         return true;
@@ -353,7 +342,7 @@ class GameMap {
 
                 // If debug mode was on, make sure it gets reinitialized
                 if (wasDebugMode) {
-                    console.log(`[GameMap] Reinitializing GridSystem debug elements`);
+                    Utility.logDebug(`[GameMap] Reinitializing GridSystem debug elements`);
                     // Make sure debug mode is off
                     if (this.gridSystem.debugMode) {
                         this.gridSystem.toggleDebug();
@@ -366,7 +355,7 @@ class GameMap {
                 }
             }
 
-            console.log(`[GameMap] Map ${mapId} initialization completed successfully`);
+            Utility.logDebug(`[GameMap] Map ${mapId} initialization completed successfully`);
             if (this.gridSystem && document.body.classList.contains('debug') && !this.gridSystem.debugMode) {
                 this.gridSystem.toggleDebug();
             }
@@ -379,7 +368,7 @@ class GameMap {
             // Otherwise, return failure
             if (options.isInitialLoad) {
                 try {
-                    console.log(`[GameMap] Creating default minimal map for initial load after error`);
+                    Utility.logDebug(`[GameMap] Creating default minimal map for initial load after error`);
                     this.createDefaultMap(mapId);
                     this.initialized = true;
                     return true;
@@ -412,7 +401,7 @@ class GameMap {
 		this.gridSystem = new GridSystem(this);
 		this.zoneManager = new ZoneManager(this);
 
-		console.log('Tile map dimensions:', this.dimensions);
+		Utility.logDebug('Tile map dimensions:', this.dimensions);
 
 		// set canvas
 		this.parent.canvas.style.width = `${this.dimensions.width}px`;
@@ -454,16 +443,8 @@ class GameMap {
 			});
 		}
 
-		// set myte position to spawn point
-		// get first myte
-        let mytes = this.mytes;
-        if (mytes.length > 0) {
-            let myte = mytes[0];
-            myte.setWrapperPosition(mapData.spawns.myte.x, mapData.spawns.myte.y);
-		}
-
-		// Add objects
-		if (mapData.objects) {
+        // Add objects
+        if (mapData.objects) {
 			for (const objData of mapData.objects) {
 				this.addObject(
 					objData.type.toUpperCase(),
@@ -532,7 +513,7 @@ class GameMap {
 	applyTerrainToGameMap(mapData) {
 		// Apply terrain data to grid system if it exists
 		if (this.gridSystem && this.gridSystem.pathfinder) {
-			console.log("[TileMapLoader] Applying terrain types to pathfinder");
+			Utility.logDebug("[TileMapLoader] Applying terrain types to pathfinder");
 	
 			// Get terrain costs from the pathfinder or use our local copy
 			let customTerrainCosts = {};
@@ -593,7 +574,7 @@ class GameMap {
 
     // Keep the createDefaultMap method for initial loads
     createDefaultMap(mapId) {
-        console.log(`[GameMap] Creating default map for ${mapId}`);
+        Utility.logDebug(`[GameMap] Creating default map for ${mapId}`);
 
         // Set basic properties
         this.name = mapId;
@@ -651,7 +632,7 @@ class GameMap {
         if (background.url) {
             const bgUrl = background.url;
             this.layers.background.style.backgroundImage = `url(${background.url})`;
-            this.layers.background.style.backgroundSize = 'fill';
+            this.layers.background.style.backgroundSize = 'cover';
 
             this.backgroundReadyPromise = new Promise(resolve => {
                 const img = new Image();
@@ -756,7 +737,10 @@ class GameMap {
         }
 
         try {
-            const object = MapObjectFactory.create(typeOrObject, variant, x, y, options);
+            const object = MapObjectFactory.create(typeOrObject, variant, x, y, {
+                ...options,
+                parent: this
+            });
 
             if (!object) {
                 console.error(`Failed to create object of type: ${typeOrObject}, variant: ${variant}`);
@@ -1019,6 +1003,6 @@ class GameMap {
         // Clear layer references
         this.layers = {};
 
-        console.log("[GameMap] Map disposed successfully");
+        Utility.logDebug("[GameMap] Map disposed successfully");
     }
 }

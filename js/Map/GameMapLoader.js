@@ -6,7 +6,7 @@ class GameMapLoader {
         this.currentMap = null;
         this.mapDisplayNames = new Map();
         this.mapDisplayNamePromises = new Map();
-        console.log(`[GameMapLoader] Initialized`);
+        Utility.logDebug(`[GameMapLoader] Initialized`);
     }
 
     normalizeMapId(mapId) {
@@ -110,14 +110,14 @@ class GameMapLoader {
 
     // Optional initialization method
     async init() {
-        console.log(`[GameMapLoader] Init called`);
+        Utility.logDebug(`[GameMapLoader] Init called`);
         return true;
     }
 
     // Update the loadMap method in GameMapLoader.js to pass the isInitialLoad flag
     async loadMap(mapId, container, options = {}) {
         try {
-            console.log(`[GameMapLoader] Loading map: ${mapId}`);
+            Utility.logDebug(`[GameMapLoader] Loading map: ${mapId}`);
 
             // Check if container is valid
             if (!container) {
@@ -129,11 +129,11 @@ class GameMapLoader {
             }
 
             // Create map instance
-            console.log(`[GameMapLoader] Creating new GameMap instance`);
+            Utility.logDebug(`[GameMapLoader] Creating new GameMap instance`);
             const map = new GameMap(container);
 
             // Initialize with TMX file, passing along initialization options
-            console.log(`[GameMapLoader] Initializing map with id: ${mapId}`);
+            Utility.logDebug(`[GameMapLoader] Initializing map with id: ${mapId}`);
             const success = await map.initialize(mapId, {
                 isInitialLoad: options.isInitialLoad || false
             });
@@ -147,7 +147,7 @@ class GameMapLoader {
             if (map?.displayName) {
                 this.mapDisplayNames.set(this.normalizeMapId(mapId), map.displayName);
             }
-            console.log(`[GameMapLoader] Map ${mapId} loaded successfully`);
+            Utility.logDebug(`[GameMapLoader] Map ${mapId} loaded successfully`);
             return map;
         } catch (error) {
             console.error(`[GameMapLoader] Error loading map ${mapId}:`, error);

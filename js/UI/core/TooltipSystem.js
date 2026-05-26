@@ -1,4 +1,13 @@
 class TooltipSystem {
+    static disposeInstance() {
+        if (!TooltipSystem.instance) {
+            return;
+        }
+
+        TooltipSystem.instance.dispose();
+        TooltipSystem.instance = null;
+    }
+
     static getInstance() {
         if (!TooltipSystem.instance) {
             TooltipSystem.instance = new TooltipSystem();
@@ -150,5 +159,17 @@ class TooltipSystem {
         if (event.key === 'Escape') {
             this.hide();
         }
+    }
+
+    dispose() {
+        this.clearHideTimer();
+        this.activeAnchor = null;
+        document.removeEventListener('pointerdown', this.handlePointerDown, true);
+        document.removeEventListener('keydown', this.handleKeyDown, true);
+        window.removeEventListener('resize', this.reposition);
+        window.removeEventListener('scroll', this.reposition, true);
+        this._anchorObserver?.disconnect?.();
+        this._anchorObserver = null;
+        this.element?.remove?.();
     }
 }

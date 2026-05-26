@@ -185,7 +185,7 @@ class MyteRenderer {
 		const targetRect = this.targetDot?.getBoundingClientRect?.();
 		const round = v => Number.isFinite(v) ? Math.round(v * 100) / 100 : null;
 
-		console.log('[myte visual debug]', {
+		Utility.logDebug('[myte visual debug]', {
 			source, name: m.name,
 			zoom: m.parent.camera?.zoomLevel ?? 1,
 			cameraX: m.parent.camera?.posX ?? 0,

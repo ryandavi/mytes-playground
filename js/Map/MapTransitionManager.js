@@ -6,7 +6,7 @@ class MapTransitionManager {
         this.messageElement = this.transitionElement?.querySelector('.transition-message');
         this.tipElement = this.transitionElement?.querySelector('.transition-tip');
 
-        console.log('[MapTransitionManager] Initializing');
+        Utility.logDebug('[MapTransitionManager] Initializing');
 
         this.minimumDisplayTime = 500;
 
@@ -19,7 +19,7 @@ class MapTransitionManager {
     }
 
     createTransitionElement() {
-        console.log('[MapTransitionManager] Creating transition element');
+        Utility.logDebug('[MapTransitionManager] Creating transition element');
         this.transitionElement = document.createElement('div');
         this.transitionElement.className = 'map-transition';
 
@@ -194,6 +194,12 @@ class MapTransitionManager {
     }
 
     _finishSuccessfulTransition(options, isInitialLoad) {
+        const resolvedMapId = this.currentMapId || this.container.gameMap?.id || options.targetMap || null;
+        if (resolvedMapId && this.core?.user) {
+            this.core.user.currentMapId = resolvedMapId;
+            this.core.user.saveUserData?.();
+        }
+
         this.container.invalidateCanvasRect?.();
 
         if (typeof options.onComplete === 'function') {
@@ -306,7 +312,7 @@ class MapTransitionManager {
             this.container.gameMap = newMap;
 
             if (newMap.gridSystem && document.body.classList.contains('debug')) {
-                console.log('[MapTransitionManager] Reinitializing GridSystem debug mode');
+                Utility.logDebug('[MapTransitionManager] Reinitializing GridSystem debug mode');
 
                 setTimeout(() => {
                     newMap.gridSystem.debugInitialized = false;
@@ -379,7 +385,7 @@ class MapTransitionManager {
             const fallbackMapId = 'House';
 
             if (mapId !== fallbackMapId) {
-                console.log(`[MapTransitionManager] Trying fallback map: ${fallbackMapId}`);
+                Utility.logDebug(`[MapTransitionManager] Trying fallback map: ${fallbackMapId}`);
                 return this.startTransition({
                     ...options,
                     targetMap: fallbackMapId,
@@ -448,7 +454,7 @@ class MapTransitionManager {
     }
 
     dispose() {
-        console.log('[MapTransitionManager] Disposing');
+        Utility.logDebug('[MapTransitionManager] Disposing');
         if (this.transitionElement && this.transitionElement.parentNode) {
             this.transitionElement.parentNode.removeChild(this.transitionElement);
         }

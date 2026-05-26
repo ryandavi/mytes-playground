@@ -768,7 +768,7 @@ class Myte {
 									y: this.posY
 								};
 								if (window._doorDebug && ['DOOR','GATE'].includes(collider.type)) {
-									console.log(`[Door X] follow=${this.followMouse} collider=${collider.constructor?.name} dest=${JSON.stringify(this._movementDestination)} targetX=${this.targetX?.toFixed(1)}`);
+									Utility.logDebug(`[Door X] follow=${this.followMouse} collider=${collider.constructor?.name} dest=${JSON.stringify(this._movementDestination)} targetX=${this.targetX?.toFixed(1)}`);
 								}
 								this.tryOpenCollider(collider, 'x');
 								this._movementDestination = savedDest;
@@ -832,7 +832,7 @@ class Myte {
 									y: this.posY + Math.sign(moveY) * 2000
 								};
 								if (window._doorDebug && ['DOOR','GATE'].includes(collider.type)) {
-									console.log(`[Door Y] follow=${this.followMouse} collider=${collider.constructor?.name} dest=${JSON.stringify(this._movementDestination)} targetY=${this.targetY?.toFixed(1)}`);
+									Utility.logDebug(`[Door Y] follow=${this.followMouse} collider=${collider.constructor?.name} dest=${JSON.stringify(this._movementDestination)} targetY=${this.targetY?.toFixed(1)}`);
 								}
 								this.tryOpenCollider(collider, 'y');
 								this._movementDestination = savedDest;

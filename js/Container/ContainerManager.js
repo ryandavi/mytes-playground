@@ -37,7 +37,7 @@ class ContainerManager {
         this._boundInvalidateCanvasRect = () => { this._cachedCanvasRect = null; };
 
         this.settings = {
-            limitMap: true,
+            limitMap: core?.user?.preferences?.containerLimit ?? true,
             defaultMyteCamera: CAMERA_FOLLOW_MODES[SiteConfig.camera.defaultFollowMode] ?? CAMERA_FOLLOW_MODES.CURSOR_EDGE,
             autoDeployMytesOnLoad: false
         }
@@ -56,7 +56,7 @@ class ContainerManager {
     // Update the init method in ContainerManager.js to set isInitialLoad flag
     async init() {
         try {
-            console.log('[ContainerManager] Initializing');
+            Utility.logDebug('[ContainerManager] Initializing');
 
             if (this.settings.limitMap) {
                 this.element.classList.add('noScroll');
@@ -77,7 +77,7 @@ class ContainerManager {
             );
 
             // Initialize camera
-            console.log('[ContainerManager] Initializing camera');
+            Utility.logDebug('[ContainerManager] Initializing camera');
             this.camera = new Camera(this, this.canvas, this.element);
             this.camera.limitToBounds = this.settings.limitMap;
             window.addEventListener('resize', this._boundInvalidateCanvasRect);
@@ -85,7 +85,7 @@ class ContainerManager {
 
 
             // Set up inventory
-            console.log('[ContainerManager] Initializing inventory');
+            Utility.logDebug('[ContainerManager] Initializing inventory');
             const inventoryElement = document.getElementById('inventory');
             if (!inventoryElement) {
                 console.warn('[ContainerManager] Inventory element not found, creating placeholder');
@@ -121,7 +121,7 @@ class ContainerManager {
 
             // Ensure the core has a mapLoader
             if (!this.core.mapLoader) {
-                console.log("[ContainerManager] Creating a new GameMapLoader for core");
+                Utility.logDebug("[ContainerManager] Creating a new GameMapLoader for core");
                 this.core.mapLoader = new GameMapLoader(this.core);
 
                 // Initialize the mapLoader if needed
@@ -143,7 +143,7 @@ class ContainerManager {
                 "Loading initial map..."
             );
 
-            console.log('[ContainerManager] Starting initial map transition');
+            Utility.logDebug('[ContainerManager] Starting initial map transition');
 
             // Get the right map ID
             // Use the default or a dev map if configured
@@ -151,7 +151,7 @@ class ContainerManager {
                 || SiteConfig.world.defaultMap;
 
             // Log to see what map we're trying to load
-            console.log(`[ContainerManager] Loading initial map: ${initialMapId}`);
+            Utility.logDebug(`[ContainerManager] Loading initial map: ${initialMapId}`);
 
             // Load the initial map through the transition manager
             // Explicitly set isInitialLoad to true
@@ -169,7 +169,7 @@ class ContainerManager {
             }
 
             // Set up mytes
-            console.log('[ContainerManager] Setting up Mytes');
+            Utility.logDebug('[ContainerManager] Setting up Mytes');
             this.updateContainerLoading(
                 ContainerManager.INIT_PROGRESS.MYTES,
                 "Initializing Mytes..."
@@ -178,10 +178,10 @@ class ContainerManager {
 
 
 
-            console.log('[ContainerManager] Initial map loaded successfully');
+            Utility.logDebug('[ContainerManager] Initial map loaded successfully');
 
             // Initialize UI
-            console.log('[ContainerManager] Initializing UI');
+            Utility.logDebug('[ContainerManager] Initializing UI');
             if (this.ui) {
                 this.ui.init();
             } else {
@@ -191,7 +191,7 @@ class ContainerManager {
             this.updateContainerLoading(ContainerManager.INIT_PROGRESS.COMPLETE);
             // completeLoading() is called by Core once all stages finish — not here.
 
-            console.log('[ContainerManager] Initialization completed successfully');
+            Utility.logDebug('[ContainerManager] Initialization completed successfully');
             return true;
         } catch (error) {
             console.error("[ContainerManager] Error initializing container:", error);
@@ -496,39 +496,271 @@ class ContainerManager {
         };
     }
 
-    // Myte management methods
-    async setupMytes() {
-        const wrappers = this.element.querySelectorAll('.myte-slot');
+    createFallbackRosterData() {
+        const speciesCatalog = MyteDefinitionRegistry.getSpeciesCatalogSync?.() || [];
+        const fallbackEntries = speciesCatalog.filter(entry => entry.essential);
+        const resolvedEntries = fallbackEntries.length > 0
+            ? fallbackEntries
+            : [{ id: MyteDefinitionRegistry.defaultSpeciesId || 'snail', label: 'Myte' }];
 
-        if (wrappers.length === 0) {
-            throw new Error("No Myte elements found.");
+        return resolvedEntries.map((entry, index) => ({
+            id: String(index + 1),
+            name: entry.label || `Myte ${index + 1}`,
+            species: entry.id || 'snail',
+            slotId: `myte-slot-${index + 1}`,
+            slotLabel: `${entry.label || `Myte ${index + 1}`}'s Slot`,
+            slotX: 0,
+            slotY: 0,
+            hasSlotPosition: false,
+            isActive: false,
+            goal: DEFAULT_MODE,
+            followGoal: DEFAULT_FOLLOW_MODE,
+            autonomyGoal: DEFAULT_AUTONOMY_MODE,
+            stats: {
+                health: 100,
+                mood: 100,
+                energy: SiteConfig.myte.initialStats.energy,
+                boredom: SiteConfig.myte.initialStats.boredom,
+                comfort: SiteConfig.myte.initialStats.comfort,
+                confidence: SiteConfig.myte.initialStats.confidence
+            }
+        }));
+    }
+
+    extractRosterDataFromDom(wrappers = []) {
+        return wrappers.map((wrapper, index) => {
+            const interactiveElement = wrapper.querySelector('.interactive-myte');
+            const slotNameElement = wrapper.querySelector('.myte-home-label .name');
+            const slotX = Number.parseFloat(wrapper.style.left) || 0;
+            const slotY = Number.parseFloat(wrapper.style.top) || 0;
+            const speciesId = interactiveElement?.dataset?.myteSpecies ||
+                wrapper.dataset?.myteSpecies ||
+                MyteDefinitionRegistry.defaultSpeciesId ||
+                'snail';
+            const name = interactiveElement?.dataset?.myteName ||
+                interactiveElement?.querySelector?.('.name')?.textContent?.trim?.() ||
+                `Myte ${index + 1}`;
+
+            return {
+                id: interactiveElement?.dataset?.myteId ||
+                    wrapper.dataset?.myteId ||
+                    wrapper.id ||
+                    String(index + 1),
+                name,
+                species: speciesId,
+                slotId: wrapper.id || `myte-slot-${index + 1}`,
+                slotLabel: slotNameElement?.textContent?.trim?.() || `${name}'s Slot`,
+                slotX,
+                slotY,
+                hasSlotPosition: wrapper.style.left !== '' || wrapper.style.top !== '',
+                isActive: false,
+                goal: DEFAULT_MODE,
+                followGoal: DEFAULT_FOLLOW_MODE,
+                autonomyGoal: DEFAULT_AUTONOMY_MODE,
+                stats: {
+                    health: 100,
+                    mood: 100,
+                    energy: SiteConfig.myte.initialStats.energy,
+                    boredom: SiteConfig.myte.initialStats.boredom,
+                    comfort: SiteConfig.myte.initialStats.comfort,
+                    confidence: SiteConfig.myte.initialStats.confidence
+                }
+            };
+        });
+    }
+
+    normalizeRosterEntry(entry = {}, index = 0) {
+        const species = MyteDefinitionRegistry.normalizeSpeciesId?.(entry.species || entry.speciesId || 'snail') || 'snail';
+        const name = String(entry.name || entry.displayName || `Myte ${index + 1}`).trim() || `Myte ${index + 1}`;
+        const slotId = String(entry.slotId || `myte-slot-${index + 1}`);
+        const slotLabel = String(entry.slotLabel || `${name}'s Slot`).trim() || `${name}'s Slot`;
+        const stats = entry.stats || {};
+        const slotX = Number.isFinite(Number(entry.slotX)) ? Number(entry.slotX) : 0;
+        const slotY = Number.isFinite(Number(entry.slotY)) ? Number(entry.slotY) : 0;
+        const hasExplicitSlotPosition = entry.hasSlotPosition === true ||
+            (entry.hasSlotPosition == null && (slotX !== 0 || slotY !== 0));
+
+        return {
+            id: String(entry.id || index + 1),
+            name,
+            species,
+            slotId,
+            slotLabel,
+            slotX,
+            slotY,
+            hasSlotPosition: hasExplicitSlotPosition,
+            isActive: entry.isActive === true,
+            goal: entry.goal ?? DEFAULT_MODE,
+            followGoal: entry.followGoal ?? DEFAULT_FOLLOW_MODE,
+            autonomyGoal: entry.autonomyGoal ?? DEFAULT_AUTONOMY_MODE,
+            posX: Number.isFinite(Number(entry.posX)) ? Number(entry.posX) : null,
+            posY: Number.isFinite(Number(entry.posY)) ? Number(entry.posY) : null,
+            stats: {
+                health: Number.isFinite(Number(stats.health)) ? Number(stats.health) : 100,
+                mood: Number.isFinite(Number(stats.mood)) ? Number(stats.mood) : 100,
+                energy: Number.isFinite(Number(stats.energy)) ? Number(stats.energy) : SiteConfig.myte.initialStats.energy,
+                boredom: Number.isFinite(Number(stats.boredom)) ? Number(stats.boredom) : SiteConfig.myte.initialStats.boredom,
+                comfort: Number.isFinite(Number(stats.comfort)) ? Number(stats.comfort) : SiteConfig.myte.initialStats.comfort,
+                confidence: Number.isFinite(Number(stats.confidence)) ? Number(stats.confidence) : SiteConfig.myte.initialStats.confidence
+            }
+        };
+    }
+
+    getInitialRosterData(existingWrappers = []) {
+        const savedRoster = this.core?.user?.savedMytes;
+        if (Array.isArray(savedRoster) && savedRoster.length > 0) {
+            return savedRoster.map((entry, index) => this.normalizeRosterEntry(entry, index));
         }
 
+        if (existingWrappers.length > 0) {
+            return this.extractRosterDataFromDom(existingWrappers)
+                .map((entry, index) => this.normalizeRosterEntry(entry, index));
+        }
+
+        return this.createFallbackRosterData()
+            .map((entry, index) => this.normalizeRosterEntry(entry, index));
+    }
+
+    createMyteSlotElement(rosterEntry, index) {
+        const wrapper = document.createElement('div');
+        wrapper.id = rosterEntry.slotId || `myte-slot-${index + 1}`;
+        wrapper.className = `myte-slot ${rosterEntry.species}`;
+        wrapper.dataset.myteSpecies = rosterEntry.species;
+        wrapper.dataset.myteId = rosterEntry.id;
+
+        if (rosterEntry.hasSlotPosition && Number.isFinite(rosterEntry.slotX)) {
+            wrapper.style.left = `${rosterEntry.slotX}px`;
+        }
+        if (rosterEntry.hasSlotPosition && Number.isFinite(rosterEntry.slotY)) {
+            wrapper.style.top = `${rosterEntry.slotY}px`;
+        }
+
+        const safeMyteId = String(rosterEntry.id || index + 1)
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]+/g, '-');
+
+        wrapper.innerHTML = `
+            <div class="myte-home-label">
+                <div class="name tooltip">${rosterEntry.slotLabel}</div>
+            </div>
+            <div class="myte-home-slot"></div>
+            <div id="interactive-myte-${safeMyteId}" class="interactive-myte" data-myte-id="${rosterEntry.id}" data-myte-name="${rosterEntry.name}" data-myte-species="${rosterEntry.species}" draggable="false">
+                <div class="inner-wrapper">
+                    <div class="sprite"></div>
+                    <div class="name-wrapper">
+                        <span class="before">x</span>
+                        <div class="name tooltip">${rosterEntry.name}</div>
+                    </div>
+                    <div class="commands"></div>
+                    <div class="dialogue">
+                        <span class="text"></span>
+                    </div>
+                    <div class="above-wrapper">
+                        <div class="battery"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        return wrapper;
+    }
+
+    applySavedMyteState(myte, rosterEntry = {}) {
+        if (!myte?.stats || !rosterEntry) {
+            return;
+        }
+
+        myte.name = rosterEntry.name || myte.name;
+        myte.element.dataset.myteName = myte.name;
+        myte.duplicate?.setAttribute?.('data-myte-name', myte.name);
+
+        const displayNameElements = [
+            myte.element.querySelector('.name-wrapper .name'),
+            myte.duplicate?.querySelector?.('.name-wrapper .name'),
+            myte.elements.wrapper?.querySelector?.('.myte-home-label .name')
+        ].filter(Boolean);
+        displayNameElements.forEach((element, index) => {
+            element.textContent = index === 2
+                ? (rosterEntry.slotLabel || `${myte.name}'s Slot`)
+                : myte.name;
+        });
+
+        const stats = rosterEntry.stats || {};
+        myte.stats.health = Math.max(myte.stats.minHealth, Math.min(myte.stats.maxHealth, stats.health ?? myte.stats.health));
+        myte.stats.mood = Math.max(myte.stats.minMood, Math.min(myte.stats.maxMood, stats.mood ?? myte.stats.mood));
+        myte.stats.energy = Math.max(myte.stats.minEnergy, Math.min(myte.stats.maxEnergy, stats.energy ?? myte.stats.energy));
+        myte.stats.boredom = Math.max(myte.stats.minBoredom, Math.min(myte.stats.maxBoredom, stats.boredom ?? myte.stats.boredom));
+        myte.stats.comfort = Math.max(myte.stats.minComfort, Math.min(myte.stats.maxComfort, stats.comfort ?? myte.stats.comfort));
+        myte.stats.confidence = Math.max(myte.stats.minConfidence, Math.min(myte.stats.maxConfidence, stats.confidence ?? myte.stats.confidence));
+        myte.stats.updateBatteryDisplay?.();
+    }
+
+    // Myte management methods
+    async setupMytes() {
         await MyteDefinitionRegistry.preload();
-        
-        wrappers.forEach(container => {
-            const wrapper = container;
-            const wrapperId = wrapper.id;
-            const idNumber = wrapperId.split('-')[1];
+
+        const foregroundLayer = this.element.querySelector('.layer.foreground');
+        if (!foregroundLayer) {
+            throw new Error('Myte foreground layer not found.');
+        }
+
+        const wrappers = Array.from(this.element.querySelectorAll('.myte-slot'));
+        const rosterData = this.getInitialRosterData(wrappers);
+        if (rosterData.length === 0) {
+            throw new Error('No Myte roster data available.');
+        }
+
+        wrappers.forEach(wrapper => wrapper.remove());
+        this.element.querySelectorAll('.world-myte').forEach(myteElement => myteElement.remove());
+
+        const rebuiltWrappers = rosterData.map((entry, index) => {
+            const wrapper = this.createMyteSlotElement(entry, index);
+            foregroundLayer.appendChild(wrapper);
+            return wrapper;
+        });
+
+        rebuiltWrappers.forEach((wrapper, index) => {
             const interactiveElement = wrapper.querySelector('.interactive-myte');
-            const speciesId = interactiveElement?.dataset?.myteSpecies || wrapper.dataset?.myteSpecies || 'snail';
-            const definition = MyteDefinitionRegistry.getSpeciesSync(speciesId);
-        
-            // create myte
-            let myte = new Myte(idNumber, this, interactiveElement, definition);
+            const rosterEntry = rosterData[index];
+            const definition = MyteDefinitionRegistry.getSpeciesSync(rosterEntry.species);
+            const myte = new Myte(rosterEntry.id, this, interactiveElement, definition);
             myte.init();
+            this.applySavedMyteState(myte, rosterEntry);
             this.mytes.push(myte);
         });
 
-
-
-        // set spawn position for first
-
+        this.core.user?.trackMytes?.(this.mytes);
 
         const myteSpawn = this.gameMap.spawnPoints.get("myte");
-
-        if (this.mytes.length > 0 && myteSpawn) {
+        const needsSpawnedHomeSlot = !rosterData[0]?.hasSlotPosition ||
+            (rosterData[0]?.slotX === 0 && rosterData[0]?.slotY === 0);
+        if (this.mytes.length > 0 && myteSpawn && needsSpawnedHomeSlot) {
             this.mytes[0].setWrapperPosition(myteSpawn.x, myteSpawn.y);
+        }
+
+        let restoredActiveMyte = null;
+        this.mytes.forEach((myte, index) => {
+            const rosterEntry = rosterData[index];
+            if (!rosterEntry?.isActive) {
+                return;
+            }
+
+            restoredActiveMyte = myte;
+            myte.startWithOptions({
+                goal: rosterEntry.goal,
+                followGoal: rosterEntry.followGoal,
+                autonomyGoal: rosterEntry.autonomyGoal
+            });
+
+            if (Number.isFinite(rosterEntry.posX) && Number.isFinite(rosterEntry.posY)) {
+                myte.setPosition(rosterEntry.posX, rosterEntry.posY, this.settings.limitMap);
+                myte.setTarget(rosterEntry.posX, rosterEntry.posY);
+                myte.setSpritePosition(rosterEntry.posX, rosterEntry.posY);
+            }
+        });
+
+        if (restoredActiveMyte) {
+            this.setActiveMyte(restoredActiveMyte);
         }
 
         if (this.settings.autoDeployMytesOnLoad) {
@@ -643,7 +875,7 @@ class ContainerManager {
         });
 
         this.ui.myteListManager.updateMytesList(null);
-        this.ui.debugPanel.updateButtons();
+        this.ui.debugPanel?.updateButtons?.();
         this.ui.hudManager.update();
         this.ui.viewPanel?.updateButtonStates();
         this.ui.setSelected(null);

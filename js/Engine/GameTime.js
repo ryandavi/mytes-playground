@@ -47,8 +47,17 @@ class GameTime {
 				{ name: 'sunset', start: { hour: 19, minute: 0 }, end: { hour: 19, minute: 30 } },
 				{ name: 'dusk', start: { hour: 19, minute: 30 }, end: { hour: 20, minute: 30 } },
 				{ name: 'gloaming', start: { hour: 20, minute: 30 }, end: { hour: 21, minute: 30 } },
-				{ name: 'nightfall', start: { hour: 21, minute: 30 }, end: { hour: 22, minute: 0 } },
-				{ name: 'twilight', start: { hour: 22, minute: 0 }, end: { hour: 22, minute: 30 } }
+				{ name: 'nightfall', start: { hour: 21, minute: 30 }, end: { hour: 22, minute: 0 } }
+			],
+
+			timePeriodsSimple: [
+				{ name: 'late_night', start: { hour: 0, minute: 0 }, end: { hour: 5, minute: 0 } },
+				{ name: 'dawn', start: { hour: 5, minute: 0 }, end: { hour: 7, minute: 0 } },
+				{ name: 'morning', start: { hour: 7, minute: 0 }, end: { hour: 12, minute: 0 } },
+				{ name: 'midday', start: { hour: 12, minute: 0 }, end: { hour: 14, minute: 0 } },
+				{ name: 'afternoon', start: { hour: 14, minute: 0 }, end: { hour: 17, minute: 0 } },
+				{ name: 'evening', start: { hour: 17, minute: 0 }, end: { hour: 20, minute: 0 } },
+				{ name: 'night', start: { hour: 20, minute: 0 }, end: { hour: 0, minute: 0 } }
 			],
 
 			// Moon configuration
@@ -81,17 +90,30 @@ class GameTime {
 			moonPhase: new Set()
 		};
 
+		const initialDate = SiteConfig.time.initialDate || {
+			year: 1,
+			season: 'spring',
+			day: 1,
+			hour: 8,
+			minute: 0
+		};
+
+		this.setDateTime(
+			initialDate.year,
+			initialDate.season,
+			initialDate.day,
+			initialDate.hour,
+			initialDate.minute
+		);
+
 		this.lastMinute = this.getCurrentMinute();
 		this.lastHour = this.getCurrentHour();
 		this.lastDay = this.getCurrentDay();
 		this.lastSeason = this.getCurrentSeason();
+		this.lastYear = this.getCurrentYear();
 		this.lastTimeOfDay = this.getTimeOfDay();
 		this.lastLightLevel = this.getLightLevel();
 		this.lastMoonPhase = this.getMoonPhase();
-
-
-
-		this.setDateTime(5, 'summer', 12);
 	}
 
 	// Helper methods for common calculations
@@ -292,6 +314,7 @@ class GameTime {
 		const currentHour = this.getCurrentHour();
 		const currentDay = this.getCurrentDay();
 		const currentSeason = this.getCurrentSeason();
+		const currentYear = this.getCurrentYear();
 		const currentTimeOfDay = this.getTimeOfDay();
 		const currentLightLevel = this.getLightLevel();
 		const currentMoonPhase = this.getMoonPhase();
@@ -314,6 +337,11 @@ class GameTime {
 		if (currentSeason !== this.lastSeason) {
 			this.notifySubscribers('season');
 			this.lastSeason = currentSeason;
+		}
+
+		if (currentYear !== this.lastYear) {
+			this.notifySubscribers('year');
+			this.lastYear = currentYear;
 		}
 
 		if (currentTimeOfDay !== this.lastTimeOfDay) {
@@ -475,5 +503,10 @@ class GameTime {
 		this.totalElapsedSeconds = Math.floor(currentGameMinutes * newSecondsPerGameMinute);
 
 		this.checkAndNotifyChanges();
+	}
+
+	dispose() {
+		Object.values(this.subscribers).forEach(subscribers => subscribers.clear());
+		GameTime.instance = null;
 	}
 }

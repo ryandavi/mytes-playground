@@ -15,7 +15,7 @@ function createAudioPresetLibrary(manager) {
 							release: 1.5
 						}
 					}).toDestination();
-					synth.maxPolyphony = 4;
+					synth.maxPolyphony = 8;
 					// // synth.volume.value = Tone.gainToDb(0.4);
 
 					const pattern = [];
@@ -53,7 +53,7 @@ function createAudioPresetLibrary(manager) {
 							release: 2.5
 						}
 					}).toDestination();
-					synth.maxPolyphony = 4;
+					synth.maxPolyphony = 10;
 
 					const pattern = [];
 					const notes = [
@@ -84,7 +84,7 @@ function createAudioPresetLibrary(manager) {
 							release: 4
 						}
 					}).toDestination();
-					pad.maxPolyphony = 4;
+					pad.maxPolyphony = 8;
 					pad.volume.value = Tone.gainToDb(0.2);
 
 					const padPattern = [
@@ -121,7 +121,7 @@ function createAudioPresetLibrary(manager) {
 							release: 2
 						}
 					}).toDestination();
-					synth.maxPolyphony = 4;
+					synth.maxPolyphony = 8;
 
 					const pattern = [];
 					const notes = ["G2", "B2", "D3", "F#3", "G3", "D3", "B2", "G2"];

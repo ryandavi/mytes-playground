@@ -41,12 +41,21 @@ class MyteCore {
         this.currentFPS = 0;
     }
 
+    applyRuntimeModeFlags() {
+        const params = new URLSearchParams(window.location.search);
+        document.body.classList.toggle('debug', params.has('debug'));
+    }
+
     async init() {
         try {
+            this.applyRuntimeModeFlags();
             this.loadingManager.initialize();
 
             this.loadingManager.setMessage("Loading item data...");
-            await ItemRegistry.preload();
+            const itemDataLoaded = await ItemRegistry.preload();
+            if (!itemDataLoaded) {
+                throw new Error('Failed to load item metadata.');
+            }
 
             this.loadingManager.setMessage("Loading action data...");
             const actionDataLoaded = await ActionDefinitionRegistry.preload();
@@ -137,7 +146,7 @@ class MyteCore {
                 const success = await this.loadUserData(savedUserId);
                 if (success) {
                     this.rememberLastUserId();
-                    console.log('Loaded saved user data');
+                    Utility.logDebug('Loaded saved user data');
                     return;
                 }
             }
@@ -170,14 +179,8 @@ class MyteCore {
                 this.rememberLastUserId(userId);
                 return true;
             }
-
-            const success = await this.user.loadUserDataFromFile(this.getUserDataFilePath(userId));
-            if (success) {
-                this.user.applyAudioSettings?.(this.soundManager);
-                this.rememberLastUserId();
-                return true;
-            }
-
+            // Remembered user ids are browser-local runtime saves.
+            // Do not probe arbitrary JSON files for generated guest ids.
             return false;
         } catch (error) {
             console.error('Error loading user data:', error);
@@ -325,6 +328,9 @@ class MyteCore {
         this.eventManager?.dispose?.();
         this.eventManager = null;
         this.resourceManager = null;
+        this.gameTime?.dispose?.();
+        this.gameTime = null;
+        TooltipSystem.disposeInstance?.();
 
         InputSystem.instance?.destroy?.();
         MyteCore.instance = null;

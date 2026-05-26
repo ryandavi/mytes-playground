@@ -77,6 +77,28 @@ class Utility {
 		return `${url}${url.includes('?') ? '&' : '?'}${cacheBuster}`;
 	}
 
+	static getQueryFlag(flagName = 'debug') {
+		try {
+			return new URLSearchParams(window.location.search).has(flagName);
+		} catch {
+			return false;
+		}
+	}
+
+	static isDebugEnabled() {
+		return document.body?.classList?.contains('debug') || this.getQueryFlag('debug');
+	}
+
+	static logDebug(...args) {
+		if (!this.isDebugEnabled()) return;
+		console.log(...args);
+	}
+
+	static warnDebug(...args) {
+		if (!this.isDebugEnabled()) return;
+		console.warn(...args);
+	}
+
 	static isTopOnlyTag(x) {
 		if (x.tagName) x = x.tagName;
 		if (typeof x === 'string') {

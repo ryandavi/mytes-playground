@@ -19,7 +19,7 @@ const AppConfig = Object.freeze({
     // ── User data paths ───────────────────────────────────────────────────────
 
     userData: Object.freeze({
-        defaultPath:           'data/user/Ryan.json',
+        defaultPath:           'data/user/default.json',
         filePathTemplate:      'data/user/{userId}.json',
         localStorageKeyPrefix: 'user_',
         lastUserIdKey:         'lastUserId',

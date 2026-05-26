@@ -286,7 +286,7 @@ class BallMapObject extends AnimatedMapObject {
             });
             
             if (this.debug) {
-                console.log(`Ball pushed! Velocity X: ${this.velocity.x.toFixed(2)}, Y: ${this.velocity.y.toFixed(2)}`);
+                Utility.logDebug(`Ball pushed! Velocity X: ${this.velocity.x.toFixed(2)}, Y: ${this.velocity.y.toFixed(2)}`);
             }
         }
     }
@@ -427,7 +427,7 @@ class BallMapObject extends AnimatedMapObject {
         this.playAnimation(animName);
         
         if (this.debug) {
-            console.log(`Playing ${absX > absY ? 'horizontal' : 'vertical'} animation: ${animName}`);
+            Utility.logDebug(`Playing ${absX > absY ? 'horizontal' : 'vertical'} animation: ${animName}`);
         }
     }
 
@@ -522,24 +522,24 @@ class BallMapObject extends AnimatedMapObject {
             this.posX = this.bounds.left;
             this.velocity.x = Math.abs(this.velocity.x) * bounceMultiplier;
             bounced = true;
-            if (this.debug) console.log("Bounced left boundary");
+            if (this.debug) Utility.logDebug("Bounced left boundary");
         } else if (this.posX + this.size.width > this.bounds.right) {
             this.posX = this.bounds.right - this.size.width;
             this.velocity.x = -Math.abs(this.velocity.x) * bounceMultiplier;
             bounced = true;
-            if (this.debug) console.log("Bounced right boundary");
+            if (this.debug) Utility.logDebug("Bounced right boundary");
         }
 
         if (this.posY < this.bounds.top) {
             this.posY = this.bounds.top;
             this.velocity.y = Math.abs(this.velocity.y) * bounceMultiplier;
             bounced = true;
-            if (this.debug) console.log("Bounced top boundary");
+            if (this.debug) Utility.logDebug("Bounced top boundary");
         } else if (this.posY + this.size.height > this.bounds.bottom) {
             this.posY = this.bounds.bottom - this.size.height;
             this.velocity.y = -Math.abs(this.velocity.y) * bounceMultiplier;
             bounced = true;
-            if (this.debug) console.log("Bounced bottom boundary");
+            if (this.debug) Utility.logDebug("Bounced bottom boundary");
         }
 
         if (bounced) {
@@ -551,12 +551,12 @@ class BallMapObject extends AnimatedMapObject {
 
     // Override the play animation method to handle special cases
     playAnimation(animationName, onComplete) {
-        if (this.debug) console.log("Ball playAnimation called with:", animationName);
+        if (this.debug) Utility.logDebug("Ball playAnimation called with:", animationName);
         
         // If we're playing idle but we already have an animation running,
         // skip it to preserve the last animation frame
         if (animationName === 'idle' && this.animation && this.animation.currentAnimation) {
-            if (this.debug) console.log("Skipping idle animation to preserve last frame");
+            if (this.debug) Utility.logDebug("Skipping idle animation to preserve last frame");
             return;
         }
         
@@ -740,7 +740,7 @@ class BallMapObject extends AnimatedMapObject {
             };
 
             if (this.debug) {
-                console.log("Ball boundaries set:", this.bounds);
+                Utility.logDebug("Ball boundaries set:", this.bounds);
             }
         }
     }
@@ -764,7 +764,7 @@ class BallMapObject extends AnimatedMapObject {
         if (this.element) {
             this.element.setAttribute('data-moving', 'false');
         }
-        if (this.debug) console.log("Ball stopped");
+        if (this.debug) Utility.logDebug("Ball stopped");
     }
 
     // tickUpdate: collision detection + physics (no DOM)

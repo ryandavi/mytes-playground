@@ -6,7 +6,8 @@ class DebugPanel extends ModalWindow {
             closeOnOutsideClick: false,
             position: 'top-right',
             draggable: true,
-            closeButtonSelector: '.modal-close-btn'
+            closeButtonSelector: '.modal-close-btn',
+            autoInit: false
         });
 
         const buildObjectOverlayToggle = ({ id, label, key, swatchClass, colorLabel, shapeLabel }) => ({
@@ -480,7 +481,6 @@ class DebugPanel extends ModalWindow {
         ];
 
         this.init();
-        this.setupDebugControls();
     }
 
     getTimeManager() {
@@ -504,6 +504,8 @@ class DebugPanel extends ModalWindow {
         if (this.modalElement) {
             const buttonContainer = this.modalElement.querySelector('.window-panel__content');
             this.createButtons(buttonContainer);
+            this.setupDebugControls();
+            this.updateButtonsEnabledState();
         }
     }
 

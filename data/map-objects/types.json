@@ -3302,7 +3302,7 @@
       "renderType": "sprite",
       "defaultState": "active",
       "spriteSheet": {
-        "url": "images/MapObjects/portal.png",
+        "url": "",
         "size": {
           "width": 1024,
           "height": 512
