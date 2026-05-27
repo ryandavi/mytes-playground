@@ -8,8 +8,6 @@ class MyteMovementController {
         if (newGoal == null) newGoal = m.followGoal;
         m.followGoal = newGoal;
         m.parent.ui?.debugPanel?.updateButton?.('cycleFollowGoal');
-        m.runAway = m.followGoal === MOVE_FOLLOW_TYPES.RUNAWAY;
-        m.goingInCircles = m.followGoal === MOVE_FOLLOW_TYPES.CIRCLES;
     }
 
     setAutonomyMode(newGoal = null) {
@@ -207,7 +205,13 @@ class MyteMovementController {
         } else if (m.goal === MOVE_TYPES.FOLLOW) {
             if (m.queue.isEmpty()) {
                 this.updateTargetToFollowMouse();
+                const mouse = m.parent?.inputHandler?.getMouseWorldPosition();
+                const savedDest = m._movementDestination;
+                if (mouse && Number.isFinite(mouse.x) && Number.isFinite(mouse.y)) {
+                    m._movementDestination = { x: mouse.x, y: mouse.y };
+                }
                 m.moveTowardsTarget();
+                m._movementDestination = savedDest;
             }
             m.queue.update(deltaTime);
         } else if (m.goal === MOVE_TYPES.GOHOME) {
@@ -365,6 +369,188 @@ class MyteMovementController {
             doYAxis ? mouse.y - (dy / distance) * leashDistance : null,
             false
         );
+    }
+
+    canMoveToPosition(newX, newY) {
+        const m = this.myte;
+        if (!m.parent?.gameMap?.gridSystem) return true;
+        return m.parent.gameMap.gridSystem.isEntityPositionValid?.(m, newX, newY) ?? true;
+    }
+
+    moveTowardsTargetDirect(doXAxis = true, doYAxis = true) {
+        const m = this.myte;
+        m.ensureFiniteCoordinates('moveTowardsTargetDirect:start');
+        const dx = m.targetX - m.posX;
+        const dy = m.targetY - m.posY;
+        const distance = Math.hypot(dx, dy);
+        const step = m.stats.getSpeed() * ((m._dt ?? 16.667) / 16.667);
+
+        if (Number.isFinite(distance) && distance !== 0) {
+            if (doXAxis) m.posX += (dx / distance) * step;
+            if (doYAxis) m.posY += (dy / distance) * step;
+        }
+
+        if (distance < step) m.snapPositionToTarget(doXAxis, doYAxis);
+        m.ensureFiniteCoordinates('moveTowardsTargetDirect:end');
+        m.setDirection(m.getDirection());
+        m.setSpritePosition(m.posX, m.posY);
+    }
+
+    moveTowardsTarget(doXAxis = true, doYAxis = true) {
+        const m = this.myte;
+        m.ensureFiniteCoordinates('moveTowardsTarget:start');
+        const dx = m.targetX - m.posX;
+        const dy = m.targetY - m.posY;
+        const distance = Math.hypot(dx, dy);
+        const step = m.stats.getSpeed() * ((m._dt ?? 16.667) / 16.667);
+        const originalX = m.posX;
+        const originalY = m.posY;
+
+        if (Number.isFinite(distance) && distance !== 0) {
+            const moveX = (dx / distance) * step;
+            const moveY = (dy / distance) * step;
+            const gridSystem = m.parent?.gameMap?.gridSystem;
+            let xBlocked = false;
+            let yBlocked = false;
+            const CORNER_SLIP = 1.0;
+
+            if (doXAxis) {
+                const newX = m.posX + moveX;
+                if (this.canMoveToPosition(newX, m.posY)) {
+                    m.posX = newX;
+                    if (m.checkForCollisions && gridSystem) {
+                        const potentialColliders = gridSystem.getPotentialColliders(m);
+                        for (const collider of potentialColliders) {
+                            if (m.parent.checkCollision(m, collider)) {
+                                m.posX = originalX;
+                                if (window._doorDebug && ['DOOR','GATE'].includes(collider.type)) {
+                                    console.log(`[Door X] follow=${m.followMouse} collider=${collider.constructor?.name} dest=${JSON.stringify(m._movementDestination)} targetX=${m.targetX?.toFixed(1)}`);
+                                }
+                                m.tryOpenCollider(collider, 'x');
+                                xBlocked = true;
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    const slipDir = moveY !== 0 ? Math.sign(moveY) : 1;
+                    if (this.canMoveToPosition(newX, m.posY + slipDir * CORNER_SLIP)) {
+                        m.posX = newX;
+                        m.posY += slipDir * CORNER_SLIP;
+                    } else if (this.canMoveToPosition(newX, m.posY - slipDir * CORNER_SLIP)) {
+                        m.posX = newX;
+                        m.posY -= slipDir * CORNER_SLIP;
+                    } else {
+                        xBlocked = true;
+                        if (m.checkForCollisions && gridSystem) {
+                            m.posX = newX;
+                            const potentialColliders = gridSystem.getPotentialColliders(m);
+                            m.posX = originalX;
+                            for (const collider of potentialColliders) m.tryOpenCollider(collider, 'x');
+                        }
+                    }
+                }
+            }
+
+            if (doYAxis) {
+                const newY = m.posY + moveY;
+                if (this.canMoveToPosition(m.posX, newY)) {
+                    m.posY = newY;
+                    if (m.checkForCollisions && gridSystem) {
+                        const potentialColliders = gridSystem.getPotentialColliders(m);
+                        for (const collider of potentialColliders) {
+                            if (m.parent.checkCollision(m, collider)) {
+                                m.posY = originalY;
+                                if (window._doorDebug && ['DOOR','GATE'].includes(collider.type)) {
+                                    console.log(`[Door Y] follow=${m.followMouse} collider=${collider.constructor?.name} dest=${JSON.stringify(m._movementDestination)} targetY=${m.targetY?.toFixed(1)}`);
+                                }
+                                m.tryOpenCollider(collider, 'y');
+                                yBlocked = true;
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    const slipDir = moveX !== 0 ? Math.sign(moveX) : 1;
+                    if (this.canMoveToPosition(m.posX + slipDir * CORNER_SLIP, newY)) {
+                        m.posY = newY;
+                        m.posX += slipDir * CORNER_SLIP;
+                    } else if (this.canMoveToPosition(m.posX - slipDir * CORNER_SLIP, newY)) {
+                        m.posY = newY;
+                        m.posX -= slipDir * CORNER_SLIP;
+                    } else {
+                        yBlocked = true;
+                        if (m.checkForCollisions && gridSystem) {
+                            m.posY = newY;
+                            const potentialColliders = gridSystem.getPotentialColliders(m);
+                            m.posY = originalY;
+                            for (const collider of potentialColliders) m.tryOpenCollider(collider, 'y');
+                        }
+                    }
+                }
+            }
+
+            if (xBlocked && yBlocked && Math.abs(moveX) > 0.1 && Math.abs(moveY) > 0.1) {
+                if (Math.abs(moveX) > Math.abs(moveY) * 0.5) {
+                    const slideX = m.posX + moveX * 1.2;
+                    if (this.canMoveToPosition(slideX, originalY)) m.posX = slideX;
+                } else if (Math.abs(moveY) > Math.abs(moveX) * 0.5) {
+                    const slideY = m.posY + moveY * 1.2;
+                    if (this.canMoveToPosition(originalX, slideY)) m.posY = slideY;
+                }
+            }
+        }
+
+        if (distance < step) m.snapPositionToTarget(doXAxis, doYAxis);
+        m.ensureFiniteCoordinates('moveTowardsTarget:end');
+        m.setDirection(m.getDirection());
+        m.setSpritePosition(m.posX, m.posY);
+    }
+
+    getOverlappingColliders() {
+        const m = this.myte;
+        if (!m.checkForCollisions) return [];
+        const gridSystem = m.parent?.gameMap?.gridSystem;
+        if (!gridSystem || !m.parent?.checkCollision) return [];
+        return gridSystem.getPotentialColliders(m).filter(collider =>
+            collider && collider !== m && !collider.isPickedUp && m.parent.checkCollision(m, collider)
+        );
+    }
+
+    tryResolveColliderOverlap(force = false) {
+        const m = this.myte;
+        if (m.isDragging || !m.checkForCollisions) {
+            m.colliderRecoveryState.overlapFrames = 0;
+            return false;
+        }
+
+        const overlaps = this.getOverlappingColliders();
+        if (overlaps.length === 0) {
+            m.colliderRecoveryState.overlapFrames = 0;
+            return false;
+        }
+
+        m.colliderRecoveryState.overlapFrames++;
+        const now = Date.now();
+        if (m.colliderRecoveryState.overlapFrames < (force ? 1 : 24)) return false;
+        if (!force && now - m.colliderRecoveryState.lastRecoverAt < 700) return false;
+
+        const gridSystem = m.parent?.gameMap?.gridSystem;
+        const home = m.getHomePosition();
+        const safePosition = gridSystem?.findNearestValidPositionForEntity?.(m, m.posX, m.posY, 22)
+            ?? gridSystem?.findNearestValidPositionForEntity?.(m, m.targetX, m.targetY, 22)
+            ?? gridSystem?.findNearestValidPositionForEntity?.(m, home.x, home.y, 18)
+            ?? null;
+
+        if (!safePosition) return false;
+
+        m.setPosition(safePosition.x, safePosition.y);
+        m.setTarget(safePosition.x, safePosition.y);
+        m.setSpritePosition(safePosition.x, safePosition.y);
+        m.physicsController?.reset?.();
+        m.colliderRecoveryState.overlapFrames = 0;
+        m.colliderRecoveryState.lastRecoverAt = now;
+        return true;
     }
 
     doRunAway(doXAxis = true, doYAxis = true) {

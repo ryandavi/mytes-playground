@@ -31,6 +31,25 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
         return genes;
     }
 
+    receivePollen(payload) {
+        if (!payload?.genes || this.pollinationState !== 'ready' || this.growthStage !== 'mature') return;
+        if (!this.genes) {
+            this.genes = { ...payload.genes };
+            return;
+        }
+        const childGenes = this.createChildGenes({ genes: payload.genes });
+        const spawnPoint = this.findSpawnPoint();
+        if (spawnPoint && this.gameMap) {
+            const newPlant = new this.constructor(
+                this.gameMap, this.type, this.variant,
+                spawnPoint.x, spawnPoint.y,
+                { ...this.config },
+                { initialGenes: childGenes }
+            );
+            this.gameMap.addObject(newPlant);
+        }
+    }
+
     getBreedingPartners() {
         if (!this.pollinationRadius || !this.gameMap) return [];
         

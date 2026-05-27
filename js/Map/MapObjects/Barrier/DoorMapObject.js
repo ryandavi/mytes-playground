@@ -205,18 +205,17 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
         const dbg = window._doorDebug;
 
         if (!actorCenter || !intent || !axis) {
-            if (dbg) Utility.logDebug(`[canAutoOpenFor] FAIL: missing actorCenter=${!!actorCenter} intent=${!!intent} axis=${axis}`);
+            if (dbg) console.log(`[canAutoOpenFor] FAIL: missing actorCenter=${!!actorCenter} intent=${!!intent} axis=${axis}`);
             return false;
         }
 
         if (dbg) {
             const b = this.getDoorBounds();
-            Utility.logDebug(`[canAutoOpenFor] axis=${axis} facing=${this.facingDirection} actor=(${actorCenter.x.toFixed(1)},${actorCenter.y.toFixed(1)}) intent=(${intent.x.toFixed(1)},${intent.y.toFixed(1)}) door=[${b.left.toFixed(0)},${b.top.toFixed(0)} ${b.width}x${b.height}] dest=${JSON.stringify(entity._movementDestination)}`);
-            console.trace('[canAutoOpenFor] call stack');
+            console.log(`[canAutoOpenFor] axis=${axis} facing=${this.facingDirection} actor=(${actorCenter.x.toFixed(1)},${actorCenter.y.toFixed(1)}) intent=(${intent.x.toFixed(1)},${intent.y.toFixed(1)}) door=[${b.left.toFixed(0)},${b.top.toFixed(0)} ${b.width}x${b.height}] dest=${JSON.stringify(entity._movementDestination)}`);
         }
 
         if (!this.isEntityAlignedWithDoor(entity, axis, actorCenter, intent)) {
-            if (dbg) Utility.logDebug(`[canAutoOpenFor] FAIL: not aligned with door`);
+            if (dbg) console.log(`[canAutoOpenFor] FAIL: not aligned with door`);
             return false;
         }
 
@@ -229,12 +228,17 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
                 const cBottom = cTop + (col.height || entity.size?.height || 0);
                 const cLeft   = entity.posX + (col.offsetX || 0);
                 const cRight  = cLeft + (col.width || entity.size?.width || 0);
-                Utility.logDebug(`[canAutoOpenFor] FAIL: not moving toward door on axis=${axis} - cTop=${cTop.toFixed(1)} cBottom=${cBottom.toFixed(1)} cLeft=${cLeft.toFixed(1)} cRight=${cRight.toFixed(1)} motion=(${(intent.x-actorCenter.x).toFixed(1)},${(intent.y-actorCenter.y).toFixed(1)})`);
+                console.log(`[canAutoOpenFor] FAIL: not moving toward door on axis=${axis} cLeft=${cLeft.toFixed(1)} cRight=${cRight.toFixed(1)} cTop=${cTop.toFixed(1)} cBottom=${cBottom.toFixed(1)} motion=(${(intent.x-actorCenter.x).toFixed(1)},${(intent.y-actorCenter.y).toFixed(1)})`);
             }
             return false;
         }
 
-        if (dbg) Utility.logDebug(`[canAutoOpenFor] PASS axis=${axis}`);
+        if (!this.isIntentAcrossDoor(axis, actorCenter, intent, bounds, 0)) {
+            if (dbg) console.log(`[canAutoOpenFor] FAIL: intent not across door actorCenter=(${actorCenter.x.toFixed(1)},${actorCenter.y.toFixed(1)}) intent=(${intent.x.toFixed(1)},${intent.y.toFixed(1)}) bounds=[${bounds.left},${bounds.top} ${bounds.width}x${bounds.height}]`);
+            return false;
+        }
+
+        if (dbg) console.log(`[canAutoOpenFor] PASS axis=${axis}`);
         return true;
     }
 

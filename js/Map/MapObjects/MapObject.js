@@ -358,26 +358,6 @@ class MapObject {
 		return Number.isFinite(parsed) ? parsed : defaultValue;
 	}
 
-	normalizeRegionId(regionId = 'collider') {
-		switch (String(regionId || '').trim().toLowerCase()) {
-			case 'interactionregion':
-			case 'interaction':
-				return 'interaction';
-			case 'selectbox':
-			case 'select':
-				return 'select';
-			case 'hitbox':
-			case 'hit':
-				return 'hit';
-			case 'pickupbox':
-			case 'pickup':
-				return 'pickup';
-			case 'collider':
-			default:
-				return 'collider';
-		}
-	}
-
 	getRegionConfig(regionId = 'collider') {
 		const normalizedRegionId = this.normalizeRegionId(regionId);
 		const canonicalRegion = this.getConfig(`spatial.regions.${normalizedRegionId}`, undefined);
@@ -450,10 +430,6 @@ class MapObject {
 		return this.getRegionRect('select') ||
 			this.getRegionRect('interaction') ||
 			this.getRegionRect('collider');
-	}
-
-	getHitRect() {
-		return this.getRegionRect('hit') || this.getRegionRect('collider');
 	}
 
 	getPickupRect() {
@@ -667,26 +643,6 @@ class MapObject {
 
 	isActiveMusicSource() {
 		return false;
-	}
-
-	getDistanceTo(target) {
-		if (!target) return Infinity;
-		return Math.hypot(this.posX - target.posX, this.posY - target.posY);
-	}
-
-	getCenterPoint() {
-		const colliderRect = this.getRegionRect('collider');
-		if (colliderRect) {
-			return {
-				x: colliderRect.left + (colliderRect.width / 2),
-				y: colliderRect.top + (colliderRect.height / 2)
-			};
-		}
-
-		return {
-			x: this.posX + (this.collider?.offsetX ?? 0) + ((this.collider?.width ?? this.size.width) / 2),
-			y: this.posY + (this.collider?.offsetY ?? 0) + ((this.collider?.height ?? this.size.height) / 2)
-		};
 	}
 
 	getFacingVector() {
@@ -2460,3 +2416,5 @@ class MapObject {
 		this.markPositionDirty();
 	}
 }
+
+applyEntityMixin(MapObject);

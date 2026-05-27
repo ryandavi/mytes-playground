@@ -1124,7 +1124,13 @@ class FollowMouseAction extends MyteAction {
 
     update() {
         this.myte.updateTargetToFollowMouse();
+        const mouse = this.myte.parent?.inputHandler?.getMouseWorldPosition();
+        const savedDest = this.myte._movementDestination;
+        if (mouse && Number.isFinite(mouse.x) && Number.isFinite(mouse.y)) {
+            this.myte._movementDestination = { x: mouse.x, y: mouse.y };
+        }
         this.myte.moveTowardsTarget();
+        this.myte._movementDestination = savedDest;
         return false;
     }
 }

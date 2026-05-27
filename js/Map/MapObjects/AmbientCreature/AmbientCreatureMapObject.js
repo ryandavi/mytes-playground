@@ -14,9 +14,6 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
             bottom: options.mapHeight || 500
         };
 
-        this.bobPhase = Math.random() * Math.PI * 2;
-        this.bobAmplitude = options.bobAmplitude || this.getConfig('bobAmplitude', 10);
-        this.bobFrequency = options.bobFrequency || this.getConfig('bobFrequency', 0.05);
         this.hoverHeightBase = this.getConfig('hoverHeight', 18);
         this.hoverVariance = this.getConfig('hoverVariance', 8);
 
@@ -66,6 +63,12 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
 
     // Override in subclass: return { x, y } rest position centered on target
     getTargetRestPosition(target) { return null; }
+
+    // Override in subclass: called once when creature arrives at resting target
+    onRestStart(target) {}
+
+    // Override in subclass: called just before creature leaves resting target
+    onRestEnd(target) {}
 
     beginTargetRest(target) {
         if (!target) return false;
@@ -209,15 +212,19 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
             return;
         }
 
-        this.isRestingOnTarget = true;
-        this.velocity.x = 0;
-        this.velocity.y = 0;
-        this.posX = pos.x;
-        this.posY = pos.y;
-        this.playAnimation('idle');
+        if (!this.isRestingOnTarget) {
+            this.isRestingOnTarget = true;
+            this.velocity.x = 0;
+            this.velocity.y = 0;
+            this.posX = pos.x;
+            this.posY = pos.y;
+            this.playAnimation('idle');
+            this.onRestStart(this.restingTarget);
+        }
 
         this.restElapsed += tickDelta;
         if (this.restElapsed >= this.restDuration) {
+            this.onRestEnd(this.restingTarget);
             this.clearTargetRest();
         }
     }
@@ -379,17 +386,11 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         }
     }
 
-    updateFlightHeight() {
-        if (this.isRestingOnTarget) {
-            this.posZ = this.getConfig('restHeight', 4);
-            return;
-        }
-        this.bobPhase += this.bobFrequency;
-        this.posZ = this.hoverHeightBase + (Math.sin(this.bobPhase) * this.hoverVariance);
-    }
+    // Override in subclass to manage posZ each frame (flight bobbing, landing lerp, etc.)
+    updateFlightHeight() {}
 
-    applyBobbing() {
-        this.setSpriteVerticalLift(this.posZ);
+    applyFlightLift() {
+        this.setSpriteVerticalLift?.(this.posZ || 0);
     }
 
     render(container, parent) {
@@ -456,7 +457,7 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
     update(deltaTime) {
         this.updateFlightHeight();
         super.update(deltaTime);
-        this.applyBobbing();
+        this.applyFlightLift();
         this.updateDebugAttributes();
     }
 

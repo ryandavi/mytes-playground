@@ -2397,6 +2397,223 @@
       }
     }
   },
+  "BEE": {
+    "category": "moving",
+    "variants": [
+      "honeybee",
+      "bumblebee"
+    ],
+    "walkable": true,
+    "renderPriority": 3,
+    "speed": 1.8,
+    "bobFrequency": 0.07,
+    "hoverHeight": 22,
+    "hoverVariance": 6,
+    "flowerSeekChance": 0.004,
+    "flowerSearchRadius": 400,
+    "flowerRestDurationMin": 1200,
+    "flowerRestDurationMax": 2800,
+    "idleChance": 0.0008,
+    "size": {
+      "width": 64,
+      "height": 64
+    },
+    "variantConfigs": {
+      "bumblebee": {
+        "speed": 1.4,
+        "hoverHeight": 18,
+        "bobFrequency": 0.05,
+        "size": {
+          "width": 80,
+          "height": 80
+        }
+      }
+    },
+    "visual": {
+      "renderType": "animated",
+      "defaultState": "idle",
+      "spriteSheet": {
+        "url": "images/MapObjects/bee.gif",
+        "size": {
+          "width": 320,
+          "height": 256
+        }
+      },
+      "animations": {
+        "E":      { "frames": [[0,0],[1,0],[2,0],[3,0],[4,0]], "loop": true },
+        "W":      { "frames": [[0,1],[1,1],[2,1],[3,1],[4,1]], "loop": true },
+        "N":      { "frames": [[0,2],[1,2],[2,2],[3,2],[4,2]], "loop": true },
+        "S":      { "frames": [[0,3],[1,3],[2,3],[3,3],[4,3]], "loop": true },
+        "idle":   { "frames": [[1,3]], "loop": true },
+        "flutter":{ "frames": [[2,3],[1,3],[0,3],[1,3]], "loop": true }
+      }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "width": 16,
+          "height": 10,
+          "x": 24,
+          "y": 46
+        }
+      }
+    }
+  },
+
+  "HIVE": {
+    "category": "structure",
+    "variants": [
+      "wooden_hive",
+      "tree_hive"
+    ],
+    "collision": true,
+    "renderPriority": 2,
+    "canInspect": true,
+    "honeyThreshold": 5,
+    "maxBees": 3,
+    "size": {
+      "width": 64,
+      "height": 64
+    },
+    "approachConfig": {
+      "gap": 8
+    },
+    "variantConfigs": {
+      "tree_hive": {
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "visual": {
+          "spriteSheet": {
+            "url": "images/MapObjects/hive_tree.png"
+          }
+        }
+      }
+    },
+    "visual": {
+      "renderType": "animated",
+      "defaultState": "idle",
+      "spriteSheet": {
+        "url": "images/MapObjects/hive.png",
+        "size": {
+          "width": 256,
+          "height": 64
+        }
+      },
+      "animations": {
+        "idle":     { "frames": [[0,0]], "loop": true },
+        "active":   { "frames": [[1,0],[2,0],[1,0]], "loop": true },
+        "full":     { "frames": [[3,0]], "loop": true }
+      }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "width": 48,
+          "height": 32,
+          "x": 8,
+          "y": 28
+        },
+        "interaction": {
+          "width": 96,
+          "height": 96,
+          "x": -16,
+          "y": -16
+        }
+      }
+    }
+  },
+
+
+  "BIRD": {
+    "category": "moving",
+    "variants": [
+      "sparrow",
+      "robin",
+      "bluebird"
+    ],
+    "walkable": true,
+    "renderPriority": 3,
+
+    "speed": 2.2,
+    "flightSpeed": 3.4,
+    "groundSpeed": 1,
+
+    "bobFrequency": 0.026,
+    "hoverHeight": 38,
+    "hoverVariance": 7,
+
+    "fleeRadius": 200,
+    "fleeDistanceMin": 220,
+    "fleeDistanceMax": 420,
+    "fleeAltitude": 120,
+    "fleeEdgeMargin": 72,
+
+    "airborneMinDuration": 2200,
+    "airborneMaxDuration": 7000,
+    "landingChanceBase": 0.0025,
+    "landingChanceMax": 0.012,
+    "takeoffChance": 0.00008,
+
+    "idleChance": 0.001,
+    "seedSeekChance": 0.002,
+    "seedSearchRadius": 280,
+    "seedRestDurationMin": 3000,
+    "seedRestDurationMax": 7000,
+    
+    "size": {
+      "width": 48,
+      "height": 48
+    },
+    "variantConfigs": {
+      "robin": {
+        "hoverHeight": 38,
+        "fleeRadius": 100
+      },
+      "bluebird": {
+        "speed": 2.0,
+        "flightSpeed": 2.0,
+        "hoverHeight": 50,
+        "fleeRadius": 150
+      }
+    },
+    "visual": {
+      "renderType": "animated",
+      "defaultState": "idle",
+      "spriteSheet": {
+        "url": "images/MapObjects/bird_sparrow.gif",
+        "size": {
+          "width": 384,
+          "height": 336
+        }
+      },
+      "animations": {
+        "E":       { "frames": [[0,0],[1,0],[2,0],[3,0],[4,0]], "loop": true },
+        "W":       { "frames": [[0,1],[1,1],[2,1],[3,1],[4,1]], "loop": true },
+        "N":       { "frames": [[0,2],[1,2],[2,2],[3,2],[4,2]], "loop": true },
+        "S":       { "frames": [[0,3],[1,3],[2,3],[3,3],[4,3]], "loop": true },
+        "walk_E":  { "frames": [[0,4],[1,4],[2,4],[3,4]], "loop": true },
+        "walk_W":  { "frames": [[0,5],[1,5],[2,5],[3,5]], "loop": true },
+        "walk_N":  { "frames": [[0,5],[1,5],[2,5],[3,5]], "loop": true },
+        "walk_S":  { "frames": [[0,4],[1,4],[2,4],[3,4]], "loop": true },
+        "peck":    { "frames": [[0,6],[1,6],[2,6],[1,6],[0,6]], "loop": false },
+        "landing": { "frames": [[0,7]], "loop": true },
+        "idle":    { "frames": [[1,3]], "loop": true }
+      }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "width": 20,
+          "height": 12,
+          "x": 14,
+          "y": 32
+        }
+      }
+    }
+  },
+
   "DOOR": {
     "category": "interactive",
     "variants": [
@@ -3571,399 +3788,96 @@
   },
   "FENCE": {
     "category": "structure",
-    "variants": [
-      "wooden_fence",
-      "stone_fence",
-      "iron_fence",
-      "garden_fence"
-    ],
+    "variants": ["wooden_fence", "stone_fence", "iron_fence", "garden_fence"],
     "collision": true,
-    "renderPriority": 2,
     "walkable": false,
     "interactive": false,
-    "size": {
-      "width": 64,
-      "height": 32
+    "renderPriority": 2,
+    "autoConnect": false,
+    "numVariations": 1,
+    "size": { "width": 32, "height": 64 },
+    "collider": {
+      "type": "box",
+      "width": 32,
+      "height": 32,
+      "offsetX": 0,
+      "offsetY": 32
     },
-    "directionConfigs": {
-      "E": {
-        "size": {
-          "width": 64,
-          "height": 32
-        },
-        "transformStyle": "",
-        "spatial": {
-          "regions": {
-            "collider": {
-              "width": 64,
-              "height": 16,
-              "x": 0,
-              "y": 8
-            }
-          }
-        }
-      },
-      "N": {
-        "size": {
-          "width": 32,
-          "height": 64
-        },
-        "transformStyle": "rotate(-90deg)",
-        "spatial": {
-          "regions": {
-            "collider": {
-              "width": 16,
-              "height": 64,
-              "x": 8,
-              "y": 0
-            }
-          }
-        }
-      },
-      "NE": {
-        "size": {
-          "width": 32,
-          "height": 32
-        },
-        "transformStyle": "",
-        "spatial": {
-          "regions": {
-            "collider": {
-              "width": 24,
-              "height": 24,
-              "x": 4,
-              "y": 4
-            }
-          }
-        }
-      },
-      "NW": {
-        "size": {
-          "width": 32,
-          "height": 32
-        },
-        "transformStyle": "scaleX(-1)",
-        "spatial": {
-          "regions": {
-            "collider": {
-              "width": 24,
-              "height": 24,
-              "x": 4,
-              "y": 4
-            }
-          }
-        }
-      },
-      "SE": {
-        "size": {
-          "width": 32,
-          "height": 32
-        },
-        "transformStyle": "scaleY(-1)",
-        "spatial": {
-          "regions": {
-            "collider": {
-              "width": 24,
-              "height": 24,
-              "x": 4,
-              "y": 4
-            }
-          }
-        }
-      },
-      "SW": {
-        "size": {
-          "width": 32,
-          "height": 32
-        },
-        "transformStyle": "rotate(180deg)",
-        "spatial": {
-          "regions": {
-            "collider": {
-              "width": 24,
-              "height": 24,
-              "x": 4,
-              "y": 4
-            }
-          }
-        }
-      },
-      "Horizontal": "E",
-      "Vertical": "N"
-    },
-    "variantConfigs": {
-      "wooden_fence": {},
-      "stone_fence": {
-        "visual": {
-          "spriteSheet": {
-            "url": "images/MapObjects/fence_stone.png"
-          }
-        }
-      },
-      "iron_fence": {
-        "visual": {
-          "spriteSheet": {
-            "url": "images/MapObjects/fence_iron.png"
-          }
-        }
-      },
-      "garden_fence": {
-        "size": {
-          "width": 64,
-          "height": 48
-        },
-        "visual": {
-          "spriteSheet": {
-            "url": "images/MapObjects/fence_garden.png"
-          }
-        }
-      }
-    },
+    "maskMap": [0, 0, 1, 1, 5, 5, 6, 6, 3, 3, 2, 2, 7, 7, 4, 4],
     "visual": {
       "renderType": "sprite",
       "spriteSheet": {
-        "url": "images/MapObjects/fence_wooden.png",
-        "size": {
-          "width": 192,
-          "height": 256
-        }
+        "url": "images/MapObjects/fence_wood.gif",
+        "size": { "width": 256, "height": 64 },
+        "frameSize": { "width": 32, "height": 64 }
       }
     },
-    "spatial": {
-      "regions": {
-        "collider": {
-          "width": 64,
-          "height": 16,
-          "x": 0,
-          "y": 0
+    "variantConfigs": {
+      "wooden_fence": {
+        "visual": {
+          "spriteSheet": { "url": "images/MapObjects/fence_wood.gif" }
         }
+      },
+      "stone_fence": {
+        "visual": { "spriteSheet": { "url": "images/MapObjects/fence_stone.png" } }
+      },
+      "iron_fence": {
+        "visual": { "spriteSheet": { "url": "images/MapObjects/fence_iron.png" } }
+      },
+      "garden_fence": {
+        "visual": { "spriteSheet": { "url": "images/MapObjects/fence_garden.png" } }
       }
     }
   },
   "GATE": {
     "category": "interactive",
-    "variants": [
-      "wooden_gate",
-      "stone_gate",
-      "iron_gate",
-      "garden_gate"
-    ],
+    "variants": ["wooden_gate", "stone_gate", "iron_gate", "garden_gate"],
     "collision": true,
+    "walkable": false,
     "renderPriority": 2,
     "interactionType": "toggle",
+
     "interactionRadius": 80,
     "canToggle": true,
-    "size": {
-      "width": 64,
-      "height": 32
+    "autoConnect": false,
+    "numVariations": 1,
+    "size": { "width": 32, "height": 96 },
+    "collider": {
+      "type": "box",
+      "width": 28,
+      "height": 20,
+      "offsetX": 2,
+      "offsetY": 76
     },
     "soundEffects": {
       "open": "obj_gate_open",
       "close": "obj_gate_close"
     },
-    "directionConfigs": {
-      "E": {
-        "size": {
-          "width": 64,
-          "height": 32
-        },
-        "transformStyle": "",
-        "spatial": {
-          "regions": {
-            "collider": {
-              "width": 64,
-              "height": 16,
-              "x": 0,
-              "y": 8
-            },
-            "interaction": {
-              "width": 96,
-              "height": 64,
-              "x": -16,
-              "y": -16
-            }
-          }
-        }
+    "visual": {
+      "renderType": "animated",
+      "defaultState": "closed",
+      "spriteSheet": {
+        "url": "images/MapObjects/gate_wooden.png",
+        "size": { "width": 256, "height": 96 },
+        "frameSize": { "width": 32, "height": 96 }
       },
-      "W": {
-        "size": {
-          "width": 64,
-          "height": 32
-        },
-        "transformStyle": "scaleX(-1)",
-        "spatial": {
-          "regions": {
-            "collider": {
-              "width": 64,
-              "height": 16,
-              "x": 0,
-              "y": 8
-            },
-            "interaction": {
-              "width": 96,
-              "height": 64,
-              "x": -16,
-              "y": -16
-            }
-          }
-        }
-      },
-      "N": {
-        "size": {
-          "width": 32,
-          "height": 64
-        },
-        "transformStyle": "rotate(-90deg)",
-        "spatial": {
-          "regions": {
-            "collider": {
-              "width": 16,
-              "height": 64,
-              "x": 8,
-              "y": 0
-            },
-            "interaction": {
-              "width": 64,
-              "height": 96,
-              "x": -16,
-              "y": -16
-            }
-          }
-        }
-      },
-      "S": {
-        "size": {
-          "width": 32,
-          "height": 64
-        },
-        "transformStyle": "rotate(90deg)",
-        "spatial": {
-          "regions": {
-            "collider": {
-              "width": 16,
-              "height": 64,
-              "x": 8,
-              "y": 0
-            },
-            "interaction": {
-              "width": 64,
-              "height": 96,
-              "x": -16,
-              "y": -16
-            }
-          }
-        }
-      },
-      "Horizontal": "E",
-      "Vertical": "N"
+      "animations": {
+        "closed":  { "frames": [[0, 0]], "loop": true },
+        "opening": { "frames": [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0]], "loop": false },
+        "open":    { "frames": [[7, 0]], "loop": true },
+        "closing": { "frames": [[7,0],[6,0],[5,0],[4,0],[3,0],[2,0],[1,0],[0,0]], "loop": false }
+      }
     },
     "variantConfigs": {
       "wooden_gate": {},
       "stone_gate": {
-        "visual": {
-          "spriteSheet": {
-            "url": "images/MapObjects/gate_stone.png"
-          }
-        }
+        "visual": { "spriteSheet": { "url": "images/MapObjects/gate_stone.png" } }
       },
       "iron_gate": {
-        "visual": {
-          "spriteSheet": {
-            "url": "images/MapObjects/gate_iron.png"
-          }
-        }
+        "visual": { "spriteSheet": { "url": "images/MapObjects/gate_iron.png" } }
       },
       "garden_gate": {
-        "size": {
-          "width": 64,
-          "height": 48
-        },
-        "visual": {
-          "spriteSheet": {
-            "url": "images/MapObjects/gate_garden.png"
-          }
-        }
-      }
-    },
-    "visual": {
-      "renderType": "sprite",
-      "defaultState": "closed",
-      "spriteSheet": {
-        "url": "images/MapObjects/gate_wooden.png",
-        "size": {
-          "width": 320,
-          "height": 128
-        }
-      },
-      "animations": {
-        "closed": {
-          "frames": [
-            [
-              0,
-              0
-            ]
-          ],
-          "loop": false
-        },
-        "opening": {
-          "frames": [
-            [
-              0,
-              0
-            ],
-            [
-              1,
-              0
-            ],
-            [
-              2,
-              0
-            ],
-            [
-              3,
-              0
-            ],
-            [
-              4,
-              0
-            ]
-          ],
-          "loop": false
-        },
-        "open": {
-          "frames": [
-            [
-              4,
-              0
-            ]
-          ],
-          "loop": true
-        },
-        "closing": {
-          "frames": [
-            [
-              4,
-              0
-            ],
-            [
-              3,
-              0
-            ],
-            [
-              2,
-              0
-            ],
-            [
-              1,
-              0
-            ],
-            [
-              0,
-              0
-            ]
-          ],
-          "loop": false
-        }
+        "visual": { "spriteSheet": { "url": "images/MapObjects/gate_garden.png" } }
       }
     }
   },
