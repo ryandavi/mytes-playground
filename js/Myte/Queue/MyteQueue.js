@@ -135,7 +135,9 @@ class MyteQueue {
         if (currentAction.update(deltaTime)) {
             this.queue.shift();
             this.isDoingAction = false;
-            currentAction.complete();
+            if (!currentAction._interrupted) {
+                currentAction.complete();
+            }
 
             if (this.queue.length > 0) {
                 this.queue[0].start();

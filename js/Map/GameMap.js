@@ -446,16 +446,23 @@ class GameMap {
         // Add objects
         if (mapData.objects) {
 			for (const objData of mapData.objects) {
-				this.addObject(
-					objData.type.toUpperCase(),
-					objData.variant,
-					objData.x,
-					objData.y,
-					{
-						...objData.properties,
-						id: objData.id
+				const type = objData.type.toUpperCase();
+
+				// Bottom-align: if the tile placeholder in the map is shorter than the
+				// object's JSON-defined height, shift Y up so the bottoms coincide.
+				let posY = objData.y;
+				if (objData.tileHeight > 0) {
+					const typeConfig = MapObjectFactory.getTypeConfig(type);
+					const jsonHeight = typeConfig?.size?.height;
+					if (jsonHeight && jsonHeight !== objData.tileHeight) {
+						posY = objData.y + objData.tileHeight - jsonHeight;
 					}
-				);
+				}
+
+				this.addObject(type, objData.variant, objData.x, posY, {
+					...objData.properties,
+					id: objData.id
+				});
 			}
 		}
 

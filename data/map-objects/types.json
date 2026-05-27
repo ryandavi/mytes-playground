@@ -3792,6 +3792,10 @@
     "collision": true,
     "walkable": false,
     "interactive": false,
+    "canInspect": true,
+    "blocksLineOfSight": true,
+    "degradationEnabled": true,
+    "degradationTime": 7200000,
     "renderPriority": 2,
     "autoConnect": false,
     "numVariations": 1,
@@ -3834,6 +3838,7 @@
     "variants": ["wooden_gate", "stone_gate", "iron_gate", "garden_gate"],
     "collision": true,
     "walkable": false,
+    "blocksLineOfSight": true,
     "renderPriority": 2,
     "interactionType": "toggle",
 

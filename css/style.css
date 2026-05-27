@@ -3474,6 +3474,47 @@ body[data-tool-mode=drag] .map-object.draggable {
   pointer-events: none;
 }
 
+@keyframes destination-ring-pulse {
+  0% {
+    width: 8px;
+    height: 8px;
+    opacity: 0.9;
+  }
+  100% {
+    width: 44px;
+    height: 44px;
+    opacity: 0;
+  }
+}
+.destination-marker {
+  position: absolute;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 500;
+  width: 0;
+  height: 0;
+}
+.destination-marker .dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 5px rgba(160, 210, 255, 0.8), 0 0 10px rgba(160, 210, 255, 0.4);
+}
+.destination-marker .ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  transform: translate(-50%, -50%);
+  animation: destination-ring-pulse 1.4s ease-out infinite;
+}
+.destination-marker .ring:nth-child(3) {
+  border-color: rgba(140, 200, 255, 0.5);
+  animation-delay: 0.7s;
+}
+
 .particle {
   position: absolute;
   pointer-events: none;

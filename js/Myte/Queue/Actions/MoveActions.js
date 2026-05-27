@@ -237,6 +237,7 @@ class AStarMoveAction extends MyteAction {
     }
 
     static canPerform(selected, active) {
+        if (selected instanceof MapObject || selected instanceof Myte) return false;
         return active && selected && !active?.queue?.isCarrying();
     }
 
@@ -268,6 +269,14 @@ class AStarMoveAction extends MyteAction {
         _slog(`[ASTAR] start: from=(${this.myte.posX.toFixed(1)},${this.myte.posY.toFixed(1)}) to=(${target.x.toFixed(1)},${target.y.toFixed(1)})`);
         this._finalTarget = target;
         this._buildPath(this.myte.posX, this.myte.posY, target);
+
+        if (this._actionComplete && this.userInitiated) {
+            const targetName = this.getQueueTargetLabel(this.target);
+            MyteCore.instance?.toastManager?.warning(
+                `${this.myte.name} can't find a path${targetName ? ` to ${targetName}` : ''}.`,
+                "Can't Reach"
+            );
+        }
     }
 
     _buildPath(fromX, fromY, to) {
@@ -376,9 +385,22 @@ class AStarMoveAction extends MyteAction {
         this._buildPath(this.myte.posX, this.myte.posY, this._finalTarget);
         if (!this.targetPoints?.length) {
             _approachWarn(`[astar] ${this.myte.name} aborted path to (${Math.round(this._finalTarget.x)}, ${Math.round(this._finalTarget.y)}) after getting stuck near (${Math.round(this.myte.posX)}, ${Math.round(this.myte.posY)}).`);
+            if (this.userInitiated && !this._abortToastShown) {
+                this._abortToastShown = true;
+                const targetName = this.getQueueTargetLabel(this.target);
+                MyteCore.instance?.toastManager?.warning(
+                    `${this.myte.name} got stuck and can't reach ${targetName || 'that location'}.`,
+                    "Can't Reach"
+                );
+            }
             return false;
         }
         return !!this.targetPoints?.length && this.targetPoints.length !== prev;
+    }
+
+    complete() {
+        this._onDone?.();
+        return super.complete();
     }
 
     interrupt() {
@@ -386,12 +408,14 @@ class AStarMoveAction extends MyteAction {
         this.clearDebugPath();
         this._actionComplete = true;
         this.myte._movementDestination = null;
+        this._onDone?.();
     }
 
     cancel() {
         this.clearDebugPath();
         this._actionComplete = true;
         this.myte._movementDestination = null;
+        this._onDone?.();
     }
 }
 
@@ -470,6 +494,17 @@ class GoToObjectAction extends PositionableAction {
 
     markApproachOutcome(outcome) {
         this._approachOutcome = outcome;
+        if (outcome === 'aborted') {
+            this._interrupted = true;
+            if (this.userInitiated && !this._abortToastShown) {
+                this._abortToastShown = true;
+                const targetName = this.getQueueTargetLabel(this.target);
+                MyteCore.instance?.toastManager?.warning(
+                    `${this.myte.name} can't reach ${targetName || 'that location'}.`,
+                    "Can't Reach"
+                );
+            }
+        }
         return outcome;
     }
 
@@ -626,6 +661,13 @@ class GoToObjectAction extends PositionableAction {
         this.buildApproachPlan();
         this._lastTargetSnapshot = this._captureTargetSnapshot();
         this._lastTargetReplanAt = performance.now();
+
+        // If buildApproachPlan found no reachable position, abort immediately
+        // rather than walking to the nearest fence wall.
+        if (!this.targetPos && !this.targetPoints) {
+            _approachWarn(`[approach] ${this.myte?.name} aborted — no reachable approach position for ${this.getQueueTargetLabel(this.target)} (target may be enclosed)`);
+            this.markApproachOutcome('aborted');
+        }
     }
 
     _captureTargetSnapshot() {
@@ -686,14 +728,13 @@ class GoToObjectAction extends PositionableAction {
             return;
         }
 
-        this.targetPos = candidates[0] ?? {
-            x: this.targetCenter.x - (this.myte.size.width / 2),
-            y: this.targetCenter.y - (this.myte.size.height / 2)
-        };
-        _alog(`[APPROACH] no path found — falling back to candidate[0] targetPos=(${this.targetPos.x.toFixed(1)},${this.targetPos.y.toFixed(1)})`);
+        // findBestPath returns null when the target appears enclosed (all candidate
+        // positions unreachable or end too far from the goal).  Leave targetPos/Points
+        // null so start() detects this and aborts without walking into a fence wall.
+        this.targetPos    = null;
         this.targetPoints = null;
         this.clearDebugPath();
-        _approachWarn(`[approach] ${this.myte.name} found no clean path to ${this.getQueueTargetLabel(this.target)} and is falling back to a direct final approach.`);
+        _approachWarn(`[approach] ${this.myte?.name} found no reachable approach to ${this.getQueueTargetLabel(this.target)} — target may be enclosed.`);
     }
 
     getMyteApproachRect(alignTo = 'sprite') {
@@ -829,6 +870,14 @@ class GoToObjectAction extends PositionableAction {
         }
 
         if (fallbackPath) {
+            // If even the best fallback path ends far from every candidate, the target
+            // is most likely enclosed by colliders.  Return null so start() aborts
+            // immediately instead of walking the myte to the nearest fence wall.
+            const enclosureThreshold = maxAdjustmentDistance * 3;
+            if (fallbackPath.adjustmentDistance > enclosureThreshold) {
+                _awarn(`[APPROACH] target appears enclosed — fallback adjust=${fallbackPath.adjustmentDistance.toFixed(1)} > threshold=${enclosureThreshold.toFixed(1)}; aborting`);
+                return null;
+            }
             _awarn(`[APPROACH] no candidates within max final adjustment ${maxAdjustmentDistance.toFixed(1)}; falling back to least-bad candidate adjust=${fallbackPath.adjustmentDistance.toFixed(1)}`);
         }
 

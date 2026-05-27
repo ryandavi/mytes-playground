@@ -99,7 +99,10 @@ class InspectAction extends GoToObjectAction {
 }
 
 // Rare, more obsessive investigation pattern that circles an object.
-class DeepInspectAction extends PositionableAction {
+// Extends GoToObjectAction so it first approaches the target using the same
+// smart pathfinding as InspectAction, then generates walkable inspect points
+// only after the myte has arrived.
+class DeepInspectAction extends GoToObjectAction {
     static metadata = {
         id: 'deep_inspect',
         label: 'Inspect Oddly',
@@ -133,38 +136,54 @@ class DeepInspectAction extends PositionableAction {
         this.inspectPoints = [];
         this.currentPoint = 0;
         this.pointTimer = this.pointDuration;
+        this.phase = 'approach';
     }
 
     getQueueTitle() {
         return 'Inspect Oddly';
     }
 
-    start() {
-        super.start();
-        this.inspectPoints = this._generateInspectPoints();
-        if (this.expressionType) {
-            this.myte.queue.addExpression(this.expressionType, this.expressionDuration, 1);
-        }
-    }
-
     _generateInspectPoints() {
         const targetRect = this.getRect(this.target);
         const myteRect = this.myte.getRect();
+        const gridSystem = this.myte.parent?.gameMap?.gridSystem;
         const points = [];
 
         for (let i = 0; i < this.numPoints; i++) {
             const horizontal = i % 2 === 0 ? 'left' : 'right';
             const vertical = i < Math.ceil(this.numPoints / 2) ? 'top' : 'bottom';
-            points.push(this.calculatePosition(myteRect, targetRect, horizontal, {
+            const raw = this.calculatePosition(myteRect, targetRect, horizontal, {
                 gap: 15,
                 align: vertical === 'top' ? 'top-edge' : 'bottom-edge'
-            }));
+            });
+            // Snap to nearest valid walkable position so we don't target colliders.
+            const safe = gridSystem?.findNearestValidPositionForEntity?.(this.myte, raw.x, raw.y, 24) ?? raw;
+            points.push(safe);
         }
 
         return points;
     }
 
     update() {
+        if (this.phase === 'approach') {
+            const arrived = super.update();
+            if (!arrived) return false;
+            if (this.didAbortApproach()) return true;
+
+            this.phase = 'inspect';
+            this.inspectPoints = this._generateInspectPoints();
+            this.currentPoint = 0;
+            this.pointTimer = this.pointDuration;
+            this.currentDuration = this.duration;
+            if (this.expressionType) {
+                this.myte.queue.addExpression(this.expressionType, this.expressionDuration, 1);
+            }
+            return false;
+        }
+
+        // Inspect phase: walk between the pre-computed nearby positions.
+        if (!this.inspectPoints.length) return true;
+
         this.pointTimer--;
         if (this.pointTimer <= 0) {
             this.currentPoint = (this.currentPoint + 1) % this.inspectPoints.length;

@@ -241,11 +241,45 @@ class ContainerInputManager {
     }
     const world = this.screenToWorldCoordinates(screenX, screenY);
     Utility.logDebug('[astar] queuing astar-move to world', world);
+    // Clear first so the old action's _onDone fires before we place the new marker,
+    // preventing the old callback from erasing the new marker.
+    myte.queue.clear();
+    this._showDestinationMarker(world.x, world.y);
     myte.queue.add('astar-move', {
       target: { x: world.x, y: world.y },
       pathfindingOptions: { exactEndMode: 'if-reachable' },
-      userInitiated: true
+      userInitiated: true,
+      _onDone: () => this._clearDestinationMarker()
     });
+  }
+
+  _showDestinationMarker(worldX, worldY) {
+    this._clearDestinationMarker();
+    const layer = this.container.canvas?.querySelector('.layer.effects');
+    if (!layer) return;
+
+    const marker = document.createElement('div');
+    marker.className = 'destination-marker';
+    marker.style.left = `${worldX}px`;
+    marker.style.top = `${worldY}px`;
+
+    const dot = document.createElement('div');
+    dot.className = 'dot';
+    const ring1 = document.createElement('div');
+    ring1.className = 'ring';
+    const ring2 = document.createElement('div');
+    ring2.className = 'ring';
+    marker.append(dot, ring1, ring2);
+
+    layer.appendChild(marker);
+    this._destinationMarker = marker;
+  }
+
+  _clearDestinationMarker() {
+    if (this._destinationMarker) {
+      this._destinationMarker.remove();
+      this._destinationMarker = null;
+    }
   }
 
   /**

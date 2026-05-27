@@ -928,6 +928,8 @@ markGridCellsConditional(grid, tileX, tileY, tileWidth, tileHeight, cellSize, co
 				variant: obj.properties?.variant || 'default',
 				x: obj.x,
 				y: obj.y,
+				tileWidth: obj.width || 0,
+				tileHeight: obj.height || 0,
 				properties: obj.properties || {}
 			});
 		}

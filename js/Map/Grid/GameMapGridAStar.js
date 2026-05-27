@@ -48,7 +48,7 @@ class AStarPathfinder {
 
             // Movement normalization
             normalizeSmallMovements: true,
-            minSegmentLength: 1.5, // In grid cells
+            minSegmentLength: 1, // In grid cells
 
         };
 

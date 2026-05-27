@@ -14,6 +14,22 @@ class FenceMapObject extends MapObject {
         { dx: -1, dy:  0, bit: 8 },  // W
     ];
 
+    static HEALTH_THRESHOLDS = {
+        damaged:  75,   // below this → 'fence-damaged' class
+        critical: 40,   // below this → 'fence-critical' class
+        fallen:    0,   // at or below this → collapse
+    };
+
+    constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
+        super(parent, type, variant, posX, posY, config, options);
+        this.health = 100;
+        this._degradationAccumulator = 0;
+        this._degradationEnabled = this.getConfig('degradationEnabled', false);
+        // degradationTime: ms of game time to go from 100 → 0 health
+        this._degradationTime = this.getConfig('degradationTime', 7200000);
+        this._fallen = false;
+    }
+
     getBaseCssClass() { return 'fence'; }
 
     // ── Grid helpers ──────────────────────────────────────────────────────────
@@ -34,7 +50,6 @@ class FenceMapObject extends MapObject {
 
     // ── Connection mask ───────────────────────────────────────────────────────
 
-    // Scans the 4 cardinal grid cells and returns a 4-bit connection mask.
     _computeConnectionMask() {
         const gs = this.gameMap?.gridSystem;
         if (!gs) return 0;
@@ -58,8 +73,6 @@ class FenceMapObject extends MapObject {
 
     // ── Variation row ─────────────────────────────────────────────────────────
 
-    // Deterministic row index based on tile position so every fence in a line
-    // gets a stable, varied appearance without storing per-object data.
     _computeVariationRow() {
         const { x, y } = this._gridPos();
         const n = this.getConfig('numVariations', 1);
@@ -68,12 +81,6 @@ class FenceMapObject extends MapObject {
 
     // ── Sprite frame ──────────────────────────────────────────────────────────
 
-    // Translates a raw 4-bit connection mask (0–15) to a sprite column.
-    // If the type config defines a `maskMap` array (length 16), that array is
-    // used as a lookup table — mask index → sprite column.  This lets a fence
-    // sheet with fewer than 16 frames share columns for visually identical
-    // states (e.g. "N connections invisible" halves the required frame count).
-    // Fences without a maskMap use the mask value directly as the column index.
     _resolveFrame(mask) {
         const maskMap = this.getConfig('maskMap', null);
         if (Array.isArray(maskMap) && maskMap.length === 16) {
@@ -87,16 +94,6 @@ class FenceMapObject extends MapObject {
         const col = this._resolveFrame(rawMask);
         const row = this._computeVariationRow();
 
-        // Debug: show computed connections on element
-        const dirs = [];
-        if (rawMask & 1) dirs.push('N');
-        if (rawMask & 2) dirs.push('E');
-        if (rawMask & 4) dirs.push('S');
-        if (rawMask & 8) dirs.push('W');
-        const label = dirs.length ? dirs.join('') : 'none';
-        const { x: gx, y: gy } = this._gridPos();
-        if (this.element) this.element.dataset.connections = `${label} mask=${rawMask} col=${col} grid=(${gx},${gy})`;
-
         const frameSize = this.getVisualFrameSize() ?? {};
         const frameW = frameSize.width  ?? this.getVisualFrameWidth() ?? 32;
         const frameH = frameSize.height ?? this.size.height;
@@ -108,16 +105,12 @@ class FenceMapObject extends MapObject {
             this.renderState.bgPosition = bgPos;
             this.renderState.dirty = true;
         }
-        // Write directly to sprite element too so the frame is correct on first
-        // paint (renderState is flushed asynchronously by MapRenderer).
         const sprite = this.getSpriteElement?.();
         if (sprite) sprite.style.backgroundPosition = bgPos;
     }
 
     // ── Neighbor notification ─────────────────────────────────────────────────
 
-    // Tells adjacent fence-compatible objects to recompute their own sprite.
-    // Called after this tile is rendered (i.e. after it's in the grid).
     _notifyNeighbors() {
         const gs = this.gameMap?.gridSystem;
         if (!gs) return;
@@ -135,19 +128,92 @@ class FenceMapObject extends MapObject {
         }
     }
 
+    // ── Degradation ───────────────────────────────────────────────────────────
+
+    repair() {
+        if (this._fallen) {
+            this._fallen = false;
+            this._updateCollisionFromHealth();
+        }
+        this.health = 100;
+        this._degradationAccumulator = 0;
+        this._updateHealthVisuals();
+    }
+
+    _updateDegradation(delta) {
+        if (!this._degradationEnabled || this._fallen) return;
+
+        this._degradationAccumulator += delta;
+        const rate = this._degradationTime;
+        while (this._degradationAccumulator >= rate / 100) {
+            this._degradationAccumulator -= rate / 100;
+            this.health = Math.max(0, this.health - 1);
+        }
+
+        if (this.health <= FenceMapObject.HEALTH_THRESHOLDS.fallen) {
+            this._collapse();
+        } else {
+            this._updateHealthVisuals();
+        }
+    }
+
+    _collapse() {
+        this._fallen = true;
+        this.health = 0;
+        this._updateCollisionFromHealth();
+        this._updateHealthVisuals();
+    }
+
+    _updateCollisionFromHealth() {
+        if (!this.element) return;
+        if (this._fallen) {
+            this.element.classList.add('fence-fallen');
+            // Disable collision so entities can pass through
+            if (this.collider) this.collider._disabled = true;
+            this.gameMap?.gridSystem?.updateObjectPosition?.(this);
+        } else {
+            this.element.classList.remove('fence-fallen');
+            if (this.collider) delete this.collider._disabled;
+            this.gameMap?.gridSystem?.updateObjectPosition?.(this);
+        }
+    }
+
+    _updateHealthVisuals() {
+        if (!this.element) return;
+        const { damaged, critical } = FenceMapObject.HEALTH_THRESHOLDS;
+        this.element.classList.toggle('fence-damaged',  this.health < damaged && !this._fallen);
+        this.element.classList.toggle('fence-critical', this.health < critical && !this._fallen);
+    }
+
+    getHealthLabel() {
+        if (this._fallen)         return 'Fallen';
+        if (this.health < FenceMapObject.HEALTH_THRESHOLDS.critical) return 'Critical';
+        if (this.health < FenceMapObject.HEALTH_THRESHOLDS.damaged)  return 'Damaged';
+        return 'Good';
+    }
+
+    // ── Selection info ────────────────────────────────────────────────────────
+
+    getSelectionDebugInfo() {
+        const base = super.getSelectionDebugInfo?.() ?? [];
+        if (!this._degradationEnabled) return base;
+        return [
+            { label: 'Health', value: `${Math.ceil(this.health)}% (${this.getHealthLabel()})` },
+            ...base,
+        ];
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     render(container, parent) {
         const element = super.render(container, parent);
-        // At this point `this` is already registered in the grid (GameMap.add
-        // calls gridSystem.addObject before render), so connection detection
-        // and neighbor notification are accurate.
         this.refreshConnectionSprite();
         this._notifyNeighbors();
+        if (this._degradationEnabled) this._updateHealthVisuals();
         return element;
     }
 
-    tickUpdate(_delta) {
-        // Fences are purely static — no per-tick logic needed.
+    tickUpdate(delta) {
+        this._updateDegradation(delta);
     }
 }

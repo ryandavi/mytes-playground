@@ -1157,7 +1157,45 @@ class MapObject {
 	}
 
 	isInInteractionRange(target, radius = this.getInteractionRadius()) {
-		return this.getDistanceTo(target) <= radius;
+		if (this.getDistanceTo(target) > radius) return false;
+		return this._hasLineOfSightTo(target);
+	}
+
+	// Returns false if any object with blocksLineOfSight:true lies between this and other.
+	// Uses Bresenham grid traversal on the collider-center line.
+	_hasLineOfSightTo(other) {
+		const gs = this.gameMap?.gridSystem;
+		if (!gs) return true;
+
+		const cs = gs.config?.cellSize ?? 32;
+		const ax = this.posX + (this.collider?.offsetX ?? 0) + (this.collider?.width  ?? this.size.width)  / 2;
+		const ay = this.posY + (this.collider?.offsetY ?? 0) + (this.collider?.height ?? this.size.height) / 2;
+		const bx = other.posX + (other.collider?.offsetX ?? 0) + (other.collider?.width  ?? other.size?.width  ?? 0) / 2;
+		const by = other.posY + (other.collider?.offsetY ?? 0) + (other.collider?.height ?? other.size?.height ?? 0) / 2;
+
+		let gx = Math.floor(ax / cs);
+		let gy = Math.floor(ay / cs);
+		const ex = Math.floor(bx / cs);
+		const ey = Math.floor(by / cs);
+		const dx = Math.abs(ex - gx);
+		const dy = Math.abs(ey - gy);
+		const sx = gx < ex ? 1 : -1;
+		const sy = gy < ey ? 1 : -1;
+		let err = dx - dy;
+
+		while (gx !== ex || gy !== ey) {
+			const cell = gs.grid[gx]?.[gy];
+			if (cell) {
+				for (const obj of cell.objects) {
+					if (obj === this || obj === other) continue;
+					if (obj.getConfig?.('blocksLineOfSight', false)) return false;
+				}
+			}
+			const e2 = 2 * err;
+			if (e2 > -dy) { err -= dy; gx += sx; }
+			if (e2 <  dx) { err += dx; gy += sy; }
+		}
+		return true;
 	}
 
 	getSelectionDebugInfo() {
@@ -1397,7 +1435,7 @@ class MapObject {
 	initializeInputComponents() {
 		if (!this.element || !this.parent) return;
 
-		if (this.getConfig('interactive', true)) this.initClickComponent();
+		if (this.getConfig('interactive', true) || this.canShowSelectPointer()) this.initClickComponent();
 		if (this.getConfig('draggable', false)) this.initDragComponent();
 		if (this.getConfig('rubbable', false)) this.initRubbingComponent();
 
