@@ -1007,14 +1007,31 @@ class MyteStats {
         }
     }
 
+    _getTimeOfDayEnergyMultiplier() {
+        const hour = GameTime.instance?.getCurrentHour?.() ?? -1;
+        if (hour < 0) return 1;
+        return (hour >= 20 || hour < 5) ? 1.35 : 1;
+    }
+
+    _getTimeOfDayMoodBoost(deltaTime) {
+        const hour = GameTime.instance?.getCurrentHour?.() ?? -1;
+        return (hour >= 5 && hour < 7) ? 0.000015 * deltaTime : 0;
+    }
+
     // Update function called each frame
     update(deltaTime) {
         this.updateMood(-this.moodDecayRate * deltaTime * this.getBuffMultiplier('stats.moodDecayMultiplier'));
+
+        const dawnBoost = this._getTimeOfDayMoodBoost(deltaTime);
+        if (dawnBoost > 0) this.updateMood(dawnBoost);
+
+        const timeOfDayMultiplier = this._getTimeOfDayEnergyMultiplier();
 
         if (this.myte.isMoving()) {
             this.useEnergy(
                 this.energyDecayRate *
                 deltaTime *
+                timeOfDayMultiplier *
                 this.getEnergyActivityMultiplier() *
                 this.getBuffMultiplier('stats.energyDecayMultiplier')
             );
@@ -1034,6 +1051,7 @@ class MyteStats {
                     this.energyDecayRate *
                     SiteConfig.stats.actionEnergyDrainFactor *
                     deltaTime *
+                    timeOfDayMultiplier *
                     this.getEnergyActivityMultiplier() *
                     this.getBuffMultiplier('stats.energyDecayMultiplier')
                 );

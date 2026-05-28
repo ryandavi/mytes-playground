@@ -78,18 +78,7 @@ const _approachWarn = console.warn.bind(console);
 
 // Direct movement to coordinates with optional A* pathfinding
 class MoveAction extends MyteAction {
-    static metadata = {
-        id: 'move',
-        label: 'Move To',
-        category: 'movement',
-        priority: 1,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Move to a specific location',
-        requiresTarget: true,
-        affectsMood: false
-    };
+    static metadata = { id: 'move' };
 
     constructor(myte, options) {
         super(myte, options);
@@ -129,22 +118,7 @@ class MoveAction extends MyteAction {
 
 // A* pathfinding movement to a position or object
 class AStarMoveAction extends MyteAction {
-    static metadata = {
-        id: 'astar-move',
-        label: 'A* Move To',
-        category: 'movement',
-        priority: 1,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Move to a location using A* pathfinding',
-        requiresTarget: true,
-        defaultOptions: {
-            target: null,
-            pathfindingOptions: {},
-            currentTargetIndex: 0
-        }
-    };
+    static metadata = { id: 'astar-move' };
 
     constructor(myte, options) {
         super(myte, { ...AStarMoveAction.metadata.defaultOptions, ...options });
@@ -457,25 +431,7 @@ const APPROACH_CONFIGS = {
 // Move to a MapObject or Myte using A* + smart side selection.
 // The target object can declare how it wants to be approached via getApproachMode().
 class GoToObjectAction extends PositionableAction {
-    static metadata = {
-        id: 'go_to_object',
-        label: 'Go To',
-        category: 'movement',
-        priority: 1,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Move to a specific object or Myte',
-        requiresTarget: true,
-        affectsMood: false,
-        defaultOptions: {
-            // approachConfig: null — pass a string key or partial config to override target's default
-            allowStuckSuccess: true,
-            stuckCompletionDistance: 18,
-            finalApproachSkipDistance: 48,
-            maxFinalAdjustmentDistance: 48
-        }
-    };
+    static metadata = { id: 'go_to_object' };
 
     targetPos = null;
     targetPoints = null;
@@ -1154,18 +1110,7 @@ class GoToObjectAction extends PositionableAction {
 
 // Follow the mouse cursor
 class FollowMouseAction extends MyteAction {
-    static metadata = {
-        id: 'follow_mouse',
-        label: 'Follow Mouse',
-        category: 'movement',
-        priority: 1,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: -1,
-        description: 'Follow the mouse cursor',
-        requiresTarget: false,
-        affectsMood: false
-    };
+    static metadata = { id: 'follow_mouse' };
 
     static canPerform(selected, active) {
         return active === selected && !active?.queue.isCarrying();
@@ -1321,23 +1266,7 @@ class PatternMovementAction extends PositionableAction {
 // Follow another Myte or a MapObject that has followable:true in its config.
 // Trails behind the target's facing direction with a gap, replanning when the target moves.
 class FollowObjectAction extends PositionableAction {
-    static metadata = {
-        id: 'follow_object',
-        label: 'Follow',
-        category: 'movement',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: -1,
-        description: 'Follow another Myte or creature',
-        requiresTarget: true,
-        affectsMood: false,
-        defaultOptions: {
-            trailGap: 28,
-            minFollowDistance: 8,
-            replanThreshold: 12
-        }
-    };
+    static metadata = { id: 'follow_object' };
 
     static canPerform(selected, active) {
         const isFollowable = selected instanceof Myte ||
@@ -1395,28 +1324,7 @@ class FollowObjectAction extends PositionableAction {
 
 // Run laps around an object
 class RunLapsAction extends PatternMovementAction {
-    static metadata = {
-        id: 'run_laps',
-        label: 'Run Laps',
-        category: 'movement',
-        energyCostMultiplier: 1.85,
-        priority: 3,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Run laps around a target',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 5,
-        defaultOptions: {
-            repeat: 5,
-            currentTargetIndex: 0,
-            lapGap: 12,
-            safeTargetRadius: 14,
-            stuckThresholdFrames: 42,
-            maxPatternRecoveries: 4
-        }
-    };
+    static metadata = { id: 'run_laps' };
 
     static canPerform(selected, active) {
         return active && selected && selected instanceof Element && !active?.queue.isCarrying();
@@ -1509,31 +1417,7 @@ class RunLapsAction extends PatternMovementAction {
 // Move in a circular pattern using discrete waypoints (like RunLapsAction).
 // Pre-generates numPoints evenly-spaced positions around the circle and walks through them.
 class CircleAction extends PatternMovementAction {
-    static metadata = {
-        id: 'circle',
-        label: 'Circle',
-        category: 'movement',
-        energyCostMultiplier: 1.85,
-        priority: 3,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Move in a circular pattern',
-        requiresTarget: false,
-        affectsMood: true,
-        moodEffect: 3,
-        defaultOptions: {
-            radius: 50,
-            numPoints: 8,
-            repeat: 2,
-            clockwise: true,
-            centerX: null,
-            centerY: null,
-            safeTargetRadius: 12,
-            stuckThresholdFrames: 42,
-            maxPatternRecoveries: 4
-        }
-    };
+    static metadata = { id: 'circle' };
 
     static canPerform(selected, active) {
         return active === selected && !active?.queue.isCarrying();
@@ -1621,30 +1505,7 @@ class CircleAction extends PatternMovementAction {
 // Pre-generates numLegs alternating-side waypoints and walks them sequentially.
 // Each leg ends at a peak (sin = ±1), computed from frequency and amplitude.
 class ZigzagAction extends PatternMovementAction {
-    static metadata = {
-        id: 'zigzag',
-        label: 'Zigzag',
-        category: 'movement',
-        energyCostMultiplier: 1.85,
-        priority: 3,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Move in a zigzag pattern',
-        requiresTarget: false,
-        affectsMood: true,
-        moodEffect: 4,
-        defaultOptions: {
-            amplitude: 80,
-            frequency: 0.05,
-            numLegs: 6,
-            direction: { x: 1, y: 0 },
-            repeat: 1,
-            safeTargetRadius: 12,
-            stuckThresholdFrames: 34,
-            maxPatternRecoveries: 4
-        }
-    };
+    static metadata = { id: 'zigzag' };
 
     static canPerform(selected, active) {
         return active === selected && !active?.queue.isCarrying();
@@ -1743,28 +1604,7 @@ class ZigzagAction extends PatternMovementAction {
 
 // Walk back and forth between two points a fixed distance apart
 class PatrolAction extends PatternMovementAction {
-    static metadata = {
-        id: 'patrol',
-        label: 'Patrol',
-        category: 'movement',
-        priority: 3,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Walk back and forth between two points',
-        requiresTarget: false,
-        affectsMood: true,
-        moodEffect: 2,
-        defaultOptions: {
-            distance: 120,
-            direction: { x: 1, y: 0 },
-            repeat: 4,
-            pauseDuration: 500, // ms (was 30 frames)
-            safeTargetRadius: 14,
-            stuckThresholdFrames: 40,
-            maxPatternRecoveries: 3
-        }
-    };
+    static metadata = { id: 'patrol' };
 
     static canPerform(selected, active) {
         return active === selected && !active?.queue.isCarrying();
@@ -1836,27 +1676,7 @@ class PatrolAction extends PatternMovementAction {
 
 // Wander randomly within a radius of the starting position
 class WanderAction extends PatternMovementAction {
-    static metadata = {
-        id: 'wander',
-        label: 'Wander',
-        category: 'movement',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 5000,
-        description: 'Wander randomly within a radius',
-        requiresTarget: false,
-        affectsMood: true,
-        moodEffect: 2,
-        defaultOptions: {
-            wanderRadius: 100,
-            pauseMin: 500,  // ms (was 30 frames)
-            pauseMax: 1500, // ms (was 90 frames)
-            safeTargetRadius: 14,
-            stuckThresholdFrames: 40,
-            maxPatternRecoveries: 5
-        }
-    };
+    static metadata = { id: 'wander' };
 
     static canPerform(selected, active) {
         return active === selected && !active?.queue.isCarrying();
@@ -1915,24 +1735,7 @@ class WanderAction extends PatternMovementAction {
 
 // Stay near a guard post; return to it whenever the Myte drifts too far
 class GuardAction extends PatternMovementAction {
-    static metadata = {
-        id: 'guard',
-        label: 'Guard',
-        category: 'movement',
-        priority: 3,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: -1,
-        description: 'Guard a position, returning if wandered too far',
-        requiresTarget: false,
-        affectsMood: false,
-        defaultOptions: {
-            returnThreshold: 80,
-            safeTargetRadius: 14,
-            stuckThresholdFrames: 40,
-            failOnUnrecoverableStuck: false
-        }
-    };
+    static metadata = { id: 'guard' };
 
     static canPerform(selected, active) {
         return active === selected && !active?.queue.isCarrying();
@@ -1980,27 +1783,7 @@ class GuardAction extends PatternMovementAction {
 
 // Physics-based jump
 class JumpAction extends MyteAction {
-    static metadata = {
-        id: 'jump',
-        label: 'Jump',
-        category: 'movement',
-        energyCostMultiplier: 1.85,
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: false,
-        defaultDuration: 0,
-        description: 'Jump with physics-based movement',
-        requiresTarget: false,
-        affectsMood: true,
-        moodEffect: 3,
-        defaultOptions: {
-            height: 100,
-            gravity: 0.5,
-            initialVelocity: -12,
-            bounceReduction: 0.5,
-            minBounceVelocity: 2
-        }
-    };
+    static metadata = { id: 'jump' };
 
     static canPerform(selected, active) {
         return active === selected && !active?.queue.isCarrying();

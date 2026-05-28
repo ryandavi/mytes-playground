@@ -6,11 +6,10 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         
-        // Growth state
-        this.growthStage = this.getConfig('defaultStage', 'seed');
-        this.growthProgress = 0;
-        // No longer uses Date.now() — growth is driven by accumulated tickDelta
-        this._growthAccumulator = 0;
+        // Growth state — options.growthStage lets saved data restore the stage
+        this.growthStage = options.growthStage || this.getConfig('defaultStage', 'seed');
+        this.growthProgress = Number.isFinite(options.growthProgress) ? options.growthProgress : 0;
+        this._growthAccumulator = Number.isFinite(options._growthAccumulator) ? options._growthAccumulator : 0;
 
         // Watering state
         this.isWatered = false;
@@ -27,9 +26,11 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
         // Cache growth stages to avoid recreating array
         this.stages = ['seed', 'sprout', 'growing', 'mature'];
 
-        // Recalculate growth rate whenever the season changes.
+        // Recalculate growth rate whenever the season or moon phase changes.
         this._onSeasonChange = () => { this.growthRate = this.calculateGrowthRate(); };
         GameTime.instance?.subscribe('season', this._onSeasonChange);
+        this._onMoonPhaseChange = () => { this.growthRate = this.calculateGrowthRate(); };
+        GameTime.instance?.subscribe('moonPhase', this._onMoonPhaseChange);
 
         // Advance growth (and any subclass state) when debug time is skipped.
         this._onTimeSkip = (realMs) => this.onTimeSkip(realMs);
@@ -43,10 +44,16 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
     calculateGrowthRate() {
         if (this.fullyGrown) return 0;
 
+        const allowedSeasons = this.getConfig('growthConfig.allowedSeasons', null);
+        if (Array.isArray(allowedSeasons) && !allowedSeasons.includes(this.getCurrentSeason())) {
+            return Infinity;
+        }
+
         const seasonMultiplier = this.getConfig(`growthConfig.seasonMultiplier.${this.getCurrentSeason()}`, 1);
         const waterBoostMultiplier = this.isWatered ? this.getConfig('growthConfig.waterBoostMultiplier', 2) : 1;
-        
-        return this.baseGrowthTime * seasonMultiplier * waterBoostMultiplier * this.growthTimeMultiplier;
+        const moonMultiplier = GameTime.instance?.getMoonGrowthMultiplier?.() ?? 1;
+
+        return this.baseGrowthTime * seasonMultiplier * waterBoostMultiplier * moonMultiplier * this.growthTimeMultiplier;
     }
 
     water(boostDuration = 30000) {
@@ -177,10 +184,36 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
         return !this.isWatered && !this.fullyGrown;
     }
 
+    getSaveData() {
+        return {
+            type: this.type,
+            variant: this.variant,
+            posX: this.posX,
+            posY: this.posY,
+            growthStage: this.growthStage,
+            growthProgress: this.growthProgress,
+            _growthAccumulator: this._growthAccumulator
+        };
+    }
+
+    restoreFromSaveData(data = {}) {
+        if (data.growthStage) {
+            this.growthStage = data.growthStage;
+            this.growthProgress = Number.isFinite(data.growthProgress) ? data.growthProgress : 0;
+            this._growthAccumulator = Number.isFinite(data._growthAccumulator) ? data._growthAccumulator : 0;
+            this.fullyGrown = this.growthStage === this.stages[this.stages.length - 1];
+            this.updateGrowthVisuals();
+        }
+    }
+
     remove() {
         if (this._onSeasonChange) {
             GameTime.instance?.unsubscribe('season', this._onSeasonChange);
             this._onSeasonChange = null;
+        }
+        if (this._onMoonPhaseChange) {
+            GameTime.instance?.unsubscribe('moonPhase', this._onMoonPhaseChange);
+            this._onMoonPhaseChange = null;
         }
         if (this._onTimeSkip) {
             GameTime.instance?.unsubscribe('timeSkip', this._onTimeSkip);

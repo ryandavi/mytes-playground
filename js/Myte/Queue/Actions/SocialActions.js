@@ -1,24 +1,6 @@
 // Show affection toward another Myte (one-sided emote, no sync needed)
 class ShowAffectionAction extends MyteAction {
-    static metadata = {
-        id: 'show_affection',
-        label: 'Show Affection',
-        category: 'social',
-        priority: 3,
-        isMovementAction: false,
-        isInterruptible: false,
-        defaultDuration: 1500,
-        description: 'Show affection to another Myte',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 8,
-        defaultOptions: {
-            emitDelay: 200,
-            expressionType: 'heart',
-            expressionDuration: 300,
-            expressionRepeat: 3
-        }
-    };
+    static metadata = { id: 'show_affection' };
 
     static canPerform(selected, active) {
         return selected instanceof Myte &&
@@ -46,24 +28,7 @@ class ShowAffectionAction extends MyteAction {
 // pushes GreetReceiveAction onto the target's queue and shares an ActionSync.
 // Both actions signal the sync when positioned, then play a wave expression.
 class GreetAction extends PositionableAction {
-    static metadata = {
-        id: 'greet',
-        label: 'Greet',
-        category: 'social',
-        priority: 3,
-        isMovementAction: false,
-        isInterruptible: true,
-        defaultDuration: 120,
-        description: 'Greet another Myte with a wave',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 5,
-        defaultOptions: {
-            expressionType: 'wave',
-            expressionDuration: 400,
-            expressionRepeat: 2
-        }
-    };
+    static metadata = { id: 'greet' };
 
     static canPerform(selected, active) {
         return selected instanceof Myte && selected !== active && !active?.queue.isCarrying();
@@ -121,24 +86,7 @@ class GreetAction extends PositionableAction {
 
 // Receiver side of a greet - queued on the target Myte by GreetAction.start().
 class GreetReceiveAction extends PositionableAction {
-    static metadata = {
-        id: 'greet_receive',
-        label: 'Greet (receive)',
-        category: 'social',
-        priority: 3,
-        isMovementAction: false,
-        isInterruptible: true,
-        defaultDuration: 120,
-        description: 'Respond to a greeting from another Myte',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 5,
-        defaultOptions: {
-            expressionType: 'wave',
-            expressionDuration: 400,
-            expressionRepeat: 2
-        }
-    };
+    static metadata = { id: 'greet_receive' };
 
     static canPerform() { return false; }
 
@@ -179,22 +127,7 @@ class GreetReceiveAction extends PositionableAction {
 
 // Stand near another Myte and loosely follow their position.
 class WatchAction extends PositionableAction {
-    static metadata = {
-        id: 'watch',
-        label: 'Watch',
-        category: 'social',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 5000,
-        description: 'Watch another Myte from nearby',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 2,
-        defaultOptions: {
-            watchDistance: 60
-        }
-    };
+    static metadata = { id: 'watch' };
 
     static canPerform(selected, active) {
         return selected instanceof Myte && selected !== active && !active?.queue.isCarrying();
@@ -230,25 +163,7 @@ class WatchAction extends PositionableAction {
 
 // Play tag - chaser/runner role switches on catch.
 class PlayTagAction extends PositionableAction {
-    static metadata = {
-        id: 'play_tag',
-        label: 'Play Tag',
-        category: 'social',
-        energyCostMultiplier: 1.85,
-        priority: 4,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 5000,
-        description: 'Play tag with another Myte',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 10,
-        defaultOptions: {
-            catchDistance: 30,
-            runDistance: 100,
-            isIt: true
-        }
-    };
+    static metadata = { id: 'play_tag' };
 
     static canPerform(selected, active) {
         return selected instanceof Myte &&
@@ -297,22 +212,7 @@ class PlayTagAction extends PositionableAction {
 
 // Chase another Myte — move toward them at speed; complete when close enough
 class ChaseAction extends PositionableAction {
-    static metadata = {
-        id: 'chase',
-        label: 'Chase',
-        category: 'social',
-        priority: 4,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 5000,
-        description: 'Chase another Myte',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 6,
-        defaultOptions: {
-            catchDistance: 30
-        }
-    };
+    static metadata = { id: 'chase' };
 
     static canPerform(selected, active) {
         return selected instanceof Myte && selected !== active && !active?.queue.isCarrying();
@@ -345,24 +245,7 @@ class ChaseAction extends PositionableAction {
 
 // Approach any target and show an expression on arrival
 class EmoteAtAction extends GoToObjectAction {
-    static metadata = {
-        id: 'emote_at',
-        label: 'Emote At',
-        category: 'social',
-        priority: 3,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Approach a target and show an expression',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 3,
-        defaultOptions: {
-            expressionType: 'heart',
-            expressionDuration: 400,
-            expressionRepeat: 2
-        }
-    };
+    static metadata = { id: 'emote_at' };
 
     static canPerform(selected, active) {
         return active && selected instanceof Myte && selected !== active && !active?.queue.isCarrying();
@@ -382,20 +265,7 @@ class EmoteAtAction extends GoToObjectAction {
 
 // Approach another Myte and transfer the held item to them
 class GiveItemAction extends GoToObjectAction {
-    static metadata = {
-        id: 'give_item',
-        label: 'Give Item',
-        category: 'carry',
-        priority: 3,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Give the held item to another Myte',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 4,
-        defaultOptions: {}
-    };
+    static metadata = { id: 'give_item' };
 
     static canPerform(selected, active) {
         return selected instanceof Myte &&
@@ -431,31 +301,7 @@ const FetchStates = {
 
 // Play fetch with a throwable object.
 class PlayFetchAction extends MyteAction {
-    static metadata = {
-        id: 'play_fetch',
-        label: 'Play Fetch',
-        category: 'social',
-        energyCostMultiplier: 1.85,
-        priority: 4,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Play fetch with a throwable object',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 8,
-        defaultOptions: {
-            throwStrength: 10,
-            maxThrowDistance: 300,
-            fetchState: FetchStates.PICKUP,
-            arcHeight: 100,
-            pickupDistance: 10,
-            catchDistance: 10,
-            roundTrips: 1,
-            expressionType: 'excited',
-            expressionDuration: 500
-        }
-    };
+    static metadata = { id: 'play_fetch' };
 
     static canPerform(selected, active) {
         return active &&

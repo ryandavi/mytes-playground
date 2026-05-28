@@ -433,20 +433,34 @@ class MyteMovementController {
                         }
                     }
                 } else {
-                    const slipDir = moveY !== 0 ? Math.sign(moveY) : 1;
-                    if (this.canMoveToPosition(newX, m.posY + slipDir * CORNER_SLIP)) {
+                    // Check for openable doors before slipping around them
+                    let doorOpenedX = false;
+                    if (m.checkForCollisions && gridSystem) {
                         m.posX = newX;
-                        m.posY += slipDir * CORNER_SLIP;
-                    } else if (this.canMoveToPosition(newX, m.posY - slipDir * CORNER_SLIP)) {
-                        m.posX = newX;
-                        m.posY -= slipDir * CORNER_SLIP;
-                    } else {
+                        const potentialColliders = gridSystem.getPotentialColliders(m);
+                        m.posX = originalX;
+                        for (const collider of potentialColliders) {
+                            if (m.tryOpenCollider(collider, 'x')) { doorOpenedX = true; break; }
+                        }
+                    }
+                    if (doorOpenedX) {
                         xBlocked = true;
-                        if (m.checkForCollisions && gridSystem) {
+                    } else {
+                        const slipDir = moveY !== 0 ? Math.sign(moveY) : 1;
+                        if (this.canMoveToPosition(newX, m.posY + slipDir * CORNER_SLIP)) {
                             m.posX = newX;
-                            const potentialColliders = gridSystem.getPotentialColliders(m);
-                            m.posX = originalX;
-                            for (const collider of potentialColliders) m.tryOpenCollider(collider, 'x');
+                            m.posY += slipDir * CORNER_SLIP;
+                        } else if (this.canMoveToPosition(newX, m.posY - slipDir * CORNER_SLIP)) {
+                            m.posX = newX;
+                            m.posY -= slipDir * CORNER_SLIP;
+                        } else {
+                            xBlocked = true;
+                            if (m.checkForCollisions && gridSystem) {
+                                m.posX = newX;
+                                const potentialColliders = gridSystem.getPotentialColliders(m);
+                                m.posX = originalX;
+                                for (const collider of potentialColliders) m.tryOpenCollider(collider, 'x');
+                            }
                         }
                     }
                 }
@@ -471,20 +485,34 @@ class MyteMovementController {
                         }
                     }
                 } else {
-                    const slipDir = moveX !== 0 ? Math.sign(moveX) : 1;
-                    if (this.canMoveToPosition(m.posX + slipDir * CORNER_SLIP, newY)) {
+                    // Check for openable doors before slipping around them
+                    let doorOpenedY = false;
+                    if (m.checkForCollisions && gridSystem) {
                         m.posY = newY;
-                        m.posX += slipDir * CORNER_SLIP;
-                    } else if (this.canMoveToPosition(m.posX - slipDir * CORNER_SLIP, newY)) {
-                        m.posY = newY;
-                        m.posX -= slipDir * CORNER_SLIP;
-                    } else {
+                        const potentialColliders = gridSystem.getPotentialColliders(m);
+                        m.posY = originalY;
+                        for (const collider of potentialColliders) {
+                            if (m.tryOpenCollider(collider, 'y')) { doorOpenedY = true; break; }
+                        }
+                    }
+                    if (doorOpenedY) {
                         yBlocked = true;
-                        if (m.checkForCollisions && gridSystem) {
+                    } else {
+                        const slipDir = moveX !== 0 ? Math.sign(moveX) : 1;
+                        if (this.canMoveToPosition(m.posX + slipDir * CORNER_SLIP, newY)) {
                             m.posY = newY;
-                            const potentialColliders = gridSystem.getPotentialColliders(m);
-                            m.posY = originalY;
-                            for (const collider of potentialColliders) m.tryOpenCollider(collider, 'y');
+                            m.posX += slipDir * CORNER_SLIP;
+                        } else if (this.canMoveToPosition(m.posX - slipDir * CORNER_SLIP, newY)) {
+                            m.posY = newY;
+                            m.posX -= slipDir * CORNER_SLIP;
+                        } else {
+                            yBlocked = true;
+                            if (m.checkForCollisions && gridSystem) {
+                                m.posY = newY;
+                                const potentialColliders = gridSystem.getPotentialColliders(m);
+                                m.posY = originalY;
+                                for (const collider of potentialColliders) m.tryOpenCollider(collider, 'y');
+                            }
                         }
                     }
                 }

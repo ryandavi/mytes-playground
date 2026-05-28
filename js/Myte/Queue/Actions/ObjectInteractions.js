@@ -37,23 +37,7 @@ function stopInteractionSoundPulse(action) {
 
 // Pause beside an object and quietly observe it.
 class InspectAction extends GoToObjectAction {
-    static metadata = {
-        id: 'inspect',
-        label: 'Inspect',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 90,
-        description: 'Pause beside an object and inspect it naturally',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 2,
-        defaultOptions: {
-            expressionType: 'curious',
-            expressionDuration: 40
-        }
-    };
+    static metadata = { id: 'inspect' };
 
     static canPerform(selected, active) {
         return active && selected instanceof MapObject && !active.queue.isCarrying();
@@ -103,25 +87,7 @@ class InspectAction extends GoToObjectAction {
 // smart pathfinding as InspectAction, then generates walkable inspect points
 // only after the myte has arrived.
 class DeepInspectAction extends GoToObjectAction {
-    static metadata = {
-        id: 'deep_inspect',
-        label: 'Inspect Oddly',
-        category: 'interactions',
-        priority: 3,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 150,
-        description: 'Investigate an object from several odd angles',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 3,
-        defaultOptions: {
-            pointDuration: 24,
-            numPoints: 3,
-            expressionType: 'surprise',
-            expressionDuration: 30
-        }
-    };
+    static metadata = { id: 'deep_inspect' };
 
     static canPerform(selected, active) {
         return active && selected instanceof MapObject && !active.queue.isCarrying();
@@ -200,19 +166,7 @@ class DeepInspectAction extends GoToObjectAction {
 }
 
 class InteractObjectAction extends GoToObjectAction {
-    static metadata = {
-        id: 'interact_object',
-        label: 'Use',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Approach an object and use its main interaction',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 4
-    };
+    static metadata = { id: 'interact_object' };
 
     static canPerform(selected, active) {
         if (!active || !(selected instanceof MapObject) || active.queue.isCarrying()) {
@@ -287,37 +241,7 @@ class InteractObjectAction extends GoToObjectAction {
 }
 
 class SurfaceSlotAction extends GoToObjectAction {
-    static metadata = {
-        id: 'use_surface_slot',
-        label: 'Use Surface',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 5000,
-        description: 'Use a slotted surface and settle into position',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 7,
-        defaultOptions: {
-            bobHeight: 3,
-            bobSpeed: 0.12,
-            energyRestore: 18,
-            healthRestore: 5,
-            comfortBoost: 14,
-            moodBoost: 8,
-            settleDuration: 260,
-            dismountDuration: 220,
-            entryGap: 10,
-            exitGap: 16,
-            exitSearchRadius: 20,
-            returnToEntry: true,
-            stuckCompletionDistance: 14,
-            finalApproachSkipDistance: 24,
-            maxFinalAdjustmentDistance: 20,
-            approachConfig: null
-        }
-    };
+    static metadata = { id: 'use_surface_slot' };
 
     static canPerform(selected, active) {
         if (!active ||
@@ -1010,33 +934,7 @@ class SurfaceSlotAction extends GoToObjectAction {
 }
 
 class NudgeBallAction extends GoToObjectAction {
-    static metadata = {
-        id: 'nudge_ball',
-        label: 'Nudge Ball',
-        category: 'play',
-        energyCostMultiplier: 1.85,
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Run into a ball to get it rolling',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 6,
-        defaultOptions: {
-            approachConfig: {
-                allowedSides: 'any',
-                preferredSide: null,
-                gap: 10,
-                align: 'center',
-                alignTo: 'collider'
-            },
-            allowStuckSuccess: false,
-            stuckCompletionDistance: 10,
-            repeat: 1,
-            postNudgeIdleDuration: 20
-        }
-    };
+    static metadata = { id: 'nudge_ball' };
 
     static canPerform(selected, active) {
         return active &&
@@ -1074,22 +972,7 @@ class NudgeBallAction extends GoToObjectAction {
 
 // Eat a consumable object — approaches it, removes it on completion
 class EatElementAction extends GoToObjectAction {
-    static metadata = {
-        id: 'eat_element',
-        label: 'Eat',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: false,
-        isInterruptible: false,
-        defaultDuration: 0,
-        description: 'Consume an edible object',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 5,
-        defaultOptions: {
-            targetPosition: { vertical: 'bottom', insideHorizontal: false, insideVertical: true }
-        }
-    };
+    static metadata = { id: 'eat_element' };
 
     static canPerform(selected, active) {
         if (!active || !(selected instanceof MapObject) || active.queue.isCarrying()) {
@@ -1130,19 +1013,7 @@ class EatElementAction extends GoToObjectAction {
 
 // Open a TreasureChestMapObject — approach, animate "prying open", then chest opens and drops items
 class OpenChestAction extends GoToObjectAction {
-    static metadata = {
-        id: 'open_chest',
-        label: 'Open Chest',
-        category: 'interactions',
-        priority: 3,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Approach and open a treasure chest',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 10
-    };
+    static metadata = { id: 'open_chest' };
 
     static canPerform(selected, active) {
         return active &&
@@ -1194,18 +1065,7 @@ class OpenChestAction extends GoToObjectAction {
 
 // Close a TreasureChestMapObject — queued by double-clicking an open chest
 class CloseChestAction extends GoToObjectAction {
-    static metadata = {
-        id: 'close_chest',
-        label: 'Close Chest',
-        category: 'interactions',
-        priority: 3,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Approach and close a treasure chest',
-        requiresTarget: true,
-        affectsMood: false
-    };
+    static metadata = { id: 'close_chest' };
 
     static canPerform(selected, active) {
         return active &&
@@ -1257,23 +1117,7 @@ class CloseChestAction extends GoToObjectAction {
 
 // Pick a flower — animates a pick, drops the flower item on the ground, marks plant as deflowered
 class PickFlowerAction extends GoToObjectAction {
-    static metadata = {
-        id: 'pick_flower',
-        label: 'Pick Flower',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Pick a flower from a plant',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 4,
-        defaultOptions: {
-            pickAnimationDuration: 45,
-            approachConfig: 'adjacent'
-        }
-    };
+    static metadata = { id: 'pick_flower' };
 
     static _isFlower(obj) {
         if (!obj) return false;
@@ -1289,6 +1133,7 @@ class PickFlowerAction extends GoToObjectAction {
 
     static canPerform(selected, active) {
         if (!active || !PickFlowerAction._isFlower(selected) || active.queue.isCarrying()) return false;
+        if (typeof selected.bloomState === 'string' && selected.bloomState !== 'open') return false;
         return selected.getConfig?.('deflowered', false) !== true;
     }
 
@@ -1366,19 +1211,7 @@ class PickFlowerAction extends GoToObjectAction {
 
 // Trample a flower — stomps through it, negative mood
 class TrampleFlowerAction extends GoToObjectAction {
-    static metadata = {
-        id: 'trample_flower',
-        label: 'Trample',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Trample a flower',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: -3
-    };
+    static metadata = { id: 'trample_flower' };
 
     static canPerform(selected, active) {
         return active && PickFlowerAction._isFlower(selected) && !active.queue.isCarrying();
@@ -1446,25 +1279,12 @@ class TrampleFlowerAction extends GoToObjectAction {
 
 // Smell a flower — approach from the side, lean in
 class SmellFlowerAction extends GoToObjectAction {
-    static metadata = {
-        id: 'smell_flower',
-        label: 'Smell Flower',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Approach and smell a flower',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 6,
-        defaultOptions: {
-            approachConfig: 'adjacent'
-        }
-    };
+    static metadata = { id: 'smell_flower' };
 
     static canPerform(selected, active) {
-        return active && PickFlowerAction._isFlower(selected) && !active.queue.isCarrying();
+        if (!active || !PickFlowerAction._isFlower(selected) || active.queue.isCarrying()) return false;
+        if (typeof selected.bloomState === 'string' && selected.bloomState !== 'open') return false;
+        return true;
     }
 
     static getRequiredOptions(selected, active) {
@@ -1481,20 +1301,7 @@ class SmellFlowerAction extends GoToObjectAction {
 
 // Drink from a FountainMapObject — approach adjacent, drink
 class DrinkFromFountainAction extends GoToObjectAction {
-    static metadata = {
-        id: 'drink_fountain',
-        label: 'Drink',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Drink from a fountain',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 5,
-        defaultOptions: {}
-    };
+    static metadata = { id: 'drink_fountain' };
 
     static canPerform(selected, active) {
         return active &&
@@ -1515,19 +1322,7 @@ class DrinkFromFountainAction extends GoToObjectAction {
 
 // Water a CropPlantMapObject
 class WaterPlantAction extends GoToObjectAction {
-    static metadata = {
-        id: 'water_plant',
-        label: 'Water Plant',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Water a crop plant',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 4
-    };
+    static metadata = { id: 'water_plant' };
 
     static canPerform(selected, active) {
         return active &&
@@ -1598,19 +1393,7 @@ class WaterPlantAction extends GoToObjectAction {
 
 // Harvest a CropPlantMapObject — approach, animate, then harvest drops to ground
 class HarvestAction extends GoToObjectAction {
-    static metadata = {
-        id: 'harvest',
-        label: 'Harvest',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Harvest a ready crop',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 8
-    };
+    static metadata = { id: 'harvest' };
 
     static canPerform(selected, active) {
         return active &&
@@ -1687,19 +1470,7 @@ class HarvestAction extends GoToObjectAction {
 }
 
 class ShakeTreeAction extends GoToObjectAction {
-    static metadata = {
-        id: 'shake_tree',
-        label: 'Shake Tree',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Shake a grown tree to collect fruit or seeds',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 5
-    };
+    static metadata = { id: 'shake_tree' };
 
     static canPerform(selected, active) {
         return active &&
@@ -1750,18 +1521,7 @@ class ShakeTreeAction extends GoToObjectAction {
 }
 
 class ChopTreeAction extends GoToObjectAction {
-    static metadata = {
-        id: 'chop_tree',
-        label: 'Chop Tree',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Chop down a grown tree, turning it into a stump',
-        requiresTarget: true,
-        affectsMood: false
-    };
+    static metadata = { id: 'chop_tree' };
 
     static canPerform(selected, active) {
         return active &&
@@ -1811,19 +1571,7 @@ class ChopTreeAction extends GoToObjectAction {
 }
 
 class RemoveStumpAction extends GoToObjectAction {
-    static metadata = {
-        id: 'remove_stump',
-        label: 'Remove Stump',
-        category: 'interactions',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Dig out and remove a tree stump',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 3
-    };
+    static metadata = { id: 'remove_stump' };
 
     static canPerform(selected, active) {
         return active &&

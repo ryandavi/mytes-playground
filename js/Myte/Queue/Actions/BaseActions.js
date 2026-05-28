@@ -284,18 +284,7 @@ class PositionableAction extends MyteAction {
 
 // Pause in place for a fixed duration (ms)
 class IdleAction extends MyteAction {
-    static metadata = {
-        id: 'idle',
-        label: 'Idle',
-        category: 'state',
-        priority: 0,
-        isMovementAction: false,
-        isInterruptible: true,
-        defaultDuration: 3000,
-        description: 'Stay in place for a moment',
-        requiresTarget: false,
-        affectsMood: false
-    };
+    static metadata = { id: 'idle' };
 
     static canPerform(selected, active) {
         return active && selected === active;
@@ -316,19 +305,7 @@ class IdleAction extends MyteAction {
 
 // Show an expression overlay (hearts, Zs, etc.)
 class ExpressionAction extends MyteAction {
-    static metadata = {
-        id: 'expression',
-        label: 'Express',
-        category: 'state',
-        priority: 2,
-        isMovementAction: false,
-        isInterruptible: false,
-        defaultDuration: 800,
-        description: 'Show an emotion or expression overlay',
-        requiresTarget: false,
-        affectsMood: true,
-        moodEffect: 5
-    };
+    static metadata = { id: 'expression' };
 
     static canPerform(selected, active) {
         return active && selected === active;

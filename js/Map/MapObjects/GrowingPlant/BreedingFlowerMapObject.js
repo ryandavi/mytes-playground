@@ -183,15 +183,12 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
     }
     
     applySeasonalEffects() {
-        // Apply seasonal effects once per update if config exists
-        const seasonConfig = this.getConfig(`seasonalConfig.${this.currentSeason}`);
-        if (seasonConfig) {
-            // Seasonal breeding modifiers should be derived, not compounded every tick.
-            this.pollinationChance = this.getConfig('breedingConfig.pollinationChance', 0.2) * 
-                                   (seasonConfig.pollinationChance || 1);
-        } else {
-            this.pollinationChance = this.getConfig('breedingConfig.pollinationChance', 0.2);
-        }
+        const season = this.getCurrentSeason();
+        const seasonConfig = this.getConfig(`seasonalConfig.${season}`);
+        const basePollination = this.getConfig('breedingConfig.pollinationChance', 0.2);
+        const seasonFactor = seasonConfig?.pollinationChance ?? 1;
+        const moonFactor = GameTime.instance?.getMoonGrowthMultiplier?.() ?? 1;
+        this.pollinationChance = basePollination * seasonFactor * moonFactor;
     }
     
     render(container, parent) {

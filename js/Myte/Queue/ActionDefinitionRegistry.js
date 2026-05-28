@@ -69,7 +69,8 @@ class ActionDefinitionRegistry {
             moodEffect: Number.isFinite(Number(definition.moodEffect)) ? Number(definition.moodEffect) : undefined,
             icon: definition.icon || '',
             implementationClass: definition.implementationClass || '',
-            defaultOptions: this.cloneValue(definition.defaultOptions || {})
+            defaultOptions: this.cloneValue(definition.defaultOptions || {}),
+            energyCostMultiplier: Number.isFinite(Number(definition.energyCostMultiplier)) ? Number(definition.energyCostMultiplier) : undefined
         };
     }
 

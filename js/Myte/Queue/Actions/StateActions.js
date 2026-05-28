@@ -1,22 +1,6 @@
 // Perform a happy dance - moves in small steps around a base position.
 class DanceAction extends MyteAction {
-    static metadata = {
-        id: 'dance',
-        label: 'Dance',
-        category: 'play',
-        energyCostMultiplier: 1.65,
-        priority: 3,
-        isMovementAction: true,
-        isInterruptible: false,
-        defaultDuration: 2000,
-        description: 'Perform a happy dance',
-        requiresTarget: false,
-        affectsMood: true,
-        moodEffect: 10,
-        defaultOptions: {
-            stepDuration: 250
-        }
-    };
+    static metadata = { id: 'dance' };
 
     static canPerform(selected, active) {
         return selected === active && !active?.queue.isCarrying();
@@ -62,23 +46,7 @@ class DanceAction extends MyteAction {
 
 // Deep sleep with bobbing animation.
 class SleepAction extends MyteAction {
-    static metadata = {
-        id: 'sleep',
-        label: 'Sleep',
-        category: 'state',
-        priority: 2,
-        isMovementAction: false,
-        isInterruptible: true,
-        defaultDuration: 5000,
-        description: 'Take a deep sleep with bobbing animation',
-        requiresTarget: false,
-        affectsMood: true,
-        moodEffect: 8,
-        defaultOptions: {
-            bobHeight: 5,
-            zInterval: 1000
-        }
-    };
+    static metadata = { id: 'sleep' };
 
     static canPerform(selected, active) {
         return selected === active && !active?.queue.isCarrying();
@@ -118,22 +86,7 @@ class SleepAction extends MyteAction {
 
 // Quick nap with gentle floating.
 class SimpleSleepAction extends MyteAction {
-    static metadata = {
-        id: 'simple_sleep',
-        label: 'Take a Nap',
-        category: 'state',
-        priority: 2,
-        isMovementAction: false,
-        isInterruptible: true,
-        defaultDuration: 5000,
-        description: 'Take a quick nap with gentle floating animation',
-        requiresTarget: false,
-        affectsMood: true,
-        moodEffect: 5,
-        defaultOptions: {
-            zSpeed: 0.1
-        }
-    };
+    static metadata = { id: 'simple_sleep' };
 
     static canPerform(selected, active) {
         return selected === active && !active?.queue.isCarrying();
@@ -169,24 +122,7 @@ class SimpleSleepAction extends MyteAction {
 
 // Spin in place by cycling through directions.
 class SpinAction extends MyteAction {
-    static metadata = {
-        id: 'spin',
-        label: 'Spin',
-        category: 'play',
-        energyCostMultiplier: 1.2,
-        priority: 3,
-        isMovementAction: false,
-        isInterruptible: false,
-        defaultDuration: 500,
-        description: 'Spin around in place',
-        requiresTarget: false,
-        affectsMood: true,
-        moodEffect: 3,
-        defaultOptions: {
-            rotations: 2,
-            frameDelay: 16
-        }
-    };
+    static metadata = { id: 'spin' };
 
     static canPerform(selected, active) {
         return selected === active && !active?.queue.isCarrying();

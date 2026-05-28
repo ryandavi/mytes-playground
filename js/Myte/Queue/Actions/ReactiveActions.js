@@ -1,22 +1,6 @@
 // Flee from a scary object or Myte
 class RunAwayAction extends MyteAction {
-    static metadata = {
-        id: 'run_away',
-        label: 'Run Away',
-        category: 'reactive',
-        priority: 5,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: -1,
-        description: 'Run away from a scary object or Myte',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: -5,
-        defaultOptions: {
-            panicDistance: 400,
-            runDistance: 350
-        }
-    };
+    static metadata = { id: 'run_away' };
 
     static canPerform(selected, active) {
         return selected instanceof Myte &&
@@ -66,22 +50,7 @@ class RunAwayAction extends MyteAction {
 // Not user-triggered; queued internally by AI when the Myte is scared.
 // Requires options: { hideTarget: MapObject, scaryObject: MapObject|Myte }
 class HideAction extends MyteAction {
-    static metadata = {
-        id: 'hide',
-        label: 'Hide',
-        category: 'reactive',
-        priority: 4,
-        isMovementAction: true,
-        isInterruptible: false,
-        defaultDuration: 5000,
-        description: 'Hide behind an object from something scary',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: -2,
-        defaultOptions: {
-            peekInterval: 2000
-        }
-    };
+    static metadata = { id: 'hide' };
 
     static canPerform() { return false; }
 
@@ -130,23 +99,7 @@ class HideAction extends MyteAction {
 
 // Run away from a MapObject (animals, scary objects, etc.)
 class RunFromAction extends MyteAction {
-    static metadata = {
-        id: 'run_from',
-        label: 'Run Away',
-        category: 'reactive',
-        priority: 5,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 3000,
-        description: 'Run away from an object',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: -3,
-        defaultOptions: {
-            panicDistance: 500,
-            runDistance: 300
-        }
-    };
+    static metadata = { id: 'run_from' };
 
     static canPerform(selected, active) {
         return selected instanceof MapObject &&

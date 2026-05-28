@@ -2,19 +2,7 @@ const CARRY_OFFSET = 45;
 
 // Pickup animation — lifts target Myte toward the carrier over a fixed duration
 class CarryPickupAction extends MyteAction {
-    static metadata = {
-        id: 'carry_pickup',
-        label: 'Pick Up',
-        category: 'carry',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: false,
-        defaultDuration: 100,
-        description: 'Pick up another Myte',
-        requiresTarget: true,
-        affectsMood: true,
-        moodEffect: 2
-    };
+    static metadata = { id: 'carry_pickup' };
 
     static canPerform(selected, active) {
         return selected instanceof Myte &&
@@ -58,18 +46,7 @@ class CarryPickupAction extends MyteAction {
 
 // Carry — the carrier follows the mouse while keeping the target overhead
 class CarryAction extends MyteAction {
-    static metadata = {
-        id: 'carry',
-        label: 'Carry',
-        category: 'carry',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: -1,
-        description: 'Carry another Myte around',
-        requiresTarget: true,
-        affectsMood: false
-    };
+    static metadata = { id: 'carry' };
 
     static canPerform(selected, active) {
         return active?.queue.isCarryingMyte?.();
@@ -88,19 +65,7 @@ class CarryAction extends MyteAction {
 
 // Being carried — passive state on the carried Myte
 class BeingCarriedAction extends MyteAction {
-    static metadata = {
-        id: 'being_carried',
-        label: 'Being Carried',
-        category: 'carry',
-        priority: 1,
-        isMovementAction: false,
-        isInterruptible: false,
-        defaultDuration: -1,
-        description: 'Being carried by another Myte',
-        requiresTarget: false,
-        affectsMood: true,
-        moodEffect: 1
-    };
+    static metadata = { id: 'being_carried' };
 
     static canPerform(selected, active) {
         return selected instanceof Myte &&
@@ -116,18 +81,7 @@ class BeingCarriedAction extends MyteAction {
 
 // Putdown animation — lowers the carried Myte to the ground
 class CarryPutdownAction extends MyteAction {
-    static metadata = {
-        id: 'carry_putdown',
-        label: 'Put Down',
-        category: 'carry',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: false,
-        defaultDuration: 100,
-        description: 'Put down a carried Myte',
-        requiresTarget: true,
-        affectsMood: false
-    };
+    static metadata = { id: 'carry_putdown' };
 
     static canPerform(selected, active) {
         return active?.queue.isCarryingMyte?.();
@@ -164,18 +118,7 @@ class CarryPutdownAction extends MyteAction {
 }
 
 class PickupItemAction extends MyteAction {
-    static metadata = {
-        id: 'pickup_item',
-        label: 'Pick Up',
-        category: 'carry',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: 0,
-        description: 'Pick up an item and carry it',
-        requiresTarget: true,
-        affectsMood: false
-    };
+    static metadata = { id: 'pickup_item' };
 
     static canPerform(selected, active) {
         return active &&
@@ -335,18 +278,7 @@ class PickupItemAction extends MyteAction {
 }
 
 class HoldItemAction extends MyteAction {
-    static metadata = {
-        id: 'hold_item',
-        label: 'Carry Item',
-        category: 'carry',
-        priority: 2,
-        isMovementAction: true,
-        isInterruptible: true,
-        defaultDuration: -1,
-        description: 'Carry an item',
-        requiresTarget: true,
-        affectsMood: false
-    };
+    static metadata = { id: 'hold_item' };
 
     static canPerform() {
         return false;
@@ -395,18 +327,7 @@ class HoldItemAction extends MyteAction {
 }
 
 class DropItemAction extends MyteAction {
-    static metadata = {
-        id: 'drop_item',
-        label: 'Drop Item',
-        category: 'carry',
-        priority: 2,
-        isMovementAction: false,
-        isInterruptible: false,
-        defaultDuration: 0,
-        description: 'Drop the item currently being carried',
-        requiresTarget: true,
-        affectsMood: false
-    };
+    static metadata = { id: 'drop_item' };
 
     static canPerform(selected, active) {
         const heldItem = active?.queue?.getHeldItem?.() || null;

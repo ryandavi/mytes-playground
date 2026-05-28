@@ -11,15 +11,42 @@ The sims does Hunger, Fun, Comfort, Social, Bladder, Hygiene, Energy, Evironment
 
 
 
+Can anything from MyteStats.js become a buff/debuff? Just to surface why something is happening.
 
+In MyteStats.js:
+const isStimulating = [
+	'inspect',
+	'deep_inspect',
+	'smell_flower',
+	'drink_fountain',
+	'water_plant',
+	'harvest',
+	'interact_object',
+	'open_chest',
+	'eat_element'
+].includes(actionId);
+const isPlayful = [
+	'run_laps',
+	'circle',
+	'zigzag',
+	'jump',
+	'dance',
+	'play_tag',
+	'play_fetch',
+	'nudge_ball'
+].includes(actionId);
+const isSocial = [
+	'show_affection',
+	'greet',
+	'greet_receive',
+	'watch',
+	'play_tag'
+].includes(actionId);
+const isPurposefulMovement = [
+	'go_to_object',
+	'astar-move',
+	'move',
+	'follow_object'
+].includes(actionId);
 
-
-How does things like crops check for time, and other time-based map objects? In debug panel if i increase time, those thigs should see that enough time has passed to replenish or do whatever their time-based function is. Flowers regrowing, crops regrowing, plants growing stages, etc. Are they aware of moon phase? season change? blooming at night? In the future time adancement may be exposed to the user in features like going to the next day when you sleep, so it shouldnt be tied directly to the debug menu buttons.
-
-
-Lets use the Time  more (day/night, seasons, moon phases). The game has 20 time-of-day periods, 4 seasons, 8 moon phases, and growth multipliers — but nothing gameplay-relevant changes with them.
-
-- **Night blooms** (`blue_moon`, `evening_star`, `night_whisper`) only open at night. Mytes can only smell/interact with them then. Creates a reason to check in after dark.
-- **Seasonal crop availability**: tomatoes only grow in summer, berries in spring. Harvests give different items by season. Now the time system is the resource system.
-- **Moon phase affects breeding flowers**: full moon = faster growth, faster color spread. New moon = dormant. Players who understand the cycle get more flowers.
-- **Myte mood is time-sensitive**: mytes get sleepy at night (energy decay faster after midnight), more playful at dawn. Matches the biological feel.
+Should these be hardcoded? Should this information be in the action metadata? What is missing?

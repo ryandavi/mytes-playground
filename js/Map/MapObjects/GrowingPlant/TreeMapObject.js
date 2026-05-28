@@ -7,7 +7,7 @@ class TreeMapObject extends GrowingPlantMapObject {
 
         // Shake-to-harvest state
         this.shakeCooldown = this.getConfig('shakeConfig.cooldown', 30000);
-        this._shakeElapsed = this.shakeCooldown; // ready immediately
+        this._shakeElapsed = Number.isFinite(options._shakeElapsed) ? options._shakeElapsed : this.shakeCooldown;
         this.shakeItemDrops = this.getConfig('shakeConfig.drops', []);
         this.minShakeYield = this.getConfig('shakeConfig.yield.min', 1);
         this.maxShakeYield = this.getConfig('shakeConfig.yield.max', 3);
@@ -153,6 +153,15 @@ class TreeMapObject extends GrowingPlantMapObject {
         element.classList.add('tree');
         element.dataset.treeStage = this.growthStage;
         return element;
+    }
+
+    getSaveData() {
+        return { ...super.getSaveData(), _shakeElapsed: this._shakeElapsed };
+    }
+
+    restoreFromSaveData(data = {}) {
+        super.restoreFromSaveData(data);
+        if (Number.isFinite(data._shakeElapsed)) this._shakeElapsed = data._shakeElapsed;
     }
 
     // ── info ─────────────────────────────────────────────────────────────────
