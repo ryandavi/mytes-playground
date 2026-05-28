@@ -142,6 +142,29 @@ class BallMapObject extends AnimatedMapObject {
 
     shouldSimulateOffScreen() { return true; }
 
+    shouldRenderShadow() {
+        return true;
+    }
+
+    getShadowConfig() {
+        const explicit = this.getVisualValue('shadow', this.getConfig('shadow', null));
+        if (explicit?.enabled) return explicit;
+        const maxZ = this.getConfig('maxArcBounceHeight', 60);
+        return {
+            enabled: true,
+            widthRatio: 0.65,
+            heightRatio: 0.16,
+            anchorX: 0.5,
+            anchorY: 0.85,
+            maxOpacity: 0.35,
+            minOpacity: 0.08,
+            opacityFadeDistance: maxZ * 1.2,
+            scaleFadeDistance: maxZ * 0.9,
+            minScale: 0.55,
+            blur: 3
+        };
+    }
+
     getApproachConfig() {
         return {
             gap: 8,

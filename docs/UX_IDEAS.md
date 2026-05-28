@@ -44,15 +44,11 @@ The game has 20 time-of-day periods, 4 seasons, 8 moon phases, and growth multip
 - **Seasonal crop availability**: tomatoes only grow in summer, berries in spring. Harvests give different items by season. Now the time system is the resource system.
 - **Moon phase affects breeding flowers**: full moon = faster growth, faster color spread. New moon = dormant. Players who understand the cycle get more flowers.
 - **Myte mood is time-sensitive**: mytes get sleepy at night (energy decay faster after midnight), more playful at dawn. Matches the biological feel.
-- **Seasonal events**: one unique world object or NPC that only appears in each season. Something to look forward to every 28 in-game days.
-- **Show the current season/time on the HUD** so players understand why things are happening.
 
 ### Chests & Loot
 Chests exist and can be opened by mytes, but what's inside isn't visible or varied.
 
 **Ideas to give them meaning:**
-- Chest loot is time/season gated. A chest opened at midnight during a full moon gives rare items. Players learn to wait.
-- Chests reset on a real-time schedule (every few hours or after a new in-game day). Creates a daily check-in reason.
 - Golden chests give significantly better loot than wooden ones — the visual difference needs to mean something.
 - Mytes remember where chests are (`objectMemories` already exists) and autonomously return to ones they liked. The player sees their myte being strategic.
 
@@ -133,12 +129,6 @@ Players name and keep mytes long-term. Give them ways to express that bond.
 - Favorite myte marker: pin one myte to always show first in the list, camera follows it by default.
 - Myte colors/appearance variants unlocked by level or playtime. Cosmetic but deeply motivating in this genre.
 
-### Seasonal Rare Events
-Tie the time system to something the player can look forward to.
-
-- Once per season, a rare NPC (butterfly variant, ghost, goblin) appears in the world for a single in-game day.
-- Interacting with it gives a unique item or triggers a special myte animation.
-- Creates "I should check back today" pull without requiring grinding.
 
 ### Simple Achievement Popups
 The game already has an event system that fires on every meaningful action.

@@ -386,6 +386,29 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         }
     }
 
+    shouldRenderShadow() {
+        return true;
+    }
+
+    getShadowConfig() {
+        const explicit = super.getShadowConfig();
+        if (explicit) return explicit;
+        const maxZ = Math.max(this.hoverHeightBase || 18, 10);
+        return {
+            enabled: true,
+            widthRatio: 0.6,
+            heightRatio: 0.15,
+            anchorX: 0.5,
+            anchorY: 0.88,
+            maxOpacity: 0.45,
+            minOpacity: 0.10,
+            opacityFadeDistance: maxZ * 2.6,
+            scaleFadeDistance: maxZ * 1.8,
+            minScale: 0.6,
+            blur: 2
+        };
+    }
+
     // Override in subclass to manage posZ each frame (flight bobbing, landing lerp, etc.)
     updateFlightHeight() {}
 

@@ -62,8 +62,6 @@ class BirdMapObject extends AmbientCreatureMapObject {
         this._dbgFleeScore = 0;
         this._dbgDestValid = false;
 
-        this._shadowEl = null;
-
         if (this.mode === 'grounded') {
             this._applyGroundedSpeed();
         } else {
@@ -128,17 +126,23 @@ class BirdMapObject extends AmbientCreatureMapObject {
         }
     }
 
-    applyFlightLift() {
-        super.applyFlightLift();
-
-        if (this._shadowEl) {
-            const maxZ = Math.max(this.fleeAltitude, this.hoverHeightBase + 1);
-            const ratio = Math.min((this.posZ || 0) / maxZ, 1);
-            this._shadowEl.style.opacity = String(0.45 - ratio * 0.35);
-
-            const scale = 1 - ratio * 0.4;
-            this._shadowEl.style.transform = `translateX(-50%) scale(${scale.toFixed(3)})`;
-        }
+    getShadowConfig() {
+        const explicit = this.getVisualValue('shadow', this.getConfig('shadow', null));
+        if (explicit?.enabled) return explicit;
+        const maxZ = Math.max(this.fleeAltitude || 0, this.hoverHeightBase + 1);
+        return {
+            enabled: true,
+            widthRatio: 0.55,
+            heightRatio: 0.14,
+            anchorX: 0.5,
+            anchorY: 0.88,
+            maxOpacity: 0.45,
+            minOpacity: 0.10,
+            opacityFadeDistance: maxZ * 1.3,
+            scaleFadeDistance: maxZ * 0.9,
+            minScale: 0.6,
+            blur: 2
+        };
     }
 
     updateBehavior(tickDelta) {
@@ -640,11 +644,6 @@ class BirdMapObject extends AmbientCreatureMapObject {
     render(container, parent) {
         const element = super.render(container, parent);
         element.classList.add('bird', 'interactive');
-
-        this._shadowEl = document.createElement('div');
-        this._shadowEl.className = 'bird-shadow';
-        element.appendChild(this._shadowEl);
-
         return element;
     }
 

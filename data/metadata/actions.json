@@ -832,7 +832,7 @@
       "priority": 3,
       "isMovementAction": false,
       "isInterruptible": false,
-      "defaultDuration": 1000,
+      "defaultDuration": 500,
       "description": "Spin around in place",
       "requiresTarget": false,
       "affectsMood": true,

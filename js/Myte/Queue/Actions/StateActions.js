@@ -177,7 +177,7 @@ class SpinAction extends MyteAction {
         priority: 3,
         isMovementAction: false,
         isInterruptible: false,
-        defaultDuration: 1000,
+        defaultDuration: 500,
         description: 'Spin around in place',
         requiresTarget: false,
         affectsMood: true,
@@ -207,15 +207,45 @@ class SpinAction extends MyteAction {
         super.start();
     }
 
-    update() {
-        this.frameTimer--;
-        if (this.frameTimer <= 0) {
-            this.dirIndex = (this.dirIndex + 1) % this.directions.length;
-            this.frameTimer = this.frameDelay;
-            this.myte.setDirection(this.directions[this.dirIndex]);
-        }
+update() {
+    const progress = 1 - (this.currentDuration / this.duration);
 
-        this.currentDuration--;
-        return this.currentDuration <= 0;
+    // Exponential acceleration/deceleration
+    // Adjust these to control the curve feel
+    const accelExponent = 2.5;
+    const decelExponent = 2.0;
+
+    let speedCurve;
+
+    if (progress < 0.5) {
+        // Accelerate
+        const t = progress / 0.5;
+        speedCurve = Math.pow(t, accelExponent);
+    } else {
+        // Decelerate
+        const t = (progress - 0.5) / 0.5;
+        speedCurve = 1 - Math.pow(t, decelExponent);
     }
+
+    // Speed control
+    // Smaller delay = faster spinning
+    const maxDelay = 12; // slowest speed
+    const minDelay = 4;  // fastest speed
+
+    const currentFrameDelay =
+        maxDelay - ((maxDelay - minDelay) * speedCurve);
+
+    this.frameTimer--;
+
+    if (this.frameTimer <= 0) {
+        this.dirIndex = (this.dirIndex + 1) % this.directions.length;
+
+        this.frameTimer = currentFrameDelay;
+
+        this.myte.setDirection(this.directions[this.dirIndex]);
+    }
+
+    this.currentDuration--;
+    return this.currentDuration <= 0;
+}
 }
