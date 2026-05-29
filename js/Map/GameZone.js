@@ -16,6 +16,12 @@ const ZONE_THRESHOLD = {
 };
 
 class Zone {
+    static _definitions = new Map();
+
+    static loadDefinitions(defsArray) {
+        defsArray.forEach(def => Zone._definitions.set(def.id, def));
+    }
+
     constructor(data, map) {
         this.map = map;
         this.id = data.id;
@@ -25,15 +31,19 @@ class Zone {
             ...SiteConfig.zones.defaults,
             ...data.properties
         };
-        
+
         // Track Mytes in the zone
         this.mytesInZone = new Set();
-        
+
         // Visual element if zone is visible
         this.element = null;
         if (this.properties.visible) {
             this.createVisualElement();
         }
+    }
+
+    _getZoneDef() {
+        return Zone._definitions.get(this.type) ?? null;
     }
 
     createVisualElement() {
@@ -248,155 +258,17 @@ class Zone {
     }
 
     onMyteEnter(myte) {
-        this.syncZoneBuff(myte, this.type !== ZONE_TYPES.FOOD);
-        
-        switch (this.type) {
-            case ZONE_TYPES.REST:
-                this.applyRestZoneEffects(myte);
-                break;
-            case ZONE_TYPES.PLAY:
-                this.applyPlayZoneEffects(myte);
-                break;
-            case ZONE_TYPES.FOOD:
-                this.applyFoodZoneEffects(myte);
-                break;
-            case ZONE_TYPES.SOCIAL:
-                this.applySocialZoneEffects(myte);
-                break;
-            case ZONE_TYPES.DANGER:
-                this.applyDangerZoneEffects(myte);
-                break;
-            case ZONE_TYPES.BOOST:
-                this.applyBoostZoneEffects(myte);
-                break;
-        }
+        // Stat effects are applied passively each tick in onMyteStay
     }
 
     onMyteExit(myte) {
-        this.syncZoneBuff(myte, false);
-        // Reset any temporary effects
-        switch (this.type) {
-            case ZONE_TYPES.REST:
-                myte.queue.clear();
-                break;
-            case ZONE_TYPES.DANGER:
-                // Stop running away
-                if (myte.goal === MOVE_TYPES.FREEROAM) {
-                    myte.setMode(myte.previousGoal);
-                }
-                break;
-        }
+        // Pass
     }
 
     onMyteStay(myte, deltaTime) {
-        this.syncZoneBuff(myte, this.type !== ZONE_TYPES.FOOD);
-        // Continue applying effects while Myte remains in zone
-        switch (this.type) {
-            case ZONE_TYPES.REST:
-                this.applyContinuousRestEffects(myte, deltaTime);
-                break;
-            case ZONE_TYPES.PLAY:
-                this.applyContinuousPlayEffects(myte, deltaTime);
-                break;
-            case ZONE_TYPES.SOCIAL:
-                this.applyContinuousSocialEffects(myte, deltaTime);
-                break;
-            case ZONE_TYPES.BOOST:
-                this.applyContinuousBoostEffects(myte, deltaTime);
-                break;
-        }
-    }
-
-    // Zone-specific effect implementations
-    applyRestZoneEffects(myte) {
-        // Make Myte more likely to rest/sleep
-        if (Math.random() < 0.3 && myte.queue.isEmpty()) {
-            myte.queue.addSleep(3000);
-        }
-    }
-
-    applyContinuousRestEffects(myte, deltaTime) {
-        this.applyContinuousStatEffects(myte, deltaTime);
-    }
-
-    applyPlayZoneEffects(myte) {
-        // Make Myte more playful
-        const chance = this.properties.enterActionChance ??
-            this.getTypeConfig().enterActionChance ??
-            0.2;
-        if (Math.random() < chance && myte.queue.isEmpty()) {
-            const actions = ['dance', 'spin', 'jump'];
-            const randomAction = actions[Math.floor(Math.random() * actions.length)];
-            myte.queue.add(randomAction);
-        }
-    }
-
-    applyContinuousPlayEffects(myte, deltaTime) {
-        this.applyContinuousStatEffects(myte, deltaTime);
-    }
-
-    applyFoodZoneEffects(myte) {
-        // Increase chance of food spawning near Myte
-        if (Math.random() < 0.1) {
-            const offset = {
-                x: (Math.random() - 0.5) * 100,
-                y: (Math.random() - 0.5) * 100
-            };
-            this.map?.addDroppedItem(
-                'FOOD',
-                'apple',
-                myte.posX + offset.x,
-                myte.posY + offset.y
-            );
-        }
-    }
-
-    applySocialZoneEffects(myte) {
-        // Make Mytes more likely to interact with each other
-        const nearbyMytes = Array.from(this.mytesInZone)
-            .map(id => this.map?.getMyteById(id))
-            .filter(m => m && m !== myte);
-
-        if (nearbyMytes.length > 0 && Math.random() < 0.2) {
-            const randomMyte = nearbyMytes[Math.floor(Math.random() * nearbyMytes.length)];
-            myte.queue.addShowAffection(randomMyte);
-        }
-    }
-
-    applyContinuousSocialEffects(myte, deltaTime) {
-        this.applyContinuousStatEffects(myte, deltaTime);
-    }
-
-    applyDangerZoneEffects(myte) {
-        const now = Date.now();
-        if (!this._dangerShockTimes) this._dangerShockTimes = new Map();
-        const lastShock = this._dangerShockTimes.get(myte.id) ?? 0;
-        if (now - lastShock > 10000) {
-            this._dangerShockTimes.set(myte.id, now);
-            myte.stats?.applyStatEffects?.({ moodBoost: -5 });
-        }
-
-        const centerX = this.bounds.x + this.bounds.width / 2;
-        const centerY = this.bounds.y + this.bounds.height / 2;
-        myte.queue.clear();
-        const angle = Math.atan2(myte.posY - centerY, myte.posX - centerX);
-        const safeDistance = 200;
-        myte.setTarget(
-            myte.posX + Math.cos(angle) * safeDistance,
-            myte.posY + Math.sin(angle) * safeDistance
-        );
-    }
-
-    applyBoostZoneEffects(myte) {
-        this.syncZoneBuff(myte, true);
-    }
-
-    applyContinuousBoostEffects(myte, deltaTime) {
-        this.applyContinuousStatEffects(myte, deltaTime);
-    }
-
-    applyContinuousStatEffects(myte, deltaTime) {
-        this.syncZoneBuff(myte, true);
+        const zoneDef = this._getZoneDef();
+        if (!zoneDef?.needEffectsPerMs) return;
+        myte.stats?.applyStatEffectsPerMs?.(zoneDef.needEffectsPerMs, deltaTime);
     }
 
 }
@@ -406,6 +278,13 @@ class ZoneManager {
     constructor(map) {
         this.parent = map;
         this.zones = new Map();
+
+        if (!Zone._definitions.size) {
+            fetch('data/metadata/zones.json')
+                .then(r => r.json())
+                .then(data => Zone.loadDefinitions(data.zones ?? []))
+                .catch(err => console.error('[ZoneManager] Failed to load zone definitions:', err));
+        }
     }
 
     addZone(zoneData) {

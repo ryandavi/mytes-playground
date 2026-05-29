@@ -91,7 +91,7 @@ const SiteConfig = Object.freeze({
                     id: 'ball_bump',
                     category: 'play',
                     affectsMood: true,
-                    moodEffect: 4,
+                    fun: 16,
                     rewardScale: 0.42
                 }),
             }),
@@ -167,9 +167,11 @@ const SiteConfig = Object.freeze({
         // Starting stat values for a freshly spawned myte
         initialStats: Object.freeze({
             energy:     75,
-            boredom:    28,
+            fun:        70,
+            social:     80,
+            hunger:     100,
             comfort:    72,
-            confidence: 58,
+            confidence: 0.55,
         }),
 
         // Thresholds that gate behavior, effects, and UI state

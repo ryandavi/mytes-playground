@@ -37,7 +37,7 @@
     "minThinkInterval": 450,
     "maxThinkInterval": 1800,
     "wanderRadius": 220,
-    "homeRadius": 320,
+    "safeAreaRadius": 320,
     "objectSearchRadius": 280,
     "socialRadius": 240,
     "preferences": {
@@ -45,34 +45,51 @@
       "light": 0.5,
       "harvest": 0.5,
       "coziness": 0.5
+    },
+    "driveWeights": {
+      "restDrive":    1.0,
+      "eatDrive":     1.0,
+      "playDrive":    1.0,
+      "socialDrive":  1.0,
+      "exploreDrive": 1.0,
+      "comfortDrive": 1.0,
+      "safetyDrive":  1.0
+    },
+    "funDeltaRates": {
+      "resting":    0.0022,
+      "stimulating": 0.0034,
+      "movement":   0.0006,
+      "idle":       0.0042,
+      "default":    0.0008,
+      "moving":     0.0002
     }
   },
   "stats": {
     "health": 100,
-    "mood": 100,
     "energy": 75,
+    "fun": 70,
+    "social": 80,
+    "hunger": 100,
     "speed": 1,
-    "moodDecayRate": 0.00018,
     "energyDecayRate": 0.00018,
     "energyRegenRate": 0.0012,
+    "funDecayRate": 0.0005,
+    "socialDecayRate": 0.0016,
+    "hungerDecayRate": 0.003,
     "needSignalCooldown": 90000,
     "behaviorDriveRate": 0.18,
     "noteBehaviorScale": 0.45,
-    "moodSyncRate": 0.00016,
     "fullChargeAnnounceCooldown": 30000,
     "fullChargeResetThreshold": 0.94,
+    "confidence": { "default": 0.5 },
+    "comfortBlendRate": 0.0016,
+    "eatEnergyBonus": 5,
+    "exhaustionThreshold": 0.05,
     "traits": {
-      "neediness": 0,
-      "activity": 0,
-      "curiosity": 0
-    },
-    "moods": {
-      "happy": { "duration": 10000, "speedMultiplier": 1.2, "expression": "happy" },
-      "sad": { "duration": 15000, "speedMultiplier": 0.8, "expression": "sad" },
-      "excited": { "duration": 8000, "speedMultiplier": 1.5, "expression": "excited" },
-      "sleepy": { "duration": 12000, "speedMultiplier": 0.7, "expression": "sleepy" },
-      "grumpy": { "duration": 10000, "speedMultiplier": 0.9, "expression": "grumpy" },
-      "neutral": { "duration": 5000, "speedMultiplier": 1, "expression": "neutral" }
+      "curiosity":   { "default": 0.5, "min": 0.1, "max": 0.9 },
+      "activity":    { "default": 0.5, "min": 0.1, "max": 0.9 },
+      "sociability": { "default": 0.5, "min": 0.0, "max": 1.0 },
+      "boldness":    { "default": 0.5, "min": 0.0, "max": 1.0 }
     }
   },
   "audio": {

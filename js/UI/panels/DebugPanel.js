@@ -432,27 +432,27 @@ class DebugPanel extends ModalWindow {
                 }
             },
             {
-                id: 'setMinMood',
+                id: 'setMinFun',
                 section: 'myte',
                 subgroup: 'stats',
                 type: 'action',
-                label: 'Min Mood',
+                label: 'Min Fun',
                 requiresActiveMyte: true,
                 action: () => {
                     const activeMyte = this.parent.parent.activeMyte;
-                    if (activeMyte?.isActive) activeMyte.stats.updateMood(-1000);
+                    if (activeMyte?.isActive) activeMyte.stats.updateFun(-1000);
                 }
             },
             {
-                id: 'setMaxMood',
+                id: 'setMaxFun',
                 section: 'myte',
                 subgroup: 'stats',
                 type: 'action',
-                label: 'Max Mood',
+                label: 'Max Fun',
                 requiresActiveMyte: true,
                 action: () => {
                     const activeMyte = this.parent.parent.activeMyte;
-                    if (activeMyte?.isActive) activeMyte.stats.updateMood(1000);
+                    if (activeMyte?.isActive) activeMyte.stats.updateFun(1000);
                 }
             },
             {

@@ -631,6 +631,16 @@ class MapObject {
 		}).filter(affordance => !this.isActionOccupied(affordance.actionId, actor));
 	}
 
+	getAIMetadata() {
+		return {
+			aiTags:           this.getConfig('ai.tags',            []),
+			comfortEffect:    this.getConfig('ai.comfortEffect',   0),
+			confidenceEffect: this.getConfig('ai.confidenceEffect', 0),
+			noveltyValue:     this.getConfig('ai.noveltyValue',    0),
+			scaryStrength:    this.getConfig('ai.scaryStrength',   0)
+		};
+	}
+
 	canBeInspectedByAi() {
 		return this.getConfig('canInspect', true) !== false &&
 			this.getConfig('interactionType') !== 'teleport' &&

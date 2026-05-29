@@ -302,30 +302,36 @@ In `MyteAction.interrupt()`: call `this.myte.stats.applyActionResult(this.buildA
 
 #### `js/Myte/MyteStats.js` — `applyActionResult()`
 
-Add `applyActionResult(result)`:
+Add `applyActionResult(result)`. In Phase 1, use existing stat methods — Phase 2 replaces them with the new need methods:
 
 ```js
 applyActionResult(result) {
-    const scale = this.noteBehaviorScale ?? 0.55;
+    const scale = this.noteBehaviorScale ?? 0.45;
 
-    if (result.funDelta)     this.updateFun(result.funDelta * scale);
-    if (result.socialDelta)  this.updateSocial(result.socialDelta * scale);
-    if (result.comfortDelta) this.updateComfort(result.comfortDelta * scale);
-    if (result.energyDelta)  this.updateEnergy(result.energyDelta * scale);
-    if (result.hungerDelta)  this.updateHunger(result.hungerDelta * scale);
+    // Use existing applyStatEffects — normalizeStatEffects already maps 'fun' to negative boredom
+    this.applyStatEffects({
+        fun:     result.funDelta,
+        comfort: result.comfortDelta,
+        energy:  result.energyDelta,
+    }, { scale });
 
-    // Confidence change based on outcome
+    // social stub: map to mood until Phase 2 adds updateSocial()
+    if (result.socialDelta) {
+        this.updateMood(result.socialDelta * scale * 0.3);
+    }
+
+    // confidence is 0–100 in Phase 1; use updateConfidence() directly
     if (result.failedOutcome) {
-        this.applyConfidenceDelta(-0.04);
+        this.updateConfidence(-4 * scale);
     } else if (result.safeOutcome) {
-        this.applyConfidenceDelta(result.novelty > 3 ? 0.04 : 0.02);
+        this.updateConfidence((result.novelty > 3 ? 4 : 2) * scale);
     }
 
     this.myte.buffs?.checkStatusTriggers?.();
 }
 ```
 
-Update `noteBehavior()` to call `applyActionResult()` internally — do not break existing callers.
+Phase 2 replaces this body with calls to `updateFun()`, `updateSocial()`, `updateHunger()` and `applyConfidenceDelta()` once those methods exist. Do not call `applyActionResult()` from inside `noteBehavior()` — they are independent call sites.
 
 #### All action `complete()` methods
 
@@ -1280,7 +1286,7 @@ getEnvironmentRatio
 - Confirm no buff ID matches any return value of `getDerivedMood()`
 - Confirm old buff IDs `cozy`, `lonely`, `playful` (buff) replaced by `well_settled`, `socially_depleted`, `energized`
 - Confirm no stale `_batchSessionActive` or `_batchSessionCounts` references
-- Update all `objectMemories.get(id)` read sites from raw timestamp to `.lastVisited`: `objectMemories.get(id)?.lastVisited ?? 0`
+- Confirm all `objectMemories.get(id)` read sites use `.lastCompletedAt` for recency and `.completedCount` for repeat counts — not raw timestamps
 
 ### Verify
 - Global grep for each term above — zero results in `js/Myte/` and `data/`
@@ -1288,4 +1294,4 @@ getEnvironmentRatio
 - Debug overlay shows: Needs / Traits + Confidence / Drives / Pressures / Active Buffs / Top Candidates — clearly separate, no mood meter
 - No console errors or undefined property accesses
 - Emergency return, rest, social, play, and explore behaviors all function correctly
-- `objectMemories` entries are objects with `lastVisited` and `visitCount` fields, not raw timestamps
+- `objectMemories` entries have `{completedCount, lastCompletedAt, lastActionId}` structure

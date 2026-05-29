@@ -300,7 +300,7 @@ class BallMapObject extends AnimatedMapObject {
             // Make the creature react
             myte.queue.addExpression('happy');
             const bumpReward = SiteConfig.stats.activityRewards.microInteractions.ballBump;
-            myte.stats?.applyActivityEffects?.(bumpReward, {
+            myte.stats?.applyStatEffects?.(bumpReward, {
                 scale: bumpReward.rewardScale
             });
             myte.buffs?.handleActionLike?.(bumpReward, {

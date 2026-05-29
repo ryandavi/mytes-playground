@@ -16,7 +16,7 @@
           "speedMultiplier": 0.82
         },
         "stats": {
-          "moodDecayMultiplier": 1.08,
+          "funDecayMultiplier": 1.08,
           "behaviorDriveMultiplier": 0.94
         }
       },
@@ -45,7 +45,7 @@
         },
         "stats": {
           "behaviorDriveMultiplier": 0.8,
-          "moodDecayMultiplier": 1.12
+          "funDecayMultiplier": 1.12
         }
       },
       "triggers": {
@@ -72,7 +72,7 @@
         },
         "stats": {
           "energyDecayMultiplier": 1.12,
-          "moodDecayMultiplier": 1.06
+          "funDecayMultiplier": 1.06
         }
       },
       "triggers": {
@@ -84,10 +84,58 @@
       }
     },
     {
+      "id": "hungry",
+      "label": "Hungry",
+      "kind": "debuff",
+      "category": "hunger",
+      "priority": 65,
+      "durationMs": 0,
+      "cancellable": false,
+      "icon": "HG",
+      "description": "Growing hunger makes it harder to focus.",
+      "effects": {
+        "stats": {
+          "funDecayMultiplier": 1.06
+        }
+      },
+      "triggers": {
+        "status": {
+          "conditions": [
+            { "stat": "hungerRatio", "lte": 0.3 },
+            { "stat": "hungerRatio", "gt": 0.05 }
+          ]
+        }
+      }
+    },
+    {
+      "id": "starving",
+      "label": "Starving",
+      "kind": "debuff",
+      "category": "hunger",
+      "priority": 95,
+      "durationMs": 0,
+      "cancellable": false,
+      "icon": "SV",
+      "description": "Severe hunger. Eating becomes the only priority.",
+      "effects": {
+        "movement": {
+          "speedMultiplier": 0.88
+        },
+        "stats": {
+          "funDecayMultiplier": 1.15
+        }
+      },
+      "triggers": {
+        "status": {
+          "conditions": [{ "stat": "hungerRatio", "lte": 0.05 }]
+        }
+      }
+    },
+    {
       "id": "spirited",
       "label": "Spirited",
       "kind": "buff",
-      "category": "mood",
+      "category": "fun",
       "priority": 30,
       "durationMs": 0,
       "cancellable": false,
@@ -98,14 +146,13 @@
           "speedMultiplier": 1.06
         },
         "stats": {
-          "moodDecayMultiplier": 0.9,
-          "moodSyncMultiplier": 1.08
+          "funDecayMultiplier": 0.9
         }
       },
       "triggers": {
         "status": {
           "conditions": [
-            { "stat": "moodRatio", "gte": 0.82 }
+            { "stat": "funRatio", "gte": 0.82 }
           ]
         }
       }
@@ -114,7 +161,7 @@
       "id": "gloomy",
       "label": "Gloomy",
       "kind": "debuff",
-      "category": "mood",
+      "category": "fun",
       "priority": 70,
       "durationMs": 0,
       "cancellable": false,
@@ -125,31 +172,30 @@
           "speedMultiplier": 0.9
         },
         "stats": {
-          "moodDecayMultiplier": 1.05,
-          "moodSyncMultiplier": 0.88
+          "funDecayMultiplier": 1.05
         }
       },
       "triggers": {
         "status": {
           "conditions": [
-            { "stat": "moodRatio", "lte": 0.25 }
+            { "stat": "funRatio", "lte": 0.25 }
           ]
         }
       }
     },
     {
-      "id": "cozy",
-      "label": "Cozy",
+      "id": "well_settled",
+      "label": "Well Settled",
       "kind": "buff",
       "category": "comfort",
       "priority": 28,
       "durationMs": 0,
       "cancellable": false,
       "icon": "CZ",
-      "description": "Deep comfort makes the world feel right. Mood holds steady and energy comes back easier.",
+      "description": "Deep comfort makes the world feel right. Fun holds steady and energy comes back easier.",
       "effects": {
         "stats": {
-          "moodDecayMultiplier": 0.88,
+          "funDecayMultiplier": 0.88,
           "energyRegenMultiplier": 1.06
         }
       },
@@ -203,7 +249,7 @@
           "speedMultiplier": 0.94
         },
         "stats": {
-          "moodDecayMultiplier": 1.06,
+          "funDecayMultiplier": 1.06,
           "behaviorDriveMultiplier": 0.92
         }
       },
@@ -230,14 +276,14 @@
           "speedMultiplier": 1.06
         },
         "stats": {
-          "moodDecayMultiplier": 1.06,
+          "funDecayMultiplier": 1.06,
           "behaviorDriveMultiplier": 1.06
         }
       },
       "triggers": {
         "status": {
           "conditions": [
-            { "stat": "boredomRatio", "gte": 0.72 }
+            { "stat": "funRatio", "lte": 0.28 }
           ]
         }
       }
@@ -252,14 +298,14 @@
       "reapplyCooldownMs": 45000,
       "cancellable": true,
       "icon": "ZR",
-      "description": "A good rest keeps energy recovery strong and mood loss softer.",
+      "description": "A good rest keeps energy recovery strong and fun loss softer.",
       "effects": {
         "movement": {
           "speedMultiplier": 1.04
         },
         "stats": {
           "energyRegenMultiplier": 1.15,
-          "moodDecayMultiplier": 0.86
+          "funDecayMultiplier": 0.86
         }
       },
       "triggers": {
@@ -272,8 +318,8 @@
       }
     },
     {
-      "id": "playful",
-      "label": "Playful",
+      "id": "energized",
+      "label": "Energized",
       "kind": "buff",
       "category": "fun",
       "priority": 25,
@@ -287,8 +333,7 @@
           "speedMultiplier": 1.08
         },
         "stats": {
-          "moodSyncMultiplier": 1.14,
-          "moodDecayMultiplier": 0.94
+          "funDecayMultiplier": 0.94
         }
       },
       "triggers": {
@@ -308,14 +353,13 @@
       "reapplyCooldownMs": 15000,
       "cancellable": true,
       "icon": "SO",
-      "description": "Positive social time steadies mood and confidence for a while.",
+      "description": "Positive social time steadies fun and confidence for a while.",
       "effects": {
         "movement": {
           "speedMultiplier": 1.03
         },
         "stats": {
-          "moodSyncMultiplier": 1.08,
-          "moodDecayMultiplier": 0.93
+          "funDecayMultiplier": 0.93
         }
       },
       "triggers": {
@@ -341,8 +385,7 @@
         },
         "stats": {
           "energyDecayMultiplier": 0.35,
-          "energyRegenMultiplier": 1.12,
-          "moodSyncMultiplier": 1.05
+          "energyRegenMultiplier": 1.12
         }
       }
     },
@@ -358,15 +401,14 @@
       "icon": "CH",
       "description": "A full recharge creates a short spark of momentum.",
       "instantEffects": {
-        "moodBoost": 2
+        "funBoost": 2
       },
       "effects": {
         "movement": {
           "speedMultiplier": 1.07
         },
         "stats": {
-          "energyDecayMultiplier": 0.92,
-          "moodSyncMultiplier": 1.08
+          "energyDecayMultiplier": 0.92
         }
       },
       "triggers": {
@@ -379,7 +421,7 @@
       "id": "thrilled",
       "label": "Thrilled",
       "kind": "buff",
-      "category": "mood",
+      "category": "fun",
       "priority": 26,
       "durationMs": 60000,
       "reapplyCooldownMs": 60000,
@@ -387,7 +429,7 @@
       "icon": "TH",
       "description": "Finding something exciting leaves a lasting rush.",
       "instantEffects": {
-        "moodBoost": 6,
+        "funBoost": 6,
         "confidenceBoost": 4
       },
       "effects": {
@@ -395,8 +437,7 @@
           "speedMultiplier": 1.1
         },
         "stats": {
-          "moodDecayMultiplier": 0.88,
-          "moodSyncMultiplier": 1.1,
+          "funDecayMultiplier": 0.88,
           "confidencePerMs": 0.0003
         }
       },
@@ -410,7 +451,7 @@
       "id": "harvest_joy",
       "label": "Harvest Joy",
       "kind": "buff",
-      "category": "mood",
+      "category": "fun",
       "priority": 24,
       "durationMs": 75000,
       "reapplyCooldownMs": 20000,
@@ -418,7 +459,7 @@
       "icon": "HJ",
       "description": "Gathering something grown leaves a warm, satisfied glow.",
       "instantEffects": {
-        "moodBoost": 4,
+        "funBoost": 4,
         "confidenceBoost": 3
       },
       "effects": {
@@ -426,7 +467,6 @@
           "speedMultiplier": 1.05
         },
         "stats": {
-          "moodSyncMultiplier": 1.08,
           "confidencePerMs": 0.00025
         }
       },
@@ -448,15 +488,14 @@
       "icon": "RF",
       "description": "A fresh drink leaves a light boost and a clearer head.",
       "instantEffects": {
-        "moodBoost": 3
+        "funBoost": 3
       },
       "effects": {
         "movement": {
           "speedMultiplier": 1.04
         },
         "stats": {
-          "energyDecayMultiplier": 0.94,
-          "moodSyncMultiplier": 1.05
+          "energyDecayMultiplier": 0.94
         }
       },
       "triggers": {
@@ -477,12 +516,12 @@
       "icon": "FB",
       "description": "A pleasant scent lingers and softens the mood for a while.",
       "instantEffects": {
-        "moodBoost": 3,
+        "funBoost": 3,
         "comfortBoost": 2
       },
       "effects": {
         "stats": {
-          "moodDecayMultiplier": 0.92,
+          "funDecayMultiplier": 0.92,
           "comfortPerMs": 0.0001
         }
       },
@@ -505,8 +544,7 @@
       "description": "A fresh sense of curiosity makes the world feel a little less dull.",
       "effects": {
         "stats": {
-          "behaviorDriveMultiplier": 1.08,
-          "moodSyncMultiplier": 1.04
+          "behaviorDriveMultiplier": 1.08
         }
       },
       "triggers": {
@@ -519,7 +557,7 @@
       "id": "disturbed",
       "label": "Disturbed",
       "kind": "debuff",
-      "category": "mood",
+      "category": "fun",
       "priority": 55,
       "durationMs": 25000,
       "reapplyCooldownMs": 30000,
@@ -527,122 +565,11 @@
       "icon": "DS",
       "description": "Being woken up mid-rest leaves a sour feeling.",
       "instantEffects": {
-        "moodBoost": -3
+        "funBoost": -3
       },
       "effects": {
         "stats": {
-          "moodDecayMultiplier": 1.1,
-          "moodSyncMultiplier": 0.9
-        }
-      }
-    },
-    {
-      "id": "mood_happy",
-      "label": "Happy",
-      "kind": "buff",
-      "category": "mood",
-      "priority": 5,
-      "durationMs": 0,
-      "cancellable": false,
-      "hidden": true,
-      "effects": {
-        "movement": {
-          "speedMultiplier": 1.2
-        }
-      },
-      "triggers": {
-        "status": {
-          "conditions": [
-            { "stat": "currentMood", "eq": "happy" }
-          ]
-        }
-      }
-    },
-    {
-      "id": "mood_excited",
-      "label": "Excited",
-      "kind": "buff",
-      "category": "mood",
-      "priority": 6,
-      "durationMs": 0,
-      "cancellable": false,
-      "hidden": true,
-      "effects": {
-        "movement": {
-          "speedMultiplier": 1.5
-        }
-      },
-      "triggers": {
-        "status": {
-          "conditions": [
-            { "stat": "currentMood", "eq": "excited" }
-          ]
-        }
-      }
-    },
-    {
-      "id": "mood_sleepy",
-      "label": "Sleepy",
-      "kind": "debuff",
-      "category": "mood",
-      "priority": 6,
-      "durationMs": 0,
-      "cancellable": false,
-      "hidden": true,
-      "effects": {
-        "movement": {
-          "speedMultiplier": 0.7
-        }
-      },
-      "triggers": {
-        "status": {
-          "conditions": [
-            { "stat": "currentMood", "eq": "sleepy" }
-          ]
-        }
-      }
-    },
-    {
-      "id": "mood_sad",
-      "label": "Sad",
-      "kind": "debuff",
-      "category": "mood",
-      "priority": 6,
-      "durationMs": 0,
-      "cancellable": false,
-      "hidden": true,
-      "effects": {
-        "movement": {
-          "speedMultiplier": 0.8
-        }
-      },
-      "triggers": {
-        "status": {
-          "conditions": [
-            { "stat": "currentMood", "eq": "sad" }
-          ]
-        }
-      }
-    },
-    {
-      "id": "mood_grumpy",
-      "label": "Grumpy",
-      "kind": "debuff",
-      "category": "mood",
-      "priority": 6,
-      "durationMs": 0,
-      "cancellable": false,
-      "hidden": true,
-      "effects": {
-        "movement": {
-          "speedMultiplier": 0.9
-        }
-      },
-      "triggers": {
-        "status": {
-          "conditions": [
-            { "stat": "currentMood", "eq": "grumpy" }
-          ]
+          "funDecayMultiplier": 1.1
         }
       }
     },
@@ -650,7 +577,7 @@
       "id": "object_uplifted",
       "label": "Uplifted",
       "kind": "buff",
-      "category": "mood",
+      "category": "fun",
       "priority": 16,
       "durationMs": 45000,
       "reapplyCooldownMs": 10000,
@@ -658,12 +585,11 @@
       "icon": "UP",
       "description": "A pleasant interaction leaves a small afterglow.",
       "instantEffects": {
-        "moodBoost": 5
+        "funBoost": 5
       },
       "effects": {
         "stats": {
-          "moodDecayMultiplier": 0.95,
-          "moodSyncMultiplier": 1.04
+          "funDecayMultiplier": 0.95
         }
       }
     },
@@ -679,14 +605,14 @@
       "icon": "LT",
       "description": "A fresh bit of light makes the world feel better.",
       "instantEffects": {
-        "moodBoost": 5
+        "funBoost": 5
       },
       "effects": {
         "movement": {
           "speedMultiplier": 1.03
         },
         "stats": {
-          "moodDecayMultiplier": 0.94,
+          "funDecayMultiplier": 0.94,
           "comfortPerMs": 0.00008
         }
       }
@@ -703,16 +629,14 @@
       "icon": "MU",
       "description": "Starting the music lifts the mood right away.",
       "instantEffects": {
-        "moodBoost": 4,
-        "funBoost": 2
+        "funBoost": 4
       },
       "effects": {
         "movement": {
           "speedMultiplier": 1.04
         },
         "stats": {
-          "moodDecayMultiplier": 0.95,
-          "moodSyncMultiplier": 1.05
+          "funDecayMultiplier": 0.95
         }
       }
     },
@@ -728,12 +652,12 @@
       "icon": "PT",
       "description": "Gentle petting leaves a cozy, content feeling behind.",
       "instantEffects": {
-        "moodBoost": 5,
+        "funBoost": 5,
         "comfortBoost": 3
       },
       "effects": {
         "stats": {
-          "moodDecayMultiplier": 0.92,
+          "funDecayMultiplier": 0.92,
           "comfortPerMs": 0.00014
         }
       }
@@ -750,7 +674,7 @@
       "icon": "OS",
       "description": "Too much fussing leaves the myte a little rattled.",
       "instantEffects": {
-        "moodBoost": -2,
+        "funBoost": -2,
         "comfortBoost": -2
       },
       "effects": {
@@ -758,7 +682,7 @@
           "speedMultiplier": 0.96
         },
         "stats": {
-          "moodDecayMultiplier": 1.08,
+          "funDecayMultiplier": 1.08,
           "behaviorDriveMultiplier": 1.04
         }
       }
@@ -775,7 +699,7 @@
       "description": "The fountain's sound softens the moment while you stay nearby.",
       "effects": {
         "stats": {
-          "moodPerMs": 0.0001,
+          "funPerMs": 0.0001,
           "comfortPerMs": 0.00006
         }
       }
@@ -792,7 +716,6 @@
       "description": "Warm light makes the space feel safer and more comfortable.",
       "effects": {
         "stats": {
-          "moodPerMs": 0.00008,
           "comfortPerMs": 0.00012
         }
       }
@@ -809,8 +732,8 @@
       "description": "Nearby music keeps things lively while it plays.",
       "effects": {
         "stats": {
-          "moodPerMs": 0.000125,
-          "funPerMs": 0.00018,
+          "funPerMs": 0.00012,
+          "comfortPerMs": 0.00006,
           "confidencePerMs": 0.00004
         }
       }
@@ -827,7 +750,6 @@
       "description": "This area supports rest and comfort while you remain inside.",
       "effects": {
         "stats": {
-          "moodPerMs": 0.00045,
           "funPerMs": 0.00055,
           "comfortPerMs": 0.00085,
           "confidencePerMs": 0.0002
@@ -846,7 +768,6 @@
       "description": "Play feels more rewarding while you're in this area.",
       "effects": {
         "stats": {
-          "moodPerMs": 0.00065,
           "funPerMs": 0.0015,
           "comfortPerMs": 0.0001,
           "confidencePerMs": 0.0004
@@ -862,10 +783,9 @@
       "durationMs": 0,
       "cancellable": false,
       "icon": "SZ",
-      "description": "Social spaces keep mood and confidence steadier over time.",
+      "description": "Social spaces keep fun and confidence steadier over time.",
       "effects": {
         "stats": {
-          "moodPerMs": 0.00045,
           "funPerMs": 0.00085,
           "comfortPerMs": 0.00035,
           "confidencePerMs": 0.00065
@@ -884,7 +804,7 @@
       "description": "Danger keeps the myte on edge while they remain inside.",
       "effects": {
         "stats": {
-          "moodDecayMultiplier": 1.12,
+          "funDecayMultiplier": 1.12,
           "confidencePerMs": -0.00035
         }
       }
@@ -901,7 +821,7 @@
       "description": "Being near another myte brings a warm sense of connection.",
       "effects": {
         "stats": {
-          "moodPerMs": 0.00012,
+          "funPerMs": 0.00012,
           "comfortPerMs": 0.00008,
           "confidencePerMs": 0.00005
         }
@@ -911,7 +831,7 @@
       "id": "struggling",
       "label": "Struggling",
       "kind": "debuff",
-      "category": "mood",
+      "category": "fun",
       "priority": 60,
       "durationMs": 0,
       "cancellable": false,
@@ -922,7 +842,7 @@
           "speedMultiplier": 0.82
         },
         "stats": {
-          "moodDecayMultiplier": 1.15,
+          "funDecayMultiplier": 1.15,
           "energyDecayMultiplier": 1.1,
           "behaviorDriveMultiplier": 1.08
         }
@@ -930,8 +850,9 @@
       "triggers": {
         "status": {
           "anyConditions": [
-            { "stat": "energy", "lt": 8 },
-            { "stat": "mood", "lt": 8 }
+            { "stat": "energyRatio", "lte": 0.08 },
+            { "stat": "funRatio", "lte": 0.08 },
+            { "stat": "socialRatio", "lte": 0.08 }
           ]
         }
       }

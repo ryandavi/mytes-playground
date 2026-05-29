@@ -466,7 +466,6 @@ class SurfaceSlotAction extends GoToObjectAction {
     interrupt() {
         const isDragInterrupt = !!this.myte.isDragging;
         if (this.phase === 'rest' || this.phase === 'settle' || isDragInterrupt) {
-            this.myte.stats?.setMood?.('grumpy');
             this.myte.buffs?.applyBuff?.('disturbed', { source: 'interrupt' });
         }
         this.finishSurfacePlacement({ snapToExit: !isDragInterrupt });

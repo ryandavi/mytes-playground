@@ -908,8 +908,10 @@ class DebugOverlayUI {
 
         const status = activeMyte.stats.getStatus();
         return [
-            { label: 'Mood',        value: `${activeMyte.stats.mood.toFixed(1)} (${activeMyte.stats.getMoodStatus()})` },
-            { label: 'Boredom',     value: activeMyte.stats.boredom.toFixed(1) },
+            { label: 'Mood',        value: activeMyte.stats.getDerivedMood() },
+            { label: 'Fun',         value: activeMyte.stats.fun.toFixed(1) },
+            { label: 'Social',      value: activeMyte.stats.social.toFixed(1) },
+            { label: 'Hunger',      value: activeMyte.stats.hunger.toFixed(1) },
             { label: 'Comfort',     value: activeMyte.stats.comfort.toFixed(1) },
             { label: 'Confidence',  value: activeMyte.stats.confidence.toFixed(1) },
             { label: 'Speed',       value: activeMyte.stats.getSpeed() },
@@ -953,22 +955,25 @@ class DebugOverlayUI {
         const aiState    = activeMyte?.ai?.getDebugState?.();
         if (!activeMyte || !aiState) return [];
 
-        const needs = aiState.context?.needs || {};
-        const fmt   = v => (v == null ? 'N/A' : Number(v).toFixed(2));
+        const drives = aiState.context?.drives || {};
+        const fmt    = v => (v == null ? 'N/A' : Number(v).toFixed(2));
 
         const candidateRows = (aiState.candidates || [])
             .slice(0, 5)
             .map((candidate, index) => this.formatAiCandidate(candidate, index));
 
         return [
-            { label: 'Decision',     value: aiState.lastDecisionLabel ? this.prettifyAiPath(aiState.lastDecisionLabel) : 'N/A' },
-            { label: 'Social',       value: fmt(needs.social) },
-            { label: 'Enrichment',   value: fmt(needs.enrichment) },
-            { label: 'Play',         value: fmt(needs.play) },
-            { label: 'Comfort',      value: fmt(needs.comfort) },
-            { label: 'Light need',   value: fmt(aiState.context?.lightNeed) },
-            { label: 'Music need',   value: fmt(aiState.context?.musicNeed) },
-            { label: 'Local light',  value: fmt(aiState.context?.localLightLevel) },
+            { label: 'Decision',    value: aiState.lastDecisionLabel ? this.prettifyAiPath(aiState.lastDecisionLabel) : 'N/A' },
+            { label: 'Rest',        value: fmt(drives.restDrive) },
+            { label: 'Eat',         value: fmt(drives.eatDrive) },
+            { label: 'Play',        value: fmt(drives.playDrive) },
+            { label: 'Social',      value: fmt(drives.socialDrive) },
+            { label: 'Explore',     value: fmt(drives.exploreDrive) },
+            { label: 'Comfort',     value: fmt(drives.comfortDrive) },
+            { label: 'Safety',      value: fmt(drives.safetyDrive) },
+            { label: 'Light need',  value: fmt(aiState.context?.lightNeed) },
+            { label: 'Music need',  value: fmt(aiState.context?.musicNeed) },
+            { label: 'Local light', value: fmt(aiState.context?.localLightLevel) },
             ...candidateRows
         ];
     }

@@ -10,7 +10,7 @@ class MyteAI {
         this.minThinkInterval = aiConfig.minThinkInterval ?? SiteConfig.ai.timing.minThinkInterval;
         this.maxThinkInterval = aiConfig.maxThinkInterval ?? SiteConfig.ai.timing.maxThinkInterval;
         this.wanderRadius = aiConfig.wanderRadius ?? SiteConfig.ai.radii.wander;
-        this.homeRadius = aiConfig.homeRadius ?? SiteConfig.ai.radii.home;
+        this.safeAreaRadius = aiConfig.safeAreaRadius ?? aiConfig.homeRadius ?? SiteConfig.ai.radii.home;
         this.objectSearchRadius = aiConfig.objectSearchRadius ?? SiteConfig.ai.radii.objectSearch;
         this.socialRadius = aiConfig.socialRadius ?? SiteConfig.ai.radii.social;
         this.playRadius = aiConfig.playRadius ?? SiteConfig.ai.radii.play;
@@ -33,6 +33,7 @@ class MyteAI {
         this.lastCandidateSnapshot = [];
 
         this._tickTime = 0;
+        this._scaryObjectDetectedThisTick = false;
     }
 
     resolveMode(mode) {
@@ -61,6 +62,7 @@ class MyteAI {
 
     tickUpdate(tickDelta) {
         this._tickTime++;
+        this._scaryObjectDetectedThisTick = false;
 
         if (!this.canPlan()) {
             this.resetThinking();
@@ -95,9 +97,9 @@ class MyteAI {
 
     getThinkInterval() {
         const activity = this.myte.stats?.getTraitNormalized?.('activity') ?? 0.5;
-        const boredom = this.myte.stats?.getBoredomRatio?.() ?? 0.25;
+        const funRatio = this.myte.stats?.getFunRatio?.() ?? 0.75;
         const energy = this.myte.stats?.getEnergyRatio?.() ?? 1;
-        const activityModifier = 1.24 - (activity * 0.42) - (boredom * 0.18);
+        const activityModifier = 1.24 - (activity * 0.42) - ((1 - funRatio) * 0.18);
         const energyModifier = energy < 0.3 ? 1.22 : 1;
 
         return Utility.clamp(
@@ -115,7 +117,7 @@ class MyteAI {
             return false;
         }
 
-        return this.executeEmergencyHomeReturn(this.buildContext());
+        return this.executeSafeReturn(this.buildContext());
     }
 
     planNextAction() {
@@ -123,14 +125,14 @@ class MyteAI {
 
         const context = this.buildContext();
         const candidates = [
-            this.buildEmergencyHomeCandidate(context),
+            this.buildSafeReturnCandidate(context),
             this.buildRestCandidate(context),
+            this.buildEatCandidate(context),
             this.buildHomeComfortCandidate(context),
             this.buildSocialCandidate(context),
             this.buildPlayCandidate(context),
             this.buildDroppedItemCandidate(context),
             this.buildInteractionCandidate(context),
-            this.buildNeedZoneCandidate(context),
             this.buildWanderCandidate(context),
             this.buildIdleCandidate(context)
         ]
@@ -176,17 +178,61 @@ class MyteAI {
         return chosen;
     }
 
-    buildContext() {
+    _buildNeedsSnapshot() {
         const stats = this.myte.stats;
-        const energy = stats?.getEnergyRatio?.() ?? 1;
-        const health = stats?.getHealthRatio?.() ?? 1;
-        const mood = stats?.getMoodRatio?.() ?? 1;
-        const boredom = stats?.getBoredomRatio?.() ?? 0.25;
-        const comfort = stats?.getComfortRatio?.() ?? 0.7;
-        const confidence = stats?.getConfidenceRatio?.() ?? 0.55;
-        const activity = stats?.getTraitNormalized?.('activity') ?? 0.5;
-        const curiosity = stats?.getTraitNormalized?.('curiosity') ?? 0.5;
-        const neediness = stats?.getTraitNormalized?.('neediness') ?? 0.5;
+        return {
+            stats,
+            energy:      stats?.getEnergyRatio?.()               ?? 1,
+            health:      stats?.getHealthRatio?.()               ?? 1,
+            fun:         stats?.getFunRatio?.()                  ?? 0.5,
+            social:      stats?.getSocialRatio?.()               ?? 0.5,
+            hunger:      stats?.getHungerRatio?.()               ?? 0.5,
+            comfort:     stats?.getComfortRatio?.()              ?? 0.7,
+            confidence:  stats?.getConfidenceRatio?.()           ?? 0.5,
+            activity:    stats?.getTraitNormalized?.('activity')    ?? 0.5,
+            curiosity:   stats?.getTraitNormalized?.('curiosity')   ?? 0.5,
+            sociability: stats?.getTraitNormalized?.('sociability') ?? 0.5,
+            boldness:    stats?.getTraitNormalized?.('boldness')    ?? 0.5
+        };
+    }
+
+    _computeDrives(needs, spatialContext) {
+        const { fun, social, hunger, energy, comfort, confidence, activity, curiosity, sociability } = needs;
+        const { distanceFromHome, nearbyObjects, isExhausted } = spatialContext;
+
+        const energyModifier             = Math.max(0, energy);
+        const exhaustionModifier         = isExhausted ? 2.0 : 1.0;
+        const normalizedDistanceFromSafe = Utility.clamp(distanceFromHome / Math.max(this.safeAreaRadius, 1), 0, 1);
+
+        const objectCount    = nearbyObjects?.length ?? 0;
+        const unvisitedCount = nearbyObjects
+            ? nearbyObjects.filter(obj => !this.objectMemories.has(this.getTargetKey(obj))).length
+            : 0;
+        const noveltyHunger         = objectCount > 0 ? unvisitedCount / objectCount : curiosity * 0.2;
+        const effectiveNoveltyHunger = Math.max(curiosity * 0.2, noveltyHunger);
+
+        const drives = {
+            restDrive:    1 - energy,
+            eatDrive:     1 - hunger,
+            playDrive:    (1 - fun) * Math.max(0.15, curiosity * activity) * energyModifier,
+            socialDrive:  ((1 - social) * (0.5 + sociability)) + (0.08 * sociability),
+            exploreDrive: curiosity * effectiveNoveltyHunger * confidence * energyModifier,
+            comfortDrive: 1 - comfort,
+            safetyDrive:  (1 - confidence) * normalizedDistanceFromSafe * exhaustionModifier
+        };
+
+        const weights = this.myte?.definition?.ai?.driveWeights ?? {};
+        for (const key of Object.keys(drives)) {
+            drives[key] = Utility.clamp(drives[key] * (weights[key] ?? 1.0), 0, 1);
+        }
+
+        return drives;
+    }
+
+    buildContext() {
+        const snapshot = this._buildNeedsSnapshot();
+        const { stats, energy, health, fun, social, hunger, comfort, confidence, activity, curiosity, sociability } = snapshot;
+
         const nearbyMytes = this.getNearbyMytes(this.socialRadius);
         const nearbyObjects = this.getNearbyObjects(this.objectSearchRadius);
         const droppedItems = this.getNearbyDroppedItems(this.objectSearchRadius);
@@ -203,81 +249,70 @@ class MyteAI {
         const nearbyActiveMusicSources = nearbyMusicSources.filter(target => target?.isActiveMusicSource?.());
         const ambientLightLevel = Utility.clamp(timeData.lightLevel ?? 1, 0, 1);
         const localLightLevel = Utility.clamp(ambientLightLevel + Math.min(nearbyActiveLights.length * 0.28, 0.6), 0, 1);
-        const moodNeed = 1 - mood;
-        const comfortNeed = 1 - comfort;
-        const lightNeed = Utility.clamp((0.45 - localLightLevel) / 0.45, 0, 1) * (0.45 + (preferences.light * 0.55));
+
+        const isExhausted = snapshot.stats?.isExhausted === true;
+        const drives = this._computeDrives(snapshot, {
+            distanceFromHome, nearbyObjects, isExhausted
+        });
+
+        if (!this._scaryObjectDetectedThisTick) {
+            const hasScaryNearby = nearbyObjects.some(target => {
+                const meta = target.getAIMetadata?.();
+                return (meta?.scaryStrength ?? 0) > 0;
+            });
+            if (hasScaryNearby) {
+                this._scaryObjectDetectedThisTick = true;
+                snapshot.stats?.applyConfidenceDelta?.(-0.05);
+            }
+        }
+
+        const lightNeed = Utility.clamp(
+            (0.45 - localLightLevel) / 0.45, 0, 1
+        ) * (0.45 + (preferences.light * 0.55));
         const musicNeed = Utility.clamp(
             (preferences.music * 0.46) +
-            (boredom * 0.32) +
-            (moodNeed * 0.18) -
+            ((1 - fun) * 0.32) +
+            ((1 - (fun * 0.6 + social * 0.4)) * 0.18) -
             (nearbyActiveMusicSources.length > 0 ? 0.42 : 0),
-            0,
-            1
+            0, 1
         );
-        const homeNeed = Utility.clamp(
-            (distanceFromHome - (this.homeRadius * 0.55)) / Math.max(this.homeRadius * 1.35, 1),
-            0,
-            1
-        );
+
         return {
             stats,
-            energy,
-            health,
-            mood,
-            moodNeed,
-            boredom,
-            comfort,
-            comfortNeed,
-            confidence,
-            activity,
-            curiosity,
-            neediness,
+            energy, health, fun, social, hunger, comfort, confidence,
+            activity, curiosity, sociability,
             preferences,
             timeOfDay: timeData.timeOfDay ?? 'day',
-            ambientLightLevel,
-            localLightLevel,
-            lightNeed,
-            musicNeed,
-            nearbyLights,
-            nearbyActiveLights,
-            nearbyMusicSources,
-            nearbyActiveMusicSources,
-            nearbyMytes,
-            nearbyObjects,
-            droppedItems,
-            nearbyZones,
-            activeZones,
+            ambientLightLevel, localLightLevel,
+            lightNeed, musicNeed,
+            nearbyLights, nearbyActiveLights,
+            nearbyMusicSources, nearbyActiveMusicSources,
+            nearbyMytes, nearbyObjects, droppedItems,
+            nearbyZones, activeZones,
             activeZoneTypes: activeZones.map(zone => zone.type),
-            home,
-            distanceFromHome,
+            home, distanceFromHome,
             getNoveltyScore: (target) => this.getNoveltyScore(target),
-            needs: {
-                social: Utility.clamp((neediness * 0.44) + (moodNeed * 0.22) + (boredom * 0.34), 0, 1),
-                enrichment: Utility.clamp((curiosity * 0.42) + (boredom * 0.44) + (comfortNeed * 0.14), 0, 1),
-                play: Utility.clamp((activity * 0.42) + (energy * 0.2) + (boredom * 0.38) - ((1 - energy) * 0.24), 0, 1),
-                comfort: Utility.clamp((comfortNeed * 0.52) + (homeNeed * 0.24) + (lightNeed * 0.24), 0, 1),
-                home: homeNeed
-            }
+            drives
         };
     }
 
-    buildEmergencyHomeCandidate(context) {
+    buildSafeReturnCandidate(context) {
         if (context.energy > 0) {
             return null;
         }
 
         return {
-            label: 'emergency:go_home',
+            label: 'safe_return:go_home',
             targetKey: 'home',
             commitmentMs: 3200,
             score: 999,
             execute: () => {
-                this.executeEmergencyHomeReturn(context);
+                this.executeSafeReturn(context);
             }
         };
     }
 
-    executeEmergencyHomeReturn(context) {
+    executeSafeReturn(context) {
         const safeHome = this.findHomeComfortTarget(context?.home ?? this.getHomePosition());
         if (!safeHome) {
             return false;
@@ -289,24 +324,58 @@ class MyteAI {
         if (distanceToHome > 8) {
             this.myte.queue.addAStarMove(safeHome);
             this.setDecisionLock(3200);
-            this.lastDecisionLabel = 'emergency:go_home';
+            this.lastDecisionLabel = 'safe_return:go_home';
             this.lastDecisionTime = SimClock.now();
             this.lastDecisionTargetKey = 'home';
             return true;
         }
 
         this.enqueueAction('sleep', { duration: 220 }, {
-            label: 'emergency:sleep',
+            label: 'safe_return:sleep',
             category: 'rest',
             novelty: 0,
             soothing: 1,
             accomplishment: 0.05
         });
         this.setDecisionLock(2200);
-        this.lastDecisionLabel = 'emergency:sleep';
+        this.lastDecisionLabel = 'safe_return:sleep';
         this.lastDecisionTime = SimClock.now();
         this.lastDecisionTargetKey = 'home';
         return true;
+    }
+
+    buildEatCandidate(context) {
+        if (context.drives.eatDrive < 0.28) {
+            return null;
+        }
+
+        const foodTarget = this.findTargetWithAffordance(context.nearbyObjects, 'eat_element', context);
+        if (!foodTarget) {
+            return null;
+        }
+
+        const distance = this.myte.getDistanceTo?.(foodTarget) ?? Infinity;
+        let score = 14 + (context.drives.eatDrive * 72) + Math.max(0, 160 - distance) * 0.1;
+        if (context.drives.eatDrive > 0.75) score += 18;
+
+        const label = 'eat:eat_element';
+        const targetKey = this.getTargetKey(foodTarget);
+
+        return {
+            label,
+            targetKey,
+            commitmentMs: 1800,
+            score: this.applyRepeatPenalty(score, label, targetKey),
+            execute: () => {
+                this.enqueueTargetedAction('eat_element', foodTarget, {}, {
+                    label,
+                    category: 'rest',
+                    novelty: this.getNoveltyScore(foodTarget),
+                    soothing: 0.6,
+                    accomplishment: 0.4
+                });
+            }
+        };
     }
 
     getAIPreferences() {
@@ -330,9 +399,9 @@ class MyteAI {
         }
 
         const nearbySurface = this.findTargetWithAffordance(context.nearbyObjects, 'use_surface_slot', context);
-        let score = 16 + ((1 - context.energy) * 84) + (context.needs.comfort * 18);
+        let score = 16 + (context.drives.restDrive * 84) + (context.drives.comfortDrive * 18);
         if (this.mode === MOVE_AUTONOMY_TYPES.REST) score += 36;
-        if (context.distanceFromHome > this.homeComfortRadius) score += context.needs.home * 14;
+        if (context.distanceFromHome > this.homeComfortRadius) score += context.drives.safetyDrive * 14;
         score += context.preferences.coziness * 10;
 
         if (score < 28) {
@@ -371,17 +440,16 @@ class MyteAI {
                     soothing: 0.85,
                     accomplishment: 0.1
                 });
-                context.stats.setMood?.('sleepy');
             }
         };
     }
 
     buildHomeComfortCandidate(context) {
-        if (context.distanceFromHome <= this.homeComfortRadius || context.needs.home < 0.12) {
+        if (context.distanceFromHome <= this.homeComfortRadius || context.drives.safetyDrive < 0.12) {
             return null;
         }
 
-        let score = 8 + (context.needs.home * 42) + (context.needs.comfort * 22) + ((1 - context.energy) * 10);
+        let score = 8 + (context.drives.safetyDrive * 42) + (context.drives.comfortDrive * 22) + (context.drives.restDrive * 10);
         if (context.energy < 0.35) score += 10;
 
         if (score < 24) {
@@ -413,7 +481,15 @@ class MyteAI {
             return null;
         }
 
-        let score = 14 + (context.needs.social * 52);
+        // Phase 3: skip unknown Mytes when confidence is low
+        const target = context.nearbyMytes.find(myte => {
+            const key = this.getTargetKey(myte);
+            const isKnown = this.objectMemories.has(key);
+            return isKnown || context.confidence >= 0.5;
+        });
+        if (!target) return null;
+
+        let score = 14 + (context.drives.socialDrive * 52);
         if (this.mode === MOVE_AUTONOMY_TYPES.SOCIAL) score += 34;
         if (context.energy < 0.25) score -= 18;
         if (context.confidence < 0.3) score -= 6;
@@ -421,12 +497,10 @@ class MyteAI {
         if (score < 26) {
             return null;
         }
-
-        const target = context.nearbyMytes[0];
-        const wantsPlay = context.needs.play > 0.74 && context.energy > 0.6 && context.boredom > 0.35;
+        const wantsPlay = context.drives.playDrive > 0.74 && context.energy > 0.6 && context.drives.playDrive > 0.35;
         const actionId = wantsPlay
             ? 'play_tag'
-            : (context.moodNeed > 0.42 || context.neediness > 0.62 ? 'show_affection' : 'greet');
+            : (context.drives.comfortDrive > 0.42 || context.sociability > 0.62 ? 'show_affection' : 'greet');
         const label = `social:${actionId}`;
 
         return {
@@ -454,29 +528,29 @@ class MyteAI {
         // while need remains elevated instead of quitting after one round.
         const hasBall = this.findTargetWithAffordance(context.nearbyObjects, 'nudge_ball', context) != null;
         const playNeedFloor = hasBall ? 0.28 : 0.4;
-        if (context.energy < energyFloor || context.needs.play < playNeedFloor) {
+        if (context.energy < energyFloor || context.drives.playDrive < playNeedFloor) {
             return null;
         }
 
         const targetBall = this.findTargetWithAffordance(context.nearbyObjects, 'nudge_ball', context);
         const targetAnchor = targetBall ?? this.getPlayAnchorTarget(context.nearbyObjects);
         const playMomentum = Utility.clamp(
-            (context.needs.play * 0.5) +
+            (context.drives.playDrive * 0.5) +
             (context.activity * 0.28) +
             (context.energy * 0.22),
             0,
             1
         );
-        let score = 10 + (context.needs.play * 54) + (context.boredom * 10);
+        let score = 10 + (context.drives.playDrive * 54) + (context.drives.playDrive * 10);
         score += context.activity * 12;
-        score -= (1 - context.energy) * 18;
+        score -= context.drives.restDrive * 18;
 
         if (score < 24) {
             return null;
         }
 
         const actionId = targetBall
-            ? (context.activity > 0.72 && context.boredom > 0.5 && context.energy > 0.58 ? 'play_fetch' : 'nudge_ball')
+            ? (context.activity > 0.72 && context.drives.playDrive > 0.5 && context.energy > 0.58 ? 'play_fetch' : 'nudge_ball')
             : (targetAnchor && context.activity > 0.68
                 ? 'run_laps'
                 : (context.activity > 0.74 ? 'zigzag' : 'circle'));
@@ -522,7 +596,7 @@ class MyteAI {
 
                 if (actionId === 'play_fetch' && targetBall) {
                     this.enqueueTargetedAction('play_fetch', targetBall, {
-                        roundTrips: Math.max(1, Math.min(4, 1 + Math.round((playMomentum * 2.4) + (context.boredom * 0.8)))),
+                        roundTrips: Math.max(1, Math.min(4, 1 + Math.round((playMomentum * 2.4) + (context.drives.playDrive * 0.8)))),
                         throwStrength: 8 + Math.round(context.activity * 6)
                     }, {
                         label: 'play:play_fetch',
@@ -567,7 +641,7 @@ class MyteAI {
                     centerX: this.myte.posX,
                     centerY: this.myte.posY,
                     radius: 32 + Math.round(context.activity * 28),
-                    duration: 90 + Math.round(context.needs.play * 90)
+                    duration: 90 + Math.round(context.drives.playDrive * 90)
                 }, {
                     label: 'play:circle',
                     category: 'play',
@@ -601,6 +675,11 @@ class MyteAI {
     }
 
     buildAffordanceCandidate(affordance, target, context) {
+        // Phase 3: risk gate — skip if action risk exceeds confidence threshold
+        const actionDef = ActionDefinitionRegistry.getDefinitionSync(affordance.actionId);
+        const actionRisk = actionDef?.risk ?? 0;
+        if (actionRisk > context.confidence * 5) return null;
+
         const distance = this.myte.getDistanceTo?.(target) ?? Infinity;
         const novelty = this.getNoveltyScore(target);
         const interactionType = target.getConfig?.('interactionType');
@@ -609,48 +688,48 @@ class MyteAI {
 
         switch (affordance.actionId) {
             case 'use_surface_slot':
-                score += ((1 - context.energy) * 32) + (context.needs.comfort * 24) + (context.preferences.coziness * 12);
-                score -= context.boredom * 6;
+                score += (context.drives.restDrive * 32) + (context.drives.comfortDrive * 24) + (context.preferences.coziness * 12);
+                score -= context.drives.playDrive * 6;
                 break;
             case 'inspect':
-                score += (context.needs.enrichment * 24) + (novelty * 18) + (context.curiosity * 10);
-                score -= (1 - context.energy) * 9;
+                score += (context.drives.exploreDrive * 24) + (novelty * 18) + (context.curiosity * 10);
+                score -= context.drives.restDrive * 9;
                 break;
             case 'deep_inspect':
-                score += (novelty * 24) + (context.curiosity * 18) + (context.boredom * 14);
-                score -= (1 - context.energy) * 12;
+                score += (novelty * 24) + (context.curiosity * 18) + (context.drives.playDrive * 14);
+                score -= context.drives.restDrive * 12;
                 break;
             case 'smell_flower':
             case 'drink_fountain':
-                score += (context.needs.comfort * 28) + (context.moodNeed * 22) + (context.curiosity * 8);
+                score += (context.drives.comfortDrive * 28) + (context.drives.comfortDrive * 22) + (context.curiosity * 8);
                 break;
             case 'open_chest':
-                score += (context.needs.enrichment * 24) + (context.curiosity * 18) + (context.confidence * 10);
+                score += (context.drives.exploreDrive * 24) + (context.curiosity * 18) + (context.confidence * 10);
                 break;
             case 'water_plant':
-                score += (context.needs.enrichment * 18) + (context.curiosity * 12) + (context.confidence * 10);
+                score += (context.drives.exploreDrive * 18) + (context.curiosity * 12) + (context.confidence * 10);
                 break;
             case 'harvest':
-                score += (context.needs.enrichment * 20) + (context.curiosity * 16) + (context.confidence * 12) + (context.preferences.harvest * 18);
+                score += (context.drives.exploreDrive * 20) + (context.curiosity * 16) + (context.confidence * 12) + (context.preferences.harvest * 18);
                 break;
             case 'eat_element':
-                score += ((1 - context.energy) * 34) + (context.needs.comfort * 8);
+                score += (context.drives.eatDrive * 34) + (context.drives.comfortDrive * 8);
                 break;
             case 'interact_object':
                 if (affordancePurpose === 'start_music') {
-                    score += (context.musicNeed * 42) + (context.preferences.music * 20) + (context.needs.play * 10);
+                    score += (context.musicNeed * 42) + (context.preferences.music * 20) + (context.drives.playDrive * 10);
                 } else if (affordancePurpose === 'light_on') {
-                    score += (context.lightNeed * 46) + (context.preferences.light * 16) + (context.needs.comfort * 12);
+                    score += (context.lightNeed * 46) + (context.preferences.light * 16) + (context.drives.comfortDrive * 12);
                 } else if (interactionType === 'dance') {
-                    score += (context.needs.play * 26) + (context.activity * 14) + (context.boredom * 10);
+                    score += (context.drives.playDrive * 26) + (context.activity * 14) + (context.drives.playDrive * 10);
                 } else if (interactionType === 'light') {
-                    score += (context.needs.comfort * 22) + (context.moodNeed * 14);
+                    score += (context.drives.comfortDrive * 22) + (context.drives.comfortDrive * 14);
                 } else {
                     score += (context.curiosity * 14) + (context.confidence * 10);
                 }
                 break;
             default:
-                score += (context.needs.enrichment * 16) + (novelty * 10);
+                score += (context.drives.exploreDrive * 16) + (novelty * 10);
                 break;
         }
 
@@ -698,7 +777,7 @@ class MyteAI {
         let best = null;
         for (const item of context.droppedItems) {
             const distance = this.myte.getDistanceTo?.(item) ?? Infinity;
-            let score = 8 + (context.curiosity * 16) + (context.boredom * 8) + Math.max(0, 120 - distance) * 0.1;
+            let score = 8 + (context.curiosity * 16) + (context.drives.exploreDrive * 8) + Math.max(0, 120 - distance) * 0.1;
 
             const age = SimClock.now() - (item.droppedAt ?? 0);
             if (age < 30000) score += 22 * (1 - age / 30000);
@@ -731,8 +810,8 @@ class MyteAI {
             return null;
         }
 
-        let score = 10 + (context.activity * 16) + (context.curiosity * 12) + (context.boredom * 14);
-        score += context.needs.play * 10;
+        let score = 10 + (context.activity * 16) + (context.curiosity * 12) + (context.drives.playDrive * 14);
+        score += context.drives.playDrive * 10;
         if (this.mode === MOVE_AUTONOMY_TYPES.WANDER) score += 38;
         if (context.energy < 0.25) score -= 14;
 
@@ -759,76 +838,14 @@ class MyteAI {
         };
     }
 
-    buildNeedZoneCandidate(context) {
-        const nearbyZones = context.nearbyZones ?? [];
-        if (nearbyZones.length === 0) {
-            return null;
-        }
-
-        let best = null;
-        const zoneScoring = SiteConfig.ai.zoneSeeking;
-        const typeScores = zoneScoring.typeScores ?? {};
-
-        for (const zone of nearbyZones) {
-            const type = String(zone?.type || '').toLowerCase();
-            const scoreConfig = typeScores[type];
-            if (!scoreConfig || context.activeZoneTypes?.includes(type)) {
-                continue;
-            }
-
-            const primaryNeed = context.needs?.[scoreConfig.need] ?? 0;
-            if (primaryNeed < (scoreConfig.minNeed ?? 0)) {
-                continue;
-            }
-
-            const secondaryNeed = scoreConfig.secondaryNeed
-                ? (context.needs?.[scoreConfig.secondaryNeed] ?? 0)
-                : 0;
-            const distance = zone.getDistanceToMyte?.(this.myte) ?? Infinity;
-            let score = (scoreConfig.base ?? 0) +
-                (primaryNeed * (scoreConfig.weight ?? 0)) +
-                (secondaryNeed * (scoreConfig.secondaryWeight ?? 0));
-            score += Math.max(0, zoneScoring.searchRadius - distance) * zoneScoring.distanceWeight;
-
-            if (type === 'play') {
-                score += context.boredom * 14;
-            } else if (type === 'social') {
-                score += Math.min(context.nearbyMytes.length, 2) * 4;
-            } else if (type === 'rest') {
-                score += (1 - context.energy) * 12;
-            }
-
-            score = this.applyRepeatPenalty(score, `zone:${type}`, `zone:${zone.id}`);
-            if (score < 20 || (best && score <= best.score)) {
-                continue;
-            }
-
-            best = {
-                label: `zone:${type}`,
-                targetKey: `zone:${zone.id}`,
-                commitmentMs: zoneScoring.travelCommitmentMs,
-                score,
-                execute: () => {
-                    const target = zone.getTargetPointForMyte?.(this.myte);
-                    if (!target) {
-                        return;
-                    }
-                    this.myte.queue.addAStarMove(target);
-                }
-            };
-        }
-
-        return best;
-    }
-
     buildIdleCandidate(context) {
         return {
             label: 'idle',
             targetKey: 'idle',
             commitmentMs: 900,
-            score: this.applyRepeatPenalty(7 + ((1 - context.energy) * 3) + (context.needs.comfort * 2), 'idle', 'idle'),
+            score: this.applyRepeatPenalty(7 + ((1 - context.energy) * 3) + (context.drives.comfortDrive * 2), 'idle', 'idle'),
             execute: () => {
-                if (context.boredom > 0.68 && Math.random() < 0.22) {
+                if (context.drives.playDrive > 0.5 && Math.random() < 0.22) {
                     this.myte.queue.addExpression('surprise', 30, 1);
                 }
 
@@ -1146,9 +1163,11 @@ class MyteAI {
         const origin = this.mode === MOVE_AUTONOMY_TYPES.WANDER
             ? { x: this.myte.posX, y: this.myte.posY }
             : localContext.home;
+        const confidence = localContext?.confidence ?? 0.55;
+        const confidenceRadius = this.safeAreaRadius * (0.3 + confidence * 0.7);
         const maxRadius = this.mode === MOVE_AUTONOMY_TYPES.WANDER
             ? this.wanderRadius
-            : this.homeRadius;
+            : confidenceRadius;
         const safeOrigin = gridSystem?.findNearestValidPositionForEntity?.(this.myte, origin.x, origin.y, 8) ?? origin;
 
         for (let attempt = 0; attempt < 18; attempt++) {
@@ -1179,7 +1198,7 @@ class MyteAI {
     }
 
     findCuriosityWanderTarget(context) {
-        if (context.boredom < 0.48 && context.curiosity < 0.55) {
+        if (context.drives.playDrive < 0.48 && context.curiosity < 0.55) {
             return null;
         }
 
@@ -1317,26 +1336,29 @@ class MyteAI {
 
     buildDebugContextSnapshot(context) {
         return {
-            energy: Number(context.energy.toFixed(2)),
-            health: Number(context.health.toFixed(2)),
-            mood: Number(context.mood.toFixed(2)),
-            boredom: Number(context.boredom.toFixed(2)),
-            comfort: Number(context.comfort.toFixed(2)),
+            energy:     Number(context.energy.toFixed(2)),
+            health:     Number(context.health.toFixed(2)),
+            fun:        Number(context.fun.toFixed(2)),
+            social:     Number(context.social.toFixed(2)),
+            hunger:     Number(context.hunger.toFixed(2)),
+            comfort:    Number(context.comfort.toFixed(2)),
             confidence: Number(context.confidence.toFixed(2)),
             localLightLevel: Number(context.localLightLevel.toFixed(2)),
-            lightNeed: Number(context.lightNeed.toFixed(2)),
-            musicNeed: Number(context.musicNeed.toFixed(2)),
-            needs: {
-                social: Number(context.needs.social.toFixed(2)),
-                enrichment: Number(context.needs.enrichment.toFixed(2)),
-                play: Number(context.needs.play.toFixed(2)),
-                comfort: Number(context.needs.comfort.toFixed(2)),
-                home: Number(context.needs.home.toFixed(2))
+            lightNeed:  Number(context.lightNeed.toFixed(2)),
+            musicNeed:  Number(context.musicNeed.toFixed(2)),
+            drives: {
+                restDrive:    Number(context.drives.restDrive.toFixed(2)),
+                eatDrive:     Number(context.drives.eatDrive.toFixed(2)),
+                playDrive:    Number(context.drives.playDrive.toFixed(2)),
+                socialDrive:  Number(context.drives.socialDrive.toFixed(2)),
+                exploreDrive: Number(context.drives.exploreDrive.toFixed(2)),
+                comfortDrive: Number(context.drives.comfortDrive.toFixed(2)),
+                safetyDrive:  Number(context.drives.safetyDrive.toFixed(2))
             },
-            nearbyMytes: context.nearbyMytes.length,
+            nearbyMytes:  context.nearbyMytes.length,
             nearbyObjects: context.nearbyObjects.length,
-            nearbyZones: context.nearbyZones.length,
-            activeZones: context.activeZoneTypes,
+            nearbyZones:  context.nearbyZones.length,
+            activeZones:  context.activeZoneTypes,
             nearbyActiveMusicSources: context.nearbyActiveMusicSources.length
         };
     }
@@ -1346,13 +1368,15 @@ class MyteAI {
             ? this.buildDebugContextSnapshot(this.buildContext())
             : (this.lastContextSnapshot ?? this.buildDebugContextSnapshot(this.buildContext()));
 
-        const needs = snapshot?.needs ?? {};
+        const drives = snapshot?.drives ?? {};
         const entries = [
-            { id: 'social', label: 'Social', value: needs.social ?? 0 },
-            { id: 'enrichment', label: 'Enrichment', value: needs.enrichment ?? 0 },
-            { id: 'play', label: 'Play', value: needs.play ?? 0 },
-            { id: 'comfort', label: 'Comfort', value: needs.comfort ?? 0 },
-            { id: 'home', label: 'Home', value: needs.home ?? 0 }
+            { id: 'socialDrive',  label: 'Social',   value: drives.socialDrive  ?? 0 },
+            { id: 'playDrive',    label: 'Play',      value: drives.playDrive    ?? 0 },
+            { id: 'exploreDrive', label: 'Explore',   value: drives.exploreDrive ?? 0 },
+            { id: 'comfortDrive', label: 'Comfort',   value: drives.comfortDrive ?? 0 },
+            { id: 'safetyDrive',  label: 'Safety',    value: drives.safetyDrive  ?? 0 },
+            { id: 'restDrive',    label: 'Rest',      value: drives.restDrive    ?? 0 },
+            { id: 'eatDrive',     label: 'Eat',       value: drives.eatDrive     ?? 0 }
         ].map(entry => ({
             ...entry,
             value: Utility.clamp(entry.value, 0, 1),
@@ -1365,19 +1389,56 @@ class MyteAI {
             needs: entries,
             topNeed,
             vitals: {
-                energy: Math.round((snapshot?.energy ?? 0) * 100),
-                health: Math.round((snapshot?.health ?? 0) * 100),
-                mood: Math.round((snapshot?.mood ?? 0) * 100),
-                fun: Math.round((1 - (snapshot?.boredom ?? 0)) * 100),
-                comfort: Math.round((snapshot?.comfort ?? 0) * 100),
+                energy:     Math.round((snapshot?.energy     ?? 0) * 100),
+                health:     Math.round((snapshot?.health     ?? 0) * 100),
+                fun:        Math.round((snapshot?.fun        ?? 0) * 100),
+                social:     Math.round((snapshot?.social     ?? 0) * 100),
+                hunger:     Math.round((snapshot?.hunger     ?? 0) * 100),
+                comfort:    Math.round((snapshot?.comfort    ?? 0) * 100),
                 confidence: Math.round((snapshot?.confidence ?? 0) * 100)
             },
             environment: {
-                light: Math.round((snapshot?.localLightLevel ?? 0) * 100),
-                lightNeed: Math.round((snapshot?.lightNeed ?? 0) * 100),
-                musicNeed: Math.round((snapshot?.musicNeed ?? 0) * 100)
+                light:     Math.round((snapshot?.localLightLevel ?? 0) * 100),
+                lightNeed: Math.round((snapshot?.lightNeed       ?? 0) * 100),
+                musicNeed: Math.round((snapshot?.musicNeed       ?? 0) * 100)
             },
             lastDecisionLabel: this.lastDecisionLabel
+        };
+    }
+
+    getDrivesSnapshot({ live = false } = {}) {
+        const snapshot = live
+            ? this.buildDebugContextSnapshot(this.buildContext())
+            : (this.lastContextSnapshot ?? this.buildDebugContextSnapshot(this.buildContext()));
+
+        const drives = snapshot?.drives ?? {};
+        return {
+            restDrive:    Utility.clamp(drives.restDrive    ?? 0, 0, 1),
+            eatDrive:     Utility.clamp(drives.eatDrive     ?? 0, 0, 1),
+            playDrive:    Utility.clamp(drives.playDrive    ?? 0, 0, 1),
+            socialDrive:  Utility.clamp(drives.socialDrive  ?? 0, 0, 1),
+            exploreDrive: Utility.clamp(drives.exploreDrive ?? 0, 0, 1),
+            comfortDrive: Utility.clamp(drives.comfortDrive ?? 0, 0, 1),
+            safetyDrive:  Utility.clamp(drives.safetyDrive  ?? 0, 0, 1)
+        };
+    }
+
+    getPressuresSnapshot({ live = false } = {}) {
+        const snapshot = live
+            ? this.buildDebugContextSnapshot(this.buildContext())
+            : (this.lastContextSnapshot ?? this.buildDebugContextSnapshot(this.buildContext()));
+
+        const drives = snapshot?.drives ?? {};
+        const driveValues = Object.values(drives).filter(v => typeof v === 'number');
+        const maxPressure = Math.max(...driveValues, 0);
+        const dominantDrive = Object.entries(drives)
+            .sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+        return {
+            drives,
+            dominantDrive,
+            maxPressure: Utility.clamp(maxPressure, 0, 1),
+            isUrgent: maxPressure > 0.75
         };
     }
 

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "zones": [
+    {
+      "id": "rest",
+      "label": "Rest Zone",
+      "needEffectsPerMs": { "comfort": 0.0008, "energy": 0.0004 }
+    },
+    {
+      "id": "play",
+      "label": "Play Zone",
+      "needEffectsPerMs": { "fun": 0.0010 }
+    },
+    {
+      "id": "social",
+      "label": "Social Zone",
+      "needEffectsPerMs": { "social": 0.0008 }
+    },
+    {
+      "id": "danger",
+      "label": "Danger Zone",
+      "needEffectsPerMs": { "comfort": -0.0006 }
+    },
+    {
+      "id": "food",
+      "label": "Food Zone",
+      "needEffectsPerMs": { "hunger": 0.0002 }
+    },
+    {
+      "id": "boost",
+      "label": "Boost Zone",
+      "needEffectsPerMs": {}
+    }
+  ]
+}

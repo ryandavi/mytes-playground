@@ -518,11 +518,12 @@ class ContainerManager {
             followGoal: DEFAULT_FOLLOW_MODE,
             autonomyGoal: DEFAULT_AUTONOMY_MODE,
             stats: {
-                health: 100,
-                mood: 100,
-                energy: SiteConfig.myte.initialStats.energy,
-                boredom: SiteConfig.myte.initialStats.boredom,
-                comfort: SiteConfig.myte.initialStats.comfort,
+                health:     100,
+                energy:     SiteConfig.myte.initialStats.energy,
+                fun:        70,
+                social:     80,
+                hunger:     100,
+                comfort:    SiteConfig.myte.initialStats.comfort,
                 confidence: SiteConfig.myte.initialStats.confidence
             }
         }));
@@ -559,11 +560,12 @@ class ContainerManager {
                 followGoal: DEFAULT_FOLLOW_MODE,
                 autonomyGoal: DEFAULT_AUTONOMY_MODE,
                 stats: {
-                    health: 100,
-                    mood: 100,
-                    energy: SiteConfig.myte.initialStats.energy,
-                    boredom: SiteConfig.myte.initialStats.boredom,
-                    comfort: SiteConfig.myte.initialStats.comfort,
+                    health:     100,
+                    energy:     SiteConfig.myte.initialStats.energy,
+                    fun:        70,
+                    social:     80,
+                    hunger:     100,
+                    comfort:    SiteConfig.myte.initialStats.comfort,
                     confidence: SiteConfig.myte.initialStats.confidence
                 }
             };
@@ -600,11 +602,12 @@ class ContainerManager {
             posX: Number.isFinite(Number(entry.posX)) ? Number(entry.posX) : null,
             posY: Number.isFinite(Number(entry.posY)) ? Number(entry.posY) : null,
             stats: {
-                health: Number.isFinite(Number(stats.health)) ? Number(stats.health) : 100,
-                mood: Number.isFinite(Number(stats.mood)) ? Number(stats.mood) : 100,
-                energy: Number.isFinite(Number(stats.energy)) ? Number(stats.energy) : SiteConfig.myte.initialStats.energy,
-                boredom: Number.isFinite(Number(stats.boredom)) ? Number(stats.boredom) : SiteConfig.myte.initialStats.boredom,
-                comfort: Number.isFinite(Number(stats.comfort)) ? Number(stats.comfort) : SiteConfig.myte.initialStats.comfort,
+                health:     Number.isFinite(Number(stats.health))     ? Number(stats.health)     : 100,
+                energy:     Number.isFinite(Number(stats.energy))     ? Number(stats.energy)     : SiteConfig.myte.initialStats.energy,
+                fun:        Number.isFinite(Number(stats.fun))        ? Number(stats.fun)        : 70,
+                social:     Number.isFinite(Number(stats.social))     ? Number(stats.social)     : 80,
+                hunger:     Number.isFinite(Number(stats.hunger))     ? Number(stats.hunger)     : 100,
+                comfort:    Number.isFinite(Number(stats.comfort))    ? Number(stats.comfort)    : SiteConfig.myte.initialStats.comfort,
                 confidence: Number.isFinite(Number(stats.confidence)) ? Number(stats.confidence) : SiteConfig.myte.initialStats.confidence
             }
         };
@@ -729,11 +732,16 @@ class ContainerManager {
 
         const stats = rosterEntry.stats || {};
         myte.stats.health = Math.max(myte.stats.minHealth, Math.min(myte.stats.maxHealth, stats.health ?? myte.stats.health));
-        myte.stats.mood = Math.max(myte.stats.minMood, Math.min(myte.stats.maxMood, stats.mood ?? myte.stats.mood));
         myte.stats.energy = Math.max(myte.stats.minEnergy, Math.min(myte.stats.maxEnergy, stats.energy ?? myte.stats.energy));
-        myte.stats.boredom = Math.max(myte.stats.minBoredom, Math.min(myte.stats.maxBoredom, stats.boredom ?? myte.stats.boredom));
-        myte.stats.comfort = Math.max(myte.stats.minComfort, Math.min(myte.stats.maxComfort, stats.comfort ?? myte.stats.comfort));
-        myte.stats.confidence = Math.max(myte.stats.minConfidence, Math.min(myte.stats.maxConfidence, stats.confidence ?? myte.stats.confidence));
+        if (stats.fun     != null) myte.stats.fun    = Math.max(myte.stats.minFun,    Math.min(myte.stats.maxFun,    stats.fun));
+        if (stats.social  != null) myte.stats.social = Math.max(myte.stats.minSocial, Math.min(myte.stats.maxSocial, stats.social));
+        if (stats.hunger  != null) myte.stats.hunger = Math.max(myte.stats.minHunger, Math.min(myte.stats.maxHunger, stats.hunger));
+        myte.stats.comfort    = Math.max(myte.stats.minComfort,    Math.min(myte.stats.maxComfort,    stats.comfort    ?? myte.stats.comfort));
+        // Migrate old 0–100 confidence saves to new 0–1 scale
+        const savedConfidence = stats.confidence != null && stats.confidence > 1
+            ? stats.confidence / 100
+            : stats.confidence;
+        myte.stats.confidence = Math.max(myte.stats.minConfidence, Math.min(myte.stats.maxConfidence, savedConfidence ?? myte.stats.confidence));
 
         // Restore progression and personality traits from the canonical save schema.
         if (stats.speed != null) myte.stats.speed = stats.speed;

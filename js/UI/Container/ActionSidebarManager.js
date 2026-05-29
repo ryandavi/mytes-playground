@@ -528,7 +528,7 @@ class ActionSidebarManager extends UIComponent {
                 const behaviorDetail = this.getMyteBehaviorDetail(selectedObject);
                 this.appendSectionHeader(rows, 'status', 'Status');
                 this.appendInfoRows(rows, [
-                    { label: 'Mood', value: `${selectedObject.stats.getMoodStatus()} (${vitals.mood ?? 0}%)` },
+                    { label: 'Mood', value: selectedObject.stats.getDerivedMood?.() ?? 'neutral' },
                     { label: 'Behavior', value: this.getMyteBehaviorLabel(selectedObject) },
                     { label: behaviorDetail?.label, value: behaviorDetail?.value },
                     { label: 'Activity', value: this.getMyteActivityLabel(selectedObject) }
@@ -550,7 +550,6 @@ class ActionSidebarManager extends UIComponent {
 
                 rows.push({ label: '__header_needs', value: 'Needs', className: 'needs-title' });
                 [
-                    { id: 'mood', label: 'Mood' },
                     { id: 'fun', label: 'Fun' },
                     { id: 'comfort', label: 'Comfort' },
                     { id: 'confidence', label: 'Confidence' }

@@ -70,7 +70,14 @@ class ActionDefinitionRegistry {
             icon: definition.icon || '',
             implementationClass: definition.implementationClass || '',
             defaultOptions: this.cloneValue(definition.defaultOptions || {}),
-            energyCostMultiplier: Number.isFinite(Number(definition.energyCostMultiplier)) ? Number(definition.energyCostMultiplier) : undefined
+            energyCostMultiplier: Number.isFinite(Number(definition.energyCostMultiplier)) ? Number(definition.energyCostMultiplier) : undefined,
+            tags: Array.isArray(definition.tags) ? [...definition.tags] : [],
+            effects: this.cloneValue(definition.effects || {}),
+            exertion: Number.isFinite(Number(definition.exertion)) ? Number(definition.exertion) : 0,
+            novelty: Number.isFinite(Number(definition.novelty)) ? Number(definition.novelty) : 0,
+            risk: Number.isFinite(Number(definition.risk)) ? Number(definition.risk) : 0,
+            soothingValue: Number.isFinite(Number(definition.soothingValue)) ? Number(definition.soothingValue) : 0,
+            repeatMode: definition.repeatMode || 'diminishing'
         };
     }
 

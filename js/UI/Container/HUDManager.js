@@ -42,7 +42,7 @@ class HUDManager extends UIComponent {
             this.lastRenderedState.visible = true;
         }
 
-        const mood = activeMyte.stats.getMoodStatus();
+        const mood = activeMyte.stats.getDerivedMood?.() ?? 'neutral';
         const energyRatio = activeMyte.stats.getEnergyRatio();
         const energy = `${this.getEnergyLabel(energyRatio)} ${Math.round(energyRatio * 100)}%`;
         const currentAction = activeMyte.queue.getCurrentAction();

@@ -33,8 +33,14 @@
   },
   "stats": {
     "energy": 90,
-    "mood": 95,
-    "speed": 0.85
+    "speed": 0.85,
+    "confidence": { "default": 0.4 },
+    "traits": {
+      "curiosity":   { "default": 0.7 },
+      "activity":    { "default": 0.55 },
+      "sociability": { "default": 0.3 },
+      "boldness":    { "default": 0.35 }
+    }
   },
   "visual": {
     "spriteSheet": {

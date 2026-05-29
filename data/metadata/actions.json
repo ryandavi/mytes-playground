@@ -17,7 +17,10 @@
         "pathfindingOptions": {},
         "currentTargetIndex": 0
       },
-      "implementationClass": "AStarMoveAction"
+      "implementationClass": "AStarMoveAction",
+      "tags": ["purposeful_movement"],
+      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
+      "exertion": 1, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "being_carried",
@@ -32,7 +35,10 @@
       "requiresTarget": false,
       "affectsMood": true,
       "moodEffect": 1,
-      "implementationClass": "BeingCarriedAction"
+      "implementationClass": "BeingCarriedAction",
+      "tags": ["social", "comfort_giving"],
+      "effects": { "fun": 0, "social": 3, "comfort": 3, "energy": 0, "hunger": 0 },
+      "exertion": 0, "novelty": 2, "risk": 0, "soothingValue": 3, "repeatMode": "free"
     },
     {
       "id": "carry",
@@ -46,7 +52,10 @@
       "description": "Carry another Myte around",
       "requiresTarget": true,
       "affectsMood": false,
-      "implementationClass": "CarryAction"
+      "implementationClass": "CarryAction",
+      "tags": ["social"],
+      "effects": { "fun": 0, "social": 0, "comfort": -2, "energy": 0, "hunger": 0 },
+      "exertion": 0, "novelty": 1, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "carry_pickup",
@@ -61,7 +70,10 @@
       "requiresTarget": true,
       "affectsMood": true,
       "moodEffect": 2,
-      "implementationClass": "CarryPickupAction"
+      "implementationClass": "CarryPickupAction",
+      "tags": ["social"],
+      "effects": { "fun": 0, "social": 0, "comfort": -1, "energy": 0, "hunger": 0 },
+      "exertion": 0, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "carry_putdown",
@@ -75,7 +87,10 @@
       "description": "Put down a carried Myte",
       "requiresTarget": true,
       "affectsMood": false,
-      "implementationClass": "CarryPutdownAction"
+      "implementationClass": "CarryPutdownAction",
+      "tags": ["social"],
+      "effects": { "fun": 0, "social": 0, "comfort": 1, "energy": 0, "hunger": 0 },
+      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 1, "repeatMode": "free"
     },
     {
       "id": "chase",
@@ -93,7 +108,10 @@
       "defaultOptions": {
         "catchDistance": 30
       },
-      "implementationClass": "ChaseAction"
+      "implementationClass": "ChaseAction",
+      "tags": ["playful", "social"],
+      "effects": { "fun": 8, "social": 3, "comfort": 0, "energy": -4, "hunger": 0 },
+      "exertion": 4, "novelty": 3, "risk": 1, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "circle",
@@ -120,7 +138,10 @@
         "stuckThresholdFrames": 42,
         "maxPatternRecoveries": 4
       },
-      "implementationClass": "CircleAction"
+      "implementationClass": "CircleAction",
+      "tags": ["playful"],
+      "effects": { "fun": 6, "social": 0, "comfort": 0, "energy": -3, "hunger": 0 },
+      "exertion": 3, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "close_chest",
@@ -138,7 +159,10 @@
         "closeAnimationDuration": 28,
         "postActionIdleDuration": 400
       },
-      "implementationClass": "CloseChestAction"
+      "implementationClass": "CloseChestAction",
+      "tags": ["stimulating"],
+      "effects": { "fun": 2, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
+      "exertion": 0, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "dance",
@@ -157,7 +181,10 @@
       "defaultOptions": {
         "stepDuration": 250
       },
-      "implementationClass": "DanceAction"
+      "implementationClass": "DanceAction",
+      "tags": ["playful", "creative"],
+      "effects": { "fun": 8, "social": 2, "comfort": 0, "energy": -3, "hunger": 0 },
+      "exertion": 3, "novelty": 3, "risk": 0, "soothingValue": 1, "repeatMode": "diminishing"
     },
     {
       "id": "deep_inspect",
@@ -178,7 +205,10 @@
         "expressionType": "surprise",
         "expressionDuration": 30
       },
-      "implementationClass": "DeepInspectAction"
+      "implementationClass": "DeepInspectAction",
+      "tags": ["stimulating", "risky"],
+      "effects": { "fun": 6, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
+      "exertion": 1, "novelty": 8, "risk": 2, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "drink_fountain",
@@ -194,7 +224,10 @@
       "affectsMood": true,
       "moodEffect": 5,
       "defaultOptions": {},
-      "implementationClass": "DrinkFromFountainAction"
+      "implementationClass": "DrinkFromFountainAction",
+      "tags": ["soothing", "food"],
+      "effects": { "fun": 3, "social": 0, "comfort": 2, "energy": 3, "hunger": 5 },
+      "exertion": 0, "novelty": 2, "risk": 0, "soothingValue": 4, "repeatMode": "diminishing"
     },
     {
       "id": "drop_item",
@@ -208,7 +241,10 @@
       "description": "Drop the item currently being carried",
       "requiresTarget": true,
       "affectsMood": false,
-      "implementationClass": "DropItemAction"
+      "implementationClass": "DropItemAction",
+      "tags": [],
+      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": 0, "hunger": 0 },
+      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "eat_element",
@@ -230,7 +266,10 @@
           "insideVertical": true
         }
       },
-      "implementationClass": "EatElementAction"
+      "implementationClass": "EatElementAction",
+      "tags": ["food"],
+      "effects": { "fun": 2, "social": 0, "comfort": 0, "energy": 5, "hunger": 20 },
+      "exertion": 0, "novelty": 2, "risk": 0, "soothingValue": 2, "repeatMode": "diminishing"
     },
     {
       "id": "emote_at",
@@ -250,7 +289,10 @@
         "expressionDuration": 400,
         "expressionRepeat": 2
       },
-      "implementationClass": "EmoteAtAction"
+      "implementationClass": "EmoteAtAction",
+      "tags": ["social", "soothing"],
+      "effects": { "fun": 2, "social": 5, "comfort": 3, "energy": 0, "hunger": 0 },
+      "exertion": 0, "novelty": 2, "risk": 1, "soothingValue": 3, "repeatMode": "diminishing"
     },
     {
       "id": "expression",
@@ -265,7 +307,10 @@
       "requiresTarget": false,
       "affectsMood": true,
       "moodEffect": 5,
-      "implementationClass": "ExpressionAction"
+      "implementationClass": "ExpressionAction",
+      "tags": [],
+      "effects": { "fun": 2, "social": 0, "comfort": 0, "energy": 0, "hunger": 0 },
+      "exertion": 0, "novelty": 1, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "follow_mouse",
@@ -279,7 +324,10 @@
       "description": "Follow the mouse cursor",
       "requiresTarget": false,
       "affectsMood": false,
-      "implementationClass": "FollowMouseAction"
+      "implementationClass": "FollowMouseAction",
+      "tags": ["purposeful_movement"],
+      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
+      "exertion": 1, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "follow_object",
@@ -298,7 +346,10 @@
         "minFollowDistance": 8,
         "replanThreshold": 12
       },
-      "implementationClass": "FollowObjectAction"
+      "implementationClass": "FollowObjectAction",
+      "tags": ["purposeful_movement", "social"],
+      "effects": { "fun": 0, "social": 1, "comfort": 0, "energy": -2, "hunger": 0 },
+      "exertion": 2, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "give_item",
@@ -314,7 +365,10 @@
       "affectsMood": true,
       "moodEffect": 4,
       "defaultOptions": {},
-      "implementationClass": "GiveItemAction"
+      "implementationClass": "GiveItemAction",
+      "tags": ["social"],
+      "effects": { "fun": 2, "social": 6, "comfort": 0, "energy": -1, "hunger": 0 },
+      "exertion": 0, "novelty": 2, "risk": 0, "soothingValue": 2, "repeatMode": "diminishing"
     },
     {
       "id": "go_to_object",
@@ -334,7 +388,10 @@
         "finalApproachSkipDistance": 48,
         "maxFinalAdjustmentDistance": 48
       },
-      "implementationClass": "GoToObjectAction"
+      "implementationClass": "GoToObjectAction",
+      "tags": ["purposeful_movement"],
+      "effects": { "fun": -1, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
+      "exertion": 2, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "greet",
@@ -354,7 +411,10 @@
         "expressionDuration": 400,
         "expressionRepeat": 2
       },
-      "implementationClass": "GreetAction"
+      "implementationClass": "GreetAction",
+      "tags": ["social"],
+      "effects": { "fun": 2, "social": 6, "comfort": 0, "energy": 0, "hunger": 0 },
+      "exertion": 0, "novelty": 2, "risk": 1, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "greet_receive",
@@ -374,7 +434,10 @@
         "expressionDuration": 400,
         "expressionRepeat": 2
       },
-      "implementationClass": "GreetReceiveAction"
+      "implementationClass": "GreetReceiveAction",
+      "tags": ["social"],
+      "effects": { "fun": 1, "social": 4, "comfort": 0, "energy": 0, "hunger": 0 },
+      "exertion": 0, "novelty": 1, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "guard",
@@ -394,7 +457,10 @@
         "stuckThresholdFrames": 40,
         "failOnUnrecoverableStuck": false
       },
-      "implementationClass": "GuardAction"
+      "implementationClass": "GuardAction",
+      "tags": ["purposeful_movement"],
+      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
+      "exertion": 2, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "harvest",
@@ -413,7 +479,10 @@
         "harvestAnimationDuration": 50,
         "postActionIdleDuration": 500
       },
-      "implementationClass": "HarvestAction"
+      "implementationClass": "HarvestAction",
+      "tags": ["stimulating", "food"],
+      "effects": { "fun": 5, "social": 0, "comfort": 0, "energy": -1, "hunger": 10 },
+      "exertion": 1, "novelty": 3, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "hide",
@@ -431,7 +500,10 @@
       "defaultOptions": {
         "peekInterval": 2000
       },
-      "implementationClass": "HideAction"
+      "implementationClass": "HideAction",
+      "tags": ["restful", "soothing"],
+      "effects": { "fun": 0, "social": 0, "comfort": 2, "energy": -1, "hunger": 0 },
+      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 2, "repeatMode": "free"
     },
     {
       "id": "hold_item",
@@ -445,7 +517,10 @@
       "description": "Carry an item",
       "requiresTarget": true,
       "affectsMood": false,
-      "implementationClass": "HoldItemAction"
+      "implementationClass": "HoldItemAction",
+      "tags": ["purposeful_movement"],
+      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
+      "exertion": 1, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "idle",
@@ -459,7 +534,10 @@
       "description": "Stay in place for a moment",
       "requiresTarget": false,
       "affectsMood": false,
-      "implementationClass": "IdleAction"
+      "implementationClass": "IdleAction",
+      "tags": [],
+      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": 0, "hunger": 0 },
+      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "inspect",
@@ -479,7 +557,10 @@
         "expressionDuration": 40,
         "lookInterval": 22
       },
-      "implementationClass": "InspectAction"
+      "implementationClass": "InspectAction",
+      "tags": ["stimulating"],
+      "effects": { "fun": 4, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
+      "exertion": 1, "novelty": 6, "risk": 1, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "interact_object",
@@ -498,7 +579,10 @@
         "interactionAnimationDuration": 32,
         "postActionIdleDuration": 500
       },
-      "implementationClass": "InteractObjectAction"
+      "implementationClass": "InteractObjectAction",
+      "tags": ["stimulating"],
+      "effects": { "fun": 4, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
+      "exertion": 1, "novelty": 4, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "jump",
@@ -521,7 +605,10 @@
         "bounceReduction": 0.5,
         "minBounceVelocity": 2
       },
-      "implementationClass": "JumpAction"
+      "implementationClass": "JumpAction",
+      "tags": ["playful"],
+      "effects": { "fun": 5, "social": 0, "comfort": 0, "energy": -3, "hunger": 0 },
+      "exertion": 3, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "move",
@@ -535,7 +622,10 @@
       "description": "Move to a specific location",
       "requiresTarget": true,
       "affectsMood": false,
-      "implementationClass": "MoveAction"
+      "implementationClass": "MoveAction",
+      "tags": ["purposeful_movement"],
+      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
+      "exertion": 1, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "nudge_ball",
@@ -564,7 +654,10 @@
         "repeat": 1,
         "postNudgeIdleDuration": 20
       },
-      "implementationClass": "NudgeBallAction"
+      "implementationClass": "NudgeBallAction",
+      "tags": ["playful"],
+      "effects": { "fun": 6, "social": 0, "comfort": 0, "energy": -3, "hunger": 0 },
+      "exertion": 3, "novelty": 3, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "open_chest",
@@ -583,7 +676,10 @@
         "openAnimationDuration": 40,
         "receiveIdleDuration": 1000
       },
-      "implementationClass": "OpenChestAction"
+      "implementationClass": "OpenChestAction",
+      "tags": ["stimulating", "risky"],
+      "effects": { "fun": 10, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
+      "exertion": 1, "novelty": 10, "risk": 3, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "patrol",
@@ -600,17 +696,17 @@
       "moodEffect": 2,
       "defaultOptions": {
         "distance": 120,
-        "direction": {
-          "x": 1,
-          "y": 0
-        },
+        "direction": { "x": 1, "y": 0 },
         "repeat": 4,
         "pauseDuration": 500,
         "safeTargetRadius": 14,
         "stuckThresholdFrames": 40,
         "maxPatternRecoveries": 3
       },
-      "implementationClass": "PatrolAction"
+      "implementationClass": "PatrolAction",
+      "tags": ["purposeful_movement"],
+      "effects": { "fun": 1, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
+      "exertion": 2, "novelty": 1, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "pick_flower",
@@ -629,7 +725,10 @@
         "pickAnimationDuration": 45,
         "approachConfig": "adjacent"
       },
-      "implementationClass": "PickFlowerAction"
+      "implementationClass": "PickFlowerAction",
+      "tags": ["stimulating", "creative"],
+      "effects": { "fun": 5, "social": 0, "comfort": 2, "energy": -1, "hunger": 0 },
+      "exertion": 0, "novelty": 3, "risk": 0, "soothingValue": 2, "repeatMode": "diminishing"
     },
     {
       "id": "pickup_item",
@@ -643,7 +742,10 @@
       "description": "Pick up an item and carry it",
       "requiresTarget": true,
       "affectsMood": false,
-      "implementationClass": "PickupItemAction"
+      "implementationClass": "PickupItemAction",
+      "tags": ["purposeful_movement"],
+      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
+      "exertion": 1, "novelty": 1, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "play_fetch",
@@ -670,7 +772,10 @@
         "expressionType": "excited",
         "expressionDuration": 500
       },
-      "implementationClass": "PlayFetchAction"
+      "implementationClass": "PlayFetchAction",
+      "tags": ["playful", "social"],
+      "effects": { "fun": 8, "social": 4, "comfort": 0, "energy": -4, "hunger": 0 },
+      "exertion": 4, "novelty": 3, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "play_tag",
@@ -691,7 +796,10 @@
         "runDistance": 100,
         "isIt": true
       },
-      "implementationClass": "PlayTagAction"
+      "implementationClass": "PlayTagAction",
+      "tags": ["playful", "social"],
+      "effects": { "fun": 10, "social": 6, "comfort": 0, "energy": -5, "hunger": 0 },
+      "exertion": 5, "novelty": 4, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "run_away",
@@ -710,7 +818,10 @@
         "panicDistance": 400,
         "runDistance": 350
       },
-      "implementationClass": "RunAwayAction"
+      "implementationClass": "RunAwayAction",
+      "tags": ["purposeful_movement"],
+      "effects": { "fun": 0, "social": 0, "comfort": -4, "energy": -5, "hunger": 0 },
+      "exertion": 5, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "run_from",
@@ -729,7 +840,10 @@
         "panicDistance": 500,
         "runDistance": 300
       },
-      "implementationClass": "RunFromAction"
+      "implementationClass": "RunFromAction",
+      "tags": ["purposeful_movement"],
+      "effects": { "fun": 0, "social": 0, "comfort": -3, "energy": -4, "hunger": 0 },
+      "exertion": 4, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
     },
     {
       "id": "run_laps",
@@ -753,7 +867,10 @@
         "stuckThresholdFrames": 42,
         "maxPatternRecoveries": 4
       },
-      "implementationClass": "RunLapsAction"
+      "implementationClass": "RunLapsAction",
+      "tags": ["playful"],
+      "effects": { "fun": 8, "social": 0, "comfort": -1, "energy": -5, "hunger": 0 },
+      "exertion": 5, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "show_affection",
@@ -774,7 +891,10 @@
         "expressionDuration": 300,
         "expressionRepeat": 3
       },
-      "implementationClass": "ShowAffectionAction"
+      "implementationClass": "ShowAffectionAction",
+      "tags": ["social", "comfort_giving", "soothing"],
+      "effects": { "fun": 3, "social": 8, "comfort": 5, "energy": 0, "hunger": 0 },
+      "exertion": 0, "novelty": 1, "risk": 0, "soothingValue": 5, "repeatMode": "diminishing"
     },
     {
       "id": "simple_sleep",
@@ -792,7 +912,10 @@
       "defaultOptions": {
         "zSpeed": 0.1
       },
-      "implementationClass": "SimpleSleepAction"
+      "implementationClass": "SimpleSleepAction",
+      "tags": ["restful"],
+      "effects": { "fun": 0, "social": 0, "comfort": 4, "energy": 15, "hunger": 0 },
+      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 6, "repeatMode": "free"
     },
     {
       "id": "sleep",
@@ -811,7 +934,10 @@
         "bobHeight": 5,
         "zInterval": 1000
       },
-      "implementationClass": "SleepAction"
+      "implementationClass": "SleepAction",
+      "tags": ["restful"],
+      "effects": { "fun": -2, "social": 0, "comfort": 8, "energy": 30, "hunger": 0 },
+      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 8, "repeatMode": "free"
     },
     {
       "id": "smell_flower",
@@ -829,7 +955,10 @@
       "defaultOptions": {
         "approachConfig": "adjacent"
       },
-      "implementationClass": "SmellFlowerAction"
+      "implementationClass": "SmellFlowerAction",
+      "tags": ["stimulating", "soothing", "comfort_giving"],
+      "effects": { "fun": 5, "social": 0, "comfort": 4, "energy": -1, "hunger": 0 },
+      "exertion": 0, "novelty": 3, "risk": 0, "soothingValue": 6, "repeatMode": "diminishing"
     },
     {
       "id": "spin",
@@ -849,7 +978,10 @@
         "rotations": 2,
         "frameDelay": 16
       },
-      "implementationClass": "SpinAction"
+      "implementationClass": "SpinAction",
+      "tags": ["playful"],
+      "effects": { "fun": 4, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
+      "exertion": 2, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "trample_flower",
@@ -869,7 +1001,10 @@
         "trampleAnimationDuration": 22,
         "postActionIdleDuration": 400
       },
-      "implementationClass": "TrampleFlowerAction"
+      "implementationClass": "TrampleFlowerAction",
+      "tags": ["stimulating"],
+      "effects": { "fun": 3, "social": 0, "comfort": -2, "energy": -1, "hunger": 0 },
+      "exertion": 1, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "use_surface_slot",
@@ -902,7 +1037,10 @@
         "maxFinalAdjustmentDistance": 20,
         "approachConfig": null
       },
-      "implementationClass": "SurfaceSlotAction"
+      "implementationClass": "SurfaceSlotAction",
+      "tags": ["restful", "comfort_giving"],
+      "effects": { "fun": -1, "social": 0, "comfort": 8, "energy": 15, "hunger": 0 },
+      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 8, "repeatMode": "free"
     },
     {
       "id": "wander",
@@ -925,7 +1063,10 @@
         "stuckThresholdFrames": 40,
         "maxPatternRecoveries": 5
       },
-      "implementationClass": "WanderAction"
+      "implementationClass": "WanderAction",
+      "tags": ["purposeful_movement"],
+      "effects": { "fun": 1, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
+      "exertion": 1, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "watch",
@@ -943,7 +1084,10 @@
       "defaultOptions": {
         "watchDistance": 60
       },
-      "implementationClass": "WatchAction"
+      "implementationClass": "WatchAction",
+      "tags": ["social", "stimulating"],
+      "effects": { "fun": 2, "social": 3, "comfort": 0, "energy": 0, "hunger": 0 },
+      "exertion": 0, "novelty": 3, "risk": 0, "soothingValue": 1, "repeatMode": "diminishing"
     },
     {
       "id": "water_plant",
@@ -962,7 +1106,10 @@
         "waterAnimationDuration": 36,
         "postActionIdleDuration": 500
       },
-      "implementationClass": "WaterPlantAction"
+      "implementationClass": "WaterPlantAction",
+      "tags": ["stimulating", "creative"],
+      "effects": { "fun": 3, "social": 0, "comfort": 2, "energy": -1, "hunger": 0 },
+      "exertion": 1, "novelty": 2, "risk": 0, "soothingValue": 1, "repeatMode": "diminishing"
     },
     {
       "id": "zigzag",
@@ -982,16 +1129,16 @@
         "amplitude": 80,
         "frequency": 0.05,
         "numLegs": 6,
-        "direction": {
-          "x": 1,
-          "y": 0
-        },
+        "direction": { "x": 1, "y": 0 },
         "repeat": 1,
         "safeTargetRadius": 12,
         "stuckThresholdFrames": 34,
         "maxPatternRecoveries": 4
       },
-      "implementationClass": "ZigzagAction"
+      "implementationClass": "ZigzagAction",
+      "tags": ["playful"],
+      "effects": { "fun": 7, "social": 0, "comfort": 0, "energy": -4, "hunger": 0 },
+      "exertion": 4, "novelty": 3, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "shake_tree",
@@ -1010,7 +1157,10 @@
         "shakeAnimationDuration": 60,
         "postActionIdleDuration": 1200
       },
-      "implementationClass": "ShakeTreeAction"
+      "implementationClass": "ShakeTreeAction",
+      "tags": ["stimulating"],
+      "effects": { "fun": 6, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
+      "exertion": 2, "novelty": 4, "risk": 1, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "chop_tree",
@@ -1028,7 +1178,10 @@
         "chopAnimationDuration": 120,
         "postActionIdleDuration": 1200
       },
-      "implementationClass": "ChopTreeAction"
+      "implementationClass": "ChopTreeAction",
+      "tags": ["stimulating", "creative"],
+      "effects": { "fun": 5, "social": 0, "comfort": 0, "energy": -3, "hunger": 0 },
+      "exertion": 3, "novelty": 3, "risk": 1, "soothingValue": 0, "repeatMode": "diminishing"
     },
     {
       "id": "remove_stump",
@@ -1047,7 +1200,10 @@
         "removeAnimationDuration": 90,
         "postActionIdleDuration": 1200
       },
-      "implementationClass": "RemoveStumpAction"
+      "implementationClass": "RemoveStumpAction",
+      "tags": ["stimulating"],
+      "effects": { "fun": 4, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
+      "exertion": 2, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
     }
   ]
 }

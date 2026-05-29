@@ -394,20 +394,22 @@ class MyteBuffController {
     resolveConditionValue(statName) {
         const stats = this.myte.stats;
         switch (statName) {
-            case 'energy': return stats?.energy ?? 0;
-            case 'health': return stats?.health ?? 0;
-            case 'mood': return stats?.mood ?? 0;
-            case 'boredom': return stats?.boredom ?? 0;
-            case 'comfort': return stats?.comfort ?? 0;
+            case 'energy':    return stats?.energy    ?? 0;
+            case 'health':    return stats?.health    ?? 0;
+            case 'fun':       return stats?.fun       ?? 0;
+            case 'social':    return stats?.social    ?? 0;
+            case 'hunger':    return stats?.hunger    ?? 0;
+            case 'comfort':   return stats?.comfort   ?? 0;
             case 'confidence': return stats?.confidence ?? 0;
-            case 'energyRatio': return stats?.getEnergyRatio?.() ?? 0;
-            case 'healthRatio': return stats?.getHealthRatio?.() ?? 0;
-            case 'moodRatio': return stats?.getMoodRatio?.() ?? 0;
-            case 'boredomRatio': return stats?.getBoredomRatio?.() ?? 0;
-            case 'comfortRatio': return stats?.getComfortRatio?.() ?? 0;
+            case 'energyRatio':    return stats?.getEnergyRatio?.()    ?? 0;
+            case 'healthRatio':    return stats?.getHealthRatio?.()    ?? 0;
+            case 'funRatio':       return stats?.getFunRatio?.()       ?? 0;
+            case 'socialRatio':    return stats?.getSocialRatio?.()    ?? 0;
+            case 'hungerRatio':    return stats?.getHungerRatio?.()    ?? 0;
+            case 'comfortRatio':   return stats?.getComfortRatio?.()   ?? 0;
             case 'confidenceRatio': return stats?.getConfidenceRatio?.() ?? 0;
+            case 'currentMood': return stats?.getDerivedMood?.() ?? 'neutral';
             case 'currentActionId': return stats?.getCurrentActionId?.() ?? null;
-            case 'currentMood': return stats?.currentMood ?? 'neutral';
             case 'isActive': return this.myte.isActive === true;
             default:
                 return 0;

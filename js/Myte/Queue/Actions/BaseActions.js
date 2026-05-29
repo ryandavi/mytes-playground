@@ -82,8 +82,28 @@ class MyteAction {
         return true;
     }
 
+    buildActionResult(overrides = {}) {
+        const def = ActionDefinitionRegistry.getDefinitionSync(this.constructor?.metadata?.id ?? '');
+        const base = def?.effects ?? {};
+        return {
+            funDelta:      base.fun     ?? 0,
+            socialDelta:   base.social  ?? 0,
+            comfortDelta:  base.comfort ?? 0,
+            energyDelta:   base.energy  ?? 0,
+            hungerDelta:   base.hunger  ?? 0,
+            novelty:       def?.novelty      ?? 0,
+            soothingValue: def?.soothingValue ?? 0,
+            exertion:      def?.exertion     ?? 0,
+            accomplishment: 0,
+            scary:         false,
+            safeOutcome:   true,
+            failedOutcome: false,
+            ...overrides
+        };
+    }
+
     complete() {
-        this.myte.stats?.applyActionCompletionEffects?.(this);
+        this.myte.stats?.applyActionResult?.(this.buildActionResult());
         this.myte.buffs?.handleActionComplete?.(this);
         if (this.onComplete !== null) {
             this.onComplete();
@@ -91,7 +111,11 @@ class MyteAction {
         return true;
     }
 
-    interrupt() {}
+    interrupt() {
+        if (this.currentDuration > 0 && this.currentDuration < (this.duration ?? 0) * 0.8) {
+            this.myte.stats?.applyActionResult?.(this.buildActionResult({ safeOutcome: false, failedOutcome: true }));
+        }
+    }
 
     isTargetValid() {
         if (!this.target) return true;
