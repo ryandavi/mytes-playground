@@ -110,21 +110,37 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
         return false;
     }
 
+    // Checks whether the actor's final navigation destination is on the far side of the
+    // door, relative to the direction of travel. Uses the motion vector (actorCenter →
+    // intent) as the authority on traversal direction rather than checking which side of
+    // the door bounds the actor is on.
+    //
+    // Why not "actor must be outside the door bounds"?
+    // The actor's sprite center (posX + size/2) is used for actorCenter, but the collision
+    // boundary that triggers tryOpenCollider is the entity's *collider* (usually at the
+    // bottom of the sprite). When approaching from the south the myte's collider first
+    // touches the door's bottom edge, but the sprite center is already inside the door's
+    // bounding box — so the old actorAbove/actorBelow check evaluated false for both sides
+    // and the S→N case always failed. The direction-based check below is immune to this.
     isIntentAcrossDoor(axis, actorCenter, intent, bounds, margin = 4) {
         if (axis === 'x') {
-            const actorOnLeft = actorCenter.x <= (bounds.left - margin);
-            const actorOnRight = actorCenter.x >= (bounds.left + bounds.width + margin);
-            const intentOnLeft = intent.x <= (bounds.left - margin);
-            const intentOnRight = intent.x >= (bounds.left + bounds.width + margin);
-            return (actorOnLeft && intentOnRight) || (actorOnRight && intentOnLeft);
+            if (intent.x >= actorCenter.x) {
+                // Moving east — final destination must clear the door's east (right) edge
+                return intent.x >= (bounds.left + bounds.width - margin);
+            } else {
+                // Moving west — final destination must clear the door's west (left) edge
+                return intent.x <= (bounds.left + margin);
+            }
         }
 
         if (axis === 'y') {
-            const actorAbove = actorCenter.y <= (bounds.top - margin);
-            const actorBelow = actorCenter.y >= (bounds.top + bounds.height + margin);
-            const intentAbove = intent.y <= (bounds.top - margin);
-            const intentBelow = intent.y >= (bounds.top + bounds.height + margin);
-            return (actorAbove && intentBelow) || (actorBelow && intentAbove);
+            if (intent.y < actorCenter.y) {
+                // Moving north (S→N) — destination must clear the door's north (top) edge
+                return intent.y <= (bounds.top + margin);
+            } else {
+                // Moving south (N→S) — destination must clear the door's south (bottom) edge
+                return intent.y >= (bounds.top + bounds.height - margin);
+            }
         }
 
         return false;

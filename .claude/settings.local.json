@@ -9,7 +9,8 @@
       "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\" -Recurse -File)",
       "Bash(Sort-Object)",
       "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\js\" -Recurse -Name)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(copy \"C:\\\\Users\\\\Ryan\\\\.claude\\\\plans\\\\snazzy-launching-pebble.md\" \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\docs\\\\MYTE_AI_REFACTOR_PLAN.md\")"
     ]
   }
 }

@@ -32,7 +32,7 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
         this._onMoonPhaseChange = () => { this.growthRate = this.calculateGrowthRate(); };
         GameTime.instance?.subscribe('moonPhase', this._onMoonPhaseChange);
 
-        // Advance growth (and any subclass state) when debug time is skipped.
+        // Advance growth (and any subclass state) whenever time is skipped forward.
         this._onTimeSkip = (realMs) => this.onTimeSkip(realMs);
         GameTime.instance?.subscribe('timeSkip', this._onTimeSkip);
     }
@@ -131,7 +131,7 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
     }
 
     // Template method — override in subclasses to advance additional time-sensitive state.
-    // Always call super.onTimeSkip(realMs) first.
+    // Always call super.onTimeSkip(realMs) first so growth is updated before subclass logic.
     onTimeSkip(realMs) {
         this.updateGrowth(realMs);
     }

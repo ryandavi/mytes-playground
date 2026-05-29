@@ -95,8 +95,10 @@ class CropPlantMapObject extends GrowingPlantMapObject {
         // Reset to growing stage
         this.growthStage = 'growing';
         this.growthProgress = 0;
+        this.fullyGrown = false;
         this.harvestable = false;
         this.quality = 1;
+        this.growthRate = this.calculateGrowthRate();
         
         // Play harvest animation
         this.playAnimation('harvest', () => {

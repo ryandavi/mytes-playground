@@ -1136,6 +1136,9 @@ class DebugOverlayUI {
 
         mytes.forEach(myte => {
             if (!myte) return;
+            // Skip mytes in their home slot — their coordinates are relative to the slot
+            // element, not the map, so debug boxes would render at the wrong position.
+            if (!myte.isActive) return;
             try {
                 if (this.overlayState.colliders) {
                     this._appendRegionBox(layer, myte.parent.getColliderBounds(myte), 'myte-collider');
