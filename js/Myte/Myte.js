@@ -687,6 +687,15 @@ class Myte {
 		return this.getDistanceToPoint(mouse.x, mouse.y);
 	}
 
+	getWorldRect() {
+		return {
+			left: this.posX, top: this.posY,
+			right: this.posX + this.size.width,
+			bottom: this.posY + this.size.height,
+			width: this.size.width, height: this.size.height
+		};
+	}
+
 	getRect() { return this.parent.getRect(this.duplicate); }
 	getOffsetRect() { return this.parent.getLocalOffset(this.duplicate); }
 

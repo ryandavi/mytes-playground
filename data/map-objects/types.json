@@ -441,6 +441,8 @@
   },
   "TREE": {
     "category": "nature",
+    
+    "animation": "sway",
     "variants": [
       "tree_pine"
     ],
@@ -537,7 +539,7 @@
         "widthRatio": 0.5,
         "heightRatio": 0.12,
         "anchorX": 0.5,
-        "anchorY": 0.92,
+        "anchorY": 0.89,
         "maxOpacity": 0.22,
         "minOpacity": 0.08,
         "minScale": 0.78,
@@ -552,6 +554,9 @@
       "chop": "obj_tree_chop"
     }
   },
+
+
+
   "TREE_STUMP": {
     "category": "nature",
     "variants": [

@@ -289,7 +289,7 @@ The following methods are pure geometry helpers with no dependency on game state
 
 - `getEntityBoundsAt(entity, x, y)`
 - `clampEntityPosition(entity, x, y)`
-- `getColliderBounds(entity)`
+- `getEntityColliderBounds(entity)`
 - `checkBoxCollision(entityA, entityB)`
 
 These are currently called as `this.container.getEntityBoundsAt(...)` from multiple places. After extraction, call them as `RectUtils.getEntityBoundsAt(...)` or `Utility.getEntityBoundsAt(...)`.
@@ -302,7 +302,7 @@ These are currently called as `this.container.getEntityBoundsAt(...)` from multi
 
 **Problem:** Three separate implementations of the same `posX + collider.offsetX` bounds calculation:
 
-1. `ContainerManager.getColliderBounds(entity)` (~line 588)
+1. `ContainerManager.getEntityColliderBounds(entity)` (~line 588)
 2. `ContainerManager.getEntityBoundsAt(entity, x, y)` (~line 452)
 3. `MapObject` computing its own bounds inline
 

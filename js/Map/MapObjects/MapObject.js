@@ -240,18 +240,16 @@ class MapObject {
 		return this.humanizeLabelToken(raw.toLowerCase());
 	}
 
-	isSidebarFlowerObject() {
-		const name = this.constructor?.name ?? '';
-		return name.includes('Flower') ||
-			name.includes('Bloom') ||
-			this.type?.toUpperCase?.() === 'GRASS' ||
-			this.type?.toUpperCase?.() === 'FLOWER';
+	// Returns true if this object is a flower (for sidebar display and pollinator logic).
+	// Override in subclasses or set `isFlower: true` in types.json config.
+	isFlower() {
+		const type = this.type?.toUpperCase?.();
+		return this.getConfig('isFlower', false) || type === 'FLOWER' || type === 'GRASS';
 	}
 
 	getSidebarStatusRows() {
 		const rows = [];
 		const interactionType = this.getConfig('interaction.type');
-		const deflowered = this.getConfig('deflowered', false) === true;
 
 		if (typeof this.isEnabled === 'function') {
 			rows.push({ label: 'Enabled', value: this.isEnabled() ? 'Yes' : 'No' });
@@ -261,32 +259,7 @@ class MapObject {
 			rows.push({ label: 'Music Active', value: this.isActiveMusicSource() ? 'Yes' : 'No' });
 		}
 
-		if (this.isSidebarFlowerObject()) {
-			rows.push(
-				{ label: 'Flower Available', value: deflowered ? 'No' : 'Yes' },
-				{ label: 'Flower State', value: deflowered ? 'Deflowered' : null }
-			);
-		}
-
-		if (this.growthStage != null) {
-			rows.push({ label: 'Stage', value: this.growthStage });
-		}
-
-		if (typeof this.isReadyToHarvest === 'function') {
-			rows.push({ label: 'Ready to Harvest', value: this.isReadyToHarvest() ? 'Yes' : 'No' });
-		}
-
-		if (this.isWatered != null) {
-			rows.push({ label: 'Watered', value: this.isWatered ? 'Yes' : 'No' });
-		}
-
-		if (typeof this.canWater === 'function' && !this.isWatered) {
-			rows.push({ label: 'Needs Water', value: this.canWater() ? 'Yes' : 'No' });
-		}
-
-		if (this.pollinationState != null) {
-			rows.push({ label: 'Pollination', value: this.pollinationState });
-		}
+		rows.push(...this._getSidebarStatusRows());
 
 		if (typeof this.isEnabled !== 'function' && rows.length === 0 && interactionType) {
 			rows.push({ label: 'Interaction', value: interactionType });
@@ -294,6 +267,9 @@ class MapObject {
 
 		return rows;
 	}
+
+	// Hook for subclasses to inject their own status rows without rewriting the base logic.
+	_getSidebarStatusRows() { return []; }
 
 	getSidebarDetailRows() {
 		const rows = [];
@@ -545,7 +521,14 @@ class MapObject {
 	// ── Collision ─────────────────────────────────────────────────────────────
 
 	initializeCollider() {
-		if (this.config.physics?.collider) return this.config.physics.collider;
+		const region = this.getRegionConfig('collider');
+		if (region) {
+			return {
+				...region,
+				offsetX: region.x ?? region.offsetX ?? 0,
+				offsetY: region.y ?? region.offsetY ?? 0
+			};
+		}
 		return {
 			type: 'box',
 			width: this.size.width * 0.8,
@@ -571,23 +554,6 @@ class MapObject {
 
 	getInteractionRadius(defaultValue = 100) {
 		return this.getConfig('interaction.radius', defaultValue);
-	}
-
-	// Mark this plant/flower as deflowered (no flower to pick until regrowth).
-	// Sets a runtime config flag and a CSS class; schedules regrowth if regrowthTime is configured.
-	setDeflowered(regrowthTime = null) {
-		if (this.config) this.config.deflowered = true;
-		this.element?.classList.add('deflowered');
-
-		const ms = regrowthTime ?? this.getConfig('regrowthTime', 0);
-		if (ms > 0) {
-			setTimeout(() => this.clearDeflowered(), ms);
-		}
-	}
-
-	clearDeflowered() {
-		if (this.config) this.config.deflowered = false;
-		this.element?.classList.remove('deflowered');
 	}
 
 	getAiAffordances(context = {}, actor = null) {
@@ -677,281 +643,6 @@ class MapObject {
 		}
 	}
 
-	getFrontDropSpawnPoint({ distance = 18, verticalLift = 0 } = {}) {
-		const rect = this.getColliderRectFor(this) ?? {
-			left: this.posX,
-			top: this.posY,
-			right: this.posX + this.size.width,
-			bottom: this.posY + this.size.height,
-			width: this.size.width,
-			height: this.size.height
-		};
-		const facing = this.getFacingVector();
-		const centerX = rect.left + (rect.width / 2);
-		const centerY = rect.top + (rect.height / 2);
-		const halfDepth = facing.x !== 0
-			? (rect.width / 2)
-			: (rect.height / 2);
-		const frontOffset = halfDepth + distance;
-
-		return {
-			x: centerX + (facing.x * frontOffset),
-			y: centerY + (facing.y * frontOffset) - verticalLift
-		};
-	}
-
-	getDefaultItemPopOutMotionOptions() {
-		return {
-			distance: 0,
-			verticalLift: 8,
-			forwardTravelDistance: 226,
-			forwardSpeed: null,
-			forwardVariance: 4,
-			spreadDistance: 8,
-			spreadSpeed: 0.5,
-			spreadIndex: 0,
-			spreadCount: 1,
-			lateralSpeed: 0.18,
-			lateralSpawnDistance: 2,
-			lateralBias: null,
-			verticalSpeed: 8.2,
-			verticalVariance: 2.1,
-			airDrag: 0.92
-		};
-	}
-
-	getItemPopOutSpreadBias(index = 0, count = 1) {
-		const resolvedCount = Math.max(1, Math.round(Number(count) || 1));
-		if (resolvedCount <= 1) return 0;
-
-		const resolvedIndex = Utility.clamp(
-			Math.round(Number(index) || 0),
-			0,
-			resolvedCount - 1
-		);
-		const midpoint = (resolvedCount - 1) / 2;
-		return (resolvedIndex - midpoint) / Math.max(midpoint, 0.5);
-	}
-
-	getItemPopOutMotion({
-		distance,
-		verticalLift,
-		forwardTravelDistance,
-		forwardSpeed,
-		forwardVariance,
-		spreadDistance,
-		spreadSpeed,
-		spreadIndex,
-		spreadCount,
-		lateralSpeed,
-		lateralSpawnDistance,
-		lateralBias = null,
-		verticalSpeed,
-		verticalVariance,
-		airDrag
-	} = {}) {
-		const defaults = this.getDefaultItemPopOutMotionOptions();
-		const forward = this.getFacingVector();
-		const lateral = { x: -forward.y, y: forward.x };
-		const resolvedDistance = Number.isFinite(Number(distance)) ? Number(distance) : defaults.distance;
-		const resolvedVerticalLift = Number.isFinite(Number(verticalLift)) ? Number(verticalLift) : defaults.verticalLift;
-		const resolvedForwardTravelDistance = Number.isFinite(Number(forwardTravelDistance))
-			? Number(forwardTravelDistance)
-			: defaults.forwardTravelDistance;
-		const resolvedForwardVariance = Number.isFinite(Number(forwardVariance)) ? Number(forwardVariance) : defaults.forwardVariance;
-		const resolvedSpreadDistance = Number.isFinite(Number(spreadDistance))
-			? Number(spreadDistance)
-			: (
-				Number.isFinite(Number(lateralSpawnDistance))
-					? Number(lateralSpawnDistance)
-					: defaults.spreadDistance
-			);
-		const resolvedSpreadSpeed = Number.isFinite(Number(spreadSpeed))
-			? Number(spreadSpeed)
-			: (
-				Number.isFinite(Number(lateralSpeed))
-					? Number(lateralSpeed)
-					: defaults.spreadSpeed
-			);
-		const resolvedSpreadIndex = Number.isFinite(Number(spreadIndex)) ? Number(spreadIndex) : defaults.spreadIndex;
-		const resolvedSpreadCount = Number.isFinite(Number(spreadCount)) ? Number(spreadCount) : defaults.spreadCount;
-		const bias = lateralBias !== null && lateralBias !== undefined && Number.isFinite(Number(lateralBias))
-			? Utility.clamp(Number(lateralBias), -1, 1)
-			: this.getItemPopOutSpreadBias(resolvedSpreadIndex, resolvedSpreadCount);
-		const resolvedVerticalSpeed = Number.isFinite(Number(verticalSpeed)) ? Number(verticalSpeed) : defaults.verticalSpeed;
-		const resolvedVerticalVariance = Number.isFinite(Number(verticalVariance)) ? Number(verticalVariance) : defaults.verticalVariance;
-		const resolvedAirDrag = Number.isFinite(Number(airDrag))
-			? Utility.clamp(Number(airDrag), 0, 0.999)
-			: defaults.airDrag;
-		const spawnPoint = this.getFrontDropSpawnPoint({
-			distance: resolvedDistance,
-			verticalLift: resolvedVerticalLift
-		});
-		const effectiveGravity = 0.5;
-		const estimatedAirborneFrames = Math.max(
-			1,
-			Math.round(((resolvedVerticalSpeed + (resolvedVerticalVariance * 0.5)) * 2) / effectiveGravity)
-		);
-		const dragDistanceFactor = resolvedAirDrag > 0 && resolvedAirDrag < 0.999
-			? (1 - Math.pow(resolvedAirDrag, estimatedAirborneFrames)) / (1 - resolvedAirDrag)
-			: estimatedAirborneFrames;
-		const derivedForwardSpeed = resolvedForwardTravelDistance / Math.max(dragDistanceFactor, 0.001);
-		const resolvedForwardSpeed = Number.isFinite(Number(forwardSpeed))
-			? Number(forwardSpeed)
-			: (Number.isFinite(Number(defaults.forwardSpeed)) ? Number(defaults.forwardSpeed) : derivedForwardSpeed);
-		const forwardMagnitude = resolvedForwardSpeed + (Math.random() * resolvedForwardVariance);
-
-		// Rotate the forward vector by a fan angle so multiple items spread in a cone.
-		// Half-angle grows with item count so a single item always flies straight forward.
-		const fanHalfAngleDeg = resolvedSpreadCount > 1
-			? Math.min(60, 15 + (resolvedSpreadCount - 1) * 15)
-			: 0;
-		const fanAngleRad = bias * fanHalfAngleDeg * (Math.PI / 180);
-		const cos_a = Math.cos(fanAngleRad);
-		const sin_a = Math.sin(fanAngleRad);
-		const rotatedX = forward.x * cos_a - forward.y * sin_a;
-		const rotatedY = forward.x * sin_a + forward.y * cos_a;
-
-		return {
-			spawnX: spawnPoint.x + (lateral.x * bias * resolvedSpreadDistance),
-			spawnY: spawnPoint.y + (lateral.y * bias * resolvedSpreadDistance),
-			velocityX: rotatedX * forwardMagnitude,
-			velocityY: rotatedY * forwardMagnitude,
-			velocityZ: resolvedVerticalSpeed + (Math.random() * resolvedVerticalVariance),
-			airDrag: resolvedAirDrag
-		};
-	}
-
-	getDroppedItemsLayer(parent = null) {
-		return this.gameMap?.layers?.objects || parent?.canvas?.querySelector('.layer.foreground') || null;
-	}
-
-	createDroppedInventoryItem({
-		type = null,
-		variant = null,
-		quantity = 1,
-		inventoryType = null,
-		inventoryVariant = null,
-		inventoryName = null,
-		description = '',
-		motion = null,
-		motionOptions = {}
-	} = {}) {
-		const resolvedVariant = ItemRegistry.resolveIdSync(variant) || variant;
-		const itemDefinition = ItemRegistry.getItemSync(resolvedVariant);
-		const resolvedType = String(
-			inventoryType ||
-			type ||
-			itemDefinition?.type ||
-			'ITEM'
-		).toUpperCase();
-		const resolvedMotion = motion ?? this.getItemPopOutMotion(motionOptions);
-		const dropped = new DroppedMapItem(
-			this.gameMap,
-			resolvedType,
-			resolvedVariant,
-			resolvedMotion.spawnX,
-			resolvedMotion.spawnY
-		);
-
-		dropped.quantity = Math.max(1, Number(quantity) || 1);
-		dropped.inventoryType = resolvedType;
-		dropped.inventoryVariant = inventoryVariant || itemDefinition?.id || resolvedVariant;
-		dropped.inventoryName = inventoryName || itemDefinition?.name || dropped.inventoryVariant;
-		dropped.description = description || itemDefinition?.description || '';
-		dropped.velocityX = resolvedMotion.velocityX ?? 0;
-		dropped.velocityY = resolvedMotion.velocityY ?? 0;
-		dropped.velocityZ = resolvedMotion.velocityZ ?? 0;
-		dropped.airDrag = resolvedMotion.airDrag ?? dropped.airDrag ?? 0.86;
-
-		return dropped;
-	}
-
-	spawnDroppedInventoryItem(itemConfig = {}, {
-		parent = null,
-		layer = null,
-		localCollection = null
-	} = {}) {
-		const foregroundLayer = layer || this.getDroppedItemsLayer(parent);
-		if (!foregroundLayer) {
-			return null;
-		}
-
-		const dropped = this.createDroppedInventoryItem(itemConfig);
-		if (!dropped?.element) {
-			return null;
-		}
-
-		foregroundLayer.appendChild(dropped.element);
-
-		if (Array.isArray(localCollection)) {
-			localCollection.push(dropped);
-		}
-		if (!this.gameMap?.droppedItems?.includes(dropped)) {
-			this.gameMap?.droppedItems?.push(dropped);
-		}
-
-		return dropped;
-	}
-
-	spawnDroppedInventoryItems(itemConfigs = [], {
-		parent = null,
-		layer = null,
-		localCollection = null,
-		motionOptions = {}
-	} = {}) {
-		const entries = Array.isArray(itemConfigs)
-			? itemConfigs.filter(Boolean)
-			: [itemConfigs].filter(Boolean);
-		const totalCount = entries.length;
-
-		return entries.map((itemConfig, index) => this.spawnDroppedInventoryItem({
-			...itemConfig,
-			motionOptions: {
-				...motionOptions,
-				...(itemConfig?.motionOptions ?? {}),
-				spreadIndex: index,
-				spreadCount: totalCount
-			}
-		}, {
-			parent,
-			layer,
-			localCollection
-		})).filter(Boolean);
-	}
-
-	pruneDroppedItemCollection(collection = []) {
-		if (!Array.isArray(collection)) {
-			return [];
-		}
-
-		return collection.filter(item => !!item && item.active && !item.collected);
-	}
-
-	// Rolls a weighted drop table and returns an array of drop results.
-	// dropTable entries: { type, variant, quantity, chance }
-	// chance values form a cumulative probability; if omitted, uniform distribution is used.
-	_rollDrops(dropTable, minYield, maxYield) {
-		if (!dropTable?.length) return [];
-
-		const quantity = Math.floor(Math.random() * (maxYield - minYield + 1)) + minYield;
-		const results = [];
-
-		for (let i = 0; i < quantity; i++) {
-			const roll = Math.random();
-			let cumulative = 0;
-			for (const drop of dropTable) {
-				cumulative += drop.chance ?? 1 / dropTable.length;
-				if (roll <= cumulative) {
-					results.push({ type: drop.type, variant: drop.variant, quantity: drop.quantity ?? 1 });
-					break;
-				}
-			}
-		}
-
-		return results;
-	}
-
 	getColliderRectFor(entity = this) {
 		if (!entity) return null;
 
@@ -984,74 +675,10 @@ class MapObject {
 		return Math.hypot(gapX, gapY);
 	}
 
-	getPickupRange(myte) {
-		const explicitRange = this.getConfig('pickupRange', null);
-		if (Number.isFinite(explicitRange)) {
-			return explicitRange;
-		}
-
-		const myteReach = Math.max(myte?.collider?.width ?? 0, myte?.collider?.height ?? 0) * 0.5;
-		const pickupRect = this.getPickupRect() || this.getRegionRect('collider');
-		const objectReach = Math.max(pickupRect?.width ?? 0, pickupRect?.height ?? 0) * 0.5;
-		return Math.max(24, myteReach + objectReach + 8);
-	}
-
-	canBePickedUpBy(myte) {
-		return !!myte?.isActive &&
-			this.active &&
-			this.getConfig('canPickUp', false) &&
-			(!this.isPickedUp || this.carrier === myte);
-	}
-
-	isInPickupRange(myte) {
-		if (!myte) return false;
-
-		const touchThreshold = this.getConfig('pickupTouchThreshold', 12);
-		const myteRect = this.getColliderRectFor(myte);
-		const pickupRect = this.getPickupRect() || this.getRegionRect('collider');
-		if (pickupRect && myteRect) {
-			const gapX = Math.max(0, pickupRect.left - myteRect.right, myteRect.left - pickupRect.right);
-			const gapY = Math.max(0, pickupRect.top - myteRect.bottom, myteRect.top - pickupRect.bottom);
-			if (Math.hypot(gapX, gapY) <= touchThreshold) {
-				return true;
-			}
-		} else if (this.getColliderGapTo(myte) <= touchThreshold) {
-			return true;
-		}
-
-		const myteCenter = typeof myte.getCenterPoint === 'function'
-			? myte.getCenterPoint('collider')
-			: {
-				x: myte.posX + (myte.collider?.offsetX ?? 0) + ((myte.collider?.width ?? myte.size.width) / 2),
-				y: myte.posY + (myte.collider?.offsetY ?? 0) + ((myte.collider?.height ?? myte.size.height) / 2)
-			};
-		const objectCenter = pickupRect
-			? {
-				x: pickupRect.left + (pickupRect.width / 2),
-				y: pickupRect.top + (pickupRect.height / 2)
-			}
-			: this.getCenterPoint();
-		return Math.hypot(objectCenter.x - myteCenter.x, objectCenter.y - myteCenter.y) <= this.getPickupRange(myte);
-	}
-
-	getPickupTargetPoint(myte = null) {
-		const pickupRect = this.getPickupRect();
-		if (pickupRect) {
-			return {
-				x: pickupRect.left + (pickupRect.width / 2),
-				y: pickupRect.top + (pickupRect.height / 2)
-			};
-		}
-
-		return this.getCenterPoint();
-	}
-
-	getCarriedPosition(carrier) {
-		return carrier?.getCarriedItemPosition?.(this.size) || {
-			x: this.posX,
-			y: this.posY
-		};
-	}
+	// Thin pickup interface — withPickupBehavior overrides these with full implementations.
+	canBePickedUpBy(myte) { return false; }
+	pickup(myte)          { return false; }
+	drop(vx = 0, vy = 0) { return { vx, vy }; }
 
 	resolveDepthOffset() {
 		const explicitDepthLine = this.getFiniteConfigNumber('visual.depthLine', null);
@@ -1144,33 +771,6 @@ class MapObject {
 		if (targetLayer && this.element.parentNode !== targetLayer) {
 			targetLayer.appendChild(this.element);
 		}
-	}
-
-	pickup(myte) {
-		if (!this.canBePickedUpBy(myte)) {
-			return false;
-		}
-
-		this.isPickedUp = true;
-		this.carrier = myte;
-		this.pendingPickup = false;
-		this.element?.classList.add('picked-up');
-		this.syncRenderLayer();
-		this.wake();
-		this.container?.ui?.setSelected?.(this);
-		this.playConfiguredSound?.('pickup');
-		return true;
-	}
-
-	drop(vx = 0, vy = 0) {
-		this.isPickedUp = false;
-		this.carrier = null;
-		this.pendingPickup = false;
-		this.element?.classList.remove('picked-up');
-		this.syncRenderLayer();
-		this.gameMap?.gridSystem?.updateObjectPosition(this);
-		this.playConfiguredSound?.('drop');
-		return { vx, vy };
 	}
 
 	isInInteractionRange(target, radius = this.getInteractionRadius()) {

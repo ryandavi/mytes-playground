@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="40" tilewidth="32" tileheight="32" infinite="0" nextlayerid="10" nextobjectid="20">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="40" tilewidth="32" tileheight="32" infinite="0" nextlayerid="10" nextobjectid="24">
  <properties>
   <property name="description" value="Bliss"/>
   <property name="location" value="outside"/>
@@ -231,6 +231,12 @@
    <properties>
     <property name="displayName" value="Chatroom"/>
     <property name="type" value="social"/>
+   </properties>
+  </object>
+  <object id="23" name="Zone" x="224" y="704" width="512" height="480">
+   <properties>
+    <property name="displayName" value="Lake Pookie"/>
+    <property name="type" value="water_lake"/>
    </properties>
   </object>
  </objectgroup>

@@ -472,29 +472,3 @@ class User {
     }
 }
 
-// Example usage:
-/*
-const core = new Core();
-const user = new User(core);
-
-// Connect to existing inventory
-user.setInventory(core.containerManager.inventory);
-
-// Login
-user.login('guest', 'default-user');
-
-// Update preferences
-user.setPreference('soundEnabled', false);
-
-// Track currency
-user.addCurrency('coins', 100);
-user.spendCurrency('coins', 50);
-
-// Unlock achievements
-user.unlockAchievement('first_myte_hatched');
-
-// Update play time
-setInterval(() => {
-    user.updatePlayTime(1000); // Update every second
-}, 1000);
-*/

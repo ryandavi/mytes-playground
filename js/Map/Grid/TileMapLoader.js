@@ -36,16 +36,55 @@ class TileMapLoader {
 		};
 	}
 
+	async _fetchXml(path) {
+		const response = await fetch(path);
+		if (!response.ok) throw new Error(`Failed to load ${path}: ${response.status}`);
+		return new DOMParser().parseFromString(await response.text(), 'text/xml');
+	}
+
+	async _loadTilesetImages(tilesets) {
+		const images = new Map();
+		for (const tileset of tilesets) {
+			if (!tileset.imageSource) continue;
+			let img = this.parent.parent?.resourceManager?.getSprite(tileset.name);
+			if (!img) {
+				img = await new Promise(resolve => {
+					const image = new Image();
+					image.onload = () => resolve(image);
+					image.onerror = () => resolve(null);
+					image.src = tileset.imageSource;
+				});
+				if (img && this.parent.parent?.resourceManager) {
+					this.parent.parent.resourceManager.sprites.set(tileset.name, img);
+				}
+			}
+			if (img) images.set(tileset.name, img);
+		}
+		return images;
+	}
+
+	_renderLayerToCanvas(ctx, layer, tilesetImages, tilesets, mapWidth, tileWidth, tileHeight) {
+		if (layer.opacity <= 0) return;
+		ctx.globalAlpha = layer.opacity;
+		layer.data.forEach((gid, index) => {
+			if (gid === 0) return;
+			const x = (index % mapWidth) * tileWidth;
+			const y = Math.floor(index / mapWidth) * tileHeight;
+			const tileset = this.findTilesetForGid(gid, tilesets);
+			if (!tileset) return;
+			const img = tilesetImages.get(tileset.name);
+			if (!img) return;
+			const localId = gid - tileset.firstgid;
+			const tilesetX = (localId % tileset.columns) * tileWidth;
+			const tilesetY = Math.floor(localId / tileset.columns) * tileHeight;
+			ctx.drawImage(img, tilesetX, tilesetY, tileWidth, tileHeight, x, y, tileWidth, tileHeight);
+		});
+		ctx.globalAlpha = 1;
+	}
+
 	async loadTileMap(mapPath) {
 		try {
-			// Fetch the TMX file
-			const response = await fetch(mapPath);
-			if (!response.ok) throw new Error(`Failed to load map: ${response.status}`);
-			const text = await response.text();
-
-			// Parse the XML
-			const parser = new DOMParser();
-			const xmlDoc = parser.parseFromString(text, "text/xml");
+			const xmlDoc = await this._fetchXml(mapPath);
 
 			// Basic map info
 			const mapEl = xmlDoc.querySelector('map');
@@ -184,15 +223,7 @@ class TileMapLoader {
 			let tilesetData;
 	
 			if (tilesetPath) {
-				// External tileset - fetch the TSX file
-				const response = await fetch(tilesetPath);
-				if (!response.ok) throw new Error(`Failed to load tileset: ${response.status}`);
-				const text = await response.text();
-	
-				// Parse the XML
-				const parser = new DOMParser();
-				const xmlDoc = parser.parseFromString(text, "text/xml");
-				tilesetData = xmlDoc.querySelector('tileset');
+				tilesetData = (await this._fetchXml(tilesetPath)).querySelector('tileset');
 			} else {
 				// Embedded tileset - use the provided element
 				tilesetData = tilesetEl;
@@ -389,51 +420,6 @@ class TileMapLoader {
 		return Object.keys(properties).length > 0 ? properties : null;
 	}
 
-	/**
-	 * Parse treasure chest item definitions from a string format
-	 */
-	parseItems(str) {
-		// Clean up the string
-		const cleanString = str.trim().replace(/\n/g, '');
-
-		// Split by commas that are followed by an open brace
-		const itemStrings = cleanString.split(/,(?=\s*{)/);
-
-		return itemStrings.map(itemStr => {
-			// Remove curly braces and split by commas
-			const parts = itemStr.replace(/[{}]/g, '').split(',').map(part => part.trim());
-
-			// Process each part to handle quotes and convert types
-			const processedParts = parts.map(part => {
-				// Remove quotes if present
-				let processed = part.replace(/^["']|["']$/g, '');
-
-				// Check if it's a range (e.g., "10-20")
-				if (/^\d+\s*-\s*\d+$/.test(processed)) {
-					const [min, max] = processed.split('-').map(Number);
-					return [min, max]; // Return as array of two numbers
-				}
-
-				// Try to parse as number if possible
-				if (!isNaN(processed) && processed !== '') {
-					return Number(processed);
-				}
-
-				return processed;
-			});
-
-			// Create structured object with default values
-			const result = {
-				type: processedParts[0],
-				variant: processedParts[1],
-				quantity: processedParts[2] !== undefined ? processedParts[2] : 1,
-				probability: processedParts[3] !== undefined ? processedParts[3] : 1
-			};
-
-			return result;
-		});
-	}
-
 	parsePoints(pointsStr) {
 		if (!pointsStr) return [];
 
@@ -455,28 +441,24 @@ class TileMapLoader {
 
 	createZonesFromObjects(mapData) {
 		mapData.objects = mapData.objects.filter(obj => {
-			if (obj.name.toUpperCase() == 'ZONE' && obj.properties) {
-				const type = obj.properties.type.toUpperCase() || 'REST';
+			if (obj.name.toUpperCase() !== 'ZONE' || !obj.properties) return true;
 
-				mapData.zones.push({
-					id: `zone_${obj.properties.displayName.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_')}`,
-					type: type,
-					bounds: {
-						x: obj.x,
-						y: obj.y,
-						width: obj.width,
-						height: obj.height
-					},
-					properties: {
-						visible: obj.properties.visible !== false,
-						strength: obj.properties.strength || 1.0,
-						...obj.properties
-					}
-				});
+			const type = (obj.properties.type || 'REST').toUpperCase();
+			const displayName = obj.properties.displayName || obj.properties.type || `zone_${obj.id}`;
+			const id = `zone_${displayName.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-				return false; // Remove from objects
-			}
-			return true; // Keep in objects
+			mapData.zones.push({
+				id,
+				type,
+				bounds: { x: obj.x, y: obj.y, width: obj.width, height: obj.height },
+				properties: {
+					visible: obj.properties.visible !== false,
+					strength: obj.properties.strength || 1.0,
+					...obj.properties
+				}
+			});
+
+			return false;
 		});
 	}
 
@@ -529,178 +511,34 @@ class TileMapLoader {
 		return terrainTypes;
 	}
 
-	// Render tile layer to canvas instead of creating DOM elements
 	renderTileLayerToCanvas(layer, mapData, canvas) {
 		const ctx = canvas.getContext('2d');
 		const { tileWidth, tileHeight, width: mapWidth } = mapData;
-
-		// Create a promise to load all tileset images
-		const loadTilesetImages = async () => {
-			const tilesetImages = new Map();
-
-			for (const tileset of mapData.tilesets) {
-				if (tileset.imageSource) {
-					// Check if image is already cached by ResourceManager
-					let img = this.parent.parent?.resourceManager?.getSprite(tileset.name);
-
-					if (!img) {
-						// Load the image if not cached
-						img = await new Promise((resolve) => {
-							const image = new Image();
-							image.onload = () => resolve(image);
-							image.onerror = () => resolve(null);
-							image.src = tileset.imageSource;
-						});
-
-						// Cache it for future use if ResourceManager exists
-						if (this.parent.parent?.resourceManager && img) {
-							this.parent.parent.resourceManager.sprites.set(tileset.name, img);
-						}
-					}
-
-					if (img) {
-						tilesetImages.set(tileset.name, img);
-					}
-				}
-			}
-
-			return tilesetImages;
-		};
-
-		// Render tiles once images are loaded
-		loadTilesetImages().then(tilesetImages => {
-			// Clear canvas first
+		this._loadTilesetImages(mapData.tilesets).then(tilesetImages => {
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-			// Only render the layer if the opacity is visible
-			if (layer.opacity <= 0) return;
-
-			// Apply layer opacity
-			ctx.globalAlpha = layer.opacity;
-
-			// Render each tile in the layer
-			layer.data.forEach((gid, index) => {
-				if (gid === 0) return; // Skip empty tiles
-
-				// Calculate tile position
-				const x = (index % mapWidth) * tileWidth;
-				const y = Math.floor(index / mapWidth) * tileHeight;
-
-				// Find tileset for this gid
-				const tilesetInfo = this.findTilesetForGid(gid, mapData.tilesets);
-				if (!tilesetInfo) return;
-
-				// Get the image for this tileset
-				const tilesetImage = tilesetImages.get(tilesetInfo.name);
-				if (!tilesetImage) return;
-
-				// Calculate tile position in the tileset image
-				const localId = gid - tilesetInfo.firstgid;
-				const tilesetColumns = tilesetInfo.columns;
-				const tilesetX = (localId % tilesetColumns) * tileWidth;
-				const tilesetY = Math.floor(localId / tilesetColumns) * tileHeight;
-
-				// Draw the tile to canvas
-				ctx.drawImage(
-					tilesetImage,
-					tilesetX, tilesetY,
-					tileWidth, tileHeight,
-					x, y,
-					tileWidth, tileHeight
-				);
-			});
-
-			// Reset global alpha
-			ctx.globalAlpha = 1;
+			this._renderLayerToCanvas(ctx, layer, tilesetImages, mapData.tilesets, mapWidth, tileWidth, tileHeight);
 		});
 	}
 
 	findTilesetForGid(gid, tilesets) {
-		let result = null;
-
-		// Find the tileset with the highest firstgid that's less than or equal to gid
-		tilesets.forEach(tileset => {
-			if (gid >= tileset.firstgid &&
-				(result === null || tileset.firstgid > result.firstgid)) {
-				result = tileset;
-			}
-		});
-
-		return result;
+		// Tilesets are ordered ascending by firstgid; walk backwards to find the first match
+		for (let i = tilesets.length - 1; i >= 0; i--) {
+			if (gid >= tilesets[i].firstgid) return tilesets[i];
+		}
+		return null;
 	}
 
-	// Creating a background image from the map for the full view
 	async createMapBackgroundUrl(mapData) {
 		try {
-			const { tileWidth, tileHeight, width, height } = mapData.TileData;
-			const { layers, tilesets } = mapData.TileData;
-
-			// Create a canvas
+			const { layers, tilesets, tileWidth, tileHeight, width, height } = mapData.TileData;
 			const canvas = document.createElement('canvas');
 			canvas.width = width * tileWidth;
 			canvas.height = height * tileHeight;
-
 			const ctx = canvas.getContext('2d');
 
-			// Load all tileset images
-			const tilesetImages = {};
-
-			for (const tileset of tilesets) {
-				if (tileset.imageSource) {
-					// First try to get from ResourceManager
-					let img = this.parent.parent?.resourceManager?.getSprite(tileset.name);
-
-					if (!img) {
-						img = new Image();
-						img.src = tileset.imageSource;
-						await new Promise(resolve => {
-							img.onload = resolve;
-							img.onerror = resolve; // Continue even if image fails to load
-						});
-					}
-
-					tilesetImages[tileset.name] = img;
-				}
-			}
-
-			// Render visible, non-collision layers to the canvas
-			const visibleLayers = layers.filter(
-				layer => layer.visible // && layer.name !== 'Collider'
-			);
-
-			for (const layer of visibleLayers) {
-				if (layer.opacity < 1) {
-					ctx.globalAlpha = layer.opacity;
-				}
-
-				// Render each tile
-				layer.data.forEach((gid, index) => {
-					if (gid === 0) return; // Skip empty tiles
-
-					// Calculate tile position
-					const x = (index % width) * tileWidth;
-					const y = Math.floor(index / width) * tileHeight;
-
-					// Find tileset for this gid
-					const tileset = this.findTilesetForGid(gid, tilesets);
-					if (!tileset || !tilesetImages[tileset.name]) return;
-
-					// Calculate position in the tileset image
-					const localId = gid - tileset.firstgid;
-					const tilesetColumns = tileset.columns;
-					const tilesetX = (localId % tilesetColumns) * tileWidth;
-					const tilesetY = Math.floor(localId / tilesetColumns) * tileHeight;
-
-					// Draw the tile
-					ctx.drawImage(
-						tilesetImages[tileset.name],
-						tilesetX, tilesetY, tileWidth, tileHeight,
-						x, y, tileWidth, tileHeight
-					);
-				});
-
-				// Reset global alpha
-				ctx.globalAlpha = 1;
+			const tilesetImages = await this._loadTilesetImages(tilesets);
+			for (const layer of layers.filter(l => l.visible)) {
+				this._renderLayerToCanvas(ctx, layer, tilesetImages, tilesets, width, tileWidth, tileHeight);
 			}
 
 			return canvas.toDataURL('image/png');
@@ -715,16 +553,11 @@ class TileMapLoader {
 	 */
 
 generateGridData(mapData, gridConfig = {}) {
-    const { tileWidth, tileHeight, width, height } = mapData.TileData;
-    
-    // Determine cell size for the grid
+    const { layers: tileLayers, tilesets, tileWidth, tileHeight, width, height } = mapData.TileData;
     const cellSize = gridConfig.cellSize || tileWidth;
-
-    // Calculate grid dimensions
     const gridWidth = Math.ceil(mapData.dimensions.width / cellSize);
     const gridHeight = Math.ceil(mapData.dimensions.height / cellSize);
 
-    // Create grid cells
     const grid = [];
     for (let x = 0; x < gridWidth; x++) {
         grid[x] = [];
@@ -735,158 +568,95 @@ generateGridData(mapData, gridConfig = {}) {
                 walkable: true,
                 swimmable: false,
                 conditionallyWalkable: false,
-                conditionType: null, // 'door', 'gate', etc.
-                conditionId: null,   // ID to reference the specific condition object
+                conditionType: null,
+                conditionId: null,
                 objects: new Set(),
-                terrainType: GridSystem.defaultTerrain // Default terrain type
+                terrainType: GridSystem.defaultTerrain
             };
         }
     }
 
-    // Process all tile layers to check for collision properties and terrain types
-    const layers = mapData.TileData.layers.filter(layer => layer.visible);
-    
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            const tileX = x * tileWidth;
-            const tileY = y * tileHeight;
-            const index = y * width + x;
-            
-            // Process each visible layer from bottom to top
-            for (const layer of layers) {
+    const visibleLayers = tileLayers.filter(l => l.visible);
+
+    for (let ty = 0; ty < height; ty++) {
+        for (let tx = 0; tx < width; tx++) {
+            const tileX = tx * tileWidth;
+            const tileY = ty * tileHeight;
+            const index = ty * width + tx;
+
+            for (const layer of visibleLayers) {
                 const gid = layer.data[index];
-                
-                // Skip empty tiles
                 if (gid === 0) continue;
-                
-                // Find tileset for this gid
-                const tileset = this.findTilesetForGid(gid, mapData.TileData.tilesets);
+
+                const tileset = this.findTilesetForGid(gid, tilesets);
                 if (!tileset) continue;
-                
-                // Calculate the local tile ID within the tileset
-                const localId = gid - tileset.firstgid;
-                
-                // Get tile properties from the tileset
-                const tileProps = tileset.tiles[localId]?.properties;
-                
-                if (tileProps) {
-                    // Check for collision property
-                    if (tileProps.type === 'collider') {
-                        // Check if it's a door or other conditional collider
-                        if (tileProps.conditionType === 'door' || tileProps.interactive === 'door') {
-                            this.markGridCellsConditional(grid, tileX, tileY, tileWidth, tileHeight, cellSize, 'door', tileProps.conditionId || tileProps.id);
-                        } else {
-                            this.markGridCellsUnwalkable(grid, tileX, tileY, tileWidth, tileHeight, cellSize);
-                        }
+
+                const tileProps = tileset.tiles[gid - tileset.firstgid]?.properties;
+                if (!tileProps) continue;
+
+                if (tileProps.type === 'collider') {
+                    if (tileProps.conditionType === 'door' || tileProps.interactive === 'door') {
+                        this.markGridCellsConditional(grid, tileX, tileY, tileWidth, tileHeight, cellSize, 'door', tileProps.conditionId || tileProps.id);
+                    } else {
+                        this.markGridCellsUnwalkable(grid, tileX, tileY, tileWidth, tileHeight, cellSize);
                     }
-                    
-                    // Check for terrain type
-                    if (tileProps.terrain || tileProps.terrainType) {
-                        const terrainType = this.terrainMapping[tileProps.terrain?.toLowerCase() || 
-                                                                tileProps.terrainType?.toLowerCase()] || 
-                                            GridSystem.defaultTerrain;
-                        
-                        this.applyTerrainTypeToGridCells(grid, tileX, tileY, tileWidth, tileHeight, cellSize, terrainType);
-                        
-                        // Mark water tiles as swimmable
-                        if (terrainType === 'shallow_water' || terrainType === 'deep_water') {
-                            this.markGridCellsSwimmable(grid, tileX, tileY, tileWidth, tileHeight, cellSize);
-                        }
+                }
+
+                const rawTerrain = tileProps.terrain || tileProps.terrainType;
+                if (rawTerrain) {
+                    const terrainType = this.terrainMapping[rawTerrain.toLowerCase()] || GridSystem.defaultTerrain;
+                    this.applyTerrainTypeToGridCells(grid, tileX, tileY, tileWidth, tileHeight, cellSize, terrainType);
+                    if (terrainType === 'shallow_water' || terrainType === 'deep_water') {
+                        this.markGridCellsSwimmable(grid, tileX, tileY, tileWidth, tileHeight, cellSize);
                     }
                 }
             }
         }
     }
 
-    return {
-        grid,
-        width: gridWidth,
-        height: gridHeight,
-        cellSize: cellSize
-    };
+    return { grid, width: gridWidth, height: gridHeight, cellSize };
 }
 
 
-markGridCellsSwimmable(grid, tileX, tileY, tileWidth, tileHeight, cellSize) {
-    // Calculate the grid cell range this tile covers
-    const startGridX = Math.floor(tileX / cellSize);
-    const startGridY = Math.floor(tileY / cellSize);
-    const endGridX = Math.ceil((tileX + tileWidth) / cellSize);
-    const endGridY = Math.ceil((tileY + tileHeight) / cellSize);
-
-    // Mark cells as swimmable
-    for (let gridX = startGridX; gridX < endGridX; gridX++) {
-        for (let gridY = startGridY; gridY < endGridY; gridY++) {
-            if (gridX >= 0 && gridX < grid.length &&
-                gridY >= 0 && gridY < grid[0].length) {
-                grid[gridX][gridY].swimmable = true;
-            }
-        }
-    }
-}
-
-// Add a new method to mark grid cells as conditionally walkable
-markGridCellsConditional(grid, tileX, tileY, tileWidth, tileHeight, cellSize, conditionType, conditionId) {
-    // Calculate the grid cell range this tile covers
-    const startGridX = Math.floor(tileX / cellSize);
-    const startGridY = Math.floor(tileY / cellSize);
-    const endGridX = Math.ceil((tileX + tileWidth) / cellSize);
-    const endGridY = Math.ceil((tileY + tileHeight) / cellSize);
-
-    // Mark cells as conditionally walkable
-    for (let gridX = startGridX; gridX < endGridX; gridX++) {
-        for (let gridY = startGridY; gridY < endGridY; gridY++) {
-            if (gridX >= 0 && gridX < grid.length &&
-                gridY >= 0 && gridY < grid[0].length) {
-                grid[gridX][gridY].walkable = false; // Initially not walkable
-                grid[gridX][gridY].conditionallyWalkable = true;
-                grid[gridX][gridY].conditionType = conditionType;
-                grid[gridX][gridY].conditionId = conditionId;
-            }
-        }
-    }
-}
-
-
-
-	/**
-	* Apply terrain type to grid cells covered by a tile
-	*/
-	applyTerrainTypeToGridCells(grid, tileX, tileY, tileWidth, tileHeight, cellSize, terrainType) {
-		// Calculate the grid cell range this tile covers
-		const startGridX = Math.floor(tileX / cellSize);
-		const startGridY = Math.floor(tileY / cellSize);
-		const endGridX = Math.ceil((tileX + tileWidth) / cellSize);
-		const endGridY = Math.ceil((tileY + tileHeight) / cellSize);
-
-		// Apply terrain type to cells
-		for (let gridX = startGridX; gridX < endGridX; gridX++) {
-			for (let gridY = startGridY; gridY < endGridY; gridY++) {
-				if (gridX >= 0 && gridX < grid.length &&
-					gridY >= 0 && gridY < grid[0].length) {
-					grid[gridX][gridY].terrainType = terrainType;
-				}
+	_iterateCells(grid, tileX, tileY, tileWidth, tileHeight, cellSize, fn) {
+		const x0 = Math.floor(tileX / cellSize);
+		const y0 = Math.floor(tileY / cellSize);
+		const x1 = Math.ceil((tileX + tileWidth) / cellSize);
+		const y1 = Math.ceil((tileY + tileHeight) / cellSize);
+		for (let gx = x0; gx < x1; gx++) {
+			if (gx < 0 || gx >= grid.length) continue;
+			for (let gy = y0; gy < y1; gy++) {
+				if (gy >= 0 && gy < grid[gx].length) fn(grid[gx][gy]);
 			}
 		}
 	}
 
-	markGridCellsUnwalkable(grid, tileX, tileY, tileWidth, tileHeight, cellSize) {
-		// Calculate the grid cell range this tile covers
-		const startGridX = Math.floor(tileX / cellSize);
-		const startGridY = Math.floor(tileY / cellSize);
-		const endGridX = Math.ceil((tileX + tileWidth) / cellSize);
-		const endGridY = Math.ceil((tileY + tileHeight) / cellSize);
+	markGridCellsSwimmable(grid, tileX, tileY, tileWidth, tileHeight, cellSize) {
+		this._iterateCells(grid, tileX, tileY, tileWidth, tileHeight, cellSize, cell => {
+			cell.swimmable = true;
+		});
+	}
 
-		// Mark cells as unwalkable
-		for (let gridX = startGridX; gridX < endGridX; gridX++) {
-			for (let gridY = startGridY; gridY < endGridY; gridY++) {
-				if (gridX >= 0 && gridX < grid.length &&
-					gridY >= 0 && gridY < grid[0].length) {
-					grid[gridX][gridY].walkable = false;
-					grid[gridX][gridY].tileWalkable = false; // Mark as unwalkable due to tile
-				}
-			}
-		}
+	markGridCellsConditional(grid, tileX, tileY, tileWidth, tileHeight, cellSize, conditionType, conditionId) {
+		this._iterateCells(grid, tileX, tileY, tileWidth, tileHeight, cellSize, cell => {
+			cell.walkable = false;
+			cell.conditionallyWalkable = true;
+			cell.conditionType = conditionType;
+			cell.conditionId = conditionId;
+		});
+	}
+
+	applyTerrainTypeToGridCells(grid, tileX, tileY, tileWidth, tileHeight, cellSize, terrainType) {
+		this._iterateCells(grid, tileX, tileY, tileWidth, tileHeight, cellSize, cell => {
+			cell.terrainType = terrainType;
+		});
+	}
+
+	markGridCellsUnwalkable(grid, tileX, tileY, tileWidth, tileHeight, cellSize) {
+		this._iterateCells(grid, tileX, tileY, tileWidth, tileHeight, cellSize, cell => {
+			cell.walkable = false;
+			cell.tileWalkable = false;
+		});
 	}
 
 	convertToGameMapFormat(TileMapData) {

@@ -826,9 +826,10 @@ class DebugOverlayUI {
                         .map(m => m.name)
                         .join(', ');
                     const type = zone.type || 'zone';
+                    const displayName = zone.displayName || type;
                     messages.push({
-                        label: `<span class="badge ${type}">${type}</span> ${zoneId}`,
-                        labelClean: `${type} ${zoneId}`,
+                        label: `<span class="badge ${type}">${displayName}</span> ${zoneId}`,
+                        labelClean: `${displayName} ${zoneId}`,
                         value: names || '—'
                     });
                 } catch {
@@ -1146,7 +1147,7 @@ class DebugOverlayUI {
             if (!myte.isActive) return;
             try {
                 if (this.overlayState.colliders) {
-                    this._appendRegionBox(layer, myte.parent.getColliderBounds(myte), 'myte-collider');
+                    this._appendRegionBox(layer, myte.parent.getEntityColliderBounds(myte), 'myte-collider');
                 }
                 if (this.overlayState.interaction) {
                     const rect = myte.getRegionRect?.('interaction');
@@ -1184,7 +1185,7 @@ class DebugOverlayUI {
                 if (!obj || obj instanceof Myte) return;
                 try {
                     if (this.overlayState.colliders) {
-                        const bounds = this.parent.getColliderBounds(obj);
+                        const bounds = this.parent.getEntityColliderBounds(obj);
                         const css = ['object-collider', ...(obj.config?.physics?.walkable ? ['walkable-object'] : [])];
                         this._appendRegionBox(layer, bounds, ...css);
 
@@ -1192,7 +1193,7 @@ class DebugOverlayUI {
                         if (slotConfig) {
                             (obj.getActionSlotDefinitions?.('use_surface_slot') ?? []).forEach(slot => {
                                 if (!slot?.restPosition) return;
-                                const cb = this.parent.getColliderBounds(obj);
+                                const cb = this.parent.getEntityColliderBounds(obj);
                                 const sx = cb.left + (cb.right - cb.left) * (slot.restPosition.xFactor ?? 0.5);
                                 const sy = cb.top  + (cb.bottom - cb.top) * (slot.restPosition.yFactor ?? 0.5);
                                 const dot = document.createElement('div');

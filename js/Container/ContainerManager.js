@@ -39,7 +39,9 @@ class ContainerManager {
         this.settings = {
             limitMap: core?.user?.preferences?.containerLimit ?? true,
             defaultMyteCamera: CAMERA_FOLLOW_MODES[SiteConfig.camera.defaultFollowMode] ?? CAMERA_FOLLOW_MODES.CURSOR_EDGE,
-            autoDeployMytesOnLoad: false
+            autoDeployMytesOnLoad: false,
+            cameraShake: true,
+            panInertia: true,
         }
 
     }
@@ -857,8 +859,8 @@ class ContainerManager {
         return RectUtils.getEntityColliderBounds(entity, x, y);
     }
 
-    getColliderBounds(entity) {
-        return RectUtils.getColliderBounds(entity);
+    getEntityColliderBounds(entity) {
+        return RectUtils.getEntityColliderBounds(entity);
     }
 
     checkBoxCollision(entityA, entityB, options = {}) {

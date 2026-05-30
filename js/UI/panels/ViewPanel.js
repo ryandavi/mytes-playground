@@ -28,6 +28,10 @@ class ViewPanel extends ModalWindow {
         return this.parent.parent.camera;
     }
 
+    _getContainer() {
+        return this.parent.parent;
+    }
+
     setupControls() {
         if (!this.modalElement) return;
 
@@ -52,6 +56,25 @@ class ViewPanel extends ModalWindow {
 
         const resetCamera = q('#view-reset-camera');
         if (resetCamera) resetCamera.onclick = () => this.getCamera()?.reset();
+
+        // Camera option toggles
+        this._shakeToggle = q('#view-shake-toggle');
+        if (this._shakeToggle) {
+            this._shakeToggle.checked = this._getContainer()?.settings.cameraShake ?? true;
+            this._shakeToggle.onchange = () => {
+                const container = this._getContainer();
+                if (container) container.settings.cameraShake = this._shakeToggle.checked;
+            };
+        }
+
+        this._inertiaToggle = q('#view-inertia-toggle');
+        if (this._inertiaToggle) {
+            this._inertiaToggle.checked = this._getContainer()?.settings.panInertia ?? true;
+            this._inertiaToggle.onchange = () => {
+                const container = this._getContainer();
+                if (container) container.settings.panInertia = this._inertiaToggle.checked;
+            };
+        }
 
         // Follow mode buttons — store references for disposal
         this._followModeBtns = this.modalElement.querySelectorAll('.follow-mode-btn');
@@ -82,7 +105,11 @@ class ViewPanel extends ModalWindow {
             });
             this._followModeBtns?.forEach(btn => { btn.onclick = null; });
         }
+        if (this._shakeToggle)   this._shakeToggle.onchange = null;
+        if (this._inertiaToggle) this._inertiaToggle.onchange = null;
         this._followModeBtns = null;
+        this._shakeToggle    = null;
+        this._inertiaToggle  = null;
         super.dispose();
     }
 

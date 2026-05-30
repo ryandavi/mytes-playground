@@ -884,6 +884,8 @@ class SoundManager {
 
 		// Start or re-volume sounds in range
 		next.forEach((volumeMultiplier, id) => {
+			const sound = this.synths.get(id);
+			if (sound) sound.proximityMultiplier = volumeMultiplier;
 			this.playAmbient(id, { volume: volumeMultiplier });
 		});
 
@@ -1233,7 +1235,6 @@ class SoundManager {
 				}
 
 				// Update all active synths based on their category
-				// Update all active synths based on their category
 				this.synths.forEach((sound, id) => {
 					if (!sound.synth) return;
 
@@ -1241,9 +1242,15 @@ class SoundManager {
 					if (!preset) return;
 
 					const categoryVolume = this.getCategoryVolume(this.resolveSoundCategory(id, preset));
-					const finalVolume = categoryVolume * (sound.baseVolume || 1);
+					const proximityMultiplier = sound.proximityMultiplier ?? 1;
+					const finalVolume = categoryVolume * proximityMultiplier * (sound.baseVolume || 1);
+
+					// Skip if volume hasn't changed — avoids interrupting ongoing fades (e.g. wind
+					// ramps when an unrelated slider like footsteps triggers updateAllVolumes)
+					if (Math.abs(finalVolume - (sound.currentVolume ?? -1)) < 0.005) return;
 
 					this.updateSynthVolume(sound.synth, finalVolume);
+					sound.currentVolume = finalVolume;
 				});
 			} catch (err) {
 				console.warn("Error updating volumes:", err);

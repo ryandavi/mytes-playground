@@ -1,4 +1,4 @@
-class TreasureChestMapObject extends ClassStateAnimatedMapObject {
+class TreasureChestMapObject extends withItemDropBehavior(ClassStateAnimatedMapObject) {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         this.items = [];
@@ -344,6 +344,7 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
         );
 
         this.playConfiguredSound('drop');
+        this.gameMap?.particleSystem?.burstEffectAtObject(this, 'SPARKLE', { count: 24, spread: 70 });
 
         this.items = [];
     }
@@ -366,10 +367,6 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
 
     update(deltaTime) {
         super.update(deltaTime);
-        this.updateDroppedItems();
-    }
-    
-    updateDroppedItems() {
         this.droppedItems = this.pruneDroppedItemCollection(this.droppedItems);
     }
 
@@ -385,51 +382,6 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
 
     
 
-
-    generateItem(itemDef, randomFunc = Math.random) {
-        // Check probability
-        if (randomFunc() > itemDef.probability) {
-          return null; // Item doesn't spawn
-        }
-        
-        // Calculate quantity
-        let quantity = itemDef.quantity;
-        if (Array.isArray(quantity)) {
-          // If quantity is a range, pick a random number within that range
-          const [min, max] = quantity;
-          quantity = Math.floor(randomFunc() * (max - min + 1)) + min;
-        }
-        
-        // Calculate value (for variants that are ranges)
-        let variant = itemDef.variant;
-        if (Array.isArray(variant)) {
-          // If variant is a range, pick a random number within that range
-          const [min, max] = variant;
-          variant = Math.floor(randomFunc() * (max - min + 1)) + min;
-        }
-        
-        return {
-          type: itemDef.type,
-          variant: variant,
-          quantity: quantity
-        };
-      }
-      
-      openChest(chestDef, seed) {
-        const items = [];
-        
-        // Create a seeded random function if seed is provided
-        const randomFunc = seed !== undefined ? Utility.createRandomGenerator(seed) : Math.random;
-        
-        chestDef.forEach(itemDef => {
-          const item = this.generateItem(itemDef, randomFunc);
-          if (item) {
-            items.push(item);
-          }
-        });
-        
-        return items;
-      }
 
       getAiAffordances(context = {}, actor = null) {
         const affordances = super.getAiAffordances(context, actor).filter(affordance => {

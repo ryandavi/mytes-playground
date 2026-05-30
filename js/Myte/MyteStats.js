@@ -62,6 +62,7 @@ class MyteStats {
         this.minConfidence = 0;
         this.maxConfidence = 1;
 
+        // Battery 
         this.batteryLevel = -1;
         this._slotBatteryLevel = -1;
         this.batteryVisible = false;

@@ -1,4 +1,4 @@
-class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
+class GrowingPlantMapObject extends withItemDropBehavior(RangeInteractiveAnimatedMapObject) {
     getApproachMode() {
         return 'adjacent';
     }
@@ -122,6 +122,7 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
         this.growthRate = this.calculateGrowthRate();
 
         this.updateGrowthVisuals();
+        this.gameMap?.particleSystem?.burstEffectAtObject(this, 'SPARKLE', { count: 12, spread: 40 });
 
         if (this.growthStage === 'mature') {
             this.fullyGrown = true;
@@ -182,6 +183,35 @@ class GrowingPlantMapObject extends RangeInteractiveAnimatedMapObject {
 
     canWater() {
         return !this.isWatered && !this.fullyGrown;
+    }
+
+    // Mark as deflowered; schedules auto-clear if regrowthTime is configured.
+    setDeflowered(regrowthTime = null) {
+        if (this.config) this.config.deflowered = true;
+        this.element?.classList.add('deflowered');
+        const ms = regrowthTime ?? this.getConfig('regrowthTime', 0);
+        if (ms > 0) setTimeout(() => this.clearDeflowered(), ms);
+    }
+
+    clearDeflowered() {
+        if (this.config) this.config.deflowered = false;
+        this.element?.classList.remove('deflowered');
+    }
+
+    _getSidebarStatusRows() {
+        const rows = [];
+        const deflowered = this.getConfig('deflowered', false) === true;
+
+        if (this.isFlower()) {
+            rows.push({ label: 'Flower Available', value: deflowered ? 'No' : 'Yes' });
+            if (deflowered) rows.push({ label: 'Flower State', value: 'Deflowered' });
+        }
+        if (this.growthStage != null) rows.push({ label: 'Stage', value: this.growthStage });
+        if (typeof this.isReadyToHarvest === 'function') rows.push({ label: 'Ready to Harvest', value: this.isReadyToHarvest() ? 'Yes' : 'No' });
+        if (this.isWatered != null) rows.push({ label: 'Watered', value: this.isWatered ? 'Yes' : 'No' });
+        if (typeof this.canWater === 'function' && !this.isWatered) rows.push({ label: 'Needs Water', value: this.canWater() ? 'Yes' : 'No' });
+
+        return rows;
     }
 
     getSaveData() {

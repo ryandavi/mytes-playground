@@ -166,6 +166,14 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
         }
     }
 
+    isFlower() { return true; }
+
+    _getSidebarStatusRows() {
+        const rows = [...super._getSidebarStatusRows()];
+        if (this.pollinationState != null) rows.push({ label: 'Pollination', value: this.pollinationState });
+        return rows;
+    }
+
     onTimeSkip(realMs) {
         super.onTimeSkip(realMs);
         this._breedingElapsed += realMs;

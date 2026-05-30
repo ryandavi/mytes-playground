@@ -428,6 +428,17 @@
 				<button class="follow-mode-btn" data-mode="6" title="Follow active Myte only when it nears the edge">Leash</button>
 				<button class="follow-mode-btn" data-mode="7" title="Slowly pan across the map">Cinematic</button>
 			</div>
+			<div class="settings-group">
+				<h3 class="settings-group-title">Camera Options</h3>
+				<label class="settings-toggle" title="Shake the camera on impact events">
+					<input type="checkbox" id="view-shake-toggle" checked>
+					Camera Shake
+				</label>
+				<label class="settings-toggle" title="Camera coasts to a stop after dragging">
+					<input type="checkbox" id="view-inertia-toggle" checked>
+					Pan Inertia
+				</label>
+			</div>
 		</div>
 	</div>
 	<!-- END VIEW PANEL -->
@@ -569,7 +580,7 @@
 	<script src="js/Map/MapObjectFactory.js?v=<?= $v ?>"></script>
 	<!-- MAP GRID -->
 	<script src="js/Map/Grid/GameMapGrid.js?v=<?= $v ?>"></script>
-	<script src="js/Map/Grid/GameMapGridAStar.js?v=<?= $v ?>"></script>
+	<script src="js/Map/Grid/AStarPathfinder.js?v=<?= $v ?>"></script>
 	<!-- UI -->
 	<script src="js/UI/Core/UIComponent.js?v=<?= $v ?>"></script>
 	<script src="js/UI/Overlays/CompactChipStripUI.js?v=<?= $v ?>"></script>

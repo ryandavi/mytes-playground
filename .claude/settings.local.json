@@ -22,7 +22,9 @@
       "Bash(powershell -Command 'Get-Content '\\\\''data/metadata/actions.json'\\\\'' | ConvertFrom-Json | Select-Object -ExpandProperty actions | ForEach-Object { if \\(!\\($_.queue\\) -and \\($_.priority -or $_.defaultDuration -or $_.isMovementAction\\)\\) { '\\\\''ISSUE: action '\\\\'' + $_.id + '\\\\'' has old flat fields'\\\\'' } } | head -10')",
       "Bash(powershell -Command \"Get-Content 'js/Myte/Queue/ActionDefinitionRegistry.js' | Select-String 'priority|exertion|novelty|soothing' -A 2 -B 2 | head -40\")",
       "Bash(powershell -Command 'Get-Content '\\\\''__TRACKED_VAR__'\\\\'' | ConvertFrom-Json | ConvertTo-Json -Depth 1 | head -20')",
-      "PowerShell(head -40)"
+      "PowerShell(head -40)",
+      "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\js\\\\Map\\\\MapObjects\\\\\" -Recurse -Force | Select-Object FullName, PSIsContainer)",
+      "Bash(Remove-Item \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\js\\\\Map\\\\MapObjects\\\\AmbientCreature\\\\ButterflyMapObject.js\")"
     ]
   }
 }

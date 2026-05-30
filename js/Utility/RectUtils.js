@@ -56,8 +56,27 @@ const RectUtils = {
         };
     },
 
-    getColliderBounds(entity) {
-        return this.getEntityColliderBounds(entity);
+    getRectIntersection(r1, r2) {
+        const l1 = r1.left ?? r1.x ?? 0, t1 = r1.top ?? r1.y ?? 0;
+        const r1r = r1.right ?? (l1 + (r1.width ?? 0)), b1 = r1.bottom ?? (t1 + (r1.height ?? 0));
+        const l2 = r2.left ?? r2.x ?? 0, t2 = r2.top ?? r2.y ?? 0;
+        const r2r = r2.right ?? (l2 + (r2.width ?? 0)), b2 = r2.bottom ?? (t2 + (r2.height ?? 0));
+        const left = Math.max(l1, l2), top = Math.max(t1, t2);
+        const right = Math.min(r1r, r2r), bottom = Math.min(b1, b2);
+        if (left >= right || top >= bottom) return null;
+        return { left, top, right, bottom, width: right - left, height: bottom - top };
+    },
+
+    getIntersectionRatio(innerRect, outerRect) {
+        const ix = this.getRectIntersection(innerRect, outerRect);
+        if (!ix) return 0;
+        const w = innerRect.width ?? (innerRect.right - innerRect.left);
+        const h = innerRect.height ?? (innerRect.bottom - innerRect.top);
+        return (w > 0 && h > 0) ? (ix.width * ix.height) / (w * h) : 0;
+    },
+
+    boundsOverlap(b1, b2) {
+        return this.getRectIntersection(b1, b2) !== null;
     },
 
     checkBoxCollision(entityA, entityB, options = {}) {

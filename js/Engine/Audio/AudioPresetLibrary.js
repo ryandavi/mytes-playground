@@ -1006,7 +1006,7 @@ function createAudioPresetLibrary(manager) {
 			// Still-water ambient — calm lake or pond surface
 			"env_water_lake": {
 				type: "ambient",
-				baseVolume: 0.14,
+				baseVolume: 0.55,
 				create: () => {
 					// Pink noise base with very slow, deep modulation — lapping at the shore
 					const noise = new Tone.Noise("pink");
@@ -1028,7 +1028,7 @@ function createAudioPresetLibrary(manager) {
 					return {
 						synth: { noise, autoFilter, filter },
 						loop: true,
-						volume: 0.14
+						volume: 0.55
 					};
 				}
 			},

@@ -1,4 +1,4 @@
-class BallMapObject extends AnimatedMapObject {
+class BallMapObject extends withPickupBehavior(AnimatedMapObject) {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         // Ensure we have proper configuration for animation
 
@@ -23,11 +23,6 @@ class BallMapObject extends AnimatedMapObject {
         this.pushCooldown = options.pushCooldown || 1500; // ms
 
         this.debug = this.getConfig('debug', false);
-
-        // Pickup state
-        this.isPickedUp = false;
-        this.carrier = null;
-        this.pendingPickup = false;
 
         // Drop bounce (Z-axis visual only — sprite translates, shadow stays grounded)
         this.verticalVelocity = 0;
@@ -194,22 +189,6 @@ class BallMapObject extends AnimatedMapObject {
         super.startDragAtPosition?.(position);
     }
 
-    // Get the center of the collider
-    getColliderCenter() {
-        return {
-            x: this.posX + (this.collider.offsetX ?? 0) + ((this.collider.width ?? this.size.width) / 2),
-            y: this.posY + (this.collider.offsetY ?? 0) + ((this.collider.height ?? this.size.height) / 2)
-        };
-    }
-
-    // Get the center of a myte's collider
-    getMyteColliderCenter(myte) {
-        return {
-            x: myte.posX + (myte.collider?.offsetX ?? 0) + ((myte.collider?.width ?? myte.size.width) / 2),
-            y: myte.posY + (myte.collider?.offsetY ?? 0) + ((myte.collider?.height ?? myte.size.height) / 2)
-        };
-    }
-
     pickup(myte) {
         if (!super.pickup(myte)) {
             return false;
@@ -248,8 +227,12 @@ class BallMapObject extends AnimatedMapObject {
 
         if (collides) {
             // Calculate push direction and force
-            const ballCenter = this.getColliderCenter();
-            const myteCenter = this.getMyteColliderCenter(myte);
+            const ballCenter = this.getCenterPoint();
+            const myteRect = this.getColliderRectFor(myte);
+            const myteCenter = {
+                x: (myteRect.left + myteRect.right) / 2,
+                y: (myteRect.top + myteRect.bottom) / 2
+            };
 
             // Calculate distance between centers
             const dx = ballCenter.x - myteCenter.x;
@@ -585,6 +568,16 @@ class BallMapObject extends AnimatedMapObject {
         
         // Call parent class implementation
         super.playAnimation(animationName, onComplete);
+    }
+
+    setPosition(x, y) {
+        if (x != null) this.posX = x;
+        if (y != null) this.posY = y;
+        this.markPositionDirty();
+    }
+
+    setSpritePosition(_x, _y) {
+        // MapObject renders via posX/posY; no separate sprite transform
     }
 
     press() {

@@ -50,7 +50,6 @@ Chests exist and can be opened by mytes, but what's inside isn't visible or vari
 
 **Ideas to give them meaning:**
 - Golden chests give significantly better loot than wooden ones — the visual difference needs to mean something.
-- Mytes remember where chests are (`objectMemories` already exists) and autonomously return to ones they liked. The player sees their myte being strategic.
 
 ### Portals & Map Transitions
 Portals exist and work but each map feels like an isolated pocket.

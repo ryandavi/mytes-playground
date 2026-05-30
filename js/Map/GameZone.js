@@ -31,6 +31,7 @@ class Zone {
             ...SiteConfig.zones.defaults,
             ...data.properties
         };
+        this.displayName = data.properties?.displayName || this.type;
 
         // Track Mytes in the zone
         this.mytesInZone = new Set();
@@ -174,41 +175,16 @@ class Zone {
         };
     }
 
-    // Add this method to your Zone class
     getIntersectionLevel(myteRect) {
-        // Calculate intersection area
-        const overlapLeft = Math.max(this.bounds.x, myteRect.left);
-        const overlapRight = Math.min(this.bounds.x + this.bounds.width, myteRect.right);
-        const overlapTop = Math.max(this.bounds.y, myteRect.top);
-        const overlapBottom = Math.min(this.bounds.y + this.bounds.height, myteRect.bottom);
-        
-        if (overlapLeft >= overlapRight || overlapTop >= overlapBottom) {
-            return null; // No intersection
-        }
-        
-        const intersectionArea = (overlapRight - overlapLeft) * (overlapBottom - overlapTop);
-        const myteArea = myteRect.width * myteRect.height;
-        const intersectionRatio = intersectionArea / myteArea;
-        
-        if (intersectionRatio >= 0.95) { // Using 0.95 instead of 1.0 for floating-point tolerance
-            return ZONE_THRESHOLD.FULLY;
-        } else if (intersectionRatio >= 0.5) {
-            return ZONE_THRESHOLD.HALFWAY;
-        } else {
-            return ZONE_THRESHOLD.TOUCHING;
-        }
+        const ratio = RectUtils.getIntersectionRatio(myteRect, this.bounds);
+        if (ratio <= 0) return null;
+        if (ratio >= 0.95) return ZONE_THRESHOLD.FULLY;
+        if (ratio >= 0.5) return ZONE_THRESHOLD.HALFWAY;
+        return ZONE_THRESHOLD.TOUCHING;
     }
 
     getMyteRect(myte) {
-        // Get Myte's collision box
-        return {
-            left: myte.posX,
-            top: myte.posY,
-            right: myte.posX + myte.size.width,
-            bottom: myte.posY + myte.size.height,
-            width: myte.size.width,
-            height: myte.size.height
-        };
+        return myte.getWorldRect();
     }
 
     containsMyte(myte) {

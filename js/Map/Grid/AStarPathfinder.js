@@ -855,31 +855,10 @@ class AStarPathfinder {
      * @private
      */
     _checkDetailedCollision(entity1, entity2) {
-        // Use defined colliders if available, otherwise fallback (though pathfinder ensures entity1 has one)
-        const col1 = entity1.collider || { offsetX: 0, offsetY: 0, width: entity1.size.width, height: entity1.size.height };
-        const col2 = entity2.collider || { offsetX: 0, offsetY: 0, width: entity2.size.width, height: entity2.size.height };
-
-        // Calculate absolute world bounds for entity1's collider
-        const e1Left = entity1.posX + col1.offsetX;
-        const e1Top = entity1.posY + col1.offsetY;
-        const e1Right = e1Left + col1.width;
-        const e1Bottom = e1Top + col1.height;
-
-        // Calculate absolute world bounds for entity2's collider
-        const e2Left = entity2.posX + col2.offsetX;
-        const e2Top = entity2.posY + col2.offsetY;
-        const e2Right = e2Left + col2.width;
-        const e2Bottom = e2Top + col2.height;
-
-        // Standard AABB collision check (no buffer)
-        const collision = (
-            e1Left < e2Right &&
-            e1Right > e2Left &&
-            e1Top < e2Bottom &&
-            e1Bottom > e2Top
+        return RectUtils.boundsOverlap(
+            RectUtils.getEntityColliderBounds(entity1),
+            RectUtils.getEntityColliderBounds(entity2)
         );
-
-        return collision;
     }
 
 

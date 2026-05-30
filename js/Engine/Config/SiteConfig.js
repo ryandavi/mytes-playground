@@ -376,6 +376,12 @@ const SiteConfig = Object.freeze({
         draggingEasing: 20,
         zoomEasing:     5,
 
+        // Position snapping — snap to target when distance is below this threshold
+        snapThreshold: 0.5,
+
+        // Adaptive easing — distance is divided by this to reduce easing at close range
+        adaptiveEasingDivisor: 100,
+
         // Zoom limits and scroll wheel step
         minZoom:  0.5,
         maxZoom:  2.5,
@@ -383,6 +389,9 @@ const SiteConfig = Object.freeze({
 
         // CURSOR_EDGE: fraction of viewport that counts as the trigger zone (0–1)
         edgeThreshold: 0.20,
+
+        // CURSOR_EDGE: easing divisor for edge scroll speed (easing / this)
+        edgeScrollEasingDivisor: 3,
 
         // LEASH: myte must drift beyond this fraction of the viewport before camera moves
         leashThreshold: 0.28,
@@ -392,6 +401,17 @@ const SiteConfig = Object.freeze({
 
         // CINEMATIC: pan cycle speed (radians per second — lower is slower)
         cinematicSpeed: 0.1,
+
+        // Fallback entity size used when an entity has no size property
+        defaultEntitySize: Object.freeze({ width: 50, height: 50 }),
+
+        // Camera shake: per-frame intensity multiplier and max world-space pixel offset
+        shakeDecay:        0.85,
+        shakeMaxAmplitude: 12,
+
+        // Pan inertia: per-frame velocity multiplier and min speed before stopping
+        panInertiaDecay:    0.88,
+        panInertiaMinSpeed: 0.5,
     }),
 
     // ── Game time ─────────────────────────────────────────────────────────────

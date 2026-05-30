@@ -568,3 +568,304 @@ class ConnectableToggleableDirectionalAnimatedMapObject extends withConnectableB
         return ['FENCE'];
     }
 }
+
+// ── withItemDropBehavior ──────────────────────────────────────────────────────
+// Mixin for objects that spawn DroppedMapItem instances (plants, chests, trees).
+// Moved out of MapObject so only declaring classes carry the ~200-line weight.
+// Apply: class Foo extends withItemDropBehavior(BaseClass) { ... }
+const withItemDropBehavior = (Base) => class extends Base {
+    getFrontDropSpawnPoint({ distance = 18, verticalLift = 0 } = {}) {
+        const rect = this.getColliderRectFor(this) ?? {
+            left: this.posX,
+            top: this.posY,
+            right: this.posX + this.size.width,
+            bottom: this.posY + this.size.height,
+            width: this.size.width,
+            height: this.size.height
+        };
+        const facing = this.getFacingVector();
+        const centerX = rect.left + (rect.width / 2);
+        const centerY = rect.top + (rect.height / 2);
+        const halfDepth = facing.x !== 0 ? (rect.width / 2) : (rect.height / 2);
+        const frontOffset = halfDepth + distance;
+        return {
+            x: centerX + (facing.x * frontOffset),
+            y: centerY + (facing.y * frontOffset) - verticalLift
+        };
+    }
+
+    getDefaultItemPopOutMotionOptions() {
+        return {
+            distance: 0,
+            verticalLift: 8,
+            forwardTravelDistance: 226,
+            forwardSpeed: null,
+            forwardVariance: 4,
+            spreadDistance: 8,
+            spreadSpeed: 0.5,
+            spreadIndex: 0,
+            spreadCount: 1,
+            lateralSpeed: 0.18,
+            lateralSpawnDistance: 2,
+            lateralBias: null,
+            verticalSpeed: 8.2,
+            verticalVariance: 2.1,
+            airDrag: 0.92
+        };
+    }
+
+    getItemPopOutSpreadBias(index = 0, count = 1) {
+        const resolvedCount = Math.max(1, Math.round(Number(count) || 1));
+        if (resolvedCount <= 1) return 0;
+        const resolvedIndex = Utility.clamp(Math.round(Number(index) || 0), 0, resolvedCount - 1);
+        const midpoint = (resolvedCount - 1) / 2;
+        return (resolvedIndex - midpoint) / Math.max(midpoint, 0.5);
+    }
+
+    getItemPopOutMotion({
+        distance, verticalLift, forwardTravelDistance, forwardSpeed, forwardVariance,
+        spreadDistance, spreadSpeed, spreadIndex, spreadCount, lateralSpeed,
+        lateralSpawnDistance, lateralBias = null, verticalSpeed, verticalVariance, airDrag
+    } = {}) {
+        const defaults = this.getDefaultItemPopOutMotionOptions();
+        const forward = this.getFacingVector();
+        const lateral = { x: -forward.y, y: forward.x };
+        const resolvedDistance = Number.isFinite(Number(distance)) ? Number(distance) : defaults.distance;
+        const resolvedVerticalLift = Number.isFinite(Number(verticalLift)) ? Number(verticalLift) : defaults.verticalLift;
+        const resolvedForwardTravelDistance = Number.isFinite(Number(forwardTravelDistance)) ? Number(forwardTravelDistance) : defaults.forwardTravelDistance;
+        const resolvedForwardVariance = Number.isFinite(Number(forwardVariance)) ? Number(forwardVariance) : defaults.forwardVariance;
+        const resolvedSpreadDistance = Number.isFinite(Number(spreadDistance)) ? Number(spreadDistance)
+            : (Number.isFinite(Number(lateralSpawnDistance)) ? Number(lateralSpawnDistance) : defaults.spreadDistance);
+        const resolvedSpreadSpeed = Number.isFinite(Number(spreadSpeed)) ? Number(spreadSpeed)
+            : (Number.isFinite(Number(lateralSpeed)) ? Number(lateralSpeed) : defaults.spreadSpeed);
+        const resolvedSpreadIndex = Number.isFinite(Number(spreadIndex)) ? Number(spreadIndex) : defaults.spreadIndex;
+        const resolvedSpreadCount = Number.isFinite(Number(spreadCount)) ? Number(spreadCount) : defaults.spreadCount;
+        const bias = lateralBias !== null && lateralBias !== undefined && Number.isFinite(Number(lateralBias))
+            ? Utility.clamp(Number(lateralBias), -1, 1)
+            : this.getItemPopOutSpreadBias(resolvedSpreadIndex, resolvedSpreadCount);
+        const resolvedVerticalSpeed = Number.isFinite(Number(verticalSpeed)) ? Number(verticalSpeed) : defaults.verticalSpeed;
+        const resolvedVerticalVariance = Number.isFinite(Number(verticalVariance)) ? Number(verticalVariance) : defaults.verticalVariance;
+        const resolvedAirDrag = Number.isFinite(Number(airDrag)) ? Utility.clamp(Number(airDrag), 0, 0.999) : defaults.airDrag;
+        const spawnPoint = this.getFrontDropSpawnPoint({ distance: resolvedDistance, verticalLift: resolvedVerticalLift });
+        const effectiveGravity = 0.5;
+        const estimatedAirborneFrames = Math.max(1, Math.round(((resolvedVerticalSpeed + (resolvedVerticalVariance * 0.5)) * 2) / effectiveGravity));
+        const dragDistanceFactor = resolvedAirDrag > 0 && resolvedAirDrag < 0.999
+            ? (1 - Math.pow(resolvedAirDrag, estimatedAirborneFrames)) / (1 - resolvedAirDrag)
+            : estimatedAirborneFrames;
+        const derivedForwardSpeed = resolvedForwardTravelDistance / Math.max(dragDistanceFactor, 0.001);
+        const resolvedForwardSpeed = Number.isFinite(Number(forwardSpeed)) ? Number(forwardSpeed)
+            : (Number.isFinite(Number(defaults.forwardSpeed)) ? Number(defaults.forwardSpeed) : derivedForwardSpeed);
+        const forwardMagnitude = resolvedForwardSpeed + (Math.random() * resolvedForwardVariance);
+
+        // Fan spread: half-angle grows with item count so a single item flies straight.
+        const fanHalfAngleDeg = resolvedSpreadCount > 1 ? Math.min(60, 15 + (resolvedSpreadCount - 1) * 15) : 0;
+        const fanAngleRad = bias * fanHalfAngleDeg * (Math.PI / 180);
+        const cos_a = Math.cos(fanAngleRad);
+        const sin_a = Math.sin(fanAngleRad);
+        const rotatedX = forward.x * cos_a - forward.y * sin_a;
+        const rotatedY = forward.x * sin_a + forward.y * cos_a;
+
+        return {
+            spawnX: spawnPoint.x + (lateral.x * bias * resolvedSpreadDistance),
+            spawnY: spawnPoint.y + (lateral.y * bias * resolvedSpreadDistance),
+            velocityX: rotatedX * forwardMagnitude,
+            velocityY: rotatedY * forwardMagnitude,
+            velocityZ: resolvedVerticalSpeed + (Math.random() * resolvedVerticalVariance),
+            airDrag: resolvedAirDrag
+        };
+    }
+
+    getDroppedItemsLayer(parent = null) {
+        return this.gameMap?.layers?.objects || parent?.canvas?.querySelector('.layer.foreground') || null;
+    }
+
+    createDroppedInventoryItem({
+        type = null, variant = null, quantity = 1, inventoryType = null,
+        inventoryVariant = null, inventoryName = null, description = '', motion = null, motionOptions = {}
+    } = {}) {
+        const resolvedVariant = ItemRegistry.resolveIdSync(variant) || variant;
+        const itemDefinition = ItemRegistry.getItemSync(resolvedVariant);
+        const resolvedType = String(inventoryType || type || itemDefinition?.type || 'ITEM').toUpperCase();
+        const resolvedMotion = motion ?? this.getItemPopOutMotion(motionOptions);
+        const dropped = new DroppedMapItem(this.gameMap, resolvedType, resolvedVariant, resolvedMotion.spawnX, resolvedMotion.spawnY);
+        dropped.quantity = Math.max(1, Number(quantity) || 1);
+        dropped.inventoryType = resolvedType;
+        dropped.inventoryVariant = inventoryVariant || itemDefinition?.id || resolvedVariant;
+        dropped.inventoryName = inventoryName || itemDefinition?.name || dropped.inventoryVariant;
+        dropped.description = description || itemDefinition?.description || '';
+        dropped.velocityX = resolvedMotion.velocityX ?? 0;
+        dropped.velocityY = resolvedMotion.velocityY ?? 0;
+        dropped.velocityZ = resolvedMotion.velocityZ ?? 0;
+        dropped.airDrag = resolvedMotion.airDrag ?? dropped.airDrag ?? 0.86;
+        return dropped;
+    }
+
+    spawnDroppedInventoryItem(itemConfig = {}, { parent = null, layer = null, localCollection = null } = {}) {
+        const foregroundLayer = layer || this.getDroppedItemsLayer(parent);
+        if (!foregroundLayer) return null;
+        const dropped = this.createDroppedInventoryItem(itemConfig);
+        if (!dropped?.element) return null;
+        foregroundLayer.appendChild(dropped.element);
+        if (Array.isArray(localCollection)) localCollection.push(dropped);
+        if (!this.gameMap?.droppedItems?.includes(dropped)) this.gameMap?.droppedItems?.push(dropped);
+        return dropped;
+    }
+
+    spawnDroppedInventoryItems(itemConfigs = [], { parent = null, layer = null, localCollection = null, motionOptions = {} } = {}) {
+        const entries = Array.isArray(itemConfigs) ? itemConfigs.filter(Boolean) : [itemConfigs].filter(Boolean);
+        const totalCount = entries.length;
+        return entries.map((itemConfig, index) => this.spawnDroppedInventoryItem({
+            ...itemConfig,
+            motionOptions: { ...motionOptions, ...(itemConfig?.motionOptions ?? {}), spreadIndex: index, spreadCount: totalCount }
+        }, { parent, layer, localCollection })).filter(Boolean);
+    }
+
+    pruneDroppedItemCollection(collection = []) {
+        if (!Array.isArray(collection)) return [];
+        return collection.filter(item => !!item && item.active && !item.collected);
+    }
+
+    // Rolls a weighted drop table. dropTable entries: { type, variant, quantity, chance }
+    _rollDrops(dropTable, minYield, maxYield) {
+        if (!dropTable?.length) return [];
+        const quantity = Math.floor(Math.random() * (maxYield - minYield + 1)) + minYield;
+        const results = [];
+        for (let i = 0; i < quantity; i++) {
+            const roll = Math.random();
+            let cumulative = 0;
+            for (const drop of dropTable) {
+                cumulative += drop.chance ?? 1 / dropTable.length;
+                if (roll <= cumulative) {
+                    results.push({ type: drop.type, variant: drop.variant, quantity: drop.quantity ?? 1 });
+                    break;
+                }
+            }
+        }
+        return results;
+    }
+};
+
+// ── withPickupBehavior ────────────────────────────────────────────────────────
+// Mixin for map objects that can be picked up and carried by a Myte.
+// Overrides the thin stubs on MapObject with full implementations.
+// Apply: class Foo extends withPickupBehavior(BaseClass) { ... }
+const withPickupBehavior = (Base) => class extends Base {
+    getPickupRange(myte) {
+        const explicitRange = this.getConfig('pickupRange', null);
+        if (Number.isFinite(explicitRange)) return explicitRange;
+        const myteReach = Math.max(myte?.collider?.width ?? 0, myte?.collider?.height ?? 0) * 0.5;
+        const pickupRect = this.getPickupRect() || this.getRegionRect('collider');
+        const objectReach = Math.max(pickupRect?.width ?? 0, pickupRect?.height ?? 0) * 0.5;
+        return Math.max(24, myteReach + objectReach + 8);
+    }
+
+    canBePickedUpBy(myte) {
+        return !!myte?.isActive &&
+            this.active &&
+            this.getConfig('canPickUp', false) &&
+            (!this.isPickedUp || this.carrier === myte);
+    }
+
+    isInPickupRange(myte) {
+        if (!myte) return false;
+        const touchThreshold = this.getConfig('pickupTouchThreshold', 12);
+        const myteRect = this.getColliderRectFor(myte);
+        const pickupRect = this.getPickupRect() || this.getRegionRect('collider');
+        if (pickupRect && myteRect) {
+            const gapX = Math.max(0, pickupRect.left - myteRect.right, myteRect.left - pickupRect.right);
+            const gapY = Math.max(0, pickupRect.top - myteRect.bottom, myteRect.top - pickupRect.bottom);
+            if (Math.hypot(gapX, gapY) <= touchThreshold) return true;
+        } else if (this.getColliderGapTo(myte) <= touchThreshold) {
+            return true;
+        }
+        const myteCenter = typeof myte.getCenterPoint === 'function'
+            ? myte.getCenterPoint('collider')
+            : {
+                x: myte.posX + (myte.collider?.offsetX ?? 0) + ((myte.collider?.width ?? myte.size.width) / 2),
+                y: myte.posY + (myte.collider?.offsetY ?? 0) + ((myte.collider?.height ?? myte.size.height) / 2)
+            };
+        const objectCenter = pickupRect
+            ? { x: pickupRect.left + (pickupRect.width / 2), y: pickupRect.top + (pickupRect.height / 2) }
+            : this.getCenterPoint?.() ?? { x: this.posX + this.size.width / 2, y: this.posY + this.size.height / 2 };
+        return Math.hypot(objectCenter.x - myteCenter.x, objectCenter.y - myteCenter.y) <= this.getPickupRange(myte);
+    }
+
+    getPickupTargetPoint(myte = null) {
+        const pickupRect = this.getPickupRect();
+        if (pickupRect) return { x: pickupRect.left + (pickupRect.width / 2), y: pickupRect.top + (pickupRect.height / 2) };
+        return this.getCenterPoint?.() ?? { x: this.posX + this.size.width / 2, y: this.posY + this.size.height / 2 };
+    }
+
+    getCarriedPosition(carrier) {
+        return carrier?.getCarriedItemPosition?.(this.size) || { x: this.posX, y: this.posY };
+    }
+
+    pickup(myte) {
+        if (!this.canBePickedUpBy(myte)) return false;
+        this.isPickedUp = true;
+        this.carrier = myte;
+        this.pendingPickup = false;
+        this.element?.classList.add('picked-up');
+        this.syncRenderLayer();
+        this.wake();
+        this.container?.ui?.setSelected?.(this);
+        this.playConfiguredSound?.('pickup');
+        return true;
+    }
+
+    drop(vx = 0, vy = 0) {
+        this.isPickedUp = false;
+        this.carrier = null;
+        this.pendingPickup = false;
+        this.element?.classList.remove('picked-up');
+        this.syncRenderLayer();
+        this.gameMap?.gridSystem?.updateObjectPosition(this);
+        this.playConfiguredSound?.('drop');
+        return { vx, vy };
+    }
+};
+
+// ── withFlightSoundBehavior ───────────────────────────────────────────────────
+// Mixin for airborne ambient creatures that play land/flight sounds.
+// Reads from `flightSound` config key (set in constructor mergedConfig or types.json):
+//   landSound, landVolume, flySound, flyVolumeBase, flyVolumeScale, flyVolumeMin,
+//   flyVolumeMax, speedThreshold, cooldownMin, cooldownVariance
+// Apply: class Foo extends withFlightSoundBehavior(BaseClass) { ... }
+const withFlightSoundBehavior = (Base) => class extends Base {
+    constructor(...args) {
+        super(...args);
+        const cfg = this.getConfig('flightSound', {});
+        this._flightSoundCooldown = (cfg.cooldownMin ?? 300) + Math.random() * (cfg.cooldownVariance ?? 400);
+    }
+
+    tickUpdate(tickDelta) {
+        const wasRestingOnTarget = this.isRestingOnTarget;
+        super.tickUpdate(tickDelta);
+        this._updateFlightSound(tickDelta, wasRestingOnTarget);
+    }
+
+    _updateFlightSound(tickDelta, wasRestingOnTarget) {
+        this._flightSoundCooldown = Math.max(0, this._flightSoundCooldown - tickDelta);
+        const cfg = this.getConfig('flightSound', null);
+        if (!cfg) return;
+        const soundManager = this.gameMap?.soundManager;
+        if (!soundManager) return;
+        const currentSpeed = Math.hypot(this.velocity?.x ?? 0, this.velocity?.y ?? 0);
+
+        if (!wasRestingOnTarget && this.isRestingOnTarget) {
+            if (cfg.landSound) soundManager.play(cfg.landSound, { volume: cfg.landVolume ?? 0.5 });
+            return;
+        }
+
+        if (!this.isIdle && !this.isRestingOnTarget && currentSpeed > (cfg.speedThreshold ?? 0.18) && this._flightSoundCooldown <= 0 && cfg.flySound) {
+            const speedRatio = currentSpeed / Math.max(this.speed, 0.01);
+            const volume = Utility.clamp(
+                (cfg.flyVolumeBase ?? 0.35) + speedRatio * (cfg.flyVolumeScale ?? 0.13),
+                cfg.flyVolumeMin ?? 0.3,
+                cfg.flyVolumeMax ?? 0.5
+            );
+            soundManager.play(cfg.flySound, { volume });
+            this._flightSoundCooldown = (cfg.cooldownMin ?? 300) + Math.random() * (cfg.cooldownVariance ?? 400);
+        }
+    }
+};

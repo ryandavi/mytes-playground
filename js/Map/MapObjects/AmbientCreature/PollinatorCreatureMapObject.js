@@ -94,17 +94,27 @@ class PollinatorCreatureMapObject extends AmbientCreatureMapObject {
 
 // ── ButterflyMapObject ────────────────────────────────────────────────────────
 
-class ButterflyMapObject extends PollinatorCreatureMapObject {
+class ButterflyMapObject extends withFlightSoundBehavior(PollinatorCreatureMapObject) {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         const mergedConfig = {
             targetSeekChance: config.flowerSeekChance ?? 0.003,
             targetSearchRadius: config.flowerSearchRadius ?? 320,
             targetRestDurationMin: config.flowerRestDurationMin ?? 2200,
             targetRestDurationMax: config.flowerRestDurationMax ?? 5200,
+            flightSound: {
+                landSound: 'obj_butterfly_land',
+                landVolume: 0.5,
+                flySound: 'obj_butterfly_flutter',
+                flyVolumeBase: 0.38,
+                flyVolumeScale: 0.14,
+                flyVolumeMin: 0.36,
+                flyVolumeMax: 0.56,
+                cooldownMin: 520,
+                cooldownVariance: 420
+            },
             ...config
         };
         super(parent, type, variant, posX, posY, mergedConfig, options);
-        this.flutterSoundCooldown = 300 + Math.random() * 300;
 
         this.parent.particleSystem.addParticleMethodsToObject(this);
         this.addEffect('SPARKLE_SPRITE', {
@@ -121,25 +131,6 @@ class ButterflyMapObject extends PollinatorCreatureMapObject {
         const element = super.render(container, parent);
         element.classList.add('butterfly', 'interactive');
         return element;
-    }
-
-    tickUpdate(tickDelta) {
-        const wasRestingOnTarget = this.isRestingOnTarget;
-        super.tickUpdate(tickDelta);
-
-        this.flutterSoundCooldown = Math.max(0, this.flutterSoundCooldown - tickDelta);
-        const currentSpeed = Math.hypot(this.velocity.x, this.velocity.y);
-        const soundManager = this.gameMap?.soundManager;
-        if (!soundManager) return;
-
-        if (!wasRestingOnTarget && this.isRestingOnTarget) {
-            soundManager.play('obj_butterfly_land', { volume: 0.5 });
-        } else if (!this.isIdle && !this.isRestingOnTarget && currentSpeed > 0.18 && this.flutterSoundCooldown <= 0) {
-            soundManager.play('obj_butterfly_flutter', {
-                volume: Utility.clamp(0.38 + (currentSpeed / Math.max(this.speed, 0.01)) * 0.14, 0.36, 0.56)
-            });
-            this.flutterSoundCooldown = 520 + Math.random() * 420;
-        }
     }
 
     getSelectionDebugInfo() {
@@ -166,19 +157,29 @@ class ButterflyMapObject extends PollinatorCreatureMapObject {
 
 // ── BeeMapObject ─────────────────────────────────────────────────────────────
 
-class BeeMapObject extends PollinatorCreatureMapObject {
+class BeeMapObject extends withFlightSoundBehavior(PollinatorCreatureMapObject) {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         const mergedConfig = {
             targetSeekChance: config.flowerSeekChance ?? 0.004,
             targetSearchRadius: config.flowerSearchRadius ?? 400,
             targetRestDurationMin: config.flowerRestDurationMin ?? 1200,
             targetRestDurationMax: config.flowerRestDurationMax ?? 2800,
+            flightSound: {
+                landSound: 'obj_bee_land',
+                landVolume: 0.4,
+                flySound: 'obj_bee_buzz',
+                flyVolumeBase: 0.3,
+                flyVolumeScale: 0.12,
+                flyVolumeMin: 0.28,
+                flyVolumeMax: 0.48,
+                cooldownMin: 600,
+                cooldownVariance: 500
+            },
             ...config
         };
         super(parent, type, variant, posX, posY, mergedConfig, options);
         this.phase = 'foraging'; // 'foraging' | 'returning'
         this.homeHive = options.homeHive || null;
-        this.buzzSoundCooldown = 300 + Math.random() * 400;
 
         if (this.homeHive) this.homeHive.registerBee(this);
     }
@@ -199,14 +200,6 @@ class BeeMapObject extends PollinatorCreatureMapObject {
         }
         if (!this.shouldLeaveHive()) return null;
         return this._findNearestFlower();
-    }
-
-    getTargetRestPosition(target) {
-        if (!target) return null;
-        return {
-            x: target.posX + ((target.size?.width || 0) - this.size.width) / 2,
-            y: target.posY + ((target.size?.height || 0) - this.size.height) / 2
-        };
     }
 
     // ── Rest hooks ───────────────────────────────────────────────────────────
@@ -239,25 +232,6 @@ class BeeMapObject extends PollinatorCreatureMapObject {
         const element = super.render(container, parent);
         element.classList.add('bee', 'interactive');
         return element;
-    }
-
-    tickUpdate(tickDelta) {
-        const wasRestingOnTarget = this.isRestingOnTarget;
-        super.tickUpdate(tickDelta);
-
-        this.buzzSoundCooldown = Math.max(0, this.buzzSoundCooldown - tickDelta);
-        const currentSpeed = Math.hypot(this.velocity.x, this.velocity.y);
-        const soundManager = this.gameMap?.soundManager;
-        if (!soundManager) return;
-
-        if (!wasRestingOnTarget && this.isRestingOnTarget) {
-            soundManager.play('obj_bee_land', { volume: 0.4 });
-        } else if (!this.isIdle && !this.isRestingOnTarget && currentSpeed > 0.18 && this.buzzSoundCooldown <= 0) {
-            soundManager.play('obj_bee_buzz', {
-                volume: Utility.clamp(0.3 + (currentSpeed / Math.max(this.speed, 0.01)) * 0.12, 0.28, 0.48)
-            });
-            this.buzzSoundCooldown = 600 + Math.random() * 500;
-        }
     }
 
     getSelectionDebugInfo() {

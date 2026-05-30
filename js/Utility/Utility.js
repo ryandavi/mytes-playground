@@ -205,6 +205,25 @@ class Utility {
         return (current + 1) % ALL_KEYS.length;
     }
 
+	static debounce(func, wait) {
+		let timeout;
+		return function(...args) {
+			clearTimeout(timeout);
+			timeout = setTimeout(() => func.apply(this, args), wait);
+		};
+	}
+
+	static throttle(func, limit) {
+		let inThrottle;
+		return function(...args) {
+			if (!inThrottle) {
+				func.apply(this, args);
+				inThrottle = true;
+				setTimeout(() => inThrottle = false, limit);
+			}
+		};
+	}
+
 	static isCollision(rect1, rect2) {
 		return !(rect1.right < rect2.left ||
 			rect1.left > rect2.right ||

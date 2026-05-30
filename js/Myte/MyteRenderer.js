@@ -178,7 +178,7 @@ class MyteRenderer {
 		const innerWrapper = this.duplicate?.querySelector('.inner-wrapper');
 		const innerLocal = innerWrapper ? m.parent.getLocalOffset(innerWrapper) : null;
 		const spriteLocal = this.sprite ? m.parent.getLocalOffset(this.sprite) : null;
-		const collider = m.parent.getColliderBounds(m);
+		const collider = m.parent.getEntityColliderBounds(m);
 		const worldBounds = m.parent.getWorldBounds?.() || null;
 		const duplicateRect = this.duplicate?.getBoundingClientRect?.();
 		const spriteRect = this.sprite?.getBoundingClientRect?.();

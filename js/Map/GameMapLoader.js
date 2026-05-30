@@ -55,8 +55,7 @@ class GameMapLoader {
                     const response = await fetch(path);
                     if (!response.ok) continue;
 
-                    const xmlText = await response.text();
-                    const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
+                    const xml = new DOMParser().parseFromString(await response.text(), 'text/xml');
                     const propertyNode = xml.querySelector('map > properties > property[name="displayName"]');
                     const displayName = propertyNode?.getAttribute('value')?.trim();
 
