@@ -1,10 +1,10 @@
 // GateMapObject — an openable/closeable section of fence.
-// Inherits open/close animation state-machine from ToggleableDirectionalAnimatedMapObject.
+// Inherits open/close animation state-machine from OpenableMapObject.
 // Notifies adjacent FenceMapObjects on placement so their connection sprites update.
 // The gate itself does not use the bitmask frame selection — its sprite is driven
 // by the open/close animation defined in types.json.
 
-class GateMapObject extends ConnectableToggleableDirectionalAnimatedMapObject {
+class GateMapObject extends LinkedOpenableMapObject {
     static FENCE_DIRECTIONS = [
         { dx:  0, dy: -1 },  // N
         { dx:  1, dy:  0 },  // E

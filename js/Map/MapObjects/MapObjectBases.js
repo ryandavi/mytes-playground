@@ -1,4 +1,4 @@
-const withDirectionalBehavior = (BaseClass) => class extends BaseClass {
+const withDirectional = (BaseClass) => class extends BaseClass {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         const direction = options.direction || config.direction || 'S';
         const processedConfig = MapObject.processDirectionConfig(config, direction);
@@ -47,13 +47,13 @@ const withDirectionalBehavior = (BaseClass) => class extends BaseClass {
     }
 };
 
-class DirectionalMapObject extends withDirectionalBehavior(MapObject) {}
+class DirectionalMapObject extends withDirectional(MapObject) {}
 
 // Uses withAnimation directly rather than the named AnimatedMapObject class,
 // removing one level from the inheritance chain.
-class DirectionalAnimatedMapObject extends withDirectionalBehavior(withAnimation(MapObject)) {}
+class DirectionalAnimatedMapObject extends withDirectional(withAnimation(MapObject)) {}
 
-class RangeInteractiveAnimatedMapObject extends withAnimation(MapObject) {
+class InteractiveMapObject extends withAnimation(MapObject) {
     getInteractionActor() {
         return this.activeMyte;
     }
@@ -130,7 +130,7 @@ class RangeInteractiveAnimatedMapObject extends withAnimation(MapObject) {
     }
 }
 
-class StatefulAnimatedMapObject extends RangeInteractiveAnimatedMapObject {
+class StatefulMapObject extends InteractiveMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         this.state = options.initialState ?? this.getDefaultState();
@@ -182,7 +182,7 @@ class StatefulAnimatedMapObject extends RangeInteractiveAnimatedMapObject {
     }
 }
 
-class BinaryStateAnimatedMapObject extends StatefulAnimatedMapObject {
+class ToggleableMapObject extends StatefulMapObject {
     getEnabledState() {
         return 'on';
     }
@@ -228,7 +228,7 @@ class BinaryStateAnimatedMapObject extends StatefulAnimatedMapObject {
     }
 }
 
-class ClassStateAnimatedMapObject extends StatefulAnimatedMapObject {
+class MultiStateMapObject extends StatefulMapObject {
     getDefaultState() {
         return this.getDefaultVisualState(super.getDefaultState());
     }
@@ -277,7 +277,7 @@ class ClassStateAnimatedMapObject extends StatefulAnimatedMapObject {
     }
 }
 
-class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObject {
+class OpenableMapObject extends DirectionalAnimatedMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         this.isOpen = options.isOpen ?? this.getDefaultVisualState('closed') === 'open';
@@ -417,7 +417,7 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
 // Mixin for objects that emit a passive aura affecting nearby mytes.
 // Subclasses override isAuraActive(), getAuraExpression(), getAuraExpressionChance().
 // Config keys read from types.json: aura.radius, aura.checkInterval, auraBuffId, auraBuffDefinition.
-const withAuraBehavior = (BaseClass) => class extends BaseClass {
+const withAura = (BaseClass) => class extends BaseClass {
     constructor(...args) {
         super(...args);
         this._auraAccumulator = 0;
@@ -492,7 +492,7 @@ const withAuraBehavior = (BaseClass) => class extends BaseClass {
     }
 };
 
-const withConnectableBehavior = (BaseClass) => class extends BaseClass {
+const withConnectable = (BaseClass) => class extends BaseClass {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         this.connectedObjectIds = new Set();
@@ -557,23 +557,17 @@ const withConnectableBehavior = (BaseClass) => class extends BaseClass {
     }
 };
 
-class ConnectableDirectionalMapObject extends withConnectableBehavior(DirectionalMapObject) {
-    getConnectableTypes() {
-        return ['FENCE', 'GATE'];
-    }
-}
-
-class ConnectableToggleableDirectionalAnimatedMapObject extends withConnectableBehavior(ToggleableDirectionalAnimatedMapObject) {
+class LinkedOpenableMapObject extends withConnectable(OpenableMapObject) {
     getConnectableTypes() {
         return ['FENCE'];
     }
 }
 
-// ── withItemDropBehavior ──────────────────────────────────────────────────────
+// ── withItemDrops ─────────────────────────────────────────────────────────────
 // Mixin for objects that spawn DroppedMapItem instances (plants, chests, trees).
 // Moved out of MapObject so only declaring classes carry the ~200-line weight.
-// Apply: class Foo extends withItemDropBehavior(BaseClass) { ... }
-const withItemDropBehavior = (Base) => class extends Base {
+// Apply: class Foo extends withItemDrops(BaseClass) { ... }
+const withItemDrops = (Base) => class extends Base {
     getFrontDropSpawnPoint({ distance = 18, verticalLift = 0 } = {}) {
         const rect = this.getColliderRectFor(this) ?? {
             left: this.posX,
@@ -745,11 +739,11 @@ const withItemDropBehavior = (Base) => class extends Base {
     }
 };
 
-// ── withPickupBehavior ────────────────────────────────────────────────────────
+// ── withPickup ────────────────────────────────────────────────────────
 // Mixin for map objects that can be picked up and carried by a Myte.
 // Overrides the thin stubs on MapObject with full implementations.
-// Apply: class Foo extends withPickupBehavior(BaseClass) { ... }
-const withPickupBehavior = (Base) => class extends Base {
+// Apply: class Foo extends withPickup(BaseClass) { ... }
+const withPickup = (Base) => class extends Base {
     getPickupRange(myte) {
         const explicitRange = this.getConfig('pickupRange', null);
         if (Number.isFinite(explicitRange)) return explicitRange;
@@ -825,13 +819,13 @@ const withPickupBehavior = (Base) => class extends Base {
     }
 };
 
-// ── withFlightSoundBehavior ───────────────────────────────────────────────────
+// ── withFlightSounds ───────────────────────────────────────────────────
 // Mixin for airborne ambient creatures that play land/flight sounds.
 // Reads from `flightSound` config key (set in constructor mergedConfig or types.json):
 //   landSound, landVolume, flySound, flyVolumeBase, flyVolumeScale, flyVolumeMin,
 //   flyVolumeMax, speedThreshold, cooldownMin, cooldownVariance
-// Apply: class Foo extends withFlightSoundBehavior(BaseClass) { ... }
-const withFlightSoundBehavior = (Base) => class extends Base {
+// Apply: class Foo extends withFlightSounds(BaseClass) { ... }
+const withFlightSounds = (Base) => class extends Base {
     constructor(...args) {
         super(...args);
         const cfg = this.getConfig('flightSound', {});

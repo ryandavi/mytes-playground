@@ -94,7 +94,7 @@ class PollinatorCreatureMapObject extends AmbientCreatureMapObject {
 
 // ── ButterflyMapObject ────────────────────────────────────────────────────────
 
-class ButterflyMapObject extends withFlightSoundBehavior(PollinatorCreatureMapObject) {
+class ButterflyMapObject extends withFlightSounds(PollinatorCreatureMapObject) {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         const mergedConfig = {
             targetSeekChance: config.flowerSeekChance ?? 0.003,
@@ -157,7 +157,7 @@ class ButterflyMapObject extends withFlightSoundBehavior(PollinatorCreatureMapOb
 
 // ── BeeMapObject ─────────────────────────────────────────────────────────────
 
-class BeeMapObject extends withFlightSoundBehavior(PollinatorCreatureMapObject) {
+class BeeMapObject extends withFlightSounds(PollinatorCreatureMapObject) {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         const mergedConfig = {
             targetSeekChance: config.flowerSeekChance ?? 0.004,

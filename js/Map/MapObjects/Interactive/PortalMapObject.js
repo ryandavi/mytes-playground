@@ -1,4 +1,4 @@
-class PortalMapObject extends RangeInteractiveAnimatedMapObject {
+class PortalMapObject extends InteractiveMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
 

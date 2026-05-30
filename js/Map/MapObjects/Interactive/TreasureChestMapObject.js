@@ -1,4 +1,4 @@
-class TreasureChestMapObject extends withItemDropBehavior(ClassStateAnimatedMapObject) {
+class TreasureChestMapObject extends withItemDrops(MultiStateMapObject) {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         this.items = [];

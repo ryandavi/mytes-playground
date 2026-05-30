@@ -1,4 +1,4 @@
-class FountainMapObject extends withAuraBehavior(BinaryStateAnimatedMapObject) {
+class FountainMapObject extends withAura(ToggleableMapObject) {
     getApproachMode() {
         return 'adjacent';
     }

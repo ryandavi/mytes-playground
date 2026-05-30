@@ -675,7 +675,7 @@ class MapObject {
 		return Math.hypot(gapX, gapY);
 	}
 
-	// Thin pickup interface — withPickupBehavior overrides these with full implementations.
+	// Thin pickup interface — withPickup overrides these with full implementations.
 	canBePickedUpBy(myte) { return false; }
 	pickup(myte)          { return false; }
 	drop(vx = 0, vy = 0) { return { vx, vy }; }

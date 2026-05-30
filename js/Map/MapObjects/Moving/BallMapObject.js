@@ -1,4 +1,4 @@
-class BallMapObject extends withPickupBehavior(AnimatedMapObject) {
+class BallMapObject extends withPickup(AnimatedMapObject) {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         // Ensure we have proper configuration for animation
 

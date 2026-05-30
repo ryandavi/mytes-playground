@@ -1,4 +1,4 @@
-class GrowingPlantMapObject extends withItemDropBehavior(RangeInteractiveAnimatedMapObject) {
+class GrowingPlantMapObject extends withItemDrops(InteractiveMapObject) {
     getApproachMode() {
         return 'adjacent';
     }

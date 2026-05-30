@@ -1,4 +1,4 @@
-class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
+class DoorMapObject extends OpenableMapObject {
     getApproachMode() {
         return 'front';
     }

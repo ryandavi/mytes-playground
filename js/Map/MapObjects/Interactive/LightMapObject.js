@@ -1,4 +1,4 @@
-class LightMapObject extends withAuraBehavior(BinaryStateAnimatedMapObject) {
+class LightMapObject extends withAura(ToggleableMapObject) {
     // isAuraActive() defaults to this.isEnabled() via the mixin — no override needed.
 
     press(parent) {
@@ -46,7 +46,7 @@ class LightMapObject extends withAuraBehavior(BinaryStateAnimatedMapObject) {
     }
 }
 
-class MusicBoxMapObject extends withAuraBehavior(RangeInteractiveAnimatedMapObject) {
+class MusicBoxMapObject extends withAura(InteractiveMapObject) {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         this.isPlayingState = options.initialState ?? this.getConfig('defaultPlaying', false);
