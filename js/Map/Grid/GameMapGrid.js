@@ -833,7 +833,7 @@ class GridSystem {
 
             // Add non-walkable objects from the cell
             cell.objects.forEach(obj => {
-                if (obj !== entity && !obj.config.walkable) {
+                if (obj !== entity && !obj.config.physics?.walkable) {
                     potentialColliders.add(obj);
                 }
             });
@@ -909,7 +909,7 @@ class GridSystem {
                      // Check if the object is collidable (defined by having a !walkable config)
                      // and not the entity performing the check.
                      // Ensure obj and obj.config exist before checking walkable.
-                     if (obj && obj !== entityToExclude && obj.config && !obj.config.walkable) {
+                     if (obj && obj !== entityToExclude && obj.config && !obj.config.physics?.walkable) {
                          potentialColliders.add(obj);
                      }
                  });
@@ -932,7 +932,7 @@ class GridSystem {
             cell.objects.add(obj);
 
             // Update object walkability
-            if (!obj.config.walkable) {
+            if (!obj.config.physics?.walkable) {
                 cell.objectWalkable = false;
             }
 
@@ -948,7 +948,7 @@ class GridSystem {
         obj._gridOccupancyX = obj.posX;
         obj._gridOccupancyY = obj.posY;
         this.invalidatePathfinderCaches();
-        if (this.debugMode && !obj.config.walkable) this._debugDirty = true;
+        if (this.debugMode && !obj.config.physics?.walkable) this._debugDirty = true;
     }
 
     // Helper method to check if an object is within visible bounds
@@ -973,9 +973,9 @@ class GridSystem {
             // blocked — handles the case where an object became walkable (e.g. door
             // opening) before refreshGridOccupancy calls removeObject, so the old
             // objectWalkable=false never gets cleared by the config check alone.
-            if (!obj.config.walkable || !cell.objectWalkable) {
+            if (!obj.config.physics?.walkable || !cell.objectWalkable) {
                 const objects = Array.from(cell.objects);
-                cell.objectWalkable = objects.every(o => o.config.walkable);
+                cell.objectWalkable = objects.every(o => o.config.physics?.walkable);
                 cell.walkable = cell.tileWalkable && cell.objectWalkable;
             }
         });
@@ -985,7 +985,7 @@ class GridSystem {
         delete obj._gridOccupancyX;
         delete obj._gridOccupancyY;
         this.invalidatePathfinderCaches();
-        if (this.debugMode && !obj.config.walkable) this._debugDirty = true;
+        if (this.debugMode && !obj.config.physics?.walkable) this._debugDirty = true;
     }
 
     // IMPROVED: Update object's position in grid - more efficient implementation
@@ -1016,9 +1016,9 @@ class GridSystem {
                 cell.objects.delete(obj);
 
                 // Recalculate walkability if needed
-                if (!obj.config.walkable) {
+                if (!obj.config.physics?.walkable) {
                     const objects = Array.from(cell.objects);
-                    cell.objectWalkable = objects.every(o => o.config.walkable);
+                    cell.objectWalkable = objects.every(o => o.config.physics?.walkable);
                     cell.walkable = cell.tileWalkable && cell.objectWalkable;
                 }
 
@@ -1040,7 +1040,7 @@ class GridSystem {
                 cell.objects.add(obj);
 
                 // Update walkability if needed
-                if (!obj.config.walkable) {
+                if (!obj.config.physics?.walkable) {
                     cell.objectWalkable = false;
                     cell.walkable = cell.tileWalkable && cell.objectWalkable;
                 }
@@ -1096,7 +1096,7 @@ class GridSystem {
         obj._gridOccupancyX = obj.posX;
         obj._gridOccupancyY = obj.posY;
         this.invalidatePathfinderCaches();
-        if (this.debugMode && !obj.config.walkable) this._debugDirty = true;
+        if (this.debugMode && !obj.config.physics?.walkable) this._debugDirty = true;
     }
     // Get objects in an area
     getObjectsInArea(x, y, width, height) {
@@ -1163,7 +1163,7 @@ class GridSystem {
                         cell.objects.add(obj);
 
                         // Update walkability if needed
-                        if (!obj.config.walkable) {
+                        if (!obj.config.physics?.walkable) {
                             cell.objectWalkable = false;
                             cell.walkable = cell.tileWalkable && cell.objectWalkable;
                         }
@@ -1385,7 +1385,7 @@ class GridSystem {
                     this.grid[x][y].objects.add(obj);
 
                     // Update walkability for objects that affect it
-                    if (!obj.config.walkable) {
+                    if (!obj.config.physics?.walkable) {
                         this.grid[x][y].objectWalkable = false;
                     }
 

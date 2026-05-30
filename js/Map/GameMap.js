@@ -950,7 +950,7 @@ class GameMap {
 
         // Fallback to object-based check
         const nearbyObjects = this.getObjectsInRadius(x, y, 50);
-        return !nearbyObjects.some(obj => !obj.config.walkable);
+        return !nearbyObjects.some(obj => !obj.config.physics?.walkable);
     }
 
     removeInactiveObjects() {

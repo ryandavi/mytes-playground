@@ -252,7 +252,7 @@ class PortalMapObject extends RangeInteractiveAnimatedMapObject {
                 String(this.targetMap);
         }
 
-        const explicitName = this.getConfig('displayName', null);
+        const explicitName = this.getConfig('label', null);
         if (typeof explicitName === 'string' && explicitName.trim()) {
             return explicitName.trim();
         }

@@ -319,8 +319,8 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
     }
 
     updateCollisionState() {
-        this.config.walkable = this.isOpen;
-        this.config.collision = !this.isOpen;
+        this.config.physics.walkable = this.isOpen;
+        this.config.physics.collision = !this.isOpen;
         this.refreshGridOccupancy();
         this.applyOpenStateClasses();
     }

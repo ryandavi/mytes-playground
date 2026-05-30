@@ -64,16 +64,16 @@ class ActionDefinitionRegistry {
             label: definition.label || id,
             labelShort: definition.labelShort || '',
             category: definition.category || 'basic',
-            priority: num(q.priority ?? definition.priority),
-            isMovementAction: (q.isMovementAction ?? definition.isMovementAction) !== false,
-            isInterruptible: (q.isInterruptible ?? definition.isInterruptible) !== false,
-            defaultDuration: num(q.defaultDuration ?? definition.defaultDuration),
+            priority: num(q.priority),
+            isMovementAction: q.isMovementAction !== false,
+            isInterruptible: q.isInterruptible !== false,
+            defaultDuration: num(q.defaultDuration),
             description: definition.description || '',
-            requiresTarget: (q.requiresTarget ?? definition.requiresTarget) === true,
+            requiresTarget: q.requiresTarget === true,
             icon: definition.icon || '',
-            implementationClass: q.implementationClass || definition.implementationClass || '',
-            defaultOptions: this.cloneValue(q.options ?? definition.defaultOptions ?? {}),
-            energyCostMultiplier: Number.isFinite(Number(q.energyCostMultiplier ?? definition.energyCostMultiplier)) ? Number(q.energyCostMultiplier ?? definition.energyCostMultiplier) : undefined,
+            implementationClass: q.implementationClass || '',
+            defaultOptions: this.cloneValue(q.options ?? {}),
+            energyCostMultiplier: Number.isFinite(Number(q.energyCostMultiplier)) ? Number(q.energyCostMultiplier) : undefined,
             tags: Array.isArray(definition.tags) ? [...definition.tags] : [],
             effects: {
                 fun:     num(fx.fun),
@@ -81,13 +81,13 @@ class ActionDefinitionRegistry {
                 comfort: num(fx.comfort),
                 energy:  num(fx.energy),
                 hunger:  num(fx.hunger),
-                mood:    num(fx.mood ?? definition.moodEffect)
+                mood:    num(fx.mood)
             },
-            exertion: num(t.exertion ?? definition.exertion),
-            novelty:  num(t.novelty  ?? definition.novelty),
-            risk:     num(t.risk     ?? definition.risk),
-            soothing: num(t.soothing ?? definition.soothing ?? definition.soothingValue),
-            repeatMode: t.repeatMode ?? definition.repeatMode ?? 'diminishing',
+            exertion: num(t.exertion),
+            novelty:  num(t.novelty),
+            risk:     num(t.risk),
+            soothing: num(t.soothing),
+            repeatMode: t.repeatMode ?? 'diminishing',
             ai: this._normalizeAiBlock(definition),
             purposeOverrides: this._normalizePurposeOverrides(definition.purposeOverrides)
         };
@@ -97,14 +97,12 @@ class ActionDefinitionRegistry {
         const ai = source?.ai ?? {};
         const num = (v, def) => Number.isFinite(Number(v)) ? Number(v) : def;
         return {
-            category:      ai.category      ?? source.aiCategory      ?? 'world',
-            soothing:      num(ai.soothing      ?? source.aiSoothing,      0.1),
-            exertion:      num(ai.exertion      ?? source.aiExertion,      0.1),
-            accomplishment: num(ai.accomplishment ?? source.aiAccomplishment, 0.1),
-            commitmentMs:  num(ai.commitmentMs  ?? source.commitmentMs,  1200),
-            scoreDrivers:  Array.isArray(ai.scoreDrivers ?? source.scoreDrivers)
-                ? this.cloneValue(ai.scoreDrivers ?? source.scoreDrivers)
-                : []
+            category:       ai.category       ?? 'world',
+            soothing:       num(ai.soothing,       0.1),
+            exertion:       num(ai.exertion,       0.1),
+            accomplishment: num(ai.accomplishment, 0.1),
+            commitmentMs:   num(ai.commitmentMs,   1200),
+            scoreDrivers:   Array.isArray(ai.scoreDrivers) ? this.cloneValue(ai.scoreDrivers) : []
         };
     }
 

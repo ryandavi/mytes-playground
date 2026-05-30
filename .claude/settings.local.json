@@ -10,7 +10,18 @@
       "Bash(Sort-Object)",
       "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\js\" -Recurse -Name)",
       "Bash(node -e ' *)",
-      "Bash(copy \"C:\\\\Users\\\\Ryan\\\\.claude\\\\plans\\\\snazzy-launching-pebble.md\" \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\docs\\\\MYTE_AI_REFACTOR_PLAN.md\")"
+      "Bash(copy \"C:\\\\Users\\\\Ryan\\\\.claude\\\\plans\\\\snazzy-launching-pebble.md\" \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\docs\\\\MYTE_AI_REFACTOR_PLAN.md\")",
+      "Bash(powershell -Command \"Get-Content 'data/metadata/actions.json' | ConvertFrom-Json | Select-Object -ExpandProperty actions | Select-Object -First 15 -Property id, queue, traits, effects, ai | ConvertTo-Json -Depth 3\")",
+      "Bash(powershell -Command 'Get-Content '\\\\''data/map-objects/types.json'\\\\'' | ConvertFrom-Json | Select-Object -ExpandProperty PSObject.Properties | Select-Object -First 6 | ForEach-Object { @{Name = $_.Name; Value = $_.Value} | ConvertTo-Json -Depth 2 }')",
+      "Bash(grep -n \"\\\\.aiCategory\\\\|\\\\.aiSoothing\\\\|\\\\.aiExertion\\\\|\\\\.aiAccomplishment\\\\|\\\\.interactionType\\\\|\\\\.moodBoostRadius\\\\|definition\\\\\\\\.priority\\\\|definition\\\\\\\\.exertion\\\\|definition\\\\\\\\.soothing\" js/Myte/MyteAI.js)",
+      "Bash(grep -n \"\\\\.collision\\\\|\\\\.walkable\\\\|physics\\\\\\\\.collision\\\\|physics\\\\\\\\.walkable\" js/Map/GameMap.js js/Map/MapObjectFactory.js)",
+      "Bash(grep -rn \"itemDef\\\\\\\\.label\\\\|myteDef\\\\\\\\.label\\\\|item\\\\\\\\.label\\\\|itemData\\\\\\\\.label\" js/)",
+      "Bash(grep -rn \"definition\\\\\\\\.moodEffect\\\\|definition\\\\\\\\.affectsMood\\\\|definition\\\\\\\\.soothingValue\\\\|actionDef\\\\\\\\.priority\\\\|actionDef\\\\\\\\.defaultDuration\\\\|actionDef\\\\\\\\.isMovementAction\" js/)",
+      "Bash(grep -E \"^\\(collision|walkable|interactionType|interactionRadius|renderPriority|renderLayer|overlappable|interactive|canToggle|collider|blocksLineOfSight|moodBoostRadius\\)$\")",
+      "Bash(grep -rn \"\\\\.definition\\\\\\\\.priority\\\\|\\\\.definition\\\\\\\\.exertion\\\\|\\\\.definition\\\\\\\\.novelty\\\\|\\\\.definition\\\\\\\\.risk\\\\|\\\\.definition\\\\\\\\.soothing\" js/)",
+      "Bash(powershell -Command 'Get-Content '\\\\''data/metadata/actions.json'\\\\'' | ConvertFrom-Json | Select-Object -ExpandProperty actions | ForEach-Object { if \\(!\\($_.queue\\) -and \\($_.priority -or $_.defaultDuration -or $_.isMovementAction\\)\\) { '\\\\''ISSUE: action '\\\\'' + $_.id + '\\\\'' has old flat fields'\\\\'' } } | head -10')",
+      "Bash(powershell -Command \"Get-Content 'js/Myte/Queue/ActionDefinitionRegistry.js' | Select-String 'priority|exertion|novelty|soothing' -A 2 -B 2 | head -40\")",
+      "Bash(powershell -Command 'Get-Content '\\\\''__TRACKED_VAR__'\\\\'' | ConvertFrom-Json | ConvertTo-Json -Depth 1 | head -20')"
     ]
   }
 }

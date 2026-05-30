@@ -1,4 +1,5 @@
 {
+  "schemaVersion": 1,
   "GRASS": {
     "category": "nature",
     "variants": [
@@ -6,8 +7,9 @@
       "grass_2",
       "grass_3"
     ],
-    "walkable": true,
-    "overlappable": true,
+    "physics": {
+      "walkable": true
+    },
     "animation": "sway",
     "canInspect": false,
     "majorActionId": [
@@ -17,23 +19,24 @@
     "approachConfig": {
       "gap": 10
     },
+    "visual": {
+      "overlappable": true,
+      "renderType": "split"
+    },
     "soundEffects": {
       "pick": "obj_flower_pick",
       "trample": "obj_flower_trample"
     },
     "variantConfigs": {
       "grass_1": {
-        "displayName": "Flower"
+        "label": "Flower"
       },
       "grass_2": {
-        "displayName": "Flower"
+        "label": "Flower"
       },
       "grass_3": {
-        "displayName": "Flower"
+        "label": "Flower"
       }
-    },
-    "visual": {
-      "renderType": "split"
     }
   },
   "COUCH": {
@@ -41,13 +44,15 @@
     "variants": [
       "test_couch"
     ],
-    "collision": true,
+    "physics": {
+      "collision": true
+    },
+    "interaction": {
+      "type": "rest"
+    },
     "draggable": true,
     "snapToGrid": true,
-    "interactionType": "rest",
     "restDuration": 4200,
-    "restHealAmount": 6,
-    "restMoodBoost": 10,
     "majorActionId": [
       "use_surface_slot"
     ],
@@ -67,10 +72,12 @@
         "randomDuration": true,
         "minDuration": 12000,
         "maxDuration": 28000,
-        "energyRestore": 8,
-        "healthRestore": 2,
-        "comfortBoost": 18,
-        "moodBoost": 12,
+        "effects": {
+          "energy": 8,
+          "health": 2,
+          "comfort": 18,
+          "fun": 12
+        },
         "exclusive": false,
         "settleDuration": 220,
         "dismountDuration": 200,
@@ -238,9 +245,12 @@
         }
       }
     },
+    "visual": {
+      "renderType": "sprite"
+    },
     "variantConfigs": {
       "test_couch": {
-        "displayName": "Test Couch",
+        "label": "Test Couch",
         "directionConfigs": {
           "S": {
             "size": {
@@ -341,12 +351,8 @@
           }
         }
       }
-    },
-    "visual": {
-      "renderType": "sprite"
     }
   },
-
   "FLOWER": {
     "category": "nature",
     "variants": [
@@ -357,17 +363,30 @@
       "flower_yellow",
       "flower_blue"
     ],
-    "walkable": true,
-    "overlappable": true,
+    "physics": {
+      "walkable": true
+    },
+    "interaction": {
+      "type": "mood_boost"
+    },
     "canInspect": false,
-    "interactionType": "mood_boost",
-    "moodBoostAmount": 5,
     "majorActionId": [
       "pick_flower"
     ],
     "regrowthTime": 120000,
     "approachConfig": {
       "gap": 10
+    },
+    "ai": {
+      "affordances": [
+        {
+          "actionId": "smell_flower",
+          "purpose": "soothe"
+        }
+      ]
+    },
+    "visual": {
+      "overlappable": true
     },
     "soundEffects": {
       "pick": "obj_flower_pick",
@@ -376,7 +395,7 @@
     "variantConfigs": {
       "flower_1": {
         "animation": "sway",
-        "displayName": "Wildflower",
+        "label": "Wildflower",
         "splitSpritePrefix": "grass_1",
         "visual": {
           "renderType": "split"
@@ -384,7 +403,7 @@
       },
       "flower_2": {
         "animation": "sway",
-        "displayName": "Wildflower",
+        "label": "Wildflower",
         "splitSpritePrefix": "grass_2",
         "visual": {
           "renderType": "split"
@@ -392,7 +411,7 @@
       },
       "flower_3": {
         "animation": "sway",
-        "displayName": "Wildflower",
+        "label": "Wildflower",
         "splitSpritePrefix": "grass_3",
         "visual": {
           "renderType": "split"
@@ -419,14 +438,6 @@
           "renderType": "split"
         }
       }
-    },
-    "ai": {
-      "affordances": [
-        {
-          "actionId": "smell_flower",
-          "purpose": "soothe"
-        }
-      ]
     }
   },
   "TREE": {
@@ -434,10 +445,14 @@
     "variants": [
       "tree_pine"
     ],
-    "collision": true,
+    "physics": {
+      "collision": true
+    },
     "canInspect": true,
-    "displayName": "Pine Tree",
-    "majorActionId": ["shake_tree"],
+    "label": "Pine Tree",
+    "majorActionId": [
+      "shake_tree"
+    ],
     "size": {
       "width": 64,
       "height": 128
@@ -447,7 +462,7 @@
       "defaultStage": "seed",
       "seasonMultiplier": {
         "spring": 1.2,
-        "summer": 1.0,
+        "summer": 1,
         "autumn": 0.7,
         "winter": 0.3
       },
@@ -455,42 +470,42 @@
     },
     "shakeConfig": {
       "cooldown": 60000,
-      "yield": { "min": 1, "max": 3 },
+      "yield": {
+        "min": 1,
+        "max": 3
+      },
       "drops": [
-        { "type": "ITEM", "variant": "pine_cone", "chance": 0.7, "quantity": 1 },
-        { "type": "ITEM", "variant": "pinecone_seed", "chance": 0.3, "quantity": 1 }
+        {
+          "type": "ITEM",
+          "variant": "pine_cone",
+          "chance": 0.7,
+          "quantity": 1
+        },
+        {
+          "type": "ITEM",
+          "variant": "pinecone_seed",
+          "chance": 0.3,
+          "quantity": 1
+        }
       ]
     },
     "chopConfig": {
-      "yield": { "min": 2, "max": 5 },
+      "yield": {
+        "min": 2,
+        "max": 5
+      },
       "drops": [
-        { "type": "ITEM", "variant": "wood_log", "chance": 1.0, "quantity": 1 }
+        {
+          "type": "ITEM",
+          "variant": "wood_log",
+          "chance": 1,
+          "quantity": 1
+        }
       ],
       "stumpConfig": {}
     },
-    "soundEffects": {
-      "shake": "obj_tree_shake",
-      "chop": "obj_tree_chop"
-    },
     "approachConfig": {
       "gap": 16
-    },
-    "visual": {
-      "renderType": "single",
-      "shadow": {
-        "enabled": true,
-        "widthRatio": 0.5,
-        "heightRatio": 0.12,
-        "anchorX": 0.5,
-        "anchorY": 0.92,
-        "maxOpacity": 0.22,
-        "minOpacity": 0.08,
-        "minScale": 0.78,
-        "blur": 3
-      },
-      "spriteSheet": {
-        "url": "images/MapObjects/tree_pine.gif"
-      }
     },
     "spatial": {
       "regions": {
@@ -510,8 +525,32 @@
     },
     "ai": {
       "affordances": [
-        { "actionId": "shake_tree", "purpose": "gather" }
+        {
+          "actionId": "shake_tree",
+          "purpose": "gather"
+        }
       ]
+    },
+    "visual": {
+      "renderType": "single",
+      "shadow": {
+        "enabled": true,
+        "widthRatio": 0.5,
+        "heightRatio": 0.12,
+        "anchorX": 0.5,
+        "anchorY": 0.92,
+        "maxOpacity": 0.22,
+        "minOpacity": 0.08,
+        "minScale": 0.78,
+        "blur": 3
+      },
+      "spriteSheet": {
+        "url": "images/MapObjects/tree_pine.gif"
+      }
+    },
+    "soundEffects": {
+      "shake": "obj_tree_shake",
+      "chop": "obj_tree_chop"
     }
   },
   "TREE_STUMP": {
@@ -520,32 +559,40 @@
       "tree_pine_stump",
       "stump"
     ],
-    "collision": true,
+    "physics": {
+      "collision": true
+    },
     "canInspect": true,
-    "displayName": "Tree Stump",
-    "majorActionId": ["remove_stump"],
+    "label": "Tree Stump",
+    "majorActionId": [
+      "remove_stump"
+    ],
     "size": {
       "width": 48,
       "height": 48
     },
     "removeConfig": {
-      "yield": { "min": 1, "max": 2 },
+      "yield": {
+        "min": 1,
+        "max": 2
+      },
       "drops": [
-        { "type": "ITEM", "variant": "wood_root", "chance": 0.6, "quantity": 1 },
-        { "type": "ITEM", "variant": "soil_clump", "chance": 0.4, "quantity": 1 }
+        {
+          "type": "ITEM",
+          "variant": "wood_root",
+          "chance": 0.6,
+          "quantity": 1
+        },
+        {
+          "type": "ITEM",
+          "variant": "soil_clump",
+          "chance": 0.4,
+          "quantity": 1
+        }
       ]
-    },
-    "soundEffects": {
-      "remove": "obj_stump_remove"
     },
     "approachConfig": {
       "gap": 8
-    },
-    "visual": {
-      "renderType": "single",
-      "spriteSheet": {
-        "url": "images/MapObjects/tree_stump.png"
-      }
     },
     "spatial": {
       "regions": {
@@ -562,6 +609,15 @@
           "y": -16
         }
       }
+    },
+    "visual": {
+      "renderType": "single",
+      "spriteSheet": {
+        "url": "images/MapObjects/tree_stump.png"
+      }
+    },
+    "soundEffects": {
+      "remove": "obj_stump_remove"
     }
   },
   "MIRROR": {
@@ -569,21 +625,29 @@
     "variants": [
       "mirror"
     ],
-    "collision": true,
-    "renderPriority": 2,
-    "interactionType": "social",
-    "interactionRadius": 80,
-    "socialBoost": 22,
-    "comfortBoost": 4,
+    "physics": {
+      "collision": true,
+      "collider": {
+        "offsetX": 4,
+        "offsetY": 48,
+        "width": 24,
+        "height": 16
+      }
+    },
+    "interaction": {
+      "type": "social",
+      "radius": 80
+    },
+    "effects": {
+      "social": 22,
+      "comfort": 4
+    },
     "size": {
       "width": 32,
       "height": 64
     },
-    "collider": {
-      "offsetX": 4,
-      "offsetY": 48,
-      "width": 24,
-      "height": 16
+    "visual": {
+      "renderPriority": 2
     }
   },
   "PLUSHIE": {
@@ -591,16 +655,24 @@
     "variants": [
       "plushie"
     ],
-    "collision": false,
-    "walkable": true,
-    "renderPriority": 2,
-    "interactionType": "social",
-    "interactionRadius": 60,
-    "socialBoost": 14,
-    "comfortBoost": 8,
+    "physics": {
+      "collision": false,
+      "walkable": true
+    },
+    "interaction": {
+      "type": "social",
+      "radius": 60
+    },
+    "effects": {
+      "social": 14,
+      "comfort": 8
+    },
     "size": {
       "width": 32,
       "height": 32
+    },
+    "visual": {
+      "renderPriority": 2
     }
   },
   "MUSIC_BOX": {
@@ -608,24 +680,29 @@
     "variants": [
       "music_box"
     ],
-    "collision": true,
-    "renderPriority": 2,
-    "interactionType": "dance",
-    "interactionRadius": 150,
-    "defaultPlaying": false,
-    "moodBoostRadius": 180,
-    "moodBoostAmount": 0.15,
-    "boostCooldown": 1200,
-    "startMoodBoostAmount": 4,
-    "soundEffects": {
-      "on": "ui_select",
-      "off": "ui_close"
+    "physics": {
+      "collision": true
     },
+    "interaction": {
+      "type": "dance",
+      "radius": 150
+    },
+    "aura": {
+      "radius": 180,
+      "moodBoost": 0.15,
+      "tickInterval": 1200
+    },
+    "defaultPlaying": false,
     "ai": {
       "musicSource": true
     },
     "visual": {
+      "renderPriority": 2,
       "animates": true
+    },
+    "soundEffects": {
+      "on": "ui_select",
+      "off": "ui_close"
     }
   },
   "FOOD": {
@@ -635,35 +712,47 @@
       "turnip",
       "acorn"
     ],
-    "walkable": true,
-    "interactionType": "consume",
-    "interactionRadius": 50,
+    "physics": {
+      "walkable": true
+    },
+    "interaction": {
+      "type": "consume",
+      "radius": 50
+    },
+    "effects": {
+      "energy": 20,
+      "fun": 8,
+      "health": 3,
+      "hunger": 30
+    },
     "consumable": true,
-    "energyRestore": 20,
-    "moodBoost": 8,
-    "healthRestore": 3,
-    "hungerBoost": 30,
     "variantConfigs": {
       "apple": {
-        "displayName": "Apple",
-        "energyRestore": 22,
-        "moodBoost": 10,
-        "healthRestore": 5,
-        "hungerBoost": 35
+        "label": "Apple",
+        "effects": {
+          "energy": 22,
+          "fun": 10,
+          "health": 5,
+          "hunger": 35
+        }
       },
       "turnip": {
-        "displayName": "Turnip",
-        "energyRestore": 14,
-        "moodBoost": 4,
-        "healthRestore": 2,
-        "hungerBoost": 22
+        "label": "Turnip",
+        "effects": {
+          "energy": 14,
+          "fun": 4,
+          "health": 2,
+          "hunger": 22
+        }
       },
       "acorn": {
-        "displayName": "Acorn",
-        "energyRestore": 9,
-        "moodBoost": 6,
-        "healthRestore": 1,
-        "hungerBoost": 16
+        "label": "Acorn",
+        "effects": {
+          "energy": 9,
+          "fun": 6,
+          "health": 1,
+          "hunger": 16
+        }
       }
     }
   },
@@ -673,10 +762,13 @@
       "wooden_chest",
       "golden_chest"
     ],
-    "collision": true,
+    "physics": {
+      "collision": true
+    },
+    "interaction": {
+      "type": "open"
+    },
     "canClose": true,
-    "renderPriority": 2,
-    "interactionType": "open",
     "majorActionId": [
       "open_chest"
     ],
@@ -693,10 +785,21 @@
       "align": "center",
       "gap": 0
     },
-    "soundEffects": {
-      "open": "obj_chest_open",
-      "close": "obj_chest_close",
-      "drop": "ui_drop_item"
+    "spatial": {
+      "regions": {
+        "collider": {
+          "width": 56,
+          "height": 24,
+          "x": 4,
+          "y": 36
+        },
+        "interaction": {
+          "width": 88,
+          "height": 88,
+          "x": -12,
+          "y": -12
+        }
+      }
     },
     "ai": {
       "affordances": [
@@ -707,6 +810,7 @@
       ]
     },
     "visual": {
+      "renderPriority": 2,
       "renderType": "sprite",
       "defaultState": "closed",
       "spriteSheet": {
@@ -787,21 +891,10 @@
         }
       }
     },
-    "spatial": {
-      "regions": {
-        "collider": {
-          "width": 56,
-          "height": 24,
-          "x": 4,
-          "y": 36
-        },
-        "interaction": {
-          "width": 88,
-          "height": 88,
-          "x": -12,
-          "y": -12
-        }
-      }
+    "soundEffects": {
+      "open": "obj_chest_open",
+      "close": "obj_chest_close",
+      "drop": "ui_drop_item"
     }
   },
   "FOUNTAIN": {
@@ -810,18 +903,20 @@
       "stone",
       "marble"
     ],
-    "collision": true,
-    "renderPriority": 2,
-    "interactionType": "mood_boost",
-    "interactionRadius": 150,
-    "moodBoostRadius": 150,
-    "moodBoostAmount": 0.1,
-    "boostCooldown": 1000,
-    "soundEffects": {
-      "on": "obj_fountain_on",
-      "off": "obj_fountain_off"
+    "physics": {
+      "collision": true
+    },
+    "interaction": {
+      "type": "mood_boost",
+      "radius": 150
+    },
+    "aura": {
+      "radius": 150,
+      "moodBoost": 0.1,
+      "tickInterval": 1000
     },
     "visual": {
+      "renderPriority": 2,
       "renderType": "animated",
       "defaultState": "on",
       "animations": {
@@ -919,6 +1014,10 @@
           "loop": true
         }
       }
+    },
+    "soundEffects": {
+      "on": "obj_fountain_on",
+      "off": "obj_fountain_off"
     }
   },
   "LANTERN": {
@@ -927,14 +1026,14 @@
       "paper",
       "crystal"
     ],
-    "walkable": true,
-    "renderPriority": 2,
-    "interactionType": "light",
-    "soundEffects": {
-      "on": "obj_lantern_on",
-      "off": "obj_lantern_off"
+    "physics": {
+      "walkable": true
+    },
+    "interaction": {
+      "type": "light"
     },
     "visual": {
+      "renderPriority": 2,
       "renderType": "animated",
       "defaultState": "off",
       "animations": {
@@ -1028,14 +1127,21 @@
           "loop": false
         }
       }
+    },
+    "soundEffects": {
+      "on": "obj_lantern_on",
+      "off": "obj_lantern_off"
     }
   },
   "GROWING_PLANT": {
-    "abstract": true,
     "category": "plant",
-    "walkable": true,
-    "renderPriority": 2,
-    "interactionType": "tend",
+    "physics": {
+      "walkable": true
+    },
+    "interaction": {
+      "type": "tend"
+    },
+    "abstract": true,
     "growthConfig": {
       "baseGrowthTime": 300000,
       "waterBoostMultiplier": 1.5,
@@ -1047,6 +1153,7 @@
       }
     },
     "visual": {
+      "renderPriority": 2,
       "renderType": "animated",
       "defaultState": "seed",
       "frameWidth": 32,
@@ -1125,20 +1232,21 @@
     }
   },
   "CROP": {
-    "baseType": "GROWING_PLANT",
     "category": "crop",
-    "majorActionId": [
-      "harvest",
-      "water_plant"
-    ],
+    "baseType": "GROWING_PLANT",
     "variants": [
       "tomato",
       "carrot",
       "wheat",
       "berry"
     ],
-    "interactionType": "tend",
-    "renderPriority": 2,
+    "interaction": {
+      "type": "tend"
+    },
+    "majorActionId": [
+      "harvest",
+      "water_plant"
+    ],
     "animation": "sway",
     "size": {
       "width": 64,
@@ -1147,9 +1255,6 @@
     "approachConfig": {
       "align": "center",
       "gap": 4
-    },
-    "soundEffects": {
-      "harvest": "obj_crop_harvest"
     },
     "growthConfig": {
       "baseGrowthTime": 3000,
@@ -1171,7 +1276,18 @@
         "qualityChance": 0.1
       }
     },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "width": 32,
+          "height": 32,
+          "x": 16,
+          "y": 84
+        }
+      }
+    },
     "visual": {
+      "renderPriority": 2,
       "renderType": "animated",
       "defaultState": "seed",
       "spriteSheet": {
@@ -1238,18 +1354,12 @@
         }
       }
     },
-    "spatial": {
-      "regions": {
-        "collider": {
-          "width": 32,
-          "height": 32,
-          "x": 16,
-          "y": 84
-        }
-      }
+    "soundEffects": {
+      "harvest": "obj_crop_harvest"
     }
   },
   "BREEDING_FLOWER": {
+    "category": "breeding-flower",
     "baseType": "GROWING_PLANT",
     "variants": [
       "rose",
@@ -1257,8 +1367,9 @@
       "lily",
       "orchid"
     ],
-    "category": "breeding-flower",
-    "interactionType": "tend",
+    "interaction": {
+      "type": "tend"
+    },
     "geneticConfig": {
       "genes": {
         "petalColor": [
@@ -1599,11 +1710,12 @@
       "red_ball",
       "blue_ball"
     ],
-    "walkable": true,
+    "physics": {
+      "walkable": true
+    },
     "draggable": true,
     "dragInSelectMode": true,
     "canPickUp": true,
-    "renderPriority": 2,
     "pickupRange": 96,
     "speed": 5,
     "friction": 0.94,
@@ -1622,10 +1734,6 @@
     "dragReleaseMaxSpeed": 16,
     "debug": false,
     "animation": "sway",
-    "soundEffects": {
-      "pickup": "ui_pickup_item",
-      "drop": "ui_drop_item"
-    },
     "ai": {
       "affordances": [
         {
@@ -1649,6 +1757,7 @@
       }
     },
     "visual": {
+      "renderPriority": 2,
       "renderType": "sprite",
       "defaultState": "idle",
       "shadow": {
@@ -1856,6 +1965,10 @@
           "loop": true
         }
       }
+    },
+    "soundEffects": {
+      "pickup": "ui_pickup_item",
+      "drop": "ui_drop_item"
     }
   },
   "PATROL_GUARD": {
@@ -1863,14 +1976,16 @@
     "variants": [
       "guard"
     ],
-    "collision": true,
-    "renderPriority": 2,
+    "physics": {
+      "collision": true
+    },
     "speed": 2,
     "waitTime": 1000,
     "detectionRadius": 150,
     "canPursue": true,
     "pursuitDuration": 5000,
     "visual": {
+      "renderPriority": 2,
       "renderType": "animated",
       "defaultState": "idle",
       "animations": {
@@ -2082,9 +2197,10 @@
       "ghost",
       "goblin"
     ],
-    "collision": false,
-    "walkable": true,
-    "renderPriority": 2,
+    "physics": {
+      "collision": false,
+      "walkable": true
+    },
     "speed": 1.5,
     "aggroRadius": 220,
     "chaseRadius": 450,
@@ -2104,24 +2220,8 @@
       "width": 64,
       "height": 64
     },
-    "variantConfigs": {
-      "ghost": {
-        "speed": 2,
-        "aggroRadius": 300,
-        "capabilities": {
-          "canSwim": true,
-          "canWade": true
-        }
-      },
-      "goblin": {
-        "speed": 2.5,
-        "capabilities": {
-          "canOpenDoors": true,
-          "canWade": true
-        }
-      }
-    },
     "visual": {
+      "renderPriority": 2,
       "renderType": "animated",
       "defaultState": "idle",
       "spriteSheet": {
@@ -2230,6 +2330,23 @@
           "loop": true
         }
       }
+    },
+    "variantConfigs": {
+      "ghost": {
+        "speed": 2,
+        "aggroRadius": 300,
+        "capabilities": {
+          "canSwim": true,
+          "canWade": true
+        }
+      },
+      "goblin": {
+        "speed": 2.5,
+        "capabilities": {
+          "canOpenDoors": true,
+          "canWade": true
+        }
+      }
     }
   },
   "BUTTERFLY": {
@@ -2239,8 +2356,9 @@
       "yellow_butterfly",
       "small"
     ],
-    "walkable": true,
-    "renderPriority": 3,
+    "physics": {
+      "walkable": true
+    },
     "speed": 1.5,
     "wanderRadius": 100,
     "bobAmplitude": 10,
@@ -2257,39 +2375,18 @@
       "width": 100,
       "height": 100
     },
-    "variantConfigs": {
-      "small": {
-        "size": {
-          "width": 50,
-          "height": 50
-        },
-        "bobAmplitude": 7,
-        "bobFrequency": 0.07,
-        "speed": 1.2,
-        "hoverHeight": 12,
-        "hoverVariance": 5,
-        "visual": {
-          "spriteSheet": {
-            "url": "images/MapObjects/butterfly_small.gif",
-            "size": {
-              "width": 250,
-              "height": 200
-            }
-          }
-        },
-        "spatial": {
-          "regions": {
-            "collider": {
-              "width": 14,
-              "height": 8,
-              "x": 18,
-              "y": 36
-            }
-          }
+    "spatial": {
+      "regions": {
+        "collider": {
+          "width": 24,
+          "height": 14,
+          "x": 38,
+          "y": 72
         }
       }
     },
     "visual": {
+      "renderPriority": 3,
       "renderType": "animated",
       "defaultState": "idle",
       "shadow": {
@@ -2443,13 +2540,35 @@
         }
       }
     },
-    "spatial": {
-      "regions": {
-        "collider": {
-          "width": 24,
-          "height": 14,
-          "x": 38,
-          "y": 72
+    "variantConfigs": {
+      "small": {
+        "size": {
+          "width": 50,
+          "height": 50
+        },
+        "bobAmplitude": 7,
+        "bobFrequency": 0.07,
+        "speed": 1.2,
+        "hoverHeight": 12,
+        "hoverVariance": 5,
+        "visual": {
+          "spriteSheet": {
+            "url": "images/MapObjects/butterfly_small.gif",
+            "size": {
+              "width": 250,
+              "height": 200
+            }
+          }
+        },
+        "spatial": {
+          "regions": {
+            "collider": {
+              "width": 14,
+              "height": 8,
+              "x": 18,
+              "y": 36
+            }
+          }
         }
       }
     }
@@ -2460,8 +2579,9 @@
       "honeybee",
       "bumblebee"
     ],
-    "walkable": true,
-    "renderPriority": 3,
+    "physics": {
+      "walkable": true
+    },
     "speed": 1.8,
     "bobFrequency": 0.07,
     "hoverHeight": 22,
@@ -2475,18 +2595,18 @@
       "width": 64,
       "height": 64
     },
-    "variantConfigs": {
-      "bumblebee": {
-        "speed": 1.4,
-        "hoverHeight": 18,
-        "bobFrequency": 0.05,
-        "size": {
-          "width": 80,
-          "height": 80
+    "spatial": {
+      "regions": {
+        "collider": {
+          "width": 16,
+          "height": 10,
+          "x": 24,
+          "y": 46
         }
       }
     },
     "visual": {
+      "renderPriority": 3,
       "renderType": "animated",
       "defaultState": "idle",
       "spriteSheet": {
@@ -2497,34 +2617,159 @@
         }
       },
       "animations": {
-        "E":      { "frames": [[0,0],[1,0],[2,0],[3,0],[4,0]], "loop": true },
-        "W":      { "frames": [[0,1],[1,1],[2,1],[3,1],[4,1]], "loop": true },
-        "N":      { "frames": [[0,2],[1,2],[2,2],[3,2],[4,2]], "loop": true },
-        "S":      { "frames": [[0,3],[1,3],[2,3],[3,3],[4,3]], "loop": true },
-        "idle":   { "frames": [[1,3]], "loop": true },
-        "flutter":{ "frames": [[2,3],[1,3],[0,3],[1,3]], "loop": true }
+        "E": {
+          "frames": [
+            [
+              0,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              4,
+              0
+            ]
+          ],
+          "loop": true
+        },
+        "W": {
+          "frames": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              4,
+              1
+            ]
+          ],
+          "loop": true
+        },
+        "N": {
+          "frames": [
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              2
+            ],
+            [
+              3,
+              2
+            ],
+            [
+              4,
+              2
+            ]
+          ],
+          "loop": true
+        },
+        "S": {
+          "frames": [
+            [
+              0,
+              3
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              3
+            ],
+            [
+              4,
+              3
+            ]
+          ],
+          "loop": true
+        },
+        "idle": {
+          "frames": [
+            [
+              1,
+              3
+            ]
+          ],
+          "loop": true
+        },
+        "flutter": {
+          "frames": [
+            [
+              2,
+              3
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              1,
+              3
+            ]
+          ],
+          "loop": true
+        }
       }
     },
-    "spatial": {
-      "regions": {
-        "collider": {
-          "width": 16,
-          "height": 10,
-          "x": 24,
-          "y": 46
+    "variantConfigs": {
+      "bumblebee": {
+        "speed": 1.4,
+        "hoverHeight": 18,
+        "bobFrequency": 0.05,
+        "size": {
+          "width": 80,
+          "height": 80
         }
       }
     }
   },
-
   "HIVE": {
     "category": "structure",
     "variants": [
       "wooden_hive",
       "tree_hive"
     ],
-    "collision": true,
-    "renderPriority": 2,
+    "physics": {
+      "collision": true
+    },
     "canInspect": true,
     "honeyThreshold": 5,
     "maxBees": 3,
@@ -2534,35 +2779,6 @@
     },
     "approachConfig": {
       "gap": 8
-    },
-    "variantConfigs": {
-      "tree_hive": {
-        "size": {
-          "width": 48,
-          "height": 48
-        },
-        "visual": {
-          "spriteSheet": {
-            "url": "images/MapObjects/hive_tree.png"
-          }
-        }
-      }
-    },
-    "visual": {
-      "renderType": "animated",
-      "defaultState": "idle",
-      "spriteSheet": {
-        "url": "images/MapObjects/hive.png",
-        "size": {
-          "width": 256,
-          "height": 64
-        }
-      },
-      "animations": {
-        "idle":     { "frames": [[0,0]], "loop": true },
-        "active":   { "frames": [[1,0],[2,0],[1,0]], "loop": true },
-        "full":     { "frames": [[3,0]], "loop": true }
-      }
     },
     "spatial": {
       "regions": {
@@ -2579,10 +2795,70 @@
           "y": -16
         }
       }
+    },
+    "visual": {
+      "renderPriority": 2,
+      "renderType": "animated",
+      "defaultState": "idle",
+      "spriteSheet": {
+        "url": "images/MapObjects/hive.png",
+        "size": {
+          "width": 256,
+          "height": 64
+        }
+      },
+      "animations": {
+        "idle": {
+          "frames": [
+            [
+              0,
+              0
+            ]
+          ],
+          "loop": true
+        },
+        "active": {
+          "frames": [
+            [
+              1,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "loop": true
+        },
+        "full": {
+          "frames": [
+            [
+              3,
+              0
+            ]
+          ],
+          "loop": true
+        }
+      }
+    },
+    "variantConfigs": {
+      "tree_hive": {
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "visual": {
+          "spriteSheet": {
+            "url": "images/MapObjects/hive_tree.png"
+          }
+        }
+      }
     }
   },
-
-
   "BIRD": {
     "category": "moving",
     "variants": [
@@ -2590,74 +2866,33 @@
       "robin",
       "bluebird"
     ],
-    "walkable": true,
-    "renderPriority": 3,
-
+    "physics": {
+      "walkable": true
+    },
     "speed": 2.2,
     "flightSpeed": 3.4,
     "groundSpeed": 1,
-
     "bobFrequency": 0.026,
     "hoverHeight": 38,
     "hoverVariance": 7,
-
     "fleeRadius": 200,
     "fleeDistanceMin": 220,
     "fleeDistanceMax": 420,
     "fleeAltitude": 120,
     "fleeEdgeMargin": 72,
-
     "airborneMinDuration": 2200,
     "airborneMaxDuration": 7000,
     "landingChanceBase": 0.0025,
     "landingChanceMax": 0.012,
     "takeoffChance": 0.00008,
-
     "idleChance": 0.001,
     "seedSeekChance": 0.002,
     "seedSearchRadius": 280,
     "seedRestDurationMin": 3000,
     "seedRestDurationMax": 7000,
-    
     "size": {
       "width": 48,
       "height": 48
-    },
-    "variantConfigs": {
-      "robin": {
-        "hoverHeight": 38,
-        "fleeRadius": 100
-      },
-      "bluebird": {
-        "speed": 2.0,
-        "flightSpeed": 2.0,
-        "hoverHeight": 50,
-        "fleeRadius": 150
-      }
-    },
-    "visual": {
-      "renderType": "animated",
-      "defaultState": "idle",
-      "spriteSheet": {
-        "url": "images/MapObjects/bird_sparrow.gif",
-        "size": {
-          "width": 384,
-          "height": 336
-        }
-      },
-      "animations": {
-        "E":       { "frames": [[0,0],[1,0],[2,0],[3,0],[4,0]], "loop": true },
-        "W":       { "frames": [[0,1],[1,1],[2,1],[3,1],[4,1]], "loop": true },
-        "N":       { "frames": [[0,2],[1,2],[2,2],[3,2],[4,2]], "loop": true },
-        "S":       { "frames": [[0,3],[1,3],[2,3],[3,3],[4,3]], "loop": true },
-        "walk_E":  { "frames": [[0,4],[1,4],[2,4],[3,4]], "loop": true },
-        "walk_W":  { "frames": [[0,5],[1,5],[2,5],[3,5]], "loop": true },
-        "walk_N":  { "frames": [[0,5],[1,5],[2,5],[3,5]], "loop": true },
-        "walk_S":  { "frames": [[0,4],[1,4],[2,4],[3,4]], "loop": true },
-        "peck":    { "frames": [[0,6],[1,6],[2,6],[1,6],[0,6]], "loop": false },
-        "landing": { "frames": [[0,7]], "loop": true },
-        "idle":    { "frames": [[1,3]], "loop": true }
-      }
     },
     "spatial": {
       "regions": {
@@ -2668,9 +2903,261 @@
           "y": 32
         }
       }
+    },
+    "visual": {
+      "renderPriority": 3,
+      "renderType": "animated",
+      "defaultState": "idle",
+      "spriteSheet": {
+        "url": "images/MapObjects/bird_sparrow.gif",
+        "size": {
+          "width": 384,
+          "height": 336
+        }
+      },
+      "animations": {
+        "E": {
+          "frames": [
+            [
+              0,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              4,
+              0
+            ]
+          ],
+          "loop": true
+        },
+        "W": {
+          "frames": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              4,
+              1
+            ]
+          ],
+          "loop": true
+        },
+        "N": {
+          "frames": [
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              2
+            ],
+            [
+              3,
+              2
+            ],
+            [
+              4,
+              2
+            ]
+          ],
+          "loop": true
+        },
+        "S": {
+          "frames": [
+            [
+              0,
+              3
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              3
+            ],
+            [
+              4,
+              3
+            ]
+          ],
+          "loop": true
+        },
+        "walk_E": {
+          "frames": [
+            [
+              0,
+              4
+            ],
+            [
+              1,
+              4
+            ],
+            [
+              2,
+              4
+            ],
+            [
+              3,
+              4
+            ]
+          ],
+          "loop": true
+        },
+        "walk_W": {
+          "frames": [
+            [
+              0,
+              5
+            ],
+            [
+              1,
+              5
+            ],
+            [
+              2,
+              5
+            ],
+            [
+              3,
+              5
+            ]
+          ],
+          "loop": true
+        },
+        "walk_N": {
+          "frames": [
+            [
+              0,
+              5
+            ],
+            [
+              1,
+              5
+            ],
+            [
+              2,
+              5
+            ],
+            [
+              3,
+              5
+            ]
+          ],
+          "loop": true
+        },
+        "walk_S": {
+          "frames": [
+            [
+              0,
+              4
+            ],
+            [
+              1,
+              4
+            ],
+            [
+              2,
+              4
+            ],
+            [
+              3,
+              4
+            ]
+          ],
+          "loop": true
+        },
+        "peck": {
+          "frames": [
+            [
+              0,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              0,
+              6
+            ]
+          ],
+          "loop": false
+        },
+        "landing": {
+          "frames": [
+            [
+              0,
+              7
+            ]
+          ],
+          "loop": true
+        },
+        "idle": {
+          "frames": [
+            [
+              1,
+              3
+            ]
+          ],
+          "loop": true
+        }
+      }
+    },
+    "variantConfigs": {
+      "robin": {
+        "hoverHeight": 38,
+        "fleeRadius": 100
+      },
+      "bluebird": {
+        "speed": 2,
+        "flightSpeed": 2,
+        "hoverHeight": 50,
+        "fleeRadius": 150
+      }
     }
   },
-
   "DOOR": {
     "category": "interactive",
     "variants": [
@@ -2678,16 +3165,15 @@
       "metal_door",
       "fancy_door"
     ],
-    "collision": true,
-    "renderPriority": 2,
-    "interactionType": "toggle",
-    "interactionRadius": 100,
-    "canToggle": true,
-    "canInspect": true,
-    "soundEffects": {
-      "open": "obj_door_open",
-      "close": "obj_door_close"
+    "physics": {
+      "collision": true
     },
+    "interaction": {
+      "type": "toggle",
+      "radius": 100,
+      "canToggle": true
+    },
+    "canInspect": true,
     "directionConfigs": {
       "E": {
         "size": {
@@ -2800,17 +3286,8 @@
       "Up": "N",
       "Down": "S"
     },
-    "variantConfigs": {
-      "wooden_door": {},
-      "metal_door": {
-        "visual": {
-          "spriteSheet": {
-            "url": "images/MapObjects/metal_door.png"
-          }
-        }
-      }
-    },
     "visual": {
+      "renderPriority": 2,
       "renderType": "sprite",
       "defaultState": "closed",
       "spriteSheet": {
@@ -2896,6 +3373,20 @@
           "loop": false
         }
       }
+    },
+    "soundEffects": {
+      "open": "obj_door_open",
+      "close": "obj_door_close"
+    },
+    "variantConfigs": {
+      "wooden_door": {},
+      "metal_door": {
+        "visual": {
+          "spriteSheet": {
+            "url": "images/MapObjects/metal_door.png"
+          }
+        }
+      }
     }
   },
   "BED": {
@@ -2907,13 +3398,14 @@
       "bed_big_long",
       "large_bed"
     ],
-    "collision": true,
+    "physics": {
+      "collision": true
+    },
+    "interaction": {
+      "type": "rest"
+    },
     "draggable": true,
     "snapToGrid": true,
-    "interactionType": "rest",
-    "restDuration": 5000,
-    "restHealAmount": 10,
-    "restMoodBoost": 15,
     "ai": {
       "affordances": [
         {
@@ -2942,9 +3434,12 @@
         "maxFinalAdjustmentDistance": 36
       }
     },
+    "visual": {
+      "renderType": "sprite"
+    },
     "variantConfigs": {
       "bed": {
-        "displayName": "Bed",
+        "label": "Bed",
         "restEnergyRegenMultiplier": 1,
         "directionConfigs": {
           "S": {
@@ -3067,7 +3562,7 @@
         }
       },
       "bed_long": {
-        "displayName": "Long Bed",
+        "label": "Long Bed",
         "restEnergyRegenMultiplier": 1,
         "directionConfigs": {
           "S": {
@@ -3190,7 +3685,7 @@
         }
       },
       "bed_big": {
-        "displayName": "Big Bed",
+        "label": "Big Bed",
         "restEnergyRegenMultiplier": 1.3,
         "directionConfigs": {
           "S": {
@@ -3313,7 +3808,7 @@
         }
       },
       "bed_big_long": {
-        "displayName": "Big Long Bed",
+        "label": "Big Long Bed",
         "restEnergyRegenMultiplier": 1.3,
         "directionConfigs": {
           "S": {
@@ -3561,9 +4056,6 @@
           }
         }
       }
-    },
-    "visual": {
-      "renderType": "sprite"
     }
   },
   "RUG": {
@@ -3571,25 +4063,27 @@
     "variants": [
       "rug_default"
     ],
-    "walkable": true,
-    "overlappable": true,
+    "physics": {
+      "walkable": true
+    },
     "draggable": true,
     "snapToGrid": true,
-    "renderPriority": 0,
-    "renderLayer": "groundDecor",
     "size": {
       "width": 192,
       "height": 128
     },
-    "visual": {
-      "renderType": "single",
-      "spriteSheet": {
-        "url": "images/MapObjects/rug.gif"
-      }
-    },
     "spatial": {
       "regions": {
         "collider": null
+      }
+    },
+    "visual": {
+      "renderPriority": 0,
+      "renderLayer": "groundDecor",
+      "overlappable": true,
+      "renderType": "single",
+      "spriteSheet": {
+        "url": "images/MapObjects/rug.gif"
       }
     }
   },
@@ -3601,16 +4095,19 @@
       "ancient_portal",
       "magic_circle"
     ],
-    "collision": false,
-    "walkable": true,
-    "renderPriority": 2,
-    "interactionType": "teleport",
+    "physics": {
+      "collision": false,
+      "walkable": true
+    },
+    "interaction": {
+      "type": "teleport",
+      "radius": 150,
+      "canToggle": true
+    },
     "majorActionId": [
       "interact_object"
     ],
     "interactionOnly": true,
-    "interactionRadius": 150,
-    "canToggle": true,
     "particleEffects": true,
     "lightEmission": true,
     "canInspect": false,
@@ -3619,10 +4116,6 @@
       "height": 128
     },
     "transitionAlignTo": "sprite",
-    "soundEffects": {
-      "depart": "obj_portal_depart",
-      "arrive": "obj_portal_arrive"
-    },
     "particleConfig": {
       "particleEffect": "GLOW",
       "orbitalMotion": true,
@@ -3630,38 +4123,24 @@
       "pulseEffect": true,
       "pulseFrequency": 0.05
     },
-    "variantConfigs": {
-      "blue_portal": {
-        "particleEffect": "GLOW",
-        "particleStartColor": "#00BFFF",
-        "particleEndColor": "#0000FF"
-      },
-      "red_portal": {
-        "particleEffect": "GLOW",
-        "particleStartColor": "#FF4500",
-        "particleEndColor": "#8B0000"
-      },
-      "ancient_portal": {
-        "particleEffect": "SPARKLE",
-        "particleStartColor": "#DAA520",
-        "particleEndColor": "#8B4513"
-      },
-      "magic_circle": {
-        "size": {
-          "width": 192,
-          "height": 192
+    "spatial": {
+      "regions": {
+        "collider": {
+          "width": 64,
+          "height": 64,
+          "x": 32,
+          "y": 32
         },
-        "particleEffect": "SPARKLE_SPRITE",
-        "particleStartColor": "#9932CC",
-        "particleEndColor": "#4B0082",
-        "visual": {
-          "spriteSheet": {
-            "url": "images/MapObjects/magic_circle.png"
-          }
+        "interaction": {
+          "width": 196,
+          "height": 196,
+          "x": -32,
+          "y": -32
         }
       }
     },
     "visual": {
+      "renderPriority": 2,
       "renderType": "sprite",
       "defaultState": "active",
       "spriteSheet": {
@@ -3826,120 +4305,305 @@
         }
       }
     },
-    "spatial": {
-      "regions": {
-        "collider": {
-          "width": 64,
-          "height": 64,
-          "x": 32,
-          "y": 32
+    "soundEffects": {
+      "depart": "obj_portal_depart",
+      "arrive": "obj_portal_arrive"
+    },
+    "variantConfigs": {
+      "blue_portal": {
+        "particleEffect": "GLOW",
+        "particleStartColor": "#00BFFF",
+        "particleEndColor": "#0000FF"
+      },
+      "red_portal": {
+        "particleEffect": "GLOW",
+        "particleStartColor": "#FF4500",
+        "particleEndColor": "#8B0000"
+      },
+      "ancient_portal": {
+        "particleEffect": "SPARKLE",
+        "particleStartColor": "#DAA520",
+        "particleEndColor": "#8B4513"
+      },
+      "magic_circle": {
+        "size": {
+          "width": 192,
+          "height": 192
         },
-        "interaction": {
-          "width": 196,
-          "height": 196,
-          "x": -32,
-          "y": -32
+        "particleEffect": "SPARKLE_SPRITE",
+        "particleStartColor": "#9932CC",
+        "particleEndColor": "#4B0082",
+        "visual": {
+          "spriteSheet": {
+            "url": "images/MapObjects/magic_circle.png"
+          }
         }
       }
     }
   },
   "FENCE": {
     "category": "structure",
-    "variants": ["wooden_fence", "stone_fence", "iron_fence", "garden_fence"],
-    "collision": true,
-    "walkable": false,
-    "interactive": false,
-    "canInspect": true,
-    "blocksLineOfSight": true,
-    "degradationEnabled": true,
-    "degradationTime": 7200000,
-    "renderPriority": 2,
-    "autoConnect": false,
-    "numVariations": 1,
-    "size": { "width": 32, "height": 64 },
-    "collider": {
-      "type": "box",
-      "width": 32,
-      "height": 32,
-      "offsetX": 0,
-      "offsetY": 32
+    "variants": [
+      "wooden_fence",
+      "stone_fence",
+      "iron_fence",
+      "garden_fence"
+    ],
+    "physics": {
+      "collision": true,
+      "walkable": false,
+      "blocksLineOfSight": true,
+      "collider": {
+        "type": "box",
+        "width": 32,
+        "height": 32,
+        "offsetX": 0,
+        "offsetY": 32
+      }
     },
-    "maskMap": [0, 0, 1, 1, 5, 5, 6, 6, 3, 3, 2, 2, 7, 7, 4, 4],
+    "interaction": {
+      "interactive": false
+    },
+    "degradation": {
+      "enabled": true,
+      "durationMs": 7200000
+    },
+    "canInspect": true,
+    "autoConnect": false,
+    "size": {
+      "width": 32,
+      "height": 64
+    },
+    "maskMap": [
+      0,
+      0,
+      1,
+      1,
+      5,
+      5,
+      6,
+      6,
+      3,
+      3,
+      2,
+      2,
+      7,
+      7,
+      4,
+      4
+    ],
     "visual": {
+      "renderPriority": 2,
       "renderType": "sprite",
       "spriteSheet": {
         "url": "images/MapObjects/fence_wood.gif",
-        "size": { "width": 256, "height": 64 },
-        "frameSize": { "width": 32, "height": 64 }
+        "size": {
+          "width": 256,
+          "height": 64
+        },
+        "frameSize": {
+          "width": 32,
+          "height": 64
+        }
       }
     },
     "variantConfigs": {
       "wooden_fence": {
         "visual": {
-          "spriteSheet": { "url": "images/MapObjects/fence_wood.gif" }
+          "spriteSheet": {
+            "url": "images/MapObjects/fence_wood.gif"
+          }
         }
       },
       "stone_fence": {
-        "visual": { "spriteSheet": { "url": "images/MapObjects/fence_stone.png" } }
+        "visual": {
+          "spriteSheet": {
+            "url": "images/MapObjects/fence_stone.png"
+          }
+        }
       },
       "iron_fence": {
-        "visual": { "spriteSheet": { "url": "images/MapObjects/fence_iron.png" } }
+        "visual": {
+          "spriteSheet": {
+            "url": "images/MapObjects/fence_iron.png"
+          }
+        }
       },
       "garden_fence": {
-        "visual": { "spriteSheet": { "url": "images/MapObjects/fence_garden.png" } }
+        "visual": {
+          "spriteSheet": {
+            "url": "images/MapObjects/fence_garden.png"
+          }
+        }
       }
     }
   },
   "GATE": {
     "category": "interactive",
-    "variants": ["wooden_gate", "stone_gate", "iron_gate", "garden_gate"],
-    "collision": true,
-    "walkable": false,
-    "blocksLineOfSight": true,
-    "renderPriority": 2,
-    "interactionType": "toggle",
-
-    "interactionRadius": 80,
-    "canToggle": true,
+    "variants": [
+      "wooden_gate",
+      "stone_gate",
+      "iron_gate",
+      "garden_gate"
+    ],
+    "physics": {
+      "collision": true,
+      "walkable": false,
+      "blocksLineOfSight": true,
+      "collider": {
+        "type": "box",
+        "width": 28,
+        "height": 20,
+        "offsetX": 2,
+        "offsetY": 76
+      }
+    },
+    "interaction": {
+      "type": "toggle",
+      "radius": 80,
+      "canToggle": true
+    },
     "autoConnect": false,
-    "numVariations": 1,
-    "size": { "width": 32, "height": 96 },
-    "collider": {
-      "type": "box",
-      "width": 28,
-      "height": 20,
-      "offsetX": 2,
-      "offsetY": 76
+    "size": {
+      "width": 32,
+      "height": 96
+    },
+    "visual": {
+      "renderPriority": 2,
+      "renderType": "animated",
+      "defaultState": "closed",
+      "spriteSheet": {
+        "url": "images/MapObjects/gate_wooden.png",
+        "size": {
+          "width": 256,
+          "height": 96
+        },
+        "frameSize": {
+          "width": 32,
+          "height": 96
+        }
+      },
+      "animations": {
+        "closed": {
+          "frames": [
+            [
+              0,
+              0
+            ]
+          ],
+          "loop": true
+        },
+        "opening": {
+          "frames": [
+            [
+              0,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              7,
+              0
+            ]
+          ],
+          "loop": false
+        },
+        "open": {
+          "frames": [
+            [
+              7,
+              0
+            ]
+          ],
+          "loop": true
+        },
+        "closing": {
+          "frames": [
+            [
+              7,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "loop": false
+        }
+      }
     },
     "soundEffects": {
       "open": "obj_gate_open",
       "close": "obj_gate_close"
     },
-    "visual": {
-      "renderType": "animated",
-      "defaultState": "closed",
-      "spriteSheet": {
-        "url": "images/MapObjects/gate_wooden.png",
-        "size": { "width": 256, "height": 96 },
-        "frameSize": { "width": 32, "height": 96 }
-      },
-      "animations": {
-        "closed":  { "frames": [[0, 0]], "loop": true },
-        "opening": { "frames": [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0]], "loop": false },
-        "open":    { "frames": [[7, 0]], "loop": true },
-        "closing": { "frames": [[7,0],[6,0],[5,0],[4,0],[3,0],[2,0],[1,0],[0,0]], "loop": false }
-      }
-    },
     "variantConfigs": {
       "wooden_gate": {},
       "stone_gate": {
-        "visual": { "spriteSheet": { "url": "images/MapObjects/gate_stone.png" } }
+        "visual": {
+          "spriteSheet": {
+            "url": "images/MapObjects/gate_stone.png"
+          }
+        }
       },
       "iron_gate": {
-        "visual": { "spriteSheet": { "url": "images/MapObjects/gate_iron.png" } }
+        "visual": {
+          "spriteSheet": {
+            "url": "images/MapObjects/gate_iron.png"
+          }
+        }
       },
       "garden_gate": {
-        "visual": { "spriteSheet": { "url": "images/MapObjects/gate_garden.png" } }
+        "visual": {
+          "spriteSheet": {
+            "url": "images/MapObjects/gate_garden.png"
+          }
+        }
       }
     }
   },
@@ -3951,9 +4615,13 @@
       "lemon",
       "cherry"
     ],
-    "collision": true,
+    "physics": {
+      "collision": true
+    },
     "canInspect": true,
-    "majorActionId": ["shake_tree"],
+    "majorActionId": [
+      "shake_tree"
+    ],
     "size": {
       "width": 64,
       "height": 128
@@ -3963,7 +4631,7 @@
       "defaultStage": "seed",
       "seasonMultiplier": {
         "spring": 1.3,
-        "summer": 1.0,
+        "summer": 1,
         "autumn": 0.6,
         "winter": 0.1
       },
@@ -3972,43 +4640,36 @@
     "fruitConfig": {
       "regrowthTime": 300000,
       "readyOnFirstGrown": true,
-      "yield": { "min": 2, "max": 5 },
+      "yield": {
+        "min": 2,
+        "max": 5
+      },
       "drops": []
     },
     "shakeConfig": {
       "drops": [],
-      "yield": { "min": 0, "max": 0 }
+      "yield": {
+        "min": 0,
+        "max": 0
+      }
     },
     "chopConfig": {
-      "yield": { "min": 2, "max": 4 },
+      "yield": {
+        "min": 2,
+        "max": 4
+      },
       "drops": [
-        { "type": "ITEM", "variant": "wood_log", "chance": 1.0, "quantity": 1 }
+        {
+          "type": "ITEM",
+          "variant": "wood_log",
+          "chance": 1,
+          "quantity": 1
+        }
       ],
       "stumpConfig": {}
     },
-    "soundEffects": {
-      "shake": "obj_tree_shake",
-      "chop": "obj_tree_chop"
-    },
     "approachConfig": {
       "gap": 16
-    },
-    "visual": {
-      "renderType": "single",
-      "shadow": {
-        "enabled": true,
-        "widthRatio": 0.5,
-        "heightRatio": 0.12,
-        "anchorX": 0.5,
-        "anchorY": 0.92,
-        "maxOpacity": 0.22,
-        "minOpacity": 0.08,
-        "minScale": 0.78,
-        "blur": 3
-      },
-      "spriteSheet": {
-        "url": "images/MapObjects/fruit_tree_apple.gif"
-      }
     },
     "spatial": {
       "regions": {
@@ -4028,64 +4689,148 @@
     },
     "ai": {
       "affordances": [
-        { "actionId": "shake_tree", "purpose": "gather" }
+        {
+          "actionId": "shake_tree",
+          "purpose": "gather"
+        }
       ]
+    },
+    "visual": {
+      "renderType": "single",
+      "shadow": {
+        "enabled": true,
+        "widthRatio": 0.5,
+        "heightRatio": 0.12,
+        "anchorX": 0.5,
+        "anchorY": 0.92,
+        "maxOpacity": 0.22,
+        "minOpacity": 0.08,
+        "minScale": 0.78,
+        "blur": 3
+      },
+      "spriteSheet": {
+        "url": "images/MapObjects/fruit_tree_apple.gif"
+      }
+    },
+    "soundEffects": {
+      "shake": "obj_tree_shake",
+      "chop": "obj_tree_chop"
     },
     "variantConfigs": {
       "apple": {
-        "displayName": "Apple Tree",
+        "label": "Apple Tree",
         "fruitConfig": {
           "regrowthTime": 300000,
-          "yield": { "min": 2, "max": 5 },
+          "yield": {
+            "min": 2,
+            "max": 5
+          },
           "drops": [
-            { "type": "ITEM", "variant": "apple", "chance": 0.85, "quantity": 1 },
-            { "type": "ITEM", "variant": "apple_seed", "chance": 0.25, "quantity": 1 }
+            {
+              "type": "ITEM",
+              "variant": "apple",
+              "chance": 0.85,
+              "quantity": 1
+            },
+            {
+              "type": "ITEM",
+              "variant": "apple_seed",
+              "chance": 0.25,
+              "quantity": 1
+            }
           ]
         },
         "visual": {
-          "spriteSheet": { "url": "images/MapObjects/fruit_tree_apple.gif" }
+          "spriteSheet": {
+            "url": "images/MapObjects/fruit_tree_apple.gif"
+          }
         }
       },
       "orange": {
-        "displayName": "Orange Tree",
+        "label": "Orange Tree",
         "fruitConfig": {
           "regrowthTime": 360000,
-          "yield": { "min": 2, "max": 4 },
+          "yield": {
+            "min": 2,
+            "max": 4
+          },
           "drops": [
-            { "type": "ITEM", "variant": "orange", "chance": 0.8, "quantity": 1 },
-            { "type": "ITEM", "variant": "orange_seed", "chance": 0.2, "quantity": 1 }
+            {
+              "type": "ITEM",
+              "variant": "orange",
+              "chance": 0.8,
+              "quantity": 1
+            },
+            {
+              "type": "ITEM",
+              "variant": "orange_seed",
+              "chance": 0.2,
+              "quantity": 1
+            }
           ]
         },
         "visual": {
-          "spriteSheet": { "url": "images/MapObjects/fruit_tree_orange.gif" }
+          "spriteSheet": {
+            "url": "images/MapObjects/fruit_tree_orange.gif"
+          }
         }
       },
       "lemon": {
-        "displayName": "Lemon Tree",
+        "label": "Lemon Tree",
         "fruitConfig": {
           "regrowthTime": 420000,
-          "yield": { "min": 3, "max": 6 },
+          "yield": {
+            "min": 3,
+            "max": 6
+          },
           "drops": [
-            { "type": "ITEM", "variant": "lemon", "chance": 0.75, "quantity": 1 },
-            { "type": "ITEM", "variant": "lemon_seed", "chance": 0.3, "quantity": 1 }
+            {
+              "type": "ITEM",
+              "variant": "lemon",
+              "chance": 0.75,
+              "quantity": 1
+            },
+            {
+              "type": "ITEM",
+              "variant": "lemon_seed",
+              "chance": 0.3,
+              "quantity": 1
+            }
           ]
         },
         "visual": {
-          "spriteSheet": { "url": "images/MapObjects/fruit_tree_lemon.gif" }
+          "spriteSheet": {
+            "url": "images/MapObjects/fruit_tree_lemon.gif"
+          }
         }
       },
       "cherry": {
-        "displayName": "Cherry Tree",
+        "label": "Cherry Tree",
         "fruitConfig": {
           "regrowthTime": 240000,
-          "yield": { "min": 3, "max": 7 },
+          "yield": {
+            "min": 3,
+            "max": 7
+          },
           "drops": [
-            { "type": "ITEM", "variant": "cherry", "chance": 0.9, "quantity": 1 },
-            { "type": "ITEM", "variant": "cherry_seed", "chance": 0.15, "quantity": 1 }
+            {
+              "type": "ITEM",
+              "variant": "cherry",
+              "chance": 0.9,
+              "quantity": 1
+            },
+            {
+              "type": "ITEM",
+              "variant": "cherry_seed",
+              "chance": 0.15,
+              "quantity": 1
+            }
           ]
         },
         "visual": {
-          "spriteSheet": { "url": "images/MapObjects/fruit_tree_cherry.gif" }
+          "spriteSheet": {
+            "url": "images/MapObjects/fruit_tree_cherry.gif"
+          }
         }
       }
     }

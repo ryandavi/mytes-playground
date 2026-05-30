@@ -1185,7 +1185,7 @@ class DebugOverlayUI {
                 try {
                     if (this.overlayState.colliders) {
                         const bounds = this.parent.getColliderBounds(obj);
-                        const css = ['object-collider', ...(obj.config?.walkable ? ['walkable-object'] : [])];
+                        const css = ['object-collider', ...(obj.config?.physics?.walkable ? ['walkable-object'] : [])];
                         this._appendRegionBox(layer, bounds, ...css);
 
                         const slotConfig = obj.getActionConfig?.('use_surface_slot');

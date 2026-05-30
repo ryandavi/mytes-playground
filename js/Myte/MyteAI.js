@@ -243,7 +243,7 @@ class MyteAI {
         const home = this.getHomePosition();
         const distanceFromHome = this.myte.getDistanceToPoint(home.x, home.y);
         const preferences = this.getAIPreferences();
-        const nearbyLights = nearbyObjects.filter(target => target?.getConfig?.('interactionType') === 'light');
+        const nearbyLights = nearbyObjects.filter(target => target?.getConfig?.('interaction.type') === 'light');
         const nearbyActiveLights = nearbyLights.filter(target => target?.isEnabled?.());
         const nearbyMusicSources = nearbyObjects.filter(target => target?.isMusicSource?.());
         const nearbyActiveMusicSources = nearbyMusicSources.filter(target => target?.isActiveMusicSource?.());
@@ -1130,7 +1130,7 @@ class MyteAI {
 
     canInspectTarget(target) {
         return target?.getConfig?.('canInspect', true) !== false &&
-            target?.getConfig?.('interactionType') !== 'teleport' &&
+            target?.getConfig?.('interaction.type') !== 'teleport' &&
             target?.type?.toUpperCase?.() !== 'PORTAL';
     }
 
@@ -1138,7 +1138,7 @@ class MyteAI {
         return targets.find(target =>
             target &&
             target.element &&
-            target.getConfig?.('interactionType') !== 'teleport'
+            target.getConfig?.('interaction.type') !== 'teleport'
         ) ?? null;
     }
 

@@ -140,12 +140,7 @@ const SiteConfig = Object.freeze({
     // Inventory hand-feeding uses inventory.itemTypes below.
 
     food: Object.freeze({
-        energyRestore: 20,
-        moodBoost: 8,
-        healthRestore: 3,
-        // How long the Nourished buff lasts after eating world food (ms).
-        // Eating another food item replaces the timer. Better food should declare
-        // a higher saturationMs in its object config to override this default.
+        effects: Object.freeze({ energy: 20, fun: 8, health: 3, hunger: 0 }),
         saturationMs: 90000,
     }),
 

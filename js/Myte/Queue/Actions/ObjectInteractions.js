@@ -173,7 +173,7 @@ class InteractObjectAction extends GoToObjectAction {
             return false;
         }
 
-        const interactionType = selected.getConfig?.('interactionType');
+        const interactionType = selected.getConfig?.('interaction.type');
         if (interactionType === 'teleport') {
             return !!selected.hasTransitionDestination?.() &&
                 selected.active !== false &&
@@ -229,14 +229,15 @@ class InteractObjectAction extends GoToObjectAction {
             this.target?.interact?.(this.myte);
         }
 
-        const interactionType = this.target?.getConfig?.('interactionType');
+        const interactionType = this.target?.getConfig?.('interaction.type');
         if (interactionType === 'dance') {
             this.myte.queue.addDance(90);
         } else if (interactionType === 'light') {
             this.myte.queue.addIdle(Math.max(300, this.postActionIdleDuration || 0));
         } else if (interactionType === 'social') {
-            const socialBoost  = this.target?.getConfig?.('socialBoost',  20) ?? 20;
-            const comfortBoost = this.target?.getConfig?.('comfortBoost',  0) ?? 0;
+            const effects = this.target?.getConfig?.('effects', {}) ?? {};
+            const socialBoost  = effects.social  ?? 20;
+            const comfortBoost = effects.comfort ?? 0;
             this.myte.stats?.updateSocial?.(socialBoost);
             if (comfortBoost > 0) this.myte.stats?.updateComfort?.(comfortBoost);
             this.myte.queue.addExpression('heart', 400, 1);
@@ -484,13 +485,7 @@ class SurfaceSlotAction extends GoToObjectAction {
     }
 
     getSurfaceStatEffects() {
-        const actionConfig = this.getTargetActionConfig();
-        return actionConfig.effects ?? {
-            energyRestore: this.energyRestore,
-            healthRestore: this.healthRestore,
-            comfortBoost: this.comfortBoost,
-            moodBoost: this.moodBoost
-        };
+        return this.getTargetActionConfig().effects ?? {};
     }
 
     getConfiguredSlots() {
@@ -985,7 +980,7 @@ class EatElementAction extends GoToObjectAction {
             return false;
         }
 
-        const interactionType = selected.getConfig?.('interactionType');
+        const interactionType = selected.getConfig?.('interaction.type');
         return (selected.type?.toUpperCase?.() === 'FOOD' ||
             selected.getConfig?.('consumable', false) === true ||
             interactionType === 'consume') &&
@@ -999,15 +994,8 @@ class EatElementAction extends GoToObjectAction {
         }
 
         // Apply nutritional benefits when the eating animation finishes
-        const energyRestore = this.target.getConfig?.('energyRestore', SiteConfig.food.energyRestore) ?? SiteConfig.food.energyRestore;
-        const moodBoost     = this.target.getConfig?.('moodBoost',     SiteConfig.food.moodBoost)     ?? SiteConfig.food.moodBoost;
-        const healthRestore = this.target.getConfig?.('healthRestore', SiteConfig.food.healthRestore) ?? SiteConfig.food.healthRestore;
         this.myte.stats.applyStatEffects(
-            this.target.getConfig?.('effects', null) ?? {
-                energyRestore,
-                moodBoost,
-                healthRestore
-            }
+            this.target.getConfig?.('effects', null) ?? SiteConfig.food.effects
         );
         const saturationMs = this.target.getConfig?.('saturationMs') ?? SiteConfig.food.saturationMs;
         this.myte.buffs?.applyBuff?.('nourished', { durationMs: saturationMs, source: 'eat_element' });

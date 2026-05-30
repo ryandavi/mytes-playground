@@ -24,9 +24,9 @@ class FenceMapObject extends MapObject {
         super(parent, type, variant, posX, posY, config, options);
         this.health = 100;
         this._degradationAccumulator = 0;
-        this._degradationEnabled = this.getConfig('degradationEnabled', false);
-        // degradationTime: ms of game time to go from 100 → 0 health
-        this._degradationTime = this.getConfig('degradationTime', 7200000);
+        const degradation = this.getConfig('degradation', {});
+        this._degradationEnabled = degradation.enabled ?? false;
+        this._degradationTime = degradation.durationMs ?? 7200000;
         this._fallen = false;
     }
 

@@ -25,7 +25,7 @@ class LightMapObject extends BinaryStateAnimatedMapObject {
             return;
         }
 
-        const radius = this.getConfig('moodAuraRadius', this.getConfig('moodBoostRadius', 160));
+        const radius = this.getConfig('aura', {}).radius ?? 160;
         mytes.forEach(myte => {
             if (!myte?.isActive) {
                 this.syncAuraBuff(myte, false);
@@ -99,9 +99,10 @@ class MusicBoxMapObject extends RangeInteractiveAnimatedMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         this.isPlayingState = options.initialState ?? this.getConfig('defaultPlaying', false);
-        this.moodBoostRadius = this.getConfig('moodBoostRadius', 180);
-        this.moodBoostAmount = this.getConfig('moodBoostAmount', 0.15);
-        this.boostCooldown = this.getConfig('boostCooldown', 1200);
+        const aura = this.getConfig('aura', {});
+        this.moodBoostRadius = aura.radius ?? 180;
+        this.moodBoostAmount = aura.moodBoost ?? 0.15;
+        this.boostCooldown = aura.tickInterval ?? 1200;
         this.lastBoostTimes = new Map();
         this._proximityAccumulator = 0;
         this._proximityInterval = 500;

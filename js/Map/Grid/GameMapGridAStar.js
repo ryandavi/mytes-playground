@@ -606,7 +606,7 @@ class AStarPathfinder {
             obj &&
             obj !== entityToExclude &&
             obj.config &&
-            !obj.config.walkable
+            !obj.config.physics?.walkable
         );
     }
 
@@ -830,7 +830,7 @@ class AStarPathfinder {
             for (const objFromGrid of potentialColliders) {
                 // Should only be actual objects now, not synthetic tiles
                 if (debug) {
-                    Utility.logDebug(`    Checking detailed collision against obj ID ${objFromGrid.id || 'N/A'} (isTile: ${!!objFromGrid.isTileCollider}, walkable: ${objFromGrid.config?.walkable})`);
+                    Utility.logDebug(`    Checking detailed collision against obj ID ${objFromGrid.id || 'N/A'} (isTile: ${!!objFromGrid.isTileCollider}, walkable: ${objFromGrid.config?.physics?.walkable})`);
                 }
                 if (this._isOpenableObstacle(objFromGrid, entityCapabilities)) {
                     continue;

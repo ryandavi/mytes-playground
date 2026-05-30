@@ -1000,7 +1000,7 @@
         "implementationClass": "SurfaceSlotAction",
         "options": {
           "bobHeight": 3, "bobSpeed": 0.12,
-          "energyRestore": 18, "healthRestore": 5, "comfortBoost": 14, "moodBoost": 8,
+          "effects": { "energy": 18, "health": 5, "comfort": 14, "fun": 8 },
           "settleDuration": 260, "dismountDuration": 220,
           "entryGap": 10, "exitGap": 16, "exitSearchRadius": 20,
           "returnToEntry": true, "stuckCompletionDistance": 14,

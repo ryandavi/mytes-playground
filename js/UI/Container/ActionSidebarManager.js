@@ -225,7 +225,7 @@ class ActionSidebarManager extends UIComponent {
             return `${selectedObject.isOpen ? 'Close' : 'Open'} Gate`;
         }
 
-        if (selectedObject?.getConfig?.('interactionType') === 'light' && action.id === 'interact_object') {
+        if (selectedObject?.getConfig?.('interaction.type') === 'light' && action.id === 'interact_object') {
             const objectLabel = selectedObject.getDisplayName?.() || selectedObject.type || 'Light';
             const isEnabled = selectedObject.isEnabled?.();
             return `${isEnabled ? 'Turn Off' : 'Turn On'} ${objectLabel}`;

@@ -517,7 +517,7 @@
       "description": "A pleasant scent lingers and softens the mood for a while.",
       "onApply": {
         "funBoost": 3,
-        "comfortBoost": 2
+        "comfort": 2
       },
       "effects": {
         "stats": {
@@ -653,7 +653,7 @@
       "description": "Gentle petting leaves a cozy, content feeling behind.",
       "onApply": {
         "funBoost": 5,
-        "comfortBoost": 3
+        "comfort": 3
       },
       "effects": {
         "stats": {
@@ -675,7 +675,7 @@
       "description": "Too much fussing leaves the myte a little rattled.",
       "onApply": {
         "funBoost": -2,
-        "comfortBoost": -2
+        "comfort": -2
       },
       "effects": {
         "movement": {

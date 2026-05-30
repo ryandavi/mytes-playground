@@ -10,10 +10,10 @@ class FountainMapObject extends BinaryStateAnimatedMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         
-        // Fountain configuration
-        this.moodBoostRadius = this.getConfig('moodBoostRadius', 150);
-        this.moodBoostAmount = this.getConfig('moodBoostAmount', 0.1);
-        this.boostCooldown = this.getConfig('boostCooldown', 1000);
+        const aura = this.getConfig('aura', {});
+        this.moodBoostRadius = aura.radius ?? 150;
+        this.moodBoostAmount = aura.moodBoost ?? 0.1;
+        this.boostCooldown = aura.tickInterval ?? 1000;
 
         // Boost tracking: myte.id → last boost timestamp (performance.now())
         // Only check nearby mytes every 500ms to avoid scanning every tick

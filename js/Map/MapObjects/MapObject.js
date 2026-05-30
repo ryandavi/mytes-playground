@@ -30,7 +30,7 @@ class MapObject {
 
 		this.interactionState = {
 			lastInteractionTime: 0,
-			cooldown: this.getConfig('interactionCooldown', 5000),
+			cooldown: this.getConfig('interaction.cooldown', 5000),
 			activeInteractions: new Set(),
 			interactionTimes: new Map()
 		};
@@ -231,7 +231,7 @@ class MapObject {
 	}
 
 	getDisplayName() {
-		const explicitName = this.getConfig('displayName', null);
+		const explicitName = this.getConfig('label', null);
 		if (typeof explicitName === 'string' && explicitName.trim()) {
 			return explicitName.trim();
 		}
@@ -250,7 +250,7 @@ class MapObject {
 
 	getSidebarStatusRows() {
 		const rows = [];
-		const interactionType = this.getConfig('interactionType');
+		const interactionType = this.getConfig('interaction.type');
 		const deflowered = this.getConfig('deflowered', false) === true;
 
 		if (typeof this.isEnabled === 'function') {
@@ -376,7 +376,7 @@ class MapObject {
 				return this.getConfig('pickupbox', null);
 			case 'collider':
 			default:
-				return this.getConfig('collider', null);
+				return this.getConfig('physics.collider', null);
 		}
 	}
 
@@ -495,8 +495,13 @@ class MapObject {
 		if (!dirConfig) return config;
 
 		if (dirConfig.size) config.size = dirConfig.size;
-		if (dirConfig.collider) config.collider = dirConfig.collider;
 		if (dirConfig.interactionRegion) config.interactionRegion = dirConfig.interactionRegion;
+		if (dirConfig.physics) {
+			config.physics = MapObjectFactory.deepMerge({}, config.physics || {}, dirConfig.physics);
+		}
+		if (dirConfig.interaction) {
+			config.interaction = MapObjectFactory.deepMerge({}, config.interaction || {}, dirConfig.interaction);
+		}
 		if (dirConfig.spatial) {
 			config.spatial = MapObjectFactory.deepMerge({}, config.spatial || {}, dirConfig.spatial);
 		}
@@ -508,7 +513,7 @@ class MapObject {
 		config.transformStyle = dirConfig.transformStyle || '';
 
 		for (const key in dirConfig) {
-			if (!['size', 'collider', 'interactionRegion', 'transformStyle', 'spatial', 'visual'].includes(key)) {
+			if (!['size', 'interactionRegion', 'transformStyle', 'physics', 'interaction', 'spatial', 'visual'].includes(key)) {
 				config[key] = dirConfig[key];
 			}
 		}
@@ -540,7 +545,7 @@ class MapObject {
 	// ── Collision ─────────────────────────────────────────────────────────────
 
 	initializeCollider() {
-		if (this.config.collider) return this.config.collider;
+		if (this.config.physics?.collider) return this.config.physics.collider;
 		return {
 			type: 'box',
 			width: this.size.width * 0.8,
@@ -565,7 +570,7 @@ class MapObject {
 	// ── Interaction ───────────────────────────────────────────────────────────
 
 	getInteractionRadius(defaultValue = 100) {
-		return this.getConfig('interactionRadius', defaultValue);
+		return this.getConfig('interaction.radius', defaultValue);
 	}
 
 	// Mark this plant/flower as deflowered (no flower to pick until regrowth).
@@ -592,7 +597,7 @@ class MapObject {
 				? { actionId: entry }
 				: { ...entry }
 		);
-		const interactionType = this.getConfig('interactionType');
+		const interactionType = this.getConfig('interaction.type');
 
 		if (this.isReadyToHarvest?.()) {
 			affordances.push({ actionId: 'harvest', purpose: 'harvest', chain: true });
@@ -645,7 +650,7 @@ class MapObject {
 
 	canBeInspectedByAi() {
 		return this.getConfig('canInspect', true) !== false &&
-			this.getConfig('interactionType') !== 'teleport' &&
+			this.getConfig('interaction.type') !== 'teleport' &&
 			this.type?.toUpperCase?.() !== 'PORTAL';
 	}
 
@@ -1049,18 +1054,18 @@ class MapObject {
 	}
 
 	resolveDepthOffset() {
-		const explicitDepthLine = this.getFiniteConfigNumber('depthLine', null);
+		const explicitDepthLine = this.getFiniteConfigNumber('visual.depthLine', null);
 		if (Number.isFinite(explicitDepthLine)) {
 			return explicitDepthLine;
 		}
 
-		const explicitDepthOffset = this.getFiniteConfigNumber('depthOffset', null);
+		const explicitDepthOffset = this.getFiniteConfigNumber('visual.depthOffset', null);
 		if (Number.isFinite(explicitDepthOffset)) {
 			return explicitDepthOffset;
 		}
 
 		const colliderBottom = (this.collider?.offsetY ?? 0) + (this.collider?.height ?? 0);
-		if (this.getConfig('collision', false) && colliderBottom > 0) {
+		if (this.getConfig('physics.collision', false) && colliderBottom > 0) {
 			return colliderBottom;
 		}
 
@@ -1073,12 +1078,12 @@ class MapObject {
 	}
 
 	getDepthPriority() {
-		const explicitPriority = this.getFiniteConfigNumber('depthPriority', null);
+		const explicitPriority = this.getFiniteConfigNumber('visual.depthPriority', null);
 		if (Number.isFinite(explicitPriority)) {
 			return explicitPriority;
 		}
 
-		return this.getFiniteConfigNumber('renderPriority', 0);
+		return this.getFiniteConfigNumber('visual.renderPriority', 0);
 	}
 
 	updateCarriedState() {
@@ -1119,7 +1124,7 @@ class MapObject {
 	}
 
 	getRenderLayerKey() {
-		return this.getConfig('renderLayer', 'objects');
+		return this.getConfig('visual.renderLayer', 'objects');
 	}
 
 	getActiveRenderLayerKey() {
@@ -1200,7 +1205,7 @@ class MapObject {
 			if (cell) {
 				for (const obj of cell.objects) {
 					if (obj === this || obj === other) continue;
-					if (obj.getConfig?.('blocksLineOfSight', false)) return false;
+					if (obj.getConfig?.('physics.blocksLineOfSight', false)) return false;
 				}
 			}
 			const e2 = 2 * err;
@@ -1219,7 +1224,7 @@ class MapObject {
 	}
 
 	canInteract(myte) {
-		if (!this.getConfig('interactionType')) return false;
+		if (!this.getConfig('interaction.type')) return false;
 		if (this.interactionState.activeInteractions.has(myte.id)) return false;
 		const timeSinceLastInteraction = performance.now() - this.interactionState.lastInteractionTime;
 		if (timeSinceLastInteraction < this.interactionState.cooldown) return false;
@@ -1234,7 +1239,7 @@ class MapObject {
 		this.interactionState.activeInteractions.add(myte.id);
 		this.interactionState.interactionTimes.set(myte.id, now);
 
-		const interactionType = this.getConfig('interactionType');
+		const interactionType = this.getConfig('interaction.type');
 		switch (interactionType) {
 			case 'mood_boost':
 				myte.buffs?.applyBuff?.(
@@ -1447,7 +1452,7 @@ class MapObject {
 	initializeInputComponents() {
 		if (!this.element || !this.parent) return;
 
-		if (this.getConfig('interactive', true) || this.canShowSelectPointer()) this.initClickComponent();
+		if (this.getConfig('interaction.interactive', true) || this.canShowSelectPointer()) this.initClickComponent();
 		if (this.getConfig('draggable', false)) this.initDragComponent();
 		if (this.getConfig('rubbable', false)) this.initRubbingComponent();
 
@@ -1630,7 +1635,7 @@ class MapObject {
 	canShowSelectPointer() {
 		return this.getConfig('canInspect', true) !== false ||
 			this.getConfig('canPickUp', false) ||
-			this.getConfig('interactionType') != null ||
+			this.getConfig('interaction.type') != null ||
 			this.getMajorActionPreferenceIds().length > 0;
 	}
 
@@ -1829,17 +1834,19 @@ class MapObject {
 		if (dirConfig.visual) {
 			this.config.visual = MapObjectFactory.deepMerge({}, this.config.visual || {}, dirConfig.visual);
 		}
-		if (dirConfig.collider) {
-			this.collider = dirConfig.collider;
-		} else {
-			const colliderRegion = this.getRegionConfig('collider');
-			if (colliderRegion) {
-				this.collider = {
-					...colliderRegion,
-					offsetX: colliderRegion.x ?? colliderRegion.offsetX ?? 0,
-					offsetY: colliderRegion.y ?? colliderRegion.offsetY ?? 0
-				};
-			}
+		if (dirConfig.physics) {
+			this.config.physics = MapObjectFactory.deepMerge({}, this.config.physics || {}, dirConfig.physics);
+		}
+		if (dirConfig.interaction) {
+			this.config.interaction = MapObjectFactory.deepMerge({}, this.config.interaction || {}, dirConfig.interaction);
+		}
+		const colliderRegion = this.getRegionConfig('collider');
+		if (colliderRegion) {
+			this.collider = {
+				...colliderRegion,
+				offsetX: colliderRegion.x ?? colliderRegion.offsetX ?? 0,
+				offsetY: colliderRegion.y ?? colliderRegion.offsetY ?? 0
+			};
 		}
 		this.config.interactionRegion = dirConfig.interactionRegion || null;
 
@@ -1987,7 +1994,7 @@ class MapObject {
 		const gridSystem = this.gameMap?.gridSystem;
 		if (!gridSystem) return true;
 
-		const thisOverlappable = this.getConfig('overlappable', false);
+		const thisOverlappable = this.getConfig('visual.overlappable', false);
 		const bounds = this.getDropValidationBounds(x, y);
 		const startGridX = Math.floor(bounds.x / gridSystem.config.cellSize);
 		const startGridY = Math.floor(bounds.y / gridSystem.config.cellSize);
@@ -2007,7 +2014,7 @@ class MapObject {
 				// Object-level block — skip if this object is overlappable (e.g. rug)
 				if (!thisOverlappable) {
 					const hasBlocker = [...cell.objects].some(
-						obj => obj !== this && !obj.getConfig('overlappable', false)
+						obj => obj !== this && !obj.getConfig('visual.overlappable', false)
 					);
 					if (hasBlocker) return false;
 				}
