@@ -1631,8 +1631,22 @@
         {
           "actionId": "nudge_ball",
           "purpose": "play"
+        },
+        {
+          "actionId": "play_fetch",
+          "purpose": "play"
         }
-      ]
+      ],
+      "noveltyProfile": {
+        "cooldownMultiplier": 0.4,
+        "cooldownMin": 8000,
+        "recencyFloor": 0.35,
+        "familiarityRate": 0.04,
+        "familiarityCap": 0.18,
+        "noveltyBase": 0.68,
+        "noveltyRange": 0.32,
+        "noveltyFloor": 0.28
+      }
     },
     "visual": {
       "renderType": "sprite",

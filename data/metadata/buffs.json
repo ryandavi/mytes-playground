@@ -400,7 +400,7 @@
       "cancellable": true,
       "icon": "🔋",
       "description": "A full recharge creates a short spark of momentum.",
-      "instantEffects": {
+      "onApply": {
         "funBoost": 2
       },
       "effects": {
@@ -428,7 +428,7 @@
       "cancellable": true,
       "icon": "🤩",
       "description": "Finding something exciting leaves a lasting rush.",
-      "instantEffects": {
+      "onApply": {
         "funBoost": 6,
         "confidenceBoost": 4
       },
@@ -458,7 +458,7 @@
       "cancellable": true,
       "icon": "🌾",
       "description": "Gathering something grown leaves a warm, satisfied glow.",
-      "instantEffects": {
+      "onApply": {
         "funBoost": 4,
         "confidenceBoost": 3
       },
@@ -487,7 +487,7 @@
       "cancellable": true,
       "icon": "💧",
       "description": "A fresh drink leaves a light boost and a clearer head.",
-      "instantEffects": {
+      "onApply": {
         "funBoost": 3
       },
       "effects": {
@@ -515,7 +515,7 @@
       "cancellable": true,
       "icon": "🌸",
       "description": "A pleasant scent lingers and softens the mood for a while.",
-      "instantEffects": {
+      "onApply": {
         "funBoost": 3,
         "comfortBoost": 2
       },
@@ -564,7 +564,7 @@
       "cancellable": true,
       "icon": "😤",
       "description": "Being woken up mid-rest leaves a sour feeling.",
-      "instantEffects": {
+      "onApply": {
         "funBoost": -3
       },
       "effects": {
@@ -584,7 +584,7 @@
       "cancellable": true,
       "icon": "✨",
       "description": "A pleasant interaction leaves a small afterglow.",
-      "instantEffects": {
+      "onApply": {
         "funBoost": 5
       },
       "effects": {
@@ -604,7 +604,7 @@
       "cancellable": true,
       "icon": "💡",
       "description": "A fresh bit of light makes the world feel better.",
-      "instantEffects": {
+      "onApply": {
         "funBoost": 5
       },
       "effects": {
@@ -628,7 +628,7 @@
       "cancellable": true,
       "icon": "🎵",
       "description": "Starting the music lifts the mood right away.",
-      "instantEffects": {
+      "onApply": {
         "funBoost": 4
       },
       "effects": {
@@ -651,7 +651,7 @@
       "cancellable": true,
       "icon": "🐾",
       "description": "Gentle petting leaves a cozy, content feeling behind.",
-      "instantEffects": {
+      "onApply": {
         "funBoost": 5,
         "comfortBoost": 3
       },
@@ -673,7 +673,7 @@
       "cancellable": true,
       "icon": "🤯",
       "description": "Too much fussing leaves the myte a little rattled.",
-      "instantEffects": {
+      "onApply": {
         "funBoost": -2,
         "comfortBoost": -2
       },

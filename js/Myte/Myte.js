@@ -15,7 +15,7 @@ class Myte {
 			'snail'
 		);
 		this.definition = definition || MyteDefinitionRegistry.getSpeciesSync(this.species);
-		this.name = element.dataset.myteName || this.definition.displayName || `Myte ${id}`;
+		this.name = element.dataset.myteName || this.definition.label || `Myte ${id}`;
 
 		// --- DOM elements ---
 		this.elements = {

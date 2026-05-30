@@ -14,7 +14,7 @@ class BuffRegistry {
         if (this.preloaded) return true;
         if (this.preloadPromise) return this.preloadPromise;
 
-        this.preloadPromise = fetch('data/metadata/buffs.json')
+        this.preloadPromise = fetch(`data/metadata/buffs.json?v=${Date.now()}`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Failed to load buff metadata: ${response.status} ${response.statusText}`);
@@ -71,7 +71,7 @@ class BuffRegistry {
             tooltip: definition.tooltip || '',
             hidden: definition.hidden === true,
             effects: this.cloneValue(definition.effects || {}),
-            instantEffects: this.cloneValue(definition.instantEffects || {}),
+            onApply: this.cloneValue(definition.onApply || {}),
             triggers: this.cloneValue(definition.triggers || {})
         };
     }

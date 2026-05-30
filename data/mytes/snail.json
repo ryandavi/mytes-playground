@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "snail",
-  "displayName": "Snail",
+  "label": "Snail",
   "size": {
     "width": 192,
     "height": 192

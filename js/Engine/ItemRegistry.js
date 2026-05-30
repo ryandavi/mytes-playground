@@ -17,7 +17,7 @@ class ItemRegistry {
         if (this.preloaded) return true;
         if (this.preloadPromise) return this.preloadPromise;
 
-        this.preloadPromise = fetch('data/metadata/items.json')
+        this.preloadPromise = fetch(`data/metadata/items.json?v=${Date.now()}`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Failed to load item metadata: ${response.status} ${response.statusText}`);
@@ -82,8 +82,8 @@ class ItemRegistry {
             aliases: Array.isArray(item.aliases)
                 ? item.aliases.map(alias => this.normalizeId(alias)).filter(Boolean)
                 : [],
-            displayName: item.displayName || id,
-            name: item.displayName || id,
+            label: item.label || id,
+            name: item.label || id,
             type: String(item.type || 'item').toLowerCase(),
             description: item.description || '',
             droppable: item.capabilities?.droppable === true,

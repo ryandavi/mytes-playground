@@ -78,11 +78,11 @@ class MyteBuffController {
     }
 
     applyInstantEffects(definition) {
-        if (!definition?.instantEffects || !this.myte?.stats?.applyStatEffects) {
+        if (!definition?.onApply || !this.myte?.stats?.applyStatEffects) {
             return;
         }
 
-        this.myte.stats.applyStatEffects(definition.instantEffects);
+        this.myte.stats.applyStatEffects(definition.onApply);
     }
 
     applyBuff(buffIdOrDefinition, options = {}) {

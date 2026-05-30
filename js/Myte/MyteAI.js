@@ -360,19 +360,20 @@ class MyteAI {
 
         const label = 'eat:eat_element';
         const targetKey = this.getTargetKey(foodTarget);
+        const aiValues = this._getActionAiValues('eat_element');
 
         return {
             label,
             targetKey,
-            commitmentMs: 1800,
+            commitmentMs: aiValues.commitmentMs,
             score: this.applyRepeatPenalty(score, label, targetKey),
             execute: () => {
                 this.enqueueTargetedAction('eat_element', foodTarget, {}, {
                     label,
-                    category: 'rest',
+                    category: aiValues.category,
                     novelty: this.getNoveltyScore(foodTarget),
-                    soothing: 0.6,
-                    accomplishment: 0.4
+                    soothing: aiValues.soothing,
+                    accomplishment: aiValues.accomplishment
                 });
             }
         };
@@ -420,6 +421,7 @@ class MyteAI {
             : (context.energy < 0.18 || context.health < 0.4 ? 'sleep' : context.energy < 0.44 ? 'simple_sleep' : 'idle');
         const label = nearbySurface ? 'rest:surface' : `rest:${actionId}`;
         const targetKey = nearbySurface ? this.getTargetKey(nearbySurface) : null;
+        const aiValues = this._getActionAiValues(actionId);
 
         return {
             label,
@@ -430,10 +432,10 @@ class MyteAI {
                 if (nearbySurface && actionId === 'use_surface_slot') {
                     this.enqueueTargetedAction('use_surface_slot', nearbySurface, {}, {
                         label,
-                        category: 'rest',
+                        category: aiValues.category,
                         novelty: Math.max(0.2, this.getNoveltyScore(nearbySurface) * 0.4),
-                        soothing: 1,
-                        accomplishment: 0.2
+                        soothing: aiValues.soothing,
+                        accomplishment: aiValues.accomplishment
                     });
                     return;
                 }
@@ -442,10 +444,10 @@ class MyteAI {
                     duration: actionId === 'sleep' ? 220 : 160
                 }, {
                     label,
-                    category: 'rest',
+                    category: aiValues.category,
                     novelty: 0.15,
-                    soothing: 0.85,
-                    accomplishment: 0.1
+                    soothing: aiValues.soothing,
+                    accomplishment: aiValues.accomplishment
                 });
             }
         };
@@ -509,20 +511,21 @@ class MyteAI {
             ? 'play_tag'
             : (context.drives.comfortDrive > 0.42 || context.sociability > 0.62 ? 'show_affection' : 'greet');
         const label = `social:${actionId}`;
+        const aiValues = this._getActionAiValues(actionId);
 
         return {
             label,
             targetKey: this.getTargetKey(target),
-            commitmentMs: actionId === 'play_tag' ? 2600 : 1800,
+            commitmentMs: aiValues.commitmentMs,
             score: this.applyRepeatPenalty(score, label, this.getTargetKey(target)),
             execute: () => {
                 this.enqueueTargetedAction(actionId, target, {}, {
                     label,
-                    category: 'social',
+                    category: aiValues.category,
                     novelty: Math.max(0.2, this.getNoveltyScore(target) * 0.45),
                     social: 1,
-                    accomplishment: actionId === 'play_tag' ? 0.65 : 0.45,
-                    exertion: actionId === 'play_tag' ? 0.5 : 0.1
+                    accomplishment: aiValues.accomplishment,
+                    exertion: aiValues.exertion
                 });
             }
         };
@@ -531,37 +534,32 @@ class MyteAI {
     buildPlayCandidate(context) {
         const energyFloor = 0.22;
 
-        // Detect any nearby play object without hardcoding object types — any object
-        // whose affordances belong to the 'play' behavior category qualifies.
-        // This covers current toys (balls) and any future ones automatically.
-        const targetPlayObj = context.nearbyObjects.find(obj =>
-            this.getAffordancesForTarget(obj, context).some(a =>
-                this.getBehaviorCategoryForAction(a.actionId) === 'play'
-            )
-        ) ?? null;
-        const hasPlayObject = targetPlayObj !== null;
+        // Find any nearby object with play-category affordances — no hardcoded object types
+        let targetPlayObj = null;
+        let bestAffordance = null;
+        for (const obj of context.nearbyObjects) {
+            const playAffordances = this.getAffordancesForTarget(obj, context)
+                .filter(a => this._getActionAiValues(a.actionId, a).category === 'play');
+            if (playAffordances.length === 0) continue;
+            targetPlayObj = obj;
+            bestAffordance = this._selectAffordanceByExertion(playAffordances, context);
+            break;
+        }
 
-        // Lower the entry threshold when a dedicated play object is nearby
+        const hasPlayObject = targetPlayObj !== null;
         const playNeedFloor = hasPlayObject ? 0.28 : 0.4;
         if (context.energy < energyFloor || context.drives.playDrive < playNeedFloor) {
             return null;
         }
 
-        // Still look specifically for nudge_ball/play_fetch targets for action selection
-        const targetBall = this.findTargetWithAffordance(context.nearbyObjects, 'nudge_ball', context);
-        const targetAnchor = targetPlayObj ?? this.getPlayAnchorTarget(context.nearbyObjects);
         const playMomentum = Utility.clamp(
-            (context.drives.playDrive * 0.5) +
-            (context.activity * 0.28) +
-            (context.energy * 0.22),
-            0,
-            1
+            (context.drives.playDrive * 0.5) + (context.activity * 0.28) + (context.energy * 0.22),
+            0, 1
         );
-        let score = 10 + (context.drives.playDrive * 54) + (context.drives.playDrive * 10);
+        let score = 10 + (context.drives.playDrive * 64);
         score += context.activity * 12;
         score -= context.drives.restDrive * 18;
 
-        // When fun is low and a play object is nearby, press harder to stay engaged
         const funPressure = hasPlayObject && context.fun < 0.45 ? (0.45 - context.fun) / 0.45 : 0;
         score += funPressure * 22;
 
@@ -569,16 +567,29 @@ class MyteAI {
             return null;
         }
 
-        const actionId = targetBall
-            ? (context.activity > 0.72 && context.drives.playDrive > 0.5 && context.energy > 0.58 ? 'play_fetch' : 'nudge_ball')
-            : (targetAnchor && context.activity > 0.68
-                ? 'run_laps'
-                : (context.activity > 0.74 ? 'zigzag' : 'circle'));
-        const targetKey = targetBall ? this.getTargetKey(targetBall) : (targetAnchor ? this.getTargetKey(targetAnchor) : null);
+        let actionId, target, targetKey;
+        if (bestAffordance && targetPlayObj) {
+            actionId = bestAffordance.actionId;
+            target = targetPlayObj;
+            targetKey = this.getTargetKey(targetPlayObj);
+        } else {
+            const targetAnchor = this.getPlayAnchorTarget(context.nearbyObjects);
+            if (targetAnchor && context.activity > 0.68) {
+                actionId = 'run_laps';
+                target = targetAnchor;
+                targetKey = this.getTargetKey(targetAnchor);
+            } else if (context.activity > 0.74) {
+                actionId = 'zigzag';
+                target = null;
+                targetKey = null;
+            } else {
+                actionId = 'circle';
+                target = null;
+                targetKey = null;
+            }
+        }
 
-        // Softer repeat penalties when playing with a specific object so the session
-        // isn't cut short — applies to any play object, not just balls
-        const repeatPenaltyOptions = targetPlayObj
+        const repeatPenaltyOptions = hasPlayObject
             ? {
                 labelMultiplier: 0.94,
                 targetMultiplier: 0.96,
@@ -588,100 +599,87 @@ class MyteAI {
             }
             : null;
 
-        // Same-target persistence: if the myte just played with this exact toy and fun is
-        // still unmet, boost the score so they stay with it rather than wandering off
         const continuingWithSameToy = targetKey &&
             this.lastDecisionTargetKey === targetKey &&
             this.lastDecisionLabel?.startsWith('play:') &&
             context.fun < 0.45;
         if (continuingWithSameToy) score += 30;
 
+        const label = `play:${actionId}`;
+        const aiValues = this._getActionAiValues(actionId, bestAffordance);
+
         return {
-            label: `play:${actionId}`,
+            label,
             targetKey,
-            commitmentMs: actionId === 'play_fetch' ? 3200 : 2200,
-            score: this.applyRepeatPenalty(score, `play:${actionId}`, targetKey, repeatPenaltyOptions),
+            commitmentMs: aiValues.commitmentMs,
+            score: this.applyRepeatPenalty(score, label, targetKey, repeatPenaltyOptions),
             execute: () => {
                 if (Math.random() < 0.3) {
                     this.myte.queue.addExpression('excited', 35, 1);
                 }
-
                 if (Math.random() < 0.16 && context.energy > 0.7) {
                     this.myte.queue.addJump();
                 }
-
-                if (actionId === 'nudge_ball' && targetBall) {
-                    const baseRepeats = playMomentum > 0.9 ? 3 : (playMomentum > 0.72 ? 2 : 1);
-                    this.enqueueTargetedAction('nudge_ball', targetBall, {
-                        repeat: funPressure > 0.4 ? Math.min(baseRepeats + 1, 4) : baseRepeats,
-                        postNudgeIdleDuration: 18 + Math.round(context.activity * 16)
-                    }, {
-                        label: 'play:nudge_ball',
-                        category: 'play',
-                        novelty: this.getNoveltyScore(targetBall),
-                        accomplishment: 0.5,
-                        exertion: 0.55
-                    });
-                    return;
-                }
-
-                if (actionId === 'play_fetch' && targetBall) {
-                    this.enqueueTargetedAction('play_fetch', targetBall, {
-                        roundTrips: Math.max(1, Math.min(4, 1 + Math.round((playMomentum * 2.4) + (context.drives.playDrive * 0.8)))),
-                        throwStrength: 8 + Math.round(context.activity * 6)
-                    }, {
-                        label: 'play:play_fetch',
-                        category: 'play',
-                        novelty: this.getNoveltyScore(targetBall),
-                        accomplishment: 0.65,
-                        exertion: 0.78
-                    });
-                    return;
-                }
-
-                if (actionId === 'run_laps' && targetAnchor) {
-                    this.enqueueTargetedAction('run_laps', targetAnchor, {
-                        repeat: context.activity > 0.8 ? 4 : 3
-                    }, {
-                        label: 'play:run_laps',
-                        category: 'play',
-                        novelty: targetAnchor ? this.getNoveltyScore(targetAnchor) * 0.7 : 0.35,
-                        accomplishment: 0.45,
-                        exertion: 0.65
-                    });
-                    return;
-                }
-
-                if (actionId === 'zigzag') {
-                    const angle = Math.random() * Math.PI * 2;
-                    this.enqueueAction('zigzag', {
-                        direction: { x: Math.cos(angle), y: Math.sin(angle) },
-                        amplitude: 36 + Math.round(context.activity * 48),
-                        duration: 90 + Math.round(context.activity * 90)
-                    }, {
-                        label: 'play:zigzag',
-                        category: 'play',
-                        novelty: 0.4,
-                        accomplishment: 0.35,
-                        exertion: 0.7
-                    });
-                    return;
-                }
-
-                this.enqueueAction('circle', {
-                    centerX: this.myte.posX,
-                    centerY: this.myte.posY,
-                    radius: 32 + Math.round(context.activity * 28),
-                    duration: 90 + Math.round(context.drives.playDrive * 90)
-                }, {
-                    label: 'play:circle',
-                    category: 'play',
-                    novelty: 0.3,
-                    accomplishment: 0.25,
-                    exertion: 0.5
-                });
+                this._executePlayAction(actionId, target, bestAffordance, context, playMomentum, funPressure);
             }
         };
+    }
+
+    _executePlayAction(actionId, target, affordance, context, playMomentum, funPressure) {
+        const aiValues = this._getActionAiValues(actionId, affordance);
+        const memory = {
+            label: `play:${actionId}`,
+            category: 'play',
+            novelty: target ? this.getNoveltyScore(target) : 0.35,
+            accomplishment: aiValues.accomplishment,
+            exertion: aiValues.exertion
+        };
+
+        if (actionId === 'nudge_ball' && target) {
+            const baseRepeats = playMomentum > 0.9 ? 3 : (playMomentum > 0.72 ? 2 : 1);
+            this.enqueueTargetedAction('nudge_ball', target, {
+                repeat: funPressure > 0.4 ? Math.min(baseRepeats + 1, 4) : baseRepeats,
+                postNudgeIdleDuration: 18 + Math.round(context.activity * 16)
+            }, memory);
+            return;
+        }
+
+        if (actionId === 'play_fetch' && target) {
+            this.enqueueTargetedAction('play_fetch', target, {
+                roundTrips: Math.max(1, Math.min(4, 1 + Math.round((playMomentum * 2.4) + (context.drives.playDrive * 0.8)))),
+                throwStrength: 8 + Math.round(context.activity * 6)
+            }, memory);
+            return;
+        }
+
+        if (actionId === 'run_laps' && target) {
+            this.enqueueTargetedAction('run_laps', target, {
+                repeat: context.activity > 0.8 ? 4 : 3
+            }, memory);
+            return;
+        }
+
+        if (target) {
+            this.enqueueTargetedAction(actionId, target, {}, memory);
+            return;
+        }
+
+        if (actionId === 'zigzag') {
+            const angle = Math.random() * Math.PI * 2;
+            this.enqueueAction('zigzag', {
+                direction: { x: Math.cos(angle), y: Math.sin(angle) },
+                amplitude: 36 + Math.round(context.activity * 48),
+                duration: 90 + Math.round(context.activity * 90)
+            }, memory);
+            return;
+        }
+
+        this.enqueueAction('circle', {
+            centerX: this.myte.posX,
+            centerY: this.myte.posY,
+            radius: 32 + Math.round(context.activity * 28),
+            duration: 90 + Math.round(context.drives.playDrive * 90)
+        }, memory);
     }
 
     buildInteractionCandidate(context) {
@@ -725,13 +723,14 @@ class MyteAI {
                 best.execute = () => {
                     originalExecute();
                     for (const chainTarget of chainTargets) {
+                        const chainAiValues = this._getActionAiValues(chainActionId);
                         this.enqueueTargetedAction(chainActionId, chainTarget, { suppressPostEffects: true }, {
                             label: best.label,
-                            category: this.getBehaviorCategoryForAction(chainActionId),
+                            category: chainAiValues.category,
                             novelty: this.getNoveltyScore(chainTarget),
-                            soothing: this.getSoothingValueForAction(chainActionId),
-                            accomplishment: this.getAccomplishmentValueForAction(chainActionId),
-                            exertion: this.getExertionValueForAction(chainActionId)
+                            soothing: chainAiValues.soothing,
+                            accomplishment: chainAiValues.accomplishment,
+                            exertion: chainAiValues.exertion
                         });
                     }
                 };
@@ -749,57 +748,19 @@ class MyteAI {
 
         const distance = this.myte.getDistanceTo?.(target) ?? Infinity;
         const novelty = this.getNoveltyScore(target);
-        const interactionType = target.getConfig?.('interactionType');
         const affordancePurpose = affordance.purpose ?? null;
         let score = 6 + Math.max(0, 140 - distance) * 0.12;
 
-        switch (affordance.actionId) {
-            case 'use_surface_slot':
-                score += (context.drives.restDrive * 32) + (context.drives.comfortDrive * 24) + (context.preferences.coziness * 12);
-                score -= context.drives.playDrive * 6;
-                break;
-            case 'inspect':
-                score += (context.drives.exploreDrive * 24) + (novelty * 18) + (context.curiosity * 10);
-                score -= context.drives.restDrive * 9;
-                break;
-            case 'deep_inspect':
-                score += (novelty * 24) + (context.curiosity * 18) + (context.drives.playDrive * 14);
-                score -= context.drives.restDrive * 12;
-                break;
-            case 'smell_flower':
-            case 'drink_fountain':
-                score += (context.drives.comfortDrive * 28) + (context.drives.comfortDrive * 22) + (context.curiosity * 8);
-                break;
-            case 'open_chest':
-                score += (context.drives.exploreDrive * 24) + (context.curiosity * 18) + (context.confidence * 10);
-                break;
-            case 'water_plant':
-                score += (context.drives.exploreDrive * 18) + (context.curiosity * 12) + (context.confidence * 10);
-                break;
-            case 'harvest':
-                score += (context.drives.exploreDrive * 20) + (context.curiosity * 16) + (context.confidence * 12) + (context.preferences.harvest * 18);
-                break;
-            case 'eat_element':
-                score += (context.drives.eatDrive * 34) + (context.drives.comfortDrive * 8);
-                break;
-            case 'interact_object':
-                if (affordancePurpose === 'start_music') {
-                    score += (context.musicNeed * 42) + (context.preferences.music * 20) + (context.drives.playDrive * 10);
-                } else if (affordancePurpose === 'light_on') {
-                    score += (context.lightNeed * 46) + (context.preferences.light * 16) + (context.drives.comfortDrive * 12);
-                } else if (affordancePurpose === 'socialize') {
-                    score += (context.drives.socialDrive * 48) + (context.preferences.sociability * 16) + (context.drives.comfortDrive * 8);
-                } else if (interactionType === 'dance') {
-                    score += (context.drives.playDrive * 26) + (context.activity * 14) + (context.drives.playDrive * 10);
-                } else if (interactionType === 'light') {
-                    score += (context.drives.comfortDrive * 22) + (context.drives.comfortDrive * 14);
-                } else {
-                    score += (context.curiosity * 14) + (context.confidence * 10);
-                }
-                break;
-            default:
-                score += (context.drives.exploreDrive * 16) + (novelty * 10);
-                break;
+        const aiValues = this._getActionAiValues(affordance.actionId, affordance);
+        const drivers = aiValues.scoreDrivers ?? [
+            { context: 'drives.exploreDrive', weight: 16 },
+            { context: 'novelty', weight: 10 }
+        ];
+        for (const driver of drivers) {
+            const val = driver.context === 'novelty'
+                ? novelty
+                : this._resolveContextPath(driver.context, context);
+            score += val * driver.weight;
         }
 
         if (this.mode === MOVE_AUTONOMY_TYPES.INTERACT) {
@@ -818,22 +779,16 @@ class MyteAI {
             label,
             targetKey,
             affordance,
-            commitmentMs: affordance.actionId === 'inspect'
-                ? 1400
-                : affordance.actionId === 'deep_inspect'
-                    ? 1900
-                    : affordance.actionId === 'nudge_ball'
-                        ? 1800
-                        : 1200,
+            commitmentMs: actionDef?.ai?.commitmentMs ?? 1200,
             score,
             execute: () => {
                 this.enqueueTargetedAction(affordance.actionId, target, {}, {
                     label,
-                    category: this.getBehaviorCategoryForAction(affordance.actionId, interactionType, affordance),
+                    category: aiValues.category,
                     novelty,
-                    soothing: this.getSoothingValueForAction(affordance.actionId, interactionType, affordance),
-                    accomplishment: this.getAccomplishmentValueForAction(affordance.actionId, affordance),
-                    exertion: this.getExertionValueForAction(affordance.actionId, affordance)
+                    soothing: aiValues.soothing,
+                    accomplishment: aiValues.accomplishment,
+                    exertion: aiValues.exertion
                 });
             }
         };
@@ -852,8 +807,9 @@ class MyteAI {
             const age = SimClock.now() - (item.droppedAt ?? 0);
             if (age < 30000) score += 22 * (1 - age / 30000);
 
-            if (item.type?.toUpperCase() === 'FOOD' && context.energy < 0.7) {
-                score += (1 - context.energy) * 48;
+            const isEdible = item.getConfig?.('isEdible') ?? (item.type?.toLowerCase() === 'food');
+            if (isEdible && context.drives.eatDrive > 0.2) {
+                score += context.drives.eatDrive * 48;
             }
 
             score = this.applyRepeatPenalty(score, `dropped_item:${item.type}`, `item:${item.id ?? item.variant ?? item.type}`);
@@ -1325,108 +1281,84 @@ class MyteAI {
 
     getNoveltyScore(target) {
         const targetKey = this.getTargetKey(target);
-        if (!targetKey) {
-            return 0.4;
-        }
+        if (!targetKey) return 0.4;
 
         const memory = this.objectMemories.get(targetKey);
-        if (!memory) {
-            return 1;
-        }
+        if (!memory) return 1;
 
-        const isBallTarget = String(target?.type || '').toUpperCase() === 'BALL';
-        const cooldownDuration = isBallTarget
-            ? Math.max(8000, this.targetCooldownDuration * 0.4)
-            : this.targetCooldownDuration;
+        const profile = target?.getConfig?.('ai.noveltyProfile') ?? {};
+        const cooldownMin = profile.cooldownMin ?? 0;
+        const cooldownMultiplier = profile.cooldownMultiplier ?? 1;
+        const cooldownDuration = Math.max(cooldownMin, this.targetCooldownDuration * cooldownMultiplier);
         const elapsed = SimClock.now() - (memory.lastCompletedAt ?? 0);
-        const recencyFloor = isBallTarget ? 0.35 : 0.1;
+        const recencyFloor = profile.recencyFloor ?? 0.1;
         const recency = elapsed >= cooldownDuration
             ? 1
             : Utility.clamp(elapsed / cooldownDuration, recencyFloor, 1);
-        const familiarityPenalty = isBallTarget
-            ? Math.min(memory.completedCount * 0.04, 0.18)
-            : Math.min(memory.completedCount * 0.08, 0.34);
-        const noveltyBase = isBallTarget ? 0.68 : 0.55;
-        const noveltyRange = isBallTarget ? 0.32 : 0.45;
-        const noveltyFloor = isBallTarget ? 0.28 : 0.12;
+        const familiarityPenalty = Math.min(
+            memory.completedCount * (profile.familiarityRate ?? 0.08),
+            profile.familiarityCap ?? 0.34
+        );
+        const noveltyBase  = profile.noveltyBase  ?? 0.55;
+        const noveltyRange = profile.noveltyRange ?? 0.45;
+        const noveltyFloor = profile.noveltyFloor ?? 0.12;
 
         return Utility.clamp(noveltyBase + (recency * noveltyRange) - familiarityPenalty, noveltyFloor, 1);
     }
 
-    getBehaviorCategoryForAction(actionId, interactionType = null, affordance = null) {
-        if (actionId === 'play_fetch') return 'play';
-        if (actionId === 'use_surface_slot') return 'rest';
-        if (actionId === 'nudge_ball') return 'play';
-        if (actionId === 'inspect' || actionId === 'deep_inspect' || actionId === 'open_chest' || actionId === 'harvest' || actionId === 'water_plant') {
-            return 'world';
-        }
-        if (actionId === 'smell_flower' || actionId === 'drink_fountain') return 'rest';
-        if (actionId === 'interact_object' && affordance?.purpose === 'start_music') return 'play';
-        if (actionId === 'interact_object' && affordance?.purpose === 'light_on') return 'rest';
-        if (actionId === 'interact_object' && affordance?.purpose === 'socialize') return 'social';
-        if (actionId === 'interact_object' && interactionType === 'dance') return 'play';
-        if (actionId === 'interact_object' && interactionType === 'social') return 'social';
-        if (actionId === 'interact_object' && interactionType === 'light') return 'rest';
-        if (actionId === 'eat_element') return 'rest';
-        return 'world';
+    _getActionAiValues(actionId, affordance = null) {
+        const def = ActionDefinitionRegistry.getDefinitionSync(actionId);
+        const defAi = def?.ai ?? {};
+        const overrideAi = def?.purposeOverrides?.[affordance?.purpose]?.ai ?? {};
+        return {
+            category:       overrideAi.category       ?? defAi.category       ?? 'world',
+            soothing:       overrideAi.soothing        ?? defAi.soothing        ?? 0.1,
+            exertion:       overrideAi.exertion        ?? defAi.exertion        ?? 0.1,
+            accomplishment: overrideAi.accomplishment  ?? defAi.accomplishment  ?? 0.1,
+            commitmentMs:   defAi.commitmentMs ?? 1200,
+            scoreDrivers:   overrideAi.scoreDrivers ?? defAi.scoreDrivers ?? null
+        };
     }
 
-    getSoothingValueForAction(actionId, interactionType = null, affordance = null) {
-        if (actionId === 'use_surface_slot') return 1;
-        if (actionId === 'smell_flower' || actionId === 'drink_fountain') return 0.85;
-        if (actionId === 'eat_element') return 0.55;
-        if (actionId === 'interact_object' && affordance?.purpose === 'start_music') return 0.45;
-        if (actionId === 'interact_object' && affordance?.purpose === 'light_on') return 0.6;
-        if (actionId === 'interact_object' && affordance?.purpose === 'socialize') return 0.55;
-        if (actionId === 'interact_object' && interactionType === 'social') return 0.55;
-        if (actionId === 'interact_object' && interactionType === 'light') return 0.55;
-        return 0.1;
+    _resolveContextPath(path, ctx) {
+        const parts = path.split('.');
+        let value = ctx;
+        for (const part of parts) {
+            if (value == null || typeof value !== 'object') return 0;
+            value = value[part];
+        }
+        return typeof value === 'number' ? value : 0;
+    }
+
+    _selectAffordanceByExertion(affordances, context) {
+        if (affordances.length === 1) return affordances[0];
+        const targetExertion = context.activity * 0.7 + context.energy * 0.3;
+        let best = affordances[0];
+        let bestDiff = Math.abs(this._getActionAiValues(best.actionId, best).exertion - targetExertion);
+        for (const affordance of affordances) {
+            const diff = Math.abs(this._getActionAiValues(affordance.actionId, affordance).exertion - targetExertion);
+            if (diff < bestDiff) {
+                best = affordance;
+                bestDiff = diff;
+            }
+        }
+        return best;
+    }
+
+    getBehaviorCategoryForAction(actionId, _interactionType = null, affordance = null) {
+        return this._getActionAiValues(actionId, affordance).category;
+    }
+
+    getSoothingValueForAction(actionId, _interactionType = null, affordance = null) {
+        return this._getActionAiValues(actionId, affordance).soothing;
     }
 
     getAccomplishmentValueForAction(actionId, affordance = null) {
-        switch (actionId) {
-            case 'open_chest':
-            case 'harvest':
-                return 0.7;
-            case 'water_plant':
-            case 'nudge_ball':
-                return 0.45;
-            case 'play_fetch':
-                return 0.6;
-            case 'use_surface_slot':
-                return 0.25;
-            case 'inspect':
-            case 'deep_inspect':
-                return 0.2;
-            case 'interact_object':
-                if (affordance?.purpose === 'start_music') return 0.55;
-                if (affordance?.purpose === 'light_on') return 0.42;
-                return 0.35;
-            default:
-                return 0.35;
-        }
+        return this._getActionAiValues(actionId, affordance).accomplishment;
     }
 
     getExertionValueForAction(actionId, affordance = null) {
-        switch (actionId) {
-            case 'use_surface_slot':
-                return 0;
-            case 'nudge_ball':
-                return 0.55;
-            case 'play_fetch':
-                return 0.78;
-            case 'harvest':
-            case 'water_plant':
-                return 0.25;
-            case 'deep_inspect':
-                return 0.18;
-            case 'interact_object':
-                if (affordance?.purpose === 'start_music') return 0.18;
-                if (affordance?.purpose === 'light_on') return 0.08;
-                return 0.1;
-            default:
-                return 0.1;
-        }
+        return this._getActionAiValues(actionId, affordance).exertion;
     }
 
     getHomePosition() {

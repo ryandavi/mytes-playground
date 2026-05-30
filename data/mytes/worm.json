@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "worm",
-  "displayName": "Worm",
+  "label": "Worm",
   "movement": {
     "baseSpeed": 0.85,
     "followRadius": {

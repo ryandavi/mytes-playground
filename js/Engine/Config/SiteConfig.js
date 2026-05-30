@@ -120,7 +120,6 @@ const SiteConfig = Object.freeze({
                 ballBump: Object.freeze({
                     id: 'ball_bump',
                     category: 'play',
-                    affectsMood: true,
                     fun: 16,
                     energy: -10,
                     rewardScale: 0.42

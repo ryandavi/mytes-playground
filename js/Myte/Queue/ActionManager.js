@@ -139,7 +139,7 @@ class ActionManager {
 
     static getMoodAffectingActions() {
         return Array.from(this.actions.entries())
-            .filter(([id, ActionClass]) => this.getMetadata(id, ActionClass)?.affectsMood)
+            .filter(([id, ActionClass]) => (this.getMetadata(id, ActionClass)?.effects?.mood ?? 0) !== 0)
             .map(([, ActionClass]) => ActionClass);
     }
 

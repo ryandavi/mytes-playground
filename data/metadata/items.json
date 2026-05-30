@@ -12,7 +12,7 @@
   "items": [
     {
       "id": "acorn",
-      "displayName": "Acorn",
+      "label":"Acorn",
       "type": "food",
       "capabilities": {
         "droppable": true
@@ -27,7 +27,7 @@
     },
     {
       "id": "turnip",
-      "displayName": "Turnip",
+      "label":"Turnip",
       "type": "food",
       "capabilities": {
         "droppable": true
@@ -45,7 +45,7 @@
     },
     {
       "id": "apple",
-      "displayName": "Apple",
+      "label":"Apple",
       "type": "food",
       "capabilities": {
         "droppable": true
@@ -63,7 +63,7 @@
     },
     {
       "id": "cherries",
-      "displayName": "Cherries",
+      "label":"Cherries",
       "type": "food",
       "capabilities": {
         "droppable": true
@@ -78,7 +78,7 @@
     },
     {
       "id": "music_box",
-      "displayName": "Music Box",
+      "label":"Music Box",
       "type": "toy",
       "capabilities": {
         "droppable": false
@@ -93,7 +93,7 @@
     },
     {
       "id": "tomato",
-      "displayName": "Tomato",
+      "label":"Tomato",
       "type": "food",
       "capabilities": {
         "droppable": true
@@ -108,7 +108,7 @@
     },
     {
       "id": "carrot",
-      "displayName": "Carrot",
+      "label":"Carrot",
       "type": "food",
       "capabilities": {
         "droppable": true
@@ -123,7 +123,7 @@
     },
     {
       "id": "wheat",
-      "displayName": "Wheat",
+      "label":"Wheat",
       "type": "food",
       "capabilities": {
         "droppable": true
@@ -138,7 +138,7 @@
     },
     {
       "id": "berry",
-      "displayName": "Berry",
+      "label":"Berry",
       "type": "food",
       "capabilities": {
         "droppable": true
@@ -153,7 +153,7 @@
     },
     {
       "id": "flower_1",
-      "displayName": "Wildflower",
+      "label":"Wildflower",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -172,7 +172,7 @@
     },
     {
       "id": "flower_2",
-      "displayName": "Wildflower",
+      "label":"Wildflower",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -190,7 +190,7 @@
     },
     {
       "id": "flower_3",
-      "displayName": "Wildflower",
+      "label":"Wildflower",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -208,7 +208,7 @@
     },
     {
       "id": "flower_red",
-      "displayName": "Red Flower",
+      "label":"Red Flower",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -226,7 +226,7 @@
     },
     {
       "id": "flower_yellow",
-      "displayName": "Yellow Flower",
+      "label":"Yellow Flower",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -244,7 +244,7 @@
     },
     {
       "id": "flower_blue",
-      "displayName": "Blue Flower",
+      "label":"Blue Flower",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -262,7 +262,7 @@
     },
     {
       "id": "rose",
-      "displayName": "Rose",
+      "label":"Rose",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -277,7 +277,7 @@
     },
     {
       "id": "tulip",
-      "displayName": "Tulip",
+      "label":"Tulip",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -292,7 +292,7 @@
     },
     {
       "id": "lily",
-      "displayName": "Lily",
+      "label":"Lily",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -307,7 +307,7 @@
     },
     {
       "id": "orchid",
-      "displayName": "Orchid",
+      "label":"Orchid",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -322,7 +322,7 @@
     },
     {
       "id": "blue_moon",
-      "displayName": "Blue Moon",
+      "label":"Blue Moon",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -337,7 +337,7 @@
     },
     {
       "id": "evening_star",
-      "displayName": "Evening Star",
+      "label":"Evening Star",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -352,7 +352,7 @@
     },
     {
       "id": "night_whisper",
-      "displayName": "Night Whisper",
+      "label":"Night Whisper",
       "type": "flower",
       "capabilities": {
         "droppable": true
@@ -367,7 +367,7 @@
     },
     {
       "id": "coin",
-      "displayName": "Coin",
+      "label":"Coin",
       "type": "currency",
       "capabilities": {
         "droppable": false
@@ -382,7 +382,7 @@
     },
     {
       "id": "health_orb",
-      "displayName": "Health Orb",
+      "label":"Health Orb",
       "type": "health",
       "capabilities": {
         "droppable": false

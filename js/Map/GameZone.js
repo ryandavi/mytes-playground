@@ -111,7 +111,7 @@ class Zone {
         }
 
         const strength = this.properties.strength ?? 1;
-        const instantEffects = this.properties.effects ?? (
+        const onApply = this.properties.effects ?? (
             this.properties.moodBoost != null
                 ? { moodBoost: this.properties.moodBoost * strength }
                 : {}
@@ -137,7 +137,7 @@ class Zone {
                     confidencePerMs: this.properties.confidencePerMs ?? stayConfig.confidencePerMs ?? 0
                 }
             },
-            instantEffects
+            onApply
         };
     }
 
@@ -267,8 +267,8 @@ class Zone {
 
     onMyteStay(myte, deltaTime) {
         const zoneDef = this._getZoneDef();
-        if (!zoneDef?.needEffectsPerMs) return;
-        myte.stats?.applyStatEffectsPerMs?.(zoneDef.needEffectsPerMs, deltaTime);
+        if (!zoneDef?.effects) return;
+        myte.stats?.applyStatEffectsPerMs?.(zoneDef.effects, deltaTime);
     }
 
 }
@@ -280,7 +280,7 @@ class ZoneManager {
         this.zones = new Map();
 
         if (!Zone._definitions.size) {
-            fetch('data/metadata/zones.json')
+            fetch(`data/metadata/zones.json?v=${Date.now()}`)
                 .then(r => r.json())
                 .then(data => Zone.loadDefinitions(data.zones ?? []))
                 .catch(err => console.error('[ZoneManager] Failed to load zone definitions:', err));

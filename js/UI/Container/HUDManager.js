@@ -47,8 +47,9 @@ class HUDManager extends UIComponent {
         const energy = `${this.getEnergyLabel(energyRatio)} ${Math.round(energyRatio * 100)}%`;
         const currentAction = activeMyte.queue.getCurrentAction();
         const actionMetadata = currentAction?.constructor?.metadata;
-        const moodEffectText = actionMetadata?.affectsMood
-            ? `Mood ${actionMetadata.moodEffect > 0 ? '+' : ''}${actionMetadata.moodEffect}`
+        const moodVal = actionMetadata?.effects?.mood ?? 0;
+        const moodEffectText = moodVal !== 0
+            ? `Mood ${moodVal > 0 ? '+' : ''}${moodVal}`
             : null;
 
         if (this.lastRenderedState.myteId !== activeMyte.id || this.lastRenderedState.name !== activeMyte.name) {

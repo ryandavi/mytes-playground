@@ -35,8 +35,8 @@ class MyteDefinitionRegistry {
 
     static async loadDefinitions() {
         const [baseResponse, speciesCatalogResponse] = await Promise.all([
-            fetch('data/mytes/myte.json'),
-            fetch('data/mytes/species.json')
+            fetch(`data/mytes/myte.json?v=${Date.now()}`),
+            fetch(`data/mytes/species.json?v=${Date.now()}`)
         ]);
 
         if (!baseResponse.ok) {

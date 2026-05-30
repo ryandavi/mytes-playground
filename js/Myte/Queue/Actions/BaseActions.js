@@ -42,9 +42,7 @@ class MyteAction {
         isInterruptible: false,
         defaultDuration: 0,
         description: null,
-        requiresTarget: false,
-        affectsMood: false,
-        moodEffect: 0
+        requiresTarget: false
     };
 
     constructor(myte, options = {}) {
@@ -92,7 +90,7 @@ class MyteAction {
             energyDelta:   base.energy  ?? 0,
             hungerDelta:   base.hunger  ?? 0,
             novelty:       def?.novelty      ?? 0,
-            soothingValue: def?.soothingValue ?? 0,
+            soothing:      def?.soothing      ?? 0,
             exertion:      def?.exertion     ?? 0,
             accomplishment: 0,
             scary:         false,
@@ -181,8 +179,7 @@ class PositionableAction extends MyteAction {
         isInterruptible: true,
         defaultDuration: 0,
         description: 'Base class for position-based actions',
-        requiresTarget: true,
-        affectsMood: false
+        requiresTarget: true
     };
 
     constructor(myte, options) {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "myte",
-  "displayName": "Myte",
+  "label": "Myte",
   "movement": {
     "baseSpeed": 1,
     "followRadius": {

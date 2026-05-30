@@ -1,1209 +1,1181 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "actions": [
     {
       "id": "astar-move",
       "label": "A* Move To",
       "icon": "🏃",
-      "category": "movement",
-      "priority": 1,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Move to a location using A* pathfinding",
-      "requiresTarget": true,
-      "defaultOptions": {
-        "target": null,
-        "pathfindingOptions": {},
-        "currentTargetIndex": 0
-      },
-      "implementationClass": "AStarMoveAction",
+      "category": "movement",
       "tags": ["purposeful_movement"],
-      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
-      "exertion": 1, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 1,
+        "requiresTarget": true,
+        "implementationClass": "AStarMoveAction",
+        "options": { "target": null, "pathfindingOptions": {}, "currentTargetIndex": 0 }
+      },
+      "traits": { "exertion": 1, "repeatMode": "free" },
+      "effects": { "energy": -1 }
     },
     {
       "id": "being_carried",
       "label": "Being Carried",
       "icon": "🪁",
-      "category": "carry",
-      "priority": 1,
-      "isMovementAction": false,
-      "isInterruptible": false,
-      "defaultDuration": -1,
       "description": "Being carried by another Myte",
-      "requiresTarget": false,
-      "affectsMood": true,
-      "moodEffect": 1,
-      "implementationClass": "BeingCarriedAction",
+      "category": "carry",
       "tags": ["social", "comfort_giving"],
-      "effects": { "fun": 0, "social": 3, "comfort": 3, "energy": 0, "hunger": 0 },
-      "exertion": 0, "novelty": 2, "risk": 0, "soothingValue": 3, "repeatMode": "free"
+      "queue": {
+        "priority": 1,
+        "isMovementAction": false,
+        "isInterruptible": false,
+        "defaultDuration": -1,
+        "implementationClass": "BeingCarriedAction"
+      },
+      "traits": { "novelty": 2, "soothing": 3, "repeatMode": "free" },
+      "effects": { "social": 3, "comfort": 3, "mood": 1 },
+      "ai": { "category": "social", "soothing": 0.3, "exertion": 0, "accomplishment": 0.2 }
     },
     {
       "id": "carry",
       "label": "Carry",
       "icon": "🫂",
-      "category": "carry",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": -1,
       "description": "Carry another Myte around",
-      "requiresTarget": true,
-      "affectsMood": false,
-      "implementationClass": "CarryAction",
+      "category": "carry",
       "tags": ["social"],
-      "effects": { "fun": 0, "social": 0, "comfort": -2, "energy": 0, "hunger": 0 },
-      "exertion": 0, "novelty": 1, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 2,
+        "defaultDuration": -1,
+        "requiresTarget": true,
+        "implementationClass": "CarryAction"
+      },
+      "traits": { "novelty": 1, "repeatMode": "free" },
+      "effects": { "comfort": -2 },
+      "ai": { "category": "social", "exertion": 0.2, "accomplishment": 0.2 }
     },
     {
       "id": "carry_pickup",
       "label": "Pick Up",
       "icon": "🤲",
-      "category": "carry",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": false,
-      "defaultDuration": 100,
       "description": "Pick up another Myte",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 2,
-      "implementationClass": "CarryPickupAction",
+      "category": "carry",
       "tags": ["social"],
-      "effects": { "fun": 0, "social": 0, "comfort": -1, "energy": 0, "hunger": 0 },
-      "exertion": 0, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 2,
+        "isInterruptible": false,
+        "defaultDuration": 100,
+        "requiresTarget": true,
+        "implementationClass": "CarryPickupAction"
+      },
+      "traits": { "novelty": 2, "repeatMode": "free" },
+      "effects": { "comfort": -1, "mood": 2 },
+      "ai": { "category": "social", "accomplishment": 0.15 }
     },
     {
       "id": "carry_putdown",
       "label": "Put Down",
       "icon": "📍",
-      "category": "carry",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": false,
-      "defaultDuration": 100,
       "description": "Put down a carried Myte",
-      "requiresTarget": true,
-      "affectsMood": false,
-      "implementationClass": "CarryPutdownAction",
+      "category": "carry",
       "tags": ["social"],
-      "effects": { "fun": 0, "social": 0, "comfort": 1, "energy": 0, "hunger": 0 },
-      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 1, "repeatMode": "free"
+      "queue": {
+        "priority": 2,
+        "isInterruptible": false,
+        "defaultDuration": 100,
+        "requiresTarget": true,
+        "implementationClass": "CarryPutdownAction"
+      },
+      "traits": { "soothing": 1, "repeatMode": "free" },
+      "effects": { "comfort": 1 },
+      "ai": { "category": "social", "exertion": 0.05, "accomplishment": 0.15 }
     },
     {
       "id": "chase",
       "label": "Chase",
       "icon": "🏃",
-      "category": "social",
-      "priority": 4,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 5000,
       "description": "Chase another Myte",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 6,
-      "defaultOptions": {
-        "catchDistance": 30
-      },
-      "implementationClass": "ChaseAction",
+      "category": "social",
       "tags": ["playful", "social"],
-      "effects": { "fun": 8, "social": 3, "comfort": 0, "energy": -4, "hunger": 0 },
-      "exertion": 4, "novelty": 3, "risk": 1, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 4,
+        "defaultDuration": 5000,
+        "requiresTarget": true,
+        "implementationClass": "ChaseAction",
+        "options": { "catchDistance": 30 }
+      },
+      "traits": { "exertion": 4, "novelty": 3, "risk": 1 },
+      "effects": { "fun": 8, "social": 3, "energy": -4, "mood": 6 },
+      "ai": { "category": "play", "exertion": 0.6, "accomplishment": 0.4 }
     },
     {
       "id": "circle",
       "label": "Circle",
       "icon": "🔄",
-      "category": "movement",
-      "priority": 3,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
-      "energyCostMultiplier": 1.85,
       "description": "Move in a circular pattern",
-      "requiresTarget": false,
-      "affectsMood": true,
-      "moodEffect": 3,
-      "defaultOptions": {
-        "radius": 50,
-        "numPoints": 8,
-        "repeat": 2,
-        "clockwise": true,
-        "centerX": null,
-        "centerY": null,
-        "safeTargetRadius": 12,
-        "stuckThresholdFrames": 42,
-        "maxPatternRecoveries": 4
-      },
-      "implementationClass": "CircleAction",
+      "category": "movement",
       "tags": ["playful"],
-      "effects": { "fun": 6, "social": 0, "comfort": 0, "energy": -3, "hunger": 0 },
-      "exertion": 3, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 3,
+        "energyCostMultiplier": 1.85,
+        "implementationClass": "CircleAction",
+        "options": {
+          "radius": 50, "numPoints": 8, "repeat": 2, "clockwise": true,
+          "centerX": null, "centerY": null,
+          "safeTargetRadius": 12, "stuckThresholdFrames": 42, "maxPatternRecoveries": 4
+        }
+      },
+      "traits": { "exertion": 3, "novelty": 2 },
+      "effects": { "fun": 6, "energy": -3, "mood": 3 },
+      "ai": { "category": "play", "exertion": 0.5, "accomplishment": 0.25 }
     },
     {
       "id": "close_chest",
       "label": "Close Chest",
       "icon": "🔒",
-      "category": "interactions",
-      "priority": 3,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Approach and close a treasure chest",
-      "requiresTarget": true,
-      "affectsMood": false,
-      "defaultOptions": {
-        "closeAnimationDuration": 28,
-        "postActionIdleDuration": 400
-      },
-      "implementationClass": "CloseChestAction",
+      "category": "interactions",
       "tags": ["stimulating"],
-      "effects": { "fun": 2, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
-      "exertion": 0, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 3,
+        "requiresTarget": true,
+        "implementationClass": "CloseChestAction",
+        "options": { "closeAnimationDuration": 28, "postActionIdleDuration": 400 }
+      },
+      "traits": { "novelty": 2, "repeatMode": "free" },
+      "effects": { "fun": 2, "energy": -1 },
+      "ai": { "accomplishment": 0.2 }
     },
     {
       "id": "dance",
       "label": "Dance",
       "icon": "💃",
-      "category": "state",
-      "priority": 3,
-      "isMovementAction": true,
-      "isInterruptible": false,
-      "defaultDuration": 2000,
-      "energyCostMultiplier": 1.65,
       "description": "Perform a happy dance",
-      "requiresTarget": false,
-      "affectsMood": true,
-      "moodEffect": 10,
-      "defaultOptions": {
-        "stepDuration": 250
-      },
-      "implementationClass": "DanceAction",
+      "category": "state",
       "tags": ["playful", "creative"],
-      "effects": { "fun": 8, "social": 2, "comfort": 0, "energy": -3, "hunger": 0 },
-      "exertion": 3, "novelty": 3, "risk": 0, "soothingValue": 1, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 3,
+        "isInterruptible": false,
+        "defaultDuration": 2000,
+        "energyCostMultiplier": 1.65,
+        "implementationClass": "DanceAction",
+        "options": { "stepDuration": 250 }
+      },
+      "traits": { "exertion": 3, "novelty": 3, "soothing": 1 },
+      "effects": { "fun": 8, "social": 2, "energy": -3, "mood": 10 },
+      "ai": { "category": "play", "soothing": 0.2, "exertion": 0.4, "accomplishment": 0.45 }
     },
     {
       "id": "deep_inspect",
       "label": "Inspect Oddly",
       "icon": "🔬",
-      "category": "interactions",
-      "priority": 3,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 150,
       "description": "Investigate an object from several odd angles",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 3,
-      "defaultOptions": {
-        "pointDuration": 24,
-        "numPoints": 3,
-        "expressionType": "surprise",
-        "expressionDuration": 30
-      },
-      "implementationClass": "DeepInspectAction",
+      "category": "interactions",
       "tags": ["stimulating", "risky"],
-      "effects": { "fun": 6, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
-      "exertion": 1, "novelty": 8, "risk": 2, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 3,
+        "defaultDuration": 150,
+        "requiresTarget": true,
+        "implementationClass": "DeepInspectAction",
+        "options": { "pointDuration": 24, "numPoints": 3, "expressionType": "surprise", "expressionDuration": 30 }
+      },
+      "traits": { "exertion": 1, "novelty": 8, "risk": 2 },
+      "effects": { "fun": 6, "energy": -2, "mood": 3 },
+      "ai": {
+        "exertion": 0.18, "accomplishment": 0.2, "commitmentMs": 1900,
+        "scoreDrivers": [
+          { "context": "novelty", "weight": 24 },
+          { "context": "curiosity", "weight": 18 },
+          { "context": "drives.playDrive", "weight": 14 },
+          { "context": "drives.restDrive", "weight": -12 }
+        ]
+      }
     },
     {
       "id": "drink_fountain",
       "label": "Drink",
       "icon": "💧",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Drink from a fountain",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 5,
-      "defaultOptions": {},
-      "implementationClass": "DrinkFromFountainAction",
+      "category": "interactions",
       "tags": ["soothing", "food"],
-      "effects": { "fun": 3, "social": 0, "comfort": 2, "energy": 3, "hunger": 5 },
-      "exertion": 0, "novelty": 2, "risk": 0, "soothingValue": 4, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "requiresTarget": true,
+        "implementationClass": "DrinkFromFountainAction"
+      },
+      "traits": { "novelty": 2, "soothing": 4 },
+      "effects": { "fun": 3, "comfort": 2, "energy": 3, "hunger": 5, "mood": 5 },
+      "ai": {
+        "category": "rest", "soothing": 0.85, "accomplishment": 0.3,
+        "scoreDrivers": [
+          { "context": "drives.comfortDrive", "weight": 50 },
+          { "context": "curiosity", "weight": 8 }
+        ]
+      }
     },
     {
       "id": "drop_item",
       "label": "Drop Item",
       "icon": "📤",
-      "category": "carry",
-      "priority": 2,
-      "isMovementAction": false,
-      "isInterruptible": false,
-      "defaultDuration": 0,
       "description": "Drop the item currently being carried",
-      "requiresTarget": true,
-      "affectsMood": false,
-      "implementationClass": "DropItemAction",
-      "tags": [],
-      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": 0, "hunger": 0 },
-      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "category": "carry",
+      "queue": {
+        "priority": 2,
+        "isMovementAction": false,
+        "isInterruptible": false,
+        "requiresTarget": true,
+        "implementationClass": "DropItemAction"
+      },
+      "traits": { "repeatMode": "free" },
+      "ai": { "exertion": 0.05 }
     },
     {
       "id": "eat_element",
       "label": "Eat",
       "icon": "🍽️",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": false,
-      "isInterruptible": false,
-      "defaultDuration": 0,
       "description": "Consume an edible object",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 5,
-      "defaultOptions": {
-        "targetPosition": {
-          "vertical": "bottom",
-          "insideHorizontal": false,
-          "insideVertical": true
+      "category": "interactions",
+      "tags": ["food"],
+      "queue": {
+        "priority": 2,
+        "isMovementAction": false,
+        "isInterruptible": false,
+        "requiresTarget": true,
+        "implementationClass": "EatElementAction",
+        "options": {
+          "targetPosition": { "vertical": "bottom", "insideHorizontal": false, "insideVertical": true }
         }
       },
-      "implementationClass": "EatElementAction",
-      "tags": ["food"],
-      "effects": { "fun": 2, "social": 0, "comfort": 0, "energy": 5, "hunger": 20 },
-      "exertion": 0, "novelty": 2, "risk": 0, "soothingValue": 2, "repeatMode": "diminishing"
+      "traits": { "novelty": 2, "soothing": 2 },
+      "effects": { "fun": 2, "energy": 5, "hunger": 20, "mood": 5 },
+      "ai": {
+        "category": "rest", "soothing": 0.55, "accomplishment": 0.3,
+        "scoreDrivers": [
+          { "context": "drives.eatDrive", "weight": 34 },
+          { "context": "drives.comfortDrive", "weight": 8 }
+        ]
+      }
     },
     {
       "id": "emote_at",
       "label": "Emote At",
       "icon": "💬",
-      "category": "social",
-      "priority": 3,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Approach a target and show an expression",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 3,
-      "defaultOptions": {
-        "expressionType": "heart",
-        "expressionDuration": 400,
-        "expressionRepeat": 2
-      },
-      "implementationClass": "EmoteAtAction",
+      "category": "social",
       "tags": ["social", "soothing"],
-      "effects": { "fun": 2, "social": 5, "comfort": 3, "energy": 0, "hunger": 0 },
-      "exertion": 0, "novelty": 2, "risk": 1, "soothingValue": 3, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 3,
+        "requiresTarget": true,
+        "implementationClass": "EmoteAtAction",
+        "options": { "expressionType": "heart", "expressionDuration": 400, "expressionRepeat": 2 }
+      },
+      "traits": { "novelty": 2, "soothing": 3, "risk": 1 },
+      "effects": { "fun": 2, "social": 5, "comfort": 3, "mood": 3 },
+      "ai": { "category": "social", "soothing": 0.3, "exertion": 0.05, "accomplishment": 0.3 }
     },
     {
       "id": "expression",
       "label": "Express",
       "icon": "😊",
-      "category": "state",
-      "priority": 2,
-      "isMovementAction": false,
-      "isInterruptible": false,
-      "defaultDuration": 800,
       "description": "Show an emotion or expression overlay",
-      "requiresTarget": false,
-      "affectsMood": true,
-      "moodEffect": 5,
-      "implementationClass": "ExpressionAction",
-      "tags": [],
-      "effects": { "fun": 2, "social": 0, "comfort": 0, "energy": 0, "hunger": 0 },
-      "exertion": 0, "novelty": 1, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "category": "state",
+      "queue": {
+        "priority": 2,
+        "isMovementAction": false,
+        "isInterruptible": false,
+        "defaultDuration": 800,
+        "implementationClass": "ExpressionAction"
+      },
+      "traits": { "novelty": 1, "repeatMode": "free" },
+      "effects": { "fun": 2, "mood": 5 },
+      "ai": { "category": "social", "soothing": 0.2, "exertion": 0 }
     },
     {
       "id": "follow_mouse",
       "label": "Follow Mouse",
       "icon": "🖱️",
-      "category": "movement",
-      "priority": 1,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": -1,
       "description": "Follow the mouse cursor",
-      "requiresTarget": false,
-      "affectsMood": false,
-      "implementationClass": "FollowMouseAction",
+      "category": "movement",
       "tags": ["purposeful_movement"],
-      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
-      "exertion": 1, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 1,
+        "defaultDuration": -1,
+        "implementationClass": "FollowMouseAction"
+      },
+      "traits": { "exertion": 1, "repeatMode": "free" },
+      "effects": { "energy": -1 },
+      "ai": { "exertion": 0.15 }
     },
     {
       "id": "follow_object",
       "label": "Follow",
       "icon": "🔗",
-      "category": "movement",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": -1,
       "description": "Follow another Myte or creature",
-      "requiresTarget": true,
-      "affectsMood": false,
-      "defaultOptions": {
-        "trailGap": 28,
-        "minFollowDistance": 8,
-        "replanThreshold": 12
-      },
-      "implementationClass": "FollowObjectAction",
+      "category": "movement",
       "tags": ["purposeful_movement", "social"],
-      "effects": { "fun": 0, "social": 1, "comfort": 0, "energy": -2, "hunger": 0 },
-      "exertion": 2, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 2,
+        "defaultDuration": -1,
+        "requiresTarget": true,
+        "implementationClass": "FollowObjectAction",
+        "options": { "trailGap": 28, "minFollowDistance": 8, "replanThreshold": 12 }
+      },
+      "traits": { "exertion": 2, "repeatMode": "free" },
+      "effects": { "social": 1, "energy": -2 },
+      "ai": { "category": "social", "exertion": 0.2, "accomplishment": 0.15 }
     },
     {
       "id": "give_item",
       "label": "Give Item",
       "icon": "🎁",
-      "category": "carry",
-      "priority": 3,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Give the held item to another Myte",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 4,
-      "defaultOptions": {},
-      "implementationClass": "GiveItemAction",
+      "category": "carry",
       "tags": ["social"],
-      "effects": { "fun": 2, "social": 6, "comfort": 0, "energy": -1, "hunger": 0 },
-      "exertion": 0, "novelty": 2, "risk": 0, "soothingValue": 2, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 3,
+        "requiresTarget": true,
+        "implementationClass": "GiveItemAction"
+      },
+      "traits": { "novelty": 2, "soothing": 2 },
+      "effects": { "fun": 2, "social": 6, "energy": -1, "mood": 4 },
+      "ai": { "category": "social", "soothing": 0.2, "accomplishment": 0.5 }
     },
     {
       "id": "go_to_object",
       "label": "Go To",
       "icon": "🏃",
-      "category": "movement",
-      "priority": 1,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Move to a specific object or Myte",
-      "requiresTarget": true,
-      "affectsMood": false,
-      "defaultOptions": {
-        "allowStuckSuccess": false,
-        "stuckCompletionDistance": 18,
-        "finalApproachSkipDistance": 48,
-        "maxFinalAdjustmentDistance": 48
-      },
-      "implementationClass": "GoToObjectAction",
+      "category": "movement",
       "tags": ["purposeful_movement"],
-      "effects": { "fun": -1, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
-      "exertion": 2, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 1,
+        "requiresTarget": true,
+        "implementationClass": "GoToObjectAction",
+        "options": {
+          "allowStuckSuccess": false, "stuckCompletionDistance": 18,
+          "finalApproachSkipDistance": 48, "maxFinalAdjustmentDistance": 48
+        }
+      },
+      "traits": { "exertion": 2, "repeatMode": "free" },
+      "effects": { "fun": -1, "energy": -2 }
     },
     {
       "id": "greet",
       "label": "Greet",
       "icon": "👋",
-      "category": "social",
-      "priority": 3,
-      "isMovementAction": false,
-      "isInterruptible": true,
-      "defaultDuration": 120,
       "description": "Greet another Myte with a wave",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 5,
-      "defaultOptions": {
-        "expressionType": "wave",
-        "expressionDuration": 400,
-        "expressionRepeat": 2
-      },
-      "implementationClass": "GreetAction",
+      "category": "social",
       "tags": ["social"],
-      "effects": { "fun": 2, "social": 6, "comfort": 0, "energy": 0, "hunger": 0 },
-      "exertion": 0, "novelty": 2, "risk": 1, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 3,
+        "isMovementAction": false,
+        "defaultDuration": 120,
+        "requiresTarget": true,
+        "implementationClass": "GreetAction",
+        "options": { "expressionType": "wave", "expressionDuration": 400, "expressionRepeat": 2 }
+      },
+      "traits": { "novelty": 2, "risk": 1 },
+      "effects": { "fun": 2, "social": 6, "mood": 5 },
+      "ai": { "category": "social", "soothing": 0.3, "exertion": 0.05, "accomplishment": 0.3 }
     },
     {
       "id": "greet_receive",
       "label": "Greet (receive)",
       "icon": "👋",
-      "category": "social",
-      "priority": 3,
-      "isMovementAction": false,
-      "isInterruptible": true,
-      "defaultDuration": 120,
       "description": "Respond to a greeting from another Myte",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 5,
-      "defaultOptions": {
-        "expressionType": "wave",
-        "expressionDuration": 400,
-        "expressionRepeat": 2
-      },
-      "implementationClass": "GreetReceiveAction",
+      "category": "social",
       "tags": ["social"],
-      "effects": { "fun": 1, "social": 4, "comfort": 0, "energy": 0, "hunger": 0 },
-      "exertion": 0, "novelty": 1, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 3,
+        "isMovementAction": false,
+        "defaultDuration": 120,
+        "requiresTarget": true,
+        "implementationClass": "GreetReceiveAction",
+        "options": { "expressionType": "wave", "expressionDuration": 400, "expressionRepeat": 2 }
+      },
+      "traits": { "novelty": 1, "repeatMode": "free" },
+      "effects": { "fun": 1, "social": 4, "mood": 5 },
+      "ai": { "category": "social", "soothing": 0.2, "exertion": 0.05, "accomplishment": 0.2 }
     },
     {
       "id": "guard",
       "label": "Guard",
       "icon": "🛡️",
-      "category": "movement",
-      "priority": 3,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": -1,
       "description": "Guard a position, returning if wandered too far",
-      "requiresTarget": false,
-      "affectsMood": false,
-      "defaultOptions": {
-        "returnThreshold": 80,
-        "safeTargetRadius": 14,
-        "stuckThresholdFrames": 40,
-        "failOnUnrecoverableStuck": false
-      },
-      "implementationClass": "GuardAction",
+      "category": "movement",
       "tags": ["purposeful_movement"],
-      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
-      "exertion": 2, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 3,
+        "defaultDuration": -1,
+        "implementationClass": "GuardAction",
+        "options": {
+          "returnThreshold": 80, "safeTargetRadius": 14,
+          "stuckThresholdFrames": 40, "failOnUnrecoverableStuck": false
+        }
+      },
+      "traits": { "exertion": 2, "repeatMode": "free" },
+      "effects": { "energy": -2 },
+      "ai": { "exertion": 0.2, "accomplishment": 0.2 }
     },
     {
       "id": "harvest",
       "label": "Harvest",
       "icon": "🌾",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Harvest a ready crop",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 8,
-      "defaultOptions": {
-        "harvestAnimationDuration": 50,
-        "postActionIdleDuration": 500
-      },
-      "implementationClass": "HarvestAction",
+      "category": "interactions",
       "tags": ["stimulating", "food"],
-      "effects": { "fun": 5, "social": 0, "comfort": 0, "energy": -1, "hunger": 10 },
-      "exertion": 1, "novelty": 3, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "requiresTarget": true,
+        "implementationClass": "HarvestAction",
+        "options": { "harvestAnimationDuration": 50, "postActionIdleDuration": 500 }
+      },
+      "traits": { "exertion": 1, "novelty": 3 },
+      "effects": { "fun": 5, "energy": -1, "hunger": 10, "mood": 8 },
+      "ai": {
+        "exertion": 0.25, "accomplishment": 0.7,
+        "scoreDrivers": [
+          { "context": "drives.exploreDrive", "weight": 20 },
+          { "context": "curiosity", "weight": 16 },
+          { "context": "confidence", "weight": 12 },
+          { "context": "preferences.harvest", "weight": 18 }
+        ]
+      }
     },
     {
       "id": "hide",
       "label": "Hide",
       "icon": "🙈",
-      "category": "reactive",
-      "priority": 4,
-      "isMovementAction": true,
-      "isInterruptible": false,
-      "defaultDuration": 5000,
       "description": "Hide behind an object from something scary",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": -2,
-      "defaultOptions": {
-        "peekInterval": 2000
-      },
-      "implementationClass": "HideAction",
+      "category": "reactive",
       "tags": ["restful", "soothing"],
-      "effects": { "fun": 0, "social": 0, "comfort": 2, "energy": -1, "hunger": 0 },
-      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 2, "repeatMode": "free"
+      "queue": {
+        "priority": 4,
+        "isInterruptible": false,
+        "defaultDuration": 5000,
+        "requiresTarget": true,
+        "implementationClass": "HideAction",
+        "options": { "peekInterval": 2000 }
+      },
+      "traits": { "soothing": 2, "repeatMode": "free" },
+      "effects": { "comfort": 2, "energy": -1, "mood": -2 },
+      "ai": { "category": "rest", "soothing": 0.6, "exertion": 0 }
     },
     {
       "id": "hold_item",
       "label": "Carry Item",
       "icon": "✊",
-      "category": "carry",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": -1,
       "description": "Carry an item",
-      "requiresTarget": true,
-      "affectsMood": false,
-      "implementationClass": "HoldItemAction",
+      "category": "carry",
       "tags": ["purposeful_movement"],
-      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
-      "exertion": 1, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 2,
+        "defaultDuration": -1,
+        "requiresTarget": true,
+        "implementationClass": "HoldItemAction"
+      },
+      "traits": { "exertion": 1, "repeatMode": "free" },
+      "effects": { "energy": -1 }
     },
     {
       "id": "idle",
       "label": "Idle",
       "icon": "💤",
-      "category": "state",
-      "priority": 0,
-      "isMovementAction": false,
-      "isInterruptible": true,
-      "defaultDuration": 3000,
       "description": "Stay in place for a moment",
-      "requiresTarget": false,
-      "affectsMood": false,
-      "implementationClass": "IdleAction",
-      "tags": [],
-      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": 0, "hunger": 0 },
-      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "category": "state",
+      "queue": {
+        "isMovementAction": false,
+        "defaultDuration": 3000,
+        "implementationClass": "IdleAction"
+      },
+      "traits": { "repeatMode": "free" },
+      "ai": { "category": "idle", "soothing": 0.2, "exertion": 0, "accomplishment": 0.05 }
     },
     {
       "id": "inspect",
       "label": "Inspect",
       "icon": "🔍",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 90,
       "description": "Pause beside an object and inspect it naturally",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 2,
-      "defaultOptions": {
-        "expressionType": "curious",
-        "expressionDuration": 40,
-        "lookInterval": 22
-      },
-      "implementationClass": "InspectAction",
+      "category": "interactions",
       "tags": ["stimulating"],
-      "effects": { "fun": 4, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
-      "exertion": 1, "novelty": 6, "risk": 1, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "defaultDuration": 90,
+        "requiresTarget": true,
+        "implementationClass": "InspectAction",
+        "options": { "expressionType": "curious", "expressionDuration": 40, "lookInterval": 22 }
+      },
+      "traits": { "exertion": 1, "novelty": 6, "risk": 1 },
+      "effects": { "fun": 4, "energy": -1, "mood": 2 },
+      "ai": {
+        "accomplishment": 0.2, "commitmentMs": 1400,
+        "scoreDrivers": [
+          { "context": "drives.exploreDrive", "weight": 24 },
+          { "context": "novelty", "weight": 18 },
+          { "context": "curiosity", "weight": 10 },
+          { "context": "drives.restDrive", "weight": -9 }
+        ]
+      }
     },
     {
       "id": "interact_object",
       "label": "Use",
       "icon": "👆",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Approach an object and use its main interaction",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 4,
-      "defaultOptions": {
-        "interactionAnimationDuration": 32,
-        "postActionIdleDuration": 500
-      },
-      "implementationClass": "InteractObjectAction",
+      "category": "interactions",
       "tags": ["stimulating"],
-      "effects": { "fun": 4, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
-      "exertion": 1, "novelty": 4, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "requiresTarget": true,
+        "implementationClass": "InteractObjectAction",
+        "options": { "interactionAnimationDuration": 32, "postActionIdleDuration": 500 }
+      },
+      "traits": { "exertion": 1, "novelty": 4 },
+      "effects": { "fun": 4, "energy": -1, "mood": 4 },
+      "ai": {
+        "accomplishment": 0.35,
+        "scoreDrivers": [
+          { "context": "curiosity", "weight": 14 },
+          { "context": "confidence", "weight": 10 }
+        ]
+      },
+      "purposeOverrides": {
+        "start_music": {
+          "ai": {
+            "category": "play", "soothing": 0.45, "exertion": 0.18, "accomplishment": 0.55,
+            "scoreDrivers": [
+              { "context": "musicNeed", "weight": 42 },
+              { "context": "preferences.music", "weight": 20 },
+              { "context": "drives.playDrive", "weight": 10 }
+            ]
+          }
+        },
+        "light_on": {
+          "ai": {
+            "category": "rest", "soothing": 0.6, "exertion": 0.08, "accomplishment": 0.42,
+            "scoreDrivers": [
+              { "context": "lightNeed", "weight": 46 },
+              { "context": "preferences.light", "weight": 16 },
+              { "context": "drives.comfortDrive", "weight": 12 }
+            ]
+          }
+        },
+        "socialize": {
+          "ai": {
+            "category": "social", "soothing": 0.55, "accomplishment": 0.5,
+            "scoreDrivers": [
+              { "context": "drives.socialDrive", "weight": 48 },
+              { "context": "sociability", "weight": 16 },
+              { "context": "drives.comfortDrive", "weight": 8 }
+            ]
+          }
+        },
+        "toggle": {
+          "ai": {
+            "soothing": 0.2, "accomplishment": 0.35,
+            "scoreDrivers": [
+              { "context": "curiosity", "weight": 14 },
+              { "context": "confidence", "weight": 8 }
+            ]
+          }
+        },
+        "dance": {
+          "ai": {
+            "category": "play", "soothing": 0.2, "exertion": 0.35, "accomplishment": 0.4,
+            "scoreDrivers": [
+              { "context": "drives.playDrive", "weight": 36 },
+              { "context": "activity", "weight": 14 }
+            ]
+          }
+        },
+        "social": {
+          "ai": {
+            "category": "social", "soothing": 0.55, "accomplishment": 0.45,
+            "scoreDrivers": [
+              { "context": "drives.socialDrive", "weight": 48 },
+              { "context": "sociability", "weight": 16 },
+              { "context": "drives.comfortDrive", "weight": 8 }
+            ]
+          }
+        },
+        "light": {
+          "ai": {
+            "category": "rest", "soothing": 0.55, "exertion": 0.08, "accomplishment": 0.3,
+            "scoreDrivers": [
+              { "context": "drives.comfortDrive", "weight": 36 }
+            ]
+          }
+        }
+      }
     },
     {
       "id": "jump",
       "label": "Jump",
       "icon": "⬆️",
-      "category": "movement",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": false,
-      "defaultDuration": 0,
-      "energyCostMultiplier": 1.85,
       "description": "Jump with physics-based movement",
-      "requiresTarget": false,
-      "affectsMood": true,
-      "moodEffect": 3,
-      "defaultOptions": {
-        "height": 100,
-        "gravity": 0.5,
-        "initialVelocity": -12,
-        "bounceReduction": 0.5,
-        "minBounceVelocity": 2
-      },
-      "implementationClass": "JumpAction",
+      "category": "movement",
       "tags": ["playful"],
-      "effects": { "fun": 5, "social": 0, "comfort": 0, "energy": -3, "hunger": 0 },
-      "exertion": 3, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "isInterruptible": false,
+        "energyCostMultiplier": 1.85,
+        "implementationClass": "JumpAction",
+        "options": {
+          "height": 100, "gravity": 0.5, "initialVelocity": -12,
+          "bounceReduction": 0.5, "minBounceVelocity": 2
+        }
+      },
+      "traits": { "exertion": 3, "novelty": 2 },
+      "effects": { "fun": 5, "energy": -3, "mood": 3 },
+      "ai": { "category": "play", "exertion": 0.35, "accomplishment": 0.25 }
     },
     {
       "id": "move",
       "label": "Move To",
       "icon": "🏃",
-      "category": "movement",
-      "priority": 1,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Move to a specific location",
-      "requiresTarget": true,
-      "affectsMood": false,
-      "implementationClass": "MoveAction",
+      "category": "movement",
       "tags": ["purposeful_movement"],
-      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
-      "exertion": 1, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 1,
+        "requiresTarget": true,
+        "implementationClass": "MoveAction"
+      },
+      "traits": { "exertion": 1, "repeatMode": "free" },
+      "effects": { "energy": -1 }
     },
     {
       "id": "nudge_ball",
       "label": "Nudge Ball",
       "icon": "⚽",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
-      "energyCostMultiplier": 1.85,
       "description": "Run into a ball to get it rolling",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 6,
-      "defaultOptions": {
-        "approachConfig": {
-          "allowedSides": "any",
-          "preferredSide": null,
-          "gap": 10,
-          "align": "center",
-          "alignTo": "collider"
-        },
-        "allowStuckSuccess": false,
-        "stuckCompletionDistance": 10,
-        "repeat": 1,
-        "postNudgeIdleDuration": 20
-      },
-      "implementationClass": "NudgeBallAction",
+      "category": "interactions",
       "tags": ["playful"],
-      "effects": { "fun": 6, "social": 0, "comfort": 0, "energy": -3, "hunger": 0 },
-      "exertion": 3, "novelty": 3, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "energyCostMultiplier": 1.85,
+        "requiresTarget": true,
+        "implementationClass": "NudgeBallAction",
+        "options": {
+          "approachConfig": { "allowedSides": "any", "preferredSide": null, "gap": 10, "align": "center", "alignTo": "collider" },
+          "allowStuckSuccess": false, "stuckCompletionDistance": 10,
+          "repeat": 1, "postNudgeIdleDuration": 20
+        }
+      },
+      "traits": { "exertion": 3, "novelty": 3 },
+      "effects": { "fun": 6, "energy": -3, "mood": 6 },
+      "ai": {
+        "category": "play", "exertion": 0.55, "accomplishment": 0.45, "commitmentMs": 1800,
+        "scoreDrivers": [
+          { "context": "drives.playDrive", "weight": 32 },
+          { "context": "novelty", "weight": 16 },
+          { "context": "activity", "weight": 12 },
+          { "context": "drives.restDrive", "weight": -10 }
+        ]
+      }
     },
     {
       "id": "open_chest",
       "label": "Open Chest",
       "icon": "📦",
-      "category": "interactions",
-      "priority": 3,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Approach and open a treasure chest",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 10,
-      "defaultOptions": {
-        "openAnimationDuration": 40,
-        "receiveIdleDuration": 1000
-      },
-      "implementationClass": "OpenChestAction",
+      "category": "interactions",
       "tags": ["stimulating", "risky"],
-      "effects": { "fun": 10, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
-      "exertion": 1, "novelty": 10, "risk": 3, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 3,
+        "requiresTarget": true,
+        "implementationClass": "OpenChestAction",
+        "options": { "openAnimationDuration": 40, "receiveIdleDuration": 1000 }
+      },
+      "traits": { "exertion": 1, "novelty": 10, "risk": 3 },
+      "effects": { "fun": 10, "energy": -2, "mood": 10 },
+      "ai": {
+        "exertion": 0.15, "accomplishment": 0.7,
+        "scoreDrivers": [
+          { "context": "drives.exploreDrive", "weight": 24 },
+          { "context": "curiosity", "weight": 18 },
+          { "context": "confidence", "weight": 10 }
+        ]
+      }
     },
     {
       "id": "patrol",
       "label": "Patrol",
       "icon": "👀",
-      "category": "movement",
-      "priority": 3,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Walk back and forth between two points",
-      "requiresTarget": false,
-      "affectsMood": true,
-      "moodEffect": 2,
-      "defaultOptions": {
-        "distance": 120,
-        "direction": { "x": 1, "y": 0 },
-        "repeat": 4,
-        "pauseDuration": 500,
-        "safeTargetRadius": 14,
-        "stuckThresholdFrames": 40,
-        "maxPatternRecoveries": 3
-      },
-      "implementationClass": "PatrolAction",
+      "category": "movement",
       "tags": ["purposeful_movement"],
-      "effects": { "fun": 1, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
-      "exertion": 2, "novelty": 1, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 3,
+        "implementationClass": "PatrolAction",
+        "options": {
+          "distance": 120, "direction": { "x": 1, "y": 0 },
+          "repeat": 4, "pauseDuration": 500,
+          "safeTargetRadius": 14, "stuckThresholdFrames": 40, "maxPatternRecoveries": 3
+        }
+      },
+      "traits": { "exertion": 2, "novelty": 1, "repeatMode": "free" },
+      "effects": { "fun": 1, "energy": -2, "mood": 2 },
+      "ai": { "exertion": 0.2, "accomplishment": 0.15 }
     },
     {
       "id": "pick_flower",
       "label": "Pick Flower",
       "icon": "🌸",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Pick a flower from a plant",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 4,
-      "defaultOptions": {
-        "pickAnimationDuration": 45,
-        "approachConfig": "adjacent"
-      },
-      "implementationClass": "PickFlowerAction",
+      "category": "interactions",
       "tags": ["stimulating", "creative"],
-      "effects": { "fun": 5, "social": 0, "comfort": 2, "energy": -1, "hunger": 0 },
-      "exertion": 0, "novelty": 3, "risk": 0, "soothingValue": 2, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "requiresTarget": true,
+        "implementationClass": "PickFlowerAction",
+        "options": { "pickAnimationDuration": 45, "approachConfig": "adjacent" }
+      },
+      "traits": { "novelty": 3, "soothing": 2 },
+      "effects": { "fun": 5, "comfort": 2, "energy": -1, "mood": 4 },
+      "ai": {
+        "soothing": 0.3, "accomplishment": 0.4,
+        "scoreDrivers": [
+          { "context": "drives.exploreDrive", "weight": 20 },
+          { "context": "curiosity", "weight": 12 },
+          { "context": "drives.comfortDrive", "weight": 8 }
+        ]
+      }
     },
     {
       "id": "pickup_item",
       "label": "Pick Up",
       "icon": "🤲",
-      "category": "carry",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Pick up an item and carry it",
-      "requiresTarget": true,
-      "affectsMood": false,
-      "implementationClass": "PickupItemAction",
+      "category": "carry",
       "tags": ["purposeful_movement"],
-      "effects": { "fun": 0, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
-      "exertion": 1, "novelty": 1, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 2,
+        "isMovementAction": false,
+        "requiresTarget": true,
+        "implementationClass": "PickupItemAction"
+      },
+      "traits": { "exertion": 1, "novelty": 1, "repeatMode": "free" },
+      "effects": { "energy": -1 },
+      "ai": { "accomplishment": 0.2 }
     },
     {
       "id": "play_fetch",
       "label": "Play Fetch",
       "icon": "🎾",
-      "category": "social",
-      "priority": 4,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
-      "energyCostMultiplier": 1.85,
       "description": "Play fetch with a throwable object",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 8,
-      "defaultOptions": {
-        "throwStrength": 10,
-        "maxThrowDistance": 300,
-        "fetchState": "pickup",
-        "arcHeight": 100,
-        "pickupDistance": 10,
-        "catchDistance": 10,
-        "roundTrips": 1,
-        "expressionType": "excited",
-        "expressionDuration": 500
-      },
-      "implementationClass": "PlayFetchAction",
+      "category": "social",
       "tags": ["playful", "social"],
-      "effects": { "fun": 8, "social": 4, "comfort": 0, "energy": -4, "hunger": 0 },
-      "exertion": 4, "novelty": 3, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 4,
+        "energyCostMultiplier": 1.85,
+        "requiresTarget": true,
+        "implementationClass": "PlayFetchAction",
+        "options": {
+          "throwStrength": 10, "maxThrowDistance": 300, "fetchState": "pickup",
+          "arcHeight": 100, "pickupDistance": 10, "catchDistance": 10,
+          "roundTrips": 1, "expressionType": "excited", "expressionDuration": 500
+        }
+      },
+      "traits": { "exertion": 4, "novelty": 3 },
+      "effects": { "fun": 8, "social": 4, "energy": -4, "mood": 8 },
+      "ai": {
+        "category": "play", "exertion": 0.78, "accomplishment": 0.6, "commitmentMs": 3200,
+        "scoreDrivers": [
+          { "context": "drives.playDrive", "weight": 36 },
+          { "context": "activity", "weight": 18 },
+          { "context": "energy", "weight": 12 },
+          { "context": "drives.restDrive", "weight": -14 }
+        ]
+      }
     },
     {
       "id": "play_tag",
       "label": "Play Tag",
       "icon": "🏷️",
-      "category": "social",
-      "priority": 4,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 5000,
-      "energyCostMultiplier": 1.85,
       "description": "Play tag with another Myte",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 10,
-      "defaultOptions": {
-        "catchDistance": 30,
-        "runDistance": 100,
-        "isIt": true
-      },
-      "implementationClass": "PlayTagAction",
+      "category": "social",
       "tags": ["playful", "social"],
-      "effects": { "fun": 10, "social": 6, "comfort": 0, "energy": -5, "hunger": 0 },
-      "exertion": 5, "novelty": 4, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 4,
+        "defaultDuration": 5000,
+        "energyCostMultiplier": 1.85,
+        "requiresTarget": true,
+        "implementationClass": "PlayTagAction",
+        "options": { "catchDistance": 30, "runDistance": 100, "isIt": true }
+      },
+      "traits": { "exertion": 5, "novelty": 4 },
+      "effects": { "fun": 10, "social": 6, "energy": -5, "mood": 10 },
+      "ai": { "category": "social", "exertion": 0.5, "accomplishment": 0.65, "commitmentMs": 2600 }
     },
     {
       "id": "run_away",
       "label": "Run Away",
       "icon": "🏃",
-      "category": "reactive",
-      "priority": 5,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": -1,
       "description": "Run away from a scary object or Myte",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": -5,
-      "defaultOptions": {
-        "panicDistance": 400,
-        "runDistance": 350
-      },
-      "implementationClass": "RunAwayAction",
+      "category": "reactive",
       "tags": ["purposeful_movement"],
-      "effects": { "fun": 0, "social": 0, "comfort": -4, "energy": -5, "hunger": 0 },
-      "exertion": 5, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 5,
+        "defaultDuration": -1,
+        "requiresTarget": true,
+        "implementationClass": "RunAwayAction",
+        "options": { "panicDistance": 400, "runDistance": 350 }
+      },
+      "traits": { "exertion": 5, "repeatMode": "free" },
+      "effects": { "comfort": -4, "energy": -5, "mood": -5 },
+      "ai": { "exertion": 0.4 }
     },
     {
       "id": "run_from",
       "label": "Run Away",
       "icon": "🚪",
-      "category": "reactive",
-      "priority": 5,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 3000,
       "description": "Run away from an object",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": -3,
-      "defaultOptions": {
-        "panicDistance": 500,
-        "runDistance": 300
-      },
-      "implementationClass": "RunFromAction",
+      "category": "reactive",
       "tags": ["purposeful_movement"],
-      "effects": { "fun": 0, "social": 0, "comfort": -3, "energy": -4, "hunger": 0 },
-      "exertion": 4, "novelty": 0, "risk": 0, "soothingValue": 0, "repeatMode": "free"
+      "queue": {
+        "priority": 5,
+        "defaultDuration": 3000,
+        "requiresTarget": true,
+        "implementationClass": "RunFromAction",
+        "options": { "panicDistance": 500, "runDistance": 300 }
+      },
+      "traits": { "exertion": 4, "repeatMode": "free" },
+      "effects": { "comfort": -3, "energy": -4, "mood": -3 },
+      "ai": { "exertion": 0.35 }
     },
     {
       "id": "run_laps",
       "label": "Run Laps",
       "icon": "🔁",
-      "category": "movement",
-      "priority": 3,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
-      "energyCostMultiplier": 1.85,
       "description": "Run laps around a target",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 5,
-      "defaultOptions": {
-        "repeat": 5,
-        "currentTargetIndex": 0,
-        "lapGap": 12,
-        "safeTargetRadius": 14,
-        "stuckThresholdFrames": 42,
-        "maxPatternRecoveries": 4
-      },
-      "implementationClass": "RunLapsAction",
+      "category": "movement",
       "tags": ["playful"],
-      "effects": { "fun": 8, "social": 0, "comfort": -1, "energy": -5, "hunger": 0 },
-      "exertion": 5, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 3,
+        "energyCostMultiplier": 1.85,
+        "requiresTarget": true,
+        "implementationClass": "RunLapsAction",
+        "options": {
+          "repeat": 5, "currentTargetIndex": 0, "lapGap": 12,
+          "safeTargetRadius": 14, "stuckThresholdFrames": 42, "maxPatternRecoveries": 4
+        }
+      },
+      "traits": { "exertion": 5, "novelty": 2 },
+      "effects": { "fun": 8, "comfort": -1, "energy": -5, "mood": 5 },
+      "ai": { "category": "play", "exertion": 0.65, "accomplishment": 0.45 }
     },
     {
       "id": "show_affection",
       "label": "Show Affection",
       "icon": "❤️",
-      "category": "social",
-      "priority": 3,
-      "isMovementAction": false,
-      "isInterruptible": false,
-      "defaultDuration": 1500,
       "description": "Show affection to another Myte",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 8,
-      "defaultOptions": {
-        "emitDelay": 200,
-        "expressionType": "heart",
-        "expressionDuration": 300,
-        "expressionRepeat": 3
-      },
-      "implementationClass": "ShowAffectionAction",
+      "category": "social",
       "tags": ["social", "comfort_giving", "soothing"],
-      "effects": { "fun": 3, "social": 8, "comfort": 5, "energy": 0, "hunger": 0 },
-      "exertion": 0, "novelty": 1, "risk": 0, "soothingValue": 5, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 3,
+        "isMovementAction": false,
+        "isInterruptible": false,
+        "defaultDuration": 1500,
+        "requiresTarget": true,
+        "implementationClass": "ShowAffectionAction",
+        "options": { "emitDelay": 200, "expressionType": "heart", "expressionDuration": 300, "expressionRepeat": 3 }
+      },
+      "traits": { "novelty": 1, "soothing": 5 },
+      "effects": { "fun": 3, "social": 8, "comfort": 5, "mood": 8 },
+      "ai": { "category": "social", "soothing": 0.6, "exertion": 0.05, "accomplishment": 0.45, "commitmentMs": 1800 }
     },
     {
       "id": "simple_sleep",
       "label": "Take a Nap",
       "icon": "😴",
-      "category": "state",
-      "priority": 2,
-      "isMovementAction": false,
-      "isInterruptible": true,
-      "defaultDuration": 5000,
       "description": "Take a quick nap with gentle floating animation",
-      "requiresTarget": false,
-      "affectsMood": true,
-      "moodEffect": 5,
-      "defaultOptions": {
-        "zSpeed": 0.1
-      },
-      "implementationClass": "SimpleSleepAction",
+      "category": "state",
       "tags": ["restful"],
-      "effects": { "fun": 0, "social": 0, "comfort": 4, "energy": 15, "hunger": 0 },
-      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 6, "repeatMode": "free"
+      "queue": {
+        "priority": 2,
+        "isMovementAction": false,
+        "defaultDuration": 5000,
+        "implementationClass": "SimpleSleepAction",
+        "options": { "zSpeed": 0.1 }
+      },
+      "traits": { "soothing": 6, "repeatMode": "free" },
+      "effects": { "comfort": 4, "energy": 15, "mood": 5 },
+      "ai": { "category": "rest", "soothing": 0.7, "exertion": 0, "accomplishment": 0.05 }
     },
     {
       "id": "sleep",
       "label": "Sleep",
       "icon": "😴",
-      "category": "state",
-      "priority": 2,
-      "isMovementAction": false,
-      "isInterruptible": true,
-      "defaultDuration": 5000,
       "description": "Take a deep sleep with bobbing animation",
-      "requiresTarget": false,
-      "affectsMood": true,
-      "moodEffect": 8,
-      "defaultOptions": {
-        "bobHeight": 5,
-        "zInterval": 1000
-      },
-      "implementationClass": "SleepAction",
+      "category": "state",
       "tags": ["restful"],
-      "effects": { "fun": -2, "social": 0, "comfort": 8, "energy": 30, "hunger": 0 },
-      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 8, "repeatMode": "free"
+      "queue": {
+        "priority": 2,
+        "isMovementAction": false,
+        "defaultDuration": 5000,
+        "implementationClass": "SleepAction",
+        "options": { "bobHeight": 5, "zInterval": 1000 }
+      },
+      "traits": { "soothing": 8, "repeatMode": "free" },
+      "effects": { "fun": -2, "comfort": 8, "energy": 30, "mood": 8 },
+      "ai": { "category": "rest", "soothing": 0.9, "exertion": 0, "accomplishment": 0.05 }
     },
     {
       "id": "smell_flower",
       "label": "Smell Flower",
       "icon": "🌺",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Approach and smell a flower",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 6,
-      "defaultOptions": {
-        "approachConfig": "adjacent"
-      },
-      "implementationClass": "SmellFlowerAction",
+      "category": "interactions",
       "tags": ["stimulating", "soothing", "comfort_giving"],
-      "effects": { "fun": 5, "social": 0, "comfort": 4, "energy": -1, "hunger": 0 },
-      "exertion": 0, "novelty": 3, "risk": 0, "soothingValue": 6, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "requiresTarget": true,
+        "implementationClass": "SmellFlowerAction",
+        "options": { "approachConfig": "adjacent" }
+      },
+      "traits": { "novelty": 3, "soothing": 6 },
+      "effects": { "fun": 5, "comfort": 4, "energy": -1, "mood": 6 },
+      "ai": {
+        "category": "rest", "soothing": 0.85, "accomplishment": 0.35,
+        "scoreDrivers": [
+          { "context": "drives.comfortDrive", "weight": 50 },
+          { "context": "curiosity", "weight": 8 }
+        ]
+      }
     },
     {
       "id": "spin",
       "label": "Spin",
       "icon": "🌀",
-      "category": "state",
-      "priority": 3,
-      "isMovementAction": false,
-      "isInterruptible": false,
-      "defaultDuration": 500,
-      "energyCostMultiplier": 1.2,
       "description": "Spin around in place",
-      "requiresTarget": false,
-      "affectsMood": true,
-      "moodEffect": 3,
-      "defaultOptions": {
-        "rotations": 2,
-        "frameDelay": 16
-      },
-      "implementationClass": "SpinAction",
+      "category": "state",
       "tags": ["playful"],
-      "effects": { "fun": 4, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
-      "exertion": 2, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 3,
+        "isMovementAction": false,
+        "isInterruptible": false,
+        "defaultDuration": 500,
+        "energyCostMultiplier": 1.2,
+        "implementationClass": "SpinAction",
+        "options": { "rotations": 2, "frameDelay": 16 }
+      },
+      "traits": { "exertion": 2, "novelty": 2 },
+      "effects": { "fun": 4, "energy": -2, "mood": 3 },
+      "ai": { "category": "play", "exertion": 0.35, "accomplishment": 0.25 }
     },
     {
       "id": "trample_flower",
       "label": "Trample",
       "icon": "👟",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Trample a flower",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": -3,
-      "defaultOptions": {
-        "approachConfig": "adjacent",
-        "trampleAnimationDuration": 22,
-        "postActionIdleDuration": 400
-      },
-      "implementationClass": "TrampleFlowerAction",
+      "category": "interactions",
       "tags": ["stimulating"],
-      "effects": { "fun": 3, "social": 0, "comfort": -2, "energy": -1, "hunger": 0 },
-      "exertion": 1, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "requiresTarget": true,
+        "implementationClass": "TrampleFlowerAction",
+        "options": { "approachConfig": "adjacent", "trampleAnimationDuration": 22, "postActionIdleDuration": 400 }
+      },
+      "traits": { "exertion": 1, "novelty": 2 },
+      "effects": { "fun": 3, "comfort": -2, "energy": -1, "mood": -3 },
+      "ai": {
+        "exertion": 0.15, "accomplishment": 0.2,
+        "scoreDrivers": [
+          { "context": "drives.playDrive", "weight": 20 },
+          { "context": "curiosity", "weight": 8 },
+          { "context": "novelty", "weight": 6 }
+        ]
+      }
     },
     {
       "id": "use_surface_slot",
       "label": "Use Surface",
       "icon": "🛏️",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 5000,
       "description": "Use a slotted surface and settle into position",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 7,
-      "defaultOptions": {
-        "bobHeight": 3,
-        "bobSpeed": 0.12,
-        "energyRestore": 18,
-        "healthRestore": 5,
-        "comfortBoost": 14,
-        "moodBoost": 8,
-        "settleDuration": 260,
-        "dismountDuration": 220,
-        "entryGap": 10,
-        "exitGap": 16,
-        "exitSearchRadius": 20,
-        "returnToEntry": true,
-        "stuckCompletionDistance": 14,
-        "finalApproachSkipDistance": 24,
-        "maxFinalAdjustmentDistance": 20,
-        "approachConfig": null
-      },
-      "implementationClass": "SurfaceSlotAction",
+      "category": "interactions",
       "tags": ["restful", "comfort_giving"],
-      "effects": { "fun": -1, "social": 0, "comfort": 8, "energy": 15, "hunger": 0 },
-      "exertion": 0, "novelty": 0, "risk": 0, "soothingValue": 8, "repeatMode": "free"
+      "queue": {
+        "priority": 2,
+        "defaultDuration": 5000,
+        "requiresTarget": true,
+        "implementationClass": "SurfaceSlotAction",
+        "options": {
+          "bobHeight": 3, "bobSpeed": 0.12,
+          "energyRestore": 18, "healthRestore": 5, "comfortBoost": 14, "moodBoost": 8,
+          "settleDuration": 260, "dismountDuration": 220,
+          "entryGap": 10, "exitGap": 16, "exitSearchRadius": 20,
+          "returnToEntry": true, "stuckCompletionDistance": 14,
+          "finalApproachSkipDistance": 24, "maxFinalAdjustmentDistance": 20,
+          "approachConfig": null
+        }
+      },
+      "traits": { "soothing": 8, "repeatMode": "free" },
+      "effects": { "fun": -1, "comfort": 8, "energy": 15, "mood": 7 },
+      "ai": {
+        "category": "rest", "soothing": 1.0, "exertion": 0, "accomplishment": 0.25,
+        "scoreDrivers": [
+          { "context": "drives.restDrive", "weight": 32 },
+          { "context": "drives.comfortDrive", "weight": 24 },
+          { "context": "preferences.coziness", "weight": 12 },
+          { "context": "drives.playDrive", "weight": -6 }
+        ]
+      }
     },
     {
       "id": "wander",
       "label": "Wander",
       "icon": "🌀",
-      "category": "movement",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 5000,
       "description": "Wander randomly within a radius",
-      "requiresTarget": false,
-      "affectsMood": true,
-      "moodEffect": 2,
-      "defaultOptions": {
-        "wanderRadius": 100,
-        "pauseMin": 500,
-        "pauseMax": 1500,
-        "safeTargetRadius": 14,
-        "stuckThresholdFrames": 40,
-        "maxPatternRecoveries": 5
-      },
-      "implementationClass": "WanderAction",
+      "category": "movement",
       "tags": ["purposeful_movement"],
-      "effects": { "fun": 1, "social": 0, "comfort": 0, "energy": -1, "hunger": 0 },
-      "exertion": 1, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "defaultDuration": 5000,
+        "implementationClass": "WanderAction",
+        "options": {
+          "wanderRadius": 100, "pauseMin": 500, "pauseMax": 1500,
+          "safeTargetRadius": 14, "stuckThresholdFrames": 40, "maxPatternRecoveries": 5
+        }
+      },
+      "traits": { "exertion": 1, "novelty": 2 },
+      "effects": { "fun": 1, "energy": -1, "mood": 2 },
+      "ai": { "exertion": 0.15, "accomplishment": 0.15 }
     },
     {
       "id": "watch",
       "label": "Watch",
       "icon": "👁️",
-      "category": "social",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 5000,
       "description": "Watch another Myte from nearby",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 2,
-      "defaultOptions": {
-        "watchDistance": 60
-      },
-      "implementationClass": "WatchAction",
+      "category": "social",
       "tags": ["social", "stimulating"],
-      "effects": { "fun": 2, "social": 3, "comfort": 0, "energy": 0, "hunger": 0 },
-      "exertion": 0, "novelty": 3, "risk": 0, "soothingValue": 1, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "defaultDuration": 5000,
+        "requiresTarget": true,
+        "implementationClass": "WatchAction",
+        "options": { "watchDistance": 60 }
+      },
+      "traits": { "novelty": 3, "soothing": 1 },
+      "effects": { "fun": 2, "social": 3, "mood": 2 },
+      "ai": { "category": "social", "soothing": 0.2, "exertion": 0.05, "accomplishment": 0.2 }
     },
     {
       "id": "water_plant",
       "label": "Water Plant",
       "icon": "🪣",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
       "description": "Water a crop plant",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 4,
-      "defaultOptions": {
-        "waterAnimationDuration": 36,
-        "postActionIdleDuration": 500
-      },
-      "implementationClass": "WaterPlantAction",
+      "category": "interactions",
       "tags": ["stimulating", "creative"],
-      "effects": { "fun": 3, "social": 0, "comfort": 2, "energy": -1, "hunger": 0 },
-      "exertion": 1, "novelty": 2, "risk": 0, "soothingValue": 1, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "requiresTarget": true,
+        "implementationClass": "WaterPlantAction",
+        "options": { "waterAnimationDuration": 36, "postActionIdleDuration": 500 }
+      },
+      "traits": { "exertion": 1, "novelty": 2, "soothing": 1 },
+      "effects": { "fun": 3, "comfort": 2, "energy": -1, "mood": 4 },
+      "ai": {
+        "exertion": 0.25, "accomplishment": 0.45,
+        "scoreDrivers": [
+          { "context": "drives.exploreDrive", "weight": 18 },
+          { "context": "curiosity", "weight": 12 },
+          { "context": "confidence", "weight": 10 }
+        ]
+      }
     },
     {
       "id": "zigzag",
       "label": "Zigzag",
       "icon": "↔️",
-      "category": "movement",
-      "priority": 3,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 0,
-      "energyCostMultiplier": 1.85,
       "description": "Move in a zigzag pattern",
-      "requiresTarget": false,
-      "affectsMood": true,
-      "moodEffect": 4,
-      "defaultOptions": {
-        "amplitude": 80,
-        "frequency": 0.05,
-        "numLegs": 6,
-        "direction": { "x": 1, "y": 0 },
-        "repeat": 1,
-        "safeTargetRadius": 12,
-        "stuckThresholdFrames": 34,
-        "maxPatternRecoveries": 4
-      },
-      "implementationClass": "ZigzagAction",
+      "category": "movement",
       "tags": ["playful"],
-      "effects": { "fun": 7, "social": 0, "comfort": 0, "energy": -4, "hunger": 0 },
-      "exertion": 4, "novelty": 3, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 3,
+        "energyCostMultiplier": 1.85,
+        "implementationClass": "ZigzagAction",
+        "options": {
+          "amplitude": 80, "frequency": 0.05, "numLegs": 6,
+          "direction": { "x": 1, "y": 0 }, "repeat": 1,
+          "safeTargetRadius": 12, "stuckThresholdFrames": 34, "maxPatternRecoveries": 4
+        }
+      },
+      "traits": { "exertion": 4, "novelty": 3 },
+      "effects": { "fun": 7, "energy": -4, "mood": 4 },
+      "ai": { "category": "play", "exertion": 0.7, "accomplishment": 0.35 }
     },
     {
       "id": "shake_tree",
       "label": "Shake Tree",
       "icon": "🌳",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 60,
       "description": "Shake a grown tree to collect fruit or seeds",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 5,
-      "defaultOptions": {
-        "shakeAnimationDuration": 60,
-        "postActionIdleDuration": 1200
-      },
-      "implementationClass": "ShakeTreeAction",
+      "category": "interactions",
       "tags": ["stimulating"],
-      "effects": { "fun": 6, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
-      "exertion": 2, "novelty": 4, "risk": 1, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "defaultDuration": 60,
+        "requiresTarget": true,
+        "implementationClass": "ShakeTreeAction",
+        "options": { "shakeAnimationDuration": 60, "postActionIdleDuration": 1200 }
+      },
+      "traits": { "exertion": 2, "novelty": 4, "risk": 1 },
+      "effects": { "fun": 6, "energy": -2, "mood": 5 },
+      "ai": {
+        "exertion": 0.25, "accomplishment": 0.5,
+        "scoreDrivers": [
+          { "context": "drives.exploreDrive", "weight": 20 },
+          { "context": "curiosity", "weight": 14 },
+          { "context": "activity", "weight": 10 }
+        ]
+      }
     },
     {
       "id": "chop_tree",
       "label": "Chop Tree",
       "icon": "🪓",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 120,
       "description": "Chop down a grown tree, turning it into a stump",
-      "requiresTarget": true,
-      "affectsMood": false,
-      "defaultOptions": {
-        "chopAnimationDuration": 120,
-        "postActionIdleDuration": 1200
-      },
-      "implementationClass": "ChopTreeAction",
+      "category": "interactions",
       "tags": ["stimulating", "creative"],
-      "effects": { "fun": 5, "social": 0, "comfort": 0, "energy": -3, "hunger": 0 },
-      "exertion": 3, "novelty": 3, "risk": 1, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "defaultDuration": 120,
+        "requiresTarget": true,
+        "implementationClass": "ChopTreeAction",
+        "options": { "chopAnimationDuration": 120, "postActionIdleDuration": 1200 }
+      },
+      "traits": { "exertion": 3, "novelty": 3, "risk": 1 },
+      "effects": { "fun": 5, "energy": -3 },
+      "ai": {
+        "exertion": 0.35, "accomplishment": 0.5,
+        "scoreDrivers": [
+          { "context": "drives.exploreDrive", "weight": 20 },
+          { "context": "curiosity", "weight": 14 },
+          { "context": "activity", "weight": 10 }
+        ]
+      }
     },
     {
       "id": "remove_stump",
       "label": "Remove Stump",
       "icon": "🪵",
-      "category": "interactions",
-      "priority": 2,
-      "isMovementAction": true,
-      "isInterruptible": true,
-      "defaultDuration": 90,
       "description": "Dig out and remove a tree stump",
-      "requiresTarget": true,
-      "affectsMood": true,
-      "moodEffect": 3,
-      "defaultOptions": {
-        "removeAnimationDuration": 90,
-        "postActionIdleDuration": 1200
-      },
-      "implementationClass": "RemoveStumpAction",
+      "category": "interactions",
       "tags": ["stimulating"],
-      "effects": { "fun": 4, "social": 0, "comfort": 0, "energy": -2, "hunger": 0 },
-      "exertion": 2, "novelty": 2, "risk": 0, "soothingValue": 0, "repeatMode": "diminishing"
+      "queue": {
+        "priority": 2,
+        "defaultDuration": 90,
+        "requiresTarget": true,
+        "implementationClass": "RemoveStumpAction",
+        "options": { "removeAnimationDuration": 90, "postActionIdleDuration": 1200 }
+      },
+      "traits": { "exertion": 2, "novelty": 2 },
+      "effects": { "fun": 4, "energy": -2, "mood": 3 },
+      "ai": {
+        "exertion": 0.25, "accomplishment": 0.4,
+        "scoreDrivers": [
+          { "context": "drives.exploreDrive", "weight": 16 },
+          { "context": "curiosity", "weight": 12 }
+        ]
+      }
     }
   ]
 }
