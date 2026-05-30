@@ -564,6 +564,45 @@
       }
     }
   },
+  "MIRROR": {
+    "category": "furniture",
+    "variants": [
+      "mirror"
+    ],
+    "collision": true,
+    "renderPriority": 2,
+    "interactionType": "social",
+    "interactionRadius": 80,
+    "socialBoost": 22,
+    "comfortBoost": 4,
+    "size": {
+      "width": 32,
+      "height": 64
+    },
+    "collider": {
+      "offsetX": 4,
+      "offsetY": 48,
+      "width": 24,
+      "height": 16
+    }
+  },
+  "PLUSHIE": {
+    "category": "item",
+    "variants": [
+      "plushie"
+    ],
+    "collision": false,
+    "walkable": true,
+    "renderPriority": 2,
+    "interactionType": "social",
+    "interactionRadius": 60,
+    "socialBoost": 14,
+    "comfortBoost": 8,
+    "size": {
+      "width": 32,
+      "height": 32
+    }
+  },
   "MUSIC_BOX": {
     "category": "item",
     "variants": [
@@ -603,24 +642,28 @@
     "energyRestore": 20,
     "moodBoost": 8,
     "healthRestore": 3,
+    "hungerBoost": 30,
     "variantConfigs": {
       "apple": {
         "displayName": "Apple",
         "energyRestore": 22,
         "moodBoost": 10,
-        "healthRestore": 5
+        "healthRestore": 5,
+        "hungerBoost": 35
       },
       "turnip": {
         "displayName": "Turnip",
         "energyRestore": 14,
         "moodBoost": 4,
-        "healthRestore": 2
+        "healthRestore": 2,
+        "hungerBoost": 22
       },
       "acorn": {
         "displayName": "Acorn",
         "energyRestore": 9,
         "moodBoost": 6,
-        "healthRestore": 1
+        "healthRestore": 1,
+        "hungerBoost": 16
       }
     }
   },

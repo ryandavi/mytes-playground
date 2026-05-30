@@ -25,20 +25,30 @@
     }
 }
 
-.myte-queue-overlay,
-.myte-buff-overlay {
+.myte-overlay-row {
     position: absolute;
     top: var(--space-lg);
     left: var(--space-lg);
+    right: var(--space-lg);
     z-index: var(--z-overlay);
     display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    pointer-events: none;
+}
+
+.myte-queue-overlay,
+.myte-buff-overlay {
+    flex: 1 1 0;
+    min-width: 0;
+    display: none;
+    flex-wrap: wrap;
     gap: var(--space-md);
     align-items: flex-start;
-    max-width: min(70%, 420px);
     pointer-events: none;
 
-    &:empty {
-        display: none;
+    &.has-items {
+        display: flex;
     }
 
     .compact-chip {
@@ -57,10 +67,8 @@
         user-select: none;
         font-family: inherit;
         flex-direction: column;
-        gap: 2px;
 
         &.is-current {
-            opacity: 1;
             @include surface-pressed;
         }
 
@@ -69,18 +77,19 @@
             transform: scale(0.96);
         }
 
-        &.queue-chip.is-current .compact-chip__label {
-            font-size: 0.78rem;
+        &.is-hidden-action {
+            border-style: dashed;
+            opacity: 0.5;
         }
 
         &.buff-chip.kind-buff {
-            border-color: var(--border-strong);
-            background: var(--surface-state-self);
+            border-color: var(--state-success-accent);
+            background: var(--surface-toast-success);
         }
 
         &.buff-chip.kind-debuff {
-            border-color: var(--button-remove-border-color);
-            background: var(--surface-state-map);
+            border-color: var(--state-error-accent);
+            background: var(--surface-toast-error);
         }
 
         .compact-chip__badge {
@@ -93,11 +102,11 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.45rem;
+            font-size: 0.5rem;
             font-weight: 700;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.03em;
             line-height: 1;
-            opacity: 0.75;
+            opacity: 0.85;
             visibility: hidden;
         }
 
@@ -106,15 +115,9 @@
         }
 
         .compact-chip__label {
-            font-size: 0.66rem;
+            font-size: 1rem;
             font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-        }
-
-        &.queue-chip.is-current .compact-chip__badge {
-            color: #6d4f00;
-            opacity: 1;
+            line-height: 1;
         }
 
         .compact-chip__meter {
@@ -122,7 +125,7 @@
             left: 4px;
             right: 4px;
             bottom: 4px;
-            height: 4px;
+            height: 3px;
             border-radius: 999px;
             overflow: hidden;
             background: var(--surface-ui-pressed);
@@ -147,7 +150,7 @@
             transition: width 200ms linear;
         }
 
-        &.buff-chip .compact-chip__meter-fill {
+        &.buff-chip.kind-buff .compact-chip__meter-fill {
             background: var(--state-success-accent);
         }
 
@@ -158,22 +161,31 @@
 }
 
 .myte-buff-overlay {
-    left: auto;
-    right: var(--space-lg);
     justify-content: flex-end;
 }
 
 .app-stage {
+    .myte-overlay-row {
+        @media (max-width: 700px) {
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+    }
+
     .myte-queue-overlay,
     .myte-buff-overlay {
         @media (max-width: 700px) {
-            max-width: calc(100% - 24px);
+            flex: none;
+            width: 100%;
             gap: var(--space-sm);
-            flex-wrap: wrap;
 
             .compact-chip {
                 width: 36px;
                 height: 36px;
+
+                .compact-chip__label {
+                    font-size: 0.9rem;
+                }
             }
         }
     }

@@ -55,9 +55,31 @@ const ACTION_CHIP_LABELS = Object.freeze({
 });
 
 class CompactQueueUI extends CompactChipStripUI {
+    // Returns grouped items: consecutive runs of the same action ID are collapsed
+    // into one entry with a count. Each entry: { item, id, count, items, queueStartIndex }
     getItems() {
         const activeMyte = this.parent.getActiveMyte?.();
-        return activeMyte?.queue?.queue ?? [];
+        const isDebug = document.body.classList.contains('debug');
+        const rawQueue = activeMyte?.queue?.queue ?? [];
+        const grouped = [];
+        let queueIdx = 0;
+        for (const item of rawQueue) {
+            const isHidden = item.constructor?.metadata?.hideFromQueue === true;
+            if (!isDebug && isHidden) {
+                queueIdx++;
+                continue;
+            }
+            const id = item.constructor?.metadata?.id ?? null;
+            const last = grouped[grouped.length - 1];
+            if (last && id && last.id === id && last.isHidden === isHidden) {
+                last.count++;
+                last.items.push(item);
+            } else {
+                grouped.push({ item, id, count: 1, items: [item], queueStartIndex: queueIdx, isHidden });
+            }
+            queueIdx++;
+        }
+        return grouped;
     }
 
     getQueueTitle(item) {
@@ -96,14 +118,13 @@ class CompactQueueUI extends CompactChipStripUI {
         return `${words[0][0]}${words[1][0]}`.toUpperCase();
     }
 
-    getProgressRatio(item, index) {
-        if (index !== 0) {
+    getProgressRatio(item, chipIndex) {
+        if (chipIndex !== 0) {
             return null;
         }
 
         if (typeof item.getProgress === 'function') {
             const p = item.getProgress();
-            // Only show if progress has meaningfully started (avoids stuck-at-0 meter)
             return p > 0 ? Utility.clamp(p, 0, 1) : null;
         }
 
@@ -111,7 +132,6 @@ class CompactQueueUI extends CompactChipStripUI {
             return null;
         }
 
-        // Only reveal meter once the action has actually started ticking down
         if (item.currentDuration >= item.duration) {
             return null;
         }
@@ -119,10 +139,11 @@ class CompactQueueUI extends CompactChipStripUI {
         return Utility.clamp(1 - (item.currentDuration / Math.max(item.duration, 1)), 0, 1);
     }
 
-    getChipConfig(item, index) {
+    getChipConfig(group, chipIndex) {
+        const { item, count, isHidden } = group;
         const title = this.getQueueTitle(item);
         const description = this.getQueueDescription(item);
-        const progressRatio = this.getProgressRatio(item, index);
+        const progressRatio = this.getProgressRatio(item, chipIndex);
         const progressPercent = progressRatio == null ? null : Math.round(progressRatio * 100);
         const tooltipLines = [];
 
@@ -130,7 +151,11 @@ class CompactQueueUI extends CompactChipStripUI {
             tooltipLines.push(description);
         }
 
-        tooltipLines.push(index === 0 ? 'Current action' : `Queued #${index + 1}`);
+        tooltipLines.push(chipIndex === 0 ? 'Current action' : `Queued #${chipIndex + 1}`);
+
+        if (count > 1) {
+            tooltipLines.push(`×${count} queued`);
+        }
 
         if (progressPercent != null) {
             tooltipLines.push(`Progress: ${progressPercent}%`);
@@ -139,13 +164,13 @@ class CompactQueueUI extends CompactChipStripUI {
         tooltipLines.push('Hold to cancel.');
 
         return {
-            key: `queue-${index}`,
-            item,
-            index,
-            className: `queue-chip ${item.constructor?.metadata?.category || ''} action-${item.constructor?.metadata?.id || 'unknown'}${index === 0 ? ' is-current' : ''}`,
+            key: `queue-${chipIndex}`,
+            item: group,
+            index: chipIndex,
+            className: `queue-chip ${item.constructor?.metadata?.category || ''} action-${item.constructor?.metadata?.id || 'unknown'}${chipIndex === 0 ? ' is-current' : ''}${isHidden ? ' is-hidden-action' : ''}`,
             label: title,
             shortLabel: this.getShortLabel(item),
-            badgeText: String(index + 1),
+            badgeText: count > 1 ? String(count) : null,
             progressRatio,
             cancellable: true,
             tooltipTitle: title,
@@ -153,19 +178,25 @@ class CompactQueueUI extends CompactChipStripUI {
         };
     }
 
-    cancelItem(item, index) {
+    cancelItem(group, chipIndex) {
         const activeMyte = this.parent.getActiveMyte?.();
         if (!activeMyte?.queue) {
             return false;
         }
 
-        if (index === 0) {
+        if (chipIndex === 0) {
             activeMyte.queue.removeCurrentAction?.();
             return true;
         }
 
+        // Remove all items in the group from the queue by reference
         if (Array.isArray(activeMyte.queue.queue)) {
-            activeMyte.queue.queue.splice(index, 1);
+            for (const groupItem of group.items) {
+                const idx = activeMyte.queue.queue.indexOf(groupItem);
+                if (idx !== -1) {
+                    activeMyte.queue.queue.splice(idx, 1);
+                }
+            }
             return true;
         }
 

@@ -14,15 +14,13 @@ class UserInterface {
         this.myteListManager = new MyteListManager(this);
         this.hudManager = new HUDManager(this);
         this.buffOverlayUI = new BuffOverlayUI(this, {
-            element: document.getElementById('myte_buff_overlay'),
-            maxItems: 6
+            element: document.getElementById('myte_buff_overlay')
         });
         this.offscreenMyteIndicatorManager = new OffscreenMyteIndicatorManager(this);
         this.screenManager = new ScreenManager(this);
         this.cursorManager = new CursorManager(this);
         this.compactQueueUI = new CompactQueueUI(this, {
-            element: document.getElementById('myte_queue_overlay'),
-            maxItems: 5
+            element: document.getElementById('myte_queue_overlay')
         });
     }
 

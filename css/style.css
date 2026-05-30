@@ -234,6 +234,7 @@ button:disabled {
   text-shadow: 1px 1px 0 var(--button-disabled-highlight, var(--button-light));
   cursor: default;
   filter: saturate(0.72);
+  pointer-events: none;
 }
 .button.disabled .icon,
 .button.disabled svg, .button:disabled .icon,
@@ -252,15 +253,6 @@ button:disabled .icon,
 button:disabled svg {
   fill: var(--button-disabled-icon-color, var(--button-icon-color));
   color: var(--button-disabled-icon-color, var(--button-icon-color));
-}
-.button.disabled, .button:disabled,
-input[type=submit].disabled,
-input[type=submit]:disabled,
-input[type=button].disabled,
-input[type=button]:disabled,
-button.disabled,
-button:disabled {
-  pointer-events: none;
 }
 
 input[type=range] {
@@ -414,8 +406,7 @@ body.debug .map-object > .interactive-hitbox {
 .dragging {
   cursor: grabbing;
   touch-action: none;
-  -moz-user-select: none;
-       user-select: none;
+  user-select: none;
   -webkit-user-select: none;
 }
 
@@ -1071,9 +1062,7 @@ body.debug .map-object > .interactive-hitbox {
   justify-content: space-between;
   list-style: none;
   padding: 6px var(--padding);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .debug-panel .debug-section > summary::-webkit-details-marker {
   display: none;
@@ -1142,9 +1131,7 @@ body.debug .map-object > .interactive-hitbox {
   cursor: pointer;
   font-weight: 600;
   font-size: 0.85em;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .debug-panel .debug-group > .debug-group-summary::-webkit-details-marker {
   display: none;
@@ -1214,9 +1201,7 @@ body.debug .map-object > .interactive-hitbox {
   justify-content: space-between;
   list-style: none;
   padding: 6px var(--padding);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .action-queue-panel .queue-panel-shell > summary::-webkit-details-marker {
   display: none;
@@ -1243,11 +1228,6 @@ body.debug .map-object > .interactive-hitbox {
 }
 .action-queue-panel .queue-empty-state {
   display: none;
-}
-.action-queue-panel .queue-empty-state.is-visible {
-  display: block;
-}
-.action-queue-panel .queue-empty-state {
   font-size: 10px;
   opacity: 0.55;
   padding: var(--padding);
@@ -1255,6 +1235,9 @@ body.debug .map-object > .interactive-hitbox {
   background-color: rgba(255, 255, 255, 0.85);
   border-radius: var(--border-width);
   backdrop-filter: blur(4px);
+}
+.action-queue-panel .queue-empty-state.is-visible {
+  display: block;
 }
 .action-queue-panel .queue-item {
   background-color: rgba(255, 255, 255, 0.85);
@@ -1420,7 +1403,6 @@ body.debug .map-object > .interactive-hitbox {
   z-index: var(--z-debug);
   flex-direction: column;
   transform: translate(calc(-100% - 40px), 0);
-  width: -moz-fit-content;
   width: fit-content;
 }
 .app-shell > .hand-controls input[type=radio] {
@@ -1563,6 +1545,48 @@ body.debug .map-object > .interactive-hitbox {
   background: var(--need-meter-color);
   box-shadow: 0 0 10px color-mix(in srgb, var(--need-meter-color) 35%, transparent);
   transition: width 180ms ease-out;
+}
+.app-shell > .sidebar > .action-controls > .other-info .neutral-meter {
+  --need-meter-color: #9d80d6;
+}
+.app-shell > .sidebar > .action-controls > .other-info .trait-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+.app-shell > .sidebar > .action-controls > .other-info .trait-info .trait-name {
+  font-size: 0.8em;
+  line-height: 1.2;
+  opacity: 0.75;
+}
+.app-shell > .sidebar > .action-controls > .other-info .trait-info .trait-pole-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.app-shell > .sidebar > .action-controls > .other-info .trait-info .trait-pole-row .pole-label {
+  font-size: 0.62em;
+  opacity: 0.45;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.app-shell > .sidebar > .action-controls > .other-info .trait-info .trait-pole-row .pole-track {
+  flex: 1;
+  height: 2px;
+  background: var(--surface-ui-pressed);
+  border-radius: 999px;
+  position: relative;
+}
+.app-shell > .sidebar > .action-controls > .other-info .trait-info .trait-pole-row .pole-track .pole-marker {
+  position: absolute;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9d80d6;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 5px rgba(157, 128, 214, 0.55);
+  transition: left 300ms ease-out;
 }
 .app-shell > .sidebar > .action-controls > .other-info .ai-choice-info {
   display: flex;
@@ -1790,9 +1814,7 @@ body.debug .map-object > .interactive-hitbox {
 .window-panel > .window-panel__header > .window-panel__controls {
   display: flex;
   gap: var(--gap);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .window-panel > .window-panel__header > .window-panel__controls > button {
   width: 30px;
@@ -1921,17 +1943,15 @@ body.debug .map-object > .interactive-hitbox {
   flex-direction: column;
   gap: 6px;
   width: 100%;
-}
-#game-debug-panel .window-panel__content .settings-subgroup .debug-button,
-#game-debug-panel .window-panel__content .settings-subgroup .button-group {
-  width: 100%;
-}
-#game-debug-panel .window-panel__content .settings-subgroup {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+}
+#game-debug-panel .window-panel__content .settings-subgroup .debug-button,
+#game-debug-panel .window-panel__content .settings-subgroup .button-group {
+  width: 100%;
 }
 #game-debug-panel .window-panel__content .settings-subgroup button.debug-button {
   padding: 0.5rem;
@@ -2077,21 +2097,31 @@ body.debug .map-object > .interactive-hitbox {
   margin-top: 2px;
 }
 
-.myte-queue-overlay,
-.myte-buff-overlay {
+.myte-overlay-row {
   position: absolute;
   top: var(--space-lg);
   left: var(--space-lg);
+  right: var(--space-lg);
   z-index: var(--z-overlay);
   display: flex;
-  gap: var(--space-md);
   align-items: flex-start;
-  max-width: min(70%, 420px);
+  gap: var(--space-md);
   pointer-events: none;
 }
-.myte-queue-overlay:empty,
-.myte-buff-overlay:empty {
+
+.myte-queue-overlay,
+.myte-buff-overlay {
+  flex: 1 1 0;
+  min-width: 0;
   display: none;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: flex-start;
+  pointer-events: none;
+}
+.myte-queue-overlay.has-items,
+.myte-buff-overlay.has-items {
+  display: flex;
 }
 .myte-queue-overlay .compact-chip,
 .myte-buff-overlay .compact-chip {
@@ -2112,16 +2142,12 @@ body.debug .map-object > .interactive-hitbox {
   padding: 0;
   overflow: visible;
   touch-action: manipulation;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   font-family: inherit;
   flex-direction: column;
-  gap: 2px;
 }
 .myte-queue-overlay .compact-chip.is-current,
 .myte-buff-overlay .compact-chip.is-current {
-  opacity: 1;
   background-color: var(--surface-ui-pressed, var(--button-hover));
   border-top-color: var(--button-dark);
   border-left-color: var(--button-dark);
@@ -2133,19 +2159,20 @@ body.debug .map-object > .interactive-hitbox {
   background: var(--button-dark);
   transform: scale(0.96);
 }
-.myte-queue-overlay .compact-chip.queue-chip.is-current .compact-chip__label,
-.myte-buff-overlay .compact-chip.queue-chip.is-current .compact-chip__label {
-  font-size: 0.78rem;
+.myte-queue-overlay .compact-chip.is-hidden-action,
+.myte-buff-overlay .compact-chip.is-hidden-action {
+  border-style: dashed;
+  opacity: 0.5;
 }
 .myte-queue-overlay .compact-chip.buff-chip.kind-buff,
 .myte-buff-overlay .compact-chip.buff-chip.kind-buff {
-  border-color: var(--border-strong);
-  background: var(--surface-state-self);
+  border-color: var(--state-success-accent);
+  background: var(--surface-toast-success);
 }
 .myte-queue-overlay .compact-chip.buff-chip.kind-debuff,
 .myte-buff-overlay .compact-chip.buff-chip.kind-debuff {
-  border-color: var(--button-remove-border-color);
-  background: var(--surface-state-map);
+  border-color: var(--state-error-accent);
+  background: var(--surface-toast-error);
 }
 .myte-queue-overlay .compact-chip .compact-chip__badge,
 .myte-buff-overlay .compact-chip .compact-chip__badge {
@@ -2158,11 +2185,11 @@ body.debug .map-object > .interactive-hitbox {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.45rem;
+  font-size: 0.5rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   line-height: 1;
-  opacity: 0.75;
+  opacity: 0.85;
   visibility: hidden;
 }
 .myte-queue-overlay .compact-chip.has-badge .compact-chip__badge,
@@ -2171,15 +2198,9 @@ body.debug .map-object > .interactive-hitbox {
 }
 .myte-queue-overlay .compact-chip .compact-chip__label,
 .myte-buff-overlay .compact-chip .compact-chip__label {
-  font-size: 0.66rem;
+  font-size: 1rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.myte-queue-overlay .compact-chip.queue-chip.is-current .compact-chip__badge,
-.myte-buff-overlay .compact-chip.queue-chip.is-current .compact-chip__badge {
-  color: #6d4f00;
-  opacity: 1;
+  line-height: 1;
 }
 .myte-queue-overlay .compact-chip .compact-chip__meter,
 .myte-buff-overlay .compact-chip .compact-chip__meter {
@@ -2187,7 +2208,7 @@ body.debug .map-object > .interactive-hitbox {
   left: 4px;
   right: 4px;
   bottom: 4px;
-  height: 4px;
+  height: 3px;
   border-radius: 999px;
   overflow: hidden;
   background: var(--surface-ui-pressed);
@@ -2211,8 +2232,8 @@ body.debug .map-object > .interactive-hitbox {
   border-radius: inherit;
   transition: width 200ms linear;
 }
-.myte-queue-overlay .compact-chip.buff-chip .compact-chip__meter-fill,
-.myte-buff-overlay .compact-chip.buff-chip .compact-chip__meter-fill {
+.myte-queue-overlay .compact-chip.buff-chip.kind-buff .compact-chip__meter-fill,
+.myte-buff-overlay .compact-chip.buff-chip.kind-buff .compact-chip__meter-fill {
   background: var(--state-success-accent);
 }
 .myte-queue-overlay .compact-chip.buff-chip.kind-debuff .compact-chip__meter-fill,
@@ -2221,22 +2242,30 @@ body.debug .map-object > .interactive-hitbox {
 }
 
 .myte-buff-overlay {
-  left: auto;
-  right: var(--space-lg);
   justify-content: flex-end;
 }
 
 @media (max-width: 700px) {
+  .app-stage .myte-overlay-row {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+}
+@media (max-width: 700px) {
   .app-stage .myte-queue-overlay,
   .app-stage .myte-buff-overlay {
-    max-width: calc(100% - 24px);
+    flex: none;
+    width: 100%;
     gap: var(--space-sm);
-    flex-wrap: wrap;
   }
   .app-stage .myte-queue-overlay .compact-chip,
   .app-stage .myte-buff-overlay .compact-chip {
     width: 36px;
     height: 36px;
+  }
+  .app-stage .myte-queue-overlay .compact-chip .compact-chip__label,
+  .app-stage .myte-buff-overlay .compact-chip .compact-chip__label {
+    font-size: 0.9rem;
   }
 }
 
@@ -2250,9 +2279,7 @@ body.debug .map-object > .interactive-hitbox {
   position: absolute;
   top: 0;
   transition: opacity var(--motion-slower) var(--ease-emphasis);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   width: 100%;
   z-index: var(--z-loading);
 }
@@ -2552,7 +2579,6 @@ body.debug .map-object > .interactive-hitbox {
   display: flex;
   gap: var(--border-width);
   align-items: center;
-  width: -moz-fit-content;
   width: fit-content;
   left: 50%;
   transform: translate(-50%, -115%);
@@ -2731,9 +2757,7 @@ body.debug .map-object > .interactive-hitbox {
 }
 .interactive-myte.is-dragging {
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   cursor: grab;
   z-index: var(--z-drag) !important;
 }
@@ -2928,6 +2952,11 @@ body.debug .map-object > .interactive-hitbox {
     filter: drop-shadow(0 0 3px rgba(0, 255, 0, 0.5));
   }
 }
+.app-shell > .app-stage {
+  --dither-size: 12px;
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
+}
 .app-shell > .app-stage.noScroll {
   overflow: hidden;
 }
@@ -2937,11 +2966,6 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage.noScroll > .canvas > .layer {
   width: 100%;
   height: 100%;
-}
-.app-shell > .app-stage {
-  --dither-size: 12px;
-  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
-  background-size: var(--dither-size, 6px);
 }
 .app-shell > .app-stage > .crosshair {
   position: absolute;
@@ -3014,9 +3038,7 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.debug {
   z-index: 100;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   width: 100%;
   height: 100%;
   visibility: hidden;
@@ -3026,9 +3048,7 @@ body.debug .map-object > .interactive-hitbox {
   border: 1px solid rgba(255, 0, 0, 0.5);
   pointer-events: none;
   position: absolute;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   z-index: 9999;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .debug-collider.myte-collider {
@@ -3074,9 +3094,7 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.debug .pathfinder-node {
   position: absolute;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .path-line {
   height: 2px;
@@ -3126,9 +3144,7 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .app-stage > .canvas > .layer.effects {
   z-index: 2;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer > .zone {
   outline: 1px dashed red;
@@ -3226,9 +3242,7 @@ body[data-tool-mode=select] .app-shell > .app-stage > .canvas > .layer > .droppe
   z-index: 1;
   image-rendering: pixelated;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   transition: filter 0.2s ease;
 }
 .map-object > .sprite > .front,
@@ -3313,9 +3327,7 @@ body[data-tool-mode=drag] .map-object.draggable {
 }
 .map-object.is-dragging {
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   cursor: grabbing;
   z-index: var(--z-drag) !important;
 }
@@ -3765,4 +3777,4 @@ body[data-tool-mode=drag] .map-object.draggable {
   100% {
     transform: scale(0.9);
   }
-}/*# sourceMappingURL=style.css.map */
+}

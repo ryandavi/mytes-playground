@@ -86,7 +86,7 @@ class GreetAction extends PositionableAction {
 
 // Receiver side of a greet - queued on the target Myte by GreetAction.start().
 class GreetReceiveAction extends PositionableAction {
-    static metadata = { id: 'greet_receive' };
+    static metadata = { id: 'greet_receive', hideFromQueue: true };
 
     static canPerform() { return false; }
 

@@ -24,7 +24,7 @@ class AStarPathfinder {
         // Options with performance-optimized defaults
         this.options = {
             allowDiagonals: true,
-            allowDiagonalCutting: true,  // Allows cutting corners
+            allowDiagonalCutting: false,  // Cutting corners causes collider catching against object edges
             heuristicWeight: 1,
             maxSearchSteps: 8000,
             smoothPaths: true,

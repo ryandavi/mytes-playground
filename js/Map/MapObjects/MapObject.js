@@ -595,9 +595,9 @@ class MapObject {
 		const interactionType = this.getConfig('interactionType');
 
 		if (this.isReadyToHarvest?.()) {
-			affordances.push({ actionId: 'harvest', purpose: 'harvest' });
+			affordances.push({ actionId: 'harvest', purpose: 'harvest', chain: true });
 		} else if (this.canWater?.() && (context.energy ?? 1) > 0.4) {
-			affordances.push({ actionId: 'water_plant', purpose: 'tend' });
+			affordances.push({ actionId: 'water_plant', purpose: 'tend', chain: true });
 		}
 
 		if ((this.type?.toUpperCase?.() === 'FOOD' || this.getConfig('consumable', false)) && !actor?.queue?.isCarrying?.()) {
@@ -610,6 +610,8 @@ class MapObject {
 			affordances.push({ actionId: 'interact_object', purpose: 'start_music' });
 		} else if (interactionType === 'toggle') {
 			affordances.push({ actionId: 'interact_object', purpose: 'toggle' });
+		} else if (interactionType === 'social') {
+			affordances.push({ actionId: 'interact_object', purpose: 'socialize' });
 		}
 
 		if (this.canBeInspectedByAi()) {

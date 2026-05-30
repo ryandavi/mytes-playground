@@ -180,7 +180,7 @@ class InteractObjectAction extends GoToObjectAction {
                 selected.isActive !== false;
         }
 
-        return interactionType === 'dance' || interactionType === 'light' || interactionType === 'toggle';
+        return interactionType === 'dance' || interactionType === 'light' || interactionType === 'toggle' || interactionType === 'social';
     }
 
     static getRequiredOptions(selected) {
@@ -234,6 +234,13 @@ class InteractObjectAction extends GoToObjectAction {
             this.myte.queue.addDance(90);
         } else if (interactionType === 'light') {
             this.myte.queue.addIdle(Math.max(300, this.postActionIdleDuration || 0));
+        } else if (interactionType === 'social') {
+            const socialBoost  = this.target?.getConfig?.('socialBoost',  20) ?? 20;
+            const comfortBoost = this.target?.getConfig?.('comfortBoost',  0) ?? 0;
+            this.myte.stats?.updateSocial?.(socialBoost);
+            if (comfortBoost > 0) this.myte.stats?.updateComfort?.(comfortBoost);
+            this.myte.queue.addExpression('heart', 400, 1);
+            this.myte.queue.addIdle(Math.max(600, this.postActionIdleDuration || 0));
         } else if (this.postActionIdleDuration > 0) {
             this.myte.queue.addIdle(this.postActionIdleDuration);
         }
@@ -1456,14 +1463,17 @@ class HarvestAction extends GoToObjectAction {
         stopInteractionSoundPulse(this);
         this.faceTarget();
         super.complete();
+        if (this.didAbortApproach()) return;
         if (typeof this.target?.performHarvest === 'function') {
             this.target.performHarvest(this.myte.parent, this.myte);
         } else if (this.target?.harvest) {
             this.target.harvest(this.myte);
         }
-        this.myte.queue.addExpression('excited', 300, 1);
-        if (this.postActionIdleDuration > 0) {
-            this.myte.queue.addIdle(this.postActionIdleDuration);
+        if (!this.suppressPostEffects) {
+            this.myte.queue.addExpression('excited', 300, 1);
+            if (this.postActionIdleDuration > 0) {
+                this.myte.queue.addIdle(this.postActionIdleDuration);
+            }
         }
     }
 }

@@ -613,6 +613,7 @@ class GoToObjectAction extends PositionableAction {
         super.start();
         this._approachOutcome = 'pending';
         this.currentTargetIndex  = 0;
+        this._failedApproachPositions = new Set();
         this._resolvedApproachConfig = this._resolveApproachConfig();
         this.buildApproachPlan();
         this._lastTargetSnapshot = this._captureTargetSnapshot();
@@ -693,6 +694,13 @@ class GoToObjectAction extends PositionableAction {
         _approachWarn(`[approach] ${this.myte?.name} found no reachable approach to ${this.getQueueTargetLabel(this.target)} — target may be enclosed.`);
     }
 
+    _blacklistApproachPos(pos) {
+        if (!pos) return;
+        const key = `${Math.round(pos.x / 16) * 16},${Math.round(pos.y / 16) * 16}`;
+        this._failedApproachPositions.add(key);
+        _approachWarn(`[approach] blacklisted approach pos (${key}) after stuck/failed attempt`);
+    }
+
     getMyteApproachRect(alignTo = 'sprite') {
         if (alignTo === 'collider' && this.myte?.collider) {
             return {
@@ -757,6 +765,15 @@ class GoToObjectAction extends PositionableAction {
 
         for (let i = 0; i < candidates.length; i++) {
             const candidate = candidates[i];
+
+            if (this._failedApproachPositions?.size) {
+                const failKey = `${Math.round(candidate.x / 16) * 16},${Math.round(candidate.y / 16) * 16}`;
+                if (this._failedApproachPositions.has(failKey)) {
+                    _alog(`[APPROACH]   candidate[${i}] (${candidate.x.toFixed(1)},${candidate.y.toFixed(1)}) skipped — previously failed`);
+                    continue;
+                }
+            }
+
             const endCX = candidate.x + (this.myte.size.width  / 2);
             const endCY = candidate.y + (this.myte.size.height / 2);
             const col = this.myte.collider;
@@ -983,6 +1000,7 @@ class GoToObjectAction extends PositionableAction {
                 this.clearDebugPath();
                 return true;
             }
+            this._blacklistApproachPos(this.targetPos);
             this.buildApproachPlan();
             this._lastTargetSnapshot = this._captureTargetSnapshot();
             this._lastTargetReplanAt = performance.now();
@@ -1023,6 +1041,7 @@ class GoToObjectAction extends PositionableAction {
                     this.clearDebugPath();
                     return true;
                 }
+                this._blacklistApproachPos(this.targetPos);
                 this.buildApproachPlan();
                 this._lastTargetSnapshot = this._captureTargetSnapshot();
                 this._lastTargetReplanAt = performance.now();
@@ -1082,6 +1101,7 @@ class GoToObjectAction extends PositionableAction {
                     return true;
                 }
                 _approachWarn(`[approach] ${this.myte.name} at final tile for ${this.getQueueTargetLabel(this.target)} — threshold not met (gap=${colliderGap.toFixed(1)}, required<=${interactionDist}). Replanning (attempt ${this._replanCount}).`);
+                this._blacklistApproachPos(this.targetPos);
                 this.buildApproachPlan();
                 this._lastTargetSnapshot = this._captureTargetSnapshot();
                 this._lastTargetReplanAt = performance.now();

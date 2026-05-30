@@ -62,6 +62,11 @@ class GateMapObject extends ConnectableToggleableDirectionalAnimatedMapObject {
 
     // ── Interaction ───────────────────────────────────────────────────────────
 
+    getAiAffordances() {
+        // Gates are handled by pathfinding auto-open; exclude them as AI interaction targets.
+        return [];
+    }
+
     press(interactor) {
         if (this.isAnimating) return false;
 

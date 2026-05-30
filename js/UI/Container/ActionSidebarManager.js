@@ -536,41 +536,51 @@ class ActionSidebarManager extends UIComponent {
                 rows.push({ label: '__header_vitals', value: 'Vitals', className: 'needs-title' });
                 [
                     { id: 'energy', label: 'Energy' },
-                    { id: 'health', label: 'Health' }
+                    { id: 'health', label: 'Health' },
+                    { id: 'hunger', label: 'Hunger' }
                 ].forEach(({ id, label }) => {
                     const value = vitals[id] ?? 0;
-                    rows.push({
-                        label: `vital_${id}`,
-                        value,
-                        meta: { label, id },
-                        type: 'meter',
-                        cacheValue: `${id}:${value}`
-                    });
+                    rows.push({ label: `vital_${id}`, value, meta: { label, id }, type: 'meter', cacheValue: `${id}:${value}` });
                 });
 
-                rows.push({ label: '__header_needs', value: 'Needs', className: 'needs-title' });
+                rows.push({ label: '__header_wellbeing', value: 'Wellbeing', className: 'needs-title' });
                 [
-                    { id: 'fun', label: 'Fun' },
-                    { id: 'comfort', label: 'Comfort' },
-                    { id: 'confidence', label: 'Confidence' }
+                    { id: 'fun',     label: 'Fun' },
+                    { id: 'social',  label: 'Social' },
+                    { id: 'comfort', label: 'Comfort' }
                 ].forEach(({ id, label }) => {
                     const value = vitals[id] ?? 0;
-                    rows.push({
-                        label: `vital_${id}`,
-                        value,
-                        meta: { label, id },
-                        type: 'meter',
-                        cacheValue: `${id}:${value}`
-                    });
+                    rows.push({ label: `vital_${id}`, value, meta: { label, id }, type: 'meter', cacheValue: `${id}:${value}` });
+                });
+
+                rows.push({ label: '__header_personality', value: 'Personality', className: 'needs-title' });
+                const confidenceValue = vitals.confidence ?? 0;
+                rows.push({
+                    label: 'vital_confidence',
+                    value: confidenceValue,
+                    meta: { label: 'Confidence', id: 'confidence', neutral: true },
+                    type: 'meter',
+                    cacheValue: `confidence:${confidenceValue}`
+                });
+                [
+                    { id: 'boldness',    label: 'Boldness',    lowPole: 'Timid',     highPole: 'Reckless' },
+                    { id: 'curiosity',   label: 'Curiosity',   lowPole: 'Contented', highPole: 'Obsessive' },
+                    { id: 'activity',    label: 'Activity',    lowPole: 'Lethargic', highPole: 'Frantic' },
+                    { id: 'sociability', label: 'Sociability', lowPole: 'Reclusive', highPole: 'Clingy' }
+                ].forEach(({ id, label, lowPole, highPole }) => {
+                    const value = Math.round((selectedObject.stats?.getTraitNormalized?.(id) ?? 0.5) * 100);
+                    rows.push({ label: `trait_${id}`, value, meta: { label, id, lowPole, highPole }, type: 'trait-pole', cacheValue: `${id}:${value}` });
                 });
 
                 if (Array.isArray(snapshot.needs) && snapshot.needs.length) {
-                    rows.push({ label: '__header_drives', value: 'Derived Drives', className: 'needs-title' });
-                    snapshot.needs.forEach(({ id, label, percent }) => {
+                    const driveLabels = { eatDrive: 'Hunger', restDrive: 'Rest', playDrive: 'Play', socialDrive: 'Social', exploreDrive: 'Explore', comfortDrive: 'Comfort', safetyDrive: 'Safety' };
+                    rows.push({ label: '__header_urgency', value: 'Urgency', className: 'needs-title' });
+                    snapshot.needs.forEach(({ id, percent }) => {
+                        const label = driveLabels[id] ?? id;
                         rows.push({
                             label: `drive_${id}`,
                             value: percent ?? 0,
-                            meta: { label, id },
+                            meta: { label, id, urgency: true },
                             type: 'meter',
                             cacheValue: `${id}:${percent ?? 0}`
                         });
@@ -685,7 +695,14 @@ class ActionSidebarManager extends UIComponent {
                 const width = `${Utility.clamp(pct, 0, 100)}%`;
                 if (fill.style.width !== width) fill.style.width = width;
                 meter.setAttribute('aria-valuenow', String(pct));
-                el.dataset.state = this.getMeterState(pct);
+                if (row.meta?.urgency) {
+                    el.dataset.state = this.getMeterState(100 - pct);
+                } else if (row.meta?.neutral) {
+                    delete el.dataset.state;
+                    el.classList.add('neutral-meter');
+                } else {
+                    el.dataset.state = this.getMeterState(pct);
+                }
                 el.dataset.metricId = row.meta.id ?? '';
             } else if (row.type === 'ai-choice') {
                 if (!el) {
@@ -723,6 +740,35 @@ class ActionSidebarManager extends UIComponent {
 
                     body.dataset.decisionKey = decisionKey;
                 }
+            } else if (row.type === 'trait-pole') {
+                if (!el) {
+                    el = document.createElement('div');
+                    el.classList.add('state-info', 'trait-info');
+                    const name = document.createElement('div');
+                    name.classList.add('trait-name');
+                    const poleRow = document.createElement('div');
+                    poleRow.classList.add('trait-pole-row');
+                    const lowLabel = document.createElement('span');
+                    lowLabel.classList.add('pole-label', 'pole-low');
+                    lowLabel.textContent = row.meta.lowPole;
+                    const track = document.createElement('div');
+                    track.classList.add('pole-track');
+                    const marker = document.createElement('div');
+                    marker.classList.add('pole-marker');
+                    track.append(marker);
+                    const highLabel = document.createElement('span');
+                    highLabel.classList.add('pole-label', 'pole-high');
+                    highLabel.textContent = row.meta.highPole;
+                    poleRow.append(lowLabel, track, highLabel);
+                    el.append(name, poleRow);
+                }
+                const name = el.querySelector('.trait-name');
+                const marker = el.querySelector('.pole-marker');
+                const pct = row.value;
+                if (name.textContent !== row.meta.label) name.textContent = row.meta.label;
+                const leftPct = `${Utility.clamp(pct, 0, 100)}%`;
+                if (marker.style.left !== leftPct) marker.style.left = leftPct;
+                el.dataset.metricId = row.meta.id ?? '';
             } else if (row.label.startsWith('__header_')) {
                 if (!el) {
                     el = document.createElement('div');

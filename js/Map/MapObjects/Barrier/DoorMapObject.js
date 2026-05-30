@@ -329,6 +329,12 @@ class DoorMapObject extends ToggleableDirectionalAnimatedMapObject {
         return shouldOpen ? this.open(context) : this.close(context);
     }
 
+    getAiAffordances() {
+        // Doors are opened automatically by pathfinding when traversed; the AI should
+        // never target a door as an explicit interact_object goal.
+        return [];
+    }
+
     press(parent) {
         const myte = this.activeMyte;
         if (!this.active || !myte || this.isAnimating) return false;

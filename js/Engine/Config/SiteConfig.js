@@ -45,12 +45,42 @@ const SiteConfig = Object.freeze({
         // Behavior drives update slower while parked in home slot
         homeSlotBehaviorRateMultiplier: 0.55,
 
-        // Comfort/confidence slowly improve just from being in the home slot
-        homeSlotComfortBoostRate: 0.0011,
+        // Home slot stasis recovery rates (per ms).
+        // These must overcome the competing decay in updateBehaviorDrives (still runs at 0.55×).
+        // Net positive ensures every stat slowly fills while docked.
+        homeSlotComfortBoostRate:    0.0011,
         homeSlotConfidenceBoostRate: 0.00055,
+        homeSlotFunRestoreRate:      0.0030,  // beats resting fun decay (~0.0014/ms), net ~+0.002/ms
+        homeSlotSocialRestoreRate:   0.0008,  // beats social decay (~0.0004/ms), net ~+0.0004/ms
+        homeSlotHungerRestoreRate:   0.0025,  // beats hunger decay (~0.0017/ms), net ~+0.0008/ms
+
+        // Stat-condition modifiers on energy drain rate.
+        // hungerDrainScale: fraction of extra drain added at 0 hunger (starving). 0.3 = +30%.
+        hungerDrainScale: 0.30,
+        // healthDrainScale: fraction of extra drain added at 0 health (critical). 0.25 = +25%.
+        healthDrainScale: 0.25,
+        // wellConditionedThreshold/Scale: above this health ratio, drain is reduced.
+        // At full health (1.0): (1.0 - 0.8) * 0.40 = 0.08 → 8% discount.
+        wellConditionedThreshold: 0.8,
+        wellConditionedBonusScale: 0.40,
 
         // Energy threshold at which exhaustion effects clear
         exhaustionRecoveryThreshold: 12,
+
+        // Energy ratio below which exhaustion cascade starts (0.30 = 30% energy).
+        // Penalty scales linearly from 0 at threshold to 1.0 at 0% energy.
+        exhaustionPenaltyThreshold: 0.30,
+
+        // Per-stat decay bonuses applied at full exhaustion (energy = 0).
+        // Each scales with _getExhaustionPenalty() — e.g. at 15% energy, penalty = 0.5.
+        exhaustionCascade: Object.freeze({
+            healthDrainPerMs:     0.00018,  // extra damage/ms; at full → ~10.8 health/min net loss
+            hungerDecayScale:     0.50,     // up to +50% faster hunger decay
+            funDecayScale:        0.60,     // up to +60% faster fun decay
+            socialDecayScale:     0.35,     // up to +35% faster social decay
+            comfortDrainPerMs:    0.0006,   // direct comfort drain/ms at full penalty
+            confidenceDrainPerMs: 0.000018, // direct confidence drain/ms at full penalty
+        }),
 
         // Passive health regen per ms (active) — 1.5× in home slot
         healthRegenRate: 0.000025,
@@ -92,6 +122,7 @@ const SiteConfig = Object.freeze({
                     category: 'play',
                     affectsMood: true,
                     fun: 16,
+                    energy: -10,
                     rewardScale: 0.42
                 }),
             }),
@@ -176,12 +207,14 @@ const SiteConfig = Object.freeze({
 
         // Thresholds that gate behavior, effects, and UI state
         thresholds: Object.freeze({
-            // Battery display level cutoffs (% of maxEnergy)
+            // Battery display level cutoffs (% of maxEnergy).
+            // animation: CSS class applied while the icon is shown at this level.
+            // hideDelay: ms until the icon auto-hides (null = never auto-hide).
             batteryLevels: Object.freeze([
-                Object.freeze({ name: 'empty',  threshold: 0  }),
-                Object.freeze({ name: 'low',    threshold: 30 }),
-                Object.freeze({ name: 'medium', threshold: 60 }),
-                Object.freeze({ name: 'full',   threshold: 90 }),
+                Object.freeze({ name: 'empty',  threshold: 0,  animation: 'critical-pulse', hideDelay: null  }),
+                Object.freeze({ name: 'low',    threshold: 20, animation: 'blinking',       hideDelay: 5000  }),
+                Object.freeze({ name: 'medium', threshold: 50, animation: null,             hideDelay: 6000  }),
+                Object.freeze({ name: 'full',   threshold: 70, animation: null,             hideDelay: 3000  }),
             ]),
 
             // Min per-ms regen rate to count as rapid charging
@@ -202,14 +235,10 @@ const SiteConfig = Object.freeze({
             boredomDecisionAge: 20000, // AI must also have been idle at least this long (ms)
         }),
 
-        // Timing / cooldown values for sound, interaction, and battery UI
+        // Timing / cooldown values for sound and interaction
         cooldowns: Object.freeze({
             sound:             8000,
             interaction:       5000,
-            // How long the battery icon stays visible after a level change
-            batteryHideLow:    5000,
-            batteryHideMedium: 6000,
-            batteryHideFull:   3000,
         }),
 
         // Default mood state definitions. Individual myte definitions can

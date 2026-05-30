@@ -1,19 +1,49 @@
 const BUFF_CATEGORY_LABELS = Object.freeze({
     energy: '⚡',
     health: '❤️',
+    hunger: '🍽️',
+    fun: '🎉',
     mood: '😊',
     boredom: '😴',
     comfort: '🛋️',
     confidence: '✨',
     social: '👥',
     play: '🎉',
+    recovery: '⭐',
+    food: '🍽️',
+    event: '✨',
+    aura: '🌟',
+    zone: '📍',
     general: '⭐'
 });
 
+// Fixed display order for exclusive groups — buffs in these groups always appear
+// in this order relative to each other, regardless of which buff in the group is active.
+const BUFF_GROUP_ORDER = [
+    'zone',
+    'time_of_day',
+    'weather',
+    'energy_tier',
+    'hunger_tier',
+    'mood_polarity',
+    'confidence_polarity'
+];
+
 class BuffOverlayUI extends CompactChipStripUI {
+    _getGroupOrder(buff) {
+        const idx = BUFF_GROUP_ORDER.indexOf(buff.exclusiveGroup ?? '');
+        return idx === -1 ? BUFF_GROUP_ORDER.length : idx;
+    }
+
     getItems() {
         const activeMyte = this.parent.getActiveMyte?.();
-        return activeMyte?.buffs?.getVisibleBuffs?.() ?? [];
+        const buffs = activeMyte?.buffs?.getVisibleBuffs?.() ?? [];
+        return [...buffs].sort((a, b) => {
+            const ga = this._getGroupOrder(a);
+            const gb = this._getGroupOrder(b);
+            if (ga !== gb) return ga - gb;
+            return (a.priority ?? 50) - (b.priority ?? 50);
+        });
     }
 
     getShortLabel(buff) {
@@ -49,7 +79,7 @@ class BuffOverlayUI extends CompactChipStripUI {
             className: `buff-chip kind-${buff.kind} category-${buff.category}${buff.cancellable ? ' is-cancellable' : ''}`,
             label: buff.label,
             shortLabel: this.getShortLabel(buff),
-            badgeText: buff.stacks > 1 ? String(buff.stacks) : (buff.kind === 'debuff' ? '!' : '+'),
+            badgeText: buff.stacks > 1 ? String(buff.stacks) : null,
             progressRatio: buff.progressRatio,
             cancellable: buff.cancellable,
             tooltipTitle: buff.label,

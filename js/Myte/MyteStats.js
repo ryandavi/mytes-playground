@@ -348,6 +348,7 @@ class MyteStats {
 
         let funDelta     = (nn * 10) + (nc * 6) + (na * 5);
         let comfortDelta = (ns * 8) + (category === 'rest' ? 10 : 0) - (ne * 3);
+        let socialDelta  = nc * 18;
         let confDelta    = (na * 0.07) + (nc * 0.04) + (nn * 0.03);
 
         if (category === 'play') {
@@ -356,6 +357,7 @@ class MyteStats {
         } else if (category === 'social') {
             funDelta     += 4;
             comfortDelta += 2;
+            socialDelta  += 12;
         } else if (category === 'idle') {
             funDelta  -= 3;
             confDelta -= 0.01;
@@ -363,12 +365,13 @@ class MyteStats {
 
         this.updateFun(funDelta * this.noteBehaviorScale);
         this.updateComfort(comfortDelta * this.noteBehaviorScale);
+        this.updateSocial(socialDelta * this.noteBehaviorScale);
         this.applyConfidenceDelta(confDelta);
     }
 
     // --- Behavior drives (updates fun, social, hunger, comfort per tick) ---
 
-    updateBehaviorDrives(deltaTime) {
+    updateBehaviorDrives(deltaTime, { suppressExhaustionCascade = false } = {}) {
         const actionId = this.getCurrentActionId();
         const def = ActionDefinitionRegistry.getDefinitionSync(actionId ?? '');
         const tags = def?.tags ?? [];
@@ -392,6 +395,8 @@ class MyteStats {
         const isRestful         = tags.includes('restful');
 
         const rateScale = this.behaviorDriveRate * this.getBuffMultiplier('stats.behaviorDriveMultiplier');
+        const exhaustionPenalty = this._getExhaustionPenalty();
+        const cascade = SiteConfig.stats.exhaustionCascade;
 
         // Fun drain/gain
         let funDelta = 0;
@@ -411,15 +416,23 @@ class MyteStats {
             funDelta += this.funDeltaRates.moving * deltaTime * rateScale;
         }
 
-        // Apply fun decay rate on top of drive adjustments
+        // Apply fun decay rate on top of drive adjustments; exhaustion accelerates decay
         const funDecayMult = this.getBuffMultiplier('stats.funDecayMultiplier');
-        this.updateFun(-this.funDecayRate * deltaTime * rateScale * funDecayMult + funDelta);
+        const funExhaustionScale = suppressExhaustionCascade ? 1 : 1 + cascade.funDecayScale * exhaustionPenalty;
+        this.updateFun(-this.funDecayRate * deltaTime * rateScale * funDecayMult * funExhaustionScale + funDelta);
 
-        // Social decay
-        this.updateSocial(-this.socialDecayRate * deltaTime * rateScale);
+        // Social decay — reduced when alone, partially offset when following the player
+        const otherMytes = this.myte.parent?.mytes ?? [];
+        const isAlone = otherMytes.filter(m => m !== this.myte && m?.isActive).length === 0;
+        const isFollowing = this.myte.goal === MOVE_TYPES.FOLLOW;
+        const socialDecayMultiplier = isAlone ? 0.5 : 1;
+        const followSocialOffset = isFollowing ? this.socialDecayRate * 0.55 * deltaTime * rateScale : 0;
+        const socialExhaustionScale = suppressExhaustionCascade ? 1 : 1 + cascade.socialDecayScale * exhaustionPenalty;
+        this.updateSocial(-this.socialDecayRate * deltaTime * rateScale * socialDecayMultiplier * socialExhaustionScale + followSocialOffset);
 
-        // Hunger decay
-        this.updateHunger(-this.hungerDecayRate * deltaTime);
+        // Hunger decay — faster when exhausted (body burns more fuel when running on empty)
+        const hungerExhaustionScale = suppressExhaustionCascade ? 1 : 1 + cascade.hungerDecayScale * exhaustionPenalty;
+        this.updateHunger(-this.hungerDecayRate * deltaTime * hungerExhaustionScale);
 
         // Comfort blends toward a target based on wellbeing and home proximity
         const comfortTarget = (
@@ -449,6 +462,11 @@ class MyteStats {
             this.applyConfidenceDelta(0.00001 * deltaTime * rateScale);
         } else if (this.getFunRatio() < 0.25 || this.getEnergyRatio() < 0.18) {
             this.applyConfidenceDelta(-0.000011 * deltaTime * rateScale);
+        }
+
+        if (exhaustionPenalty > 0 && !suppressExhaustionCascade) {
+            this.updateComfort(-cascade.comfortDrainPerMs * exhaustionPenalty * deltaTime * rateScale);
+            this.applyConfidenceDelta(-cascade.confidenceDrainPerMs * exhaustionPenalty * deltaTime * rateScale);
         }
     }
 
@@ -600,9 +618,10 @@ class MyteStats {
             this.isRapidCharging = this.lastEnergyChange > this.rapidChargingThreshold;
 
             if (this.isRapidCharging && this.myte.battery) {
+                this.clearManagedTimeout(this.batteryHideTimeout, 'batteryHideTimeout');
+                this.clearManagedTimeout(this.chargingClassTimeout, 'chargingClassTimeout');
                 this.myte.battery.classList.add('charging');
                 this.showBattery();
-                this.clearManagedTimeout(this.chargingClassTimeout, 'chargingClassTimeout');
             }
 
             if (this.energy > this.exhaustionRecoveryThreshold) {
@@ -652,13 +671,15 @@ class MyteStats {
         this.lastFullChargeAnnouncementAt = now;
 
         if (this.myte.battery) {
+            this.clearManagedTimeout(this.batteryHideTimeout, 'batteryHideTimeout');
             this.myte.battery.classList.add('charging');
             this.myte.battery.classList.remove('critical-pulse');
             this.showBattery();
             this.playBatterySound(this.batteryThresholds.length - 1);
-            this.setManagedTimeout(() => {
+            this.batteryHideTimeout = this.setManagedTimeout(() => {
                 this.myte.battery.classList.remove('charging');
                 this.hideBattery();
+                this.batteryHideTimeout = null;
             }, 2000);
         }
 
@@ -772,34 +793,25 @@ class MyteStats {
     }
 
     handleBatteryVisibility() {
+        if (!this.myte.battery) return;
         this.clearManagedTimeout(this.batteryHideTimeout, 'batteryHideTimeout');
-        const batteryStatus = this.batteryThresholds[this.batteryLevel].name;
-        this.myte.battery.classList.remove('blinking');
-        this.myte.battery.classList.remove('critical-pulse');
 
-        if (batteryStatus === 'empty') {
-            this.showBattery();
-            this.myte.battery.classList.add('critical-pulse');
-        } else if (batteryStatus === 'low') {
-            this.showBattery();
-            this.myte.battery.classList.add('blinking');
-            this.batteryHideTimeout = this.setManagedTimeout(() => {
-                this.myte.battery.classList.remove('blinking');
-                this.batteryHideTimeout = null;
-            }, SiteConfig.myte.cooldowns.batteryHideLow);
-        } else if (batteryStatus === 'medium') {
-            this.showBattery();
-            this.batteryHideTimeout = this.setManagedTimeout(() => {
-                this.hideBattery();
-                this.batteryHideTimeout = null;
-            }, SiteConfig.myte.cooldowns.batteryHideMedium);
-        } else if (batteryStatus === 'full') {
-            this.showBattery();
-            this.batteryHideTimeout = this.setManagedTimeout(() => {
-                this.hideBattery();
-                this.batteryHideTimeout = null;
-            }, SiteConfig.myte.cooldowns.batteryHideFull);
+        const level = this.batteryThresholds[this.batteryLevel];
+
+        // Clear all level-based animation classes, then apply the current one
+        for (const t of this.batteryThresholds) {
+            if (t.animation) this.myte.battery.classList.remove(t.animation);
         }
+        if (level.animation) this.myte.battery.classList.add(level.animation);
+
+        if (level.hideDelay != null) {
+            this.batteryHideTimeout = this.setManagedTimeout(() => {
+                if (level.animation) this.myte.battery.classList.remove(level.animation);
+                this.hideBattery();
+                this.batteryHideTimeout = null;
+            }, level.hideDelay);
+        }
+        // hideDelay === null → persist (empty/critical state — never auto-hides)
     }
 
     // --- Timeout management ---
@@ -841,6 +853,20 @@ class MyteStats {
         return actionId === 'sleep' || actionId === 'simple_sleep' || actionId === 'use_surface_slot';
     }
 
+    _getExhaustionPenalty() {
+        const ratio = this.getEnergyRatio();
+        const threshold = SiteConfig.stats.exhaustionPenaltyThreshold;
+        return ratio >= threshold ? 0 : 1 - (ratio / threshold);
+    }
+
+    getStatConditionEnergyMultiplier() {
+        const cfg = SiteConfig.stats;
+        const penalty = (1 - this.getHungerRatio()) * cfg.hungerDrainScale
+                      + (1 - this.getHealthRatio()) * cfg.healthDrainScale;
+        const bonus = Math.max(0, this.getHealthRatio() - cfg.wellConditionedThreshold) * cfg.wellConditionedBonusScale;
+        return 1 + penalty - bonus;
+    }
+
     getEnergyActivityMultiplier() {
         const metadata = this.getCurrentActionMetadata();
         const actionId = metadata.id ?? this.getCurrentActionId();
@@ -865,12 +891,16 @@ class MyteStats {
     update(deltaTime) {
         const timeOfDayMultiplier = this._getTimeOfDayEnergyMultiplier();
 
+        const conditionMultiplier = this.getStatConditionEnergyMultiplier();
+        const exhaustionPenalty   = this._getExhaustionPenalty();
+
         if (this.myte.isMoving()) {
             this.useEnergy(
                 this.energyDecayRate *
                 deltaTime *
                 timeOfDayMultiplier *
                 this.getEnergyActivityMultiplier() *
+                conditionMultiplier *
                 this.getBuffMultiplier('stats.energyDecayMultiplier')
             );
         } else if (this.isRestingAction()) {
@@ -878,23 +908,28 @@ class MyteStats {
         } else {
             const actionId = this.getCurrentActionId();
             const isIdle = !actionId || actionId === 'idle';
-            if (isIdle) {
-                this.regenerateEnergy(deltaTime);
-            } else {
+            if (!isIdle) {
                 this.useEnergy(
                     this.energyDecayRate *
                     SiteConfig.stats.actionEnergyDrainFactor *
                     deltaTime *
                     timeOfDayMultiplier *
                     this.getEnergyActivityMultiplier() *
+                    conditionMultiplier *
                     this.getBuffMultiplier('stats.energyDecayMultiplier')
                 );
             }
+            // Idle standing is neutral — no regen, no drain.
+            // Energy only recovers during explicit rest actions.
         }
 
         this.applyContinuousBuffStatEffects(deltaTime);
         this.updateBehaviorDrives(deltaTime);
+
         this.updateHealth(SiteConfig.stats.healthRegenRate * deltaTime);
+        if (exhaustionPenalty > 0 && !this.isRestingAction()) {
+            this.applyDamage(SiteConfig.stats.exhaustionCascade.healthDrainPerMs * exhaustionPenalty * deltaTime);
+        }
         this.maybeSignalNeeds();
         this.updateBatteryDisplay();
     }
@@ -902,10 +937,15 @@ class MyteStats {
     updateInHomeSlot(deltaTime) {
         this.regenerateEnergy(deltaTime, this.homeSlotEnergyRegenRate);
         this.applyContinuousBuffStatEffects(deltaTime);
-        this.updateBehaviorDrives(deltaTime * this.homeSlotBehaviorRateMultiplier);
-        this.updateComfort(this.homeSlotComfortBoostRate * deltaTime);
+        this.updateBehaviorDrives(deltaTime * this.homeSlotBehaviorRateMultiplier, { suppressExhaustionCascade: true });
+        // Stasis boosts — override the residual decay from behavior drives above
+        const cfg = SiteConfig.stats;
+        this.updateFun(cfg.homeSlotFunRestoreRate * deltaTime);
+        this.updateSocial(cfg.homeSlotSocialRestoreRate * deltaTime);
+        this.updateHunger(cfg.homeSlotHungerRestoreRate * deltaTime);
+        this.updateComfort(cfg.homeSlotComfortBoostRate * deltaTime);
         this.applyConfidenceDelta(this.homeSlotConfidenceDeltaPerMs * deltaTime);
-        this.updateHealth(SiteConfig.stats.healthRegenRate * 1.5 * deltaTime);
+        this.updateHealth(cfg.healthRegenRate * 1.5 * deltaTime);
         this.updateBatteryDisplay();
     }
 

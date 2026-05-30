@@ -157,6 +157,55 @@
                     }
                 }
 
+                .neutral-meter {
+                    --need-meter-color: #9d80d6;
+                }
+
+                .trait-info {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.28rem;
+
+                    .trait-name {
+                        font-size: 0.8em;
+                        line-height: 1.2;
+                        opacity: 0.75;
+                    }
+
+                    .trait-pole-row {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.35rem;
+
+                        .pole-label {
+                            font-size: 0.62em;
+                            opacity: 0.45;
+                            white-space: nowrap;
+                            flex-shrink: 0;
+                        }
+
+                        .pole-track {
+                            flex: 1;
+                            height: 2px;
+                            background: var(--surface-ui-pressed);
+                            border-radius: 999px;
+                            position: relative;
+
+                            .pole-marker {
+                                position: absolute;
+                                top: 50%;
+                                width: 7px;
+                                height: 7px;
+                                border-radius: 50%;
+                                background: #9d80d6;
+                                transform: translate(-50%, -50%);
+                                box-shadow: 0 0 5px rgba(157, 128, 214, 0.55);
+                                transition: left 300ms ease-out;
+                            }
+                        }
+                    }
+                }
+
                 .ai-choice-info {
                     display: flex;
                     flex-direction: column;

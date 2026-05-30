@@ -398,7 +398,14 @@ class MyteAI {
             return null;
         }
 
-        const nearbySurface = this.findTargetWithAffordance(context.nearbyObjects, 'use_surface_slot', context);
+        const nearbySurface = this.findTargetWithAffordance(context.nearbyObjects, 'use_surface_slot', context)
+            ?? (context.drives.restDrive > 0.55
+                ? this.findTargetWithAffordance(
+                    this.getNearbyObjects(this.objectSearchRadius * 2.5),
+                    'use_surface_slot',
+                    context
+                )
+                : null);
         let score = 16 + (context.drives.restDrive * 84) + (context.drives.comfortDrive * 18);
         if (this.mode === MOVE_AUTONOMY_TYPES.REST) score += 36;
         if (context.distanceFromHome > this.homeComfortRadius) score += context.drives.safetyDrive * 14;
@@ -522,18 +529,27 @@ class MyteAI {
     }
 
     buildPlayCandidate(context) {
-        // Ball play has a lower energy floor since it's exciting — only block on exhaustion.
         const energyFloor = 0.22;
-        // When a ball is present the play need threshold is lower so the myte keeps playing
-        // while need remains elevated instead of quitting after one round.
-        const hasBall = this.findTargetWithAffordance(context.nearbyObjects, 'nudge_ball', context) != null;
-        const playNeedFloor = hasBall ? 0.28 : 0.4;
+
+        // Detect any nearby play object without hardcoding object types — any object
+        // whose affordances belong to the 'play' behavior category qualifies.
+        // This covers current toys (balls) and any future ones automatically.
+        const targetPlayObj = context.nearbyObjects.find(obj =>
+            this.getAffordancesForTarget(obj, context).some(a =>
+                this.getBehaviorCategoryForAction(a.actionId) === 'play'
+            )
+        ) ?? null;
+        const hasPlayObject = targetPlayObj !== null;
+
+        // Lower the entry threshold when a dedicated play object is nearby
+        const playNeedFloor = hasPlayObject ? 0.28 : 0.4;
         if (context.energy < energyFloor || context.drives.playDrive < playNeedFloor) {
             return null;
         }
 
+        // Still look specifically for nudge_ball/play_fetch targets for action selection
         const targetBall = this.findTargetWithAffordance(context.nearbyObjects, 'nudge_ball', context);
-        const targetAnchor = targetBall ?? this.getPlayAnchorTarget(context.nearbyObjects);
+        const targetAnchor = targetPlayObj ?? this.getPlayAnchorTarget(context.nearbyObjects);
         const playMomentum = Utility.clamp(
             (context.drives.playDrive * 0.5) +
             (context.activity * 0.28) +
@@ -545,6 +561,10 @@ class MyteAI {
         score += context.activity * 12;
         score -= context.drives.restDrive * 18;
 
+        // When fun is low and a play object is nearby, press harder to stay engaged
+        const funPressure = hasPlayObject && context.fun < 0.45 ? (0.45 - context.fun) / 0.45 : 0;
+        score += funPressure * 22;
+
         if (score < 24) {
             return null;
         }
@@ -555,8 +575,10 @@ class MyteAI {
                 ? 'run_laps'
                 : (context.activity > 0.74 ? 'zigzag' : 'circle'));
         const targetKey = targetBall ? this.getTargetKey(targetBall) : (targetAnchor ? this.getTargetKey(targetAnchor) : null);
-        // Ball repeat penalties are softer so the myte keeps playing while need stays high.
-        const repeatPenaltyOptions = targetBall
+
+        // Softer repeat penalties when playing with a specific object so the session
+        // isn't cut short — applies to any play object, not just balls
+        const repeatPenaltyOptions = targetPlayObj
             ? {
                 labelMultiplier: 0.94,
                 targetMultiplier: 0.96,
@@ -565,6 +587,14 @@ class MyteAI {
                 historyWindowMs: Math.min(this.repeatWindow, 20000)
             }
             : null;
+
+        // Same-target persistence: if the myte just played with this exact toy and fun is
+        // still unmet, boost the score so they stay with it rather than wandering off
+        const continuingWithSameToy = targetKey &&
+            this.lastDecisionTargetKey === targetKey &&
+            this.lastDecisionLabel?.startsWith('play:') &&
+            context.fun < 0.45;
+        if (continuingWithSameToy) score += 30;
 
         return {
             label: `play:${actionId}`,
@@ -581,8 +611,9 @@ class MyteAI {
                 }
 
                 if (actionId === 'nudge_ball' && targetBall) {
+                    const baseRepeats = playMomentum > 0.9 ? 3 : (playMomentum > 0.72 ? 2 : 1);
                     this.enqueueTargetedAction('nudge_ball', targetBall, {
-                        repeat: playMomentum > 0.9 ? 3 : (playMomentum > 0.72 ? 2 : 1),
+                        repeat: funPressure > 0.4 ? Math.min(baseRepeats + 1, 4) : baseRepeats,
                         postNudgeIdleDuration: 18 + Math.round(context.activity * 16)
                     }, {
                         label: 'play:nudge_ball',
@@ -671,6 +702,42 @@ class MyteAI {
             }
         }
 
+        // If the winning affordance declares chain:true, queue all other nearby objects
+        // that offer the same chainable affordance — no hardcoded object type checks.
+        if (best?.affordance?.chain) {
+            const chainActionId = best.affordance.actionId;
+            const primaryKey = best.targetKey;
+            const now = SimClock.now();
+            const chainTargets = this._sortByDistance(
+                context.nearbyObjects.filter(obj => {
+                    const key = this.getTargetKey(obj);
+                    if (key === primaryKey) return false;
+                    if (!this.getAffordancesForTarget(obj, context).some(a => a.actionId === chainActionId && a.chain)) return false;
+                    // Skip recently attempted targets (failed approaches re-try endlessly otherwise)
+                    const mem = this.objectMemories.get(key);
+                    if (mem && (now - mem.lastCompletedAt) < this.targetCooldownDuration) return false;
+                    return true;
+                })
+            );
+            if (chainTargets.length > 0) {
+                const originalExecute = best.execute;
+                best.commitmentMs = (best.commitmentMs ?? 1200) + chainTargets.length * 2200;
+                best.execute = () => {
+                    originalExecute();
+                    for (const chainTarget of chainTargets) {
+                        this.enqueueTargetedAction(chainActionId, chainTarget, { suppressPostEffects: true }, {
+                            label: best.label,
+                            category: this.getBehaviorCategoryForAction(chainActionId),
+                            novelty: this.getNoveltyScore(chainTarget),
+                            soothing: this.getSoothingValueForAction(chainActionId),
+                            accomplishment: this.getAccomplishmentValueForAction(chainActionId),
+                            exertion: this.getExertionValueForAction(chainActionId)
+                        });
+                    }
+                };
+            }
+        }
+
         return best;
     }
 
@@ -720,6 +787,8 @@ class MyteAI {
                     score += (context.musicNeed * 42) + (context.preferences.music * 20) + (context.drives.playDrive * 10);
                 } else if (affordancePurpose === 'light_on') {
                     score += (context.lightNeed * 46) + (context.preferences.light * 16) + (context.drives.comfortDrive * 12);
+                } else if (affordancePurpose === 'socialize') {
+                    score += (context.drives.socialDrive * 48) + (context.preferences.sociability * 16) + (context.drives.comfortDrive * 8);
                 } else if (interactionType === 'dance') {
                     score += (context.drives.playDrive * 26) + (context.activity * 14) + (context.drives.playDrive * 10);
                 } else if (interactionType === 'light') {
@@ -748,6 +817,7 @@ class MyteAI {
         return {
             label,
             targetKey,
+            affordance,
             commitmentMs: affordance.actionId === 'inspect'
                 ? 1400
                 : affordance.actionId === 'deep_inspect'
@@ -842,18 +912,36 @@ class MyteAI {
         return {
             label: 'idle',
             targetKey: 'idle',
-            commitmentMs: 900,
+            commitmentMs: 1400,
             score: this.applyRepeatPenalty(7 + ((1 - context.energy) * 3) + (context.drives.comfortDrive * 2), 'idle', 'idle'),
             execute: () => {
-                if (context.drives.playDrive > 0.5 && Math.random() < 0.22) {
-                    this.myte.queue.addExpression('surprise', 30, 1);
+                const roll = Math.random();
+                // Expression chosen by current state so the pause reads as intentional
+                if (context.energy < 0.4 && roll < 0.55) {
+                    this.myte.queue.addExpression('sleep', 60, 1);
+                } else if (context.drives.socialDrive > 0.55 && roll < 0.35) {
+                    this.myte.queue.addExpression('thought', 50, 1);
+                } else if (context.drives.playDrive > 0.5 && roll < 0.28) {
+                    this.myte.queue.addExpression('surprise', 40, 1);
                 }
 
-                this.enqueueAction('idle', { duration: 45 }, {
-                    label: 'idle',
-                    category: 'idle',
-                    novelty: 0.05
-                });
+                // Settle into a brief doze when tired; otherwise hold a proper deliberate pause
+                if (context.energy < 0.45 && Math.random() < 0.55) {
+                    this.enqueueAction('simple_sleep', { duration: 220 }, {
+                        label: 'idle',
+                        category: 'rest',
+                        novelty: 0.05,
+                        soothing: 0.4
+                    });
+                } else {
+                    this.enqueueAction('idle', {
+                        duration: 200 + Math.round(context.drives.comfortDrive * 140)
+                    }, {
+                        label: 'idle',
+                        category: 'idle',
+                        novelty: 0.05
+                    });
+                }
             }
         };
     }
@@ -1117,8 +1205,10 @@ class MyteAI {
 
         const gridSystem = this.myte.parent?.gameMap?.gridSystem;
         const cellSize = gridSystem?.config?.cellSize ?? 32;
-        const paddingX = Math.max(cellSize, Math.round(this.myte.size.width * 0.25));
-        const paddingY = Math.max(cellSize, Math.round(this.myte.size.height * 0.25));
+        // Keep mytes well away from the map edge — 3 cells minimum so they don't try to
+        // path into border colliders or visually hug the wall.
+        const paddingX = cellSize * 3;
+        const paddingY = cellSize * 3;
         const left = worldBounds.left + paddingX;
         const top = worldBounds.top + paddingY;
         const right = worldBounds.right - this.myte.size.width - paddingX;
@@ -1170,9 +1260,13 @@ class MyteAI {
             : confidenceRadius;
         const safeOrigin = gridSystem?.findNearestValidPositionForEntity?.(this.myte, origin.x, origin.y, 8) ?? origin;
 
+        const gridSystem_cs = gridSystem?.config?.cellSize ?? 32;
+        // Minimum distance: 4 cells. Shorter hops look jittery and random.
+        const minWanderDist = gridSystem_cs * 4;
+
         for (let attempt = 0; attempt < 18; attempt++) {
             const angle = Math.random() * Math.PI * 2;
-            const distance = 48 + Math.random() * maxRadius;
+            const distance = minWanderDist + Math.random() * maxRadius;
             const candidate = {
                 x: safeOrigin.x + Math.cos(angle) * distance,
                 y: safeOrigin.y + Math.sin(angle) * distance
@@ -1182,7 +1276,8 @@ class MyteAI {
                 continue;
             }
 
-            const safe = gridSystem?.findNearestValidPositionForEntity?.(this.myte, candidate.x, candidate.y, 8);
+            // Snap radius of 16 gives a wider berth from collider edges than 8
+            const safe = gridSystem?.findNearestValidPositionForEntity?.(this.myte, candidate.x, candidate.y, 16);
 
             if (safe &&
                 this.isWithinWanderBounds(safe, wanderBounds) &&
@@ -1268,7 +1363,9 @@ class MyteAI {
         if (actionId === 'smell_flower' || actionId === 'drink_fountain') return 'rest';
         if (actionId === 'interact_object' && affordance?.purpose === 'start_music') return 'play';
         if (actionId === 'interact_object' && affordance?.purpose === 'light_on') return 'rest';
+        if (actionId === 'interact_object' && affordance?.purpose === 'socialize') return 'social';
         if (actionId === 'interact_object' && interactionType === 'dance') return 'play';
+        if (actionId === 'interact_object' && interactionType === 'social') return 'social';
         if (actionId === 'interact_object' && interactionType === 'light') return 'rest';
         if (actionId === 'eat_element') return 'rest';
         return 'world';
@@ -1280,6 +1377,8 @@ class MyteAI {
         if (actionId === 'eat_element') return 0.55;
         if (actionId === 'interact_object' && affordance?.purpose === 'start_music') return 0.45;
         if (actionId === 'interact_object' && affordance?.purpose === 'light_on') return 0.6;
+        if (actionId === 'interact_object' && affordance?.purpose === 'socialize') return 0.55;
+        if (actionId === 'interact_object' && interactionType === 'social') return 0.55;
         if (actionId === 'interact_object' && interactionType === 'light') return 0.55;
         return 0.1;
     }

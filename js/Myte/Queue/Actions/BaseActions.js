@@ -308,7 +308,7 @@ class PositionableAction extends MyteAction {
 
 // Pause in place for a fixed duration (ms)
 class IdleAction extends MyteAction {
-    static metadata = { id: 'idle' };
+    static metadata = { id: 'idle', hideFromQueue: true };
 
     static canPerform(selected, active) {
         return active && selected === active;
@@ -329,7 +329,7 @@ class IdleAction extends MyteAction {
 
 // Show an expression overlay (hearts, Zs, etc.)
 class ExpressionAction extends MyteAction {
-    static metadata = { id: 'expression' };
+    static metadata = { id: 'expression', hideFromQueue: true };
 
     static canPerform(selected, active) {
         return active && selected === active;

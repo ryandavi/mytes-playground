@@ -383,7 +383,7 @@
       "requiresTarget": true,
       "affectsMood": false,
       "defaultOptions": {
-        "allowStuckSuccess": true,
+        "allowStuckSuccess": false,
         "stuckCompletionDistance": 18,
         "finalApproachSkipDistance": 48,
         "maxFinalAdjustmentDistance": 48

@@ -65,7 +65,7 @@ class CarryAction extends MyteAction {
 
 // Being carried — passive state on the carried Myte
 class BeingCarriedAction extends MyteAction {
-    static metadata = { id: 'being_carried' };
+    static metadata = { id: 'being_carried', hideFromQueue: true };
 
     static canPerform(selected, active) {
         return selected instanceof Myte &&

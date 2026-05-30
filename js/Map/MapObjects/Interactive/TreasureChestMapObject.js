@@ -442,8 +442,6 @@ class TreasureChestMapObject extends ClassStateAnimatedMapObject {
 
         if (this.state === 'closed' && this.hasLoot()) {
           affordances.push({ actionId: 'open_chest', purpose: 'open' });
-        } else if (this.state === 'opened' && this.canClose) {
-          affordances.push({ actionId: 'close_chest', purpose: 'close' });
         }
 
         return affordances;
