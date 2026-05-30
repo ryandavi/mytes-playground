@@ -138,7 +138,7 @@
         "priority": 3,
         "requiresTarget": true,
         "implementationClass": "CloseChestAction",
-        "options": { "closeAnimationDuration": 28, "postActionIdleDuration": 400 }
+        "options": { "closeAnimationDuration": 467, "postActionIdleDuration": 400 }
       },
       "traits": { "novelty": 2, "repeatMode": "free" },
       "effects": { "fun": 2, "energy": -1 },
@@ -172,10 +172,10 @@
       "tags": ["stimulating", "risky"],
       "queue": {
         "priority": 3,
-        "defaultDuration": 150,
+        "defaultDuration": 2500,
         "requiresTarget": true,
         "implementationClass": "DeepInspectAction",
-        "options": { "pointDuration": 24, "numPoints": 3, "expressionType": "surprise", "expressionDuration": 30 }
+        "options": { "pointDuration": 400, "numPoints": 3, "expressionType": "surprise", "expressionDuration": 500 }
       },
       "traits": { "exertion": 1, "novelty": 8, "risk": 2 },
       "effects": { "fun": 6, "energy": -2, "mood": 3 },
@@ -426,7 +426,7 @@
         "priority": 2,
         "requiresTarget": true,
         "implementationClass": "HarvestAction",
-        "options": { "harvestAnimationDuration": 50, "postActionIdleDuration": 500 }
+        "options": { "harvestAnimationDuration": 833, "postActionIdleDuration": 500 }
       },
       "traits": { "exertion": 1, "novelty": 3 },
       "effects": { "fun": 5, "energy": -1, "hunger": 10, "mood": 8 },
@@ -498,10 +498,10 @@
       "tags": ["stimulating"],
       "queue": {
         "priority": 2,
-        "defaultDuration": 90,
+        "defaultDuration": 1500,
         "requiresTarget": true,
         "implementationClass": "InspectAction",
-        "options": { "expressionType": "curious", "expressionDuration": 40, "lookInterval": 22 }
+        "options": { "expressionType": "curious", "expressionDuration": 667, "lookInterval": 367 }
       },
       "traits": { "exertion": 1, "novelty": 6, "risk": 1 },
       "effects": { "fun": 4, "energy": -1, "mood": 2 },
@@ -526,7 +526,7 @@
         "priority": 2,
         "requiresTarget": true,
         "implementationClass": "InteractObjectAction",
-        "options": { "interactionAnimationDuration": 32, "postActionIdleDuration": 500 }
+        "options": { "interactionAnimationDuration": 533, "postActionIdleDuration": 500 }
       },
       "traits": { "exertion": 1, "novelty": 4 },
       "effects": { "fun": 4, "energy": -1, "mood": 4 },
@@ -683,7 +683,7 @@
         "priority": 3,
         "requiresTarget": true,
         "implementationClass": "OpenChestAction",
-        "options": { "openAnimationDuration": 40, "receiveIdleDuration": 1000 }
+        "options": { "openAnimationDuration": 667, "receiveIdleDuration": 1000 }
       },
       "traits": { "exertion": 1, "novelty": 10, "risk": 3 },
       "effects": { "fun": 10, "energy": -2, "mood": 10 },
@@ -727,7 +727,7 @@
         "priority": 2,
         "requiresTarget": true,
         "implementationClass": "PickFlowerAction",
-        "options": { "pickAnimationDuration": 45, "approachConfig": "adjacent" }
+        "options": { "pickAnimationDuration": 750, "approachConfig": "adjacent" }
       },
       "traits": { "novelty": 3, "soothing": 2 },
       "effects": { "fun": 5, "comfort": 2, "energy": -1, "mood": 4 },
@@ -973,7 +973,7 @@
         "priority": 2,
         "requiresTarget": true,
         "implementationClass": "TrampleFlowerAction",
-        "options": { "approachConfig": "adjacent", "trampleAnimationDuration": 22, "postActionIdleDuration": 400 }
+        "options": { "approachConfig": "adjacent", "trampleAnimationDuration": 367, "postActionIdleDuration": 400 }
       },
       "traits": { "exertion": 1, "novelty": 2 },
       "effects": { "fun": 3, "comfort": -2, "energy": -1, "mood": -3 },
@@ -1069,7 +1069,7 @@
         "priority": 2,
         "requiresTarget": true,
         "implementationClass": "WaterPlantAction",
-        "options": { "waterAnimationDuration": 36, "postActionIdleDuration": 500 }
+        "options": { "waterAnimationDuration": 600, "postActionIdleDuration": 500 }
       },
       "traits": { "exertion": 1, "novelty": 2, "soothing": 1 },
       "effects": { "fun": 3, "comfort": 2, "energy": -1, "mood": 4 },
@@ -1112,10 +1112,10 @@
       "tags": ["stimulating"],
       "queue": {
         "priority": 2,
-        "defaultDuration": 60,
+        "defaultDuration": 1000,
         "requiresTarget": true,
         "implementationClass": "ShakeTreeAction",
-        "options": { "shakeAnimationDuration": 60, "postActionIdleDuration": 1200 }
+        "options": { "shakeAnimationDuration": 1000, "postActionIdleDuration": 1200 }
       },
       "traits": { "exertion": 2, "novelty": 4, "risk": 1 },
       "effects": { "fun": 6, "energy": -2, "mood": 5 },
@@ -1137,10 +1137,10 @@
       "tags": ["stimulating", "creative"],
       "queue": {
         "priority": 2,
-        "defaultDuration": 120,
+        "defaultDuration": 2000,
         "requiresTarget": true,
         "implementationClass": "ChopTreeAction",
-        "options": { "chopAnimationDuration": 120, "postActionIdleDuration": 1200 }
+        "options": { "chopAnimationDuration": 2000, "postActionIdleDuration": 1200 }
       },
       "traits": { "exertion": 3, "novelty": 3, "risk": 1 },
       "effects": { "fun": 5, "energy": -3 },
@@ -1162,10 +1162,10 @@
       "tags": ["stimulating"],
       "queue": {
         "priority": 2,
-        "defaultDuration": 90,
+        "defaultDuration": 1500,
         "requiresTarget": true,
         "implementationClass": "RemoveStumpAction",
-        "options": { "removeAnimationDuration": 90, "postActionIdleDuration": 1200 }
+        "options": { "removeAnimationDuration": 1500, "postActionIdleDuration": 1200 }
       },
       "traits": { "exertion": 2, "novelty": 2 },
       "effects": { "fun": 4, "energy": -2, "mood": 3 },

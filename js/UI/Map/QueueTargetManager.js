@@ -2,6 +2,7 @@ class QueueTargetManager extends UIComponent {
     constructor(parent) {
         super(parent);
         this.currentTarget = null;
+        this._lastUpdate = 0;
     }
 
     getHighlightElement(target) {
@@ -40,6 +41,10 @@ class QueueTargetManager extends UIComponent {
     }
 
     update() {
+        const now = performance.now();
+        if (now - this._lastUpdate < 100) return; // ~10fps
+        this._lastUpdate = now;
+
         const activeMyte = this.parent.getActiveMyte();
         let target = null;
 

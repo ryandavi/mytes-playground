@@ -15,6 +15,7 @@ class PatrolGuardMapObject extends MovingMapObject {
         this.waitElapsed = 0;   // accumulated ms since we started waiting
         this.isWaiting = false;
         this.detectionRadius = this.getConfig('detectionRadius', 150);
+        this.detectInterval  = this.getConfig('detectInterval', 250);
         
         // Set patrol path
         this.patrolPoints = options.patrolPoints || [];
@@ -247,7 +248,11 @@ class PatrolGuardMapObject extends MovingMapObject {
     tickUpdate(tickDelta) {
         super.tickUpdate(tickDelta);
 
-        this.detectTargets();
+        this._detectAccum = (this._detectAccum || 0) + tickDelta;
+        if (this._detectAccum >= this.detectInterval) {
+            this._detectAccum = 0;
+            this.detectTargets();
+        }
 
         if (this.alertStatus === 'pursuit') {
             this.updatePursuit(tickDelta);

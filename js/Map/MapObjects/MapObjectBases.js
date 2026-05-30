@@ -414,11 +414,88 @@ class ToggleableDirectionalAnimatedMapObject extends DirectionalAnimatedMapObjec
     }
 }
 
+// Mixin for objects that emit a passive aura affecting nearby mytes.
+// Subclasses override isAuraActive(), getAuraExpression(), getAuraExpressionChance().
+// Config keys read from types.json: aura.radius, aura.checkInterval, auraBuffId, auraBuffDefinition.
+const withAuraBehavior = (BaseClass) => class extends BaseClass {
+    constructor(...args) {
+        super(...args);
+        this._auraAccumulator = 0;
+        this._auraInterval = this.getConfig('aura.checkInterval', SiteConfig.objects.aura.proximityInterval);
+    }
+
+    getAuraRadius() {
+        return this.getConfig('aura.radius', SiteConfig.objects.aura.defaultRadius);
+    }
+
+    getBuffContextKey() {
+        return `${this.type.toLowerCase()}:${this.id ?? `${this.posX},${this.posY}`}:aura`;
+    }
+
+    // Return false to deactivate the aura without removing the buff.
+    isAuraActive() {
+        return typeof this.isEnabled === 'function' ? this.isEnabled() : true;
+    }
+
+    // Return an expression id to occasionally emit while a myte is in range, or null for none.
+    getAuraExpression() {
+        return null;
+    }
+
+    getAuraExpressionChance() {
+        return 0;
+    }
+
+    syncAuraBuff(myte, active) {
+        myte?.buffs?.syncContextBuff?.(
+            this.getBuffContextKey(),
+            this.getConfig('auraBuffDefinition', null) ?? this.getConfig('auraBuffId', null),
+            {
+                active,
+                source: 'aura',
+                payload: { objectType: this.type, objectId: this.id }
+            }
+        );
+    }
+
+    checkNearbyMytes() {
+        const mytes = this.mytes;
+        if (!mytes.length) return;
+
+        const auraActive = this.isAuraActive();
+        const radius = this.getAuraRadius();
+        const expression = this.getAuraExpression();
+        const expressionChance = expression ? this.getAuraExpressionChance() : 0;
+
+        mytes.forEach(myte => {
+            if (!myte?.isActive) {
+                this.syncAuraBuff(myte, false);
+                return;
+            }
+
+            const inRange = auraActive && this.getDistanceTo(myte) <= radius;
+            this.syncAuraBuff(myte, inRange);
+
+            if (inRange && expression && Math.random() < expressionChance) {
+                myte.queue.addExpression(expression);
+            }
+        });
+    }
+
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
+        this._auraAccumulator += tickDelta;
+        if (this._auraAccumulator >= this._auraInterval) {
+            this._auraAccumulator = 0;
+            this.checkNearbyMytes();
+        }
+    }
+};
+
 const withConnectableBehavior = (BaseClass) => class extends BaseClass {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         this.connectedObjectIds = new Set();
-        this.connectedFences = this.connectedObjectIds;
 
         if (this.getConfig('autoConnect', true)) {
             this.connectToNearbyObjects();
@@ -441,54 +518,28 @@ const withConnectableBehavior = (BaseClass) => class extends BaseClass {
     }
 
     getNearbyConnectableObjects() {
-        if (!this.gameMap?.objects) return [];
-        return this.gameMap.objects.filter(obj => this.canConnectTo(obj));
-    }
-
-    getDistanceToObjectCenter(object) {
-        const myCenterX = this.posX + this.size.width / 2;
-        const myCenterY = this.posY + this.size.height / 2;
-        const otherCenterX = object.posX + object.size.width / 2;
-        const otherCenterY = object.posY + object.size.height / 2;
-        return Math.hypot(myCenterX - otherCenterX, myCenterY - otherCenterY);
+        if (!this.gameMap) return [];
+        return this.gameMap.getObjectsInRadius(this.posX, this.posY, this.getConnectionRadius())
+            .filter(obj => this.canConnectTo(obj));
     }
 
     connectToObject(object) {
         if (!this.canConnectTo(object)) return false;
         this.connectedObjectIds.add(object.id);
-
-        if (typeof object.addConnectedFence === 'function') {
-            object.addConnectedFence(this.id);
-        } else if (typeof object.addConnectedObject === 'function') {
-            object.addConnectedObject(this.id);
-        }
-
+        object.addConnectedObject?.(this.id);
         return true;
     }
 
     connectToNearbyObjects() {
-        const searchRadius = this.getConnectionRadius();
-        this.getNearbyConnectableObjects().forEach(object => {
-            if (this.getDistanceToObjectCenter(object) <= searchRadius) {
-                this.connectToObject(object);
-            }
-        });
+        this.getNearbyConnectableObjects().forEach(obj => this.connectToObject(obj));
     }
 
     addConnectedObject(objectId) {
         this.connectedObjectIds.add(objectId);
     }
 
-    addConnectedFence(fenceId) {
-        this.addConnectedObject(fenceId);
-    }
-
     removeConnectedObject(objectId) {
         this.connectedObjectIds.delete(objectId);
-    }
-
-    removeConnectedFence(fenceId) {
-        this.removeConnectedObject(fenceId);
     }
 
     disconnectFromConnectedObjects() {
@@ -496,13 +547,7 @@ const withConnectableBehavior = (BaseClass) => class extends BaseClass {
 
         this.connectedObjectIds.forEach(objectId => {
             const object = this.gameMap.objects.find(obj => obj.id === objectId);
-            if (!object) return;
-
-            if (typeof object.removeConnectedFence === 'function') {
-                object.removeConnectedFence(this.id);
-            } else if (typeof object.removeConnectedObject === 'function') {
-                object.removeConnectedObject(this.id);
-            }
+            object?.removeConnectedObject?.(this.id);
         });
     }
 

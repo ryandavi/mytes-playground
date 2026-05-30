@@ -111,6 +111,10 @@ class MyteStats {
         this.lastInteractionTime = 0;
         this.interactionCooldown = SiteConfig.myte.cooldowns.interaction;
 
+        this._statDriveAccum = 0;
+        this._statDriveTickInterval = SiteConfig.stats.behaviorDriveTickInterval;
+        this._needSignalAccum = 0;
+
         // Initialize battery display
         this.updateBatteryDisplay();
     }
@@ -923,29 +927,44 @@ class MyteStats {
             // Energy only recovers during explicit rest actions.
         }
 
-        this.applyContinuousBuffStatEffects(deltaTime);
-        this.updateBehaviorDrives(deltaTime);
+        this._statDriveAccum += deltaTime;
+        if (this._statDriveAccum >= this._statDriveTickInterval) {
+            const dt = this._statDriveAccum;
+            this._statDriveAccum = 0;
+            this.applyContinuousBuffStatEffects(dt);
+            this.updateBehaviorDrives(dt);
+        }
 
         this.updateHealth(SiteConfig.stats.healthRegenRate * deltaTime);
         if (exhaustionPenalty > 0 && !this.isRestingAction()) {
             this.applyDamage(SiteConfig.stats.exhaustionCascade.healthDrainPerMs * exhaustionPenalty * deltaTime);
         }
-        this.maybeSignalNeeds();
+
+        this._needSignalAccum += deltaTime;
+        if (this._needSignalAccum >= 1000) {
+            this._needSignalAccum = 0;
+            this.maybeSignalNeeds();
+        }
         this.updateBatteryDisplay();
     }
 
     updateInHomeSlot(deltaTime) {
         this.regenerateEnergy(deltaTime, this.homeSlotEnergyRegenRate);
-        this.applyContinuousBuffStatEffects(deltaTime);
-        this.updateBehaviorDrives(deltaTime * this.homeSlotBehaviorRateMultiplier, { suppressExhaustionCascade: true });
-        // Stasis boosts — override the residual decay from behavior drives above
-        const cfg = SiteConfig.stats;
-        this.updateFun(cfg.homeSlotFunRestoreRate * deltaTime);
-        this.updateSocial(cfg.homeSlotSocialRestoreRate * deltaTime);
-        this.updateHunger(cfg.homeSlotHungerRestoreRate * deltaTime);
-        this.updateComfort(cfg.homeSlotComfortBoostRate * deltaTime);
-        this.applyConfidenceDelta(this.homeSlotConfidenceDeltaPerMs * deltaTime);
-        this.updateHealth(cfg.healthRegenRate * 1.5 * deltaTime);
+
+        this._statDriveAccum += deltaTime;
+        if (this._statDriveAccum >= this._statDriveTickInterval) {
+            const dt = this._statDriveAccum;
+            this._statDriveAccum = 0;
+            this.applyContinuousBuffStatEffects(dt);
+            this.updateBehaviorDrives(dt * this.homeSlotBehaviorRateMultiplier, { suppressExhaustionCascade: true });
+            const cfg = SiteConfig.stats;
+            this.updateFun(cfg.homeSlotFunRestoreRate * dt);
+            this.updateSocial(cfg.homeSlotSocialRestoreRate * dt);
+            this.updateHunger(cfg.homeSlotHungerRestoreRate * dt);
+            this.updateComfort(cfg.homeSlotComfortBoostRate * dt);
+            this.applyConfidenceDelta(this.homeSlotConfidenceDeltaPerMs * dt);
+            this.updateHealth(cfg.healthRegenRate * 1.5 * dt);
+        }
         this.updateBatteryDisplay();
     }
 

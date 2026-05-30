@@ -2451,7 +2451,6 @@ class MapObject {
 
 	// Fixed-rate simulation (20 Hz). No DOM writes. Override in subclasses for AI/physics.
 	tickUpdate(tickDelta) {
-		this.updateCarriedState();
 		const now = performance.now();
 		for (const [id, time] of this.interactionState.interactionTimes) {
 			if (now - time >= this.interactionState.cooldown) {

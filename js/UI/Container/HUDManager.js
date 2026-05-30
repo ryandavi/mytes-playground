@@ -6,6 +6,7 @@ class HUDManager extends UIComponent {
         this.moodElement = this.hudElement?.querySelector('.mood') || null;
         this.energyElement = this.hudElement?.querySelector('.energy') || null;
         this.currentMoodEffect = null;
+        this._lastUpdate = 0;
         this.lastRenderedState = {
             visible: false,
             myteId: null,
@@ -26,6 +27,10 @@ class HUDManager extends UIComponent {
 
     update() {
         if (!this.hudElement) return;
+
+        const now = performance.now();
+        if (now - this._lastUpdate < 250) return;
+        this._lastUpdate = now;
 
         const activeMyte = this.parent.getActiveMyte();
 

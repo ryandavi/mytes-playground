@@ -52,7 +52,6 @@
     },
     "draggable": true,
     "snapToGrid": true,
-    "restDuration": 4200,
     "majorActionId": [
       "use_surface_slot"
     ],
@@ -690,7 +689,7 @@
     "aura": {
       "radius": 180,
       "moodBoost": 0.15,
-      "tickInterval": 1200
+      "checkInterval": 1200
     },
     "defaultPlaying": false,
     "ai": {
@@ -913,7 +912,7 @@
     "aura": {
       "radius": 150,
       "moodBoost": 0.1,
-      "tickInterval": 1000
+      "checkInterval": 1000
     },
     "visual": {
       "renderPriority": 2,
@@ -1031,6 +1030,10 @@
     },
     "interaction": {
       "type": "light"
+    },
+    "aura": {
+      "radius": 160,
+      "checkInterval": 500
     },
     "visual": {
       "renderPriority": 2,

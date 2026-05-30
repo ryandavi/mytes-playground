@@ -815,7 +815,7 @@ class Myte {
 
 	_syncCompanionBuffs(tickDelta) {
 		this._companionAccumulator = (this._companionAccumulator ?? 0) + tickDelta;
-		if (this._companionAccumulator < 500) return;
+		if (this._companionAccumulator < SiteConfig.myte.companionSyncInterval) return;
 		this._companionAccumulator = 0;
 
 		const radius = SiteConfig.myte.companionRadius;

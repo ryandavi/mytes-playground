@@ -42,6 +42,11 @@ const SiteConfig = Object.freeze({
         // Scales all behavior-drive (boredom/comfort/confidence) update rates
         behaviorDriveRate: 0.42,
 
+        // How often (ms) behavior drives and buff stat effects are recalculated.
+        // All calculations are deltaTime-scaled so batching is mathematically equivalent.
+        // Lower = more responsive; higher = cheaper. 100ms is imperceptible.
+        behaviorDriveTickInterval: 100,
+
         // Behavior drives update slower while parked in home slot
         homeSlotBehaviorRateMultiplier: 0.55,
 
@@ -168,6 +173,14 @@ const SiteConfig = Object.freeze({
         // Set to true to allow R-key rotation during drag.
         // Keep false while art for rotated variants isn't ready.
         canRotate: false,
+
+        // Aura system defaults — individual types can override via their aura config block.
+        aura: Object.freeze({
+            // How often (ms) aura objects scan for nearby mytes
+            proximityInterval: 500,
+            // Default aura radius when not specified in types.json
+            defaultRadius: 150,
+        }),
     }),
 
     // ── World defaults ────────────────────────────────────────────────────────
@@ -188,6 +201,10 @@ const SiteConfig = Object.freeze({
 
         // Radius (px) within which another active myte grants companionship_aura
         companionRadius: 120,
+
+        // How often (ms) companion proximity is re-evaluated (tickUpdate runs at 20 Hz / 50 ms,
+        // so 1000 ms = every 20 ticks). Buff state is stable enough that 1 Hz is fine.
+        companionSyncInterval: 1000,
 
         // Starting stat values for a freshly spawned myte
         initialStats: Object.freeze({

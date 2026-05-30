@@ -115,6 +115,7 @@ class GameTime {
 		this.lastTimeOfDay = this.getTimeOfDay();
 		this.lastLightLevel = this.getLightLevel();
 		this.lastMoonPhase = this.getMoonPhase();
+		this._notifyAccum = 0;
 	}
 
 	// Helper methods for common calculations
@@ -378,7 +379,12 @@ class GameTime {
 		if (this.isPaused) return;
 
 		this.totalElapsedSeconds += (deltaTime / 1000) * this.timeScale;
-		this.checkAndNotifyChanges();
+
+		this._notifyAccum += deltaTime;
+		if (this._notifyAccum >= 250) {
+			this._notifyAccum = 0;
+			this.checkAndNotifyChanges();
+		}
 	}
 
 	tickUpdate(deltaTime) {

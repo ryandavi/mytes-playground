@@ -6,26 +6,26 @@ function startInteractionSoundPulse(action, config = {}) {
     if (!action) return;
     action._interactionSoundPulse = {
         soundIds: Array.isArray(config.soundIds) ? config.soundIds.slice() : [config.soundId].filter(Boolean),
-        intervalTicks: Math.max(1, config.intervalTicks ?? 10),
-        jitterTicks: Math.max(0, config.jitterTicks ?? 0),
+        intervalMs: Math.max(1, config.intervalMs ?? 167),
+        jitterMs: Math.max(0, config.jitterMs ?? 0),
         volume: config.volume ?? 1,
-        nextTick: 0,
+        nextMs: 0,
         index: 0
     };
 }
 
-function tickInteractionSoundPulse(action) {
+function tickInteractionSoundPulse(action, tickDelta) {
     const pulse = action?._interactionSoundPulse;
     if (!pulse?.soundIds?.length) return;
 
-    if (pulse.nextTick > 0) {
-        pulse.nextTick--;
+    if (pulse.nextMs > 0) {
+        pulse.nextMs -= tickDelta;
         return;
     }
 
     const soundId = pulse.soundIds[pulse.index % pulse.soundIds.length];
     pulse.index++;
-    pulse.nextTick = pulse.intervalTicks + (pulse.jitterTicks ? Math.floor(Math.random() * (pulse.jitterTicks + 1)) : 0);
+    pulse.nextMs = pulse.intervalMs + (pulse.jitterMs ? Math.random() * pulse.jitterMs : 0);
     getInteractionSoundManager(action)?.play?.(soundId, { volume: pulse.volume });
 }
 
@@ -56,18 +56,12 @@ class InspectAction extends GoToObjectAction {
         return 'Inspect';
     }
 
-    update() {
+    update(tickDelta) {
         if (this.phase === 'approach') {
-            const arrived = super.update();
-            if (!arrived) {
-                return false;
-            }
-            if (this.didAbortApproach()) {
-                console.warn(`[inspect] ${this.myte.name} ABORTED inspect of ${this.getQueueTargetLabel(this.target)}. outcome=${this.getApproachOutcome()} replanCount=${this._replanCount} pos=(${Math.round(this.myte.posX)},${Math.round(this.myte.posY)})`);
-                return true;
-            }
+            const arrived = super.update(tickDelta);
+            if (!arrived) return false;
+            if (this.didAbortApproach()) return true;
 
-            console.log(`[inspect] ${this.myte.name} reached ${this.getQueueTargetLabel(this.target)}, switching to observe. gap=${this.getTargetColliderGap?.()?.toFixed(1) ?? '?'} pos=(${Math.round(this.myte.posX)},${Math.round(this.myte.posY)})`);
             this.phase = 'observe';
             this.currentDuration = this.duration;
             if (this.expressionType) {
@@ -76,8 +70,7 @@ class InspectAction extends GoToObjectAction {
         }
 
         this.faceTarget();
-
-        this.currentDuration--;
+        this.currentDuration -= tickDelta;
         return this.currentDuration <= 0;
     }
 }
@@ -130,9 +123,9 @@ class DeepInspectAction extends GoToObjectAction {
         return points;
     }
 
-    update() {
+    update(tickDelta) {
         if (this.phase === 'approach') {
-            const arrived = super.update();
+            const arrived = super.update(tickDelta);
             if (!arrived) return false;
             if (this.didAbortApproach()) return true;
 
@@ -147,10 +140,9 @@ class DeepInspectAction extends GoToObjectAction {
             return false;
         }
 
-        // Inspect phase: walk between the pre-computed nearby positions.
         if (!this.inspectPoints.length) return true;
 
-        this.pointTimer--;
+        this.pointTimer -= tickDelta;
         if (this.pointTimer <= 0) {
             this.currentPoint = (this.currentPoint + 1) % this.inspectPoints.length;
             this.pointTimer = this.pointDuration;
@@ -160,7 +152,7 @@ class DeepInspectAction extends GoToObjectAction {
         this.myte.setTarget(point.x, point.y);
         this.myte.moveTowardsTarget();
 
-        this.currentDuration--;
+        this.currentDuration -= tickDelta;
         return this.currentDuration <= 0;
     }
 }
@@ -198,9 +190,9 @@ class InteractObjectAction extends GoToObjectAction {
         this.animationTimer = 0;
     }
 
-    update() {
+    update(tickDelta) {
         if (this.phase === 'approach') {
-            const arrived = super.update();
+            const arrived = super.update(tickDelta);
             if (!arrived) return false;
             if (this.didAbortApproach()) return true;
             this.phase = 'interact';
@@ -211,7 +203,7 @@ class InteractObjectAction extends GoToObjectAction {
 
         if (this.phase === 'interact') {
             this.faceTarget();
-            this.animationTimer--;
+            this.animationTimer -= tickDelta;
             return this.animationTimer <= 0;
         }
 
@@ -951,7 +943,7 @@ class NudgeBallAction extends GoToObjectAction {
     complete() {
         this.target?.nudgeBy?.(this.myte);
         super.complete();
-        this.myte.queue.addExpression('excited', 30, 1);
+        this.myte.queue.addExpression('excited', 500, 1);
         this.myte.queue.addIdle(400);
 
         const remainingRepeats = Math.max(0, (Number(this.repeat) || 1) - 1);
@@ -1026,9 +1018,9 @@ class OpenChestAction extends GoToObjectAction {
         this.animationTimer = 0;
     }
 
-    update() {
+    update(tickDelta) {
         if (this.phase === 'approach') {
-            const arrived = super.update();
+            const arrived = super.update(tickDelta);
             if (!arrived) return false;
             if (this.didAbortApproach()) return true;
             this.phase = 'open';
@@ -1039,7 +1031,7 @@ class OpenChestAction extends GoToObjectAction {
 
         if (this.phase === 'open') {
             this.faceTarget();
-            this.animationTimer--;
+            this.animationTimer -= tickDelta;
             return this.animationTimer <= 0;
         }
 
@@ -1079,9 +1071,9 @@ class CloseChestAction extends GoToObjectAction {
         this.animationTimer = 0;
     }
 
-    update() {
+    update(tickDelta) {
         if (this.phase === 'approach') {
-            const arrived = super.update();
+            const arrived = super.update(tickDelta);
             if (!arrived) return false;
             if (this.didAbortApproach()) return true;
             this.phase = 'close';
@@ -1092,7 +1084,7 @@ class CloseChestAction extends GoToObjectAction {
 
         if (this.phase === 'close') {
             this.faceTarget();
-            this.animationTimer--;
+            this.animationTimer -= tickDelta;
             return this.animationTimer <= 0;
         }
 
@@ -1141,9 +1133,9 @@ class PickFlowerAction extends GoToObjectAction {
         this.animationTimer = 0;
     }
 
-    update() {
+    update(tickDelta) {
         if (this.phase === 'approach') {
-            const arrived = super.update();
+            const arrived = super.update(tickDelta);
             if (!arrived) return false;
             if (this.didAbortApproach()) return true;
             this.phase = 'pick';
@@ -1151,8 +1143,8 @@ class PickFlowerAction extends GoToObjectAction {
             this.faceTarget();
             startInteractionSoundPulse(this, {
                 soundIds: ['obj_flower_rustle', 'obj_flower_pick'],
-                intervalTicks: 11,
-                jitterTicks: 4,
+                intervalMs: 180,
+                jitterMs: 65,
                 volume: 0.78
             });
             return false;
@@ -1160,8 +1152,8 @@ class PickFlowerAction extends GoToObjectAction {
 
         if (this.phase === 'pick') {
             this.faceTarget();
-            tickInteractionSoundPulse(this);
-            this.animationTimer--;
+            tickInteractionSoundPulse(this, tickDelta);
+            this.animationTimer -= tickDelta;
             return this.animationTimer <= 0;
         }
 
@@ -1221,9 +1213,9 @@ class TrampleFlowerAction extends GoToObjectAction {
         this.animationTimer = 0;
     }
 
-    update() {
+    update(tickDelta) {
         if (this.phase === 'approach') {
-            const arrived = super.update();
+            const arrived = super.update(tickDelta);
             if (!arrived) return false;
             if (this.didAbortApproach()) return true;
             this.phase = 'trample';
@@ -1231,8 +1223,8 @@ class TrampleFlowerAction extends GoToObjectAction {
             this.faceTarget();
             startInteractionSoundPulse(this, {
                 soundIds: ['obj_flower_trample_step', 'obj_flower_trample'],
-                intervalTicks: 6,
-                jitterTicks: 2,
+                intervalMs: 100,
+                jitterMs: 35,
                 volume: 0.72
             });
             return false;
@@ -1240,8 +1232,8 @@ class TrampleFlowerAction extends GoToObjectAction {
 
         if (this.phase === 'trample') {
             this.faceTarget();
-            tickInteractionSoundPulse(this);
-            this.animationTimer--;
+            tickInteractionSoundPulse(this, tickDelta);
+            this.animationTimer -= tickDelta;
             return this.animationTimer <= 0;
         }
 
@@ -1335,9 +1327,9 @@ class WaterPlantAction extends GoToObjectAction {
         this.animationTimer = 0;
     }
 
-    update() {
+    update(tickDelta) {
         if (this.phase === 'approach') {
-            const arrived = super.update();
+            const arrived = super.update(tickDelta);
             if (!arrived) return false;
             if (this.didAbortApproach()) return true;
             this.phase = 'water';
@@ -1345,8 +1337,8 @@ class WaterPlantAction extends GoToObjectAction {
             this.faceTarget();
             startInteractionSoundPulse(this, {
                 soundIds: ['obj_crop_tend', 'obj_crop_tend'],
-                intervalTicks: 9,
-                jitterTicks: 3,
+                intervalMs: 150,
+                jitterMs: 50,
                 volume: 0.64
             });
             return false;
@@ -1354,8 +1346,8 @@ class WaterPlantAction extends GoToObjectAction {
 
         if (this.phase === 'water') {
             this.faceTarget();
-            tickInteractionSoundPulse(this);
-            this.animationTimer--;
+            tickInteractionSoundPulse(this, tickDelta);
+            this.animationTimer -= tickDelta;
             return this.animationTimer <= 0;
         }
 
@@ -1410,9 +1402,9 @@ class HarvestAction extends GoToObjectAction {
         return 'Harvest Crop';
     }
 
-    update() {
+    update(tickDelta) {
         if (this.phase === 'approach') {
-            const arrived = super.update();
+            const arrived = super.update(tickDelta);
             if (!arrived) return false;
             if (this.didAbortApproach()) return true;
             this.phase = 'harvest';
@@ -1420,8 +1412,8 @@ class HarvestAction extends GoToObjectAction {
             this.faceTarget();
             startInteractionSoundPulse(this, {
                 soundIds: ['obj_crop_tend', 'obj_crop_harvest'],
-                intervalTicks: 10,
-                jitterTicks: 4,
+                intervalMs: 165,
+                jitterMs: 65,
                 volume: 0.72
             });
             return false;
@@ -1429,8 +1421,8 @@ class HarvestAction extends GoToObjectAction {
 
         if (this.phase === 'harvest') {
             this.faceTarget();
-            tickInteractionSoundPulse(this);
-            this.animationTimer--;
+            tickInteractionSoundPulse(this, tickDelta);
+            this.animationTimer -= tickDelta;
             return this.animationTimer <= 0;
         }
 
@@ -1486,13 +1478,13 @@ class ShakeTreeAction extends GoToObjectAction {
         this.animationTimer = 0;
     }
 
-    update() {
+    update(tickDelta) {
         if (this.phase === 'approach') {
-            const arrived = super.update();
+            const arrived = super.update(tickDelta);
             if (!arrived) return false;
             if (this.didAbortApproach()) return true;
             this.phase = 'shake';
-            this.animationTimer = this.shakeAnimationDuration ?? 60;
+            this.animationTimer = this.shakeAnimationDuration ?? 1000;
             this.faceTarget();
             this.target?.shake?.();
             return false;
@@ -1500,7 +1492,7 @@ class ShakeTreeAction extends GoToObjectAction {
 
         if (this.phase === 'shake') {
             this.faceTarget();
-            this.animationTimer--;
+            this.animationTimer -= tickDelta;
             return this.animationTimer <= 0;
         }
 
@@ -1537,13 +1529,13 @@ class ChopTreeAction extends GoToObjectAction {
         this.animationTimer = 0;
     }
 
-    update() {
+    update(tickDelta) {
         if (this.phase === 'approach') {
-            const arrived = super.update();
+            const arrived = super.update(tickDelta);
             if (!arrived) return false;
             if (this.didAbortApproach()) return true;
             this.phase = 'chop';
-            this.animationTimer = this.chopAnimationDuration ?? 120;
+            this.animationTimer = this.chopAnimationDuration ?? 2000;
             this.faceTarget();
             this.target?.chop?.();
             return false;
@@ -1551,7 +1543,7 @@ class ChopTreeAction extends GoToObjectAction {
 
         if (this.phase === 'chop') {
             this.faceTarget();
-            this.animationTimer--;
+            this.animationTimer -= tickDelta;
             return this.animationTimer <= 0;
         }
 
@@ -1587,13 +1579,13 @@ class RemoveStumpAction extends GoToObjectAction {
         this.animationTimer = 0;
     }
 
-    update() {
+    update(tickDelta) {
         if (this.phase === 'approach') {
-            const arrived = super.update();
+            const arrived = super.update(tickDelta);
             if (!arrived) return false;
             if (this.didAbortApproach()) return true;
             this.phase = 'remove';
-            this.animationTimer = this.removeAnimationDuration ?? 90;
+            this.animationTimer = this.removeAnimationDuration ?? 1500;
             this.faceTarget();
             this.target?.removeStump?.();
             return false;
@@ -1601,7 +1593,7 @@ class RemoveStumpAction extends GoToObjectAction {
 
         if (this.phase === 'remove') {
             this.faceTarget();
-            this.animationTimer--;
+            this.animationTimer -= tickDelta;
             return this.animationTimer <= 0;
         }
 
