@@ -88,6 +88,18 @@
                     z-index: 0;
                 }
 
+                &.environment-back,
+                &.environment-front {
+                    z-index: 2;
+                    pointer-events: none;
+                    overflow: hidden;
+                    border-radius: inherit;
+                }
+
+                &.environment-back {
+                    z-index: 1;
+                }
+
                 &.debug {
                     z-index: 100;
                     pointer-events: none;
@@ -211,14 +223,37 @@
                 }
 
                 &.foreground {
-                    z-index: 1;
+                    z-index: 2;
                     padding: 0;
                 }
 
                 &.effects {
-                    z-index: 2;
+                    z-index: 3;
                     pointer-events: none;
                     user-select: none;
+                }
+
+                .map-environment-fill,
+                .map-environment-gradient,
+                .map-environment-vignette,
+                .map-environment-root {
+                    @include layer-fill;
+                    pointer-events: none;
+                    transition:
+                        opacity 900ms ease,
+                        background-color 1200ms ease,
+                        background-position 1600ms linear,
+                        background-size 1200ms ease;
+                }
+
+                .map-environment-gradient {
+                    background-repeat: no-repeat;
+                    opacity: 0;
+                    transform-origin: center center;
+                }
+
+                .map-environment-vignette {
+                    opacity: 0;
                 }
 
                 > .zone {
@@ -296,6 +331,37 @@
                         &.equipment.sword { background-color: red; }
                     }
                 }
+            }
+        }
+
+        > .lighting-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            z-index: 4;
+            pointer-events: none;
+            overflow: hidden;
+            border-radius: inherit;
+            opacity: 0;
+            contain: layout paint;
+            mix-blend-mode: multiply;
+
+            > .lighting-overlay__canvas {
+                @include layer-fill;
+                display: block;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+            }
+
+            > .lighting-overlay__color {
+                opacity: 1;
+            }
+
+            > .lighting-overlay__darkness {
+                opacity: 1;
             }
         }
     }

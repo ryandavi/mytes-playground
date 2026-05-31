@@ -109,7 +109,9 @@ class TileMapLoader {
 					height: parseInt(mapEl.getAttribute('height')) * parseInt(mapEl.getAttribute('tileheight'))
 				},
 				environment: {
-					location: 'interior' // Default, can be overridden by properties
+					location: 'interior', // Default, can be overridden by properties
+					rooms: [],
+					lightOpenings: []
 				},
 				spawns: {
 					myte: { x: 100, y: 100 }, // Default spawn points
@@ -179,6 +181,8 @@ class TileMapLoader {
 				const objects = this.parseObjectGroup(groupEl, mapData);
 				mapData.objects.push(...objects);
 			}
+
+			this.createLightingDataFromObjects(mapData);
 
 			// Create zones from object groups with specific names
 			this.createZonesFromObjects(mapData);
@@ -352,6 +356,7 @@ class TileMapLoader {
 				height,
 				type,
 				name,
+				groupName: group.name,
 				gid,
 				rotation,
 				visible: objectEl.getAttribute('visible') !== '0',
@@ -459,6 +464,67 @@ class TileMapLoader {
 			});
 
 			return false;
+		});
+	}
+
+	createLightingDataFromObjects(mapData) {
+		mapData.environment.rooms = Array.isArray(mapData.environment.rooms)
+			? mapData.environment.rooms
+			: [];
+		mapData.environment.lightOpenings = Array.isArray(mapData.environment.lightOpenings)
+			? mapData.environment.lightOpenings
+			: [];
+
+		mapData.objects = mapData.objects.filter(obj => {
+			const objName = String(obj.name || '').toUpperCase();
+			const groupName = String(obj.groupName || '').toUpperCase();
+			const lightingKind = String(obj.properties?.lightingKind || obj.properties?.kind || '').toLowerCase();
+			const roomId = obj.properties?.roomId || obj.properties?.id || null;
+			const displayName = obj.properties?.displayName || obj.name || roomId || `room_${obj.id}`;
+
+			const isRoomVolume =
+				objName === 'LIGHTVOLUME' ||
+				lightingKind === 'room' ||
+				(groupName === 'LIGHTING' && !!roomId);
+			if (isRoomVolume) {
+				mapData.environment.rooms.push({
+					id: String(roomId || displayName).toLowerCase().replace(/[^a-z0-9_-]+/g, '_'),
+					displayName,
+					bounds: {
+						x: obj.x,
+						y: obj.y,
+						width: obj.width,
+						height: obj.height
+					},
+					polygon: Array.isArray(obj.polygon) ? obj.polygon : null,
+					properties: {
+						...obj.properties
+					}
+				});
+				return false;
+			}
+
+			const isLightOpening =
+				objName === 'LIGHTOPENING' ||
+				lightingKind === 'opening';
+			if (isLightOpening) {
+				mapData.environment.lightOpenings.push({
+					id: String(obj.properties?.id || `opening_${obj.id}`).toLowerCase().replace(/[^a-z0-9_-]+/g, '_'),
+					bounds: {
+						x: obj.x,
+						y: obj.y,
+						width: obj.width,
+						height: obj.height
+					},
+					polygon: Array.isArray(obj.polygon) ? obj.polygon : null,
+					properties: {
+						...obj.properties
+					}
+				});
+				return false;
+			}
+
+			return true;
 		});
 	}
 

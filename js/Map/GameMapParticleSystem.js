@@ -92,12 +92,14 @@ const MAP_PARTICLE_PRESETS = {
     RAIN: {
         extends: 'RAIN',
         renderLayer: 'overlay',
+        weatherEffect: true,
         emitWhileVisible: true
     },
 
     SNOW: {
         extends: 'SNOW',
         renderLayer: 'overlay',
+        weatherEffect: true,
         emitWhileVisible: true
     },
 
@@ -130,6 +132,7 @@ const MAP_PARTICLE_PRESETS = {
     POLLEN: {
         extends: 'POLLEN',
         renderLayer: 'overlay',
+        weatherEffect: true,
         emitWhileVisible: true
     },
 
@@ -516,8 +519,46 @@ class GameMapParticleSystem extends ParticleSystem {
 
         this.map = map;
         this.objectEffects = new Map();
+        this.weatherEnabled = options.weatherEnabled !== false;
 
         this.registerPresets(MAP_PARTICLE_PRESETS);
+    }
+
+    isWeatherEnabled() {
+        return this.weatherEnabled !== false;
+    }
+
+    setWeatherEnabled(enabled = true) {
+        const nextEnabled = enabled !== false;
+        if (this.weatherEnabled === nextEnabled) {
+            return this;
+        }
+
+        this.weatherEnabled = nextEnabled;
+
+        for (const emitter of this.emitters) {
+            if (this.isWeatherEmitter(emitter)) {
+                emitter.pendingBursts = [];
+                emitter.elapsed = 0;
+            }
+        }
+
+        if (!nextEnabled) {
+            this.removeWeatherParticles();
+        }
+
+        return this;
+    }
+
+    isWeatherEmitter(emitter) {
+        return emitter?.options?.weatherEffect === true;
+    }
+
+    removeWeatherParticles() {
+        const weatherParticles = this.particles.filter(
+            particle => particle?.sourceEmitter?.options?.weatherEffect === true
+        );
+        weatherParticles.forEach(particle => this.releaseParticle(particle, 'weather-disabled'));
     }
 
     getSimulationBounds() {
@@ -780,6 +821,10 @@ class GameMapParticleSystem extends ParticleSystem {
 
     evaluateEmitterConditions(emitter) {
         if (!super.evaluateEmitterConditions(emitter)) {
+            return false;
+        }
+
+        if (this.isWeatherEmitter(emitter) && !this.isWeatherEnabled()) {
             return false;
         }
 

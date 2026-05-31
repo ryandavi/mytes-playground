@@ -159,6 +159,7 @@
 				<div class="layer debug"></div>
 				<div class="layer background"></div>
 				<div class="layer ground-decor"></div>
+				<div class="layer environment-back"></div>
 				<div class="layer particles"></div>
 				<!-- map objects -->
 				<div class="layer controls">
@@ -201,6 +202,7 @@
 							</div>
 						-->
 				</div>
+				<div class="layer environment-front"></div>
 				<div class="layer effects"></div>
 			</div>
 			<!-- END CANVAS -->
@@ -338,6 +340,18 @@
 					<div class="checkbox-wrapper">
 						<input type="checkbox" id="animations-toggle" checked>
 						<label for="animations-toggle">Animations</label>
+					</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" id="time-of-day-overlay-toggle" checked>
+						<label for="time-of-day-overlay-toggle">Show Time of Day Overlay</label>
+					</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" id="weather-toggle" checked>
+						<label for="weather-toggle">Show Weather</label>
 					</div>
 				</div>
 			</div>
@@ -537,6 +551,7 @@
 	<script src="js/Map/GameMapLoader.js?v=<?= $v ?>"></script>
 	<script src="js/Map/GameMap.js?v=<?= $v ?>"></script>
 	<script src="js/Map/GameZone.js?v=<?= $v ?>"></script>
+	<script src="js/Map/MapEnvironmentManager.js?v=<?= $v ?>"></script>
 	<script src="js/Map/GameMapParticleSystem.js?v=<?= $v ?>"></script>
 	<script src="js/Map/Grid/TileMapLoader.js?v=<?= $v ?>"></script>
 	<script src="js/Map/MapTransitionManager.js?v=<?= $v ?>"></script>

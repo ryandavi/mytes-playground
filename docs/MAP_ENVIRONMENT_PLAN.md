@@ -684,6 +684,259 @@ Example:
 - `forest-clearing`
 - `indoors-soft`
 
+## Interiors And Room Fill Lighting
+
+Interiors should not rely only on radial point lights.
+
+If we want light to "fill rooms," the right model is:
+
+- each interior room has an authored **light volume**
+- the room has a base ambient level
+- active lights can raise the room's ambient fill
+- some lights also add local hotspots on top
+
+So for interiors, think in layers:
+
+1. room ambient
+2. room fill from active fixtures
+3. local accent lights
+4. doorway spill between connected rooms
+
+## Do Not Infer Rooms Every Frame
+
+Do not try to discover enclosed rooms from tiles during gameplay.
+
+That would be:
+
+- fragile
+- harder to tune
+- harder to debug
+- more expensive than needed
+
+Instead, rooms should be authored in Tiled as explicit regions.
+
+Good news:
+
+- `House.tmx` already has large interior rectangles in the `Zones` object group
+- those can be reused as a temporary first source of room bounds
+
+Long-term, I would prefer a dedicated object group such as:
+
+- `LightVolumes`
+- or `Rooms`
+
+so gameplay zones and lighting zones can diverge when needed.
+
+## Recommended Room Data Model
+
+Recommended authored room entry:
+
+```json
+{
+  "id": "bedroom",
+  "type": "room",
+  "bounds": { "x": 608, "y": 480, "width": 320, "height": 448 },
+  "lighting": {
+    "ambientFloor": 0.18,
+    "ambientCeiling": 0.7,
+    "fillColor": "rgba(255, 218, 170, 1)",
+    "shadowColor": "rgba(18, 18, 28, 0.82)",
+    "feather": 24,
+    "mode": "filled"
+  }
+}
+```
+
+Optional future fields:
+
+- `polygon` instead of rectangle
+- `ceilingHeight`
+- `windowEdges`
+- `doorways`
+- `connectedRooms`
+
+## Recommended Interior Lighting Modes
+
+Each room should choose one of three modes:
+
+1. `filled`
+   Whole room lifts when lights are on. Best default for bedrooms, kitchens, playrooms.
+
+2. `local`
+   Mostly dark room with only local pools. Best for caves, storage rooms, spooky spaces.
+
+3. `mixed`
+   Room gets a soft ambient lift, plus brighter pools near fixtures. Best for cozy interiors.
+
+For this game, I think most house rooms should use `mixed`.
+
+That gives:
+
+- readable interiors
+- cozy room glow
+- still enough shadow contrast for atmosphere
+
+## How Room Fill Should Work
+
+When a room light is active:
+
+- raise the room's ambient floor
+- tint the room with the light color
+- keep a slightly brighter hotspot near the source
+
+So one lantern in a bedroom does not just create a circle on the floor.
+It changes the whole emotional temperature of the room.
+
+Recommended behavior:
+
+- room fill is soft and broad
+- local fixture glow is brighter and more focused
+- corners stay slightly darker so the room keeps depth
+
+## Doorways And Spill
+
+Rooms should not feel like sealed boxes unless we want them to.
+
+Recommended rule:
+
+- light fill belongs to a room volume
+- a small amount of light can spill through open doorways or wide openings
+
+Implementation approach:
+
+- represent doorway/opening regions explicitly
+- build a simple room adjacency graph
+- allow a percentage of fill contribution into adjacent rooms
+
+Example:
+
+- Bedroom lamp on
+- Bedroom gets full fill
+- Hall/chatroom gets 15% warm spill through doorway
+
+This will make interiors feel much more believable.
+
+## How To Reuse Existing Map Data
+
+Best path:
+
+### Phase 1
+
+Reuse current `Zones` rectangles in interior maps as provisional room volumes where they match real rooms.
+
+### Phase 2
+
+Add dedicated lighting volumes in Tiled:
+
+- `objectgroup name="Lighting"`
+- each object has:
+  - `roomId`
+  - `lightingMode`
+  - `ambientFloor`
+  - `fillColor`
+  - `feather`
+
+### Phase 3
+
+Add doorway/opening objects:
+
+- `objectgroup name="LightOpenings"`
+- each object links room A and room B
+
+This keeps authoring explicit and efficient.
+
+## Relationship Between Room Fill And Local Lights
+
+A room light should be able to contribute in two ways:
+
+1. **room contribution**
+   Raises the room fill level
+
+2. **local contribution**
+   Adds a nearby hotspot and optional shadowing
+
+Recommended light config additions:
+
+```json
+{
+  "lighting": {
+    "emitsLight": true,
+    "radius": 160,
+    "intensity": 0.85,
+    "color": "rgba(255, 214, 150, 1)",
+    "roomFill": 0.42,
+    "roomId": "bedroom",
+    "castsShadows": true
+  }
+}
+```
+
+That means a bedside lantern can:
+
+- warm the bedroom generally
+- still feel brightest near the lantern itself
+
+## Performance Strategy For Interiors
+
+Room fill is much cheaper than many shadow-casting point lights.
+
+That is good for us.
+
+Recommended strategy:
+
+- resolve room fill state from authored room volumes
+- only recompute when:
+  - light state changes
+  - room membership changes
+  - relevant doorway/opening state changes
+- render room fills as cached masks/regions
+- keep local shadowed lights limited to important fixtures
+
+This gives interiors a rich look without needing lots of expensive per-pixel lighting.
+
+## Emotional Recommendation For Interiors
+
+Interiors should feel different from outdoors in a structural way.
+
+Outdoors:
+
+- sky-driven
+- broad gradients
+- horizon emotion
+- shifting atmospheric color
+
+Indoors:
+
+- room-shaped light
+- warmth trapped by walls
+- cozy falloff
+- contrast between rooms
+
+That contrast will make both spaces feel better.
+
+If sunsets are awe, interiors should often be intimacy.
+
+The player should feel:
+
+- awe outside
+- safety and warmth inside
+
+## Best Recommendation
+
+For interiors, use **authored room light volumes** with:
+
+- soft room-wide fill
+- local fixture hotspots
+- optional doorway spill
+- optional shadow masking for important lights
+
+That is the most forward-thinking version because it:
+
+- reuses existing zone-like map authoring
+- avoids expensive runtime room detection
+- scales well
+- gives us much better emotional control over indoor spaces
+
 ## Weather Compatibility
 
 This system should become the home for weather visuals even if weather logic ships later.

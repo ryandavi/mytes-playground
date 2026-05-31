@@ -17,6 +17,8 @@ const USER_DEFAULT_PREFERENCES = Object.freeze({
     graphicsQuality: 'medium',
     effectsEnabled: true,
     animationsEnabled: true,
+    timeOfDayOverlayEnabled: true,
+    weatherEffectsEnabled: true,
     difficulty: 'normal',
     tutorialsEnabled: true,
     autoSaveEnabled: true,
@@ -403,6 +405,8 @@ class User {
             graphicsQuality: settings.graphics?.quality,
             effectsEnabled: settings.graphics?.effects,
             animationsEnabled: settings.graphics?.animations,
+            timeOfDayOverlayEnabled: settings.graphics?.timeOfDayOverlay,
+            weatherEffectsEnabled: settings.graphics?.weather,
             difficulty: settings.gameplay?.difficulty,
             tutorialsEnabled: settings.gameplay?.tutorials,
             autoSaveEnabled: settings.gameplay?.autoSave,
@@ -471,4 +475,3 @@ class User {
         };
     }
 }
-

@@ -415,6 +415,85 @@ class MapObject {
 			this.getRegionRect('collider');
 	}
 
+	getCenterPoint(regionId = 'collider') {
+		const rect = this.getRegionRect(regionId) || this.getSelectionRect() || {
+			left: this.posX,
+			top: this.posY,
+			width: this.size.width,
+			height: this.size.height
+		};
+
+		return {
+			x: rect.left + (rect.width / 2),
+			y: rect.top + (rect.height / 2)
+		};
+	}
+
+	canEmitLight() {
+		return this.getConfig('lighting.emitsLight', false) || this.getConfig('lightEmission', false);
+	}
+
+	isLightSource() {
+		if (!this.active || !this.canEmitLight()) {
+			return false;
+		}
+
+		if (typeof this.isEnabled === 'function' && this.getConfig('interaction.type') === 'light') {
+			return this.isEnabled();
+		}
+
+		return true;
+	}
+
+	getLightSourceConfig() {
+		if (!this.canEmitLight()) {
+			return null;
+		}
+
+		const type = this.type?.toUpperCase?.() || '';
+		const defaultColor = type === 'PORTAL'
+			? 'rgba(110, 180, 255, 1)'
+			: 'rgba(255, 214, 150, 1)';
+
+		return {
+			emitsLight: true,
+			radius: this.getConfig('lighting.radius', this.getConfig('aura.radius', Math.max(this.size.width, this.size.height) * 2)),
+			intensity: this.getConfig('lighting.intensity', 0.8),
+			color: this.getConfig('lighting.color', defaultColor),
+			falloff: this.getConfig('lighting.falloff', 'smooth'),
+			castsShadows: this.getConfig('lighting.castsShadows', false),
+			hero: this.getConfig('lighting.hero', false),
+			roomFill: this.getConfig('lighting.roomFill', 0.3)
+		};
+	}
+
+	isLightBlocking() {
+		return !!this.active && this.getConfig('physics.blocksLineOfSight', false);
+	}
+
+	getLightBlockerGeometry() {
+		if (!this.isLightBlocking()) {
+			return null;
+		}
+
+		const rect = this.getRegionRect('collider') || this.getSelectionRect() || {
+			left: this.posX,
+			top: this.posY,
+			width: this.size.width,
+			height: this.size.height
+		};
+
+		return rect ? {
+			type: 'rect',
+			left: rect.left,
+			top: rect.top,
+			right: rect.left + rect.width,
+			bottom: rect.top + rect.height,
+			width: rect.width,
+			height: rect.height
+		} : null;
+	}
+
 	getActionConfig(actionId, defaultValue = null) {
 		if (!actionId) {
 			return defaultValue;

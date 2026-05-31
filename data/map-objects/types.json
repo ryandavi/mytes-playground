@@ -1045,6 +1045,15 @@
       "radius": 160,
       "checkInterval": 500
     },
+    "lighting": {
+      "emitsLight": true,
+      "radius": 210,
+      "intensity": 0.92,
+      "color": "rgba(255, 214, 150, 1)",
+      "castsShadows": true,
+      "hero": true,
+      "roomFill": 0.48
+    },
     "visual": {
       "renderPriority": 2,
       "renderType": "animated",
@@ -4135,6 +4144,15 @@
       "orbitalSpeed": 0.02,
       "pulseEffect": true,
       "pulseFrequency": 0.05
+    },
+    "lighting": {
+      "emitsLight": true,
+      "radius": 180,
+      "intensity": 0.64,
+      "color": "rgba(110, 180, 255, 1)",
+      "castsShadows": false,
+      "hero": true,
+      "roomFill": 0.12
     },
     "spatial": {
       "regions": {

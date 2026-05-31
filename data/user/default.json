@@ -22,6 +22,8 @@
     "graphicsQuality": "medium",
     "effectsEnabled": true,
     "animationsEnabled": true,
+    "timeOfDayOverlayEnabled": true,
+    "weatherEffectsEnabled": true,
     "difficulty": "normal",
     "tutorialsEnabled": true,
     "autoSaveEnabled": true,

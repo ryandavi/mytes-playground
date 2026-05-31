@@ -15,8 +15,9 @@ class GameMap {
         this.layers = {
             background: parent.canvas?.querySelector('.layer.background'),
             groundDecor: parent.canvas?.querySelector('.layer.ground-decor'),
+            environmentBack: parent.canvas?.querySelector('.layer.environment-back'),
             objects: parent.canvas?.querySelector('.layer.foreground'),
-            overlay: parent.canvas?.querySelector('.layer.overlay'),
+            environmentFront: parent.canvas?.querySelector('.layer.environment-front'),
             debug: parent.canvas?.querySelector('.layer.debug'),
             particles: parent.canvas?.querySelector('.layer.particles')
         };
@@ -25,6 +26,7 @@ class GameMap {
         this.zoneManager = null;
         this.gridSystem = null;
         this.particleSystem = null;
+        this.environmentManager = null;
         this.renderer = new MapRenderer();
 
         // Map elements
@@ -100,6 +102,24 @@ class GameMap {
         }
 
         return this.core?.user?.preferences?.effectsEnabled !== false;
+    }
+
+    getTimeOfDayOverlayEnabledSetting() {
+        const liveSetting = this.ui?.settingsPanel?.isTimeOfDayOverlayEnabled?.();
+        if (typeof liveSetting === 'boolean') {
+            return liveSetting;
+        }
+
+        return this.core?.user?.preferences?.timeOfDayOverlayEnabled !== false;
+    }
+
+    getWeatherEffectsEnabledSetting() {
+        const liveSetting = this.ui?.settingsPanel?.isWeatherEnabled?.();
+        if (typeof liveSetting === 'boolean') {
+            return liveSetting;
+        }
+
+        return this.core?.user?.preferences?.weatherEffectsEnabled !== false;
     }
 
     getZIndex(y, height) {
@@ -202,7 +222,8 @@ class GameMap {
             // Initialize particle system first to avoid dependency issues
             Utility.logDebug(`[GameMap] Creating particle system`);
             this.particleSystem = new GameMapParticleSystem(this, {
-                effectsEnabled: this.getParticleEffectsEnabledSetting()
+                effectsEnabled: this.getParticleEffectsEnabledSetting(),
+                weatherEnabled: this.getWeatherEffectsEnabledSetting()
             });
             this.particleSystem.start();
 
@@ -468,6 +489,14 @@ class GameMap {
 
 		// Apply terrain data to pathfinding after objects have been added
 		this.applyTerrainToGameMap(mapData);
+
+        this.layers.environmentBack = this.parent.canvas?.querySelector('.layer.environment-back');
+        this.layers.environmentFront = this.parent.canvas?.querySelector('.layer.environment-front');
+        if (typeof MapEnvironmentManager === 'function') {
+            this.environmentManager?.dispose?.();
+            this.environmentManager = new MapEnvironmentManager(this);
+            await this.environmentManager.initialize(mapData);
+        }
 
 		// Notify the sound system of this map's audio context and begin proximity polling
 		const sm = this.soundManager;
@@ -1021,6 +1050,10 @@ class GameMap {
         if (this.particleSystem) {
             this.particleSystem.update(deltaTime);
         }
+
+        if (this.environmentManager) {
+            this.environmentManager.update(deltaTime);
+        }
     }
 
     dispose() {
@@ -1057,6 +1090,11 @@ class GameMap {
         if (this.particleSystem) {
             this.particleSystem.dispose();
             this.particleSystem = null;
+        }
+
+        if (this.environmentManager) {
+            this.environmentManager.dispose();
+            this.environmentManager = null;
         }
 
         // Clean up grid system

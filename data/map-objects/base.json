@@ -10,6 +10,16 @@
   "canPickUp": false,
   "particleEffects": false,
   "lightEmission": false,
+  "lighting": {
+    "emitsLight": false,
+    "radius": 160,
+    "intensity": 0.8,
+    "color": "rgba(255, 214, 150, 1)",
+    "falloff": "smooth",
+    "castsShadows": false,
+    "hero": false,
+    "roomFill": 0.3
+  },
   "lootable": false,
   "consumable": false,
   "storable": false,

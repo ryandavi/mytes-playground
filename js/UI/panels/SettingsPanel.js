@@ -6,7 +6,9 @@ class SettingsPanel extends ModalWindow {
             graphics: {
                 quality: 'medium',
                 effects: true,
-                animations: true
+                animations: true,
+                timeOfDayOverlay: true,
+                weather: true
             },
             gameplay: {
                 difficulty: 'normal',
@@ -109,6 +111,24 @@ class SettingsPanel extends ModalWindow {
                 this.applyGraphicsSettings();
             };
         }
+
+        const timeOfDayOverlayToggle = this.modalElement.querySelector('#time-of-day-overlay-toggle');
+        if (timeOfDayOverlayToggle) {
+            timeOfDayOverlayToggle.checked = this.settings.graphics.timeOfDayOverlay;
+            timeOfDayOverlayToggle.onchange = () => {
+                this.settings.graphics.timeOfDayOverlay = timeOfDayOverlayToggle.checked;
+                this.applyGraphicsSettings();
+            };
+        }
+
+        const weatherToggle = this.modalElement.querySelector('#weather-toggle');
+        if (weatherToggle) {
+            weatherToggle.checked = this.settings.graphics.weather;
+            weatherToggle.onchange = () => {
+                this.settings.graphics.weather = weatherToggle.checked;
+                this.applyGraphicsSettings();
+            };
+        }
     }
 
     setupGameplaySettings() {
@@ -135,13 +155,26 @@ class SettingsPanel extends ModalWindow {
         return this.settings?.graphics?.effects !== false;
     }
 
+    isTimeOfDayOverlayEnabled() {
+        return this.settings?.graphics?.timeOfDayOverlay !== false;
+    }
+
+    isWeatherEnabled() {
+        return this.settings?.graphics?.weather !== false;
+    }
+
     applyGraphicsSettings() {
         const container = this.parent?.parent || null;
         const particleSystem = container?.gameMap?.particleSystem || null;
+        const environmentManager = container?.gameMap?.environmentManager || null;
 
         if (particleSystem?.setEffectsEnabled) {
             particleSystem.setEffectsEnabled(this.isEffectsEnabled());
         }
+        if (particleSystem?.setWeatherEnabled) {
+            particleSystem.setWeatherEnabled(this.isWeatherEnabled());
+        }
+        environmentManager?.refreshDisplaySettings?.();
     }
 
     getCore() {
@@ -162,7 +195,9 @@ class SettingsPanel extends ModalWindow {
             graphics: {
                 quality: preferences.graphicsQuality,
                 effects: preferences.effectsEnabled,
-                animations: preferences.animationsEnabled
+                animations: preferences.animationsEnabled,
+                timeOfDayOverlay: preferences.timeOfDayOverlayEnabled,
+                weather: preferences.weatherEffectsEnabled
             },
             gameplay: {
                 difficulty: preferences.difficulty,
@@ -182,6 +217,8 @@ class SettingsPanel extends ModalWindow {
             graphicsQuality: normalized.graphics.quality,
             effectsEnabled: normalized.graphics.effects,
             animationsEnabled: normalized.graphics.animations,
+            timeOfDayOverlayEnabled: normalized.graphics.timeOfDayOverlay,
+            weatherEffectsEnabled: normalized.graphics.weather,
             difficulty: normalized.gameplay.difficulty,
             tutorialsEnabled: normalized.gameplay.tutorials,
             autoSaveEnabled: normalized.gameplay.autoSave,

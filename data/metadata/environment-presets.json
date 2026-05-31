@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 2,
+  "presets": {
+    "outside-default": {
+      "atmosphere": {
+        "transitionMs": 1200,
+        "nightColor": "rgba(10, 30, 88, 1)",
+        "nightOpacityMax": 0.6,
+        "nightBlendMode": "multiply",
+        "vignetteColor": "rgba(6, 12, 30, 1)",
+        "vignetteOpacityMax": 0.08,
+        "sunrise": {
+          "start": "04:30",
+          "end": "07:30",
+          "angle": -100,
+          "startX": 2.15,
+          "endX": -1.15,
+          "originY": 0.5,
+          "startSpan": 1.9,
+          "endSpan": 1.62,
+          "bandOpacity": 0.9,
+          "blendMode": "normal",
+          "stops": [
+            { "position": 0.0, "color": "rgba(0, 0, 0, 0)" },
+            { "position": 0.08, "color": "rgba(0, 0, 0, 0)" },
+            { "position": 0.2, "color": "rgba(54, 88, 186, 0.08)" },
+            { "position": 0.32, "color": "rgba(84, 112, 212, 0.14)" },
+            { "position": 0.44, "color": "rgba(142, 108, 226, 0.24)" },
+            { "position": 0.54, "color": "rgba(198, 110, 214, 0.34)" },
+            { "position": 0.64, "color": "rgba(238, 134, 122, 0.5)" },
+            { "position": 0.74, "color": "rgba(252, 172, 104, 0.6)" },
+            { "position": 0.84, "color": "rgba(255, 214, 138, 0.42)" },
+            { "position": 0.92, "color": "rgba(255, 242, 194, 0.16)" },
+            { "position": 1.0, "color": "rgba(0, 0, 0, 0)" }
+          ]
+        },
+        "sunset": {
+          "start": "18:00",
+          "end": "21:30",
+          "angle": 100,
+          "startX": -1.15,
+          "endX": 2.15,
+          "originY": 0.5,
+          "startSpan": 1.62,
+          "endSpan": 1.9,
+          "bandOpacity": 0.9,
+          "blendMode": "normal",
+          "stops": [
+            { "position": 0.0, "color": "rgba(0, 0, 0, 0)" },
+            { "position": 0.08, "color": "rgba(0, 0, 0, 0)" },
+            { "position": 0.18, "color": "rgba(255, 244, 198, 0.14)" },
+            { "position": 0.28, "color": "rgba(255, 218, 144, 0.34)" },
+            { "position": 0.4, "color": "rgba(252, 176, 102, 0.56)" },
+            { "position": 0.5, "color": "rgba(244, 134, 86, 0.62)" },
+            { "position": 0.6, "color": "rgba(228, 116, 134, 0.48)" },
+            { "position": 0.7, "color": "rgba(188, 104, 210, 0.36)" },
+            { "position": 0.8, "color": "rgba(116, 108, 218, 0.22)" },
+            { "position": 0.9, "color": "rgba(60, 92, 182, 0.1)" },
+            { "position": 1.0, "color": "rgba(0, 0, 0, 0)" }
+          ]
+        }
+      },
+      "lighting": {
+        "enabled": true,
+        "darknessColor": "rgba(10, 28, 82, 1)",
+        "darknessOpacityMax": 0.75,
+        "resolutionScale": 0.5,
+        "colorResolutionScale": 1,
+        "overscan": 96,
+        "heroLightLimit": 4,
+        "shadowStrength": 0.28,
+        "roomDefaults": {
+          "ambientFloor": 0.05,
+          "ambientCeiling": 0.2,
+          "fillColor": "rgba(135, 160, 255, 0.16)",
+          "feather": 28,
+          "mode": "local"
+        }
+      }
+    },
+    "indoors-soft": {
+      "atmosphere": {
+        "transitionMs": 1000,
+        "nightColor": "rgba(10, 20, 48, 1)",
+        "nightOpacityMax": 0.2,
+        "nightBlendMode": "multiply",
+        "vignetteColor": "rgba(8, 10, 18, 1)",
+        "vignetteOpacityMax": 0.04,
+        "sunrise": {
+          "start": "04:30",
+          "end": "07:30",
+          "angle": -100,
+          "startX": 1.85,
+          "endX": -0.85,
+          "originY": 0.55,
+          "startSpan": 1.48,
+          "endSpan": 1.18,
+          "bandOpacity": 0.26,
+          "blendMode": "normal",
+          "stops": [
+            { "position": 0.0, "color": "rgba(0, 0, 0, 0)" },
+            { "position": 0.2, "color": "rgba(0, 0, 0, 0)" },
+            { "position": 0.38, "color": "rgba(88, 112, 198, 0.06)" },
+            { "position": 0.5, "color": "rgba(182, 112, 198, 0.14)" },
+            { "position": 0.62, "color": "rgba(246, 162, 102, 0.24)" },
+            { "position": 0.76, "color": "rgba(255, 224, 164, 0.12)" },
+            { "position": 1.0, "color": "rgba(0, 0, 0, 0)" }
+          ]
+        },
+        "sunset": {
+          "start": "18:00",
+          "end": "21:30",
+          "angle": 100,
+          "startX": -0.85,
+          "endX": 1.85,
+          "originY": 0.55,
+          "startSpan": 1.18,
+          "endSpan": 1.48,
+          "bandOpacity": 0.3,
+          "blendMode": "normal",
+          "stops": [
+            { "position": 0.0, "color": "rgba(0, 0, 0, 0)" },
+            { "position": 0.18, "color": "rgba(0, 0, 0, 0)" },
+            { "position": 0.32, "color": "rgba(255, 224, 160, 0.1)" },
+            { "position": 0.46, "color": "rgba(248, 166, 104, 0.26)" },
+            { "position": 0.58, "color": "rgba(186, 110, 196, 0.18)" },
+            { "position": 0.72, "color": "rgba(84, 108, 194, 0.08)" },
+            { "position": 1.0, "color": "rgba(0, 0, 0, 0)" }
+          ]
+        }
+      },
+      "lighting": {
+        "enabled": true,
+        "darknessColor": "rgba(10, 20, 48, 1)",
+        "darknessOpacityMax": 0.56,
+        "resolutionScale": 0.6,
+        "colorResolutionScale": 1,
+        "overscan": 72,
+        "heroLightLimit": 3,
+        "shadowStrength": 0.36,
+        "roomDefaults": {
+          "ambientFloor": 0.18,
+          "ambientCeiling": 0.72,
+          "fillColor": "rgba(255, 210, 142, 0.34)",
+          "feather": 40,
+          "mode": "mixed"
+        }
+      }
+    }
+  }
+}
