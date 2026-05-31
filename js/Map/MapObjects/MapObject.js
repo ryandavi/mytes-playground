@@ -312,7 +312,8 @@ class MapObject {
 
 	// ── Config helpers ────────────────────────────────────────────────────────
 
-	getConfig(path, defaultValue = null) {
+	getConfig(path, ...args) {
+		const defaultValue = args.length > 0 ? args[0] : null;
 		const keys = path.split('.');
 		let current = this.config;
 		for (const key of keys) {

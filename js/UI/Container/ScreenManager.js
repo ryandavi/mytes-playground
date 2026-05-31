@@ -14,6 +14,8 @@ class ScreenManager extends UIComponent {
         this.initializeHeaderState();
     }
 
+    static STORAGE_KEY = 'neko_fullscreen';
+
     initializeButtons() {
         if (this.fullscreenButton) {
             this.handleFullscreenClick = () => {
@@ -22,17 +24,27 @@ class ScreenManager extends UIComponent {
             this.fullscreenButton.addEventListener("click", this.handleFullscreenClick);
             this.listenerCleanup.push(() => this.fullscreenButton?.removeEventListener('click', this.handleFullscreenClick));
         }
+
+        if (localStorage.getItem(ScreenManager.STORAGE_KEY) === '1') {
+            this.parent.containerWrapper.classList.add('is-fullscreen');
+            this.fullscreenButton?.classList.add('active');
+            const camera = this.parent.parent.camera;
+            if (camera) {
+                requestAnimationFrame(() => {
+                    const anchor = camera.getViewportCenterAnchor?.();
+                    camera.zoomTo(camera.zoomLevel, { anchor, immediate: true });
+                });
+            }
+        }
     }
 
     toggleFullscreen() {
         const camera = this.parent.parent.camera;
         const anchor = camera?.getViewportCenterAnchor ? camera.getViewportCenterAnchor() : null;
 
-        // toggle class on container
-        this.parent.containerWrapper.classList.toggle('is-fullscreen');
-        if (this.fullscreenButton) {
-            this.fullscreenButton.classList.toggle('active');
-        }
+        const isNowFullscreen = this.parent.containerWrapper.classList.toggle('is-fullscreen');
+        this.fullscreenButton?.classList.toggle('active', isNowFullscreen);
+        localStorage.setItem(ScreenManager.STORAGE_KEY, isNowFullscreen ? '1' : '0');
 
         if (camera && anchor) {
             requestAnimationFrame(() => {

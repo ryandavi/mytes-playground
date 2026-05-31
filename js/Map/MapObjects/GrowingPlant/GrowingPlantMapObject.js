@@ -252,3 +252,6 @@ class GrowingPlantMapObject extends withItemDrops(InteractiveMapObject) {
         super.remove();
     }
 }
+
+// Static decorative flower — no growth stages, but supports item drops for pick interactions.
+class FlowerMapObject extends withItemDrops(MapObject) {}

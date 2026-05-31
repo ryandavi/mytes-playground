@@ -383,7 +383,7 @@ class MapObjectFactory {
 // Set up the factory with default registrations
 MapObjectFactory.registry
     .register('GRASS', MapObject)
-    .register('FLOWER', MapObject)
+    .register('FLOWER', FlowerMapObject)
     .register('TREE', TreeMapObject)
     .register('FRUIT_TREE', FruitTreeMapObject)
     .register('TREE_STUMP', TreeStumpMapObject)

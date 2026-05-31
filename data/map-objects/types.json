@@ -630,12 +630,17 @@
       "mirror"
     ],
     "physics": {
-      "collision": true,
-      "collider": {
-        "offsetX": 4,
-        "offsetY": 48,
-        "width": 24,
-        "height": 16
+      "collision": true
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "width": 24,
+          "height": 16,
+          "x": 4,
+          "y": 48
+        }
       }
     },
     "interaction": {
@@ -4360,13 +4365,17 @@
     "physics": {
       "collision": true,
       "walkable": false,
-      "blocksLineOfSight": true,
-      "collider": {
-        "type": "box",
-        "width": 32,
-        "height": 32,
-        "offsetX": 0,
-        "offsetY": 32
+      "blocksLineOfSight": true
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "width": 32,
+          "height": 32,
+          "x": 0,
+          "y": 32
+        }
       }
     },
     "interaction": {
@@ -4457,13 +4466,17 @@
     "physics": {
       "collision": true,
       "walkable": false,
-      "blocksLineOfSight": true,
-      "collider": {
-        "type": "box",
-        "width": 28,
-        "height": 20,
-        "offsetX": 2,
-        "offsetY": 76
+      "blocksLineOfSight": true
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "width": 28,
+          "height": 20,
+          "x": 2,
+          "y": 76
+        }
       }
     },
     "interaction": {

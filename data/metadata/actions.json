@@ -478,7 +478,7 @@
     {
       "id": "idle",
       "label": "Idle",
-      "icon": "💤",
+      "icon": "⏸️",
       "description": "Stay in place for a moment",
       "category": "state",
       "queue": {
