@@ -501,6 +501,7 @@
 	<script src="js/Engine/SimClock.js?v=<?= $v ?>"></script>
 	<script src="js/Engine/Core.js?v=<?= $v ?>"></script>
 	<script src="js/Engine/GameTime.js?v=<?= $v ?>"></script>
+	<script src="js/Engine/SpriteAnimator.js?v=<?= $v ?>"></script>
 	<script src="js/Effects/ParticleSystem.js?v=<?= $v ?>"></script>
 
 	<!-- INPUT -->

@@ -9,6 +9,7 @@ const withAnimation = (BaseClass) => class extends BaseClass {
             frameHeight: this.getVisualFrameSize()?.height ?? this.getConfig('size.height'),
             scale:       this.getVisualScale(),
             spriteSheet: this.getVisualSpriteSheet().url || this.getConfig('spriteSheet.url'),
+            fps:         options.fps ?? this.getConfig('spriteConfig.fps'),
             frameDelay:  options.frameDelay || this.getVisualFrameDelay(),
             animations:  this.getVisualAnimations(),
             default:     this.getDefaultVisualState('idle')

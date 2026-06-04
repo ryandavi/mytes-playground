@@ -50,7 +50,7 @@
     "defaultState": "default",
     "states": ["default"],
     "animates": false,
-    "frameDelay": 100
+    "fps": 8
   },
   "soundEffects": {
     "pickup": "ui_pickup_item",

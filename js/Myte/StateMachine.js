@@ -5,43 +5,9 @@ const StateTypes = {
 	SLIDE_DOWN: 'slide_down',
 	GRAVITY: 'gravity',
 	DRAGGING: 'dragging',
-	BEING_CARRIED: 'being_carried'  // Add this
+	BEING_CARRIED: 'being_carried'
 };
 
-
-class SpriteAnimator {
-	constructor(sprite, spriteConfig) {
-		this.sprite = sprite;
-		this.spriteConfig = spriteConfig;
-		this.size = { width: 64, height: 64 };
-	}
-
-	setSize(width, height) {
-		this.size = { width, height };
-	}
-
-	setSpriteConfig(config) {
-		this.spriteConfig = config;
-	}
-
-	updateSprite(animationKey, frameIndex) {
-		const spriteData = this.spriteConfig[animationKey];
-		if (!spriteData || !spriteData[frameIndex]) return false;
-
-		const [x, y] = spriteData[frameIndex];
-		this.setPosition(x, y);
-		return true;
-	}
-
-	setPosition(x, y) {
-		this.sprite.style.backgroundPosition =
-			`${x * -this.size.width}px ${y * -this.size.height}px`;
-	}
-
-	getFrameCount(animationKey) {
-		return this.spriteConfig[animationKey]?.length || 0;
-	}
-}
 
 class StateController {
 	constructor(parent, states, priorities, stateConfig) {
@@ -55,7 +21,6 @@ class StateController {
 	}
 
 	determineNextState(conditions) {
-		// Handle special case for dropping state
 		if (this.isDroppingState() && !conditions.isDragging) {
 			return this.handleDroppingState(conditions);
 		}
@@ -107,8 +72,6 @@ class StateController {
 			this.parent.parent.playSound(stateConfig.sound);
 		}
 
-
-
 		return true;
 	}
 
@@ -128,10 +91,11 @@ class StateController {
 class StateMachine {
 	constructor(parent, initialState) {
 		this.parent = parent;
-		this.animator = new SpriteAnimator(
-			parent.duplicate.querySelector('.sprite'),
-			{}
-		);
+		this.spriteElement = parent.duplicate.querySelector('.sprite');
+		this.spriteConfig = {};
+		this.spriteSize = { width: 64, height: 64 };
+		this.spriteAnimator = new SpriteAnimator();
+
 		this.stateRules = this.loadStateRules();
 		this.statePriorities = this.loadStatePriorities();
 		this.stateConfig = this.loadStateConfig();
@@ -143,9 +107,6 @@ class StateMachine {
 			this.stateConfig
 		);
 
-		this.currentFrameIndex = 0;
-		this._animElapsed = 0;
-		this._currentFrameElapsed = 0; // tracks time on current frame (for per-frame durations)
 		this.applySpeciesDefinition(this.parent.definition);
 		this.stateController.transitionTo(initialState);
 	}
@@ -158,13 +119,10 @@ class StateMachine {
 			},
 			[StateTypes.GRAVITY]: {
 				check: (context) => {
-					// We need to check if we're in a gravity-affected state
-					return context.isGravity && (context.isFalling || context.isJumping || 
-						   // The key addition: detect when we've just landed
+					return context.isGravity && (context.isFalling || context.isJumping ||
 						   (context.stateController?.currentState === 'falling' && !context.isFalling));
 				},
 				getState: (context) => {
-					// If we were falling but no longer are, we must have landed
 					if (context.stateController?.currentState === 'falling' && !context.isFalling) {
 						return 'land';
 					}
@@ -204,12 +162,12 @@ class StateMachine {
 			[StateTypes.SLIDE_DOWN]: 3,
 			[StateTypes.GRAVITY]: 4,
 			[StateTypes.DRAGGING]: 5,
-			[StateTypes.BEING_CARRIED]: 6  
+			[StateTypes.BEING_CARRIED]: 6
 		};
 	}
 
 	loadStateConfig() {
-		return { 			// Idle states
+		return {
 			'idle': {
 				spriteSet: ['idle'],
 				repeat: true
@@ -231,7 +189,6 @@ class StateMachine {
 				repeat: true
 			},
 
-			// Movement states
 			'moving_N': {
 				spriteSet: ['N'],
 				repeat: true,
@@ -261,7 +218,6 @@ class StateMachine {
 				}
 			},
 
-			// Transition states
 			'transition_NS': {
 				spriteSet: ['verticalTurn'],
 				repeat: true,
@@ -283,7 +239,6 @@ class StateMachine {
 				onTransitionEnd: 'moving_W'
 			},
 
-			// Action states
 			'scratch_left': {
 				spriteSet: ['scratchLeft'],
 				repeat: true
@@ -293,7 +248,6 @@ class StateMachine {
 				repeat: true
 			},
 
-			// Expression states
 			'cry': {
 				spriteSet: ['cry_expression'],
 				repeat: false
@@ -315,7 +269,6 @@ class StateMachine {
 				repeat: false
 			},
 
-			// Special states
 			'dragging': {
 				spriteSet: ['dragging'],
 				repeat: true
@@ -328,14 +281,13 @@ class StateMachine {
 			'dropping': {
 				spriteSet: ['dropping'],
 				repeat: false,
-				onTransitionEnd: 'land'  // Add this line
+				onTransitionEnd: 'land'
 			},
 
 			'land': {
 				spriteSet: ['land'],
 				repeat: false,
 				sound: 'land',
-				// onTransitionEnd: 'idle'  // Add this line
 			},
 
 			'jumping': {
@@ -347,21 +299,18 @@ class StateMachine {
 			'falling': {
 				spriteSet: ['falling'],
 				repeat: true,
-				onTransitionEnd: 'land'  // Add this line
-
+				onTransitionEnd: 'land'
 			},
-			
+
 			'slide_down': {
 				spriteSet: ['slide_down'],
 				repeat: true
 			},
 
 			'being_carried': {
-				spriteSet: ['idle'],  // Using idle animation while being carried
+				spriteSet: ['idle'],
 				repeat: true
 			},
-
-
 
 			'being_carried_N': {
 				spriteSet: ['idle_N'],
@@ -379,9 +328,6 @@ class StateMachine {
 				spriteSet: ['idle_W'],
 				repeat: true
 			},
-
-
-
 		};
 	}
 
@@ -391,7 +337,7 @@ class StateMachine {
 			return 'pickup';
 		}
 
-		if (currentState === 'pickup' && this.currentFrameIndex === -1) {
+		if (currentState === 'pickup' && this.spriteAnimator.isComplete) {
 			return 'dragging';
 		}
 
@@ -415,7 +361,7 @@ class StateMachine {
 			return 'idle_' + this.parent.direction;
 		}
 
-		if (this.currentFrameIndex === -1) {
+		if (this.spriteAnimator.isComplete) {
 			this.parent.queue.removeCurrentAction();
 			return 'idle_' + this.parent.direction;
 		}
@@ -445,26 +391,31 @@ class StateMachine {
 			console.error(`[StateMachine] Species "${speciesId}" has no spriteSets defined.`);
 		}
 
-		this.animator.setSize(frameSize.width || 64, frameSize.height || 64);
-		this.animator.setSpriteConfig(spriteSets || {});
+		this.spriteSize = { width: frameSize.width || 64, height: frameSize.height || 64 };
+		this.spriteConfig = spriteSets || {};
 	}
 
-	// Returns the interval (ms) to wait before advancing from the current frame.
-	// Priority: sprite data [col, row, durationMs] > stateConfig.frameDurations[i] > stateConfig.fps > 8fps default.
-	_getFrameInterval(state) {
+	// Load frames for the given state into the animator.
+	// Merges per-state frameDurations into frame data so SpriteAnimator only needs frame[2].
+	_initAnimatorForState(state) {
 		const cfg = this.stateConfig[state];
 		const animKey = this.getAnimationKey(state);
-		const frame = this.animator.spriteConfig?.[animKey]?.[this.currentFrameIndex];
-		let interval;
-		if (Array.isArray(frame) && frame[2] != null) {
-			interval = frame[2];
-		} else if (cfg?.frameDurations?.[this.currentFrameIndex] != null) {
-			interval = cfg.frameDurations[this.currentFrameIndex];
-		} else {
-			interval = 1000 / (cfg?.fps ?? 8);
+		let frames = this.spriteConfig[animKey] ?? [];
+
+		const durations = cfg?.frameDurations;
+		if (durations) {
+			frames = frames.map((f, i) => {
+				if (Array.isArray(f) && f[2] != null) return f;
+				const dur = durations[i];
+				if (dur == null) return f;
+				return Array.isArray(f) ? [f[0], f[1], dur] : [f, 0, dur];
+			});
 		}
 
-		return interval / this._getAnimationSpeedScale(state);
+		this.spriteAnimator.setFrames(frames, {
+			fps: cfg?.fps,
+			loop: cfg?.repeat ?? true
+		});
 	}
 
 	_getAnimationSpeedScale(state) {
@@ -540,54 +491,31 @@ class StateMachine {
 
 		const newState = this.stateController.determineNextState(context);
 		if (this.stateController.transitionTo(newState)) {
-			this.currentFrameIndex = 0;
-			this._currentFrameElapsed = 0;
-			// Show the first frame of the new state immediately.
+			this._initAnimatorForState(this.stateController.currentState);
 			this._renderCurrentFrame();
 		}
 
-		// Accumulate time and advance one frame at a time so fast deltaTime
-		// doesn't skip multiple frames in a single update.
-		this._currentFrameElapsed += deltaTime;
-		const interval = this._getFrameInterval(this.stateController.currentState);
-		if (this._currentFrameElapsed >= interval) {
-			this._currentFrameElapsed -= interval;
-			// Clamp so a stall doesn't cause runaway catch-up.
-			if (this._currentFrameElapsed >= interval) this._currentFrameElapsed = 0;
-			this._advanceFrame();
+		const currentState = this.stateController.currentState;
+		this.spriteAnimator.setSpeedScale(this._getAnimationSpeedScale(currentState));
+
+		if (this.spriteAnimator.update(deltaTime)) {
+			this._renderCurrentFrame();
+			const animKey = this.getAnimationKey(currentState);
+			this._triggerFrameEvents(currentState, animKey, this.spriteAnimator.frameIndex);
+
+			if (this.spriteAnimator.isComplete) {
+				this.handleAnimationComplete(currentState);
+			}
 		}
 	}
 
 	// Write the current frame to the DOM without advancing the index.
 	_renderCurrentFrame() {
 		const animKey = this.getAnimationKey(this.stateController.currentState);
-		if (!animKey) return;
-		this.animator.updateSprite(animKey, this.currentFrameIndex);
-		this.parent.duplicate.setAttribute("sprite", animKey);
-	}
-
-	// Advance one sprite frame and handle looping / completion.
-	_advanceFrame() {
-		const currentState = this.stateController.currentState;
-		const animationKey = this.getAnimationKey(currentState);
-		if (!animationKey) return;
-
-		const updated = this.animator.updateSprite(animationKey, this.currentFrameIndex);
-		if (!updated) return;
-
-		this.parent.duplicate.setAttribute("sprite", animationKey);
-		this._triggerFrameEvents(currentState, animationKey, this.currentFrameIndex);
-
-		if (this.isAtLastFrame(animationKey)) {
-			this.handleAnimationComplete(currentState);
-		} else {
-			this.currentFrameIndex++;
-		}
-	}
-
-	// Kept for backwards compatibility — calls _advanceFrame.
-	updateAnimation() {
-		this._advanceFrame();
+		if (!animKey || !this.spriteElement) return;
+		this.spriteElement.style.backgroundPosition =
+			this.spriteAnimator.getBackgroundPosition(this.spriteSize.width, this.spriteSize.height);
+		this.parent.duplicate.setAttribute('sprite', animKey);
 	}
 
 	getAnimationKey(state) {
@@ -626,7 +554,7 @@ class StateMachine {
 
 	_getSpriteFrameRow(spriteKey) {
 		if (!spriteKey) return null;
-		const frames = this.animator?.spriteConfig?.[spriteKey];
+		const frames = this.spriteConfig[spriteKey];
 		if (!Array.isArray(frames) || frames.length === 0 || !Array.isArray(frames[0])) {
 			return null;
 		}
@@ -635,26 +563,22 @@ class StateMachine {
 		return Number.isFinite(row) ? row : null;
 	}
 
-	isAtLastFrame(animationKey) {
-		return this.currentFrameIndex >= this.animator.getFrameCount(animationKey) - 1;
-	}
-
 	handleAnimationComplete(state) {
 		const config = this.stateConfig[state];
-		if (!config) {
-			this.currentFrameIndex = 0;
-			return;
-		}
+		if (!config) return;
 
 		if (this.stateController.isTransitioning) {
 			this.stateController.handleTransitionComplete();
-		} else if (!config.repeat) {
-			this.currentFrameIndex = -1;
-			if (config.onTransitionEnd) {
-				this.stateController.transitionTo(config.onTransitionEnd);
+			// handleTransitionComplete may have changed currentState — re-init for the new state
+			this._initAnimatorForState(this.stateController.currentState);
+			this._renderCurrentFrame();
+		} else if (!config.repeat && config.onTransitionEnd) {
+			if (this.stateController.transitionTo(config.onTransitionEnd)) {
+				this._initAnimatorForState(this.stateController.currentState);
+				this._renderCurrentFrame();
 			}
-		} else {
-			this.currentFrameIndex = 0;
 		}
+		// If !repeat and no onTransitionEnd: animator stays complete.
+		// determineNextState will detect isComplete on the next tick and transition out.
 	}
 }
