@@ -1147,6 +1147,9 @@ class MapObject {
 		this.inputComponents.click = new ClickComponent(this, {
 			element: this.element,
 			enabled: true,
+			doubleClickInterval: this.getConfig('interactionGestures.doubleClickInterval', SiteConfig.interaction.gestures.doubleClickInterval),
+			longPressDelay: this.getConfig('interactionGestures.longPressDelay', SiteConfig.interaction.gestures.longPressDelay),
+			clickMoveThreshold: this.getConfig('interactionGestures.clickMoveThreshold', SiteConfig.interaction.gestures.clickMoveThreshold),
 			canClick: () => this.active,
 			onClick: () => this.handleSingleClick(),
 			onDoubleClick: (event) => this.handleDoubleClick(event),
@@ -1173,7 +1176,7 @@ class MapObject {
 			enabled: true,
 			autoActivate: false,
 			canDrag: () => this.active && this.canBeDragged(),
-			dragThreshold: 3,
+			dragThreshold: this.getConfig('dragThreshold', SiteConfig.interaction.mapObject.dragThreshold),
 			dragTimeThreshold: 0,
 			preventDefaultsForDrag: true,
 			onDragStart: () => {
@@ -1340,13 +1343,13 @@ class MapObject {
 			return;
 		}
 
-		const dragThreshold = this.getConfig('selectDragThreshold', 8);
-		const dragTimeThreshold = this.getConfig('selectDragTimeThreshold', 300);
-		const maxYForPickup = this.getConfig('selectPickupMaxY', 500);
-		const maxXForPickup = this.getConfig('selectPickupMaxX', 300);
+		const dragThreshold = this.getConfig('selectDragThreshold', SiteConfig.interaction.mapObject.selectDragThreshold);
+		const dragTimeThreshold = this.getConfig('selectDragTimeThreshold', SiteConfig.interaction.mapObject.selectDragTimeThreshold);
+		const maxYForPickup = this.getConfig('selectPickupMaxY', SiteConfig.interaction.mapObject.selectPickupMaxY);
+		const maxXForPickup = this.getConfig('selectPickupMaxX', SiteConfig.interaction.mapObject.selectPickupMaxX);
 		const usePickupGesture = this.getConfig('canPickUp', false);
-		const dragModeRestoreDelay = this.getConfig('selectDragModeRestoreDelay', 100);
-		const dragStartDelay = this.getConfig('selectDragStartDelay', 10);
+		const dragModeRestoreDelay = this.getConfig('selectDragModeRestoreDelay', SiteConfig.interaction.mapObject.selectDragModeRestoreDelay);
+		const dragStartDelay = this.getConfig('selectDragStartDelay', SiteConfig.interaction.mapObject.selectDragStartDelay);
 		let pressStart = null;
 		let previousMode = null;
 		let pressStartTime = 0;

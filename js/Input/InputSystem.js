@@ -307,15 +307,21 @@ class InputSystem {
 	get hasDragOwner() {
 		return !!this._dragOwner;
 	}
+
+	getGestureConfig() {
+		return SiteConfig?.interaction?.gestures ?? {};
+	}
 	
 	/**
 	 * Handle click events
 	 * @param {MouseEvent} event 
 	 */
 	handleClick(event) {
+	  const gestureConfig = this.getGestureConfig();
+	  const doubleClickInterval = gestureConfig.doubleClickInterval ?? 300;
 	  const now = Date.now();
 	  const timeSinceLastClick = now - this.state.mouse.lastClickTime;
-	  const isDoubleClick = timeSinceLastClick < 300; // 300ms double-click threshold
+	  const isDoubleClick = timeSinceLastClick < doubleClickInterval;
 	  
 	  // Update state
 	  this.state.mouse.lastClickTime = now;
@@ -520,6 +526,9 @@ class InputSystem {
 	 * @param {TouchEvent} event 
 	 */
 	handleTouchEnd(event) {
+	  const gestureConfig = this.getGestureConfig();
+	  const tapMaxDuration = gestureConfig.tapMaxDuration ?? 300;
+	  const doubleClickInterval = gestureConfig.doubleClickInterval ?? 300;
 	  let activeTouch = null;
 	  
 	  // Find our active touch in the changed touches list
@@ -573,10 +582,10 @@ class InputSystem {
 			});
 			
 			// If this was a short tap, also trigger a click
-			if (touchDuration < 300) { // 300ms tap threshold
+			if (touchDuration < tapMaxDuration) {
 			  const now = Date.now();
 			  const timeSinceLastClick = now - this.state.mouse.lastClickTime;
-			  const isDoubleClick = timeSinceLastClick < 300;
+			  const isDoubleClick = timeSinceLastClick < doubleClickInterval;
 			  
 			  // Update click time
 			  this.state.mouse.lastClickTime = now;

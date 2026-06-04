@@ -466,6 +466,12 @@ class Inventory {
             if (dropped) {
                 dropped.inventoryVariant = itemVariant;
                 dropped.inventoryName = name;
+                dropped.userDropSource = 'inventory';
+                dropped.offeredToMytes = String(itemDef.type || '').toUpperCase() === 'FOOD';
+                dropped.allowAutoCollect = dropped.offeredToMytes ? false : dropped.allowAutoCollect;
+                if (dropped.offeredToMytes) {
+                    this.notifyNearbyMytesOfDroppedFood(dropped);
+                }
             }
             success = !!dropped;
         } else {
@@ -539,21 +545,33 @@ class Inventory {
 
         const itemType = this.state.draggedItem.dataset.type;
         const itemConfig = this.config.itemTypes[itemType];
+        const draggedItemData = {
+            name: this.state.draggedItem.dataset.name,
+            variant: this.state.draggedItem.dataset.variant || this.state.draggedItem.dataset.name,
+            type: itemType,
+            description: this.state.draggedItem.dataset.description || ''
+        };
 
         if (!itemConfig) return;
 
-        // Apply item effects and remove from inventory
-        this.applyItemEffects(myte, itemType, itemConfig);
-        this.removeItem(this.state.draggedItem.dataset.variant || this.state.draggedItem.dataset.name);
+        this.removeItem(draggedItemData.variant || draggedItemData.name);
 
-        // Play type-appropriate sound
-        const soundMap = { FOOD: 'myte_eat', TOY: 'myte_happy', MEDICINE: 'myte_happy', FLOWER: 'myte_happy', HEALTH: 'myte_happy' };
-        this.parent.soundManager?.play(soundMap[itemType] || 'ui_drop_item');
+        if (itemType === 'FOOD') {
+            this.startFeedingSequence(myte, draggedItemData, itemConfig, {
+                clientX: e.clientX,
+                clientY: e.clientY
+            });
+        } else {
+            this.applyItemEffects(myte, itemType, itemConfig);
+
+            const soundMap = { FOOD: 'myte_eat', TOY: 'myte_happy', MEDICINE: 'myte_happy', FLOWER: 'myte_happy', HEALTH: 'myte_happy' };
+            this.parent.soundManager?.play(soundMap[itemType] || 'ui_drop_item');
+        }
 
         // Update cooldown
         this.state.lastFeedTime[myte.id] = now;
 
-        myteElement.classList.remove('is-drag-over');
+        myteElement.classList.remove('is-drag-over', 'is-drop-rejected');
         this.state.myteTarget = null;
     }
 
@@ -561,31 +579,180 @@ class Inventory {
         // Clear current actions
         myte.queue.clear();
 
-        // Add configured expressions
-        itemConfig.expressions.forEach(expression => {
-            myte.queue.addExpression(expression, itemConfig.consumeTime / itemConfig.expressions.length);
-        });
+        this.queueItemExpressions(myte, itemConfig);
+        this.applyConfiguredItemEffects(myte, itemConfig, { source: `inventory_${String(itemType || '').toLowerCase()}` });
+        this.emitItemParticles(myte, itemType);
+    }
 
-        // Apply configurable stat effects using a shared payload format.
-        myte.stats.applyStatEffects(itemConfig.effects ?? {
-            moodBoost: itemConfig.moodBoost
+    queueItemExpressions(myte, itemConfig) {
+        const expressions = Array.isArray(itemConfig?.expressions) ? itemConfig.expressions.filter(Boolean) : [];
+        if (expressions.length === 0) return;
+        const duration = Math.max(120, (itemConfig.consumeTime || 1000) / expressions.length);
+        expressions.forEach(expression => {
+            myte.queue.addExpression(expression, duration);
         });
-        if (itemConfig.saturationMs) {
-            myte.buffs?.applyBuff?.('nourished', { durationMs: itemConfig.saturationMs, source: 'inventory' });
+    }
+
+    resolveItemEffects(itemConfig = {}) {
+        if (itemConfig.effects && typeof itemConfig.effects === 'object') {
+            return itemConfig.effects;
         }
 
-        // Emit particles or other visual effects if system exists
+        if (Number.isFinite(itemConfig.moodBoost)) {
+            return { fun: itemConfig.moodBoost };
+        }
+
+        return {};
+    }
+
+    applyConfiguredItemEffects(myte, itemConfig, { source = 'inventory' } = {}) {
+        myte.stats.applyStatEffects(this.resolveItemEffects(itemConfig));
+        if (itemConfig?.saturationMs) {
+            myte.buffs?.applyBuff?.('nourished', { durationMs: itemConfig.saturationMs, source });
+        }
+    }
+
+    emitItemParticles(myte, itemType, options = {}) {
         const particleSystem = this.parent?.gameMap?.particleSystem || null;
-        if (particleSystem) {
-            particleSystem.emit(
-                'SPARKLE',
-                myte.posX + myte.size.width / 2,
-                myte.posY + myte.size.height / 2,
-                {
-                    debugLabel: `inventory_${itemType}`
-                }
-            );
+        if (!particleSystem) return;
+
+        const anchorId = options.anchorId || null;
+        const position = anchorId
+            ? myte.getAnchorWorldPosition?.(anchorId, null, { y: Math.round(myte.size.height * 0.55) })
+            : {
+                x: myte.posX + myte.size.width / 2,
+                y: myte.posY + myte.size.height / 2
+            };
+
+        if (typeof particleSystem.spawnBurst === 'function') {
+            particleSystem.spawnBurst('SPARKLE', position.x, position.y, {
+                count: options.count ?? 6,
+                spread: options.spread ?? 18,
+                debugLabel: `inventory_${itemType}`
+            });
+            return;
         }
+
+        particleSystem.emit?.('SPARKLE', position.x, position.y, {
+            debugLabel: `inventory_${itemType}`
+        });
+    }
+
+    startFeedingSequence(myte, itemData, itemConfig, { clientX = null, clientY = null } = {}) {
+        const consumeTime = Math.max(400, Number(itemConfig?.consumeTime) || 1000);
+        const animationDuration = Math.min(260, Math.max(140, Math.round(consumeTime * 0.3)));
+
+        myte.queue.clear();
+        this.queueItemExpressions(myte, {
+            ...itemConfig,
+            expressions: ['eat'],
+            consumeTime
+        });
+
+        this.animateItemToMyteMouth(myte, itemData, { clientX, clientY, duration: animationDuration });
+
+        const burstCount = Math.max(2, Math.round(consumeTime / 260));
+        for (let index = 0; index < burstCount; index++) {
+            const delay = animationDuration + Math.round(((consumeTime - animationDuration) * index) / Math.max(1, burstCount));
+            window.setTimeout(() => {
+                if (!myte?.active) return;
+                this.emitItemParticles(myte, 'FOOD', {
+                    anchorId: 'mouth.item',
+                    count: 4,
+                    spread: 10
+                });
+            }, delay);
+        }
+
+        window.setTimeout(() => {
+            if (!myte?.active) return;
+            this.applyConfiguredItemEffects(myte, itemConfig, { source: 'inventory_food' });
+            this.parent.soundManager?.play('myte_eat');
+        }, consumeTime);
+    }
+
+    animateItemToMyteMouth(myte, itemData, { clientX = null, clientY = null, duration = 180 } = {}) {
+        const layer = this.parent?.gameMap?.layers?.objects;
+        if (!layer) return;
+
+        const tempSprite = this.createFeedSprite(itemData, duration);
+        if (!tempSprite) return;
+
+        const startWorldPos = (Number.isFinite(clientX) && Number.isFinite(clientY))
+            ? this.parent.inputHandler.screenToWorldCoordinates(clientX, clientY)
+            : myte.getAnchorWorldPosition?.('mouth.item') || {
+                x: myte.posX + myte.size.width / 2,
+                y: myte.posY + myte.size.height / 2
+            };
+        const endPos = myte.getMouthItemPosition?.(tempSprite.size) || {
+            x: myte.posX + ((myte.size.width - tempSprite.size.width) / 2),
+            y: myte.posY + ((myte.size.height - tempSprite.size.height) / 2)
+        };
+
+        tempSprite.element.style.left = `${startWorldPos.x - (tempSprite.size.width / 2)}px`;
+        tempSprite.element.style.top = `${startWorldPos.y - (tempSprite.size.height / 2)}px`;
+        tempSprite.element.style.zIndex = `${myte.getZIndex?.(myte.posY) ?? 9999}`;
+        layer.appendChild(tempSprite.element);
+
+        requestAnimationFrame(() => {
+            tempSprite.element.style.left = `${endPos.x}px`;
+            tempSprite.element.style.top = `${endPos.y}px`;
+            tempSprite.element.style.transform = 'scale(0.82)';
+            tempSprite.element.style.opacity = '0.95';
+        });
+
+        window.setTimeout(() => {
+            tempSprite.element.remove();
+        }, duration + 60);
+    }
+
+    createFeedSprite(itemData = {}, duration = 180) {
+        const variant = itemData.variant || itemData.name;
+        const itemDefinition = ItemRegistry.getItemSync(variant);
+        const width = itemDefinition?.sprite?.width || 32;
+        const height = itemDefinition?.sprite?.height || 32;
+        const element = document.createElement('div');
+        element.className = `inventory-feed-item ${ItemRegistry.normalizeId(variant)}`;
+        const transitionMs = Math.max(120, Number(duration) || 180);
+        element.style.position = 'absolute';
+        element.style.width = `${width}px`;
+        element.style.height = `${height}px`;
+        element.style.pointerEvents = 'none';
+        element.style.transition = `left ${transitionMs}ms ease-out, top ${transitionMs}ms ease-out, transform ${transitionMs}ms ease-out, opacity ${transitionMs}ms linear`;
+        element.style.transformOrigin = 'center center';
+        element.style.imageRendering = 'pixelated';
+        element.style.backgroundRepeat = 'no-repeat';
+        element.style.backgroundPosition = 'var(--item-sprite-x) var(--item-sprite-y)';
+        element.style.opacity = '1';
+
+        if (!ItemRegistry.applySpriteStyles(element, variant)) {
+            element.style.background = 'rgba(255, 255, 255, 0.85)';
+            element.style.borderRadius = '6px';
+        }
+
+        return {
+            element,
+            size: { width, height }
+        };
+    }
+
+    notifyNearbyMytesOfDroppedFood(droppedItem) {
+        if (!droppedItem?.isUserOfferedFood?.()) return;
+
+        const nearbyMytes = (this.parent?.mytes || []).filter(myte =>
+            myte?.isActive &&
+            myte.goal === MOVE_TYPES.FREEROAM &&
+            !myte.isDragging &&
+            !myte.queue?.hasUserInitiatedAction?.() &&
+            (myte.ai?.objectSearchRadius == null || myte.getDistanceTo?.(droppedItem) <= myte.ai.objectSearchRadius)
+        );
+
+        nearbyMytes.forEach((myte) => {
+            myte.ai?.resetThinking?.();
+            if (myte.ai?.canPlan?.()) {
+                myte.ai.planNextAction();
+            }
+        });
     }
 
     findMyteFromElement(element) {

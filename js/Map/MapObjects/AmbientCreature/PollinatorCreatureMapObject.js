@@ -118,12 +118,8 @@ class ButterflyMapObject extends withFlightSounds(PollinatorCreatureMapObject) {
 
         this.parent.particleSystem.addParticleMethodsToObject(this);
         this.addEffect('SPARKLE_SPRITE', {
-            attachmentPoint: 'back',
-            directionalDistance: Math.max(8, this.size.width * 0.18),
+            attachmentPoint: 'sparkle',
             followElevation: true,
-            randomizePosition: true,
-            randomizeFactor: 10,
-            offsetY: this.size.height * 0.05
         });
     }
 

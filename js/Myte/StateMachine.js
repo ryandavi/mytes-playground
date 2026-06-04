@@ -594,6 +594,47 @@ class StateMachine {
 		return this.stateConfig[state]?.spriteSet[0];
 	}
 
+	getAnchorDirection(fallbackDirection = this.parent.direction) {
+		const normalizedFallback = String(fallbackDirection || 'S').trim().toUpperCase();
+		const currentState = this.stateController?.currentState || '';
+		const animationKey = this.getAnimationKey(currentState);
+		const directDirection = this._extractCardinalDirection(currentState) || this._extractCardinalDirection(animationKey);
+		if (directDirection) {
+			return directDirection;
+		}
+
+		const frameRow = this._getSpriteFrameRow(animationKey);
+		if (frameRow == null) {
+			return normalizedFallback;
+		}
+
+		for (const candidate of ['N', 'S', 'E', 'W', 'idle_N', 'idle_S', 'idle_E', 'idle_W']) {
+			if (this._getSpriteFrameRow(candidate) !== frameRow) {
+				continue;
+			}
+
+			return this._extractCardinalDirection(candidate) || normalizedFallback;
+		}
+
+		return normalizedFallback;
+	}
+
+	_extractCardinalDirection(value) {
+		const match = String(value || '').trim().toUpperCase().match(/(?:^|_)(N|S|E|W)$/);
+		return match ? match[1] : null;
+	}
+
+	_getSpriteFrameRow(spriteKey) {
+		if (!spriteKey) return null;
+		const frames = this.animator?.spriteConfig?.[spriteKey];
+		if (!Array.isArray(frames) || frames.length === 0 || !Array.isArray(frames[0])) {
+			return null;
+		}
+
+		const row = Number(frames[0][1]);
+		return Number.isFinite(row) ? row : null;
+	}
+
 	isAtLastFrame(animationKey) {
 		return this.currentFrameIndex >= this.animator.getFrameCount(animationKey) - 1;
 	}

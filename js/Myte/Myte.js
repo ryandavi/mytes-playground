@@ -421,18 +421,63 @@ class Myte {
 		this.ensureFiniteCoordinates('snapPositionToTarget');
 	}
 
-	getCarriedItemPosition(itemSize = {}) {
-		const carryAnchor = MyteDefinitionRegistry.getSpatialAnchor(this.definition, 'carry.item', this.direction) || {};
+	getResolvedAnchorDirection(direction = null) {
+		if (direction != null) {
+			return String(direction).trim().toUpperCase();
+		}
+
+		return this.stateMachine?.getAnchorDirection?.(this.direction) ||
+			String(this.direction || 'S').trim().toUpperCase();
+	}
+
+	getAnchorDefinition(anchorId, direction = null) {
+		return MyteDefinitionRegistry.getSpatialAnchor(
+			this.definition,
+			anchorId,
+			this.getResolvedAnchorDirection(direction)
+		) || {};
+	}
+
+	getAnchorWorldPosition(anchorId, direction = null, fallback = {}) {
+		const anchor = this.getAnchorDefinition(anchorId, direction);
+		const fallbackX = fallback.x ?? Math.round(this.size.width * 0.5);
+		const fallbackY = fallback.y ?? Math.round(this.size.height * 0.5);
+		return {
+			x: this.posX + (anchor.x ?? fallbackX),
+			y: this.posY + (anchor.y ?? fallbackY)
+		};
+	}
+
+	getAnchoredItemPosition(anchorId, itemSize = {}, direction = null, fallback = {}) {
+		const anchor = this.getAnchorDefinition(anchorId, direction);
 		const itemWidth = itemSize.width ?? 0;
 		const itemHeight = itemSize.height ?? 0;
-		const anchorX = carryAnchor.x ?? Math.round(this.size.width * 0.5);
-		const anchorY = carryAnchor.y ?? Math.round(this.size.height * 0.12);
-		const itemAnchorX = carryAnchor.itemAnchorX ?? 0.5;
-		const itemAnchorY = carryAnchor.itemAnchorY ?? 1;
+		const anchorX = anchor.x ?? fallback.x ?? Math.round(this.size.width * 0.5);
+		const anchorY = anchor.y ?? fallback.y ?? Math.round(this.size.height * 0.5);
+		const itemAnchorX = anchor.itemAnchorX ?? fallback.itemAnchorX ?? 0.5;
+		const itemAnchorY = anchor.itemAnchorY ?? fallback.itemAnchorY ?? 0.5;
 		return {
 			x: this.posX + anchorX - (itemWidth * itemAnchorX),
 			y: this.posY + anchorY - (itemHeight * itemAnchorY)
 		};
+	}
+
+	getCarriedItemPosition(itemSize = {}) {
+		return this.getAnchoredItemPosition('carry.item', itemSize, null, {
+			x: Math.round(this.size.width * 0.5),
+			y: Math.round(this.size.height * 0.12),
+			itemAnchorX: 0.5,
+			itemAnchorY: 1
+		});
+	}
+
+	getMouthItemPosition(itemSize = {}) {
+		return this.getAnchoredItemPosition('mouth.item', itemSize, null, {
+			x: Math.round(this.size.width * 0.5),
+			y: Math.round(this.size.height * 0.55),
+			itemAnchorX: 0.5,
+			itemAnchorY: 0.5
+		});
 	}
 
 

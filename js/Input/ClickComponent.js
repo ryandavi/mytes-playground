@@ -7,11 +7,12 @@ class ClickComponent extends InputComponent {
    * @returns {Object} Default options
    */
   getDefaultOptions() {
+    const gestureConfig = SiteConfig?.interaction?.gestures ?? {};
     return {
       ...super.getDefaultOptions(),
-      doubleClickInterval: 300,      // Max time between clicks for a double click (ms)
-      longPressDelay: 500,           // Time to hold for a long press (ms)
-      clickMoveThreshold: 10,        // Max distance moved to still count as a click
+      doubleClickInterval: gestureConfig.doubleClickInterval ?? 300, // Max time between clicks for a double click (ms)
+      longPressDelay: gestureConfig.longPressDelay ?? 500,           // Time to hold for a long press (ms)
+      clickMoveThreshold: gestureConfig.clickMoveThreshold ?? 10,    // Max distance moved to still count as a click
       preventContextMenu: false,     // Whether to prevent context menu on right click
       stopPropagation: true,         // Whether to stop event propagation
       
@@ -39,6 +40,7 @@ class ClickComponent extends InputComponent {
     this.lastClickTime = 0;
     this.longPressTimer = null;
     this.touchId = null;
+    this.didLongPress = false;
     
     // Add context menu listener if needed
     if (this.options.preventContextMenu && this.element) {
@@ -104,6 +106,7 @@ class ClickComponent extends InputComponent {
 
     // Store press information
     this.isPressed = true;
+    this.didLongPress = false;
     this.pressStartTime = Date.now();
     this.pressStartPosition = { ...event.position };
     
@@ -170,6 +173,7 @@ class ClickComponent extends InputComponent {
     if (this.options.stopPropagation && event.originalEvent) {
       event.originalEvent.stopPropagation();
     }
+
   }
   
   /**
@@ -226,6 +230,11 @@ class ClickComponent extends InputComponent {
       event.originalEvent.stopPropagation();
     }
 
+    if (this.didLongPress) {
+      this.didLongPress = false;
+      return;
+    }
+
     // Check if it's a right click
     if (event.button === 2) {
       if (this.options.onRightClick) {
@@ -268,6 +277,7 @@ class ClickComponent extends InputComponent {
    */
   handleLongPress = (event) => {
     if (!this.active || !this.isPressed) return;
+    this.didLongPress = true;
     
     // Call long press callback
     if (this.options.onLongPress) {

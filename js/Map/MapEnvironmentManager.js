@@ -1275,10 +1275,64 @@ class MapEnvironmentManager {
             );
         });
 
+        const ditherConfig = lightingConfig.dither || {};
+        if (ditherConfig.enabled && Number(ditherConfig.pixelSize) >= 1) {
+            const fillAlpha = Math.round(darknessOpacity * 255);
+            // Scale pixel size with zoom so the dither pattern has consistent game-world size.
+            const effectivePixelSize = Math.max(1, Math.round(
+                Number(ditherConfig.pixelSize) * view.zoom
+            ));
+            this.drawDitherPass(darkCtx, this.lightingDarknessCanvas, effectivePixelSize, fillAlpha);
+        }
+
         const hasVisibleEffect = darknessOpacity > 0.01 ||
             lightingState.bandStrength > 0.01 ||
             Array.from(roomState.values()).some(entry => entry.lift > 0.01);
         this.lightingOverlay.style.opacity = hasVisibleEffect ? '1' : '0';
+    }
+
+    drawDitherPass(ctx, canvas, pixelSize, fillAlpha = 255) {
+        if (canvas.width <= 0 || canvas.height <= 0 || fillAlpha < 8) {
+            return;
+        }
+
+        const ps = Math.max(1, Math.round(pixelSize));
+        const w = canvas.width;
+        const h = canvas.height;
+
+        // clearMax (65% of fill): below this the area is lit — force to 0 so no smooth gradient
+        //   leaks through when zoomed in. Covers light interiors down to ~35% intensity lights.
+        // solidMin (fill - 4): at or above this is solid darkness — force to fillAlpha.
+        //   Prevents a smooth dark rim from appearing outside the dithered band.
+        const clearMax = Math.round(fillAlpha * 0.65);
+        const solidMin = Math.max(clearMax + 16, fillAlpha - 4);
+
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const px = imageData.data;
+
+        // Bayer 4×4 ordered dither matrix
+        const B = [
+             0, 128,  32, 160,
+            192,  64, 224,  96,
+             48, 176,  16, 144,
+            240, 112, 208,  80
+        ];
+
+        for (let y = 0; y < h; y++) {
+            const row = (Math.floor(y / ps) & 3) << 2;
+            for (let x = 0; x < w; x++) {
+                const i = (y * w + x) << 2;
+                const a = px[i + 3];
+                if (a === 0) continue;
+                if (a <= clearMax) { px[i + 3] = 0; continue; }      // force clear — no smooth halo
+                if (a >= solidMin) { px[i + 3] = fillAlpha; continue; } // force solid — no smooth rim
+                const col = Math.floor(x / ps) & 3;
+                const normalized = Math.round((a - clearMax) / (solidMin - clearMax) * 255);
+                px[i + 3] = normalized > B[row | col] ? fillAlpha : 0;
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
     }
 
     drawAmbientDarkness(ctx, view, lightingState, darknessColor) {

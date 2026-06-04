@@ -420,10 +420,27 @@ class AttachmentPointResolver {
                 y = bounds.bottom;
                 break;
             case 'center':
-            default:
                 x = bounds.centerX;
                 y = bounds.centerY;
                 break;
+            default: {
+                const normalizedDir = String(direction || '').trim().toUpperCase() || null;
+                const dirAnchor = normalizedDir
+                    ? object.getConfig?.(`spatial.directions.${normalizedDir}.anchors.${point}`, null)
+                    : null;
+                const baseAnchor = object.getConfig?.(`spatial.anchors.${point}`, null);
+                const anchor = dirAnchor != null
+                    ? (baseAnchor != null ? { ...baseAnchor, ...dirAnchor } : dirAnchor)
+                    : baseAnchor;
+                if (anchor) {
+                    x = posX + (typeof anchor.x === 'number' ? anchor.x : size.width * 0.5);
+                    y = posY + (typeof anchor.y === 'number' ? anchor.y : size.height * 0.5);
+                } else {
+                    x = bounds.centerX;
+                    y = bounds.centerY;
+                }
+                break;
+            }
         }
 
         x += ParticleDataUtils.toFiniteNumber(options.offsetX, 0);
@@ -522,6 +539,19 @@ class GameMapParticleSystem extends ParticleSystem {
         this.weatherEnabled = options.weatherEnabled !== false;
 
         this.registerPresets(MAP_PARTICLE_PRESETS);
+        this.preloadSpriteAssets();
+    }
+
+    preloadSpriteAssets() {
+        const seen = new Set();
+        for (const [, preset] of this.configResolver.presets) {
+            const url = preset.sprite || preset.spriteUrl;
+            if (url && !seen.has(url)) {
+                seen.add(url);
+                const img = new Image();
+                img.src = url;
+            }
+        }
     }
 
     isWeatherEnabled() {

@@ -967,29 +967,45 @@ class NudgeBallAction extends GoToObjectAction {
 class EatElementAction extends GoToObjectAction {
     static metadata = { id: 'eat_element' };
 
-    static canPerform(selected, active) {
-        if (!active || !(selected instanceof MapObject) || active.queue.isCarrying()) {
+    static isConsumableTarget(selected, active) {
+        if (!active || active.queue.isCarrying() || selected?.active === false) {
+            return false;
+        }
+
+        if (selected instanceof DroppedMapItem) {
+            return selected.isConsumableBy?.(active) === true;
+        }
+
+        if (!(selected instanceof MapObject)) {
             return false;
         }
 
         const interactionType = selected.getConfig?.('interaction.type');
         return (selected.type?.toUpperCase?.() === 'FOOD' ||
             selected.getConfig?.('consumable', false) === true ||
-            interactionType === 'consume') &&
-            selected.active !== false;
+            interactionType === 'consume');
+    }
+
+    static canPerform(selected, active) {
+        return this.isConsumableTarget(selected, active);
     }
 
     complete() {
         super.complete();
-        if (!EatElementAction.canPerform(this.target, this.myte)) {
+        if (!EatElementAction.isConsumableTarget(this.target, this.myte)) {
             return;
         }
 
         // Apply nutritional benefits when the eating animation finishes
         this.myte.stats.applyStatEffects(
-            this.target.getConfig?.('effects', null) ?? SiteConfig.food.effects
+            this.target.getConsumableEffects?.() ??
+            this.target.getConfig?.('effects', null) ??
+            SiteConfig.food.effects
         );
-        const saturationMs = this.target.getConfig?.('saturationMs') ?? SiteConfig.food.saturationMs;
+        const saturationMs =
+            this.target.getConsumableSaturationMs?.() ??
+            this.target.getConfig?.('saturationMs') ??
+            SiteConfig.food.saturationMs;
         this.myte.buffs?.applyBuff?.('nourished', { durationMs: saturationMs, source: 'eat_element' });
 
         this.myte.queue.addExpression('heart', 300, 1);

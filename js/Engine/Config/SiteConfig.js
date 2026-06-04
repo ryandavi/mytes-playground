@@ -159,7 +159,13 @@ const SiteConfig = Object.freeze({
         // Per-type effects when an item is dragged from inventory onto a Myte.
         // moodBoost is separate from food.moodBoost (hand-feeding vs ground eating).
         itemTypes: Object.freeze({
-            FOOD:     Object.freeze({ moodBoost: 15, expressions: ['eat'],                consumeTime: 1000, saturationMs: 60000 }),
+            FOOD:     Object.freeze({
+                moodBoost: 15,
+                effects: Object.freeze({ hunger: 20, energy: 5, fun: 6, comfort: 4 }),
+                expressions: ['eat'],
+                consumeTime: 1000,
+                saturationMs: 60000
+            }),
             TOY:      Object.freeze({ moodBoost: 10, expressions: ['play', 'happy'],      consumeTime: 2000 }),
             MEDICINE: Object.freeze({ moodBoost: 5,  expressions: ['surprised', 'happy'], consumeTime: 1500 }),
             FLOWER:   Object.freeze({ moodBoost: 6,  expressions: ['happy'],              consumeTime: 1200 }),
@@ -185,6 +191,46 @@ const SiteConfig = Object.freeze({
 
     // ── World defaults ────────────────────────────────────────────────────────
 
+    // Interaction / control defaults
+    interaction: Object.freeze({
+        // Shared gesture timings used across click/tap handlers.
+        gestures: Object.freeze({
+            doubleClickInterval: 300,
+            longPressDelay: 500,
+            tapMaxDuration: 300,
+            clickMoveThreshold: 10,
+        }),
+
+        // Empty-world navigation gestures.
+        world: Object.freeze({
+            longPressMoveDelay: 500,
+            longPressMoveCancelDistance: 10,
+        }),
+
+        // Myte-specific click / pickup feel.
+        myte: Object.freeze({
+            clickPressDuration: 100,
+            dragThreshold: 10,
+            dragTimeThreshold: 300,
+            pickupMaxY: 500,
+            pickupMaxX: 300,
+            dragModeRestoreDelay: 100,
+        }),
+
+        // Default map-object interaction feel. Individual objects can still
+        // override these through their own config when needed.
+        mapObject: Object.freeze({
+            dragThreshold: 3,
+            selectDragThreshold: 8,
+            selectDragTimeThreshold: 300,
+            selectPickupMaxY: 500,
+            selectPickupMaxX: 300,
+            selectDragModeRestoreDelay: 100,
+            selectDragStartDelay: 10,
+        }),
+    }),
+
+    // World defaults
     world: Object.freeze({
         defaultMap: 'Outside',
     }),
@@ -196,7 +242,8 @@ const SiteConfig = Object.freeze({
         // Default animation frame rate for sprite sheets
         defaultAnimationFPS: 8,
 
-        // How long a myte must be motionless before becoming inactive (ms)
+        // How long the player can be inactive before the active myte enters
+        // inactivity free-roam (ms)
         inactiveTimeout: 8000,
 
         // Radius (px) within which another active myte grants companionship_aura

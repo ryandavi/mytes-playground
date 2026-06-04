@@ -30,6 +30,22 @@
     "canWade": true,
     "fireResistance": false
   },
+  "spatial": {
+    "anchors": {
+      "carry.item": {
+        "x": 96,
+        "y": 80,
+        "itemAnchorX": 0.5,
+        "itemAnchorY": 1
+      },
+      "mouth.item": {
+        "x": 96,
+        "y": 104,
+        "itemAnchorX": 0.5,
+        "itemAnchorY": 0.5
+      }
+    }
+  },
   "ai": {
     "enabled": true,
     "defaultMode": "INTERACT",
@@ -129,5 +145,8 @@
       "filter": "none"
     },
     "spriteSets": null
+  },
+  "expressions": {
+    "eat": "kiss"
   }
 }

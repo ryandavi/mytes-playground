@@ -2,15 +2,18 @@ class MyteClickHandler extends MyteBaseHandler {
 	constructor(myte) {
 		super(myte);
 
+		const gestureConfig = SiteConfig?.interaction?.gestures ?? {};
+		const myteControlConfig = SiteConfig?.interaction?.myte ?? {};
+
 		this.config = {
-			doubleClickTimeout: 300,
-			longPressTimeout: 500,
-			dragThreshold: 10,
-			dragTimeThreshold: 300,
-			maxYForPickup: 500,
-			maxXForPickup: 300,
-			clickPressDuration: 100,
-			dragModeRestoreDelay: 100
+			doubleClickTimeout: gestureConfig.doubleClickInterval ?? 300,
+			longPressTimeout: gestureConfig.longPressDelay ?? 500,
+			dragThreshold: myteControlConfig.dragThreshold ?? 10,
+			dragTimeThreshold: myteControlConfig.dragTimeThreshold ?? 300,
+			maxYForPickup: myteControlConfig.pickupMaxY ?? 500,
+			maxXForPickup: myteControlConfig.pickupMaxX ?? 300,
+			clickPressDuration: myteControlConfig.clickPressDuration ?? 100,
+			dragModeRestoreDelay: myteControlConfig.dragModeRestoreDelay ?? 100
 		};
 
 		this.lastClickTime = 0;
@@ -27,6 +30,7 @@ class MyteClickHandler extends MyteBaseHandler {
 		this.previousMode = null;
 		this._homePressState = null;
 		this._suppressNextInactiveClick = false;
+		this._suppressNextHomeClick = false;
 
 		this._initListeners();
 	}
@@ -163,6 +167,11 @@ class MyteClickHandler extends MyteBaseHandler {
 	_onHomeClick(event) {
 		event?.stopPropagation?.();
 
+		if (this._suppressNextHomeClick) {
+			this._suppressNextHomeClick = false;
+			return;
+		}
+
 		if (!this.myte.isActive) {
 			this.myte.parent.ui?.setSelected?.(this.myte.dropTarget);
 			return;
@@ -190,6 +199,7 @@ class MyteClickHandler extends MyteBaseHandler {
 		if (!this.myte.isActive || !this.myte.isActiveMyte) return;
 		this._homeLongPressTimer = setTimeout(() => {
 			this._homeLongPressTimer = null;
+			this._suppressNextHomeClick = true;
 			this._sendMyteHome();
 		}, this.config.longPressTimeout);
 	}

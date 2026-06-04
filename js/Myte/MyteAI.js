@@ -345,18 +345,28 @@ class MyteAI {
     }
 
     buildEatCandidate(context) {
-        if (context.drives.eatDrive < 0.28) {
+        const offeredFoodTargets = context.droppedItems.filter(item => item?.isUserOfferedFood?.());
+        const foodTarget = this.findTargetWithAffordance(
+            [...offeredFoodTargets, ...context.nearbyObjects, ...context.droppedItems],
+            'eat_element',
+            context
+        );
+        if (!foodTarget) {
             return null;
         }
 
-        const foodTarget = this.findTargetWithAffordance(context.nearbyObjects, 'eat_element', context);
-        if (!foodTarget) {
+        const isUserOfferedFood = foodTarget?.isUserOfferedFood?.() === true;
+        if (context.drives.eatDrive < 0.28 && !isUserOfferedFood) {
             return null;
         }
 
         const distance = this.myte.getDistanceTo?.(foodTarget) ?? Infinity;
         let score = 14 + (context.drives.eatDrive * 72) + Math.max(0, 160 - distance) * 0.1;
         if (context.drives.eatDrive > 0.75) score += 18;
+        if (isUserOfferedFood) {
+            const age = SimClock.now() - (foodTarget.droppedAt ?? 0);
+            score += 36 + Math.max(0, 18000 - age) * 0.0012;
+        }
 
         const label = 'eat:eat_element';
         const targetKey = this.getTargetKey(foodTarget);
@@ -801,6 +811,10 @@ class MyteAI {
 
         let best = null;
         for (const item of context.droppedItems) {
+            if (item.isUserOfferedFood?.()) {
+                continue;
+            }
+
             const distance = this.myte.getDistanceTo?.(item) ?? Infinity;
             let score = 8 + (context.curiosity * 16) + (context.drives.exploreDrive * 8) + Math.max(0, 120 - distance) * 0.1;
 

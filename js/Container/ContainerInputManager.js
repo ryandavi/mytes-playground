@@ -7,6 +7,7 @@ class ContainerInputManager {
     this.container = containerManager;
     this.inputSystem = InputSystem.getInstance();
     this.subscriptions = [];
+    this.interactionConfig = SiteConfig.interaction;
 
     // Track input state
     this.isEnabled = true;
@@ -14,6 +15,7 @@ class ContainerInputManager {
     this.longTapTimer = null;
     this.longTapStartX = 0;
     this.longTapStartY = 0;
+    this.longTapEligibleTarget = false;
 
     // Set up event handlers
     this.setupKeyboardShortcuts();
@@ -191,8 +193,8 @@ class ContainerInputManager {
       if (!this.isEnabled) { Utility.logDebug('[dblclick] blocked: ContainerInputManager disabled'); return; }
       if (event.originalEvent && event.originalEvent.defaultPrevented) { Utility.logDebug('[dblclick] blocked: defaultPrevented'); return; }
       const target = event.originalEvent?.target;
-      Utility.logDebug('[dblclick] target:', target?.className || target?.tagName, 'closest world-myte/map-object:', target?.closest('.world-myte, .map-object')?.className);
-      if (target?.closest('.world-myte, .map-object')) { Utility.logDebug('[dblclick] blocked: myte or map-object'); return; }
+      Utility.logDebug('[dblclick] target:', target?.className || target?.tagName);
+      if (!this.canStartWorldGestureFromTarget(target)) { Utility.logDebug('[dblclick] blocked: non-world target'); return; }
       this._tryAStarToClick(event.position.x, event.position.y);
     });
   }
@@ -201,24 +203,29 @@ class ContainerInputManager {
    * Set up long-press on mobile to A* move the active myte
    */
   setupLongTapHandling() {
-    const LONG_PRESS_MS = 500;
-    const MOVE_CANCEL_PX = 10;
+    const worldGestureConfig = this.interactionConfig?.world ?? {};
+    const longPressDelay = worldGestureConfig.longPressMoveDelay ?? 500;
+    const cancelDistance = worldGestureConfig.longPressMoveCancelDistance ?? 10;
 
     this.subscribe('touch.start', (event) => {
       if (!this.isEnabled) return;
+      this.clearLongTapTimer();
+      this.longTapEligibleTarget = this.canStartWorldGestureFromTarget(event.originalEvent?.target);
+      if (!this.longTapEligibleTarget) {
+        return;
+      }
       this.longTapStartX = event.position.x;
       this.longTapStartY = event.position.y;
-      this.clearLongTapTimer();
       this.longTapTimer = setTimeout(() => {
         this.longTapTimer = null;
         this._tryAStarToClick(this.longTapStartX, this.longTapStartY);
-      }, LONG_PRESS_MS);
+      }, longPressDelay);
     });
 
     this.subscribe('touch.move', (event) => {
-      if (!this.longTapTimer) return;
-      if (Math.abs(event.position.x - this.longTapStartX) > MOVE_CANCEL_PX ||
-          Math.abs(event.position.y - this.longTapStartY) > MOVE_CANCEL_PX) {
+      if (!this.longTapTimer || !this.longTapEligibleTarget) return;
+      if (Math.abs(event.position.x - this.longTapStartX) > cancelDistance ||
+          Math.abs(event.position.y - this.longTapStartY) > cancelDistance) {
         this.clearLongTapTimer();
       }
     });
@@ -331,6 +338,34 @@ class ContainerInputManager {
     }
 
     return true;
+  }
+
+  canStartWorldGestureFromTarget(target) {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+
+    if (!this.container.canvas?.contains?.(target)) {
+      return false;
+    }
+
+    const blockedSelector = [
+      '.world-myte',
+      '.map-object',
+      '.myte-slot',
+      '.interactive-hitbox',
+      '.map-object-slot',
+      'button',
+      'input',
+      'textarea',
+      'select',
+      'option',
+      'label',
+      'a',
+      '[role=\"button\"]'
+    ].join(', ');
+
+    return !target.closest(blockedSelector);
   }
 
   /**
@@ -570,6 +605,7 @@ class ContainerInputManager {
       clearTimeout(this.longTapTimer);
       this.longTapTimer = null;
     }
+    this.longTapEligibleTarget = false;
   }
   
   /**

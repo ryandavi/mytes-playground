@@ -2405,6 +2405,15 @@
           "x": 38,
           "y": 72
         }
+      },
+      "anchors": {
+        "sparkle": { "x": 50, "y": 79 }
+      },
+      "directions": {
+        "E": { "anchors": { "sparkle": { "x": 38, "y": 79 } } },
+        "W": { "anchors": { "sparkle": { "x": 62, "y": 79 } } },
+        "N": { "anchors": { "sparkle": { "x": 50, "y": 86 } } },
+        "S": { "anchors": { "sparkle": { "x": 50, "y": 72 } } }
       }
     },
     "visual": {
@@ -2590,6 +2599,15 @@
               "x": 18,
               "y": 36
             }
+          },
+          "anchors": {
+            "sparkle": { "x": 25, "y": 40 }
+          },
+          "directions": {
+            "E": { "anchors": { "sparkle": { "x": 18, "y": 40 } } },
+            "W": { "anchors": { "sparkle": { "x": 32, "y": 40 } } },
+            "N": { "anchors": { "sparkle": { "x": 25, "y": 44 } } },
+            "S": { "anchors": { "sparkle": { "x": 25, "y": 36 } } }
           }
         }
       }

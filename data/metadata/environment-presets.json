@@ -69,6 +69,10 @@
         "overscan": 96,
         "heroLightLimit": 4,
         "shadowStrength": 0.28,
+        "dither": {
+          "enabled": true,
+          "pixelSize": 1
+        },
         "roomDefaults": {
           "ambientFloor": 0.05,
           "ambientCeiling": 0.2,
@@ -138,6 +142,10 @@
         "overscan": 72,
         "heroLightLimit": 3,
         "shadowStrength": 0.36,
+        "dither": {
+          "enabled": true,
+          "pixelSize": 1
+        },
         "roomDefaults": {
           "ambientFloor": 0.18,
           "ambientCeiling": 0.72,

@@ -874,13 +874,23 @@ class ActionSidebarManager extends UIComponent {
 
     _createDroppedItemPickupButton(selectedObject, activeMyte) {
         const button = document.createElement('button');
-        button.textContent = 'Pick Up';
+        const isFoodOffering = selectedObject?.isUserOfferedFood?.() === true;
+        button.textContent = isFoodOffering ? 'Eat' : 'Pick Up';
         button.classList.add('primary-action');
         button.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
 
             if (!activeMyte || selectedObject.collected) return;
+
+            if (isFoodOffering) {
+                activeMyte.queue.interrupt('eat_element', {
+                    target: selectedObject,
+                    userInitiated: true
+                });
+                return;
+            }
+
             const itemCenter = {
                 x: selectedObject.posX + (selectedObject.size.width / 2),
                 y: selectedObject.posY + (selectedObject.size.height / 2)

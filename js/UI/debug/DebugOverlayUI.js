@@ -1170,7 +1170,9 @@ class DebugOverlayUI {
                 }
                 if (this.overlayState.anchors) {
                     const anchors = myte.definition?.spatial?.anchors ?? {};
-                    Object.entries(anchors).forEach(([id, anchor]) => {
+                    Object.keys(anchors).forEach((id) => {
+                        const anchorDirection = myte.getResolvedAnchorDirection?.() ?? myte.direction;
+                        const anchor = MyteDefinitionRegistry.getSpatialAnchor?.(myte.definition, id, anchorDirection) ?? anchors[id];
                         if (!anchor) return;
                         this._appendAnchorDot(layer, myte.posX + (anchor.x ?? 0), myte.posY + (anchor.y ?? 0), id);
                     });

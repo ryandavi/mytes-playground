@@ -17,6 +17,62 @@
         "y": 80,
         "itemAnchorX": 0.5,
         "itemAnchorY": 1
+      },
+      "mouth.item": {
+        "x": 96,
+        "y": 112,
+        "itemAnchorX": 0.5,
+        "itemAnchorY": 0.5
+      }
+    },
+    "directions": {
+      "N": {
+        "anchors": {
+          "carry.item": {
+            "x": 96,
+            "y": 72
+          },
+          "mouth.item": {
+            "x": 96,
+            "y": 92
+          }
+        }
+      },
+      "S": {
+        "anchors": {
+          "carry.item": {
+            "x": 96,
+            "y": 82
+          },
+          "mouth.item": {
+            "x": 96,
+            "y": 120
+          }
+        }
+      },
+      "E": {
+        "anchors": {
+          "carry.item": {
+            "x": 118,
+            "y": 78
+          },
+          "mouth.item": {
+            "x": 126,
+            "y": 108
+          }
+        }
+      },
+      "W": {
+        "anchors": {
+          "carry.item": {
+            "x": 74,
+            "y": 78
+          },
+          "mouth.item": {
+            "x": 66,
+            "y": 108
+          }
+        }
       }
     },
     "regions": {

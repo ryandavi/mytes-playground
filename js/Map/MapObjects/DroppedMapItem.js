@@ -72,6 +72,9 @@ class DroppedMapItem {
         this.inventoryType = null;
         this.inventoryVariant = null;
         this.description = '';
+        this.userDropSource = null;
+        this.offeredToMytes = false;
+        this.allowAutoCollect = true;
 
         this.size = {
             width: 24,
@@ -209,6 +212,46 @@ class DroppedMapItem {
         };
     }
 
+    getDisplayName() {
+        return this.getInventoryEntryData(this.quantity).name;
+    }
+
+    getItemDefinition() {
+        return ItemRegistry.getItemSync(this.inventoryVariant || this.inventoryName || this.variant);
+    }
+
+    isEdible() {
+        const itemDefinition = this.getItemDefinition();
+        return String(itemDefinition?.type || this.inventoryType || this.type || '').toUpperCase() === 'FOOD';
+    }
+
+    isUserOfferedFood() {
+        return this.offeredToMytes === true && this.userDropSource === 'inventory' && this.isEdible();
+    }
+
+    isConsumableBy(actor = null) {
+        return this.active !== false &&
+            !this.collected &&
+            this.isUserOfferedFood() &&
+            !actor?.queue?.isCarrying?.();
+    }
+
+    getAiAffordances(_context = {}, actor = null) {
+        if (!this.isConsumableBy(actor)) {
+            return [];
+        }
+
+        return [{ actionId: 'eat_element', purpose: 'consume' }];
+    }
+
+    getConsumableEffects() {
+        return this.getItemDefinition()?.effects ?? SiteConfig.food.effects;
+    }
+
+    getConsumableSaturationMs() {
+        return this.getItemDefinition()?.saturationMs ?? SiteConfig.food.saturationMs;
+    }
+
     updatePosition() {
         if (!this.element) return;
 
@@ -269,7 +312,7 @@ class DroppedMapItem {
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 const canMagnetize = !this.groundedAt || (Date.now() - this.groundedAt) >= this.magnetDelayMs;
 
-                if (canMagnetize && myte.isIndependent() && distance < this.minimumCollectDistance) {
+                if (this.allowAutoCollect !== false && canMagnetize && myte.isIndependent() && distance < this.minimumCollectDistance) {
                     const magnetStrength = 1 - (distance / this.minimumCollectDistance);
                     this.posX += dx * this.magnetSpeed * magnetStrength * dt;
                     this.posY += dy * this.magnetSpeed * magnetStrength * dt;
