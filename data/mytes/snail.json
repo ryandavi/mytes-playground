@@ -139,7 +139,7 @@
       "jumping": [[7, 4]],
       "falling": [[7, 4]],
       "slide_down": [[0, 3]],
-      "land": [[0, 3]]
+      "land": [[0, 4]]
     }
   },
   "stats": {

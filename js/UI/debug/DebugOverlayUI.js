@@ -878,7 +878,8 @@ class DebugOverlayUI {
         const targetTile = this.pixelToTile(activeMyte.targetX, activeMyte.targetY);
 
         return [
-            { label: 'State',           value: activeMyte.stateMachine.stateController.currentState },
+            { label: 'State',           value: activeMyte.stateMachine.currentState },
+            { label: 'State Duration',  value: `${(activeMyte.stateMachine.getStateDuration() / 1000).toFixed(1)}s` },
             { label: 'Goal',            value: activeMyte.getMoveType(activeMyte.goal) },
             { label: 'Previous Goal',   value: activeMyte.getMoveType(activeMyte.previousGoal) },
             { label: 'Follow Goal',     value: activeMyte.getMoveFollowType(activeMyte.followGoal) },

@@ -28,6 +28,13 @@ class SpriteAnimator {
         if (options.frameDuration != null) this._baseInterval = options.frameDuration;
         if (options.loop != null) this._loop = options.loop;
         this.reset();
+        // Non-looping animations with no frames can't display anything — complete immediately
+        // so sticky states and isTransitioning locks don't wait forever.
+        // Single-frame (length === 1) non-looping animations are intentional (e.g. turn
+        // transitions); let update() time them out normally so they display for a full interval.
+        if (!this._loop && this._frames.length === 0) {
+            this._complete = true;
+        }
     }
 
     setSpeedScale(scale) {
@@ -50,7 +57,17 @@ class SpriteAnimator {
     // Returns true when the frame index changes, or on the tick a non-looping animation completes.
     // After returning true, check isComplete to distinguish completion from a normal frame advance.
     update(deltaTime) {
-        if (this._complete || this._frames.length <= 1) return false;
+        if (this._complete || this._frames.length === 0) return false;
+
+        // Single-frame non-looping: hold the frame for one interval then complete.
+        if (this._frames.length === 1 && !this._loop) {
+            this._elapsed += deltaTime;
+            if (this._elapsed >= this._getFrameInterval()) {
+                this._complete = true;
+                return true;
+            }
+            return false;
+        }
 
         this._elapsed += deltaTime;
         const interval = this._getFrameInterval();

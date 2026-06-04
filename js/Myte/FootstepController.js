@@ -4,6 +4,7 @@ class FootstepController {
         this.lastTriggerAt = 0;
         this.lastFrameKey = '';
         this.lastFoot = 'right';
+        this._stateMachineSubscribed = false;
     }
 
     reset() {
@@ -13,6 +14,18 @@ class FootstepController {
     }
 
     handleAnimationEvent(event = {}) {
+        if (!this._stateMachineSubscribed) {
+            this._stateMachineSubscribed = true;
+            this.myte.stateMachine?.addStateListener((newState, prevState) => {
+                // Reset foot alternation and cooldown when a walk ends so the
+                // next walk starts with a clean left/right sequence.
+                if (String(prevState || '').startsWith('moving_') &&
+                    !String(newState || '').startsWith('moving_')) {
+                    this.reset();
+                }
+            });
+        }
+
         if (event.type !== 'footstep') return;
 
         const config = this.getConfig();

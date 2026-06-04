@@ -886,12 +886,15 @@ class MyteAI {
             score: this.applyRepeatPenalty(7 + ((1 - context.energy) * 3) + (context.drives.comfortDrive * 2), 'idle', 'idle'),
             execute: () => {
                 const roll = Math.random();
+                // Ramps from 0 → +0.25 over 6 s of continuous idle time, making a
+                // bored/restless myte progressively more likely to express itself.
+                const idleBonus = Math.min(this.myte.stateMachine.getStateDuration() / 6000, 0.25);
                 // Expression chosen by current state so the pause reads as intentional
-                if (context.energy < 0.4 && roll < 0.55) {
+                if (context.energy < 0.4 && roll < 0.55 + idleBonus) {
                     this.myte.queue.addExpression('sleep', 60, 1);
-                } else if (context.drives.socialDrive > 0.55 && roll < 0.35) {
+                } else if (context.drives.socialDrive > 0.55 && roll < 0.35 + idleBonus) {
                     this.myte.queue.addExpression('thought', 50, 1);
-                } else if (context.drives.playDrive > 0.5 && roll < 0.28) {
+                } else if (context.drives.playDrive > 0.5 && roll < 0.28 + idleBonus) {
                     this.myte.queue.addExpression('surprise', 40, 1);
                 }
 

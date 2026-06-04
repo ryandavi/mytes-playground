@@ -1,8 +1,8 @@
 # Content Editor Plan
 
-**Date:** 2026-05-24  
-**Status:** Planning  
-**Scope:** Mytes, map objects, items, actions, map-object slot geometry, geometry, animation/state preview, future "edit everything" foundation
+**Date:** 2026-06-04 (originally 2026-05-24)
+**Status:** In Progress — Data Foundation Complete
+**Scope:** Mytes, map objects, items, actions, buffs, zones, environment presets, map-object slot geometry, geometry, animation/state preview, future "edit everything" foundation
 
 ## Goal
 
@@ -33,33 +33,43 @@ We should reuse:
 - `ItemRegistry`
 - `MyteDefinitionRegistry`
 - `MapObjectFactory`
-- `AnimationController`
+- `SpriteAnimator` (the canonical animation ticker, at `js/Engine/SpriteAnimator.js`)
+- `StateMachine` and `StateController` for state preview
 - debug collider overlay ideas already in `DebugUI`
 
 We should not make "edit `.js` files directly" the primary long-term strategy. For editable domains, the source of truth should become structured data files. Direct JS rewriting can exist only as a temporary bridge if needed.
 
 ## What Exists Today
 
-### Already data-driven
+### Already data-driven and canonical
 
-- Items are loaded from `data/metadata/items.json` via `js/Engine/ItemRegistry.js`
-- Mytes are loaded from `data/mytes/myte.json` plus species files like `data/mytes/snail.json` via `js/Myte/MyteDefinitions.js`
+All of the following canonical data files exist and are runtime-authoritative:
 
-### Recently migrated catalog data
-
-- available Myte species should come from `data/mytes/species.json` rather than hardcoded loader lists
+- `data/mytes/myte.json` — base Myte definition with movement, physics, capabilities, spatial anchors, AI config, stats, audio, and visual sections
+- `data/mytes/snail.json` — species override with full `spatial.anchors`, `spatial.regions`, `spatial.directions`, and `visual.spriteSets`
+- `data/mytes/worm.json` — sparse species override (only differences from base are stored)
+- `data/mytes/species.json` — species catalog with `defaultSpeciesId`, `enabled`, `essential`, `sortOrder`
+- `data/metadata/items.json` — item catalog with top-level `visual.spriteSheet` (shared atlas) and per-item `visual.sprite {col, row}`
+- `data/metadata/actions.json` — action definitions at schemaVersion 2 with `queue`, `traits`, `effects`, `ai`, and `purposeOverrides` sections
+- `data/metadata/buffs.json` — buff/debuff definitions with `triggers`, `effects`, `onApply`, and `kind` classification
+- `data/metadata/zones.json` — zone type definitions with stat effect rates
+- `data/metadata/environment-presets.json` — atmosphere and lighting preset configs at schemaVersion 2
+- `data/map-objects/base.json` — base map object config with all shared defaults
+- `data/map-objects/types.json` — per-type overrides including slots, AI affordances, action configs, and visual settings
 
 ### Still code-driven
 
 - Object behavior/class wiring lives in `js/Map/MapObjectFactory.js`
-- Action behavior/queue execution still lives in JS queue/action classes, but canonical action metadata now lives in `data/metadata/actions.json`
+- Action behavior/queue execution lives in JS queue/action classes; canonical action metadata now lives in `data/metadata/actions.json`
 
 ### Useful existing pieces we can build on
 
 - `MapObject` already renders colliders, interactive hit areas, and slot surfaces
 - `DebugUI` already draws collider overlays and slot markers
 - `ModalWindow`, `ScreenManager`, and the current shell/window CSS already give us a native-looking UI system
-- legacy `selectbox`/`hitbox` ideas already existed in the project, which confirms they should be restored as proper data concepts rather than ignored
+- `SpriteAnimator` at `js/Engine/SpriteAnimator.js` handles frame-by-frame animation ticking with `[col, row]`, `[col, row, durationMs]`, or plain column index frame formats
+- `StateMachine` is split into `StateController` (pure state logic with `addStateListener`) and `StateMachine` (drives animator + DOM), making it hookable from preview code without reimplementing state logic
+- `ActionDefinitionRegistry` already loads `actions.json` and provides sync lookup by id
 
 ## Product Direction
 
@@ -224,7 +234,8 @@ Reuse targets:
 - `js/Engine/ItemRegistry.js`
 - `js/Myte/MyteDefinitions.js`
 - `js/Map/MapObjectFactory.js`
-- `js/Map/MapObjects/AnimationController.js`
+- `js/Engine/SpriteAnimator.js` — canonical frame ticker; replaces the older AnimationController for Myte and any sprite animation preview
+- `js/Myte/StateMachine.js` — `StateController.addStateListener()` lets the editor observe state transitions without reimplementing state logic
 - `js/Map/MapObjects/MapObject.js`
 - `js/Utility/RectUtils.js`
 - `js/UI/ModalWindow.js`
@@ -237,13 +248,13 @@ Do not duplicate object rendering logic in the editor if the game already knows 
 
 The editor should operate on three layers:
 
-1. Source files  
+1. Source files
    JSON files and transitional adapters for code-backed configs.
 
-2. Normalized editor model  
+2. Normalized editor model
    A schema-shaped object the forms work against.
 
-3. Runtime preview model  
+3. Runtime preview model
    The exact structure needed to feed preview renderers.
 
 This lets us keep the forms clean even if runtime structures are messy.
@@ -252,51 +263,47 @@ This lets us keep the forms clean even if runtime structures are messy.
 
 For maintainability, each domain should have exactly one canonical authored format:
 
-- Mytes: JSON
-- Species catalog: JSON
-- Items: JSON
-- Actions: JSON definitions plus JS implementations
-- Map objects: JSON definitions plus JS behavior classes
+- Mytes: JSON (`data/mytes/myte.json` + species files)
+- Species catalog: JSON (`data/mytes/species.json`)
+- Items: JSON (`data/metadata/items.json`)
+- Actions: JSON definitions (`data/metadata/actions.json`) plus JS implementations
+- Buffs: JSON (`data/metadata/buffs.json`)
+- Zones: JSON (`data/metadata/zones.json`)
+- Environment presets: JSON (`data/metadata/environment-presets.json`)
+- Map objects: JSON definitions (`data/map-objects/base.json` + `types.json`) plus JS behavior classes
 - Future map editor placements: map files plus shared object definition references
 
 If a value is editable, it should come from the canonical authored file, not from duplicated constants elsewhere.
 
-## Phase 1 Canonical Files
+## Phase 1 Canonical Files (All Now Exist)
 
-Start with the domains that are already closest to being editable:
+All canonical data files are in place:
 
 - `data/mytes/*.json`
-- `data/metadata/items.json`
-
-Then add:
-
 - `data/mytes/species.json`
+- `data/metadata/items.json`
 - `data/metadata/actions.json`
+- `data/metadata/buffs.json`
+- `data/metadata/zones.json`
+- `data/metadata/environment-presets.json`
 - `data/map-objects/base.json`
 - `data/map-objects/types.json`
 
 ## Species Registry
 
-Yes, we should add a `species.json`.
-
-Recommended purpose:
-
-- define which species exist
-- define display order
-- define which species file to load
-- optionally define editor grouping, status, and preview thumbnail metadata
-
-Recommended shape:
+Implemented. The actual shape includes two additions beyond the original plan:
 
 ```json
 {
   "schemaVersion": 1,
+  "defaultSpeciesId": "snail",
   "species": [
     {
       "id": "snail",
       "definitionFile": "snail.json",
       "label": "Snail",
       "enabled": true,
+      "essential": true,
       "sortOrder": 10
     },
     {
@@ -304,74 +311,69 @@ Recommended shape:
       "definitionFile": "worm.json",
       "label": "Worm",
       "enabled": true,
+      "essential": false,
       "sortOrder": 20
     }
   ]
 }
 ```
 
-Then `MyteDefinitionRegistry` should load this catalog instead of relying on a hardcoded species list.
+Fields added beyond the original plan:
+
+- `defaultSpeciesId` — which species to load when no saved preference exists
+- `essential` — whether the species can be disabled in the editor without breaking the game
+
+`MyteDefinitionRegistry` loads from this catalog.
 
 ## Map Object Migration Strategy
 
-Map objects should use canonical JSON definition files plus JS behavior classes.
+Map objects use canonical JSON definition files plus JS behavior classes. The migration is complete through Step C.
 
-Recommended migration:
+### Step A ✓
 
-### Step A
+JSON format exists for map object definitions with:
 
-Create a JSON format for map object definitions that mirrors Myte structure where the concepts overlap:
+- base config in `data/map-objects/base.json`
+- type and variant configs in `data/map-objects/types.json`
+- `visual.defaultState`, `visual.states[]`, `visual.animates`, `visual.fps`, `visual.renderType`
+- `interaction`, `physics`, `actionConfigs`, `ai.affordances`, slot data in `slotsByFacing`
+- `soundEffects`, `lighting`, `approachConfig`, `variantConfigs`
 
-- base config
-- type config
-- variant config
-- direction config
-- action config
-- slot config
-- geometry config
-- sprite/animation config
-- shared `spatial.anchors` and `spatial.regions`
-- shared `visual` section for sprite, animation, and shadow data
+Note: map object visual uses `visual.defaultState`, `visual.states`, and `visual.fps` rather than `spriteSets`. The rendering path differs from Myte sprite animation — map objects use CSS class/state-based rendering, not SpriteAnimator frame ticking. The editor will need separate handling for map object animation authoring vs. Myte animation authoring.
 
-### Step B
+### Step B ✓
 
-Teach `MapObjectFactory` to initialize from JSON-loaded configs before maps are created.
+`MapObjectFactory` initializes from JSON-loaded configs.
 
-### Step C
+### Step C ✓
 
-Keep `MapObjectFactory` class registrations in JS, but move editable values out of JS-authored config tables.
+Editable values are in JSON; class registrations remain in JS.
 
-### Step D
+### Step D ✓
 
-Leave special behavior classes like `DoorMapObject`, `PortalMapObject`, `LightMapObject`, `AmbientCreatureMapObject` in JS.
-
-This gives us editable config without weakening the behavior model.
+Behavior classes like `DoorMapObject`, `PortalMapObject`, `LightMapObject`, `AmbientCreatureMapObject` remain in JS.
 
 ### Step E
 
-Use the JSON files as the runtime source of truth and remove legacy JS-authored config sources from the load path.
+Remove legacy JS-authored config sources from load path once canonical data is fully trusted.
 
 ## Action System Strategy
 
-Actions should probably become **definition + implementation**:
+Actions use **definition + implementation**, implemented at schemaVersion 2.
 
-- definition data in JSON
-- executable behavior in JS
+The actual schema is richer than originally planned. Each action definition has:
 
-For example:
+- `id`, `label`, `icon`, `description`
+- `category`, `tags[]`
+- `queue` — `priority`, `isInterruptible`, `isMovementAction`, `defaultDuration`, `energyCostMultiplier`, `requiresTarget`, `implementationClass`, `options`
+- `traits` — `exertion`, `novelty`, `soothing`, `risk`, `repeatMode`
+- `effects` — stat deltas applied on completion (`fun`, `energy`, `comfort`, `social`, `hunger`, `mood`, `health`)
+- `ai` — `category`, `soothing`, `exertion`, `accomplishment`, `commitmentMs`, `scoreDrivers[]`
+- `purposeOverrides` — per-purpose `ai` overrides (used when the same action has different AI scoring for different object contexts, e.g. `interact_object` for `start_music` vs `light_on` vs `socialize`)
 
-- label
-- category
-- priority
-- cooldown
-- energy cost
-- targeting rules
-- preview metadata
-- parameter schema
+`scoreDrivers` entries reference context paths like `"drives.exploreDrive"`, `"novelty"`, `"preferences.music"`, etc. with a numeric `weight`.
 
-stay in JSON.
-
-Behavior like queue execution, pathing, reactions, and side effects stays in JS.
+The editor should expose all of these fields and warn when a definition exists with no JS implementation or vice versa.
 
 ## Editor UX
 
@@ -383,6 +385,9 @@ Recommended top-level sections:
 - Map Objects
 - Items
 - Actions
+- Buffs
+- Zones
+- Environment Presets
 - Assets
 - Validation
 
@@ -425,11 +430,12 @@ For Mytes:
 - switch species
 - switch direction
 - preview any sprite set/state
-- preview sprite sheet source and visual filter
-- scrub frame sequences
+- preview sprite sheet source and visual filter (CSS filter string stored in `visual.spriteSheet.filter`)
+- scrub frame sequences using `SpriteAnimator`
 - preview named anchors and named regions
 - preview collider/select/hit geometry
 - preview idle vs moving vs expression states
+- hook into `StateMachine.addStateListener()` rather than reimplementing state logic
 
 For Map Objects:
 
@@ -440,13 +446,13 @@ For Map Objects:
 - preview shadow placement, opacity, scale, and offsets
 - preview collider, interaction area, selection area, hit area, and pickup area
 - preview select box and hit box
-- preview slot regions and slot rest points
+- preview slot regions and slot rest points (stored in `slotsByFacing`)
 - preview light radius and offsets where relevant
 - preview walkable vs blocking footprint
 
 For Items:
 
-- preview sprite atlas cell
+- preview sprite atlas cell (shared atlas at `visual.spriteSheet.url`, per-item `visual.sprite {col, row}`)
 - preview inventory icon scale/crop
 - preview slot compatibility
 - preview dropped-world representation if needed
@@ -467,6 +473,8 @@ Editable geometry concepts:
 - slot anchor points
 - approach positions
 - light radius/origin
+
+Each region has a `type` discriminator (`"box"` currently; reserve for future `"circle"` or `"polygon"` support). The editor should render and persist this field.
 
 Recommended interaction model:
 
@@ -503,37 +511,9 @@ Recommended migration:
 
 ## Spatial Anchors And Regions
 
-We should not solve this separately for carry points, eyes, head, shell, dialogue, and future attachments.
+Implemented. The shared `spatial` schema is live in both `myte.json` and species files.
 
-Use one general spatial schema with two families:
-
-- `anchors` for named points
-- `regions` for named areas
-
-This gives us one future-proof system instead of many one-off fields.
-
-Recommended concepts:
-
-- `anchors.head`
-- `anchors.eyes.left`
-- `anchors.eyes.right`
-- `anchors.shell.center`
-- `anchors.carry.item`
-- `anchors.dialogue`
-- `anchors.selection.focus`
-- `anchors.pickup.primary`
-- `anchors.fx.sparkle`
-- `anchors.custom.*`
-- `regions.collider`
-- `regions.interaction`
-- `regions.hit`
-- `regions.select`
-- `regions.pickup`
-- `regions.slot.*`
-
-Direction-specific overrides should be built in from the start, and unspecified direction values should inherit from base automatically.
-
-Recommended shape:
+The actual implemented shape for a species file:
 
 ```json
 {
@@ -541,48 +521,72 @@ Recommended shape:
     "anchors": {
       "carry.item": {
         "x": 96,
-        "y": 24
+        "y": 80,
+        "itemAnchorX": 0.5,
+        "itemAnchorY": 1
       },
-      "head": {
-        "x": 92,
-        "y": 52
-      },
-      "shell.center": {
-        "x": 70,
-        "y": 92
+      "mouth.item": {
+        "x": 96,
+        "y": 112,
+        "itemAnchorX": 0.5,
+        "itemAnchorY": 0.5
       }
     },
     "regions": {
       "collider": {
+        "type": "box",
         "x": 48,
         "y": 115,
         "width": 96,
         "height": 58
       },
       "select": {
-        "x": 30,
-        "y": 40,
-        "width": 132,
-        "height": 120
+        "type": "box",
+        "x": 8,
+        "y": 8,
+        "width": 176,
+        "height": 176
+      },
+      "interaction": {
+        "type": "box",
+        "x": 8,
+        "y": 8,
+        "width": 176,
+        "height": 176
+      },
+      "hit": {
+        "type": "box",
+        "x": 32,
+        "y": 80,
+        "width": 128,
+        "height": 100
       }
     },
     "directions": {
-      "E": {
+      "N": {
         "anchors": {
-          "carry.item": { "x": 108, "y": 30 },
-          "head": { "x": 118, "y": 68 }
+          "carry.item": { "x": 96, "y": 72 },
+          "mouth.item": { "x": 96, "y": 92 }
         }
       },
-      "W": {
+      "E": {
         "anchors": {
-          "carry.item": { "x": 82, "y": 30 },
-          "head": { "x": 74, "y": 68 }
+          "carry.item": { "x": 118, "y": 78 },
+          "mouth.item": { "x": 126, "y": 108 }
         }
       }
     }
   }
 }
 ```
+
+Important notes on the actual implementation:
+
+- regions each have a `type` field (`"box"`) — this is the discriminator for future non-box region types; the editor must read and preserve it
+- anchors can have extra fields beyond `x`/`y` (e.g. `itemAnchorX`, `itemAnchorY` for item attachment alignment)
+- direction overrides in `spatial.directions` only need to contain what actually differs; unspecified anchors/regions inherit from the base
+
+The `pickup` region is not yet present in species files — adding it is still pending.
 
 Why this structure:
 
@@ -593,12 +597,6 @@ Why this structure:
 - direction overrides are explicit instead of scattered across special-case fields
 - base inheritance keeps authoring smaller and less repetitive
 
-Recommended migration path:
-
-- add `spatial.anchors` and `spatial.regions`
-- move one-off spatial fields into that shared model
-- keep new authored data centered on the shared spatial schema instead of inventing new special-case fields
-
 ## Animation Editing
 
 For any animation/state editor, support:
@@ -606,16 +604,24 @@ For any animation/state editor, support:
 - reorder frames
 - duplicate frame
 - remove frame
-- change duration/frame delay
+- change duration/frame delay (per-frame via the `[col, row, durationMs]` triplet, or base rate via `fps`)
 - set loop on/off
 - set per-animation loop behavior explicitly
 - assign preview state
-- play/pause/step
+- play/pause/step (drive via `SpriteAnimator.update(deltaTime)`)
 - reorder states
 - rename state
 - mark default state
-- edit sprite-sheet source, frame size, and animation membership
+- edit sprite-sheet source (`visual.spriteSheet.url`), frame size (`visual.frameSize`), and animation membership under `visual.spriteSets`
 - preview one-shot animations versus looping idle states clearly
+
+Frame data format (in `visual.spriteSets`):
+
+- `[col, row]` — standard frame at column/row in the sheet
+- `[col, row, durationMs]` — frame with per-frame timing override
+- plain integer — single-row sheet shorthand (column index only)
+
+`SpriteAnimator` handles all three. The editor timeline should read and write `[col, row, durationMs]` when per-frame timing is needed, and strip the third element when it matches the base rate.
 
 State naming best practice:
 
@@ -630,8 +636,6 @@ Why:
 - the state id answers what real gameplay or visual mode the object is in
 - semantic state ids are clearer for runtime, editor UX, debugging, and future content work
 
-If possible, frame editing should use the existing sprite-sheet logic rather than inventing a new rendering path.
-
 ## Domain-Specific Plans
 
 ## Myte Editor
@@ -644,14 +648,15 @@ Should edit:
 - collider geometry
 - physics values
 - capabilities
-- AI defaults and ranges
+- AI defaults and ranges (`ai.thinkInterval`, `ai.wanderRadius`, `ai.safeAreaRadius`, `ai.driveWeights`, `ai.preferences`)
 - stats and decay/regeneration values
 - mood definitions
-- visual frame size
-- sprite sheet metadata
-- sprite sets
+- visual frame size (`visual.frameSize`)
+- sprite sheet metadata (`visual.spriteSheet.url`, `visual.spriteSheet.filter`)
+- sprite sets (`visual.spriteSets`) — keyed animation frame arrays
 - named anchors and named regions
 - expression aliases
+- audio locomotion config (`audio.locomotion.footsteps`, `audio.locomotion.animationSpeedScale`)
 
 Important UX:
 
@@ -664,20 +669,22 @@ Important UX:
 Should edit:
 
 - base type properties
-- per-variant overrides
+- per-variant overrides (`variantConfigs`)
 - per-direction overrides
-- render type
-- sprite sheets and states
-- animation sequences
+- render type (`visual.renderType`: `"single"`, `"split"`, etc.)
+- visual states (`visual.defaultState`, `visual.states[]`, `visual.animates`, `visual.fps`)
 - shadow config
 - collision and interaction geometry
 - named anchors and named regions
-- action config
-- sound config
-- light/shadow config
-- surface slot definitions
-- AI affordances metadata
+- action config (`actionConfigs` per action id)
+- sound config (`soundEffects`)
+- light/shadow config (`lighting`)
+- surface slot definitions (`slotsByFacing` — keyed by facing direction, each an array of slot objects with `id`, `restPosition`, `restFacing`, `approachConfig`)
+- AI affordances (`ai.affordances[]` with `actionId` and `purpose`)
+- approach config
 - regrowth/respawn/toggle behavior parameters
+
+Note: map object `visual` structure differs from Myte visual. Map objects do not use `spriteSets`; they use `visual.defaultState` / `visual.states[]` for CSS class-based state rendering. Keep these as separate authoring concepts even though both live under `visual`.
 
 Important UX:
 
@@ -692,26 +699,64 @@ Should edit:
 - id
 - aliases
 - type
-- droppable flag
+- `capabilities.droppable` flag
 - description
-- sprite atlas position
+- sprite atlas position (`visual.sprite.col`, `visual.sprite.row`)
 - sprite dimensions if we ever support non-standard item sizes
 - future item behavior metadata
 - slot compatibility tags
+
+The shared sprite atlas is configured at the top level of `items.json` under `visual.spriteSheet` (url and frameSize) and should be editable there, not per-item.
 
 ## Action Editor
 
 Should edit:
 
 - action definition metadata
-- categories
-- labels/descriptions
-- targeting rules
-- cooldowns/costs
-- data parameters used by implementations
-- affordance metadata used by objects or AI
+- categories and tags
+- labels/descriptions/icon
+- `queue` settings (priority, duration, interruptibility, implementation class name)
+- `traits` (exertion, novelty, soothing, risk, repeatMode)
+- `effects` (stat delta values)
+- `ai` values (category, soothing, exertion, accomplishment, commitmentMs, scoreDrivers)
+- `purposeOverrides` — per-purpose AI overrides (show as named variants within the action)
 
 The editor should warn if a definition exists with no JS implementation, or a JS implementation exists with no definition.
+
+## Buff Editor
+
+Should edit:
+
+- id, label, icon, description
+- kind (`"buff"` or `"debuff"`)
+- category, priority
+- `durationMs`, `reapplyCooldownMs`
+- `cancellable`, `stackMode`
+- `onApply` — instant stat boosts applied on activation
+- `effects.movement.speedMultiplier`
+- `effects.stats` — multiplier and per-ms fields
+- `triggers` — condition-based (`status.conditions`), action-complete-based (`actionComplete.actionIds`, `actionComplete.categories`), or event-based (`event.names`)
+
+Buffs are a new editable domain not in the original plan. They are already runtime-authoritative through `data/metadata/buffs.json`.
+
+## Zone Editor
+
+Should edit:
+
+- id, label
+- `effects` — per-stat passive tick rates
+
+Zones are simple. The editor UX can be a lightweight list editor without a preview canvas.
+
+## Environment Preset Editor
+
+Should edit:
+
+- preset id
+- `atmosphere` — nightColor, nightOpacityMax, vignette settings, sunrise/sunset gradient stops
+- `lighting` — darknessColor, darknessOpacityMax, resolution scales, shadow strength, dither settings, roomDefaults
+
+This domain has rich nested config (gradient stop arrays, lighting params). The editor should show live previews of the atmosphere gradient band and the lighting darkness blend, not just raw number fields. Currently at schemaVersion 2.
 
 ## Map Object Slot Editing
 
@@ -719,17 +764,38 @@ Slot editing should focus on map object slots for now, especially things like be
 
 This should be part of the Map Object Editor, not a separate top-level editor in the first version.
 
-Recommended slot concepts:
+Actual slot structure in `types.json` (under `slotsByFacing`):
+
+```json
+{
+  "slotsByFacing": {
+    "S": [
+      {
+        "id": "left_seat",
+        "restPosition": { "xFactor": 0.35, "yFactor": 0.5 },
+        "restFacing": "S",
+        "approachConfig": {
+          "allowedSides": ["bottom"],
+          "preferredSide": "bottom",
+          "gap": 10,
+          "align": "left-edge",
+          "alignTo": "collider",
+          "myteAlignTo": "collider"
+        }
+      }
+    ]
+  }
+}
+```
+
+Recommended slot concepts to expose in the editor:
 
 - slot id
-- slot region
-- rest position
-- facing override
+- rest position (xFactor/yFactor relative to object bounds)
+- rest facing direction
 - occupancy rules
 - allowed actions
-- approach config
-
-This keeps the immediate scope aligned with the slot use cases you actually care about.
+- approach config (sides, gap, align, alignTo)
 
 ## Save Strategy
 
@@ -750,7 +816,7 @@ Before overwriting a file, create timestamped backups.
 Example:
 
 - `data/mytes/snail.json`
-- `data/mytes/_backup/snail.2026-05-24T14-18-32.json`
+- `data/mytes/_backup/snail.2026-06-04T14-18-32.json`
 
 ## Validation Before Save
 
@@ -822,82 +888,64 @@ If we follow this pattern, the editor stays in sync because both systems evolve 
 
 These are the highest-value prep changes to make first.
 
-### 1. Choose canonical authored files now
+### 1. Choose canonical authored files ✓
 
-- keep Mytes and Items on JSON
-- keep map object authored config in `data/map-objects/base.json` and `data/map-objects/types.json`
-- revive Actions as JSON definitions plus JS implementations
+- Mytes, Items, Actions, Buffs, Zones, Environment Presets, Map Objects all have canonical JSON files
+- all runtime load paths use these files
 
-### 2. Formalize geometry concepts
+### 2. Formalize geometry concepts (partial)
 
-- add explicit `hitbox`
-- add explicit `selectbox`
-- add explicit `pickupbox`
-- use `spatial.regions.interaction` as the canonical authored name
-- make runtime tolerate missing optional regions cleanly
+- `collider`, `interaction`, `hit`, `select` regions are live in species files
+- `pickup` region is not yet present — still pending
+- explicit `hitbox` and `selectbox` as standalone top-level authored concepts are not yet formalized
 
-### 3. Add a shared spatial schema
+### 3. Add a shared spatial schema ✓
 
-- introduce named `anchors`
-- introduce named `regions`
-- support per-direction overrides
-- keep carry-style attachment data in this system instead of separate per-feature fields
+- `spatial.anchors` and `spatial.regions` are live
+- per-direction overrides are live in `spatial.directions`
+- anchor extra fields (itemAnchorX, itemAnchorY) are in place for carry attachment alignment
+- map object types do not yet have `spatial.regions` — that migration is still pending
 
-### 3.5. Bring domain parity to authored visuals
+### 3.5. Bring domain parity to authored visuals (partial)
 
-- map objects and Mytes should both use a `visual` section as the authored source of truth
-- items should also use `visual` for sprite-sheet and icon data
-- sprite-sheet metadata, animation definitions, default state, and shadow data should live there
-- runtime loaders can normalize authored `visual` data into any older runtime fields still needed internally
+- Mytes use `visual.spriteSets` with `[col, row]` frame arrays ✓
+- Map objects use `visual.defaultState` / `visual.states[]` with CSS-class-based rendering — different model, not directly comparable ✓
+- Items use `visual.spriteSheet` at catalog level + `visual.sprite {col, row}` per item ✓
+- `visual.spriteSheet.filter` used by Mytes for CSS filter overrides per species ✓
 
-### 4. Add stable ids and references
+### 4. Add stable ids and references ✓
 
-- species ids
-- action ids
-- item ids
-- map object type ids
-- variant ids
-- slot ids
+All domains have stable `id` fields. Action, item, buff, and zone ids are used as cross-references in buff triggers and AI affordances.
 
-Renames should be deliberate migrations, not casual text edits.
+### 5. Add schema versioning ✓
 
-### 5. Add schema versioning and validation
+All files have `schemaVersion`. Enforcement at load time is not yet wired — that is still pending.
 
-- per-domain `schemaVersion`
-- load-time warnings
-- save-time validation
-- migration hooks if formats change later
+### 6. Remove legacy load paths
 
-### 6. Remove legacy load paths once canonical data is in place
+- runtime should load only canonical authored data files once all loaders are confirmed stable
+- older JS-authored config sources should be removed from the load path
 
-- runtime should load only canonical authored data files
-- older JS-authored config sources should be removed from the load path, not left as hidden fallbacks
-- internal normalization is acceptable only when it is derived from canonical data at load time
+### 7. Separate authored config from behavior code ✓ (substantially done)
 
-### 7. Separate authored config from behavior code everywhere possible
-
-- editable numbers and metadata move to data
-- behavior branches and algorithms stay in JS
-
-If we do these first, the editor becomes much simpler and less brittle.
+- editable numbers and metadata are in JSON
+- behavior classes and algorithms remain in JS
 
 ### 6.5. Add validation so compatibility is enforced automatically
 
-- add repo-level content validation for Mytes, items, actions, and map objects
+- add repo-level content validation for Mytes, items, actions, map objects, buffs
 - validate ids, references, canonical file presence, and action implementation parity
 - run validation during migration work and before editor changes so drift is caught immediately
 
 ## Future Map Editor Relationship
 
-You said map placement will stay in another tool for now, which is a good scope boundary.
+Map placement will stay in another tool for now, which is a good scope boundary.
 
 For the future in-house map editor, the plan should be:
 
 - map placements remain their own domain
 - map editor references the same canonical map object definitions used by runtime and the content editor
 - the future map editor preview should render actual map objects in place, not placeholders
-
-That solves the visualization problem you called out without mixing map placement into the first editor milestone.
 
 ## Edge Cases
 
@@ -908,11 +956,12 @@ These are the things the plan must handle up front.
 - inherited values from base myte/type/direction being overwritten accidentally
 - removing an override should restore inheritance, not write `null` unless intentional
 - arrays that are ordered semantically, like animation frames or state priority
-- ids renamed while other files still reference them
+- ids renamed while other files still reference them (buff triggers reference action ids; affordances reference action ids)
 - aliases colliding across items/actions/species/variants
 - variant-level and direction-level geometry fighting each other
 - objects with behavior code that expects a config shape the editor must preserve
 - direction overrides accidentally shadowing inherited anchors/regions unnecessarily
+- `purposeOverrides` in actions that reference purpose strings used in affordance configs — renaming a purpose must update all references
 
 ## Runtime Preview Edge Cases
 
@@ -922,6 +971,7 @@ These are the things the plan must handle up front.
 - previewing behaviors that need a map context, time context, or active myte
 - map objects that depend on specialized classes for behavior
 - lighting/particle effects that need a scene wrapper
+- `SpriteAnimator` preview requires calling `.update(deltaTime)` in a loop; the editor must drive this with requestAnimationFrame
 
 ## Save/Workflow Edge Cases
 
@@ -939,6 +989,7 @@ These are the things the plan must handle up front.
 - existing maps referencing object types/variants that get renamed
 - selection, hit, and pickup regions need to stay semantically distinct in every consuming runtime path
 - objects that need separate interaction, selection, hit, or pickup regions instead of one overloaded area
+- buff trigger `actionIds` that reference removed or renamed actions
 
 ## Technical Constraints
 
@@ -968,29 +1019,37 @@ The editor should feel like a workshop, not a spreadsheet.
 
 ## Phased Rollout
 
-## Phase 0: Foundation
+## Phase 0: Foundation ✓ COMPLETE
+
+- `data/mytes/species.json` ✓
+- sparse base/species Myte JSON inheritance ✓
+- item catalog parity under `data/metadata/items.json` with canonical `visual` data ✓
+- canonical `data/map-objects/base.json` ✓
+- canonical `data/map-objects/types.json` ✓
+- runtime loading from the canonical map object JSON files ✓
+- shared runtime normalization path so map object authored data can use `visual` structure ✓
+- canonical `data/metadata/actions.json` (schemaVersion 2) ✓
+- runtime action metadata loading through `js/Myte/Queue/ActionDefinitionRegistry.js` ✓
+- canonical `data/metadata/buffs.json` ✓
+- canonical `data/metadata/zones.json` ✓
+- canonical `data/metadata/environment-presets.json` (schemaVersion 2) ✓
+- `SpriteAnimator` at `js/Engine/SpriteAnimator.js` ✓
+- `StateController` split from `StateMachine` with `addStateListener` hook ✓
+- `spatial.anchors`, `spatial.regions`, `spatial.directions` live in Myte species files ✓
+
+Still pending from the prep phase:
+
+- `pickup` region formalization
+- load-time schema version enforcement
+- map object `spatial.regions` migration (currently only Mytes have it)
+- content validation suite
+
+## Phase 1: Read-Only Preview Explorer
 
 - create `editor/` app shell
 - create shared editor store/router/panel structure
 - reuse tokens and panel styles
 - implement read-only loaders for mytes/items/map object configs
-- add `data/mytes/species.json`
-- keep map object authored config in JSON files loaded before map initialization
-
-Already completed in prep work:
-
-- `data/mytes/species.json`
-- sparse base/species Myte JSON inheritance
-- item catalog parity under `data/metadata/items.json` with canonical `visual` data
-- canonical `data/map-objects/base.json`
-- canonical `data/map-objects/types.json`
-- runtime loading from the canonical map object JSON files
-- shared runtime normalization path so map object authored data can use `spatial` and `visual` structure
-- canonical `data/metadata/actions.json`
-- runtime action metadata loading through `js/Myte/Queue/ActionDefinitionRegistry.js`
-
-## Phase 1: Read-Only Preview Explorer
-
 - browse mytes/items/map object types
 - live preview states, directions, and geometry
 - no saving yet
@@ -1011,16 +1070,18 @@ This de-risks the preview layer before write support.
 - save edited object definitions back to the canonical JSON files
 - keep JS class registrations intact
 
-## Phase 4: Actions and Slot System
+## Phase 4: Actions, Buffs, and Slot System
 
-- extend `data/metadata/actions.json` and validate it against registered implementations
+- extend `data/metadata/actions.json` editor and validate against registered implementations
+- add buff editor for `data/metadata/buffs.json`
 - add map-object slot editing inside the Map Object Editor
 - add validation for slot ids, regions, and rest points
 
 ## Phase 5: Geometry/Interaction Completion
 
 - formalize `hitbox` and `selectbox`
-- formalize shared `anchors` and `regions`
+- formalize `pickup` region
+- formalize shared `anchors` and `regions` for map object types
 - support direct manipulation tools
 - support slot bounds editing
 - support side-by-side compare and reset-to-default flows
@@ -1029,6 +1090,7 @@ This de-risks the preview layer before write support.
 
 Potential future domains:
 
+- zones and environment presets (already have canonical files, low-complexity editor)
 - particles
 - sounds and cue metadata
 - light presets
@@ -1071,23 +1133,19 @@ Why this first:
 11. Direction overrides inherit from base unless explicitly overridden.
 12. ID renames should update references automatically through the tool.
 13. Preview quality is a priority feature, not a later polish pass.
+14. `SpriteAnimator` is the canonical animation runtime for Myte preview; map object animation uses CSS-class-based states, not SpriteAnimator.
+15. Map object `visual` and Myte `visual` share the `visual` key name but have structurally different contents — the editor must not conflate them.
 
 ## Open Questions For Later Implementation
-
-None right now beyond normal implementation details. The higher-risk structural questions have been decided above so we can prep the data model first.
-
-## Questions To Answer Before Implementation
 
 - do we want the built-in anchor vocabulary to be enforced strictly, or recommended with support for custom names
 - for `pickupbox`, should pickup also require a matching named anchor like `anchors.pickup.primary`, or is the region enough by itself
 - which current runtime systems should consume `selectbox` first: selection only, hover highlighting too, or both
+- should the environment preset editor show a live canvas preview of the atmosphere gradient, or is a numeric editor sufficient for the first version
+- buff `purposeOverrides` do not exist yet — should buffs ever support per-context variations the way actions do
 
 ## Bottom Line
 
-This is worth doing, and the current codebase is already close enough to support it if we treat it as:
+This is worth doing, and the current codebase is already close enough to support it. The data foundation is complete — all canonical JSON files exist and are runtime-authoritative. The editor work can now begin at Phase 1 (app shell + read-only preview) without any further data migration blocking it.
 
-- a separate editor app
-- a shared runtime preview system
-- a gradual migration from config-in-JS to config-in-JSON
-
-If we do that, we can get an editor that covers Mytes, map objects, items, actions, slots, collider geometry, state previews, and future content systems without making the project harder to maintain.
+If we do that, we can get an editor that covers Mytes, map objects, items, actions, buffs, zones, slots, collider geometry, state previews, and future content systems without making the project harder to maintain.

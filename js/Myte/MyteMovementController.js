@@ -212,6 +212,9 @@ class MyteMovementController {
                 }
                 m.moveTowardsTarget();
                 m._movementDestination = savedDest;
+                if (!m.isMoving() && mouse && Number.isFinite(mouse.x) && Number.isFinite(mouse.y)) {
+                    m.faceTowardsPoint(mouse.x, mouse.y);
+                }
             }
             m.queue.update(deltaTime);
         } else if (m.goal === MOVE_TYPES.GOHOME) {
