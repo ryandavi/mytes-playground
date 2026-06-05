@@ -30,7 +30,9 @@
       "PowerShell(git -C \"c:/xampp/htdocs/genes/chat/neko\" log --oneline -10)",
       "Bash(python -c \"import json; data=json.load\\(open\\('c:/xampp/htdocs/genes/chat/neko/data/map-objects/types.json'\\)\\); bt=[v for k,v in data.items\\(\\) if 'butterfly' in k.lower\\(\\)]; print\\(json.dumps\\(bt, indent=2\\)\\)\")",
       "Bash(Test-Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\js\\\\Engine\\\\SpriteAnimator.js\")",
-      "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\js\" -Recurse -Filter \"*.js\")"
+      "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\js\" -Recurse -Filter \"*.js\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\" -Force)",
+      "Bash(Select-Object Name, FullName)"
     ]
   }
 }
