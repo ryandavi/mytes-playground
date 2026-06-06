@@ -10,7 +10,7 @@ class MyteStats {
         // Basic stats
         this.minHealth = 0;
         this.maxHealth = 100;
-        this.health = Math.max(this.minHealth, Math.min(this.maxHealth, statConfig.health ?? 100));
+        this.health = Utility.clamp(statConfig.health ?? 100, this.minHealth, this.maxHealth);
         this.speed = statConfig.speed ?? movementConfig.baseSpeed ?? 1;
         this.level = 1;
         this.experience = 0;
@@ -18,14 +18,14 @@ class MyteStats {
         // Energy system
         this.minEnergy = 0;
         this.maxEnergy = 100;
-        this.energy = Math.max(this.minEnergy, Math.min(this.maxEnergy, statConfig.energy ?? SiteConfig.myte.initialStats.energy));
+        this.energy = Utility.clamp(statConfig.energy ?? SiteConfig.myte.initialStats.energy, this.minEnergy, this.maxEnergy);
         this.energyDecayRate = statConfig.energyDecayRate ?? SiteConfig.stats.energyDecayRate;
         this.energyRegenRate = statConfig.energyRegenRate ?? SiteConfig.stats.energyRegenRate;
         this.bedRestEnergyRegenRate = statConfig.bedRestEnergyRegenRate ?? SiteConfig.stats.bedRestEnergyRegenRate;
         this.homeSlotEnergyRegenRate = statConfig.homeSlotEnergyRegenRate ?? SiteConfig.stats.homeSlotEnergyRegenRate;
         this.homeSlotBehaviorRateMultiplier = statConfig.homeSlotBehaviorRateMultiplier ?? SiteConfig.stats.homeSlotBehaviorRateMultiplier;
         this.homeSlotComfortBoostRate = statConfig.homeSlotComfortBoostRate ?? SiteConfig.stats.homeSlotComfortBoostRate;
-        this.homeSlotConfidenceDeltaPerMs = statConfig.homeSlotConfidenceDeltaPerMs ?? 0.00006;
+        this.homeSlotConfidenceBoostRate = statConfig.homeSlotConfidenceBoostRate ?? SiteConfig.stats.homeSlotConfidenceBoostRate;
         this.fullChargeAnnounceCooldown = statConfig.fullChargeAnnounceCooldown ?? SiteConfig.stats.fullChargeAnnounceCooldown;
         this.fullChargeResetThreshold = statConfig.fullChargeResetThreshold ?? SiteConfig.stats.fullChargeResetThreshold;
         this.lastFullChargeAnnouncementAt = 0;
@@ -34,31 +34,31 @@ class MyteStats {
         // Fun (replaces boredom — high fun = engaged, low fun = bored)
         this.minFun = 0;
         this.maxFun = 100;
-        this.fun = Math.max(this.minFun, Math.min(this.maxFun, statConfig.fun ?? SiteConfig.myte.initialStats.fun ?? 70));
+        this.fun = Utility.clamp(statConfig.fun ?? SiteConfig.myte.initialStats.fun ?? 70, this.minFun, this.maxFun);
         this.funDecayRate = statConfig.funDecayRate ?? SiteConfig.stats.funDecayRate ?? 0.004;
 
         // Social need
         this.minSocial = 0;
         this.maxSocial = 100;
-        this.social = Math.max(this.minSocial, Math.min(this.maxSocial, statConfig.social ?? 80));
+        this.social = Utility.clamp(statConfig.social ?? 80, this.minSocial, this.maxSocial);
         this.socialDecayRate = statConfig.socialDecayRate ?? SiteConfig.stats.socialDecayRate ?? 0.0016;
 
         // Hunger
         this.minHunger = 0;
         this.maxHunger = 100;
-        this.hunger = Math.max(this.minHunger, Math.min(this.maxHunger, statConfig.hunger ?? 100));
+        this.hunger = Utility.clamp(statConfig.hunger ?? 100, this.minHunger, this.maxHunger);
         this.hungerDecayRate = statConfig.hungerDecayRate ?? SiteConfig.stats.hungerDecayRate ?? 0.003;
 
         // Comfort
         this.minComfort = 0;
         this.maxComfort = 100;
-        this.comfort = Math.max(this.minComfort, Math.min(this.maxComfort, statConfig.comfort ?? SiteConfig.myte.initialStats.comfort));
+        this.comfort = Utility.clamp(statConfig.comfort ?? SiteConfig.myte.initialStats.comfort, this.minComfort, this.maxComfort);
 
         // Confidence (0–1)
         const confConfig = statConfig.confidence;
         this.confidence = typeof confConfig === 'object' && confConfig !== null
-            ? Math.max(0, Math.min(1, confConfig.default ?? 0.5))
-            : Math.max(0, Math.min(1, (confConfig ?? 50) / 100));
+            ? Utility.clamp(confConfig.default ?? 0.5, 0, 1)
+            : Utility.clamp((confConfig ?? 50) / 100, 0, 1);
         this.minConfidence = 0;
         this.maxConfidence = 1;
 
@@ -82,7 +82,7 @@ class MyteStats {
         this.needSignalCooldown = statConfig.needSignalCooldown ?? SiteConfig.stats.needSignalCooldown;
         this.lastNeedSignalTimes = {};
         this.behaviorDriveRate = statConfig.behaviorDriveRate ?? SiteConfig.stats.behaviorDriveRate;
-        this.noteBehaviorScale = statConfig.noteBehaviorScale ?? 0.45;
+        this.noteBehaviorScale = statConfig.noteBehaviorScale ?? SiteConfig.stats.noteBehaviorScale;
 
         // Traits: 0–1 range. curiosity, activity, sociability, boldness.
         this.traits = {
@@ -96,7 +96,7 @@ class MyteStats {
         this._lastDistanceFromHome = 0;
 
         this.comfortBlendRate = statConfig.comfortBlendRate ?? 0.0016;
-        this.eatEnergyBonus   = statConfig.eatEnergyBonus   ?? 5;
+        this.confidenceBlendRate = statConfig.confidenceBlendRate ?? SiteConfig.stats.confidenceBlendRate;
         this.exhaustionThreshold = statConfig.exhaustionThreshold ?? 0.05;
 
         const funRateCfg = aiConfig.funDeltaRates ?? {};
@@ -121,7 +121,7 @@ class MyteStats {
     }
 
     updateHealth(amount) {
-        this.health = Math.max(this.minHealth, Math.min(this.maxHealth, this.health + amount));
+        this.health = Utility.clamp(this.health + amount, this.minHealth, this.maxHealth);
     }
 
     applyDamage(amount) {
@@ -132,14 +132,14 @@ class MyteStats {
     }
 
     heal(amount) {
-        this.health = Math.min(this.maxHealth, this.health + amount);
+        this.health = Utility.clamp(this.health + amount, this.minHealth, this.maxHealth);
     }
 
     // Trait value resolution: accepts number (0–1) or object {default, min, max}
     resolveTraitValue(config) {
-        if (typeof config === 'number') return Math.max(0, Math.min(1, config));
+        if (typeof config === 'number') return Utility.clamp(config, 0, 1);
         if (typeof config === 'object' && config !== null) {
-            return Math.max(config.min ?? 0, Math.min(config.max ?? 1, config.default ?? 0.5));
+            return Utility.clamp(config.default ?? 0.5, config.min ?? 0, config.max ?? 1);
         }
         return 0.5;
     }
@@ -147,26 +147,26 @@ class MyteStats {
     // --- Need update methods ---
 
     updateFun(amount) {
-        this.fun = Math.max(this.minFun, Math.min(this.maxFun, this.fun + amount));
+        this.fun = Utility.clamp(this.fun + amount, this.minFun, this.maxFun);
     }
 
     updateSocial(amount) {
-        this.social = Math.max(this.minSocial, Math.min(this.maxSocial, this.social + amount));
+        this.social = Utility.clamp(this.social + amount, this.minSocial, this.maxSocial);
     }
 
     updateHunger(amount) {
-        this.hunger = Math.max(this.minHunger, Math.min(this.maxHunger, this.hunger + amount));
+        this.hunger = Utility.clamp(this.hunger + amount, this.minHunger, this.maxHunger);
     }
 
     updateComfort(amount) {
-        this.comfort = Math.max(this.minComfort, Math.min(this.maxComfort, this.comfort + amount));
+        this.comfort = Utility.clamp(this.comfort + amount, this.minComfort, this.maxComfort);
     }
 
     // --- Confidence ---
 
     applyConfidenceDelta(delta) {
         const scaled = delta * (0.5 + this.traits.boldness * 0.5);
-        this.confidence = Math.max(this.minConfidence, Math.min(this.maxConfidence, this.confidence + scaled));
+        this.confidence = Utility.clamp(this.confidence + scaled, this.minConfidence, this.maxConfidence);
     }
 
     // --- Ratio getters ---
@@ -244,7 +244,7 @@ class MyteStats {
 
     // Apply the result of a completed (or failed) action
     applyActionResult(result) {
-        const scale = this.noteBehaviorScale ?? 0.45;
+        const scale = this.noteBehaviorScale;
 
         if (result.funDelta)     this.updateFun(result.funDelta * scale);
         if (result.socialDelta)  this.updateSocial(result.socialDelta * scale);
@@ -270,11 +270,6 @@ class MyteStats {
             return amount * (1 + (Utility.clamp(needLevel, 0, 1) * SiteConfig.stats.activityRewards.missingNeedMultiplier));
         }
         return amount;
-    }
-
-    getActivityRewardProfile(category = 'default') {
-        return SiteConfig.stats.activityRewards.categories[category] ??
-            SiteConfig.stats.activityRewards.categories.default;
     }
 
     resolveActivityMetadata(activityInstance) {
@@ -392,7 +387,7 @@ class MyteStats {
             : 0.5;
 
         const isIdle            = !actionId || actionId === 'idle';
-        const isResting         = actionId === 'sleep' || actionId === 'simple_sleep' || actionId === 'use_surface_slot';
+        const isResting         = this.isRestingAction(actionId);
         const isStimulating     = tags.includes('stimulating');
         const isPlayful         = tags.includes('playful');
         const isSocial          = tags.includes('social');
@@ -460,7 +455,7 @@ class MyteStats {
             ((this.getFunRatio() + this.getEnergyRatio() + this.getHealthRatio()) / 3) * 0.72 +
             (homeComfort * 0.28)
         );
-        const confBlend = (confTarget - this.confidence) * 0.0013 * deltaTime * rateScale;
+        const confBlend = (confTarget - this.confidence) * this.confidenceBlendRate * deltaTime * rateScale;
         this.applyConfidenceDelta(confBlend);
 
         if (isSocial || isPlayful) {
@@ -575,7 +570,7 @@ class MyteStats {
 
     useEnergy(amount) {
         const previousEnergy = this.energy;
-        this.energy = Math.max(this.minEnergy, Math.min(this.maxEnergy, this.energy - amount));
+        this.energy = Utility.clamp(this.energy - amount, this.minEnergy, this.maxEnergy);
 
         if (previousEnergy > 0 && this.energy <= 0) {
             this.onEnergyDepleted();
@@ -593,7 +588,7 @@ class MyteStats {
 
     restoreEnergy(amount) {
         const previousEnergy = this.energy;
-        this.energy = Math.max(this.minEnergy, Math.min(this.maxEnergy, this.energy + amount));
+        this.energy = Utility.clamp(this.energy + amount, this.minEnergy, this.maxEnergy);
 
         if (this.energy > this.exhaustionRecoveryThreshold) {
             this.clearExhaustionEffects();
@@ -616,7 +611,7 @@ class MyteStats {
 
         if (this.energy < this.maxEnergy) {
             const energyBefore = this.energy;
-            this.energy = Math.min(this.maxEnergy, this.energy + (effectiveRate * delta));
+            this.energy = Utility.clamp(this.energy + (effectiveRate * delta), this.minEnergy, this.maxEnergy);
 
             const energyChange = this.energy - energyBefore;
             this.lastEnergyChange = delta > 0 ? (energyChange / delta) : 0;
@@ -963,7 +958,7 @@ class MyteStats {
             this.updateSocial(cfg.homeSlotSocialRestoreRate * dt);
             this.updateHunger(cfg.homeSlotHungerRestoreRate * dt);
             this.updateComfort(cfg.homeSlotComfortBoostRate * dt);
-            this.applyConfidenceDelta(this.homeSlotConfidenceDeltaPerMs * dt);
+            this.applyConfidenceDelta(this.homeSlotConfidenceBoostRate * dt);
             this.updateHealth(cfg.healthRegenRate * 1.5 * dt);
         }
         this.updateBatteryDisplay();

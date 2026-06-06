@@ -351,7 +351,7 @@ class TreasureChestMapObject extends withItemDrops(MultiStateMapObject) {
 
     createDroppedItemConfig(item) {
         const resolvedQuantity = Array.isArray(item.quantity)
-            ? Math.floor(Math.random() * (item.quantity[1] - item.quantity[0] + 1)) + item.quantity[0]
+            ? Utility.randomInt(item.quantity[0], item.quantity[1])
             : Math.max(1, Number(item.quantity) || 1);
         const itemDefinition = ItemRegistry.getItemSync(item.variant);
         if (!itemDefinition) {

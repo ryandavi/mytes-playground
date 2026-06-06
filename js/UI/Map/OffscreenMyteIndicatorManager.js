@@ -51,10 +51,6 @@ class OffscreenMyteIndicatorManager extends UIComponent {
         );
     }
 
-    clamp(value, min, max) {
-        return Math.max(min, Math.min(max, value));
-    }
-
     getViewportWorldBounds(camera, viewportWidth, viewportHeight) {
         const safeZoom = Number.isFinite(camera?.zoomLevel) && camera.zoomLevel > 0
             ? camera.zoomLevel
@@ -141,12 +137,12 @@ class OffscreenMyteIndicatorManager extends UIComponent {
         }
 
         for (let i = 0; i < markers.length; i += 1) {
-            markers[i][axis] = this.clamp(markers[i][axis], min, max);
+            markers[i][axis] = Utility.clamp(markers[i][axis], min, max);
         }
 
         for (let i = 1; i < markers.length; i += 1) {
             markers[i][axis] = Math.max(markers[i][axis], markers[i - 1][axis] + gap);
-            markers[i][axis] = this.clamp(markers[i][axis], min, max);
+            markers[i][axis] = Utility.clamp(markers[i][axis], min, max);
         }
     }
 
@@ -207,8 +203,8 @@ class OffscreenMyteIndicatorManager extends UIComponent {
                 viewportHeight
             );
 
-            let x = this.clamp(projectedCenter.x, this.edgePadding, viewportWidth - this.edgePadding);
-            let y = this.clamp(projectedCenter.y, this.edgePadding, viewportHeight - this.edgePadding);
+            let x = Utility.clamp(projectedCenter.x, this.edgePadding, viewportWidth - this.edgePadding);
+            let y = Utility.clamp(projectedCenter.y, this.edgePadding, viewportHeight - this.edgePadding);
             const edge = this.getMarkerEdge(x, y, viewportWidth, viewportHeight);
 
             visibleMarkerIds.add(String(myte.id));

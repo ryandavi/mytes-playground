@@ -220,10 +220,6 @@ class ContainerManager {
         });
     }
 
-    get mapArea() {
-        return this.gameMap;
-    }
-
     get soundManager() {
         return this.core?.soundManager || null;
     }

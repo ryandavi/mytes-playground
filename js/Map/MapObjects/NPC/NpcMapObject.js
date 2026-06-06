@@ -159,7 +159,7 @@ class NpcMapObject extends MovingMapObject {
 	// door/gate among them. Called by the stuck detector.
 	_tryOpenNearbyDoors() {
 		if (!this.capabilities.canOpenDoors) return;
-		const gridSystem = this.map?.gridSystem;
+		const gridSystem = this.parent?.gridSystem;
 		if (!gridSystem) return;
 		const colliders = gridSystem.getPotentialColliders(this);
 		for (const c of colliders) {

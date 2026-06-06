@@ -1233,9 +1233,9 @@ class MyteAI {
             : confidenceRadius;
         const safeOrigin = gridSystem?.findNearestValidPositionForEntity?.(this.myte, origin.x, origin.y, 8) ?? origin;
 
-        const gridSystem_cs = gridSystem?.config?.cellSize ?? 32;
+        const cellSize = gridSystem?.config?.cellSize ?? 32;
         // Minimum distance: 4 cells. Shorter hops look jittery and random.
-        const minWanderDist = gridSystem_cs * 4;
+        const minWanderDist = cellSize * 4;
 
         for (let attempt = 0; attempt < 18; attempt++) {
             const angle = Math.random() * Math.PI * 2;
@@ -1360,22 +1360,6 @@ class MyteAI {
             }
         }
         return best;
-    }
-
-    getBehaviorCategoryForAction(actionId, _interactionType = null, affordance = null) {
-        return this._getActionAiValues(actionId, affordance).category;
-    }
-
-    getSoothingValueForAction(actionId, _interactionType = null, affordance = null) {
-        return this._getActionAiValues(actionId, affordance).soothing;
-    }
-
-    getAccomplishmentValueForAction(actionId, affordance = null) {
-        return this._getActionAiValues(actionId, affordance).accomplishment;
-    }
-
-    getExertionValueForAction(actionId, affordance = null) {
-        return this._getActionAiValues(actionId, affordance).exertion;
     }
 
     getHomePosition() {

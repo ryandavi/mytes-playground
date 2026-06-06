@@ -722,7 +722,7 @@ const withItemDrops = (Base) => class extends Base {
     // Rolls a weighted drop table. dropTable entries: { type, variant, quantity, chance }
     _rollDrops(dropTable, minYield, maxYield) {
         if (!dropTable?.length) return [];
-        const quantity = Math.floor(Math.random() * (maxYield - minYield + 1)) + minYield;
+        const quantity = Utility.randomInt(minYield, maxYield);
         const results = [];
         for (let i = 0; i < quantity; i++) {
             const roll = Math.random();

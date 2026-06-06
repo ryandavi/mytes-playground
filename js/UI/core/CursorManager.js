@@ -165,7 +165,7 @@ class CursorManager extends UIComponent {
         if (this.listenersAttached) return;
 
         const input = InputSystem.getInstance();
-        const throttledMove = this.throttle((data) => {
+        const throttledMove = Utility.throttle((data) => {
             if (!this.config.enabled) return;
             this.position.x = data.position.clientX;
             this.position.y = data.position.clientY;
@@ -404,17 +404,6 @@ class CursorManager extends UIComponent {
         } else if (!isClicking && hasClickingClass) {
             this.handleMouseUp();
         }
-    }
-
-    throttle(func, limit) {
-        let inThrottle;
-        return function(...args) {
-            if (!inThrottle) {
-                func.apply(this, args);
-                inThrottle = true;
-                setTimeout(() => inThrottle = false, limit);
-            }
-        };
     }
 
     dispose() {

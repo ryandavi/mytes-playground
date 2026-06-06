@@ -156,7 +156,7 @@ class MyteCore {
             if (!success) {
                 console.warn('Failed to load default user data, using empty user');
                 // Set some basic default values
-                this.user.login('Guest' + Math.floor(Math.random() * 1000), 'guest_' + Date.now());
+                this.user.login('Guest' + Utility.randomInt(0, 999), 'guest_' + Date.now());
                 this.rememberLastUserId();
             } else {
                 this.rememberLastUserId();
@@ -164,7 +164,7 @@ class MyteCore {
         } catch (error) {
             console.error('Error initializing user:', error);
             // Create a basic guest user as fallback
-            this.user.login('Guest' + Math.floor(Math.random() * 1000), 'guest_' + Date.now());
+            this.user.login('Guest' + Utility.randomInt(0, 999), 'guest_' + Date.now());
             this.rememberLastUserId();
         }
 

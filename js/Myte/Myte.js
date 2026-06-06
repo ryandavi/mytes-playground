@@ -745,7 +745,7 @@ class Myte {
 	getOffsetRect() { return this.parent.getLocalOffset(this.duplicate); }
 
 	getRandomNearbyObject(range, returnClosest = false) {
-		const nearbyObjects = this.parent.mapArea.objects.filter(obj => {
+		const nearbyObjects = this.parent.gameMap.objects.filter(obj => {
 			const distanceX = Math.abs(this.posX - obj.posX);
 			const distanceY = Math.abs(this.posY - obj.posY);
 			return obj !== this && obj.active && distanceX <= range && distanceY <= range;
@@ -761,7 +761,7 @@ class Myte {
 			});
 		}
 
-		return nearbyObjects[Math.floor(Math.random() * nearbyObjects.length)];
+		return Utility.randomChoice(nearbyObjects);
 	}
 
 	getMoveType(i) { return Utility.getKeyByValue(MOVE_TYPES, i); }

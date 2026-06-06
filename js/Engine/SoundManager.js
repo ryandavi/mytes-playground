@@ -207,7 +207,7 @@ class SoundManager {
 		const pitchScale = options.pitchScale ?? (pitchRange > 0 ? 1 + this.getCenteredVariation(pitchRange) : 1);
 		const volumeSteps = Array.isArray(variation.volumeSteps) ? variation.volumeSteps : null;
 		const volumeMultiplier = options.volumeMultiplier ??
-			(volumeSteps && volumeSteps.length ? volumeSteps[Math.floor(Math.random() * volumeSteps.length)] : 1);
+			(volumeSteps && volumeSteps.length ? Utility.randomChoice(volumeSteps) : 1);
 
 		return {
 			pitchScale,

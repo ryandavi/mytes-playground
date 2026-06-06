@@ -103,7 +103,7 @@ class DeepInspectAction extends GoToObjectAction {
     }
 
     _generateInspectPoints() {
-        const targetRect = this.getRect(this.target);
+        const targetRect = this.getTargetRect(this.target, 'sprite');
         const myteRect = this.myte.getRect();
         const gridSystem = this.myte.parent?.gameMap?.gridSystem;
         const points = [];

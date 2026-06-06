@@ -17,7 +17,6 @@ class MapObject {
 		this.active = true;
 		this.element = null;
 		this.parent = parent;
-		this.map = parent || null;
 		this.container = parent?.parent || null;
 		this.core = this.container?.core || null;
 
@@ -76,14 +75,14 @@ class MapObject {
 
 	// ── Getters ──────────────────────────────────────────────────────────────
 
-	get gameMap() { return this.map; }
+	get gameMap() { return this.parent; }
 
 	get activeMyte() {
-		return this.container?.activeMyte || this.map?.activeMyte || null;
+		return this.container?.activeMyte || this.parent?.activeMyte || null;
 	}
 
 	get mytes() {
-		return this.map?.mytes || this.container?.mytes || [];
+		return this.parent?.mytes || this.container?.mytes || [];
 	}
 
 	getShadowConfig() {
@@ -672,7 +671,7 @@ class MapObject {
 		if (
 			this.canBeInspectedByAi() &&
 			(context.curiosity ?? 0) > 0.78 &&
-			(context.boredom ?? 0) > 0.42 &&
+			(1 - (context.fun ?? 1)) > 0.42 &&
 			(context.getNoveltyScore?.(this) ?? 0.4) > 0.55
 		) {
 			affordances.push({ actionId: 'deep_inspect', purpose: 'inspect' });

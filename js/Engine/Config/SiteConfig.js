@@ -33,12 +33,6 @@ const SiteConfig = Object.freeze({
         // Home slot is passive recovery — faster than idle, slower than bed rest.
         homeSlotEnergyRegenRate: 0.003,
 
-        // Mood decay rate while active (per ms)
-        moodDecayRate: 0.0005,
-
-        // Mood decay is reduced to this fraction while in home slot
-        homeSlotMoodDecayMultiplier: 0.18,
-
         // Scales all behavior-drive (boredom/comfort/confidence) update rates
         behaviorDriveRate: 0.42,
 
@@ -87,6 +81,12 @@ const SiteConfig = Object.freeze({
             confidenceDrainPerMs: 0.000018, // direct confidence drain/ms at full penalty
         }),
 
+        // Scale applied to all noteBehavior / applyActionResult stat deltas
+        noteBehaviorScale: 0.45,
+
+        // Per-ms blend rate for the confidence passive drift toward its wellbeing target
+        confidenceBlendRate: 0.0013,
+
         // Passive health regen per ms (active) — 1.5× in home slot
         healthRegenRate: 0.000025,
 
@@ -105,22 +105,8 @@ const SiteConfig = Object.freeze({
         // even if restUntilFull is true and energy is already full.
         minRestDuration: 2000,
 
-        // Activity completion and live-action rewards.
-        // Positive boredom values increase boredom; negative values reduce it.
         activityRewards: Object.freeze({
-            moodEffectMultiplier: 0.32,
             missingNeedMultiplier: 0.7,
-            categories: Object.freeze({
-                default:   Object.freeze({ mood: 0.3, boredom: -0.4, comfort: 0.1, confidence: 0.1 }),
-                movement:  Object.freeze({ mood: 0.45, boredom: -1.3, comfort: 0.0, confidence: 0.2 }),
-                state:     Object.freeze({ mood: 0.8, boredom: -1.0, comfort: 0.35, confidence: 0.2 }),
-                interactions: Object.freeze({ mood: 0.65, boredom: -2.4, comfort: 0.2, confidence: 0.35 }),
-                play:      Object.freeze({ mood: 1.4, boredom: -6.5, comfort: 0.2, confidence: 0.8 }),
-                social:    Object.freeze({ mood: 1.0, boredom: -3.2, comfort: 0.55, confidence: 0.6 }),
-                carrying:  Object.freeze({ mood: 0.35, boredom: -0.8, comfort: 0.0, confidence: 0.15 }),
-                reactive:  Object.freeze({ mood: -0.8, boredom: 1.2, comfort: -0.35, confidence: -0.45 }),
-                idle:      Object.freeze({ mood: 0.0, boredom: 0.0, comfort: 0.0, confidence: 0.0 }),
-            }),
             microInteractions: Object.freeze({
                 ballBump: Object.freeze({
                     id: 'ball_bump',
@@ -129,13 +115,6 @@ const SiteConfig = Object.freeze({
                     energy: -10,
                     rewardScale: 0.42
                 }),
-            }),
-            liveMoodRates: Object.freeze({
-                play: 0.0011,
-                social: 0.00075,
-                stimulating: 0.00055,
-                movement: 0.00018,
-                idle: -0.0002
             }),
         }),
     }),

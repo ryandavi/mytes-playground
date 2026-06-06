@@ -229,11 +229,6 @@ class PositionableAction extends MyteAction {
         return rect;
     }
 
-    // Backward-compatible alias - always uses sprite rect
-    getRect(target) {
-        return this.getTargetRect(target, 'sprite');
-    }
-
     /**
      * Returns the {x, y} top-left position for the Myte to stand at beside destRect.
      *

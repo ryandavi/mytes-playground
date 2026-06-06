@@ -64,7 +64,7 @@ class GreetAction extends PositionableAction {
     }
 
     _faceTarget() {
-        const tr = this.getRect(this.target);
+        const tr = this.getTargetRect(this.target, 'sprite');
         const mr = this.myte.getRect();
         if (!tr) return;
 
@@ -105,7 +105,7 @@ class GreetReceiveAction extends PositionableAction {
     }
 
     _faceTarget() {
-        const tr = this.getRect(this.target);
+        const tr = this.getTargetRect(this.target, 'sprite');
         const mr = this.myte.getRect();
         if (!tr) return;
 
@@ -148,7 +148,7 @@ class WatchAction extends PositionableAction {
     update() {
         if (!this.target) return true;
 
-        const targetRect = this.getRect(this.target);
+        const targetRect = this.getTargetRect(this.target, 'sprite');
         const myteRect = this.myte.getRect();
         const horizontal = this.getClosestSideHorizontal(targetRect, myteRect);
         const watchPos = this.calculatePosition(myteRect, targetRect, horizontal, { gap: -5, align: 'bottom-edge' });

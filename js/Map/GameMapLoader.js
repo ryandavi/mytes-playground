@@ -93,7 +93,7 @@ class GameMapLoader {
             'Double-click the map to queue an A* move for your active myte.'
         ];
 
-        return tips[Math.floor(Math.random() * tips.length)];
+        return Utility.randomChoice(tips);
     }
 
     updateTransitionOverlay(progress, message = null) {

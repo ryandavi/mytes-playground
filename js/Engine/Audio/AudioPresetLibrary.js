@@ -902,12 +902,12 @@ function createAudioPresetLibrary(manager) {
 
 					for (let i = 0; i < 20; i++) {
 						const time = i * 2 + Math.random() * 2;
-						const note = birdNotes[Math.floor(Math.random() * birdNotes.length)];
+						const note = Utility.randomChoice(birdNotes);
 						pattern.push({ note, time, duration: "32n" });
 
 						// Sometimes add a second note for a trill
 						if (Math.random() > 0.5) {
-							const trillNote = birdNotes[Math.floor(Math.random() * birdNotes.length)];
+							const trillNote = Utility.randomChoice(birdNotes);
 							pattern.push({ note: trillNote, time: time + 0.1, duration: "32n" });
 						}
 					}

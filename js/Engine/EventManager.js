@@ -43,12 +43,6 @@ class EventManager {
         }
     }
 
-    isUserInactive() {
-        const input = InputSystem.instance;
-        if (input) return !input.isUserActive();
-        return false;
-    }
-
     dispose() {
         this.handlers.clear();
     }

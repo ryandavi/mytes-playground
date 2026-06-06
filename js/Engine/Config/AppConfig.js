@@ -41,6 +41,13 @@ const AppConfig = Object.freeze({
         }),
     }),
 
+    // ── UI layer ──────────────────────────────────────────────────────────────
+
+    ui: Object.freeze({
+        // Base z-index for floating modal windows. Must sit above all game content.
+        modalBaseZIndex: 9999,
+    }),
+
     // ── Audio boot defaults ───────────────────────────────────────────────────
     // User preferences override these once user data is loaded.
 

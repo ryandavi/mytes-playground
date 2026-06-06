@@ -1,8 +1,6 @@
 class GameMap {
     constructor(parent, mapData = null) {
         this.parent = parent;
-        this.gameMap = this;
-        this.mapArea = this;
         this.mapData = mapData || {}; // Default empty object if no data provided
 
         // Core properties
@@ -922,7 +920,7 @@ class GameMap {
         const spawn = this.spawnPoints.get(type);
         if (Array.isArray(spawn)) {
             // If it's an array of spawn points, choose random one
-            return spawn[Math.floor(Math.random() * spawn.length)];
+            return Utility.randomChoice(spawn);
         }
         return spawn || { x: 0, y: 0 };
     }

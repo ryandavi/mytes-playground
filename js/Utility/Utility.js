@@ -128,7 +128,7 @@ class Utility {
 
     static getRandomElement(withinSelector = null) {
         var visibleElements = this.getFilteredElements(withinSelector);
-        return visibleElements[Math.floor(Math.random() * visibleElements.length)];
+        return this.randomChoice(visibleElements);
     }
     static getFindableElements() {
         return `${this.findableElementsSelector}${this.ignoreElementsSelector.split(',')}`;
@@ -193,7 +193,7 @@ class Utility {
         const closestElements = elementsWithinDistance.slice(0, numToReturn).map((item) => item.element);
 
         // choose random
-        if (chooseRandom) return closestElements[Math.floor(Math.random() * closestElements.length)];
+        if (chooseRandom) return this.randomChoice(closestElements);
 
         return closestElements;
     }
@@ -261,6 +261,23 @@ class Utility {
 		return Math.floor(Math.random() * (max - min + 1) + min);
 	}
 
+	static randomChoice(arr) {
+		return arr[Math.floor(Math.random() * arr.length)];
+	}
+
+	static inverseLerp(start, end, value) {
+		if (start === end) return 0;
+		return (value - start) / (end - start);
+	}
+
+	static wrap(value, min, max) {
+		const range = max - min;
+		if (range <= 0) return min;
+		let wrapped = (value - min) % range;
+		if (wrapped < 0) wrapped += range;
+		return wrapped + min;
+	}
+
 	// Define a to calculate the distance between two points
 	static calculateDistance(x1, y1, x2, y2) {
 		return Math.hypot(x1 - x2, y1 - y2);
@@ -283,12 +300,6 @@ class Utility {
 		return true;
 	}
 
-	static checkCollide(element1, element2) {
-		return element1.left <= element2.right &&
-			element1.right >= element2.left &&
-			element1.top <= element2.bottom &&
-			element1.bottom >= element2.top;
-	}
 
 	static isCoordTouchingElement(posX, posY, element) {
 		return posX >= element.left &&

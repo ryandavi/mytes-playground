@@ -32,7 +32,8 @@
       "Bash(Test-Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\js\\\\Engine\\\\SpriteAnimator.js\")",
       "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\js\" -Recurse -Filter \"*.js\")",
       "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\" -Force)",
-      "Bash(Select-Object Name, FullName)"
+      "Bash(Select-Object Name, FullName)",
+      "Bash(grep -v \":0$\")"
     ]
   }
 }

@@ -373,14 +373,12 @@ constructor(parent, options = {}) {
 	 * Bring this window to the front of other windows
 	 */
 	bringToFront() {
-		// Find highest z-index among active windows
-		let highestZIndex = 9999;
+		const base = AppConfig?.ui?.modalBaseZIndex ?? 9999;
+		let highestZIndex = base;
 		ModalWindow.activeWindows.forEach(window => {
 			const zIndex = parseInt(window.modalElement.style.zIndex) || 0;
 			if (zIndex > highestZIndex) highestZIndex = zIndex;
 		});
-		
-		// Set this window's z-index higher
 		this.modalElement.style.zIndex = `${highestZIndex + 1}`;
 	}
 	
@@ -468,6 +466,8 @@ constructor(parent, options = {}) {
 	 * @param {MouseEvent} e - Mouse event
 	 */
 	handleOutsideClick(e) {
+		// Ignore the click that triggered open() — its event fires after the listener attaches
+		if (e.timeStamp < this._openTime + 16) return;
 		if (this.isVisible &&
 			this.modalElement &&
 			!this.modalElement.contains(e.target) &&
@@ -505,12 +505,11 @@ constructor(parent, options = {}) {
 		// Add visible class to show the modal
 		this.modalElement.classList.add('is-visible');
 		this.isVisible = true;
-	
+		this._openTime = performance.now();
+
 		// Add document click listener for outside clicks
 		if (this.options.closeOnOutsideClick) {
-			setTimeout(() => {
-				document.addEventListener('click', this.handleOutsideClick);
-			}, 10); // Short delay to avoid immediate close
+			document.addEventListener('click', this.handleOutsideClick);
 		}
 	
 		// Call onOpen callback if provided

@@ -26,7 +26,7 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
         
         const genes = {};
         Object.entries(geneticConfig.genes).forEach(([trait, possibilities]) => {
-            genes[trait] = possibilities[Math.floor(Math.random() * possibilities.length)];
+            genes[trait] = Utility.randomChoice(possibilities);
         });
         return genes;
     }
@@ -113,7 +113,7 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
             if (Math.random() < this.mutationChance) {
                 // Mutation: pick a random value
                 const possibilities = geneticConfig.genes?.[trait] || [];
-                childGenes[trait] = possibilities[Math.floor(Math.random() * possibilities.length)];
+                childGenes[trait] = Utility.randomChoice(possibilities);
             } else {
                 // Inheritance: pick from either parent
                 childGenes[trait] = Math.random() < inheritanceChance ? 

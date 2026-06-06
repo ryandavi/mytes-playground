@@ -1308,7 +1308,7 @@ class FollowObjectAction extends PositionableAction {
     }
 
     _recomputeTrailPos() {
-        const targetRect = this.getRect(this.target);
+        const targetRect = this.getTargetRect(this.target, 'sprite');
         const myteRect   = this.myte.getRect();
         return this.calculatePosition(myteRect, targetRect, this._getTrailSide(), {
             gap: this.trailGap,
