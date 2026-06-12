@@ -133,7 +133,8 @@ class Myte {
 		};
 		this.colliderRecoveryState = {
 			overlapFrames: 0,
-			lastRecoverAt: 0
+			// -Infinity so the first recovery isn't throttled (SimClock starts near 0)
+			lastRecoverAt: -Infinity
 		};
 		this._lastFinitePosition = { x: 0, y: 0 };
 		this._lastFiniteTarget = { x: 0, y: 0 };
@@ -643,8 +644,8 @@ class Myte {
 		this.dropTarget.classList.add("is-droppable");
 	}
 
-	setStartTime() { this.startTime = Date.now(); }
-	canDrag() { return Date.now() - this.startTime > 1000; }
+	setStartTime() { this.startTime = SimClock.now(); }
+	canDrag() { return SimClock.now() - this.startTime > 1000; }
 	isIndependent() { return !this.isDragging; }
 
 

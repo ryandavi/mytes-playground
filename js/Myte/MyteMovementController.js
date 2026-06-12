@@ -112,7 +112,7 @@ class MyteMovementController {
         const gridSystem = m.parent?.gameMap?.gridSystem;
 
         m.setTarget(home.x, home.y);
-        m.goHomePathState.lastPlanAt = Date.now();
+        m.goHomePathState.lastPlanAt = SimClock.now();
         m.goHomePathState.directFallbackFrames = 0;
 
         if (!forceReplan && !m.queue.isEmpty()) return false;
@@ -230,7 +230,7 @@ class MyteMovementController {
 
                     if (!m.goHomePathState.hasPlannedPath &&
                         distanceToHome > 96 &&
-                        Date.now() - m.goHomePathState.lastPlanAt > 300) {
+                        SimClock.now() - m.goHomePathState.lastPlanAt > 300) {
                         this.beginGoHomeJourney(true);
                     }
 
@@ -562,7 +562,7 @@ class MyteMovementController {
         }
 
         m.colliderRecoveryState.overlapFrames++;
-        const now = Date.now();
+        const now = SimClock.now();
         if (m.colliderRecoveryState.overlapFrames < (force ? 1 : 24)) return false;
         if (!force && now - m.colliderRecoveryState.lastRecoverAt < 700) return false;
 

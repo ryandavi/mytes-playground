@@ -8,17 +8,17 @@ class RubbingComponent extends InputComponent {
    * @returns {Object} Default options
    */
   getDefaultOptions() {
+    const rubbing = SiteConfig.interaction.rubbing;
     return {
       ...super.getDefaultOptions(),
-      minRubs: 3,                // Minimum rubs needed for a valid interaction
-      maxRubs: 15,               // Maximum effective rubs
-      rubbingThreshold: 2,       // Minimum velocity for a valid rub
-      minTimeBetweenRubs: 5000,  // Cooldown between rub sessions (ms)
-      directionThreshold: 10,    // Pixels needed to determine direction
-      validRubTimeout: 1000,     // Time window for connected rubs (ms)
+      minRubs: rubbing.minRubs,                       // Minimum rubs needed for a valid interaction
+      maxRubs: rubbing.maxRubsObject,                 // Maximum effective rubs
+      rubbingThreshold: rubbing.rubbingThreshold,     // Minimum velocity for a valid rub
+      minTimeBetweenRubs: rubbing.minTimeBetweenRubs, // Cooldown between rub sessions (ms)
+      directionThreshold: rubbing.directionThreshold, // Pixels needed to determine direction
       hapticEnabled: true,       // Whether to use haptic feedback
-      hapticDuration: 50,        // Duration of haptic feedback (ms)
-      
+      hapticDuration: rubbing.hapticDuration,         // Duration of haptic feedback (ms)
+
       // Callbacks
       onRubProgress: null,       // Called during rubbing with progress
       onRubComplete: null,       // Called when rubbing sequence completes

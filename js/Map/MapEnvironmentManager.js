@@ -296,7 +296,12 @@ class MapEnvironmentManager {
 
     getViewportBounds() {
         const root = this.container?.element || null;
-        const containerRect = this.getElementRect(root);
+        // Container geometry is cached by ContainerManager (invalidated on resize/
+        // fullscreen); only the canvas rect must be measured live because the
+        // camera CSS transform moves it every frame.
+        const containerRect = typeof this.container?.getContainerRect === 'function'
+            ? this.container.getContainerRect()
+            : this.getElementRect(root);
         const canvasRect = this.getElementRect(this.canvas);
         const contentLeft = containerRect.left + Number(root?.clientLeft || 0);
         const contentTop = containerRect.top + Number(root?.clientTop || 0);
@@ -818,8 +823,9 @@ class MapEnvironmentManager {
             const progress = this.atmosphereTransitionMs > 0
                 ? Utility.clamp(this.atmosphereTransitionElapsed / this.atmosphereTransitionMs, 0, 1)
                 : 1;
+            // Interpolated state differs every frame — force, skipping the signature build
             this.currentAtmosphere = this.interpolateAtmosphereState(this.atmosphereFrom, this.targetAtmosphere, progress);
-            this.renderAtmosphere();
+            this.renderAtmosphere(true);
             if (progress >= 1) {
                 this.currentAtmosphere = MapEnvironmentManager.deepClone(this.targetAtmosphere);
                 this.atmosphereTransitionActive = false;
@@ -868,25 +874,32 @@ class MapEnvironmentManager {
         }
 
         const state = this.currentAtmosphere;
-        const signature = JSON.stringify({
-            fill: state.globalColor.map(value => Number(value.toFixed(3))),
-            fillBlend: state.globalBlendMode,
-            gradientEnabled: state.gradientEnabled,
-            gradientOpacity: Number(state.gradientOpacity.toFixed(3)),
-            gradientAngle: Number(state.gradientAngle.toFixed(2)),
-            gradientOriginX: Number(state.gradientOriginX.toFixed(3)),
-            gradientOriginY: Number(state.gradientOriginY.toFixed(3)),
-            gradientSpan: Number(state.gradientSpan.toFixed(3)),
-            stops: state.gradientStops.map(stop => [
-                Number(stop.position.toFixed(3)),
-                ...stop.color.map(value => Number(value.toFixed(3)))
-            ]),
-            vignette: state.vignetteColor.map(value => Number(value.toFixed(3))),
-            vignetteOpacity: Number(state.vignetteOpacity.toFixed(3))
-        });
 
-        if (!force && signature === this._atmosphereSignature) {
-            return;
+        // Only build the (allocation-heavy) signature when change detection is
+        // actually wanted — forced calls (transitions write every frame anyway)
+        // skip it and invalidate so the next unforced call re-establishes it.
+        let signature = null;
+        if (!force) {
+            signature = JSON.stringify({
+                fill: state.globalColor.map(value => Number(value.toFixed(3))),
+                fillBlend: state.globalBlendMode,
+                gradientEnabled: state.gradientEnabled,
+                gradientOpacity: Number(state.gradientOpacity.toFixed(3)),
+                gradientAngle: Number(state.gradientAngle.toFixed(2)),
+                gradientOriginX: Number(state.gradientOriginX.toFixed(3)),
+                gradientOriginY: Number(state.gradientOriginY.toFixed(3)),
+                gradientSpan: Number(state.gradientSpan.toFixed(3)),
+                stops: state.gradientStops.map(stop => [
+                    Number(stop.position.toFixed(3)),
+                    ...stop.color.map(value => Number(value.toFixed(3)))
+                ]),
+                vignette: state.vignetteColor.map(value => Number(value.toFixed(3))),
+                vignetteOpacity: Number(state.vignetteOpacity.toFixed(3))
+            });
+
+            if (signature === this._atmosphereSignature) {
+                return;
+            }
         }
 
         this._atmosphereSignature = signature;
@@ -1031,8 +1044,8 @@ class MapEnvironmentManager {
             .filter(Boolean);
     }
 
-    collectVisibleLights(view = this.getViewportMetrics()) {
-        const lights = this.collectAllLights()
+    collectVisibleLights(view = this.getViewportMetrics(), allLights = this.collectAllLights()) {
+        const lights = allLights
             .filter(light => {
                 const radius = Number(light.config?.radius || 0);
                 return (
@@ -1178,6 +1191,34 @@ class MapEnvironmentManager {
             return;
         }
 
+        // Steady-state gate — the full pass below measures rects and scans every
+        // map object for lights, which is far too heavy to run per frame when
+        // nothing can have changed. Viewport geometry only moves with the camera
+        // (window resize forces a refresh via _boundResize), and light/room
+        // toggles are caught by a low-cadence periodic re-check instead.
+        const camera = this.gameMap?.camera;
+        const camX = camera?.posX ?? 0;
+        const camY = camera?.posY ?? 0;
+        const camZoom = camera?.zoomLevel ?? 1;
+        const minutes = this.getMinutesFromTimeData(this.getTimeData());
+        const now = performance.now();
+        const cameraChanged = camX !== this._lastLightingCamX ||
+            camY !== this._lastLightingCamY ||
+            camZoom !== this._lastLightingCamZoom;
+        const refreshDue = now >= (this._nextLightingRefreshAt ?? 0);
+
+        if (!force && !cameraChanged && !refreshDue &&
+            minutes === this._lastLightingMinutes &&
+            !this.atmosphereTransitionActive) {
+            return;
+        }
+
+        this._lastLightingCamX = camX;
+        this._lastLightingCamY = camY;
+        this._lastLightingCamZoom = camZoom;
+        this._lastLightingMinutes = minutes;
+        this._nextLightingRefreshAt = now + (this.config?.lighting?.idleRefreshMs ?? 150);
+
         const view = this.getViewportMetrics();
         if (view.viewportWidth <= 0 || view.viewportHeight <= 0) {
             this.lightingOverlay.style.opacity = '0';
@@ -1197,7 +1238,7 @@ class MapEnvironmentManager {
         const lightingState = this.resolveLightingPeriodState(timeData);
         const darknessFactor = lightingState.darknessFactor;
         const allLights = this.collectAllLights();
-        const visibleLights = this.collectVisibleLights(view);
+        const visibleLights = this.collectVisibleLights(view, allLights);
         const blockers = this.collectVisibleBlockers(view);
         const roomState = this.deriveRoomLightingState(allLights, darknessFactor);
 

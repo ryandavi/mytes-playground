@@ -219,6 +219,19 @@ const SiteConfig = Object.freeze({
             clickMoveThreshold: 10,
         }),
 
+        // Rubbing/petting gesture tuning, shared by RubbingComponent (map objects)
+        // and MyteRubbingHandler (mytes). The over-rub limit differs per context:
+        // mytes tolerate more rubs before getting overstimulated.
+        rubbing: Object.freeze({
+            minRubs: 3,
+            rubbingThreshold: 2,
+            minTimeBetweenRubs: 5000,
+            directionThreshold: 10,
+            hapticDuration: 50,
+            maxRubsObject: 15,
+            maxRubsMyte: 25,
+        }),
+
         // Empty-world navigation gestures.
         world: Object.freeze({
             longPressMoveDelay: 500,

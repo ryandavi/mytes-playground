@@ -203,6 +203,13 @@ class ContainerManager {
                 console.warn('[ContainerManager] UI not defined');
             }
 
+            // Frame the camera once now that mytes exist and the final layout is in
+            // place (ScreenManager applies saved fullscreen during ui.init()). The
+            // initial map transition never centers the camera — mytes don't exist
+            // yet at that point — so without this it sits at (0,0) until a resize.
+            this.invalidateCanvasRect();
+            this.camera.resetView(true);
+
             this.updateContainerLoading(ContainerManager.INIT_PROGRESS.COMPLETE);
             // completeLoading() is called by Core once all stages finish — not here.
 

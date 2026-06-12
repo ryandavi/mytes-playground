@@ -185,22 +185,12 @@ class GrowingPlantMapObject extends withItemDrops(InteractiveMapObject) {
         return !this.isWatered && !this.fullyGrown;
     }
 
-    // Mark as deflowered; schedules auto-clear if regrowthTime is configured.
-    setDeflowered(regrowthTime = null) {
-        if (this.config) this.config.deflowered = true;
-        this.element?.classList.add('deflowered');
-        const ms = regrowthTime ?? this.getConfig('regrowthTime', 0);
-        if (ms > 0) setTimeout(() => this.clearDeflowered(), ms);
-    }
-
-    clearDeflowered() {
-        if (this.config) this.config.deflowered = false;
-        this.element?.classList.remove('deflowered');
-    }
+    // setDeflowered/clearDeflowered/isDeflowered are inherited from MapObject —
+    // FLOWER/GRASS types use them too, so they live on the shared base.
 
     _getSidebarStatusRows() {
         const rows = [];
-        const deflowered = this.getConfig('deflowered', false) === true;
+        const deflowered = this.isDeflowered();
 
         if (this.isFlower()) {
             rows.push({ label: 'Flower Available', value: deflowered ? 'No' : 'Yes' });

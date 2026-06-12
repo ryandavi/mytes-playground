@@ -1136,7 +1136,7 @@ class PickFlowerAction extends GoToObjectAction {
     static canPerform(selected, active) {
         if (!active || !PickFlowerAction._isFlower(selected) || active.queue.isCarrying()) return false;
         if (typeof selected.bloomState === 'string' && selected.bloomState !== 'open') return false;
-        return selected.getConfig?.('deflowered', false) !== true;
+        return selected.isDeflowered?.() !== true;
     }
 
     static getRequiredOptions(selected) {

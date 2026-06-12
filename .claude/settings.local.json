@@ -43,7 +43,10 @@
       "Bash(perl -0pi -e 's{\\\\t<!-- USER -->\\\\n\\\\t<script src=\"js/User/User\\\\.js\"></script>}{\\\\t<!-- USER -->\\\\n\\\\t<script src=\"js/User/MyteRosterSchema.js\"></script>\\\\n\\\\t<script src=\"js/User/User.js\"></script>}' index.html)",
       "Bash(perl -0pi -e 's{\\\\t<!-- USER -->\\\\n\\\\t<script src=\"js/User/User\\\\.js\\\\?v=<\\\\?= \\\\$v \\\\?>\"></script>}{\\\\t<!-- USER -->\\\\n\\\\t<script src=\"js/User/MyteRosterSchema.js?v=<?= \\\\$v ?>\"></script>\\\\n\\\\t<script src=\"js/User/User.js?v=<?= \\\\$v ?>\"></script>}' index.php)",
       "Bash(perl -0pi -e 's{<script src=\"js/User/User\\\\.js\\\\?v=}{<script src=\"js/User/MyteRosterSchema.js?v=<?= \\\\$v ?>\"></script>\\\\n\\\\t<script src=\"js/User/User.js?v=}' index.php)",
-      "Bash(grep -iv \"//\")"
+      "Bash(grep -iv \"//\")",
+      "Bash(sed -i 's/this\\\\.validationCache\\\\.get\\(cacheKey\\)/cache.get\\(cacheKey\\)/; s/this\\\\.validationCache\\\\.set\\(cacheKey/cache.set\\(cacheKey/g' js/Map/Grid/AStarPathfinder.js)",
+      "Bash(node --check js/Map/Grid/AStarPathfinder.js)",
+      "Bash(python -c ' *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Ryan\\.claude\\projects\\c--xampp-htdocs-genes-chat-neko\\memory"

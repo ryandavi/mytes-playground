@@ -152,6 +152,7 @@ All design values are CSS custom properties. Never hard-code values that exist h
 - **Data-driven where possible.** Behavior defined in JSON (`data/`) and config rather than hard-coded logic.
 - **Constants and config, not magic values.** All tunable numbers live in `SiteConfig.js`. All IDs and string keys are registered constants or data-file keys.
 - **Avoid broad side effects.** Methods should do one thing. Mutations to shared state should be intentional and explicit.
+- **Time sources.** Use `SimClock.now()` for all gameplay timing — cooldowns, state aging, regrowth, physics timers — it pauses when the tab is hidden. Wall-clock (`Date.now()` / `performance.now()`) is only for input gestures, UI/loading timing, audio scheduling, and cache-busting URLs. Never compare timestamps from different clocks.
 
 ---
 

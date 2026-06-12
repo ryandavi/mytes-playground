@@ -543,10 +543,10 @@ const withConnectable = (BaseClass) => class extends BaseClass {
     }
 
     disconnectFromConnectedObjects() {
-        if (!this.gameMap?.objects) return;
+        if (!this.gameMap) return;
 
         this.connectedObjectIds.forEach(objectId => {
-            const object = this.gameMap.objects.find(obj => obj.id === objectId);
+            const object = this.gameMap.getObjectById?.(objectId);
             object?.removeConnectedObject?.(this.id);
         });
     }

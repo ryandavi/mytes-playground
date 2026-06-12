@@ -71,8 +71,14 @@ class AStarPathfinder {
             path: []
         };
 
-        // Position validation cache
+        // Persistent validation cache — serves out-of-search callers (GridSystem
+        // position lookups). It is cleared whenever any object moves, so within a
+        // findPath run the per-search cache below does the heavy lifting instead.
         this.validationCache = new LRUCache(200);
+
+        // Scoped to a single findPath call (see findPath wrapper) — unbounded Map,
+        // no staleness risk because a search is synchronous.
+        this._activeSearchCache = null;
     }
 
     /**
@@ -117,6 +123,18 @@ class AStarPathfinder {
      * @returns {Array|null} Array of path points {x, y} (entity center positions) or null if no path found
      */
     findPath(entity, startX, startY, endCenterX, endCenterY, pathOptions = {}) {
+        // A single A* run re-validates the same positions many times (neighbor
+        // expansion, LOS smoothing). Scope a fresh cache to this search so those
+        // hits are free regardless of how often the persistent LRU gets wiped.
+        this._activeSearchCache = new Map();
+        try {
+            return this._runSearch(entity, startX, startY, endCenterX, endCenterY, pathOptions);
+        } finally {
+            this._activeSearchCache = null;
+        }
+    }
+
+    _runSearch(entity, startX, startY, endCenterX, endCenterY, pathOptions = {}) {
         const startTime = performance.now();
         const exactEndMode = pathOptions?.exactEndMode ?? 'always';
 
@@ -687,15 +705,18 @@ class AStarPathfinder {
         }
 
         // --- Proceed with Collider Validation ---
+        // During a findPath run, use the per-search cache (unbounded, no staleness);
+        // outside a search, fall back to the persistent LRU.
+        const cache = this._activeSearchCache ?? this.validationCache;
         const colWidth = collider.width;
         const colHeight = collider.height;
         const hasColliderSize = colWidth > 0 && colHeight > 0;
 
         if (!hasColliderSize) {
             const zeroSizeCacheKey = `validate_${entity?.id || 'no-id'}_${Math.round(entityX)}_${Math.round(entityY)}_0x0`;
-            const zeroCached = this.validationCache.get(zeroSizeCacheKey);
+            const zeroCached = cache.get(zeroSizeCacheKey);
             if (zeroCached !== undefined) return zeroCached;
-            this.validationCache.set(zeroSizeCacheKey, true);
+            cache.set(zeroSizeCacheKey, true);
             return true; // No collider means no collision
         }
 
@@ -706,7 +727,7 @@ class AStarPathfinder {
 
         // --- Caching ---
         const cacheKey = `validate_${entity?.id || 'no-id'}_${Math.round(colliderWorldX)}_${Math.round(colliderWorldY)}_${colWidth}x${colHeight}`;
-        const cached = this.validationCache.get(cacheKey);
+        const cached = cache.get(cacheKey);
         if (cached !== undefined) {
             return cached;
         }
@@ -756,7 +777,7 @@ class AStarPathfinder {
                     // Index is out of bounds. Fail ONLY if the collider overlaps this specific OOB cell space.
                     if (overlapsThisCell) { // Check using standard overlap
                         if (debug) Utility.logDebug(`  FAIL: Collider overlaps out-of-bounds grid index (${gridX}, ${gridY}) world area [${cellWorldX.toFixed(1)}..${cellWorldRight.toFixed(1)}, ${cellWorldY.toFixed(1)}..${cellWorldBottom.toFixed(1)}]`);
-                        this.validationCache.set(cacheKey, false);
+                        cache.set(cacheKey, false);
                         return false;
                     }
                     // If not overlapping this specific OOB cell, continue loop.
@@ -769,13 +790,13 @@ class AStarPathfinder {
                     const cell = this.gridSystem.grid[gridX]?.[gridY];
                     if (!cell) {
                         if (debug) Utility.logDebug(`  FAIL: Valid Cell Index (${gridX}, ${gridY}) is unexpectedly null/undefined.`);
-                        this.validationCache.set(cacheKey, false); return false;
+                        cache.set(cacheKey, false); return false;
                     }
 
                     // Check properties for this valid, overlapped cell:
                     if (!cell.tileWalkable && !this._canTraverseConditionalCell(cell, entityCapabilities)) {
                         if (debug) Utility.logDebug(`  FAIL: Collider overlaps non-walkable tile at valid grid (${gridX}, ${gridY})`);
-                        this.validationCache.set(cacheKey, false); return false;
+                        cache.set(cacheKey, false); return false;
                     }
                     // For objects: use precise AABB check so the entity can pass through
                     // grid cells that contain an obstacle's bounding box but not its actual collider.
@@ -785,18 +806,18 @@ class AStarPathfinder {
                             if (this._isOpenableObstacle(obj, entityCapabilities)) continue;
                             if (this._checkDetailedCollision(entityState, obj)) {
                                 if (debug) Utility.logDebug(`  FAIL: Precise collider collision with obj ID ${obj.id || 'N/A'} at cell (${gridX}, ${gridY})`);
-                                this.validationCache.set(cacheKey, false); return false;
+                                cache.set(cacheKey, false); return false;
                             }
                         }
                     }
                     if (cell.hasDoor && entityCapabilities && !entityCapabilities.canOpenDoors) {
                         if (debug) Utility.logDebug(`  FAIL: Collider overlaps door at valid grid (${gridX}, ${gridY})`);
-                        this.validationCache.set(cacheKey, false); return false;
+                        cache.set(cacheKey, false); return false;
                     }
                     const terrainType = this.getTerrainTypeAt(gridX, gridY);
                     if (!this._canTraverseTerrain(terrainType, entityCapabilities)) {
                         if (debug) Utility.logDebug(`  FAIL: Collider overlaps non-traversable terrain '${terrainType}' at valid grid (${gridX}, ${gridY})`);
-                        this.validationCache.set(cacheKey, false); return false;
+                        cache.set(cacheKey, false); return false;
                     }
                 }
                 // If collider doesn't overlap this specific valid cell, continue loop
@@ -837,7 +858,7 @@ class AStarPathfinder {
                 }
                 if (this._checkDetailedCollision(entityStateForCollision, objFromGrid)) {
                     if (debug) Utility.logDebug(`  FAIL: Detailed collision with obj ID ${objFromGrid.id || 'N/A'}`);
-                    this.validationCache.set(cacheKey, false);
+                    cache.set(cacheKey, false);
                     return false;
                 }
             }
@@ -847,7 +868,7 @@ class AStarPathfinder {
         if (debug) {
             Utility.logDebug(`  SUCCESS: Validation passed for Entity ${entity?.id} at TL (${entityX.toFixed(1)}, ${entityY.toFixed(1)})`);
         }
-        this.validationCache.set(cacheKey, true);
+        cache.set(cacheKey, true);
         return true;
     }
     /**
@@ -995,15 +1016,20 @@ class AStarPathfinder {
         // through tight spaces is unaffected — the planner still uses them when necessary.
         const wallClearancePenalty = effectiveOptions.wallClearancePenalty ?? this.options.wallClearancePenalty;
         if (wallClearancePenalty > 0) {
-            let wallCount = 0;
-            for (const dir of this.cardinalDirections) {
-                const nx = toNode.x + dir.x;
-                const ny = toNode.y + dir.y;
-                if (nx < 0 || nx >= this.gridSystem.gridWidth || ny < 0 || ny >= this.gridSystem.gridHeight) {
-                    wallCount++;
-                } else {
-                    const nc = this.gridSystem.grid[nx]?.[ny];
-                    if (!nc?.tileWalkable) wallCount++;
+            // Precomputed per cell at map load (GridSystem._computeStaticWallCounts);
+            // the live scan only runs for grids built without tile data.
+            let wallCount = this.gridSystem.grid[toNode.x]?.[toNode.y]?.staticWallCount;
+            if (wallCount === undefined) {
+                wallCount = 0;
+                for (const dir of this.cardinalDirections) {
+                    const nx = toNode.x + dir.x;
+                    const ny = toNode.y + dir.y;
+                    if (nx < 0 || nx >= this.gridSystem.gridWidth || ny < 0 || ny >= this.gridSystem.gridHeight) {
+                        wallCount++;
+                    } else {
+                        const nc = this.gridSystem.grid[nx]?.[ny];
+                        if (!nc?.tileWalkable) wallCount++;
+                    }
                 }
             }
             terrainMultiplier += wallClearancePenalty * wallCount;
@@ -1383,42 +1409,33 @@ class LRUCache {
         this.cache.clear();
     }
 }
+// Min-heap over f-scores. Duplicate keys are allowed (A* re-pushes improved
+// nodes); stale duplicates are harmless because the better copy pops first and
+// the closedSet check rejects the rest.
 class BinaryHeap {
     constructor(scoreFunction) {
         this.content = [];
         this.scoreFunction = scoreFunction;
-        // We don't strictly need nodeMap for basic A* if we allow duplicates,
-        // but it's useful for contains check or potential decrease-key implementations.
-        this.nodeMap = new Map(); // Optional: Map key to index for faster contains/update
     }
 
     push(element) {
         this.content.push(element);
-        const index = this.content.length - 1;
-        this.nodeMap.set(element.key, index); // Update map
-        this.bubbleUp(index);
+        this.bubbleUp(this.content.length - 1);
     }
 
     pop() {
         if (this.content.length === 0) return null; // Handle empty heap
         const result = this.content[0];
-        this.nodeMap.delete(result.key); // Remove from map
         const end = this.content.pop();
         if (this.content.length > 0) {
             this.content[0] = end;
-            this.nodeMap.set(end.key, 0); // Update map for the swapped element
             this.sinkDown(0);
         }
         return result;
     }
 
-    contains(key) {
-        return this.nodeMap.has(key);
-    }
-
     clear() {
         this.content = [];
-        this.nodeMap.clear();
     }
 
     isEmpty() {
@@ -1436,9 +1453,6 @@ class BinaryHeap {
             // Swap elements
             this.content[parentN] = element;
             this.content[n] = parent;
-            // Update map
-            this.nodeMap.set(element.key, parentN);
-            this.nodeMap.set(parent.key, n);
             n = parentN;
         }
     }
@@ -1479,9 +1493,6 @@ class BinaryHeap {
             const swapElement = this.content[swapIndex];
             this.content[n] = swapElement;
             this.content[swapIndex] = element;
-            // Update map
-            this.nodeMap.set(swapElement.key, n);
-            this.nodeMap.set(element.key, swapIndex);
 
             n = swapIndex; // Continue sinking down from the new position
         }

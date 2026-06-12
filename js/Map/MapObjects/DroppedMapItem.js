@@ -58,7 +58,9 @@ class DroppedMapItem {
         this.grounded = false;
         this.groundedAt = null;
 
-        this.droppedAt = Date.now();
+        // SimClock: MyteAI ages items against SimClock.now() — using Date.now() here
+        // made every item look "billions of ms fresh" and dominate AI scoring.
+        this.droppedAt = SimClock.now();
 
         // hover
         this.hoverOffset = 0;
@@ -291,7 +293,7 @@ class DroppedMapItem {
                     this.bounceCount++;
                 } else {
                     this.grounded = true;
-                    this.groundedAt = Date.now();
+                    this.groundedAt = SimClock.now();
                     this.velocityX = 0;
                     this.velocityY = 0;
                     this.velocityZ = 0;
@@ -313,7 +315,7 @@ class DroppedMapItem {
                 const dx = myteCenter.x - center.x;
                 const dy = myteCenter.y - center.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
-                const canMagnetize = !this.groundedAt || (Date.now() - this.groundedAt) >= this.magnetDelayMs;
+                const canMagnetize = !this.groundedAt || (SimClock.now() - this.groundedAt) >= this.magnetDelayMs;
 
                 if (this.allowAutoCollect !== false && canMagnetize && myte.isIndependent() && distance < this.minimumCollectDistance) {
                     const magnetStrength = 1 - (distance / this.minimumCollectDistance);

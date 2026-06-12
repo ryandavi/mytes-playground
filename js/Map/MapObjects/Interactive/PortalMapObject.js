@@ -60,7 +60,7 @@ class PortalMapObject extends InteractiveMapObject {
     canTransitionMyte(myte) {
         if (!myte) return false;
         if (myte.isDragging) return false;
-        return (myte.portalCooldownUntil || 0) <= Date.now();
+        return (myte.portalCooldownUntil || 0) <= SimClock.now();
     }
 
     getPortalReferenceId() {
@@ -182,7 +182,7 @@ class PortalMapObject extends InteractiveMapObject {
         this.isAnimating = true;
         this.isActive = false;
         if (myte) {
-            myte.portalCooldownUntil = Date.now() + this.transitionDuration + this.getPortalCooldownDuration();
+            myte.portalCooldownUntil = SimClock.now() + this.transitionDuration + this.getPortalCooldownDuration();
         }
 
         this.playPortalSound('depart');

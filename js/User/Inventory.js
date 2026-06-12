@@ -537,9 +537,10 @@ class Inventory {
 
         if (!myte) return;
 
-        // Check feeding cooldown
-        const now = Date.now();
-        if (now - (this.state.lastFeedTime[myte.id] || 0) < this.config.feedCooldown) {
+        // Check feeding cooldown (SimClock: gameplay cooldown; -Infinity default so
+        // the first feed isn't blocked while SimClock is still near zero)
+        const now = SimClock.now();
+        if (now - (this.state.lastFeedTime[myte.id] ?? -Infinity) < this.config.feedCooldown) {
             return;
         }
 

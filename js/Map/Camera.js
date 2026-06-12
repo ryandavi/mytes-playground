@@ -651,7 +651,7 @@ class Camera {
 
 		const midX  = (bounds.minX + bounds.maxX) / 2;
 		const midY  = (bounds.minY + bounds.maxY) / 2;
-		const t     = Date.now() / 1000;
+		const t     = SimClock.now() / 1000;
 		const speed = SiteConfig.camera.cinematicSpeed;
 
 		this.setTarget(

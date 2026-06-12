@@ -197,6 +197,14 @@ Explicitly **not** over-engineered: the buff system, action metadata fallback ch
 
 Deep pass over the areas Part 1 skipped: `AStarPathfinder.js`, `SoundManager.js`, MapObject subclasses, `MapEnvironmentManager.js`, `ParticleSystem.js` internals, and the two input stacks.
 
+> Status: Part 2 fixes applied 2026-06-12 — sound disposal race + fade-to-zero ramp + music gain staging + dead `toggle()` removed; pathfinder per-search cache, heap `nodeMap` removed, static wall counts precomputed; lighting steady-state gate + deduped light scan + cached container rect + atmosphere signature skip; `getObjectById` swap; rubbing gesture config consolidated into `SiteConfig.interaction.rubbing`.
+>
+> Follow-up 2026-06-12 (second pass): startup centering root-caused (initial map transition never centers — mytes don't exist yet; fixed with explicit `camera.resetView(true)` at end of `ContainerManager.init`). **Date.now()→SimClock audit complete** — converted: portal cooldowns, dropped-item age/magnet timing (fixed a live cross-clock bug where `MyteAI` aged `droppedAt` epoch timestamps against SimClock, giving every dropped item a ~billion-point score boost), physics coyote/jump-buffer, goHome replan throttle, collider recovery cooldown, feed cooldown, `Myte.startTime`, cinematic camera, flower regrowth. Time-source rule documented in AGENTS.md. **Flower picking bug fixed**: `setDeflowered` only existed on `GrowingPlantMapObject` but FLOWER/GRASS map to `FlowerMapObject`/`MapObject` — the optional call silently no-opped, so map flowers were pickable forever. Moved deflowered state to `MapObject` with lazy SimClock regrowth (`isDeflowered()`); all readers unified.
+>
+> Known latent issue (not fixed, pre-existing pattern): interaction actions' `complete()` runs effects/rewards even when `didAbortApproach()` — aborted approaches still deflower/open/drop. Fix requires a coordinated pass over all GoToObjectAction subclasses.
+>
+> Remaining open items (recommend doing with manual testing available): full Myte input-stack port onto InputComponent (touch parity risk), SoundManager engine/game split, preset stop/fade contract.
+
 ## AStarPathfinder.js — solid core, a few sharp edges
 
 The architecture is genuinely good: binary heap open set, LRU validation cache, search timeout + max-step caps, collider-aware validation (`_validatePosition` is the single collision authority), LOS path smoothing with a clearance buffer, terrain costs with per-entity capability multipliers.

@@ -13,16 +13,14 @@ class MyteRubbingHandler extends MyteBaseHandler {
 		this.lastRubDirection = null;
 		this.consecutiveSameDirection = 0;
 
+		const rubbing = SiteConfig.interaction.rubbing;
 		this.config = {
-			minRubs: 3,
-			maxRubs: 25,
-			rubbingThreshold: 2,
-			minTimeBetweenRubs: 5000,
-			directionThreshold: 10,
-			moodBoostPerRub: 5,
-			moodPenaltyOverrub: -2,
-			validRubTimeout: 1000,
-			hapticDuration: 50,
+			minRubs: rubbing.minRubs,
+			maxRubs: rubbing.maxRubsMyte,
+			rubbingThreshold: rubbing.rubbingThreshold,
+			minTimeBetweenRubs: rubbing.minTimeBetweenRubs,
+			directionThreshold: rubbing.directionThreshold,
+			hapticDuration: rubbing.hapticDuration,
 		};
 
 		this._initListeners();

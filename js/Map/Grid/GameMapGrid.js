@@ -1404,12 +1404,30 @@ class GridSystem {
             }
         });
 
+        this._computeStaticWallCounts();
+
         // Force culling update on next frame
         this.lastCameraPos = { x: -9999, y: -9999 };
         this.invalidatePathfinderCaches();
         if (this.debugMode) this._debugDirty = true;
 
         Utility.logDebug(`[GridSystem] Grid system updated: ${this.gridWidth}x${this.gridHeight} cells`);
+    }
+
+    // Tile walkability is static per map (only updateFromTileGrid writes it), so the
+    // wall-adjacency counts the pathfinder charges per node can be computed once
+    // instead of re-scanning four neighbors on every A* cost evaluation.
+    _computeStaticWallCounts() {
+        for (let x = 0; x < this.gridWidth; x++) {
+            for (let y = 0; y < this.gridHeight; y++) {
+                let wallCount = 0;
+                if (x === 0 || !this.grid[x - 1][y].tileWalkable) wallCount++;
+                if (x === this.gridWidth - 1 || !this.grid[x + 1][y].tileWalkable) wallCount++;
+                if (y === 0 || !this.grid[x][y - 1].tileWalkable) wallCount++;
+                if (y === this.gridHeight - 1 || !this.grid[x][y + 1].tileWalkable) wallCount++;
+                this.grid[x][y].staticWallCount = wallCount;
+            }
+        }
     }
 
     // Sync active objects with the parent

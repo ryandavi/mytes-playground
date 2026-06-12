@@ -1,5 +1,34 @@
 // SoundManager.js - Handles all game audio using Tone.js synthesis
 class SoundManager {
+	// Music gain staging — melody and pad sit below the raw category volume so
+	// SFX/ambience can read over them. startMusic and updateAllVolumes must use
+	// the same factors or slider changes make the music jump in loudness.
+	static MUSIC_GAIN = 0.5;
+	static MUSIC_PAD_GAIN = 0.3;
+
+	static SURFACE_FOOTSTEP_POOLS = Object.freeze({
+		grass: ['footstep_grass_1', 'footstep_grass_2'],
+		path: ['footstep_path_1', 'footstep_path_2'],
+		floor: ['footstep_floor_1', 'footstep_floor_2'],
+		sand: ['footstep_sand_1', 'footstep_sand_2'],
+		mud: ['footstep_mud_1', 'footstep_mud_2'],
+		water: ['footstep_water_1', 'footstep_water_2'],
+		ground: ['footstep_ground_1', 'footstep_ground_2'],
+		default: ['footstep_ground_1', 'footstep_ground_2']
+	});
+
+	static DEFAULT_PITCH_RANGE_BY_CATEGORY = Object.freeze({
+		entities: 0.018,
+		notifications: 0.012,
+		world: 0.012,
+		machines: 0.01,
+		footsteps: 0,
+		ui: 0,
+		ambient: 0,
+		music: 0,
+		sfx: 0.01
+	});
+
 	constructor(parent, options = {}) {
 
 		this.parent = parent;
@@ -192,17 +221,7 @@ class SoundManager {
 
 	resolvePlaybackModifiers(preset, soundCategory, options = {}) {
 		const variation = preset?.variation || {};
-		const defaultPitchRange = {
-			entities: 0.018,
-			notifications: 0.012,
-			world: 0.012,
-			machines: 0.01,
-			footsteps: 0,
-			ui: 0,
-			ambient: 0,
-			music: 0,
-			sfx: 0.01
-		}[soundCategory] ?? 0;
+		const defaultPitchRange = SoundManager.DEFAULT_PITCH_RANGE_BY_CATEGORY[soundCategory] ?? 0;
 		const pitchRange = variation.pitchRange ?? defaultPitchRange;
 		const pitchScale = options.pitchScale ?? (pitchRange > 0 ? 1 + this.getCenteredVariation(pitchRange) : 1);
 		const volumeSteps = Array.isArray(variation.volumeSteps) ? variation.volumeSteps : null;
@@ -219,16 +238,7 @@ class SoundManager {
 		if (!this.initialized || !this.isCategoryEnabled('footsteps')) return;
 
 		const normalizedSurface = String(surfaceTag || 'ground').toLowerCase();
-		const surfacePools = {
-			grass: ['footstep_grass_1', 'footstep_grass_2'],
-			path: ['footstep_path_1', 'footstep_path_2'],
-			floor: ['footstep_floor_1', 'footstep_floor_2'],
-			sand: ['footstep_sand_1', 'footstep_sand_2'],
-			mud: ['footstep_mud_1', 'footstep_mud_2'],
-			water: ['footstep_water_1', 'footstep_water_2'],
-			ground: ['footstep_ground_1', 'footstep_ground_2'],
-			default: ['footstep_ground_1', 'footstep_ground_2']
-		};
+		const surfacePools = SoundManager.SURFACE_FOOTSTEP_POOLS;
 		const variants = surfacePools[normalizedSurface] || surfacePools.default;
 		const variantIndex = options.foot === 'left' ? 0 : 1;
 		const soundId = variants[variantIndex % variants.length];
@@ -633,10 +643,10 @@ class SoundManager {
 		if (this.currentMusicPart && this.currentMusicSynth === id) {
 			const sound = this.synths.get(id);
 			if (sound?.synth?.volume?.rampTo) {
-				sound.synth.volume.rampTo(Tone.gainToDb(0.5 * this.getCategoryVolume('music')), 0.1);
+				sound.synth.volume.rampTo(Tone.gainToDb(SoundManager.MUSIC_GAIN * this.getCategoryVolume('music')), 0.1);
 			}
 			if (sound?.pad?.volume?.rampTo) {
-				sound.pad.volume.rampTo(Tone.gainToDb(0.3 * this.getCategoryVolume('music')), 0.1);
+				sound.pad.volume.rampTo(Tone.gainToDb(SoundManager.MUSIC_PAD_GAIN * this.getCategoryVolume('music')), 0.1);
 			}
 			return;
 		}
@@ -666,7 +676,7 @@ class SoundManager {
 					Tone.Transport.bpm.value = sound.tempo;
 				}
 
-				sound.synth.volume.value = Tone.gainToDb(0.5 * this.getCategoryVolume('music'));
+				sound.synth.volume.value = Tone.gainToDb(SoundManager.MUSIC_GAIN * this.getCategoryVolume('music'));
 
 				// Create sequence with a small delay
 				const sequence = new Tone.Part((time, note) => {
@@ -686,7 +696,7 @@ class SoundManager {
 
 				this.currentMusicLayers = [];
 				if (sound.pad && Array.isArray(sound.padPattern) && sound.padPattern.length) {
-					sound.pad.volume.value = Tone.gainToDb(0.3 * this.getCategoryVolume('music'));
+					sound.pad.volume.value = Tone.gainToDb(SoundManager.MUSIC_PAD_GAIN * this.getCategoryVolume('music'));
 					const padSequence = new Tone.Part((time, note) => {
 						sound.pad.triggerAttackRelease(
 							note.note,
@@ -982,6 +992,12 @@ class SoundManager {
 		const sound = this.synths.get(id) || this.createSynth(id);
 		if (!sound) return;
 
+		// Revived while fading out — cancel the pending disposal (see fadeOutAndStop).
+		if (sound._fadeOutTimer) {
+			clearTimeout(sound._fadeOutTimer);
+			sound._fadeOutTimer = null;
+		}
+
 		// Calculate the actual volume to use
 		const baseVolume = sound.baseVolume || preset.baseVolume || 1;
 		const categoryVolume = this.getCategoryVolume('ambient');
@@ -1061,8 +1077,21 @@ class SoundManager {
 		const sound = this.synths.get(id);
 		if (!sound) return;
 
-		// Fade out the volume
-		this.fadeAmbientSound(sound, sound.currentVolume || 0.3, 0, duration, () => {
+		// Cancellable disposal token — playAmbient clears it if the sound re-enters
+		// range mid-fade (proximity flapping at a water edge), otherwise the pending
+		// timer would dispose a synth that is actively playing again.
+		if (sound._fadeOutTimer) {
+			clearTimeout(sound._fadeOutTimer);
+		}
+
+		this.fadeAmbientSound(sound, sound.currentVolume || 0.3, 0, duration);
+
+		sound._fadeOutTimer = setTimeout(() => {
+			sound._fadeOutTimer = null;
+
+			// Bail if the sound was replaced or revived while fading.
+			if (this.synths.get(id) !== sound) return;
+
 			// Stop and dispose the Tone.Part loop
 			if (this.loops.has(id)) {
 				const loop = this.loops.get(id);
@@ -1078,7 +1107,7 @@ class SoundManager {
 			try {
 				this.disposeSoundResources(sound);
 			} catch (_) {}
-		});
+		}, duration * 1000);
 	}
 
 
@@ -1100,42 +1129,27 @@ class SoundManager {
 		}
 
 		try {
+			// linearRampTo cannot target -Infinity, so fades to zero ramp down to an
+			// inaudible floor instead — previously a zero target skipped the ramp
+			// entirely and the sound stayed at full volume until hard-stopped.
+			const SILENT_DB = -60;
+			const rampVolume = (volumeParam) => {
+				const startDB = startVolume <= 0 ? SILENT_DB : Tone.gainToDb(startVolume);
+				const endDB = endVolume <= 0 ? SILENT_DB : Tone.gainToDb(endVolume);
+				volumeParam.value = startDB;
+				volumeParam.linearRampTo(endDB, duration);
+			};
+
 			// Handle different synth types
 			if (sound.synth.volume) {
-				// Convert to dB for Tone.js
-				const startDB = startVolume <= 0 ? -Infinity : Tone.gainToDb(startVolume);
-				const endDB = endVolume <= 0 ? -Infinity : Tone.gainToDb(endVolume);
-
-				// Start at initial volume
-				sound.synth.volume.value = startDB;
-
-				// Perform the ramp
-				if (endVolume > 0) {
-					sound.synth.volume.linearRampTo(endDB, duration);
-				}
+				rampVolume(sound.synth.volume);
 			} else if (sound.synth.noise && sound.synth.noise.volume) {
-				// Handle noise-based synths
-				const startDB = startVolume <= 0 ? -Infinity : Tone.gainToDb(startVolume);
-				const endDB = endVolume <= 0 ? -Infinity : Tone.gainToDb(endVolume);
-
-				sound.synth.noise.volume.value = startDB;
-
-				// Perform the ramp
-				if (endVolume > 0) {
-					sound.synth.noise.volume.linearRampTo(endDB, duration);
-				}
+				rampVolume(sound.synth.noise.volume);
 			} else if (sound.synth instanceof Object) {
 				// Handle complex synths with multiple components
 				Object.values(sound.synth).forEach(component => {
 					if (component && component.volume) {
-						const startDB = startVolume <= 0 ? -Infinity : Tone.gainToDb(startVolume);
-						const endDB = endVolume <= 0 ? -Infinity : Tone.gainToDb(endVolume);
-
-						component.volume.value = startDB;
-
-						if (endVolume > 0) {
-							component.volume.linearRampTo(endDB, duration);
-						}
+						rampVolume(component.volume);
 					}
 				});
 			}
@@ -1226,10 +1240,10 @@ class SoundManager {
 					const sound = this.synths.get(this.currentMusicSynth);
 					if (sound && sound.synth) {
 						const musicVolume = this.getCategoryVolume('music');
-						// Smooth transition to avoid clicks
-						sound.synth.volume.rampTo(Tone.gainToDb(musicVolume), 0.1);
+						// Smooth transition to avoid clicks — same staging as startMusic
+						sound.synth.volume.rampTo(Tone.gainToDb(SoundManager.MUSIC_GAIN * musicVolume), 0.1);
 						if (sound.pad?.volume?.rampTo) {
-							sound.pad.volume.rampTo(Tone.gainToDb(musicVolume * 0.3), 0.1);
+							sound.pad.volume.rampTo(Tone.gainToDb(SoundManager.MUSIC_PAD_GAIN * musicVolume), 0.1);
 						}
 					}
 				}
@@ -1284,15 +1298,6 @@ class SoundManager {
 
 
 
-	toggle() {
-		this.soundEnabled = !this.soundEnabled;
-		this.musicEnabled = !this.musicEnabled;
-		if (this.soundEnabled) {
-			this.startAllSounds();
-		} else {
-			this.stopAllSounds();
-		}
-	}
 
 
 

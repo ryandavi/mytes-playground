@@ -246,6 +246,34 @@ class MapObject {
 		return this.getConfig('isFlower', false) || type === 'FLOWER' || type === 'GRASS';
 	}
 
+	// ── Deflowered state (pick_flower / regrowth) ─────────────────────────────
+	// Lives on MapObject because FLOWER/GRASS map to plain MapObject/FlowerMapObject,
+	// not GrowingPlantMapObject — defining it only there left those types pickable
+	// forever. Regrowth is a lazy SimClock deadline so it pauses with the sim and
+	// works for culled objects (checked in tickUpdate and on every read).
+
+	setDeflowered(regrowthTime = null) {
+		if (this.config) this.config.deflowered = true;
+		this.element?.classList.add('deflowered');
+		const ms = regrowthTime ?? this.getConfig('regrowthTime', 0);
+		this._deflowerClearAt = ms > 0 ? SimClock.now() + ms : null;
+	}
+
+	clearDeflowered() {
+		if (this.config) this.config.deflowered = false;
+		this.element?.classList.remove('deflowered');
+		this._deflowerClearAt = null;
+	}
+
+	isDeflowered() {
+		if (this.getConfig('deflowered', false) !== true) return false;
+		if (this._deflowerClearAt != null && SimClock.now() >= this._deflowerClearAt) {
+			this.clearDeflowered();
+			return false;
+		}
+		return true;
+	}
+
 	getSidebarStatusRows() {
 		const rows = [];
 		const interactionType = this.getConfig('interaction.type');
@@ -2139,6 +2167,11 @@ class MapObject {
 				this.interactionState.activeInteractions.delete(id);
 				this.interactionState.interactionTimes.delete(id);
 			}
+		}
+
+		// Regrow picked flowers once the deadline passes (clears the visual class)
+		if (this._deflowerClearAt != null && SimClock.now() >= this._deflowerClearAt) {
+			this.clearDeflowered();
 		}
 	}
 

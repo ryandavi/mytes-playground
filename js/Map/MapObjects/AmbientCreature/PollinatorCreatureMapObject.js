@@ -58,7 +58,7 @@ class PollinatorCreatureMapObject extends AmbientCreatureMapObject {
         for (const obj of objects) {
             if (!obj || obj === this || obj.active === false) continue;
             if (!this.isFlower(obj)) continue;
-            if (obj.config?.deflowered || obj.getConfig?.('deflowered')) continue;
+            if (obj.isDeflowered?.()) continue;
 
             const claimed = objects.some(other =>
                 other !== this &&

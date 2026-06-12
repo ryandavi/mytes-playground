@@ -154,7 +154,8 @@ class MapTransitionManager {
         myte.setSpritePosition(arrival.position.x, arrival.position.y);
 
         if (arrival.portal) {
-            myte.portalCooldownUntil = Date.now() + (
+            // SimClock: gameplay cooldown — must not expire while the tab is hidden
+            myte.portalCooldownUntil = SimClock.now() + (
                 arrival.portal.getPortalCooldownDuration?.() || 1500
             );
         }

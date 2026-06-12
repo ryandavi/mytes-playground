@@ -179,12 +179,12 @@ class MytePhysics {
 		const m = this.myte;
 
 		const canJump = this.isOnSolidGround ||
-			(this.leftGroundTime && Date.now() - this.leftGroundTime < m.physics.coyoteTime);
+			(this.leftGroundTime && SimClock.now() - this.leftGroundTime < m.physics.coyoteTime);
 		const hasBufferedJump = this.jumpBufferTime &&
-			Date.now() - this.jumpBufferTime < m.physics.jumpBuffer;
+			SimClock.now() - this.jumpBufferTime < m.physics.jumpBuffer;
 
 		if (!canJump && !hasBufferedJump) {
-			this.jumpBufferTime = Date.now();
+			this.jumpBufferTime = SimClock.now();
 			return false;
 		}
 
@@ -320,7 +320,7 @@ class MytePhysics {
 			this.isOnSolidGround = false;
 
 			if (wasOnSolidGround && this.leftGroundTime === undefined) {
-				this.leftGroundTime = Date.now();
+				this.leftGroundTime = SimClock.now();
 			}
 		}
 
