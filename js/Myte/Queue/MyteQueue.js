@@ -1,8 +1,30 @@
+// Queue policy — three tiers, pick the right one for every callsite:
+//
+//   interrupt(id, opts)   Drop everything, do this now.
+//                         Use when something external makes the current queue meaningless:
+//                         user commands, pickup/carry/drop, danger, item use, petting.
+//
+//   addToFront(id, opts)  Do this next, then resume the plan.
+//                         Use for brief reactions that shouldn't discard queued intent:
+//                         buff/need-signal expressions, cosmetic mid-action responses.
+//
+//   add(id, opts)         Queue at the end, do when you get to it.
+//                         Use for AI autonomous decisions and sequence step building only.
+
 class MyteQueue {
     constructor(myte) {
         this.myte = myte;
         this.queue = [];
         this.isDoingAction = false;
+        this.logEnabled = localStorage.getItem('myteQueueLog') === 'true';
+        this.consoleClearEnabled = localStorage.getItem('myteQueueConsoleClear') === 'true';
+        this.strictInterrupt = localStorage.getItem('myteQueueStrictInterrupt') === 'true';
+    }
+
+    _log(tier, actionId) {
+        if (!this.logEnabled) return;
+        if (this.consoleClearEnabled) console.clear();
+        console.log(`[Queue:${this.myte?.name ?? '?'}] ${tier.padEnd(10)} ${actionId}`);
     }
 
     // Core API
@@ -39,11 +61,17 @@ class MyteQueue {
             console.trace('[MyteQueue] queued without target');
         }
 
+        if (this.strictInterrupt) {
+            this._log('add→interrupt', actionId);
+            this.clear();
+        } else {
+            this._log('add', actionId);
+        }
         this.queue.push(new ActionClass(this.myte, options));
         return this;
     }
 
-    // Insert an action at the front - interrupts the current action cleanly.
+    // Insert an action at the front — do this next, then resume the plan.
     addToFront(actionId, options = {}) {
         const ActionClass = ActionManager.actions.get(actionId);
         if (!ActionClass) {
@@ -55,8 +83,14 @@ class MyteQueue {
             options.duration = ActionClass.metadata.defaultDuration;
         }
 
-        if (this.isDoingAction && this.queue[0]?.interrupt) {
-            this.queue[0].interrupt();
+        if (this.strictInterrupt) {
+            this._log('front→interrupt', actionId);
+            this.clear();
+        } else {
+            if (this.isDoingAction && this.queue[0]?.interrupt) {
+                this.queue[0].interrupt();
+            }
+            this._log('addToFront', actionId);
         }
 
         this.queue.unshift(new ActionClass(this.myte, options));
@@ -64,8 +98,9 @@ class MyteQueue {
         return this;
     }
 
-    // Clear queue and immediately start a new action
+    // Drop everything and do this now — something external made the current queue meaningless.
     interrupt(actionId, options = {}) {
+        this._log('interrupt', actionId);
         this.clear();
         return this.add(actionId, options);
     }
@@ -314,8 +349,7 @@ class MyteQueue {
         const currentAction = this.getCurrentAction();
         if (!(currentAction instanceof CarryAction) || !currentAction.target) return false;
 
-        this.clear();
-        this.add('carry_putdown', { target: currentAction.target, duration: 100 });
+        this.interrupt('carry_putdown', { target: currentAction.target, duration: 100 });
         return true;
     }
 
@@ -338,8 +372,7 @@ class MyteQueue {
             currentAction.target = null;
         }
 
-        this.clear();
-        this.add('drop_item', { target: heldItem });
+        this.interrupt('drop_item', { target: heldItem });
         return true;
     }
 

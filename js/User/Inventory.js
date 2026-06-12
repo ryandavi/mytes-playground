@@ -576,20 +576,21 @@ class Inventory {
     }
 
     applyItemEffects(myte, itemType, itemConfig) {
-        // Clear current actions
-        myte.queue.clear();
-
-        this.queueItemExpressions(myte, itemConfig);
+        this.queueItemExpressions(myte, itemConfig, { interruptFirst: true });
         this.applyConfiguredItemEffects(myte, itemConfig, { source: `inventory_${String(itemType || '').toLowerCase()}` });
         this.emitItemParticles(myte, itemType);
     }
 
-    queueItemExpressions(myte, itemConfig) {
+    queueItemExpressions(myte, itemConfig, { interruptFirst = false } = {}) {
         const expressions = Array.isArray(itemConfig?.expressions) ? itemConfig.expressions.filter(Boolean) : [];
         if (expressions.length === 0) return;
         const duration = Math.max(120, (itemConfig.consumeTime || 1000) / expressions.length);
-        expressions.forEach(expression => {
-            myte.queue.addExpression(expression, duration);
+        expressions.forEach((expression, i) => {
+            if (interruptFirst && i === 0) {
+                myte.queue.interrupt('expression', { actionType: expression, duration });
+            } else {
+                myte.queue.addExpression(expression, duration);
+            }
         });
     }
 
@@ -642,12 +643,11 @@ class Inventory {
         const consumeTime = Math.max(400, Number(itemConfig?.consumeTime) || 1000);
         const animationDuration = Math.min(260, Math.max(140, Math.round(consumeTime * 0.3)));
 
-        myte.queue.clear();
         this.queueItemExpressions(myte, {
             ...itemConfig,
             expressions: ['eat'],
             consumeTime
-        });
+        }, { interruptFirst: true });
 
         this.animateItemToMyteMouth(myte, itemData, { clientX, clientY, duration: animationDuration });
 
@@ -741,16 +741,19 @@ class Inventory {
 
         const nearbyMytes = (this.parent?.mytes || []).filter(myte =>
             myte?.isActive &&
-            myte.goal === MOVE_TYPES.FREEROAM &&
             !myte.isDragging &&
             !myte.queue?.hasUserInitiatedAction?.() &&
             (myte.ai?.objectSearchRadius == null || myte.getDistanceTo?.(droppedItem) <= myte.ai.objectSearchRadius)
         );
 
         nearbyMytes.forEach((myte) => {
-            myte.ai?.resetThinking?.();
-            if (myte.ai?.canPlan?.()) {
-                myte.ai.planNextAction();
+            if (myte.goal === MOVE_TYPES.FREEROAM) {
+                myte.ai?.resetThinking?.();
+                if (myte.ai?.canPlan?.()) {
+                    myte.ai.planNextAction();
+                }
+            } else {
+                myte.ai?.reactToOfferedFood?.(droppedItem);
             }
         });
     }

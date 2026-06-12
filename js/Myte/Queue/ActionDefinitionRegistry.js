@@ -80,7 +80,7 @@ class ActionDefinitionRegistry {
                 social:  num(fx.social),
                 comfort: num(fx.comfort),
                 energy:  num(fx.energy),
-                hunger:  num(fx.hunger),
+                satiety: num(fx.satiety ?? fx.hunger),
                 mood:    num(fx.mood)
             },
             exertion: num(t.exertion),

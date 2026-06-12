@@ -85,6 +85,21 @@ class MyteBuffController {
         this.myte.stats.applyStatEffects(definition.onApply);
     }
 
+    _applyExcludes(definition) {
+        if (!definition?.excludes?.length) return false;
+        let removed = false;
+        for (const excludedId of definition.excludes) {
+            const excluded = this.findBuffById(excludedId);
+            if (!excluded) continue;
+            this.contextBuffs.forEach((instanceId, key) => {
+                if (instanceId === excluded.instanceId) this.contextBuffs.delete(key);
+            });
+            this.activeBuffs.delete(excluded.instanceId);
+            removed = true;
+        }
+        return removed;
+    }
+
     applyBuff(buffIdOrDefinition, options = {}) {
         const definition = this.resolveBuffDefinition(buffIdOrDefinition);
         if (!definition) {
@@ -110,6 +125,7 @@ class MyteBuffController {
                 }
                 existing.source = source;
                 this.applyInstantEffects(definition);
+                this._applyExcludes(definition);
                 this._recordApplied(definition);
                 this.bumpVersion();
                 return existing;
@@ -119,6 +135,7 @@ class MyteBuffController {
                     existing.remainingMs = definition.durationMs;
                 }
                 existing.source = source;
+                this._applyExcludes(definition);
                 this._recordApplied(definition);
                 this.bumpVersion();
                 return existing;
@@ -145,6 +162,9 @@ class MyteBuffController {
         this.activeBuffs.set(buff.instanceId, buff);
         this.applyInstantEffects(definition);
         this._recordApplied(definition);
+        if (this._applyExcludes(definition)) {
+            // bumpVersion called below covers both the new buff and removed excludes
+        }
         this.bumpVersion();
         return buff;
     }
@@ -398,14 +418,14 @@ class MyteBuffController {
             case 'health':    return stats?.health    ?? 0;
             case 'fun':       return stats?.fun       ?? 0;
             case 'social':    return stats?.social    ?? 0;
-            case 'hunger':    return stats?.hunger    ?? 0;
+            case 'satiety':   return stats?.satiety   ?? 0;
             case 'comfort':   return stats?.comfort   ?? 0;
             case 'confidence': return stats?.confidence ?? 0;
             case 'energyRatio':    return stats?.getEnergyRatio?.()    ?? 0;
             case 'healthRatio':    return stats?.getHealthRatio?.()    ?? 0;
             case 'funRatio':       return stats?.getFunRatio?.()       ?? 0;
             case 'socialRatio':    return stats?.getSocialRatio?.()    ?? 0;
-            case 'hungerRatio':    return stats?.getHungerRatio?.()    ?? 0;
+            case 'satietyRatio':   return stats?.getSatietyRatio?.()   ?? 0;
             case 'comfortRatio':   return stats?.getComfortRatio?.()   ?? 0;
             case 'confidenceRatio': return stats?.getConfidenceRatio?.() ?? 0;
             case 'currentMood': return stats?.getDerivedMood?.() ?? 'neutral';

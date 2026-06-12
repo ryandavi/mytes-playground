@@ -103,11 +103,10 @@ class MyteRubbingHandler extends MyteBaseHandler {
 
 		if (this.rubCounter >= this.config.minRubs) {
 			this.lastRubTimestamp = Date.now();
-			this.myte.queue.clear();
 
-			this.myte.queue.addExpression(
-				this.rubCounter <= this.config.maxRubs ? 'happy' : 'dizzy'
-			);
+			this.myte.queue.interrupt('expression', {
+				actionType: this.rubCounter <= this.config.maxRubs ? 'happy' : 'dizzy'
+			});
 			this._updateMood();
 		}
 

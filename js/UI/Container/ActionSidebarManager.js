@@ -537,7 +537,7 @@ class ActionSidebarManager extends UIComponent {
                 [
                     { id: 'energy', label: 'Energy' },
                     { id: 'health', label: 'Health' },
-                    { id: 'hunger', label: 'Hunger' }
+                    { id: 'satiety', label: 'Fullness' }
                 ].forEach(({ id, label }) => {
                     const value = vitals[id] ?? 0;
                     rows.push({ label: `vital_${id}`, value, meta: { label, id }, type: 'meter', cacheValue: `${id}:${value}` });

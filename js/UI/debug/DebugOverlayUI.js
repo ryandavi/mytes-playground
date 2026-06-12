@@ -913,7 +913,7 @@ class DebugOverlayUI {
             { label: 'Mood',        value: activeMyte.stats.getDerivedMood() },
             { label: 'Fun',         value: activeMyte.stats.fun.toFixed(1) },
             { label: 'Social',      value: activeMyte.stats.social.toFixed(1) },
-            { label: 'Hunger',      value: activeMyte.stats.hunger.toFixed(1) },
+            { label: 'Fullness',    value: activeMyte.stats.satiety.toFixed(1) },
             { label: 'Comfort',     value: activeMyte.stats.comfort.toFixed(1) },
             { label: 'Confidence',  value: activeMyte.stats.confidence.toFixed(1) },
             { label: 'Speed',       value: activeMyte.stats.getSpeed() },

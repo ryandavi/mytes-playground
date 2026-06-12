@@ -1,7 +1,7 @@
 const BUFF_CATEGORY_LABELS = Object.freeze({
     energy: '⚡',
     health: '❤️',
-    hunger: '🍽️',
+    satiety: '🍽️',
     fun: '🎉',
     mood: '😊',
     boredom: '😴',
@@ -24,7 +24,7 @@ const BUFF_GROUP_ORDER = [
     'time_of_day',
     'weather',
     'energy_tier',
-    'hunger_tier',
+    'satiety_tier',
     'mood_polarity',
     'confidence_polarity'
 ];

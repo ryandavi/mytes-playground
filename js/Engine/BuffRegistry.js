@@ -70,6 +70,9 @@ class BuffRegistry {
             description: definition.description || '',
             tooltip: definition.tooltip || '',
             hidden: definition.hidden === true,
+            excludes: Array.isArray(definition.excludes)
+                ? definition.excludes.map(buffId => this.normalizeBuffId(buffId)).filter(Boolean)
+                : [],
             effects: this.cloneValue(definition.effects || {}),
             onApply: this.cloneValue(definition.onApply || {}),
             triggers: this.cloneValue(definition.triggers || {})

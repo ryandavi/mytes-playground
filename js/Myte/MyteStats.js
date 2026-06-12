@@ -43,11 +43,11 @@ class MyteStats {
         this.social = Utility.clamp(statConfig.social ?? 80, this.minSocial, this.maxSocial);
         this.socialDecayRate = statConfig.socialDecayRate ?? SiteConfig.stats.socialDecayRate ?? 0.0016;
 
-        // Hunger
-        this.minHunger = 0;
-        this.maxHunger = 100;
-        this.hunger = Utility.clamp(statConfig.hunger ?? 100, this.minHunger, this.maxHunger);
-        this.hungerDecayRate = statConfig.hungerDecayRate ?? SiteConfig.stats.hungerDecayRate ?? 0.003;
+        // Satiety (100 = full, 0 = starving)
+        this.minSatiety = 0;
+        this.maxSatiety = 100;
+        this.satiety = Utility.clamp(statConfig.satiety ?? statConfig.hunger ?? 100, this.minSatiety, this.maxSatiety);
+        this.satietyDecayRate = statConfig.satietyDecayRate ?? statConfig.hungerDecayRate ?? SiteConfig.stats.satietyDecayRate ?? 0.003;
 
         // Comfort
         this.minComfort = 0;
@@ -127,7 +127,7 @@ class MyteStats {
     applyDamage(amount) {
         this.health = Math.max(this.minHealth, this.health - amount);
         if (this.health <= this.minHealth) {
-            this.myte.queue.addExpression('faint');
+            this.myte.queue.interrupt('expression', { actionType: 'faint' });
         }
     }
 
@@ -154,8 +154,8 @@ class MyteStats {
         this.social = Utility.clamp(this.social + amount, this.minSocial, this.maxSocial);
     }
 
-    updateHunger(amount) {
-        this.hunger = Utility.clamp(this.hunger + amount, this.minHunger, this.maxHunger);
+    updateSatiety(amount) {
+        this.satiety = Utility.clamp(this.satiety + amount, this.minSatiety, this.maxSatiety);
     }
 
     updateComfort(amount) {
@@ -173,7 +173,7 @@ class MyteStats {
 
     getFunRatio()        { return this.fun      / this.maxFun; }
     getSocialRatio()     { return this.social   / this.maxSocial; }
-    getHungerRatio()     { return this.hunger   / this.maxHunger; }
+    getSatietyRatio()    { return this.satiety  / this.maxSatiety; }
     getComfortRatio()    { return this.comfort  / this.maxComfort; }
     getConfidenceRatio() { return this.confidence; }
     getEnergyRatio()     { return this.energy   / this.maxEnergy; }
@@ -214,7 +214,7 @@ class MyteStats {
             health:  this.getEffectAmount(effectSource, ['health',  'healthDelta',  'healthRestore',  'healthBoost'])  * totalScale,
             fun:     this.getEffectAmount(effectSource, ['fun',     'funDelta',     'funBoost'])  * totalScale,
             social:  this.getEffectAmount(effectSource, ['social',  'socialDelta',  'socialBoost']) * totalScale,
-            hunger:  this.getEffectAmount(effectSource, ['hunger',  'hungerDelta',  'hungerBoost']) * totalScale,
+            satiety: this.getEffectAmount(effectSource, ['satiety', 'satietyDelta', 'satietyBoost', 'hunger', 'hungerDelta', 'hungerBoost']) * totalScale,
             comfort: this.getEffectAmount(effectSource, ['comfort', 'comfortDelta', 'comfortBoost']) * totalScale,
             confidence: this.getEffectAmount(effectSource, ['confidence', 'confidenceDelta', 'confidenceBoost']) * totalScale
         };
@@ -231,7 +231,7 @@ class MyteStats {
 
         if (deltas.fun !== 0)     this.updateFun(deltas.fun);
         if (deltas.social !== 0)  this.updateSocial(deltas.social);
-        if (deltas.hunger !== 0)  this.updateHunger(deltas.hunger);
+        if (deltas.satiety !== 0) this.updateSatiety(deltas.satiety);
         if (deltas.comfort !== 0) this.updateComfort(deltas.comfort);
         if (deltas.confidence !== 0) this.applyConfidenceDelta(deltas.confidence);
 
@@ -253,7 +253,7 @@ class MyteStats {
             if (result.energyDelta > 0) this.restoreEnergy(result.energyDelta * scale);
             else this.useEnergy(-result.energyDelta * scale);
         }
-        if (result.hungerDelta)  this.updateHunger(result.hungerDelta * scale);
+        if (result.satietyDelta) this.updateSatiety(result.satietyDelta * scale);
 
         if (result.failedOutcome) {
             this.applyConfidenceDelta(-0.04);
@@ -282,7 +282,7 @@ class MyteStats {
             health:   this.getBuffFlat('stats.healthPerMs'),
             fun:      this.getBuffFlat('stats.funPerMs'),
             social:   this.getBuffFlat('stats.socialPerMs'),
-            hunger:   this.getBuffFlat('stats.hungerPerMs'),
+            satiety:  this.getBuffFlat('stats.satietyPerMs'),
             comfort:  this.getBuffFlat('stats.comfortPerMs'),
             confidence: this.getBuffFlat('stats.confidencePerMs')
         }, deltaTime);
@@ -416,6 +416,13 @@ class MyteStats {
             funDelta += this.funDeltaRates.moving * deltaTime * rateScale;
         }
 
+        // Wellbeing ceiling: fun can't stay high when vitals (energy, health, hunger) are depleted.
+        // Ceiling scales from wb.funMinCap (all vitals = 0) up to maxFun (all vitals = 100%).
+        const wb = SiteConfig.stats.wellbeing;
+        const vitalRatio = (this.getEnergyRatio() + this.getHealthRatio() + this.getSatietyRatio()) / 3;
+        const funCeiling = Utility.clamp(vitalRatio, wb.funMinCap, 1) * this.maxFun;
+        if (this.fun > funCeiling) funDelta -= (this.fun - funCeiling) * wb.ceilingDrainRate * deltaTime;
+
         // Apply fun decay rate on top of drive adjustments; exhaustion accelerates decay
         const funDecayMult = this.getBuffMultiplier('stats.funDecayMultiplier');
         const funExhaustionScale = suppressExhaustionCascade ? 1 : 1 + cascade.funDecayScale * exhaustionPenalty;
@@ -430,16 +437,18 @@ class MyteStats {
         const socialExhaustionScale = suppressExhaustionCascade ? 1 : 1 + cascade.socialDecayScale * exhaustionPenalty;
         this.updateSocial(-this.socialDecayRate * deltaTime * rateScale * socialDecayMultiplier * socialExhaustionScale + followSocialOffset);
 
-        // Hunger decay — faster when exhausted (body burns more fuel when running on empty)
-        const hungerExhaustionScale = suppressExhaustionCascade ? 1 : 1 + cascade.hungerDecayScale * exhaustionPenalty;
-        this.updateHunger(-this.hungerDecayRate * deltaTime * hungerExhaustionScale);
+        // Satiety decay — faster when exhausted (body burns more fuel when running on empty)
+        const satietyExhaustionScale = suppressExhaustionCascade ? 1 : 1 + cascade.satietyDecayScale * exhaustionPenalty;
+        this.updateSatiety(-this.satietyDecayRate * deltaTime * satietyExhaustionScale);
 
-        // Comfort blends toward a target based on wellbeing and home proximity
+        // Comfort blends toward a target based on wellbeing and home proximity.
+        // Energy, health, and hunger are weighted heavily — you can't be comfortable while starving/exhausted/injured.
         const comfortTarget = (
-            (this.getFunRatio() * 0.35) +
-            (this.getEnergyRatio() * 0.22) +
-            (this.getHealthRatio() * 0.13) +
-            (homeComfort * 0.3)
+            (this.getFunRatio()    * 0.20) +
+            (this.getEnergyRatio() * 0.30) +
+            (this.getHealthRatio() * 0.20) +
+            (this.getSatietyRatio() * 0.10) +
+            (homeComfort           * 0.20)
         ) * this.maxComfort;
         const comfortBlend = (comfortTarget - this.comfort) * this.comfortBlendRate * deltaTime * rateScale;
         this.updateComfort(comfortBlend);
@@ -450,10 +459,14 @@ class MyteStats {
             this.updateComfort(-0.0018 * deltaTime * rateScale);
         }
 
-        // Confidence passive: blend toward a target based on wellbeing and home proximity
+        // Confidence passive: blend toward a target based on wellbeing and home proximity.
+        // Survival vitals (energy, health, hunger) are the primary drivers — fun is secondary.
         const confTarget = (
-            ((this.getFunRatio() + this.getEnergyRatio() + this.getHealthRatio()) / 3) * 0.72 +
-            (homeComfort * 0.28)
+            this.getEnergyRatio() * 0.35 +
+            this.getHealthRatio() * 0.25 +
+            this.getSatietyRatio() * 0.20 +
+            this.getFunRatio()    * 0.10 +
+            homeComfort           * 0.10
         );
         const confBlend = (confTarget - this.confidence) * this.confidenceBlendRate * deltaTime * rateScale;
         this.applyConfidenceDelta(confBlend);
@@ -467,6 +480,24 @@ class MyteStats {
         if (exhaustionPenalty > 0 && !suppressExhaustionCascade) {
             this.updateComfort(-cascade.comfortDrainPerMs * exhaustionPenalty * deltaTime * rateScale);
             this.applyConfidenceDelta(-cascade.confidenceDrainPerMs * exhaustionPenalty * deltaTime * rateScale);
+        }
+
+        // Comfort ceiling: scales from wb.comfortMinCap (vitals=0) to maxComfort (vitals=100%)
+        const comfortCeiling = Utility.clamp(vitalRatio, wb.comfortMinCap, 1) * this.maxComfort;
+        if (this.comfort > comfortCeiling) {
+            this.updateComfort(-(this.comfort - comfortCeiling) * wb.ceilingDrainRate * deltaTime);
+        }
+
+        // Confidence ceiling: scales from wb.confidenceMinCap (vitals=0) to 1.0 (vitals=100%)
+        const confidenceCeiling = Utility.clamp(vitalRatio, wb.confidenceMinCap, 1);
+        if (this.confidence > confidenceCeiling) {
+            this.applyConfidenceDelta(-(this.confidence - confidenceCeiling) * wb.ceilingDrainRate * deltaTime);
+        }
+
+        // Starvation: near-zero hunger slowly drains health, separate from exhaustion cascade
+        if (this.getSatietyRatio() < wb.starvationThreshold) {
+            const starvationPenalty = 1 - (this.getSatietyRatio() / wb.starvationThreshold);
+            this.applyDamage(wb.starvationHealthDrainPerMs * starvationPenalty * deltaTime);
         }
     }
 
@@ -504,8 +535,8 @@ class MyteStats {
                 expression: 'peek'
             },
             {
-                id: 'hunger_high',
-                condition: this.getHungerRatio() <= 0.25,
+                id: 'satiety_low',
+                condition: this.getSatietyRatio() <= 0.25,
                 text: 'hungry...',
                 style: 'thought',
                 expression: 'peek'
@@ -524,7 +555,7 @@ class MyteStats {
         this.lastNeedSignalTimes[signal.id] = now;
         dialogue.showMessage(signal.text, signal.style);
         if (signal.expression) {
-            this.myte.queue.addExpression(signal.expression, 45, 1);
+            this.myte.queue.addToFront('expression', { actionType: signal.expression, duration: 45, repeat: 1 });
         }
     }
 
@@ -533,7 +564,7 @@ class MyteStats {
     getNeedsSnapshot() {
         return {
             energy:  { value: this.energy,  max: this.maxEnergy,  ratio: this.getEnergyRatio() },
-            hunger:  { value: this.hunger,  max: this.maxHunger,  ratio: this.getHungerRatio() },
+            satiety: { value: this.satiety, max: this.maxSatiety, ratio: this.getSatietyRatio() },
             fun:     { value: this.fun,     max: this.maxFun,     ratio: this.getFunRatio() },
             social:  { value: this.social,  max: this.maxSocial,  ratio: this.getSocialRatio() },
             comfort: { value: this.comfort, max: this.maxComfort, ratio: this.getComfortRatio() }
@@ -861,7 +892,7 @@ class MyteStats {
 
     getStatConditionEnergyMultiplier() {
         const cfg = SiteConfig.stats;
-        const penalty = (1 - this.getHungerRatio()) * cfg.hungerDrainScale
+        const penalty = (1 - this.getSatietyRatio()) * cfg.satietyDrainScale
                       + (1 - this.getHealthRatio()) * cfg.healthDrainScale;
         const bonus = Math.max(0, this.getHealthRatio() - cfg.wellConditionedThreshold) * cfg.wellConditionedBonusScale;
         return 1 + penalty - bonus;
@@ -956,10 +987,10 @@ class MyteStats {
             const cfg = SiteConfig.stats;
             this.updateFun(cfg.homeSlotFunRestoreRate * dt);
             this.updateSocial(cfg.homeSlotSocialRestoreRate * dt);
-            this.updateHunger(cfg.homeSlotHungerRestoreRate * dt);
+            this.updateSatiety(cfg.homeSlotSatietyRestoreRate * dt);
             this.updateComfort(cfg.homeSlotComfortBoostRate * dt);
             this.applyConfidenceDelta(this.homeSlotConfidenceBoostRate * dt);
-            this.updateHealth(cfg.healthRegenRate * 1.5 * dt);
+            this.updateHealth(cfg.homeSlotHealthRegenRate * dt);
         }
         this.updateBatteryDisplay();
     }
@@ -987,7 +1018,7 @@ class MyteStats {
             needs: {
                 fun:     this.fun,
                 social:  this.social,
-                hunger:  this.hunger,
+                satiety: this.satiety,
                 comfort: this.comfort,
                 confidence: this.confidence
             },

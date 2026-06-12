@@ -520,7 +520,7 @@ class ContainerManager {
                 energy:     SiteConfig.myte.initialStats.energy,
                 fun:        70,
                 social:     80,
-                hunger:     100,
+                satiety:    100,
                 comfort:    SiteConfig.myte.initialStats.comfort,
                 confidence: SiteConfig.myte.initialStats.confidence
             }
@@ -562,7 +562,7 @@ class ContainerManager {
                     energy:     SiteConfig.myte.initialStats.energy,
                     fun:        70,
                     social:     80,
-                    hunger:     100,
+                    satiety:    100,
                     comfort:    SiteConfig.myte.initialStats.comfort,
                     confidence: SiteConfig.myte.initialStats.confidence
                 }
@@ -604,7 +604,7 @@ class ContainerManager {
                 energy:     Number.isFinite(Number(stats.energy))     ? Number(stats.energy)     : SiteConfig.myte.initialStats.energy,
                 fun:        Number.isFinite(Number(stats.fun))        ? Number(stats.fun)        : 70,
                 social:     Number.isFinite(Number(stats.social))     ? Number(stats.social)     : 80,
-                hunger:     Number.isFinite(Number(stats.hunger))     ? Number(stats.hunger)     : 100,
+                satiety:    Number.isFinite(Number(stats.satiety ?? stats.hunger)) ? Number(stats.satiety ?? stats.hunger) : 100,
                 comfort:    Number.isFinite(Number(stats.comfort))    ? Number(stats.comfort)    : SiteConfig.myte.initialStats.comfort,
                 confidence: Number.isFinite(Number(stats.confidence)) ? Number(stats.confidence) : SiteConfig.myte.initialStats.confidence
             }
@@ -733,7 +733,8 @@ class ContainerManager {
         myte.stats.energy = Math.max(myte.stats.minEnergy, Math.min(myte.stats.maxEnergy, stats.energy ?? myte.stats.energy));
         if (stats.fun     != null) myte.stats.fun    = Math.max(myte.stats.minFun,    Math.min(myte.stats.maxFun,    stats.fun));
         if (stats.social  != null) myte.stats.social = Math.max(myte.stats.minSocial, Math.min(myte.stats.maxSocial, stats.social));
-        if (stats.hunger  != null) myte.stats.hunger = Math.max(myte.stats.minHunger, Math.min(myte.stats.maxHunger, stats.hunger));
+        const savedSatiety = stats.satiety ?? stats.hunger;
+        if (savedSatiety != null) myte.stats.satiety = Math.max(myte.stats.minSatiety, Math.min(myte.stats.maxSatiety, savedSatiety));
         myte.stats.comfort    = Math.max(myte.stats.minComfort,    Math.min(myte.stats.maxComfort,    stats.comfort    ?? myte.stats.comfort));
         // Migrate old 0–100 confidence saves to new 0–1 scale
         const savedConfidence = stats.confidence != null && stats.confidence > 1

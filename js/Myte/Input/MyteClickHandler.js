@@ -236,7 +236,7 @@ class MyteClickHandler extends MyteBaseHandler {
 	}
 
 	_onDoubleClick() {
-		this.myte.queue.addExpression('surprise');
+		this.myte.queue.interrupt('expression', { actionType: 'surprise' });
 		this.myte.queue.addExpression('dance');
 	}
 

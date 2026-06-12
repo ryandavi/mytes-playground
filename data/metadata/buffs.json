@@ -10,6 +10,7 @@
       "durationMs": 0,
       "cancellable": false,
       "icon": "😴",
+      "excludes": ["well_rested", "charged_up"],
       "description": "Low energy drags movement and makes it harder to stay upbeat.",
       "effects": {
         "movement": {
@@ -38,6 +39,7 @@
       "durationMs": 0,
       "cancellable": false,
       "icon": "😵",
+      "excludes": ["well_rested", "charged_up", "energized"],
       "description": "Completely drained. Movement is heavily slowed until energy returns.",
       "effects": {
         "movement": {
@@ -93,6 +95,7 @@
       "cancellable": false,
       "icon": "🍽️",
       "description": "Growing hunger makes it harder to focus.",
+      "excludes": ["nourished"],
       "effects": {
         "stats": {
           "funDecayMultiplier": 1.06
@@ -101,8 +104,8 @@
       "triggers": {
         "status": {
           "conditions": [
-            { "stat": "hungerRatio", "lte": 0.3 },
-            { "stat": "hungerRatio", "gt": 0.05 }
+            { "stat": "satietyRatio", "lte": 0.3 },
+            { "stat": "satietyRatio", "gt": 0.05 }
           ]
         }
       }
@@ -117,6 +120,7 @@
       "cancellable": false,
       "icon": "😫",
       "description": "Severe hunger. Eating becomes the only priority.",
+      "excludes": ["nourished"],
       "effects": {
         "movement": {
           "speedMultiplier": 0.88
@@ -127,7 +131,7 @@
       },
       "triggers": {
         "status": {
-          "conditions": [{ "stat": "hungerRatio", "lte": 0.05 }]
+          "conditions": [{ "stat": "satietyRatio", "lte": 0.05 }]
         }
       }
     },
@@ -166,6 +170,7 @@
       "durationMs": 0,
       "cancellable": false,
       "icon": "😔",
+      "excludes": ["spirited"],
       "description": "Low mood weighs on momentum and slows emotional recovery.",
       "effects": {
         "movement": {
@@ -270,6 +275,7 @@
       "durationMs": 0,
       "cancellable": false,
       "icon": "🌀",
+      "excludes": ["spirited"],
       "description": "Boredom makes it harder to settle until something fun breaks the loop.",
       "effects": {
         "movement": {
@@ -379,6 +385,7 @@
       "cancellable": true,
       "icon": "🍽️",
       "description": "Well-fed and energized. Activities burn much less energy until it wears off.",
+      "excludes": ["hungry", "starving"],
       "effects": {
         "movement": {
           "speedMultiplier": 1.05

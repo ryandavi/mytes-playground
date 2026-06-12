@@ -1963,6 +1963,7 @@ body.debug .map-object > .interactive-hitbox {
 #game-debug-panel .window-panel__content .settings-subgroup .button-group button {
   padding: 0.5rem;
 }
+#game-debug-panel .window-panel__content .settings-subgroup button.debug-button--full,
 #game-debug-panel .window-panel__content .settings-subgroup #toggleDebug,
 #game-debug-panel .window-panel__content .settings-subgroup #cycleFollowGoal,
 #game-debug-panel .window-panel__content .settings-subgroup #cycleCamera,

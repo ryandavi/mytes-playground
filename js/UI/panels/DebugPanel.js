@@ -310,12 +310,31 @@ class DebugPanel extends ModalWindow {
                 action: () => this.getTimeManager()?.skipTime?.(1, 0)
             },
             {
+                id: 'subtractHour',
+                section: 'time',
+                subgroup: 'presets',
+                type: 'action',
+                label: '-1 Hour',
+                action: () => {
+                    this.getTimeManager()?.skipTime?.(-1, 0);
+                    this.updateButton('toggleTimePause');
+                }
+            },
+            {
                 id: 'skipDay',
                 section: 'time',
                 subgroup: 'presets',
                 type: 'action',
                 label: '+1 Day',
                 action: () => this.getTimeManager()?.skipDays?.(1)
+            },
+            {
+                id: 'subtractDay',
+                section: 'time',
+                subgroup: 'presets',
+                type: 'action',
+                label: '-1 Day',
+                action: () => this.subtractDay()
             },
 
             // ── MYTE / CONTROLS ─────────────────────────────────────────
@@ -386,6 +405,57 @@ class DebugPanel extends ModalWindow {
                         activeMyte.setAutonomyMode(nextGoal);
                         this.updateButton('cycleAutonomyGoal');
                     }
+                }
+            },
+            {
+                id: 'queueLog',
+                section: 'myte',
+                subgroup: 'queue',
+                type: 'toggle',
+                fullWidth: true,
+                label: 'Queue Log: ',
+                states: { true: 'ON', false: 'OFF' },
+                getValue: () => localStorage.getItem('myteQueueLog') === 'true',
+                action: () => {
+                    const next = !(localStorage.getItem('myteQueueLog') === 'true');
+                    localStorage.setItem('myteQueueLog', String(next));
+                    const activeMyte = this.parent.parent.activeMyte;
+                    if (activeMyte?.queue) activeMyte.queue.logEnabled = next;
+                    this.updateButton('queueLog');
+                }
+            },
+            {
+                id: 'queueConsoleClear',
+                section: 'myte',
+                subgroup: 'queue',
+                type: 'toggle',
+                fullWidth: true,
+                label: 'Queue Clear Console: ',
+                states: { true: 'ON', false: 'OFF' },
+                getValue: () => localStorage.getItem('myteQueueConsoleClear') === 'true',
+                action: () => {
+                    const next = !(localStorage.getItem('myteQueueConsoleClear') === 'true');
+                    localStorage.setItem('myteQueueConsoleClear', String(next));
+                    const activeMyte = this.parent.parent.activeMyte;
+                    if (activeMyte?.queue) activeMyte.queue.consoleClearEnabled = next;
+                    this.updateButton('queueConsoleClear');
+                }
+            },
+            {
+                id: 'queueStrictInterrupt',
+                section: 'myte',
+                subgroup: 'queue',
+                type: 'toggle',
+                fullWidth: true,
+                label: 'Queue Strict Interrupt: ',
+                states: { true: 'ON', false: 'OFF' },
+                getValue: () => localStorage.getItem('myteQueueStrictInterrupt') === 'true',
+                action: () => {
+                    const next = !(localStorage.getItem('myteQueueStrictInterrupt') === 'true');
+                    localStorage.setItem('myteQueueStrictInterrupt', String(next));
+                    const activeMyte = this.parent.parent.activeMyte;
+                    if (activeMyte?.queue) activeMyte.queue.strictInterrupt = next;
+                    this.updateButton('queueStrictInterrupt');
                 }
             },
             {
@@ -559,6 +629,34 @@ class DebugPanel extends ModalWindow {
         this.updateButton('timeScale');
     }
 
+    subtractDay() {
+        const tm = this.getTimeManager();
+        if (!tm) return;
+
+        const seasons = tm.config.seasons;
+        let year = tm.getCurrentYear();
+        let season = tm.getCurrentSeason();
+        let day = tm.getCurrentDay() + 1; // getCurrentDay is 0-indexed; setDateTime expects 1-indexed
+        const hour = tm.getCurrentHour();
+        const minute = tm.getCurrentMinute();
+
+        day -= 1;
+        if (day < 1) {
+            const seasonIdx = seasons.indexOf(season);
+            if (seasonIdx > 0) {
+                season = seasons[seasonIdx - 1];
+            } else {
+                year -= 1;
+                if (year < 1) return;
+                season = seasons[seasons.length - 1];
+            }
+            day = tm.config.daysPerSeason;
+        }
+
+        tm.setDateTime(year, season, day, hour, minute);
+        this.updateButton('toggleTimePause');
+    }
+
     handleButtonClick(config, button) {
         if (config.action) {
             if (config.type === 'toggle') {
@@ -674,7 +772,7 @@ class DebugPanel extends ModalWindow {
             map:  { label: 'Map',  subgroups: { overlays: 'Overlays', controls: 'Controls' } },
             time: { label: 'Time', subgroups: { controls: 'Controls', presets: 'Presets' } },
             user: { label: 'User', subgroups: { modes: 'Modes' } },
-            myte: { label: 'Myte', subgroups: { controls: 'Controls', stats: 'Stats' } }
+            myte: { label: 'Myte', subgroups: { controls: 'Controls', stats: 'Stats', queue: 'Queue' } }
         };
 
         for (const [sectionKey, sectionDef] of Object.entries(layout)) {
@@ -726,6 +824,7 @@ class DebugPanel extends ModalWindow {
         button.type = 'button';
         if (config.type) button.dataset.type = config.type;
         if (config.presentation) button.dataset.presentation = config.presentation;
+        if (config.fullWidth) button.classList.add('debug-button--full');
 
         if (config.requiresActiveMyte) {
             button.classList.add('requires-myte');

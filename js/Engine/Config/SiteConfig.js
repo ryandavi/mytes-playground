@@ -51,11 +51,14 @@ const SiteConfig = Object.freeze({
         homeSlotConfidenceBoostRate: 0.00055,
         homeSlotFunRestoreRate:      0.0030,  // beats resting fun decay (~0.0014/ms), net ~+0.002/ms
         homeSlotSocialRestoreRate:   0.0008,  // beats social decay (~0.0004/ms), net ~+0.0004/ms
-        homeSlotHungerRestoreRate:   0.0025,  // beats hunger decay (~0.0017/ms), net ~+0.0008/ms
+        homeSlotSatietyRestoreRate:  0.0025,  // beats satiety decay (~0.0017/ms), net ~+0.0008/ms
+        // Health recovers slower than other stats (it's more serious).
+        // At 0.00035/ms: 0→100 in ~5 minutes in home slot vs ~67 min passively.
+        homeSlotHealthRegenRate:     0.00035,
 
         // Stat-condition modifiers on energy drain rate.
-        // hungerDrainScale: fraction of extra drain added at 0 hunger (starving). 0.3 = +30%.
-        hungerDrainScale: 0.30,
+        // satietyDrainScale: fraction of extra energy drain at 0 satiety (starving). 0.3 = +30%.
+        satietyDrainScale: 0.30,
         // healthDrainScale: fraction of extra drain added at 0 health (critical). 0.25 = +25%.
         healthDrainScale: 0.25,
         // wellConditionedThreshold/Scale: above this health ratio, drain is reduced.
@@ -74,7 +77,7 @@ const SiteConfig = Object.freeze({
         // Each scales with _getExhaustionPenalty() — e.g. at 15% energy, penalty = 0.5.
         exhaustionCascade: Object.freeze({
             healthDrainPerMs:     0.00018,  // extra damage/ms; at full → ~10.8 health/min net loss
-            hungerDecayScale:     0.50,     // up to +50% faster hunger decay
+            satietyDecayScale:    0.50,     // up to +50% faster satiety decay when exhausted
             funDecayScale:        0.60,     // up to +60% faster fun decay
             socialDecayScale:     0.35,     // up to +35% faster social decay
             comfortDrainPerMs:    0.0006,   // direct comfort drain/ms at full penalty
@@ -117,6 +120,21 @@ const SiteConfig = Object.freeze({
                 }),
             }),
         }),
+
+        // Wellbeing ceilings — emotional stats can't stay high when survival vitals are low.
+        // vitalRatio = average(energy, health, hunger) as 0–1 ratios.
+        // Each minCap is the stat's floor when vitalRatio = 0 (all vitals depleted).
+        // The ceiling scales linearly from minCap (vitalRatio=0) to 1.0 (vitalRatio=1).
+        // ceilingDrainRate: fraction of excess above the ceiling drained per ms.
+        // starvation: near-zero hunger slowly damages health, independent of exhaustion cascade.
+        wellbeing: Object.freeze({
+            funMinCap:                  0.15,     // fun floor at 0 vitals (15% of maxFun)
+            comfortMinCap:              0.10,     // comfort floor at 0 vitals (10% of maxComfort)
+            confidenceMinCap:           0.10,     // confidence floor at 0 vitals (0–1 scale)
+            ceilingDrainRate:           0.0008,   // fraction of excess above ceiling drained/ms
+            starvationThreshold:        0.15,     // hunger ratio below which starvation begins
+            starvationHealthDrainPerMs: 0.000085, // health/ms at full starvation (hunger = 0)
+        }),
     }),
 
     // ── Food defaults ─────────────────────────────────────────────────────────
@@ -124,7 +142,7 @@ const SiteConfig = Object.freeze({
     // Inventory hand-feeding uses inventory.itemTypes below.
 
     food: Object.freeze({
-        effects: Object.freeze({ energy: 20, fun: 8, health: 3, hunger: 0 }),
+        effects: Object.freeze({ energy: 20, fun: 8, health: 3, satiety: 0 }),
         saturationMs: 90000,
     }),
 
@@ -140,7 +158,7 @@ const SiteConfig = Object.freeze({
         itemTypes: Object.freeze({
             FOOD:     Object.freeze({
                 moodBoost: 15,
-                effects: Object.freeze({ hunger: 20, energy: 5, fun: 6, comfort: 4 }),
+                effects: Object.freeze({ satiety: 20, energy: 5, fun: 6, comfort: 4 }),
                 expressions: ['eat'],
                 consumeTime: 1000,
                 saturationMs: 60000
@@ -237,7 +255,7 @@ const SiteConfig = Object.freeze({
             energy:     75,
             fun:        70,
             social:     80,
-            hunger:     100,
+            satiety:    100,
             comfort:    72,
             confidence: 0.55,
         }),

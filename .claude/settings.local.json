@@ -33,7 +33,9 @@
       "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\\\\js\" -Recurse -Filter \"*.js\")",
       "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\genes\\\\chat\\\\neko\" -Force)",
       "Bash(Select-Object Name, FullName)",
-      "Bash(grep -v \":0$\")"
+      "Bash(grep -v \":0$\")",
+      "Bash(xargs wc -l)",
+      "Bash(node --check js/Map/Grid/GameMapGrid.js)"
     ]
   }
 }

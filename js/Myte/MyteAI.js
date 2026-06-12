@@ -120,6 +120,21 @@ class MyteAI {
         return this.executeSafeReturn(this.buildContext());
     }
 
+    reactToOfferedFood(item) {
+        if (!this.enabled || !this.myte.isActive || this.myte.isDragging) return false;
+        if (this.myte.queue?.isCarrying?.() || this.myte.queue?.hasUserInitiatedAction?.()) return false;
+        if (!item?.isUserOfferedFood?.()) return false;
+
+        const aiValues = this._getActionAiValues('eat_element');
+        return this.enqueueTargetedAction('eat_element', item, {}, {
+            label: 'eat:eat_element',
+            category: aiValues.category,
+            novelty: this.getNoveltyScore(item),
+            soothing: aiValues.soothing,
+            accomplishment: aiValues.accomplishment
+        });
+    }
+
     planNextAction() {
         this.pruneMemory();
 
@@ -186,7 +201,7 @@ class MyteAI {
             health:      stats?.getHealthRatio?.()               ?? 1,
             fun:         stats?.getFunRatio?.()                  ?? 0.5,
             social:      stats?.getSocialRatio?.()               ?? 0.5,
-            hunger:      stats?.getHungerRatio?.()               ?? 0.5,
+            satiety:     stats?.getSatietyRatio?.()              ?? 0.5,
             comfort:     stats?.getComfortRatio?.()              ?? 0.7,
             confidence:  stats?.getConfidenceRatio?.()           ?? 0.5,
             activity:    stats?.getTraitNormalized?.('activity')    ?? 0.5,
@@ -197,7 +212,7 @@ class MyteAI {
     }
 
     _computeDrives(needs, spatialContext) {
-        const { fun, social, hunger, energy, comfort, confidence, activity, curiosity, sociability } = needs;
+        const { fun, social, satiety, energy, comfort, confidence, activity, curiosity, sociability } = needs;
         const { distanceFromHome, nearbyObjects, isExhausted } = spatialContext;
 
         const energyModifier             = Math.max(0, energy);
@@ -213,7 +228,7 @@ class MyteAI {
 
         const drives = {
             restDrive:    1 - energy,
-            eatDrive:     1 - hunger,
+            eatDrive:     1 - satiety,
             playDrive:    (1 - fun) * Math.max(0.15, curiosity * activity) * energyModifier,
             socialDrive:  ((1 - social) * (0.5 + sociability)) + (0.08 * sociability),
             exploreDrive: curiosity * effectiveNoveltyHunger * confidence * energyModifier,
@@ -231,7 +246,7 @@ class MyteAI {
 
     buildContext() {
         const snapshot = this._buildNeedsSnapshot();
-        const { stats, energy, health, fun, social, hunger, comfort, confidence, activity, curiosity, sociability } = snapshot;
+        const { stats, energy, health, fun, social, satiety, comfort, confidence, activity, curiosity, sociability } = snapshot;
 
         const nearbyMytes = this.getNearbyMytes(this.socialRadius);
         const nearbyObjects = this.getNearbyObjects(this.objectSearchRadius);
@@ -279,7 +294,7 @@ class MyteAI {
 
         return {
             stats,
-            energy, health, fun, social, hunger, comfort, confidence,
+            energy, health, fun, social, satiety, comfort, confidence,
             activity, curiosity, sociability,
             preferences,
             timeOfDay: timeData.timeOfDay ?? 'day',
@@ -319,10 +334,9 @@ class MyteAI {
         }
 
         const distanceToHome = this.myte.getDistanceToPoint(safeHome.x, safeHome.y);
-        this.myte.queue.clear();
 
         if (distanceToHome > 8) {
-            this.myte.queue.addAStarMove(safeHome);
+            this.myte.queue.interrupt('astar-move', { target: safeHome });
             this.setDecisionLock(3200);
             this.lastDecisionLabel = 'safe_return:go_home';
             this.lastDecisionTime = SimClock.now();
@@ -330,6 +344,7 @@ class MyteAI {
             return true;
         }
 
+        this.myte.queue.clear();
         this.enqueueAction('sleep', { duration: 220 }, {
             label: 'safe_return:sleep',
             category: 'rest',
@@ -1372,7 +1387,7 @@ class MyteAI {
             health:     Number(context.health.toFixed(2)),
             fun:        Number(context.fun.toFixed(2)),
             social:     Number(context.social.toFixed(2)),
-            hunger:     Number(context.hunger.toFixed(2)),
+            satiety:    Number(context.satiety.toFixed(2)),
             comfort:    Number(context.comfort.toFixed(2)),
             confidence: Number(context.confidence.toFixed(2)),
             localLightLevel: Number(context.localLightLevel.toFixed(2)),
@@ -1425,7 +1440,7 @@ class MyteAI {
                 health:     Math.round((snapshot?.health     ?? 0) * 100),
                 fun:        Math.round((snapshot?.fun        ?? 0) * 100),
                 social:     Math.round((snapshot?.social     ?? 0) * 100),
-                hunger:     Math.round((snapshot?.hunger     ?? 0) * 100),
+                satiety:    Math.round((snapshot?.satiety    ?? 0) * 100),
                 comfort:    Math.round((snapshot?.comfort    ?? 0) * 100),
                 confidence: Math.round((snapshot?.confidence ?? 0) * 100)
             },

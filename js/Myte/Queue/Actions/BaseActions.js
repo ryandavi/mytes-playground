@@ -88,7 +88,7 @@ class MyteAction {
             socialDelta:   base.social  ?? 0,
             comfortDelta:  base.comfort ?? 0,
             energyDelta:   base.energy  ?? 0,
-            hungerDelta:   base.hunger  ?? 0,
+            satietyDelta:  base.satiety ?? 0,
             novelty:       def?.novelty      ?? 0,
             soothing:      def?.soothing      ?? 0,
             exertion:      def?.exertion     ?? 0,

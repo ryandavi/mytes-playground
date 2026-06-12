@@ -125,7 +125,7 @@ class User {
                     energy:     myte.stats?.energy     ?? 75,
                     fun:        myte.stats?.fun        ?? 70,
                     social:     myte.stats?.social     ?? 80,
-                    hunger:     myte.stats?.hunger     ?? 100,
+                    satiety:    myte.stats?.satiety    ?? 100,
                     comfort:    myte.stats?.comfort    ?? SiteConfig.myte.initialStats.comfort,
                     confidence: myte.stats?.confidence ?? SiteConfig.myte.initialStats.confidence,
                     speed:      myte.stats?.speed      ?? 1,

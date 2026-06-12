@@ -36,8 +36,7 @@ class CarryPickupAction extends MyteAction {
 
         if (this.currentDuration <= 0) {
             this.myte.queue.add('carry', { target: this.target, duration: -1 });
-            this.target.queue.clear();
-            this.target.queue.add('being_carried', { carrierMyte: this.myte, duration: -1 });
+            this.target.queue.interrupt('being_carried', { carrierMyte: this.myte, duration: -1 });
         }
 
         return this.currentDuration <= 0;

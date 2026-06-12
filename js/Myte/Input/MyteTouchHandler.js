@@ -134,7 +134,7 @@ class MyteTouchHandler extends DragHandler {
                         if (best) {
                             const actionOptions = ActionManager.getActionOptions(best.id, dropObj, myte);
                             if (actionOptions) {
-                                myte.queue.add(best.id, {
+                                myte.queue.interrupt(best.id, {
                                     ...actionOptions,
                                     userInitiated: true,
                                     immediate: isSurfaceSlotDrop,
