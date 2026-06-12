@@ -203,7 +203,11 @@ Deep pass over the areas Part 1 skipped: `AStarPathfinder.js`, `SoundManager.js`
 >
 > Known latent issue (not fixed, pre-existing pattern): interaction actions' `complete()` runs effects/rewards even when `didAbortApproach()` — aborted approaches still deflower/open/drop. Fix requires a coordinated pass over all GoToObjectAction subclasses.
 >
-> Remaining open items (recommend doing with manual testing available): full Myte input-stack port onto InputComponent (touch parity risk), SoundManager engine/game split, preset stop/fade contract.
+> Follow-up 2026-06-12 (third pass): **MyteRubbingHandler ported onto the shared RubbingComponent** — the duplicate gesture detection is deleted; the handler now only wires myte reactions (expressions + petted/overstimulated buffs). MapObject's rubbing init drops its hardcoded gesture values in favor of the SiteConfig-driven component defaults. **SoundManager `getVolumeParams`** centralizes the volume-param shape sniffing for the fade path (contract-lite; presets needing different handling should extend it there).
+>
+> **Reassessed after full read:** `MyteClickHandler`/`MyteTouchHandler` are *not* duplicates of ClickComponent/DragComponent — they are bespoke choreography (three element targets: home slot, inactive sprite, world duplicate; upward-drag pickup gesture; tool-mode switching; direct touch-handler driving). Porting them would be a rewrite over a different transport with no dedupe gain and high touch-parity risk. Recommendation downgraded: leave as-is unless gesture bugs force a revisit. The per-myte document-level listeners they attach are cheap (early-return guards) and bounded by roster size.
+>
+> Still open: SoundManager engine/game file split (purely organizational — do as its own focused change), full per-preset stop/fade contract (extend `getVolumeParams` when preset shapes next change).
 
 ## AStarPathfinder.js — solid core, a few sharp edges
 

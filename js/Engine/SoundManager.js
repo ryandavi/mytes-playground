@@ -1111,6 +1111,21 @@ class SoundManager {
 	}
 
 
+	// Resolve the Tone volume params for a sound's synth, mirroring the historical
+	// precedence: a root-level volume wins; otherwise the noise child; otherwise
+	// each top-level component that has its own volume. Centralizes the shape
+	// sniffing the fade path previously did inline. Preset shapes that need
+	// different handling should grow an explicit contract here, not new branches
+	// at call sites.
+	getVolumeParams(synth) {
+		if (!synth || typeof synth !== 'object') return [];
+		if (synth.volume) return [synth.volume];
+		if (synth.noise?.volume) return [synth.noise.volume];
+		return Object.values(synth)
+			.filter(component => component && typeof component === 'object' && component.volume)
+			.map(component => component.volume);
+	}
+
 	fadeAmbientSound(sound, startVolume, endVolume, duration = 1.0, onComplete = null) {
 		if (!sound || !sound.synth) return;
 
@@ -1133,26 +1148,13 @@ class SoundManager {
 			// inaudible floor instead — previously a zero target skipped the ramp
 			// entirely and the sound stayed at full volume until hard-stopped.
 			const SILENT_DB = -60;
-			const rampVolume = (volumeParam) => {
-				const startDB = startVolume <= 0 ? SILENT_DB : Tone.gainToDb(startVolume);
-				const endDB = endVolume <= 0 ? SILENT_DB : Tone.gainToDb(endVolume);
+			const startDB = startVolume <= 0 ? SILENT_DB : Tone.gainToDb(startVolume);
+			const endDB = endVolume <= 0 ? SILENT_DB : Tone.gainToDb(endVolume);
+
+			this.getVolumeParams(sound.synth).forEach(volumeParam => {
 				volumeParam.value = startDB;
 				volumeParam.linearRampTo(endDB, duration);
-			};
-
-			// Handle different synth types
-			if (sound.synth.volume) {
-				rampVolume(sound.synth.volume);
-			} else if (sound.synth.noise && sound.synth.noise.volume) {
-				rampVolume(sound.synth.noise.volume);
-			} else if (sound.synth instanceof Object) {
-				// Handle complex synths with multiple components
-				Object.values(sound.synth).forEach(component => {
-					if (component && component.volume) {
-						rampVolume(component.volume);
-					}
-				});
-			}
+			});
 
 			// Execute callback after fade completes
 			if (onComplete) {

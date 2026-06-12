@@ -1291,13 +1291,12 @@ class MapObject {
 
 	initRubbingComponent() {
 		if (this.inputComponents.rubbing) return;
+		// Gesture tuning comes from SiteConfig.interaction.rubbing via the
+		// component defaults; only the per-object cooldown is overridable here.
 		this.inputComponents.rubbing = new RubbingComponent(this, {
 			element: this.element,
 			enabled: true,
 			canRub: () => this.active && this.parent?.ui?.isTool(UIToolModes.PET),
-			minRubs: 3,
-			maxRubs: 15,
-			directionThreshold: 10,
 			minTimeBetweenRubs: this.getConfig('rubCooldown', 5000),
 			onRubStart: () => this.element.classList.add('being-rubbed'),
 			onRubProgress: (event) => {
