@@ -90,6 +90,27 @@ const SiteConfig = Object.freeze({
         // Per-ms blend rate for the confidence passive drift toward its wellbeing target
         confidenceBlendRate: 0.0013,
 
+        // Passive need decay rates (per ms) while deployed
+        funDecayRate: 0.004,
+        socialDecayRate: 0.0016,
+        satietyDecayRate: 0.003,
+
+        // Per-ms blend rate for comfort drifting toward its environmental target
+        comfortBlendRate: 0.0016,
+
+        // Energy ratio at/below which the myte counts as exhausted
+        exhaustionThreshold: 0.05,
+
+        // Fun delta rates (per ms) by activity context; species override via ai.funDeltaRates
+        funDeltaRates: Object.freeze({
+            resting:     0.0022,
+            stimulating: 0.0034,
+            movement:    0.0006,
+            idle:        0.0042,
+            default:     0.0008,
+            moving:      0.0002,
+        }),
+
         // Passive health regen per ms (active) — 1.5× in home slot
         healthRegenRate: 0.000025,
 
@@ -252,6 +273,7 @@ const SiteConfig = Object.freeze({
 
         // Starting stat values for a freshly spawned myte
         initialStats: Object.freeze({
+            health:     100,
             energy:     75,
             fun:        70,
             social:     80,

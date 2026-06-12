@@ -34,20 +34,20 @@ class MyteStats {
         // Fun (replaces boredom — high fun = engaged, low fun = bored)
         this.minFun = 0;
         this.maxFun = 100;
-        this.fun = Utility.clamp(statConfig.fun ?? SiteConfig.myte.initialStats.fun ?? 70, this.minFun, this.maxFun);
-        this.funDecayRate = statConfig.funDecayRate ?? SiteConfig.stats.funDecayRate ?? 0.004;
+        this.fun = Utility.clamp(statConfig.fun ?? SiteConfig.myte.initialStats.fun, this.minFun, this.maxFun);
+        this.funDecayRate = statConfig.funDecayRate ?? SiteConfig.stats.funDecayRate;
 
         // Social need
         this.minSocial = 0;
         this.maxSocial = 100;
-        this.social = Utility.clamp(statConfig.social ?? 80, this.minSocial, this.maxSocial);
-        this.socialDecayRate = statConfig.socialDecayRate ?? SiteConfig.stats.socialDecayRate ?? 0.0016;
+        this.social = Utility.clamp(statConfig.social ?? SiteConfig.myte.initialStats.social, this.minSocial, this.maxSocial);
+        this.socialDecayRate = statConfig.socialDecayRate ?? SiteConfig.stats.socialDecayRate;
 
         // Satiety (100 = full, 0 = starving)
         this.minSatiety = 0;
         this.maxSatiety = 100;
-        this.satiety = Utility.clamp(statConfig.satiety ?? statConfig.hunger ?? 100, this.minSatiety, this.maxSatiety);
-        this.satietyDecayRate = statConfig.satietyDecayRate ?? statConfig.hungerDecayRate ?? SiteConfig.stats.satietyDecayRate ?? 0.003;
+        this.satiety = Utility.clamp(statConfig.satiety ?? statConfig.hunger ?? SiteConfig.myte.initialStats.satiety, this.minSatiety, this.maxSatiety);
+        this.satietyDecayRate = statConfig.satietyDecayRate ?? statConfig.hungerDecayRate ?? SiteConfig.stats.satietyDecayRate;
 
         // Comfort
         this.minComfort = 0;
@@ -92,21 +92,22 @@ class MyteStats {
             boldness:    this.resolveTraitValue(traitConfig.boldness ?? 0.5)
         };
 
-        this.safeAreaRadius = aiConfig.safeAreaRadius ?? aiConfig.homeRadius ?? 320;
+        this.safeAreaRadius = aiConfig.safeAreaRadius ?? aiConfig.homeRadius ?? SiteConfig.ai.radii.home;
         this._lastDistanceFromHome = 0;
 
-        this.comfortBlendRate = statConfig.comfortBlendRate ?? 0.0016;
+        this.comfortBlendRate = statConfig.comfortBlendRate ?? SiteConfig.stats.comfortBlendRate;
         this.confidenceBlendRate = statConfig.confidenceBlendRate ?? SiteConfig.stats.confidenceBlendRate;
-        this.exhaustionThreshold = statConfig.exhaustionThreshold ?? 0.05;
+        this.exhaustionThreshold = statConfig.exhaustionThreshold ?? SiteConfig.stats.exhaustionThreshold;
 
         const funRateCfg = aiConfig.funDeltaRates ?? {};
+        const funRateDefaults = SiteConfig.stats.funDeltaRates;
         this.funDeltaRates = {
-            resting:     funRateCfg.resting     ?? 0.0022,
-            stimulating: funRateCfg.stimulating ?? 0.0034,
-            movement:    funRateCfg.movement    ?? 0.0006,
-            idle:        funRateCfg.idle        ?? 0.0042,
-            default:     funRateCfg.default     ?? 0.0008,
-            moving:      funRateCfg.moving      ?? 0.0002
+            resting:     funRateCfg.resting     ?? funRateDefaults.resting,
+            stimulating: funRateCfg.stimulating ?? funRateDefaults.stimulating,
+            movement:    funRateCfg.movement    ?? funRateDefaults.movement,
+            idle:        funRateCfg.idle        ?? funRateDefaults.idle,
+            default:     funRateCfg.default     ?? funRateDefaults.default,
+            moving:      funRateCfg.moving      ?? funRateDefaults.moving
         };
 
         this.lastInteractionTime = 0;

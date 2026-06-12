@@ -1,49 +1,32 @@
+// Thin aliases over the shared Utility helpers — kept so particle code reads
+// in its own vocabulary, but with a single implementation underneath.
 class ParticleMath {
     static FRAME_MS = 1000 / 60;
 
     static clamp(value, min, max) {
-        return Math.min(max, Math.max(min, value));
+        return Utility.clamp(value, min, max);
     }
 
     static lerp(start, end, amount) {
-        return start + (end - start) * amount;
+        return Utility.lerp(start, end, amount);
     }
 
     static inverseLerp(start, end, value) {
-        if (start === end) return 0;
-        return (value - start) / (end - start);
+        return Utility.inverseLerp(start, end, value);
     }
 
     static wrap(value, min, max) {
-        const range = max - min;
-        if (range <= 0) return min;
-        let wrapped = (value - min) % range;
-        if (wrapped < 0) wrapped += range;
-        return wrapped + min;
+        return Utility.wrap(value, min, max);
     }
 }
 
 class ParticleDataUtils {
     static isPlainObject(value) {
-        if (!value || typeof value !== 'object') return false;
-        const proto = Object.getPrototypeOf(value);
-        return proto === Object.prototype || proto === null;
+        return Utility.isPlainObject(value);
     }
 
     static clone(value) {
-        if (Array.isArray(value)) {
-            return value.map(entry => ParticleDataUtils.clone(entry));
-        }
-
-        if (ParticleDataUtils.isPlainObject(value)) {
-            const clone = {};
-            Object.keys(value).forEach(key => {
-                clone[key] = ParticleDataUtils.clone(value[key]);
-            });
-            return clone;
-        }
-
-        return value;
+        return Utility.deepClone(value);
     }
 
     static merge(base, extra) {

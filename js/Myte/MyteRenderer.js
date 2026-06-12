@@ -11,6 +11,14 @@ class MyteRenderer {
 		this.battery = null;
 		this.homeBattery = null;
 		this.targetDot = null;
+
+		// Last-written values so per-frame calls only touch the DOM on change
+		this._lastLeft = null;
+		this._lastTop = null;
+		this._lastZIndex = null;
+		this._lastLift = null;
+		this._lastDotLeft = null;
+		this._lastDotTop = null;
 	}
 
 	// ── Setup ─────────────────────────────────────────────────────────────────
@@ -81,10 +89,20 @@ class MyteRenderer {
 			y = clamped.y;
 		}
 
-		if (setX) this.duplicate.style.left = `${x.toFixed(0)}px`;
+		if (setX) {
+			const left = Math.round(x);
+			if (left !== this._lastLeft) {
+				this._lastLeft = left;
+				this.duplicate.style.left = `${left}px`;
+			}
+		}
 		if (setY) {
-			this.duplicate.style.top = `${y.toFixed(0)}px`;
-			this.setZIndex(y);
+			const top = Math.round(y);
+			if (top !== this._lastTop) {
+				this._lastTop = top;
+				this.duplicate.style.top = `${top}px`;
+				this.setZIndex(y);
+			}
 		}
 
 		this.applyVerticalVisuals();
@@ -99,8 +117,15 @@ class MyteRenderer {
 	}
 
 	setZIndex(y) {
-		this.duplicate.style.zIndex = this.getZIndex(y);
-		this.duplicate.dataset.sortY = `${Math.round(this.getSortY(y) * 100) / 100}`;
+		const zIndex = this.getZIndex(y);
+		if (zIndex !== this._lastZIndex) {
+			this._lastZIndex = zIndex;
+			this.duplicate.style.zIndex = zIndex;
+		}
+		// dataset.sortY is a devtools inspection aid only
+		if (document.body.classList.contains('debug')) {
+			this.duplicate.dataset.sortY = `${Math.round(this.getSortY(y) * 100) / 100}`;
+		}
 	}
 
 	toFiniteNumber(value, defaultValue = null) {
@@ -144,10 +169,14 @@ class MyteRenderer {
 	}
 
 	applyVerticalVisuals() {
+		const lift = this.getVisualElevation();
+		if (lift === this._lastLift) return;
+		this._lastLift = lift;
+
 		[this.visualRoot, this.homeVisualRoot].forEach(root => {
 			Utility.applyElementVerticalVisuals(root, {
 				baseTop: 0,
-				lift: this.getVisualElevation()
+				lift
 			});
 		});
 	}
@@ -159,8 +188,16 @@ class MyteRenderer {
 
 	updateTargetDot() {
 		const m = this.myte;
-		this.targetDot.style.left = `${m.targetX + m.size.width / 2}px`;
-		this.targetDot.style.top  = `${m.targetY + m.size.height / 2}px`;
+		if (this.targetDot.classList.contains('is-hidden')) return;
+
+		const left = Math.round(m.targetX + m.size.width / 2);
+		const top  = Math.round(m.targetY + m.size.height / 2);
+		if (left === this._lastDotLeft && top === this._lastDotTop) return;
+		this._lastDotLeft = left;
+		this._lastDotTop = top;
+
+		this.targetDot.style.left = `${left}px`;
+		this.targetDot.style.top  = `${top}px`;
 		// this.logVisualDebug('update_target_dot');
 	}
 

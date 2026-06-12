@@ -335,6 +335,30 @@ class Utility {
 		return Math.max(min, Math.min(max, current));
 	}
 
+	static isPlainObject(value) {
+		if (!value || typeof value !== 'object') return false;
+		const proto = Object.getPrototypeOf(value);
+		return proto === Object.prototype || proto === null;
+	}
+
+	// Deep-clones arrays and plain objects; anything else (DOM nodes, class
+	// instances, functions) passes through by reference.
+	static deepClone(value) {
+		if (Array.isArray(value)) {
+			return value.map(entry => Utility.deepClone(entry));
+		}
+
+		if (Utility.isPlainObject(value)) {
+			const clone = {};
+			Object.keys(value).forEach(key => {
+				clone[key] = Utility.deepClone(value[key]);
+			});
+			return clone;
+		}
+
+		return value;
+	}
+
 	static composeTransforms(parts = []) {
 		if (!Array.isArray(parts)) {
 			return '';

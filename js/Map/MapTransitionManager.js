@@ -168,6 +168,7 @@ class MapTransitionManager {
         if (!slotEl) return;
         slotEl.style.left = `${position.x}px`;
         slotEl.style.top  = `${position.y}px`;
+        myte.invalidateHomePositionCache?.();
         Utility.logDebug(`[MapTransition] slot synced for ${myte.name} to (${position.x}, ${position.y})`);
     }
 

@@ -167,6 +167,12 @@ class CompactChipStripUI extends UIComponent {
     update() {
         if (!this.host) return;
 
+        // Chip data (buffs/queue) changes on the order of seconds — ~150ms refresh
+        // keeps progress meters smooth without rebuilding chip configs every frame.
+        const now = performance.now();
+        if (now - (this._lastUpdate ?? 0) < 150) return;
+        this._lastUpdate = now;
+
         const items = (this.getItems() || [])
             .slice(0, this.maxItems)
             .map((item, index) => this.getChipConfig(item, index))

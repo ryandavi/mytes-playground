@@ -35,12 +35,23 @@ const withAnimation = (BaseClass) => class extends BaseClass {
         this.animation?.updateFrame();
     }
 
+    // While sleeping (culled), the live paused flag must stay true and wake()
+    // restores _animationPausedBeforeSleep — so pause/resume during sleep update
+    // that snapshot instead. Otherwise an object that stops while off-screen
+    // resumes its old animation on wake (e.g. a settled ball spinning in place).
     pauseAnimation() {
-        if (this.animation) this.animation.paused = true;
+        if (!this.animation) return;
+        this.animation.paused = true;
+        if (this.sleeping) this._animationPausedBeforeSleep = true;
     }
 
     resumeAnimation() {
-        if (this.animation) this.animation.paused = false;
+        if (!this.animation) return;
+        if (this.sleeping) {
+            this._animationPausedBeforeSleep = false;
+            return;
+        }
+        this.animation.paused = false;
     }
 
     hasAnimation(animationName) {

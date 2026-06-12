@@ -3,6 +3,11 @@ class ActionDefinitionRegistry {
     static preloadPromise = null;
     static preloaded = false;
 
+    // Merged-definition caches — definitions are static after preload and callers
+    // only read the result, so merge once and hand out a frozen shared object.
+    static _noFallbackCache = new Map();
+    static _fallbackCache = new Map();
+
     static normalizeActionId(value) {
         return String(value || '')
             .trim()
@@ -34,8 +39,14 @@ class ActionDefinitionRegistry {
         return this.preloadPromise;
     }
 
+    static invalidateMergeCaches() {
+        this._noFallbackCache.clear();
+        this._fallbackCache.clear();
+    }
+
     static loadFromData(data = {}) {
         this.definitions.clear();
+        this.invalidateMergeCaches();
 
         const entries = Array.isArray(data.actions)
             ? data.actions
@@ -48,6 +59,8 @@ class ActionDefinitionRegistry {
         const normalized = this.normalizeDefinition(definition);
         if (!normalized) return;
         this.definitions.set(normalized.id, normalized);
+        this._noFallbackCache.delete(normalized.id);
+        this._fallbackCache.delete(normalized.id);
     }
 
     static normalizeDefinition(definition = {}) {
@@ -132,7 +145,37 @@ class ActionDefinitionRegistry {
             return null;
         }
 
-        return this.deepMerge(fallbackDefinition || {}, definition || {});
+        if (fallbackDefinition == null) {
+            let cached = this._noFallbackCache.get(normalizedId);
+            if (!cached) {
+                cached = this.deepFreeze(this.deepMerge({}, definition));
+                this._noFallbackCache.set(normalizedId, cached);
+            }
+            return cached;
+        }
+
+        // Fallbacks are stable objects (ActionManager.fallbackMetadata), so key
+        // the cache by their identity; ad-hoc fallback objects simply never hit.
+        let byFallback = this._fallbackCache.get(normalizedId);
+        if (!byFallback) {
+            byFallback = new WeakMap();
+            this._fallbackCache.set(normalizedId, byFallback);
+        }
+
+        let cached = byFallback.get(fallbackDefinition);
+        if (!cached) {
+            cached = this.deepFreeze(this.deepMerge(fallbackDefinition, definition || {}));
+            byFallback.set(fallbackDefinition, cached);
+        }
+        return cached;
+    }
+
+    static deepFreeze(value) {
+        if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+            Object.freeze(value);
+            Object.values(value).forEach(child => this.deepFreeze(child));
+        }
+        return value;
     }
 
     static getActionIds() {

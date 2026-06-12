@@ -323,11 +323,21 @@ class Myte {
 	}
 
 	getHomePosition() {
+		// Derived from DOM layout (getLocalOffset walks offsetParents), so cache it —
+		// AI thinks and GOHOME movement read this constantly. Invalidated whenever the
+		// slot element moves (setWrapperPosition, map transitions, container resize).
+		if (this._cachedHomePosition) return this._cachedHomePosition;
+
 		const rect = this.getHomeSlotRect();
-		return {
+		this._cachedHomePosition = {
 			x: rect.left + ((rect.width - this.size.width) / 2),
 			y: rect.top + ((rect.height - this.size.height) / 2)
 		};
+		return this._cachedHomePosition;
+	}
+
+	invalidateHomePositionCache() {
+		this._cachedHomePosition = null;
 	}
 
 	isAtHomePosition(tolerance = 0.5) {
@@ -347,6 +357,7 @@ class Myte {
 	setWrapperPosition(x, y) {
 		this.elements.wrapper.style.left = x + 'px';
 		this.elements.wrapper.style.top = y + 'px';
+		this.invalidateHomePositionCache();
 		this.snapToHomePosition();
 	}
 
@@ -548,9 +559,9 @@ class Myte {
 		if (direction !== this.direction) this.direction = direction;
 	}
 
-	getDirection(directionWeight = 2) {
-		const dx = this.targetX - this.posX;
-		const dy = this.targetY - this.posY;
+	// Horizontal movement is visually dominant for the side-view sprites, so dx
+	// gets extra weight when picking a cardinal facing.
+	_directionFromDelta(dx, dy, directionWeight = 2) {
 		const distance = Math.hypot(dx, dy);
 
 		if (!Number.isFinite(distance) || distance === 0) return this.direction;
@@ -563,19 +574,20 @@ class Myte {
 			: (wy > 0 ? DIRECTION.SOUTH : DIRECTION.NORTH);
 	}
 
+	getDirection(directionWeight = 2) {
+		return this._directionFromDelta(
+			this.targetX - this.posX,
+			this.targetY - this.posY,
+			directionWeight
+		);
+	}
+
 	faceTowardsPoint(x, y, directionWeight = 2) {
-		const dx = x - (this.posX + this.size.width / 2);
-		const dy = y - (this.posY + this.size.height / 2);
-		const distance = Math.hypot(dx, dy);
-
-		if (!Number.isFinite(distance) || distance === 0) return this.direction;
-
-		const wx = (dx / distance) * directionWeight;
-		const wy = dy / distance;
-
-		const direction = Math.abs(wx) > Math.abs(wy)
-			? (wx > 0 ? DIRECTION.EAST : DIRECTION.WEST)
-			: (wy > 0 ? DIRECTION.SOUTH : DIRECTION.NORTH);
+		const direction = this._directionFromDelta(
+			x - (this.posX + this.size.width / 2),
+			y - (this.posY + this.size.height / 2),
+			directionWeight
+		);
 
 		this.setDirection(direction);
 		return direction;

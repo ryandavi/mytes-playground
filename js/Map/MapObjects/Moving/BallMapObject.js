@@ -408,9 +408,9 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
             return;
         }
         
-        // Resume animation if paused
+        // Resume animation if paused (sleep-aware — see AnimatedMapObject)
         if (this.animation && this.animation.paused) {
-            this.animation.paused = false;
+            this.resumeAnimation();
         }
         
         // Determine primary direction of movement

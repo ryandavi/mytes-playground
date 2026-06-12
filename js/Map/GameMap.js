@@ -34,7 +34,9 @@ class GameMap {
         // this.zones = new Map();
         this.spawnPoints = new Map();
 
-        this.noCache = true;
+        // Cache-bust TMX fetches only while debugging — production transitions
+        // should reuse the browser cache.
+        this.noCache = Utility.isDebugEnabled();
 
         // Optimization tracking
         this.activeObjectsCount = 0;
@@ -900,19 +902,21 @@ class GameMap {
                 searchArea.width, searchArea.height
             );
 
-            // Filter by actual radius and active state
+            // Filter by actual radius (squared compare — no sqrt) and active state
+            const radiusSq = radius * radius;
             return nearbyObjects.filter(obj => {
                 const dx = obj.posX + obj.size.width / 2 - x;
                 const dy = obj.posY + obj.size.height / 2 - y;
-                return Math.sqrt(dx * dx + dy * dy) <= radius && obj.active;
+                return (dx * dx + dy * dy) <= radiusSq && obj.active;
             });
         }
 
         // Fallback to direct search if grid system is not available
+        const radiusSq = radius * radius;
         return this.objects.filter(obj => {
             const dx = obj.posX + obj.size.width / 2 - x;
             const dy = obj.posY + obj.size.height / 2 - y;
-            return Math.sqrt(dx * dx + dy * dy) <= radius && obj.active;
+            return (dx * dx + dy * dy) <= radiusSq && obj.active;
         });
     }
 
@@ -1057,7 +1061,7 @@ class GameMap {
     dispose() {
         // Stop proximity polling and clear any proximity sounds before the new map takes over
         this._stopProximitySoundPolling();
-        this.soundManager?.setProximitySounds(new Set());
+        this.soundManager?.setProximitySounds(new Map());
 
         // Clean up dropped items (their DOM elements live in the shared layer)
         this.droppedItems.forEach(item => item.remove());

@@ -1122,8 +1122,24 @@ class MyteAI {
             this._nearbyObjectsTime === this._tickTime) {
             return this._nearbyObjectsCache;
         }
+
+        const gameMap = this.myte.parent?.gameMap;
+        // Broad-phase through the grid spatial index instead of scanning every map
+        // object. Padded so collider-inset objects at the radius edge aren't missed;
+        // the unchanged predicate below keeps the exact same selection semantics.
+        // (Virtual tile colliders from getObjectsInArea lack `active` and filter out.)
+        const pad = radius + 64;
+        const candidates = gameMap?.gridSystem
+            ? gameMap.gridSystem.getObjectsInArea(
+                this.myte.posX - pad,
+                this.myte.posY - pad,
+                pad * 2,
+                pad * 2
+            )
+            : (gameMap?.objects || []);
+
         const result = this._sortByDistance(
-            (this.myte.parent?.gameMap?.objects || []).filter(target =>
+            candidates.filter(target =>
                 target && target.active && !target.isDragging &&
                 Number.isFinite(target.posX) && Number.isFinite(target.posY) &&
                 this.myte.getDistanceTo(target) <= radius

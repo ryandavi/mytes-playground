@@ -512,6 +512,7 @@
 	<script src="js/Input/DragComponent.js?v=<?= $v ?>"></script>
 	<script src="js/Input/RubbingComponent.js?v=<?= $v ?>"></script>
 	<!-- USER -->
+	<script src="js/User/MyteRosterSchema.js?v=<?= $v ?>"></script>
 	<script src="js/User/User.js?v=<?= $v ?>"></script>
 	<script src="js/User/Inventory.js?v=<?= $v ?>"></script>
 	<!-- CONTAINER -->

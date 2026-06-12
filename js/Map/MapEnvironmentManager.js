@@ -50,18 +50,7 @@ class MapEnvironmentManager {
     }
 
     static deepClone(value) {
-        if (Array.isArray(value)) {
-            return value.map(entry => MapEnvironmentManager.deepClone(entry));
-        }
-
-        if (value && typeof value === 'object') {
-            return Object.entries(value).reduce((acc, [key, entry]) => {
-                acc[key] = MapEnvironmentManager.deepClone(entry);
-                return acc;
-            }, {});
-        }
-
-        return value;
+        return Utility.deepClone(value);
     }
 
     static deepMerge(base, extra) {

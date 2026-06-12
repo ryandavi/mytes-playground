@@ -28,6 +28,8 @@ class MapRenderer {
     flush(objects) {
         let dirty = 0;
         let skipped = 0;
+        // dataset.sortY is a devtools inspection aid — skip the attribute writes in production
+        const debugMode = document.body.classList.contains('debug');
 
         for (const obj of objects) {
             if (!obj.renderState || !obj.element) {
@@ -51,7 +53,7 @@ class MapRenderer {
                 obj.element.style.zIndex = rs.zIndex;
             }
 
-            if (rs.sortY !== undefined) {
+            if (debugMode && rs.sortY !== undefined) {
                 obj.element.dataset.sortY = `${Math.round(rs.sortY * 100) / 100}`;
             }
 
@@ -95,7 +97,9 @@ class MapRenderer {
         obj.element.style.left   = `${rs.posX}px`;
         obj.element.style.top    = `${rs.posY}px`;
         if (rs.zIndex !== undefined) obj.element.style.zIndex = rs.zIndex;
-        if (rs.sortY !== undefined) obj.element.dataset.sortY = `${Math.round(rs.sortY * 100) / 100}`;
+        if (rs.sortY !== undefined && document.body.classList.contains('debug')) {
+            obj.element.dataset.sortY = `${Math.round(rs.sortY * 100) / 100}`;
+        }
 
         if (rs.bgPosition !== null && rs.bgPosition !== undefined) {
             const sprite = obj.animation?.sprite || obj._spriteElement || (obj._spriteElement = obj.element.querySelector('.sprite'));

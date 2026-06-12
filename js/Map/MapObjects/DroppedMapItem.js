@@ -166,7 +166,10 @@ class DroppedMapItem {
         element.style.left = `${this.posX - this.size.width / 2}px`;
         element.style.top  = `${this.posY - this.size.height / 2}px`;
         element.style.zIndex = this.getRenderZIndex();
-        element.dataset.sortY = `${Math.round(this.getSortY() * 100) / 100}`;
+        // dataset.sortY is a devtools inspection aid only
+        if (document.body.classList.contains('debug')) {
+            element.dataset.sortY = `${Math.round(this.getSortY() * 100) / 100}`;
+        }
     }
 
     _applyVerticalVisuals(lift = 0) {

@@ -18,6 +18,7 @@ class GridSystem {
 
         this.lastCameraPos = { x: -9999, y: -9999 }; // Initialize to force first update
         this.lastCameraZoom = -1;
+        this._needsCullRefresh = true;
 
         // Calculate grid dimensions
         this.gridWidth = Math.ceil(this.parent.dimensions.width / this.config.cellSize);
@@ -947,6 +948,7 @@ class GridSystem {
 
         obj._gridOccupancyX = obj.posX;
         obj._gridOccupancyY = obj.posY;
+        this._needsCullRefresh = true;
         this.invalidatePathfinderCaches();
         if (this.debugMode && !obj.config.physics?.walkable) this._debugDirty = true;
     }
@@ -982,6 +984,7 @@ class GridSystem {
 
         // Remove from active objects
         this.activeObjects.delete(obj);
+        this._needsCullRefresh = true;
         delete obj._gridOccupancyX;
         delete obj._gridOccupancyY;
         this.invalidatePathfinderCaches();
@@ -1196,7 +1199,7 @@ class GridSystem {
 
         const forceUpdate =
             this.lastCameraPos.x === -9999 ||
-            this.activeObjects.size === 0 ||
+            this._needsCullRefresh ||
             Math.abs(camera.posX - this.lastCameraPos.x) >= moveThreshold ||
             Math.abs(camera.posY - this.lastCameraPos.y) >= moveThreshold ||
             Math.abs(camera.zoomLevel - this.lastCameraZoom) >= 0.001 ||
@@ -1210,6 +1213,7 @@ class GridSystem {
         this.lastCameraPos.x = camera.posX;
         this.lastCameraPos.y = camera.posY;
         this.lastCameraZoom = camera.zoomLevel;
+        this._needsCullRefresh = false;
 
         // Get viewport bounds with padding
         const viewport = this.parent.parent.getContainerRect();
