@@ -1,7 +1,7 @@
 # Content Editor Plan
 
 **Date:** 2026-06-04 (originally 2026-05-24)
-**Status:** In Progress — Data Foundation Complete
+**Status:** In Progress — Phase 1 explorer + PHP API (`editor/api/`, per `docs/EDITOR_API_SPEC.md`) complete; Phase 2 writable Items + Myte editors built (typed inspector edits, sparse override saves, item create/duplicate/delete, save/revert with conflict + validation handling)
 **Scope:** Mytes, map objects, items, actions, buffs, zones, environment presets, map-object slot geometry, geometry, animation/state preview, future "edit everything" foundation
 
 ## Goal

@@ -46,7 +46,25 @@
       "Bash(grep -iv \"//\")",
       "Bash(sed -i 's/this\\\\.validationCache\\\\.get\\(cacheKey\\)/cache.get\\(cacheKey\\)/; s/this\\\\.validationCache\\\\.set\\(cacheKey/cache.set\\(cacheKey/g' js/Map/Grid/AStarPathfinder.js)",
       "Bash(node --check js/Map/Grid/AStarPathfinder.js)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "PowerShell($j = Get-Content data/map-objects/types.json -Raw | ConvertFrom-Json; $j.PSObject.Properties.Name; Write-Output '--- types:'; $j.types.PSObject.Properties.Name)",
+      "PowerShell($j = Get-Content data/map-objects/types.json -Raw | ConvertFrom-Json; $j.COUCH | ConvertTo-Json -Depth 8)",
+      "PowerShell(foreach \\($f in 'actions','buffs','zones','environment-presets'\\) { $j = Get-Content \"data/metadata/$f.json\" -Raw | ConvertFrom-Json; Write-Output \"$f => $\\($j.PSObject.Properties.Name -join ', '\\)\" }; $z = Get-Content data/metadata/zones.json -Raw | ConvertFrom-Json; $z | ConvertTo-Json -Depth 4 | Select-Object -First 1; $a = Get-Content data/metadata/actions.json -Raw | ConvertFrom-Json; if \\($a.actions\\) { $a.actions[0].id; $a.actions.Count })",
+      "PowerShell(npx sass css/editor.scss css/editor.css --no-source-map)",
+      "PowerShell($r = Invoke-WebRequest -Uri 'http://localhost/genes/chat/neko/editor/' -UseBasicParsing; $r.StatusCode; if \\($r.Content -match 'editor-shell'\\) { 'shell markup OK' }; if \\($r.Content -match 'base href'\\) { 'base tag OK' })",
+      "PowerShell(Test-Path node_modules/puppeteer; Test-Path node_modules/playwright; \\(Get-Content package.json -Raw | ConvertFrom-Json\\).devDependencies)",
+      "PowerShell(New-Item -ItemType Directory -Path \"editor/api\" -Force)",
+      "Bash(curl -s \"http://localhost/genes/chat/neko/editor/api/load.php?file=items\")",
+      "Bash(python -m json.tool --no-ensure-ascii)",
+      "Bash(curl -s \"http://localhost/genes/chat/neko/editor/api/load.php?file=../user\")",
+      "Bash(python -m json.tool)",
+      "Bash(php -r \"define\\('EDITOR_PROJECT_ROOT', realpath\\(__DIR__ . '/../../../genes/chat/neko'\\)\\); echo EDITOR_PROJECT_ROOT . PHP_EOL; echo DIRECTORY_SEPARATOR . PHP_EOL;\")",
+      "Bash(php -r 'define\\('\\\\''EDITOR_PROJECT_ROOT'\\\\'', realpath\\(__DIR__\\)\\); $path = EDITOR_PROJECT_ROOT . DIRECTORY_SEPARATOR . '\\\\''data\\\\metadata\\\\_backup\\\\items.test.json'\\\\''; echo $path . PHP_EOL; $rel = str_replace\\(EDITOR_PROJECT_ROOT . DIRECTORY_SEPARATOR, '\\\\'''\\\\'', $path\\); echo $rel . PHP_EOL;')",
+      "Bash(python -c \"import json; f=open\\('c:/xampp/htdocs/genes/chat/neko/data/metadata/items.json'\\); json.load\\(f\\); print\\('target parses OK'\\)\")",
+      "Bash(curl -s \"http://localhost/genes/chat/neko/editor/api/assets.php?dir=items\")",
+      "PowerShell(foreach \\($pair in @\\(@\\('buffs','buffs'\\),@\\('environment-presets','presets'\\)\\)\\) { $j = Get-Content \"data/metadata/$\\($pair[0]\\).json\" -Raw | ConvertFrom-Json; $v = $j.\\($pair[1]\\); Write-Output \"$\\($pair[0]\\).$\\($pair[1]\\) is array: $\\($v -is [Array]\\) / type: $\\($v.GetType\\(\\).Name\\)\" })",
+      "PowerShell(if \\($?\\) { 'compiled' })",
+      "Bash(curl -s \"http://localhost/genes/chat/neko/editor/\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Ryan\\.claude\\projects\\c--xampp-htdocs-genes-chat-neko\\memory"

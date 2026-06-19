@@ -42,3 +42,6 @@ coverage/
 
 # Blender
 *.blend1
+
+# Editor backups
+data/**/_backup/

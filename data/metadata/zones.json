@@ -4,32 +4,43 @@
     {
       "id": "rest",
       "label": "Rest Zone",
-      "effects":{ "comfort": 0.0008, "energy": 0.0004 }
+      "effects": {
+        "comfort": 0.0008,
+        "energy": 0.0004
+      }
     },
     {
       "id": "play",
       "label": "Play Zone",
-      "effects":{ "fun": 0.0010 }
+      "effects": {
+        "fun": 0.001
+      }
     },
     {
       "id": "social",
       "label": "Social Zone",
-      "effects":{ "social": 0.0008 }
+      "effects": {
+        "social": 0.0008
+      }
     },
     {
       "id": "danger",
       "label": "Danger Zone",
-      "effects":{ "comfort": -0.0006 }
+      "effects": {
+        "comfort": -0.0006
+      }
     },
     {
       "id": "food",
       "label": "Food Zone",
-      "effects":{ "hunger": 0.0002 }
+      "effects": {
+        "hunger": 0.0002
+      }
     },
     {
       "id": "boost",
       "label": "Boost Zone",
-      "effects":{}
+      "effects": []
     }
   ]
 }

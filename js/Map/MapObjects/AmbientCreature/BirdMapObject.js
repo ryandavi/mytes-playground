@@ -213,7 +213,15 @@ class BirdMapObject extends AmbientCreatureMapObject {
             this._targetAngle = this._flightAngle + (Math.random() - 0.5) * 1.5;
         }
 
-        this._turnToward(this._targetAngle, this._turnRate);
+        // When near a boundary, override target angle toward interior and turn faster
+        // so checkBoundaries' velocity flip isn't immediately overwritten next frame.
+        const edgeAngle = this._computeEdgeAvoidAngle();
+        if (edgeAngle !== null) {
+            this._targetAngle = edgeAngle;
+        }
+
+        const turnRate = edgeAngle !== null ? this._turnRate * 3 : this._turnRate;
+        this._turnToward(this._targetAngle, turnRate);
         this._flightAngle += (Math.random() - 0.5) * this._driftAmount;
 
         const phaseSpeed = this._flightPhase === 'flap'
@@ -222,6 +230,24 @@ class BirdMapObject extends AmbientCreatureMapObject {
 
         this.velocity.x = Math.cos(this._flightAngle) * phaseSpeed;
         this.velocity.y = Math.sin(this._flightAngle) * phaseSpeed;
+    }
+
+    _computeEdgeAvoidAngle() {
+        const margin = 80;
+        const left   = this.bounds.left   ?? 0;
+        const right  = this.bounds.right  ?? 1200;
+        const top    = this.bounds.top    ?? 0;
+        const bottom = this.bounds.bottom ?? 1200;
+
+        let pushX = 0, pushY = 0;
+
+        if (this.posX - left   < margin) pushX += 1;
+        if (right  - this.posX < margin) pushX -= 1;
+        if (this.posY - top    < margin) pushY += 1;
+        if (bottom - this.posY < margin) pushY -= 1;
+
+        if (pushX === 0 && pushY === 0) return null;
+        return Math.atan2(pushY, pushX);
     }
 
     _updateGroundedBehavior(tickDelta) {
@@ -252,8 +278,14 @@ class BirdMapObject extends AmbientCreatureMapObject {
     _findLandingSpot() {
         const candidates = [];
 
+        // When near an edge most of a random circle falls out of bounds, so bias
+        // candidates toward the interior using the same push vector as flight avoidance.
+        const edgeAngle = this._computeEdgeAvoidAngle();
+        const searchHalfSpread = edgeAngle !== null ? Math.PI * 0.7 : Math.PI;
+
         for (let i = 0; i < 20; i++) {
-            const angle = Math.random() * Math.PI * 2;
+            const baseAngle = edgeAngle ?? (Math.random() * Math.PI * 2);
+            const angle = baseAngle + (Math.random() * 2 - 1) * searchHalfSpread;
             const dist = 20 + Math.random() * 120;
             const x = this.posX + Math.cos(angle) * dist;
             const y = this.posY + Math.sin(angle) * dist;
