@@ -1,7 +1,7 @@
 # Content Editor Plan
 
-**Date:** 2026-06-04 (originally 2026-05-24)
-**Status:** In Progress — Phase 1 explorer + PHP API (`editor/api/`, per `docs/EDITOR_API_SPEC.md`) complete; Phase 2 writable Items + Myte editors built (typed inspector edits, sparse override saves, item create/duplicate/delete, save/revert with conflict + validation handling)
+**Date:** 2026-06-19 (originally 2026-05-24)
+**Status:** In Progress — Phases 0–4 complete. All eight domains are writable (Mytes, Map Objects, Items, Actions, Buffs, Zones, Environment Presets). Phase 5 (geometry completion + slot editing) is next.
 **Scope:** Mytes, map objects, items, actions, buffs, zones, environment presets, map-object slot geometry, geometry, animation/state preview, future "edit everything" foundation
 
 ## Goal
@@ -1044,38 +1044,69 @@ Still pending from the prep phase:
 - map object `spatial.regions` migration (currently only Mytes have it)
 - content validation suite
 
-## Phase 1: Read-Only Preview Explorer
+## Phase 1: Read-Only Preview Explorer ✓ COMPLETE
 
-- create `editor/` app shell
-- create shared editor store/router/panel structure
-- reuse tokens and panel styles
-- implement read-only loaders for mytes/items/map object configs
-- browse mytes/items/map object types
-- live preview states, directions, and geometry
-- no saving yet
+Built:
 
-This de-risks the preview layer before write support.
+- `editor/index.php` — app shell; `<base href="../">` for project-root-relative asset/API paths; hash routing with JS only (no `<a href="#...">`)
+- `editor/js/EditorRouter.js` — hash-based router parsing `#/<domainId>/<recordId>`, `navigate()`, `emit()`
+- `editor/js/EditorApi.js` — `EditorApi.load/save/validate/assets` over `editor/api/*.php`; `EditorApiError` with `status/code/extra`
+- `editor/js/EditorDocument.js` — writable file wrapper: `setAt/deleteAt/getAt` path arrays, `isDirty`, `revert`, `markSaved`; `deleteAt` prunes empty parent objects; `deepEqual` for dirty tracking
+- `editor/js/EditorStore.js` — loads all domains; `deepMerge` delegates to `MyteDefinitionRegistry.deepMerge`; layered record model (base + override + merged); sparse edit removes override when value matches base; `rebuildMyteRecords`, `rebuildItemRecords` after revert
+- `editor/js/panels/ListRailPanel.js` — filterable record list with active state
+- `editor/js/panels/InspectorPanel.js` — schema-tree renderer; typed inputs (boolean/number/array/string); override badge with per-field reset-to-base for layered records; `isLeaf` treats primitive-element arrays as leaves
+- `editor/js/preview/PreviewControls.js` — shared stage/controls/legend builders; `EditorOverlayColors` palette; `makeBoxOverlay`, `makeMarkerOverlay`, `makeRadiusOverlay`
+- `editor/js/preview/MytePreview.js` — SpriteAnimator-driven sprite preview; play/pause/step; zoom; spatial region and anchor overlays; direction-aware via `MyteDefinitionRegistry.getSpatialValue`; `refresh()` preserves playback/zoom state
+- `editor/js/preview/MapObjectPreview.js` — read-only map object preview; variant/facing/state selectors; region overlays (canonical `spatial.regions` + legacy path fallback); slot rest-point markers; light-radius circle
+- `editor/js/preview/ItemPreview.js` — magnified atlas cell + full atlas with active-cell highlight; click atlas to navigate to item by `(col, row)`
+- `editor/js/preview/SummaryPreview.js` — summary card fallback for non-visual domains (actions, buffs, zones, environment presets)
+- `editor/js/EditorApp.js` — top-level: tab bar, header Save/Revert, rail New/Duplicate/Delete, findings bar; conflict-resolution prompt on 409; `beforeunload` guard when dirty
 
-## Phase 2: Writable JSON Domains
+## Phase 2: Writable JSON Domains ✓ COMPLETE
 
-- full item editor
-- full myte editor
-- species catalog loading from `species.json`
-- PHP save/backup/validation pipeline
+Built (in addition to the Phase 1 infrastructure above):
 
-## Phase 3: Map Object Editor Layer
+- Full item editor: create/duplicate/delete items; edit all fields including `visual.sprite {col, row}`; catalog-level `visual.spriteSheet` editable as the `_catalog` record
+- Full Myte editor: edit base definition or species override; sparse override saves; inherited values shown with badge + reset-to-base; base edits propagate to all species merged views
+- Species catalog loading from `data/mytes/species.json` — only enabled species loaded; sorted by `sortOrder`
+- PHP persistence layer — all five endpoints implemented per `docs/EDITOR_API_SPEC.md`:
+  - `editor/api/bootstrap.php` — file registry, request/response helpers, domain validation, backup, atomic write
+  - `editor/api/load.php` — returns file content + `mtime` for conflict detection
+  - `editor/api/save.php` — conflict check (mtime), validation gate, timestamped backup (max 20), atomic 2-space-indent write
+  - `editor/api/validate.php` — validate-only endpoint; returns `findings[]` with `level/path/message`
+  - `editor/api/assets.php` — lists image assets for sprite pickers
+- Findings bar in editor UI for validation errors and save warnings
+- Save conflict flow: 409 triggers a confirm prompt; user can force-overwrite (creates backup first)
 
-- build schema-aware inspector UI on top of canonical map object JSON
-- load preview from normalized editor model
-- save edited object definitions back to the canonical JSON files
-- keep JS class registrations intact
+## Phase 3: Map Object Editor Layer ✓ COMPLETE
 
-## Phase 4: Actions, Buffs, and Slot System
+Built:
 
-- extend `data/metadata/actions.json` editor and validate against registered implementations
-- add buff editor for `data/metadata/buffs.json`
-- add map-object slot editing inside the Map Object Editor
-- add validation for slot ids, regions, and rest points
+- `EditorStore.loadMapObjects` refactored to call `rebuildMapObjectRecords` (same pattern as mytes); `writable: true`
+- `rebuildMapObjectRecords(domain)` — builds layered records with `basePath: [typeId]`, `base: baseLayer`, `override: typesDoc.content[typeId]`
+- `recomputeLayeredRecords` extended to handle `'map-objects'` domain
+- `rebuildDomain` dispatches to `rebuildMapObjectRecords` for `'map-objects'`
+- `MapObjectPreview.refresh(record)` re-derives `variants` and `facings` before re-mounting so controls stay correct after inspector edits
+- Inspector shows `editable` mode; sparse override semantics apply (value equal to base removes override)
+- Save/Revert work identically to Mytes; `map-objects.types` is in the PHP file registry
+
+## Phase 4: Actions, Buffs, Zones, and Environment Presets ✓ COMPLETE
+
+Built:
+
+- `EditorStore.loadMetadataList` refactored to accept `{ writable }` option and build proper `basePath` per record:
+  - Array domains (`actions`, `buffs`, `zones`): `basePath: [listKey, index]`; `supportsItemOps: true`
+  - Object domain (`environment-presets`): `basePath: ['presets', key]`; `supportsItemOps: false`
+- `rebuildMetadataRecords(domain)` — re-derives all records from document content; called after add/duplicate/delete
+- `addMetadataEntry(domain)` — creates a new entry with `DEFAULT_ENTRIES` scaffold + unique id
+- `duplicateMetadataEntry(domain, recordId)` — clones entry with unique id
+- `deleteMetadataEntry(domain, recordId)` — splices entry and rebuilds
+- `uniqueMetadataId(list, candidate)` — generates a non-colliding id
+- `syncRecordIdentity` generalized: updates `record.id` for any non-layered record when `id` is edited
+- `rebuildDomain` dispatches to `rebuildMetadataRecords` for domains with `listKey`
+- `EditorApp.createItem/duplicateItem/deleteItem` dispatch to metadata ops for non-items domains
+- All six metadata domains are now writable; inspect/edit/save/revert works like items
+- Slot editing inside Map Object Editor is still pending (Phase 5 scope)
 
 ## Phase 5: Geometry/Interaction Completion
 

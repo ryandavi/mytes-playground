@@ -64,7 +64,17 @@
       "Bash(curl -s \"http://localhost/genes/chat/neko/editor/api/assets.php?dir=items\")",
       "PowerShell(foreach \\($pair in @\\(@\\('buffs','buffs'\\),@\\('environment-presets','presets'\\)\\)\\) { $j = Get-Content \"data/metadata/$\\($pair[0]\\).json\" -Raw | ConvertFrom-Json; $v = $j.\\($pair[1]\\); Write-Output \"$\\($pair[0]\\).$\\($pair[1]\\) is array: $\\($v -is [Array]\\) / type: $\\($v.GetType\\(\\).Name\\)\" })",
       "PowerShell(if \\($?\\) { 'compiled' })",
-      "Bash(curl -s \"http://localhost/genes/chat/neko/editor/\")"
+      "Bash(curl -s \"http://localhost/genes/chat/neko/editor/\")",
+      "Bash(node --input-type=module)",
+      "Bash(python3 -c ' *)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(python3)",
+      "Bash(xargs grep -l \"getRegionRect\\\\|getRegionConfig\")",
+      "Bash(grep -r \"config\\\\\\\\.physics\" js --include=\"*.js\")",
+      "Bash(grep -r \"config\\\\\\\\.collider\\\\|getConfig\\('collider\" js --include=\"*.js\")",
+      "Bash(grep -r \"\\\\/\\\\*[\\\\s\\\\S]*?\\\\*\\\\/\" js --include=\"*.js\")",
+      "Skill(fewer-permission-prompts)",
+      "Skill(fewer-permission-prompts:*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Ryan\\.claude\\projects\\c--xampp-htdocs-genes-chat-neko\\memory"

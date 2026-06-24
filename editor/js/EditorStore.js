@@ -4,11 +4,47 @@
 // MyteDefinitionRegistry.deepMerge so editor merge semantics can never drift
 // from runtime merge semantics.
 //
-// Phase 2 writable domains: mytes (base + species overrides) and items.
-// Records carry { fileId, basePath } mapping them into their document, and
-// layered records edit sparsely: setting a field back to its inherited base
-// value removes the override instead of serializing a duplicate.
+// All domains are writable. Records carry { fileId, basePath } mapping them
+// into their document. Layered records (mytes, map-objects) edit sparsely:
+// setting a field back to its inherited base value removes the override.
+// Non-layered records (items, actions, buffs, zones, environment-presets) write
+// directly at their basePath position in the document.
 class EditorStore {
+    // Scaffold for new entries created via the rail New button.
+    static DEFAULT_ENTRIES = {
+        actions: {
+            category: 'misc',
+            tags: [],
+            queue: {
+                priority: 1,
+                defaultDuration: 1000,
+                isInterruptible: true,
+                requiresTarget: false
+            },
+            traits: { exertion: 0, novelty: 0, soothing: 0, risk: 0, repeatMode: 'allowed' },
+            effects: {},
+            ai: {
+                category: 'misc',
+                soothing: 0,
+                exertion: 0,
+                accomplishment: 0,
+                commitmentMs: 1000,
+                scoreDrivers: []
+            }
+        },
+        buffs: {
+            kind: 'buff',
+            category: '',
+            priority: 0,
+            durationMs: 5000,
+            cancellable: true,
+            stackMode: 'refresh',
+            triggers: {}
+        },
+        zones: {
+            effects: {}
+        }
+    };
     constructor() {
         this.domains = [];
         this.domainsById = new Map();
@@ -41,10 +77,10 @@ class EditorStore {
             this.loadMytes(),
             this.loadMapObjects(),
             this.loadItems(),
-            this.loadMetadataList('actions', 'Actions', 'actions'),
-            this.loadMetadataList('buffs', 'Buffs', 'buffs'),
-            this.loadMetadataList('zones', 'Zones', 'zones'),
-            this.loadMetadataList('environment-presets', 'Environment', 'presets')
+            this.loadMetadataList('actions', 'Actions', 'actions', { writable: true }),
+            this.loadMetadataList('buffs', 'Buffs', 'buffs', { writable: true }),
+            this.loadMetadataList('zones', 'Zones', 'zones', { writable: true }),
+            this.loadMetadataList('environment-presets', 'Environment', 'presets', { writable: true })
         ]);
 
         this.domains = [mytes, mapObjects, items, actions, buffs, zones, environmentPresets];
@@ -117,18 +153,36 @@ class EditorStore {
         domain.records = records;
     }
 
-    // ── Map objects (read-only until Phase 3) ────────────────────────────────
+    // ── Map objects ──────────────────────────────────────────────────────────
 
     async loadMapObjects() {
-        const [baseDoc, typesDoc] = await Promise.all([
+        await Promise.all([
             this.loadDocument('map-objects.base'),
             this.loadDocument('map-objects.types')
         ]);
 
+        const typesDoc = this.documents.get('map-objects.types');
+        const domain = {
+            id: 'map-objects',
+            label: 'Map Objects',
+            previewType: 'mapObject',
+            writable: true,
+            schemaVersion: typesDoc.content.schemaVersion ?? null,
+            sourceFile: typesDoc.path,
+            records: []
+        };
+        this.rebuildMapObjectRecords(domain);
+        return domain;
+    }
+
+    rebuildMapObjectRecords(domain) {
+        const baseDoc = this.documents.get('map-objects.base');
+        const typesDoc = this.documents.get('map-objects.types');
+
         const baseLayer = { ...baseDoc.content };
         delete baseLayer.schemaVersion;
 
-        const records = Object.entries(typesDoc.content)
+        domain.records = Object.entries(typesDoc.content)
             .filter(([key]) => key !== 'schemaVersion')
             .map(([typeId, typeConfig]) => ({
                 id: typeId,
@@ -142,16 +196,6 @@ class EditorStore {
                 layered: true,
                 sourceFile: typesDoc.path
             }));
-
-        return {
-            id: 'map-objects',
-            label: 'Map Objects',
-            previewType: 'mapObject',
-            writable: false,
-            schemaVersion: typesDoc.content.schemaVersion ?? null,
-            sourceFile: typesDoc.path,
-            records
-        };
     }
 
     // ── Items ────────────────────────────────────────────────────────────────
@@ -257,40 +301,97 @@ class EditorStore {
         return `${candidate}_${counter}`;
     }
 
-    // ── Read-only metadata lists ─────────────────────────────────────────────
+    // ── Metadata lists (actions, buffs, zones, environment-presets) ─────────
 
-    async loadMetadataList(fileId, label, listKey) {
+    async loadMetadataList(fileId, label, listKey, { writable = false } = {}) {
         const doc = await this.loadDocument(fileId);
-        const listValue = doc.content[listKey];
+        const isArrayDomain = Array.isArray(doc.content[listKey]);
+        const domain = {
+            id: fileId,
+            label,
+            previewType: 'summary',
+            writable,
+            supportsItemOps: writable && isArrayDomain,
+            listKey,
+            isArrayDomain,
+            schemaVersion: doc.content.schemaVersion ?? null,
+            sourceFile: doc.path,
+            records: []
+        };
+        this.rebuildMetadataRecords(domain);
+        return domain;
+    }
 
-        // Some catalogs store the list as an array, others as an object keyed
-        // by id (e.g. environment-presets); normalize both.
-        const entries = Array.isArray(listValue)
-            ? listValue.map((entry, index) => ({ key: entry?.id || String(index), entry }))
-            : Object.entries(listValue || {}).map(([key, entry]) => ({ key: entry?.id || key, entry }));
+    rebuildMetadataRecords(domain) {
+        const doc = this.documents.get(domain.id);
+        const listValue = doc.content[domain.listKey];
 
-        const records = entries.map(({ key, entry }) => ({
+        let entries;
+        if (domain.isArrayDomain) {
+            entries = (listValue || []).map((entry, index) => ({
+                key: entry?.id || String(index),
+                entry,
+                basePath: [domain.listKey, index]
+            }));
+        } else {
+            entries = Object.entries(listValue || {}).map(([key, entry]) => ({
+                key: entry?.id || key,
+                entry,
+                basePath: [domain.listKey, key]
+            }));
+        }
+
+        domain.records = entries.map(({ key, entry, basePath }) => ({
             id: key,
             label: entry?.label || key,
             hint: entry?.category || entry?.kind || '',
-            fileId,
-            basePath: null,
+            fileId: domain.id,
+            basePath,
             base: null,
             override: null,
             merged: entry,
             layered: false,
             sourceFile: doc.path
         }));
+    }
 
-        return {
-            id: fileId,
-            label,
-            previewType: 'summary',
-            writable: false,
-            schemaVersion: doc.content.schemaVersion ?? null,
-            sourceFile: doc.path,
-            records
-        };
+    addMetadataEntry(domain) {
+        const doc = this.documents.get(domain.id);
+        const list = doc.content[domain.listKey];
+        const defaults = EditorStore.DEFAULT_ENTRIES[domain.id] || {};
+        const id = this.uniqueMetadataId(list, 'new_entry');
+        list.push({ ...Utility.deepClone(defaults), id, label: 'New Entry' });
+        this.rebuildMetadataRecords(domain);
+        return id;
+    }
+
+    duplicateMetadataEntry(domain, recordId) {
+        const doc = this.documents.get(domain.id);
+        const list = doc.content[domain.listKey];
+        const index = list.findIndex(entry => entry.id === recordId);
+        if (index === -1) return null;
+        const copy = Utility.deepClone(list[index]);
+        copy.id = this.uniqueMetadataId(list, `${copy.id}_copy`);
+        list.splice(index + 1, 0, copy);
+        this.rebuildMetadataRecords(domain);
+        return copy.id;
+    }
+
+    deleteMetadataEntry(domain, recordId) {
+        const doc = this.documents.get(domain.id);
+        const list = doc.content[domain.listKey];
+        const index = list.findIndex(entry => entry.id === recordId);
+        if (index === -1) return;
+        list.splice(index, 1);
+        this.rebuildMetadataRecords(domain);
+    }
+
+    uniqueMetadataId(list, candidate) {
+        const taken = new Set((list || []).map(entry => entry?.id).filter(Boolean));
+        if (!taken.has(candidate)) return candidate;
+        let counter = 2;
+        while (taken.has(`${candidate}_${counter}`)) counter++;
+        return `${candidate}_${counter}`;
     }
 
     // ── Editing ──────────────────────────────────────────────────────────────
@@ -332,10 +433,10 @@ class EditorStore {
         return EditorDocument.getAtPath(record.override, path) !== undefined ? 'override' : 'base';
     }
 
-    // Editing the base myte changes the inherited layer of every species, so
-    // merged views recompute domain-wide.
+    // Editing a base layer (myte base or map-objects base) changes the inherited
+    // layer of every child record, so merged views recompute domain-wide.
     recomputeLayeredRecords(domain) {
-        if (domain.id !== 'mytes') return;
+        if (domain.id !== 'mytes' && domain.id !== 'map-objects') return;
         domain.records.forEach(record => {
             if (record.layered) {
                 record.merged = EditorStore.mergeLayers(record.base, record.override);
@@ -345,7 +446,7 @@ class EditorStore {
 
     syncRecordIdentity(domain, record, path, value) {
         if (path.length !== 1) return;
-        if (path[0] === 'id' && typeof value === 'string' && record.basePath?.[0] === 'items') {
+        if (path[0] === 'id' && typeof value === 'string' && !record.layered) {
             record.id = value;
         }
         if (path[0] === 'label' && typeof value === 'string') {
@@ -360,6 +461,8 @@ class EditorStore {
         if (!domain) return;
         if (domain.id === 'mytes') this.rebuildMyteRecords(domain);
         if (domain.id === 'items') this.rebuildItemRecords(domain);
+        if (domain.id === 'map-objects') this.rebuildMapObjectRecords(domain);
+        if (domain.listKey) this.rebuildMetadataRecords(domain);
     }
 
     // ── Dirty tracking / persistence ─────────────────────────────────────────

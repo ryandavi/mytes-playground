@@ -73,6 +73,12 @@ class EditorApp {
     buildHeaderActions() {
         const actions = document.querySelector('.editor-header__actions');
 
+        this.validateButton = document.createElement('button');
+        this.validateButton.type = 'button';
+        this.validateButton.className = 'editor-header__button';
+        this.validateButton.textContent = 'Validate';
+        this.validateButton.addEventListener('click', () => this.validateCurrentDomain());
+
         this.revertButton = document.createElement('button');
         this.revertButton.type = 'button';
         this.revertButton.className = 'editor-header__button';
@@ -89,6 +95,7 @@ class EditorApp {
 
         actions.prepend(this.saveButton);
         actions.prepend(this.revertButton);
+        actions.prepend(this.validateButton);
     }
 
     buildRailActions() {
@@ -136,7 +143,8 @@ class EditorApp {
         findings.forEach(finding => {
             const row = document.createElement('div');
             row.className = `editor-findings__row editor-findings__row--${finding.level}`;
-            row.textContent = `${finding.level === 'error' ? '✕' : '⚠'} ${finding.path}: ${finding.message}`;
+            const filePrefix = finding.file ? `[${finding.file}] ` : '';
+            row.textContent = `${finding.level === 'error' ? '✕' : '⚠'} ${filePrefix}${finding.path}: ${finding.message}`;
             this.findingsEl.appendChild(row);
         });
         this.findingsEl.hidden = false;
@@ -251,7 +259,9 @@ class EditorApp {
     createItem() {
         const domain = this.store.getDomain(this.currentDomainId);
         if (!domain?.supportsItemOps) return;
-        const newId = this.store.addItem(domain);
+        const newId = domain.id === 'items'
+            ? this.store.addItem(domain)
+            : this.store.addMetadataEntry(domain);
         this.rail.setDomain(domain, newId);
         this.router.navigate(domain.id, newId);
         this.updateDirtyUI();
@@ -261,7 +271,9 @@ class EditorApp {
         const domain = this.store.getDomain(this.currentDomainId);
         if (!domain?.supportsItemOps) return;
         const { recordId } = this.router.parse();
-        const newId = this.store.duplicateItem(domain, recordId);
+        const newId = domain.id === 'items'
+            ? this.store.duplicateItem(domain, recordId)
+            : this.store.duplicateMetadataEntry(domain, recordId);
         if (!newId) return;
         this.rail.setDomain(domain, newId);
         this.router.navigate(domain.id, newId);
@@ -275,13 +287,52 @@ class EditorApp {
         const record = this.store.getRecord(domain.id, recordId);
         if (!record || record.id === '_catalog') return;
         if (!window.confirm(`Delete "${record.label}"? This is staged until you Save.`)) return;
-        this.store.deleteItem(domain, recordId);
+        if (domain.id === 'items') {
+            this.store.deleteItem(domain, recordId);
+        } else {
+            this.store.deleteMetadataEntry(domain, recordId);
+        }
         this.rail.setDomain(domain, null);
         this.router.navigate(domain.id);
         this.updateDirtyUI();
     }
 
     // ── Persistence ──────────────────────────────────────────────────────────
+
+    async validateCurrentDomain() {
+        const domain = this.store.getDomain(this.currentDomainId);
+        if (!domain) return;
+
+        const fileIds = this.store.domainFileIds(domain);
+        if (fileIds.length === 0) return;
+
+        this.validateButton.disabled = true;
+        this.statusEl.textContent = 'Validating...';
+
+        const allFindings = [];
+        for (const fileId of fileIds) {
+            const doc = this.store.documents.get(fileId);
+            if (!doc) continue;
+            try {
+                const result = await EditorApi.validate(fileId, doc.content);
+                (result.findings || []).forEach(f => allFindings.push({ ...f, file: fileId }));
+            } catch (error) {
+                allFindings.push({ level: 'error', path: fileId, message: error.message });
+            }
+        }
+
+        this.validateButton.disabled = false;
+
+        if (allFindings.length === 0) {
+            this.showFindings(null);
+            this.statusEl.textContent = 'Validation passed — no issues found.';
+        } else {
+            const errors = allFindings.filter(f => f.level === 'error').length;
+            const warnings = allFindings.filter(f => f.level === 'warning').length;
+            this.showFindings(allFindings, `Validation: ${errors} error(s), ${warnings} warning(s)`);
+            this.statusEl.textContent = `Validation found ${allFindings.length} issue(s).`;
+        }
+    }
 
     async saveCurrentDomain() {
         const domain = this.store.getDomain(this.currentDomainId);

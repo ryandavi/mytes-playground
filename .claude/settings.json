@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Blender__get_screenshot_of_window_as_image",
+      "mcp__Blender__get_screenshot_of_area_as_image",
+      "mcp__Blender__get_objects_summary",
+      "mcp__Blender__jump_to_view3d_object_by_name"
+    ]
+  }
+}

@@ -250,7 +250,17 @@ class MapObjectPreview {
     refresh(record) {
         this.record = record;
         this.baseConfig = record.merged;
-        this.rebuild();
+        // Re-derive structural state so mount() re-reads the updated config.
+        this.variants = Array.isArray(this.baseConfig.variants) ? this.baseConfig.variants : [];
+        if (this.currentVariant && !this.variants.includes(this.currentVariant)) {
+            this.currentVariant = this.variants[0] || null;
+        }
+        const facings = Object.keys(this.baseConfig.slotsByFacing || {});
+        this.facings = facings.length > 0 ? facings : [this.baseConfig.direction || 'S'];
+        if (!this.facings.includes(this.currentFacing)) {
+            this.currentFacing = this.facings[0];
+        }
+        this.mount();
     }
 
     destroy() {}

@@ -97,7 +97,7 @@ class InspectorPanel {
         keyEl.textContent = `${key}:`;
         field.appendChild(keyEl);
 
-        if (this.editable && this.onEdit && value !== null) {
+        if (this.editable && this.onEdit) {
             field.appendChild(this.buildInput(value, path, field));
         } else {
             const valueEl = document.createElement('span');
@@ -114,6 +114,24 @@ class InspectorPanel {
     }
 
     buildInput(value, path, field) {
+        if (value === null) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = 'null';
+            input.className = 'editor-field__input editor-field__input--json';
+            input.placeholder = 'JSON value';
+            input.addEventListener('change', () => {
+                let parsed;
+                try { parsed = JSON.parse(input.value); } catch (e) {
+                    input.classList.add('is-invalid');
+                    return;
+                }
+                input.classList.remove('is-invalid');
+                this.commit(path, parsed, field, input);
+            });
+            return input;
+        }
+
         if (typeof value === 'boolean') {
             const input = document.createElement('input');
             input.type = 'checkbox';
@@ -193,24 +211,35 @@ class InspectorPanel {
     }
 
     applyBadgeState(badge, path, source) {
-        badge.className = `editor-badge editor-badge--${source}`;
+        badge.className = 'editor-badge editor-badge--' + source;
         badge.innerHTML = '';
 
         const text = document.createElement('span');
         text.textContent = source;
         badge.appendChild(text);
-        badge.title = source === 'override'
-            ? 'Value set by this record’s own definition file'
-            : 'Value inherited from the base definition';
 
-        if (source === 'override' && this.editable && this.onReset) {
-            const reset = document.createElement('button');
-            reset.type = 'button';
-            reset.className = 'editor-badge__reset';
-            reset.textContent = '×';
-            reset.title = 'Reset to base value (removes the override)';
-            reset.addEventListener('click', () => this.onReset(path));
-            badge.appendChild(reset);
+        if (source === 'override') {
+            const baseValue = EditorDocument.getAtPath(this.record && this.record.base, path);
+            if (baseValue !== undefined) {
+                const baseEl = document.createElement('span');
+                baseEl.className = 'editor-badge__base';
+                baseEl.textContent = this.formatValue(baseValue);
+                baseEl.title = 'Inherited base value: ' + this.formatValue(baseValue);
+                badge.appendChild(baseEl);
+            }
+            badge.title = "Value set by this record's own definition file";
+
+            if (this.editable && this.onReset) {
+                const reset = document.createElement('button');
+                reset.type = 'button';
+                reset.className = 'editor-badge__reset';
+                reset.textContent = '×';
+                reset.title = 'Reset to base value (removes the override)';
+                reset.addEventListener('click', () => this.onReset(path));
+                badge.appendChild(reset);
+            }
+        } else {
+            badge.title = 'Value inherited from the base definition';
         }
     }
 
@@ -233,10 +262,10 @@ class InspectorPanel {
 
     formatValue(value) {
         if (value === null) return 'null';
-        if (typeof value === 'string') return `"${value}"`;
+        if (typeof value === 'string') return '"' + value + '"';
         if (Array.isArray(value)) {
             const text = JSON.stringify(value);
-            return text.length > 120 ? `${text.slice(0, 117)}...` : text;
+            return text.length > 120 ? text.slice(0, 117) + '...' : text;
         }
         return String(value);
     }

@@ -653,6 +653,16 @@ body.editor-body {
                 color: var(--color-danger);
             }
         }
+
+        .editor-badge__base {
+            opacity: 0.65;
+            font-style: italic;
+            max-width: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: default;
+        }
     }
 }
 
