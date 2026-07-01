@@ -74,7 +74,21 @@
       "Bash(grep -r \"config\\\\\\\\.collider\\\\|getConfig\\('collider\" js --include=\"*.js\")",
       "Bash(grep -r \"\\\\/\\\\*[\\\\s\\\\S]*?\\\\*\\\\/\" js --include=\"*.js\")",
       "Skill(fewer-permission-prompts)",
-      "Skill(fewer-permission-prompts:*)"
+      "Skill(fewer-permission-prompts:*)",
+      "Bash(node -e \"const d = require\\('./data/mytes/base/neko.json'\\); console.log\\(JSON.stringify\\(Object.keys\\(d\\), null, 2\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/map-objects/types.json'\\); const k = Object.keys\\(d\\).find\\(k=>k!='schemaVersion'\\); console.log\\(JSON.stringify\\(d[k], null, 2\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/items.json'\\); const k = Object.keys\\(d\\).find\\(k=>k!='schemaVersion'\\); console.log\\(JSON.stringify\\(d[k], null, 2\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/mytes/myte.json'\\); console.log\\(JSON.stringify\\(Object.keys\\(d\\), null, 2\\)\\); if\\(d.anchors\\) console.log\\('anchors:', JSON.stringify\\(d.anchors, null, 2\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/metadata/items.json'\\); const k = Object.keys\\(d\\).find\\(k=>k!='schemaVersion'\\); console.log\\(JSON.stringify\\(d[k], null, 2\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/map-objects/types.json'\\); const k = Object.keys\\(d\\).find\\(k=>k!='schemaVersion'\\); const t = d[k]; console.log\\(JSON.stringify\\(t.visual, null, 2\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/metadata/items.json'\\); const keys = Object.keys\\(d\\).filter\\(k=>k!='schemaVersion'\\); const sample = keys.slice\\(0,3\\).map\\(k=>[k, d[k]]\\); console.log\\(JSON.stringify\\(Object.fromEntries\\(sample\\), null, 2\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/map-objects/types.json'\\); const k = Object.keys\\(d\\).find\\(k=>d[k].visual && d[k].visual.spriteSheet\\); console.log\\(k, JSON.stringify\\(d[k].visual, null, 2\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/mytes/myte.json'\\); console.log\\(JSON.stringify\\(d.visual, null, 2\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/mytes/myte.json'\\); const sets = d.visual.spriteSets; Object.keys\\(sets\\).forEach\\(k => console.log\\(k, JSON.stringify\\(sets[k]\\)\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/mytes/snail.json'\\); console.log\\(JSON.stringify\\(d.visual, null, 2\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/mytes/snail.json'\\); const sets = d.visual.spriteSets; Object.keys\\(sets\\).forEach\\(k => console.log\\(k, ':', sets[k].length, 'frames, sample:', JSON.stringify\\(sets[k][0]\\)\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/mytes/worm.json'\\); console.log\\(JSON.stringify\\(d.visual, null, 2\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./data/mytes/snail.json'\\); const sets = d.visual.spriteSets; const has3 = Object.values\\(sets\\).some\\(s => s.some\\(f => f.length === 3\\)\\); console.log\\('has duration frames:', has3\\); console.log\\('sample 3-tuple:', Object.values\\(sets\\).flat\\(\\).find\\(f=>f.length===3\\)\\)\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Ryan\\.claude\\projects\\c--xampp-htdocs-genes-chat-neko\\memory"

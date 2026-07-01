@@ -40,6 +40,13 @@ class EditorApp {
             onSelect: recordId => this.router.navigate(this.currentDomainId, recordId)
         });
         this.inspector = new InspectorPanel(document.getElementById('editor-inspector'));
+        this.compareActive = false;
+        this.baseInspectorEl = document.createElement('div');
+        this.baseInspectorEl.id = 'editor-inspector-base';
+        this.baseInspectorEl.className = 'editor-inspector editor-inspector--base';
+        this.baseInspectorEl.hidden = true;
+        document.getElementById('editor-inspector').parentElement.appendChild(this.baseInspectorEl);
+        this.baseInspector = new InspectorPanel(this.baseInspectorEl);
 
         this.buildTabs();
         this.buildHeaderActions();
@@ -51,6 +58,14 @@ class EditorApp {
                 event.preventDefault();
             }
         });
+
+        const schemaWarnings = this.store.schemaWarnings();
+        if (schemaWarnings.length > 0) {
+            this.showFindings(
+                schemaWarnings.map(w => ({ level: 'warning', path: w.fileId, message: w.message })),
+                'Schema version warnings:'
+            );
+        }
 
         this.router.start();
         loadingEl.classList.add('is-hidden');
@@ -93,9 +108,17 @@ class EditorApp {
         this.saveButton.disabled = true;
         this.saveButton.addEventListener('click', () => this.saveCurrentDomain());
 
+        this.compareButton = document.createElement('button');
+        this.compareButton.type = 'button';
+        this.compareButton.className = 'editor-header__button';
+        this.compareButton.textContent = 'Compare';
+        this.compareButton.title = 'Toggle side-by-side base vs override view';
+        this.compareButton.addEventListener('click', () => this.toggleCompare());
+
         actions.prepend(this.saveButton);
         actions.prepend(this.revertButton);
         actions.prepend(this.validateButton);
+        actions.prepend(this.compareButton);
     }
 
     buildRailActions() {
@@ -207,12 +230,17 @@ class EditorApp {
         this.inspector.onEdit = (path, value) => this.handleEdit(domain, record, path, value);
         this.inspector.onReset = path => this.handleReset(domain, record, path);
         this.inspector.show(record, { editable: domain.writable });
+        this.renderBaseInspector(record);
 
         const PreviewClass = EditorApp.PREVIEW_CLASSES[domain.previewType] || SummaryPreview;
         this.workspaceEl.innerHTML = '';
         this.activePreview = new PreviewClass(this.workspaceEl, record, {
             domain,
-            onNavigate: recordId => this.router.navigate(domain.id, recordId)
+            onNavigate: recordId => this.router.navigate(domain.id, recordId),
+            onEdit: domain.writable ? (path, value) => {
+                this.handleEdit(domain, record, path, value);
+                this.inspector.show(record, { editable: domain.writable });
+            } : null
         });
         this.activePreview.mount();
 
@@ -223,6 +251,26 @@ class EditorApp {
         if (this.activePreview?.refresh) {
             this.activePreview.refresh(record);
         }
+    }
+
+    // ── Compare view ─────────────────────────────────────────────────────────
+
+    toggleCompare() {
+        this.compareActive = !this.compareActive;
+        this.compareButton.classList.toggle('is-active', this.compareActive);
+        this.baseInspectorEl.hidden = !this.compareActive;
+        const section = document.getElementById('editor-inspector').closest('.editor-panel');
+        section.classList.toggle('editor-inspector--split', this.compareActive);
+    }
+
+    renderBaseInspector(record) {
+        if (!record || !record.layered || !record.base) {
+            this.baseInspector.clear('No base layer for this record.');
+            return;
+        }
+        // Build a synthetic record from the base layer for read-only display
+        const baseRecord = { ...record, merged: record.base, layered: false, label: `${record.label} (base)` };
+        this.baseInspector.show(baseRecord, { editable: false });
     }
 
     // ── Editing ──────────────────────────────────────────────────────────────

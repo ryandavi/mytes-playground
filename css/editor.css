@@ -995,6 +995,312 @@ body.editor-body {
   flex: 1;
 }
 
+.editor-field--add-trigger {
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: var(--space-2xs) var(--space-base);
+  user-select: none;
+}
+.editor-field--add-trigger:hover {
+  color: var(--text-subtle);
+  background-color: var(--button-hover);
+}
+
+.editor-field--add-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-2xs) var(--space-base);
+  flex-wrap: wrap;
+}
+.editor-field--add-form .editor-field__input--key {
+  padding: var(--padding);
+  border-radius: var(--border-radius-inner);
+  border: var(--border-width) solid var(--button-dark);
+  border-style: solid;
+  background-color: white;
+  padding: 1px var(--space-xs);
+  border-width: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  width: 90px;
+  flex-shrink: 0;
+}
+.editor-field--add-form .editor-field__input--json {
+  padding: var(--padding);
+  border-radius: var(--border-radius-inner);
+  border: var(--border-width) solid var(--button-dark);
+  border-style: solid;
+  background-color: white;
+  padding: 1px var(--space-xs);
+  border-width: 2px;
+  font-size: 12px;
+  flex: 1;
+  min-width: 80px;
+}
+.editor-field--add-form .editor-field__add-btn {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  color: var(--button-text-color);
+  padding: 1px var(--space-sm);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.editor-item-popover {
+  position: fixed;
+  z-index: var(--z-tooltip);
+  background-color: var(--surface-app);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-popover, 0 4px 12px rgba(0, 0, 0, 0.2));
+  padding: var(--space-xs);
+  min-width: 160px;
+  max-width: 260px;
+}
+.editor-item-popover .editor-item-popover__title {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  padding: var(--space-2xs) var(--space-xs) var(--space-xs);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+  margin-bottom: var(--space-xs);
+}
+.editor-item-popover .editor-item-popover__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--radius-xs);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--button-text-color);
+}
+.editor-item-popover .editor-item-popover__item:hover {
+  background-color: var(--button-hover);
+}
+.editor-item-popover .editor-item-popover__item.is-active {
+  font-weight: 700;
+  background-color: var(--surface-state-myte);
+}
+
+.editor-stage__subject--no-labels .editor-overlay__label,
+.editor-stage__subject--no-labels .editor-drag-region__label {
+  display: none;
+}
+
+.editor-drag-region {
+  box-sizing: border-box;
+}
+.editor-drag-region:hover {
+  opacity: 0.88;
+}
+.editor-drag-region .editor-drag-region__label {
+  position: absolute;
+  top: -16px;
+  left: 0;
+  font-size: 9px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--black);
+  background-color: var(--surface-tooltip);
+  outline: 1px solid var(--black);
+  padding: 1px 3px;
+  border-radius: var(--radius-xs);
+  pointer-events: none;
+}
+.editor-drag-region .editor-drag-region__handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background-color: white;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-xs);
+  cursor: nwse-resize;
+}
+.editor-drag-region .editor-drag-region__handle[data-corner=ne], .editor-drag-region .editor-drag-region__handle[data-corner=sw] {
+  cursor: nesw-resize;
+}
+.editor-drag-region .editor-drag-region__handle:hover {
+  transform: scale(1.4);
+}
+
+.editor-drag-slot {
+  border-radius: var(--radius-round);
+  cursor: grab;
+}
+.editor-drag-slot:hover {
+  transform: scale(1.2);
+}
+.editor-drag-slot:active {
+  cursor: grabbing;
+}
+
+.editor-panel.editor-inspector--split {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr 1fr;
+}
+.editor-panel.editor-inspector--split > .editor-panel__header {
+  grid-column: 1/-1;
+}
+.editor-panel.editor-inspector--split > .editor-panel__content {
+  overflow-y: auto;
+}
+.editor-panel.editor-inspector--split > .editor-inspector--base {
+  overflow-y: auto;
+  border-left: var(--border-width) solid var(--border-subtle);
+  opacity: 0.8;
+}
+
+.editor-sprite-set-editor {
+  display: flex;
+  flex-direction: column;
+  border-top: var(--border-width) solid var(--border-color);
+  background-color: var(--surface-raised);
+  min-height: 0;
+}
+.editor-sprite-set-editor[hidden] {
+  display: none;
+}
+.editor-sprite-set-editor__empty {
+  padding: var(--space-md);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.editor-sprite-grid {
+  overflow: auto;
+  padding: var(--space-md) var(--padding);
+  max-height: 320px;
+  flex-shrink: 0;
+}
+
+.editor-sprite-cell {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 80ms, border-color 80ms;
+}
+.editor-sprite-cell:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(255, 255, 255, 0.12);
+}
+.editor-sprite-cell.is-active {
+  border-color: var(--accent, #4285f4);
+  background-color: rgba(66, 133, 244, 0.2);
+}
+.editor-sprite-cell.is-active::after {
+  content: "✓";
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  font-size: 9px;
+  color: var(--accent, #4285f4);
+  font-weight: 700;
+  pointer-events: none;
+}
+.editor-sprite-cell__badge {
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent, #4285f4);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.editor-sprite-sequence {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--padding);
+  overflow-x: auto;
+  background-color: var(--surface-sunken, var(--surface-app));
+  border-top: var(--border-width) solid var(--border-subtle);
+  min-height: 80px;
+  flex-shrink: 0;
+}
+.editor-sprite-sequence__empty {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: italic;
+  align-self: center;
+}
+
+.editor-sprite-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+  flex-shrink: 0;
+  cursor: grab;
+  border-radius: var(--radius-xs);
+  padding: 2px;
+  border: 1px solid transparent;
+  user-select: none;
+}
+.editor-sprite-frame:hover {
+  border-color: var(--border-color);
+  background-color: var(--button-hover);
+}
+.editor-sprite-frame.is-dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+.editor-sprite-frame.is-drag-over {
+  border-color: var(--accent, #4285f4);
+  background-color: color-mix(in srgb, var(--accent, #4285f4) 10%, transparent);
+}
+.editor-sprite-frame__clip {
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+.editor-sprite-frame__inner {
+  position: absolute;
+  background-repeat: no-repeat;
+  background-size: auto;
+}
+.editor-sprite-frame__info {
+  font-size: 9px;
+  color: var(--text-muted);
+  line-height: 1;
+  text-align: center;
+}
+.editor-sprite-frame__remove {
+  display: none;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  line-height: 12px;
+  font-size: 10px;
+  text-align: center;
+  border-radius: var(--radius-round);
+  background-color: var(--color-danger);
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+.editor-sprite-frame:hover .editor-sprite-frame__remove {
+  display: block;
+}
+
 .editor-loading {
   position: fixed;
   inset: 0;

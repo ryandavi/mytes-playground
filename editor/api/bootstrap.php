@@ -547,6 +547,45 @@ function editor_validate_map_objects_types(array $content): array
             }
         }
 
+        // spatial.regions validation
+        $regions = $typeConfig['spatial']['regions'] ?? null;
+        if ($regions === null) {
+            $findings[] = ['level' => 'warning', 'path' => "$base.spatial.regions", 'message' => "Type \"$typeId\" is missing spatial.regions."];
+        } elseif (!is_array($regions) || array_is_list($regions)) {
+            $findings[] = ['level' => 'error', 'path' => "$base.spatial.regions", 'message' => "spatial.regions must be an object."];
+        } else {
+            $requiredRegions = ['collider', 'interaction', 'select', 'hit'];
+            foreach ($requiredRegions as $rId) {
+                if (!array_key_exists($rId, $regions)) {
+                    $findings[] = ['level' => 'warning', 'path' => "$base.spatial.regions.$rId", 'message' => "Missing required region \"$rId\"."];
+                }
+            }
+            foreach ($regions as $regionId => $region) {
+                $rBase = "$base.spatial.regions.$regionId";
+                if ($region === null) continue; // null is allowed (disabled region)
+                if (!is_array($region) || array_is_list($region)) {
+                    $findings[] = ['level' => 'error', 'path' => $rBase, 'message' => "Region \"$regionId\" must be an object or null."];
+                    continue;
+                }
+                if (!isset($region['type']) || $region['type'] !== 'box') {
+                    $findings[] = ['level' => 'warning', 'path' => "$rBase.type", 'message' => "Region \"$regionId\" must have type \"box\"."];
+                }
+                foreach (['x', 'y', 'width', 'height'] as $coord) {
+                    if (!array_key_exists($coord, $region)) {
+                        $findings[] = ['level' => 'warning', 'path' => "$rBase.$coord", 'message' => "Region \"$regionId\" is missing \"$coord\"."];
+                    } elseif (!is_numeric($region[$coord])) {
+                        $findings[] = ['level' => 'error', 'path' => "$rBase.$coord", 'message' => "Region \"$regionId\".$coord must be a number."];
+                    }
+                }
+                if (isset($region['width']) && is_numeric($region['width']) && $region['width'] < 0) {
+                    $findings[] = ['level' => 'error', 'path' => "$rBase.width", 'message' => "Region \"$regionId\".width must be >= 0."];
+                }
+                if (isset($region['height']) && is_numeric($region['height']) && $region['height'] < 0) {
+                    $findings[] = ['level' => 'error', 'path' => "$rBase.height", 'message' => "Region \"$regionId\".height must be >= 0."];
+                }
+            }
+        }
+
         // visual.states / visual.defaultState consistency
         $states       = $typeConfig['visual']['states'] ?? null;
         $defaultState = $typeConfig['visual']['defaultState'] ?? null;

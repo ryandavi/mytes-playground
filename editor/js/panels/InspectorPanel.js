@@ -82,6 +82,9 @@ class InspectorPanel {
             });
         } else {
             this.renderChildren(children, value, path, record, depth + 1);
+            if (this.editable && this.onEdit) {
+                children.appendChild(this.buildAddEntryRow(path));
+            }
         }
 
         details.appendChild(children);
@@ -241,6 +244,71 @@ class InspectorPanel {
         } else {
             badge.title = 'Value inherited from the base definition';
         }
+    }
+
+    buildAddEntryRow(path) {
+        const trigger = document.createElement('div');
+        trigger.className = 'editor-field editor-field--add-trigger';
+        trigger.textContent = '+ add entry';
+
+        const form = document.createElement('div');
+        form.className = 'editor-field editor-field--add-form';
+        form.hidden = true;
+
+        const keyInput = document.createElement('input');
+        keyInput.type = 'text';
+        keyInput.placeholder = 'key';
+        keyInput.className = 'editor-field__input editor-field__input--key';
+
+        const valInput = document.createElement('input');
+        valInput.type = 'text';
+        valInput.value = 'null';
+        valInput.placeholder = 'JSON value';
+        valInput.className = 'editor-field__input editor-field__input--json';
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.type = 'button';
+        confirmBtn.textContent = 'Add';
+        confirmBtn.className = 'editor-field__add-btn';
+        confirmBtn.addEventListener('click', () => {
+            const key = keyInput.value.trim();
+            if (!key) { keyInput.classList.add('is-invalid'); return; }
+            let parsed;
+            try { parsed = JSON.parse(valInput.value); } catch (e) {
+                valInput.classList.add('is-invalid');
+                return;
+            }
+            keyInput.classList.remove('is-invalid');
+            valInput.classList.remove('is-invalid');
+            this.onEdit([...path, key], parsed);
+        });
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.textContent = '×';
+        cancelBtn.className = 'editor-field__add-btn';
+        cancelBtn.addEventListener('click', () => {
+            form.hidden = true;
+            trigger.hidden = false;
+        });
+
+        form.appendChild(keyInput);
+        form.appendChild(valInput);
+        form.appendChild(confirmBtn);
+        form.appendChild(cancelBtn);
+
+        trigger.addEventListener('click', () => {
+            trigger.hidden = true;
+            form.hidden = false;
+            keyInput.value = '';
+            valInput.value = 'null';
+            keyInput.focus();
+        });
+
+        const wrapper = document.createElement('div');
+        wrapper.appendChild(trigger);
+        wrapper.appendChild(form);
+        return wrapper;
     }
 
     // Arrays are leaves when every entry is primitive (frame lists, tag lists);

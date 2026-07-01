@@ -1,5 +1,4 @@
 const USER_DATA_VERSION = 1;
-const USER_LEGACY_SETTINGS_STORAGE_KEY = 'gameSettings';
 const USER_DEFAULT_PREFERENCES = Object.freeze({
     soundEnabled: true,
     musicEnabled: true,
@@ -155,16 +154,6 @@ class User {
 
         if (Array.isArray(userData.inventory)) {
             this.items = userData.inventory.map(item => ({ ...item }));
-        }
-
-        const legacyPreferences = this.loadLegacyPreferencesFromStorage();
-        if (legacyPreferences) {
-            this.preferences = User.normalizePreferences({
-                ...this.preferences,
-                ...legacyPreferences
-            });
-            // Delete immediately so stale legacy data never overrides canonical preferences again.
-            try { localStorage.removeItem(USER_LEGACY_SETTINGS_STORAGE_KEY); } catch (_) {}
         }
 
         this.syncInventoryFromItems();
@@ -373,36 +362,6 @@ class User {
             ...USER_DEFAULT_PREFERENCES,
             ...(rawPreferences || {})
         };
-    }
-
-    static migrateLegacySettings(settings = {}) {
-        return {
-            graphicsQuality: settings.graphics?.quality,
-            effectsEnabled: settings.graphics?.effects,
-            animationsEnabled: settings.graphics?.animations,
-            timeOfDayOverlayEnabled: settings.graphics?.timeOfDayOverlay,
-            weatherEffectsEnabled: settings.graphics?.weather,
-            difficulty: settings.gameplay?.difficulty,
-            tutorialsEnabled: settings.gameplay?.tutorials,
-            autoSaveEnabled: settings.gameplay?.autoSave,
-            language: settings.misc?.language,
-            notificationsEnabled: settings.misc?.notifications
-        };
-    }
-
-    loadLegacyPreferencesFromStorage() {
-        try {
-            const rawSettings = localStorage.getItem(USER_LEGACY_SETTINGS_STORAGE_KEY);
-            if (!rawSettings) {
-                return null;
-            }
-
-            const parsed = JSON.parse(rawSettings);
-            return User.migrateLegacySettings(parsed);
-        } catch (error) {
-            console.warn('[User] Failed to read legacy settings storage.', error);
-            return null;
-        }
     }
 
     // Data persistence

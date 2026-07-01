@@ -29,21 +29,12 @@ const EntityMethods = {
 
 	normalizeRegionId(regionId = 'collider') {
 		switch (String(regionId || '').trim().toLowerCase()) {
-			case 'interactionregion':
-			case 'interaction':
-				return 'interaction';
-			case 'selectbox':
-			case 'select':
-				return 'select';
-			case 'hitbox':
-			case 'hit':
-				return 'hit';
-			case 'pickupbox':
-			case 'pickup':
-				return 'pickup';
+			case 'interaction': return 'interaction';
+			case 'select': return 'select';
+			case 'hit': return 'hit';
+			case 'pickup': return 'pickup';
 			case 'collider':
-			default:
-				return 'collider';
+			default: return 'collider';
 		}
 	},
 

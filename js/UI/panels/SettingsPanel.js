@@ -1,6 +1,4 @@
 class SettingsPanel extends ModalWindow {
-    static LEGACY_STORAGE_KEY = 'gameSettings';
-
     static getDefaultSettings() {
         return {
             graphics: {
@@ -241,7 +239,6 @@ class SettingsPanel extends ModalWindow {
             Object.entries(nextPreferences).forEach(([key, value]) => {
                 user.setPreference(key, value);
             });
-            localStorage.removeItem(SettingsPanel.LEGACY_STORAGE_KEY);
             this.playSound('success');
         } catch (error) {
             console.error('Failed to save settings:', error);
@@ -254,16 +251,6 @@ class SettingsPanel extends ModalWindow {
         if (userPreferences) {
             this.settings = SettingsPanel.settingsFromPreferences(userPreferences);
             return true;
-        }
-
-        try {
-            const savedSettings = localStorage.getItem(SettingsPanel.LEGACY_STORAGE_KEY);
-            if (savedSettings) {
-                this.settings = SettingsPanel.normalizeSettings(JSON.parse(savedSettings));
-                return true;
-            }
-        } catch (error) {
-            console.error('Failed to load settings:', error);
         }
 
         this.settings = SettingsPanel.getDefaultSettings();

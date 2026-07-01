@@ -81,12 +81,14 @@ class PreviewControls {
         items.forEach(item => {
             const chip = document.createElement('span');
             chip.className = 'editor-legend__chip';
-            chip.style.setProperty('--overlay-color', item.color);
             chip.classList.toggle('is-off', item.active === false);
 
-            const swatch = document.createElement('span');
-            swatch.className = 'editor-legend__swatch';
-            chip.appendChild(swatch);
+            if (item.color != null) {
+                chip.style.setProperty('--overlay-color', item.color);
+                const swatch = document.createElement('span');
+                swatch.className = 'editor-legend__swatch';
+                chip.appendChild(swatch);
+            }
 
             const label = document.createElement('span');
             label.textContent = item.label;

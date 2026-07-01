@@ -82,6 +82,7 @@
 	<script src="editor/js/EditorRouter.js?v=<?= $v ?>"></script>
 	<script src="editor/js/panels/ListRailPanel.js?v=<?= $v ?>"></script>
 	<script src="editor/js/panels/InspectorPanel.js?v=<?= $v ?>"></script>
+	<script src="editor/js/panels/SpriteSetEditor.js?v=<?= $v ?>"></script>
 	<script src="editor/js/preview/PreviewControls.js?v=<?= $v ?>"></script>
 	<script src="editor/js/preview/MytePreview.js?v=<?= $v ?>"></script>
 	<script src="editor/js/preview/MapObjectPreview.js?v=<?= $v ?>"></script>

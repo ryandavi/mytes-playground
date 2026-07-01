@@ -1,7 +1,7 @@
 # Content Editor Plan
 
 **Date:** 2026-06-19 (originally 2026-05-24)
-**Status:** In Progress — Phases 0–4 complete. All eight domains are writable (Mytes, Map Objects, Items, Actions, Buffs, Zones, Environment Presets). Phase 5 (geometry completion + slot editing) is next.
+**Status:** In Progress — Phases 0–5 complete. All eight domains are writable (Mytes, Map Objects, Items, Actions, Buffs, Zones, Environment Presets). Phase 5 (geometry completion + slot editing) complete: draggable region/slot overlays, compare panel, spatial.regions validation, schema version enforcement.
 **Scope:** Mytes, map objects, items, actions, buffs, zones, environment presets, map-object slot geometry, geometry, animation/state preview, future "edit everything" foundation
 
 ## Goal
@@ -1108,14 +1108,15 @@ Built:
 - All six metadata domains are now writable; inspect/edit/save/revert works like items
 - Slot editing inside Map Object Editor is still pending (Phase 5 scope)
 
-## Phase 5: Geometry/Interaction Completion
+## Phase 5: Geometry/Interaction Completion ✓ COMPLETE
 
-- formalize `hitbox` and `selectbox`
-- formalize `pickup` region
-- formalize shared `anchors` and `regions` for map object types
-- support direct manipulation tools
-- support slot bounds editing
-- support side-by-side compare and reset-to-default flows
+- ✓ Formalized `hit`, `select`, `pickup`, `collider`, `interaction` regions — all types in `spatial.regions` canonical format
+- ✓ Removed all legacy region synthesis (MapObjectFactory, MapObject, Entity) 
+- ✓ Direct-manipulation draggable region boxes with corner resize handles
+- ✓ Slot rest-position drag markers
+- ✓ Side-by-side compare panel (base vs merged read-only inspector)
+- ✓ Schema version enforcement on load (EditorStore) and save (bootstrap.php)
+- ✓ `spatial.regions` validation in bootstrap.php (required regions, box type, numeric coords)
 
 ## Phase 6: "Edit Everything" Expansion
 

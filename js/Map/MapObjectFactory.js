@@ -89,7 +89,6 @@ class MapObjectFactory {
         });
 
         const visual = this.isPlainObject(normalized.visual) ? normalized.visual : null;
-        const regions = this.isPlainObject(normalized.spatial?.regions) ? normalized.spatial.regions : null;
 
         if (visual) {
             const inferredDefaultState = this.inferVisualDefaultState(visual);
@@ -139,24 +138,6 @@ class MapObjectFactory {
             }
         }
 
-        if (regions) {
-            if (normalized.collider === undefined && regions.collider !== undefined) {
-                normalized.collider = this.regionToLegacyCollider(regions.collider);
-            }
-            if (normalized.interactionRegion === undefined && regions.interaction !== undefined) {
-                normalized.interactionRegion = this.regionToLegacyCollider(regions.interaction);
-            }
-            if (normalized.hitbox === undefined && regions.hit !== undefined) {
-                normalized.hitbox = this.regionToLegacyCollider(regions.hit);
-            }
-            if (normalized.selectbox === undefined && regions.select !== undefined) {
-                normalized.selectbox = this.regionToLegacyCollider(regions.select);
-            }
-            if (normalized.pickupbox === undefined && regions.pickup !== undefined) {
-                normalized.pickupbox = this.regionToLegacyCollider(regions.pickup);
-            }
-        }
-
         return normalized;
     }
 
@@ -179,25 +160,6 @@ class MapObjectFactory {
         }
 
         return animationIds[0] || null;
-    }
-
-    static regionToLegacyCollider(region) {
-        if (region == null) {
-            return null;
-        }
-
-        if (!this.isPlainObject(region)) {
-            return region;
-        }
-
-        const legacyRegion = this.cloneValue(region);
-        if (legacyRegion.x !== undefined && legacyRegion.offsetX === undefined) {
-            legacyRegion.offsetX = legacyRegion.x;
-        }
-        if (legacyRegion.y !== undefined && legacyRegion.offsetY === undefined) {
-            legacyRegion.offsetY = legacyRegion.y;
-        }
-        return legacyRegion;
     }
 
     static async loadConfig(configUrl) {

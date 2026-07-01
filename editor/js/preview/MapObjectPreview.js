@@ -1,32 +1,49 @@
-// Read-only map object preview: object bounds, sprite (when the type defines
-// one), spatial regions, surface slots per facing, and light radius.
-// Region lookup mirrors MapObject.getRegionConfig: canonical spatial.regions
-// first, then the legacy per-region config keys.
+// Read-only (or editable) map object preview: object bounds, sprite, spatial
+// regions, surface slots per facing, and light radius.
+// When editable=true, region overlays gain drag-to-move and corner resize handles
+// that write back through onEdit. Slot rest-points gain drag handles too.
 class MapObjectPreview {
     static REGION_IDS = ['collider', 'interaction', 'select', 'hit', 'pickup'];
 
-    static LEGACY_REGION_KEYS = {
-        collider: ['physics', 'collider'],
-        interaction: ['interactionRegion'],
-        select: ['selectbox'],
-        hit: ['hitbox'],
-        pickup: ['pickupbox']
-    };
-
-    constructor(container, record) {
+    constructor(container, record, { domain = null, onNavigate = null, onEdit = null } = {}) {
         this.container = container;
         this.record = record;
         this.baseConfig = record.merged;
+        this.editable = domain?.writable ?? false;
+        this.onEdit = onEdit;
+        this.onNavigate = onNavigate;
 
         this.variants = Array.isArray(this.baseConfig.variants) ? this.baseConfig.variants : [];
         this.currentVariant = this.variants[0] || null;
 
-        const facings = Object.keys(this.baseConfig.slotsByFacing || {});
+        const facings = Object.keys(this.baseConfig.slotsByFacing || this._findActionSlots());
         this.facings = facings.length > 0 ? facings : [this.baseConfig.direction || 'S'];
         this.currentFacing = this.facings[0];
 
         this.zoom = 1;
         this.overlayState = { collider: true, slots: true, light: true };
+        this.labelsVisible = true;
+
+        this._drag = null;
+    }
+
+    // Slots may live at top-level slotsByFacing OR inside actionConfigs.<id>.slotsByFacing
+    _findActionSlots() {
+        if (this.baseConfig.slotsByFacing) return this.baseConfig.slotsByFacing;
+        const ac = this.baseConfig.actionConfigs || {};
+        for (const cfg of Object.values(ac)) {
+            if (cfg.slotsByFacing) return cfg.slotsByFacing;
+        }
+        return {};
+    }
+
+    _slotActionConfigKey() {
+        if (this.baseConfig.slotsByFacing) return null;
+        const ac = this.baseConfig.actionConfigs || {};
+        for (const [id, cfg] of Object.entries(ac)) {
+            if (cfg.slotsByFacing) return id;
+        }
+        return null;
     }
 
     get config() {
@@ -101,7 +118,41 @@ class MapObjectPreview {
             PreviewControls.makeButton('+', () => this.setZoom(this.zoom + 0.25))
         ));
 
+        if (this.editable && this.onEdit) {
+            row.appendChild(this.buildSpritesheetPicker());
+        }
+
         return row;
+    }
+
+    buildSpritesheetPicker() {
+        const DATALIST_ID = 'editor-mapobject-spritesheets';
+        if (!document.getElementById(DATALIST_ID)) {
+            const datalist = document.createElement('datalist');
+            datalist.id = DATALIST_ID;
+            document.body.appendChild(datalist);
+            EditorApi.assets('map-objects').then(result => {
+                (result.assets || []).forEach(url => {
+                    const opt = document.createElement('option');
+                    opt.value = url;
+                    datalist.appendChild(opt);
+                });
+            }).catch(() => {});
+        }
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'editor-field__input editor-field__input--string';
+        input.value = this.baseConfig.visual?.spriteSheet?.url || '';
+        input.placeholder = 'images/MapObjects/...';
+        input.setAttribute('list', DATALIST_ID);
+        input.style.width = '220px';
+        input.addEventListener('change', () => {
+            const url = input.value.trim();
+            this.onEdit(['visual', 'spriteSheet', 'url'], url || null);
+        });
+
+        return PreviewControls.makeGroup('Spritesheet', input);
     }
 
     buildLegend() {
@@ -126,34 +177,35 @@ class MapObjectPreview {
             items.push({ id: 'light', label: 'light radius', color: EditorOverlayColors.light, active: this.overlayState.light });
         }
 
+        items.push({ id: 'labels', label: 'labels', color: null, active: this.labelsVisible });
+
         return PreviewControls.makeLegend(items, (id, isActive) => {
-            this.overlayState[id] = isActive;
-            this.rebuild();
+            if (id === 'labels') {
+                this.labelsVisible = isActive;
+                this.subject.classList.toggle('editor-stage__subject--no-labels', !isActive);
+            } else {
+                this.overlayState[id] = isActive;
+                this.rebuild();
+            }
         });
     }
 
     resolveRegion(regionId) {
-        const canonical = this.config.spatial?.regions?.[regionId];
-        if (canonical) return canonical;
-
-        let node = this.config;
-        for (const key of MapObjectPreview.LEGACY_REGION_KEYS[regionId]) {
-            node = node?.[key];
-        }
-        return (node && typeof node === 'object') ? node : null;
+        return this.config.spatial?.regions?.[regionId] || null;
     }
 
     regionRect(region) {
         return {
-            x: region.x ?? region.offsetX ?? 0,
-            y: region.y ?? region.offsetY ?? 0,
+            x: region.x ?? 0,
+            y: region.y ?? 0,
             width: region.width ?? this.size.width,
             height: region.height ?? this.size.height
         };
     }
 
     slotsForFacing() {
-        return this.baseConfig.slotsByFacing?.[this.currentFacing] || [];
+        const slots = this._findActionSlots();
+        return slots[this.currentFacing] || [];
     }
 
     setZoom(zoom) {
@@ -179,23 +231,31 @@ class MapObjectPreview {
             if (!this.overlayState[regionId]) return;
             const region = this.resolveRegion(regionId);
             if (!region) return;
-            overlayLayer.appendChild(PreviewControls.makeBoxOverlay(
-                this.regionRect(region),
-                EditorOverlayColors[regionId] || '#888888',
-                regionId
-            ));
+            const rect = this.regionRect(region);
+            const color = EditorOverlayColors[regionId] || '#888888';
+
+            if (this.editable && this.onEdit) {
+                overlayLayer.appendChild(this.buildDraggableRegion(regionId, region, rect, color));
+            } else {
+                overlayLayer.appendChild(PreviewControls.makeBoxOverlay(rect, color, regionId));
+            }
         });
 
         if (this.overlayState.slots) {
-            this.slotsForFacing().forEach(slot => {
+            this.slotsForFacing().forEach((slot, index) => {
                 const rest = slot.restPosition || {};
-                overlayLayer.appendChild(PreviewControls.makeMarkerOverlay(
-                    (rest.xFactor ?? 0.5) * width,
-                    (rest.yFactor ?? 0.5) * height,
-                    EditorOverlayColors.slot,
-                    `${slot.id}${slot.restFacing ? ` →${slot.restFacing}` : ''}`,
-                    'point'
-                ));
+                const cx = (rest.xFactor ?? 0.5) * width;
+                const cy = (rest.yFactor ?? 0.5) * height;
+                if (this.editable && this.onEdit) {
+                    overlayLayer.appendChild(this.buildDraggableSlot(slot, index, cx, cy));
+                } else {
+                    overlayLayer.appendChild(PreviewControls.makeMarkerOverlay(
+                        cx, cy,
+                        EditorOverlayColors.slot,
+                        `${slot.id}${slot.restFacing ? ` →${slot.restFacing}` : ''}`,
+                        'point'
+                    ));
+                }
             });
         }
 
@@ -210,6 +270,228 @@ class MapObjectPreview {
             ));
         }
     }
+
+    // ── Drag handles ─────────────────────────────────────────────────────────
+
+    buildDraggableRegion(regionId, region, rect, color) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'editor-drag-region';
+        wrapper.style.cssText = `
+            position:absolute;
+            left:${rect.x}px; top:${rect.y}px;
+            width:${rect.width}px; height:${rect.height}px;
+            box-sizing:border-box;
+            pointer-events:auto;
+            border:2px solid ${color};
+            cursor:move;
+            user-select:none;
+        `;
+
+        const label = document.createElement('span');
+        label.className = 'editor-drag-region__label';
+        label.textContent = regionId;
+        label.style.cssText = `
+            position:absolute; top:2px; left:4px;
+            font-size:10px; line-height:1; color:${color};
+            pointer-events:none;
+        `;
+        wrapper.appendChild(label);
+
+        // Resize handles at each corner
+        const corners = [
+            { name: 'nw', cursor: 'nw-resize', style: 'top:-4px;left:-4px;' },
+            { name: 'ne', cursor: 'ne-resize', style: 'top:-4px;right:-4px;' },
+            { name: 'sw', cursor: 'sw-resize', style: 'bottom:-4px;left:-4px;' },
+            { name: 'se', cursor: 'se-resize', style: 'bottom:-4px;right:-4px;' },
+        ];
+        corners.forEach(({ name, cursor, style }) => {
+            const handle = document.createElement('div');
+            handle.className = 'editor-drag-region__handle';
+            handle.dataset.corner = name;
+            handle.style.cssText = `
+                position:absolute; ${style}
+                width:8px; height:8px;
+                background:${color}; border-radius:50%;
+                cursor:${cursor}; pointer-events:auto;
+            `;
+            handle.addEventListener('mousedown', e => {
+                e.stopPropagation();
+                this._startResizeDrag(e, regionId, region, name);
+            });
+            wrapper.appendChild(handle);
+        });
+
+        wrapper.addEventListener('mousedown', e => {
+            if (e.target !== wrapper && !e.target.classList.contains('editor-drag-region__label')) return;
+            this._startMoveDrag(e, regionId, region);
+        });
+
+        return wrapper;
+    }
+
+    buildDraggableSlot(slot, index, cx, cy) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'editor-drag-slot';
+        wrapper.style.cssText = `
+            position:absolute;
+            left:${cx - 8}px; top:${cy - 8}px;
+            width:16px; height:16px;
+            background:${EditorOverlayColors.slot};
+            border-radius:50%;
+            pointer-events:auto;
+            cursor:move;
+            user-select:none;
+            box-sizing:border-box;
+            border:2px solid #fff;
+        `;
+        wrapper.title = `${slot.id}${slot.restFacing ? ' →' + slot.restFacing : ''}`;
+
+        wrapper.addEventListener('mousedown', e => {
+            e.stopPropagation();
+            this._startSlotDrag(e, slot, index);
+        });
+
+        return wrapper;
+    }
+
+    _startMoveDrag(e, regionId, region) {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const origX = region.x ?? 0;
+        const origY = region.y ?? 0;
+
+        const onMove = mv => {
+            const dx = Math.round((mv.clientX - startX) / this.zoom);
+            const dy = Math.round((mv.clientY - startY) / this.zoom);
+            this._previewRegionMove(regionId, origX + dx, origY + dy,
+                region.width ?? this.size.width, region.height ?? this.size.height);
+        };
+        const onUp = mv => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            const dx = Math.round((mv.clientX - startX) / this.zoom);
+            const dy = Math.round((mv.clientY - startY) / this.zoom);
+            this._commitRegion(regionId, region, origX + dx, origY + dy,
+                region.width ?? this.size.width, region.height ?? this.size.height);
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }
+
+    _startResizeDrag(e, regionId, region, corner) {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const origX = region.x ?? 0;
+        const origY = region.y ?? 0;
+        const origW = region.width ?? this.size.width;
+        const origH = region.height ?? this.size.height;
+
+        const onMove = mv => {
+            const { x, y, w, h } = this._applyCornerDelta(
+                corner, origX, origY, origW, origH,
+                (mv.clientX - startX) / this.zoom,
+                (mv.clientY - startY) / this.zoom
+            );
+            this._previewRegionMove(regionId, x, y, w, h);
+        };
+        const onUp = mv => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            const { x, y, w, h } = this._applyCornerDelta(
+                corner, origX, origY, origW, origH,
+                (mv.clientX - startX) / this.zoom,
+                (mv.clientY - startY) / this.zoom
+            );
+            this._commitRegion(regionId, region, x, y, w, h);
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }
+
+    _applyCornerDelta(corner, ox, oy, ow, oh, dx, dy) {
+        dx = Math.round(dx); dy = Math.round(dy);
+        let x = ox, y = oy, w = ow, h = oh;
+        if (corner === 'nw') { x = ox + dx; y = oy + dy; w = Math.max(4, ow - dx); h = Math.max(4, oh - dy); }
+        if (corner === 'ne') { y = oy + dy; w = Math.max(4, ow + dx); h = Math.max(4, oh - dy); }
+        if (corner === 'sw') { x = ox + dx; w = Math.max(4, ow - dx); h = Math.max(4, oh + dy); }
+        if (corner === 'se') { w = Math.max(4, ow + dx); h = Math.max(4, oh + dy); }
+        return { x, y, w, h };
+    }
+
+    _startSlotDrag(e, slot, index) {
+        e.preventDefault();
+        const { width, height } = this.size;
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const origXF = slot.restPosition?.xFactor ?? 0.5;
+        const origYF = slot.restPosition?.yFactor ?? 0.5;
+
+        const onMove = mv => {
+            const dx = (mv.clientX - startX) / this.zoom;
+            const dy = (mv.clientY - startY) / this.zoom;
+            const xf = Math.max(0, Math.min(1, origXF + dx / width));
+            const yf = Math.max(0, Math.min(1, origYF + dy / height));
+            this._previewSlotMove(index, xf, yf);
+        };
+        const onUp = mv => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            const dx = (mv.clientX - startX) / this.zoom;
+            const dy = (mv.clientY - startY) / this.zoom;
+            const xf = Math.round((Math.max(0, Math.min(1, origXF + dx / width))) * 100) / 100;
+            const yf = Math.round((Math.max(0, Math.min(1, origYF + dy / height))) * 100) / 100;
+            this._commitSlot(slot, index, xf, yf);
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }
+
+    _previewRegionMove(regionId, x, y, w, h) {
+        const el = this.subject.querySelector(`.editor-drag-region[data-region="${regionId}"]`) ||
+            this._findDragRegion(regionId);
+        if (!el) return;
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+        el.style.width = `${w}px`;
+        el.style.height = `${h}px`;
+    }
+
+    _findDragRegion(regionId) {
+        const els = this.subject.querySelectorAll('.editor-drag-region');
+        for (const el of els) {
+            const label = el.querySelector('.editor-drag-region__label');
+            if (label && label.textContent === regionId) return el;
+        }
+        return null;
+    }
+
+    _previewSlotMove(index, xf, yf) {
+        const { width, height } = this.size;
+        const slots = this.subject.querySelectorAll('.editor-drag-slot');
+        const el = slots[index];
+        if (!el) return;
+        el.style.left = `${xf * width - 8}px`;
+        el.style.top = `${yf * height - 8}px`;
+    }
+
+    _commitRegion(regionId, original, x, y, w, h) {
+        if (!this.onEdit) return;
+        const newRegion = { type: original.type || 'box', x, y, width: w, height: h };
+        this.onEdit(['spatial', 'regions', regionId], newRegion);
+    }
+
+    _commitSlot(slot, index, xf, yf) {
+        if (!this.onEdit) return;
+        const ac = this._slotActionConfigKey();
+        const path = ac
+            ? ['actionConfigs', ac, 'slotsByFacing', this.currentFacing, index, 'restPosition']
+            : ['slotsByFacing', this.currentFacing, index, 'restPosition'];
+        this.onEdit(path, { xFactor: xf, yFactor: yf });
+    }
+
+    // ── Sprite ───────────────────────────────────────────────────────────────
 
     buildSprite(width, height) {
         const visual = this.config.visual || {};
@@ -250,12 +532,11 @@ class MapObjectPreview {
     refresh(record) {
         this.record = record;
         this.baseConfig = record.merged;
-        // Re-derive structural state so mount() re-reads the updated config.
         this.variants = Array.isArray(this.baseConfig.variants) ? this.baseConfig.variants : [];
         if (this.currentVariant && !this.variants.includes(this.currentVariant)) {
             this.currentVariant = this.variants[0] || null;
         }
-        const facings = Object.keys(this.baseConfig.slotsByFacing || {});
+        const facings = Object.keys(this._findActionSlots());
         this.facings = facings.length > 0 ? facings : [this.baseConfig.direction || 'S'];
         if (!this.facings.includes(this.currentFacing)) {
             this.currentFacing = this.facings[0];

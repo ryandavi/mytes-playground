@@ -37,6 +37,38 @@
       "grass_3": {
         "label": "Flower"
       }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 8,
+          "y": 48,
+          "width": 48,
+          "height": 16
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 80,
+          "height": 80
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 8,
+          "width": 48,
+          "height": 48
+        }
+      }
     }
   },
   "COUCH": {
@@ -350,6 +382,38 @@
           }
         }
       }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 4,
+          "y": 40,
+          "width": 56,
+          "height": 24
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 80,
+          "height": 80
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 4,
+          "y": 16,
+          "width": 56,
+          "height": 48
+        }
+      }
     }
   },
   "FLOWER": {
@@ -437,11 +501,42 @@
           "renderType": "split"
         }
       }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 16,
+          "y": 40,
+          "width": 32,
+          "height": 24
+        },
+        "interaction": {
+          "type": "box",
+          "x": -16,
+          "y": -16,
+          "width": 96,
+          "height": 96
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 8,
+          "width": 48,
+          "height": 48
+        }
+      }
     }
   },
   "TREE": {
     "category": "nature",
-    
     "animation": "sway",
     "variants": [
       "tree_pine"
@@ -521,6 +616,20 @@
           "height": 96,
           "x": -16,
           "y": 32
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 128
+        },
+        "hit": {
+          "type": "box",
+          "x": 16,
+          "y": 64,
+          "width": 32,
+          "height": 56
         }
       }
     },
@@ -554,9 +663,6 @@
       "chop": "obj_tree_chop"
     }
   },
-
-
-
   "TREE_STUMP": {
     "category": "nature",
     "variants": [
@@ -611,6 +717,20 @@
           "height": 80,
           "x": -16,
           "y": -16
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 48,
+          "height": 48
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 8,
+          "width": 32,
+          "height": 32
         }
       }
     },
@@ -640,6 +760,27 @@
           "height": 16,
           "x": 4,
           "y": 48
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": 16,
+          "width": 48,
+          "height": 56
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 4,
+          "y": 16,
+          "width": 24,
+          "height": 44
         }
       }
     },
@@ -682,6 +823,45 @@
     },
     "visual": {
       "renderPriority": 2
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 4,
+          "y": 20,
+          "width": 24,
+          "height": 12
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 48,
+          "height": 48
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 32
+        },
+        "hit": {
+          "type": "box",
+          "x": 4,
+          "y": 4,
+          "width": 24,
+          "height": 24
+        },
+        "pickup": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 32
+        }
+      }
     }
   },
   "MUSIC_BOX": {
@@ -712,6 +892,38 @@
     "soundEffects": {
       "on": "ui_select",
       "off": "ui_close"
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 8,
+          "y": 40,
+          "width": 48,
+          "height": 24
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 80,
+          "height": 80
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 16,
+          "width": 48,
+          "height": 48
+        }
+      }
     }
   },
   "FOOD": {
@@ -763,6 +975,45 @@
           "hunger": 16
         }
       }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 12,
+          "y": 40,
+          "width": 40,
+          "height": 24
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 80,
+          "height": 80
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 8,
+          "width": 48,
+          "height": 48
+        },
+        "pickup": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        }
+      }
     }
   },
   "TREASURE_CHEST": {
@@ -807,6 +1058,27 @@
           "height": 88,
           "x": -12,
           "y": -12
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 4,
+          "y": 16,
+          "width": 56,
+          "height": 48
+        },
+        "pickup": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
         }
       }
     },
@@ -1027,6 +1299,38 @@
     "soundEffects": {
       "on": "obj_fountain_on",
       "off": "obj_fountain_off"
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 8,
+          "y": 40,
+          "width": 48,
+          "height": 24
+        },
+        "interaction": {
+          "type": "box",
+          "x": -16,
+          "y": -16,
+          "width": 96,
+          "height": 96
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 4,
+          "y": 8,
+          "width": 56,
+          "height": 56
+        }
+      }
     }
   },
   "LANTERN": {
@@ -1153,6 +1457,38 @@
     "soundEffects": {
       "on": "obj_lantern_on",
       "off": "obj_lantern_off"
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 20,
+          "y": 44,
+          "width": 24,
+          "height": 20
+        },
+        "interaction": {
+          "type": "box",
+          "x": -16,
+          "y": -16,
+          "width": 96,
+          "height": 96
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 16,
+          "y": 16,
+          "width": 32,
+          "height": 48
+        }
+      }
     }
   },
   "GROWING_PLANT": {
@@ -1251,6 +1587,38 @@
           "loop": false
         }
       }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 16,
+          "y": 40,
+          "width": 32,
+          "height": 24
+        },
+        "interaction": {
+          "type": "box",
+          "x": -16,
+          "y": -16,
+          "width": 96,
+          "height": 96
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 8,
+          "width": 48,
+          "height": 48
+        }
+      }
     }
   },
   "CROP": {
@@ -1305,6 +1673,27 @@
           "height": 32,
           "x": 16,
           "y": 84
+        },
+        "interaction": {
+          "type": "box",
+          "x": -16,
+          "y": 48,
+          "width": 96,
+          "height": 96
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 128
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 48,
+          "width": 48,
+          "height": 72
         }
       }
     },
@@ -1587,6 +1976,38 @@
           "loop": false
         }
       }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 16,
+          "y": 40,
+          "width": 32,
+          "height": 24
+        },
+        "interaction": {
+          "type": "box",
+          "x": -16,
+          "y": -16,
+          "width": 96,
+          "height": 96
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 8,
+          "width": 48,
+          "height": 48
+        }
+      }
     }
   },
   "NIGHT_BLOOM": {
@@ -1722,6 +2143,38 @@
             ]
           ],
           "loop": true
+        }
+      }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 16,
+          "y": 40,
+          "width": 32,
+          "height": 24
+        },
+        "interaction": {
+          "type": "box",
+          "x": -16,
+          "y": -16,
+          "width": 96,
+          "height": 96
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 8,
+          "width": 48,
+          "height": 48
         }
       }
     }
@@ -1991,6 +2444,45 @@
     "soundEffects": {
       "pickup": "ui_pickup_item",
       "drop": "ui_drop_item"
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 16,
+          "y": 48,
+          "width": 32,
+          "height": 16
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 80,
+          "height": 80
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 8,
+          "width": 48,
+          "height": 48
+        },
+        "pickup": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        }
+      }
     }
   },
   "PATROL_GUARD": {
@@ -2210,6 +2702,38 @@
           "loop": true
         }
       }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 16,
+          "y": 44,
+          "width": 32,
+          "height": 20
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 80,
+          "height": 80
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 16,
+          "y": 16,
+          "width": 32,
+          "height": 32
+        }
+      }
     }
   },
   "NPC": {
@@ -2369,6 +2893,38 @@
           "canWade": true
         }
       }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 16,
+          "y": 44,
+          "width": 32,
+          "height": 20
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 80,
+          "height": 80
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 16,
+          "y": 16,
+          "width": 32,
+          "height": 32
+        }
+      }
     }
   },
   "BUTTERFLY": {
@@ -2404,16 +2960,68 @@
           "height": 14,
           "x": 38,
           "y": 72
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 116,
+          "height": 116
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 100,
+          "height": 100
+        },
+        "hit": {
+          "type": "box",
+          "x": 25,
+          "y": 25,
+          "width": 50,
+          "height": 50
         }
       },
       "anchors": {
-        "sparkle": { "x": 50, "y": 79 }
+        "sparkle": {
+          "x": 50,
+          "y": 79
+        }
       },
       "directions": {
-        "E": { "anchors": { "sparkle": { "x": 38, "y": 79 } } },
-        "W": { "anchors": { "sparkle": { "x": 62, "y": 79 } } },
-        "N": { "anchors": { "sparkle": { "x": 50, "y": 86 } } },
-        "S": { "anchors": { "sparkle": { "x": 50, "y": 72 } } }
+        "E": {
+          "anchors": {
+            "sparkle": {
+              "x": 38,
+              "y": 79
+            }
+          }
+        },
+        "W": {
+          "anchors": {
+            "sparkle": {
+              "x": 62,
+              "y": 79
+            }
+          }
+        },
+        "N": {
+          "anchors": {
+            "sparkle": {
+              "x": 50,
+              "y": 86
+            }
+          }
+        },
+        "S": {
+          "anchors": {
+            "sparkle": {
+              "x": 50,
+              "y": 72
+            }
+          }
+        }
       }
     },
     "visual": {
@@ -2601,13 +3209,44 @@
             }
           },
           "anchors": {
-            "sparkle": { "x": 25, "y": 40 }
+            "sparkle": {
+              "x": 25,
+              "y": 40
+            }
           },
           "directions": {
-            "E": { "anchors": { "sparkle": { "x": 18, "y": 40 } } },
-            "W": { "anchors": { "sparkle": { "x": 32, "y": 40 } } },
-            "N": { "anchors": { "sparkle": { "x": 25, "y": 44 } } },
-            "S": { "anchors": { "sparkle": { "x": 25, "y": 36 } } }
+            "E": {
+              "anchors": {
+                "sparkle": {
+                  "x": 18,
+                  "y": 40
+                }
+              }
+            },
+            "W": {
+              "anchors": {
+                "sparkle": {
+                  "x": 32,
+                  "y": 40
+                }
+              }
+            },
+            "N": {
+              "anchors": {
+                "sparkle": {
+                  "x": 25,
+                  "y": 44
+                }
+              }
+            },
+            "S": {
+              "anchors": {
+                "sparkle": {
+                  "x": 25,
+                  "y": 36
+                }
+              }
+            }
           }
         }
       }
@@ -2642,6 +3281,27 @@
           "height": 10,
           "x": 24,
           "y": 46
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 80,
+          "height": 80
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 16,
+          "y": 16,
+          "width": 32,
+          "height": 32
         }
       }
     },
@@ -2833,6 +3493,20 @@
           "height": 96,
           "x": -16,
           "y": -16
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 4,
+          "y": 16,
+          "width": 56,
+          "height": 44
         }
       }
     },
@@ -2941,6 +3615,27 @@
           "height": 12,
           "x": 14,
           "y": 32
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 64,
+          "height": 64
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 48,
+          "height": 48
+        },
+        "hit": {
+          "type": "box",
+          "x": 12,
+          "y": 12,
+          "width": 24,
+          "height": 24
         }
       }
     },
@@ -3425,6 +4120,38 @@
           "spriteSheet": {
             "url": "images/MapObjects/metal_door.png"
           }
+        }
+      }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 8,
+          "y": 32,
+          "width": 48,
+          "height": 32
+        },
+        "interaction": {
+          "type": "box",
+          "x": -16,
+          "y": -16,
+          "width": 96,
+          "height": 96
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 16,
+          "width": 48,
+          "height": 48
         }
       }
     }
@@ -4096,6 +4823,38 @@
           }
         }
       }
+    },
+    "spatial": {
+      "regions": {
+        "collider": {
+          "type": "box",
+          "x": 8,
+          "y": 40,
+          "width": 48,
+          "height": 24
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 80,
+          "height": 80
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 16,
+          "width": 48,
+          "height": 48
+        }
+      }
     }
   },
   "RUG": {
@@ -4114,7 +4873,34 @@
     },
     "spatial": {
       "regions": {
-        "collider": null
+        "collider": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 192,
+          "height": 128
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": -8,
+          "width": 208,
+          "height": 144
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 192,
+          "height": 128
+        },
+        "hit": {
+          "type": "box",
+          "x": 8,
+          "y": 8,
+          "width": 176,
+          "height": 112
+        }
       }
     },
     "visual": {
@@ -4185,6 +4971,20 @@
           "height": 196,
           "x": -32,
           "y": -32
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 128,
+          "height": 128
+        },
+        "hit": {
+          "type": "box",
+          "x": 16,
+          "y": 16,
+          "width": 96,
+          "height": 96
         }
       }
     },
@@ -4411,6 +5211,27 @@
           "height": 32,
           "x": 0,
           "y": 32
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": 16,
+          "width": 48,
+          "height": 56
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 64
+        },
+        "hit": {
+          "type": "box",
+          "x": 0,
+          "y": 16,
+          "width": 32,
+          "height": 48
         }
       }
     },
@@ -4512,6 +5333,27 @@
           "height": 20,
           "x": 2,
           "y": 76
+        },
+        "interaction": {
+          "type": "box",
+          "x": -8,
+          "y": 56,
+          "width": 48,
+          "height": 56
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 96
+        },
+        "hit": {
+          "type": "box",
+          "x": 2,
+          "y": 32,
+          "width": 28,
+          "height": 60
         }
       }
     },
@@ -4741,6 +5583,20 @@
           "height": 96,
           "x": -16,
           "y": 32
+        },
+        "select": {
+          "type": "box",
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 128
+        },
+        "hit": {
+          "type": "box",
+          "x": 16,
+          "y": 64,
+          "width": 32,
+          "height": 56
         }
       }
     },

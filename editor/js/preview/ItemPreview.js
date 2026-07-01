@@ -101,13 +101,16 @@ class ItemPreview {
             const rect = img.getBoundingClientRect();
             const col = Math.floor((event.clientX - rect.left) / this.frameSize.width);
             const row = Math.floor((event.clientY - rect.top) / this.frameSize.height);
-            const target = this.domain.records.find(record => {
-                const cellSprite = record.merged.visual?.sprite;
-                return cellSprite && cellSprite.col === col && cellSprite.row === row;
+            const matches = this.domain.records.filter(r => {
+                const s = r.merged.visual?.sprite;
+                return s && s.col === col && s.row === row;
             });
-            if (target && target.id !== this.record.id) {
-                this.onNavigate(target.id);
+            if (matches.length === 0) return;
+            if (matches.length === 1) {
+                if (matches[0].id !== this.record.id) this.onNavigate(matches[0].id);
+                return;
             }
+            this._showCellPopover(matches, event.clientX, event.clientY);
         });
         atlas.style.cursor = 'pointer';
         atlas.title = 'Click an occupied cell to jump to that item';
@@ -116,5 +119,53 @@ class ItemPreview {
         return wrapper;
     }
 
-    destroy() {}
+    _showCellPopover(matches, clientX, clientY) {
+        this._dismissPopover();
+
+        const popover = document.createElement('div');
+        popover.className = 'editor-item-popover';
+        popover.style.left = `${clientX}px`;
+        popover.style.top = `${clientY}px`;
+
+        const title = document.createElement('div');
+        title.className = 'editor-item-popover__title';
+        title.textContent = `${matches.length} items share this cell`;
+        popover.appendChild(title);
+
+        matches.forEach(record => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'editor-item-popover__item';
+            btn.textContent = record.label !== record.id ? `${record.label} (${record.id})` : record.id;
+            btn.classList.toggle('is-active', record.id === this.record.id);
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                this._dismissPopover();
+                if (record.id !== this.record.id) this.onNavigate(record.id);
+            });
+            popover.appendChild(btn);
+        });
+
+        document.body.appendChild(popover);
+        this._activePopover = popover;
+
+        const dismiss = e => {
+            if (!popover.contains(e.target)) {
+                this._dismissPopover();
+                document.removeEventListener('click', dismiss, true);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', dismiss, true), 0);
+    }
+
+    _dismissPopover() {
+        if (this._activePopover) {
+            this._activePopover.remove();
+            this._activePopover = null;
+        }
+    }
+
+    destroy() {
+        this._dismissPopover();
+    }
 }

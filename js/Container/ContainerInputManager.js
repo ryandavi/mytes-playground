@@ -590,10 +590,6 @@ class ContainerInputManager {
     };
   }
 
-  //==================================================
-  // COMPATIBILITY METHODS (TO BE PHASED OUT)
-  //==================================================
-
   subscribe(eventName, handler) {
     const subscription = this.inputSystem.on(eventName, handler);
     this.subscriptions.push(subscription);

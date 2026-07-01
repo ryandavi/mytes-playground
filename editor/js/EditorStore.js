@@ -11,6 +11,18 @@
 // directly at their basePath position in the document.
 class EditorStore {
     // Scaffold for new entries created via the rail New button.
+    static SCHEMA_VERSIONS = {
+        'mytes.species-catalog': 1,
+        'mytes.base':            1,
+        'map-objects.base':      1,
+        'map-objects.types':     1,
+        'items':                 1,
+        'actions':               2,
+        'buffs':                 1,
+        'zones':                 1,
+        'environment-presets':   2,
+    };
+
     static DEFAULT_ENTRIES = {
         actions: {
             category: 'misc',
@@ -463,6 +475,25 @@ class EditorStore {
         if (domain.id === 'items') this.rebuildItemRecords(domain);
         if (domain.id === 'map-objects') this.rebuildMapObjectRecords(domain);
         if (domain.listKey) this.rebuildMetadataRecords(domain);
+    }
+
+    // ── Schema version enforcement ───────────────────────────────────────────
+
+    schemaWarnings() {
+        const warnings = [];
+        for (const [fileId, doc] of this.documents) {
+            const expected = EditorStore.SCHEMA_VERSIONS[fileId];
+            if (expected === undefined) continue;
+            const actual = doc.content.schemaVersion;
+            if (actual == null) {
+                warnings.push({ fileId, message: `schemaVersion missing — expected v${expected}.` });
+            } else if (actual < expected) {
+                warnings.push({ fileId, message: `schemaVersion is v${actual}, expected v${expected}. File may need migration.` });
+            } else if (actual > expected) {
+                warnings.push({ fileId, message: `schemaVersion is v${actual}, editor knows v${expected}. Update the editor.` });
+            }
+        }
+        return warnings;
     }
 
     // ── Dirty tracking / persistence ─────────────────────────────────────────

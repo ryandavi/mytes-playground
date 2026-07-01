@@ -364,24 +364,7 @@ class MapObject {
 
 	getRegionConfig(regionId = 'collider') {
 		const normalizedRegionId = this.normalizeRegionId(regionId);
-		const canonicalRegion = this.getConfig(`spatial.regions.${normalizedRegionId}`, undefined);
-		if (canonicalRegion !== undefined) {
-			return canonicalRegion;
-		}
-
-		switch (normalizedRegionId) {
-			case 'interaction':
-				return this.getConfig('interactionRegion', null);
-			case 'select':
-				return this.getConfig('selectbox', null);
-			case 'hit':
-				return this.getConfig('hitbox', null);
-			case 'pickup':
-				return this.getConfig('pickupbox', null);
-			case 'collider':
-			default:
-				return this.getConfig('physics.collider', null);
-		}
+		return this.getConfig(`spatial.regions.${normalizedRegionId}`, null);
 	}
 
 	getRegionRect(regionId = 'collider') {
@@ -390,8 +373,8 @@ class MapObject {
 			return null;
 		}
 
-		const x = this.posX + (region.x ?? region.offsetX ?? 0);
-		const y = this.posY + (region.y ?? region.offsetY ?? 0);
+		const x = this.posX + (region.x ?? 0);
+		const y = this.posY + (region.y ?? 0);
 		const width = region.width ?? this.size.width;
 		const height = region.height ?? this.size.height;
 		return {
@@ -413,8 +396,8 @@ class MapObject {
 			return null;
 		}
 
-		const x = region.x ?? region.offsetX ?? 0;
-		const y = region.y ?? region.offsetY ?? 0;
+		const x = region.x ?? 0;
+		const y = region.y ?? 0;
 		const width = region.width ?? this.size.width;
 		const height = region.height ?? this.size.height;
 		return {
@@ -578,7 +561,6 @@ class MapObject {
 		if (!dirConfig) return config;
 
 		if (dirConfig.size) config.size = dirConfig.size;
-		if (dirConfig.interactionRegion) config.interactionRegion = dirConfig.interactionRegion;
 		if (dirConfig.physics) {
 			config.physics = MapObjectFactory.deepMerge({}, config.physics || {}, dirConfig.physics);
 		}
@@ -596,7 +578,7 @@ class MapObject {
 		config.transformStyle = dirConfig.transformStyle || '';
 
 		for (const key in dirConfig) {
-			if (!['size', 'interactionRegion', 'transformStyle', 'physics', 'interaction', 'spatial', 'visual'].includes(key)) {
+			if (!['size', 'transformStyle', 'physics', 'interaction', 'spatial', 'visual'].includes(key)) {
 				config[key] = dirConfig[key];
 			}
 		}
@@ -1553,18 +1535,16 @@ class MapObject {
 		if (colliderRegion) {
 			this.collider = {
 				...colliderRegion,
-				offsetX: colliderRegion.x ?? colliderRegion.offsetX ?? 0,
-				offsetY: colliderRegion.y ?? colliderRegion.offsetY ?? 0
+				offsetX: colliderRegion.x ?? 0,
+				offsetY: colliderRegion.y ?? 0
 			};
 		}
-		this.config.interactionRegion = dirConfig.interactionRegion || null;
-
 		this.config.facingDirection = normalizedDir;
 		this.config.transformStyle = dirConfig.transformStyle || '';
 		this.config.spriteFrameOffset = dirConfig.spriteFrameOffset || null;
 
 		for (const key in dirConfig) {
-			if (!['size', 'collider', 'interactionRegion', 'transformStyle', 'spriteFrameOffset', 'spatial', 'visual'].includes(key)) {
+			if (!['size', 'collider', 'transformStyle', 'spriteFrameOffset', 'spatial', 'visual'].includes(key)) {
 				this.config[key] = dirConfig[key];
 			}
 		}
