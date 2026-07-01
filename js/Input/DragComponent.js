@@ -233,10 +233,6 @@ class DragComponent extends InputComponent {
 			});
 		}
 
-		// Prevent default if needed
-		if (this.options.preventDefaultsForDrag && event.originalEvent && event.originalEvent.preventDefault) {
-			// event.originalEvent.preventDefault();
-		}
 	}
 
 	/**

@@ -256,7 +256,7 @@ class ZoneManager {
         this.zones = new Map();
 
         if (!Zone._definitions.size) {
-            fetch(`data/metadata/zones.json?v=${Date.now()}`)
+            fetch(Utility.preventCache('data/metadata/zones.json'))
                 .then(r => r.json())
                 .then(data => Zone.loadDefinitions(data.zones ?? []))
                 .catch(err => console.error('[ZoneManager] Failed to load zone definitions:', err));

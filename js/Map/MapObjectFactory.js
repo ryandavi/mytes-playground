@@ -5,49 +5,24 @@ class MapObjectRegistry {
         this.defaultConstructor = MapObject;
     }
 
-    /**
-     * Register a type with its constructor
-     * @param {string} type The object type
-     * @param {Function} constructor The constructor function
-     * @returns {MapObjectRegistry} Returns self for chaining
-     */
     register(type, constructor) {
         this.typeMappings.set(type, constructor);
-        return this; // Allow chaining
+        return this;
     }
 
-    /**
-     * Get the constructor for a type
-     * @param {string} type The object type
-     * @returns {Function} The constructor function
-     */
     getConstructor(type) {
         return this.typeMappings.get(type) || this.defaultConstructor;
     }
 
-    /**
-     * Set the default constructor
-     * @param {Function} constructor The constructor function
-     * @returns {MapObjectRegistry} Returns self for chaining
-     */
     setDefaultConstructor(constructor) {
         this.defaultConstructor = constructor;
-        return this; // Allow chaining
+        return this;
     }
-    
-    /**
-     * Check if a constructor is registered for a type
-     * @param {string} type The object type
-     * @returns {boolean} Whether a constructor is registered
-     */
+
     hasConstructor(type) {
         return this.typeMappings.has(type);
     }
-    
-    /**
-     * Get all registered types
-     * @returns {Array<string>} Array of registered types
-     */
+
     getRegisteredTypes() {
         return Array.from(this.typeMappings.keys());
     }
@@ -79,7 +54,7 @@ class MapObjectFactory {
             return value.map(entry => this.normalizeCanonicalConfig(entry));
         }
 
-        if (!this.isPlainObject(value)) {
+        if (!Utility.isPlainObject(value)) {
             return value;
         }
 
@@ -88,7 +63,7 @@ class MapObjectFactory {
             normalized[key] = this.normalizeCanonicalConfig(childValue);
         });
 
-        const visual = this.isPlainObject(normalized.visual) ? normalized.visual : null;
+        const visual = Utility.isPlainObject(normalized.visual) ? normalized.visual : null;
 
         if (visual) {
             const inferredDefaultState = this.inferVisualDefaultState(visual);
@@ -99,7 +74,7 @@ class MapObjectFactory {
                 normalized.default = visual.defaultState ?? inferredDefaultState;
             }
             if (normalized.states === undefined && visual.states !== undefined) {
-                normalized.states = this.cloneValue(visual.states);
+                normalized.states = Utility.deepClone(visual.states);
             }
             if (normalized.animates === undefined && visual.animates !== undefined) {
                 normalized.animates = visual.animates;
@@ -108,7 +83,7 @@ class MapObjectFactory {
                 normalized.frameDelay = visual.frameDelay;
             }
             if (normalized.shadow === undefined && visual.shadow !== undefined) {
-                normalized.shadow = this.cloneValue(visual.shadow);
+                normalized.shadow = Utility.deepClone(visual.shadow);
             }
 
             if (normalized.spriteConfig === undefined) {
@@ -126,10 +101,10 @@ class MapObjectFactory {
                     spriteConfig.scale = visual.scale;
                 }
                 if (visual.spriteSheet !== undefined) {
-                    spriteConfig.spriteSheet = this.cloneValue(visual.spriteSheet);
+                    spriteConfig.spriteSheet = Utility.deepClone(visual.spriteSheet);
                 }
                 if (visual.animations !== undefined) {
-                    spriteConfig.animations = this.cloneValue(visual.animations);
+                    spriteConfig.animations = Utility.deepClone(visual.animations);
                 }
 
                 if (Object.keys(spriteConfig).length > 0) {
@@ -143,7 +118,7 @@ class MapObjectFactory {
 
     static inferVisualDefaultState(visual = {}) {
         const animations = visual?.animations;
-        if (!this.isPlainObject(animations)) {
+        if (!Utility.isPlainObject(animations)) {
             return null;
         }
 
@@ -216,7 +191,6 @@ class MapObjectFactory {
         type = this.normalizeType(type);
         const { parent: resolvedParent = null, ...factoryOptions } = options;
 
-        // Get the configuration for this type
         const typeConfig = this.getTypeConfig(type);
         if (!typeConfig) {
             console.error(`Unknown object type: ${type}`);
@@ -226,36 +200,26 @@ class MapObjectFactory {
             console.error(`Cannot create abstract object type directly: ${type}`);
             return null;
         }
-
-        // Merge base config with type config and options
-        const config = this.mergeConfigs(type, variant, factoryOptions);
-
-        // Get the appropriate constructor
-        const Constructor = this.registry.getConstructor(type);
-
-        // Create and return the instance
         if (!resolvedParent) {
             console.error(`Cannot create object type "${type}" without a parent map.`);
             return null;
         }
 
+        const config = this.mergeConfigs(type, variant, factoryOptions);
+        const Constructor = this.registry.getConstructor(type);
         return new Constructor(resolvedParent, type, variant, x, y, config, factoryOptions);
-    }
-
-    static isPlainObject(value) {
-        return value !== null && typeof value === 'object' && !Array.isArray(value);
     }
 
     static deepMerge(target = {}, ...sources) {
         const result = { ...target };
 
         for (const source of sources) {
-            if (!this.isPlainObject(source)) continue;
+            if (!Utility.isPlainObject(source)) continue;
 
             Object.entries(source).forEach(([key, value]) => {
-                if (this.isPlainObject(value) && this.isPlainObject(result[key])) {
+                if (Utility.isPlainObject(value) && Utility.isPlainObject(result[key])) {
                     result[key] = this.deepMerge(result[key], value);
-                } else if (this.isPlainObject(value)) {
+                } else if (Utility.isPlainObject(value)) {
                     result[key] = this.deepMerge({}, value);
                 } else if (Array.isArray(value)) {
                     result[key] = value.slice();
@@ -268,22 +232,6 @@ class MapObjectFactory {
         return result;
     }
 
-    static cloneValue(value) {
-        if (Array.isArray(value)) {
-            return value.map(entry => this.cloneValue(entry));
-        }
-
-        if (this.isPlainObject(value)) {
-            const cloned = {};
-            Object.entries(value).forEach(([key, childValue]) => {
-                cloned[key] = this.cloneValue(childValue);
-            });
-            return cloned;
-        }
-
-        return value;
-    }
-
     static getTypeConfig(type) {
         type = this.normalizeType(type);
         
@@ -293,22 +241,19 @@ class MapObjectFactory {
     static mergeConfigs(type, variant, options = {}) {
         const typeConfig = this.getTypeConfig(type);
         let config = this.deepMerge({}, this.BASE_CONFIG);
-        
-        // Get the base type if specified
+
         const baseType = typeConfig.baseType;
         if (baseType && this.TYPE_CONFIGS[baseType]) {
             config = this.deepMerge(config, this.TYPE_CONFIGS[baseType]);
         }
-        
+
         config = this.deepMerge(config, typeConfig);
-        
-        // Merge variant-specific config if available
+
         if (typeConfig.variants && typeConfig.variantConfigs && typeConfig.variantConfigs[variant]) {
             config = this.deepMerge(config, typeConfig.variantConfigs[variant]);
         }
-        
-        // Merge any config overrides from options
-        if (options && options?.configOverrides) {
+
+        if (options?.configOverrides) {
             config = this.deepMerge(config, options.configOverrides);
         }
 
@@ -317,7 +262,7 @@ class MapObjectFactory {
         } else if (options?.objectId !== undefined) {
             config.id = options.objectId;
         }
-        
+
         return config;
     }
 

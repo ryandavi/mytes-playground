@@ -50,16 +50,6 @@ class GameTime {
 				{ name: 'nightfall', start: { hour: 21, minute: 30 }, end: { hour: 22, minute: 0 } }
 			],
 
-			timePeriodsSimple: [
-				{ name: 'late_night', start: { hour: 0, minute: 0 }, end: { hour: 5, minute: 0 } },
-				{ name: 'dawn', start: { hour: 5, minute: 0 }, end: { hour: 7, minute: 0 } },
-				{ name: 'morning', start: { hour: 7, minute: 0 }, end: { hour: 12, minute: 0 } },
-				{ name: 'midday', start: { hour: 12, minute: 0 }, end: { hour: 14, minute: 0 } },
-				{ name: 'afternoon', start: { hour: 14, minute: 0 }, end: { hour: 17, minute: 0 } },
-				{ name: 'evening', start: { hour: 17, minute: 0 }, end: { hour: 20, minute: 0 } },
-				{ name: 'night', start: { hour: 20, minute: 0 }, end: { hour: 0, minute: 0 } }
-			],
-
 			// Moon configuration
 			moonPhases: {
 				daysPerPhase: 3.5,

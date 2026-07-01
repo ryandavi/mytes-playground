@@ -35,8 +35,8 @@ class MyteDefinitionRegistry {
 
     static async loadDefinitions() {
         const [baseResponse, speciesCatalogResponse] = await Promise.all([
-            fetch(`data/mytes/myte.json?v=${Date.now()}`),
-            fetch(`data/mytes/species.json?v=${Date.now()}`)
+            fetch(Utility.preventCache('data/mytes/myte.json')),
+            fetch(Utility.preventCache('data/mytes/species.json'))
         ]);
 
         if (!baseResponse.ok) {
@@ -63,7 +63,7 @@ class MyteDefinitionRegistry {
             throw new Error('No enabled Myte species were found in data/mytes/species.json.');
         }
 
-        this.speciesCatalog = speciesEntries.map(entry => this.cloneValue(entry));
+        this.speciesCatalog = speciesEntries.map(entry => Utility.deepClone(entry));
         this.defaultSpeciesId = this.normalizeSpeciesId(
             speciesCatalogData.defaultSpeciesId || speciesEntries[0].id
         );
@@ -97,7 +97,7 @@ class MyteDefinitionRegistry {
     }
 
     static getSpeciesCatalogSync() {
-        return this.cloneValue(this.speciesCatalog);
+        return Utility.deepClone(this.speciesCatalog);
     }
 
     static getSpeciesLayersSync(speciesId = this.defaultSpeciesId) {
@@ -108,8 +108,8 @@ class MyteDefinitionRegistry {
         }
 
         return {
-            baseDefinition: this.cloneValue(this.baseDefinition),
-            speciesDefinition: this.cloneValue(speciesDefinition),
+            baseDefinition: Utility.deepClone(this.baseDefinition),
+            speciesDefinition: Utility.deepClone(speciesDefinition),
             mergedDefinition: this.getSpeciesSync(resolvedSpeciesId)
         };
     }
@@ -170,7 +170,7 @@ class MyteDefinitionRegistry {
     static getSpatialValue(definition, section, valueId, direction = null) {
         const baseValue = definition?.spatial?.[section]?.[valueId];
         if (!direction) {
-            return baseValue == null ? null : this.cloneValue(baseValue);
+            return baseValue == null ? null : Utility.deepClone(baseValue);
         }
 
         const normalizedDirection = String(direction || '').trim().toUpperCase();
@@ -192,11 +192,11 @@ class MyteDefinitionRegistry {
 
     static deepMerge(baseValue, overrideValue) {
         if (Array.isArray(baseValue) || Array.isArray(overrideValue)) {
-            return this.cloneValue(overrideValue ?? baseValue);
+            return Utility.deepClone(overrideValue ?? baseValue);
         }
 
-        if (!this.isPlainObject(baseValue) || !this.isPlainObject(overrideValue)) {
-            return this.cloneValue(overrideValue ?? baseValue);
+        if (!Utility.isPlainObject(baseValue) || !Utility.isPlainObject(overrideValue)) {
+            return Utility.deepClone(overrideValue ?? baseValue);
         }
 
         const merged = {};
@@ -210,12 +210,12 @@ class MyteDefinitionRegistry {
             const overrideChild = overrideValue?.[key];
 
             if (overrideChild === undefined) {
-                merged[key] = this.cloneValue(baseChild);
+                merged[key] = Utility.deepClone(baseChild);
                 return;
             }
 
             if (baseChild === undefined) {
-                merged[key] = this.cloneValue(overrideChild);
+                merged[key] = Utility.deepClone(overrideChild);
                 return;
             }
 
@@ -225,23 +225,4 @@ class MyteDefinitionRegistry {
         return merged;
     }
 
-    static isPlainObject(value) {
-        return value != null && typeof value === 'object' && !Array.isArray(value);
-    }
-
-    static cloneValue(value) {
-        if (Array.isArray(value)) {
-            return value.map(entry => this.cloneValue(entry));
-        }
-
-        if (this.isPlainObject(value)) {
-            const cloned = {};
-            Object.entries(value).forEach(([key, childValue]) => {
-                cloned[key] = this.cloneValue(childValue);
-            });
-            return cloned;
-        }
-
-        return value;
-    }
 }

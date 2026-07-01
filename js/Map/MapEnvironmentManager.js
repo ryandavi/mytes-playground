@@ -34,12 +34,12 @@ class MapEnvironmentManager {
             .then(data => {
                 MapEnvironmentManager._presetData = (data && typeof data === 'object')
                     ? data
-                    : MapEnvironmentManager.deepClone(MapEnvironmentManager.EMPTY_PRESET_DATA);
+                    : Utility.deepClone(MapEnvironmentManager.EMPTY_PRESET_DATA);
                 return MapEnvironmentManager._presetData;
             })
             .catch(error => {
                 console.warn('[MapEnvironmentManager] Failed to load environment presets JSON:', error);
-                MapEnvironmentManager._presetData = MapEnvironmentManager.deepClone(MapEnvironmentManager.EMPTY_PRESET_DATA);
+                MapEnvironmentManager._presetData = Utility.deepClone(MapEnvironmentManager.EMPTY_PRESET_DATA);
                 return MapEnvironmentManager._presetData;
             })
             .finally(() => {
@@ -49,19 +49,15 @@ class MapEnvironmentManager {
         return MapEnvironmentManager._presetPromise;
     }
 
-    static deepClone(value) {
-        return Utility.deepClone(value);
-    }
-
     static deepMerge(base, extra) {
         if (!extra || typeof extra !== 'object' || Array.isArray(extra)) {
             return extra !== undefined ? extra : base;
         }
 
-        const merged = MapEnvironmentManager.deepClone(base || {});
+        const merged = Utility.deepClone(base || {});
         Object.entries(extra).forEach(([key, value]) => {
             if (Array.isArray(value)) {
-                merged[key] = value.map(entry => MapEnvironmentManager.deepClone(entry));
+                merged[key] = value.map(entry => Utility.deepClone(entry));
                 return;
             }
 
@@ -185,8 +181,8 @@ class MapEnvironmentManager {
         this.lightOpenings = this.buildLightOpenings();
         this._timeData = this.getTimeData();
         this.currentAtmosphere = this.resolveAtmosphereState(this._timeData);
-        this.targetAtmosphere = MapEnvironmentManager.deepClone(this.currentAtmosphere);
-        this.atmosphereFrom = MapEnvironmentManager.deepClone(this.currentAtmosphere);
+        this.targetAtmosphere = Utility.deepClone(this.currentAtmosphere);
+        this.atmosphereFrom = Utility.deepClone(this.currentAtmosphere);
         this.subscribeToTime();
         window.addEventListener('resize', this._boundResize);
         this.syncLightingOverlayBounds(true);
@@ -424,7 +420,7 @@ class MapEnvironmentManager {
             : {};
 
         return MapEnvironmentManager.deepMerge(
-            MapEnvironmentManager.deepClone(basePreset),
+            Utility.deepClone(basePreset),
             inlineOverrides
         );
     }
@@ -532,9 +528,9 @@ class MapEnvironmentManager {
         const transitionMs = Math.max(0, Number(nextState.transitionMs || this.config?.atmosphere?.defaultTransitionMs || 0));
 
         if (immediate || !this.currentAtmosphere) {
-            this.currentAtmosphere = MapEnvironmentManager.deepClone(nextState);
-            this.targetAtmosphere = MapEnvironmentManager.deepClone(nextState);
-            this.atmosphereFrom = MapEnvironmentManager.deepClone(nextState);
+            this.currentAtmosphere = Utility.deepClone(nextState);
+            this.targetAtmosphere = Utility.deepClone(nextState);
+            this.atmosphereFrom = Utility.deepClone(nextState);
             this.atmosphereTransitionMs = 0;
             this.atmosphereTransitionElapsed = 0;
             this.atmosphereTransitionActive = false;
@@ -543,14 +539,14 @@ class MapEnvironmentManager {
             return;
         }
 
-        this.atmosphereFrom = MapEnvironmentManager.deepClone(this.currentAtmosphere);
-        this.targetAtmosphere = MapEnvironmentManager.deepClone(nextState);
+        this.atmosphereFrom = Utility.deepClone(this.currentAtmosphere);
+        this.targetAtmosphere = Utility.deepClone(nextState);
         this.atmosphereTransitionMs = transitionMs;
         this.atmosphereTransitionElapsed = 0;
         this.atmosphereTransitionActive = transitionMs > 0;
 
         if (!this.atmosphereTransitionActive) {
-            this.currentAtmosphere = MapEnvironmentManager.deepClone(nextState);
+            this.currentAtmosphere = Utility.deepClone(nextState);
             this.renderAtmosphere(true);
             this.renderLighting(true);
         }
@@ -807,7 +803,7 @@ class MapEnvironmentManager {
             gradientOriginX: Utility.lerp(fromState.gradientOriginX, toState.gradientOriginX, t),
             gradientOriginY: Utility.lerp(fromState.gradientOriginY, toState.gradientOriginY, t),
             gradientSpan: Utility.lerp(fromState.gradientSpan, toState.gradientSpan, t),
-            gradientStops: stops.length > 0 ? stops : MapEnvironmentManager.deepClone(toState.gradientStops),
+            gradientStops: stops.length > 0 ? stops : Utility.deepClone(toState.gradientStops),
             vignetteColor: lerpColor(fromState.vignetteColor, toState.vignetteColor),
             vignetteOpacity: Utility.lerp(fromState.vignetteOpacity, toState.vignetteOpacity, t)
         };
@@ -827,7 +823,7 @@ class MapEnvironmentManager {
             this.currentAtmosphere = this.interpolateAtmosphereState(this.atmosphereFrom, this.targetAtmosphere, progress);
             this.renderAtmosphere(true);
             if (progress >= 1) {
-                this.currentAtmosphere = MapEnvironmentManager.deepClone(this.targetAtmosphere);
+                this.currentAtmosphere = Utility.deepClone(this.targetAtmosphere);
                 this.atmosphereTransitionActive = false;
             }
         }

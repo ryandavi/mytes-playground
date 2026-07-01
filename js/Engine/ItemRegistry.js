@@ -7,17 +7,14 @@ class ItemRegistry {
     static preloadPromise = null;
 
     static normalizeId(value) {
-        return String(value || '')
-            .trim()
-            .toLowerCase()
-            .replace(/\s+/g, '_');
+        return Utility.normalizeId(value);
     }
 
     static async preload() {
         if (this.preloaded) return true;
         if (this.preloadPromise) return this.preloadPromise;
 
-        this.preloadPromise = fetch(`data/metadata/items.json?v=${Date.now()}`)
+        this.preloadPromise = fetch(Utility.preventCache('data/metadata/items.json'))
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Failed to load item metadata: ${response.status} ${response.statusText}`);

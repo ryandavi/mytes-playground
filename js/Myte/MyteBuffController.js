@@ -118,19 +118,13 @@ class MyteBuffController {
         if (existing) {
             if (definition.stackMode === 'replace') {
                 this.activeBuffs.delete(existing.instanceId);
-            } else if (definition.stackMode === 'stack') {
-                existing.stacks = Math.min(definition.maxStacks, existing.stacks + 1);
-                if (definition.refreshOnReapply && definition.durationMs > 0) {
-                    existing.remainingMs = definition.durationMs;
-                }
-                existing.source = source;
-                this.applyInstantEffects(definition);
-                this._applyExcludes(definition);
-                this._recordApplied(definition);
-                this.bumpVersion();
-                return existing;
             } else {
-                existing.stacks = Math.min(existing.stacks, definition.maxStacks);
+                if (definition.stackMode === 'stack') {
+                    existing.stacks = Math.min(definition.maxStacks, existing.stacks + 1);
+                    this.applyInstantEffects(definition);
+                } else {
+                    existing.stacks = Math.min(existing.stacks, definition.maxStacks);
+                }
                 if (definition.refreshOnReapply && definition.durationMs > 0) {
                     existing.remainingMs = definition.durationMs;
                 }

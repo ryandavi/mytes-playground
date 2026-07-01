@@ -1,4 +1,4 @@
-function createAudioPresetLibrary(manager) {
+﻿function createAudioPresetLibrary(manager) {
 	return {
 			// Music synths
 			"music_main": {
@@ -16,7 +16,6 @@ function createAudioPresetLibrary(manager) {
 						}
 					}).toDestination();
 					synth.maxPolyphony = 8;
-					// // synth.volume.value = Tone.gainToDb(0.4);
 
 					const pattern = [];
 					const notes = ["C3", "E3", "G3", "B3", "C4", "B3", "G3", "E3"];
@@ -161,7 +160,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.1
 						}
 					}).toDestination();
-					// // synth.volume.value = Tone.gainToDb(0.3);
 					return { synth, note: "C5", duration: "16n" };
 				}
 			},
@@ -187,7 +185,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.1
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.2);
 					return { synth, note: "E6", duration: "32n" };
 				}
 			},
@@ -204,7 +201,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.1
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
 					return {
 						synth,
 						notes: ["C5", "G5"],
@@ -226,7 +222,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.1
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.4);
 					return {
 						synth,
 						notes: ["C4", "B3"],
@@ -236,7 +231,7 @@ function createAudioPresetLibrary(manager) {
 			},
 
 
-			// Ball hit — bouncy thud
+			// Ball hit â€” bouncy thud
 			"ball_hit": {
 				type: "sfx",
 				baseVolume: 0.44,
@@ -400,7 +395,7 @@ function createAudioPresetLibrary(manager) {
 					release: 0.08
 					}
 				}).toDestination();
-				// Soft high tick — "lifted"
+				// Soft high tick â€” "lifted"
 				return { synth, note: "B5", duration: "32n" };
 				}
 			},
@@ -643,7 +638,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.1
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
 					return {
 						synth,
 						notes: ["G5", "C6"],
@@ -665,7 +659,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.4
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.4);
 					return {
 						synth,
 						notes: ["C4", "A3"],
@@ -687,7 +680,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.1
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
 					return { synth, note: "G4", duration: "16n" };
 				}
 			},
@@ -706,7 +698,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.1
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
 					return { synth, note: "G4", duration: "16n" };
 				}
 			},
@@ -726,7 +717,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.2
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.6);
 					return { synth, note: "C2", duration: "16n" };
 				}
 			},
@@ -746,7 +736,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.05
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.3);
 					return { synth, duration: "16n" };
 				}
 			},
@@ -765,7 +754,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.4
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.2);
 					return { synth, duration: "4n" };
 				}
 			},
@@ -783,7 +771,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.1
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
 					return {
 						synth,
 						notes: ["C4", "E4", "G4"],
@@ -805,7 +792,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.1
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
 					return {
 						synth,
 						notes: ["G4", "E4", "C4"],
@@ -819,7 +805,7 @@ function createAudioPresetLibrary(manager) {
 				type: "ambient",
 				baseVolume: 0.22,
 				create: () => {
-					// Do NOT call .start() here — playAmbient starts them lazily to avoid
+					// Do NOT call .start() here â€” playAmbient starts them lazily to avoid
 					// running the audio worklet 24/7 even when the sound is inactive.
 					const noise = new Tone.Noise("brown");
 					const autoFilter = new Tone.AutoFilter({
@@ -876,7 +862,7 @@ function createAudioPresetLibrary(manager) {
 				type: "ambient",
 				baseVolume: 0.14,
 				create: () => {
-					// Use a lightweight AMSynth instead of PolySynth(FMSynth) — bird chirps
+					// Use a lightweight AMSynth instead of PolySynth(FMSynth) â€” bird chirps
 					// don't need polyphony and FMSynth is among the most CPU-intensive types.
 					const synth = new Tone.AMSynth({
 						harmonicity: 8,
@@ -929,7 +915,7 @@ function createAudioPresetLibrary(manager) {
 				type: "ambient",
 				baseVolume: 0.008,
 				create: () => {
-					// AMSynth is much lighter than FMSynth — cricket chirps are short
+					// AMSynth is much lighter than FMSynth â€” cricket chirps are short
 					// high-frequency pulses that don't need FM's complexity.
 					const synth = new Tone.AMSynth({
 						harmonicity: 10,
@@ -971,12 +957,12 @@ function createAudioPresetLibrary(manager) {
 				}
 			},
 
-			// Indoor ambient — soft, sheltered warmth (no wind)
+			// Indoor ambient â€” soft, sheltered warmth (no wind)
 			"env_indoor_cozy": {
 				type: "ambient",
 				baseVolume: 0.09,
 				create: () => {
-					// Very gentle brown noise through a tight low-pass — the muffled hum
+					// Very gentle brown noise through a tight low-pass â€” the muffled hum
 					// of a quiet room. AutoFilter adds a barely-perceptible slow breath.
 					// Uses autoFilter (not Tremolo) so playAmbient starts it lazily.
 					const noise = new Tone.Noise("brown");
@@ -1003,12 +989,12 @@ function createAudioPresetLibrary(manager) {
 				}
 			},
 
-			// Still-water ambient — calm lake or pond surface
+			// Still-water ambient â€” calm lake or pond surface
 			"env_water_lake": {
 				type: "ambient",
 				baseVolume: 0.55,
 				create: () => {
-					// Pink noise base with very slow, deep modulation — lapping at the shore
+					// Pink noise base with very slow, deep modulation â€” lapping at the shore
 					const noise = new Tone.Noise("pink");
 					const autoFilter = new Tone.AutoFilter({
 						frequency: 0.06,
@@ -1033,7 +1019,7 @@ function createAudioPresetLibrary(manager) {
 				}
 			},
 
-			// Flowing-water ambient — stream or river with movement
+			// Flowing-water ambient â€” stream or river with movement
 			"env_water_river": {
 				type: "ambient",
 				baseVolume: 0.18,
@@ -1082,7 +1068,6 @@ function createAudioPresetLibrary(manager) {
 						resonance: 4000,
 						octaves: 1.5
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.4);
 					return { synth, note: "G3", duration: "8n" };
 				}
 			},
@@ -1104,7 +1089,6 @@ function createAudioPresetLibrary(manager) {
 						resonance: 3000,
 						octaves: 1
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
 					return { synth, note: "D3", duration: "8n" };
 				}
 			},
@@ -1280,7 +1264,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.5
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.3);
 					return { synth, note: "E5", duration: "8n" };
 				}
 			},
@@ -1398,7 +1381,6 @@ function createAudioPresetLibrary(manager) {
 					}).toDestination();
 					const filter = new Tone.Filter(3000, "lowpass").toDestination();
 					synth.connect(filter);
-					// synth.volume.value = Tone.gainToDb(0.4);
 					return { synth, duration: "16n" };
 				}
 			},
@@ -1418,7 +1400,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.2
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.5);
 					return { synth, note: "G3", duration: "16n" };
 				}
 			},
@@ -1437,7 +1418,6 @@ function createAudioPresetLibrary(manager) {
 							release: 0.1
 						}
 					}).toDestination();
-					// synth.volume.value = Tone.gainToDb(0.2);
 					return {
 						synth,
 						notes: ["A6", "C7"],

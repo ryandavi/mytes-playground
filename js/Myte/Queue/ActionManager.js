@@ -3,7 +3,7 @@ class ActionManager {
     static fallbackMetadata = new Map();
 
     static cloneMetadata(value) {
-        return ActionDefinitionRegistry.cloneValue(value);
+        return Utility.deepClone(value);
     }
 
     static getMetadata(actionId, ActionClass = null) {
@@ -20,21 +20,14 @@ class ActionManager {
     }
 
     static getActionPresentation(actionId, selected) {
-        const targetConfig = selected?.getActionConfig?.(actionId, null);
-        if (!targetConfig || typeof targetConfig !== 'object') {
-            return {};
-        }
-
-        const presentation = {};
-        if (targetConfig.label) presentation.label = targetConfig.label;
-        if (targetConfig.description) presentation.description = targetConfig.description;
-
-        const priority = Number(targetConfig.priority);
-        if (Number.isFinite(priority)) {
-            presentation.priority = priority;
-        }
-
-        return presentation;
+        const config = selected?.getActionConfig?.(actionId, null);
+        if (!config || typeof config !== 'object') return {};
+        const out = {};
+        if (config.label) out.label = config.label;
+        if (config.description) out.description = config.description;
+        const priority = Number(config.priority);
+        if (Number.isFinite(priority)) out.priority = priority;
+        return out;
     }
 
     static registerAction(ActionClass) {

@@ -91,13 +91,12 @@ class SoundManager {
 		// Add these properties to the constructor
 		this.lastPlayTimes = new Map();
 		this.minTimeBetweenSounds = 50; // ms
-		this.triggeredSounds = new Set(); // Keep track of currently triggered sounds
 
 
 
 		// Species sound profiles - defines which instrument/synth to use for each species
 		this.defaultSpeciesVoices = createDefaultSpeciesVoices();
-		this.speciesVoices = this._cloneVoiceData(this.defaultSpeciesVoices);
+		this.speciesVoices = Utility.deepClone(this.defaultSpeciesVoices);
 
 		// Sound definitions using Tone.js synthesis
 		this.synthPresets = createAudioPresetLibrary(this);
@@ -291,14 +290,6 @@ class SoundManager {
 		});
 	}
 
-	_cloneVoiceData(data) {
-		if (typeof structuredClone === 'function') {
-			return structuredClone(data);
-		}
-
-		return JSON.parse(JSON.stringify(data));
-	}
-
 	registerVoice(characterId, profile = {}) {
 		if (!characterId) {
 			console.warn('registerVoice called without a characterId');
@@ -324,7 +315,7 @@ class SoundManager {
 			synthType: profile.synthType || fallbackVoice.synthType,
 			baseNote: profile.baseNote || fallbackVoice.baseNote,
 			settings: profile.settings
-				? this._cloneVoiceData(profile.settings)
+				? Utility.deepClone(profile.settings)
 				: {
 					oscillator: {
 						type: profile.waveform || fallbackVoice.settings?.oscillator?.type || 'triangle'
@@ -348,7 +339,7 @@ class SoundManager {
 		}
 
 		if (profile.modifiers) {
-			normalizedVoice.modifiers = this._cloneVoiceData(profile.modifiers);
+			normalizedVoice.modifiers = Utility.deepClone(profile.modifiers);
 		}
 
 		this.speciesVoices[characterId] = normalizedVoice;
@@ -365,7 +356,7 @@ class SoundManager {
 
 	clearVoices(preserveDefaults = true) {
 		this.speciesVoices = preserveDefaults
-			? this._cloneVoiceData(this.defaultSpeciesVoices)
+			? Utility.deepClone(this.defaultSpeciesVoices)
 			: {};
 	}
 

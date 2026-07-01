@@ -4,17 +4,14 @@ class BuffRegistry {
     static preloaded = false;
 
     static normalizeBuffId(value) {
-        return String(value || '')
-            .trim()
-            .toLowerCase()
-            .replace(/\s+/g, '_');
+        return Utility.normalizeId(value);
     }
 
     static async preload() {
         if (this.preloaded) return true;
         if (this.preloadPromise) return this.preloadPromise;
 
-        this.preloadPromise = fetch(`data/metadata/buffs.json?v=${Date.now()}`)
+        this.preloadPromise = fetch(Utility.preventCache('data/metadata/buffs.json'))
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Failed to load buff metadata: ${response.status} ${response.statusText}`);
@@ -73,9 +70,9 @@ class BuffRegistry {
             excludes: Array.isArray(definition.excludes)
                 ? definition.excludes.map(buffId => this.normalizeBuffId(buffId)).filter(Boolean)
                 : [],
-            effects: this.cloneValue(definition.effects || {}),
-            onApply: this.cloneValue(definition.onApply || {}),
-            triggers: this.cloneValue(definition.triggers || {})
+            effects: Utility.deepClone(definition.effects || {}),
+            onApply: Utility.deepClone(definition.onApply || {}),
+            triggers: Utility.deepClone(definition.triggers || {})
         };
     }
 
@@ -164,23 +161,4 @@ class BuffRegistry {
         return true;
     }
 
-    static isPlainObject(value) {
-        return value != null && typeof value === 'object' && !Array.isArray(value);
-    }
-
-    static cloneValue(value) {
-        if (Array.isArray(value)) {
-            return value.map(entry => this.cloneValue(entry));
-        }
-
-        if (this.isPlainObject(value)) {
-            const cloned = {};
-            Object.entries(value).forEach(([key, childValue]) => {
-                cloned[key] = this.cloneValue(childValue);
-            });
-            return cloned;
-        }
-
-        return value;
-    }
 }

@@ -77,6 +77,10 @@ class Utility {
 		return `${url}${url.includes('?') ? '&' : '?'}${cacheBuster}`;
 	}
 
+	static normalizeId(value) {
+		return String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
+	}
+
 	static getQueryFlag(flagName = 'debug') {
 		try {
 			return new URLSearchParams(window.location.search).has(flagName);
@@ -222,13 +226,6 @@ class Utility {
 				setTimeout(() => inThrottle = false, limit);
 			}
 		};
-	}
-
-	static isCollision(rect1, rect2) {
-		return !(rect1.right < rect2.left ||
-			rect1.left > rect2.right ||
-			rect1.bottom < rect2.top ||
-			rect1.top > rect2.bottom);
 	}
 
 	static isIntersecting(x, y, rect) {

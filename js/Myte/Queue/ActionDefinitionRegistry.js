@@ -9,17 +9,14 @@ class ActionDefinitionRegistry {
     static _fallbackCache = new Map();
 
     static normalizeActionId(value) {
-        return String(value || '')
-            .trim()
-            .toLowerCase()
-            .replace(/\s+/g, '_');
+        return Utility.normalizeId(value);
     }
 
     static async preload() {
         if (this.preloaded) return true;
         if (this.preloadPromise) return this.preloadPromise;
 
-        this.preloadPromise = fetch(`data/metadata/actions.json?v=${Date.now()}`)
+        this.preloadPromise = fetch(Utility.preventCache('data/metadata/actions.json'))
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Failed to load action metadata: ${response.status} ${response.statusText}`);
@@ -85,7 +82,7 @@ class ActionDefinitionRegistry {
             requiresTarget: q.requiresTarget === true,
             icon: definition.icon || '',
             implementationClass: q.implementationClass || '',
-            defaultOptions: this.cloneValue(q.options ?? {}),
+            defaultOptions: Utility.deepClone(q.options ?? {}),
             energyCostMultiplier: Number.isFinite(Number(q.energyCostMultiplier)) ? Number(q.energyCostMultiplier) : undefined,
             tags: Array.isArray(definition.tags) ? [...definition.tags] : [],
             effects: {
@@ -115,15 +112,15 @@ class ActionDefinitionRegistry {
             exertion:       num(ai.exertion,       0.1),
             accomplishment: num(ai.accomplishment, 0.1),
             commitmentMs:   num(ai.commitmentMs,   1200),
-            scoreDrivers:   Array.isArray(ai.scoreDrivers) ? this.cloneValue(ai.scoreDrivers) : []
+            scoreDrivers:   Array.isArray(ai.scoreDrivers) ? Utility.deepClone(ai.scoreDrivers) : []
         };
     }
 
     static _normalizePurposeOverrides(overrides) {
-        if (!this.isPlainObject(overrides)) return {};
+        if (!Utility.isPlainObject(overrides)) return {};
         const result = {};
         Object.entries(overrides).forEach(([purpose, override]) => {
-            if (!this.isPlainObject(override)) return;
+            if (!Utility.isPlainObject(override)) return;
             const ai = override?.ai ?? {};
             const num = (v) => Number.isFinite(Number(v)) ? Number(v) : undefined;
             const normalized = {};
@@ -132,7 +129,7 @@ class ActionDefinitionRegistry {
             if (ai.exertion !== undefined)      normalized.exertion      = num(ai.exertion);
             if (ai.accomplishment !== undefined) normalized.accomplishment = num(ai.accomplishment);
             if (ai.commitmentMs !== undefined)  normalized.commitmentMs  = num(ai.commitmentMs);
-            if (Array.isArray(ai.scoreDrivers)) normalized.scoreDrivers  = this.cloneValue(ai.scoreDrivers);
+            if (Array.isArray(ai.scoreDrivers)) normalized.scoreDrivers  = Utility.deepClone(ai.scoreDrivers);
             result[purpose] = { ai: normalized };
         });
         return result;
@@ -184,11 +181,11 @@ class ActionDefinitionRegistry {
 
     static deepMerge(baseValue, overrideValue) {
         if (Array.isArray(baseValue) || Array.isArray(overrideValue)) {
-            return this.cloneValue(overrideValue ?? baseValue);
+            return Utility.deepClone(overrideValue ?? baseValue);
         }
 
-        if (!this.isPlainObject(baseValue) || !this.isPlainObject(overrideValue)) {
-            return this.cloneValue(overrideValue ?? baseValue);
+        if (!Utility.isPlainObject(baseValue) || !Utility.isPlainObject(overrideValue)) {
+            return Utility.deepClone(overrideValue ?? baseValue);
         }
 
         const merged = {};
@@ -201,11 +198,11 @@ class ActionDefinitionRegistry {
             const baseChild = baseValue?.[key];
             const overrideChild = overrideValue?.[key];
             if (overrideChild === undefined) {
-                merged[key] = this.cloneValue(baseChild);
+                merged[key] = Utility.deepClone(baseChild);
                 return;
             }
             if (baseChild === undefined) {
-                merged[key] = this.cloneValue(overrideChild);
+                merged[key] = Utility.deepClone(overrideChild);
                 return;
             }
             merged[key] = this.deepMerge(baseChild, overrideChild);
@@ -214,23 +211,4 @@ class ActionDefinitionRegistry {
         return merged;
     }
 
-    static isPlainObject(value) {
-        return value != null && typeof value === 'object' && !Array.isArray(value);
-    }
-
-    static cloneValue(value) {
-        if (Array.isArray(value)) {
-            return value.map(entry => this.cloneValue(entry));
-        }
-
-        if (this.isPlainObject(value)) {
-            const cloned = {};
-            Object.entries(value).forEach(([key, childValue]) => {
-                cloned[key] = this.cloneValue(childValue);
-            });
-            return cloned;
-        }
-
-        return value;
-    }
 }
