@@ -692,7 +692,7 @@ class GameMapParticleSystem extends ParticleSystem {
 
     addEffect(object, effectType, customOptions = {}) {
         if (!object) {
-            console.warn('[GameMapParticleSystem] Cannot add effect without a source object.');
+            Utility.warnDebug('[GameMapParticleSystem] Cannot add effect without a source object.');
             return null;
         }
 

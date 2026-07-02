@@ -64,7 +64,7 @@ class GameMapLoader {
                         return displayName;
                     }
                 } catch (error) {
-                    console.warn(`[GameMapLoader] Could not resolve display name for ${normalized} from ${path}:`, error);
+                    Utility.warnDebug(`[GameMapLoader] Could not resolve display name for ${normalized} from ${path}:`, error);
                 }
             }
 
@@ -115,6 +115,7 @@ class GameMapLoader {
 
     // Update the loadMap method in GameMapLoader.js to pass the isInitialLoad flag
     async loadMap(mapId, container, options = {}) {
+        let map = null;
         try {
             Utility.logDebug(`[GameMapLoader] Loading map: ${mapId}`);
 
@@ -129,18 +130,14 @@ class GameMapLoader {
 
             // Create map instance
             Utility.logDebug(`[GameMapLoader] Creating new GameMap instance`);
-            const map = new GameMap(container);
+            map = new GameMap(container);
 
             // Initialize with TMX file, passing along initialization options
             Utility.logDebug(`[GameMapLoader] Initializing map with id: ${mapId}`);
-            const success = await map.initialize(mapId, {
-                isInitialLoad: options.isInitialLoad || false
+            await map.initialize(mapId, {
+                isInitialLoad: options.isInitialLoad || false,
+                allowFallback: options.allowFallback === true
             });
-
-            if (!success) {
-                console.error(`[GameMapLoader] Failed to initialize map: ${mapId}`);
-                return null;
-            }
 
             this.currentMap = map;
             if (map?.displayName) {
@@ -149,8 +146,8 @@ class GameMapLoader {
             Utility.logDebug(`[GameMapLoader] Map ${mapId} loaded successfully`);
             return map;
         } catch (error) {
-            console.error(`[GameMapLoader] Error loading map ${mapId}:`, error);
-            return null;
+            map?.dispose?.();
+            throw error;
         }
     }
 
@@ -159,12 +156,9 @@ class GameMapLoader {
 
         try {
             const map = await this.loadMap(mapId, container, {
-                isInitialLoad: options.isInitialLoad || false
+                isInitialLoad: options.isInitialLoad || false,
+                allowFallback: options.allowFallback === true
             });
-
-            if (!map) {
-                throw new Error(`Failed to load map: ${mapId}`);
-            }
 
             if (previousMap) {
                 previousMap.dispose();
@@ -173,9 +167,8 @@ class GameMapLoader {
             this.currentMap = map;
             return map;
         } catch (error) {
-            console.error(`Error loading map ${mapId}:`, error);
             this.currentMap = previousMap;
-            return null;
+            throw error;
         }
     }
 }

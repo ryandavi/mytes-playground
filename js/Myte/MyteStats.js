@@ -297,7 +297,7 @@ class MyteStats {
         const s    = this.getSocialRatio();
         const c    = this.getComfortRatio();
         const conf = this.confidence;
-        const far  = this._lastDistanceFromHome > (this.safeAreaRadius ?? 200);
+        const far  = this._lastDistanceFromHome > this.safeAreaRadius;
 
         if (e < 0.15 && f < 0.30) return 'exhausted';
         if (conf < 0.2 && far)    return 'anxious';
@@ -381,7 +381,7 @@ class MyteStats {
         const distanceFromHome = home ? this.myte.getDistanceToPoint(home.x, home.y) : 0;
         this._lastDistanceFromHome = distanceFromHome;
 
-        const safeRadius = this.safeAreaRadius ?? 320;
+        const safeRadius = this.safeAreaRadius;
         const comfortRadius = this.myte.ai?.homeComfortRadius ?? (safeRadius * 0.44);
         const homeComfort = home
             ? Utility.clamp(1 - (distanceFromHome / Math.max(comfortRadius * 2, 1)), 0, 1)

@@ -62,7 +62,7 @@ class SoundPanel extends ModalWindow {
     initSoundSettings() {
         const soundManager = this.getSoundManager();
         if (!soundManager) {
-            console.warn('Sound manager not available');
+            Utility.warnDebug('Sound manager not available');
             return;
         }
 
@@ -199,7 +199,7 @@ class SoundPanel extends ModalWindow {
                 soundManager.playFootstepPreview?.();
             }
         } catch (error) {
-            console.warn('Could not play test sound:', error);
+            Utility.warnDebug('Could not play test sound:', error);
         }
     }
 

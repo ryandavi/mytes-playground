@@ -237,6 +237,14 @@ class DebugPanel extends ModalWindow {
                 }
             },
             {
+                id: 'testPathfinding',
+                section: 'map',
+                subgroup: 'controls',
+                type: 'action',
+                label: 'Test Path',
+                action: () => this.runPathfindingDebug()
+            },
+            {
                 id: 'toggleTimePause',
                 section: 'time',
                 subgroup: 'controls',
@@ -627,6 +635,43 @@ class DebugPanel extends ModalWindow {
         this.getTimeManager()?.setTime?.(hour, minute);
         this.updateButton('toggleTimePause');
         this.updateButton('timeScale');
+    }
+
+    runPathfindingDebug() {
+        const container = this.parent?.parent;
+        const gameMap = container?.gameMap;
+        const pathfinder = gameMap?.gridSystem?.pathfinder;
+        if (!gameMap?.initialized || !pathfinder) {
+            return null;
+        }
+
+        if (!container?.inputHandler?.isMouseInContainer?.()) {
+            return null;
+        }
+
+        const myte = container.activeMyte || gameMap.mytes?.[0];
+        if (!myte?.isActive) {
+            return null;
+        }
+
+        const { posX: startX, posY: startY } = myte;
+        const { x: endX, y: endY } = container.inputHandler.getMouseWorldPosition();
+        const { height: entityHeight, width: entityWidth } = myte.size;
+        const { collider } = myte;
+
+        pathfinder.setDebugMode(true);
+        pathfinder.options.visualizeSearch = false;
+
+        const path = pathfinder.findPath(
+            myte,
+            startX,
+            startY,
+            endX,
+            endY
+        );
+
+        pathfinder.visualizePath(gameMap.layers.debug, path || [], entityWidth, entityHeight, collider);
+        return path;
     }
 
     subtractDay() {

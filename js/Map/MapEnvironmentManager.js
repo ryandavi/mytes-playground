@@ -49,28 +49,6 @@ class MapEnvironmentManager {
         return MapEnvironmentManager._presetPromise;
     }
 
-    static deepMerge(base, extra) {
-        if (!extra || typeof extra !== 'object' || Array.isArray(extra)) {
-            return extra !== undefined ? extra : base;
-        }
-
-        const merged = Utility.deepClone(base || {});
-        Object.entries(extra).forEach(([key, value]) => {
-            if (Array.isArray(value)) {
-                merged[key] = value.map(entry => Utility.deepClone(entry));
-                return;
-            }
-
-            if (value && typeof value === 'object') {
-                merged[key] = MapEnvironmentManager.deepMerge(merged[key] || {}, value);
-                return;
-            }
-
-            merged[key] = value;
-        });
-        return merged;
-    }
-
     static parseColor(color, fallback = [0, 0, 0, 0]) {
         if (Array.isArray(color)) {
             const [r, g, b, a = 1] = color;
@@ -419,7 +397,7 @@ class MapEnvironmentManager {
             ? mapProps.environmentOverrides
             : {};
 
-        return MapEnvironmentManager.deepMerge(
+        return Utility.deepMerge(
             Utility.deepClone(basePreset),
             inlineOverrides
         );

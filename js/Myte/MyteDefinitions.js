@@ -190,39 +190,9 @@ class MyteDefinitionRegistry {
         };
     }
 
+    // Public alias kept for editor/runtime parity; EditorStore calls this by name.
     static deepMerge(baseValue, overrideValue) {
-        if (Array.isArray(baseValue) || Array.isArray(overrideValue)) {
-            return Utility.deepClone(overrideValue ?? baseValue);
-        }
-
-        if (!Utility.isPlainObject(baseValue) || !Utility.isPlainObject(overrideValue)) {
-            return Utility.deepClone(overrideValue ?? baseValue);
-        }
-
-        const merged = {};
-        const keys = new Set([
-            ...Object.keys(baseValue || {}),
-            ...Object.keys(overrideValue || {})
-        ]);
-
-        keys.forEach((key) => {
-            const baseChild = baseValue?.[key];
-            const overrideChild = overrideValue?.[key];
-
-            if (overrideChild === undefined) {
-                merged[key] = Utility.deepClone(baseChild);
-                return;
-            }
-
-            if (baseChild === undefined) {
-                merged[key] = Utility.deepClone(overrideChild);
-                return;
-            }
-
-            merged[key] = this.deepMerge(baseChild, overrideChild);
-        });
-
-        return merged;
+        return Utility.deepMerge(baseValue, overrideValue);
     }
 
 }

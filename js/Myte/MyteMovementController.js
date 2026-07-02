@@ -427,7 +427,7 @@ class MyteMovementController {
                             if (m.parent.checkCollision(m, collider)) {
                                 m.posX = originalX;
                                 if (window._doorDebug && ['DOOR','GATE'].includes(collider.type)) {
-                                    console.log(`[Door X] follow=${m.followMouse} collider=${collider.constructor?.name} dest=${JSON.stringify(m._movementDestination)} targetX=${m.targetX?.toFixed(1)}`);
+                                    Utility.logDebug(`[Door X] follow=${m.followMouse} collider=${collider.constructor?.name} dest=${JSON.stringify(m._movementDestination)} targetX=${m.targetX?.toFixed(1)}`);
                                 }
                                 m.tryOpenCollider(collider, 'x');
                                 xBlocked = true;
@@ -479,7 +479,7 @@ class MyteMovementController {
                             if (m.parent.checkCollision(m, collider)) {
                                 m.posY = originalY;
                                 if (window._doorDebug && ['DOOR','GATE'].includes(collider.type)) {
-                                    console.log(`[Door Y] follow=${m.followMouse} collider=${collider.constructor?.name} dest=${JSON.stringify(m._movementDestination)} targetY=${m.targetY?.toFixed(1)}`);
+                                    Utility.logDebug(`[Door Y] follow=${m.followMouse} collider=${collider.constructor?.name} dest=${JSON.stringify(m._movementDestination)} targetY=${m.targetY?.toFixed(1)}`);
                                 }
                                 m.tryOpenCollider(collider, 'y');
                                 yBlocked = true;

@@ -24,7 +24,7 @@ class MyteQueue {
     _log(tier, actionId) {
         if (!this.logEnabled) return;
         if (this.consoleClearEnabled) console.clear();
-        console.log(`[Queue:${this.myte?.name ?? '?'}] ${tier.padEnd(10)} ${actionId}`);
+        Utility.logDebug(`[Queue:${this.myte?.name ?? '?'}] ${tier.padEnd(10)} ${actionId}`);
     }
 
     // Core API

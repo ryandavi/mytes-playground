@@ -336,7 +336,7 @@ class PortalMapObject extends InteractiveMapObject {
             liveTitleElement.textContent = displayName;
             liveTitleElement.title = displayName;
         }).catch(error => {
-            console.warn(`[PortalMapObject] Failed to refresh portal title for ${this.targetMap}:`, error);
+            Utility.warnDebug(`[PortalMapObject] Failed to refresh portal title for ${this.targetMap}:`, error);
         });
     }
 

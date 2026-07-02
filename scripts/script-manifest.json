@@ -1,0 +1,401 @@
+[
+  {
+    "src": "https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js",
+    "cdn": true,
+    "commentLine": "<!-- EXTERNAL -->"
+  },
+  {
+    "src": "js/Engine/Config/AppConfig.js",
+    "commentLine": "<!-- CORE -->"
+  },
+  {
+    "src": "js/Engine/Config/SiteConfig.js"
+  },
+  {
+    "src": "js/Utility/Utility.js"
+  },
+  {
+    "src": "js/Utility/RectUtils.js"
+  },
+  {
+    "src": "js/UI/Core/TooltipSystem.js"
+  },
+  {
+    "src": "js/Engine/ItemRegistry.js"
+  },
+  {
+    "src": "js/Engine/BuffRegistry.js"
+  },
+  {
+    "src": "js/Myte/Queue/ActionDefinitionRegistry.js"
+  },
+  {
+    "src": "js/Input/BaseInputHandler.js"
+  },
+  {
+    "src": "js/Input/BaseDragHandler.js"
+  },
+  {
+    "src": "js/Engine/ResourceManager.js"
+  },
+  {
+    "src": "js/Engine/Audio/AudioCategoryRules.js"
+  },
+  {
+    "src": "js/Engine/Audio/AudioScheduleProfiles.js"
+  },
+  {
+    "src": "js/Engine/Audio/AudioVoiceProfiles.js"
+  },
+  {
+    "src": "js/Engine/Audio/AudioPresetLibrary.js"
+  },
+  {
+    "src": "js/Engine/SoundManager.js"
+  },
+  {
+    "src": "js/Engine/EventManager.js"
+  },
+  {
+    "src": "js/Engine/LoadingManager.js"
+  },
+  {
+    "src": "js/UI/Core/ToastSystem.js",
+    "blankLineBefore": true
+  },
+  {
+    "src": "js/Engine/SimClock.js"
+  },
+  {
+    "src": "js/Engine/Core.js"
+  },
+  {
+    "src": "js/Engine/GameTime.js"
+  },
+  {
+    "src": "js/Engine/SpriteAnimator.js"
+  },
+  {
+    "src": "js/Effects/ParticleSystem.js"
+  },
+  {
+    "src": "js/Input/MapObjectSelectDragManager.js",
+    "commentLine": "<!-- INPUT -->",
+    "blankLineBefore": true
+  },
+  {
+    "src": "js/Input/InputSystem.js"
+  },
+  {
+    "src": "js/Input/InputComponent.js"
+  },
+  {
+    "src": "js/Input/ClickComponent.js"
+  },
+  {
+    "src": "js/Input/DragComponent.js"
+  },
+  {
+    "src": "js/Input/RubbingComponent.js"
+  },
+  {
+    "src": "js/User/MyteRosterSchema.js",
+    "commentLine": "<!-- USER -->",
+    "phpLineEnding": "lf"
+  },
+  {
+    "src": "js/User/User.js"
+  },
+  {
+    "src": "js/User/Inventory.js"
+  },
+  {
+    "src": "js/Container/ContainerManager.js",
+    "commentLine": "<!-- CONTAINER -->"
+  },
+  {
+    "src": "js/Container/ContainerInputManager.js"
+  },
+  {
+    "src": "js/Engine/Entity.js",
+    "commentLine": "<!-- SHARED ENTITY MIXIN (must load before Myte and any NPC class) -->"
+  },
+  {
+    "src": "js/Myte/MyteDefinitions.js",
+    "commentLine": "<!-- MYTE -->"
+  },
+  {
+    "src": "js/Myte/FootstepController.js"
+  },
+  {
+    "src": "js/Myte/MytePhysics.js"
+  },
+  {
+    "src": "js/Myte/MyteMovementController.js"
+  },
+  {
+    "src": "js/Myte/MyteRenderer.js"
+  },
+  {
+    "src": "js/Myte/Myte.js"
+  },
+  {
+    "src": "js/Myte/MyteStats.js"
+  },
+  {
+    "src": "js/Myte/MyteBuffController.js"
+  },
+  {
+    "src": "js/Myte/MyteAI.js"
+  },
+  {
+    "src": "js/Myte/StateMachine.js"
+  },
+  {
+    "src": "js/Myte/Input/BaseInputHandler.js"
+  },
+  {
+    "src": "js/Myte/Input/MyteInputHandler.js"
+  },
+  {
+    "src": "js/Myte/Input/MyteTouchHandler.js"
+  },
+  {
+    "src": "js/Myte/Input/MyteClickHandler.js"
+  },
+  {
+    "src": "js/Myte/Input/MyteRubbingHandler.js"
+  },
+  {
+    "src": "js/Myte/MyteDialogue.js"
+  },
+  {
+    "src": "js/Myte/MyteSpeech.js"
+  },
+  {
+    "src": "js/Myte/Queue/Actions/BaseActions.js",
+    "commentLine": "<!-- QUEUE -->"
+  },
+  {
+    "src": "js/Myte/Queue/Actions/MoveActions.js"
+  },
+  {
+    "src": "js/Myte/Queue/Actions/ObjectInteractions.js"
+  },
+  {
+    "src": "js/Myte/Queue/Actions/SocialActions.js"
+  },
+  {
+    "src": "js/Myte/Queue/Actions/StateActions.js"
+  },
+  {
+    "src": "js/Myte/Queue/Actions/CarryActions.js"
+  },
+  {
+    "src": "js/Myte/Queue/Actions/ReactiveActions.js"
+  },
+  {
+    "src": "js/Myte/Queue/MyteQueue.js"
+  },
+  {
+    "src": "js/Myte/Queue/ActionManager.js"
+  },
+  {
+    "src": "js/Map/Camera.js",
+    "commentLine": "<!-- MAP -->"
+  },
+  {
+    "src": "js/Map/GameMapLoader.js"
+  },
+  {
+    "src": "js/Map/GameMap.js"
+  },
+  {
+    "src": "js/Map/GameZone.js"
+  },
+  {
+    "src": "js/Map/MapEnvironmentManager.js"
+  },
+  {
+    "src": "js/Map/GameMapParticleSystem.js"
+  },
+  {
+    "src": "js/Map/Grid/TileMapLoader.js"
+  },
+  {
+    "src": "js/Map/MapTransitionManager.js"
+  },
+  {
+    "src": "js/Map/MapRenderer.js"
+  },
+  {
+    "src": "js/Map/MapObjects/ActionSlotLedger.js",
+    "commentLine": "<!-- BASE MAP OBJECTS-->"
+  },
+  {
+    "src": "js/Map/MapObjects/MapObjectInputController.js"
+  },
+  {
+    "src": "js/Map/MapObjects/MapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/DroppedMapItem.js"
+  },
+  {
+    "src": "js/Map/MapObjects/AnimationController.js",
+    "commentLine": "<!-- ANIMATED -->"
+  },
+  {
+    "src": "js/Map/MapObjects/AnimatedMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/MapObjectBases.js"
+  },
+  {
+    "src": "js/Map/MapObjects/Interactive/FountainMapObject.js",
+    "commentLine": "<!-- INTERACTIVE -->"
+  },
+  {
+    "src": "js/Map/MapObjects/Interactive/LightMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/Interactive/TreasureChestMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/Interactive/PortalMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/Moving/MovingMapObject.js",
+    "commentLine": "<!-- MOVING -->"
+  },
+  {
+    "src": "js/Map/MapObjects/Moving/BallMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/AmbientCreature/AmbientCreatureMapObject.js",
+    "commentLine": "<!-- AMBIENT CREATURES -->"
+  },
+  {
+    "src": "js/Map/MapObjects/AmbientCreature/HiveMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/AmbientCreature/PollinatorCreatureMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/AmbientCreature/BirdMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/NPC/PatrolGuardMapObject.js",
+    "commentLine": "<!-- NPC -->"
+  },
+  {
+    "src": "js/Map/MapObjects/NPC/NpcMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/Barrier/DoorMapObject.js",
+    "commentLine": "<!-- BARRIERS -->"
+  },
+  {
+    "src": "js/Map/MapObjects/Barrier/FenceMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/Barrier/GateMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/GrowingPlant/GrowingPlantMapObject.js",
+    "commentLine": "<!-- PLANTS -->"
+  },
+  {
+    "src": "js/Map/MapObjects/GrowingPlant/BreedingFlowerMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/GrowingPlant/NightBloomMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/GrowingPlant/CropPlantMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/GrowingPlant/TreeMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/GrowingPlant/FruitTreeMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/GrowingPlant/TreeStumpMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjectFactory.js",
+    "commentLine": "<!-- MAP OBJECT FACTORY -->"
+  },
+  {
+    "src": "js/Map/Grid/GameMapGrid.js",
+    "commentLine": "<!-- MAP GRID -->"
+  },
+  {
+    "src": "js/Map/Grid/AStarPathfinder.js"
+  },
+  {
+    "src": "js/UI/Core/UIComponent.js",
+    "commentLine": "<!-- UI -->"
+  },
+  {
+    "src": "js/UI/Overlays/CompactChipStripUI.js"
+  },
+  {
+    "src": "js/UI/Core/CursorManager.js"
+  },
+  {
+    "src": "js/UI/Container/ToolManager.js"
+  },
+  {
+    "src": "js/UI/Map/SelectionManager.js"
+  },
+  {
+    "src": "js/UI/Map/QueueTargetManager.js"
+  },
+  {
+    "src": "js/UI/Container/ActionSidebarManager.js"
+  },
+  {
+    "src": "js/UI/Overlays/CompactQueueUI.js"
+  },
+  {
+    "src": "js/UI/Overlays/BuffOverlayUI.js"
+  },
+  {
+    "src": "js/UI/Container/MyteListManager.js"
+  },
+  {
+    "src": "js/UI/Container/HUDManager.js"
+  },
+  {
+    "src": "js/UI/Map/OffscreenMyteIndicatorManager.js"
+  },
+  {
+    "src": "js/UI/Container/ScreenManager.js"
+  },
+  {
+    "src": "js/UI/Core/UserInterface.js"
+  },
+  {
+    "src": "js/UI/Core/ModalWindow.js"
+  },
+  {
+    "src": "js/UI/Debug/DebugOverlayUI.js"
+  },
+  {
+    "src": "js/UI/Debug/QueueUI.js"
+  },
+  {
+    "src": "js/UI/Panels/SoundPanel.js"
+  },
+  {
+    "src": "js/UI/Panels/SettingsPanel.js"
+  },
+  {
+    "src": "js/UI/Panels/ViewPanel.js"
+  },
+  {
+    "src": "js/UI/Panels/DebugPanel.js"
+  }
+]

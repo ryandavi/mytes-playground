@@ -212,8 +212,19 @@ class MapTransitionManager {
         if (this.container.inputHandler && this.container.inputHandler.enable) {
             this.container.inputHandler.enable();
         } else {
-            console.warn('InputHandler enable method not available');
+            Utility.warnDebug('InputHandler enable method not available');
         }
+    }
+
+    _showMapLoadFailureToast(mapId) {
+        const message = `Failed to load map ${mapId}`;
+        const toastManager = this.core?.toastManager;
+        if (toastManager?.error) {
+            toastManager.error(message, 'Map Load Failed');
+            return;
+        }
+
+        this.container.ui?.showMessage?.(message, 'error', 'Map Load Failed');
     }
 
     _finishSuccessfulTransition(options, isInitialLoad) {
@@ -256,6 +267,7 @@ class MapTransitionManager {
         const spawnPoint = options.targetSpawnPoint || null;
         const targetPortalId = options.targetPortalId || null;
         const isInitialLoad = options.isInitialLoad || false;
+        const allowFallback = options.allowFallback === true;
         const sourcePortal = options.sourcePortal || null;
         const sourcePortalId = options.sourcePortalId || sourcePortal?.getPortalReferenceId?.() || null;
         const sameMapTransition = !isInitialLoad && !!mapId && mapId === sourceMapId;
@@ -265,7 +277,7 @@ class MapTransitionManager {
             if (this.container.inputHandler && this.container.inputHandler.disable) {
                 this.container.inputHandler.disable();
             } else {
-                console.warn('InputHandler disable method not available');
+                Utility.warnDebug('InputHandler disable method not available');
             }
 
             if (!sameMapTransition) {
@@ -297,35 +309,41 @@ class MapTransitionManager {
         }
 
         let newMap;
+        let loadError = null;
 
-        if (this.core && this.core.mapLoader) {
-            if (isInitialLoad) {
-                newMap = await this.core.mapLoader.loadMap(mapId, this.container, { isInitialLoad: true });
-            } else {
-                newMap = await this.core.mapLoader.loadMapWithTransition(mapId, this.container, {
-                    ...options,
-                    message: transitionCopy.message,
-                    transitionTitle: transitionCopy.title,
-                    transitionDescription: transitionCopy.description,
-                    transitionTip: transitionCopy.tip,
-                    minVisibleTime: transitionCopy.minVisibleTime,
-                    isInitialLoad: false
-                });
-            }
-        } else {
-            console.warn('Core mapLoader not available, creating map directly');
-            newMap = new GameMap(this.container);
-
-            try {
-                const success = await newMap.initialize(mapId, { isInitialLoad });
-                if (!success) {
-                    console.error(`[MapTransitionManager] Failed to initialize map: ${mapId}`);
-                    newMap = null;
+        try {
+            if (this.core && this.core.mapLoader) {
+                if (isInitialLoad) {
+                    newMap = await this.core.mapLoader.loadMap(mapId, this.container, {
+                        isInitialLoad: true,
+                        allowFallback
+                    });
+                } else {
+                    newMap = await this.core.mapLoader.loadMapWithTransition(mapId, this.container, {
+                        ...options,
+                        message: transitionCopy.message,
+                        transitionTitle: transitionCopy.title,
+                        transitionDescription: transitionCopy.description,
+                        transitionTip: transitionCopy.tip,
+                        minVisibleTime: transitionCopy.minVisibleTime,
+                        isInitialLoad: false,
+                        allowFallback
+                    });
                 }
-            } catch (error) {
-                console.error('[MapTransitionManager] Error initializing map:', error);
-                newMap = null;
+            } else {
+                Utility.warnDebug('Core mapLoader not available, creating map directly');
+                newMap = new GameMap(this.container);
+                try {
+                    await newMap.initialize(mapId, { isInitialLoad, allowFallback });
+                } catch (error) {
+                    newMap.dispose?.();
+                    newMap = null;
+                    throw error;
+                }
             }
+        } catch (error) {
+            loadError = error;
+            newMap = null;
         }
 
         if (newMap) {
@@ -391,23 +409,11 @@ class MapTransitionManager {
         }
 
         if (!isInitialLoad) {
-            this.messageElement.textContent = "Map not found!";
-
-            if (this.container.ui && this.container.ui.showMessage) {
-                this.container.ui.showMessage(`Cannot find map "${mapId}"`);
-            }
-
-            setTimeout(() => {
-                this.hideTransition();
-
-                if (this.container.inputHandler && this.container.inputHandler.enable) {
-                    this.container.inputHandler.enable();
-                } else {
-                    console.warn('InputHandler enable method not available');
-                }
-            }, 2000);
+            console.error(`[MapTransitionManager] Failed to load map ${mapId}:`, loadError);
+            this._showMapLoadFailureToast(mapId);
+            this._completeTransitionUi(false);
         } else {
-            console.error(`[MapTransitionManager] Initial map load failed for ${mapId}`);
+            console.error(`[MapTransitionManager] Initial map load failed for ${mapId}:`, loadError);
 
             const fallbackMapId = SiteConfig?.world?.defaultMap ?? 'House';
 
@@ -416,6 +422,7 @@ class MapTransitionManager {
                 return this.startTransition({
                     ...options,
                     targetMap: fallbackMapId,
+                    allowFallback,
                     message: `Loading fallback map...`
                 });
             }

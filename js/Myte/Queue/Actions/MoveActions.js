@@ -73,8 +73,8 @@ const _alog  = APPROACH_DEBUG ? console.log.bind(console)  : () => {};
 const _awarn = APPROACH_DEBUG ? console.warn.bind(console) : () => {};
 const _slog  = ASTAR_DEBUG    ? console.log.bind(console)  : () => {};
 const _swarn = ASTAR_DEBUG    ? console.warn.bind(console) : () => {};
-const _approachInfo = console.log.bind(console);
-const _approachWarn = console.warn.bind(console);
+const _approachInfo = APPROACH_DEBUG ? console.log.bind(console)  : () => {};
+const _approachWarn = APPROACH_DEBUG ? console.warn.bind(console) : () => {};
 
 // Direct movement to coordinates with optional A* pathfinding
 class MoveAction extends MyteAction {

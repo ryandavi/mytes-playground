@@ -204,7 +204,8 @@ function validateActions() {
     const registeredClasses = getRegisteredActionClasses();
     actions.forEach((action) => {
         const actionId = normalizeId(action.id);
-        const className = String(action.implementationClass || '').trim();
+        // Runtime reads this from queue.implementationClass (ActionDefinitionRegistry).
+        const className = String(action.queue?.implementationClass || '').trim();
         if (!className) {
             fail(`Action "${actionId}" is missing implementationClass.`);
             return;

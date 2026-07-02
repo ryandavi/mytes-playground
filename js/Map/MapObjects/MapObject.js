@@ -33,10 +33,10 @@ class MapObject {
 			activeInteractions: new Set(),
 			interactionTimes: new Map()
 		};
-		this.actionOccupancy = new Map();
-		this.actionSlotOccupancy = new Map();
+		this.actionSlots = new ActionSlotLedger(this);
 
 		this.inputComponents = {};
+		this.input = new MapObjectInputController(this);
 		this.isDragging = false;
 		this.shadowElement = null;
 		this.isPickedUp = false;
@@ -208,25 +208,11 @@ class MapObject {
 	}
 
 	humanizeLabelToken(value) {
-		return String(value || '')
-			.trim()
-			.split(/[_\s-]+/)
-			.filter(Boolean)
-			.map(part => part.charAt(0).toUpperCase() + part.slice(1))
-			.join(' ');
+		return Utility.humanizeLabel(value);
 	}
 
 	formatDisplayQuantity(quantity) {
-		if (Array.isArray(quantity) && quantity.length >= 2) {
-			return `${quantity[0]}-${quantity[1]}`;
-		}
-
-		const numericQuantity = Number(quantity);
-		if (Number.isFinite(numericQuantity)) {
-			return String(numericQuantity);
-		}
-
-		return null;
+		return Utility.formatQuantityRange(quantity);
 	}
 
 	getDisplayName() {
@@ -522,32 +508,7 @@ class MapObject {
 	}
 
 	getActionSlotDefinitions(actionId) {
-		const actionConfig = this.getActionConfig(actionId, {}) ?? {};
-		const facing = this.getConfig('facingDirection', this.facingDirection ?? 'S');
-		let slots = [];
-
-		if (Array.isArray(actionConfig.slots)) {
-			slots = actionConfig.slots;
-		} else if (actionConfig.slotsByFacing && typeof actionConfig.slotsByFacing === 'object') {
-			slots = actionConfig.slotsByFacing[facing] ??
-				actionConfig.slotsByFacing.default ??
-				[];
-		}
-
-		if (!Array.isArray(slots) || slots.length === 0) {
-			const mytePosition = this.getConfig('mytePosition', null);
-			if (!mytePosition) return [];
-			return [{
-				id: 'default',
-				restPosition: mytePosition,
-				restFacing: this.getConfig('myteFacing', null) ?? undefined
-			}];
-		}
-
-		return slots.map((slot, index) => ({
-			id: slot?.id ?? `${actionId}_slot_${index}`,
-			...slot
-		}));
+		return this.actionSlots.getActionSlotDefinitions(actionId);
 	}
 
 	// ── Direction helpers ─────────────────────────────────────────────────────
@@ -562,16 +523,16 @@ class MapObject {
 
 		if (dirConfig.size) config.size = dirConfig.size;
 		if (dirConfig.physics) {
-			config.physics = MapObjectFactory.deepMerge({}, config.physics || {}, dirConfig.physics);
+			config.physics = Utility.deepMerge(config.physics || {}, dirConfig.physics);
 		}
 		if (dirConfig.interaction) {
-			config.interaction = MapObjectFactory.deepMerge({}, config.interaction || {}, dirConfig.interaction);
+			config.interaction = Utility.deepMerge(config.interaction || {}, dirConfig.interaction);
 		}
 		if (dirConfig.spatial) {
-			config.spatial = MapObjectFactory.deepMerge({}, config.spatial || {}, dirConfig.spatial);
+			config.spatial = Utility.deepMerge(config.spatial || {}, dirConfig.spatial);
 		}
 		if (dirConfig.visual) {
-			config.visual = MapObjectFactory.deepMerge({}, config.visual || {}, dirConfig.visual);
+			config.visual = Utility.deepMerge(config.visual || {}, dirConfig.visual);
 		}
 
 		config.facingDirection = normalizedDirection;
@@ -960,217 +921,57 @@ class MapObject {
 	}
 
 	getActionOccupant(actionId) {
-		return actionId ? (this.actionOccupancy.get(actionId) ?? null) : null;
+		return this.actionSlots.getActionOccupant(actionId);
 	}
 
 	getActionSlotOccupants(actionId) {
-		if (!actionId) {
-			return null;
-		}
-
-		let slotOccupants = this.actionSlotOccupancy.get(actionId);
-		if (!slotOccupants) {
-			slotOccupants = new Map();
-			this.actionSlotOccupancy.set(actionId, slotOccupants);
-		}
-
-		return slotOccupants;
+		return this.actionSlots.getActionSlotOccupants(actionId);
 	}
 
 	getActionSlotOccupant(actionId, slotId) {
-		if (!actionId || !slotId) {
-			return null;
-		}
-
-		return this.actionSlotOccupancy.get(actionId)?.get(slotId) ?? null;
+		return this.actionSlots.getActionSlotOccupant(actionId, slotId);
 	}
 
 	isActionSlotOccupied(actionId, slotId, actor = null) {
-		const occupant = this.getActionSlotOccupant(actionId, slotId);
-		return !!occupant && occupant !== actor;
+		return this.actionSlots.isActionSlotOccupied(actionId, slotId, actor);
 	}
 
 	getAvailableActionSlots(actionId, actor = null) {
-		return this.getActionSlotDefinitions(actionId)
-			.filter(slot => !this.isActionSlotOccupied(actionId, slot.id, actor));
+		return this.actionSlots.getAvailableActionSlots(actionId, actor);
 	}
 
 	isActionOccupied(actionId, actor = null) {
-		const slots = this.getActionSlotDefinitions(actionId);
-		if (slots.length > 0) {
-			return this.getAvailableActionSlots(actionId, actor).length === 0;
-		}
-
-		const occupant = this.getActionOccupant(actionId);
-		return !!occupant && occupant !== actor;
+		return this.actionSlots.isActionOccupied(actionId, actor);
 	}
 
 	claimActionSlot(actionId, slotId, actor = null) {
-		if (!actionId || !slotId) {
-			return false;
-		}
-
-		const slots = this.getActionSlotDefinitions(actionId);
-		if (!slots.some(slot => slot.id === slotId)) {
-			return false;
-		}
-
-		const occupant = this.getActionSlotOccupant(actionId, slotId);
-		if (occupant && occupant !== actor) {
-			return false;
-		}
-
-		if (actor) {
-			this.getActionSlotOccupants(actionId).set(slotId, actor);
-		}
-
-		return true;
+		return this.actionSlots.claimActionSlot(actionId, slotId, actor);
 	}
 
 	claimActionOccupancy(actionId, actor = null) {
-		if (!actionId) {
-			return true;
-		}
-
-		if (this.getActionSlotDefinitions(actionId).length > 0) {
-			return !this.isActionOccupied(actionId, actor);
-		}
-
-		const actionConfig = this.getActionConfig(actionId, {}) ?? {};
-		const exclusive = actionConfig.exclusive !== false;
-		const occupant = this.getActionOccupant(actionId);
-
-		if (exclusive && occupant && occupant !== actor) {
-			return false;
-		}
-
-		if (actor) {
-			this.actionOccupancy.set(actionId, actor);
-		}
-
-		return true;
+		return this.actionSlots.claimActionOccupancy(actionId, actor);
 	}
 
 	releaseActionOccupancy(actionId, actor = null) {
-		if (!actionId) {
-			return false;
-		}
-
-		if (this.getActionSlotDefinitions(actionId).length > 0) {
-			let released = false;
-			const slotOccupants = this.actionSlotOccupancy.get(actionId);
-			if (!slotOccupants) {
-				return false;
-			}
-
-			for (const [slotId, occupant] of slotOccupants.entries()) {
-				if (!actor || occupant === actor) {
-					slotOccupants.delete(slotId);
-					released = true;
-				}
-			}
-
-			if (slotOccupants.size === 0) {
-				this.actionSlotOccupancy.delete(actionId);
-			}
-
-			return released;
-		}
-
-		const occupant = this.getActionOccupant(actionId);
-		if (!occupant) {
-			return false;
-		}
-
-		if (actor && occupant !== actor) {
-			return false;
-		}
-
-		this.actionOccupancy.delete(actionId);
-		return true;
+		return this.actionSlots.releaseActionOccupancy(actionId, actor);
 	}
 
 	releaseActionSlot(actionId, slotId, actor = null) {
-		if (!actionId || !slotId) {
-			return false;
-		}
-
-		const slotOccupants = this.actionSlotOccupancy.get(actionId);
-		if (!slotOccupants) {
-			return false;
-		}
-
-		const occupant = slotOccupants.get(slotId);
-		if (!occupant) {
-			return false;
-		}
-
-		if (actor && occupant !== actor) {
-			return false;
-		}
-
-		slotOccupants.delete(slotId);
-		if (slotOccupants.size === 0) {
-			this.actionSlotOccupancy.delete(actionId);
-		}
-
-		return true;
+		return this.actionSlots.releaseActionSlot(actionId, slotId, actor);
 	}
 
 	isInUse(actionId = null) {
-		if (actionId) {
-			const slotOccupants = this.actionSlotOccupancy.get(actionId);
-			return this.getActionOccupant(actionId) != null || (slotOccupants?.size ?? 0) > 0;
-		}
-
-		if (this.actionOccupancy.size > 0) {
-			return true;
-		}
-
-		for (const slotOccupants of this.actionSlotOccupancy.values()) {
-			if ((slotOccupants?.size ?? 0) > 0) {
-				return true;
-			}
-		}
-
-		return false;
+		return this.actionSlots.isInUse(actionId);
 	}
 
 	// ── Input components ──────────────────────────────────────────────────────
 
 	initializeInputComponents() {
-		if (!this.element || !this.parent) return;
-
-		if (this.getConfig('interaction.interactive', true) || this.canShowSelectPointer()) this.initClickComponent();
-		if (this.getConfig('draggable', false)) this.initDragComponent();
-		if (this.getConfig('rubbable', false)) this.initRubbingComponent();
-
-		Object.values(this.inputComponents).forEach(component => {
-			if (!component.element) component.element = this.element;
-			component.initialize();
-		});
+		this.input.initializeInputComponents();
 	}
 
 	initClickComponent() {
-		if (this.inputComponents.click) return;
-		this.inputComponents.click = new ClickComponent(this, {
-			element: this.element,
-			enabled: true,
-			doubleClickInterval: this.getConfig('interactionGestures.doubleClickInterval', SiteConfig.interaction.gestures.doubleClickInterval),
-			longPressDelay: this.getConfig('interactionGestures.longPressDelay', SiteConfig.interaction.gestures.longPressDelay),
-			clickMoveThreshold: this.getConfig('interactionGestures.clickMoveThreshold', SiteConfig.interaction.gestures.clickMoveThreshold),
-			canClick: () => this.active,
-			onClick: () => this.handleSingleClick(),
-			onDoubleClick: (event) => this.handleDoubleClick(event),
-			onLongPress: (event) => {
-				if (this.canStartSelectModeDrag()) {
-					this.parent?.ui?.changeToolMode(UIToolModes.DRAG);
-					this.startDrag();
-				} else {
-					this.handleLongPress(event);
-				}
-			}
-		});
+		this.input.initClickComponent();
 	}
 
 	handleSingleClick() {
@@ -1179,120 +980,11 @@ class MapObject {
 	}
 
 	initDragComponent() {
-		if (this.inputComponents.drag) return;
-		this.inputComponents.drag = new DragComponent(this, {
-			element: this.element,
-			enabled: true,
-			autoActivate: false,
-			canDrag: () => this.active && this.canBeDragged(),
-			dragThreshold: this.getConfig('dragThreshold', SiteConfig.interaction.mapObject.dragThreshold),
-			dragTimeThreshold: 0,
-			preventDefaultsForDrag: true,
-			onDragStart: () => {
-				this.isDragging = true;
-				this._dragOriginX = this.posX;
-				this._dragOriginY = this.posY;
-				this._dragOriginDirection = this.getConfig('facingDirection', null);
-				this.syncRenderLayer();
-				this.element.classList.add('dragging');
-				this.container?.camera?.beginTemporaryFollow?.(this);
-				if (this.container?.ui) this.container.ui.setSelected(this);
-				this.playConfiguredSound?.('pickup');
-				if (this.getConfig('directionConfigs', null) && SiteConfig.objects.canRotate) {
-					this._rotateKeyHandler = (e) => {
-						if ((e.key === 'r' || e.key === 'R') && this.isDragging) {
-							e.preventDefault();
-							this._rotateDuringDrag();
-						}
-					};
-					window.addEventListener('keydown', this._rotateKeyHandler);
-				}
-			},
-			onDragMove: (event) => {
-				const world = this.container?.inputHandler?.screenToWorldCoordinates
-					? this.container.inputHandler.screenToWorldCoordinates(event.position.x, event.position.y, {
-						element: this
-					})
-					: { x: this.posX, y: this.posY };
-				const clampedWorld = this.container?.clampEntityPosition
-					? this.container.clampEntityPosition(this, world.x, world.y)
-					: world;
-				this.posX = clampedWorld.x;
-				this.posY = clampedWorld.y;
-				this.updatePosition();
-				this.container?.camera?.focusOn?.(this);
-				this.showDropTarget();
-			},
-			onDragEnd: () => {
-				this.isDragging = false;
-				this.container?.camera?.endTemporaryFollow?.(this);
-				this.element.classList.remove('dragging');
-				this.hideDropTarget();
-				if (this._rotateKeyHandler) {
-					window.removeEventListener('keydown', this._rotateKeyHandler);
-					this._rotateKeyHandler = null;
-				}
-				if (this.getConfig('snapToGrid', false)) this.snapToGrid();
-				if (this.container?.clampEntityPosition) {
-					const clampedWorld = this.container.clampEntityPosition(this, this.posX, this.posY);
-					this.posX = clampedWorld.x;
-					this.posY = clampedWorld.y;
-					this.updatePosition();
-				}
-				const isValid = this.checkDropValidity(this.posX, this.posY);
-				if (!isValid) {
-					const safePosition = this.gameMap?.gridSystem?.findNearestValidPositionForEntity?.(
-						this,
-						this.posX,
-						this.posY,
-						12
-					);
-					if (safePosition) {
-						this.posX = safePosition.x;
-						this.posY = safePosition.y;
-						this.updatePosition();
-						this.playConfiguredSound?.('drop');
-					} else {
-						this.posX = this._dragOriginX;
-						this.posY = this._dragOriginY;
-						if (this._dragOriginDirection !== null &&
-							this._dragOriginDirection !== this.getConfig('facingDirection', null)) {
-							this.applyFacingDirection(this._dragOriginDirection);
-						}
-						this.updatePosition();
-						this.playConfiguredSound?.('drop_error');
-					}
-				} else {
-					this.playConfiguredSound?.('drop');
-				}
-				this.syncRenderLayer();
-				this.handleMovedEvent();
-			}
-		});
+		this.input.initDragComponent();
 	}
 
 	initRubbingComponent() {
-		if (this.inputComponents.rubbing) return;
-		// Gesture tuning comes from SiteConfig.interaction.rubbing via the
-		// component defaults; only the per-object cooldown is overridable here.
-		this.inputComponents.rubbing = new RubbingComponent(this, {
-			element: this.element,
-			enabled: true,
-			canRub: () => this.active && this.parent?.ui?.isTool(UIToolModes.PET),
-			minTimeBetweenRubs: this.getConfig('rubCooldown', 5000),
-			onRubStart: () => this.element.classList.add('being-rubbed'),
-			onRubProgress: (event) => {
-				if (this.getConfig('rubFeedback')) this.handleRubProgress(event.count);
-			},
-			onRubComplete: (event) => {
-				this.element.classList.remove('being-rubbed');
-				if (this.getConfig('onRub')) this.handleRubEvent(event.count);
-			},
-			onRubOverdone: (event) => {
-				this.element.classList.remove('being-rubbed');
-				if (this.getConfig('onRubOverdone')) this.handleRubOverdone(event.count);
-			}
-		});
+		this.input.initRubbingComponent();
 	}
 
 	// ── Drag helpers ──────────────────────────────────────────────────────────
@@ -1331,174 +1023,19 @@ class MapObject {
 	}
 
 	startDrag() {
-		this.startDragAtPosition();
+		this.input.startDrag();
 	}
 
 	startDragAtPosition(position = null) {
-		if (this.isPickedUp && this.carrier?.queue) {
-			this.carrier.queue.clear();
-		}
-		if (!this.canBeDragged() || !this.inputComponents.drag) return;
-		if (position) {
-			this.inputComponents.drag.startDragAtPosition(position);
-			return;
-		}
-		this.inputComponents.drag.startDragAtCurrentPosition();
+		this.input.startDragAtPosition(position);
 	}
 
 	_initSelectDragHandler() {
-		if (!this.element || this._selectDragCleanup || !this.getConfig('dragInSelectMode', false)) {
-			return;
-		}
-
-		const dragThreshold = this.getConfig('selectDragThreshold', SiteConfig.interaction.mapObject.selectDragThreshold);
-		const dragTimeThreshold = this.getConfig('selectDragTimeThreshold', SiteConfig.interaction.mapObject.selectDragTimeThreshold);
-		const maxYForPickup = this.getConfig('selectPickupMaxY', SiteConfig.interaction.mapObject.selectPickupMaxY);
-		const maxXForPickup = this.getConfig('selectPickupMaxX', SiteConfig.interaction.mapObject.selectPickupMaxX);
-		const usePickupGesture = this.getConfig('canPickUp', false);
-		const dragModeRestoreDelay = this.getConfig('selectDragModeRestoreDelay', SiteConfig.interaction.mapObject.selectDragModeRestoreDelay);
-		const dragStartDelay = this.getConfig('selectDragStartDelay', SiteConfig.interaction.mapObject.selectDragStartDelay);
-		let pressStart = null;
-		let previousMode = null;
-		let pressStartTime = 0;
-		let pendingTemporaryDrag = null;
-
-		const onMouseDown = (event) => {
-			// The central manager already confirmed event.target belongs to this.element.
-			if (event.button !== 0 || !this.active || this.isDragging || !this.canStartSelectModeDrag()) {
-				return;
-			}
-			const rect = this.element?.getBoundingClientRect?.();
-			if (!rect) {
-				return;
-			}
-			const isInside =
-				event.clientX >= rect.left &&
-				event.clientX <= rect.right &&
-				event.clientY >= rect.top &&
-				event.clientY <= rect.bottom;
-			if (!isInside) {
-				return;
-			}
-
-			pressStart = {
-				x: event.clientX,
-				y: event.clientY,
-				pageX: event.pageX,
-				pageY: event.pageY
-			};
-			previousMode = UIToolModes.SELECT;
-			pressStartTime = Date.now();
-		};
-
-		const onMouseMove = (event) => {
-			if (!pressStart || this.isDragging || !this.canStartSelectModeDrag()) {
-				return;
-			}
-
-			const dx = event.clientX - pressStart.x;
-			const dy = event.clientY - pressStart.y;
-			const distance = Math.hypot(dx, dy);
-			const timeElapsed = Date.now() - pressStartTime;
-			const passesPickupGesture = !usePickupGesture || (
-				distance > dragThreshold &&
-				timeElapsed > dragTimeThreshold &&
-				event.clientY < pressStart.y &&
-				pressStart.y - event.clientY > dragThreshold &&
-				pressStart.y - event.clientY < maxYForPickup &&
-				Math.abs(pressStart.x - event.clientX) < maxXForPickup
-			);
-
-			if (!passesPickupGesture && distance < dragThreshold) {
-				return;
-			}
-
-			if (usePickupGesture && !passesPickupGesture) {
-				return;
-			}
-
-			const previousStart = pressStart;
-			const pointerPosition = {
-				x: event.pageX,
-				y: event.pageY,
-				clientX: event.clientX,
-				clientY: event.clientY
-			};
-			pressStart = null;
-			this._tempSelectDragActive = true;
-			pendingTemporaryDrag = {
-				previousMode,
-				startPosition: previousStart,
-				pointerPosition
-			};
-			this.parent?.ui?.changeToolMode(UIToolModes.DRAG);
-			window.setTimeout(() => {
-				if (!pendingTemporaryDrag || this.isDragging) {
-					return;
-				}
-
-				const { previousMode: queuedMode, startPosition, pointerPosition: queuedPointer } = pendingTemporaryDrag;
-				pendingTemporaryDrag = null;
-
-				this.startDragAtPosition({
-					x: startPosition.pageX ?? startPosition.x,
-					y: startPosition.pageY ?? startPosition.y,
-					clientX: startPosition.x,
-					clientY: startPosition.y
-				});
-
-				if (this.isDragging) {
-					this.inputComponents.drag?.handleMove?.({
-						position: queuedPointer,
-						originalEvent: event
-					});
-					this._restoreToolModeAfterDrag(queuedMode, dragModeRestoreDelay);
-				} else {
-					this._tempSelectDragActive = false;
-					this.parent?.ui?.changeToolMode(queuedMode);
-				}
-			}, dragStartDelay);
-		};
-
-		const onMouseUp = () => {
-			pressStart = null;
-			previousMode = null;
-			pressStartTime = 0;
-			pendingTemporaryDrag = null;
-			if (!this.isDragging) {
-				this._tempSelectDragActive = false;
-			}
-		};
-
-		// Register with the central manager (one document listener set for all objects).
-		const unregister = MapObjectSelectDragManager.getInstance().register(
-			this.element, onMouseDown, onMouseMove, onMouseUp
-		);
-
-		this._selectDragCleanup = () => {
-			unregister();
-			this._selectDragCleanup = null;
-		};
+		this.input._initSelectDragHandler();
 	}
 
 	_restoreToolModeAfterDrag(mode, delay = 0) {
-		const dragComp = this.inputComponents.drag;
-		if (!dragComp || !mode) {
-			return;
-		}
-
-		const savedEnd = dragComp.options.onDragEnd;
-		dragComp.options.onDragEnd = (event) => {
-			if (savedEnd) {
-				savedEnd(event);
-			}
-
-			this._tempSelectDragActive = false;
-			window.setTimeout(() => {
-				this.parent?.ui?.changeToolMode(mode);
-			}, delay);
-			dragComp.options.onDragEnd = savedEnd;
-		};
+		this.input._restoreToolModeAfterDrag(mode, delay);
 	}
 
 	playConfiguredSound(type) {
@@ -1520,16 +1057,16 @@ class MapObject {
 			this.size = { width: dirConfig.size.width, height: dirConfig.size.height };
 		}
 		if (dirConfig.spatial) {
-			this.config.spatial = MapObjectFactory.deepMerge({}, this.config.spatial || {}, dirConfig.spatial);
+			this.config.spatial = Utility.deepMerge(this.config.spatial || {}, dirConfig.spatial);
 		}
 		if (dirConfig.visual) {
-			this.config.visual = MapObjectFactory.deepMerge({}, this.config.visual || {}, dirConfig.visual);
+			this.config.visual = Utility.deepMerge(this.config.visual || {}, dirConfig.visual);
 		}
 		if (dirConfig.physics) {
-			this.config.physics = MapObjectFactory.deepMerge({}, this.config.physics || {}, dirConfig.physics);
+			this.config.physics = Utility.deepMerge(this.config.physics || {}, dirConfig.physics);
 		}
 		if (dirConfig.interaction) {
-			this.config.interaction = MapObjectFactory.deepMerge({}, this.config.interaction || {}, dirConfig.interaction);
+			this.config.interaction = Utility.deepMerge(this.config.interaction || {}, dirConfig.interaction);
 		}
 		const colliderRegion = this.getRegionConfig('collider');
 		if (colliderRegion) {
@@ -1598,118 +1135,23 @@ class MapObject {
 	}
 
 	_rotateDuringDrag() {
-		if (!SiteConfig.objects.canRotate) return;
-		const directionConfigs = this.getConfig('directionConfigs', null);
-		if (!directionConfigs) return;
-
-		const directions = Object.keys(directionConfigs);
-		const currentDir = this.getConfig('facingDirection', directions[0]);
-		const currentIdx = directions.indexOf(currentDir);
-		const nextDir = directions[(currentIdx + 1) % directions.length];
-		this.applyFacingDirection(nextDir);
-		this.showDropTarget();
+		this.input._rotateDuringDrag();
 	}
 
 	showDropTarget() {
-		const gridSystem = this.gameMap?.gridSystem;
-		if (!gridSystem) return;
-
-		if (!this._dropTargetEl) {
-			this._dropTargetEl = document.createElement('div');
-			this._dropTargetEl.className = 'drop-target';
-			this.gameMap.layers.objects.appendChild(this._dropTargetEl);
-		}
-
-		const snappedPos = this.getConfig('snapToGrid', false)
-			? gridSystem.snapToGrid(
-				this.posX,
-				this.posY,
-				this.size.width,
-				this.size.height,
-				gridSystem.config.cellSize,
-				{ useCenter: false }
-			)
-			: { x: this.posX, y: this.posY };
-
-		// Outer container always uses sprite size (grid-aligned)
-		this._dropTargetEl.style.width = `${this.size.width}px`;
-		this._dropTargetEl.style.height = `${this.size.height}px`;
-		this._dropTargetEl.style.left = `${snappedPos.x}px`;
-		this._dropTargetEl.style.top = `${snappedPos.y}px`;
-
-		const isValid = this.checkDropValidity(snappedPos.x, snappedPos.y);
-		this._dropTargetEl.classList.toggle('is-drop-valid', isValid);
-		this._dropTargetEl.classList.toggle('is-drop-invalid', !isValid);
-
-		// Show collider bounds as inner indicator when collider differs from sprite size
-		if (this.collider) {
-			if (!this._dropTargetColliderEl) {
-				this._dropTargetColliderEl = document.createElement('div');
-				this._dropTargetColliderEl.className = 'drop-target-collider';
-				this._dropTargetEl.appendChild(this._dropTargetColliderEl);
-			}
-			this._dropTargetColliderEl.style.left = `${this.collider.offsetX ?? 0}px`;
-			this._dropTargetColliderEl.style.top = `${this.collider.offsetY ?? 0}px`;
-			this._dropTargetColliderEl.style.width = `${this.collider.width ?? this.size.width}px`;
-			this._dropTargetColliderEl.style.height = `${this.collider.height ?? this.size.height}px`;
-		}
-
-		this._dropTargetEl.style.display = '';
+		this.input.showDropTarget();
 	}
 
 	hideDropTarget() {
-		if (this._dropTargetEl) this._dropTargetEl.style.display = 'none';
+		this.input.hideDropTarget();
 	}
 
 	getDropValidationBounds(x = this.posX, y = this.posY) {
-		if (this.collider) {
-			return {
-				x: x + (this.collider.offsetX ?? 0),
-				y: y + (this.collider.offsetY ?? 0),
-				width: this.collider.width ?? this.size.width,
-				height: this.collider.height ?? this.size.height
-			};
-		}
-
-		return {
-			x,
-			y,
-			width: this.size.width,
-			height: this.size.height
-		};
+		return this.input.getDropValidationBounds(x, y);
 	}
 
 	checkDropValidity(x, y) {
-		const gridSystem = this.gameMap?.gridSystem;
-		if (!gridSystem) return true;
-
-		const thisOverlappable = this.getConfig('visual.overlappable', false);
-		const bounds = this.getDropValidationBounds(x, y);
-		const startGridX = Math.floor(bounds.x / gridSystem.config.cellSize);
-		const startGridY = Math.floor(bounds.y / gridSystem.config.cellSize);
-		const endGridX = Math.ceil((bounds.x + bounds.width) / gridSystem.config.cellSize);
-		const endGridY = Math.ceil((bounds.y + bounds.height) / gridSystem.config.cellSize);
-
-		for (let gx = startGridX; gx < endGridX; gx++) {
-			for (let gy = startGridY; gy < endGridY; gy++) {
-				if (gx < 0 || gx >= gridSystem.gridWidth || gy < 0 || gy >= gridSystem.gridHeight) {
-					return false;
-				}
-				const cell = gridSystem.grid[gx][gy];
-
-				// Tile-level block (walls, water) — always hard-block regardless of overlappable
-				if (!cell.tileWalkable) return false;
-
-				// Object-level block — skip if this object is overlappable (e.g. rug)
-				if (!thisOverlappable) {
-					const hasBlocker = [...cell.objects].some(
-						obj => obj !== this && !obj.getConfig('visual.overlappable', false)
-					);
-					if (hasBlocker) return false;
-				}
-			}
-		}
-		return true;
+		return this.input.checkDropValidity(x, y);
 	}
 
 	// ── Position / render state ───────────────────────────────────────────────
@@ -1983,14 +1425,8 @@ class MapObject {
 
 	remove() {
 		this.removeAllEffects?.();
-		Object.values(this.inputComponents).forEach(c => c.destroy());
-		this.inputComponents = {};
-		this._selectDragCleanup?.();
-		if (this._dropTargetEl) {
-			this._dropTargetEl.remove();
-			this._dropTargetEl = null;
-			this._dropTargetColliderEl = null;
-		}
+		this.input.dispose();
+		this.actionSlots.clear();
 		if (this.element) {
 			this.element.remove();
 			this.element = null;
@@ -2121,20 +1557,16 @@ class MapObject {
 	// ── Component enable/disable ──────────────────────────────────────────────
 
 	enableDragging() {
-		if (!this.getConfig('draggable', false)) this.config.draggable = true;
-		if (this.inputComponents.drag) this.inputComponents.drag.enable();
-		else this.initDragComponent();
+		this.input.enableDragging();
 	}
 
-	disableDragging() { this.inputComponents.drag?.disable(); }
+	disableDragging() { this.input.disableDragging(); }
 
 	enableRubbing() {
-		if (!this.getConfig('rubbable', false)) this.config.rubbable = true;
-		if (this.inputComponents.rubbing) this.inputComponents.rubbing.enable();
-		else this.initRubbingComponent();
+		this.input.enableRubbing();
 	}
 
-	disableRubbing() { this.inputComponents.rubbing?.disable(); }
+	disableRubbing() { this.input.disableRubbing(); }
 
 	// ── Game-loop hooks ───────────────────────────────────────────────────────
 

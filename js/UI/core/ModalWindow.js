@@ -80,7 +80,7 @@ constructor(parent, options = {}) {
 			this.modalElement = document.getElementById(this.options.id);
 
 			if (!this.modalElement) {
-				console.warn(`Modal element with id '${this.options.id}' not found`);
+				Utility.warnDebug(`Modal element with id '${this.options.id}' not found`);
 				return;
 			}
 
@@ -92,7 +92,7 @@ constructor(parent, options = {}) {
 				this.buttonElement = document.getElementById(this.options.buttonId);
 
 				if (!this.buttonElement) {
-					console.warn(`Button with id '${this.options.id}' for modal element with id '${this.options.id}' not found`);
+					Utility.warnDebug(`Button with id '${this.options.id}' for modal element with id '${this.options.id}' not found`);
 					return;
 				}
 
@@ -128,7 +128,7 @@ constructor(parent, options = {}) {
 			// Apply initial positioning
 			this.applyPosition();
 		} else {
-			console.warn('No modal ID provided');
+			Utility.warnDebug('No modal ID provided');
 		}
 	}
 
@@ -611,7 +611,7 @@ constructor(parent, options = {}) {
 						soundManager.playUISound('click');
 				}
 			} catch (error) {
-				console.warn('Could not play sound:', error);
+				Utility.warnDebug('Could not play sound:', error);
 			}
 		}
 	}

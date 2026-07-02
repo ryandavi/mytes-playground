@@ -475,6 +475,7 @@
 	</div>
 	<!-- END GAME SETTINGS PANEL -->
 
+	<!-- SCRIPTS:BEGIN -->
 	<!-- EXTERNAL -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
 	<!-- CORE -->
@@ -559,6 +560,8 @@
 	<script src="js/Map/MapTransitionManager.js?v=<?= $v ?>"></script>
 	<script src="js/Map/MapRenderer.js?v=<?= $v ?>"></script>
 	<!-- BASE MAP OBJECTS-->
+	<script src="js/Map/MapObjects/ActionSlotLedger.js?v=<?= $v ?>"></script>
+	<script src="js/Map/MapObjects/MapObjectInputController.js?v=<?= $v ?>"></script>
 	<script src="js/Map/MapObjects/MapObject.js?v=<?= $v ?>"></script>
 	<script src="js/Map/MapObjects/DroppedMapItem.js?v=<?= $v ?>"></script>
 	<!-- ANIMATED -->
@@ -620,6 +623,7 @@
 	<script src="js/UI/Panels/SettingsPanel.js?v=<?= $v ?>"></script>
 	<script src="js/UI/Panels/ViewPanel.js?v=<?= $v ?>"></script>
 	<script src="js/UI/Panels/DebugPanel.js?v=<?= $v ?>"></script>
+	<!-- SCRIPTS:END -->
 </body>
 
 </html>

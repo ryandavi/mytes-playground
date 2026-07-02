@@ -174,7 +174,8 @@ class ContainerManager {
                 targetSpawnPoint: 'default',
                 message: `Welcome to ${initialMapId}!`,
                 preserveCamera: true,
-                isInitialLoad: true
+                isInitialLoad: true,
+                allowFallback: true
             });
 
 
@@ -235,7 +236,8 @@ class ContainerManager {
             duration: options.duration || 1000,
             message: options.message || `Traveling to ${mapId}...`,
             preserveCamera: options.preserveCamera !== false,
-            isInitialLoad: false // Explicitly set to false for normal transitions
+            isInitialLoad: false, // Explicitly set to false for normal transitions
+            allowFallback: false
         });
     }
 
