@@ -3,7 +3,8 @@
 **Date:** 2026-06-12
 **Scope:** Full runtime audit (~56K lines, 124 JS files) — performance, duplication, expandability, architecture, editor readiness.
 
-> Status note: fixes from this audit are being applied on the `new-ai-system` branch.
+> **STATUS 2026-07-01 — this document is now historical.** A follow-up audit verified that nearly every item below is fixed on `new-ai-system` (commit `370d088` landed the last five work packages: script manifest, deepMerge consolidation, fail-loud map loading, AI scoring → SiteConfig.ai.candidates, MapObject split into ActionSlotLedger + MapObjectInputController). All changes were verified in a running browser: clean console-silent boot, autonomous AI behavior, drag/rub gestures, surface-slot occupancy, map-failure toast, editor merge parity.
+> Remaining open by choice: SoundManager engine/game file split (organizational, do when next touched); ParticleDataUtils.merge kept separate (different undefined-override semantics, documented in code).
 > Exception by decision: Utility XPath + legacy element-finding blocks are **kept** (may be used later).
 
 ## Executive Summary
