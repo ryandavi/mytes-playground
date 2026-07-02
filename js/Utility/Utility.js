@@ -81,6 +81,28 @@ class Utility {
 		return String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
 	}
 
+	static humanizeLabel(value) {
+		return String(value || '')
+			.trim()
+			.split(/[_\s-]+/)
+			.filter(Boolean)
+			.map(part => part.charAt(0).toUpperCase() + part.slice(1))
+			.join(' ');
+	}
+
+	static formatQuantityRange(quantity) {
+		if (Array.isArray(quantity) && quantity.length >= 2) {
+			return `${quantity[0]}-${quantity[1]}`;
+		}
+
+		const numericQuantity = Number(quantity);
+		if (Number.isFinite(numericQuantity)) {
+			return String(numericQuantity);
+		}
+
+		return null;
+	}
+
 	static getQueryFlag(flagName = 'debug') {
 		try {
 			return new URLSearchParams(window.location.search).has(flagName);
@@ -354,6 +376,37 @@ class Utility {
 		}
 
 		return value;
+	}
+
+	// Deep merge semantics used across runtime data layering:
+	// - arrays: override replaces base, cloned into a fresh array
+	// - override === undefined: clone base
+	// - non-plain objects / primitives / null: clone override (or base if override is undefined)
+	// - plain objects: recursive key-union merge with no shared child references
+	static deepMerge(baseValue, overrideValue) {
+		if (overrideValue === undefined) {
+			return Utility.deepClone(baseValue);
+		}
+
+		if (Array.isArray(baseValue) || Array.isArray(overrideValue)) {
+			return Utility.deepClone(overrideValue);
+		}
+
+		if (!Utility.isPlainObject(baseValue) || !Utility.isPlainObject(overrideValue)) {
+			return Utility.deepClone(overrideValue);
+		}
+
+		const merged = {};
+		const keys = new Set([
+			...Object.keys(baseValue),
+			...Object.keys(overrideValue)
+		]);
+
+		keys.forEach((key) => {
+			merged[key] = Utility.deepMerge(baseValue[key], overrideValue[key]);
+		});
+
+		return merged;
 	}
 
 	static composeTransforms(parts = []) {

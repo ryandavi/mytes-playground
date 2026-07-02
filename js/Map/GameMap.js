@@ -160,55 +160,29 @@ class GameMap {
         return this.parent?.checkCollision?.(entityA, entityB) ?? false;
     }
 
-    // Add to GameMap class
-    testPathfinding() {
+    getMapSourcePath(mapId) {
+        return mapId.endsWith('.tmx')
+            ? `data/maps/${mapId}`
+            : `data/maps/${mapId}.tmx`;
+    }
 
-        if (!this.initialized || !this.gridSystem || !this.gridSystem.pathfinder) {
-            return null;
-        }
-
-        if (!this.parent.inputHandler.isMouseInContainer()) return null;
-    
-        // Get the entity (myte)
-        const myte = this.mytes?.[0];
-        if (!myte?.isActive) return null;
-    
-        // Get start position (entity top-left)
-        const { posX: startX, posY: startY } = myte;
-        // Get end position (target center - mouse coords)
-        const { x: endX, y: endY } = this.parent.inputHandler.getMouseWorldPosition();
-    
-        // For visualization and potentially options if needed later
-        const { height: entityHeight, width: entityWidth } = myte.size;
-        const { collider } = myte; // Get collider from the entity itself
-    
-        // show debug
-        this.gridSystem.pathfinder.setDebugMode(true);
-        this.gridSystem.pathfinder.options.visualizeSearch = false;
-    
-        // --- MODIFIED CALL to findPath ---
-        const path = this.gridSystem.pathfinder.findPath(
-            myte,      // 1. Pass the entity object itself
-            startX,    // 2. Entity top-left X
-            startY,    // 3. Entity top-left Y
-            endX,      // 4. Target center X
-            endY       // 5. Target center Y
-        );
-        // --- END MODIFIED CALL ---
-    
-        // Visualization uses the entity's overall dimensions and collider
-        this.gridSystem.pathfinder.visualizePath(this.layers.debug, path || [], entityWidth, entityHeight, collider);
-    
-        return path;
+    createMapInitializationError(phase, mapId, attemptedPath, cause) {
+        const reason = cause?.message || String(cause || 'Unknown error');
+        const error = new Error(`Failed to ${phase} map "${mapId}" from "${attemptedPath}": ${reason}`);
+        error.cause = cause;
+        return error;
     }
 
 
     async initialize(mapId, options = {}) {
+        const allowFallback = options.allowFallback === true;
+        const mapSourcePath = this.getMapSourcePath(mapId);
+        const requestedPath = this.noCache
+            ? Utility.preventCache(mapSourcePath)
+            : mapSourcePath;
+
         try {
             Utility.logDebug(`[GameMap] Initializing map: ${mapId}`);
-
-            // Get initialization options
-            const isInitialLoad = options.isInitialLoad || false;
 
             // Check if the parent and canvas exist
             if (!this.parent) {
@@ -239,118 +213,27 @@ class GameMap {
                 this.tileMapLoader = new TileMapLoader(this);
             }
 
-            // Build the TMX path - check if it already has the extension
-            let tmxPath = mapId.endsWith('.tmx')
-                ? `data/maps/${mapId}`
-                : `data/maps/${mapId}.tmx`;
+            Utility.logDebug(`[GameMap] Loading TMX from: ${mapSourcePath}`);
 
-            Utility.logDebug(`[GameMap] Loading TMX from: ${tmxPath}`);
-
-            if (this.noCache) tmxPath = Utility.preventCache(tmxPath);
-
-            // Try to load the TMX data without applying it yet
             let mapData;
-            let tmxLoadFailed = false;
             try {
-                mapData = await this.tileMapLoader.loadTileMap(tmxPath);
+                mapData = await this.tileMapLoader.loadTileMap(requestedPath);
 
                 if (!mapData) {
-                    throw new Error(`TMX data is null or undefined`);
+                    throw new Error('TMX data is null or undefined');
                 }
 
                 Utility.logDebug(`[GameMap] TMX data loaded successfully`);
             } catch (tmxError) {
-                console.error(`[GameMap] Failed to load TMX data:`, tmxError);
-                tmxLoadFailed = true;
-
-                // Try alternative paths
-                const altPaths = [
-                    `data/spritesheets/${mapId}.tmx`,
-                    `data/maps/${mapId}.tmx`,
-                    `assets/maps/${mapId}.tmx`,
-                    `${mapId}.tmx`
-                ];
-
-                let loaded = false;
-                for (const altPath of altPaths) {
-                    try {
-                        Utility.logDebug(`[GameMap] Trying alternative path: ${altPath}`);
-                        mapData = await this.tileMapLoader.loadTileMap(altPath);
-                        if (mapData) {
-                            Utility.logDebug(`[GameMap] Successfully loaded TMX from ${altPath}`);
-                            loaded = true;
-                            tmxLoadFailed = false;
-                            break;
-                        }
-                    } catch (e) {
-                        Utility.logDebug(`[GameMap] Failed to load from ${altPath}`);
-                    }
-                }
-
-                if (!loaded) {
-                    // If this is an initial load, create a default map
-                    // Otherwise, indicate that loading failed
-                    if (isInitialLoad) {
-                        Utility.logDebug(`[GameMap] Creating default minimal map for initial load`);
-                        this.createDefaultMap(mapId);
-                        this.initialized = true;
-                        return true;
-                    } else {
-                        console.error(`[GameMap] Map ${mapId} could not be loaded from any location`);
-                        this.initialized = false;
-                        return false;
-                    }
-                }
+                throw this.createMapInitializationError('load', mapId, mapSourcePath, tmxError);
             }
 
-            // Apply the TMX data to this GameMap instance with error handling
             try {
                 Utility.logDebug(`[GameMap] Applying TMX data to game map`);
                 await this.applyToGameMap(mapData);
-
-
-
                 Utility.logDebug(`[GameMap] TMX data applied successfully`);
             } catch (applyError) {
-                console.error(`[GameMap] Error applying TMX data:`, applyError);
-
-                // If this is an initial load, try to create a default map
-                // Otherwise, return false if TMX loading failed completely
-                if (tmxLoadFailed) {
-                    if (isInitialLoad) {
-                        Utility.logDebug(`[GameMap] Creating default minimal map for initial load after apply error`);
-                        this.createDefaultMap(mapId);
-                        this.initialized = true;
-                        return true;
-                    } else {
-                        console.error(`[GameMap] Map ${mapId} could not be loaded or applied`);
-                        this.initialized = false;
-                        return false;
-                    }
-                }
-
-                // If we got some map data but couldn't fully apply it,
-                // we can extract basic properties as a fallback
-                if (mapData && mapData.properties) {
-                    try {
-                        // Convert properties to a more accessible format
-                        const props = {};
-                        mapData.properties.forEach(prop => {
-                            props[prop.name] = prop.value;
-                        });
-
-                        // Update map metadata
-                        this.name = props.Name || mapId;
-                        this.description = props.Description || '';
-                        this.location = props.Location || '';
-
-                        // Store the original properties
-                        this.mapProperties = props;
-
-                    } catch (propsError) {
-                        console.warn(`[GameMap] Error extracting properties:`, propsError);
-                    }
-                }
+                throw this.createMapInitializationError('initialize', mapId, mapSourcePath, applyError);
             }
 
             // Reset debug initialization state for GridSystem
@@ -383,25 +266,20 @@ class GameMap {
             this.initialized = true;
             return true;
         } catch (error) {
-            console.error(`[GameMap] Error initializing map:`, error);
+            this.initialized = false;
 
-            // If this is an initial load, create a default map
-            // Otherwise, return failure
-            if (options.isInitialLoad) {
+            if (allowFallback) {
                 try {
-                    Utility.logDebug(`[GameMap] Creating default minimal map for initial load after error`);
+                    Utility.warnDebug(`[GameMap] Falling back to default map for initial load of ${mapId}`, error);
                     this.createDefaultMap(mapId);
                     this.initialized = true;
                     return true;
-                } catch (e) {
-                    console.error(`[GameMap] Failed to create default map:`, e);
-                    this.initialized = false;
-                    return false;
+                } catch (fallbackError) {
+                    throw this.createMapInitializationError('create fallback', mapId, mapSourcePath, fallbackError);
                 }
-            } else {
-                this.initialized = false;
-                return false;
             }
+
+            throw error;
         }
     }
 
@@ -865,7 +743,7 @@ class GameMap {
                     object.posX = newposition.x;
                     object.posY = newposition.y;
                 } catch (gridError) {
-                    console.warn(`[GameMap] Error snapping to grid:`, gridError);
+                    Utility.warnDebug(`[GameMap] Error snapping to grid:`, gridError);
                     object.posX = x;
                     object.posY = y;
                 }

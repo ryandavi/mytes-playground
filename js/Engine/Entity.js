@@ -62,12 +62,12 @@ const EntityMethods = {
 	canAutoOpenCollider(collider, axis) {
 		const dbg = window._doorDebug;
 		if (!collider || !this.capabilities?.canOpenDoors) {
-			if (dbg && collider && ['DOOR','GATE'].includes(collider.type)) console.log(`[canAutoOpenCollider] FAIL: canOpenDoors=${this.capabilities?.canOpenDoors}`);
+			if (dbg && collider && ['DOOR','GATE'].includes(collider.type)) Utility.logDebug(`[canAutoOpenCollider] FAIL: canOpenDoors=${this.capabilities?.canOpenDoors}`);
 			return false;
 		}
 		if (!['DOOR', 'GATE'].includes(collider.type)) return false;
 		if (typeof collider.open !== 'function' || collider.isOpen) {
-			if (dbg) console.log(`[canAutoOpenCollider] FAIL: isOpen=${collider.isOpen} hasOpen=${typeof collider.open === 'function'}`);
+			if (dbg) Utility.logDebug(`[canAutoOpenCollider] FAIL: isOpen=${collider.isOpen} hasOpen=${typeof collider.open === 'function'}`);
 			return false;
 		}
 
@@ -75,11 +75,11 @@ const EntityMethods = {
 			const verticalDoors = ['E', 'W']; // tall doors — block X movement
 			const horizontalDoors = ['N', 'S']; // wide doors — block Y movement
 			if (axis === 'x' && !verticalDoors.includes(collider.facingDirection)) {
-				if (dbg) console.log(`[canAutoOpenCollider] FAIL: axis=x but door facing=${collider.facingDirection} (need E/W)`);
+				if (dbg) Utility.logDebug(`[canAutoOpenCollider] FAIL: axis=x but door facing=${collider.facingDirection} (need E/W)`);
 				return false;
 			}
 			if (axis === 'y' && !horizontalDoors.includes(collider.facingDirection)) {
-				if (dbg) console.log(`[canAutoOpenCollider] FAIL: axis=y but door facing=${collider.facingDirection} (need N/S)`);
+				if (dbg) Utility.logDebug(`[canAutoOpenCollider] FAIL: axis=y but door facing=${collider.facingDirection} (need N/S)`);
 				return false;
 			}
 		}

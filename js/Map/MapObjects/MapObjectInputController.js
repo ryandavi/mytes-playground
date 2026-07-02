@@ -1,0 +1,485 @@
+class MapObjectInputController {
+	constructor(object) {
+		this.object = object;
+	}
+
+	initializeInputComponents() {
+		const object = this.object;
+		if (!object.element || !object.parent) return;
+
+		if (object.getConfig('interaction.interactive', true) || object.canShowSelectPointer()) object.initClickComponent();
+		if (object.getConfig('draggable', false)) object.initDragComponent();
+		if (object.getConfig('rubbable', false)) object.initRubbingComponent();
+
+		Object.values(object.inputComponents).forEach(component => {
+			if (!component.element) component.element = object.element;
+			component.initialize();
+		});
+	}
+
+	initClickComponent() {
+		const object = this.object;
+		if (object.inputComponents.click) return;
+		object.inputComponents.click = new ClickComponent(object, {
+			element: object.element,
+			enabled: true,
+			doubleClickInterval: object.getConfig('interactionGestures.doubleClickInterval', SiteConfig.interaction.gestures.doubleClickInterval),
+			longPressDelay: object.getConfig('interactionGestures.longPressDelay', SiteConfig.interaction.gestures.longPressDelay),
+			clickMoveThreshold: object.getConfig('interactionGestures.clickMoveThreshold', SiteConfig.interaction.gestures.clickMoveThreshold),
+			canClick: () => object.active,
+			onClick: () => object.handleSingleClick(),
+			onDoubleClick: (event) => object.handleDoubleClick(event),
+			onLongPress: (event) => {
+				if (object.canStartSelectModeDrag()) {
+					object.parent?.ui?.changeToolMode(UIToolModes.DRAG);
+					object.startDrag();
+				} else {
+					object.handleLongPress(event);
+				}
+			}
+		});
+	}
+
+	initDragComponent() {
+		const object = this.object;
+		if (object.inputComponents.drag) return;
+		object.inputComponents.drag = new DragComponent(object, {
+			element: object.element,
+			enabled: true,
+			autoActivate: false,
+			canDrag: () => object.active && object.canBeDragged(),
+			dragThreshold: object.getConfig('dragThreshold', SiteConfig.interaction.mapObject.dragThreshold),
+			dragTimeThreshold: 0,
+			preventDefaultsForDrag: true,
+			onDragStart: () => {
+				object.isDragging = true;
+				object._dragOriginX = object.posX;
+				object._dragOriginY = object.posY;
+				object._dragOriginDirection = object.getConfig('facingDirection', null);
+				object.syncRenderLayer();
+				object.element.classList.add('dragging');
+				object.container?.camera?.beginTemporaryFollow?.(object);
+				if (object.container?.ui) object.container.ui.setSelected(object);
+				object.playConfiguredSound?.('pickup');
+				if (object.getConfig('directionConfigs', null) && SiteConfig.objects.canRotate) {
+					object._rotateKeyHandler = (e) => {
+						if ((e.key === 'r' || e.key === 'R') && object.isDragging) {
+							e.preventDefault();
+							object._rotateDuringDrag();
+						}
+					};
+					window.addEventListener('keydown', object._rotateKeyHandler);
+				}
+			},
+			onDragMove: (event) => {
+				const world = object.container?.inputHandler?.screenToWorldCoordinates
+					? object.container.inputHandler.screenToWorldCoordinates(event.position.x, event.position.y, {
+						element: object
+					})
+					: { x: object.posX, y: object.posY };
+				const clampedWorld = object.container?.clampEntityPosition
+					? object.container.clampEntityPosition(object, world.x, world.y)
+					: world;
+				object.posX = clampedWorld.x;
+				object.posY = clampedWorld.y;
+				object.updatePosition();
+				object.container?.camera?.focusOn?.(object);
+				object.showDropTarget();
+			},
+			onDragEnd: () => {
+				object.isDragging = false;
+				object.container?.camera?.endTemporaryFollow?.(object);
+				object.element.classList.remove('dragging');
+				object.hideDropTarget();
+				if (object._rotateKeyHandler) {
+					window.removeEventListener('keydown', object._rotateKeyHandler);
+					object._rotateKeyHandler = null;
+				}
+				if (object.getConfig('snapToGrid', false)) object.snapToGrid();
+				if (object.container?.clampEntityPosition) {
+					const clampedWorld = object.container.clampEntityPosition(object, object.posX, object.posY);
+					object.posX = clampedWorld.x;
+					object.posY = clampedWorld.y;
+					object.updatePosition();
+				}
+				const isValid = object.checkDropValidity(object.posX, object.posY);
+				if (!isValid) {
+					const safePosition = object.gameMap?.gridSystem?.findNearestValidPositionForEntity?.(
+						object,
+						object.posX,
+						object.posY,
+						12
+					);
+					if (safePosition) {
+						object.posX = safePosition.x;
+						object.posY = safePosition.y;
+						object.updatePosition();
+						object.playConfiguredSound?.('drop');
+					} else {
+						object.posX = object._dragOriginX;
+						object.posY = object._dragOriginY;
+						if (object._dragOriginDirection !== null &&
+							object._dragOriginDirection !== object.getConfig('facingDirection', null)) {
+							object.applyFacingDirection(object._dragOriginDirection);
+						}
+						object.updatePosition();
+						object.playConfiguredSound?.('drop_error');
+					}
+				} else {
+					object.playConfiguredSound?.('drop');
+				}
+				object.syncRenderLayer();
+				object.handleMovedEvent();
+			}
+		});
+	}
+
+	initRubbingComponent() {
+		const object = this.object;
+		if (object.inputComponents.rubbing) return;
+		object.inputComponents.rubbing = new RubbingComponent(object, {
+			element: object.element,
+			enabled: true,
+			canRub: () => object.active && object.parent?.ui?.isTool(UIToolModes.PET),
+			minTimeBetweenRubs: object.getConfig('rubCooldown', 5000),
+			onRubStart: () => object.element.classList.add('being-rubbed'),
+			onRubProgress: (event) => {
+				if (object.getConfig('rubFeedback')) object.handleRubProgress(event.count);
+			},
+			onRubComplete: (event) => {
+				object.element.classList.remove('being-rubbed');
+				if (object.getConfig('onRub')) object.handleRubEvent(event.count);
+			},
+			onRubOverdone: (event) => {
+				object.element.classList.remove('being-rubbed');
+				if (object.getConfig('onRubOverdone')) object.handleRubOverdone(event.count);
+			}
+		});
+	}
+
+	startDrag() {
+		this.startDragAtPosition();
+	}
+
+	startDragAtPosition(position = null) {
+		const object = this.object;
+		if (object.isPickedUp && object.carrier?.queue) {
+			object.carrier.queue.clear();
+		}
+		if (!object.canBeDragged() || !object.inputComponents.drag) return;
+		if (position) {
+			object.inputComponents.drag.startDragAtPosition(position);
+			return;
+		}
+		object.inputComponents.drag.startDragAtCurrentPosition();
+	}
+
+	_initSelectDragHandler() {
+		const object = this.object;
+		if (!object.element || object._selectDragCleanup || !object.getConfig('dragInSelectMode', false)) {
+			return;
+		}
+
+		const dragThreshold = object.getConfig('selectDragThreshold', SiteConfig.interaction.mapObject.selectDragThreshold);
+		const dragTimeThreshold = object.getConfig('selectDragTimeThreshold', SiteConfig.interaction.mapObject.selectDragTimeThreshold);
+		const maxYForPickup = object.getConfig('selectPickupMaxY', SiteConfig.interaction.mapObject.selectPickupMaxY);
+		const maxXForPickup = object.getConfig('selectPickupMaxX', SiteConfig.interaction.mapObject.selectPickupMaxX);
+		const usePickupGesture = object.getConfig('canPickUp', false);
+		const dragModeRestoreDelay = object.getConfig('selectDragModeRestoreDelay', SiteConfig.interaction.mapObject.selectDragModeRestoreDelay);
+		const dragStartDelay = object.getConfig('selectDragStartDelay', SiteConfig.interaction.mapObject.selectDragStartDelay);
+		let pressStart = null;
+		let previousMode = null;
+		let pressStartTime = 0;
+		let pendingTemporaryDrag = null;
+
+		const onMouseDown = (event) => {
+			if (event.button !== 0 || !object.active || object.isDragging || !object.canStartSelectModeDrag()) {
+				return;
+			}
+			const rect = object.element?.getBoundingClientRect?.();
+			if (!rect) {
+				return;
+			}
+			const isInside =
+				event.clientX >= rect.left &&
+				event.clientX <= rect.right &&
+				event.clientY >= rect.top &&
+				event.clientY <= rect.bottom;
+			if (!isInside) {
+				return;
+			}
+
+			pressStart = {
+				x: event.clientX,
+				y: event.clientY,
+				pageX: event.pageX,
+				pageY: event.pageY
+			};
+			previousMode = UIToolModes.SELECT;
+			pressStartTime = Date.now();
+		};
+
+		const onMouseMove = (event) => {
+			if (!pressStart || object.isDragging || !object.canStartSelectModeDrag()) {
+				return;
+			}
+
+			const dx = event.clientX - pressStart.x;
+			const dy = event.clientY - pressStart.y;
+			const distance = Math.hypot(dx, dy);
+			const timeElapsed = Date.now() - pressStartTime;
+			const passesPickupGesture = !usePickupGesture || (
+				distance > dragThreshold &&
+				timeElapsed > dragTimeThreshold &&
+				event.clientY < pressStart.y &&
+				pressStart.y - event.clientY > dragThreshold &&
+				pressStart.y - event.clientY < maxYForPickup &&
+				Math.abs(pressStart.x - event.clientX) < maxXForPickup
+			);
+
+			if (!passesPickupGesture && distance < dragThreshold) {
+				return;
+			}
+
+			if (usePickupGesture && !passesPickupGesture) {
+				return;
+			}
+
+			const previousStart = pressStart;
+			const pointerPosition = {
+				x: event.pageX,
+				y: event.pageY,
+				clientX: event.clientX,
+				clientY: event.clientY
+			};
+			pressStart = null;
+			object._tempSelectDragActive = true;
+			pendingTemporaryDrag = {
+				previousMode,
+				startPosition: previousStart,
+				pointerPosition
+			};
+			object.parent?.ui?.changeToolMode(UIToolModes.DRAG);
+			window.setTimeout(() => {
+				if (!pendingTemporaryDrag || object.isDragging) {
+					return;
+				}
+
+				const { previousMode: queuedMode, startPosition, pointerPosition: queuedPointer } = pendingTemporaryDrag;
+				pendingTemporaryDrag = null;
+
+				object.startDragAtPosition({
+					x: startPosition.pageX ?? startPosition.x,
+					y: startPosition.pageY ?? startPosition.y,
+					clientX: startPosition.x,
+					clientY: startPosition.y
+				});
+
+				if (object.isDragging) {
+					object.inputComponents.drag?.handleMove?.({
+						position: queuedPointer,
+						originalEvent: event
+					});
+					object._restoreToolModeAfterDrag(queuedMode, dragModeRestoreDelay);
+				} else {
+					object._tempSelectDragActive = false;
+					object.parent?.ui?.changeToolMode(queuedMode);
+				}
+			}, dragStartDelay);
+		};
+
+		const onMouseUp = () => {
+			pressStart = null;
+			previousMode = null;
+			pressStartTime = 0;
+			pendingTemporaryDrag = null;
+			if (!object.isDragging) {
+				object._tempSelectDragActive = false;
+			}
+		};
+
+		const unregister = MapObjectSelectDragManager.getInstance().register(
+			object.element, onMouseDown, onMouseMove, onMouseUp
+		);
+
+		object._selectDragCleanup = () => {
+			unregister();
+			object._selectDragCleanup = null;
+		};
+	}
+
+	_restoreToolModeAfterDrag(mode, delay = 0) {
+		const object = this.object;
+		const dragComp = object.inputComponents.drag;
+		if (!dragComp || !mode) {
+			return;
+		}
+
+		const savedEnd = dragComp.options.onDragEnd;
+		dragComp.options.onDragEnd = (event) => {
+			if (savedEnd) {
+				savedEnd(event);
+			}
+
+			object._tempSelectDragActive = false;
+			window.setTimeout(() => {
+				object.parent?.ui?.changeToolMode(mode);
+			}, delay);
+			dragComp.options.onDragEnd = savedEnd;
+		};
+	}
+
+	_rotateDuringDrag() {
+		const object = this.object;
+		if (!SiteConfig.objects.canRotate) return;
+		const directionConfigs = object.getConfig('directionConfigs', null);
+		if (!directionConfigs) return;
+
+		const directions = Object.keys(directionConfigs);
+		const currentDir = object.getConfig('facingDirection', directions[0]);
+		const currentIdx = directions.indexOf(currentDir);
+		const nextDir = directions[(currentIdx + 1) % directions.length];
+		object.applyFacingDirection(nextDir);
+		object.showDropTarget();
+	}
+
+	showDropTarget() {
+		const object = this.object;
+		const gridSystem = object.gameMap?.gridSystem;
+		if (!gridSystem) return;
+
+		if (!object._dropTargetEl) {
+			object._dropTargetEl = document.createElement('div');
+			object._dropTargetEl.className = 'drop-target';
+			object.gameMap.layers.objects.appendChild(object._dropTargetEl);
+		}
+
+		const snappedPos = object.getConfig('snapToGrid', false)
+			? gridSystem.snapToGrid(
+				object.posX,
+				object.posY,
+				object.size.width,
+				object.size.height,
+				gridSystem.config.cellSize,
+				{ useCenter: false }
+			)
+			: { x: object.posX, y: object.posY };
+
+		object._dropTargetEl.style.width = `${object.size.width}px`;
+		object._dropTargetEl.style.height = `${object.size.height}px`;
+		object._dropTargetEl.style.left = `${snappedPos.x}px`;
+		object._dropTargetEl.style.top = `${snappedPos.y}px`;
+
+		const isValid = object.checkDropValidity(snappedPos.x, snappedPos.y);
+		object._dropTargetEl.classList.toggle('is-drop-valid', isValid);
+		object._dropTargetEl.classList.toggle('is-drop-invalid', !isValid);
+
+		if (object.collider) {
+			if (!object._dropTargetColliderEl) {
+				object._dropTargetColliderEl = document.createElement('div');
+				object._dropTargetColliderEl.className = 'drop-target-collider';
+				object._dropTargetEl.appendChild(object._dropTargetColliderEl);
+			}
+			object._dropTargetColliderEl.style.left = `${object.collider.offsetX ?? 0}px`;
+			object._dropTargetColliderEl.style.top = `${object.collider.offsetY ?? 0}px`;
+			object._dropTargetColliderEl.style.width = `${object.collider.width ?? object.size.width}px`;
+			object._dropTargetColliderEl.style.height = `${object.collider.height ?? object.size.height}px`;
+		}
+
+		object._dropTargetEl.style.display = '';
+	}
+
+	hideDropTarget() {
+		if (this.object._dropTargetEl) this.object._dropTargetEl.style.display = 'none';
+	}
+
+	getDropValidationBounds(x = this.object.posX, y = this.object.posY) {
+		const object = this.object;
+		if (object.collider) {
+			return {
+				x: x + (object.collider.offsetX ?? 0),
+				y: y + (object.collider.offsetY ?? 0),
+				width: object.collider.width ?? object.size.width,
+				height: object.collider.height ?? object.size.height
+			};
+		}
+
+		return {
+			x,
+			y,
+			width: object.size.width,
+			height: object.size.height
+		};
+	}
+
+	checkDropValidity(x, y) {
+		const object = this.object;
+		const gridSystem = object.gameMap?.gridSystem;
+		if (!gridSystem) return true;
+
+		const thisOverlappable = object.getConfig('visual.overlappable', false);
+		const bounds = this.getDropValidationBounds(x, y);
+		const startGridX = Math.floor(bounds.x / gridSystem.config.cellSize);
+		const startGridY = Math.floor(bounds.y / gridSystem.config.cellSize);
+		const endGridX = Math.ceil((bounds.x + bounds.width) / gridSystem.config.cellSize);
+		const endGridY = Math.ceil((bounds.y + bounds.height) / gridSystem.config.cellSize);
+
+		for (let gx = startGridX; gx < endGridX; gx++) {
+			for (let gy = startGridY; gy < endGridY; gy++) {
+				if (gx < 0 || gx >= gridSystem.gridWidth || gy < 0 || gy >= gridSystem.gridHeight) {
+					return false;
+				}
+				const cell = gridSystem.grid[gx][gy];
+
+				if (!cell.tileWalkable) return false;
+
+				if (!thisOverlappable) {
+					const hasBlocker = [...cell.objects].some(
+						obj => obj !== object && !obj.getConfig('visual.overlappable', false)
+					);
+					if (hasBlocker) return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	enableDragging() {
+		const object = this.object;
+		if (!object.getConfig('draggable', false)) object.config.draggable = true;
+		if (object.inputComponents.drag) object.inputComponents.drag.enable();
+		else object.initDragComponent();
+	}
+
+	disableDragging() {
+		this.object.inputComponents.drag?.disable();
+	}
+
+	enableRubbing() {
+		const object = this.object;
+		if (!object.getConfig('rubbable', false)) object.config.rubbable = true;
+		if (object.inputComponents.rubbing) object.inputComponents.rubbing.enable();
+		else object.initRubbingComponent();
+	}
+
+	disableRubbing() {
+		this.object.inputComponents.rubbing?.disable();
+	}
+
+	dispose() {
+		const object = this.object;
+		if (object._rotateKeyHandler) {
+			window.removeEventListener('keydown', object._rotateKeyHandler);
+			object._rotateKeyHandler = null;
+		}
+		Object.values(object.inputComponents).forEach(component => component.destroy());
+		object.inputComponents = {};
+		object._selectDragCleanup?.();
+		if (object._dropTargetEl) {
+			object._dropTargetEl.remove();
+			object._dropTargetEl = null;
+			object._dropTargetColliderEl = null;
+		}
+		object._tempSelectDragActive = false;
+	}
+}

@@ -1154,7 +1154,7 @@ class DebugOverlayUI {
                     const rect = myte.getRegionRect?.('interaction');
                     if (!rect && !myte._debugRegionWarned) {
                         myte._debugRegionWarned = true;
-                        console.warn('[DebugUI] myte interaction region is null. species:', myte.species,
+                        Utility.warnDebug('[DebugUI] myte interaction region is null. species:', myte.species,
                             '| spatial.regions:', myte.definition?.spatial?.regions,
                             '| posX:', myte.posX, 'posY:', myte.posY);
                     }
@@ -1395,7 +1395,7 @@ class DebugOverlayUI {
                 this.updateDebug();
                 this.wasDebugEnabled = true;
             } catch (error) {
-                console.warn('Debug UI update error:', error);
+                Utility.warnDebug('Debug UI update error:', error);
             }
         } else if (this.wasDebugEnabled) {
             this.clearDebugVisuals();

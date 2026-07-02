@@ -145,7 +145,7 @@ class ActionDefinitionRegistry {
         if (fallbackDefinition == null) {
             let cached = this._noFallbackCache.get(normalizedId);
             if (!cached) {
-                cached = this.deepFreeze(this.deepMerge({}, definition));
+                cached = this.deepFreeze(Utility.deepMerge({}, definition));
                 this._noFallbackCache.set(normalizedId, cached);
             }
             return cached;
@@ -161,7 +161,7 @@ class ActionDefinitionRegistry {
 
         let cached = byFallback.get(fallbackDefinition);
         if (!cached) {
-            cached = this.deepFreeze(this.deepMerge(fallbackDefinition, definition || {}));
+            cached = this.deepFreeze(Utility.deepMerge(fallbackDefinition, definition || {}));
             byFallback.set(fallbackDefinition, cached);
         }
         return cached;
@@ -177,38 +177,6 @@ class ActionDefinitionRegistry {
 
     static getActionIds() {
         return Array.from(this.definitions.keys());
-    }
-
-    static deepMerge(baseValue, overrideValue) {
-        if (Array.isArray(baseValue) || Array.isArray(overrideValue)) {
-            return Utility.deepClone(overrideValue ?? baseValue);
-        }
-
-        if (!Utility.isPlainObject(baseValue) || !Utility.isPlainObject(overrideValue)) {
-            return Utility.deepClone(overrideValue ?? baseValue);
-        }
-
-        const merged = {};
-        const keys = new Set([
-            ...Object.keys(baseValue || {}),
-            ...Object.keys(overrideValue || {})
-        ]);
-
-        keys.forEach(key => {
-            const baseChild = baseValue?.[key];
-            const overrideChild = overrideValue?.[key];
-            if (overrideChild === undefined) {
-                merged[key] = Utility.deepClone(baseChild);
-                return;
-            }
-            if (baseChild === undefined) {
-                merged[key] = Utility.deepClone(overrideChild);
-                return;
-            }
-            merged[key] = this.deepMerge(baseChild, overrideChild);
-        });
-
-        return merged;
     }
 
 }

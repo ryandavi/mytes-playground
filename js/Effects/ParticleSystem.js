@@ -340,6 +340,7 @@ class ParticleRenderer {
 
     flush(particles, alpha = 1, deltaTime = 0) {
         this.stats.domWrites = 0;
+        let culled = 0;
 
         for (const particle of particles) {
             if (!particle?.active) continue;
@@ -349,7 +350,10 @@ class ParticleRenderer {
 
             particle.updateVisual(deltaTime, alpha, this.system);
             this.flushParticle(particle, view);
+            if (!particle.renderVisible) culled++;
         }
+
+        return culled;
     }
 
     flushParticle(particle, view) {
@@ -2260,9 +2264,7 @@ class ParticleSystem {
         this.timeSinceLastTick = Math.min(this.tickInterval, this.timeSinceLastTick + deltaTime);
         const alpha = ParticleMath.clamp(this.timeSinceLastTick / this.tickInterval, 0, 1);
 
-        this.culledThisFrame = 0;
-        this.renderer.flush(this.particles, alpha, deltaTime);
-        this.culledThisFrame = this.particles.reduce((count, particle) => count + (particle.renderVisible ? 0 : 1), 0);
+        this.culledThisFrame = this.renderer.flush(this.particles, alpha, deltaTime);
         this.debug.setFrameCulledCount(this.culledThisFrame);
         this.debug.sync();
     }

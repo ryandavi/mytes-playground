@@ -114,7 +114,7 @@ class StateMachine {
 			onEnter: (state, prevState, config) => {
 				if (config?.sound) this.parent.playSound(config.sound);
 				if (window._stateMachineDebug) {
-					console.log(`[StateMachine] ${this.parent.id ?? '?'}: ${prevState} → ${state}`);
+					Utility.logDebug(`[StateMachine] ${this.parent.id ?? '?'}: ${prevState} -> ${state}`);
 				}
 				this._notifyStateListeners(state, prevState, config);
 			}

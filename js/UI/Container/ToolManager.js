@@ -122,7 +122,7 @@ class ToolManager extends UIComponent {
         const toolConfig = this.toolConfig[mode];
 
         if (!toolConfig || !toolConfig.id) {
-            console.warn(`Invalid tool mode: ${mode}`);
+            Utility.warnDebug(`Invalid tool mode: ${mode}`);
             return false;
         }
 
@@ -142,7 +142,7 @@ class ToolManager extends UIComponent {
             return true;
         }
 
-        console.warn(`Could not find radio button for tool: ${toolConfig.id}`);
+        Utility.warnDebug(`Could not find radio button for tool: ${toolConfig.id}`);
         return false;
     }
 

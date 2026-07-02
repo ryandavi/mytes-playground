@@ -210,28 +210,6 @@ class MapObjectFactory {
         return new Constructor(resolvedParent, type, variant, x, y, config, factoryOptions);
     }
 
-    static deepMerge(target = {}, ...sources) {
-        const result = { ...target };
-
-        for (const source of sources) {
-            if (!Utility.isPlainObject(source)) continue;
-
-            Object.entries(source).forEach(([key, value]) => {
-                if (Utility.isPlainObject(value) && Utility.isPlainObject(result[key])) {
-                    result[key] = this.deepMerge(result[key], value);
-                } else if (Utility.isPlainObject(value)) {
-                    result[key] = this.deepMerge({}, value);
-                } else if (Array.isArray(value)) {
-                    result[key] = value.slice();
-                } else {
-                    result[key] = value;
-                }
-            });
-        }
-
-        return result;
-    }
-
     static getTypeConfig(type) {
         type = this.normalizeType(type);
         
@@ -240,21 +218,21 @@ class MapObjectFactory {
 
     static mergeConfigs(type, variant, options = {}) {
         const typeConfig = this.getTypeConfig(type);
-        let config = this.deepMerge({}, this.BASE_CONFIG);
+        let config = Utility.deepMerge({}, this.BASE_CONFIG);
 
         const baseType = typeConfig.baseType;
         if (baseType && this.TYPE_CONFIGS[baseType]) {
-            config = this.deepMerge(config, this.TYPE_CONFIGS[baseType]);
+            config = Utility.deepMerge(config, this.TYPE_CONFIGS[baseType]);
         }
 
-        config = this.deepMerge(config, typeConfig);
+        config = Utility.deepMerge(config, typeConfig);
 
         if (typeConfig.variants && typeConfig.variantConfigs && typeConfig.variantConfigs[variant]) {
-            config = this.deepMerge(config, typeConfig.variantConfigs[variant]);
+            config = Utility.deepMerge(config, typeConfig.variantConfigs[variant]);
         }
 
         if (options?.configOverrides) {
-            config = this.deepMerge(config, options.configOverrides);
+            config = Utility.deepMerge(config, options.configOverrides);
         }
 
         if (options?.id !== undefined) {

@@ -312,6 +312,7 @@ class MyteAI {
     }
 
     buildSafeReturnCandidate(context) {
+        const cfg = SiteConfig.ai.candidates.safeReturn;
         if (context.energy > 0) {
             return null;
         }
@@ -319,8 +320,8 @@ class MyteAI {
         return {
             label: 'safe_return:go_home',
             targetKey: 'home',
-            commitmentMs: 3200,
-            score: 999,
+            commitmentMs: cfg.commitmentMs,
+            score: cfg.score,
             execute: () => {
                 this.executeSafeReturn(context);
             }
@@ -328,6 +329,7 @@ class MyteAI {
     }
 
     executeSafeReturn(context) {
+        const cfg = SiteConfig.ai.candidates.safeReturn;
         const safeHome = this.findHomeComfortTarget(context?.home ?? this.getHomePosition());
         if (!safeHome) {
             return false;
@@ -335,9 +337,9 @@ class MyteAI {
 
         const distanceToHome = this.myte.getDistanceToPoint(safeHome.x, safeHome.y);
 
-        if (distanceToHome > 8) {
+        if (distanceToHome > cfg.moveThreshold) {
             this.myte.queue.interrupt('astar-move', { target: safeHome });
-            this.setDecisionLock(3200);
+            this.setDecisionLock(cfg.commitmentMs);
             this.lastDecisionLabel = 'safe_return:go_home';
             this.lastDecisionTime = SimClock.now();
             this.lastDecisionTargetKey = 'home';
@@ -345,14 +347,14 @@ class MyteAI {
         }
 
         this.myte.queue.clear();
-        this.enqueueAction('sleep', { duration: 220 }, {
+        this.enqueueAction('sleep', { duration: cfg.sleepDuration }, {
             label: 'safe_return:sleep',
             category: 'rest',
             novelty: 0,
             soothing: 1,
-            accomplishment: 0.05
+            accomplishment: cfg.sleepAccomplishment
         });
-        this.setDecisionLock(2200);
+        this.setDecisionLock(cfg.sleepCommitmentMs);
         this.lastDecisionLabel = 'safe_return:sleep';
         this.lastDecisionTime = SimClock.now();
         this.lastDecisionTargetKey = 'home';
@@ -360,6 +362,7 @@ class MyteAI {
     }
 
     buildEatCandidate(context) {
+        const cfg = SiteConfig.ai.candidates.eat;
         const offeredFoodTargets = context.droppedItems.filter(item => item?.isUserOfferedFood?.());
         const foodTarget = this.findTargetWithAffordance(
             [...offeredFoodTargets, ...context.nearbyObjects, ...context.droppedItems],
@@ -371,16 +374,19 @@ class MyteAI {
         }
 
         const isUserOfferedFood = foodTarget?.isUserOfferedFood?.() === true;
-        if (context.drives.eatDrive < 0.28 && !isUserOfferedFood) {
+        if (context.drives.eatDrive < cfg.minDrive && !isUserOfferedFood) {
             return null;
         }
 
         const distance = this.myte.getDistanceTo?.(foodTarget) ?? Infinity;
-        let score = 14 + (context.drives.eatDrive * 72) + Math.max(0, 160 - distance) * 0.1;
-        if (context.drives.eatDrive > 0.75) score += 18;
+        let score = cfg.base +
+            (context.drives.eatDrive * cfg.driveWeight) +
+            Math.max(0, cfg.distanceFalloffRange - distance) * cfg.distanceFalloffRate;
+        if (context.drives.eatDrive > cfg.urgentThreshold) score += cfg.urgentBonus;
         if (isUserOfferedFood) {
             const age = SimClock.now() - (foodTarget.droppedAt ?? 0);
-            score += 36 + Math.max(0, 18000 - age) * 0.0012;
+            score += cfg.offeredBaseBonus +
+                Math.max(0, cfg.offeredFreshnessWindowMs - age) * cfg.offeredFreshnessRate;
         }
 
         const label = 'eat:eat_element';
@@ -415,35 +421,44 @@ class MyteAI {
     }
 
     buildRestCandidate(context) {
+        const cfg = SiteConfig.ai.candidates.rest;
         if (!context.stats) {
             return null;
         }
 
-        const restThreshold = SiteConfig.stats.restEnergyThreshold ?? 90;
+        const restThreshold = SiteConfig.stats.restEnergyThreshold;
         if ((context.stats.energy ?? 100) >= restThreshold) {
             return null;
         }
 
         const nearbySurface = this.findTargetWithAffordance(context.nearbyObjects, 'use_surface_slot', context)
-            ?? (context.drives.restDrive > 0.55
+            ?? (context.drives.restDrive > cfg.expandedSearchDriveThreshold
                 ? this.findTargetWithAffordance(
-                    this.getNearbyObjects(this.objectSearchRadius * 2.5),
+                    this.getNearbyObjects(this.objectSearchRadius * cfg.expandedSearchRadiusMultiplier),
                     'use_surface_slot',
                     context
                 )
                 : null);
-        let score = 16 + (context.drives.restDrive * 84) + (context.drives.comfortDrive * 18);
-        if (this.mode === MOVE_AUTONOMY_TYPES.REST) score += 36;
-        if (context.distanceFromHome > this.homeComfortRadius) score += context.drives.safetyDrive * 14;
-        score += context.preferences.coziness * 10;
+        let score = cfg.base +
+            (context.drives.restDrive * cfg.driveWeight) +
+            (context.drives.comfortDrive * cfg.comfortDriveWeight);
+        if (this.mode === MOVE_AUTONOMY_TYPES.REST) score += cfg.modeBonus;
+        if (context.distanceFromHome > this.homeComfortRadius) score += context.drives.safetyDrive * cfg.farFromHomeSafetyWeight;
+        score += context.preferences.coziness * cfg.cozinessWeight;
 
-        if (score < 28) {
+        if (score < cfg.minScore) {
             return null;
         }
 
         const actionId = nearbySurface
             ? 'use_surface_slot'
-            : (context.energy < 0.18 || context.health < 0.4 ? 'sleep' : context.energy < 0.44 ? 'simple_sleep' : 'idle');
+            : (
+                context.energy < cfg.emergencySleepEnergyThreshold || context.health < cfg.emergencySleepHealthThreshold
+                    ? 'sleep'
+                    : context.energy < cfg.simpleSleepEnergyThreshold
+                        ? 'simple_sleep'
+                        : 'idle'
+            );
         const label = nearbySurface ? 'rest:surface' : `rest:${actionId}`;
         const targetKey = nearbySurface ? this.getTargetKey(nearbySurface) : null;
         const aiValues = this._getActionAiValues(actionId);
@@ -451,26 +466,26 @@ class MyteAI {
         return {
             label,
             targetKey,
-            commitmentMs: nearbySurface ? 2400 : 1600,
+            commitmentMs: nearbySurface ? cfg.surfaceCommitmentMs : cfg.fallbackCommitmentMs,
             score: this.applyRepeatPenalty(score, label, targetKey),
             execute: () => {
                 if (nearbySurface && actionId === 'use_surface_slot') {
                     this.enqueueTargetedAction('use_surface_slot', nearbySurface, {}, {
                         label,
                         category: aiValues.category,
-                        novelty: Math.max(0.2, this.getNoveltyScore(nearbySurface) * 0.4),
+                        novelty: Math.max(cfg.surfaceNoveltyFloor, this.getNoveltyScore(nearbySurface) * cfg.surfaceNoveltyScale),
                         soothing: aiValues.soothing,
                         accomplishment: aiValues.accomplishment
                     });
                     return;
                 }
 
-                this.enqueueAction(actionId, actionId === 'idle' ? { duration: 90 } : {
-                    duration: actionId === 'sleep' ? 220 : 160
+                this.enqueueAction(actionId, actionId === 'idle' ? { duration: cfg.idleDuration } : {
+                    duration: actionId === 'sleep' ? cfg.sleepDuration : cfg.simpleSleepDuration
                 }, {
                     label,
                     category: aiValues.category,
-                    novelty: 0.15,
+                    novelty: cfg.actionNovelty,
                     soothing: aiValues.soothing,
                     accomplishment: aiValues.accomplishment
                 });
@@ -479,31 +494,35 @@ class MyteAI {
     }
 
     buildHomeComfortCandidate(context) {
-        if (context.distanceFromHome <= this.homeComfortRadius || context.drives.safetyDrive < 0.12) {
+        const cfg = SiteConfig.ai.candidates.homeComfort;
+        if (context.distanceFromHome <= this.homeComfortRadius || context.drives.safetyDrive < cfg.minSafetyDrive) {
             return null;
         }
 
-        let score = 8 + (context.drives.safetyDrive * 42) + (context.drives.comfortDrive * 22) + (context.drives.restDrive * 10);
-        if (context.energy < 0.35) score += 10;
+        let score = cfg.base +
+            (context.drives.safetyDrive * cfg.safetyDriveWeight) +
+            (context.drives.comfortDrive * cfg.comfortDriveWeight) +
+            (context.drives.restDrive * cfg.restDriveWeight);
+        if (context.energy < cfg.lowEnergyThreshold) score += cfg.lowEnergyBonus;
 
-        if (score < 24) {
+        if (score < cfg.minScore) {
             return null;
         }
 
         return {
             label: 'home_comfort',
             targetKey: 'home',
-            commitmentMs: 1800,
+            commitmentMs: cfg.commitmentMs,
             score: this.applyRepeatPenalty(score, 'home_comfort', 'home'),
             execute: () => {
                 const safeHome = this.findHomeComfortTarget(context.home);
                 if (safeHome) {
                     this.myte.queue.addAStarMove(safeHome);
                 } else {
-                    this.enqueueAction('idle', { duration: 50 }, {
+                    this.enqueueAction('idle', { duration: cfg.fallbackIdleDuration }, {
                         label: 'home_comfort:fallback',
                         category: 'idle',
-                        novelty: 0.1
+                        novelty: cfg.fallbackNovelty
                     });
                 }
             }
@@ -511,6 +530,7 @@ class MyteAI {
     }
 
     buildSocialCandidate(context) {
+        const cfg = SiteConfig.ai.candidates.social;
         if (!context.stats || context.nearbyMytes.length === 0) {
             return null;
         }
@@ -519,22 +539,28 @@ class MyteAI {
         const target = context.nearbyMytes.find(myte => {
             const key = this.getTargetKey(myte);
             const isKnown = this.objectMemories.has(key);
-            return isKnown || context.confidence >= 0.5;
+            return isKnown || context.confidence >= cfg.knownConfidenceThreshold;
         });
         if (!target) return null;
 
-        let score = 14 + (context.drives.socialDrive * 52);
-        if (this.mode === MOVE_AUTONOMY_TYPES.SOCIAL) score += 34;
-        if (context.energy < 0.25) score -= 18;
-        if (context.confidence < 0.3) score -= 6;
+        let score = cfg.base + (context.drives.socialDrive * cfg.driveWeight);
+        if (this.mode === MOVE_AUTONOMY_TYPES.SOCIAL) score += cfg.modeBonus;
+        if (context.energy < cfg.lowEnergyThreshold) score -= cfg.lowEnergyPenalty;
+        if (context.confidence < cfg.lowConfidenceThreshold) score -= cfg.lowConfidencePenalty;
 
-        if (score < 26) {
+        if (score < cfg.minScore) {
             return null;
         }
-        const wantsPlay = context.drives.playDrive > 0.74 && context.energy > 0.6 && context.drives.playDrive > 0.35;
+        const wantsPlay = context.drives.playDrive > cfg.playDriveThreshold &&
+            context.energy > cfg.playEnergyThreshold &&
+            context.drives.playDrive > cfg.secondaryPlayDriveThreshold;
         const actionId = wantsPlay
             ? 'play_tag'
-            : (context.drives.comfortDrive > 0.42 || context.sociability > 0.62 ? 'show_affection' : 'greet');
+            : (
+                context.drives.comfortDrive > cfg.comfortDriveThreshold || context.sociability > cfg.sociabilityThreshold
+                    ? 'show_affection'
+                    : 'greet'
+            );
         const label = `social:${actionId}`;
         const aiValues = this._getActionAiValues(actionId);
 
@@ -547,7 +573,7 @@ class MyteAI {
                 this.enqueueTargetedAction(actionId, target, {}, {
                     label,
                     category: aiValues.category,
-                    novelty: Math.max(0.2, this.getNoveltyScore(target) * 0.45),
+                    novelty: Math.max(cfg.noveltyFloor, this.getNoveltyScore(target) * cfg.noveltyScale),
                     social: 1,
                     accomplishment: aiValues.accomplishment,
                     exertion: aiValues.exertion
@@ -557,7 +583,8 @@ class MyteAI {
     }
 
     buildPlayCandidate(context) {
-        const energyFloor = 0.22;
+        const cfg = SiteConfig.ai.candidates.play;
+        const energyFloor = cfg.energyFloor;
 
         // Find any nearby object with play-category affordances — no hardcoded object types
         let targetPlayObj = null;
@@ -572,23 +599,27 @@ class MyteAI {
         }
 
         const hasPlayObject = targetPlayObj !== null;
-        const playNeedFloor = hasPlayObject ? 0.28 : 0.4;
+        const playNeedFloor = hasPlayObject ? cfg.objectPlayNeedFloor : cfg.noObjectPlayNeedFloor;
         if (context.energy < energyFloor || context.drives.playDrive < playNeedFloor) {
             return null;
         }
 
         const playMomentum = Utility.clamp(
-            (context.drives.playDrive * 0.5) + (context.activity * 0.28) + (context.energy * 0.22),
+            (context.drives.playDrive * cfg.momentum.playDriveWeight) +
+            (context.activity * cfg.momentum.activityWeight) +
+            (context.energy * cfg.momentum.energyWeight),
             0, 1
         );
-        let score = 10 + (context.drives.playDrive * 64);
-        score += context.activity * 12;
-        score -= context.drives.restDrive * 18;
+        let score = cfg.base + (context.drives.playDrive * cfg.driveWeight);
+        score += context.activity * cfg.activityWeight;
+        score -= context.drives.restDrive * cfg.restDrivePenaltyWeight;
 
-        const funPressure = hasPlayObject && context.fun < 0.45 ? (0.45 - context.fun) / 0.45 : 0;
-        score += funPressure * 22;
+        const funPressure = hasPlayObject && context.fun < cfg.funPressureThreshold
+            ? (cfg.funPressureThreshold - context.fun) / cfg.funPressureThreshold
+            : 0;
+        score += funPressure * cfg.funPressureWeight;
 
-        if (score < 24) {
+        if (score < cfg.minScore) {
             return null;
         }
 
@@ -599,11 +630,11 @@ class MyteAI {
             targetKey = this.getTargetKey(targetPlayObj);
         } else {
             const targetAnchor = this.getPlayAnchorTarget(context.nearbyObjects);
-            if (targetAnchor && context.activity > 0.68) {
+            if (targetAnchor && context.activity > cfg.anchorActivityThreshold) {
                 actionId = 'run_laps';
                 target = targetAnchor;
                 targetKey = this.getTargetKey(targetAnchor);
-            } else if (context.activity > 0.74) {
+            } else if (context.activity > cfg.zigzagActivityThreshold) {
                 actionId = 'zigzag';
                 target = null;
                 targetKey = null;
@@ -616,19 +647,19 @@ class MyteAI {
 
         const repeatPenaltyOptions = hasPlayObject
             ? {
-                labelMultiplier: 0.94,
-                targetMultiplier: 0.96,
-                historyLabelPenaltyScale: 0.3,
-                historyTargetPenaltyScale: 0.2,
-                historyWindowMs: Math.min(this.repeatWindow, 20000)
+                labelMultiplier: cfg.repeatPenalty.labelMultiplier,
+                targetMultiplier: cfg.repeatPenalty.targetMultiplier,
+                historyLabelPenaltyScale: cfg.repeatPenalty.historyLabelPenaltyScale,
+                historyTargetPenaltyScale: cfg.repeatPenalty.historyTargetPenaltyScale,
+                historyWindowMs: Math.min(this.repeatWindow, cfg.repeatPenalty.historyWindowCapMs)
             }
             : null;
 
         const continuingWithSameToy = targetKey &&
             this.lastDecisionTargetKey === targetKey &&
             this.lastDecisionLabel?.startsWith('play:') &&
-            context.fun < 0.45;
-        if (continuingWithSameToy) score += 30;
+            context.fun < cfg.continuingToyFunThreshold;
+        if (continuingWithSameToy) score += cfg.continuingToyBonus;
 
         const label = `play:${actionId}`;
         const aiValues = this._getActionAiValues(actionId, bestAffordance);
@@ -639,10 +670,10 @@ class MyteAI {
             commitmentMs: aiValues.commitmentMs,
             score: this.applyRepeatPenalty(score, label, targetKey, repeatPenaltyOptions),
             execute: () => {
-                if (Math.random() < 0.3) {
-                    this.myte.queue.addExpression('excited', 35, 1);
+                if (Math.random() < cfg.celebrationExpressionChance) {
+                    this.myte.queue.addExpression('excited', cfg.celebrationExpressionDuration, 1);
                 }
-                if (Math.random() < 0.16 && context.energy > 0.7) {
+                if (Math.random() < cfg.jumpChance && context.energy > cfg.jumpEnergyThreshold) {
                     this.myte.queue.addJump();
                 }
                 this._executePlayAction(actionId, target, bestAffordance, context, playMomentum, funPressure);
@@ -651,35 +682,57 @@ class MyteAI {
     }
 
     _executePlayAction(actionId, target, affordance, context, playMomentum, funPressure) {
+        const cfg = SiteConfig.ai.candidates.play;
         const aiValues = this._getActionAiValues(actionId, affordance);
         const memory = {
             label: `play:${actionId}`,
             category: 'play',
-            novelty: target ? this.getNoveltyScore(target) : 0.35,
+            novelty: target ? this.getNoveltyScore(target) : cfg.fallbackNovelty,
             accomplishment: aiValues.accomplishment,
             exertion: aiValues.exertion
         };
 
         if (actionId === 'nudge_ball' && target) {
-            const baseRepeats = playMomentum > 0.9 ? 3 : (playMomentum > 0.72 ? 2 : 1);
+            const baseRepeats = playMomentum > cfg.nudgeBall.highMomentumThreshold
+                ? cfg.nudgeBall.highRepeatCount
+                : (
+                    playMomentum > cfg.nudgeBall.mediumMomentumThreshold
+                        ? cfg.nudgeBall.mediumRepeatCount
+                        : cfg.nudgeBall.lowRepeatCount
+                );
             this.enqueueTargetedAction('nudge_ball', target, {
-                repeat: funPressure > 0.4 ? Math.min(baseRepeats + 1, 4) : baseRepeats,
-                postNudgeIdleDuration: 18 + Math.round(context.activity * 16)
+                repeat: funPressure > cfg.nudgeBall.extraRepeatFunPressureThreshold
+                    ? Math.min(baseRepeats + 1, cfg.nudgeBall.maxRepeatCount)
+                    : baseRepeats,
+                postNudgeIdleDuration: cfg.nudgeBall.postNudgeIdleBaseDuration +
+                    Math.round(context.activity * cfg.nudgeBall.postNudgeIdleActivityScale)
             }, memory);
             return;
         }
 
         if (actionId === 'play_fetch' && target) {
             this.enqueueTargetedAction('play_fetch', target, {
-                roundTrips: Math.max(1, Math.min(4, 1 + Math.round((playMomentum * 2.4) + (context.drives.playDrive * 0.8)))),
-                throwStrength: 8 + Math.round(context.activity * 6)
+                roundTrips: Math.max(
+                    cfg.playFetch.minRoundTrips,
+                    Math.min(
+                        cfg.playFetch.maxRoundTrips,
+                        cfg.playFetch.minRoundTrips + Math.round(
+                            (playMomentum * cfg.playFetch.momentumRoundTripWeight) +
+                            (context.drives.playDrive * cfg.playFetch.playDriveRoundTripWeight)
+                        )
+                    )
+                ),
+                throwStrength: cfg.playFetch.throwStrengthBase +
+                    Math.round(context.activity * cfg.playFetch.throwStrengthActivityScale)
             }, memory);
             return;
         }
 
         if (actionId === 'run_laps' && target) {
             this.enqueueTargetedAction('run_laps', target, {
-                repeat: context.activity > 0.8 ? 4 : 3
+                repeat: context.activity > cfg.runLaps.highActivityThreshold
+                    ? cfg.runLaps.highActivityRepeatCount
+                    : cfg.runLaps.normalRepeatCount
             }, memory);
             return;
         }
@@ -693,8 +746,8 @@ class MyteAI {
             const angle = Math.random() * Math.PI * 2;
             this.enqueueAction('zigzag', {
                 direction: { x: Math.cos(angle), y: Math.sin(angle) },
-                amplitude: 36 + Math.round(context.activity * 48),
-                duration: 90 + Math.round(context.activity * 90)
+                amplitude: cfg.zigzag.amplitudeBase + Math.round(context.activity * cfg.zigzag.amplitudeActivityScale),
+                duration: cfg.zigzag.durationBase + Math.round(context.activity * cfg.zigzag.durationActivityScale)
             }, memory);
             return;
         }
@@ -702,12 +755,13 @@ class MyteAI {
         this.enqueueAction('circle', {
             centerX: this.myte.posX,
             centerY: this.myte.posY,
-            radius: 32 + Math.round(context.activity * 28),
-            duration: 90 + Math.round(context.drives.playDrive * 90)
+            radius: cfg.circle.radiusBase + Math.round(context.activity * cfg.circle.radiusActivityScale),
+            duration: cfg.circle.durationBase + Math.round(context.drives.playDrive * cfg.circle.durationPlayDriveScale)
         }, memory);
     }
 
     buildInteractionCandidate(context) {
+        const cfg = SiteConfig.ai.candidates.interaction;
         if (this.mode === MOVE_AUTONOMY_TYPES.REST) {
             return null;
         }
@@ -744,7 +798,8 @@ class MyteAI {
             );
             if (chainTargets.length > 0) {
                 const originalExecute = best.execute;
-                best.commitmentMs = (best.commitmentMs ?? 1200) + chainTargets.length * 2200;
+                best.commitmentMs = (best.commitmentMs ?? cfg.defaultCommitmentMs) +
+                    chainTargets.length * cfg.chainCommitmentPerTargetMs;
                 best.execute = () => {
                     originalExecute();
                     for (const chainTarget of chainTargets) {
@@ -767,20 +822,18 @@ class MyteAI {
 
     buildAffordanceCandidate(affordance, target, context) {
         // Phase 3: risk gate — skip if action risk exceeds confidence threshold
+        const cfg = SiteConfig.ai.candidates.interaction;
         const actionDef = ActionDefinitionRegistry.getDefinitionSync(affordance.actionId);
         const actionRisk = actionDef?.risk ?? 0;
-        if (actionRisk > context.confidence * 5) return null;
+        if (actionRisk > context.confidence * cfg.riskConfidenceScale) return null;
 
         const distance = this.myte.getDistanceTo?.(target) ?? Infinity;
         const novelty = this.getNoveltyScore(target);
         const affordancePurpose = affordance.purpose ?? null;
-        let score = 6 + Math.max(0, 140 - distance) * 0.12;
+        let score = cfg.base + Math.max(0, cfg.distanceFalloffRange - distance) * cfg.distanceFalloffRate;
 
         const aiValues = this._getActionAiValues(affordance.actionId, affordance);
-        const drivers = aiValues.scoreDrivers ?? [
-            { context: 'drives.exploreDrive', weight: 16 },
-            { context: 'novelty', weight: 10 }
-        ];
+        const drivers = aiValues.scoreDrivers ?? cfg.defaultScoreDrivers;
         for (const driver of drivers) {
             const val = driver.context === 'novelty'
                 ? novelty
@@ -789,14 +842,14 @@ class MyteAI {
         }
 
         if (this.mode === MOVE_AUTONOMY_TYPES.INTERACT) {
-            score += 24;
+            score += cfg.modeBonus;
         }
 
         const label = `interaction:${affordance.actionId}${affordancePurpose ? `:${affordancePurpose}` : ''}`;
         const targetKey = this.getTargetKey(target);
         score = this.applyRepeatPenalty(score, label, targetKey);
 
-        if (score < 20) {
+        if (score < cfg.minScore) {
             return null;
         }
 
@@ -804,7 +857,7 @@ class MyteAI {
             label,
             targetKey,
             affordance,
-            commitmentMs: actionDef?.ai?.commitmentMs ?? 1200,
+            commitmentMs: actionDef?.ai?.commitmentMs ?? cfg.defaultCommitmentMs,
             score,
             execute: () => {
                 this.enqueueTargetedAction(affordance.actionId, target, {}, {
@@ -820,6 +873,7 @@ class MyteAI {
     }
 
     buildDroppedItemCandidate(context) {
+        const cfg = SiteConfig.ai.candidates.droppedItem;
         if (context.droppedItems.length === 0) {
             return null;
         }
@@ -831,14 +885,17 @@ class MyteAI {
             }
 
             const distance = this.myte.getDistanceTo?.(item) ?? Infinity;
-            let score = 8 + (context.curiosity * 16) + (context.drives.exploreDrive * 8) + Math.max(0, 120 - distance) * 0.1;
+            let score = cfg.base +
+                (context.curiosity * cfg.curiosityWeight) +
+                (context.drives.exploreDrive * cfg.exploreDriveWeight) +
+                Math.max(0, cfg.distanceFalloffRange - distance) * cfg.distanceFalloffRate;
 
             const age = SimClock.now() - (item.droppedAt ?? 0);
-            if (age < 30000) score += 22 * (1 - age / 30000);
+            if (age < cfg.freshnessWindowMs) score += cfg.freshnessBonus * (1 - age / cfg.freshnessWindowMs);
 
             const isEdible = item.getConfig?.('isEdible') ?? (item.type?.toLowerCase() === 'food');
-            if (isEdible && context.drives.eatDrive > 0.2) {
-                score += context.drives.eatDrive * 48;
+            if (isEdible && context.drives.eatDrive > cfg.edibleDriveThreshold) {
+                score += context.drives.eatDrive * cfg.edibleDriveWeight;
             }
 
             score = this.applyRepeatPenalty(score, `dropped_item:${item.type}`, `item:${item.id ?? item.variant ?? item.type}`);
@@ -847,7 +904,7 @@ class MyteAI {
                 best = {
                     label: `dropped_item:${item.type}`,
                     targetKey: `item:${item.id ?? item.variant ?? item.type}`,
-                    commitmentMs: 1800,
+                    commitmentMs: cfg.commitmentMs,
                     score,
                     execute: () => {
                         this.myte.queue.addAStarMove({ x: item.posX, y: item.posY });
@@ -860,33 +917,39 @@ class MyteAI {
     }
 
     buildWanderCandidate(context) {
+        const cfg = SiteConfig.ai.candidates.wander;
         const target = this.findWanderTarget(context);
         if (!target) {
             return null;
         }
 
-        let score = 10 + (context.activity * 16) + (context.curiosity * 12) + (context.drives.playDrive * 14);
-        score += context.drives.playDrive * 10;
-        if (this.mode === MOVE_AUTONOMY_TYPES.WANDER) score += 38;
-        if (context.energy < 0.25) score -= 14;
+        let score = cfg.base +
+            (context.activity * cfg.activityWeight) +
+            (context.curiosity * cfg.curiosityWeight) +
+            (context.drives.playDrive * cfg.playDriveWeight);
+        score += context.drives.playDrive * cfg.extraPlayDriveWeight;
+        if (this.mode === MOVE_AUTONOMY_TYPES.WANDER) score += cfg.modeBonus;
+        if (context.energy < cfg.lowEnergyThreshold) score -= cfg.lowEnergyPenalty;
 
         return {
             label: 'wander',
             targetKey: 'wander',
-            commitmentMs: 2400,
+            commitmentMs: cfg.commitmentMs,
             score: this.applyRepeatPenalty(score, 'wander', 'wander'),
             execute: () => {
-                if (context.energy > 0.72 && Math.random() < 0.12) {
+                if (context.energy > cfg.jumpEnergyThreshold && Math.random() < cfg.jumpChance) {
                     this.myte.queue.addJump();
                 }
 
                 this.myte.queue.addAStarMove(target);
 
-                if (Math.random() < 0.45) {
-                    this.enqueueAction('idle', { duration: 45 + Math.round(context.comfort * 35) }, {
+                if (Math.random() < cfg.pauseChance) {
+                    this.enqueueAction('idle', {
+                        duration: cfg.pauseDurationBase + Math.round(context.comfort * cfg.pauseDurationComfortScale)
+                    }, {
                         label: 'wander:pause',
                         category: 'idle',
-                        novelty: 0.18
+                        novelty: cfg.pauseNovelty
                     });
                 }
             }
@@ -894,40 +957,50 @@ class MyteAI {
     }
 
     buildIdleCandidate(context) {
+        const cfg = SiteConfig.ai.candidates.idle;
         return {
             label: 'idle',
             targetKey: 'idle',
-            commitmentMs: 1400,
-            score: this.applyRepeatPenalty(7 + ((1 - context.energy) * 3) + (context.drives.comfortDrive * 2), 'idle', 'idle'),
+            commitmentMs: cfg.commitmentMs,
+            score: this.applyRepeatPenalty(
+                cfg.base +
+                ((1 - context.energy) * cfg.energyNeedWeight) +
+                (context.drives.comfortDrive * cfg.comfortDriveWeight),
+                'idle',
+                'idle'
+            ),
             execute: () => {
                 const roll = Math.random();
                 // Ramps from 0 → +0.25 over 6 s of continuous idle time, making a
                 // bored/restless myte progressively more likely to express itself.
-                const idleBonus = Math.min(this.myte.stateMachine.getStateDuration() / 6000, 0.25);
+                const idleBonus = Math.min(
+                    this.myte.stateMachine.getStateDuration() / cfg.idleBonusDurationMs,
+                    cfg.idleBonusMax
+                );
                 // Expression chosen by current state so the pause reads as intentional
-                if (context.energy < 0.4 && roll < 0.55 + idleBonus) {
-                    this.myte.queue.addExpression('sleep', 60, 1);
-                } else if (context.drives.socialDrive > 0.55 && roll < 0.35 + idleBonus) {
-                    this.myte.queue.addExpression('thought', 50, 1);
-                } else if (context.drives.playDrive > 0.5 && roll < 0.28 + idleBonus) {
-                    this.myte.queue.addExpression('surprise', 40, 1);
+                if (context.energy < cfg.tiredExpressionEnergyThreshold && roll < cfg.tiredExpressionChance + idleBonus) {
+                    this.myte.queue.addExpression('sleep', cfg.tiredExpressionDuration, 1);
+                } else if (context.drives.socialDrive > cfg.socialExpressionDriveThreshold && roll < cfg.socialExpressionChance + idleBonus) {
+                    this.myte.queue.addExpression('thought', cfg.socialExpressionDuration, 1);
+                } else if (context.drives.playDrive > cfg.playExpressionDriveThreshold && roll < cfg.playExpressionChance + idleBonus) {
+                    this.myte.queue.addExpression('surprise', cfg.playExpressionDuration, 1);
                 }
 
                 // Settle into a brief doze when tired; otherwise hold a proper deliberate pause
-                if (context.energy < 0.45 && Math.random() < 0.55) {
-                    this.enqueueAction('simple_sleep', { duration: 220 }, {
+                if (context.energy < cfg.simpleSleepEnergyThreshold && Math.random() < cfg.simpleSleepChance) {
+                    this.enqueueAction('simple_sleep', { duration: cfg.simpleSleepDuration }, {
                         label: 'idle',
                         category: 'rest',
-                        novelty: 0.05,
-                        soothing: 0.4
+                        novelty: cfg.actionNovelty,
+                        soothing: cfg.actionSoothing
                     });
                 } else {
                     this.enqueueAction('idle', {
-                        duration: 200 + Math.round(context.drives.comfortDrive * 140)
+                        duration: cfg.durationBase + Math.round(context.drives.comfortDrive * cfg.durationComfortScale)
                     }, {
                         label: 'idle',
                         category: 'idle',
-                        novelty: 0.05
+                        novelty: cfg.actionNovelty
                     });
                 }
             }
@@ -1355,6 +1428,7 @@ class MyteAI {
     }
 
     _getActionAiValues(actionId, affordance = null) {
+        const cfg = SiteConfig.ai.candidates.interaction;
         const def = ActionDefinitionRegistry.getDefinitionSync(actionId);
         const defAi = def?.ai ?? {};
         const overrideAi = def?.purposeOverrides?.[affordance?.purpose]?.ai ?? {};
@@ -1363,7 +1437,7 @@ class MyteAI {
             soothing:       overrideAi.soothing        ?? defAi.soothing        ?? 0.1,
             exertion:       overrideAi.exertion        ?? defAi.exertion        ?? 0.1,
             accomplishment: overrideAi.accomplishment  ?? defAi.accomplishment  ?? 0.1,
-            commitmentMs:   defAi.commitmentMs ?? 1200,
+            commitmentMs:   defAi.commitmentMs ?? cfg.defaultCommitmentMs,
             scoreDrivers:   overrideAi.scoreDrivers ?? defAi.scoreDrivers ?? null
         };
     }

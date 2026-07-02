@@ -188,7 +188,7 @@ class AStarPathfinder {
         // --- ADJUST TARGET IF INVALID ---
         if (!isEndValid) {
             if (effectiveOptions.debug) {
-                console.warn(`Requested target position (Center ${originalEndCenterX.toFixed(0)}, ${originalEndCenterY.toFixed(0)} / TL ${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)}) is invalid. Attempting to find nearest valid spot.`);
+                Utility.warnDebug(`Requested target position (Center ${originalEndCenterX.toFixed(0)}, ${originalEndCenterY.toFixed(0)} / TL ${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)}) is invalid. Attempting to find nearest valid spot.`);
             }
             // Use existing helper to find nearest valid grid coordinate for the entity's TL
             const searchRadius = 12; // How far to search (in grid cells)
@@ -241,7 +241,7 @@ class AStarPathfinder {
             if (effectiveOptions.debug) {
                 const snappedY = endGrid.y * cellSize;
                 const snappedColliderY = snappedY + collider.offsetY;
-                console.warn(`Target grid cell (${endGrid.x},${endGrid.y}) is unreachable by A* — grid-snapped collider Y=${snappedColliderY.toFixed(0)} differs from exact Y=${(endEntityY + collider.offsetY).toFixed(0)}. Searching for nearest valid cell.`);
+                Utility.warnDebug(`Target grid cell (${endGrid.x},${endGrid.y}) is unreachable by A* - grid-snapped collider Y=${snappedColliderY.toFixed(0)} differs from exact Y=${(endEntityY + collider.offsetY).toFixed(0)}. Searching for nearest valid cell.`);
             }
             const searchRadius = 12;
             const validEndGrid = this._findNearestValidGridPos(entity, endGrid.x, endGrid.y, searchRadius, entityWidth, entityHeight, collider, entityCapabilities);
@@ -300,7 +300,7 @@ class AStarPathfinder {
         if (startGrid.x === endGrid.x && startGrid.y === endGrid.y) {
             // Still need to validate the start position itself
             if (!this._validatePosition(entity, startX, startY, entityWidth, entityHeight, collider, entityCapabilities)) {
-                if (effectiveOptions.debug) { console.warn(`Start and (adjusted) end grid positions are the same, but start TL (${startX}, ${startY}) is invalid.`); }
+                if (effectiveOptions.debug) { Utility.warnDebug(`Start and (adjusted) end grid positions are the same, but start TL (${startX}, ${startY}) is invalid.`); }
                 return null;
             }
             if (effectiveOptions.debug) { Utility.logDebug("Start and (adjusted) end grid positions are the same and valid."); }
@@ -310,7 +310,7 @@ class AStarPathfinder {
 
         // --- Validate Start Position (and adjust if necessary) ---
         if (!this._validatePosition(entity, startX, startY, entityWidth, entityHeight, collider, entityCapabilities)) {
-            if (effectiveOptions.debug) { console.warn(`Entity collider cannot fit at input start TL (${startX.toFixed(0)}, ${startY.toFixed(0)})`); }
+            if (effectiveOptions.debug) { Utility.warnDebug(`Entity collider cannot fit at input start TL (${startX.toFixed(0)}, ${startY.toFixed(0)})`); }
             const validStartGrid = this._findNearestValidGridPos(entity, startGrid.x, startGrid.y, 12, entityWidth, entityHeight, collider, entityCapabilities);
             if (!validStartGrid) {
                 console.error("No valid start grid position found near the initial one.");
@@ -343,11 +343,11 @@ class AStarPathfinder {
         while (!this.openSet.isEmpty()) {
             steps++;
             if (performance.now() - startTime > timeoutMs) {
-                console.warn(`A* search timed out after ${timeoutMs}ms`);
+                Utility.warnDebug(`A* search timed out after ${timeoutMs}ms`);
                 return null; // Timeout
             }
             if (steps > effectiveOptions.maxSearchSteps) {
-                console.warn(`A* search exceeded max steps: ${effectiveOptions.maxSearchSteps}`);
+                Utility.warnDebug(`A* search exceeded max steps: ${effectiveOptions.maxSearchSteps}`);
                 return null; // Max steps exceeded
             }
 
@@ -403,7 +403,7 @@ class AStarPathfinder {
             }
         } // End A* loop
 
-        if (effectiveOptions.debug) { console.warn(`No path found after ${steps} steps (${(performance.now() - startTime).toFixed(2)}ms)`); }
+        if (effectiveOptions.debug) { Utility.warnDebug(`No path found after ${steps} steps (${(performance.now() - startTime).toFixed(2)}ms)`); }
         return null; // No path found
     }
 
@@ -1186,7 +1186,7 @@ class AStarPathfinder {
                     return [{ x: originalStartCenterX, y: originalStartCenterY }];
                 } else { return null; }
             }
-            console.warn("Path reconstruction resulted in empty worldPath."); return null;
+            Utility.warnDebug("Path reconstruction resulted in empty worldPath."); return null;
         }
 
         // Path Processing

@@ -1183,7 +1183,7 @@ class GridSystem {
     // OPTIMIZATION: Improved culling system
     updateCulling(camera) {
         if (!camera) {
-            console.warn('[GridSystem] No camera provided for culling update');
+            Utility.warnDebug('[GridSystem] No camera provided for culling update');
             return;
         }
 

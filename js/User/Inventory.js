@@ -189,7 +189,7 @@ class Inventory {
 
         while (remainingQuantity > 0) {
             if (this.items.length >= this.config.maxItems) {
-                console.warn('Inventory is full!');
+                Utility.warnDebug('Inventory is full!');
                 this.updateInventoryDisplay();
                 return false;
             }
@@ -477,7 +477,7 @@ class Inventory {
         } else {
             const resolvedObject = this.resolveDroppedMapObject({ name, type, variant });
             if (!resolvedObject) {
-                console.warn(`Inventory item "${name}" is not placeable on the map.`);
+                Utility.warnDebug(`Inventory item "${name}" is not placeable on the map.`);
                 return;
             }
             const object = this.parent.gameMap.addObject(
