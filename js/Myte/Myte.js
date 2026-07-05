@@ -31,6 +31,13 @@ class Myte {
 			...(this.definition.capabilities || {})
 		};
 
+		// --- World/grid identity (see WorldRegistry grid-interplay contract) ---
+		// Mytes are spatially indexed for queries but never block cells or
+		// colliders, and ContainerManager (not grid culling) owns their update.
+		this.contributesToWalkability = false;
+		this.excludeFromCulling = true;
+		this._gridRegistered = null;   // GridSystem instance we're currently indexed in
+
 		// --- Goals & mode lists ---
 		this.modes = [MOVE_TYPES.FOLLOW, MOVE_TYPES.FREEROAM, MOVE_TYPES.GRAVITY, MOVE_TYPES.GOHOME, MOVE_TYPES.QUEUE_ONLY];
 		this.followModes = [MOVE_FOLLOW_TYPES.NORMAL, MOVE_FOLLOW_TYPES.CIRCLES, MOVE_FOLLOW_TYPES.RUNAWAY, MOVE_FOLLOW_TYPES.LEASH];
@@ -226,6 +233,7 @@ class Myte {
 	stop() {
 		this.isActive = false;
 		this.atOriginal = true;
+		this._deregisterFromGrid();
 		this.queue.clear();
 		this.footstepController?.reset?.();
 		this.clearHomeSlotHold();
@@ -260,7 +268,14 @@ class Myte {
 		this.parent.eventManager?.emit('myte:stopped', { myte: this });
 	}
 
+	_deregisterFromGrid() {
+		if (!this._gridRegistered) return;
+		this._gridRegistered.removeObject(this);
+		this._gridRegistered = null;
+	}
+
 	dispose() {
+		this._deregisterFromGrid();
 		this.queue?.clear?.();
 		this.inputHandler?.dispose?.();
 		this.dialogue?.destroy?.();
@@ -858,12 +873,22 @@ class Myte {
 		this.stateMachine.update(deltaTime);
 		this.renderer?.applyVerticalVisuals?.();
 
-		// Grid front-tile only needs ~8fps
+		// Grid bookkeeping only needs ~8fps: spatial-index position refresh
+		// (queries tolerate 125ms staleness — they pad by 64px) and the debug
+		// front tile. Registration is self-healing: map transitions recreate
+		// the GridSystem, so re-register whenever the instance changed.
 		this._gridElapsed = (this._gridElapsed || 0) + deltaTime;
 		if (this._gridElapsed >= 125) {
 			this._gridElapsed -= 125;
-			if (this.parent?.gameMap?.gridSystem) {
-				this.parent.gameMap.gridSystem.updateMyteFrontTile(this);
+			const gridSystem = this.parent?.gameMap?.gridSystem;
+			if (gridSystem) {
+				if (this._gridRegistered !== gridSystem) {
+					gridSystem.addObject(this);
+					this._gridRegistered = gridSystem;
+				} else {
+					gridSystem.updateObjectPosition(this);
+				}
+				gridSystem.updateMyteFrontTile(this);
 			}
 		}
 	}

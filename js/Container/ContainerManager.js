@@ -10,6 +10,10 @@ class ContainerManager {
     constructor(elementId, core) {
         this.core = core;
         this.mytes = [];
+        // Container-scoped: spans map transitions (mytes persist; map objects
+        // re-register per map load via GameMap.add/dispose).
+        this.worldRegistry = new WorldRegistry(this);
+        this.relationships = new EntityRelationships(this.worldRegistry);
 
         this.element = document.getElementById(elementId);
         this.containerWrapper = this.element.closest('.app-shell');
@@ -707,6 +711,7 @@ class ContainerManager {
             myte.init();
             MyteRosterSchema.applyToMyte(myte, rosterEntry);
             this.mytes.push(myte);
+            this.worldRegistry.add(myte, 'myte');
         });
 
         this.core.user?.trackMytes?.(this.mytes);
@@ -892,7 +897,10 @@ class ContainerManager {
         this._cachedCanvasRect = null;
         this._cachedContainerRect = null;
 
-        this.mytes.forEach(myte => myte.dispose());
+        this.mytes.forEach(myte => {
+            this.worldRegistry?.remove(myte);
+            myte.dispose();
+        });
         this.mytes = [];
         this.activeMyte = null;
 

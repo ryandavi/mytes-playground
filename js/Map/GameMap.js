@@ -26,6 +26,9 @@ class GameMap {
         this.particleSystem = null;
         this.environmentManager = null;
         this.renderer = new MapRenderer();
+        // Handles a missing gridSystem (falls back to registry scans), so safe
+        // to construct before the map initializes.
+        this.worldQuery = new WorldQuery(parent?.worldRegistry ?? null, this);
 
         // Map elements
         this.objects = [];
@@ -700,6 +703,7 @@ class GameMap {
 
         // Add to objects array
         this.objects.push(object);
+        this.parent?.worldRegistry?.add(object, 'object');
 
         // Add to grid system
         if (this.gridSystem) {
@@ -762,6 +766,7 @@ class GameMap {
             this.layers.objects.appendChild(item.element);
         }
         this.droppedItems.push(item);
+        this.parent?.worldRegistry?.add(item, 'item');
         return item;
     }
 
@@ -850,6 +855,7 @@ class GameMap {
             if (obj.id !== undefined && obj.id !== null) {
                 this.objectsById.delete(String(obj.id));
             }
+            this.parent?.worldRegistry?.remove(obj);
         });
 
         // Remove from the main array
@@ -915,6 +921,7 @@ class GameMap {
             this.droppedItems = this.droppedItems.filter(item => {
                 if (item.collected) {
                     item.remove();
+                    this.parent?.worldRegistry?.remove(item);
                     return false;
                 }
                 item.update(activeMyte, deltaTime);
@@ -942,7 +949,10 @@ class GameMap {
         this.soundManager?.setProximitySounds(new Map());
 
         // Clean up dropped items (their DOM elements live in the shared layer)
-        this.droppedItems.forEach(item => item.remove());
+        this.droppedItems.forEach(item => {
+            item.remove();
+            this.parent?.worldRegistry?.remove(item);
+        });
         this.droppedItems = [];
 
         // Clean up objects
@@ -950,6 +960,7 @@ class GameMap {
             if (obj.remove) {
                 obj.remove();
             }
+            this.parent?.worldRegistry?.remove(obj);
         });
         this.objects = [];
         this.objectsById.clear();

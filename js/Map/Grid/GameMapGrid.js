@@ -128,6 +128,19 @@ class GridSystem {
         this.pathfinder?.validationCache?.clear();
     }
 
+    // Entities indexed for spatial queries but transparent to movement
+    // (mytes, dropped items — see WorldRegistry grid-interplay contract).
+    _isPassthrough(obj) {
+        return obj?.contributesToWalkability === false;
+    }
+
+    // True when this object blocks cell walkability / belongs in collider
+    // lists. For regular map objects this is exactly the historical
+    // !config.physics?.walkable check.
+    _blocksMovement(obj) {
+        return !this._isPassthrough(obj) && !obj?.config?.physics?.walkable;
+    }
+
     // Add this method to update grid cells with terrain data
     updateCellTerrain(gridX, gridY, terrainType) {
         if (gridX < 0 || gridX >= this.gridWidth ||
@@ -834,7 +847,7 @@ class GridSystem {
 
             // Add non-walkable objects from the cell
             cell.objects.forEach(obj => {
-                if (obj !== entity && !obj.config.physics?.walkable) {
+                if (obj !== entity && this._blocksMovement(obj)) {
                     potentialColliders.add(obj);
                 }
             });
@@ -907,10 +920,9 @@ class GridSystem {
             // Add non-walkable OBJECTS physically present in this cell
             if (cell.objects && cell.objects.size > 0) {
                  cell.objects.forEach(obj => {
-                     // Check if the object is collidable (defined by having a !walkable config)
-                     // and not the entity performing the check.
-                     // Ensure obj and obj.config exist before checking walkable.
-                     if (obj && obj !== entityToExclude && obj.config && !obj.config.physics?.walkable) {
+                     // Collidable = blocks movement (passthrough entities like
+                     // mytes/items are spatially indexed but never colliders).
+                     if (obj && obj !== entityToExclude && this._blocksMovement(obj)) {
                          potentialColliders.add(obj);
                      }
                  });
@@ -933,7 +945,7 @@ class GridSystem {
             cell.objects.add(obj);
 
             // Update object walkability
-            if (!obj.config.physics?.walkable) {
+            if (this._blocksMovement(obj)) {
                 cell.objectWalkable = false;
             }
 
@@ -942,7 +954,7 @@ class GridSystem {
         });
 
         // If the object is within current culling bounds, make it active immediately
-        if (this.lastCullingBounds && this.isObjectVisible(obj, this.lastCullingBounds)) {
+        if (!obj.excludeFromCulling && this.lastCullingBounds && this.isObjectVisible(obj, this.lastCullingBounds)) {
             this.activeObjects.add(obj);
         }
 
@@ -950,7 +962,7 @@ class GridSystem {
         obj._gridOccupancyY = obj.posY;
         this._needsCullRefresh = true;
         this.invalidatePathfinderCaches();
-        if (this.debugMode && !obj.config.physics?.walkable) this._debugDirty = true;
+        if (this.debugMode && this._blocksMovement(obj)) this._debugDirty = true;
     }
 
     // Helper method to check if an object is within visible bounds
@@ -975,9 +987,9 @@ class GridSystem {
             // blocked — handles the case where an object became walkable (e.g. door
             // opening) before refreshGridOccupancy calls removeObject, so the old
             // objectWalkable=false never gets cleared by the config check alone.
-            if (!obj.config.physics?.walkable || !cell.objectWalkable) {
+            if (this._blocksMovement(obj) || !cell.objectWalkable) {
                 const objects = Array.from(cell.objects);
-                cell.objectWalkable = objects.every(o => o.config.physics?.walkable);
+                cell.objectWalkable = objects.every(o => !this._blocksMovement(o));
                 cell.walkable = cell.tileWalkable && cell.objectWalkable;
             }
         });
@@ -988,7 +1000,7 @@ class GridSystem {
         delete obj._gridOccupancyX;
         delete obj._gridOccupancyY;
         this.invalidatePathfinderCaches();
-        if (this.debugMode && !obj.config.physics?.walkable) this._debugDirty = true;
+        if (this.debugMode && this._blocksMovement(obj)) this._debugDirty = true;
     }
 
     // IMPROVED: Update object's position in grid - more efficient implementation
@@ -1019,9 +1031,9 @@ class GridSystem {
                 cell.objects.delete(obj);
 
                 // Recalculate walkability if needed
-                if (!obj.config.physics?.walkable) {
+                if (this._blocksMovement(obj)) {
                     const objects = Array.from(cell.objects);
-                    cell.objectWalkable = objects.every(o => o.config.physics?.walkable);
+                    cell.objectWalkable = objects.every(o => !this._blocksMovement(o));
                     cell.walkable = cell.tileWalkable && cell.objectWalkable;
                 }
 
@@ -1043,7 +1055,7 @@ class GridSystem {
                 cell.objects.add(obj);
 
                 // Update walkability if needed
-                if (!obj.config.physics?.walkable) {
+                if (this._blocksMovement(obj)) {
                     cell.objectWalkable = false;
                     cell.walkable = cell.tileWalkable && cell.objectWalkable;
                 }
@@ -1081,7 +1093,7 @@ class GridSystem {
         });
 
         // Check visibility state for active objects management
-        if (this.lastCullingBounds) {
+        if (this.lastCullingBounds && !obj.excludeFromCulling) {
             const wasVisible = this.isObjectVisible({ ...obj, posX: oldX, posY: oldY }, this.lastCullingBounds);
             const isVisible = this.isObjectVisible(obj, this.lastCullingBounds);
 
@@ -1098,8 +1110,13 @@ class GridSystem {
 
         obj._gridOccupancyX = obj.posX;
         obj._gridOccupancyY = obj.posY;
-        this.invalidatePathfinderCaches();
-        if (this.debugMode && !obj.config.physics?.walkable) this._debugDirty = true;
+        // Only movement-blocking or terrain-modifying objects can change path
+        // validity — walkable movers (butterflies, balls, mytes) must not nuke
+        // the validation cache on every step.
+        if (this._blocksMovement(obj) || obj.terrainType) {
+            this.invalidatePathfinderCaches();
+        }
+        if (this.debugMode && this._blocksMovement(obj)) this._debugDirty = true;
     }
     // Get objects in an area
     getObjectsInArea(x, y, width, height) {
@@ -1166,7 +1183,7 @@ class GridSystem {
                         cell.objects.add(obj);
 
                         // Update walkability if needed
-                        if (!obj.config.physics?.walkable) {
+                        if (this._blocksMovement(obj)) {
                             cell.objectWalkable = false;
                             cell.walkable = cell.tileWalkable && cell.objectWalkable;
                         }
@@ -1243,7 +1260,12 @@ class GridSystem {
             for (let y = Math.max(0, startGrid.y); y <= Math.min(endGrid.y, this.gridHeight - 1); y++) {
                 const cell = this.grid[x][y];
                 this.visibleCells.push(cell);
-                cell.objects.forEach(obj => nextActive.add(obj));
+                // excludeFromCulling entities (mytes) are indexed for spatial
+                // queries but never managed by grid culling — ContainerManager
+                // owns their update and visibility.
+                cell.objects.forEach(obj => {
+                    if (!obj.excludeFromCulling) nextActive.add(obj);
+                });
             }
         }
 
@@ -1389,7 +1411,7 @@ class GridSystem {
                     this.grid[x][y].objects.add(obj);
 
                     // Update walkability for objects that affect it
-                    if (!obj.config.physics?.walkable) {
+                    if (this._blocksMovement(obj)) {
                         this.grid[x][y].objectWalkable = false;
                     }
 

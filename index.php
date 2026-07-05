@@ -521,6 +521,11 @@
 	<script src="js/Container/ContainerInputManager.js?v=<?= $v ?>"></script>
 	<!-- SHARED ENTITY MIXIN (must load before Myte and any NPC class) -->
 	<script src="js/Engine/Entity.js?v=<?= $v ?>"></script>
+	<!-- WORLD REGISTRY / QUERY / RELATIONSHIPS / ATTACHMENTS (interface skeletons — audit T3-T6) -->
+	<script src="js/Engine/WorldRegistry.js?v=<?= $v ?>"></script>
+	<script src="js/Engine/WorldQuery.js?v=<?= $v ?>"></script>
+	<script src="js/Engine/EntityRelationships.js?v=<?= $v ?>"></script>
+	<script src="js/Engine/AttachmentSystem.js?v=<?= $v ?>"></script>
 	<!-- MYTE -->
 	<script src="js/Myte/MyteDefinitions.js?v=<?= $v ?>"></script>
 	<script src="js/Myte/FootstepController.js?v=<?= $v ?>"></script>
@@ -618,6 +623,7 @@
 	<script src="js/UI/Core/UserInterface.js?v=<?= $v ?>"></script>
 	<script src="js/UI/Core/ModalWindow.js?v=<?= $v ?>"></script>
 	<script src="js/UI/Debug/DebugOverlayUI.js?v=<?= $v ?>"></script>
+	<script src="js/UI/Debug/AuditHarness.js?v=<?= $v ?>"></script>
 	<script src="js/UI/Debug/QueueUI.js?v=<?= $v ?>"></script>
 	<script src="js/UI/Panels/SoundPanel.js?v=<?= $v ?>"></script>
 	<script src="js/UI/Panels/SettingsPanel.js?v=<?= $v ?>"></script>
