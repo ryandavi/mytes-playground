@@ -1,113 +1,178 @@
-# Codex Goals — July 2026 Audit Follow-up
+# Task Dispatch — July 2026 Architecture Roadmap
 
-Paste each block into Codex as a `/goal`. Suggested order: Goal 3 → Goal 2 → Goal 1 → Goal 4 → Goal 5.
+Paste-ready blocks for the currently-unblocked tasks from `docs/ARCHITECTURE_AUDIT_2026-07.md`. Blocks for T3+ get added here **when their dependencies land**, not before. (Previous goals file for the June audit was archived to `docs/OLD/CODEX_GOALS.md`; all its goals shipped.)
 
-Already done in the main session (do NOT redo): `_approachInfo`/`_approachWarn` gating in MoveActions.js; deletion of `js/Myte/MyteCommand.js` + `js/User/UserSettings.js`; `safeAreaRadius ?? literal` removal in MyteStats.js; particle culled-count moved into `renderer.flush`.
+Rules for every task: one branch off `new-ai-system` per task; end by running `docs/SMOKE_CHECKLIST.md` and reporting results; Fable reviews the diff against the spec before merge.
+
+Dispatch order: D1 and D3/D4 can run in parallel. D2 requires D1 merged **and** depth baselines recorded (see `docs/audit-baselines/README.md`).
 
 ---
 
-## Goal 1 — Unify the script manifest
+## D1 (= audit T1) — Cleanup bundle — **Sonnet, Claude Code session**
 
 ```
-/goal Unify the duplicated script lists in index.html and index.php behind one generated manifest.
+In the Neko codebase (read AGENTS.md first; branch task/t1-cleanup off new-ai-system):
 
-Context: c:\xampp\htdocs\genes\chat\neko. Vanilla JS project, no bundler; load order is the dependency system. index.html and index.php each contain an identical, hand-maintained list of ~123 <script src="js/..."> tags. index.php appends ?v=<?= $v ?> to each src for cache busting; index.html has bare paths.
+1. Move MapObject shadow visuals into the renderState/MapRenderer.flush contract:
+   rename updateShadowVisual() to computeShadowVisual() and have it write
+   renderState.shadow = { visible, width, height, left, top, opacity, scale, color, blur }
+   (only when values changed — compare against the previous shadow state), setting
+   renderState.dirty when it changes. MapRenderer.flush/flushOne applies
+   renderState.shadow to obj.shadowElement. Keep the immediate write inside
+   MapObject.updatePosition() (one-shot path). Callers of updateShadowVisual update
+   to the new name.
+2. In AmbientCreatureMapObject.updateDebugAttributes(), return early unless
+   document.body.classList.contains('debug') (read once per frame via a cached
+   static/module flag updated in render or update, not per attribute).
+3. In MapObject: switch interactionState timing (canInteract, interact, and the
+   cooldown sweep in tickUpdate) from performance.now() to SimClock.now().
+4. In js/Myte/Queue/Actions/CarryActions.js: replace the CARRY_OFFSET = 45 constant
+   with SiteConfig.myte.carryOffset (add the key with value 45 to SiteConfig.js);
+   convert CarryPickupAction and CarryPutdownAction from frame-count durations
+   (currentDuration--) to deltaTime-millisecond accumulation with the same
+   effective default (100 ms total).
+5. In GameMap.createDefaultMap: remove the BUTTERFLY and NPC spawns; keep
+   dimensions/spawn points; surface a ToastSystem warning
+   "Map failed to load — using empty fallback map".
+6. Rename js/Myte/Input/BaseInputHandler.js to MyteBaseHandler.js (file only; the
+   class inside is already MyteBaseHandler). Update scripts/script-manifest.json and
+   run `npm run build:scripts`.
+7. In User.saveUserData (js/User/User.js): wrap the localStorage.setItem calls in
+   try/catch; on failure, console.error and show a ToastSystem warning
+   "Could not save — storage full or unavailable". Never let a save failure throw
+   into callers (it is called from dispose).
+
+Do not change any other behavior. Verify in the browser: shadows on objects and
+ambient creatures look identical, bird hover unchanged, myte carry/putdown feels
+identical, interaction cooldowns still work. Finish by running
+docs/SMOKE_CHECKLIST.md and reporting results.
+```
+
+---
+
+## D2 (= audit T2) — Depth caching + dedupe — **Sonnet, Claude Code session**
+**Preconditions: D1 merged; `docs/audit-baselines/depth-Outside.json` and `depth-House.json` committed (Ryan records via `window.__audit.dumpDepth()`).**
+
+```
+In the Neko codebase (read AGENTS.md; branch task/t2-depth off new-ai-system):
+
+Baselines exist at docs/audit-baselines/depth-*.json (produced by
+window.__audit.dumpDepth() from js/UI/Debug/AuditHarness.js). Your acceptance is a
+zero diff against them.
+
+1. Cache MapObject depth resolution: compute this._depthOffset, this._depthPriority,
+   and this._renderLayerKey once in the constructor using the existing
+   resolveDepthOffset/getDepthPriority/getRenderLayerKey logic; make those methods
+   return the cached values. Add invalidateDepthCache() and call it from
+   applyFacingDirection and anywhere config.spatial, config.visual, or this.collider
+   is mutated (grep for those mutations — applyFacingDirection is the main one).
+2. Deduplicate the depth implementation: move the shared body of
+   resolveDepthOffset/getSortY into EntityMethods in js/Engine/Entity.js,
+   parameterized by (depthLine, depthOffset, colliderBottom, sizeHeight). MapObject
+   feeds it from config; MyteRenderer feeds it from myte.definition. Delete the
+   duplicated code in MyteRenderer.
+3. Re-dump depth on Outside and House and diff against the baselines: the diff must
+   be empty. Include the diff result in your report.
+
+Finish by running docs/SMOKE_CHECKLIST.md and reporting results.
+```
+
+---
+
+## D3 (= audit T14) — Production script bundle — **Codex**
+
+```
+/goal Add a zero-dependency production bundle mode to the Neko script build.
+
+Context: c:\xampp\htdocs\genes\chat\neko, branch task/t14-bundle off new-ai-system.
+Vanilla JS, no bundler; scripts/script-manifest.json is the ordered source of truth
+(~129 entries, first entry is the Tone.js CDN script with "cdn": true);
+scripts/build-manifest.js rewrites the script blocks in index.html/index.php between
+SCRIPTS:BEGIN/END markers.
 
 Changes:
-1. Create scripts/script-manifest.json: an ordered JSON array of the js/ script paths, extracted exactly from the current index.php order (treat index.php as canonical). Include the Tone.js CDN entry as the first item with a "cdn": true flag.
-2. Create scripts/build-manifest.js (Node, no dependencies): reads the manifest and rewrites the script block in BOTH index.html and index.php between marker comments <!-- SCRIPTS:BEGIN --> and <!-- SCRIPTS:END -->. For index.php emit src="...?v=<?= $v ?>"; for index.html emit bare src. Insert the marker comments around the existing blocks as part of this change. Fail with a nonzero exit and a clear message if markers are missing or the manifest references a file that does not exist on disk.
-3. Add npm script "build:scripts": "node scripts/build-manifest.js" to package.json.
-4. Run it and verify: git diff of index.html and index.php shows only the marker comments added — zero script reordering, zero entries added or removed.
-5. Extend the build script to also verify every .js file under js/ is present in the manifest, so dead files and missing registrations are caught (fail listing the unreferenced files). js/Myte/MyteCommand.js and js/User/UserSettings.js have already been deleted; there should be zero exceptions.
+1. Extend scripts/build-manifest.js with a --bundle flag (npm script
+   "build:bundle": "node scripts/build-manifest.js --bundle"). Without the flag,
+   behavior is byte-identical to today.
+2. --bundle additionally: (a) concatenates every non-CDN manifest entry, in manifest
+   order, into js/bundle.js — each file preceded by a "/* ── <src> ── */" comment
+   line and joined with ";\n" for statement safety; (b) generates index.bundled.php
+   and index.bundled.html as copies of index.php/index.html with the marker block
+   replaced by exactly two tags: the Tone.js CDN tag with a defer attribute, and
+   <script src="js/bundle.js?v=<?= $v ?>"></script> (bare src for the .html
+   variant). Everything outside the marker block is copied verbatim, including the
+   PHP header of index.php.
+3. Add js/bundle.js, index.bundled.php, and index.bundled.html to .gitignore
+   (create the file if the repo has none; check first).
+4. Do not touch index.php/index.html dev behavior, and do not add npm dependencies.
 
-Constraints: do not change load order. Do not touch anything outside the script blocks in the two entry files. PHP short echo tags must be emitted literally into index.php.
-
-Acceptance: both entry files load the game identically before/after; build script is idempotent (second run produces no diff); validation fails if a js file is missing from the manifest.
+Acceptance: `npm run build:scripts` output unchanged (empty git diff on the two dev
+entry files); `npm run build:bundle` is idempotent (second run, no changes); opening
+index.bundled.php through XAMPP boots the game identically to index.php with a
+console free of new errors; browser network tab shows ~3 requests for JS instead of
+~129. Report the before/after request counts. Finish by running
+docs/SMOKE_CHECKLIST.md against index.bundled.php and reporting results.
 ```
 
 ---
 
-## Goal 2 — Finish the clone/merge consolidation
+## D4 — Headless stat-balance simulation — **Codex**
 
 ```
-/goal Consolidate all deepMerge implementations onto a single Utility.deepMerge, and remove the duplicated math/data helpers in ParticleSystem.js.
+/goal Create a headless Node simulation of Myte stat decay/regen so balance tuning
+has curves instead of vibes.
 
-Context: c:\xampp\htdocs\genes\chat\neko, branch new-ai-system. A consolidation pass already moved cloneValue/isPlainObject/normalizeId/preventCache into js/Utility/Utility.js — build on it, don't revert it. Utility.deepClone and Utility.isPlainObject exist. deepMerge still has six implementations: ActionDefinitionRegistry.deepMerge, MyteDefinitionRegistry deepMerge (js/Myte/MyteDefinitions.js), MapEnvironmentManager.deepMerge, one in MapObjectFactory.js, one in MapObject.js, and ParticleDataUtils.merge in js/Effects/ParticleSystem.js.
-
-Step 1 — semantics table first: read all six and produce a short table (in the commit description) of their differences: array handling (replace vs clone vs concat), undefined-override handling, null handling, non-plain-object handling. Do not write the unified function until this table exists.
-
-Step 2 — implement Utility.deepMerge(base, override) with these canonical semantics unless the table reveals a live conflict: arrays → override replaces base, result deep-cloned; override === undefined → deep-cloned base; base or override not a plain object → deep-cloned override (or base when override undefined); plain objects → recursive key-union merge. Document the semantics in a comment block on the function.
-
-Step 3 — migrate callers one file at a time. For each call site, verify against the table that behavior is preserved; where a local implementation differs in a way that matters, note it and preserve observable behavior. KEEP MyteDefinitionRegistry.deepMerge as a public delegating alias — editor/js/EditorStore.js calls it by name for runtime-parity merge semantics (see comment at EditorStore.js:4); its behavior must not change.
-CAUTION: ActionDefinitionRegistry.getDefinitionSync caches deepFreeze(deepMerge(...)) results — frozen output must still work (Utility.deepMerge must return fresh objects, never shared references into base/override).
-
-Step 4 — ParticleSystem.js: replace ParticleMath.clamp/lerp/inverseLerp/wrap bodies with delegation to Utility (keep the ParticleMath names as local aliases for hot-path brevity), and replace ParticleDataUtils.clone/isPlainObject with Utility delegation. ParticleDataUtils.merge migrates to Utility.deepMerge only if the semantics table says it's equivalent; otherwise leave it and note why.
-
-Acceptance: game boots with no console errors; mytes queue and complete actions (action metadata merging is on this path); map environment presets and atmosphere transitions render; particles render; editor still merges records identically (open editor/, inspect a myte record with overrides, confirm base/override badges unchanged). npm run validate:content passes. No remaining method named deepMerge/cloneValue outside Utility except the MyteDefinitionRegistry alias.
-```
-
----
-
-## Goal 3 — Fail-loud map loading + console hygiene
-
-```
-/goal Remove load-failure masking in GameMap, relocate the pathfinding dev harness, and sweep console output behind the debug gate.
-
-Context: c:\xampp\htdocs\genes\chat\neko, branch new-ai-system. Vanilla JS game; Utility.isDebugEnabled(), Utility.logDebug and Utility.warnDebug are the debug-gated logging path.
+Context: c:\xampp\htdocs\genes\chat\neko, branch task/sim-stats off new-ai-system.
+The stat math lives in js/Myte/MyteStats.js driven entirely by
+js/Engine/Config/SiteConfig.js; time comes from js/Engine/SimClock.js; helpers from
+js/Utility/Utility.js. These are browser globals (no modules).
 
 Changes:
-1. js/Map/GameMap.js: remove the alternative-TMX-path probing in initialize (the loop trying alternate paths around line 266). A failed map load must reject/throw with the attempted path in the message. Keep createDefaultMap ONLY for the explicit initial-boot case: add an options.allowFallback flag threaded from the initial ContainerManager.init load; all other call sites (~3 falling through to createDefaultMap) must surface the error instead — use the existing ToastSystem (Core.instance.toastManager) to show "Failed to load map <id>" and keep the current map active where one exists (a map-transition failure must not black-screen).
-2. js/Map/GameMap.js: move testPathfinding() out of GameMap — relocate its body to js/UI/Panels/DebugPanel.js as a debug action (follow how existing debug actions there are registered); delete the GameMap method.
-3. Console hygiene sweep across js/ (NOT editor/): for each console.log/console.warn call, classify: (a) real failure/error path → leave as console.error or console.warn, (b) developer diagnostics → convert to Utility.logDebug/Utility.warnDebug, (c) commented-out or trivially useless → delete. Do not touch console.error calls. Keep the singleton warning in Core.js. List every conversion in the commit message grouped by file. Roughly 160 call sites across ~45 files; use judgment — error paths in registries/loaders should stay loud.
+1. Create scripts/simulate-stats.js (Node, zero dependencies). Load Utility.js,
+   SimClock.js, SiteConfig.js, and MyteStats.js into a Node `vm` context with the
+   minimal global stubs they need at load/run time (window, document, etc. — read
+   the files and stub exactly what is touched; if something needs a stub that feels
+   like real behavior, stop and flag it rather than faking it). DO NOT modify any
+   game file.
+2. Construct MyteStats with a minimal stub myte (read the constructor to see what it
+   touches: definition, parent, buffs — stub buff aggregation as neutral). Drive it
+   with fixed 50 ms steps, advancing SimClock identically.
+3. Simulate and report three scenarios: (a) 8 sim-hours idle in home slot
+   (updateInHomeSlot path), (b) 2 sim-hours deployed/active (update path, no action
+   effects), (c) 1 sim-hour deployed then a sleep-effect application using the sleep
+   action's effects values from data/metadata/actions.json.
+4. Output: a markdown table per scenario (stat values at 15-sim-minute intervals)
+   printed to stdout, plus a summary listing any stat that reaches 0 or max and the
+   sim-time it happened. Add npm script "sim:stats".
 
-Constraints: no behavior changes outside error surfacing and logging. Time sources: any new timing uses SimClock.now() for gameplay, wall-clock only for UI.
-
-Acceptance: game boots clean with zero console output in non-debug mode until an actual error occurs; ?debug=1 restores diagnostics; loading a nonexistent map id shows a toast and does not silently create a default butterfly map; initial boot with valid data unchanged; npm run validate:content passes.
+Acceptance: `npm run sim:stats` runs clean on Node without a browser and its output
+tables change when a SiteConfig.stats decay rate is temporarily doubled (prove it in
+your report, then revert). No game files modified.
 ```
 
 ---
 
-## Goal 4 — AI candidate scoring to SiteConfig
+## Queued (do NOT dispatch yet)
 
-```
-/goal Move MyteAI candidate scoring constants into SiteConfig.ai.candidates so AI balancing is data-driven.
+| Task | Blocked on |
+|---|---|
+| ~~T3 WorldRegistry impl~~ | **DONE by Fable 2026-07-05** — WorldRegistry implemented; grid passthrough/culling guards in GameMapGrid; myte self-healing grid registration; registry wiring in GameMap/ContainerManager. Included a pathfinder-cache fix: walkable movers no longer invalidate the validation cache on every step. **Needs one browser smoke pass (docs/SMOKE_CHECKLIST.md) + the console check below before T4 dispatch.** |
+| T4 WorldQuery **call-site migration** | **WorldQuery itself is implemented** (Fable 2026-07-05, headless-tested; per-kind liveness predicates pinned in its header). Remaining T4 = flipping the callers over (MyteAI.getNearby*, NpcMapObject._detectTargets, Myte._syncCompanionBuffs, getRandomNearbyObject, BirdMapObject broad phase) — blocked on T3 browser verification + candidate baselines. |
+| T5 EntityRelationships **call-site migration** | **EntityRelationships itself is implemented** (Fable 2026-07-05, headless-tested: inverse pairing, exclusivity stealing, despawn cleanup via WorldRegistry.remove, serialize/restore). `container.relationships` is constructed and the despawn hook is live (inert until relations are set). Remaining T5 = migrating carry/aggro/rest/follow encodings behind the existing façades — blocked on T3 browser verification. |
+| T6 sockets/attachments rollout | T5 + **Fable's couch vertical slice** |
+| T6b/T7 data migrations | T6 / T4; specs in docs/SOCKET_SCHEMA.md |
+| T12 validation harness + invariant sweeper | sweeper needs T5; the sockets-schema validator part can ship with T6b |
 
-Context: c:\xampp\htdocs\genes\chat\neko, branch new-ai-system. js/Myte/MyteAI.js candidate builder methods (roughly lines 370-900) compute scores from inline literals, e.g. `let score = 14 + (context.drives.eatDrive * 72) + Math.max(0, 160 - distance) * 0.1;` and `if (context.drives.eatDrive > 0.75) score += 18;`. js/Engine/Config/SiteConfig.js is the declared single source of truth for simulation tuning (see AGENTS.md).
+**T3 console verification** (run with a deployed myte, then again after a map transition):
 
-Changes:
-1. Inventory every numeric literal in the candidate builder methods in MyteAI.js: base scores, drive weights, distance falloffs and ranges, threshold values, conditional bonuses, commitment times, amplitude/duration/radius constants. Skip literals that are structural (array indices, 0/1 identity values, unit conversions).
-2. Add SiteConfig.ai.candidates as one block, one sub-object per candidate type (eat, rest, safety, social, play, explore, inspect, ...following the actual builder names), with descriptive key names (base, driveWeight, urgentThreshold, urgentBonus, distanceFalloffRange, distanceFalloffRate, modeBonus, commitmentMs, ...). Preserve every current value exactly.
-3. In each builder, read the config once at the top (const cfg = SiteConfig.ai.candidates.eat;) and use cfg.* in the formulas. Formula structure stays identical — this is value relocation, not rebalancing.
-4. Where the same concept repeats across candidates (e.g. mode bonus, distance falloff), use the same key names for consistency, but keep per-candidate values separate (no shared magic defaults).
-5. Add a brief comment block above SiteConfig.ai.candidates explaining the scoring model: candidates are scored per think, highest wins, typical range 0-100, commitmentMs prevents thrash.
-
-Constraints: zero behavior change — every value identical before/after. Do not add a fallback `?? literal` after any config read (AGENTS.md forbids duplicate inline defaults; SiteConfig is the single source). Do not restructure the builders themselves.
-
-Acceptance: game boots; mytes still eat when hungry, rest when tired, socialize (observe a few minutes of autonomous behavior with 2+ mytes); diff of MyteAI.js shows only literal→cfg substitutions and the config reads; every removed literal appears exactly once in SiteConfig.ai.candidates.
-```
-
----
-
-## Goal 5 — MapObject de-accretion (boundaries pre-drawn)
-
-```
-/goal Extract two self-contained subsystems out of js/Map/MapObjects/MapObject.js (2,170 lines) into composed controller classes, and move two generic string helpers to Utility. Boundaries are pre-decided — do not re-litigate them.
-
-Context: c:\xampp\htdocs\genes\chat\neko, branch new-ai-system. MapObject is the base class for ~30 subclasses under js/Map/MapObjects/. The established precedent for this split is js/Myte/Input/ — Myte keeps input choreography in separate handler classes; MapObject currently inlines all of it. New files must be added to BOTH index.html and index.php script lists (or scripts/script-manifest.json + npm run build:scripts, if Goal 1 has landed), ordered before MapObject.js dependents — place them right before MapObject.js.
-
-Extraction 1 — ActionSlotLedger (new file js/Map/MapObjects/ActionSlotLedger.js):
-Move the action-slot occupancy subsystem: getActionSlotDefinitions, getActionOccupant, getActionSlotOccupants, getActionSlotOccupant, isActionSlotOccupied, getAvailableActionSlots, isActionOccupied, claimActionSlot, claimActionOccupancy, releaseActionOccupancy, releaseActionSlot, isInUse (MapObject.js ~lines 524-605 and 962-1140), plus the occupancy state they own. Composition, not inheritance: MapObject constructs this.actionSlots = new ActionSlotLedger(this) and keeps thin one-line delegating methods with the SAME public signatures (actions, ActionManager, and AI call these on the object — the external API must not change). The ledger reads config via this.object.getConfig/getActionConfig.
-
-Extraction 2 — MapObjectInputController (new file js/Map/MapObjects/MapObjectInputController.js):
-Move the input wiring and drag choreography: initializeInputComponents, initClickComponent, initDragComponent, initRubbingComponent, _initSelectDragHandler, _restoreToolModeAfterDrag, startDrag, startDragAtPosition, _rotateDuringDrag, showDropTarget, hideDropTarget, getDropValidationBounds, checkDropValidity, enableDragging/disableDragging, enableRubbing/disableRubbing (MapObject.js ~lines 1141-1500, 1600-1717, 2123-2140). MapObject constructs this.input = new MapObjectInputController(this) and keeps thin delegates only for methods called externally (search callers first; enableDragging/disableDragging and startDrag are called from outside; the init* methods are likely internal-only and need no delegate).
-CRITICAL subclass-hook constraint: gesture/behavior hooks that subclasses override — handleSingleClick, handleDoubleClick, handleLongPress, handleMovedEvent, handleRubProgress, handleRubEvent, handleRubOverdone, canBeDragged, canStartSelectModeDrag, canShowSelectPointer, canBePickedUpBy, pickup, drop — STAY on MapObject. The controller invokes them via this.object.handleSingleClick() etc., so every subclass override keeps working. Grep all subclasses for overrides of the moved methods before moving anything; if a subclass overrides a method you planned to move (e.g. a custom startDrag), keep that method on MapObject as a delegating seam and note it.
-
-Extraction 3 — string helpers to Utility:
-Move humanizeLabelToken and formatDisplayQuantity (MapObject.js lines 210-230) to js/Utility/Utility.js as static methods (Utility.humanizeLabel, Utility.formatQuantityRange). Keep one-line delegating instance methods on MapObject (TreasureChestMapObject and getDisplayName call them via this.*) — the delegation preserves the subclass API at near-zero cost.
-
-Do NOT move: sidebar row methods (getSidebarStatusRows/_getSidebarStatusRows/getSidebarDetailRows — polymorphic view-model contract, stays), deflowered state (deliberately placed, see its comment), light-source config accessors, collider math, depth/z-index, render methods, the Entity mixin application.
-
-Lifecycle: both new controllers need dispose hooks called from MapObject.remove() — move the input-component teardown currently in remove() into MapObjectInputController.dispose(), and any occupancy cleanup into ActionSlotLedger.clear(). Every event subscription made in the controllers must be cleaned up there.
-
-Acceptance: node --check passes on all touched files; game boots with no console errors; drag a chest and a ball (drop targets + tool-mode restore work); rub a rubbable object; two mytes can claim different slots on one object and a third is refused when full (drinking at the fountain exercises this); TreasureChest sidebar shows humanized loot labels with quantity ranges; MapObject.js drops below ~1,400 lines; no subclass file needed changes beyond (at most) renamed internal calls — if a subclass required edits, explain why in the commit message.
+```js
+const c = MyteCore.instance.getFirstContainer();
+console.log(c.worldRegistry.stats());                      // counts match c.mytes.length / gameMap.objects.length / droppedItems.length
+const m = c.activeMyte;
+console.log(c.gameMap.gridSystem.getObjectsInArea(m.posX, m.posY, 1, 1).includes(m)); // true within ~125ms of deploy
+console.log(c.gameMap.gridSystem.getPotentialCollidersForArea(m.posX, m.posY, 10, 10).includes(m)); // must be false (mytes are never colliders)
+// Walkability unchanged: stand a myte on open ground, confirm cells stay walkable in ?debug grid overlay
+console.log(__audit.invariants());                        // [] = clean; run again after a map transition and after collecting a dropped item
+const wq = c.gameMap.worldQuery;                          // implemented but unmigrated — sanity: returns nearby objects sorted by distance
+console.log(wq.findNearby({ x: m.posX, y: m.posY, radius: 300, kind: 'object' }).map(o => o.type));
 ```

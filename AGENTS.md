@@ -168,3 +168,7 @@ npm run sass:watch
 # Validate content data
 npm run validate:content
 ```
+
+## Browser Support Baseline
+
+Modern evergreen browsers only (Chrome/Edge/Firefox/Safari, last ~2 years). The codebase freely uses optional chaining, nullish coalescing, class fields, and `ResizeObserver` — effectively **ES2021+**. Do not add polyfills, transpilation, or compatibility workarounds for anything older; compatibility beyond this baseline is not promised and "fixes" for it will be reverted.

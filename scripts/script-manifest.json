@@ -121,6 +121,19 @@
     "commentLine": "<!-- SHARED ENTITY MIXIN (must load before Myte and any NPC class) -->"
   },
   {
+    "src": "js/Engine/WorldRegistry.js",
+    "commentLine": "<!-- WORLD REGISTRY / QUERY / RELATIONSHIPS / ATTACHMENTS (interface skeletons — audit T3-T6) -->"
+  },
+  {
+    "src": "js/Engine/WorldQuery.js"
+  },
+  {
+    "src": "js/Engine/EntityRelationships.js"
+  },
+  {
+    "src": "js/Engine/AttachmentSystem.js"
+  },
+  {
     "src": "js/Myte/MyteDefinitions.js",
     "commentLine": "<!-- MYTE -->"
   },
@@ -382,6 +395,9 @@
   },
   {
     "src": "js/UI/Debug/DebugOverlayUI.js"
+  },
+  {
+    "src": "js/UI/Debug/AuditHarness.js"
   },
   {
     "src": "js/UI/Debug/QueueUI.js"
