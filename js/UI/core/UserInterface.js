@@ -39,6 +39,7 @@ class UserInterface {
         this.settingsPanel = new SettingsPanel(this);
         this.viewPanel = new ViewPanel(this);
         this.debugPanel = new DebugPanel(this);
+        this.gameLogManager = new GameLogManager(this);
         this.soundMenu = this.soundPanel;
         this.settingsMenu = this.settingsPanel;
         this.viewMenu = this.viewPanel;

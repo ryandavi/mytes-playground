@@ -73,6 +73,7 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
         partners.forEach(partner => {
             if (Math.random() < this.pollinationChance) {
                 this.breed(partner);
+                this.gameMap?.eventManager?.emit('plant:pollinated', { plant: this, partner });
                 this.pollinationState = 'pollinating';
                 this.playAnimation('pollinating', () => {
                     this.pollinationState = 'ready';
@@ -114,6 +115,7 @@ class BreedingFlowerMapObject extends GrowingPlantMapObject {
                 // Mutation: pick a random value
                 const possibilities = geneticConfig.genes?.[trait] || [];
                 childGenes[trait] = Utility.randomChoice(possibilities);
+                this.gameMap?.eventManager?.emit('plant:mutated', { plant: this });
             } else {
                 // Inheritance: pick from either parent
                 childGenes[trait] = Math.random() < inheritanceChance ? 

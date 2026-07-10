@@ -412,5 +412,8 @@
   },
   {
     "src": "js/UI/Panels/DebugPanel.js"
+  },
+  {
+    "src": "js/UI/Container/GameLogManager.js"
   }
 ]

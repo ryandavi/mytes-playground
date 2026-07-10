@@ -431,6 +431,19 @@ class StateMachine {
 		// determineNextState will see animatorComplete=true and transition out naturally.
 	}
 
+	resetToIdle(direction = this.parent.direction) {
+		if (direction) {
+			this.parent.setDirection(direction);
+		}
+
+		this.stateController.isTransitioning = false;
+		this.stateController.currentState = null;
+		const idleState = `idle_${this.parent.direction || 'S'}`;
+		this.stateController.transitionTo(idleState);
+		this._initAnimatorForState(this.stateController.currentState);
+		this._renderCurrentFrame();
+	}
+
 	// -------------------------------------------------------------------------
 	// Utilities
 	// -------------------------------------------------------------------------

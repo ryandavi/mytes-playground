@@ -178,6 +178,29 @@ class AttachmentSystem {
 		}
 	}
 
+	_getParentSortY(parent) {
+		if (!parent) return 0;
+		const sortY = parent.getSortY?.();
+		if (Number.isFinite(sortY)) return sortY;
+		return Number(parent?.posY) || 0;
+	}
+
+	_getParentRenderZIndex(parent) {
+		if (!parent) return 0;
+
+		const directZIndex = parent.getRenderZIndex?.();
+		if (Number.isFinite(directZIndex)) return directZIndex;
+
+		const rendererZIndex = parent.renderer?.getZIndex?.(parent.posY);
+		if (Number.isFinite(rendererZIndex)) return rendererZIndex;
+
+		const mapDepthZIndex = parent.parent?.getDepthZIndex?.(
+			this._getParentSortY(parent),
+			parent.getDepthPriority?.() ?? 0
+		);
+		return Number.isFinite(mapDepthZIndex) ? mapDepthZIndex : 0;
+	}
+
 	_wouldCreateCycle(parent, child) {
 		for (let current = parent; current; current = this._byChild.get(current)?.parent) {
 			if (current === child) return true;
@@ -312,9 +335,11 @@ class AttachmentSystem {
 			if (attachment.inheritFacing && socket.facing) {
 				attachment.child.setDirection?.(socket.facing);
 			}
-			const parentZ = attachment.parent?.renderer?.getZIndex?.(attachment.parent.posY) ?? 0;
+			const parentSortY = this._getParentSortY(attachment.parent);
+			const parentZ = this._getParentRenderZIndex(attachment.parent);
 			attachment.child._attachmentRenderZIndex = parentZ + attachment.zBias;
 			if (attachment.child.renderState) {
+				attachment.child.renderState.sortY = parentSortY + attachment.zBias;
 				attachment.child.renderState.zIndex = attachment.child._attachmentRenderZIndex;
 				attachment.child.renderState.dirty = true;
 			}

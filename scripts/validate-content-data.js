@@ -48,6 +48,26 @@ function normalizeTypeId(value) {
         .toUpperCase();
 }
 
+function validateSocketApproach(socket, label) {
+    if (socket?.approach === undefined) return;
+    if (!isPlainObject(socket.approach)) {
+        fail(`${label}.approach must be a plain object.`);
+        return;
+    }
+
+    const validSides = new Set(['top', 'right', 'bottom', 'left', 'center']);
+    const allowedSides = socket.approach.allowedSides;
+    if (!Array.isArray(allowedSides) || allowedSides.length === 0 ||
+        allowedSides.some(side => !validSides.has(side))) {
+        fail(`${label}.approach.allowedSides must contain valid approach sides.`);
+    }
+
+    const preferredSide = socket.approach.preferredSide;
+    if (preferredSide != null && !validSides.has(preferredSide)) {
+        fail(`${label}.approach.preferredSide must be null or a valid approach side.`);
+    }
+}
+
 function validateNoLegacySatietyKeys(value, label) {
     if (!isPlainObject(value)) return;
 
@@ -351,6 +371,7 @@ function validateMapObjects() {
                             });
                         }
                     }
+                    validateSocketApproach(socket, label);
                 });
 
                 const surfaceConfig = config.actionConfigs?.use_surface_slot;
@@ -390,9 +411,27 @@ function validateMapObjects() {
                             !Number.isFinite(Number(socket.position.yFactor)))) {
                         fail(`${label} point sockets require numeric x/y position factors.`);
                     }
+                    validateSocketApproach(socket, label);
                 });
             });
         });
+
+        if (typeId === 'BED') {
+            const expectedSidesByFacing = {
+                S: ['left', 'right'],
+                N: ['left', 'right'],
+                E: ['top', 'bottom'],
+                W: ['top', 'bottom']
+            };
+            Object.entries(config.variantConfigs ?? {}).forEach(([variantId, variant]) => {
+                Object.entries(expectedSidesByFacing).forEach(([facing, expectedSides]) => {
+                    const actualSides = variant.directionConfigs?.[facing]?.sockets?.sleep?.approach?.allowedSides;
+                    if (!Array.isArray(actualSides) || actualSides.join(',') !== expectedSides.join(',')) {
+                        fail(`BED variant "${variantId}" facing "${facing}" must approach from its lateral sides.`);
+                    }
+                });
+            });
+        }
 
         if (hasDirectionalSockets) {
             const surfaceConfig = config.actionConfigs?.use_surface_slot;

@@ -307,6 +307,7 @@ class SurfaceSlotAction extends GoToObjectAction {
         this._restingWithCollisionDisabled = false;
         this._selectedSlot = null;
         this._selectedSlotId = null;
+        this._requestedSlotId = options?.slotId ?? null;
         this._attachment = null;
     }
 
@@ -573,6 +574,15 @@ class SurfaceSlotAction extends GoToObjectAction {
             return null;
         }
 
+        if (this._requestedSlotId) {
+            const requestedSlot = availableSlots.find(slot => slot.id === this._requestedSlotId);
+            if (!requestedSlot) return null;
+            return this.evaluateSlot(requestedSlot) ?? {
+                slot: requestedSlot,
+                approachConfig: this._normalizeConfig(this.buildSlotApproachConfig(requestedSlot))
+            };
+        }
+
         let best = null;
         for (const slot of availableSlots) {
             const evaluated = this.evaluateSlot(slot);
@@ -809,6 +819,7 @@ class SurfaceSlotAction extends GoToObjectAction {
         this.clearDebugPath();
 
         if (this._blocked) {
+            this.releaseSlotReservation();
             return;
         }
 
@@ -816,6 +827,7 @@ class SurfaceSlotAction extends GoToObjectAction {
         if (this._attachment) {
             this.myte.container?.attachments?.detach?.(this.myte, { exitPosition });
             this._attachment = null;
+            this._reserved = false;
         } else if (this._restingWithCollisionDisabled) {
             this.myte.checkForCollisions = this._previousCollisionSetting;
             this._restingWithCollisionDisabled = false;
@@ -826,12 +838,15 @@ class SurfaceSlotAction extends GoToObjectAction {
         }
 
         this.myte.physicsController?.reset?.();
-        if (this._reserved && !this.target?.sockets?.get?.(this._selectedSlotId)) {
-            if (this._selectedSlotId) {
-                this.target?.releaseActionSlot?.('use_surface_slot', this._selectedSlotId, this.myte);
-            }
-            this._reserved = false;
+        this.releaseSlotReservation();
+    }
+
+    releaseSlotReservation() {
+        if (!this._reserved) return;
+        if (this._selectedSlotId) {
+            this.target?.releaseActionSlot?.('use_surface_slot', this._selectedSlotId, this.myte);
         }
+        this._reserved = false;
     }
 
     getExitCandidates(targetRect, myteRect) {
@@ -851,40 +866,32 @@ class SurfaceSlotAction extends GoToObjectAction {
         }));
     }
 
-    getSlotFrontExitPosition(slot, exitSearchRadius) {
+    getSlotExitPositionForSide(slot, side, exitSearchRadius) {
         if (!slot?.restPosition || !slot?.approachConfig) return null;
         const targetRect = this.getTargetRect(this.target, 'collider');
         const myteCollider = this.getMyteColliderMetrics();
-        if (!targetRect) return null;
+        const socketPosition = this.target?.sockets?.resolveWorldPosition?.(this._selectedSlotId);
+        if (!targetRect || !socketPosition) return null;
 
-        const xFactor = slot.restPosition.xFactor ?? 0.5;
-        const yFactor = slot.restPosition.yFactor ?? 0.5;
-        const slotCX  = targetRect.x + targetRect.width  * xFactor;
-        const slotCY  = targetRect.y + targetRect.height * yFactor;
-        const gap     = this.toFiniteNumber(this.exitGap, 16);
-
-        const sides   = Array.isArray(slot.approachConfig.allowedSides)
-            ? slot.approachConfig.allowedSides
-            : [slot.approachConfig.preferredSide ?? 'bottom'];
-        const exitSide = this._entrySide ?? sides[0] ?? 'bottom';
+        const gap = this.toFiniteNumber(this.exitGap, 16);
 
         let x, y;
-        switch (exitSide) {
+        switch (side) {
             case 'bottom':
-                x = slotCX - myteCollider.offsetX - (myteCollider.width / 2);
+                x = socketPosition.x - myteCollider.offsetX - (myteCollider.width / 2);
                 y = targetRect.y + targetRect.height + gap - myteCollider.offsetY;
                 break;
             case 'top':
-                x = slotCX - myteCollider.offsetX - (myteCollider.width / 2);
+                x = socketPosition.x - myteCollider.offsetX - (myteCollider.width / 2);
                 y = targetRect.y - gap - myteCollider.offsetY - myteCollider.height;
                 break;
             case 'left':
                 x = targetRect.x - gap - myteCollider.offsetX - myteCollider.width;
-                y = slotCY - myteCollider.offsetY - (myteCollider.height / 2);
+                y = socketPosition.y - myteCollider.offsetY - (myteCollider.height / 2);
                 break;
             case 'right':
                 x = targetRect.x + targetRect.width + gap - myteCollider.offsetX;
-                y = slotCY - myteCollider.offsetY - (myteCollider.height / 2);
+                y = socketPosition.y - myteCollider.offsetY - (myteCollider.height / 2);
                 break;
             default: return null;
         }
@@ -892,6 +899,62 @@ class SurfaceSlotAction extends GoToObjectAction {
         const gridSystem = this.myte.parent?.gameMap?.gridSystem;
         const safe = gridSystem?.findNearestValidPositionForEntity?.(this.myte, x, y, exitSearchRadius) ?? { x, y };
         return (safe && this.myte.canMoveToPosition?.(safe.x, safe.y)) ? safe : null;
+    }
+
+    getNextQueuedTargetPosition() {
+        const queue = this.myte.queue?.queue;
+        if (!Array.isArray(queue)) return null;
+
+        const currentIndex = queue.indexOf(this);
+        const nextAction = currentIndex >= 0 ? queue[currentIndex + 1] : null;
+        const target = nextAction?.target;
+        if (Number.isFinite(target?.posX) && Number.isFinite(target?.posY)) {
+            return {
+                x: target.posX + ((target.size?.width ?? 0) / 2),
+                y: target.posY + ((target.size?.height ?? 0) / 2)
+            };
+        }
+
+        const targetPosition = nextAction?.targetPos ?? nextAction?._finalTarget;
+        return Number.isFinite(targetPosition?.x) && Number.isFinite(targetPosition?.y)
+            ? { x: targetPosition.x, y: targetPosition.y }
+            : null;
+    }
+
+    chooseSlotExitPosition(slot, exitSearchRadius) {
+        if (!slot?.approachConfig) return null;
+
+        const allowedSides = (Array.isArray(slot.approachConfig.allowedSides)
+            ? slot.approachConfig.allowedSides
+            : [slot.approachConfig.preferredSide ?? 'bottom'])
+            .filter(side => side && side !== 'center');
+        const orderedSides = [
+            ...(allowedSides.includes(this._entrySide) ? [this._entrySide] : []),
+            ...allowedSides
+        ].filter((side, index, sides) => sides.indexOf(side) === index);
+        const candidates = orderedSides
+            .map(side => ({ side, position: this.getSlotExitPositionForSide(slot, side, exitSearchRadius) }))
+            .filter(candidate => candidate.position);
+        if (!candidates.length) return null;
+
+        const preferred = candidates[0];
+        const nextTarget = this.getNextQueuedTargetPosition();
+        if (!nextTarget || candidates.length === 1) return preferred.position;
+
+        const score = candidate => Math.hypot(
+            candidate.position.x - nextTarget.x,
+            candidate.position.y - nextTarget.y
+        );
+        const best = candidates.reduce((currentBest, candidate) =>
+            score(candidate) < score(currentBest) ? candidate : currentBest
+        );
+        const advantageThreshold = this.toFiniteNumber(
+            SiteConfig.actions.surfaceSlot.exitGoalAdvantageThreshold,
+            64
+        );
+        return best !== preferred && score(best) + advantageThreshold < score(preferred)
+            ? best.position
+            : preferred.position;
     }
 
     getSurfaceExitPosition() {
@@ -908,9 +971,8 @@ class SurfaceSlotAction extends GoToObjectAction {
             }
         }
 
-        // Slots with explicit approach sides exit directly in front of their rest position
-        const slotFront = this.getSlotFrontExitPosition(slot, exitSearchRadius);
-        if (slotFront) return slotFront;
+        const slotExit = this.chooseSlotExitPosition(slot, exitSearchRadius);
+        if (slotExit) return slotExit;
 
         if (this.returnToEntry !== false && this._entryPosition) {
             const safeEntry = gridSystem?.findNearestValidPositionForEntity?.(

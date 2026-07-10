@@ -262,6 +262,14 @@ const SiteConfig = Object.freeze({
         }),
     }),
 
+    actions: Object.freeze({
+        surfaceSlot: Object.freeze({
+            // Prefer the entry side unless another allowed exit shortens the
+            // route to the next queued target by at least this many pixels.
+            exitGoalAdvantageThreshold: 64,
+        }),
+    }),
+
     // World defaults
     world: Object.freeze({
         defaultMap: 'Outside',
@@ -389,6 +397,23 @@ const SiteConfig = Object.freeze({
             // Flat deductions per history entry (scaled by recency)
             historyLabelPenalty:    12,
             historyTargetPenalty:   18,
+        }),
+
+        // Thought-bubble feedback when a myte commits to a need-driven decision.
+        // Keyed by candidate label prefix; prefixes without an icon show nothing
+        // (wander/idle stay silent on purpose — bubbling every think is noise).
+        needBubbles: Object.freeze({
+            minIntervalMs: 6000,
+            icons: Object.freeze({
+                safe_return:  '🏠',
+                home_comfort: '🏠',
+                rest:         '💤',
+                eat:          '🍎',
+                social:       '❤️',
+                play:         '⚽',
+                interaction:  '✨',
+                dropped_item: '👀',
+            }),
         }),
 
         // Candidate scores are recomputed each think and the highest score wins.
@@ -721,12 +746,40 @@ const SiteConfig = Object.freeze({
         panInertiaMinSpeed: 0.5,
     }),
 
+    // ── HUD feedback ─────────────────────────────────────────────────────────
+
+    ui: Object.freeze({
+        hud: Object.freeze({
+            updateIntervalMs: 250,
+            seasonGlyphs: Object.freeze({
+                spring: '🌱',
+                summer: '☀',
+                autumn: '🍂',
+                winter: '❄',
+            }),
+            numericAnimation: Object.freeze({
+                minDurationMs: 200,
+                durationLogScaleMs: 260,
+                maxDurationMs: 1400,
+                maxScale: 1.1,
+                scalePerLogMagnitude: 0.025,
+                tickMinDelta: 3,
+                tickStartIntervalMs: 190,
+                tickEndIntervalMs: 90,
+                finalChimeMinDelta: 10,
+            }),
+        }),
+    }),
+
     // ── Game time ─────────────────────────────────────────────────────────────
 
     time: Object.freeze({
         // Real-time minutes for one full game day
         dayDurationInMinutes: 5,
         daysPerSeason:        28,
+        // Minute interval used by formatted clocks/log timestamps. Set to 5 or 10
+        // for a stepped game clock, or 1 to display every in-game minute.
+        displayMinuteStep:    10,
         initialDate: Object.freeze({
             year: 1,
             season: 'spring',

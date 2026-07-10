@@ -335,8 +335,9 @@ class TreasureChestMapObject extends withItemDrops(MultiStateMapObject) {
         const itemsToSpawn = this.normalizeItems(this.items);
         if (!itemsToSpawn.length) return;
 
+        const itemConfigs = itemsToSpawn.map(item => this.createDroppedItemConfig(item));
         this.spawnDroppedInventoryItems(
-            itemsToSpawn.map(item => this.createDroppedItemConfig(item)),
+            itemConfigs,
             {
                 parent,
                 localCollection: this.droppedItems
@@ -345,6 +346,7 @@ class TreasureChestMapObject extends withItemDrops(MultiStateMapObject) {
 
         this.playConfiguredSound('drop');
         this.gameMap?.particleSystem?.burstEffectAtObject(this, 'SPARKLE', { count: 24, spread: 70 });
+        this.gameMap?.eventManager?.emit('chest:opened', { chest: this, items: itemConfigs });
 
         this.items = [];
     }

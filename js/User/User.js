@@ -256,6 +256,7 @@ class User {
         if (this.currency.hasOwnProperty(type)) {
             this.currency[type] += amount;
             this._scheduleSave();
+            this._emitCurrencyChanged(type, amount);
             return true;
         }
         return false;
@@ -265,9 +266,18 @@ class User {
         if (this.currency.hasOwnProperty(type) && this.currency[type] >= amount) {
             this.currency[type] -= amount;
             this._scheduleSave();
+            this._emitCurrencyChanged(type, -amount);
             return true;
         }
         return false;
+    }
+
+    _emitCurrencyChanged(type, delta) {
+        this.core?.eventManager?.emit('user:currency_changed', {
+            type,
+            delta,
+            total: this.currency[type]
+        });
     }
 
     // Preference management

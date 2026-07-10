@@ -4318,7 +4318,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "bottom"
+                    "left",
+                    "right"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -4373,7 +4374,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "top"
+                    "left",
+                    "right"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -4428,7 +4430,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "right"
+                    "top",
+                    "bottom"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -4483,7 +4486,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "left"
+                    "top",
+                    "bottom"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -4549,7 +4553,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "bottom"
+                    "left",
+                    "right"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -4604,7 +4609,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "top"
+                    "left",
+                    "right"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -4659,7 +4665,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "right"
+                    "top",
+                    "bottom"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -4714,7 +4721,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "left"
+                    "top",
+                    "bottom"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -4780,7 +4788,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "bottom"
+                    "left",
+                    "right"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -4835,7 +4844,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "top"
+                    "left",
+                    "right"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -4890,7 +4900,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "right"
+                    "top",
+                    "bottom"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -4945,7 +4956,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "left"
+                    "top",
+                    "bottom"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -5011,7 +5023,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "bottom"
+                    "left",
+                    "right"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -5066,7 +5079,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "top"
+                    "left",
+                    "right"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -5121,7 +5135,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "right"
+                    "top",
+                    "bottom"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -5176,7 +5191,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "left"
+                    "top",
+                    "bottom"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -5245,7 +5261,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "bottom"
+                    "left",
+                    "right"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -5300,7 +5317,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "top"
+                    "left",
+                    "right"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -5355,7 +5373,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "right"
+                    "top",
+                    "bottom"
                   ],
                   "preferredSide": null,
                   "gap": 10,
@@ -5410,7 +5429,8 @@
                 "collision": "disabled",
                 "approach": {
                   "allowedSides": [
-                    "left"
+                    "top",
+                    "bottom"
                   ],
                   "preferredSide": null,
                   "gap": 10,

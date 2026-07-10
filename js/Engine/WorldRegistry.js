@@ -38,11 +38,29 @@ const WORLD_ENTITY_KINDS = Object.freeze({
 
 class WorldRegistry {
 	static _nextAnonId = 1;
+	static _nextScopeId = 1;
 
 	constructor(container) {
 		this.container = container;
 		this._byId = new Map();     // worldId → entity
 		this._byKind = new Map();   // kind → Set<entity>
+	}
+
+	getScopedOwnerId(entity, kind) {
+		if (!entity || kind === WORLD_ENTITY_KINDS.MYTE) {
+			return null;
+		}
+
+		const owner = entity.gameMap || entity.parent || null;
+		if (!owner) {
+			return null;
+		}
+
+		if (!owner._worldRegistryScopeId) {
+			owner._worldRegistryScopeId = `scope_${WorldRegistry._nextScopeId++}`;
+		}
+
+		return owner._worldRegistryScopeId;
 	}
 
 	// Registers an entity under the given kind. Stamps entity.kind and
@@ -60,13 +78,27 @@ class WorldRegistry {
 			entity.id = `anon_${WorldRegistry._nextAnonId++}`;
 		}
 
-		const worldId = `${kind}:${entity.id}`;
-		const existing = this._byId.get(worldId);
+		const scopedOwnerId = this.getScopedOwnerId(entity, kind);
+		const typeToken = kind === WORLD_ENTITY_KINDS.OBJECT && entity.type
+			? `:${String(entity.type).toLowerCase()}`
+			: '';
+		const baseWorldId = scopedOwnerId
+			? `${kind}:${scopedOwnerId}${typeToken}:${entity.id}`
+			: `${kind}:${entity.id}`;
+		let worldId = baseWorldId;
+		let existing = this._byId.get(worldId);
 		if (existing === entity) {
 			throw new Error(`[WorldRegistry] Entity already registered: ${worldId}`);
 		}
 		if (existing) {
-			throw new Error(`[WorldRegistry] Duplicate world id: ${worldId}`);
+			if (kind === WORLD_ENTITY_KINDS.MYTE) {
+				throw new Error(`[WorldRegistry] Duplicate world id: ${worldId}`);
+			}
+
+			let suffix = 2;
+			while (this._byId.has(worldId)) {
+				worldId = `${baseWorldId}:${suffix++}`;
+			}
 		}
 
 		entity.kind = kind;

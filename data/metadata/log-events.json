@@ -1,0 +1,33 @@
+{
+    "schemaVersion": 1,
+    "defaults": {
+        "cooldownMs": 20000
+    },
+    "events": [
+        { "id": "chest:opened",           "category": "loot",   "icon": "★", "rarity": "notable", "cooldownMs": 0, "template": "{items} spilled out of the treasure chest!" },
+        { "id": "action:open_chest",      "category": "loot",   "icon": "★", "template": "{myte} opened the treasure chest." },
+        { "id": "user:currency_changed",  "category": "loot",   "icon": "¢", "cooldownMs": 4000, "template": "Picked up {coins} — {total} total." },
+
+        { "id": "action:harvest",         "category": "garden", "icon": "✿", "template": "{myte} harvested {target}." },
+        { "id": "action:water_plant",     "category": "garden", "icon": "✿", "template": "{myte} watered {target}." },
+        { "id": "action:pick_flower",     "category": "garden", "icon": "✿", "template": "{myte} picked a flower." },
+        { "id": "action:shake_tree",      "category": "garden", "icon": "✿", "template": "{myte} gave {target} a good shake." },
+        { "id": "action:chop_tree",       "category": "garden", "icon": "✿", "rarity": "notable", "template": "{myte} chopped down {target}!" },
+        { "id": "plant:matured",          "category": "garden", "icon": "✿", "template": "{plant} is ready to harvest!" },
+        { "id": "plant:pollinated",       "category": "garden", "icon": "✿", "template": "A {plant} was pollinated." },
+        { "id": "plant:mutated",          "category": "garden", "icon": "✿", "rarity": "notable", "cooldownMs": 0, "template": "A new mutation bloomed: {plant}!" },
+
+        { "id": "action:greet",           "category": "social", "icon": "♥", "template": "{myte} waved hello to {target}." },
+        { "id": "action:show_affection",  "category": "social", "icon": "♥", "template": "{myte} showed some affection." },
+        { "id": "action:give_item",       "category": "social", "icon": "♥", "rarity": "notable", "template": "{myte} gave a gift to {target}!" },
+        { "id": "action:play_tag",        "category": "social", "icon": "♥", "template": "{myte} played tag with {target}." },
+        { "id": "action:kiss",            "category": "social", "icon": "♥", "template": "{myte} kissed {target}!" },
+        { "id": "action:high_five",       "category": "social", "icon": "♥", "template": "{myte} high-fived {target}." },
+
+        { "id": "action:eat_element",     "category": "myte",   "icon": "•", "template": "{myte} ate {target}." },
+        { "id": "action:drink_fountain",  "category": "myte",   "icon": "•", "template": "{myte} drank from the fountain." },
+        { "id": "action:sleep",           "category": "myte",   "icon": "Z", "template": "{myte} fell asleep." },
+        { "id": "action:use_surface_slot","category": "myte",   "icon": "Z", "template": "{myte} got comfy on {target}." },
+        { "id": "action:smell_flower",    "category": "myte",   "icon": "•", "template": "{myte} stopped to smell {target}." }
+    ]
+}
