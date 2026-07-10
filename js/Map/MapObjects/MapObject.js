@@ -26,6 +26,9 @@ class MapObject {
 		};
 
 		this.collider = this.initializeCollider();
+		this.capabilities = {
+			...(this.getConfig('capabilities', {}) || {})
+		};
 
 		this.interactionState = {
 			lastInteractionTime: 0,
@@ -51,6 +54,7 @@ class MapObject {
 			sortY: 0,
 			zIndex: 0,
 			bgPosition: null,
+			shadow: null,
 			visible: true,
 			dirty: true
 		};
@@ -71,6 +75,8 @@ class MapObject {
 		// tickUpdate() still runs for objects where shouldSimulateOffScreen() returns true.
 		this.sleeping = false;
 		this._animationPausedBeforeSleep = false;
+
+		this.invalidateDepthCache();
 	}
 
 	// ── Getters ──────────────────────────────────────────────────────────────
@@ -348,6 +354,39 @@ class MapObject {
 		return Number.isFinite(parsed) ? parsed : defaultValue;
 	}
 
+	invalidateDepthCache() {
+		const colliderBottom = this.getConfig('physics.collision', false)
+			? (this.collider?.offsetY ?? 0) + (this.collider?.height ?? 0)
+			: 0;
+		this._depthOffset = EntityMethods.resolveDepthOffsetValue(
+			this.getFiniteConfigNumber('visual.depthLine', null),
+			this.getFiniteConfigNumber('visual.depthOffset', null),
+			colliderBottom,
+			this.size.height
+		);
+
+		const explicitPriority = this.getFiniteConfigNumber('visual.depthPriority', null);
+		this._depthPriority = Number.isFinite(explicitPriority)
+			? explicitPriority
+			: this.getFiniteConfigNumber('visual.renderPriority', 0);
+		this._renderLayerKey = this.getConfig('visual.renderLayer', 'objects');
+	}
+
+	_shadowStateEquals(nextState, previousState = this.renderState?.shadow) {
+		if (nextState === previousState) return true;
+		if (!nextState || !previousState) return false;
+
+		return nextState.visible === previousState.visible &&
+			nextState.width === previousState.width &&
+			nextState.height === previousState.height &&
+			nextState.left === previousState.left &&
+			nextState.top === previousState.top &&
+			nextState.opacity === previousState.opacity &&
+			nextState.scale === previousState.scale &&
+			nextState.color === previousState.color &&
+			nextState.blur === previousState.blur;
+	}
+
 	getRegionConfig(regionId = 'collider') {
 		const normalizedRegionId = this.normalizeRegionId(regionId);
 		return this.getConfig(`spatial.regions.${normalizedRegionId}`, null);
@@ -606,33 +645,129 @@ class MapObject {
 		return this.getConfig('interaction.radius', defaultValue);
 	}
 
-	getAiAffordances(context = {}, actor = null) {
+	normalizeAiAffordanceEntry(entry) {
+		if (typeof entry === 'string') {
+			return { actionId: entry };
+		}
+
+		return Utility.isPlainObject(entry) ? { ...entry } : null;
+	}
+
+	resolveAffordanceContextValue(context = {}, path = '') {
+		const keys = String(path || '').split('.').filter(Boolean);
+		let current = context;
+
+		for (const key of keys) {
+			if (current == null || !Object.prototype.hasOwnProperty.call(current, key)) {
+				return undefined;
+			}
+			current = current[key];
+		}
+
+		return current;
+	}
+
+	passesAffordanceNumericGate(value, gate) {
+		if (!Utility.isPlainObject(gate)) return false;
+
+		const threshold = Number(gate.value);
+		if (!Number.isFinite(value) || !Number.isFinite(threshold)) {
+			return false;
+		}
+
+		switch (gate.op) {
+			case 'gt': return value > threshold;
+			case 'gte': return value >= threshold;
+			case 'lt': return value < threshold;
+			case 'lte': return value <= threshold;
+			default: return false;
+		}
+	}
+
+	passesAffordanceWhen(when = null, context = {}, actor = null) {
+		if (!Utility.isPlainObject(when)) {
+			return true;
+		}
+
+		if (when.capability && !this.capabilities?.[when.capability]) {
+			return false;
+		}
+
+		if (Object.prototype.hasOwnProperty.call(when, 'isEnabled')) {
+			if (typeof this.isEnabled !== 'function' || this.isEnabled() !== when.isEnabled) {
+				return false;
+			}
+		}
+
+		if (Object.prototype.hasOwnProperty.call(when, 'isActiveMusicSource')) {
+			if (typeof this.isActiveMusicSource !== 'function' || this.isActiveMusicSource() !== when.isActiveMusicSource) {
+				return false;
+			}
+		}
+
+		if (when.method) {
+			if (typeof this[when.method] !== 'function' || !this[when.method]()) {
+				return false;
+			}
+		}
+
+		if (when.notMethod) {
+			if (typeof this[when.notMethod] === 'function' && this[when.notMethod]()) {
+				return false;
+			}
+		}
+
+		if (when.actorNotCarrying === true && actor?.queue?.isCarrying?.()) {
+			return false;
+		}
+
+		if (when.socketAvailable) {
+			if (this.sockets?.availableFor) {
+				if ((this.sockets.availableFor(actor, when.socketAvailable) || []).length <= 0) {
+					return false;
+				}
+			} else if ((this.getAvailableActionSlots?.('use_surface_slot', actor) || []).length <= 0) {
+				return false;
+			}
+		}
+
+		if (when.contextGate) {
+			const actual = this.resolveAffordanceContextValue(context, when.contextGate.path);
+			if (!this.passesAffordanceNumericGate(actual, when.contextGate)) {
+				return false;
+			}
+		}
+
+		if (when.novelty) {
+			const noveltyScore = context.getNoveltyScore?.(this);
+			if (!this.passesAffordanceNumericGate(noveltyScore, when.novelty)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	getConfiguredAiAffordances(context = {}, actor = null) {
 		const configuredAffordances = this.getConfig('ai.affordances', []);
-		const affordances = configuredAffordances.map(entry =>
-			typeof entry === 'string'
-				? { actionId: entry }
-				: { ...entry }
-		);
-		const interactionType = this.getConfig('interaction.type');
+		if (!Array.isArray(configuredAffordances)) {
+			return [];
+		}
+
+		return configuredAffordances
+			.map(entry => this.normalizeAiAffordanceEntry(entry))
+			.filter(entry => entry?.actionId)
+			.filter(entry => this.passesAffordanceWhen(entry.when, context, actor))
+			.map(({ when, ...affordance }) => affordance);
+	}
+
+	getAiAffordances(context = {}, actor = null) {
+		const affordances = this.getConfiguredAiAffordances(context, actor);
 
 		if (this.isReadyToHarvest?.()) {
 			affordances.push({ actionId: 'harvest', purpose: 'harvest', chain: true });
 		} else if (this.canWater?.() && (context.energy ?? 1) > 0.4) {
 			affordances.push({ actionId: 'water_plant', purpose: 'tend', chain: true });
-		}
-
-		if ((this.type?.toUpperCase?.() === 'FOOD' || this.getConfig('consumable', false)) && !actor?.queue?.isCarrying?.()) {
-			affordances.push({ actionId: 'eat_element', purpose: 'consume' });
-		}
-
-		if (interactionType === 'light' && typeof this.isEnabled === 'function' && !this.isEnabled()) {
-			affordances.push({ actionId: 'interact_object', purpose: 'light_on' });
-		} else if (interactionType === 'dance' && this.isMusicSource?.() && !this.isActiveMusicSource?.()) {
-			affordances.push({ actionId: 'interact_object', purpose: 'start_music' });
-		} else if (interactionType === 'toggle') {
-			affordances.push({ actionId: 'interact_object', purpose: 'toggle' });
-		} else if (interactionType === 'social') {
-			affordances.push({ actionId: 'interact_object', purpose: 'socialize' });
 		}
 
 		if (this.canBeInspectedByAi()) {
@@ -731,36 +866,15 @@ class MapObject {
 	drop(vx = 0, vy = 0) { return { vx, vy }; }
 
 	resolveDepthOffset() {
-		const explicitDepthLine = this.getFiniteConfigNumber('visual.depthLine', null);
-		if (Number.isFinite(explicitDepthLine)) {
-			return explicitDepthLine;
-		}
-
-		const explicitDepthOffset = this.getFiniteConfigNumber('visual.depthOffset', null);
-		if (Number.isFinite(explicitDepthOffset)) {
-			return explicitDepthOffset;
-		}
-
-		const colliderBottom = (this.collider?.offsetY ?? 0) + (this.collider?.height ?? 0);
-		if (this.getConfig('physics.collision', false) && colliderBottom > 0) {
-			return colliderBottom;
-		}
-
-		return this.size.height;
+		return this._depthOffset;
 	}
 
 	getSortY(y = this.posY) {
-		const resolvedY = Number.isFinite(y) ? y : this.posY;
-		return resolvedY + this.resolveDepthOffset();
+		return EntityMethods.getSortYValue(y, this.posY, this.resolveDepthOffset());
 	}
 
 	getDepthPriority() {
-		const explicitPriority = this.getFiniteConfigNumber('visual.depthPriority', null);
-		if (Number.isFinite(explicitPriority)) {
-			return explicitPriority;
-		}
-
-		return this.getFiniteConfigNumber('visual.renderPriority', 0);
+		return this._depthPriority;
 	}
 
 	updateCarriedState() {
@@ -801,7 +915,7 @@ class MapObject {
 	}
 
 	getRenderLayerKey() {
-		return this.getConfig('visual.renderLayer', 'objects');
+		return this._renderLayerKey;
 	}
 
 	getActiveRenderLayerKey() {
@@ -876,7 +990,7 @@ class MapObject {
 	canInteract(myte) {
 		if (!this.getConfig('interaction.type')) return false;
 		if (this.interactionState.activeInteractions.has(myte.id)) return false;
-		const timeSinceLastInteraction = performance.now() - this.interactionState.lastInteractionTime;
+		const timeSinceLastInteraction = SimClock.now() - this.interactionState.lastInteractionTime;
 		if (timeSinceLastInteraction < this.interactionState.cooldown) return false;
 		return true;
 	}
@@ -884,7 +998,7 @@ class MapObject {
 	interact(myte) {
 		if (!this.canInteract(myte)) return false;
 
-		const now = performance.now();
+		const now = SimClock.now();
 		this.interactionState.lastInteractionTime = now;
 		this.interactionState.activeInteractions.add(myte.id);
 		this.interactionState.interactionTimes.set(myte.id, now);
@@ -1090,7 +1204,10 @@ class MapObject {
 			this.facingDirection = normalizedDir;
 		}
 
+		this.invalidateDepthCache();
+
 		if (this.element) {
+			this.element.dataset.renderLayer = this.getRenderLayerKey();
 			this.element.style.width = `${this.size.width}px`;
 			this.element.style.height = `${this.size.height}px`;
 			['n', 's', 'e', 'w'].forEach(d => this.element.classList.remove(`facing-${d}`));
@@ -1131,6 +1248,7 @@ class MapObject {
 		}
 
 		this._createSurfaceSlotElements();
+		this.syncRenderLayer();
 		this.updatePosition();
 	}
 
@@ -1179,9 +1297,10 @@ class MapObject {
 		if (this.renderState.zIndex) this.element.style.zIndex = this.renderState.zIndex;
 		this._prevRenderX = this.posX;
 		this._prevRenderY = this.posY;
-		this.renderState.dirty = false;
 		this.element.dataset.sortY = `${Math.round(this.getSortY() * 100) / 100}`;
-		this.updateShadowVisual();
+		this.computeShadowVisual();
+		this.parent?.renderer?.applyShadowState?.(this);
+		this.renderState.dirty = false;
 	}
 
 	snapToGrid() {
@@ -1258,7 +1377,8 @@ class MapObject {
 		container.appendChild(divElement);
 		this.captureSpriteBaseStyles();
 		this.setBaseSpriteTransform(this.getConfig('transformStyle', ''));
-		this.updateShadowVisual();
+		this.computeShadowVisual();
+		this.parent?.renderer?.applyShadowState?.(this);
 		this.initializeInputComponents();
 		this._initSelectDragHandler();
 		this._createSurfaceSlotElements();
@@ -1320,43 +1440,44 @@ class MapObject {
 		});
 	}
 
-	updateShadowVisual() {
+	computeShadowVisual() {
 		if (!this.shadowElement) return;
-		if (this.isPickedUp) {
-			this.shadowElement.style.display = 'none';
-			return;
+
+		let nextShadowState = { visible: false };
+		if (!this.isPickedUp) {
+			const config = this.getShadowConfig();
+			if (config) {
+				const elevation = Math.max(0, Number(this.posZ) || 0);
+				const width = Number(config.width) || this.size.width * (config.widthRatio ?? 0.5);
+				const height = Number(config.height) || this.size.height * (config.heightRatio ?? 0.18);
+				const left = ((this.size.width - width) * (config.anchorX ?? 0.5)) + (config.offsetX ?? 0);
+				const top = (this.size.height * (config.anchorY ?? 0.82)) - (height / 2) + (config.offsetY ?? 0);
+				const opacityDistance = Math.max(1, config.opacityFadeDistance ?? 96);
+				const scaleDistance = Math.max(1, config.scaleFadeDistance ?? 72);
+				const maxOpacity = config.maxOpacity ?? 0.28;
+				const minOpacity = config.minOpacity ?? 0.08;
+				const minScale = config.minScale ?? 0.6;
+				const opacity = Math.max(minOpacity, maxOpacity * (1 - (elevation / opacityDistance)));
+				const scale = Math.max(minScale, 1 - (elevation / scaleDistance) * 0.35);
+
+				nextShadowState = {
+					visible: true,
+					width,
+					height,
+					left,
+					top,
+					opacity,
+					scale,
+					color: config.color || 'rgba(0, 0, 0, 0.35)',
+					blur: config.blur ?? 2
+				};
+			}
 		}
 
-		const config = this.getShadowConfig();
-		if (!config) {
-			this.shadowElement.style.display = 'none';
-			return;
+		if (!this._shadowStateEquals(nextShadowState)) {
+			this.renderState.shadow = nextShadowState;
+			this.renderState.dirty = true;
 		}
-
-		const elevation = Math.max(0, Number(this.posZ) || 0);
-		const width = Number(config.width) || this.size.width * (config.widthRatio ?? 0.5);
-		const height = Number(config.height) || this.size.height * (config.heightRatio ?? 0.18);
-		const left = ((this.size.width - width) * (config.anchorX ?? 0.5)) + (config.offsetX ?? 0);
-		const top = (this.size.height * (config.anchorY ?? 0.82)) - (height / 2) + (config.offsetY ?? 0);
-		const opacityDistance = Math.max(1, config.opacityFadeDistance ?? 96);
-		const scaleDistance = Math.max(1, config.scaleFadeDistance ?? 72);
-		const maxOpacity = config.maxOpacity ?? 0.28;
-		const minOpacity = config.minOpacity ?? 0.08;
-		const minScale = config.minScale ?? 0.6;
-		const opacity = Math.max(minOpacity, maxOpacity * (1 - (elevation / opacityDistance)));
-		const scale = Math.max(minScale, 1 - (elevation / scaleDistance) * 0.35);
-
-		Object.assign(this.shadowElement.style, {
-			display: '',
-			width: `${width}px`,
-			height: `${height}px`,
-			left: `${left}px`,
-			top: `${top}px`,
-			opacity: `${opacity}`,
-			transform: `scale(${scale})`,
-			backgroundColor: config.color || 'rgba(0, 0, 0, 0.35)',
-			filter: `blur(${config.blur ?? 2}px)`
-		});
 	}
 
 	renderSplitObject(container) {
@@ -1572,7 +1693,7 @@ class MapObject {
 
 	// Fixed-rate simulation (20 Hz). No DOM writes. Override in subclasses for AI/physics.
 	tickUpdate(tickDelta) {
-		const now = performance.now();
+		const now = SimClock.now();
 		for (const [id, time] of this.interactionState.interactionTimes) {
 			if (now - time >= this.interactionState.cooldown) {
 				this.interactionState.activeInteractions.delete(id);
@@ -1594,7 +1715,7 @@ class MapObject {
 		});
 		const updateFn = this.getConfig('update');
 		if (typeof updateFn === 'function') updateFn(this, deltaTime);
-		this.updateShadowVisual();
+		this.computeShadowVisual();
 		this.markPositionDirty();
 	}
 }

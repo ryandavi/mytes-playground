@@ -53,18 +53,26 @@ class PollinatorCreatureMapObject extends AmbientCreatureMapObject {
     _findNearestFlower() {
         let best = null;
         let bestDistance = this.targetSearchRadius;
-        const objects = this.gameMap?.objects || [];
+        const objects = this.gameMap?.worldQuery?.findNearby({
+            x: this.posX,
+            y: this.posY,
+            radius: this.targetSearchRadius,
+            kind: WORLD_ENTITY_KINDS.OBJECT
+        }) ?? [];
+        const activePollinators = Array.from(
+            this.container?.worldRegistry?.all(WORLD_ENTITY_KINDS.OBJECT) ?? []
+        ).filter(other =>
+            other !== this &&
+            other instanceof PollinatorCreatureMapObject &&
+            other.active !== false
+        );
 
         for (const obj of objects) {
             if (!obj || obj === this || obj.active === false) continue;
             if (!this.isFlower(obj)) continue;
             if (obj.isDeflowered?.()) continue;
 
-            const claimed = objects.some(other =>
-                other !== this &&
-                other instanceof PollinatorCreatureMapObject &&
-                other.restingTarget === obj
-            );
+            const claimed = activePollinators.some(other => other.restingTarget === obj);
             if (claimed) continue;
 
             const pos = this.getTargetRestPosition(obj);

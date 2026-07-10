@@ -139,28 +139,16 @@ class MyteRenderer {
 
 	resolveDepthOffset() {
 		const m = this.myte;
-		const explicitDepthLine = this.toFiniteNumber(m.definition?.depthLine, null);
-		if (Number.isFinite(explicitDepthLine)) {
-			return explicitDepthLine;
-		}
-
-		const explicitDepthOffset = this.toFiniteNumber(m.definition?.depthOffset, null);
-		if (Number.isFinite(explicitDepthOffset)) {
-			return explicitDepthOffset;
-		}
-
-		const colliderBottom = (m.collider?.offsetY ?? 0) + (m.collider?.height ?? 0);
-		if (colliderBottom > 0) {
-			return colliderBottom;
-		}
-
-		return m.size.height;
+		return EntityMethods.resolveDepthOffsetValue(
+			this.toFiniteNumber(m.definition?.depthLine, null),
+			this.toFiniteNumber(m.definition?.depthOffset, null),
+			(m.collider?.offsetY ?? 0) + (m.collider?.height ?? 0),
+			m.size.height
+		);
 	}
 
 	getSortY(y = this.myte.posY) {
-		const m = this.myte;
-		const resolvedY = Number.isFinite(y) ? y : m.posY;
-		return resolvedY + this.resolveDepthOffset();
+		return EntityMethods.getSortYValue(y, this.myte.posY, this.resolveDepthOffset());
 	}
 
 	getVisualElevation() {

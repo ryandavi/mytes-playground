@@ -1,4 +1,32 @@
 class AmbientCreatureMapObject extends AnimatedMapObject {
+    static _debugAttributesEnabled = false;
+    static _debugAttributesSyncAt = -1;
+
+    get restingTarget() {
+        const relationships = this.container?.relationships;
+        if (relationships) return relationships.get('targeting', this) ?? null;
+        return this._restingTarget ?? null;
+    }
+
+    set restingTarget(target) {
+        const relationships = this.container?.relationships;
+        const previous = relationships?.get?.('targeting', this) ?? this._restingTarget ?? null;
+        this._restingTarget = target ?? null;
+
+        if (!relationships) return;
+
+        if (previous && previous !== target) {
+            relationships.clear('targeting', this, previous);
+        }
+
+        if (target?.worldId) {
+            relationships.set('targeting', this, target);
+            return;
+        }
+
+        relationships.clear('targeting', this);
+    }
+
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
 
@@ -34,6 +62,7 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         this.targetSearchRadius = this.getConfig('targetSearchRadius', 320);
         this.targetRestDurationMin = this.getConfig('targetRestDurationMin', 2200);
         this.targetRestDurationMax = this.getConfig('targetRestDurationMax', 5200);
+        this._restingTarget = null;
         this.restingTarget = null;
         this.isRestingOnTarget = false;
         this.restElapsed = 0;
@@ -481,11 +510,16 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         this.updateFlightHeight();
         super.update(deltaTime);
         this.applyFlightLift();
+        const simNow = SimClock.now();
+        if (AmbientCreatureMapObject._debugAttributesSyncAt !== simNow) {
+            AmbientCreatureMapObject._debugAttributesSyncAt = simNow;
+            AmbientCreatureMapObject._debugAttributesEnabled = document.body.classList.contains('debug');
+        }
         this.updateDebugAttributes();
     }
 
     updateDebugAttributes() {
-        if (!this.element) return;
+        if (!this.element || !AmbientCreatureMapObject._debugAttributesEnabled) return;
         this.element.setAttribute('data-idle', this.isIdle);
         this.element.setAttribute('data-hovering', this.isHovering);
         this.element.setAttribute('data-fluttering', this.fluttering);

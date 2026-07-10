@@ -371,11 +371,19 @@ class User {
         const storageKey = this.getStorageKey();
         if (!storageKey) return;
 
-        localStorage.setItem(storageKey, JSON.stringify(this.serializeUserData()));
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(this.serializeUserData()));
 
-        const lastUserIdKey = this.core?.config?.userData?.lastUserIdKey;
-        if (lastUserIdKey) {
-            localStorage.setItem(lastUserIdKey, this.userId);
+            const lastUserIdKey = this.core?.config?.userData?.lastUserIdKey;
+            if (lastUserIdKey) {
+                localStorage.setItem(lastUserIdKey, this.userId);
+            }
+        } catch (error) {
+            console.error('[User] Failed to save user data:', error);
+            this.core?.toastManager?.warning?.(
+                'Could not save - storage full or unavailable',
+                'Warning'
+            );
         }
     }
 

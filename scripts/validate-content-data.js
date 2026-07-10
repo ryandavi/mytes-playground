@@ -220,11 +220,29 @@ function validateActions() {
 function validateMapObjects() {
     const baseConfig = readJson('data/map-objects/base.json');
     const typeConfigs = readJson('data/map-objects/types.json');
-    if (!baseConfig || !typeConfigs) {
+    const actionCatalog = readJson('data/metadata/actions.json');
+    if (!baseConfig || !typeConfigs || !actionCatalog) {
         return;
     }
 
     const typeEntries = Object.entries(typeConfigs);
+    const validActionIds = new Set(
+        (Array.isArray(actionCatalog.actions) ? actionCatalog.actions : [])
+            .map(action => normalizeId(action.id))
+            .filter(Boolean)
+    );
+    const affordanceWhenKeys = new Set([
+        'capability',
+        'isEnabled',
+        'isActiveMusicSource',
+        'method',
+        'notMethod',
+        'actorNotCarrying',
+        'socketAvailable',
+        'contextGate',
+        'novelty'
+    ]);
+    const numericOps = new Set(['gt', 'gte', 'lt', 'lte']);
     ensureUniqueIds(typeEntries, 'data/map-objects/types.json types', ([typeId]) => normalizeTypeId(typeId));
 
     typeEntries.forEach(([typeId, config]) => {
@@ -236,6 +254,110 @@ function validateMapObjects() {
         const visual = isPlainObject(config.visual) ? config.visual : null;
         if (visual?.animations && !visual.defaultState && !inferDefaultVisualState(visual)) {
             fail(`Map object type "${typeId}" has animations but no resolvable visual.defaultState.`);
+        }
+
+        if (config.capabilities !== undefined && !isPlainObject(config.capabilities)) {
+            fail(`Map object type "${typeId}" has non-object capabilities.`);
+        }
+
+        const affordances = config.ai?.affordances;
+        if (affordances !== undefined && !Array.isArray(affordances)) {
+            fail(`Map object type "${typeId}" has ai.affordances that is not an array.`);
+        }
+
+        if (Array.isArray(affordances)) {
+            affordances.forEach((entry, index) => {
+                const label = `Map object type "${typeId}" ai.affordances[${index}]`;
+
+                if (typeof entry === 'string') {
+                    if (!validActionIds.has(normalizeId(entry))) {
+                        fail(`${label} references unknown action "${entry}".`);
+                    }
+                    return;
+                }
+
+                if (!isPlainObject(entry)) {
+                    fail(`${label} must be a string or plain object.`);
+                    return;
+                }
+
+                if (!validActionIds.has(normalizeId(entry.actionId))) {
+                    fail(`${label} references unknown action "${entry.actionId}".`);
+                }
+
+                if (entry.purpose !== undefined && typeof entry.purpose !== 'string') {
+                    fail(`${label}.purpose must be a string when present.`);
+                }
+
+                if (entry.chain !== undefined && typeof entry.chain !== 'boolean') {
+                    fail(`${label}.chain must be a boolean when present.`);
+                }
+
+                if (entry.when === undefined) {
+                    return;
+                }
+
+                if (!isPlainObject(entry.when)) {
+                    fail(`${label}.when must be a plain object.`);
+                    return;
+                }
+
+                Object.keys(entry.when).forEach((key) => {
+                    if (!affordanceWhenKeys.has(key)) {
+                        fail(`${label}.when has unknown clause "${key}".`);
+                    }
+                });
+
+                if (entry.when.capability !== undefined && typeof entry.when.capability !== 'string') {
+                    fail(`${label}.when.capability must be a string.`);
+                }
+
+                if (entry.when.isEnabled !== undefined && typeof entry.when.isEnabled !== 'boolean') {
+                    fail(`${label}.when.isEnabled must be a boolean.`);
+                }
+
+                if (entry.when.isActiveMusicSource !== undefined && typeof entry.when.isActiveMusicSource !== 'boolean') {
+                    fail(`${label}.when.isActiveMusicSource must be a boolean.`);
+                }
+
+                if (entry.when.method !== undefined && typeof entry.when.method !== 'string') {
+                    fail(`${label}.when.method must be a string.`);
+                }
+
+                if (entry.when.notMethod !== undefined && typeof entry.when.notMethod !== 'string') {
+                    fail(`${label}.when.notMethod must be a string.`);
+                }
+
+                if (entry.when.actorNotCarrying !== undefined && entry.when.actorNotCarrying !== true) {
+                    fail(`${label}.when.actorNotCarrying must be true when present.`);
+                }
+
+                if (entry.when.socketAvailable !== undefined && typeof entry.when.socketAvailable !== 'string') {
+                    fail(`${label}.when.socketAvailable must be a string.`);
+                }
+
+                ['contextGate', 'novelty'].forEach((gateKey) => {
+                    const gate = entry.when[gateKey];
+                    if (gate === undefined) return;
+
+                    if (!isPlainObject(gate)) {
+                        fail(`${label}.when.${gateKey} must be a plain object.`);
+                        return;
+                    }
+
+                    if (!numericOps.has(gate.op)) {
+                        fail(`${label}.when.${gateKey}.op must be one of gt, gte, lt, lte.`);
+                    }
+
+                    if (!Number.isFinite(Number(gate.value))) {
+                        fail(`${label}.when.${gateKey}.value must be numeric.`);
+                    }
+
+                    if (gateKey === 'contextGate' && typeof gate.path !== 'string') {
+                        fail(`${label}.when.contextGate.path must be a string.`);
+                    }
+                });
+            });
         }
     });
 

@@ -1178,12 +1178,14 @@ class MyteAI {
             this._nearbyMytesTime === this._tickTime) {
             return this._nearbyMytesCache;
         }
-        const result = this._sortByDistance(
-            (this.myte.parent?.mytes || []).filter(target =>
-                target && target !== this.myte && target.isActive &&
-                !target.isDragging && this.myte.getDistanceTo(target) <= radius
-            )
-        );
+        const worldQuery = this.myte.parent?.gameMap?.worldQuery;
+        const result = worldQuery?.findNearby({
+            x: this.myte.posX,
+            y: this.myte.posY,
+            radius,
+            kind: WORLD_ENTITY_KINDS.MYTE,
+            exclude: this.myte
+        }) ?? [];
         this._nearbyMytesCache = result;
         this._nearbyMytesRadius = radius;
         this._nearbyMytesTime = this._tickTime;
@@ -1196,28 +1198,13 @@ class MyteAI {
             return this._nearbyObjectsCache;
         }
 
-        const gameMap = this.myte.parent?.gameMap;
-        // Broad-phase through the grid spatial index instead of scanning every map
-        // object. Padded so collider-inset objects at the radius edge aren't missed;
-        // the unchanged predicate below keeps the exact same selection semantics.
-        // (Virtual tile colliders from getObjectsInArea lack `active` and filter out.)
-        const pad = radius + 64;
-        const candidates = gameMap?.gridSystem
-            ? gameMap.gridSystem.getObjectsInArea(
-                this.myte.posX - pad,
-                this.myte.posY - pad,
-                pad * 2,
-                pad * 2
-            )
-            : (gameMap?.objects || []);
-
-        const result = this._sortByDistance(
-            candidates.filter(target =>
-                target && target.active && !target.isDragging &&
-                Number.isFinite(target.posX) && Number.isFinite(target.posY) &&
-                this.myte.getDistanceTo(target) <= radius
-            )
-        );
+        const worldQuery = this.myte.parent?.gameMap?.worldQuery;
+        const result = worldQuery?.findNearby({
+            x: this.myte.posX,
+            y: this.myte.posY,
+            radius,
+            kind: WORLD_ENTITY_KINDS.OBJECT
+        }) ?? [];
         this._nearbyObjectsCache = result;
         this._nearbyObjectsRadius = radius;
         this._nearbyObjectsTime = this._tickTime;
@@ -1229,12 +1216,13 @@ class MyteAI {
             this._nearbyItemsTime === this._tickTime) {
             return this._nearbyItemsCache;
         }
-        const result = this._sortByDistance(
-            (this.myte.parent?.gameMap?.droppedItems || []).filter(item =>
-                item && item.active && !item.collected &&
-                this.myte.getDistanceTo(item) <= radius
-            )
-        );
+        const worldQuery = this.myte.parent?.gameMap?.worldQuery;
+        const result = worldQuery?.findNearby({
+            x: this.myte.posX,
+            y: this.myte.posY,
+            radius,
+            kind: WORLD_ENTITY_KINDS.ITEM
+        }) ?? [];
         this._nearbyItemsCache = result;
         this._nearbyItemsRadius = radius;
         this._nearbyItemsTime = this._tickTime;

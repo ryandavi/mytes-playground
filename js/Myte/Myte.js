@@ -771,13 +771,18 @@ class Myte {
 
 	getRect() { return this.parent.getRect(this.duplicate); }
 	getOffsetRect() { return this.parent.getLocalOffset(this.duplicate); }
+	get container() { return this.parent; }
 
 	getRandomNearbyObject(range, returnClosest = false) {
-		const nearbyObjects = this.parent.gameMap.objects.filter(obj => {
-			const distanceX = Math.abs(this.posX - obj.posX);
-			const distanceY = Math.abs(this.posY - obj.posY);
-			return obj !== this && obj.active && distanceX <= range && distanceY <= range;
-		});
+		if (!Number.isFinite(range)) return null;
+
+		const nearbyObjects = this.parent?.gameMap?.worldQuery?.findNearby({
+			x: this.posX,
+			y: this.posY,
+			radius: Math.hypot(range, range),
+			kind: WORLD_ENTITY_KINDS.OBJECT,
+			filter: (obj) => Math.abs(this.posX - obj.posX) <= range && Math.abs(this.posY - obj.posY) <= range
+		}) ?? [];
 
 		if (nearbyObjects.length === 0) return null;
 
@@ -911,9 +916,14 @@ class Myte {
 		this._companionAccumulator = 0;
 
 		const radius = SiteConfig.myte.companionRadius;
-		const hasCompanion = (this.parent?.mytes ?? []).some(
-			other => other !== this && other.isActive && this.getDistanceTo(other) <= radius
-		);
+		const hasCompanion = (this.parent?.gameMap?.worldQuery?.findNearby({
+			x: this.posX,
+			y: this.posY,
+			radius,
+			kind: WORLD_ENTITY_KINDS.MYTE,
+			exclude: this,
+			limit: 1
+		})?.length ?? 0) > 0;
 		this.buffs?.syncContextBuff?.('companion:nearby', 'companionship_aura', { active: hasCompanion });
 	}
 

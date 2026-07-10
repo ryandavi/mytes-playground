@@ -186,20 +186,44 @@ class MyteQueue {
         return this.getCurrentAction() instanceof BeingCarriedAction;
     }
 
+    getCarryRelationTarget() {
+        return this.myte?.container?.relationships?.get?.('carrying', this.myte) ?? null;
+    }
+
     isCarrying() {
+        const relatedTarget = this.getCarryRelationTarget();
+        if (relatedTarget) {
+            return true;
+        }
+
         const action = this.getCurrentAction();
         return action instanceof CarryAction || action instanceof HoldItemAction || action instanceof CarryPickupAction;
     }
 
     isCarryingItem() {
+        const relatedTarget = this.getCarryRelationTarget();
+        if (relatedTarget instanceof MapObject) {
+            return true;
+        }
+
         return this.getCurrentAction() instanceof HoldItemAction;
     }
 
     isCarryingMyte() {
+        const relatedTarget = this.getCarryRelationTarget();
+        if (relatedTarget instanceof Myte) {
+            return true;
+        }
+
         return this.getCurrentAction() instanceof CarryAction || this.getCurrentAction() instanceof CarryPickupAction;
     }
 
     getHeldItem() {
+        const relatedTarget = this.getCarryRelationTarget();
+        if (relatedTarget instanceof MapObject) {
+            return relatedTarget;
+        }
+
         const currentAction = this.getCurrentAction();
         if (currentAction instanceof HoldItemAction) {
             return currentAction.target ?? null;

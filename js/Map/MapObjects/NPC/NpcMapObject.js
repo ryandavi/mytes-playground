@@ -31,6 +31,31 @@ const NPC_STATES = Object.freeze({
 // ─────────────────────────────────────────────────────────────────────────────
 
 class NpcMapObject extends MovingMapObject {
+	get aggroTarget() {
+		const relationships = this.container?.relationships;
+		if (relationships) return relationships.get('targeting', this) ?? null;
+		return this._aggroTarget ?? null;
+	}
+
+	set aggroTarget(target) {
+		const relationships = this.container?.relationships;
+		const previous = relationships?.get?.('targeting', this) ?? this._aggroTarget ?? null;
+		this._aggroTarget = target ?? null;
+
+		if (!relationships) return;
+
+		if (previous && previous !== target) {
+			relationships.clear('targeting', this, previous);
+		}
+
+		if (target) {
+			relationships.set('targeting', this, target);
+			return;
+		}
+
+		relationships.clear('targeting', this);
+	}
+
 	constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
 		super(parent, type, variant, posX, posY, config, options);
 
@@ -52,6 +77,7 @@ class NpcMapObject extends MovingMapObject {
 		};
 
 		// ── AI state ──────────────────────────────────────────────────────────
+		this._aggroTarget = null;
 		this.aiState     = NPC_STATES.IDLE;
 		this.aggroTarget = null;
 
@@ -207,19 +233,14 @@ class NpcMapObject extends MovingMapObject {
 
 	// Returns the closest active myte within aggroRadius, or null.
 	_detectTargets() {
-		let closest     = null;
-		let closestDist = this.aggroRadius;
-
-		for (const myte of this.mytes) {
-			if (!myte.isActive) continue;
-			const d = this.getDistanceTo(myte);
-			if (d < closestDist) {
-				closestDist = d;
-				closest     = myte;
-			}
-		}
-
-		return closest;
+		return this.parent?.worldQuery?.nearest?.({
+			x: this.posX,
+			y: this.posY,
+			radius: this.aggroRadius,
+			kind: WORLD_ENTITY_KINDS.MYTE,
+			measureFrom: 'pos',
+			excludeDragging: false
+		}) ?? null;
 	}
 
 	// ── State machine ─────────────────────────────────────────────────────────

@@ -273,6 +273,9 @@ const SiteConfig = Object.freeze({
         // Default animation frame rate for sprite sheets
         defaultAnimationFPS: 8,
 
+        // Vertical carry anchor in world px for Myte-on-Myte carry actions.
+        carryOffset: 45,
+
         // How long the player can be inactive before the active myte enters
         // inactivity free-roam (ms)
         inactiveTimeout: 8000,

@@ -537,7 +537,7 @@
 	<script src="js/Myte/MyteBuffController.js?v=<?= $v ?>"></script>
 	<script src="js/Myte/MyteAI.js?v=<?= $v ?>"></script>
 	<script src="js/Myte/StateMachine.js?v=<?= $v ?>"></script>
-	<script src="js/Myte/Input/BaseInputHandler.js?v=<?= $v ?>"></script>
+	<script src="js/Myte/Input/MyteBaseHandler.js?v=<?= $v ?>"></script>
 	<script src="js/Myte/Input/MyteInputHandler.js?v=<?= $v ?>"></script>
 	<script src="js/Myte/Input/MyteTouchHandler.js?v=<?= $v ?>"></script>
 	<script src="js/Myte/Input/MyteClickHandler.js?v=<?= $v ?>"></script>

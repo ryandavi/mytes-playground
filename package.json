@@ -2,6 +2,8 @@
   "private": true,
   "scripts": {
     "build:scripts": "node scripts/build-manifest.js",
+    "build:bundle": "node scripts/build-manifest.js --bundle",
+    "sim:stats": "node scripts/simulate-stats.js",
     "validate:content": "node scripts/validate-content-data.js",
     "sass:build": "sass css/style.scss css/style.css --no-source-map",
     "sass:watch": "sass --watch css/style.scss css/style.css --no-source-map"
