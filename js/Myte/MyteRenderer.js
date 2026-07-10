@@ -111,6 +111,9 @@ class MyteRenderer {
 	}
 
 	getZIndex(y) {
+		if (Number.isFinite(this.myte._attachmentRenderZIndex)) {
+			return this.myte._attachmentRenderZIndex;
+		}
 		const m = this.myte;
 		const sortY = this.getSortY(y);
 		return m.parent.getDepthZIndex(sortY, this.getDepthPriority());

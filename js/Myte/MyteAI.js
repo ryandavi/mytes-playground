@@ -249,6 +249,7 @@ class MyteAI {
         const { stats, energy, health, fun, social, satiety, comfort, confidence, activity, curiosity, sociability } = snapshot;
 
         const nearbyMytes = this.getNearbyMytes(this.socialRadius);
+        const nearbySocialMytes = this.getNearbyMytes(this.socialRadius, 'social');
         const nearbyObjects = this.getNearbyObjects(this.objectSearchRadius);
         const droppedItems = this.getNearbyDroppedItems(this.objectSearchRadius);
         const zoneManager = this.myte.parent?.gameMap?.zoneManager;
@@ -302,7 +303,7 @@ class MyteAI {
             lightNeed, musicNeed,
             nearbyLights, nearbyActiveLights,
             nearbyMusicSources, nearbyActiveMusicSources,
-            nearbyMytes, nearbyObjects, droppedItems,
+            nearbyMytes, nearbySocialMytes, nearbyObjects, droppedItems,
             nearbyZones, activeZones,
             activeZoneTypes: activeZones.map(zone => zone.type),
             home, distanceFromHome,
@@ -364,8 +365,9 @@ class MyteAI {
     buildEatCandidate(context) {
         const cfg = SiteConfig.ai.candidates.eat;
         const offeredFoodTargets = context.droppedItems.filter(item => item?.isUserOfferedFood?.());
+        const edibleObjects = this.getNearbyObjectsWithCapability(this.objectSearchRadius, 'edible');
         const foodTarget = this.findTargetWithAffordance(
-            [...offeredFoodTargets, ...context.nearbyObjects, ...context.droppedItems],
+            [...offeredFoodTargets, ...edibleObjects, ...context.droppedItems],
             'eat_element',
             context
         );
@@ -431,10 +433,17 @@ class MyteAI {
             return null;
         }
 
-        const nearbySurface = this.findTargetWithAffordance(context.nearbyObjects, 'use_surface_slot', context)
+        const nearbySurface = this.findTargetWithAffordance(
+            this.getNearbyObjectsWithCapability(this.objectSearchRadius, 'sittable'),
+            'use_surface_slot',
+            context
+        )
             ?? (context.drives.restDrive > cfg.expandedSearchDriveThreshold
                 ? this.findTargetWithAffordance(
-                    this.getNearbyObjects(this.objectSearchRadius * cfg.expandedSearchRadiusMultiplier),
+                    this.getNearbyObjectsWithCapability(
+                        this.objectSearchRadius * cfg.expandedSearchRadiusMultiplier,
+                        'sittable'
+                    ),
                     'use_surface_slot',
                     context
                 )
@@ -531,12 +540,13 @@ class MyteAI {
 
     buildSocialCandidate(context) {
         const cfg = SiteConfig.ai.candidates.social;
-        if (!context.stats || context.nearbyMytes.length === 0) {
+        if (!context.stats || context.nearbySocialMytes.length === 0) {
             return null;
         }
 
         // Phase 3: skip unknown Mytes when confidence is low
-        const target = context.nearbyMytes.find(myte => {
+        const target = context.nearbySocialMytes.find(myte => {
+            if (this.getAffordancesForTarget(myte, context).length === 0) return false;
             const key = this.getTargetKey(myte);
             const isKnown = this.objectMemories.has(key);
             return isKnown || context.confidence >= cfg.knownConfidenceThreshold;
@@ -554,13 +564,16 @@ class MyteAI {
         const wantsPlay = context.drives.playDrive > cfg.playDriveThreshold &&
             context.energy > cfg.playEnergyThreshold &&
             context.drives.playDrive > cfg.secondaryPlayDriveThreshold;
-        const actionId = wantsPlay
-            ? 'play_tag'
-            : (
-                context.drives.comfortDrive > cfg.comfortDriveThreshold || context.sociability > cfg.sociabilityThreshold
-                    ? 'show_affection'
-                    : 'greet'
-            );
+        const preferredActionIds = wantsPlay
+            ? ['high_five', 'play_tag']
+            : (context.drives.comfortDrive > cfg.comfortDriveThreshold || context.sociability > cfg.sociabilityThreshold
+                ? ['kiss', 'show_affection', 'greet']
+                : ['high_five', 'greet']);
+        const offeredActions = this.getAffordancesForTarget(target, context);
+        const actionId = preferredActionIds.find(preferredActionId =>
+            offeredActions.some(affordance => affordance.actionId === preferredActionId)
+        ) ?? offeredActions[0]?.actionId;
+        if (!actionId) return null;
         const label = `social:${actionId}`;
         const aiValues = this._getActionAiValues(actionId);
 
@@ -1173,8 +1186,10 @@ class MyteAI {
             .map(entry => entry.item);
     }
 
-    getNearbyMytes(radius) {
+    getNearbyMytes(radius, capability = null) {
+        const cacheKey = capability ?? '';
         if (this._nearbyMytesCache && this._nearbyMytesRadius === radius &&
+            this._nearbyMytesCapability === cacheKey &&
             this._nearbyMytesTime === this._tickTime) {
             return this._nearbyMytesCache;
         }
@@ -1184,12 +1199,25 @@ class MyteAI {
             y: this.myte.posY,
             radius,
             kind: WORLD_ENTITY_KINDS.MYTE,
+            capability,
             exclude: this.myte
         }) ?? [];
         this._nearbyMytesCache = result;
         this._nearbyMytesRadius = radius;
+        this._nearbyMytesCapability = cacheKey;
         this._nearbyMytesTime = this._tickTime;
         return result;
+    }
+
+    getNearbyObjectsWithCapability(radius, capability) {
+        const worldQuery = this.myte.parent?.gameMap?.worldQuery;
+        return worldQuery?.findNearby({
+            x: this.myte.posX,
+            y: this.myte.posY,
+            radius,
+            kind: WORLD_ENTITY_KINDS.OBJECT,
+            capability
+        }) ?? [];
     }
 
     getNearbyObjects(radius) {

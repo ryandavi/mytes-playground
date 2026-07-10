@@ -30,6 +30,7 @@ class Myte {
 			...(typeof EntityDefaults?.capabilities === 'function' ? EntityDefaults.capabilities() : {}),
 			...(this.definition.capabilities || {})
 		};
+		this.sockets = new SocketSet(this, this.definition.sockets || {});
 
 		// --- World/grid identity (see WorldRegistry grid-interplay contract) ---
 		// Mytes are spatially indexed for queries but never block cells or
@@ -138,6 +139,7 @@ class Myte {
 			directFallbackFrames: 0,
 			lastPlanAt: 0
 		};
+		this.breadcrumbTrail = new BreadcrumbTrail(this);
 		this.colliderRecoveryState = {
 			overlapFrames: 0,
 			// -Infinity so the first recovery isn't throttled (SimClock starts near 0)
@@ -240,6 +242,8 @@ class Myte {
 	}
 
 	stop() {
+		this.container?.attachments?.detachAllChildren?.(this);
+		this.container?.attachments?.detach?.(this);
 		this.isActive = false;
 		this.atOriginal = true;
 		this._deregisterFromGrid();
@@ -284,6 +288,8 @@ class Myte {
 	}
 
 	dispose() {
+		this.container?.attachments?.detachAllChildren?.(this);
+		this.container?.attachments?.detach?.(this);
 		this._deregisterFromGrid();
 		this.queue?.clear?.();
 		this.inputHandler?.dispose?.();
@@ -782,6 +788,22 @@ class Myte {
 	getOffsetRect() { return this.parent.getLocalOffset(this.duplicate); }
 	get container() { return this.parent; }
 
+	getAiAffordances(_context = {}, actor = null) {
+		if (!this.isActive || !actor || actor === this ||
+			actor.queue?.isCarrying?.() || this.queue?.isCarrying?.() ||
+			(this.queue?.count?.() ?? 0) > 0) {
+			return [];
+		}
+
+		return [
+			{ actionId: 'greet', purpose: 'social' },
+			{ actionId: 'play_tag', purpose: 'play' },
+			{ actionId: 'show_affection', purpose: 'affection' },
+			{ actionId: 'kiss', purpose: 'affection' },
+			{ actionId: 'high_five', purpose: 'social' }
+		];
+	}
+
 	getRandomNearbyObject(range, returnClosest = false) {
 		if (!Number.isFinite(range)) return null;
 
@@ -879,6 +901,7 @@ class Myte {
 
 		this.updateTargetDot();
 		this.doMovementLogic(deltaTime);
+		this.breadcrumbTrail?.record?.();
 		this.tryResolveColliderOverlap();
 		this.ensureFiniteCoordinates('update:end');
 

@@ -377,6 +377,82 @@
       "ai": { "category": "social", "soothing": 0.3, "exertion": 0.05, "accomplishment": 0.3 }
     },
     {
+      "id": "kiss",
+      "label": "Kiss",
+      "icon": "💋",
+      "description": "Share a synchronized kiss with another Myte",
+      "category": "social",
+      "tags": ["social", "affection"],
+      "queue": {
+        "priority": 3,
+        "isMovementAction": false,
+        "defaultDuration": 600,
+        "requiresTarget": true,
+        "implementationClass": "KissAction",
+        "options": { "expressionType": "kiss", "expressionDuration": 450, "expressionRepeat": 1, "socialGap": 6 }
+      },
+      "traits": { "novelty": 3, "risk": 1 },
+      "effects": { "fun": 4, "social": 9, "comfort": 3, "mood": 8 },
+      "ai": { "category": "social", "soothing": 0.55, "exertion": 0.08, "accomplishment": 0.5 }
+    },
+    {
+      "id": "high_five",
+      "label": "High Five",
+      "icon": "✋",
+      "description": "Celebrate together with another Myte",
+      "category": "social",
+      "tags": ["social", "playful"],
+      "queue": {
+        "priority": 3,
+        "isMovementAction": false,
+        "defaultDuration": 500,
+        "requiresTarget": true,
+        "implementationClass": "HighFiveAction",
+        "options": { "expressionType": "excited", "expressionDuration": 350, "expressionRepeat": 1, "socialGap": 12 }
+      },
+      "traits": { "novelty": 2, "risk": 1 },
+      "effects": { "fun": 6, "social": 7, "mood": 7 },
+      "ai": { "category": "social", "soothing": 0.3, "exertion": 0.12, "accomplishment": 0.65 }
+    },
+    {
+      "id": "kiss_receive",
+      "label": "Kiss (receive)",
+      "icon": "💋",
+      "description": "Respond to a synchronized kiss",
+      "category": "social",
+      "tags": ["social", "affection"],
+      "queue": {
+        "priority": 3,
+        "isMovementAction": false,
+        "defaultDuration": 600,
+        "requiresTarget": true,
+        "implementationClass": "KissReceiveAction",
+        "options": { "expressionType": "kiss", "expressionDuration": 450, "expressionRepeat": 1, "socialGap": 6 }
+      },
+      "traits": { "novelty": 1, "repeatMode": "free" },
+      "effects": { "fun": 3, "social": 7, "comfort": 2, "mood": 6 },
+      "ai": { "category": "social", "soothing": 0.45, "exertion": 0.05, "accomplishment": 0.35 }
+    },
+    {
+      "id": "high_five_receive",
+      "label": "High Five (receive)",
+      "icon": "✋",
+      "description": "Respond to a synchronized high five",
+      "category": "social",
+      "tags": ["social", "playful"],
+      "queue": {
+        "priority": 3,
+        "isMovementAction": false,
+        "defaultDuration": 500,
+        "requiresTarget": true,
+        "implementationClass": "HighFiveReceiveAction",
+        "options": { "expressionType": "excited", "expressionDuration": 350, "expressionRepeat": 1, "socialGap": 12 }
+      },
+      "traits": { "novelty": 1, "repeatMode": "free" },
+      "effects": { "fun": 5, "social": 6, "mood": 6 },
+      "ai": { "category": "social", "soothing": 0.25, "exertion": 0.08, "accomplishment": 0.5 }
+    },
+    {
       "id": "greet_receive",
       "label": "Greet (receive)",
       "icon": "👋",

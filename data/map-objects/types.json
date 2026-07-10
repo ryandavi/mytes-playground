@@ -112,171 +112,10 @@
           "comfort": 18,
           "fun": 12
         },
-        "exclusive": false,
         "settleDuration": 220,
         "dismountDuration": 200,
-        "entryGap": 10,
-        "exitGap": 14,
-        "exitSearchRadius": 20,
-        "returnToEntry": true,
         "bobHeight": 1.5,
-        "bobSpeed": 0.08,
-        "stuckCompletionDistance": 22,
-        "maxFinalAdjustmentDistance": 36,
-        "slotsByFacing": {
-          "S": [
-            {
-              "id": "left_seat",
-              "restPosition": {
-                "xFactor": 0.35,
-                "yFactor": 0.5
-              },
-              "restFacing": "S",
-              "approachConfig": {
-                "allowedSides": [
-                  "bottom"
-                ],
-                "preferredSide": "bottom",
-                "gap": 10,
-                "align": "left-edge",
-                "alignTo": "collider",
-                "myteAlignTo": "collider"
-              }
-            },
-            {
-              "id": "right_seat",
-              "restPosition": {
-                "xFactor": 0.65,
-                "yFactor": 0.5
-              },
-              "restFacing": "S",
-              "approachConfig": {
-                "allowedSides": [
-                  "bottom"
-                ],
-                "preferredSide": "bottom",
-                "gap": 10,
-                "align": "right-edge",
-                "alignTo": "collider",
-                "myteAlignTo": "collider"
-              }
-            }
-          ],
-          "N": [
-            {
-              "id": "left_seat",
-              "restPosition": {
-                "xFactor": 0.35,
-                "yFactor": 0.5
-              },
-              "restFacing": "N",
-              "approachConfig": {
-                "allowedSides": [
-                  "top"
-                ],
-                "preferredSide": "top",
-                "gap": 10,
-                "align": "left-edge",
-                "alignTo": "collider",
-                "myteAlignTo": "collider"
-              }
-            },
-            {
-              "id": "right_seat",
-              "restPosition": {
-                "xFactor": 0.65,
-                "yFactor": 0.5
-              },
-              "restFacing": "N",
-              "approachConfig": {
-                "allowedSides": [
-                  "top"
-                ],
-                "preferredSide": "top",
-                "gap": 10,
-                "align": "right-edge",
-                "alignTo": "collider",
-                "myteAlignTo": "collider"
-              }
-            }
-          ],
-          "E": [
-            {
-              "id": "top_seat",
-              "restPosition": {
-                "xFactor": 0.5,
-                "yFactor": 0.35
-              },
-              "restFacing": "E",
-              "approachConfig": {
-                "allowedSides": [
-                  "right"
-                ],
-                "preferredSide": "right",
-                "gap": 10,
-                "align": "top-edge",
-                "alignTo": "collider",
-                "myteAlignTo": "collider"
-              }
-            },
-            {
-              "id": "bottom_seat",
-              "restPosition": {
-                "xFactor": 0.5,
-                "yFactor": 0.65
-              },
-              "restFacing": "E",
-              "approachConfig": {
-                "allowedSides": [
-                  "right"
-                ],
-                "preferredSide": "right",
-                "gap": 10,
-                "align": "bottom-edge",
-                "alignTo": "collider",
-                "myteAlignTo": "collider"
-              }
-            }
-          ],
-          "W": [
-            {
-              "id": "top_seat",
-              "restPosition": {
-                "xFactor": 0.5,
-                "yFactor": 0.35
-              },
-              "restFacing": "W",
-              "approachConfig": {
-                "allowedSides": [
-                  "left"
-                ],
-                "preferredSide": "left",
-                "gap": 10,
-                "align": "top-edge",
-                "alignTo": "collider",
-                "myteAlignTo": "collider"
-              }
-            },
-            {
-              "id": "bottom_seat",
-              "restPosition": {
-                "xFactor": 0.5,
-                "yFactor": 0.65
-              },
-              "restFacing": "W",
-              "approachConfig": {
-                "allowedSides": [
-                  "left"
-                ],
-                "preferredSide": "left",
-                "gap": 10,
-                "align": "bottom-edge",
-                "alignTo": "collider",
-                "myteAlignTo": "collider"
-              }
-            }
-          ]
-        }
+        "bobSpeed": 0.08
       }
     },
     "visual": {
@@ -415,6 +254,174 @@
           "y": 16,
           "width": 56,
           "height": 48
+        }
+      }
+    },
+    "sockets": {
+      "seat_a": {
+        "kind": "seat",
+        "position": {
+          "xFactor": 0.35,
+          "yFactor": 0.5
+        },
+        "facing": "S",
+        "accepts": [
+          "myte"
+        ],
+        "capacity": 1,
+        "zBias": 2,
+        "collision": "disabled",
+        "approach": {
+          "allowedSides": [
+            "bottom"
+          ],
+          "preferredSide": "bottom",
+          "gap": 10,
+          "align": "left-edge",
+          "alignTo": "collider",
+          "myteAlignTo": "collider"
+        },
+        "entryGap": 10,
+        "exit": {
+          "returnToEntry": true,
+          "gap": 14,
+          "searchRadius": 20
+        },
+        "byFacing": {
+          "N": {
+            "position": {
+              "xFactor": 0.35,
+              "yFactor": 0.5
+            },
+            "facing": "N",
+            "approach": {
+              "allowedSides": [
+                "top"
+              ],
+              "preferredSide": "top",
+              "gap": 10,
+              "align": "left-edge",
+              "alignTo": "collider",
+              "myteAlignTo": "collider"
+            }
+          },
+          "E": {
+            "position": {
+              "xFactor": 0.5,
+              "yFactor": 0.35
+            },
+            "facing": "E",
+            "approach": {
+              "allowedSides": [
+                "right"
+              ],
+              "preferredSide": "right",
+              "gap": 10,
+              "align": "top-edge",
+              "alignTo": "collider",
+              "myteAlignTo": "collider"
+            }
+          },
+          "W": {
+            "position": {
+              "xFactor": 0.5,
+              "yFactor": 0.35
+            },
+            "facing": "W",
+            "approach": {
+              "allowedSides": [
+                "left"
+              ],
+              "preferredSide": "left",
+              "gap": 10,
+              "align": "top-edge",
+              "alignTo": "collider",
+              "myteAlignTo": "collider"
+            }
+          }
+        }
+      },
+      "seat_b": {
+        "kind": "seat",
+        "position": {
+          "xFactor": 0.65,
+          "yFactor": 0.5
+        },
+        "facing": "S",
+        "accepts": [
+          "myte"
+        ],
+        "capacity": 1,
+        "zBias": 2,
+        "collision": "disabled",
+        "approach": {
+          "allowedSides": [
+            "bottom"
+          ],
+          "preferredSide": "bottom",
+          "gap": 10,
+          "align": "right-edge",
+          "alignTo": "collider",
+          "myteAlignTo": "collider"
+        },
+        "entryGap": 10,
+        "exit": {
+          "returnToEntry": true,
+          "gap": 14,
+          "searchRadius": 20
+        },
+        "byFacing": {
+          "N": {
+            "position": {
+              "xFactor": 0.65,
+              "yFactor": 0.5
+            },
+            "facing": "N",
+            "approach": {
+              "allowedSides": [
+                "top"
+              ],
+              "preferredSide": "top",
+              "gap": 10,
+              "align": "right-edge",
+              "alignTo": "collider",
+              "myteAlignTo": "collider"
+            }
+          },
+          "E": {
+            "position": {
+              "xFactor": 0.5,
+              "yFactor": 0.65
+            },
+            "facing": "E",
+            "approach": {
+              "allowedSides": [
+                "right"
+              ],
+              "preferredSide": "right",
+              "gap": 10,
+              "align": "bottom-edge",
+              "alignTo": "collider",
+              "myteAlignTo": "collider"
+            }
+          },
+          "W": {
+            "position": {
+              "xFactor": 0.5,
+              "yFactor": 0.65
+            },
+            "facing": "W",
+            "approach": {
+              "allowedSides": [
+                "left"
+              ],
+              "preferredSide": "left",
+              "gap": 10,
+              "align": "bottom-edge",
+              "alignTo": "collider",
+              "myteAlignTo": "collider"
+            }
+          }
         }
       }
     }
@@ -4257,19 +4264,12 @@
         "label": "Rest",
         "description": "Settle onto the bed and rest for a while",
         "benefit": "energy",
-        "exclusive": true,
         "duration": 5000,
         "settleDuration": 260,
         "dismountDuration": 220,
-        "entryGap": 10,
-        "exitGap": 16,
-        "exitSearchRadius": 20,
-        "returnToEntry": true,
         "bobHeight": 2.5,
         "bobSpeed": 0.1,
-        "restUntilFull": true,
-        "stuckCompletionDistance": 22,
-        "maxFinalAdjustmentDistance": 36
+        "restUntilFull": true
       }
     },
     "visual": {
@@ -4286,11 +4286,6 @@
               "height": 128
             },
             "transformStyle": "rotate(90deg)",
-            "mytePosition": {
-              "xFactor": 0.5,
-              "yFactor": 0.47
-            },
-            "myteFacing": "S",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4306,6 +4301,38 @@
                   "y": 128
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.5,
+                  "yFactor": 0.47
+                },
+                "facing": "S",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "bottom"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "N": {
@@ -4314,11 +4341,6 @@
               "height": 128
             },
             "transformStyle": "rotate(-90deg)",
-            "mytePosition": {
-              "xFactor": 0.5,
-              "yFactor": 0.28
-            },
-            "myteFacing": "N",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4334,6 +4356,38 @@
                   "y": -64
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.5,
+                  "yFactor": 0.28
+                },
+                "facing": "N",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "top"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "E": {
@@ -4342,11 +4396,6 @@
               "height": 64
             },
             "transformStyle": "",
-            "mytePosition": {
-              "xFactor": 0.72,
-              "yFactor": 0.5
-            },
-            "myteFacing": "E",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4362,6 +4411,38 @@
                   "y": -32
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.72,
+                  "yFactor": 0.5
+                },
+                "facing": "E",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "right"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "W": {
@@ -4370,11 +4451,6 @@
               "height": 64
             },
             "transformStyle": "scaleX(-1)",
-            "mytePosition": {
-              "xFactor": 0.28,
-              "yFactor": 0.5
-            },
-            "myteFacing": "W",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4388,6 +4464,38 @@
                   "height": 128,
                   "x": -64,
                   "y": -32
+                }
+              }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.28,
+                  "yFactor": 0.5
+                },
+                "facing": "W",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "left"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
                 }
               }
             }
@@ -4409,11 +4517,6 @@
               "height": 128
             },
             "transformStyle": "",
-            "mytePosition": {
-              "xFactor": 0.5,
-              "yFactor": 0.47
-            },
-            "myteFacing": "S",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4429,6 +4532,38 @@
                   "y": 128
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.5,
+                  "yFactor": 0.47
+                },
+                "facing": "S",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "bottom"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "N": {
@@ -4437,11 +4572,6 @@
               "height": 128
             },
             "transformStyle": "scaleY(-1)",
-            "mytePosition": {
-              "xFactor": 0.5,
-              "yFactor": 0.28
-            },
-            "myteFacing": "N",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4457,6 +4587,38 @@
                   "y": -64
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.5,
+                  "yFactor": 0.28
+                },
+                "facing": "N",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "top"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "E": {
@@ -4465,11 +4627,6 @@
               "height": 64
             },
             "transformStyle": "rotate(90deg)",
-            "mytePosition": {
-              "xFactor": 0.72,
-              "yFactor": 0.5
-            },
-            "myteFacing": "E",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4485,6 +4642,38 @@
                   "y": -32
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.72,
+                  "yFactor": 0.5
+                },
+                "facing": "E",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "right"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "W": {
@@ -4493,11 +4682,6 @@
               "height": 64
             },
             "transformStyle": "rotate(-90deg)",
-            "mytePosition": {
-              "xFactor": 0.28,
-              "yFactor": 0.5
-            },
-            "myteFacing": "W",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4511,6 +4695,38 @@
                   "height": 128,
                   "x": -64,
                   "y": -32
+                }
+              }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.28,
+                  "yFactor": 0.5
+                },
+                "facing": "W",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "left"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
                 }
               }
             }
@@ -4532,11 +4748,6 @@
               "height": 256
             },
             "transformStyle": "rotate(90deg)",
-            "mytePosition": {
-              "xFactor": 0.5,
-              "yFactor": 0.625
-            },
-            "myteFacing": "S",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4552,6 +4763,38 @@
                   "y": 256
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.5,
+                  "yFactor": 0.625
+                },
+                "facing": "S",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "bottom"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "N": {
@@ -4560,11 +4803,6 @@
               "height": 256
             },
             "transformStyle": "rotate(-90deg)",
-            "mytePosition": {
-              "xFactor": 0.5,
-              "yFactor": 0.25
-            },
-            "myteFacing": "N",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4580,6 +4818,38 @@
                   "y": -64
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.5,
+                  "yFactor": 0.25
+                },
+                "facing": "N",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "top"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "E": {
@@ -4588,11 +4858,6 @@
               "height": 128
             },
             "transformStyle": "",
-            "mytePosition": {
-              "xFactor": 0.75,
-              "yFactor": 0.5
-            },
-            "myteFacing": "E",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4608,6 +4873,38 @@
                   "y": -32
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.75,
+                  "yFactor": 0.5
+                },
+                "facing": "E",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "right"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "W": {
@@ -4616,11 +4913,6 @@
               "height": 128
             },
             "transformStyle": "scaleX(-1)",
-            "mytePosition": {
-              "xFactor": 0.25,
-              "yFactor": 0.5
-            },
-            "myteFacing": "W",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4634,6 +4926,38 @@
                   "height": 192,
                   "x": -64,
                   "y": -32
+                }
+              }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.25,
+                  "yFactor": 0.5
+                },
+                "facing": "W",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "left"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
                 }
               }
             }
@@ -4655,11 +4979,6 @@
               "height": 256
             },
             "transformStyle": "",
-            "mytePosition": {
-              "xFactor": 0.5,
-              "yFactor": 0.625
-            },
-            "myteFacing": "S",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4675,6 +4994,38 @@
                   "y": 256
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.5,
+                  "yFactor": 0.625
+                },
+                "facing": "S",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "bottom"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "N": {
@@ -4683,11 +5034,6 @@
               "height": 256
             },
             "transformStyle": "scaleY(-1)",
-            "mytePosition": {
-              "xFactor": 0.5,
-              "yFactor": 0.25
-            },
-            "myteFacing": "N",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4703,6 +5049,38 @@
                   "y": -64
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.5,
+                  "yFactor": 0.25
+                },
+                "facing": "N",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "top"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "E": {
@@ -4711,11 +5089,6 @@
               "height": 128
             },
             "transformStyle": "rotate(90deg)",
-            "mytePosition": {
-              "xFactor": 0.75,
-              "yFactor": 0.5
-            },
-            "myteFacing": "E",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4731,6 +5104,38 @@
                   "y": -32
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.75,
+                  "yFactor": 0.5
+                },
+                "facing": "E",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "right"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "W": {
@@ -4739,11 +5144,6 @@
               "height": 128
             },
             "transformStyle": "rotate(-90deg)",
-            "mytePosition": {
-              "xFactor": 0.25,
-              "yFactor": 0.5
-            },
-            "myteFacing": "W",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4757,6 +5157,38 @@
                   "height": 192,
                   "x": -64,
                   "y": -32
+                }
+              }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.25,
+                  "yFactor": 0.5
+                },
+                "facing": "W",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "left"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
                 }
               }
             }
@@ -4781,11 +5213,6 @@
               "height": 256
             },
             "transformStyle": "",
-            "mytePosition": {
-              "xFactor": 0.5,
-              "yFactor": 0.625
-            },
-            "myteFacing": "S",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4801,6 +5228,38 @@
                   "y": 256
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.5,
+                  "yFactor": 0.625
+                },
+                "facing": "S",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "bottom"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "N": {
@@ -4809,11 +5268,6 @@
               "height": 256
             },
             "transformStyle": "scaleY(-1)",
-            "mytePosition": {
-              "xFactor": 0.5,
-              "yFactor": 0.25
-            },
-            "myteFacing": "N",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4829,6 +5283,38 @@
                   "y": -64
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.5,
+                  "yFactor": 0.25
+                },
+                "facing": "N",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "top"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "E": {
@@ -4837,11 +5323,6 @@
               "height": 128
             },
             "transformStyle": "rotate(90deg)",
-            "mytePosition": {
-              "xFactor": 0.75,
-              "yFactor": 0.5
-            },
-            "myteFacing": "E",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4857,6 +5338,38 @@
                   "y": -32
                 }
               }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.75,
+                  "yFactor": 0.5
+                },
+                "facing": "E",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "right"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
+                }
+              }
             }
           },
           "W": {
@@ -4865,11 +5378,6 @@
               "height": 128
             },
             "transformStyle": "rotate(-90deg)",
-            "mytePosition": {
-              "xFactor": 0.25,
-              "yFactor": 0.5
-            },
-            "myteFacing": "W",
             "spatial": {
               "regions": {
                 "collider": {
@@ -4883,6 +5391,38 @@
                   "height": 192,
                   "x": -64,
                   "y": -32
+                }
+              }
+            },
+            "sockets": {
+              "sleep": {
+                "kind": "sleep",
+                "position": {
+                  "xFactor": 0.25,
+                  "yFactor": 0.5
+                },
+                "facing": "W",
+                "accepts": [
+                  "myte"
+                ],
+                "capacity": 1,
+                "zBias": 2,
+                "collision": "disabled",
+                "approach": {
+                  "allowedSides": [
+                    "left"
+                  ],
+                  "preferredSide": null,
+                  "gap": 10,
+                  "align": "center",
+                  "alignTo": "collider",
+                  "myteAlignTo": "collider"
+                },
+                "entryGap": 10,
+                "exit": {
+                  "returnToEntry": true,
+                  "gap": 16,
+                  "searchRadius": 20
                 }
               }
             }
