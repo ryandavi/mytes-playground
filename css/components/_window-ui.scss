@@ -232,6 +232,83 @@
     }
 }
 
+// ── Event log panel (ModalWindow) ─────────────────────────────────────────────
+#game-log-panel {
+    .window-panel__content {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+        width: 300px;
+    }
+
+    .game-log-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2xs);
+
+        .game-log-filter {
+            font-size: 10px;
+            text-transform: capitalize;
+            padding: 2px var(--space-xs);
+
+            &.is-active {
+                background: var(--surface-ui-inset);
+                font-weight: 600;
+            }
+        }
+    }
+
+    .game-log-list {
+        list-style: none;
+        margin: 0;
+        padding: var(--space-xs);
+        height: 190px;
+        overflow-y: auto;
+        background: var(--surface-ui-inset);
+        border-radius: var(--radius-xs);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2xs);
+        font-size: 11px;
+        line-height: 1.35;
+
+        .game-log-entry {
+            display: flex;
+            align-items: baseline;
+            gap: var(--space-2xs);
+
+            > .time {
+                color: var(--text-subtle);
+                flex: 0 0 auto;
+            }
+
+            > .icon {
+                flex: 0 0 auto;
+            }
+
+            > .text {
+                color: var(--text-base);
+            }
+
+            &.rarity-notable > .text {
+                font-weight: 600;
+            }
+
+            &.is-clickable {
+                cursor: pointer;
+
+                &:hover > .text {
+                    text-decoration: underline;
+                }
+            }
+
+            &.is-hidden {
+                display: none;
+            }
+        }
+    }
+}
+
 // ── Debug panel (ModalWindow) ─────────────────────────────────────────────────
 #game-debug-panel {
     .window-panel__content {

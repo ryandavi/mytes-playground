@@ -230,6 +230,11 @@ class Myte {
 		this.resetGoHomeState();
 		this.footstepController?.reset?.();
 		this.snapToHomePosition();
+		this.posZ = 0;
+		this.physicsController?.reset?.();
+		const homeSlotDirection = this.getHomeSlotDirection();
+		this.setDirection(homeSlotDirection);
+		this.stateMachine?.resetToIdle?.(homeSlotDirection);
 		this.playSlotExitSound();
 
 		this.syncSelectionState();
@@ -269,6 +274,9 @@ class Myte {
 		this.duplicate.classList.add('is-deactivated');
 		this.elements.wrapper.classList.remove('empty');
 		this.targetDot.classList.add('is-hidden');
+		const homeSlotDirection = this.getHomeSlotDirection();
+		this.setDirection(homeSlotDirection);
+		this.stateMachine?.resetToIdle?.(homeSlotDirection);
 
 		this.playSlotEnterSound();
 		this.parent.setNextMyteAsActive(this);
@@ -375,6 +383,10 @@ class Myte {
 		const home = this.getHomePosition();
 		return Math.abs(this.posX - home.x) <= tolerance &&
 			Math.abs(this.posY - home.y) <= tolerance;
+	}
+
+	getHomeSlotDirection() {
+		return this.definition?.visual?.homeSlotDirection ?? DIRECTION.EAST;
 	}
 
 	snapToHomePosition() {

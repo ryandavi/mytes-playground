@@ -242,6 +242,10 @@
             &.thought {
                 --bubble-color: var(--dialogue-background-color);
                 border-radius: 20px;
+                max-width: 76px;
+                min-width: 26px;
+                min-height: 24px;
+                padding: 2px 5px;
 
                 &::before,
                 &::after {

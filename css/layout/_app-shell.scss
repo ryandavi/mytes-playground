@@ -74,6 +74,36 @@
         >.date-time {
             margin-left: auto;
         }
+
+        >.date-time,
+        >.coin-count {
+            @include surface-inset;
+            padding: var(--space-xs) var(--space-sm);
+            color: var(--text-base);
+            white-space: nowrap;
+        }
+
+        >.coin-count {
+            min-width: 4em;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            transform-origin: center;
+            transition: color var(--motion-base) var(--ease-ui);
+
+            &.is-gaining {
+                color: var(--state-success-accent);
+            }
+
+            &.is-spending {
+                color: var(--state-error-accent);
+            }
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        >.header >.coin-count {
+            transition: none;
+        }
     }
 
     .bottom {

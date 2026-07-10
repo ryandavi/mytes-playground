@@ -247,6 +247,74 @@ Follow "C. Updated work queue" items 4–5 in the 2026-07-09 addendum: `followin
 
 ---
 
+## D8 — Feedback layer completion (HUD clock, coin counter, emit sites) — **GPT-5.6** — dispatchable now
+
+Context: Fable shipped the feedback-layer skeleton on `new-ai-system` 2026-07-10 (see `docs/GAME_DESIGN_AUDIT_2026-07.md` §7): the event contract, `GameLogManager` (event-log ModalWindow, `#log-toggle`), `data/metadata/log-events.json` templates, need bubbles in `MyteAI.showNeedBubble`, and three instrumented emit sites (`MyteAction.complete()` → `myte:action_completed`, `TreasureChestMapObject.spawnItems()` → `chest:opened`, `User.addCurrency/spendCurrency` → `user:currency_changed`). All verified in-browser. This task completes the layer. **The event payload shapes below are a contract — match them exactly; do not restructure GameLogManager, only extend it where instructed.**
+
+```
+In the Neko codebase (read AGENTS.md first; branch task/d8-feedback-layer off new-ai-system):
+
+1. HUD clock. The header already has an empty slot: the `.date-time` div in
+   index.php/index.html (currently showing "--:--" in a misnamed .username child —
+   rename that child to class "clock" in BOTH index files). Extend HUDManager
+   (js/UI/Container/HUDManager.js) following its exact pattern (250ms throttle,
+   lastRenderedState diffing) to render `GameTime.getFormattedTime()` plus a
+   season glyph (spring 🌱 summer ☀ autumn 🍂 winter ❄ — map in SiteConfig, not
+   inline). GameTime is at `this.parent.parent.core.gameTime`. Tooltip
+   (title attr) = `getFormattedDate()`. Update only when the rendered string
+   changes.
+
+2. Coin counter. Add a `.coin-count` element next to `.date-time` in BOTH index
+   files ("¢ 0"). HUDManager renders `core.user.currency.coins` on init and
+   updates by subscribing once to `user:currency_changed` on
+   `core.eventManager` (payload: { type, delta, total } — use total, never
+   recompute). Style both header widgets in the SCSS source
+   (css/layout/_app-shell.scss `.date-time` block area) using existing tokens;
+   compile with `npx sass css/style.scss css/style.css --no-source-map`.
+
+3. Remaining emit sites (one line each; optional-chain every emit exactly like
+   the existing three):
+   a. js/Myte/MyteBuffController.js applyBuff() — after a buff instance is
+      actually applied (not refreshed):
+      eventManager.emit('myte:buff_gained', { myte, buffId })
+      and where instances expire (the expiry sweep) / removeBuff():
+      emit('myte:buff_expired', { myte, buffId, reason }).
+      Reach the bus via this.myte.parent?.eventManager.
+   b. js/Map/MapObjects/GrowingPlant/GrowingPlantMapObject.js — where the stage
+      advances to 'mature' (the growthStage assignment around line 118, inside
+      the existing mature branch): this.gameMap?.eventManager?.emit(
+      'plant:matured', { plant: this }).
+   c. js/Map/MapObjects/GrowingPlant/BreedingFlowerMapObject.js — on successful
+      pollination emit 'plant:pollinated' { plant: this, partner }; where the
+      mutationChance roll succeeds (line ~113) emit 'plant:mutated'
+      { plant: this }.
+
+4. Log wiring. In js/UI/Container/GameLogManager.js add formatters (follow the
+   existing this.formatters entries verbatim in style):
+   - 'plant:matured'   → templateId 'plant:matured',   values { plant: this.getEntityLabel(payload.plant) }, entity: payload.plant
+   - 'plant:mutated'   → templateId 'plant:mutated',   values { plant: ... },   entity: payload.plant
+   - 'plant:pollinated'→ templateId 'plant:pollinated', values { plant: ... },  entity: payload.plant
+   Do NOT add a formatter for buff events yet (they'd spam; the emits are for
+   future consumers). Add to data/metadata/log-events.json:
+   - { "id": "plant:matured",    "category": "garden", "icon": "✿", "template": "{plant} is ready to harvest!" }
+   - { "id": "plant:pollinated", "category": "garden", "icon": "✿", "template": "A {plant} was pollinated." }
+   - { "id": "plant:mutated",    "category": "garden", "icon": "✿", "rarity": "notable", "cooldownMs": 0, "template": "A new mutation bloomed: {plant}!" }
+
+5. Do not touch: js/Engine/{WorldRegistry,WorldQuery,EntityRelationships,
+   AttachmentSystem}.js, docs/SOCKET_SCHEMA.md (frozen), the existing three emit
+   sites, MyteAI, or GameLogManager's rendering/persistence internals.
+
+Verify in the browser (there is a project verify skill at .claude/skills/verify/
+SKILL.md with the headless recipe — note: activate a myte via
+container.setActiveMyte(container.mytes[0]) or nothing simulation-driven runs):
+clock ticks and matches GameTime; coin counter updates when
+core.user.addCurrency('coins', 5) runs; a crop reaching mature logs "{plant} is
+ready to harvest!"; zero new console errors. Finish by running
+docs/SMOKE_CHECKLIST.md and reporting results.
+```
+
+---
+
 ## Queued (do NOT dispatch yet)
 
 | Task | Blocked on |

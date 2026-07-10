@@ -138,7 +138,10 @@ class MyteTouchHandler extends DragHandler {
                                     ...actionOptions,
                                     userInitiated: true,
                                     immediate: isSurfaceSlotDrop,
-                                    ...(isSurfaceSlotDrop ? { settleDuration: 1 } : {})
+                                    ...(isSurfaceSlotDrop ? {
+                                        settleDuration: 1,
+                                        slotId: droppedSlotEntry.slot.id
+                                    } : {})
                                 });
                             } else if (isSurfaceSlotDrop) {
                                 // Can't use slot (occupied, etc.) — show rejection on slot element

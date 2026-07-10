@@ -191,8 +191,8 @@ Every creature above is a subclass + a data entry — the pattern is fully estab
 The log and the need bubbles are the multiplier: every other feature becomes more fun because the player can finally *see it happen and remember it happened*.
 
 ### Suggested order
-1. **Need bubbles + HUD clock + coin counter** (§5.1, 5.2, 5.4) — feedback first, all tiny.
-2. **Event log** (§2) — needs the event emissions; do it before new features so they emit from day one.
+1. **Need bubbles + HUD clock + coin counter** (§5.1, 5.2, 5.4) — feedback first, all tiny. — ✅ *Need bubbles shipped 2026-07-10 (Fable); clock + coin counter dispatched as D8 in `CODEX_GOALS.md`.*
+2. **Event log** (§2) — needs the event emissions; do it before new features so they emit from day one. — ✅ *Shipped 2026-07-10 (Fable): `GameLogManager` + `log-events.json` (19 templates) + 3 emit sites, browser-verified (log lines, toast on notable, filters, click-to-pan, localStorage restore). Remaining emit sites in D8.*
 3. **Bond score + AI bias** (§3.1), then **conversations** (§3.2).
 4. **Garden persistence** (§5.9) + **chest loot table** (§5.12).
 5. **Fireflies + dust bunnies + creature reactions** (§4).
@@ -210,7 +210,7 @@ Split by the same rule as the architecture roadmap: **Fable takes work whose cos
 
 | Work | Why it's Fable-shaped |
 |---|---|
-| **Event instrumentation + `GameLog` architecture** (§2) | The event taxonomy is a *contract* — every future system (achievements, quests, stats page) consumes it. Choosing payload shapes and choke points wrong is expensive to unwind. Fable designs and lands the skeleton + 2–3 instrumented sites; remaining emit sites become delegable one-liners. |
+| **Event instrumentation + `GameLog` architecture** (§2) — ✅ **shipped 2026-07-10** | The event taxonomy is a *contract* — every future system (achievements, quests, stats page) consumes it. Choosing payload shapes and choke points wrong is expensive to unwind. Fable designs and lands the skeleton + 2–3 instrumented sites; remaining emit sites become delegable one-liners. *Landed: `myte:action_completed` (BaseActions), `chest:opened` (chest), `user:currency_changed` (User); `GameLogManager` ModalWindow with filters/toasts/click-to-pan/persistence; need bubbles (`MyteAI.showNeedBubble` + `SiteConfig.ai.needBubbles`). Remaining emits → D8.* |
 | **Bond system + AI scoring integration** (§3.1) | Touches `MyteAI` scoring feel — the July stats audit already found tuning is fragile. Needs judgment about weights, decay, and interaction with the shortlist roll, plus the roster schema change. |
 | **World persistence schema** (§5.9) | Save-format decisions are one-way doors, and it must converge with the architecture audit's attachment/relationship serialization. Highest cross-system risk on the list. |
 | **`ChatAction` choreography** (§3.2) | `ActionSync` two-party interrupts are subtle (the June action-system work shows the edge cases: partner carried, despawned, interrupted mid-turn). Also the flagship charm feature — worth first-party polish. |

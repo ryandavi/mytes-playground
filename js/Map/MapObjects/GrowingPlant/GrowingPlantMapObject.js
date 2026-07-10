@@ -126,6 +126,7 @@ class GrowingPlantMapObject extends withItemDrops(InteractiveMapObject) {
 
         if (this.growthStage === 'mature') {
             this.fullyGrown = true;
+            this.gameMap?.eventManager?.emit('plant:matured', { plant: this });
         }
 
         this.onGrowthStageComplete(this.growthStage);

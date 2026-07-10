@@ -289,6 +289,36 @@ class PortalMapObject extends InteractiveMapObject {
         this.element.classList.toggle('inactive', !this.isActive);
     }
 
+    syncPortalWindowTitle() {
+        const titleElement = this.element?.querySelector('.portal-window .portal-panel__title');
+        if (!titleElement) return;
+
+        const nextTitle = this.getPortalWindowTitle();
+        if (titleElement.textContent !== nextTitle) {
+            titleElement.textContent = nextTitle;
+        }
+        titleElement.title = nextTitle;
+    }
+
+    updatePortalDom({ refreshTitle = false } = {}) {
+        if (!this.element) return;
+
+        this.element.classList.add('portal');
+        this.updatePortalStateClasses();
+        this.ensurePortalWindow();
+        this.syncPortalWindowTitle();
+
+        if (this.targetMap) {
+            this.element.dataset.targetMap = this.targetMap;
+        } else {
+            delete this.element.dataset.targetMap;
+        }
+
+        if (refreshTitle) {
+            this.refreshPortalWindowTitle();
+        }
+    }
+
     ensurePortalWindow() {
         if (!this.element || this.element.querySelector('.portal-window')) return;
 
@@ -301,7 +331,7 @@ class PortalMapObject extends InteractiveMapObject {
         title.title = this.getPortalWindowTitle();
 
         const content = document.createElement('div');
-        content.className = 'content';
+        content.className = 'content portal-panel__content';
         const portalWindowBackground = this.getConfig('portalWindowBackground', '');
         if (portalWindowBackground) {
             content.style.backgroundImage = `url(${portalWindowBackground})`;
@@ -316,12 +346,7 @@ class PortalMapObject extends InteractiveMapObject {
     }
 
     refreshPortalWindowTitle() {
-        const titleElement = this.element?.querySelector('.portal-window .portal-panel__title');
-        const nextTitle = this.getPortalWindowTitle();
-        if (titleElement) {
-            titleElement.textContent = nextTitle;
-            titleElement.title = nextTitle;
-        }
+        this.syncPortalWindowTitle();
 
         if (!this.targetMap || !this.core?.mapLoader?.getMapDisplayName) {
             return;
@@ -342,7 +367,6 @@ class PortalMapObject extends InteractiveMapObject {
 
     render(container, parent) {
         const element = super.render(container, parent);
-        element.classList.add('portal');
 
         if (this.usesFallbackVisual) {
             const spriteElement = element.querySelector('.sprite');
@@ -353,13 +377,7 @@ class PortalMapObject extends InteractiveMapObject {
             }
         }
 
-        this.updatePortalStateClasses();
-        this.ensurePortalWindow();
-        this.refreshPortalWindowTitle();
-
-        if (this.targetMap) {
-            element.dataset.targetMap = this.targetMap;
-        }
+        this.updatePortalDom({ refreshTitle: true });
 
         return element;
     }
@@ -374,7 +392,7 @@ class PortalMapObject extends InteractiveMapObject {
 
     update(deltaTime) {
         super.update(deltaTime);
-        this.updatePortalStateClasses();
+        this.updatePortalDom();
 
         if (this.particleSystem?.setEnabled) {
             this.particleSystem.setEnabled(this.isActive);
@@ -394,5 +412,10 @@ class PortalMapObject extends InteractiveMapObject {
         }
 
         super.remove();
+    }
+
+    wake() {
+        super.wake();
+        this.updatePortalDom();
     }
 }

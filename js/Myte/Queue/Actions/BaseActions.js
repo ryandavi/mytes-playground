@@ -103,6 +103,12 @@ class MyteAction {
     complete() {
         this.myte.stats?.applyActionResult?.(this.buildActionResult());
         this.myte.buffs?.handleActionComplete?.(this);
+        this.myte.parent?.eventManager?.emit('myte:action_completed', {
+            myte: this.myte,
+            actionId: this.constructor.metadata?.id ?? null,
+            target: this.target ?? null,
+            userInitiated: this.userInitiated === true
+        });
         if (this.onComplete !== null) {
             this.onComplete();
         }

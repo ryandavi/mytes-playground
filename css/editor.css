@@ -234,7 +234,6 @@ button:disabled {
   text-shadow: 1px 1px 0 var(--button-disabled-highlight, var(--button-light));
   cursor: default;
   filter: saturate(0.72);
-  pointer-events: none;
 }
 .button.disabled .icon,
 .button.disabled svg, .button:disabled .icon,
@@ -253,6 +252,15 @@ button:disabled .icon,
 button:disabled svg {
   fill: var(--button-disabled-icon-color, var(--button-icon-color));
   color: var(--button-disabled-icon-color, var(--button-icon-color));
+}
+.button.disabled, .button:disabled,
+input[type=submit].disabled,
+input[type=submit]:disabled,
+input[type=button].disabled,
+input[type=button]:disabled,
+button.disabled,
+button:disabled {
+  pointer-events: none;
 }
 
 input[type=range] {
@@ -467,7 +475,9 @@ body.editor-body {
   letter-spacing: 0.04em;
   color: var(--button-text-color);
   flex-shrink: 0;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .editor-panel .editor-panel__content {
   flex: 1;
@@ -755,7 +765,9 @@ body.editor-body {
   font-size: 11px;
   color: var(--text-subtle);
   cursor: pointer;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   padding: var(--space-2xs) var(--space-sm);
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
@@ -796,7 +808,9 @@ body.editor-body {
 }
 .editor-inspector .editor-tree details > summary {
   cursor: pointer;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
   padding: var(--space-2xs) var(--space-base);
   font-weight: 700;
   color: var(--button-text-color);
@@ -1000,7 +1014,9 @@ body.editor-body {
   cursor: pointer;
   font-size: 11px;
   padding: var(--space-2xs) var(--space-base);
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .editor-field--add-trigger:hover {
   color: var(--text-subtle);
@@ -1249,7 +1265,9 @@ body.editor-body {
   border-radius: var(--radius-xs);
   padding: 2px;
   border: 1px solid transparent;
-  user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .editor-sprite-frame:hover {
   border-color: var(--border-color);
@@ -1316,4 +1334,4 @@ body.editor-body {
 .editor-loading.is-hidden {
   opacity: 0;
   pointer-events: none;
-}
+}/*# sourceMappingURL=editor.css.map */

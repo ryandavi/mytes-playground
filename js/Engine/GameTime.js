@@ -14,6 +14,7 @@ class GameTime {
 		this.config = {
 			dayDurationInMinutes: SiteConfig.time.dayDurationInMinutes,
 			daysPerSeason: SiteConfig.time.daysPerSeason,
+			displayMinuteStep: SiteConfig.time.displayMinuteStep,
 			seasons: ['spring', 'summer', 'autumn', 'winter'],
 			daysOfTheWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
 
@@ -244,7 +245,8 @@ class GameTime {
 	// Formatting methods
 	getFormattedTime() {
 		const hour = this.getCurrentHour();
-		const minute = this.getCurrentMinute();
+		const minuteStep = Utility.clamp(Math.round(Number(this.config.displayMinuteStep) || 1), 1, 60);
+		const minute = Math.floor(this.getCurrentMinute() / minuteStep) * minuteStep;
 
 		const display12hour = true;
 		let displayHour = display12hour ? (hour % 12 || 12) : hour;

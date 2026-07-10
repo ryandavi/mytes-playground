@@ -34,6 +34,9 @@ class MyteAI {
 
         this._tickTime = 0;
         this._scaryObjectDetectedThisTick = false;
+
+        this._lastBubblePrefix = null;
+        this._lastBubbleTime = -Infinity;
     }
 
     resolveMode(mode) {
@@ -167,11 +170,29 @@ class MyteAI {
         const chosen = this.selectCandidate(candidates);
         chosen.execute();
         this.setDecisionLock(chosen.commitmentMs ?? 0);
+        this.showNeedBubble(chosen);
 
         this.lastDecisionLabel = chosen.label;
         this.lastDecisionTime = SimClock.now();
         this.lastDecisionTargetKey = chosen.targetKey ?? null;
     }
+
+    // Surface the winning drive as a thought bubble so the AI's choices are
+    // legible. Repeats of the same drive are throttled; a drive *change* shows
+    // immediately.
+    showNeedBubble(candidate) {
+        const cfg = SiteConfig.ai.needBubbles;
+        const prefix = String(candidate.label ?? '').split(':')[0];
+        const icon = cfg?.icons?.[prefix];
+        if (!icon) return;
+
+        const now = SimClock.now();
+		if (prefix === this._lastBubblePrefix && (now - this._lastBubbleTime) < cfg.minIntervalMs) return;
+
+		this._lastBubblePrefix = prefix;
+		this._lastBubbleTime = now;
+		this.myte.dialogue?.showMessage(icon, 'thought');
+	}
 
     selectCandidate(candidates) {
         const bestScore = candidates[0]?.score ?? 0;
