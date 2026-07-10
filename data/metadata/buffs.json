@@ -111,6 +111,25 @@
       }
     },
     {
+      "id": "recovering",
+      "label": "Recovering",
+      "kind": "debuff",
+      "category": "recovery",
+      "priority": 110,
+      "durationMs": 300000,
+      "cancellable": false,
+      "icon": "💤",
+      "description": "After fainting, a little more rest is needed before heading out again.",
+      "effects": {
+        "movement": {
+          "speedMultiplier": 0.7
+        },
+        "stats": {
+          "behaviorDriveMultiplier": 0.9
+        }
+      }
+    },
+    {
       "id": "starving",
       "label": "Starving",
       "kind": "debuff",

@@ -46,8 +46,8 @@ class MyteStats {
         // Satiety (100 = full, 0 = starving)
         this.minSatiety = 0;
         this.maxSatiety = 100;
-        this.satiety = Utility.clamp(statConfig.satiety ?? statConfig.hunger ?? SiteConfig.myte.initialStats.satiety, this.minSatiety, this.maxSatiety);
-        this.satietyDecayRate = statConfig.satietyDecayRate ?? statConfig.hungerDecayRate ?? SiteConfig.stats.satietyDecayRate;
+        this.satiety = Utility.clamp(statConfig.satiety ?? SiteConfig.myte.initialStats.satiety, this.minSatiety, this.maxSatiety);
+        this.satietyDecayRate = statConfig.satietyDecayRate ?? SiteConfig.stats.satietyDecayRate;
 
         // Comfort
         this.minComfort = 0;
@@ -116,6 +116,8 @@ class MyteStats {
         this._statDriveAccum = 0;
         this._statDriveTickInterval = SiteConfig.stats.behaviorDriveTickInterval;
         this._needSignalAccum = 0;
+        this._starvationElapsed = 0;
+        this._healthDepletionArmed = this.health > this.minHealth;
 
         // Initialize battery display
         this.updateBatteryDisplay();
@@ -123,17 +125,20 @@ class MyteStats {
 
     updateHealth(amount) {
         this.health = Utility.clamp(this.health + amount, this.minHealth, this.maxHealth);
+        this._rearmHealthDepletionIfRecovered();
     }
 
     applyDamage(amount) {
+        const previousHealth = this.health;
         this.health = Math.max(this.minHealth, this.health - amount);
-        if (this.health <= this.minHealth) {
-            this.myte.queue.interrupt('expression', { actionType: 'faint' });
+        if (previousHealth > this.minHealth && this.health <= this.minHealth && this._healthDepletionArmed) {
+            this.onHealthDepleted();
         }
     }
 
     heal(amount) {
         this.health = Utility.clamp(this.health + amount, this.minHealth, this.maxHealth);
+        this._rearmHealthDepletionIfRecovered();
     }
 
     // Trait value resolution: accepts number (0–1) or object {default, min, max}
@@ -215,7 +220,7 @@ class MyteStats {
             health:  this.getEffectAmount(effectSource, ['health',  'healthDelta',  'healthRestore',  'healthBoost'])  * totalScale,
             fun:     this.getEffectAmount(effectSource, ['fun',     'funDelta',     'funBoost'])  * totalScale,
             social:  this.getEffectAmount(effectSource, ['social',  'socialDelta',  'socialBoost']) * totalScale,
-            satiety: this.getEffectAmount(effectSource, ['satiety', 'satietyDelta', 'satietyBoost', 'hunger', 'hungerDelta', 'hungerBoost']) * totalScale,
+            satiety: this.getEffectAmount(effectSource, ['satiety', 'satietyDelta', 'satietyBoost']) * totalScale,
             comfort: this.getEffectAmount(effectSource, ['comfort', 'comfortDelta', 'comfortBoost']) * totalScale,
             confidence: this.getEffectAmount(effectSource, ['confidence', 'confidenceDelta', 'confidenceBoost']) * totalScale
         };
@@ -370,7 +375,7 @@ class MyteStats {
         this.applyConfidenceDelta(confDelta);
     }
 
-    // --- Behavior drives (updates fun, social, hunger, comfort per tick) ---
+    // --- Behavior drives (updates fun, social, satiety, comfort per tick) ---
 
     updateBehaviorDrives(deltaTime, { suppressExhaustionCascade = false } = {}) {
         const actionId = this.getCurrentActionId();
@@ -417,7 +422,7 @@ class MyteStats {
             funDelta += this.funDeltaRates.moving * deltaTime * rateScale;
         }
 
-        // Wellbeing ceiling: fun can't stay high when vitals (energy, health, hunger) are depleted.
+        // Wellbeing ceiling: fun can't stay high when vitals (energy, health, satiety) are depleted.
         // Ceiling scales from wb.funMinCap (all vitals = 0) up to maxFun (all vitals = 100%).
         const wb = SiteConfig.stats.wellbeing;
         const vitalRatio = (this.getEnergyRatio() + this.getHealthRatio() + this.getSatietyRatio()) / 3;
@@ -440,10 +445,10 @@ class MyteStats {
 
         // Satiety decay — faster when exhausted (body burns more fuel when running on empty)
         const satietyExhaustionScale = suppressExhaustionCascade ? 1 : 1 + cascade.satietyDecayScale * exhaustionPenalty;
-        this.updateSatiety(-this.satietyDecayRate * deltaTime * satietyExhaustionScale);
+        this.updateSatiety(-this.satietyDecayRate * deltaTime * rateScale * satietyExhaustionScale);
 
         // Comfort blends toward a target based on wellbeing and home proximity.
-        // Energy, health, and hunger are weighted heavily — you can't be comfortable while starving/exhausted/injured.
+        // Energy, health, and satiety are weighted heavily — you can't be comfortable while starving/exhausted/injured.
         const comfortTarget = (
             (this.getFunRatio()    * 0.20) +
             (this.getEnergyRatio() * 0.30) +
@@ -461,7 +466,7 @@ class MyteStats {
         }
 
         // Confidence passive: blend toward a target based on wellbeing and home proximity.
-        // Survival vitals (energy, health, hunger) are the primary drivers — fun is secondary.
+        // Survival vitals (energy, health, satiety) are the primary drivers — fun is secondary.
         const confTarget = (
             this.getEnergyRatio() * 0.35 +
             this.getHealthRatio() * 0.25 +
@@ -495,10 +500,15 @@ class MyteStats {
             this.applyConfidenceDelta(-(this.confidence - confidenceCeiling) * wb.ceilingDrainRate * deltaTime);
         }
 
-        // Starvation: near-zero hunger slowly drains health, separate from exhaustion cascade
+        // Starvation: near-zero satiety slowly drains health, separate from exhaustion cascade
         if (this.getSatietyRatio() < wb.starvationThreshold) {
-            const starvationPenalty = 1 - (this.getSatietyRatio() / wb.starvationThreshold);
-            this.applyDamage(wb.starvationHealthDrainPerMs * starvationPenalty * deltaTime);
+            this._starvationElapsed += deltaTime;
+            if (this._starvationElapsed >= wb.starvationGraceMs) {
+                const starvationPenalty = 1 - (this.getSatietyRatio() / wb.starvationThreshold);
+                this.applyDamage(wb.starvationHealthDrainPerMs * starvationPenalty * deltaTime);
+            }
+        } else {
+            this._starvationElapsed = 0;
         }
     }
 
@@ -690,6 +700,20 @@ class MyteStats {
         this.playBatterySound(0);
         this.applyExhaustionEffects();
         this.myte.ai?.handleEnergyDepleted?.();
+    }
+
+    _rearmHealthDepletionIfRecovered() {
+        if (this.health > 20) {
+            this._healthDepletionArmed = true;
+        }
+    }
+
+    onHealthDepleted() {
+        this._healthDepletionArmed = false;
+        this.myte.queue?.clear?.();
+        this.myte.queue?.interrupt?.('expression', { actionType: 'faint' });
+        this.myte.buffs?.syncContextBuff?.('health:recovering', 'recovering', { active: true });
+        this.myte.setMode?.(MOVE_TYPES.GOHOME);
     }
 
     onEnergyFull() {

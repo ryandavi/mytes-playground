@@ -214,11 +214,12 @@ class MyteClickHandler extends MyteBaseHandler {
 	_activateFromHomeSlot(event, { holdInSlot = true } = {}) {
 		event?.preventDefault?.();
 		event?.stopPropagation?.();
-		this.myte.startWithOptions({
+		const started = this.myte.startWithOptions({
 			goal: DEFAULT_MODE,
 			followGoal: this.myte.followGoal,
 			autonomyGoal: this.myte.autonomyGoal
 		});
+		if (!started) return;
 		this.myte.parent.setActiveMyte(this.myte);
 		if (holdInSlot) {
 			this.myte.holdInHomeSlotUntilPointerLeaves?.();

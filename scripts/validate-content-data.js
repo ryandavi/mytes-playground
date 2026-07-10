@@ -48,6 +48,22 @@ function normalizeTypeId(value) {
         .toUpperCase();
 }
 
+function validateNoLegacySatietyKeys(value, label) {
+    if (!isPlainObject(value)) return;
+
+    for (const key of ['hunger', 'hungerDelta', 'hungerBoost', 'hungerDecayRate']) {
+        if (Object.hasOwn(value, key)) {
+            fail(`${label} uses legacy "${key}"; use the canonical satiety key.`);
+        }
+    }
+
+    Object.entries(value).forEach(([key, child]) => {
+        if (isPlainObject(child)) {
+            validateNoLegacySatietyKeys(child, `${label}.${key}`);
+        }
+    });
+}
+
 function inferDefaultVisualState(visual = {}) {
     const animations = visual?.animations;
     if (!isPlainObject(animations)) {
@@ -93,6 +109,8 @@ function validateMytes() {
         return;
     }
 
+    validateNoLegacySatietyKeys(baseDefinition.stats, 'Base Myte stats');
+
     const species = Array.isArray(speciesCatalog.species) ? speciesCatalog.species : [];
     ensureUniqueIds(species, 'data/mytes/species.json species', entry => normalizeId(entry.id || entry.speciesId));
 
@@ -111,6 +129,8 @@ function validateMytes() {
         if (!definition) {
             return;
         }
+
+        validateNoLegacySatietyKeys(definition.stats, `Myte species "${id}" stats`);
 
         const definitionId = normalizeId(definition.id || id);
         if (definitionId !== id) {
@@ -214,6 +234,8 @@ function validateActions() {
         if (!registeredClasses.has(className)) {
             fail(`Action "${actionId}" points to implementationClass "${className}", but it is not registered in ActionManager.registerActions(...).`);
         }
+
+        validateNoLegacySatietyKeys(action.effects, `Action "${actionId}" effects`);
     });
 }
 
@@ -246,6 +268,10 @@ function validateMapObjects() {
     ensureUniqueIds(typeEntries, 'data/map-objects/types.json types', ([typeId]) => normalizeTypeId(typeId));
 
     typeEntries.forEach(([typeId, config]) => {
+        validateNoLegacySatietyKeys(config.effects, `Map object type "${typeId}" effects`);
+        Object.entries(config.variantConfigs ?? {}).forEach(([variantId, variantConfig]) => {
+            validateNoLegacySatietyKeys(variantConfig?.effects, `Map object type "${typeId}" variant "${variantId}" effects`);
+        });
         const baseType = normalizeTypeId(config.baseType);
         if (baseType && !typeConfigs[baseType]) {
             fail(`Map object type "${typeId}" references missing baseType "${baseType}".`);
@@ -379,12 +405,22 @@ function validateNoLegacyFiles() {
     });
 }
 
+function validateZones() {
+    const zoneCatalog = readJson('data/metadata/zones.json');
+    if (!zoneCatalog) return;
+
+    (zoneCatalog.zones ?? []).forEach((zone) => {
+        validateNoLegacySatietyKeys(zone?.effects, `Zone "${zone?.id ?? 'unknown'}" effects`);
+    });
+}
+
 function run() {
     validateNoLegacyFiles();
     validateMytes();
     validateItems();
     validateActions();
     validateMapObjects();
+    validateZones();
 
     if (warnings.length) {
         console.warn('Warnings:');

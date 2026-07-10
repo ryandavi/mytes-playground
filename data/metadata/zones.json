@@ -34,7 +34,7 @@
       "id": "food",
       "label": "Food Zone",
       "effects": {
-        "hunger": 0.0002
+        "satiety": 0.0002
       }
     },
     {

@@ -70,14 +70,6 @@
       "exploreDrive": 1.0,
       "comfortDrive": 1.0,
       "safetyDrive":  1.0
-    },
-    "funDeltaRates": {
-      "resting":    0.0022,
-      "stimulating": 0.0034,
-      "movement":   0.0006,
-      "idle":       0.0042,
-      "default":    0.0008,
-      "moving":     0.0002
     }
   },
   "stats": {
@@ -85,15 +77,11 @@
     "energy": 75,
     "fun": 70,
     "social": 80,
-    "hunger": 100,
+    "satiety": 100,
     "speed": 1,
     "energyDecayRate": 0.00045,
     "energyRegenRate": 0.0012,
-    "funDecayRate": 0.0005,
-    "socialDecayRate": 0.0016,
-    "hungerDecayRate": 0.00025,
     "needSignalCooldown": 90000,
-    "behaviorDriveRate": 0.18,
     "noteBehaviorScale": 0.45,
     "fullChargeAnnounceCooldown": 30000,
     "fullChargeResetThreshold": 0.94,
