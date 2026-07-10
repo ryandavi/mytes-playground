@@ -2,7 +2,7 @@
 
 Paste-ready blocks for the currently-unblocked tasks from `docs/ARCHITECTURE_AUDIT_2026-07.md`. Blocks for T3+ get added here **when their dependencies land**, not before. (Previous goals file for the June audit was archived to `docs/OLD/CODEX_GOALS.md`; all its goals shipped.)
 
-> **Status update 2026-07-09:** the uncommitted working tree already implements D1, D2, D3 (bundle mode), D4, most of T4/T16, and parts of T5/T7 — reviewed in detail in the audit doc's *Addendum — 2026-07-09 Working-Tree Review*. **Do not re-dispatch D1–D4.** The live queue is **D5 → D6 → D7** below.
+> **Status update 2026-07-10:** D5/D6, D7's T5/T7 work, T6/T6b, T13, and T15 are implemented headlessly on `new-ai-system`. **Do not re-dispatch D1–D7, T6, T13, or T15.** The live queue is browser regression verification, then T8; exact status and required checks are maintained in the audit's 2026-07-10 ledger.
 >
 > **Model routing update:** implementation tasks now go to **GPT-5.6** (owner has no Fable budget). Wherever this file says Sonnet/Opus/Codex, read GPT-5.6. Fable's review gate is replaced by: run every acceptance harness + `docs/SMOKE_CHECKLIST.md` and report raw results; never change APIs in `js/Engine/{WorldRegistry,WorldQuery,EntityRelationships,AttachmentSystem}.js` or `docs/SOCKET_SCHEMA.md` (frozen specs).
 

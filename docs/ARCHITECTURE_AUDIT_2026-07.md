@@ -1,5 +1,7 @@
 # Architecture Audit & Forward Plan — Neko / Mytes
 
+> **Implementation status — 2026-07-10:** D5 and D6 are landed on `new-ai-system` (the stats commit was cherry-picked as `40e0776`); the D2 depth fallback regression is fixed in the current working tree. T5/T7 completion is now implemented headlessly: `following` is relationship-backed for `FollowObjectAction`, Mytes advertise guarded social affordances, and social/eat/rest AI discovery uses `WorldQuery` capability broad-phases. T6/T6b are now implemented headlessly: COUCH and BED are destructively converted to sockets, `AttachmentSystem` owns seating, held items, and steady-state Myte carrying, the editor previews socket markers, and `ActionSlotLedger` is deleted. T13 and T15 are also implemented headlessly: paired social actions now synchronize kiss/high-five, and the follow system uses shared breadcrumbs, dead-band hysteresis, and throttled fallback paths. Browser acceptance remains outstanding; see the status ledger in the 2026-07-09 addendum.
+
 **Date:** 2026-07-05
 **Auditor:** Claude Fable (architect/planning role)
 **Scope:** Entity architecture, rooms/zones, attachments/sockets, relationships, capability AI, walls, memory/performance, data model, refactor roadmap, delegation plan.
@@ -1094,13 +1096,25 @@ applyShadowState(obj) {
 
 ## C. Updated work queue for GPT-5.6 (in order)
 
-1. **WT-fix bundle** (Section B, one branch, one PR). Blocking everything else because WT-1/2/3 are correctness holes in already-written code.
-2. **Browser verification pass** — T3 console block in `docs/CODEX_GOALS.md` + `__audit.dumpDepth()` / `dumpAffordances()` baseline diffs + `docs/SMOKE_CHECKLIST.md`. Record results in `docs/audit-baselines/`.
-3. **T17 stats retune** (next addendum — self-contained spec).
-4. **T5 completion** — `following` relation via `FollowObjectAction` start/interrupt/complete; then the despawn-cleanup scenarios in Phase 5's acceptance.
-5. **T7 completion** — myte-side `getAiAffordances` for social actions (per Addendum 2026-07-05 §5); capability broad-phase in MyteAI candidate builders (`findNearby({ capability })` before per-target affordance evaluation).
-6. **T6 socket/attachment vertical slice** — previously Fable-reserved. Re-routed to GPT-5.6 **with guardrails**: implement `AttachmentSystem` + convert only COUCH end-to-end per `docs/SOCKET_SCHEMA.md` (frozen — do not deviate); stop and report before rolling out to other types; the §8 scenario walkthrough table in this document is the design test.
-7. T13 (paired social), T15 (follow behavior), T8, T9/T10 as previously specced.
+1. **Browser verification pass — blocking gate.** Run the T3 console block in `docs/CODEX_GOALS.md`, record `__audit.dumpDepth()` / `dumpAffordances()` / candidate baselines, and complete `docs/SMOKE_CHECKLIST.md`. Also verify the D2 depth fallback fix and T17 Step 4 observation. Record results in `docs/audit-baselines/`.
+2. **T6/T6b browser review.** Verify couch and bed occupancy, third-seat refusal, drag while seated, hold/carry/drop, dismount/interrupt, editor preview, and map-transition/despawn cleanup. The headless rollout is complete; this is now the regression gate.
+3. **T15 browser review / T8.** Verify the shared-trail follow cases, then implement movement-body consolidation.
+4. **T9/T10/T11.** Region/room unification, WallBuilder/render modes, then wall customization.
+5. **T12/P13/P14.** Complete schema validation and scripted autoplay, run the profile/heap protocols, then execute the full browser regression suite.
+
+### 2026-07-10 implementation and verification ledger
+
+| Work item | Code status | Verification status |
+|---|---|---|
+| D5 working-tree fixes | Complete | Headless syntax/content validation complete; browser smoke and registry/query baselines pending. |
+| D6 / T17 stats retune | Complete | `simulate-stats.js` assertions pass; 30-minute multi-Myte browser observation pending. |
+| D2 depth fallback | Complete in working tree | Node behavioral check passes; map depth baseline and visual pass pending. |
+| T5 completion | Complete headlessly | Follow start/complete/interrupt now writes/clears `following`; browser despawn scenarios pending. |
+| T7 completion | Complete headlessly | Myte social affordances and capability broad-phases are in place; affordance/candidate baseline diff pending. |
+| T6/T6b socket and attachment rollout | Complete headlessly | Couch-seat, hold-anchor, and Myte-carry parity tests pass; browser interaction, transition, and editor checks pending. |
+| T13 paired social | Complete headlessly | Syntax/content checks pass; synchronized approach, refusal, and expression behavior require browser review. |
+| T15 follower system | Complete headlessly | Breadcrumb arc lookup and dead-band checks pass; six-follower/door and closed-door fallback cases require browser review. |
+| T8 and all later phases | Not started | Next implementation work after the browser regression gate. |
 
 ---
 

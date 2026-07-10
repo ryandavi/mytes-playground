@@ -16,7 +16,7 @@ class MapObjectPreview {
         this.variants = Array.isArray(this.baseConfig.variants) ? this.baseConfig.variants : [];
         this.currentVariant = this.variants[0] || null;
 
-        const facings = Object.keys(this.baseConfig.slotsByFacing || this._findActionSlots());
+        const facings = this._findSlotFacings();
         this.facings = facings.length > 0 ? facings : [this.baseConfig.direction || 'S'];
         this.currentFacing = this.facings[0];
 
@@ -37,6 +37,21 @@ class MapObjectPreview {
         return {};
     }
 
+    _findSlotFacings() {
+        const facings = new Set(Object.keys(this.baseConfig.slotsByFacing || this._findActionSlots()));
+        const baseSockets = Object.values(this.baseConfig.sockets || {});
+        if (baseSockets.length > 0) facings.add(this.baseConfig.direction || 'S');
+        for (const socket of baseSockets) {
+            Object.keys(socket?.byFacing || {}).forEach(facing => facings.add(facing));
+        }
+        for (const variant of Object.values(this.baseConfig.variantConfigs || {})) {
+            Object.entries(variant?.directionConfigs || {}).forEach(([facing, direction]) => {
+                if (direction?.sockets) facings.add(facing);
+            });
+        }
+        return [...facings];
+    }
+
     _slotActionConfigKey() {
         if (this.baseConfig.slotsByFacing) return null;
         const ac = this.baseConfig.actionConfigs || {};
@@ -50,9 +65,13 @@ class MapObjectPreview {
         const variantConfig = this.currentVariant
             ? this.baseConfig.variantConfigs?.[this.currentVariant]
             : null;
-        return variantConfig
+        const merged = variantConfig
             ? EditorStore.mergeLayers(this.baseConfig, variantConfig)
             : this.baseConfig;
+        const directionConfig = merged.directionConfigs?.[this.currentFacing];
+        return directionConfig
+            ? EditorStore.mergeLayers(merged, directionConfig)
+            : merged;
     }
 
     get size() {
@@ -204,8 +223,44 @@ class MapObjectPreview {
     }
 
     slotsForFacing() {
+        const sockets = this._getSocketEntries();
+        if (sockets.length > 0) {
+            return sockets.map(entry => ({
+                id: entry.id,
+                restPosition: entry.socket.position,
+                restFacing: entry.socket.facing,
+                socketPath: entry.path
+            }));
+        }
+
         const slots = this._findActionSlots();
         return slots[this.currentFacing] || [];
+    }
+
+    _getSocketEntries() {
+        const variantDirection = this.currentVariant
+            ? this.baseConfig.variantConfigs?.[this.currentVariant]?.directionConfigs?.[this.currentFacing]
+            : null;
+        const sourceSockets = variantDirection?.sockets ?? this.baseConfig.sockets;
+        const sourcePath = variantDirection
+            ? ['variantConfigs', this.currentVariant, 'directionConfigs', this.currentFacing, 'sockets']
+            : ['sockets'];
+        if (!sourceSockets || typeof sourceSockets !== 'object') return [];
+
+        return Object.entries(sourceSockets).flatMap(([id, socket]) => {
+            const override = socket?.byFacing?.[this.currentFacing];
+            if (override === null) return [];
+            const resolved = override && typeof override === 'object'
+                ? EditorStore.mergeLayers(socket, override)
+                : socket;
+            return resolved?.position ? [{
+                id,
+                socket: resolved,
+                path: override && typeof override === 'object'
+                    ? [...sourcePath, id, 'byFacing', this.currentFacing, 'position']
+                    : [...sourcePath, id, 'position']
+            }] : [];
+        });
     }
 
     setZoom(zoom) {
@@ -484,6 +539,10 @@ class MapObjectPreview {
 
     _commitSlot(slot, index, xf, yf) {
         if (!this.onEdit) return;
+        if (slot.socketPath) {
+            this.onEdit(slot.socketPath, { xFactor: xf, yFactor: yf });
+            return;
+        }
         const ac = this._slotActionConfigKey();
         const path = ac
             ? ['actionConfigs', ac, 'slotsByFacing', this.currentFacing, index, 'restPosition']

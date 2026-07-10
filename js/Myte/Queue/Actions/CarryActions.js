@@ -81,21 +81,29 @@ class CarryAction extends MyteAction {
 
 	start() {
 		super.start();
-		setCarryRelation(this.myte, this.target);
+		this._attachment = this.myte.container?.attachments?.attach?.(
+			this.myte,
+			this.target,
+			'carry.myte'
+		) ?? null;
+		if (!this._attachment) {
+			setCarryRelation(this.myte, this.target);
+		}
 	}
 
 	interrupt() {
 		super.interrupt();
-		clearCarryRelation(this.myte, this.target);
+		if (this._attachment) {
+			this.myte.container?.attachments?.detach?.(this.target);
+			this._attachment = null;
+		} else {
+			clearCarryRelation(this.myte, this.target);
+		}
 	}
 
 	update() {
         this.myte.updateTargetToFollowMouse();
         this.myte.moveTowardsTarget();
-        const carryOffset = getCarryOffset();
-
-        this.target.setPosition(this.myte.posX, this.myte.posY - carryOffset);
-        this.target.setSpritePosition(this.myte.posX, this.myte.posY - carryOffset);
 
         return false;
     }

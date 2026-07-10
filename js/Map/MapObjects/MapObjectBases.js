@@ -796,10 +796,16 @@ const withPickup = (Base) => class extends Base {
 
     pickup(myte) {
         if (!this.canBePickedUpBy(myte)) return false;
+
+        const attachment = this.container?.attachments?.attach?.(myte, this, 'carry.item');
+        if (this.container?.attachments && !attachment) return false;
+
         this.isPickedUp = true;
         this.carrier = myte;
         this.pendingPickup = false;
-        this.container?.relationships?.set?.('carrying', myte, this);
+        if (!attachment) {
+            this.container?.relationships?.set?.('carrying', myte, this);
+        }
         this.element?.classList.add('picked-up');
         this.syncRenderLayer();
         this.wake();
@@ -809,7 +815,10 @@ const withPickup = (Base) => class extends Base {
     }
 
     drop(vx = 0, vy = 0) {
-        if (this.carrier) {
+        const attachment = this.container?.attachments?.getAttachment?.(this);
+        if (attachment) {
+            this.container.attachments.detach(this);
+        } else if (this.carrier) {
             this.container?.relationships?.clear?.('carrying', this.carrier, this);
         }
         this.isPickedUp = false;

@@ -307,6 +307,7 @@ class SurfaceSlotAction extends GoToObjectAction {
         this._restingWithCollisionDisabled = false;
         this._selectedSlot = null;
         this._selectedSlotId = null;
+        this._attachment = null;
     }
 
     static resolveDuration(target, targetActionConfig = {}, explicitDuration = null) {
@@ -420,8 +421,12 @@ class SurfaceSlotAction extends GoToObjectAction {
         this._restElapsed = (this._restElapsed ?? 0) + dt;
 
         this.bobPhase += (dt / 16.667) * this.bobSpeed;
-        const bobY = this.baseRestPosition.y + Math.sin(this.bobPhase) * this.bobHeight;
-        this.setMyteWorldPosition(this.baseRestPosition.x, bobY);
+        const bobOffset = Math.sin(this.bobPhase) * this.bobHeight;
+        if (this._attachment) {
+            this._attachment.localOffset.y = bobOffset;
+        } else {
+            this.setMyteWorldPosition(this.baseRestPosition.x, this.baseRestPosition.y + bobOffset);
+        }
 
         const actionConfig = this.getTargetActionConfig();
         const benefit = actionConfig.benefit ?? 'energy';
@@ -440,13 +445,20 @@ class SurfaceSlotAction extends GoToObjectAction {
             }
         }
 
+        const exitPosition = this.getSurfaceExitPosition();
+        if (this._attachment) {
+            this.myte.container?.attachments?.detach?.(this.myte, {
+                exitPosition: { x: this.myte.posX, y: this.myte.posY }
+            });
+            this._attachment = null;
+        }
         this.beginTransition(
             'dismount',
             { x: this.myte.posX, y: this.myte.posY },
-            this.getSurfaceExitPosition(),
+            exitPosition,
             this.resolveTransitionDuration(
                 { x: this.myte.posX, y: this.myte.posY },
-                this.getSurfaceExitPosition(),
+                exitPosition,
                 this.dismountDuration,
                 { minDuration: 80, maxDuration: 420, referenceDistance: 52 }
             )
@@ -660,8 +672,10 @@ class SurfaceSlotAction extends GoToObjectAction {
 
         if (phase === 'settle') {
             this._previousCollisionSetting = this.myte.checkForCollisions;
-            this.myte.checkForCollisions = false;
-            this._restingWithCollisionDisabled = true;
+            if (!this.target?.sockets?.get?.(this._selectedSlotId)) {
+                this.myte.checkForCollisions = false;
+                this._restingWithCollisionDisabled = true;
+            }
             this.baseRestPosition = { ...safeTo };
 
             if (!this._benefitsApplied) {
@@ -700,6 +714,16 @@ class SurfaceSlotAction extends GoToObjectAction {
         this.setMyteWorldPosition(this._transition.to.x, this._transition.to.y);
 
         if (this.phase === 'settle') {
+            this._attachment = this.target?.container?.attachments?.attach?.(
+                this.target,
+                this.myte,
+                this._selectedSlotId,
+                { localOffset: { x: 0, y: 0 }, inheritFacing: true }
+            ) ?? null;
+            if (this.target?.sockets?.get?.(this._selectedSlotId) && !this._attachment) {
+                this._blocked = true;
+                return true;
+            }
             this.phase = 'rest';
             this.baseY = this._transition.to.y;
             this.baseRestPosition = { ...this._transition.to };
@@ -742,6 +766,14 @@ class SurfaceSlotAction extends GoToObjectAction {
     }
 
     getSurfaceRestPosition() {
+        const socketPosition = this.target?.sockets?.resolveWorldPosition?.(this._selectedSlotId);
+        if (socketPosition) {
+            return {
+                x: socketPosition.x - (this.myte.size.width / 2),
+                y: socketPosition.y - (this.myte.size.height / 2)
+            };
+        }
+
         const actionConfig = this.getTargetActionConfig();
         const slot = this.getSlotDefinition();
         return this.resolveTargetSlotPosition(
@@ -780,18 +812,21 @@ class SurfaceSlotAction extends GoToObjectAction {
             return;
         }
 
-        if (this._restingWithCollisionDisabled) {
+        const exitPosition = snapToExit ? this.getSurfaceExitPosition() : null;
+        if (this._attachment) {
+            this.myte.container?.attachments?.detach?.(this.myte, { exitPosition });
+            this._attachment = null;
+        } else if (this._restingWithCollisionDisabled) {
             this.myte.checkForCollisions = this._previousCollisionSetting;
             this._restingWithCollisionDisabled = false;
         }
 
-        if (snapToExit) {
-            const exitPosition = this.getSurfaceExitPosition();
+        if (snapToExit && exitPosition) {
             this.setMyteWorldPosition(exitPosition.x, exitPosition.y);
         }
 
         this.myte.physicsController?.reset?.();
-        if (this._reserved) {
+        if (this._reserved && !this.target?.sockets?.get?.(this._selectedSlotId)) {
             if (this._selectedSlotId) {
                 this.target?.releaseActionSlot?.('use_surface_slot', this._selectedSlotId, this.myte);
             }

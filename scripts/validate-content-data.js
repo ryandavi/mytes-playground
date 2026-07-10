@@ -64,6 +64,29 @@ function validateNoLegacySatietyKeys(value, label) {
     });
 }
 
+function validateMyteSockets(definition, label) {
+    if (definition?.sockets === undefined) return;
+    if (!isPlainObject(definition.sockets)) {
+        fail(`${label} has non-object sockets.`);
+        return;
+    }
+
+    const socketKinds = new Set(['seat', 'sleep', 'hold', 'surface', 'mount']);
+    Object.entries(definition.sockets).forEach(([socketId, socket]) => {
+        const socketLabel = `${label} socket "${socketId}"`;
+        if (!isPlainObject(socket) || !socketKinds.has(socket.kind)) {
+            fail(`${socketLabel} has an invalid kind.`);
+            return;
+        }
+        if (socket.kind !== 'surface' &&
+            (!isPlainObject(socket.position) ||
+                !Number.isFinite(Number(socket.position.xFactor)) ||
+                !Number.isFinite(Number(socket.position.yFactor)))) {
+            fail(`${socketLabel} point sockets require numeric x/y position factors.`);
+        }
+    });
+}
+
 function inferDefaultVisualState(visual = {}) {
     const animations = visual?.animations;
     if (!isPlainObject(animations)) {
@@ -110,6 +133,7 @@ function validateMytes() {
     }
 
     validateNoLegacySatietyKeys(baseDefinition.stats, 'Base Myte stats');
+    validateMyteSockets(baseDefinition, 'Base Myte definition');
 
     const species = Array.isArray(speciesCatalog.species) ? speciesCatalog.species : [];
     ensureUniqueIds(species, 'data/mytes/species.json species', entry => normalizeId(entry.id || entry.speciesId));
@@ -131,6 +155,7 @@ function validateMytes() {
         }
 
         validateNoLegacySatietyKeys(definition.stats, `Myte species "${id}" stats`);
+        validateMyteSockets(definition, `Myte species "${id}"`);
 
         const definitionId = normalizeId(definition.id || id);
         if (definitionId !== id) {
@@ -265,6 +290,7 @@ function validateMapObjects() {
         'novelty'
     ]);
     const numericOps = new Set(['gt', 'gte', 'lt', 'lte']);
+    const socketKinds = new Set(['seat', 'sleep', 'hold', 'surface', 'mount']);
     ensureUniqueIds(typeEntries, 'data/map-objects/types.json types', ([typeId]) => normalizeTypeId(typeId));
 
     typeEntries.forEach(([typeId, config]) => {
@@ -284,6 +310,102 @@ function validateMapObjects() {
 
         if (config.capabilities !== undefined && !isPlainObject(config.capabilities)) {
             fail(`Map object type "${typeId}" has non-object capabilities.`);
+        }
+
+        if (config.sockets !== undefined) {
+            if (!isPlainObject(config.sockets)) {
+                fail(`Map object type "${typeId}" has non-object sockets.`);
+            } else {
+                Object.entries(config.sockets).forEach(([socketId, socket]) => {
+                    const label = `Map object type "${typeId}" socket "${socketId}"`;
+                    if (!isPlainObject(socket) || !socketKinds.has(socket.kind)) {
+                        fail(`${label} has an invalid kind.`);
+                        return;
+                    }
+                    if (socket.kind === 'surface') {
+                        if (!Array.isArray(socket.area?.xFactor) || !Array.isArray(socket.area?.yFactor) ||
+                            socket.area.xFactor.length !== 2 || socket.area.yFactor.length !== 2) {
+                            fail(`${label} surface sockets require two-factor x/y areas.`);
+                        }
+                    } else if (!isPlainObject(socket.position) ||
+                        !Number.isFinite(Number(socket.position.xFactor)) ||
+                        !Number.isFinite(Number(socket.position.yFactor))) {
+                        fail(`${label} point sockets require numeric x/y position factors.`);
+                    }
+                    if (socket.accepts !== undefined &&
+                        (!Array.isArray(socket.accepts) || socket.accepts.some(value => typeof value !== 'string'))) {
+                        fail(`${label}.accepts must be an array of strings.`);
+                    }
+                    if (socket.capacity !== undefined && (!Number.isInteger(socket.capacity) || socket.capacity < 1)) {
+                        fail(`${label}.capacity must be a positive integer.`);
+                    }
+                    if (socket.byFacing !== undefined) {
+                        if (!isPlainObject(socket.byFacing)) {
+                            fail(`${label}.byFacing must be a plain object.`);
+                        } else {
+                            Object.entries(socket.byFacing).forEach(([facing, override]) => {
+                                if (!['N', 'S', 'E', 'W'].includes(facing) ||
+                                    (override !== null && !isPlainObject(override))) {
+                                    fail(`${label}.byFacing has invalid "${facing}" override.`);
+                                }
+                            });
+                        }
+                    }
+                });
+
+                const surfaceConfig = config.actionConfigs?.use_surface_slot;
+                const legacySlotKeys = [
+                    'slots', 'slotsByFacing', 'mytePosition', 'myteFacing', 'exclusive',
+                    'entryGap', 'exitGap', 'exitSearchRadius', 'returnToEntry',
+                    'stuckCompletionDistance', 'maxFinalAdjustmentDistance'
+                ];
+                legacySlotKeys.forEach(key => {
+                    if (surfaceConfig && Object.hasOwn(surfaceConfig, key)) {
+                        fail(`Map object type "${typeId}" uses sockets but retains legacy use_surface_slot.${key}.`);
+                    }
+                });
+            }
+        }
+
+        const hasDirectionalSockets = Object.values(config.variantConfigs ?? {}).some(variant =>
+            Object.values(variant?.directionConfigs ?? {}).some(direction => direction?.sockets)
+        );
+        Object.entries(config.variantConfigs ?? {}).forEach(([variantId, variant]) => {
+            Object.entries(variant?.directionConfigs ?? {}).forEach(([facing, direction]) => {
+                if (Object.hasOwn(direction ?? {}, 'mytePosition') || Object.hasOwn(direction ?? {}, 'myteFacing')) {
+                    fail(`Map object type "${typeId}" variant "${variantId}" facing "${facing}" retains legacy myte rest fields.`);
+                }
+                if (direction?.sockets === undefined) return;
+                if (!isPlainObject(direction.sockets)) {
+                    fail(`Map object type "${typeId}" variant "${variantId}" facing "${facing}" has non-object sockets.`);
+                    return;
+                }
+                Object.entries(direction.sockets).forEach(([socketId, socket]) => {
+                    const label = `Map object type "${typeId}" variant "${variantId}" facing "${facing}" socket "${socketId}"`;
+                    if (!isPlainObject(socket) || !socketKinds.has(socket.kind)) {
+                        fail(`${label} has an invalid kind.`);
+                    } else if (socket.kind !== 'surface' &&
+                        (!isPlainObject(socket.position) ||
+                            !Number.isFinite(Number(socket.position.xFactor)) ||
+                            !Number.isFinite(Number(socket.position.yFactor)))) {
+                        fail(`${label} point sockets require numeric x/y position factors.`);
+                    }
+                });
+            });
+        });
+
+        if (hasDirectionalSockets) {
+            const surfaceConfig = config.actionConfigs?.use_surface_slot;
+            const legacySlotKeys = [
+                'slots', 'slotsByFacing', 'mytePosition', 'myteFacing', 'exclusive',
+                'entryGap', 'exitGap', 'exitSearchRadius', 'returnToEntry',
+                'stuckCompletionDistance', 'maxFinalAdjustmentDistance'
+            ];
+            legacySlotKeys.forEach(key => {
+                if (surfaceConfig && Object.hasOwn(surfaceConfig, key)) {
+                    fail(`Map object type "${typeId}" uses directional sockets but retains legacy use_surface_slot.${key}.`);
+                }
+            });
         }
 
         const affordances = config.ai?.affordances;

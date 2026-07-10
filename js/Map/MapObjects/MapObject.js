@@ -36,7 +36,7 @@ class MapObject {
 			activeInteractions: new Set(),
 			interactionTimes: new Map()
 		};
-		this.actionSlots = new ActionSlotLedger(this);
+		this.sockets = new SocketSet(this, this.getConfig('sockets', {}));
 
 		this.inputComponents = {};
 		this.input = new MapObjectInputController(this);
@@ -547,7 +547,21 @@ class MapObject {
 	}
 
 	getActionSlotDefinitions(actionId) {
-		return this.actionSlots.getActionSlotDefinitions(actionId);
+		if (actionId === 'use_surface_slot') {
+			return this.sockets.list()
+				.filter(socket => socket.kind === 'seat' || socket.kind === 'sleep')
+				.map(socket => ({
+					id: socket.id,
+					restPosition: socket.position,
+					restFacing: socket.facing,
+					approachConfig: socket.approach,
+					entryGap: socket.entryGap,
+					returnToEntry: socket.exit?.returnToEntry,
+					exitGap: socket.exit?.gap,
+					exitSearchRadius: socket.exit?.searchRadius
+				}));
+		}
+		return [];
 	}
 
 	// ── Direction helpers ─────────────────────────────────────────────────────
@@ -878,6 +892,10 @@ class MapObject {
 	}
 
 	updateCarriedState() {
+		if (this.container?.attachments?.getAttachment?.(this)) {
+			return true;
+		}
+
 		if (!this.isPickedUp || !this.carrier) {
 			return false;
 		}
@@ -903,6 +921,10 @@ class MapObject {
 	}
 
 	getRenderZIndex() {
+		if (Number.isFinite(this._attachmentRenderZIndex)) {
+			return this._attachmentRenderZIndex;
+		}
+
 		if (this.isPickedUp && this.carrier?.renderer?.getZIndex) {
 			return this.carrier.renderer.getZIndex(this.carrier.posY) + 2;
 		}
@@ -1035,47 +1057,88 @@ class MapObject {
 	}
 
 	getActionOccupant(actionId) {
-		return this.actionSlots.getActionOccupant(actionId);
+		if (actionId === 'use_surface_slot') {
+			return this.sockets.list().flatMap(socket => this.sockets.occupantsOf(socket.id))[0] ?? null;
+		}
+		return null;
 	}
 
 	getActionSlotOccupants(actionId) {
-		return this.actionSlots.getActionSlotOccupants(actionId);
+		if (actionId === 'use_surface_slot') {
+			return new Map(this.sockets.list().flatMap(socket =>
+				this.sockets.occupantsOf(socket.id).map(occupant => [socket.id, occupant])
+			));
+		}
+		return new Map();
 	}
 
 	getActionSlotOccupant(actionId, slotId) {
-		return this.actionSlots.getActionSlotOccupant(actionId, slotId);
+		if (actionId === 'use_surface_slot' && this.sockets?.get?.(slotId)) {
+			return this.sockets.occupantsOf(slotId)[0] ?? null;
+		}
+		return null;
 	}
 
 	isActionSlotOccupied(actionId, slotId, actor = null) {
-		return this.actionSlots.isActionSlotOccupied(actionId, slotId, actor);
+		if (actionId === 'use_surface_slot' && this.sockets?.get?.(slotId)) {
+			return !this.sockets.hasCapacity(slotId, actor);
+		}
+		return false;
 	}
 
 	getAvailableActionSlots(actionId, actor = null) {
-		return this.actionSlots.getAvailableActionSlots(actionId, actor);
+		if (actionId === 'use_surface_slot') {
+			return this.sockets.availableFor(actor)
+				.filter(socket => socket.kind === 'seat' || socket.kind === 'sleep')
+				.map(socket => this.getActionSlotDefinitions(actionId).find(slot => slot.id === socket.id));
+		}
+		return [];
 	}
 
 	isActionOccupied(actionId, actor = null) {
-		return this.actionSlots.isActionOccupied(actionId, actor);
+		if (actionId === 'use_surface_slot') {
+			return this.getAvailableActionSlots(actionId, actor).length === 0;
+		}
+		return false;
 	}
 
 	claimActionSlot(actionId, slotId, actor = null) {
-		return this.actionSlots.claimActionSlot(actionId, slotId, actor);
+		if (actionId === 'use_surface_slot' && this.sockets?.get?.(slotId)) {
+			return this.sockets._claim(slotId, actor);
+		}
+		return false;
 	}
 
 	claimActionOccupancy(actionId, actor = null) {
-		return this.actionSlots.claimActionOccupancy(actionId, actor);
+		if (actionId === 'use_surface_slot') {
+			return !this.isActionOccupied(actionId, actor);
+		}
+		return true;
 	}
 
 	releaseActionOccupancy(actionId, actor = null) {
-		return this.actionSlots.releaseActionOccupancy(actionId, actor);
+		if (actionId === 'use_surface_slot') {
+			let released = false;
+			for (const socket of this.sockets.list()) {
+				released = this.sockets._release(socket.id, actor) || released;
+			}
+			return released;
+		}
+		return false;
 	}
 
 	releaseActionSlot(actionId, slotId, actor = null) {
-		return this.actionSlots.releaseActionSlot(actionId, slotId, actor);
+		if (actionId === 'use_surface_slot' && this.sockets?.get?.(slotId)) {
+			return this.sockets._release(slotId, actor);
+		}
+		return false;
 	}
 
 	isInUse(actionId = null) {
-		return this.actionSlots.isInUse(actionId);
+		if (!actionId || actionId === 'use_surface_slot') {
+			return this.sockets.list().some(socket => this.sockets.occupantsOf(socket.id).length > 0);
+		}
+		return false;
 	}
 
 	// ── Input components ──────────────────────────────────────────────────────
@@ -1546,8 +1609,9 @@ class MapObject {
 
 	remove() {
 		this.removeAllEffects?.();
+		this.container?.attachments?.detachAllChildren?.(this);
+		this.container?.attachments?.detach?.(this);
 		this.input.dispose();
-		this.actionSlots.clear();
 		if (this.element) {
 			this.element.remove();
 			this.element = null;

@@ -147,6 +147,9 @@
     "src": "js/Myte/MyteMovementController.js"
   },
   {
+    "src": "js/Myte/FollowBehavior.js"
+  },
+  {
     "src": "js/Myte/MyteRenderer.js"
   },
   {
@@ -240,10 +243,6 @@
   },
   {
     "src": "js/Map/MapRenderer.js"
-  },
-  {
-    "src": "js/Map/MapObjects/ActionSlotLedger.js",
-    "commentLine": "<!-- BASE MAP OBJECTS-->"
   },
   {
     "src": "js/Map/MapObjects/MapObjectInputController.js"

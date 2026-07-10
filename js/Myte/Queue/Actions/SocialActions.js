@@ -17,112 +17,155 @@ class ShowAffectionAction extends MyteAction {
         this.myte.queue.addExpression(this.expressionType, this.expressionDuration, this.expressionRepeat);
     }
 
-    update() {
-        this.currentDuration--;
+    update(deltaTime = 0) {
+        this.currentDuration -= deltaTime;
         return this.currentDuration <= 0;
     }
 }
 
-// Greet
-// Two-part synchronized greeting. The initiator queues itself; on start it
-// pushes GreetReceiveAction onto the target's queue and shares an ActionSync.
-// Both actions signal the sync when positioned, then play a wave expression.
-class GreetAction extends PositionableAction {
-    static metadata = { id: 'greet' };
+class PairedSocialAction extends PositionableAction {
+    static receiverActionId = null;
 
     static canPerform(selected, active) {
-        return selected instanceof Myte && selected !== active && !active?.queue.isCarrying();
+        return selected instanceof Myte && selected !== active &&
+            !active?.queue?.isCarrying?.() && !selected.queue?.isCarrying?.() &&
+            !selected.queue?.isBeingCarried?.() && (selected.queue?.count?.() ?? 0) === 0;
     }
 
-    static getRequiredOptions(selected, active) {
+    static getRequiredOptions(selected) {
         return { target: selected };
     }
 
-    constructor(myte, options) {
-        super(myte, { ...GreetAction.metadata.defaultOptions, duration: GreetAction.metadata.defaultDuration, ...options });
+    constructor(myte, options = {}) {
+        super(myte, { ...options, duration: options.duration ?? this.constructor.metadata.defaultDuration });
         this.sync = options.sync ?? new ActionSync();
-        this._synced = false;
+        this.partnerSide = options.partnerSide ?? null;
+        this.phase = 'approach';
+        this._signalled = false;
+        this._refused = false;
     }
 
     start() {
         super.start();
-        this._faceTarget();
-
-        this.sync.signal(this);
-        this.sync.onReady(() => {
-            this._synced = true;
-            this.myte.queue.addExpression(this.expressionType, this.expressionDuration, this.expressionRepeat);
-        });
-
-        const target = this.target;
-        if (target instanceof Myte && !target.queue.isCarrying() && !target.queue.isBeingCarried()) {
-            target.queue.addToFront('greet_receive', { target: this.myte, sync: this.sync });
-        } else {
-            // No partner available - signal both sides ourselves so the expression still plays.
-            this.sync.signal({});
+        if (!(this.target instanceof Myte)) {
+            this._refuse();
+            return;
         }
+
+        if (!this.partnerSide && !this.constructor.isReceiver && !PairedSocialAction.canPerform(this.target, this.myte)) {
+            this._refuse();
+            return;
+        }
+
+        this.partnerSide ??= this._resolveApproachSide();
+        this._setApproachTarget();
+
+        if (!this.constructor.isReceiver) {
+            this.target.queue.addToFront(this.constructor.receiverActionId, {
+                target: this.myte,
+                sync: this.sync,
+                partnerSide: this._oppositeSide(this.partnerSide),
+                expressionType: this.expressionType,
+                expressionDuration: this.expressionDuration,
+                expressionRepeat: this.expressionRepeat,
+                duration: this.duration
+            });
+        }
+    }
+
+    _refuse() {
+        this._refused = true;
+        this._interrupted = true;
+        this.myte.queue.addExpression('cry', 400, 1);
+    }
+
+    _resolveApproachSide() {
+        const targetRect = this.getTargetRect(this.target, 'sprite');
+        const myteRect = this.myte.getRect();
+        return this.getClosestSideHorizontal(targetRect, myteRect) ?? 'left';
+    }
+
+    _oppositeSide(side) {
+        return ({ left: 'right', right: 'left', top: 'bottom', bottom: 'top' })[side] ?? 'right';
+    }
+
+    _setApproachTarget() {
+        const targetRect = this.getTargetRect(this.target, 'sprite');
+        const myteRect = this.myte.getRect();
+        if (!targetRect || !myteRect) return;
+        const point = this.calculatePosition(myteRect, targetRect, this.partnerSide, {
+            gap: this.socialGap ?? 8,
+            align: 'center'
+        });
+        this.myte.setTarget(point.x, point.y);
     }
 
     _faceTarget() {
-        const tr = this.getTargetRect(this.target, 'sprite');
-        const mr = this.myte.getRect();
-        if (!tr) return;
-
-        const dx = (tr.x + tr.width / 2) - (mr.x + mr.width / 2);
-        const dy = (tr.y + tr.height / 2) - (mr.y + mr.height / 2);
-
-        if (Math.abs(dx) > Math.abs(dy)) {
-            this.myte.setDirection(dx > 0 ? DIRECTION.EAST : DIRECTION.WEST);
-        } else {
-            this.myte.setDirection(dy > 0 ? DIRECTION.SOUTH : DIRECTION.NORTH);
-        }
+        const dx = this.target.posX - this.myte.posX;
+        const dy = this.target.posY - this.myte.posY;
+        this.myte.setDirection(Math.abs(dx) > Math.abs(dy)
+            ? (dx > 0 ? DIRECTION.EAST : DIRECTION.WEST)
+            : (dy > 0 ? DIRECTION.SOUTH : DIRECTION.NORTH));
     }
 
-    update() {
-        this.currentDuration--;
+    _signalReady() {
+        if (this._signalled) return;
+        this._signalled = true;
+        this._faceTarget();
+        this.sync.signal(this);
+        this.sync.onReady(() => {
+            this.phase = 'perform';
+            this.currentDuration = this.duration;
+            this.myte.queue.addExpression(this.expressionType, this.expressionDuration, this.expressionRepeat);
+        });
+    }
+
+    update(deltaTime = 0) {
+        if (this._refused || !this.target?.isActive) return true;
+        if (this.phase === 'approach') {
+            if (!this.myte.isAtTarget()) {
+                this.myte.moveTowardsTarget();
+                return false;
+            }
+            this._signalReady();
+            return false;
+        }
+        if (this.phase !== 'perform') return false;
+        this.currentDuration -= deltaTime;
         return this.currentDuration <= 0;
     }
 }
 
-// Receiver side of a greet - queued on the target Myte by GreetAction.start().
-class GreetReceiveAction extends PositionableAction {
-    static metadata = { id: 'greet_receive', hideFromQueue: true };
-
+class PairedSocialReceiveAction extends PairedSocialAction {
+    static isReceiver = true;
     static canPerform() { return false; }
+}
 
-    constructor(myte, options) {
-        super(myte, { ...GreetReceiveAction.metadata.defaultOptions, duration: GreetReceiveAction.metadata.defaultDuration, ...options });
-        this.sync = options.sync ?? new ActionSync();
-    }
+class GreetAction extends PairedSocialAction {
+    static metadata = { id: 'greet' };
+    static receiverActionId = 'greet_receive';
+}
 
-    start() {
-        super.start();
-        this._faceTarget();
-        this.sync.signal(this);
-        this.sync.onReady(() => {
-            this.myte.queue.addExpression(this.expressionType, this.expressionDuration, this.expressionRepeat);
-        });
-    }
+class GreetReceiveAction extends PairedSocialReceiveAction {
+    static metadata = { id: 'greet_receive', hideFromQueue: true };
+}
 
-    _faceTarget() {
-        const tr = this.getTargetRect(this.target, 'sprite');
-        const mr = this.myte.getRect();
-        if (!tr) return;
+class KissAction extends PairedSocialAction {
+    static metadata = { id: 'kiss' };
+    static receiverActionId = 'kiss_receive';
+}
 
-        const dx = (tr.x + tr.width / 2) - (mr.x + mr.width / 2);
-        const dy = (tr.y + tr.height / 2) - (mr.y + mr.height / 2);
+class KissReceiveAction extends PairedSocialReceiveAction {
+    static metadata = { id: 'kiss_receive', hideFromQueue: true };
+}
 
-        if (Math.abs(dx) > Math.abs(dy)) {
-            this.myte.setDirection(dx > 0 ? DIRECTION.EAST : DIRECTION.WEST);
-        } else {
-            this.myte.setDirection(dy > 0 ? DIRECTION.SOUTH : DIRECTION.NORTH);
-        }
-    }
+class HighFiveAction extends PairedSocialAction {
+    static metadata = { id: 'high_five' };
+    static receiverActionId = 'high_five_receive';
+}
 
-    update() {
-        this.currentDuration--;
-        return this.currentDuration <= 0;
-    }
+class HighFiveReceiveAction extends PairedSocialReceiveAction {
+    static metadata = { id: 'high_five_receive', hideFromQueue: true };
 }
 
 // Stand near another Myte and loosely follow their position.
@@ -145,7 +188,7 @@ class WatchAction extends PositionableAction {
         super.start();
     }
 
-    update() {
+    update(deltaTime = 0) {
         if (!this.target) return true;
 
         const targetRect = this.getTargetRect(this.target, 'sprite');
@@ -156,7 +199,7 @@ class WatchAction extends PositionableAction {
         this.myte.setTarget(watchPos.x, watchPos.y);
         this.myte.moveTowardsTarget();
 
-        this.currentDuration--;
+        this.currentDuration -= deltaTime;
         return this.currentDuration <= 0;
     }
 }
@@ -175,7 +218,7 @@ class PlayTagAction extends PositionableAction {
         super(myte, { ...PlayTagAction.metadata.defaultOptions, duration: PlayTagAction.metadata.defaultDuration, ...options });
     }
 
-    update() {
+    update(deltaTime = 0) {
         const target = this.target;
         if (!target) return true;
 
@@ -205,7 +248,7 @@ class PlayTagAction extends PositionableAction {
             this.myte.moveTowardsTarget();
         }
 
-        this.currentDuration--;
+        this.currentDuration -= deltaTime;
         return this.currentDuration <= 0;
     }
 }
@@ -226,7 +269,7 @@ class ChaseAction extends PositionableAction {
         super(myte, { ...ChaseAction.metadata.defaultOptions, duration: ChaseAction.metadata.defaultDuration, ...options });
     }
 
-    update() {
+    update(deltaTime = 0) {
         if (!this.target) return true;
 
         const dist = Math.hypot(this.target.posX - this.myte.posX, this.target.posY - this.myte.posY);
@@ -238,7 +281,7 @@ class ChaseAction extends PositionableAction {
 
         this.myte.setTarget(this.target.posX, this.target.posY);
         this.myte.moveTowardsTarget();
-        this.currentDuration--;
+        this.currentDuration -= deltaTime;
         return this.currentDuration <= 0;
     }
 }

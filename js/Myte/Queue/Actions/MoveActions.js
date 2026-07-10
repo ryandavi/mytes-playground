@@ -1296,49 +1296,37 @@ class FollowObjectAction extends PositionableAction {
 
     constructor(myte, options) {
         super(myte, { ...FollowObjectAction.metadata.defaultOptions, ...options });
-        this._trailPos = null;
-        this._lastTargetPos = null;
+        this.followBehavior = null;
     }
 
-    // Opposite of target's facing direction — stand here to trail behind them
-    _getTrailSide() {
-        if (!(this.target instanceof Myte)) return 'bottom';
-        const opposite = { N: 'bottom', S: 'top', E: 'left', W: 'right' };
-        return opposite[this.target.direction] ?? 'bottom';
-    }
-
-    _recomputeTrailPos() {
-        const targetRect = this.getTargetRect(this.target, 'sprite');
-        const myteRect   = this.myte.getRect();
-        return this.calculatePosition(myteRect, targetRect, this._getTrailSide(), {
-            gap: this.trailGap,
-            align: 'center'
-        });
-    }
-
-    update() {
-        if (!this.target) return true;
-
-        const targetMoved = !this._lastTargetPos ||
-            Math.hypot(
-                this.target.posX - this._lastTargetPos.x,
-                this.target.posY - this._lastTargetPos.y
-            ) >= this.replanThreshold;
-
-        if (targetMoved || !this._trailPos) {
-            this._trailPos = this._recomputeTrailPos();
-            this._lastTargetPos = { x: this.target.posX, y: this.target.posY };
+    start() {
+        super.start();
+        if (this.target) {
+            this.myte.container?.relationships?.set?.('following', this.myte, this.target);
+            this.followBehavior = new FollowBehavior(this.myte, this.target, {
+                minDistance: this.minFollowDistance,
+                maxDistance: this.maxFollowDistance ?? Math.max(
+                    (this.trailGap ?? 28) * 2.5,
+                    (this.minFollowDistance ?? 8) + 48
+                ),
+                followDistance: this.trailGap,
+                repathInterval: this.repathInterval
+            });
         }
+    }
 
-        const dist = Math.hypot(
-            this.myte.posX - this._trailPos.x,
-            this.myte.posY - this._trailPos.y
-        );
-        if (dist <= this.minFollowDistance) return false;
+    complete() {
+        this.myte.container?.relationships?.clear?.('following', this.myte, this.target);
+        return super.complete();
+    }
 
-        this.myte.setTarget(this._trailPos.x, this._trailPos.y);
-        this.myte.moveTowardsTarget();
-        return false;
+    interrupt() {
+        super.interrupt();
+        this.myte.container?.relationships?.clear?.('following', this.myte, this.target);
+    }
+
+    update(deltaTime = 0) {
+        return this.followBehavior?.update(deltaTime) ?? true;
     }
 }
 

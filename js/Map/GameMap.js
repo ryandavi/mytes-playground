@@ -879,6 +879,7 @@ class GameMap {
                 }
             }
 
+            this.parent?.attachments?.update?.();
             // Batch-flush all dirty renderStates to the DOM in one pass
             this.renderer.flush(this.gridSystem.activeObjects);
         } else {
@@ -886,6 +887,7 @@ class GameMap {
             for (const object of this.objects) {
                 if (object.update) object.update(deltaTime);
             }
+            this.parent?.attachments?.update?.();
             this.renderer.flush(this.objects);
             this.activeObjectsCount = this.objects.length;
         }

@@ -531,6 +531,7 @@
 	<script src="js/Myte/FootstepController.js?v=<?= $v ?>"></script>
 	<script src="js/Myte/MytePhysics.js?v=<?= $v ?>"></script>
 	<script src="js/Myte/MyteMovementController.js?v=<?= $v ?>"></script>
+	<script src="js/Myte/FollowBehavior.js?v=<?= $v ?>"></script>
 	<script src="js/Myte/MyteRenderer.js?v=<?= $v ?>"></script>
 	<script src="js/Myte/Myte.js?v=<?= $v ?>"></script>
 	<script src="js/Myte/MyteStats.js?v=<?= $v ?>"></script>
@@ -564,8 +565,6 @@
 	<script src="js/Map/Grid/TileMapLoader.js?v=<?= $v ?>"></script>
 	<script src="js/Map/MapTransitionManager.js?v=<?= $v ?>"></script>
 	<script src="js/Map/MapRenderer.js?v=<?= $v ?>"></script>
-	<!-- BASE MAP OBJECTS-->
-	<script src="js/Map/MapObjects/ActionSlotLedger.js?v=<?= $v ?>"></script>
 	<script src="js/Map/MapObjects/MapObjectInputController.js?v=<?= $v ?>"></script>
 	<script src="js/Map/MapObjects/MapObject.js?v=<?= $v ?>"></script>
 	<script src="js/Map/MapObjects/DroppedMapItem.js?v=<?= $v ?>"></script>

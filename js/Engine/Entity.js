@@ -22,13 +22,23 @@ const EntityDefaults = {
 const EntityMethods = {
 
 	resolveDepthOffsetValue(depthLine, depthOffset, colliderBottom, sizeHeight) {
-		const resolvedDepthLine = Number(depthLine);
-		if (Number.isFinite(resolvedDepthLine)) {
+		const resolveExplicitDepth = value => {
+			if (value === null || value === undefined ||
+				(typeof value === 'string' && value.trim() === '')) {
+				return null;
+			}
+
+			const numericValue = Number(value);
+			return Number.isFinite(numericValue) ? numericValue : null;
+		};
+
+		const resolvedDepthLine = resolveExplicitDepth(depthLine);
+		if (resolvedDepthLine !== null) {
 			return resolvedDepthLine;
 		}
 
-		const resolvedDepthOffset = Number(depthOffset);
-		if (Number.isFinite(resolvedDepthOffset)) {
+		const resolvedDepthOffset = resolveExplicitDepth(depthOffset);
+		if (resolvedDepthOffset !== null) {
 			return resolvedDepthOffset;
 		}
 

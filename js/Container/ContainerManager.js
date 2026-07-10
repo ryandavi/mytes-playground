@@ -14,6 +14,7 @@ class ContainerManager {
         // re-register per map load via GameMap.add/dispose).
         this.worldRegistry = new WorldRegistry(this);
         this.relationships = new EntityRelationships(this.worldRegistry);
+        this.attachments = new AttachmentSystem(this.worldRegistry, this.relationships);
 
         this.element = document.getElementById(elementId);
         this.containerWrapper = this.element.closest('.app-shell');
