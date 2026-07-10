@@ -21,6 +21,31 @@ const EntityDefaults = {
 
 const EntityMethods = {
 
+	resolveDepthOffsetValue(depthLine, depthOffset, colliderBottom, sizeHeight) {
+		const resolvedDepthLine = Number(depthLine);
+		if (Number.isFinite(resolvedDepthLine)) {
+			return resolvedDepthLine;
+		}
+
+		const resolvedDepthOffset = Number(depthOffset);
+		if (Number.isFinite(resolvedDepthOffset)) {
+			return resolvedDepthOffset;
+		}
+
+		const resolvedColliderBottom = Number(colliderBottom);
+		if (Number.isFinite(resolvedColliderBottom) && resolvedColliderBottom > 0) {
+			return resolvedColliderBottom;
+		}
+
+		return Number.isFinite(sizeHeight) ? sizeHeight : 0;
+	},
+
+	getSortYValue(y, fallbackY, depthOffset) {
+		const resolvedY = Number.isFinite(y) ? y : fallbackY;
+		const resolvedDepthOffset = Number.isFinite(depthOffset) ? depthOffset : 0;
+		return resolvedY + resolvedDepthOffset;
+	},
+
 	// Returns the map's shared AStarPathfinder. All pathfinding goes through
 	// one instance per map — no per-entity copies needed.
 	get pathfinder() {

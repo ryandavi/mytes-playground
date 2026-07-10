@@ -34,15 +34,9 @@ class LightMapObject extends withAura(ToggleableMapObject) {
     }
 
     getAiAffordances(context = {}, actor = null) {
-        const affordances = super.getAiAffordances(context, actor).filter(a =>
+        return super.getAiAffordances(context, actor).filter(a =>
             !(a.actionId === 'interact_object' && a.purpose === 'toggle')
         );
-
-        if (!this.isEnabled()) {
-            affordances.push({ actionId: 'interact_object', purpose: 'light_on' });
-        }
-
-        return affordances;
     }
 }
 
@@ -106,15 +100,5 @@ class MusicBoxMapObject extends withAura(InteractiveMapObject) {
         element.classList.add('music-box');
         this.updatePlaybackState();
         return element;
-    }
-
-    getAiAffordances(context = {}, actor = null) {
-        const affordances = super.getAiAffordances(context, actor);
-
-        if (!this.isPlayingState) {
-            affordances.push({ actionId: 'interact_object', purpose: 'start_music' });
-        }
-
-        return affordances;
     }
 }

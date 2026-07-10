@@ -905,3 +905,287 @@ Audits worth scheduling as the game matures, none blocking the current roadmap:
 4. ~~**Browser-baseline decision**~~ — **Done 2026-07-05:** ES2021+/evergreen floor written into AGENTS.md (§Browser Support Baseline).
 5. **Editor-parity audit (recurring, after each schema-changing phase):** every data-schema change (sockets T6b, capabilities T7, wall materials T12) must land with its editor counterpart or the editor silently corrupts the new keys on save. T6b includes this; make it a standing acceptance item for any task that touches `data/` schemas.
 6. **Editor PHP security review (mandatory before any public hosting)** — already item 1 of the further-inspection list; repeated here because it is the only *hard* gate in this backlog.
+
+---
+
+# Addendum — 2026-07-08 Pathfinding & Follow Audit
+
+Final pathfinding audit of `js/Map/Grid/AStarPathfinder.js` and its consumers (`MoveActions.js`, `MyteMovementController.js`, `NpcMapObject.js`). Overall verdict: **mature and well-defended** — binary heap, per-search validation cache, wall-clearance penalty, LOS smoothing with buffer, no diagonal cutting, corner-slip in movement, stuck detection with repath and approach blacklisting. Nothing is broken; findings below are ranked by payoff.
+
+## Performance findings
+
+1. **String keys are the biggest CPU tax.** `getKey()` builds `"x,y"` strings for every node touch, and `_validatePosition` builds a template-string cache key per call. In the hot loop, string hashing/allocation dominates. Fix: integer node keys (`y * gridWidth + x`) and a packed-number validation cache key. Cheap change, typically 2–4× on the search loop.
+2. **Static geometry is revalidated per entity per search.** Each neighbor runs the grid-cell loop plus `getPotentialCollidersForArea`, but most blockers never move. Precompute a per-cell **static clearance field** at map load (distance to nearest blocked cell — sibling of the existing `staticWallCount` precompute). "Does a W×H collider fit here" against static geometry becomes one comparison; only dynamic objects need AABB checks. Biggest structural win; also enables "keep a 1-cell safety margin when open space allows" for free.
+3. **The 500 ms search timeout runs on the main thread** — worst case is a 500 ms frozen frame. Drop to ~30–50 ms once partial-path-on-failure (below) exists, or time-slice / move to a Worker with an async request queue. `maxSearchSteps: 8000` usually saves us first, but 8000 steps × full collider validation is still tens of ms.
+4. Minor: the `fScore` map is write-only (deletable); `_findNearestValidGridPos` iterates the full square to enumerate each ring perimeter (O(r²) per ring — fine at radius 8, fix if radius grows).
+
+## Reachability findings
+
+1. **Return a partial path instead of `null`.** Timeout, max-steps, and exhausted-open-set all currently return `null` and the myte does nothing. Track the closed node with the lowest heuristic during search; on failure, reconstruct the path to it. The myte walks as close as it can get — almost always the right-looking behavior, and it gives the stuck/approach layer something to work with. **This is the single biggest behavioral improvement available.**
+2. **`_findNearestValidGridPos` picks the nearest *valid* cell, not the nearest *reachable* one.** A target inside a walled area gets adjusted to a cell on the wrong side of the wall, then the search burns all 8000 steps failing. Partial-path also absorbs this case.
+3. Inconsistency: callers pass `searchRadius = 12` but the helper clamps to 8 internally — pick one number.
+
+## Edge-snagging findings
+
+1. **Scale `smoothingBuffer` with movement speed.** 2 px of LOS clearance is enough at low speed; a fast myte overshoots per frame by more and clips corners the smoother approved. Rule: `buffer = max(2, pxPerFrame)`.
+2. **Latent LOS tunneling:** `_hasLineOfSight` caps at 20 samples. With `maxSmoothingDistance: 3` segments never get long enough to matter, but `NpcMapObject` and DebugPanel call it too — a >10-cell segment samples sparser than one per cell and can jump a thin obstacle. A grid-traversal (DDA) or swept-AABB check makes LOS exact *and* cheaper.
+
+## Robustness / future
+
+1. **In-flight path invalidation:** the validation cache clears when objects move, but active paths aren't re-validated — a door closing mid-walk is only caught by stuck detection ~45 frames later. Cheap fix: on grid change, mark active paths dirty; walker LOS-checks its next waypoint.
+2. **Path caching:** if free-roam mytes route between the same landmarks, cache recent `(startCell, endCell, sizeClass) → path` and re-validate cheaply instead of re-searching.
+3. HPA* only if maps grow well past ~200×200; flow fields only for dozens of entities converging on one target. Neither is warranted now.
+
+## Follow behavior design (myte following a myte / moving object)
+
+Do **not** reach for moving-target A* (D* Lite, MT-D*) — at this scale the standard game patterns below are strictly better. Much of the mouse-follow infrastructure in `MyteMovementController` (`MOVE_FOLLOW_TYPES`, follow radii, orbit/leash modes) is reusable: the leader becomes an entity instead of the cursor.
+
+### Core loop: throttled repath + dead-band (jitter immunity)
+
+The follower must **not** react to raw leader position. A leader jittering left/right must produce a stationary follower, not oscillation. Three layers, all required:
+
+1. **Smoothed leader position** — follow an exponential moving average (or the leader's position ~250 ms ago), never the instantaneous position. Jitter averages out before the follower ever sees it.
+2. **Deviation-triggered repath** — keep walking the current path; recompute only when the (smoothed) leader has moved > ~1–2 cells from the position the path was computed for, or every 400–500 ms, whichever comes first. Never per-frame.
+3. **Arrival radius with hysteresis (dead-band)** — stop when within `followRadius.min`, and do not start moving again until outside `followRadius.max`. The gap between the two radii is what makes the follower stand calmly while the leader fidgets inside it.
+
+### "Are we locked to the back?" — No, and don't be.
+
+A fixed rear-offset target (`leader − facing × distance`) is exactly what breaks under direction jitter: every heading flip teleports the target to the opposite side and the follower orbits pathologically. Two correct options:
+
+- **Default — approach from your own side:** target the nearest point on a circle of radius `followDistance` around the leader, i.e. `target = leader + normalize(follower − leader) × followDistance`. The follower stays on whichever side it already occupies; a leader turning around requires *zero* follower movement. Heading-independent, therefore jitter-immune. This should be the standard follow mode.
+- **Optional — rear formation with hysteresis:** if a marching-line aesthetic is wanted, compute "behind" from the *smoothed* heading and only swap sides when the new heading persists > ~1 s. Cosmetic mode, not the default.
+
+### Best structure: breadcrumb trail, A* as fallback
+
+The recommended architecture for follow (and the answer to chains):
+
+- The leader records a **breadcrumb trail** — its last N positions, sampled every ~half cell of actual movement (not per frame, so a stationary/jittering leader adds no crumbs).
+- The follower consumes the trail, steering toward the crumb `followDistance` behind the leader's trail-arc-length. Every crumb is a position the leader physically occupied, so the path is *pre-validated* — no A* calls at all while the trail is intact, and followers thread doors single-file naturally.
+- Fall back to a real `findPath` only when the follower is **separated** (no crumb within range, e.g. teleport, map transition, or blocked by a newly closed door). Repath throttling from the core loop applies.
+
+### Chains of 5+ followers
+
+Two topologies; pick per group size:
+
+- **Chain (each follows the one ahead)** — simplest, works to ~4–5. Weakness: the **accordion effect** — smoothing lag compounds per link, so the tail lags and rubber-bands. Mitigate with **speed matching**: follower speed scales with gap (slightly faster than leader when gap > desired, slowing to match as it closes) rather than binary move/stop.
+- **Shared trail (recommended at 5+)** — all followers consume the *leader's* trail at staggered arc-length distances (`i × spacing`). One trail, one entity ever pathfinding, no compounding lag, and the conga line stays evenly spaced no matter how long. Scales to dozens.
+- Either way, add a small **local separation** step (push apart overlapping followers per frame, à la boids separation) instead of letting followers treat each other as A* obstacles — moving entities as hard blockers causes mutual deadlock in corridors.
+
+### Follow work package (T15 — follower system)
+
+Suggested split: **Opus** implements `FollowBehavior` (smoothed target, dead-band, deviation repath, own-side targeting) reusing `MOVE_FOLLOW_TYPES` plumbing; **Codex** implements `BreadcrumbTrail` (ring buffer on the leader, arc-length lookup) once the behavior contract exists. Depends on nothing in the phase plan; pairs naturally with T8 (MovementBody consolidation) so the three brains share one follow implementation.
+
+**Acceptance criteria:**
+- Leader oscillating ±3 cells horizontally at 2 Hz → follower inside its dead-band does not move at all.
+- Leader reverses direction → follower with own-side targeting takes zero steps if already within `followDistance`.
+- 6-myte shared-trail line through a 1-cell-wide door: all arrive, single file, no A* call after the leader's initial path.
+- Follower separated by a closed door falls back to `findPath`, and (with partial-path landed) waits at the door rather than idling in place.
+
+### Pathfinding work package (T16 — pathfinder final pass)
+
+Small, low-risk bundle from the findings above, suitable for **Sonnet**: integer node/cache keys; partial-path-on-failure; speed-scaled smoothing buffer; delete write-only `fScore`; align the `searchRadius` clamp. The static clearance field is a follow-up **Opus** task the next time `GameMapGrid`/`GridSystem` is open. Acceptance: pathing behavior unchanged on existing maps (audit-harness recording comparison), search time on the busiest map measurably down, unreachable-target clicks produce walk-toward-and-stop instead of no-op.
+
+---
+
+# Addendum — 2026-07-09 Working-Tree Review & Worker Handoff
+
+**Model routing change (owner decision):** implementation work is delegated to **GPT-5.6** (external worker). Everywhere this document says Codex/Opus/Sonnet for implementation tasks, read GPT-5.6. Fable-reserved review gates cannot currently run (no Fable budget); the substitute discipline is: **every task ends by running the acceptance harness + `docs/SMOKE_CHECKLIST.md` and reporting raw results, and no task may change an API in `js/Engine/WorldRegistry.js`, `WorldQuery.js`, `EntityRelationships.js`, `AttachmentSystem.js`, or `docs/SOCKET_SCHEMA.md` — those are frozen specs.**
+
+## A. What the uncommitted working tree contains (reviewed 2026-07-09)
+
+The working tree on `new-ai-system` holds a large in-flight batch. All changed files pass `node --check`; `node scripts/validate-content-data.js` passes; the `BaseInputHandler.js → MyteBaseHandler.js` rename is byte-identical with all references (manifest, index.html, index.php) updated; `node scripts/build-manifest.js` regenerates cleanly.
+
+| Task | Working-tree status | Notes |
+|---|---|---|
+| T1 Phase-1 cleanup | **Implemented** | Shadow → `renderState.shadow` + `MapRenderer.applyShadowState`; creature debug attrs gated behind body `.debug` class (cached per sim-tick); interaction cooldowns on `SimClock.now()`; `CARRY_OFFSET` → `SiteConfig.myte.carryOffset` with ms-based durations; empty fallback map + toast (`GameMap.core.toastManager` verified reachable). Defect WT-6 below applies. |
+| T2 depth caching/dedupe | **Implemented** | `_depthOffset/_depthPriority/_renderLayerKey` cached; `invalidateDepthCache()` from constructor + `applyFacingDirection` — verified `size`/`collider` only mutate in those two places, and invalidation runs after both mutations. Shared math in `EntityMethods.resolveDepthOffsetValue/getSortYValue`; `MyteRenderer` delegates. Depth baseline diff (`__audit.dumpDepth()`) still needs a browser run. |
+| L7 rename | **Done** | Pure rename, references updated. |
+| T4 query migration | **Mostly implemented** | `MyteAI.getNearbyMytes/Objects/Items`, `NpcMapObject._detectTargets`, `Myte._syncCompanionBuffs`, `Myte.getRandomNearbyObject`, `PollinatorCreatureMapObject._findNearestFlower` now route through `WorldQuery`. `BirdMapObject.findTarget` **no longer needs migration** — it returns synthetic peck-spot targets, no population scan remains. Parity notes WT-5/WT-9 below. |
+| T5 relationships migration | **Partial, with a disabling bug** | `withPickup.pickup/drop` write `carrying`; Carry actions write `carrying`; NPC `aggroTarget` and creature `restingTarget` are relationship-backed getters; `MyteQueue.isCarrying*` reads relation-first; invariant sweeper extended (`window.__invariants()`). **WT-1/WT-2/WT-3 below must land before this is real** — as written, the myte-side writes silently no-op. `following` not yet migrated. |
+| T7 affordance data migration | **Partial** | `getAiAffordances` base hardcoding removed; `when`-DSL interpreter (`passesAffordanceWhen`) + validator schema landed; data added for FOOD (edible), light, dance/music, social×2, COUCH/LOG sittable capability. **Toggle gap WT-4**; myte social affordances + capability broad-phase in MyteAI still open. |
+| T16 pathfinder pass | **Implemented** | Integer node keys (16+16 packed, sign-safe decode), partial-path-on-failure (all three failure exits; `_reconstructPath` call signature verified correct), speed-scaled smoothing buffer, `fScore` map deleted, `nearestValidSearchRadius` option aligned (clamp removed). WT-7/WT-8 below. |
+| T14 bundle | **Implemented** | `build:bundle` concatenates manifest order into `js/bundle.js` + emits `index.bundled.{html,php}` with the CDN (Tone.js) entry `defer`red; outputs gitignored. Needs one boot-from-bundle verification. |
+| D4 balance sim | **Implemented and working** | `scripts/simulate-stats.js` runs the real `MyteStats` in a Node VM. Its output drives the Stats Audit addendum below. |
+| Extras | Done | `User.saveUserData` try/catch + toast (June gap); AuditHarness carriedBy invariants; validator affordance/capability schema (T12 slice). |
+
+## B. Defects found in the working tree — fix before commit (WT-blocks, paste-ready)
+
+> Worker instructions: apply WT-1 through WT-6 and WT-8 exactly as specified; WT-7 is optional. After all fixes: `node --check` every touched file, `node scripts/validate-content-data.js`, then run the browser console block at the end of `docs/CODEX_GOALS.md` plus `docs/SMOKE_CHECKLIST.md` and report results verbatim.
+
+### WT-1 — `Myte` has no `.container`, so every myte-side relationship call silently no-ops — **critical**
+**Evidence:** `MyteQueue.getCarryRelationTarget()` reads `this.myte?.container?.relationships` (`MyteQueue.js:189-191`); `setCarryRelation/clearCarryRelation` in `CarryActions.js:5-22` read `carrier?.container?.relationships`. `Myte` has no `container` property or getter (its ContainerManager is `this.parent`). `MapObject` has one (`MapObject.js:20: this.container = parent?.parent`). Result: myte-carrying-myte relations are never written; the item-side relation written by `withPickup.pickup()` (which works — object's `container` is the ContainerManager) is never *read* by `MyteQueue`, so everything degrades to the old instanceof path and the T5 migration is inert.
+**Fix:** add to `Myte` (near the other getters, e.g. after `getOffsetRect()` at `Myte.js:773`):
+```js
+get container() { return this.parent; }   // ContainerManager — mirrors MapObject.container
+```
+**Acceptance:** in browser, pick up an item: `c.relationships.get('carrying', c.activeMyte)` returns the item and `__invariants()` is clean; carry a myte: `c.activeMyte.queue.isCarryingMyte()` true via the relation (verify by checking `c.relationships.serialize()` contains the pair).
+
+### WT-2 — Relationship-backed getters fall back to a stale field after despawn cleanup — **defeats the point of T5**
+**Evidence:** `NpcMapObject.js:35: get aggroTarget() { return this.container?.relationships?.get?.('targeting', this) ?? this._aggroTarget ?? null; }` and the identical pattern in `AmbientCreatureMapObject.js:5-8` (`restingTarget`). When a target despawns, `WorldRegistry.remove → clearAllFor` clears the relation — but the getter then returns the stale `this._aggroTarget`/`this._restingTarget` object reference. The stale-reference bug C2 was written to prevent comes straight back.
+**Fix (both getters):** fall back to the field **only when the relationships registry is unavailable**:
+```js
+get aggroTarget() {
+    const relationships = this.container?.relationships;
+    if (relationships) return relationships.get('targeting', this) ?? null;
+    return this._aggroTarget ?? null;
+}
+```
+Also update `_aggroTarget`/`_restingTarget` in the setters as today (they remain the no-registry fallback store).
+**Acceptance:** aggro an NPC onto a myte, despawn the myte via debug — `npc.aggroTarget` is `null` on the next read (no defensive `.active` check needed); same for a pollinator whose flower is removed mid-rest.
+
+### WT-3 — `CarryAction` never clears its `carrying` relation on interrupt — dangling relation locks the carrier
+**Evidence:** `CarryActions.js` — `CarryPickupAction` and `CarryPutdownAction` clear the relation in `interrupt()`/on completion, but `CarryAction` (the steady-state, potentially minutes-long action) has `start()` set with **no** `interrupt()`/`complete()` cleanup. If the carry is interrupted (drag, map transition, higher-priority interrupt), the relation persists; after WT-1 lands, `isCarrying()` is relation-first, so the carrier is permanently "carrying" — it can never eat (`actorNotCarrying` gate), never pick up again, and the AI's carry checks all misfire. Same failure the audit predicted for representation-fragile state, inverted.
+**Fix:** add to `CarryAction`:
+```js
+interrupt() {
+    super.interrupt();
+    clearCarryRelation(this.myte, this.target);
+}
+```
+(The normal handoff to `CarryPutdownAction` is safe either way: putdown's `start()` re-establishes the relation after any interrupt-ordering, verified in `MyteQueue.interrupt` semantics.)
+**Acceptance:** start a myte-carry, drag the carrier to force an interrupt — `c.relationships.serialize()` has no `carrying` pair and `__invariants()` is clean; repeat across a map transition while carrying.
+
+### WT-4 — DOOR and GATE lost their `toggle` affordance in the data migration — T7 parity break
+**Evidence:** old `MapObject.getAiAffordances` pushed `{ actionId: 'interact_object', purpose: 'toggle' }` for every `interaction.type === 'toggle'` object. The interaction-type sweep of `types.json` shows exactly two toggle types — DOOR (~line 3967) and GATE (~line 5424) — and neither received an `ai.affordances` entry. T7's acceptance is byte-identical affordance output per type; this diff is non-empty.
+**Fix:** add to both DOOR and GATE in `types.json`:
+```json
+"ai": { "affordances": [ { "actionId": "interact_object", "purpose": "toggle" } ] }
+```
+(If the owner prefers AI *not* toggling doors/gates — defensible, doors already auto-open via the Entity mixin — record the intentional drop here instead of adding the data. Default: preserve parity, add the entries.)
+**Acceptance:** `__audit.dumpAffordances()` diff vs `docs/audit-baselines/` is empty for all 31 types (record the baseline on a pre-migration build first if not already committed).
+
+### WT-5 — `NpcMapObject._detectTargets` silently gained an `isDragging` exclusion
+**Evidence:** the old loop filtered only `!myte.isActive`; `WorldQuery.findNearby` defaults `excludeDragging: true`. An NPC now loses/never acquires aggro on a dragged myte — a behavior change smuggled in by defaults, against the T4 rule that specs pin exact predicates.
+**Fix:** pass `excludeDragging: false` in the `_detectTargets` query options to preserve current behavior. (Owner may later decide dragged mytes should be untargetable — that's a gameplay decision, not a migration side effect.)
+**Acceptance:** NPC aggro range/behavior identical with a dragged myte in radius.
+
+### WT-6 — Shadow styles: duplicated apply implementation + no change detection in the flush path — partial M1 regression
+**Evidence:** `MapObject.applyShadowVisual()` (`MapObject.js` ~line 389) and `MapRenderer.applyShadowState()` are byte-identical 9-property `Object.assign` blocks. Worse, `flush/flushOne` call `applyShadowState(obj)` on **every** dirty flush — a moving object with an unchanged shadow (ball rolling, `posZ` static) rewrites 9 style properties every frame, which is the exact per-frame-write class M1 was fixing.
+**Fix:** (1) `computeShadowVisual()` already allocates a **new** state object only when something changed — exploit that: in `applyShadowState`, skip when the reference was already applied:
+```js
+applyShadowState(obj) {
+    const shadowElement = obj?.shadowElement;
+    const shadowState = obj?.renderState?.shadow;
+    if (!shadowElement || obj._appliedShadowState === shadowState) return;
+    obj._appliedShadowState = shadowState;
+    // …existing style application…
+}
+```
+(2) Delete `MapObject.applyShadowVisual` and have its two call sites (`updatePosition`, `render`) call `this.parent?.renderer?.applyShadowState?.(this)` so there is exactly one implementation.
+**Acceptance:** shadows visually identical (creature hover fade, pickup hide); a paused-in-place bird writes zero shadow styles per frame (verify with a counter or DevTools style-recalc profile).
+
+### WT-7 — BigInt validation-cache keys likely cost more than the strings they replaced *(optional, perf)*
+**Evidence:** `_getValidationCacheKey` (`AStarPathfinder.js` ~line 135) builds a BigInt from 7 shift/or operations per `_validatePosition` call — the hottest line in a search. The T16 finding targeted *string allocation*; BigInt allocation is typically no cheaper in V8.
+**Fix (keep it simple):** inside an active search (`this._activeSearchCache` non-null) the entity and collider are constants — key by packed plain number only: `(colliderWorldX + 0x800000) * 0x1000000 + (colliderWorldY + 0x800000)` (48 bits < 2^53, world px rounded). Keep the BigInt (or the old string) key **only** for the cross-search LRU path where entity/dims vary. Guard: the per-search cache must be (and is) discarded per `findPath` call.
+**Acceptance:** identical paths on existing maps (audit-harness recording comparison); measure search time on the busiest map before/after.
+
+### WT-8 — Search timeout still 500 ms — the audit's own follow-through
+**Evidence:** `timeoutMs = 500` remains in `findPath`. The 2026-07-08 addendum says to drop it to 30–50 ms *once partial paths exist* — they now do; the worst-case main-thread stall should shrink 10×.
+**Fix:** make it an option `searchTimeoutMs: 50` in `this.options` (overridable per call like the other options) and use it in the loop.
+**Acceptance:** no behavioral change on normal paths; a deliberately unreachable far target returns a partial path in ≤ ~50 ms (console-time it).
+
+### WT-9 — Minor notes (fix opportunistically, none blocking)
+1. `MusicBoxMapObject.getAiAffordances` now just returns `super(...)` — delete the override (`LightMapObject.js:105`).
+2. Bird peck-spot **synthetic** targets (`{posX, posY, isPeckSpot: true}`) now flow into the relationship registry via the `restingTarget` setter. Harmless today (they're cleared when the setter nulls, never serialized — no `worldId`), but add a one-line guard in the creature setter: skip `relationships.set` when `!target.worldId`, keeping synthetic spots in `_restingTarget` only.
+3. `Myte.getRandomNearbyObject` now throws (via WorldQuery's finite-args check) if `range` is undefined/NaN, where the old filter returned null. Audit all call sites pass a number, or wrap with `Number.isFinite(range) ? … : null`.
+4. `AmbientCreatureMapObject` debug-flag cache keys on `SimClock.now()` — while the sim is paused the flag never re-syncs. Cosmetic; acceptable.
+5. `getRandomNearbyObject`/`_syncCompanionBuffs`/`getNearbyItems` now inherit `excludeDragging: true` where the old code had no such check — accepted as a benign improvement (do not "fix"); recorded here so the T4 parity ledger is honest.
+6. Cross-reference: `buildActionResult` drops the `hunger` key from action definitions — see ST-2 in the Stats Audit below.
+
+## C. Updated work queue for GPT-5.6 (in order)
+
+1. **WT-fix bundle** (Section B, one branch, one PR). Blocking everything else because WT-1/2/3 are correctness holes in already-written code.
+2. **Browser verification pass** — T3 console block in `docs/CODEX_GOALS.md` + `__audit.dumpDepth()` / `dumpAffordances()` baseline diffs + `docs/SMOKE_CHECKLIST.md`. Record results in `docs/audit-baselines/`.
+3. **T17 stats retune** (next addendum — self-contained spec).
+4. **T5 completion** — `following` relation via `FollowObjectAction` start/interrupt/complete; then the despawn-cleanup scenarios in Phase 5's acceptance.
+5. **T7 completion** — myte-side `getAiAffordances` for social actions (per Addendum 2026-07-05 §5); capability broad-phase in MyteAI candidate builders (`findNearby({ capability })` before per-target affordance evaluation).
+6. **T6 socket/attachment vertical slice** — previously Fable-reserved. Re-routed to GPT-5.6 **with guardrails**: implement `AttachmentSystem` + convert only COUCH end-to-end per `docs/SOCKET_SCHEMA.md` (frozen — do not deviate); stop and report before rolling out to other types; the §8 scenario walkthrough table in this document is the design test.
+7. T13 (paired social), T15 (follow behavior), T8, T9/T10 as previously specced.
+
+---
+
+# Addendum — 2026-07-09 Stats System Audit (design: "will this be fun?")
+
+**Scope:** `js/Myte/MyteStats.js` (1,042 lines), `SiteConfig.stats`, action reward flow (`BaseActions.buildActionResult` → `applyActionResult`, `noteBehavior`), buffs' continuous stat effects, and the drive→AI coupling. **Method:** code reading plus the new headless simulator (`node scripts/simulate-stats.js`), which executes the real `MyteStats` in a Node VM — the numbers below are measured, not estimated, and every claim can be re-verified by re-running the sim.
+
+## Verdict up front
+
+**The architecture is good. The tuning is broken badly enough that, as shipped, the stats system cannot produce fun gameplay.** Everything meaningful happens on a seconds scale in a game whose interaction loop operates on minutes, and the home slot is a total-recovery exploit that makes *not playing* the optimal strategy. The good news: because the whole system is pure config + pure functions (which is *why* the simulator works), this is a tuning-and-two-bug-fixes problem, not a redesign.
+
+## What is architecturally right (keep all of it)
+
+- **Pure, config-driven math** — every rate in `SiteConfig.stats`, deltaTime-scaled, batched at a 100 ms drive tick that is mathematically equivalent to per-frame. This is what made a headless simulator possible in an afternoon.
+- **Wellbeing ceilings** (`fun`/`comfort`/`confidence` capped by vitals) — elegant: a starving myte cannot be blissful, enforced as a soft drain rather than a clamp.
+- **Derived mood → behavior** (`getDerivedMood` → speed multiplier, AI hints) — the right way to make stats *legible* without more meters.
+- **Exhaustion cascade** as a concept (low energy accelerates other decay) — good death-spiral *texture*, currently tuned too hot.
+- **Separation of drives (AI pressure) from meters (player-facing)**, and `needSignalCooldown` rate-limiting the bubbles.
+
+## Measured behavior (the sim tables, summarized)
+
+| Scenario | Result |
+|---|---|
+| **Deployed, idle** | Fun 70→0 in **~20 s**. Satiety 100→0 in **~33 s**. Social 80→0 in **~3–4 min**. Health 100→0 by **~30 min** (starvation drain). Comfort settles at ~33. Terminal state: everything pinned at 0, myte permanently "exhausted/bored," nothing further changes. |
+| **Docked in home slot** | Every stat at maximum **before the first 15-min sample**; confidence saturates in **under one second** (see ST-3). |
+| **Food economy** | One apple = +30 satiety (FOOD `effects.hunger: 30`, unscaled through `applyStatEffects`). At the deployed decay of 3 satiety/s, **one apple buys ~10 seconds of not being hungry.** |
+| **Action economy** | `noteBehaviorScale` 0.45 means a completed play action grants ~+4–8 fun — at 3.4 fun/s decay, **any action pays for roughly 2 seconds of itself.** |
+
+Derivations (all verifiable against `SiteConfig.stats`): effective fun loss while idle = (`funDecayRate` 0.004 + `funDeltaRates.idle` 0.0042) × `behaviorDriveRate` 0.42 ≈ 0.0034/ms. Satiety = `satietyDecayRate` 0.003/ms **with no rate scale** (see ST-1). Social = 0.0016 × 0.42 (× 0.5 alone). Starvation = `wellbeing.starvationHealthDrainPerMs` 0.000085 ramping below 15% satiety, ≈ 5/min at full starvation against 1.5/min passive regen.
+
+## Design failures (why this can't be fun as-is)
+
+1. **Crisis timescale ≠ interaction timescale.** Needs empty in 20–200 seconds; the AI's think loop, pathfinding, approach, and action durations mean one need-servicing cycle takes ~10–30 s. The AI can *only* firefight, the player can never meaningfully help, and meters spend their lives pinned at 0 — a meter that is always empty carries zero information and trains the player to ignore it (learned helplessness). The mood system, which is genuinely nice, is starved of dynamic range: the myte is permanently `exhausted`/`bored`.
+2. **The home slot is the dominant strategy.** Docked = everything maxes in minutes with the exhaustion cascade suppressed; deployed = everything collapses. The rational player docks their pets and stops playing. Stakes must exist *in* the world, and recovery must be slow enough that care actions in the world can compete with the dock.
+3. **The reward economy is dwarfed by decay** (apple = 10 s, play action = 2 s). Feeding/playing must buy *minutes* or care is Sisyphean.
+4. **Zero-health has no consequence and no arc.** At health 0 the myte plays a `faint` expression (`MyteStats.js:131`) and… keeps existing at 0 until it drifts back up. The terminal state is static — no drama, no recovery story, no reason to prevent it. Stakes without consequence are just a red bar.
+5. **No return-visit story.** Docked mytes are always at max, so a player returning after a day sees nothing to do. A pet game's core loop is *"they need me"* — some gentle docked/offline drift toward a contented-but-imperfect baseline (e.g., 70s) gives returning players a warm re-entry ritual without punishing absence.
+
+## Stats bugs found while auditing (fix regardless of tuning)
+
+### ST-1 — `satietyDecayRate` skips the `rateScale` every other drive uses
+`MyteStats.js:443`: `this.updateSatiety(-this.satietyDecayRate * deltaTime * satietyExhaustionScale)` — no `rateScale` factor, unlike fun (line 430) and social (line 439). Effect: satiety decays at 100% of its configured rate while fun/social run at 42%, and buffs' `behaviorDriveMultiplier` can't touch hunger. Almost certainly an omission (the home-slot comments at `SiteConfig.js:54` assume scaled math). **Fix: multiply by `rateScale` like its siblings, then retune the constant (T17 table).**
+
+### ST-2 — `buildActionResult` silently drops `hunger` effects from action definitions
+`BaseActions.js:91` maps `satietyDelta: base.satiety ?? 0`, but action definitions use the `hunger` key (`eat_element` has `"hunger": 20` at `actions.json:248`) — that 20 is lost; eating only nourishes via the *object's* effects going through `applyStatEffects` (which does honor the alias, `MyteStats.js:218`). Per Addendum 2026-07-05 §1 (breaking migrations welcome): **canonicalize on `satiety` — rename the key in `actions.json`, make `buildActionResult` read only `satiety`, and delete the `hunger|hungerDelta|hungerBoost` aliases from `normalizeStatEffects` after migrating `types.json` FOOD effects (`hunger: 30` → `satiety: 30`) and any other `hunger` keys (`grep -rn '"hunger"' data/`).** Extend `validate-content-data.js` to reject the legacy keys.
+
+### ST-3 — `homeSlotConfidenceBoostRate` is ~100× too large for confidence's 0–1 scale
+Confidence is 0–1 (`getConfidenceRatio` returns it raw) while other stats are 0–100, and `homeSlotConfidenceBoostRate: 0.00055`/ms fills the whole bar in under a second (the sim shows confidence at max at t≈0). Compare the correctly-scaled `exhaustionCascade.confidenceDrainPerMs: 0.000018`. **Fix: 0.00055 → ~0.0000055** (full bar in ~3 min against the blend). Longer-term (optional, T17 stretch): move confidence to 0–100 like everything else — the mixed scale has now caused a real bug and it complicates every UI/editor touchpoint.
+
+## T17 — Stats retune work package (GPT-5.6, paste-ready)
+
+**Goal:** deployed needs move on a 30–90 minute arc; docked recovery takes ~10–15 minutes and is *not* strictly better than in-world care; care actions buy minutes; health failure has a visible consequence and a recovery arc.
+
+**Step 0 — bugs first:** ST-1, ST-2, ST-3 above.
+
+**Step 1 — retune constants** in `SiteConfig.stats` (starting values; the sim assertions in Step 3 are the real spec — iterate until they pass):
+
+| Key | Now | Proposed | Rationale (effective rate) |
+|---|---|---|---|
+| `funDecayRate` | 0.004 | **0.0002** | with rateScale ≈ 0.000084/ms → 100 fun ≈ 20 min of pure decay |
+| `funDeltaRates` (all six) | 0.0002–0.0042 | **÷10** | keeps context *ratios*; idle boredom ≈ +decay ≈ fun empties in ~10 min if the AI does nothing (AI will act well before that) |
+| `satietyDecayRate` | 0.003 | **0.000066** (after ST-1 adds rateScale) | ≈ 0.0000277/ms → 100 satiety ≈ 60 min; an apple (+30) buys ~18 min |
+| `socialDecayRate` | 0.0016 | **0.00013** | ≈ 0.0000546/ms → ~30 min (60 alone) |
+| `wellbeing.starvationHealthDrainPerMs` | 0.000085 | **0.00003** + add `starvationGraceMs: 120000` (drain starts only after satiety has been < threshold for 2 min continuously) | full starvation → health 100→0 in ~55 min, with warning time |
+| `exhaustionCascade.healthDrainPerMs` | 0.00018 | **0.00004** | cascade menaces, doesn't execute |
+| `exhaustionCascade.comfortDrainPerMs` | 0.0006 | **0.00015** | proportional |
+| `homeSlotEnergyRegenRate` | 0.003 | **0.00025** | 0→100 ≈ 7 min docked |
+| `homeSlotFunRestoreRate` | 0.0030 | **0.00012** | net-positive vs new docked decay; full ≈ 15 min |
+| `homeSlotSocialRestoreRate` | 0.0008 | **0.00008** | ditto |
+| `homeSlotSatietyRestoreRate` | 0.0025 | **0.0001** | ditto |
+| `homeSlotComfortBoostRate` | 0.0011 | **0.00025** | |
+| `homeSlotConfidenceBoostRate` | 0.00055 | **0.0000055** | ST-3 |
+| `homeSlotHealthRegenRate` | 0.00035 | **0.0001** | 0→100 ≈ 17 min docked |
+| energy economy (`energyDecayRate`, `bedRestEnergyRegenRate`, etc.) | — | **unchanged for now** | the minute-scale energy/nap loop is the *activity* metabolism and reads well on screen; revisit only if the browser pass shows nap-spam |
+
+Recheck after retuning: the home-slot comments in `SiteConfig.js:47-57` state net-positive margins — recompute and update those comments; they are load-bearing documentation.
+
+**Step 2 — consequence at zero health:** when health hits 0 while deployed: interrupt the queue with the existing `faint` expression, then force-return the myte to its home slot using the **existing GOHOME pathway** — `myte.queue.clear()` then `myte.setMode(MOVE_TYPES.GOHOME)`; `MyteMovementController.update` (the `MOVE_TYPES.GOHOME` branch, `MyteMovementController.js:220-246`) already paths it home and calls `myte.stop()` (= docked) on arrival — and apply a `recovering` context buff via `buffs.syncContextBuff` (define it in `data/metadata/buffs.json` following the existing context-buff entries; effects: `movement.speedMultiplier` ~0.7 plus a small `stats.behaviorDriveMultiplier` reduction, duration ~5 sim-minutes). While the buff is active, block re-deploy (guard in the same place the deploy/start flow checks `isActive`, surfacing a toast). No death. Implement the trigger as an `onHealthDepleted()` hook next to `onEnergyDepleted()` (`MyteStats.js:685`), fired once on the 100→0 crossing with a re-arm threshold (e.g. health back above 20), mirroring how `exhaustionRecoveryThreshold` re-arms exhaustion.
+
+**Step 3 — extend `scripts/simulate-stats.js`** with a `deployed + AI care model` scenario (synthetic care: when satiety < 30 apply +30 after an 8 s delay; when fun < 30 apply the play-action reward after 10 s; when energy < 25 switch to bed-rest regen until 90) and turn the script into an assertion harness (exit non-zero on failure):
+- With care: no stat touches 0 across 2 sim-hours; mood (via `getDerivedMood`) is not `exhausted`/`bored` more than 20% of samples.
+- Without care: satiety reaches 0 in 45–90 min; health reaches 0 no sooner than 60 min after that grace.
+- Docked from the crashed state: full recovery in 8–20 min; confidence takes ≥ 2 min to saturate.
+- One apple sustains ≥ 15 min of satiety at the new decay.
+
+**Step 4 — browser pass:** 30-minute observation with 2 deployed mytes: mood cycles through ≥ 4 distinct moods; need bubbles ≤ 1 per 5 min per myte; mytes visibly alternate eat/play/social/rest rather than firefighting one need.
+
+**Files:** `SiteConfig.js`, `MyteStats.js`, `BaseActions.js`, `data/metadata/actions.json`, `data/map-objects/types.json` (hunger→satiety), `scripts/validate-content-data.js`, `scripts/simulate-stats.js`. **Out of scope:** AI drive formulas (`MyteAI` scoring), buff definitions, zone effect values — retune those only if Step 4 observation demands it, as a separate task.

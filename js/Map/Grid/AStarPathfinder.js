@@ -27,6 +27,8 @@ class AStarPathfinder {
             allowDiagonalCutting: false,  // Cutting corners causes collider catching against object edges
             heuristicWeight: 1,
             maxSearchSteps: 8000,
+            searchTimeoutMs: 50,
+            nearestValidSearchRadius: 12,
             smoothPaths: true,
             debug: false,
             preferPaths: true,
@@ -79,16 +81,124 @@ class AStarPathfinder {
         // Scoped to a single findPath call (see findPath wrapper) — unbounded Map,
         // no staleness risk because a search is synchronous.
         this._activeSearchCache = null;
+        this._entityValidationSeeds = new WeakMap();
+        this._nextEntityValidationSeed = 1;
     }
 
     /**
      * Get unique key for grid coordinates
      * @param {number} x - Grid x coordinate
      * @param {number} y - Grid y coordinate
-     * @returns {string} Unique string key
+     * @returns {number} Packed numeric key
      */
     getKey(x, y) {
-        return `${x},${y}`;
+        return ((((y & 0xffff) << 16) | (x & 0xffff)) >>> 0);
+    }
+
+    _decodeGridKey(key) {
+        if (typeof key === 'number' && Number.isFinite(key)) {
+            const rawX = key & 0xffff;
+            const rawY = (key >>> 16) & 0xffff;
+            return {
+                x: rawX >= 0x8000 ? rawX - 0x10000 : rawX,
+                y: rawY >= 0x8000 ? rawY - 0x10000 : rawY
+            };
+        }
+
+        if (typeof key === 'string') {
+            const [x, y] = key.split(',').map(Number);
+            return { x, y };
+        }
+
+        return { x: NaN, y: NaN };
+    }
+
+    _packSignedKeyPart(value, bits = 24) {
+        const max = (2 ** (bits - 1)) - 1;
+        const min = -(2 ** (bits - 1));
+        const clamped = Math.max(min, Math.min(max, Math.round(value)));
+        const modulus = 1n << BigInt(bits);
+        let packed = BigInt(clamped);
+        if (packed < 0) {
+            packed += modulus;
+        }
+        return packed;
+    }
+
+    _getEntityValidationSeed(entity) {
+        if (!entity) return 0;
+
+        let seed = this._entityValidationSeeds.get(entity);
+        if (!seed) {
+            seed = this._nextEntityValidationSeed++;
+            this._entityValidationSeeds.set(entity, seed);
+        }
+        return seed;
+    }
+
+    _getValidationCacheKey(entity, colliderWorldX, colliderWorldY, collider) {
+        const seed = BigInt(this._getEntityValidationSeed(entity));
+        return (seed << 96n) |
+            (this._packSignedKeyPart(colliderWorldX, 24) << 72n) |
+            (this._packSignedKeyPart(colliderWorldY, 24) << 48n) |
+            (this._packSignedKeyPart(collider?.width ?? 0, 12) << 36n) |
+            (this._packSignedKeyPart(collider?.height ?? 0, 12) << 24n) |
+            (this._packSignedKeyPart(collider?.offsetX ?? 0, 12) << 12n) |
+            this._packSignedKeyPart(collider?.offsetY ?? 0, 12);
+    }
+
+    _getNearestValidSearchRadius(pathOptions = {}) {
+        const radius = pathOptions.nearestValidSearchRadius ?? this.options.nearestValidSearchRadius;
+        return Math.max(1, Math.floor(radius));
+    }
+
+    _getEntityMovementPixelsPerFrame(entity) {
+        const statSpeed = entity?.stats?.getSpeed?.();
+        if (Number.isFinite(statSpeed) && statSpeed > 0) {
+            return statSpeed;
+        }
+
+        const velocitySpeed = Math.hypot(entity?.velocity?.x ?? 0, entity?.velocity?.y ?? 0);
+        if (velocitySpeed > 0) {
+            return velocitySpeed;
+        }
+
+        const fallbackSpeeds = [
+            entity?.speed,
+            entity?.maxSpeed,
+            entity?.groundSpeed,
+            entity?.flightSpeed
+        ];
+        return fallbackSpeeds.find(speed => Number.isFinite(speed) && speed > 0) ?? 0;
+    }
+
+    _resolveSmoothingBuffer(entity, effectiveOptions = {}) {
+        const configuredBuffer = Number.isFinite(effectiveOptions.smoothingBuffer)
+            ? effectiveOptions.smoothingBuffer
+            : this.options.smoothingBuffer;
+
+        return Math.max(2, configuredBuffer ?? 2, this._getEntityMovementPixelsPerFrame(entity));
+    }
+
+    _buildPartialPath(entity, cameFrom, bestGridNode, startGrid,
+        originalStartCenterX, originalStartCenterY,
+        entityWidth, entityHeight, collider, entityCapabilities,
+        effectiveOptions) {
+        if (!bestGridNode || (bestGridNode.x === startGrid.x && bestGridNode.y === startGrid.y)) {
+            return null;
+        }
+
+        const cellSize = this.gridSystem.config.cellSize;
+        const endCenterX = (bestGridNode.x * cellSize) + (entityWidth / 2);
+        const endCenterY = (bestGridNode.y * cellSize) + (entityHeight / 2);
+
+        return this._reconstructPath(
+            entity, cameFrom, bestGridNode, startGrid, bestGridNode,
+            originalStartCenterX, originalStartCenterY,
+            endCenterX, endCenterY,
+            entityWidth, entityHeight, collider, entityCapabilities,
+            effectiveOptions
+        );
     }
 
     /**
@@ -191,7 +301,7 @@ class AStarPathfinder {
                 Utility.warnDebug(`Requested target position (Center ${originalEndCenterX.toFixed(0)}, ${originalEndCenterY.toFixed(0)} / TL ${endEntityX.toFixed(0)}, ${endEntityY.toFixed(0)}) is invalid. Attempting to find nearest valid spot.`);
             }
             // Use existing helper to find nearest valid grid coordinate for the entity's TL
-            const searchRadius = 12; // How far to search (in grid cells)
+            const searchRadius = this._getNearestValidSearchRadius(effectiveOptions);
             const validEndGrid = this._findNearestValidGridPos(
                 entity,
                 endGrid.x, // Start search from the original invalid grid pos
@@ -243,7 +353,7 @@ class AStarPathfinder {
                 const snappedColliderY = snappedY + collider.offsetY;
                 Utility.warnDebug(`Target grid cell (${endGrid.x},${endGrid.y}) is unreachable by A* - grid-snapped collider Y=${snappedColliderY.toFixed(0)} differs from exact Y=${(endEntityY + collider.offsetY).toFixed(0)}. Searching for nearest valid cell.`);
             }
-            const searchRadius = 12;
+            const searchRadius = this._getNearestValidSearchRadius(effectiveOptions);
             const validEndGrid = this._findNearestValidGridPos(entity, endGrid.x, endGrid.y, searchRadius, entityWidth, entityHeight, collider, entityCapabilities);
             if (!validEndGrid) {
                 if (effectiveOptions.debug) console.error(`No valid grid cell found near (${endGrid.x},${endGrid.y}).`);
@@ -311,7 +421,16 @@ class AStarPathfinder {
         // --- Validate Start Position (and adjust if necessary) ---
         if (!this._validatePosition(entity, startX, startY, entityWidth, entityHeight, collider, entityCapabilities)) {
             if (effectiveOptions.debug) { Utility.warnDebug(`Entity collider cannot fit at input start TL (${startX.toFixed(0)}, ${startY.toFixed(0)})`); }
-            const validStartGrid = this._findNearestValidGridPos(entity, startGrid.x, startGrid.y, 12, entityWidth, entityHeight, collider, entityCapabilities);
+            const validStartGrid = this._findNearestValidGridPos(
+                entity,
+                startGrid.x,
+                startGrid.y,
+                this._getNearestValidSearchRadius(effectiveOptions),
+                entityWidth,
+                entityHeight,
+                collider,
+                entityCapabilities
+            );
             if (!validStartGrid) {
                 console.error("No valid start grid position found near the initial one.");
                 return null;
@@ -326,32 +445,52 @@ class AStarPathfinder {
         const closedSet = new Set();
         const cameFrom = new Map();
         const gScore = new Map();
-        const fScore = new Map();
 
         const startKey = this.getKey(startGrid.x, startGrid.y); // Use potentially adjusted startGrid
         const endKey = this.getKey(endGrid.x, endGrid.y); // Use potentially adjusted endGrid
+        const startHeuristic = this._heuristic(startGrid.x, startGrid.y, endGrid.x, endGrid.y);
 
         gScore.set(startKey, 0);
-        fScore.set(startKey, this._heuristic(startGrid.x, startGrid.y, endGrid.x, endGrid.y)); // Heuristic to adjusted end
 
-        this.openSet.push({ x: startGrid.x, y: startGrid.y, f: fScore.get(startKey), key: startKey });
+        this.openSet.push({ x: startGrid.x, y: startGrid.y, f: startHeuristic, key: startKey });
+        let bestReachedNode = { x: startGrid.x, y: startGrid.y, f: startHeuristic, key: startKey };
+        let bestReachedHeuristic = startHeuristic;
 
         let steps = 0;
-        const timeoutMs = 500;
+        const timeoutMs = effectiveOptions.searchTimeoutMs;
 
         // --- Main A* Search Loop ---
         while (!this.openSet.isEmpty()) {
             steps++;
             if (performance.now() - startTime > timeoutMs) {
                 Utility.warnDebug(`A* search timed out after ${timeoutMs}ms`);
-                return null; // Timeout
+                return this._buildPartialPath(
+                    entity, cameFrom, bestReachedNode, startGrid,
+                    startCenterX, startCenterY,
+                    entityWidth, entityHeight, collider, entityCapabilities,
+                    effectiveOptions
+                ); // Timeout
             }
             if (steps > effectiveOptions.maxSearchSteps) {
                 Utility.warnDebug(`A* search exceeded max steps: ${effectiveOptions.maxSearchSteps}`);
-                return null; // Max steps exceeded
+                return this._buildPartialPath(
+                    entity, cameFrom, bestReachedNode, startGrid,
+                    startCenterX, startCenterY,
+                    entityWidth, entityHeight, collider, entityCapabilities,
+                    effectiveOptions
+                ); // Max steps exceeded
             }
 
             const current = this.openSet.pop();
+            const currentHeuristic = this._heuristic(current.x, current.y, endGrid.x, endGrid.y);
+            const currentCost = gScore.get(current.key) ?? Infinity;
+            const bestCost = gScore.get(bestReachedNode.key) ?? Infinity;
+
+            if (currentHeuristic < bestReachedHeuristic ||
+                (currentHeuristic === bestReachedHeuristic && currentCost < bestCost)) {
+                bestReachedNode = current;
+                bestReachedHeuristic = currentHeuristic;
+            }
 
             if (effectiveOptions.debug) { this.debugElements.exploredNodes.add(current.key); }
 
@@ -393,7 +532,6 @@ class AStarPathfinder {
                     // Heuristic uses the potentially adjusted endGrid
                     const h = this._heuristic(neighbor.x, neighbor.y, endGrid.x, endGrid.y);
                     const f = tentativeG + (h * effectiveOptions.heuristicWeight);
-                    fScore.set(neighborKey, f);
                     // Check if node already in openSet to potentially update, otherwise add
                     // Note: BinaryHeap implementation might need an update method or handle duplicates
                     const neighborNode = { x: neighbor.x, y: neighbor.y, f: f, key: neighborKey };
@@ -404,7 +542,12 @@ class AStarPathfinder {
         } // End A* loop
 
         if (effectiveOptions.debug) { Utility.warnDebug(`No path found after ${steps} steps (${(performance.now() - startTime).toFixed(2)}ms)`); }
-        return null; // No path found
+        return this._buildPartialPath(
+            entity, cameFrom, bestReachedNode, startGrid,
+            startCenterX, startCenterY,
+            entityWidth, entityHeight, collider, entityCapabilities,
+            effectiveOptions
+        ); // No path found
     }
 
     /**
@@ -542,7 +685,7 @@ class AStarPathfinder {
             return { x: gridX, y: gridY };
         }
 
-        maxRadius = Math.min(maxRadius, 8);
+        maxRadius = Math.max(1, Math.floor(maxRadius));
 
         // Check cardinal directions - PASS ENTITY
         for (const dir of this.cardinalDirections) {
@@ -713,7 +856,12 @@ class AStarPathfinder {
         const hasColliderSize = colWidth > 0 && colHeight > 0;
 
         if (!hasColliderSize) {
-            const zeroSizeCacheKey = `validate_${entity?.id || 'no-id'}_${Math.round(entityX)}_${Math.round(entityY)}_0x0`;
+            const zeroSizeCacheKey = this._getValidationCacheKey(entity, entityX, entityY, {
+                width: 0,
+                height: 0,
+                offsetX: 0,
+                offsetY: 0
+            });
             const zeroCached = cache.get(zeroSizeCacheKey);
             if (zeroCached !== undefined) return zeroCached;
             cache.set(zeroSizeCacheKey, true);
@@ -726,7 +874,7 @@ class AStarPathfinder {
         const colliderBottom = colliderWorldY + colHeight;
 
         // --- Caching ---
-        const cacheKey = `validate_${entity?.id || 'no-id'}_${Math.round(colliderWorldX)}_${Math.round(colliderWorldY)}_${colWidth}x${colHeight}`;
+        const cacheKey = this._getValidationCacheKey(entity, colliderWorldX, colliderWorldY, collider);
         const cached = cache.get(cacheKey);
         if (cached !== undefined) {
             return cached;
@@ -1247,7 +1395,7 @@ class AStarPathfinder {
             let furthestVisibleIndex = currentIndex + 1;
             const maxLookAheadIndex = Math.min(currentIndex + 1 + effectiveOptions.maxSmoothingDistance, path.length - 1);
 
-            const losBuffer = effectiveOptions.smoothingBuffer ?? 0;
+            const losBuffer = this._resolveSmoothingBuffer(entity, effectiveOptions);
             for (let i = currentIndex + 2; i <= maxLookAheadIndex; i++) {
                 if (this._hasLineOfSight(entity, smoothed[smoothed.length - 1], path[i], entityWidth, entityHeight, collider, entityCapabilities, losBuffer)) {
                     furthestVisibleIndex = i;
@@ -1365,7 +1513,7 @@ class AStarPathfinder {
         const step = Math.max(1, Math.ceil(keys.length / maxNodes));
 
         for (let i = 0; i < keys.length; i += step) {
-            const [gridX, gridY] = keys[i].split(',').map(Number);
+            const { x: gridX, y: gridY } = this._decodeGridKey(keys[i]);
             if (!Number.isFinite(gridX) || !Number.isFinite(gridY)) continue;
 
             const center = this.gridSystem.gridToWorld(gridX, gridY);

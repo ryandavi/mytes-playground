@@ -194,6 +194,23 @@ const AuditHarness = {
 			for (const pair of container.relationships.serialize()) {
 				if (!registry.byId(pair.a)) issues.push(`relation ${pair.type}: dangling a=${pair.a}`);
 				if (!registry.byId(pair.b)) issues.push(`relation ${pair.type}: dangling b=${pair.b}`);
+				const entityA = registry.byId(pair.a);
+				const entityB = registry.byId(pair.b);
+				if (entityA && entityA.active === false) issues.push(`relation ${pair.type}: inactive a=${pair.a}`);
+				if (entityB && entityB.active === false) issues.push(`relation ${pair.type}: inactive b=${pair.b}`);
+			}
+
+			for (const obj of gameMap?.objects ?? []) {
+				const relatedCarrier = container.relationships.get('carriedBy', obj);
+				if (obj.isPickedUp && !relatedCarrier) {
+					issues.push(`picked-up object ${obj.id} missing carriedBy relation`);
+				}
+				if (!obj.isPickedUp && relatedCarrier) {
+					issues.push(`object ${obj.id} has carriedBy relation while not picked up`);
+				}
+				if (obj.carrier && relatedCarrier !== obj.carrier) {
+					issues.push(`object ${obj.id} carrier field mismatches carriedBy relation`);
+				}
 			}
 		}
 
@@ -213,3 +230,4 @@ const AuditHarness = {
 };
 
 window.__audit = AuditHarness;
+window.__invariants = () => AuditHarness.invariants();

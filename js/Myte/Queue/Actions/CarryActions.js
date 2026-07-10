@@ -1,4 +1,22 @@
-const CARRY_OFFSET = 45;
+function getCarryOffset() {
+    return SiteConfig.myte.carryOffset ?? 45;
+}
+
+function setCarryRelation(carrier, target) {
+    carrier?.container?.relationships?.set?.('carrying', carrier, target);
+}
+
+function clearCarryRelation(carrier, target = null) {
+    const relationships = carrier?.container?.relationships;
+    if (!relationships) return;
+
+    if (target) {
+        relationships.clear('carrying', carrier, target);
+        return;
+    }
+
+    relationships.clear('carrying', carrier);
+}
 
 // Pickup animation — lifts target Myte toward the carrier over a fixed duration
 class CarryPickupAction extends MyteAction {
@@ -16,23 +34,28 @@ class CarryPickupAction extends MyteAction {
         this.startPosition = { x: this.target.posX, y: this.target.posY };
     }
 
-    update() {
+    start() {
+        super.start();
+        setCarryRelation(this.myte, this.target);
+    }
+
+    update(deltaTime = 0) {
         if (this.currentDuration === -1) {
             this.currentDuration = this.duration;
         }
 
+        this.currentDuration = Math.max(0, this.currentDuration - deltaTime);
         const progress      = 1 - (this.currentDuration / this.duration);
         const easedProgress = 1 - Math.pow(1 - progress, 3);
+        const carryOffset = getCarryOffset();
 
         const currentPos = {
             x: this.startPosition.x + (this.myte.posX - this.startPosition.x) * easedProgress,
-            y: this.startPosition.y + ((this.myte.posY - CARRY_OFFSET) - this.startPosition.y) * easedProgress
+            y: this.startPosition.y + ((this.myte.posY - carryOffset) - this.startPosition.y) * easedProgress
         };
 
         this.target.setPosition(currentPos.x, currentPos.y);
         this.target.setSpritePosition(currentPos.x, currentPos.y);
-
-        this.currentDuration--;
 
         if (this.currentDuration <= 0) {
             this.myte.queue.add('carry', { target: this.target, duration: -1 });
@@ -40,6 +63,11 @@ class CarryPickupAction extends MyteAction {
         }
 
         return this.currentDuration <= 0;
+    }
+
+    interrupt() {
+        super.interrupt();
+        clearCarryRelation(this.myte, this.target);
     }
 }
 
@@ -51,12 +79,23 @@ class CarryAction extends MyteAction {
         return active?.queue.isCarryingMyte?.();
     }
 
-    update() {
+	start() {
+		super.start();
+		setCarryRelation(this.myte, this.target);
+	}
+
+	interrupt() {
+		super.interrupt();
+		clearCarryRelation(this.myte, this.target);
+	}
+
+	update() {
         this.myte.updateTargetToFollowMouse();
         this.myte.moveTowardsTarget();
+        const carryOffset = getCarryOffset();
 
-        this.target.setPosition(this.myte.posX, this.myte.posY - CARRY_OFFSET);
-        this.target.setSpritePosition(this.myte.posX, this.myte.posY - CARRY_OFFSET);
+        this.target.setPosition(this.myte.posX, this.myte.posY - carryOffset);
+        this.target.setSpritePosition(this.myte.posX, this.myte.posY - carryOffset);
 
         return false;
     }
@@ -91,28 +130,39 @@ class CarryPutdownAction extends MyteAction {
         this.startPosition = { x: this.target.posX, y: this.target.posY };
     }
 
-    update() {
+    start() {
+        super.start();
+        setCarryRelation(this.myte, this.target);
+    }
+
+    update(deltaTime = 0) {
         if (this.currentDuration === -1) {
             this.currentDuration = this.duration;
         }
 
+        this.currentDuration = Math.max(0, this.currentDuration - deltaTime);
         const progress      = 1 - (this.currentDuration / this.duration);
         const easedProgress = 1 - Math.pow(1 - progress, 3);
+        const carryOffset = getCarryOffset();
 
         const currentPos = {
             x: this.startPosition.x + (this.myte.posX - this.startPosition.x) * easedProgress,
-            y: this.startPosition.y + ((this.myte.posY + CARRY_OFFSET) - this.startPosition.y) * easedProgress
+            y: this.startPosition.y + ((this.myte.posY + carryOffset) - this.startPosition.y) * easedProgress
         };
 
         this.target.setPosition(currentPos.x, currentPos.y);
         this.target.setSpritePosition(currentPos.x, currentPos.y);
-        this.currentDuration--;
-
         if (this.currentDuration <= 0) {
+            clearCarryRelation(this.myte, this.target);
             this.target.queue.clear();
         }
 
         return this.currentDuration <= 0;
+    }
+
+    interrupt() {
+        super.interrupt();
+        clearCarryRelation(this.myte, this.target);
     }
 }
 

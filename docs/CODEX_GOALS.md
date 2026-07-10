@@ -2,9 +2,13 @@
 
 Paste-ready blocks for the currently-unblocked tasks from `docs/ARCHITECTURE_AUDIT_2026-07.md`. Blocks for T3+ get added here **when their dependencies land**, not before. (Previous goals file for the June audit was archived to `docs/OLD/CODEX_GOALS.md`; all its goals shipped.)
 
-Rules for every task: one branch off `new-ai-system` per task; end by running `docs/SMOKE_CHECKLIST.md` and reporting results; Fable reviews the diff against the spec before merge.
+> **Status update 2026-07-09:** the uncommitted working tree already implements D1, D2, D3 (bundle mode), D4, most of T4/T16, and parts of T5/T7 — reviewed in detail in the audit doc's *Addendum — 2026-07-09 Working-Tree Review*. **Do not re-dispatch D1–D4.** The live queue is **D5 → D6 → D7** below.
+>
+> **Model routing update:** implementation tasks now go to **GPT-5.6** (owner has no Fable budget). Wherever this file says Sonnet/Opus/Codex, read GPT-5.6. Fable's review gate is replaced by: run every acceptance harness + `docs/SMOKE_CHECKLIST.md` and report raw results; never change APIs in `js/Engine/{WorldRegistry,WorldQuery,EntityRelationships,AttachmentSystem}.js` or `docs/SOCKET_SCHEMA.md` (frozen specs).
 
-Dispatch order: D1 and D3/D4 can run in parallel. D2 requires D1 merged **and** depth baselines recorded (see `docs/audit-baselines/README.md`).
+Rules for every task: one branch off `new-ai-system` per task; end by running `docs/SMOKE_CHECKLIST.md` and reporting results; diff is reviewed against the spec before merge.
+
+Dispatch order (historical): D1 and D3/D4 can run in parallel. D2 requires D1 merged **and** depth baselines recorded (see `docs/audit-baselines/README.md`).
 
 ---
 
@@ -149,6 +153,97 @@ Acceptance: `npm run sim:stats` runs clean on Node without a browser and its out
 tables change when a SiteConfig.stats decay rate is temporarily doubled (prove it in
 your report, then revert). No game files modified.
 ```
+
+---
+
+## Combined run (D5 + D6 in one session)
+
+D5 and D6 may run in a single worker session, in this order:
+1. **D5 first**, directly on `new-ai-system` (it repairs the uncommitted tree). When its checks pass, **commit** the working tree (one commit for the in-flight batch + fixes is fine; message should cite the 2026-07-09 addendum).
+2. **Then D6** on branch `task/t17-stats` off that commit.
+3. Steps that require a live browser (T3 console block, smoke checklist, D6 Step 4 observation): perform them if the environment can run the game (XAMPP serves the repo root; open /index.php); otherwise do NOT silently skip — end the report with a "NEEDS HUMAN BROWSER PASS" checklist enumerating exactly which checks remain, so the owner can run them.
+
+---
+
+## D5 — Working-tree defect fixes (WT-1 … WT-9) — **GPT-5.6** — DISPATCH FIRST
+
+```
+In the Neko codebase (read AGENTS.md first; work directly on branch new-ai-system —
+this task FIXES the current uncommitted working tree before it gets committed):
+
+Open docs/ARCHITECTURE_AUDIT_2026-07.md and find the section
+"Addendum — 2026-07-09 Working-Tree Review & Worker Handoff", subsection
+"B. Defects found in the working tree". Implement WT-1 through WT-6 and WT-8
+exactly as specified there (each block gives file, line, defect, exact fix, and
+acceptance). WT-7 is optional — attempt it only if everything else is green.
+Apply the WT-9 minor notes items 1–3.
+
+Summary of the blocks (the audit doc text is authoritative):
+  WT-1  add `get container() { return this.parent; }` to Myte — without it every
+        myte-side relationship read/write is a silent no-op
+  WT-2  NpcMapObject.aggroTarget / AmbientCreatureMapObject.restingTarget getters:
+        fall back to the private field ONLY when container.relationships is absent
+  WT-3  CarryAction.interrupt() must clearCarryRelation(this.myte, this.target)
+  WT-4  add { "actionId": "interact_object", "purpose": "toggle" } ai.affordances
+        to DOOR and GATE in data/map-objects/types.json
+  WT-5  NpcMapObject._detectTargets: pass excludeDragging: false (parity)
+  WT-6  shadow styles: reference-compare renderState.shadow in
+        MapRenderer.applyShadowState (skip if obj._appliedShadowState === state);
+        delete MapObject.applyShadowVisual and route its call sites through
+        this.parent?.renderer?.applyShadowState?.(this)
+  WT-8  pathfinder timeoutMs 500 → options.searchTimeoutMs default 50
+
+Then: node --check every touched file; node scripts/validate-content-data.js;
+run the T3 console verification block at the bottom of this file in the browser;
+run docs/SMOKE_CHECKLIST.md. Report all results verbatim, including the
+relationship checks: pick up an item and confirm
+c.relationships.get('carrying', c.activeMyte) returns it and __invariants() is [];
+carry a myte, drag the carrier to interrupt, confirm no dangling 'carrying' pair.
+```
+
+---
+
+## D6 (= audit T17) — Stats bug-fixes + retune — **GPT-5.6** — after D5
+
+```
+In the Neko codebase (read AGENTS.md; branch task/t17-stats off new-ai-system):
+
+Open docs/ARCHITECTURE_AUDIT_2026-07.md, section
+"Addendum — 2026-07-09 Stats System Audit". Implement the work package
+"T17 — Stats retune work package" exactly:
+
+  Step 0: fix ST-1 (satietyDecayRate missing rateScale in MyteStats.js:443),
+          ST-2 (canonicalize hunger→satiety across actions.json, types.json,
+          BaseActions.buildActionResult, MyteStats.normalizeStatEffects — delete
+          the aliases; extend validate-content-data.js to reject legacy keys),
+          ST-3 (homeSlotConfidenceBoostRate 0.00055 → 0.0000055).
+  Step 1: apply the retune table to SiteConfig.stats and update the load-bearing
+          rate comments at SiteConfig.js:14-57 to match the new math.
+  Step 2: onHealthDepleted() hook (fires once on the 0-crossing, re-arms above
+          health 20) — faint expression, then myte.queue.clear() +
+          myte.setMode(MOVE_TYPES.GOHOME) (the GOHOME branch in
+          MyteMovementController.update already paths home and docks via
+          myte.stop() on arrival); apply a 'recovering' context buff
+          (data/metadata/buffs.json, existing context-buff pattern; ~0.7 speed,
+          ~5 sim-min) and block re-deploy while it is active (toast on attempt).
+          Full spec is in the audit doc's T17 Step 2.
+  Step 3: extend scripts/simulate-stats.js into an assertion harness with the
+          "deployed + AI care model" scenario; the assertions listed in the audit
+          section are the acceptance spec — tune constants until they pass, and
+          report any constant you had to move from the proposed value.
+  Step 4: 30-minute browser observation per the audit section; report mood
+          variety and bubble frequency.
+
+The proposed constants are starting points; the Step-3 sim assertions are the
+authoritative spec. Never edit generated files; SCSS only via source files.
+Finish with docs/SMOKE_CHECKLIST.md and report results.
+```
+
+---
+
+## D7 (= T5/T7 completion) — after D5 verified in browser
+
+Follow "C. Updated work queue" items 4–5 in the 2026-07-09 addendum: `following` relation via FollowObjectAction lifecycle; myte-side social `getAiAffordances`; capability broad-phase in MyteAI candidate builders. Write the dispatch block when D5's browser verification is reported clean.
 
 ---
 

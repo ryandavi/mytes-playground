@@ -165,7 +165,7 @@
     "src": "js/Myte/StateMachine.js"
   },
   {
-    "src": "js/Myte/Input/BaseInputHandler.js"
+    "src": "js/Myte/Input/MyteBaseHandler.js"
   },
   {
     "src": "js/Myte/Input/MyteInputHandler.js"

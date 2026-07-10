@@ -45,3 +45,8 @@ coverage/
 
 # Editor backups
 data/**/_backup/
+
+# Generated bundled entry points
+js/bundle.js
+index.bundled.html
+index.bundled.php

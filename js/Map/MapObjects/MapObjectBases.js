@@ -799,6 +799,7 @@ const withPickup = (Base) => class extends Base {
         this.isPickedUp = true;
         this.carrier = myte;
         this.pendingPickup = false;
+        this.container?.relationships?.set?.('carrying', myte, this);
         this.element?.classList.add('picked-up');
         this.syncRenderLayer();
         this.wake();
@@ -808,6 +809,9 @@ const withPickup = (Base) => class extends Base {
     }
 
     drop(vx = 0, vy = 0) {
+        if (this.carrier) {
+            this.container?.relationships?.clear?.('carrying', this.carrier, this);
+        }
         this.isPickedUp = false;
         this.carrier = null;
         this.pendingPickup = false;

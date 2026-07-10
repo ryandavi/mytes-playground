@@ -82,6 +82,9 @@
     "interaction": {
       "type": "rest"
     },
+    "capabilities": {
+      "sittable": true
+    },
     "draggable": true,
     "snapToGrid": true,
     "majorActionId": [
@@ -788,6 +791,14 @@
       "type": "social",
       "radius": 80
     },
+    "ai": {
+      "affordances": [
+        {
+          "actionId": "interact_object",
+          "purpose": "socialize"
+        }
+      ]
+    },
     "effects": {
       "social": 22,
       "comfort": 4
@@ -812,6 +823,14 @@
     "interaction": {
       "type": "social",
       "radius": 60
+    },
+    "ai": {
+      "affordances": [
+        {
+          "actionId": "interact_object",
+          "purpose": "socialize"
+        }
+      ]
     },
     "effects": {
       "social": 14,
@@ -876,6 +895,9 @@
       "type": "dance",
       "radius": 150
     },
+    "capabilities": {
+      "musicSource": true
+    },
     "aura": {
       "radius": 180,
       "moodBoost": 0.15,
@@ -883,7 +905,16 @@
     },
     "defaultPlaying": false,
     "ai": {
-      "musicSource": true
+      "musicSource": true,
+      "affordances": [
+        {
+          "actionId": "interact_object",
+          "purpose": "start_music",
+          "when": {
+            "isActiveMusicSource": false
+          }
+        }
+      ]
     },
     "visual": {
       "renderPriority": 2,
@@ -945,6 +976,21 @@
       "fun": 8,
       "health": 3,
       "hunger": 30
+    },
+    "capabilities": {
+      "edible": true
+    },
+    "ai": {
+      "affordances": [
+        {
+          "actionId": "eat_element",
+          "purpose": "consume",
+          "when": {
+            "capability": "edible",
+            "actorNotCarrying": true
+          }
+        }
+      ]
     },
     "consumable": true,
     "variantConfigs": {
@@ -1344,6 +1390,20 @@
     },
     "interaction": {
       "type": "light"
+    },
+    "capabilities": {
+      "lightSource": true
+    },
+    "ai": {
+      "affordances": [
+        {
+          "actionId": "interact_object",
+          "purpose": "light_on",
+          "when": {
+            "isEnabled": false
+          }
+        }
+      ]
     },
     "aura": {
       "radius": 160,
@@ -3908,6 +3968,14 @@
       "radius": 100,
       "canToggle": true
     },
+    "ai": {
+      "affordances": [
+        {
+          "actionId": "interact_object",
+          "purpose": "toggle"
+        }
+      ]
+    },
     "canInspect": true,
     "directionConfigs": {
       "E": {
@@ -4170,6 +4238,9 @@
     },
     "interaction": {
       "type": "rest"
+    },
+    "capabilities": {
+      "sittable": true
     },
     "draggable": true,
     "snapToGrid": true,
@@ -5361,6 +5432,14 @@
       "type": "toggle",
       "radius": 80,
       "canToggle": true
+    },
+    "ai": {
+      "affordances": [
+        {
+          "actionId": "interact_object",
+          "purpose": "toggle"
+        }
+      ]
     },
     "autoConnect": false,
     "size": {

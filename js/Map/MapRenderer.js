@@ -73,6 +73,8 @@ class MapRenderer {
                 // Don't clear bgPosition — it stays valid until the next frame change
             }
 
+            this.applyShadowState(obj);
+
             // Mark clean
             rs.dirty = false;
             obj._prevRenderX = rs.posX;
@@ -106,9 +108,35 @@ class MapRenderer {
             if (sprite) sprite.style.backgroundPosition = rs.bgPosition;
         }
 
+        this.applyShadowState(obj);
+
         rs.dirty = false;
         obj._prevRenderX = rs.posX;
         obj._prevRenderY = rs.posY;
+    }
+
+    applyShadowState(obj) {
+        const shadowElement = obj?.shadowElement;
+        const shadowState = obj?.renderState?.shadow;
+        if (!shadowElement || obj._appliedShadowState === shadowState) return;
+        obj._appliedShadowState = shadowState;
+
+        if (!shadowState?.visible) {
+            shadowElement.style.display = 'none';
+            return;
+        }
+
+        Object.assign(shadowElement.style, {
+            display: '',
+            width: `${shadowState.width}px`,
+            height: `${shadowState.height}px`,
+            left: `${shadowState.left}px`,
+            top: `${shadowState.top}px`,
+            opacity: `${shadowState.opacity}`,
+            transform: `scale(${shadowState.scale})`,
+            backgroundColor: shadowState.color,
+            filter: `blur(${shadowState.blur}px)`
+        });
     }
 
     getStats() {
