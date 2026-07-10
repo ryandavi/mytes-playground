@@ -199,6 +199,14 @@ class Myte {
 	}
 
 	startWithOptions(options = {}) {
+		if (!this.isActive && this.buffs?.findBuffById?.('recovering')) {
+			MyteCore.instance?.toastManager?.warning(
+				`${this.name} is still recovering.`,
+				'Recovering'
+			);
+			return false;
+		}
+
 		const {
 			goal = this.goal,
 			followGoal = this.followGoal,
@@ -228,6 +236,7 @@ class Myte {
 		}
 
 		this.parent.eventManager?.emit('myte:started', { myte: this });
+		return true;
 	}
 
 	stop() {

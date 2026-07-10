@@ -975,7 +975,7 @@
       "energy": 20,
       "fun": 8,
       "health": 3,
-      "hunger": 30
+      "satiety": 30
     },
     "capabilities": {
       "edible": true
@@ -1000,7 +1000,7 @@
           "energy": 22,
           "fun": 10,
           "health": 5,
-          "hunger": 35
+          "satiety": 35
         }
       },
       "turnip": {
@@ -1009,7 +1009,7 @@
           "energy": 14,
           "fun": 4,
           "health": 2,
-          "hunger": 22
+          "satiety": 22
         }
       },
       "acorn": {
@@ -1018,7 +1018,7 @@
           "energy": 9,
           "fun": 6,
           "health": 1,
-          "hunger": 16
+          "satiety": 16
         }
       }
     },

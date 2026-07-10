@@ -44,17 +44,17 @@ const SiteConfig = Object.freeze({
         // Behavior drives update slower while parked in home slot
         homeSlotBehaviorRateMultiplier: 0.55,
 
-        // Home slot stasis recovery rates (per ms).
-        // These must overcome the competing decay in updateBehaviorDrives (still runs at 0.55×).
-        // Net positive ensures every stat slowly fills while docked.
-        homeSlotComfortBoostRate:    0.0011,
-        homeSlotConfidenceBoostRate: 0.00055,
-        homeSlotFunRestoreRate:      0.0030,  // beats resting fun decay (~0.0014/ms), net ~+0.002/ms
-        homeSlotSocialRestoreRate:   0.0008,  // beats social decay (~0.0004/ms), net ~+0.0004/ms
-        homeSlotSatietyRestoreRate:  0.0025,  // beats satiety decay (~0.0017/ms), net ~+0.0008/ms
-        // Health recovers slower than other stats (it's more serious).
-        // At 0.00035/ms: 0→100 in ~5 minutes in home slot vs ~67 min passively.
-        homeSlotHealthRegenRate:     0.00035,
+        // Home-slot recovery rates (per ms), applied after the 0.55× behavior-drive pass.
+        // Idle fun loses ~0.000143/ms while docked, so its 0.00025 restore nets
+        // ~0.000107/ms (about 16 minutes from empty). Alone social and satiety each
+        // net ~0.000085/ms (about 20 minutes from empty).
+        homeSlotComfortBoostRate:    0.00025,
+        homeSlotConfidenceBoostRate: 0.0000055,
+        homeSlotFunRestoreRate:      0.00025,
+        homeSlotSocialRestoreRate:   0.0001,
+        homeSlotSatietyRestoreRate:  0.0001,
+        // Health remains the slowest serious recovery: 0→100 takes about 17 minutes.
+        homeSlotHealthRegenRate:     0.0001,
 
         // Stat-condition modifiers on energy drain rate.
         // satietyDrainScale: fraction of extra energy drain at 0 satiety (starving). 0.3 = +30%.
@@ -76,11 +76,11 @@ const SiteConfig = Object.freeze({
         // Per-stat decay bonuses applied at full exhaustion (energy = 0).
         // Each scales with _getExhaustionPenalty() — e.g. at 15% energy, penalty = 0.5.
         exhaustionCascade: Object.freeze({
-            healthDrainPerMs:     0.00018,  // extra damage/ms; at full → ~10.8 health/min net loss
+            healthDrainPerMs:     0.00004,  // extra damage/ms; at full → ~2.4 health/min before passive regen
             satietyDecayScale:    0.50,     // up to +50% faster satiety decay when exhausted
             funDecayScale:        0.60,     // up to +60% faster fun decay
             socialDecayScale:     0.35,     // up to +35% faster social decay
-            comfortDrainPerMs:    0.0006,   // direct comfort drain/ms at full penalty
+            comfortDrainPerMs:    0.00015,  // direct comfort drain/ms at full penalty
             confidenceDrainPerMs: 0.000018, // direct confidence drain/ms at full penalty
         }),
 
@@ -91,9 +91,9 @@ const SiteConfig = Object.freeze({
         confidenceBlendRate: 0.0013,
 
         // Passive need decay rates (per ms) while deployed
-        funDecayRate: 0.004,
-        socialDecayRate: 0.0016,
-        satietyDecayRate: 0.003,
+        funDecayRate: 0.0002,
+        socialDecayRate: 0.00013,
+        satietyDecayRate: 0.000066,
 
         // Per-ms blend rate for comfort drifting toward its environmental target
         comfortBlendRate: 0.0016,
@@ -103,12 +103,12 @@ const SiteConfig = Object.freeze({
 
         // Fun delta rates (per ms) by activity context; species override via ai.funDeltaRates
         funDeltaRates: Object.freeze({
-            resting:     0.0022,
-            stimulating: 0.0034,
-            movement:    0.0006,
-            idle:        0.0042,
-            default:     0.0008,
-            moving:      0.0002,
+            resting:     0.00022,
+            stimulating: 0.00034,
+            movement:    0.00006,
+            idle:        0.00042,
+            default:     0.00008,
+            moving:      0.00002,
         }),
 
         // Passive health regen per ms (active) — 1.5× in home slot
@@ -143,18 +143,19 @@ const SiteConfig = Object.freeze({
         }),
 
         // Wellbeing ceilings — emotional stats can't stay high when survival vitals are low.
-        // vitalRatio = average(energy, health, hunger) as 0–1 ratios.
+        // vitalRatio = average(energy, health, satiety) as 0–1 ratios.
         // Each minCap is the stat's floor when vitalRatio = 0 (all vitals depleted).
         // The ceiling scales linearly from minCap (vitalRatio=0) to 1.0 (vitalRatio=1).
         // ceilingDrainRate: fraction of excess above the ceiling drained per ms.
-        // starvation: near-zero hunger slowly damages health, independent of exhaustion cascade.
+        // starvation: persistently low satiety slowly damages health, independent of exhaustion cascade.
         wellbeing: Object.freeze({
             funMinCap:                  0.15,     // fun floor at 0 vitals (15% of maxFun)
             comfortMinCap:              0.10,     // comfort floor at 0 vitals (10% of maxComfort)
             confidenceMinCap:           0.10,     // confidence floor at 0 vitals (0–1 scale)
             ceilingDrainRate:           0.0008,   // fraction of excess above ceiling drained/ms
-            starvationThreshold:        0.15,     // hunger ratio below which starvation begins
-            starvationHealthDrainPerMs: 0.000085, // health/ms at full starvation (hunger = 0)
+            starvationThreshold:        0.15,     // satiety ratio below which starvation begins
+            starvationHealthDrainPerMs: 0.00003,  // health/ms at full starvation after the grace period
+            starvationGraceMs:          120000,  // starvation must persist for 2 sim-minutes before health drains
         }),
     }),
 

@@ -202,7 +202,7 @@
         "implementationClass": "DrinkFromFountainAction"
       },
       "traits": { "novelty": 2, "soothing": 4 },
-      "effects": { "fun": 3, "comfort": 2, "energy": 3, "hunger": 5, "mood": 5 },
+      "effects": { "fun": 3, "comfort": 2, "energy": 3, "satiety": 5, "mood": 5 },
       "ai": {
         "category": "rest", "soothing": 0.85, "accomplishment": 0.3,
         "scoreDrivers": [
@@ -245,7 +245,7 @@
         }
       },
       "traits": { "novelty": 2, "soothing": 2 },
-      "effects": { "fun": 2, "energy": 5, "hunger": 20, "mood": 5 },
+      "effects": { "fun": 2, "energy": 5, "satiety": 20, "mood": 5 },
       "ai": {
         "category": "rest", "soothing": 0.55, "accomplishment": 0.3,
         "scoreDrivers": [
@@ -429,7 +429,7 @@
         "options": { "harvestAnimationDuration": 833, "postActionIdleDuration": 500 }
       },
       "traits": { "exertion": 1, "novelty": 3 },
-      "effects": { "fun": 5, "energy": -1, "hunger": 10, "mood": 8 },
+      "effects": { "fun": 5, "energy": -1, "satiety": 10, "mood": 8 },
       "ai": {
         "exertion": 0.25, "accomplishment": 0.7,
         "scoreDrivers": [
