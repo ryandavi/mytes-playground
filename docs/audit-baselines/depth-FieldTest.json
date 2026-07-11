@@ -1,0 +1,762 @@
+[
+  {
+    "id": "1",
+    "type": "PORTAL",
+    "variant": "red_portal",
+    "sortY": 192,
+    "depthOffset": 128,
+    "depthPriority": 0,
+    "zIndex": 19200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "10",
+    "type": "FLOWER",
+    "variant": "flower_2",
+    "sortY": 224,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 22400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "11",
+    "type": "FLOWER",
+    "variant": "flower_3",
+    "sortY": 224,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 22400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "12",
+    "type": "TREASURE_CHEST",
+    "variant": "wooden_chest",
+    "sortY": 380,
+    "depthOffset": 60,
+    "depthPriority": 0,
+    "zIndex": 38000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "13",
+    "type": "TREASURE_CHEST",
+    "variant": "golden_chest",
+    "sortY": 380,
+    "depthOffset": 60,
+    "depthPriority": 0,
+    "zIndex": 38000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "14",
+    "type": "BALL",
+    "variant": "red_ball",
+    "sortY": 514.53,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 51453,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "15",
+    "type": "BALL",
+    "variant": "blue_ball",
+    "sortY": 527.8,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 52780,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "16",
+    "type": "DOOR",
+    "variant": "wooden_door",
+    "sortY": 256,
+    "depthOffset": 96,
+    "depthPriority": 0,
+    "zIndex": 25600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "17",
+    "type": "DOOR",
+    "variant": "metal_door",
+    "sortY": 448,
+    "depthOffset": 96,
+    "depthPriority": 0,
+    "zIndex": 44800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "18",
+    "type": "DOOR",
+    "variant": "fancy_door",
+    "sortY": 1024,
+    "depthOffset": 32,
+    "depthPriority": 0,
+    "zIndex": 102400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "19",
+    "type": "BED",
+    "variant": "bed_long",
+    "sortY": 1208,
+    "depthOffset": 88,
+    "depthPriority": 0,
+    "zIndex": 120800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "20",
+    "type": "BED",
+    "variant": "bed_big",
+    "sortY": 400,
+    "depthOffset": 208,
+    "depthPriority": 0,
+    "zIndex": 40000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "27",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 672,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 67200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "28",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 672,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 67200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "3",
+    "type": "FLOWER",
+    "variant": "flower_red",
+    "sortY": 224,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 22400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "31",
+    "type": "FLOWER",
+    "variant": "flower_red",
+    "sortY": 640,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 64000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "32",
+    "type": "FLOWER",
+    "variant": "flower_blue",
+    "sortY": 640,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 64000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "33",
+    "type": "FLOWER",
+    "variant": "flower_yellow",
+    "sortY": 640,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 64000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "34",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "sortY": 608,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 60800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "35",
+    "type": "FLOWER",
+    "variant": "flower_2",
+    "sortY": 672,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 67200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "36",
+    "type": "FLOWER",
+    "variant": "flower_3",
+    "sortY": 736,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 73600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "37",
+    "type": "TREASURE_CHEST",
+    "variant": "golden_chest",
+    "sortY": 732,
+    "depthOffset": 60,
+    "depthPriority": 0,
+    "zIndex": 73200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "38",
+    "type": "TREASURE_CHEST",
+    "variant": "wooden_chest",
+    "sortY": 732,
+    "depthOffset": 60,
+    "depthPriority": 0,
+    "zIndex": 73200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "39",
+    "type": "DOOR",
+    "variant": "fancy_door",
+    "sortY": 704,
+    "depthOffset": 32,
+    "depthPriority": 0,
+    "zIndex": 70400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "4",
+    "type": "FLOWER",
+    "variant": "flower_blue",
+    "sortY": 224,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 22400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "40",
+    "type": "BALL",
+    "variant": "red_ball",
+    "sortY": 832,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 83200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "41",
+    "type": "FLOWER",
+    "variant": "flower_red",
+    "sortY": 928,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 92800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "42",
+    "type": "FLOWER",
+    "variant": "flower_blue",
+    "sortY": 928,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 92800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "43",
+    "type": "FLOWER",
+    "variant": "flower_yellow",
+    "sortY": 928,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 92800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "44",
+    "type": "BUTTERFLY",
+    "variant": "small",
+    "sortY": 484.17,
+    "depthOffset": 50,
+    "depthPriority": 0,
+    "zIndex": 48417,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "45",
+    "type": "BUTTERFLY",
+    "variant": "yellow_butterfly",
+    "sortY": 367.67,
+    "depthOffset": 100,
+    "depthPriority": 0,
+    "zIndex": 36767,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "46",
+    "type": "BUTTERFLY",
+    "variant": "blue_butterfly",
+    "sortY": 509.64,
+    "depthOffset": 100,
+    "depthPriority": 0,
+    "zIndex": 50964,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "47",
+    "type": "BUTTERFLY",
+    "variant": "yellow_butterfly",
+    "sortY": 768.43,
+    "depthOffset": 100,
+    "depthPriority": 0,
+    "zIndex": 76843,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "48",
+    "type": "NPC",
+    "variant": "goblin",
+    "sortY": 427.53,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 42753,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "49",
+    "type": "NPC",
+    "variant": "slime",
+    "sortY": 729.91,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 72991,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "5",
+    "type": "FLOWER",
+    "variant": "flower_yellow",
+    "sortY": 224,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 22400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "50",
+    "type": "NPC",
+    "variant": "ghost",
+    "sortY": 792.01,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 79201,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "51",
+    "type": "BUTTERFLY",
+    "variant": "small",
+    "sortY": 689.61,
+    "depthOffset": 50,
+    "depthPriority": 0,
+    "zIndex": 68961,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "52",
+    "type": "BUTTERFLY",
+    "variant": "blue_butterfly",
+    "sortY": 1016.09,
+    "depthOffset": 100,
+    "depthPriority": 0,
+    "zIndex": 101609,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "53",
+    "type": "CROP",
+    "variant": "tomato",
+    "sortY": 928,
+    "depthOffset": 128,
+    "depthPriority": 0,
+    "zIndex": 92800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "54",
+    "type": "CROP",
+    "variant": "carrot",
+    "sortY": 928,
+    "depthOffset": 128,
+    "depthPriority": 0,
+    "zIndex": 92800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "55",
+    "type": "CROP",
+    "variant": "wheat",
+    "sortY": 928,
+    "depthOffset": 128,
+    "depthPriority": 0,
+    "zIndex": 92800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "56",
+    "type": "CROP",
+    "variant": "berry",
+    "sortY": 928,
+    "depthOffset": 128,
+    "depthPriority": 0,
+    "zIndex": 92800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "57",
+    "type": "LANTERN",
+    "variant": "paper",
+    "sortY": 928,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 92800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "58",
+    "type": "LANTERN",
+    "variant": "crystal",
+    "sortY": 928,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 92800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "59",
+    "type": "FOUNTAIN",
+    "variant": "stone",
+    "sortY": 864,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 86400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "6",
+    "type": "FLOWER",
+    "variant": "flower_yellow",
+    "sortY": 288,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 28800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "60",
+    "type": "MUSIC_BOX",
+    "variant": "music_box",
+    "sortY": 1024,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 102400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "61",
+    "type": "BREEDING_FLOWER",
+    "variant": "rose",
+    "sortY": 864,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 86400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "62",
+    "type": "NIGHT_BLOOM",
+    "variant": "blue_moon",
+    "sortY": 864,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 86400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "63",
+    "type": "FOUNTAIN",
+    "variant": "marble",
+    "sortY": 960,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 96000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "64",
+    "type": "LANTERN",
+    "variant": "paper",
+    "sortY": 832,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 83200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "65",
+    "type": "COUCH",
+    "variant": "test_couch",
+    "sortY": 554,
+    "depthOffset": 106,
+    "depthPriority": 0,
+    "zIndex": 55400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "65",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 608,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 60800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "66",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 640,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 64000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "67",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 672,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 67200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "68",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 672,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 67200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "69",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 672,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 67200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "7",
+    "type": "FLOWER",
+    "variant": "flower_red",
+    "sortY": 288,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 28800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "70",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 672,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 67200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "71",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 672,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 67200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "72",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 672,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 67200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "73",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 608,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 60800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "74",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 640,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 64000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "75",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 576,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 57600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "76",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 576,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 57600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "77",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 576,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 57600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "78",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 576,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 57600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "79",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 576,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 57600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "8",
+    "type": "FLOWER",
+    "variant": "flower_blue",
+    "sortY": 288,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 28800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "80",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 576,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 57600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "81",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 576,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 57600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "82",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 576,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 57600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "83",
+    "type": "FENCE",
+    "variant": "default",
+    "sortY": 672,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 67200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "9",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "sortY": 224,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 22400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "myte_1",
+    "type": "MYTE",
+    "variant": "snail",
+    "sortY": 628,
+    "depthOffset": 173,
+    "depthPriority": 50,
+    "zIndex": 62850,
+    "renderLayer": "myte"
+  }
+]

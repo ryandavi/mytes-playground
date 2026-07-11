@@ -1114,7 +1114,74 @@ applyShadowState(obj) {
 | T6/T6b socket and attachment rollout | Complete headlessly | Couch-seat, hold-anchor, and Myte-carry parity tests pass; browser interaction, transition, and editor checks pending. |
 | T13 paired social | Complete headlessly | Syntax/content checks pass; synchronized approach, refusal, and expression behavior require browser review. |
 | T15 follower system | Complete headlessly | Breadcrumb arc lookup and dead-band checks pass; six-follower/door and closed-door fallback cases require browser review. |
-| T8 and all later phases | Not started | Next implementation work after the browser regression gate. |
+| T12 validation/regression harness | Partial | Content validation now covers capabilities, sockets, and spatial region shapes; the live invariant sweeper covers registry populations, relationships, attachments, socket occupancy, and both parent/child despawn cleanup. `__audit.autoplay()` samples those invariants over a five-minute simulation-time AI run and returns a structured report; completing a clean browser run remains pending. |
+| T8 movement consolidation | Partial | The behavior-neutral `MovementBody` math component is loaded before movers; Ball, `MovingMapObject`, and ambient creatures now share speed limiting/direction selection without changing collision, friction, timing, or AI. Collision/stuck/axis-slide migration and browser species observation remain pending. |
+| T9, T10, and T11 | Not started | Region/room and wall work remains after T8 and its browser regression gate. |
+
+### 2026-07-10 live browser pass (Codex app)
+
+**Environment:** `index.php` served locally and driven in the Codex in-app browser. The pass covered boot, deploy/free-roam, Outside → House → Outside → FieldTest transitions, live AI observation, House bed/FieldTest couch action discovery, ambient-object population, and `editor/` boot. This is a real browser result, not a headless inference.
+
+| Check | Result | Evidence / follow-up |
+|---|---|---|
+| Boot/loading | **Pass** | Loading reaches "Ready to play!" and `#loading-screen` gains `is-hidden`. HUD clock/currency and roster render. |
+| Deploy + free-roam | **Pass with warnings** | Roster changes from inactive/in-slot to active/deployed; the Myte moves autonomously and emits a need bubble. Repeated `[approach] ... threshold=null` warnings occur during ordinary AI approach checks. |
+| Console-silent smoke gate | **Fail** | Wheel input throws `TypeError: this.container.camera.handleScroll is not a function` from `ContainerInputManager.js:301`. The repeated `threshold=null` approach diagnostics also violate the zero-warning gate. |
+| Map transitions | **Pass** | Outside → House → Outside → FieldTest completed, loading overlay cleared each time, and each destination populated with its expected object set. No visible duplicate population after returning Outside. |
+| Ambient species / T8 observation | **Partial pass** | Outside butterflies and House bird were present with live movement-state attributes; FieldTest populated butterflies/NPCs. A full 10-minute species/ball/NPC comparison was not completed because the console and socket failures already block the gate. |
+| House bed socket | **Fail (UI reachability)** | BED data advertises `sittable` and `use_surface_slot`, but selecting the bed exposes only Go To / Inspect / Inspect Oddly. No Rest/Sit action is reachable from the normal sidebar. |
+| FieldTest couch socket | **Fail** | COUCH exposes a `Sit` action and renders two `.map-object-slot` markers. Invoking Sit from a Myte at `(224,176)` toward the couch at `(928,448)` emptied the queue without moving or seating the Myte; no toast explained the refusal. Multi-seat, third-seat refusal, drag-while-seated, and dismount cleanup therefore remain blocked. |
+| Editor parity | **Pass (boot/schema visibility)** | `editor/` loads without an editor-originated console error, shows all content categories, and displays Myte socket/capability data. Couch/bed marker editing still needs a focused visual edit/save/reload pass after the socket action defect is repaired. |
+| T17 observation | **Partial** | During this shorter live run mood remained `happy`; energy moved from 75% to 46% and a sleep bubble appeared. This does not satisfy the specified 30-minute/two-Myte, four-mood measurement. |
+| Harness/baselines | **Still pending** | The in-app browser can drive and inspect the rendered app, but its page-evaluation world cannot access the classic-script lexical `MyteCore` or the page-world `window.__audit`. Run the documented console block/downloads in the page's own DevTools (or the project headless Playwright recipe) after the blocking runtime defects are fixed. |
+
+**Gate decision:** browser acceptance is **failed**, not merely outstanding. Fix the missing camera scroll API/call, remove or repair the `threshold=null` approach diagnostics, restore BED action reachability, and diagnose the couch Sit no-op before resuming T8 or treating T5–T7/T12–T15 browser acceptance as green. The deeper attachment cleanup, paired-social, six-follower/door, autoplay, and baseline-diff scenarios remain unverified behind those blockers.
+
+#### Follow-up correction and fixes (same day)
+
+The project headless Playwright workflow was then run in the page's main JavaScript world, with AI disabled via `QUEUE_ONLY`, to remove visible-browser timing ambiguity:
+
+- **Camera/console defects fixed:** removed `ContainerInputManager`'s obsolete window-scroll subscription to nonexistent `Camera.handleScroll()` (Camera already owns canvas wheel zoom), and routed the unconditional final-approach `console.warn`/`console.log` calls through the existing `APPROACH_DEBUG` gate.
+- **Couch and bed data/action resolution pass:** `ActionManager.getActionOptions('use_surface_slot', ...)` returns options for both objects when the Myte is eligible; FieldTest exposes couch sockets `seat_a`/`seat_b` and bed socket `sleep`.
+- **Couch lifecycle passes in isolation:** the action queues as `use_surface_slot`, approaches the couch, reserves one seat, completes the finite inactive-Myte rest cycle, releases occupancy, and ends with no attachment or invariant leak. The earlier "Sit no-op" conclusion was a false observation made after the action cycle had completed while autonomous queue activity obscured the queue UI.
+- **Bed sidebar conclusion narrowed:** the missing Rest button observed in the visible pass was eligibility/state-dependent, not missing action data. Direct action resolution succeeds at low energy. A focused visible active-Myte rest animation check remains useful, but this is no longer considered an architecture blocker.
+- **Invariant harness fixed:** a seat is intentionally reserved during `SurfaceSlotAction` approach/settle before the attachment exists. `__audit.invariants()` now recognizes that active reservation instead of reporting a false socket/attachment mismatch. The same scenario finishes with `[]`.
+- **Recordings created:** `docs/audit-baselines/depth-FieldTest.json` and `affordances-FieldTest.json`. These are post-migration reference recordings, not proof of a zero diff against a missing pre-migration baseline.
+
+**Revised gate:** the two confirmed console defects are repaired and isolated couch/bed socket resolution is green. Remaining browser work is the multi-Myte/third-seat and drag-interrupt matrix, carry/despawn cleanup, paired social actions, follower door cases, autoplay, Outside/House recordings, and the full T17 observation.
+
+#### Registry/autoplay follow-through
+
+The first 60-second FieldTest autoplay run correctly failed every sample with `registry objects=91 vs gameMap.objects=75`. The extra 16 entries were the complete initial Outside object population. `GameMapLoader.loadMapWithTransition()` only disposed `this.currentMap`; that field is unset when boot installs the initial map through the container path, so the first transition leaked its registry population. The loader now falls back to `container.gameMap` for the previous map.
+
+After the fix, the same run passes all 13 five-second samples: registry remains flat at `{ total: 76, myte: 1, object: 75, item: 0 }`, with zero invariant issues. A subsequent formal five-minute run also passes all 61 samples with the same flat population and zero unique issues. Structured reports are stored as `docs/audit-baselines/autoplay-FieldTest-60s.json` and `autoplay-FieldTest-5m.json`.
+
+Outside, House, and FieldTest depth/affordance recordings now exist. They are current-tree references because no pre-migration recordings were made. Network capture also found two genuine missing FieldTest visual assets (`images/MapObjects/metal_door.png`, `images/MapObjects/npc_slime.gif`) plus the loader's expected failed TMX fallback probes and a headless-only blocked Google Fonts request. The missing visuals remain a content follow-up and keep the broad zero-network-error smoke gate from being fully green.
+
+#### Three-Myte acceptance pass
+
+Per owner direction, the starter roster is now three Mytes (`Myte`, `Worm`, `Snail 2`) through the canonical roster/config path (`SiteConfig.myte.initialRosterCount`). Existing smaller pre-release saves retain their saved entries and are filled to the configured count from the enabled species catalog.
+
+The first isolated multi-seat run exposed a relationship-direction defect: `occupying` was exclusive on the furniture/parent endpoint, so attaching the second sitter removed the first sitter's semantic relationship even though both socket attachments remained. `occupying` and `riding` now allow multiple children per parent while enforcing one parent per child (`exclusive: false`, `inverseExclusive: true`).
+
+The clean rerun verifies:
+
+- registry population exactly `{ total: 78, myte: 3, object: 75, item: 0 }`;
+- Mytes 1 and 2 reserve and attach to distinct `seat_a` / `seat_b` couch sockets;
+- Myte 3 is refused while both seats are occupied;
+- interrupting Myte 1 releases only its seat and attachment while Myte 2 remains seated;
+- Myte-to-Myte carry creates `carrying` plus the `carry.myte` attachment, and queue interruption clears both;
+- kiss synchronizes `kiss` / `kiss_receive`;
+- high-five synchronizes `high_five` / `high_five_receive`;
+- every checkpoint and final sweep returns `__audit.invariants() === []`; no page errors occur.
+
+The 30-minute T17 mood/bubble observation is **cancelled by owner direction** and is no longer part of the current browser queue. Remaining browser work is limited to the six-follower/door case and any focused visual/manual feel checks the owner elects to run; the architecture-critical three-Myte socket/carry/social gate is green.
+
+#### Six-Myte follower follow-through
+
+A temporary six-Myte browser profile (the permanent starter roster remains three) verified the shared breadcrumb behavior on FieldTest. The leader plus five followers remained in strict ID order along one trail; all five `following` relations stayed pointed at leader 1; follower A* calls were **zero**; only the leader invoked A* (two calls while resolving a partial reachable destination); final invariants were empty and there were no page errors. Evidence is stored in `docs/audit-baselines/follow-FieldTest-6mytes.json`.
+
+This is a **partial pass** for T15 rather than a claim that the complete doorway criterion passed. FieldTest's door is freestanding, so pathfinding routed above it instead of forcing traversal. Four Mytes crossed the door's x-line and the final two remained correctly spaced in the tail when the leader's partial path ended. An attempted House case did open the door, but the selected destination was unreachable and dominated the result with fallback replanning, so it was rejected as an invalid acceptance scenario. The shared-trail/no-follower-A* contract is green; a purpose-built one-cell forced-door fixture is still required to test the exact doorway criterion mechanically.
 
 ---
 

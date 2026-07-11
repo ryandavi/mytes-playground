@@ -1,0 +1,162 @@
+[
+  {
+    "id": "1",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "sortY": 320,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 32000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "10",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "sortY": 576,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 57600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "11",
+    "type": "PORTAL",
+    "variant": "default",
+    "sortY": 576,
+    "depthOffset": 128,
+    "depthPriority": 0,
+    "zIndex": 57600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "13",
+    "type": "BUTTERFLY",
+    "variant": "small",
+    "sortY": 441,
+    "depthOffset": 50,
+    "depthPriority": 0,
+    "zIndex": 44100,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "14",
+    "type": "BUTTERFLY",
+    "variant": "yellow_butterfly",
+    "sortY": 210,
+    "depthOffset": 100,
+    "depthPriority": 0,
+    "zIndex": 21000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "15",
+    "type": "BUTTERFLY",
+    "variant": "blue_butterfly",
+    "sortY": 626,
+    "depthOffset": 100,
+    "depthPriority": 0,
+    "zIndex": 62600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "17",
+    "type": "PORTAL",
+    "variant": "red_portal",
+    "sortY": 192,
+    "depthOffset": 128,
+    "depthPriority": 0,
+    "zIndex": 19200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "19",
+    "type": "PORTAL",
+    "variant": "blue_portal",
+    "sortY": 1024,
+    "depthOffset": 128,
+    "depthPriority": 0,
+    "zIndex": 102400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "2",
+    "type": "FLOWER",
+    "variant": "flower_2",
+    "sortY": 480,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 48000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "3",
+    "type": "FLOWER",
+    "variant": "flower_3",
+    "sortY": 384,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 38400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "4",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "sortY": 224,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 22400,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "5",
+    "type": "FLOWER",
+    "variant": "flower_2",
+    "sortY": 512,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 51200,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "6",
+    "type": "FLOWER",
+    "variant": "flower_3",
+    "sortY": 160,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 16000,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "7",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "sortY": 608,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 60800,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "8",
+    "type": "FLOWER",
+    "variant": "flower_2",
+    "sortY": 256,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 25600,
+    "renderLayer": "objects"
+  },
+  {
+    "id": "9",
+    "type": "FLOWER",
+    "variant": "flower_3",
+    "sortY": 160,
+    "depthOffset": 64,
+    "depthPriority": 0,
+    "zIndex": 16000,
+    "renderLayer": "objects"
+  }
+]

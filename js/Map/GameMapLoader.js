@@ -152,7 +152,7 @@ class GameMapLoader {
     }
 
     async loadMapWithTransition(mapId, container, options = {}) {
-        const previousMap = this.currentMap;
+        const previousMap = this.currentMap ?? container?.gameMap ?? null;
 
         try {
             const map = await this.loadMap(mapId, container, {

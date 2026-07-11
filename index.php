@@ -600,6 +600,8 @@
 	<script src="js/Map/MapObjects/Interactive/LightMapObject.js?v=<?= $v ?>"></script>
 	<script src="js/Map/MapObjects/Interactive/TreasureChestMapObject.js?v=<?= $v ?>"></script>
 	<script src="js/Map/MapObjects/Interactive/PortalMapObject.js?v=<?= $v ?>"></script>
+	<!-- MOVEMENT BODY -->
+	<script src="js/Map/MapObjects/MovementBody.js?v=<?= $v ?>"></script>
 	<!-- MOVING -->
 	<script src="js/Map/MapObjects/Moving/MovingMapObject.js?v=<?= $v ?>"></script>
 	<script src="js/Map/MapObjects/Moving/BallMapObject.js?v=<?= $v ?>"></script>

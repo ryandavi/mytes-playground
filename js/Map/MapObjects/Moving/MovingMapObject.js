@@ -5,6 +5,7 @@ class MovingMapObject extends withAnimation(MapObject) {
 		super(parent, type, variant, posX, posY, config, options);
 
 		this.velocity = { x: 0, y: 0 };
+		this.movementBody = new MovementBody(this);
 		this.speed = this.getConfig('speed', 2);
 		this.maxSpeed = this.getConfig('maxSpeed', 5);
 		this.acceleration = this.getConfig('acceleration', 0.1);
@@ -104,13 +105,7 @@ class MovingMapObject extends withAnimation(MapObject) {
 	}
 
 	getMovementDirection() {
-		if (!this.isMoving || (Math.abs(this.velocity.x) < 0.1 && Math.abs(this.velocity.y) < 0.1)) {
-			return null;
-		}
-		if (Math.abs(this.velocity.x) > Math.abs(this.velocity.y)) {
-			return this.velocity.x > 0 ? 'E' : 'W';
-		}
-		return this.velocity.y > 0 ? 'S' : 'N';
+		return this.isMoving ? this.movementBody.getDirection(this.velocity, 0.1) : null;
 	}
 
 	// ── Game-loop hooks ───────────────────────────────────────────────────────

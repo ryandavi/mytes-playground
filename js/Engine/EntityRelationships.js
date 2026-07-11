@@ -24,8 +24,8 @@
 
 const RELATION_TYPES = Object.freeze({
 	carrying:  Object.freeze({ inverse: 'carriedBy',  exclusive: true, inverseExclusive: true  }),
-	occupying: Object.freeze({ inverse: 'occupiedBy', exclusive: true, inverseExclusive: false }),
-	riding:    Object.freeze({ inverse: 'riddenBy',   exclusive: true, inverseExclusive: false }),
+	occupying: Object.freeze({ inverse: 'occupiedBy', exclusive: false, inverseExclusive: true  }),
+	riding:    Object.freeze({ inverse: 'riddenBy',   exclusive: false, inverseExclusive: true  }),
 	targeting: Object.freeze({ inverse: 'targetedBy', exclusive: true, inverseExclusive: false }),
 	following: Object.freeze({ inverse: 'followedBy', exclusive: true, inverseExclusive: false })
 });

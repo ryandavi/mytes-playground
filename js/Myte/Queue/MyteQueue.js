@@ -101,6 +101,9 @@ class MyteQueue {
     // Drop everything and do this now — something external made the current queue meaningless.
     interrupt(actionId, options = {}) {
         this._log('interrupt', actionId);
+        if (this.isDoingAction) {
+            this.queue[0]?.setInterruptionDestination?.(options);
+        }
         this.clear();
         return this.add(actionId, options);
     }

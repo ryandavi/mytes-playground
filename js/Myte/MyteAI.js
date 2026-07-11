@@ -124,7 +124,9 @@ class MyteAI {
     }
 
     reactToOfferedFood(item) {
-        if (!this.enabled || !this.myte.isActive || this.myte.isDragging) return false;
+        // Food offered by the user is directed at the controlled myte; background
+        // deployed mytes shouldn't intercept it (they still forage autonomously).
+        if (!this.enabled || !this.myte.isActiveMyte || this.myte.isDragging) return false;
         if (this.myte.queue?.isCarrying?.() || this.myte.queue?.hasUserInitiatedAction?.()) return false;
         if (!item?.isUserOfferedFood?.()) return false;
 

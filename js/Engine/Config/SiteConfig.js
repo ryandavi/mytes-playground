@@ -279,6 +279,10 @@ const SiteConfig = Object.freeze({
 
     myte: Object.freeze({
 
+        // Starter roster size. Existing smaller pre-release rosters are filled
+        // from the enabled species catalog without replacing saved Mytes.
+        initialRosterCount: 3,
+
         // Default animation frame rate for sprite sheets
         defaultAnimationFPS: 8,
 

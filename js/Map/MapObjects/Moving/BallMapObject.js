@@ -7,6 +7,7 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
 
         // Physics properties
         this.velocity = { x: 0, y: 0 };
+        this.movementBody = new MovementBody(this);
         this.friction = this.getConfig('friction', 0.94);
         this.settleFriction = this.getConfig('settleFriction', 0.82);
         this.maxSpeed = this.getConfig('speed', 5);
@@ -375,11 +376,7 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
             this.stopMotion();
             return;
         }
-
-        if (speed > this.maxSpeed) {
-            this.velocity.x = (this.velocity.x / speed) * this.maxSpeed;
-            this.velocity.y = (this.velocity.y / speed) * this.maxSpeed;
-        }
+        this.movementBody.capVelocity(this.maxSpeed);
     }
 
     capVelocityTo(limit = this.maxSpeed) {
@@ -393,10 +390,7 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
             return;
         }
 
-        if (speed > limit) {
-            this.velocity.x = (this.velocity.x / speed) * limit;
-            this.velocity.y = (this.velocity.y / speed) * limit;
-        }
+        this.movementBody.capVelocity(limit);
     }
     
     // Update animation based on movement direction
@@ -416,17 +410,18 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
         // Determine primary direction of movement
         const absX = Math.abs(velocity.x);
         const absY = Math.abs(velocity.y);
+        const direction = this.movementBody.getDirection(velocity, 0);
         
         // Choose animation based on direction
         let animName;
         if (absX > absY) {
             // Moving right (positive X) = rotateZ_reverse
             // Moving left (negative X) = rotateY
-            animName = velocity.x > 0 ? 'rotateZ_reverse' : 'rotateY';
+            animName = direction === 'E' ? 'rotateZ_reverse' : 'rotateY';
         } else {
             // Moving down (positive Y) = rotateX
             // Moving up (negative Y) = rotateX_reverse
-            animName = velocity.y > 0 ? 'rotateX' : 'rotateX_reverse';
+            animName = direction === 'S' ? 'rotateX' : 'rotateX_reverse';
         }
         
         this.syncAnimationSpeed(speed);
@@ -762,7 +757,7 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
     }
 
     getSpeed(velocity = this.velocity) {
-        return Math.hypot(velocity.x, velocity.y);
+        return this.movementBody.getSpeed(velocity);
     }
 
     syncAnimationSpeed(speed = this.getSpeed()) {

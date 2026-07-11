@@ -14,6 +14,7 @@
 // docs/audit-baselines/, dump again after, diff. Zero diff = accepted.
 
 const AuditHarness = {
+	_activeAutoplay: null,
 
 	_container() {
 		const container = MyteCore.instance?.getFirstContainer?.();
@@ -165,6 +166,11 @@ const AuditHarness = {
 				issues.push(`object ${obj.id} (${obj.type}) not registered`);
 			}
 		}
+		for (const item of gameMap?.droppedItems ?? []) {
+			if (!item.worldId || registry.byId(item.worldId) !== item) {
+				issues.push(`dropped item ${item.id} not registered`);
+			}
+		}
 
 		// 4. Deployed mytes are grid-indexed in the CURRENT gridSystem
 		//    (self-healing runs at 8 fps — a mismatch right after a map
@@ -214,10 +220,150 @@ const AuditHarness = {
 			}
 		}
 
+		// 7. Attachments, socket occupancy, and their semantic relations agree.
+		if (container.attachments) {
+			for (const record of container.attachments.serialize()) {
+				const parent = registry.byId(record.parentId);
+				const child = registry.byId(record.childId);
+				if (!parent) issues.push(`attachment ${record.socketId}: dangling parent=${record.parentId}`);
+				if (!child) issues.push(`attachment ${record.socketId}: dangling child=${record.childId}`);
+				if (!parent || !child) continue;
+
+				const attachment = container.attachments.getAttachment(child);
+				if (attachment?.parent !== parent || attachment?.socketId !== record.socketId) {
+					issues.push(`attachment ${record.childId}: lookup disagrees with serialized record`);
+				}
+				const socket = parent.sockets?.get?.(record.socketId);
+				if (!socket) {
+					issues.push(`attachment ${record.childId}: missing socket ${record.socketId}`);
+					continue;
+				}
+				if (!parent.sockets.occupantsOf(record.socketId).includes(child)) {
+					issues.push(`attachment ${record.childId}: absent from socket ${record.socketId} occupancy`);
+				}
+				const relationType = socket.kind === 'hold'
+					? 'carrying'
+					: socket.kind === 'mount' ? 'riding' : 'occupying';
+				if (!container.relationships?.has?.(relationType, parent, child)) {
+					issues.push(`attachment ${record.childId}: missing ${relationType} relation`);
+				}
+			}
+
+			for (const parent of registry.all()) {
+				for (const socket of parent.sockets?.list?.() ?? []) {
+					for (const child of parent.sockets.occupantsOf(socket.id)) {
+						if (!child.worldId || registry.byId(child.worldId) !== child) {
+							issues.push(`socket ${parent.worldId}:${socket.id} contains unregistered occupant`);
+							continue;
+						}
+						const attachment = container.attachments.getAttachment(child);
+						if (attachment?.parent !== parent || attachment?.socketId !== socket.id) {
+							const action = child.queue?.getCurrentAction?.();
+							const isReservedApproach = action?._reserved === true &&
+								action.target === parent &&
+								action._selectedSlotId === socket.id &&
+								(action.phase === 'approach' || action.phase === 'settle');
+							if (!isReservedApproach) {
+								issues.push(`socket ${parent.worldId}:${socket.id} occupant ${child.worldId} lacks matching attachment`);
+							}
+						}
+					}
+				}
+			}
+		}
+
 		return issues;
 	},
 
 	// ── Shared: save any dump as a JSON file ─────────────────────────────────
+	// Runs the game's normal autonomous AI while sampling invariants on
+	// simulation time. Hidden tabs do not consume the requested duration.
+	// Returns a controller immediately; await controller.promise for the report.
+	autoplay({ durationMs = 5 * 60 * 1000, sampleIntervalMs = 5000 } = {}) {
+		if (this._activeAutoplay) {
+			throw new Error('[AuditHarness] An autoplay run is already active');
+		}
+		if (!Number.isFinite(durationMs) || durationMs <= 0) {
+			throw new Error('[AuditHarness] durationMs must be a positive finite number');
+		}
+		if (!Number.isFinite(sampleIntervalMs) || sampleIntervalMs <= 0) {
+			throw new Error('[AuditHarness] sampleIntervalMs must be a positive finite number');
+		}
+
+		const container = this._container();
+		const samples = [];
+		let elapsedMs = 0;
+		let lastSimTime = SimClock.now();
+		let nextSampleAt = 0;
+		let frameHandle = null;
+		let resolveReport;
+		let controller;
+		const promise = new Promise(resolve => { resolveReport = resolve; });
+
+		const sample = () => {
+			let issues;
+			try {
+				issues = this.invariants();
+			} catch (error) {
+				issues = [`invariant sweep threw: ${error?.message ?? String(error)}`];
+			}
+			samples.push({
+				elapsedMs: Math.round(elapsedMs),
+				simTime: Math.round(SimClock.now()),
+				issues,
+				registry: container.worldRegistry?.stats?.() ?? null
+			});
+		};
+
+		const finish = reason => {
+			if (this._activeAutoplay !== controller) return null;
+			if (frameHandle !== null) cancelAnimationFrame(frameHandle);
+			if (samples.at(-1)?.elapsedMs !== Math.round(elapsedMs)) sample();
+			const issueSamples = samples.filter(entry => entry.issues.length > 0);
+			const report = {
+				reason,
+				passed: reason === 'completed' && issueSamples.length === 0,
+				durationMs: Math.round(elapsedMs),
+				requestedDurationMs: durationMs,
+				sampleIntervalMs,
+				sampleCount: samples.length,
+				issueSampleCount: issueSamples.length,
+				uniqueIssues: [...new Set(issueSamples.flatMap(entry => entry.issues))],
+				samples
+			};
+			this._activeAutoplay = null;
+			resolveReport(report);
+			return report;
+		};
+
+		const tick = () => {
+			const now = SimClock.now();
+			if (now >= lastSimTime) elapsedMs += now - lastSimTime;
+			lastSimTime = now;
+
+			if (elapsedMs >= nextSampleAt) {
+				sample();
+				nextSampleAt = elapsedMs + sampleIntervalMs;
+			}
+			if (elapsedMs >= durationMs) {
+				finish('completed');
+				return;
+			}
+			frameHandle = requestAnimationFrame(tick);
+		};
+
+		controller = {
+			promise,
+			stop: () => finish('stopped'),
+			get samples() { return samples; }
+		};
+		this._activeAutoplay = controller;
+		sample();
+		nextSampleAt = sampleIntervalMs;
+		frameHandle = requestAnimationFrame(tick);
+		return controller;
+	},
+
 	download(name, data) {
 		const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
 		const url = URL.createObjectURL(blob);

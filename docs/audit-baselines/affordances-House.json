@@ -1,0 +1,196 @@
+[
+  {
+    "id": "105",
+    "type": "BUTTERFLY",
+    "variant": "blue_butterfly",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "106",
+    "type": "FLOWER",
+    "variant": "flower_3",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "107",
+    "type": "TREASURE_CHEST",
+    "variant": "wooden_chest",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "open_chest:open"
+    ]
+  },
+  {
+    "id": "113",
+    "type": "RUG",
+    "variant": "rug_default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "114",
+    "type": "CROP",
+    "variant": "tomato",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "water_plant:tend:chain"
+    ]
+  },
+  {
+    "id": "115",
+    "type": "CROP",
+    "variant": "carrot",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "water_plant:tend:chain"
+    ]
+  },
+  {
+    "id": "116",
+    "type": "CROP",
+    "variant": "wheat",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "water_plant:tend:chain"
+    ]
+  },
+  {
+    "id": "117",
+    "type": "CROP",
+    "variant": "berry",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "water_plant:tend:chain"
+    ]
+  },
+  {
+    "id": "119",
+    "type": "BIRD",
+    "variant": "sparrow",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "16",
+    "type": "BED",
+    "variant": "bed_big_long",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "5",
+    "type": "DOOR",
+    "variant": "default",
+    "affordances": []
+  },
+  {
+    "id": "65",
+    "type": "PORTAL",
+    "variant": "default",
+    "affordances": []
+  },
+  {
+    "id": "66",
+    "type": "BUTTERFLY",
+    "variant": "small",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "68",
+    "type": "BALL",
+    "variant": "red_ball",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "nudge_ball:play",
+      "play_fetch:play"
+    ]
+  },
+  {
+    "id": "69",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "7",
+    "type": "DOOR",
+    "variant": "default",
+    "affordances": []
+  },
+  {
+    "id": "71",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "72",
+    "type": "FLOWER",
+    "variant": "flower_2",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "76",
+    "type": "FLOWER",
+    "variant": "flower_2",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "78",
+    "type": "DOOR",
+    "variant": "default",
+    "affordances": []
+  },
+  {
+    "id": "80",
+    "type": "BUTTERFLY",
+    "variant": "yellow_butterfly",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "81",
+    "type": "BUTTERFLY",
+    "variant": "blue_butterfly",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "82",
+    "type": "DOOR",
+    "variant": "default",
+    "affordances": []
+  }
+]

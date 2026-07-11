@@ -31,6 +31,7 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         super(parent, type, variant, posX, posY, config, options);
 
         this.velocity = { x: 0, y: 0 };
+        this.movementBody = new MovementBody(this);
         this.speed = this.getConfig('speed', 1);
         this.moveThreshold = options.moveThreshold || 0.025;
         this.direction = 'S';
@@ -309,13 +310,9 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
     }
 
     updateDirection() {
-        if (Math.abs(this.velocity.x) < 0.01 && Math.abs(this.velocity.y) < 0.01) return;
-
-        if (Math.abs(this.velocity.x) > Math.abs(this.velocity.y)) {
-            this.direction = this.velocity.x > 0 ? 'E' : 'W';
-        } else {
-            this.direction = this.velocity.y > 0 ? 'S' : 'N';
-        }
+        const direction = this.movementBody.getDirection(this.velocity, 0.01);
+        if (!direction) return;
+        this.direction = direction;
 
         if (!this.isIdle && !this.isRestingOnTarget) {
             this.playAnimation(this.direction);

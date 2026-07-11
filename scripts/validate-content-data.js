@@ -68,6 +68,43 @@ function validateSocketApproach(socket, label) {
     }
 }
 
+function validateSpatialRegions(spatial, label) {
+    if (spatial === undefined) return;
+    if (!isPlainObject(spatial)) {
+        fail(`${label}.spatial must be a plain object.`);
+        return;
+    }
+    if (spatial.regions === undefined) return;
+    if (!isPlainObject(spatial.regions)) {
+        fail(`${label}.spatial.regions must be a plain object.`);
+        return;
+    }
+
+    Object.entries(spatial.regions).forEach(([regionId, region]) => {
+        const regionLabel = `${label}.spatial.regions.${regionId || '<empty>'}`;
+        if (!regionId.trim()) {
+            fail(`${label}.spatial.regions contains an empty region id.`);
+        }
+        if (!isPlainObject(region)) {
+            fail(`${regionLabel} must be a plain object.`);
+            return;
+        }
+        if (region.type !== undefined && region.type !== 'box') {
+            fail(`${regionLabel}.type must be "box".`);
+        }
+        for (const key of ['x', 'y', 'width', 'height']) {
+            if (region[key] !== undefined && !Number.isFinite(region[key])) {
+                fail(`${regionLabel}.${key} must be a finite number.`);
+            }
+        }
+        for (const key of ['width', 'height']) {
+            if (Number.isFinite(region[key]) && region[key] <= 0) {
+                fail(`${regionLabel}.${key} must be greater than zero.`);
+            }
+        }
+    });
+}
+
 function validateNoLegacySatietyKeys(value, label) {
     if (!isPlainObject(value)) return;
 
@@ -312,8 +349,10 @@ function validateMapObjects() {
     const numericOps = new Set(['gt', 'gte', 'lt', 'lte']);
     const socketKinds = new Set(['seat', 'sleep', 'hold', 'surface', 'mount']);
     ensureUniqueIds(typeEntries, 'data/map-objects/types.json types', ([typeId]) => normalizeTypeId(typeId));
+    validateSpatialRegions(baseConfig.spatial, 'Map object base config');
 
     typeEntries.forEach(([typeId, config]) => {
+        validateSpatialRegions(config.spatial, `Map object type "${typeId}"`);
         validateNoLegacySatietyKeys(config.effects, `Map object type "${typeId}" effects`);
         Object.entries(config.variantConfigs ?? {}).forEach(([variantId, variantConfig]) => {
             validateNoLegacySatietyKeys(variantConfig?.effects, `Map object type "${typeId}" variant "${variantId}" effects`);
@@ -392,7 +431,12 @@ function validateMapObjects() {
             Object.values(variant?.directionConfigs ?? {}).some(direction => direction?.sockets)
         );
         Object.entries(config.variantConfigs ?? {}).forEach(([variantId, variant]) => {
+            validateSpatialRegions(variant?.spatial, `Map object type "${typeId}" variant "${variantId}"`);
             Object.entries(variant?.directionConfigs ?? {}).forEach(([facing, direction]) => {
+                validateSpatialRegions(
+                    direction?.spatial,
+                    `Map object type "${typeId}" variant "${variantId}" facing "${facing}"`
+                );
                 if (Object.hasOwn(direction ?? {}, 'mytePosition') || Object.hasOwn(direction ?? {}, 'myteFacing')) {
                     fail(`Map object type "${typeId}" variant "${variantId}" facing "${facing}" retains legacy myte rest fields.`);
                 }
