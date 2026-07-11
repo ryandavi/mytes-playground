@@ -899,16 +899,18 @@ class GameMap {
             });
         }
 
-        // Update dropped items (physics + magnet collection)
+        // Update dropped items (physics + magnet collection). Any deployed myte can
+        // collect — not just the controlled one — so background mytes that walk over a
+        // chest drop actually pick it up.
         if (this.droppedItems.length > 0) {
-            const activeMyte = this.mytes?.find(m => m.isActive) || null;
+            const deployedMytes = this.mytes?.filter(m => m.isActive) || [];
             this.droppedItems = this.droppedItems.filter(item => {
                 if (item.collected) {
                     item.remove();
                     this.parent?.worldRegistry?.remove(item);
                     return false;
                 }
-                item.update(activeMyte, deltaTime);
+                item.update(deployedMytes, deltaTime);
                 return true;
             });
         }

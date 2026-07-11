@@ -20,7 +20,6 @@ class ContainerInputManager {
     // Set up event handlers
     this.setupKeyboardShortcuts();
     this.setupClickHandling();
-    this.setupScrollHandling();
     this.setupLongTapHandling();
 
     // Track inactivity
@@ -287,20 +286,6 @@ class ContainerInputManager {
       this._destinationMarker.remove();
       this._destinationMarker = null;
     }
-  }
-
-  /**
-   * Set up scroll handling
-   */
-  setupScrollHandling() {
-    this.subscribe('scroll', (event) => {
-      if (!this.isEnabled) return; // Ignore when disabled
-
-      // Update camera if needed
-      if (this.container.camera) {
-        this.container.camera.handleScroll(event);
-      }
-    });
   }
 
   /**

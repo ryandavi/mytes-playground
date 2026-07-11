@@ -1,0 +1,30 @@
+{
+  "scenario": "Six-Myte shared breadcrumb trail across FieldTest",
+  "result": "partial-pass",
+  "registry": {
+    "total": 81,
+    "myte": 6,
+    "object": 75,
+    "item": 0
+  },
+  "finalPositions": [
+    { "id": "1", "x": 896, "y": 64 },
+    { "id": "2", "x": 868, "y": 60 },
+    { "id": "3", "x": 840, "y": 62 },
+    { "id": "4", "x": 821, "y": 80 },
+    { "id": "5", "x": 809, "y": 105 },
+    { "id": "6", "x": 796, "y": 130 }
+  ],
+  "pathCallsByMyte": {
+    "1": 2
+  },
+  "followerPathCalls": 0,
+  "followingTargets": ["1", "1", "1", "1", "1"],
+  "invariants": [],
+  "runtimeIssues": [],
+  "notes": [
+    "All followers remained ordered on the shared trail.",
+    "The leader resolved its requested destination to a partial reachable path.",
+    "FieldTest's freestanding door did not force door traversal; the closed one-cell doorway case remains pending."
+  ]
+}

@@ -1089,7 +1089,7 @@ class GoToObjectAction extends PositionableAction {
         if (this.myte.isAtTarget()) {
             const withinInteractionThreshold = this.hasReachedInteractionThreshold();
             const colliderGap = this.getTargetColliderGap?.() ?? -1;
-            console.warn(`[approach] ${this.myte.name} isAtTarget for ${this.getQueueTargetLabel(this.target)}: threshold=${withinInteractionThreshold} gap=${typeof colliderGap === 'number' ? colliderGap.toFixed(1) : colliderGap} pos=(${Math.round(this.myte.posX)},${Math.round(this.myte.posY)})`);
+            _approachInfo(`[approach] ${this.myte.name} isAtTarget for ${this.getQueueTargetLabel(this.target)}: threshold=${withinInteractionThreshold} gap=${typeof colliderGap === 'number' ? colliderGap.toFixed(1) : colliderGap} pos=(${Math.round(this.myte.posX)},${Math.round(this.myte.posY)})`);
 
             if (withinInteractionThreshold === false) {
                 this._replanCount++;
@@ -1111,7 +1111,7 @@ class GoToObjectAction extends PositionableAction {
                 }
             }
 
-            console.log(`[approach] ${this.myte.name} marking ARRIVED at ${this.getQueueTargetLabel(this.target)}`);
+            _approachInfo(`[approach] ${this.myte.name} marking ARRIVED at ${this.getQueueTargetLabel(this.target)}`);
             this.markApproachOutcome('arrived');
             this.faceTarget();
             this.clearDebugPath();

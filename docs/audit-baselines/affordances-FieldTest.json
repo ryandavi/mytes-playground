@@ -1,0 +1,650 @@
+[
+  {
+    "id": "1",
+    "type": "PORTAL",
+    "variant": "red_portal",
+    "affordances": []
+  },
+  {
+    "id": "10",
+    "type": "FLOWER",
+    "variant": "flower_2",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "11",
+    "type": "FLOWER",
+    "variant": "flower_3",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "12",
+    "type": "TREASURE_CHEST",
+    "variant": "wooden_chest",
+    "affordances": []
+  },
+  {
+    "id": "13",
+    "type": "TREASURE_CHEST",
+    "variant": "golden_chest",
+    "affordances": []
+  },
+  {
+    "id": "14",
+    "type": "BALL",
+    "variant": "red_ball",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "nudge_ball:play",
+      "play_fetch:play"
+    ]
+  },
+  {
+    "id": "15",
+    "type": "BALL",
+    "variant": "blue_ball",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "nudge_ball:play",
+      "play_fetch:play"
+    ]
+  },
+  {
+    "id": "16",
+    "type": "DOOR",
+    "variant": "wooden_door",
+    "affordances": []
+  },
+  {
+    "id": "17",
+    "type": "DOOR",
+    "variant": "metal_door",
+    "affordances": []
+  },
+  {
+    "id": "18",
+    "type": "DOOR",
+    "variant": "fancy_door",
+    "affordances": []
+  },
+  {
+    "id": "19",
+    "type": "BED",
+    "variant": "bed_long",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "20",
+    "type": "BED",
+    "variant": "bed_big",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "27",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "28",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "3",
+    "type": "FLOWER",
+    "variant": "flower_red",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "31",
+    "type": "FLOWER",
+    "variant": "flower_red",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "32",
+    "type": "FLOWER",
+    "variant": "flower_blue",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "33",
+    "type": "FLOWER",
+    "variant": "flower_yellow",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "34",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "35",
+    "type": "FLOWER",
+    "variant": "flower_2",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "36",
+    "type": "FLOWER",
+    "variant": "flower_3",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "37",
+    "type": "TREASURE_CHEST",
+    "variant": "golden_chest",
+    "affordances": []
+  },
+  {
+    "id": "38",
+    "type": "TREASURE_CHEST",
+    "variant": "wooden_chest",
+    "affordances": []
+  },
+  {
+    "id": "39",
+    "type": "DOOR",
+    "variant": "fancy_door",
+    "affordances": []
+  },
+  {
+    "id": "4",
+    "type": "FLOWER",
+    "variant": "flower_blue",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "40",
+    "type": "BALL",
+    "variant": "red_ball",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "nudge_ball:play",
+      "play_fetch:play"
+    ]
+  },
+  {
+    "id": "41",
+    "type": "FLOWER",
+    "variant": "flower_red",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "42",
+    "type": "FLOWER",
+    "variant": "flower_blue",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "43",
+    "type": "FLOWER",
+    "variant": "flower_yellow",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "44",
+    "type": "BUTTERFLY",
+    "variant": "small",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "45",
+    "type": "BUTTERFLY",
+    "variant": "yellow_butterfly",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "46",
+    "type": "BUTTERFLY",
+    "variant": "blue_butterfly",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "47",
+    "type": "BUTTERFLY",
+    "variant": "yellow_butterfly",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "48",
+    "type": "NPC",
+    "variant": "goblin",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "49",
+    "type": "NPC",
+    "variant": "slime",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "5",
+    "type": "FLOWER",
+    "variant": "flower_yellow",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "50",
+    "type": "NPC",
+    "variant": "ghost",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "51",
+    "type": "BUTTERFLY",
+    "variant": "small",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "52",
+    "type": "BUTTERFLY",
+    "variant": "blue_butterfly",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "53",
+    "type": "CROP",
+    "variant": "tomato",
+    "affordances": [
+      "deep_inspect:inspect",
+      "harvest:harvest:chain",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "54",
+    "type": "CROP",
+    "variant": "carrot",
+    "affordances": [
+      "deep_inspect:inspect",
+      "harvest:harvest:chain",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "55",
+    "type": "CROP",
+    "variant": "wheat",
+    "affordances": [
+      "deep_inspect:inspect",
+      "harvest:harvest:chain",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "56",
+    "type": "CROP",
+    "variant": "berry",
+    "affordances": [
+      "deep_inspect:inspect",
+      "harvest:harvest:chain",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "57",
+    "type": "LANTERN",
+    "variant": "paper",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "interact_object:light_on"
+    ]
+  },
+  {
+    "id": "58",
+    "type": "LANTERN",
+    "variant": "crystal",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "interact_object:light_on"
+    ]
+  },
+  {
+    "id": "59",
+    "type": "FOUNTAIN",
+    "variant": "stone",
+    "affordances": [
+      "deep_inspect:inspect",
+      "drink_fountain:soothe",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "6",
+    "type": "FLOWER",
+    "variant": "flower_yellow",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "60",
+    "type": "MUSIC_BOX",
+    "variant": "music_box",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "interact_object:start_music"
+    ]
+  },
+  {
+    "id": "61",
+    "type": "BREEDING_FLOWER",
+    "variant": "rose",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "water_plant:tend:chain"
+    ]
+  },
+  {
+    "id": "62",
+    "type": "NIGHT_BLOOM",
+    "variant": "blue_moon",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "water_plant:tend:chain"
+    ]
+  },
+  {
+    "id": "63",
+    "type": "FOUNTAIN",
+    "variant": "marble",
+    "affordances": [
+      "deep_inspect:inspect",
+      "drink_fountain:soothe",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "64",
+    "type": "LANTERN",
+    "variant": "paper",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect",
+      "interact_object:light_on"
+    ]
+  },
+  {
+    "id": "65",
+    "type": "COUCH",
+    "variant": "test_couch",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "65",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "66",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "67",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "68",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "69",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "7",
+    "type": "FLOWER",
+    "variant": "flower_red",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "70",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "71",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "72",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "73",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "74",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "75",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "76",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "77",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "78",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "79",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "8",
+    "type": "FLOWER",
+    "variant": "flower_blue",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "80",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "81",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "82",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "83",
+    "type": "FENCE",
+    "variant": "default",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "9",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  }
+]

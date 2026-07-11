@@ -395,6 +395,10 @@ class GridSystem {
     updateMyteFrontTile(myte) {
         if (!this.debugMode || !this.debugInitialized || !myte) return;
         if (!this.overlayFlags.myteFrontTile) return;
+        // Single shared front-tile element: only the controlled myte drives it,
+        // otherwise every deployed myte overwrites it each frame and it flickers
+        // between them. (Switch to per-myte elements if all mytes need one.)
+        if (!myte.isActiveMyte) return;
 
         // Get myte's direction
         const direction = myte.direction || DIRECTION.SOUTH;

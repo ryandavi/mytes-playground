@@ -115,14 +115,15 @@ class WorldRegistry {
 	}
 
 	// Removes an entity. Idempotent — unknown/already-removed entities are a
-	// no-op. THE despawn path: clears the entity's relationships (and, once T6
-	// lands, its attachments) so no other code path has to remember to.
+	// no-op. THE despawn path: clears the entity's attachments and relationships
+	// so no other code path has to remember to.
 	remove(entity) {
 		if (!entity?.worldId) return false;
 		if (this._byId.get(entity.worldId) !== entity) return false;
 
+		this.container?.attachments?.detachAllChildren?.(entity);
+		this.container?.attachments?.detach?.(entity);
 		this.container?.relationships?.clearAllFor?.(entity);
-		// T6 hook: this.container?.attachments?.detachAllChildren?.(entity)
 
 		this._byId.delete(entity.worldId);
 		this._byKind.get(entity.kind)?.delete(entity);

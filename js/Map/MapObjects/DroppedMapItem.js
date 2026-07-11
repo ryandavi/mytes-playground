@@ -271,8 +271,11 @@ class DroppedMapItem {
         }
     }
 
-    update(myte = null, deltaTime = 16.667) {
+    update(mytes = null, deltaTime = 16.667) {
         if (this.collected) return;
+
+        // Accept a single myte or a list of candidate collectors.
+        const candidateMytes = Array.isArray(mytes) ? mytes : (mytes ? [mytes] : []);
 
         const dt = deltaTime / 16.667;
 
@@ -299,31 +302,39 @@ class DroppedMapItem {
                     this.velocityZ = 0;
                 }
             }
-        } else if (myte) {
-            const activeMyte = this.parent?.activeMyte || myte.parent?.activeMyte;
-            if (activeMyte === myte) {
-                const myteCenter = {
-                    x: myte.posX + (myte.size.width / 2),
-                    y: myte.posY + (myte.size.height / 2)
-                };
+        } else if (candidateMytes.length) {
+            const canMagnetize = !this.groundedAt || (SimClock.now() - this.groundedAt) >= this.magnetDelayMs;
 
+            if (this.allowAutoCollect !== false && canMagnetize) {
                 const center = {
                     x: this.posX + (this.size.width / 2),
                     y: this.posY + (this.size.height / 2)
                 };
 
-                const dx = myteCenter.x - center.x;
-                const dy = myteCenter.y - center.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const canMagnetize = !this.groundedAt || (SimClock.now() - this.groundedAt) >= this.magnetDelayMs;
+                // Magnetize toward whichever eligible deployed myte is closest.
+                let nearest = null;
+                let nearestDistance = Infinity;
+                let nearestDelta = null;
+                for (const candidate of candidateMytes) {
+                    if (!candidate || !candidate.isActive || !candidate.isIndependent?.()) continue;
 
-                if (this.allowAutoCollect !== false && canMagnetize && myte.isIndependent() && distance < this.minimumCollectDistance) {
-                    const magnetStrength = 1 - (distance / this.minimumCollectDistance);
-                    this.posX += dx * this.magnetSpeed * magnetStrength * dt;
-                    this.posY += dy * this.magnetSpeed * magnetStrength * dt;
+                    const dx = (candidate.posX + candidate.size.width / 2) - center.x;
+                    const dy = (candidate.posY + candidate.size.height / 2) - center.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        nearest = candidate;
+                        nearestDelta = { dx, dy };
+                    }
+                }
 
-                    if (distance < 20) {
-                        this.collect(myte);
+                if (nearest && nearestDistance < this.minimumCollectDistance) {
+                    const magnetStrength = 1 - (nearestDistance / this.minimumCollectDistance);
+                    this.posX += nearestDelta.dx * this.magnetSpeed * magnetStrength * dt;
+                    this.posY += nearestDelta.dy * this.magnetSpeed * magnetStrength * dt;
+
+                    if (nearestDistance < 20) {
+                        this.collect(nearest);
                     }
                 }
             }

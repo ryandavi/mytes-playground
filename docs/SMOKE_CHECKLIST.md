@@ -36,4 +36,5 @@ One page, ~5 minutes in the browser (`index.php` via XAMPP). Every delegated tas
 
 ## After your specific change
 - [ ] Re-verify the feature areas your diff touched, beyond the items above.
+- [ ] Run `const run = __audit.autoplay(); const report = await run.promise; console.log(report);` while the Mytes free-roam. Confirm `report.passed === true`, then save it with `__audit.download('autoplay', report)`.
 - [ ] If your task has a recorded baseline (depth / affordances / candidates — see `window.__audit` in `js/UI/Debug/AuditHarness.js`), dump the *after* JSON and diff against `docs/audit-baselines/`.

@@ -1,0 +1,127 @@
+[
+  {
+    "id": "1",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "10",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "11",
+    "type": "PORTAL",
+    "variant": "default",
+    "affordances": []
+  },
+  {
+    "id": "13",
+    "type": "BUTTERFLY",
+    "variant": "small",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "14",
+    "type": "BUTTERFLY",
+    "variant": "yellow_butterfly",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "15",
+    "type": "BUTTERFLY",
+    "variant": "blue_butterfly",
+    "affordances": [
+      "deep_inspect:inspect",
+      "inspect:inspect"
+    ]
+  },
+  {
+    "id": "17",
+    "type": "PORTAL",
+    "variant": "red_portal",
+    "affordances": []
+  },
+  {
+    "id": "19",
+    "type": "PORTAL",
+    "variant": "blue_portal",
+    "affordances": []
+  },
+  {
+    "id": "2",
+    "type": "FLOWER",
+    "variant": "flower_2",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "3",
+    "type": "FLOWER",
+    "variant": "flower_3",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "4",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "5",
+    "type": "FLOWER",
+    "variant": "flower_2",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "6",
+    "type": "FLOWER",
+    "variant": "flower_3",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "7",
+    "type": "FLOWER",
+    "variant": "flower_1",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "8",
+    "type": "FLOWER",
+    "variant": "flower_2",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  },
+  {
+    "id": "9",
+    "type": "FLOWER",
+    "variant": "flower_3",
+    "affordances": [
+      "smell_flower:soothe"
+    ]
+  }
+]

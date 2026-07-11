@@ -14,8 +14,9 @@ class MyteTouchHandler extends DragHandler {
             },
 
             onDragStart: () => {
-                // Set this Myte as active if coming from auto-pickup
-                if (this.autoPickup && !myte.isActiveMyte) {
+                // Picking up a myte always transfers control to it, regardless of
+                // whether the drag came from auto-pickup or the explicit DRAG tool.
+                if (!myte.isActiveMyte) {
                     myte.parent.setActiveMyte(myte);
                 }
 

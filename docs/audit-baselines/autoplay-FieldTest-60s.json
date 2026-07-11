@@ -1,0 +1,155 @@
+{
+  "reason": "completed",
+  "passed": true,
+  "durationMs": 60014,
+  "requestedDurationMs": 60000,
+  "sampleIntervalMs": 5000,
+  "sampleCount": 13,
+  "issueSampleCount": 0,
+  "uniqueIssues": [],
+  "samples": [
+    {
+      "elapsedMs": 0,
+      "simTime": 3591,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    },
+    {
+      "elapsedMs": 5017,
+      "simTime": 8607,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    },
+    {
+      "elapsedMs": 10033,
+      "simTime": 13624,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    },
+    {
+      "elapsedMs": 15049,
+      "simTime": 18640,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    },
+    {
+      "elapsedMs": 20066,
+      "simTime": 23657,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    },
+    {
+      "elapsedMs": 25082,
+      "simTime": 28673,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    },
+    {
+      "elapsedMs": 30099,
+      "simTime": 33690,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    },
+    {
+      "elapsedMs": 35132,
+      "simTime": 38723,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    },
+    {
+      "elapsedMs": 40148,
+      "simTime": 43739,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    },
+    {
+      "elapsedMs": 45165,
+      "simTime": 48756,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    },
+    {
+      "elapsedMs": 50181,
+      "simTime": 53772,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    },
+    {
+      "elapsedMs": 55198,
+      "simTime": 58789,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    },
+    {
+      "elapsedMs": 60014,
+      "simTime": 63605,
+      "issues": [],
+      "registry": {
+        "total": 76,
+        "myte": 1,
+        "object": 75,
+        "item": 0
+      }
+    }
+  ]
+}

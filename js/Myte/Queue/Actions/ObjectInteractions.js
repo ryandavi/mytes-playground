@@ -308,6 +308,7 @@ class SurfaceSlotAction extends GoToObjectAction {
         this._selectedSlot = null;
         this._selectedSlotId = null;
         this._requestedSlotId = options?.slotId ?? null;
+        this._interruptionDestination = null;
         this._attachment = null;
     }
 
@@ -901,13 +902,15 @@ class SurfaceSlotAction extends GoToObjectAction {
         return (safe && this.myte.canMoveToPosition?.(safe.x, safe.y)) ? safe : null;
     }
 
-    getNextQueuedTargetPosition() {
-        const queue = this.myte.queue?.queue;
-        if (!Array.isArray(queue)) return null;
-
-        const currentIndex = queue.indexOf(this);
-        const nextAction = currentIndex >= 0 ? queue[currentIndex + 1] : null;
-        const target = nextAction?.target;
+    resolveActionDestination(action) {
+        const target = action?.target;
+        if (Array.isArray(target) && target.length >= 2 &&
+            Number.isFinite(target[0]) && Number.isFinite(target[1])) {
+            return { x: target[0], y: target[1] };
+        }
+        if (Number.isFinite(target?.x) && Number.isFinite(target?.y)) {
+            return { x: target.x, y: target.y };
+        }
         if (Number.isFinite(target?.posX) && Number.isFinite(target?.posY)) {
             return {
                 x: target.posX + ((target.size?.width ?? 0) / 2),
@@ -915,9 +918,24 @@ class SurfaceSlotAction extends GoToObjectAction {
             };
         }
 
-        const targetPosition = nextAction?.targetPos ?? nextAction?._finalTarget;
+        const targetPosition = action?.targetPos ?? action?._finalTarget;
         return Number.isFinite(targetPosition?.x) && Number.isFinite(targetPosition?.y)
             ? { x: targetPosition.x, y: targetPosition.y }
+            : null;
+    }
+
+    setInterruptionDestination(options = {}) {
+        this._interruptionDestination = this.resolveActionDestination(options);
+    }
+
+    getNextQueuedTargetPosition() {
+        if (this._interruptionDestination) return this._interruptionDestination;
+
+        const queue = this.myte.queue?.queue;
+        if (!Array.isArray(queue)) return null;
+        const currentIndex = queue.indexOf(this);
+        return currentIndex >= 0
+            ? this.resolveActionDestination(queue[currentIndex + 1])
             : null;
     }
 
