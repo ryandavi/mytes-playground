@@ -362,7 +362,7 @@ class GameMap {
 				}
 
 				this.addObject(type, objData.variant, objData.x, posY, {
-					...objData.properties,
+					configOverrides: objData.properties,
 					id: objData.id
 				});
 			}

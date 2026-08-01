@@ -24,6 +24,9 @@
     "src": "js/Engine/ItemRegistry.js"
   },
   {
+    "src": "js/Engine/ShopRegistry.js"
+  },
+  {
     "src": "js/Engine/BuffRegistry.js"
   },
   {
@@ -355,6 +358,9 @@
     "commentLine": "<!-- UI -->"
   },
   {
+    "src": "js/UI/Core/TabController.js"
+  },
+  {
     "src": "js/UI/Overlays/CompactChipStripUI.js"
   },
   {
@@ -395,6 +401,18 @@
   },
   {
     "src": "js/UI/Core/ModalWindow.js"
+  },
+  {
+    "src": "js/UI/Core/WorldModal.js"
+  },
+  {
+    "src": "js/UI/Panels/MyteInfoPanel.js"
+  },
+  {
+    "src": "js/UI/Panels/UserProfilePanel.js"
+  },
+  {
+    "src": "js/UI/Panels/ShopPanel.js"
   },
   {
     "src": "js/UI/Debug/DebugOverlayUI.js"

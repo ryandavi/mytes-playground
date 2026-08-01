@@ -3,6 +3,28 @@
 // helpers, so field names, defaults, and clamping rules live in one place.
 class MyteRosterSchema {
 
+    static createStarterRoster(existingRoster = []) {
+        const starters = SiteConfig.myte.starterRoster || [];
+        const candidates = Array.isArray(existingRoster) ? existingRoster : [];
+        const usedCandidates = new Set();
+
+        return starters.map((starter, index) => {
+            const candidateIndex = candidates.findIndex((entry, candidateIndex) =>
+                !usedCandidates.has(candidateIndex) &&
+                MyteDefinitionRegistry.normalizeSpeciesId?.(entry?.species || entry?.speciesId) === starter.species
+            );
+            const candidate = candidateIndex >= 0 ? candidates[candidateIndex] : {};
+            if (candidateIndex >= 0) usedCandidates.add(candidateIndex);
+
+            return this.normalizeEntry({
+                ...candidate,
+                ...starter,
+                stats: candidate?.stats,
+                isActive: false
+            }, index);
+        });
+    }
+
     static statDefaults() {
         const initial = SiteConfig.myte.initialStats;
         return {

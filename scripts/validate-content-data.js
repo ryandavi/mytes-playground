@@ -270,6 +270,53 @@ function validateItems() {
     });
 }
 
+function validateShops() {
+    const itemCatalog = readJson('data/metadata/items.json');
+    const shopCatalog = readJson('data/metadata/shops.json');
+    if (!itemCatalog || !shopCatalog) return;
+
+    const itemIds = new Set((itemCatalog.items || []).map(item => normalizeId(item.id)));
+    const shops = Array.isArray(shopCatalog.shops) ? shopCatalog.shops : [];
+    const requiredDialogue = ['welcome', 'purchase', 'insufficientFunds', 'inventoryFull', 'soldOut'];
+    ensureUniqueIds(shops, 'data/metadata/shops.json shops', shop => normalizeId(shop.id));
+
+    shops.forEach(shop => {
+        const shopId = normalizeId(shop.id);
+        if (!isPlainObject(shop.shopkeeper) || !String(shop.shopkeeper.name || '').trim()) {
+            fail(`Shop "${shopId}" requires a shopkeeper name.`);
+        }
+        if (!isPlainObject(shop.dialogue)) {
+            fail(`Shop "${shopId}" requires a dialogue object.`);
+        } else {
+            requiredDialogue.forEach(key => {
+                const value = shop.dialogue[key];
+                const valid = typeof value === 'string'
+                    ? value.trim().length > 0
+                    : Array.isArray(value) && value.length > 0 &&
+                        value.every(entry => typeof entry === 'string' && entry.trim().length > 0);
+                if (!valid) {
+                    fail(`Shop "${shopId}" is missing dialogue "${key}".`);
+                }
+            });
+        }
+
+        const entries = Array.isArray(shop.items) ? shop.items : [];
+        ensureUniqueIds(entries, `Shop "${shopId}" items`, entry => normalizeId(entry.itemId));
+        entries.forEach(entry => {
+            const itemId = normalizeId(entry.itemId);
+            if (!itemIds.has(itemId)) {
+                fail(`Shop "${shopId}" references unknown item "${entry.itemId}".`);
+            }
+            if (!Number.isInteger(entry.price) || entry.price < 0) {
+                fail(`Shop "${shopId}" item "${itemId}" requires a non-negative integer price.`);
+            }
+            if (!Number.isInteger(entry.stock) || entry.stock < 0) {
+                fail(`Shop "${shopId}" item "${itemId}" requires a non-negative integer stock.`);
+            }
+        });
+    });
+}
+
 function getRegisteredActionClasses() {
     const source = readText('js/Myte/Queue/ActionManager.js');
     const match = source.match(/ActionManager\.registerActions\(\[([\s\S]*?)\]\);/);
@@ -623,6 +670,7 @@ function run() {
     validateNoLegacyFiles();
     validateMytes();
     validateItems();
+    validateShops();
     validateActions();
     validateMapObjects();
     validateZones();

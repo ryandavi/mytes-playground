@@ -37,6 +37,7 @@ const DEFAULT_CAMERA_FOLLOW_MODE = CAMERA_FOLLOW_MODES.CHARACTER;
 
 
 class Utility {
+	static numberFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 
 
     /********************************************
@@ -101,6 +102,16 @@ class Utility {
 		}
 
 		return null;
+	}
+
+	static formatNumber(value) {
+		return this.numberFormatter.format(Number(value) || 0);
+	}
+
+	static formatCurrency(currencyId, value) {
+		const symbol = SiteConfig.ui.currencySymbols[currencyId] ?? '';
+		const formattedValue = this.formatNumber(value);
+		return symbol ? `${symbol} ${formattedValue}` : formattedValue;
 	}
 
 	static getQueryFlag(flagName = 'debug') {

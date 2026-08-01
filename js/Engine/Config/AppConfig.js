@@ -25,6 +25,10 @@ const AppConfig = Object.freeze({
         lastUserIdKey:         'lastUserId',
     }),
 
+    content: Object.freeze({
+        shopsPath: 'data/metadata/shops.json',
+    }),
+
     // ── DOM wiring ────────────────────────────────────────────────────────────
 
     container: Object.freeze({

@@ -181,6 +181,25 @@ class DebugPanel extends ModalWindow {
             }),
             buildDirectInteractToggle(),
             {
+                id: 'openShop',
+                section: 'user',
+                subgroup: 'tools',
+                type: 'action',
+                label: 'Open Shop',
+                action: () => {
+                    this.close();
+                    this.parent?.shopPanel?.openFor?.(null, 'goblin_goods');
+                }
+            },
+            ...SiteConfig.debug.currencyPresets.map(value => ({
+                id: `giveCoins${value}`,
+                section: 'user',
+                subgroup: 'resources',
+                type: 'action',
+                label: `+${value} Coins`,
+                action: () => this.changeCoins(value)
+            })),
+            {
                 id: 'cycleCamera',
                 section: 'map',
                 subgroup: 'controls',
@@ -413,6 +432,32 @@ class DebugPanel extends ModalWindow {
                         activeMyte.setAutonomyMode(nextGoal);
                         this.updateButton('cycleAutonomyGoal');
                     }
+                }
+            },
+            {
+                id: 'openMyteInfo',
+                section: 'myte',
+                subgroup: 'controls',
+                type: 'action',
+                label: 'Open Pet Info',
+                requiresActiveMyte: true,
+                action: () => {
+                    const activeMyte = this.parent.parent.activeMyte;
+                    if (activeMyte?.isActive) this.parent.myteInfoPanel?.openFor?.(activeMyte);
+                }
+            },
+            {
+                id: 'editMyteInfo',
+                section: 'myte',
+                subgroup: 'controls',
+                type: 'toggle',
+                label: 'Edit Pet Data: ',
+                states: { true: 'ON', false: 'OFF' },
+                requiresActiveMyte: true,
+                getValue: () => this.parent.myteInfoPanel?.isDebugEditing?.() ?? false,
+                action: (button, value) => {
+                    this.parent.myteInfoPanel?.setDebugEditing?.(value);
+                    this.updateButton('editMyteInfo');
                 }
             },
             {
@@ -816,7 +861,7 @@ class DebugPanel extends ModalWindow {
         const layout = {
             map:  { label: 'Map',  subgroups: { overlays: 'Overlays', controls: 'Controls' } },
             time: { label: 'Time', subgroups: { controls: 'Controls', presets: 'Presets' } },
-            user: { label: 'User', subgroups: { modes: 'Modes' } },
+            user: { label: 'User', subgroups: { modes: 'Modes', resources: 'Resources', tools: 'Tools' } },
             myte: { label: 'Myte', subgroups: { controls: 'Controls', stats: 'Stats', queue: 'Queue' } }
         };
 
@@ -836,7 +881,8 @@ class DebugPanel extends ModalWindow {
                 const configs = this.buttonConfigs.filter(
                     c => c.section === sectionKey && c.subgroup === subgroupKey
                 );
-                if (!configs.length) continue;
+                const hasInventoryEditor = sectionKey === 'user' && subgroupKey === 'resources';
+                if (!configs.length && !hasInventoryEditor) continue;
 
                 const subgroupEl = document.createElement('div');
                 subgroupEl.className = `settings-subgroup subgroup-${subgroupKey}`;
@@ -849,6 +895,10 @@ class DebugPanel extends ModalWindow {
                 for (const config of configs) {
                     const el = this._buildButtonElement(config);
                     subgroupEl.appendChild(el);
+                }
+
+                if (hasInventoryEditor) {
+                    subgroupEl.appendChild(this.createInventoryEditor());
                 }
 
                 sectionEl.appendChild(subgroupEl);
@@ -908,7 +958,7 @@ class DebugPanel extends ModalWindow {
             group.appendChild(button);
             group.appendChild(plusBtn);
 
-            this.updateButton(config.id);
+            this.updateButtonText(config, button);
             return group;
         }
 
@@ -949,8 +999,82 @@ class DebugPanel extends ModalWindow {
             button.appendChild(state);
         }
 
-        this.updateButton(config.id);
+        this.updateButtonText(config, button);
         return button;
+    }
+
+    createInventoryEditor() {
+        const editor = document.createElement('div');
+        editor.className = 'debug-inventory-editor';
+
+        const label = document.createElement('label');
+        label.className = 'debug-editor-label';
+        label.textContent = 'Inventory';
+        label.htmlFor = 'debug-inventory-item';
+
+        const select = document.createElement('select');
+        select.id = 'debug-inventory-item';
+        select.className = 'debug-inventory-editor__item';
+        Array.from(ItemRegistry.items.values())
+            .sort((a, b) => a.label.localeCompare(b.label))
+            .forEach((item) => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.label;
+                select.appendChild(option);
+            });
+
+        const quantity = document.createElement('input');
+        quantity.className = 'debug-inventory-editor__quantity';
+        quantity.id = 'debug-inventory-quantity';
+        quantity.type = 'number';
+        quantity.min = '1';
+        quantity.max = String(SiteConfig.inventory.stackSize);
+        quantity.value = String(SiteConfig.debug.itemStep);
+        quantity.setAttribute('aria-label', 'Item quantity');
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.textContent = 'Remove';
+        remove.addEventListener('click', () => this.changeInventoryItem(select.value, -Number(quantity.value)));
+
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.textContent = 'Add';
+        add.addEventListener('click', () => this.changeInventoryItem(select.value, Number(quantity.value)));
+
+        const actions = document.createElement('div');
+        actions.className = 'button-group debug-inventory-editor__actions';
+        actions.append(remove, add);
+        editor.append(label, select, quantity, actions);
+        return editor;
+    }
+
+    changeCoins(value) {
+        const amount = Math.max(0, Math.round(Number(value) || 0));
+        if (amount === 0) return false;
+        const user = this.parent?.parent?.core?.user;
+        return user?.addCurrency?.('coins', amount) ?? false;
+    }
+
+    changeInventoryItem(itemId, delta) {
+        const inventory = this.parent?.parent?.inventory;
+        const item = ItemRegistry.getItemSync(itemId);
+        const quantity = Math.max(1, Math.round(Math.abs(Number(delta) || 1)));
+        if (!inventory || !item) return false;
+
+        const changed = delta > 0
+            ? inventory.addItem(item.name, quantity, item.type, item.description, item.id)
+            : inventory.removeItem(item.id, quantity);
+        if (changed) {
+            this.parent.parent.core?.user?._scheduleSave?.();
+            this.parent.showMessage(
+                `${delta > 0 ? 'Added' : 'Removed'} ${quantity} ${item.label}`,
+                'success',
+                'Debug'
+            );
+        }
+        return changed;
     }
 
     // Show/hide per-overlay buttons when master debug toggle is off

@@ -57,6 +57,12 @@ class MyteCore {
                 throw new Error('Failed to load item metadata.');
             }
 
+            this.loadingManager.setMessage("Loading shop data...");
+            const shopDataLoaded = await ShopRegistry.preload();
+            if (!shopDataLoaded) {
+                throw new Error('Failed to load shop metadata.');
+            }
+
             this.loadingManager.setMessage("Loading action data...");
             const actionDataLoaded = await ActionDefinitionRegistry.preload();
             if (!actionDataLoaded) {
@@ -113,7 +119,9 @@ class MyteCore {
             try {
                 await this.soundManager.init();
                 this.removeAudioUnlockListeners();
-                setTimeout(() => this.soundManager.startAllSounds(), this.config.sound.unlockDelay);
+                if (this.soundManager.initialized) {
+                    setTimeout(() => this.soundManager.startAllSounds(), this.config.sound.unlockDelay);
+                }
             } catch (error) {
                 console.error('Failed to initialize audio after user interaction:', error);
             }

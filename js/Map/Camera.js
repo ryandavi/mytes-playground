@@ -36,6 +36,7 @@ class Camera {
 		this.dragStartY = 0;
 		this.dragStartCameraX = 0;
 		this.dragStartCameraY = 0;
+		this._panSoundStarted = false;
 
 		// Pan inertia
 		this._inertiaVelX = 0;
@@ -86,6 +87,19 @@ class Camera {
 
 	_clampZoom(zoom) {
 		return this._getSafeZoomValue(zoom, this.targetZoomLevel);
+	}
+
+	_playInteractionSound(soundId, options = {}) {
+		this.parent?.core?.soundManager?.playWhenReady?.(soundId, options);
+	}
+
+	_playZoomSound(previousZoom, nextZoom) {
+		if (nextZoom === previousZoom) return;
+		const sounds = SiteConfig.ui.interactionSounds;
+		this._playInteractionSound(sounds.zoom, {
+			pitchScale: nextZoom > previousZoom ? sounds.zoomInPitch : sounds.zoomOutPitch,
+			volume: sounds.zoomVolume
+		});
 	}
 
 	// ========== STATE SANITIZATION ==========
@@ -250,6 +264,7 @@ class Camera {
 	}
 
 	zoomTo(zoom, options = {}) {
+		const previousZoom = this.targetZoomLevel;
 		const targetZoom = this._clampZoom(zoom);
 		const anchor = options.anchor || this.getViewportCenterAnchor();
 		const targetPosition = this._calculateAnchoredPosition(anchor, targetZoom);
@@ -257,6 +272,7 @@ class Camera {
 		this.zoomAnchor = anchor;
 		this.setTarget(targetPosition.x, targetPosition.y);
 		this.setZoomLevel(targetZoom);
+		this._playZoomSound(previousZoom, targetZoom);
 
 		if (options.immediate) {
 			this.zoomLevel = this.targetZoomLevel;
@@ -399,11 +415,13 @@ class Camera {
 		const newZoom = this._clampZoom(this.targetZoomLevel + zoomDirection * this.zoomStep);
 
 		if (newZoom !== this.targetZoomLevel) {
+			const previousZoom = this.targetZoomLevel;
 			const anchor    = this._getZoomAnchorForEvent(e);
 			const newTarget = this._calculateAnchoredPosition(anchor, newZoom);
 			this.zoomAnchor = anchor;
 			this.setTarget(newTarget.x, newTarget.y);
 			this.setZoomLevel(newZoom);
+			this._playZoomSound(previousZoom, newZoom);
 		}
 	}
 
@@ -419,6 +437,7 @@ class Camera {
 		this._lastDragClientY = e.clientY;
 		this._inertiaVelX = 0;
 		this._inertiaVelY = 0;
+		this._panSoundStarted = false;
 		this.dragStartCameraX = this.posX;
 		this.dragStartCameraY = this.posY;
 		this.canvas.style.cursor = 'grabbing';
@@ -430,6 +449,11 @@ class Camera {
 
 		const dx = (e.clientX - this.dragStartX) / this.zoomLevel;
 		const dy = (e.clientY - this.dragStartY) / this.zoomLevel;
+		const sounds = SiteConfig.ui.interactionSounds;
+		if (!this._panSoundStarted && Math.hypot(e.clientX - this.dragStartX, e.clientY - this.dragStartY) >= sounds.panThresholdPx) {
+			this._panSoundStarted = true;
+			this._playInteractionSound(sounds.panStart, { volume: sounds.panStartVolume });
+		}
 
 		this._inertiaVelX = (e.clientX - this._lastDragClientX) / this.zoomLevel;
 		this._inertiaVelY = (e.clientY - this._lastDragClientY) / this.zoomLevel;
@@ -449,7 +473,13 @@ class Camera {
 	}
 
 	endDrag() {
+		if (!this.isDragging) return;
+		if (this._panSoundStarted) {
+			const sounds = SiteConfig.ui.interactionSounds;
+			this._playInteractionSound(sounds.panEnd, { volume: sounds.panEndVolume });
+		}
 		this.isDragging = false;
+		this._panSoundStarted = false;
 		this.canvas.style.cursor = 'default';
 	}
 

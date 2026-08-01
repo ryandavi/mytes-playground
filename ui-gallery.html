@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Neko UI Gallery</title>
+	<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="ui-gallery-page">
+	<main class="ui-gallery">
+		<header class="ui-gallery__header">
+			<div>
+				<h1>Neko UI Gallery</h1>
+				<p>Static fixtures for editing HTML and SCSS without starting the simulation.</p>
+			</div>
+			<a href="index.html">Back to game</a>
+		</header>
+
+		<section class="ui-gallery__group">
+			<h2>Myte information — Behavior</h2>
+			<div id="myte-info-panel" class="window-panel myte-info" data-tab-group>
+				<div class="window-panel__header">
+					<h2 class="window-panel__title"><span class="icon">i</span><span class="text">pookie.myte</span></h2>
+					<div class="window-panel__controls"><button aria-label="Minimize">&#128469;</button><button aria-label="Maximize">&#x26F6;</button><button aria-label="Close">&times;</button></div>
+				</div>
+				<div class="window-panel__content">
+					<div class="myte-info__summary">
+						<div class="myte-info__portrait"></div>
+						<div><div class="myte-info__name">Pookie</div><div class="myte-info__species">Garden Snail</div></div>
+					</div>
+					<div class="window-tabs myte-info__tabs" role="tablist">
+						<button role="tab" data-tab="general">General</button><button role="tab" data-tab="needs">Needs</button><button class="is-active" role="tab" aria-selected="true" data-tab="behavior">Behavior</button><button role="tab" data-tab="drives">Drives</button>
+					</div>
+					<div class="window-tab-body myte-info__body">
+						<div class="myte-info__page" role="tabpanel" data-tab-panel="general" hidden>
+							<div class="myte-info__row"><span class="myte-info__row-label">Status</span><div class="myte-info__row-value">Active</div></div>
+							<div class="myte-info__row"><span class="myte-info__row-label">Level</span><div class="myte-info__row-value">7</div></div>
+							<div class="myte-info__row"><span class="myte-info__row-label">Current action</span><div class="myte-info__row-value">Walking to fountain</div></div>
+						</div>
+						<div class="myte-info__page" role="tabpanel" data-tab-panel="needs" hidden>
+							<div class="myte-info__row"><span class="myte-info__row-label">Energy</span><div class="myte-info__row-value"><div class="myte-info__need-value"><div class="myte-info__meter"><span style="width:64%"></span></div><output>64%</output></div></div></div>
+							<div class="myte-info__row"><span class="myte-info__row-label">Fun</span><div class="myte-info__row-value"><div class="myte-info__need-value"><div class="myte-info__meter"><span style="width:38%"></span></div><output>38%</output></div></div></div>
+							<div class="myte-info__row"><span class="myte-info__row-label">Satiety</span><div class="myte-info__row-value"><div class="myte-info__need-value"><div class="myte-info__meter"><span style="width:81%"></span></div><output>81%</output></div></div></div>
+						</div>
+						<div class="myte-info__page myte-info__dashboard" role="tabpanel" data-tab-panel="behavior">
+							<section class="myte-info__section myte-info__section--status">
+								<h3 class="myte-info__section-title">Current behavior</h3>
+								<div class="myte-info__section-body">
+									<div class="myte-info__row"><span class="myte-info__row-label">Mood</span><div class="myte-info__row-value">Curious</div></div>
+									<div class="myte-info__row"><span class="myte-info__row-label">Behavior</span><div class="myte-info__row-value">Exploring</div></div>
+									<div class="myte-info__row"><span class="myte-info__row-label">Activity</span><div class="myte-info__row-value">Walking to fountain</div></div>
+								</div>
+							</section>
+							<section class="myte-info__section">
+								<h3 class="myte-info__section-title">Personality</h3>
+								<div class="myte-info__section-body">
+									<div class="myte-info__row"><span class="myte-info__row-label">Confidence</span><div class="myte-info__row-value"><div class="myte-info__need-value"><div class="myte-info__meter"><span style="width:72%"></span></div><output>72%</output></div></div></div>
+									<div class="myte-info__row"><span class="myte-info__row-label">Boldness</span><div class="myte-info__row-value"><span class="myte-info__trait-value"><span>Timid</span><span class="myte-info__trait-track"><span class="myte-info__trait-marker" style="left:68%"></span></span><span>Reckless</span></span></div></div>
+								</div>
+							</section>
+						</div>
+						<div class="myte-info__page" role="tabpanel" data-tab-panel="drives" hidden>
+							<p class="myte-info__page-description">Drives show what the AI currently feels most compelled to do.</p>
+							<div class="myte-info__row"><span class="myte-info__row-label">Explore</span><div class="myte-info__row-value"><div class="myte-info__need-value is-urgency"><div class="myte-info__meter"><span style="width:78%"></span></div><output>78%</output></div></div></div>
+							<div class="myte-info__row"><span class="myte-info__row-label">Play</span><div class="myte-info__row-value"><div class="myte-info__need-value is-urgency"><div class="myte-info__meter"><span style="width:52%"></span></div><output>52%</output></div></div></div>
+							<div class="myte-info__row"><span class="myte-info__row-label">Safety</span><div class="myte-info__row-value"><div class="myte-info__need-value is-urgency"><div class="myte-info__meter"><span style="width:12%"></span></div><output>12%</output></div></div></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section class="ui-gallery__group">
+			<h2>Shop states</h2>
+			<div class="ui-gallery__grid">
+				<section class="window-panel world-modal">
+					<p class="ui-gallery__state-label">Stocked</p>
+					<div class="window-panel__header"><h2 class="window-panel__title"><span class="icon">$</span><span class="text">Patch's Supply Cache</span></h2><div class="window-panel__controls"><button>&times;</button></div></div>
+					<div class="world-modal__body"><div class="shop-panel">
+						<div class="shop-panel__shopkeeper"><div class="shop-panel__identity"><strong>Patch</strong><span>Cache Keeper</span></div><p class="shop-panel__dialogue">Fresh packets, clean bytes. What do you need?</p></div>
+						<div class="shop-panel__items">
+							<article class="shop-item"><span class="shop-item__image item food acorn"></span><div class="shop-item__details"><div class="shop-item__heading"><strong>Acorn</strong><span class="shop-item__stock">× 8</span></div><span class="shop-item__description">A crunchy little snack.</span></div><div class="shop-item__purchase"><button>Buy 1× for 4¢</button></div></article>
+							<article class="shop-item"><span class="shop-item__image item food berry"></span><div class="shop-item__details"><div class="shop-item__heading"><strong>Berry</strong><span class="shop-item__stock">Sold out</span></div><span class="shop-item__description">Sweet forest fruit.</span></div><div class="shop-item__purchase"><button disabled>Sold out</button></div></article>
+						</div>
+					</div></div>
+				</section>
+				<section class="window-panel world-modal">
+					<p class="ui-gallery__state-label">Empty inventory</p>
+					<div class="window-panel__header"><h2 class="window-panel__title"><span class="icon">$</span><span class="text">Patch's Supply Cache</span></h2><div class="window-panel__controls"><button>&times;</button></div></div>
+					<div class="world-modal__body"><div class="shop-panel"><div class="shop-panel__shopkeeper"><div class="shop-panel__identity"><strong>Patch</strong><span>Cache Keeper</span></div><p class="shop-panel__dialogue">Looks like the cache is wiped clean.</p></div><div class="shop-panel__items"><div class="window-empty-state">Nothing is for sale right now. Check back later.</div></div></div></div>
+				</section>
+			</div>
+		</section>
+
+		<section class="ui-gallery__group">
+			<h2>Event log states</h2>
+			<div class="ui-gallery__grid">
+				<section id="game-log-panel" class="window-panel">
+					<p class="ui-gallery__state-label">Populated</p>
+					<div class="window-panel__header"><h2 class="window-panel__title"><span class="icon">!</span><span class="text">Event Log</span></h2><div class="window-panel__controls"><button aria-label="Maximize">⛶</button><button>&times;</button></div></div>
+					<div class="window-panel__content game-log"><div class="window-tabs game-log-filters"><button class="game-log-filter is-active">All</button><button class="game-log-filter">Mytes</button><button class="game-log-filter">World</button></div><div class="window-tab-body game-log-body"><ul class="game-log-list"><li class="game-log-entry"><span class="time">10:42 AM</span><span class="icon">•</span><span class="text">Pookie started exploring.</span></li><li class="game-log-entry rarity-notable"><span class="time">10:44 AM</span><span class="icon">★</span><span class="text">The berry bush has matured.</span></li></ul></div></div>
+				</section>
+				<section class="window-panel">
+					<p class="ui-gallery__state-label">Empty</p>
+					<div class="window-panel__header"><h2 class="window-panel__title"><span class="icon">!</span><span class="text">Event Log</span></h2><div class="window-panel__controls"><button aria-label="Maximize">⛶</button><button>&times;</button></div></div>
+					<div class="window-panel__content"><div class="window-tabs"><button class="is-active">All</button></div><div class="window-tab-body"><div class="window-empty-state">No events recorded yet.</div></div></div>
+				</section>
+			</div>
+		</section>
+
+		<section class="ui-gallery__group">
+			<h2>User profile</h2>
+			<div id="user-profile-panel" class="window-panel user-profile" data-tab-group>
+				<div class="window-panel__header"><h2 class="window-panel__title"><span class="icon">☺</span><span class="text">User Profile</span></h2><div class="window-panel__controls"><button aria-label="Maximize">⛶</button><button>&times;</button></div></div>
+				<div class="window-panel__content user-profile__content">
+					<section class="user-profile__identity"><div class="user-profile__avatar">R</div><div><h3 class="user-profile__name">Ryan</h3><div class="user-profile__id">User ID: local-player</div></div></section>
+					<div class="window-tabs user-profile__tabs" role="tablist"><button class="is-active" role="tab" data-tab="account">Account</button><button role="tab" data-tab="progress">Progress</button></div>
+					<div class="window-tab-body user-profile__body">
+						<dl class="info-list user-profile__stats" role="tabpanel" data-tab-panel="account"><div class="info-row user-profile__stat"><dt class="info-row__label">Username</dt><dd class="info-row__value">Ryan</dd></div><div class="info-row user-profile__stat"><dt class="info-row__label">User ID</dt><dd class="info-row__value">local-player</dd></div><div class="info-row user-profile__stat"><dt class="info-row__label">Member since</dt><dd class="info-row__value">Jan 1, 2026</dd></div><div class="info-row user-profile__stat"><dt class="info-row__label">Current map</dt><dd class="info-row__value">Outside</dd></div></dl>
+						<dl class="info-list user-profile__stats" role="tabpanel" data-tab-panel="progress" hidden><div class="info-row user-profile__stat"><dt class="info-row__label">Play time</dt><dd class="info-row__value">12h 34m</dd></div><div class="info-row user-profile__stat"><dt class="info-row__label">Mytes</dt><dd class="info-row__value">4</dd></div><div class="info-row user-profile__stat"><dt class="info-row__label">Coins</dt><dd class="info-row__value">&cent; 1,240</dd></div><div class="info-row user-profile__stat"><dt class="info-row__label">Achievements</dt><dd class="info-row__value">6</dd></div></dl>
+					</div>
+				</div>
+			</div>
+		</section>
+	</main>
+	<script src="js/UI/Core/TabController.js"></script>
+	<script src="scripts/ui-gallery.js"></script>
+</body>
+</html>

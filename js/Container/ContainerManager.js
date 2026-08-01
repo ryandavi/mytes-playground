@@ -196,6 +196,10 @@ class ContainerManager {
             );
             await this.setupMytes();
 
+            if (!this.activeMyte) {
+                this.camera.setMode(this.settings.defaultMyteCamera);
+            }
+
             // Mytes now exist — apply map-defined slot positions.
             this.transitionManager._syncAllMyteSlotsToSpawn(this.gameMap);
 
@@ -534,38 +538,7 @@ class ContainerManager {
     }
 
     createFallbackRosterData() {
-        const speciesCatalog = MyteDefinitionRegistry.getSpeciesCatalogSync?.() || [];
-        const enabledEntries = speciesCatalog.filter(entry => entry.enabled !== false);
-        const essentialEntries = enabledEntries.filter(entry => entry.essential);
-        const orderedEntries = [
-            ...essentialEntries,
-            ...enabledEntries.filter(entry => !entry.essential)
-        ];
-        const availableEntries = orderedEntries.length > 0
-            ? orderedEntries
-            : [{ id: MyteDefinitionRegistry.defaultSpeciesId || 'snail', label: 'Myte' }];
-        const rosterCount = Math.max(1, Number(SiteConfig.myte.initialRosterCount) || 1);
-        const nameCounts = new Map();
-        const resolvedEntries = Array.from({ length: rosterCount }, (_, index) => {
-            const entry = availableEntries[index % availableEntries.length];
-            const label = entry.label || `Myte ${index + 1}`;
-            const occurrence = (nameCounts.get(label) ?? 0) + 1;
-            nameCounts.set(label, occurrence);
-            return {
-                ...entry,
-                rosterLabel: occurrence === 1 ? label : `${label} ${occurrence}`
-            };
-        });
-
-        // Sparse entries — MyteRosterSchema.normalizeEntry fills goals, slot
-        // position flags, and stat defaults in getInitialRosterData.
-        return resolvedEntries.map((entry, index) => ({
-            id: String(index + 1),
-            name: entry.rosterLabel || entry.label || `Myte ${index + 1}`,
-            species: entry.id || 'snail',
-            slotId: `myte-slot-${index + 1}`,
-            slotLabel: `${entry.rosterLabel || entry.label || `Myte ${index + 1}`}'s Slot`
-        }));
+        return MyteRosterSchema.createStarterRoster();
     }
 
     extractRosterDataFromDom(wrappers = []) {
@@ -603,12 +576,7 @@ class ContainerManager {
     getInitialRosterData(existingWrappers = []) {
         const savedRoster = this.core?.user?.savedMytes;
         if (Array.isArray(savedRoster) && savedRoster.length > 0) {
-            const configuredCount = Math.max(1, Number(SiteConfig.myte.initialRosterCount) || 1);
-            const expandedRoster = savedRoster.slice();
-            if (expandedRoster.length < configuredCount) {
-                expandedRoster.push(...this.createFallbackRosterData().slice(expandedRoster.length, configuredCount));
-            }
-            return expandedRoster.map((entry, index) => MyteRosterSchema.normalizeEntry(entry, index, {
+            return savedRoster.map((entry, index) => MyteRosterSchema.normalizeEntry(entry, index, {
                 preserveSlotPosition: false
             }));
         }

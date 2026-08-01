@@ -12,6 +12,7 @@ class GameLogManager extends ModalWindow {
             closeOnOutsideClick: false,
             position: 'bottom-right',
             draggable: true,
+            fullscreen: true,
             closeButtonSelector: '.modal-close-btn'
         });
 
@@ -59,8 +60,8 @@ class GameLogManager extends ModalWindow {
                 return {
                     templateId: 'user:currency_changed',
                     values: {
-                        coins: `${payload.delta} coin${payload.delta === 1 ? '' : 's'}`,
-                        total: String(payload.total)
+                        coins: Utility.formatCurrency('coins', payload.delta),
+                        total: Utility.formatCurrency('coins', payload.total)
                     },
                     entity: null
                 };
@@ -69,9 +70,17 @@ class GameLogManager extends ModalWindow {
 
         this.init(); // explicit — subclass state is ready before any virtual method call
         this.listElement = this.modalElement?.querySelector('.game-log-list') ?? null;
+        this.emptyElement = this.modalElement?.querySelector('.game-log-empty') ?? null;
         this.filtersElement = this.modalElement?.querySelector('.game-log-filters') ?? null;
+		this.setupTabs({
+			element: this.filtersElement,
+			buttonSelector: '.game-log-filter',
+			getTabId: (tab) => tab.dataset.gameLogFilter,
+			onChange: (tabId) => this.setFilter(tabId === 'all' ? null : tabId)
+		});
 
         this.restoreEntries();
+        this.syncEmptyState();
         this.subscribe();
         this.loadTemplates();
     }
@@ -212,6 +221,7 @@ class GameLogManager extends ModalWindow {
         }
 
         this.listElement.appendChild(item);
+        this.syncEmptyState();
         if (stickToBottom) this.listElement.scrollTop = this.listElement.scrollHeight;
     }
 
@@ -242,21 +252,28 @@ class GameLogManager extends ModalWindow {
             button.type = 'button';
             button.className = 'game-log-filter';
             button.textContent = chip.label;
-            if (chip.id === this.activeFilter) button.classList.add('is-active');
-            button.addEventListener('click', () => this.setFilter(chip.id, button));
+			button.setAttribute('role', 'tab');
+			button.dataset.gameLogFilter = chip.id ?? 'all';
             this.filtersElement.appendChild(button);
         }
+		this.syncTabs(this.activeFilter ?? 'all');
     }
 
-    setFilter(category, activeButton) {
+    setFilter(category) {
         this.activeFilter = category;
-        this.filtersElement?.querySelectorAll('.game-log-filter').forEach((button) => {
-            button.classList.toggle('is-active', button === activeButton);
-        });
+		this.syncTabs(category ?? 'all');
         this.listElement?.querySelectorAll('.game-log-entry').forEach((item) => {
             item.classList.toggle('is-hidden', category !== null && item.dataset.category !== category);
         });
+        this.syncEmptyState();
         if (this.listElement) this.listElement.scrollTop = this.listElement.scrollHeight;
+    }
+
+    syncEmptyState() {
+        if (!this.emptyElement || !this.listElement) return;
+        const hasVisibleEntry = [...this.listElement.children]
+            .some((entry) => !entry.classList.contains('is-hidden'));
+        this.emptyElement.hidden = hasVisibleEntry;
     }
 
     getGameTimeStamp() {

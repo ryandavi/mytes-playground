@@ -519,6 +519,7 @@
   </object>
   <object id="48" name="NPC" x="704" y="256" width="64" height="64">
    <properties>
+    <property name="shopId" value="goblin_goods"/>
     <property name="variant" value="goblin"/>
    </properties>
   </object>

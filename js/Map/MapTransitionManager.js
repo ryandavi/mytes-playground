@@ -178,9 +178,44 @@ class MapTransitionManager {
     _syncAllMyteSlotsToSpawn(map) {
         const spawnPoint = map?.getSpawnPoint?.('myte') ?? map?.getSpawnPoint?.('default');
         if (!spawnPoint) return;
-        for (const myte of this.container.mytes ?? []) {
-            this._syncMyteSlotToPosition(myte, spawnPoint);
-        }
+        const mytes = this.container.mytes ?? [];
+        const layout = SiteConfig.myte.homeSlotLayout;
+        const spacing = layout.spacing;
+        const slotSize = layout.slotSize;
+        const mapWidth = map.dimensions?.width ?? Infinity;
+        const mapHeight = map.dimensions?.height ?? Infinity;
+        const offsets = [
+            { x: 0, y: 0 },
+            { x: spacing, y: 0 },
+            { x: -spacing, y: 0 },
+            { x: 0, y: spacing },
+            { x: 0, y: -spacing },
+            { x: spacing, y: spacing },
+            { x: -spacing, y: spacing },
+            { x: spacing, y: -spacing },
+            { x: -spacing, y: -spacing }
+        ];
+        const placed = [];
+
+        mytes.forEach((myte, index) => {
+            const candidates = offsets.slice(index).concat(offsets.slice(0, index));
+            const offset = candidates.find(candidate => {
+                const x = spawnPoint.x + candidate.x;
+                const y = spawnPoint.y + candidate.y;
+                const insideMap = x >= 0 && y >= 0 && x + slotSize <= mapWidth && y + slotSize <= mapHeight;
+                const clear = placed.every(position =>
+                    Math.abs(position.x - x) >= slotSize ||
+                    Math.abs(position.y - y) >= slotSize
+                );
+                return insideMap && clear;
+            }) || { x: index * spacing, y: 0 };
+            const position = {
+                x: spawnPoint.x + offset.x,
+                y: spawnPoint.y + offset.y
+            };
+            placed.push(position);
+            this._syncMyteSlotToPosition(myte, position);
+        });
     }
 
     _prepareMyteForTransition(myte) {

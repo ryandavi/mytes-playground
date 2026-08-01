@@ -20,6 +20,7 @@ constructor(parent, options = {}) {
         position: 'center',        // center, top-right, bottom-left, etc.
         draggable: false,          // Allow dragging the modal
         resizable: false,          // Allow resizing the modal
+        fullscreen: null,          // true creates a maximize control; null uses authored markup
         onOpen: null,              // Callback when modal opens
         onClose: null,             // Callback when modal closes
         onMinimize: null,          // Callback when modal is minimized
@@ -32,7 +33,8 @@ constructor(parent, options = {}) {
         rememberPosition: true,    // Remember the position when reopening
         allowMultipleWindows: false, // Allow multiple windows to be open at once
         enableKeyboardShortcuts: true, // Enable keyboard shortcuts (Escape to close)
-        snapToEdges: true          // Snap windows to screen edges when dragging
+        snapToEdges: true,         // Snap windows to screen edges when dragging
+        dragBoundsElement: null    // Optional element (or getter) that bounds relative-positioned windows
     }, options);
 
     // Element references
@@ -51,6 +53,8 @@ constructor(parent, options = {}) {
     this.position = { x: 0, y: 0 };  // Track current position
     this.originalSize = { width: 0, height: 0 }; // Store original size for restoring
     this.lastClickTime = 0; // For double-click detection
+    this.dragPointerId = null;
+	this.tabBinding = null;
 
     // Bind methods to maintain correct 'this' context
     this.open = this.open.bind(this);
@@ -88,6 +92,9 @@ constructor(parent, options = {}) {
 				this.modalElement.classList.add('is-floating');
 			}
 
+			this.modalElement.inert = true;
+			this.modalElement.setAttribute('aria-hidden', 'true');
+
 			if(this.options.buttonId) {
 				this.buttonElement = document.getElementById(this.options.buttonId);
 
@@ -107,13 +114,17 @@ constructor(parent, options = {}) {
 				this.buttonElement.onclick = (e) => {
 					this.buttonLeftClick(e);
 				};
+				this.buttonElement.dataset.modalTrigger = 'true';
 			}
 
-			// Find control buttons
+			// Find or create window controls
+			this.headerElement = this.modalElement.querySelector('.window-panel__header');
+			if (this.options.fullscreen === true) {
+				this.ensureFullscreenButton();
+			}
 			this.closeButton = this.modalElement.querySelector(this.options.closeButtonSelector);
 			this.minimizeButton = this.modalElement.querySelector(this.options.minimizeButtonSelector);
 			this.fullscreenButton = this.modalElement.querySelector(this.options.fullscreenButtonSelector);
-            this.headerElement = this.modalElement.querySelector('.window-panel__header');
 
 			// Store original size for restoring from fullscreen/minimize
 			const rect = this.modalElement.getBoundingClientRect();
@@ -178,7 +189,8 @@ constructor(parent, options = {}) {
 		if (this.options.draggable && this.modalElement) {
 			const header = this.modalElement.querySelector('.window-panel__header') || this.modalElement;
 			header.style.cursor = 'move';
-			header.onmousedown = this.handleDragStart;
+			header.style.touchAction = 'none';
+			header.addEventListener('pointerdown', this.handleDragStart);
 		}
 	}
 
@@ -187,6 +199,10 @@ constructor(parent, options = {}) {
 	 * @param {MouseEvent} e - Mouse event
 	 */
 	handleHeaderDoubleClick(e) {
+		// A title bar should only advertise maximize-by-double-click when the
+		// window actually exposes a maximize control.
+		if (!this.fullscreenButton) return;
+
 		// If minimized, restore to normal
 		if (this.isMinimized) {
 			this.toggleMinimize();
@@ -342,9 +358,11 @@ constructor(parent, options = {}) {
 	handleDragStart(e) {
 		// Don't allow dragging in fullscreen mode
 		if (!this.options.draggable || this.isFullscreen) return;
-	
+		if (e.button !== 0 || e.target.closest('button, input, select, textarea, a, .window-panel__controls')) return;
+
 		this.isDragging = true;
-		
+		this.dragPointerId = e.pointerId;
+
 		// Calculate offset relative to the modal element
 		const rect = this.modalElement.getBoundingClientRect();
 		this.dragOffset = {
@@ -357,10 +375,25 @@ constructor(parent, options = {}) {
 			x: rect.left,
 			y: rect.top
 		};
+
+		// Convert CSS-positioned windows to explicit viewport coordinates before
+		// moving them. This prevents the centering transform from transitioning
+		// against the first left/top update and producing a top-left jump.
+		this.modalElement.classList.add('is-dragging');
+		this.modalElement.classList.remove('position-center', 'position-top-right',
+			'position-top-left', 'position-bottom-right', 'position-bottom-left');
+		this.modalElement.style.transform = 'none';
+		const isViewportPositioned = getComputedStyle(this.modalElement).position === 'fixed';
+		const offsetRect = isViewportPositioned
+			? { left: 0, top: 0 }
+			: this.modalElement.offsetParent?.getBoundingClientRect?.() ?? { left: 0, top: 0 };
+		this.modalElement.style.left = `${rect.left - offsetRect.left}px`;
+		this.modalElement.style.top = `${rect.top - offsetRect.top}px`;
 	
-		// Add temporary event listeners for dragging
-		document.addEventListener('mousemove', this.handleDragMove);
-		document.addEventListener('mouseup', this.handleDragEnd);
+		this.headerElement?.setPointerCapture?.(e.pointerId);
+		this.headerElement?.addEventListener('pointermove', this.handleDragMove);
+		this.headerElement?.addEventListener('pointerup', this.handleDragEnd);
+		this.headerElement?.addEventListener('pointercancel', this.handleDragEnd);
 	
 		// Prevent text selection during drag
 		e.preventDefault();
@@ -386,36 +419,51 @@ constructor(parent, options = {}) {
 	 * Handle drag move event
 	 */
 	handleDragMove(e) {
-		if (!this.isDragging) return;
-	
+		if (!this.isDragging || e.pointerId !== this.dragPointerId) return;
+
+		const configuredBounds = typeof this.options.dragBoundsElement === 'function'
+			? this.options.dragBoundsElement()
+			: this.options.dragBoundsElement;
+		const boundsRect = configuredBounds?.getBoundingClientRect?.() || {
+			left: 0,
+			top: 0,
+			width: window.innerWidth,
+			height: window.innerHeight
+		};
+		const isViewportPositioned = getComputedStyle(this.modalElement).position === 'fixed';
+		const minX = isViewportPositioned ? boundsRect.left : 0;
+		const minY = isViewportPositioned ? boundsRect.top : 0;
+		const modalRect = this.modalElement.getBoundingClientRect();
+		const maxX = Math.max(minX, minX + boundsRect.width - modalRect.width);
+		const maxY = Math.max(minY, minY + boundsRect.height - modalRect.height);
+
 		// Calculate new position based on mouse movement and initial offset
-		let x = e.clientX - this.dragOffset.x;
-		let y = e.clientY - this.dragOffset.y;
-		
+		let x = e.clientX - this.dragOffset.x - (isViewportPositioned ? 0 : boundsRect.left);
+		let y = e.clientY - this.dragOffset.y - (isViewportPositioned ? 0 : boundsRect.top);
+
 		// Apply snapping if enabled
 		if (this.options.snapToEdges) {
-			const windowWidth = window.innerWidth;
-			const windowHeight = window.innerHeight;
-			const modalRect = this.modalElement.getBoundingClientRect();
 			const snapDistance = 15; // Pixels to trigger snapping
-			
+
 			// Snap to left edge
-			if (x < snapDistance) x = 0;
-			
+			if (x < minX + snapDistance) x = minX;
+
 			// Snap to right edge
-			if (x + modalRect.width > windowWidth - snapDistance) {
-				x = windowWidth - modalRect.width;
+			if (x > maxX - snapDistance) {
+				x = maxX;
 			}
-			
+
 			// Snap to top edge
-			if (y < snapDistance) y = 0;
-			
+			if (y < minY + snapDistance) y = minY;
+
 			// Snap to bottom edge
-			if (y + modalRect.height > windowHeight - snapDistance) {
-				y = windowHeight - modalRect.height;
+			if (y > maxY - snapDistance) {
+				y = maxY;
 			}
 		}
-	
+		x = Math.min(maxX, Math.max(minX, x));
+		y = Math.min(maxY, Math.max(minY, y));
+
 		// Apply new position with inline styles (necessary for dragging)
 		this.modalElement.style.left = `${x}px`;
 		this.modalElement.style.top = `${y}px`;
@@ -438,12 +486,18 @@ constructor(parent, options = {}) {
 	/**
 	 * Handle drag end event
 	 */
-	handleDragEnd() {
+	handleDragEnd(event) {
+		if (event?.pointerId !== undefined && event.pointerId !== this.dragPointerId) return;
+		if (this.dragPointerId !== null && this.headerElement?.hasPointerCapture?.(this.dragPointerId)) {
+			this.headerElement.releasePointerCapture(this.dragPointerId);
+		}
 		this.isDragging = false;
+		this.dragPointerId = null;
+		this.modalElement?.classList.remove('is-dragging');
 
-		// Remove temporary event listeners
-		document.removeEventListener('mousemove', this.handleDragMove);
-		document.removeEventListener('mouseup', this.handleDragEnd);
+		this.headerElement?.removeEventListener('pointermove', this.handleDragMove);
+		this.headerElement?.removeEventListener('pointerup', this.handleDragEnd);
+		this.headerElement?.removeEventListener('pointercancel', this.handleDragEnd);
 	}
 
 	/**
@@ -481,6 +535,8 @@ constructor(parent, options = {}) {
 	 */
 	open() {
 		if (!this.modalElement || this.isVisible) return;
+		this.modalElement.inert = false;
+		this.modalElement.setAttribute('aria-hidden', 'false');
 	
 		// Close other windows if multiple windows aren't allowed
 		if (!this.options.allowMultipleWindows) {
@@ -533,7 +589,8 @@ constructor(parent, options = {}) {
 	 */
 	close() {
 		if (!this.modalElement || !this.isVisible) return;
-	
+		this.handleDragEnd();
+
 		// Save the current state for tracking
 		const wasFullscreen = this.isFullscreen;
 		const wasMinimized = this.isMinimized;
@@ -545,6 +602,8 @@ constructor(parent, options = {}) {
 		
 		// Remove visible class to hide the modal (keeping fullscreen/minimize classes for animation)
 		this.modalElement.classList.remove('is-visible');
+		this.modalElement.inert = true;
+		this.modalElement.setAttribute('aria-hidden', 'true');
 		
 		// Set up a delayed removal of state classes after animation completes
 		if (wasFullscreen || wasMinimized) {
@@ -591,29 +650,52 @@ constructor(parent, options = {}) {
 		}
 	}
 
+	ensureFullscreenButton() {
+		if (!this.headerElement || this.modalElement.querySelector(this.options.fullscreenButtonSelector)) return;
+		const controls = this.headerElement.querySelector('.window-panel__controls');
+		if (!controls) return;
+
+		const button = document.createElement('button');
+		button.type = 'button';
+		button.className = this.options.fullscreenButtonSelector.replace(/^\./, '');
+		button.setAttribute('aria-label', 'Maximize');
+		button.textContent = '⛶';
+		const closeButton = controls.querySelector(this.options.closeButtonSelector);
+		controls.insertBefore(button, closeButton);
+	}
+
+	setupTabs(options = {}) {
+		this.disposeTabs();
+		if (!options.element) return;
+		this.tabBinding = new TabController(options).init();
+	}
+
+	syncTabs(activeId) {
+		const binding = this.tabBinding;
+		if (!binding) return;
+		binding.sync(activeId);
+	}
+
+	disposeTabs() {
+		if (!this.tabBinding) return;
+		this.tabBinding.dispose();
+		this.tabBinding = null;
+	}
+
 	/**
 	 * Play a UI sound if sound manager is available
 	 * @param {string} soundType - Type of sound to play (open, close, etc.)
 	 */
 	playSound(soundType) {
 		const soundManager = this.getSoundManager();
+		const sounds = SiteConfig.ui.interactionSounds;
+		const soundId = soundType === 'open'
+			? sounds.modalOpen
+			: soundType === 'close'
+				? sounds.modalClose
+				: sounds.click;
 
-		if (soundManager?.soundEnabled && soundManager?.initialized) {
-			try {
-				switch (soundType) {
-					case 'open':
-						soundManager.playUISound('select');
-						break;
-					case 'close':
-						soundManager.playUISound('hover');
-						break;
-					default:
-						soundManager.playUISound('click');
-				}
-			} catch (error) {
-				Utility.warnDebug('Could not play sound:', error);
-			}
-		}
+		soundManager?.playWhenReady?.(soundId);
 	}
 
 	/**
@@ -640,6 +722,7 @@ constructor(parent, options = {}) {
 	 * Clean up event listeners when the modal is no longer needed
 	 */
 	dispose() {
+		this.disposeTabs();
 		// Remove all event listeners
 		if (this.closeButton) {
 			this.closeButton.onclick = null;
@@ -657,16 +740,21 @@ constructor(parent, options = {}) {
 			this.headerElement.ondblclick = null;
 		}
 
+		if (this.buttonElement) {
+			this.buttonElement.onclick = null;
+			this.buttonElement.oncontextmenu = null;
+			delete this.buttonElement.dataset.modalTrigger;
+		}
+
 		document.removeEventListener('click', this.handleOutsideClick);
 		document.removeEventListener('keydown', this.handleKeyDown);
 
 		if (this.options.draggable && this.modalElement) {
 			const header = this.modalElement.querySelector('.window-panel__header') || this.modalElement;
-			header.onmousedown = null;
+			header.removeEventListener('pointerdown', this.handleDragStart);
 		}
 
-		document.removeEventListener('mousemove', this.handleDragMove);
-		document.removeEventListener('mouseup', this.handleDragEnd);
+		this.handleDragEnd();
 		
 		// Remove from active windows array
 		const index = ModalWindow.activeWindows.indexOf(this);

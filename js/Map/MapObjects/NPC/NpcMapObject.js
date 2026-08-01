@@ -119,6 +119,28 @@ class NpcMapObject extends MovingMapObject {
 		return element;
 	}
 
+	handleSingleClick() {
+		super.handleSingleClick();
+		this.openConfiguredShop();
+	}
+
+	handleDoubleClick(event) {
+		if (this.openConfiguredShop()) return;
+		super.handleDoubleClick(event);
+	}
+
+	handleLongPress(event) {
+		if (this.openConfiguredShop()) return;
+		super.handleLongPress(event);
+	}
+
+	openConfiguredShop() {
+		const shopId = this.getConfig('shopId', null);
+		if (!shopId) return false;
+		this.container?.ui?.shopPanel?.openFor(this, shopId);
+		return true;
+	}
+
 	// ── Pathfinding helpers ───────────────────────────────────────────────────
 
 	// Runs A* from current position to (targetCenterX, targetCenterY).

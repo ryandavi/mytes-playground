@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "shops": [
+    {
+      "id": "goblin_goods",
+      "name": "Goblin Goods",
+      "currency": "coins",
+      "shopkeeper": {
+        "name": "Glim",
+        "title": "Traveling Shopkeeper"
+      },
+      "dialogue": {
+        "welcome": [
+          "Welcome! Glim has useful things for clever little files.",
+          "Come in, come in! Everything here is only slightly suspicious.",
+          "Fresh stock today. Take a look before another Myte finds it."
+        ],
+        "purchase": [
+          "Excellent choice. {item} is yours!",
+          "Sold! Treat that {item} well.",
+          "A fine trade. Glim knew the {item} would suit you."
+        ],
+        "insufficientFunds": [
+          "That costs {price} coins. Your pockets sound a little light.",
+          "Almost! Bring {price} coins and Glim will keep it polished.",
+          "No credit today. This one needs {price} coins."
+        ],
+        "inventoryFull": [
+          "Your inventory is full. Make some room and come back.",
+          "No room for that one. Empty a slot and try again.",
+          "Your pockets are packed tighter than Glim's cart."
+        ],
+        "soldOut": [
+          "Sorry, {item} is sold out.",
+          "Not a single {item} left. Glim should have ordered more.",
+          "The last {item} just walked out the door."
+        ]
+      },
+      "items": [
+        {
+          "itemId": "acorn",
+          "price": 4,
+          "stock": 12
+        },
+        {
+          "itemId": "turnip",
+          "price": 7,
+          "stock": 8
+        },
+        {
+          "itemId": "music_box",
+          "price": 25,
+          "stock": 2
+        }
+      ]
+    }
+  ]
+}

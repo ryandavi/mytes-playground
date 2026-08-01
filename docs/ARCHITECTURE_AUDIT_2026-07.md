@@ -833,18 +833,67 @@ These resolve several Questions/Unknowns and adjust task scope. Worker models sh
 
 ## Wall spritesheet format (answers "how should the wall spritesheet work")
 
-One sheet per material, 3-slice horizontal composition per face (DOM `background-repeat` friendly). Grid unit = map cell (32 px). Rows per sheet, defined in `wall-materials.json` so the renderer never hardcodes offsets:
+**Mental model (for the asset author):** you do not draw walls. You draw a handful of small, repeatable strips per material, and the renderer tiles/stacks them into a wall of any length via CSS `background-repeat` — a vertical 3-slice: two end **caps** + a **body** that repeats sideways to fill the run, with a thin **top strip** repeated along the top for the wall's thickness. Draw ~5 tiles once and a 2-tile wall and a 40-tile wall both come for free.
 
-| Row | Piece | Size | Use |
-|---|---|---|---|
-| 1 | Front face, middle | 32 × H (H = height·32, e.g. 96–128) | `background-repeat: repeat-x` body of every south-facing run |
-| 2 | Front face, left / right end caps | 2 tiles, 32 × H | run ends and cutaway/door cut edges |
-| 3 | Top cap strip | 32 × 16–32 | horizontal "thickness" strip above the face; repeat-x |
-| 4 | Stub (walls-down) | 32 × 24–32 | short base with its own top edge baked in |
-| 5 | Side edge (E/W-facing runs) | 32 × H (+ caps) | vertical runs show a side face |
-| 6 | Trim: window jamb / door jamb tiles | 32 × H | drawn at gap edges |
+One sheet per material. Grid unit = map cell (32 px). `H` = wall height in px, canonically **96** (3 cells); bump to 128 for taller rooms — keep `body`, both caps, the side face and the jamb all at the same `H`. The renderer reads every piece's rectangle from `wall-materials.json`, so exact offsets are data, never hard-coded.
 
-A `WallRun` element is then: one body div (row-1 repeat-x) + two cap divs + one top strip div; mode switches swap which row the body uses (full ↔ stub) via CSS class. Interior vs exterior face = a second material sheet or a second row-set in the same sheet — `faces.south.materialId` / `faces.north.materialId` pick independently. Wallpaper/paint = another material sheet reusing the same layout, so customization is purely a `materialId` swap.
+### Pieces (per material)
+
+| Piece | Size | Tiling | Seam rule — what must line up | Used for |
+|---|---|---|---|---|
+| front `body` | 32 × H | repeat-x | Left edge = right edge, pixel-for-pixel | Middle of every south-facing run |
+| front `capL` / `capR` | 32 × H (2 tiles) | none | Outer edge = finished corner; inner edge matches `body` | Run ends, and clean edges where a door/window cuts the wall |
+| `top` strip | 32 × 16–32 | repeat-x | Left = right; bottom edge aligns to `body` top | The "thickness" strip seen above the face |
+| `stub` (walls-down) | 32 × 24–32 | repeat-x | Left = right; its **own** top edge baked in | Short knee-wall the run collapses to in walls-down mode |
+| `side` face | 32 × H | repeat-**y** | Top edge = bottom edge (tiles vertically) | E/W-facing (vertical) runs, seen side-on |
+| `jamb` / trim | 32 × H | none | Match `body` height; one clean edge facing the opening | Finished reveal drawn at window/door gap edges |
+
+Height is drawn **upward** from the base (negative `top` offset); `sortY` = the base line, so mytes south of a wall render in front and those north render behind — existing depth system, zero changes.
+
+### Default sheet packing
+
+A clean starting layout (coordinates are top-left, art px; whole sheet **160 × 148** at H=96). Any packing works as long as the coordinates match `wall-materials.json`:
+
+| Region | x | y | w | h |
+|---|---|---|---|---|
+| front `body` | 0 | 0 | 32 | 96 |
+| front `capL` | 32 | 0 | 32 | 96 |
+| front `capR` | 64 | 0 | 32 | 96 |
+| `side` face | 96 | 0 | 32 | 96 |
+| `jamb` | 128 | 0 | 32 | 96 |
+| `top` strip | 0 | 96 | 32 | 24 |
+| `top` capL / capR | 32 / 64 | 96 | 32 | 24 |
+| `stub` body | 0 | 120 | 32 | 28 |
+| `stub` capL / capR | 32 / 64 | 120 | 32 | 28 |
+
+### Data structure — `data/map-objects/wall-materials.json`
+
+Field names below are illustrative (the wall renderer lands in Phase 12 / T10); the shape is the contract — every piece is a plain `{x, y, w, h}` rect into the sheet, plus a `repeat` hint. `WallRun.faces.*.materialId` references a key here; runs store only the id, never material data.
+
+```jsonc
+{
+  "plaster": {
+    "sheet":  "walls/plaster.png",
+    "cell":   32,
+    "height": 96,                                   // H — must match the tall pieces
+    "front": {
+      "body": { "x": 0,  "y": 0,   "w": 32, "h": 96, "repeat": "x" },
+      "capL": { "x": 32, "y": 0,   "w": 32, "h": 96 },
+      "capR": { "x": 64, "y": 0,   "w": 32, "h": 96 },
+      "top":  { "x": 0,  "y": 96,  "w": 32, "h": 24, "repeat": "x" },
+      "stub": { "x": 0,  "y": 120, "w": 32, "h": 28, "repeat": "x" }
+    },
+    "side": { "body": { "x": 96, "y": 0, "w": 32, "h": 96, "repeat": "y" } },
+    "jamb": { "x": 128, "y": 0, "w": 32, "h": 96 }
+  }
+}
+```
+
+### Composition & customization
+
+A `WallRun` element is: one body div (`front.body` repeat-x) + two cap divs + one top-strip div. Mode switches swap which row the body uses (full ↔ `stub`) via a CSS class; cutaway just hides run segments (no art). Interior vs exterior face = a second material sheet (identical layout) — `faces.south.materialId` / `faces.north.materialId` pick independently. Wallpaper/paint = another material sheet reusing the same layout, so runtime customization is purely a `materialId` swap; keep every material's pieces in the same cells so overrides re-apply cleanly after regeneration (see Customizable Walls Plan §"Customization storage & regeneration survival").
+
+**Authoring checklist (one material):** new sheet, transparent bg, everything snapped to the 32 px grid → pick `H` → draw `body` (test L↔R seam) → `capL`/`capR` (finished outer edge) → `top` strip (seamless, bottom aligned to body top) → `stub` (own baked top edge) → `side` face (tiles top-to-bottom) → `jamb` → record every rect into `wall-materials.json`. For an interior look or repaint, duplicate the sheet, restyle, keep the same cells.
 
 ## Further-inspection list (areas this audit did not deep-dive)
 

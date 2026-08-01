@@ -1,6 +1,6 @@
 # Smoke Checklist — run at the end of EVERY refactor task
 
-One page, ~5 minutes in the browser (`index.php` via XAMPP). Every delegated task prompt ends with "run docs/SMOKE_CHECKLIST.md and report results". A failure means *your task* caused it — fix before hand-back.
+One page, ~5 minutes in the browser (`index.html` via XAMPP). Every delegated task prompt ends with "run docs/SMOKE_CHECKLIST.md and report results". A failure means *your task* caused it — fix before hand-back.
 
 ## Boot
 - [ ] Game loads to the world with **zero console errors or warnings** (warnings that existed before your change: note them, don't fix them silently).

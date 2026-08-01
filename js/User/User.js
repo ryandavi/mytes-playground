@@ -1,4 +1,4 @@
-const USER_DATA_VERSION = 1;
+const USER_DATA_VERSION = 2;
 const USER_DEFAULT_PREFERENCES = Object.freeze({
     soundEnabled: true,
     musicEnabled: true,
@@ -187,6 +187,13 @@ class User {
             migrated.data_version = 1;
         }
 
+        if (migrated.data_version < 2) {
+            if (migrated.userId === 'default') {
+                migrated.mytes = MyteRosterSchema.createStarterRoster(migrated.mytes);
+            }
+            migrated.data_version = 2;
+        }
+
         if (migrated.data_version === USER_DATA_VERSION) {
             Utility.logDebug(`[User] Migrated save data from v${version} to v${USER_DATA_VERSION}.`);
             return migrated;
@@ -252,24 +259,30 @@ class User {
     }
 
     // Currency management
+    setCurrency(type, total) {
+        if (!Object.prototype.hasOwnProperty.call(this.currency, type)) return false;
+
+        const nextTotal = Math.max(0, Math.round(Number(total) || 0));
+        const previousTotal = this.currency[type];
+        const delta = nextTotal - previousTotal;
+        if (delta === 0) return true;
+
+        this.currency[type] = nextTotal;
+        this._scheduleSave();
+        this._emitCurrencyChanged(type, delta);
+        return true;
+    }
+
     addCurrency(type, amount) {
-        if (this.currency.hasOwnProperty(type)) {
-            this.currency[type] += amount;
-            this._scheduleSave();
-            this._emitCurrencyChanged(type, amount);
-            return true;
-        }
-        return false;
+        if (!Object.prototype.hasOwnProperty.call(this.currency, type)) return false;
+        return this.setCurrency(type, this.currency[type] + Number(amount || 0));
     }
 
     spendCurrency(type, amount) {
-        if (this.currency.hasOwnProperty(type) && this.currency[type] >= amount) {
-            this.currency[type] -= amount;
-            this._scheduleSave();
-            this._emitCurrencyChanged(type, -amount);
-            return true;
-        }
-        return false;
+        if (!Object.prototype.hasOwnProperty.call(this.currency, type)) return false;
+        const cost = Math.max(0, Number(amount) || 0);
+        if (this.currency[type] < cost) return false;
+        return this.setCurrency(type, this.currency[type] - cost);
     }
 
     _emitCurrencyChanged(type, delta) {

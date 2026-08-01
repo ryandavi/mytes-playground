@@ -209,27 +209,51 @@ class Inventory {
         return remainingQuantity === 0;
     }
 
+    getAvailableCapacity(nameOrVariant) {
+        const canonicalVariant = ItemRegistry.resolveIdSync(nameOrVariant) || ItemRegistry.normalizeId(nameOrVariant);
+        const stackCapacity = this.items
+            .filter(item => item.variant === canonicalVariant)
+            .reduce((total, item) => total + Math.max(0, this.config.stackSize - (Number(item.quantity) || 0)), 0);
+        const emptySlotCapacity = Math.max(0, this.config.maxItems - this.items.length) * this.config.stackSize;
+        return stackCapacity + emptySlotCapacity;
+    }
+
+    canAddItem(nameOrVariant, quantity = 1) {
+        return this.getAvailableCapacity(nameOrVariant) >= Math.max(0, Number(quantity) || 0);
+    }
+
     removeItem(nameOrVariant, quantity = 1) {
         const canonicalVariant = ItemRegistry.resolveIdSync(nameOrVariant) || ItemRegistry.normalizeId(nameOrVariant);
-        const item = this.items.find(existingItem =>
+        const matchingItems = this.items.filter(existingItem =>
             existingItem.variant === canonicalVariant || existingItem.name === nameOrVariant
         );
-        if (!item) return false;
+        if (matchingItems.length === 0) return false;
 
-        const newQuantity = Math.max(0, parseInt(item.quantity) - quantity);
+        let remainingQuantity = Math.max(0, Number(quantity) || 0);
+        let removedQuantity = 0;
+        matchingItems.forEach((item) => {
+            if (remainingQuantity <= 0) return;
 
-        if (newQuantity === 0) {
-            this.hideItemTooltip(item.element);
-            this.inventoryElement.removeChild(item.element);
-            this.items = this.items.filter(i => i !== item);
-        } else {
+            const currentQuantity = Number(item.quantity) || 0;
+            const quantityToRemove = Math.min(currentQuantity, remainingQuantity);
+            const newQuantity = currentQuantity - quantityToRemove;
+            remainingQuantity -= quantityToRemove;
+            removedQuantity += quantityToRemove;
+
+            if (newQuantity === 0) {
+                this.hideItemTooltip(item.element);
+                item.element.remove();
+                this.items = this.items.filter(existingItem => existingItem !== item);
+                return;
+            }
+
             item.quantity = newQuantity;
             item.element.dataset.quantity = newQuantity;
             this.updateItemDisplay(item);
-        }
+        });
 
         this.updateInventoryDisplay();
-        return true;
+        return removedQuantity > 0;
     }
 
     updateItemDisplay(item) {
