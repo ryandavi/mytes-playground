@@ -16,6 +16,15 @@ class HUDManager extends UIComponent {
         this._coinScale = 1;
         this._lastCoinTickAt = -Infinity;
         this.numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+        this.boundOpenMyteInfo = () => {
+            const activeMyte = this.parent.getActiveMyte();
+            if (activeMyte) this.parent.myteInfoPanel?.openFor?.(activeMyte);
+        };
+        this.boundOpenMyteInfoKey = (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            this.boundOpenMyteInfo();
+        };
         this.lastRenderedState = {
             visible: false,
             myteId: null,
@@ -33,6 +42,14 @@ class HUDManager extends UIComponent {
         const core = this.parent.parent?.core;
         const initialCoins = Number(core?.user?.currency?.coins) || 0;
         this.renderCoinValue(initialCoins);
+
+        if (this.hudElement) {
+            this.hudElement.tabIndex = 0;
+            this.hudElement.setAttribute('role', 'button');
+            this.hudElement.setAttribute('aria-label', 'Open active Myte information');
+            this.hudElement.addEventListener('click', this.boundOpenMyteInfo);
+            this.hudElement.addEventListener('keydown', this.boundOpenMyteInfoKey);
+        }
 
         if (!this._currencyUnsubscribe && core?.eventManager) {
             this._currencyUnsubscribe = core.eventManager.on('user:currency_changed', (payload) => {
@@ -142,7 +159,7 @@ class HUDManager extends UIComponent {
         const roundedValue = Math.round(value);
         this._coinDisplayedValue = value;
         if (this.coinElement && this.lastRenderedState.coins !== roundedValue) {
-            this.coinElement.textContent = `¢ ${this.numberFormatter.format(roundedValue)}`;
+            this.coinElement.textContent = Utility.formatCurrency('coins', roundedValue);
             this.lastRenderedState.coins = roundedValue;
         }
     }
@@ -167,8 +184,14 @@ class HUDManager extends UIComponent {
 
         const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         if (reducedMotion) {
+            const soundConfig = SiteConfig.ui.hud.numericAnimation.sound;
+            const isPositive = delta > 0;
             this.resetCoinEmphasis();
             this.renderCoinValue(target);
+            this.playCoinSound(soundConfig.tickId, {
+                volume: isPositive ? soundConfig.gainTickVolume : soundConfig.spendTickVolume,
+                pitchScale: isPositive ? soundConfig.gainPitchStart : soundConfig.spendPitchStart
+            });
             return;
         }
 
@@ -189,6 +212,7 @@ class HUDManager extends UIComponent {
         const startingScaleOffset = Math.max(0, this._coinScale - 1);
         const startedAt = performance.now();
         const isPositive = authoritativeDelta > 0;
+        this._lastCoinTickAt = -Infinity;
         const directionClass = isPositive ? 'is-gaining' : 'is-spending';
         this.coinElement?.classList.remove('is-gaining', 'is-spending');
         this.coinElement?.classList.add(directionClass);
@@ -216,7 +240,7 @@ class HUDManager extends UIComponent {
             this.renderCoinValue(target);
             this.resetCoinEmphasis();
             if (isPositive && magnitude >= config.finalChimeMinDelta) {
-                this.playCoinSound('ui_select', { volume: 0.3 });
+                this.playCoinSound(config.sound.chimeId, { volume: config.sound.chimeVolume });
             }
         };
 
@@ -225,6 +249,7 @@ class HUDManager extends UIComponent {
 
     playCoinTick(progress, magnitude, isPositive, now) {
         const config = SiteConfig.ui.hud.numericAnimation;
+        const soundConfig = config.sound;
         if (magnitude < config.tickMinDelta) return;
 
         const interval = config.tickStartIntervalMs
@@ -232,9 +257,10 @@ class HUDManager extends UIComponent {
         if (now - this._lastCoinTickAt < interval) return;
 
         this._lastCoinTickAt = now;
-        this.playCoinSound('ui_hover', {
-            volume: isPositive ? 0.16 : 0.1,
-            pitchScale: 0.9 + progress * 0.16
+        this.playCoinSound(soundConfig.tickId, {
+            volume: isPositive ? soundConfig.gainTickVolume : soundConfig.spendTickVolume,
+            pitchScale: (isPositive ? soundConfig.gainPitchStart : soundConfig.spendPitchStart)
+                + progress * soundConfig.pitchRise
         });
     }
 
@@ -252,6 +278,8 @@ class HUDManager extends UIComponent {
     }
 
     dispose() {
+        this.hudElement?.removeEventListener('click', this.boundOpenMyteInfo);
+        this.hudElement?.removeEventListener('keydown', this.boundOpenMyteInfoKey);
         this._currencyUnsubscribe?.();
         this._currencyUnsubscribe = null;
         this._coinAnimationToken++;
@@ -266,5 +294,7 @@ class HUDManager extends UIComponent {
         this.coinElement = null;
         this.numberFormatter = null;
         this.currentMoodEffect = null;
+        this.boundOpenMyteInfo = null;
+        this.boundOpenMyteInfoKey = null;
     }
 }

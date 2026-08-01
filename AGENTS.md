@@ -6,7 +6,7 @@
 
 **Stack:** Vanilla JS (ES6 classes, no framework), PHP (cache-busting entry point), SCSS → CSS, Tone.js (audio), Tiled (.tmx maps).
 
-**Entry point:** `index.php` / `index.html` — loads 150+ scripts in dependency order.
+**Entry point:** `index.html` — loads the generated `js/bundle.js`, whose order comes from `scripts/script-manifest.json`.
 
 ---
 
@@ -161,6 +161,9 @@ All design values are CSS custom properties. Never hard-code values that exist h
 ```bash
 # Compile SCSS
 npx sass css/style.scss css/style.css --no-source-map
+
+# Rebuild the browser bundle after JS changes
+node scripts/build-manifest.js
 
 # Watch SCSS
 npm run sass:watch

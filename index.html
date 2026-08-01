@@ -1,8 +1,10 @@
-<html>
+<!doctype html>
+<html lang="en">
 
 <head>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 	<meta charset="UTF-8">
+	<title>Neko</title>
 	<link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -25,11 +27,18 @@
 			<div class="date-time">
 				<div class="clock">--:--</div>
 			</div>
-			<div class="coin-count">¢ 0</div>
-			<div class="user">
-				<div class="username">Guest</div>
+			<div class="user-summary">
+				<div class="user">
+					<button type="button" class="username" aria-label="Open user profile">
+						<svg class="user-icon" aria-hidden="true" viewBox="0 0 16 16">
+							<path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.5 6c.25-3 2.1-4.5 5.5-4.5s5.25 1.5 5.5 4.5h-11Z" />
+						</svg>
+						<span class="username__text">Guest</span>
+					</button>
+				</div>
+				<div class="coin-count">¢ 0</div>
 			</div>
-			<button class="app-fullscreen-btn fullscreen-btn">⛶</button>
+			<button type="button" class="app-fullscreen-btn fullscreen-btn" aria-label="Toggle fullscreen">⛶</button>
 		</div>
 		<!-- END HEADER -->
 		<!-- HAND CONTROLS -->
@@ -82,7 +91,7 @@
 						d="m11.91,10.63c-.15.19-.43.23-.63.08L.17,2c-.2-.15-.23-.44-.08-.63.09-.11.22-.17.35-.17.1,0,.19.03.28.1l3.3,2.59,2.17-1.93c.18-.16.43-.2.64-.1.22.1.35.31.35.55v3.97l1.02.8c-.05-.17,0-.36.15-.48.21-.17.33-.43.33-.69s-.12-.52-.33-.69c-.19-.16-.22-.44-.06-.63.16-.19.44-.22.63-.06.42.35.66.85.66,1.39s-.24,1.04-.66,1.39c-.08.07-.18.1-.28.1,0,0-.02,0-.03,0l.83.65s.03-.04.05-.06c.64-.52,1-1.28,1-2.08s-.36-1.56-1-2.08c-.19-.16-.22-.44-.06-.63.16-.19.44-.22.63-.06.84.69,1.33,1.7,1.33,2.78s-.45,2-1.24,2.69l1.67,1.3c.2.15.23.44.08.63ZM1.66,4.32l5.54,4.34v.94c0,.24-.14.45-.35.55-.08.04-.16.05-.25.05-.14,0-.29-.05-.4-.15l-2.53-2.25h-1.57c-.5,0-.9-.4-.9-.9v-1.8c0-.34.19-.63.46-.78Z" />
 				</svg>
 
-				
+
 
 			</button>
 
@@ -106,7 +115,7 @@
 			d="m12,6.75c0,.41-.34.75-.75.75h-1.5v.75c0,.35-.07.69-.19,1l1.47,1.46c.29.29.29.77,0,1.06-.15.15-.34.22-.53.22s-.38-.07-.53-.22l-1.27-1.27c-.53.45-1.2.74-1.95.74h-.38v-5.63c0-.21-.17-.37-.37-.37s-.37.17-.37.37v5.63h-.38c-.75,0-1.43-.28-1.95-.74l-1.27,1.27c-.15.15-.34.22-.53.22s-.38-.07-.53-.22c-.29-.29-.29-.77,0-1.06l1.47-1.46c-.11-.32-.19-.65-.19-1v-.75H.75C.34,7.5,0,7.16,0,6.75s.34-.75.75-.75h1.5v-1.19l-1.28-1.28c-.29-.29-.29-.77,0-1.06s.77-.29,1.06,0l1.28,1.28h5.38l1.28-1.28c.29-.29.77-.29,1.06,0s.29.77,0,1.06l-1.28,1.28v1.19h1.5c.41,0,.75.34.75.75Zm-3.75-3.75H3.75v-.75c0-1.24,1.01-2.25,2.25-2.25s2.25,1.01,2.25,2.25v.75Z" />
 			</svg>
 
-			
+
 		</button>
 
 
@@ -310,6 +319,67 @@
 		</div>
 	</div>
 	<!-- END SOUND SETTINGS -->
+	<!-- MYTE INFORMATION PANEL -->
+	<div id="myte-info-panel" class="window-panel myte-info">
+		<div class="window-panel__header">
+			<h2 class="window-panel__title">
+				<span class="icon" aria-hidden="true">i</span>
+				<span class="text">Myte Information</span>
+			</h2>
+			<div class="window-panel__controls">
+				<button class="modal-minimize-btn" aria-label="Minimize">&#128469;</button>
+				<button class="modal-fullscreen-btn" aria-label="Maximize">&#x26F6;</button>
+				<button class="modal-close-btn" aria-label="Close">&times;</button>
+			</div>
+		</div>
+		<div class="window-panel__content">
+			<div class="myte-info__summary">
+				<div class="myte-info__portrait" aria-hidden="true"></div>
+				<div class="myte-info__identity">
+					<div class="myte-info__name">Myte</div>
+					<div class="myte-info__species">Species</div>
+				</div>
+			</div>
+			<div class="window-tabs myte-info__tabs" role="tablist" aria-label="Myte information">
+				<button id="myte-info-tab-general" type="button" role="tab" aria-controls="myte-info-tabpanel" data-myte-info-tab="general">General</button>
+				<button id="myte-info-tab-needs" type="button" role="tab" aria-controls="myte-info-tabpanel" data-myte-info-tab="needs">Needs</button>
+				<button id="myte-info-tab-behavior" type="button" role="tab" aria-controls="myte-info-tabpanel" data-myte-info-tab="behavior">Behavior</button>
+				<button id="myte-info-tab-drives" type="button" role="tab" aria-controls="myte-info-tabpanel" data-myte-info-tab="drives">Drives</button>
+				<button id="myte-info-tab-debug" type="button" role="tab" aria-controls="myte-info-tabpanel" data-myte-info-tab="debug" hidden>Debug</button>
+			</div>
+			<div id="myte-info-tabpanel" class="window-tab-body myte-info__body" role="tabpanel"></div>
+		</div>
+	</div>
+	<!-- END MYTE INFORMATION PANEL -->
+	<!-- USER PROFILE PANEL -->
+	<div id="user-profile-panel" class="window-panel user-profile">
+		<div class="window-panel__header">
+			<h2 class="window-panel__title">
+				<span class="icon" aria-hidden="true">☺</span>
+				<span class="text">User Profile</span>
+			</h2>
+			<div class="window-panel__controls">
+				<button class="modal-minimize-btn" aria-label="Minimize">&#128469;</button>
+				<button class="modal-close-btn" aria-label="Close">&times;</button>
+			</div>
+		</div>
+		<div class="window-panel__content user-profile__content">
+			<section class="user-profile__identity">
+				<div class="user-profile__avatar" aria-hidden="true">G</div>
+				<div>
+					<h3 class="user-profile__name">Guest</h3>
+					<div class="user-profile__id">User ID: default</div>
+				</div>
+			</section>
+			<div class="window-tabs user-profile__tabs" role="tablist" aria-label="User profile">
+				<button type="button" role="tab" data-user-profile-tab="account">Account</button>
+				<button type="button" role="tab" data-user-profile-tab="progress">Progress</button>
+			</div>
+			<div class="window-tab-body user-profile__body" role="tabpanel"></div>
+		</div>
+	</div>
+	<!-- END USER PROFILE PANEL -->
+
 	<!-- GAME SETTINGS PANEL -->
 	<div id="game-settings-panel" class="window-panel">
 		<div class="window-panel__header">
@@ -426,9 +496,12 @@
 				<button class="modal-close-btn">&times;</button>
 			</div>
 		</div>
-		<div class="window-panel__content">
-			<div class="game-log-filters"></div>
-			<ul class="game-log-list"></ul>
+		<div class="window-panel__content game-log">
+			<div class="window-tabs game-log-filters" role="tablist" aria-label="Event categories"></div>
+			<div class="window-tab-body game-log-body" role="tabpanel" aria-label="Event entries">
+				<ul class="game-log-list"></ul>
+				<div class="window-empty-state game-log-empty">No events recorded yet.</div>
+			</div>
 		</div>
 	</div>
 	<div id="view-panel" class="window-panel">
@@ -498,161 +571,8 @@
 	<!-- END GAME SETTINGS PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<!-- EXTERNAL -->
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
-	<!-- CORE -->
-	<script src="js/Engine/Config/AppConfig.js"></script>
-	<script src="js/Engine/Config/SiteConfig.js"></script>
-	<script src="js/Utility/Utility.js"></script>
-	<script src="js/Utility/RectUtils.js"></script>
-	<script src="js/UI/Core/TooltipSystem.js"></script>
-	<script src="js/Engine/ItemRegistry.js"></script>
-	<script src="js/Engine/BuffRegistry.js"></script>
-	<script src="js/Myte/Queue/ActionDefinitionRegistry.js"></script>
-	<script src="js/Input/BaseInputHandler.js"></script>
-	<script src="js/Input/BaseDragHandler.js"></script>
-	<script src="js/Engine/ResourceManager.js"></script>
-	<script src="js/Engine/Audio/AudioCategoryRules.js"></script>
-	<script src="js/Engine/Audio/AudioScheduleProfiles.js"></script>
-	<script src="js/Engine/Audio/AudioVoiceProfiles.js"></script>
-	<script src="js/Engine/Audio/AudioPresetLibrary.js"></script>
-	<script src="js/Engine/SoundManager.js"></script>
-	<script src="js/Engine/EventManager.js"></script>
-	<script src="js/Engine/LoadingManager.js"></script>
-
-	<script src="js/UI/Core/ToastSystem.js"></script>
-	<script src="js/Engine/SimClock.js"></script>
-	<script src="js/Engine/Core.js"></script>
-	<script src="js/Engine/GameTime.js"></script>
-	<script src="js/Engine/SpriteAnimator.js"></script>
-	<script src="js/Effects/ParticleSystem.js"></script>
-
-	<!-- INPUT -->
-	<script src="js/Input/MapObjectSelectDragManager.js"></script>
-	<script src="js/Input/InputSystem.js"></script>
-	<script src="js/Input/InputComponent.js"></script>
-	<script src="js/Input/ClickComponent.js"></script>
-	<script src="js/Input/DragComponent.js"></script>
-	<script src="js/Input/RubbingComponent.js"></script>
-	<!-- USER -->
-	<script src="js/User/MyteRosterSchema.js"></script>
-	<script src="js/User/User.js"></script>
-	<script src="js/User/Inventory.js"></script>
-	<!-- CONTAINER -->
-	<script src="js/Container/ContainerManager.js"></script>
-	<script src="js/Container/ContainerInputManager.js"></script>
-	<!-- SHARED ENTITY MIXIN (must load before Myte and any NPC class) -->
-	<script src="js/Engine/Entity.js"></script>
-	<!-- WORLD REGISTRY / QUERY / RELATIONSHIPS / ATTACHMENTS (interface skeletons — audit T3-T6) -->
-	<script src="js/Engine/WorldRegistry.js"></script>
-	<script src="js/Engine/WorldQuery.js"></script>
-	<script src="js/Engine/EntityRelationships.js"></script>
-	<script src="js/Engine/AttachmentSystem.js"></script>
-	<!-- MYTE -->
-	<script src="js/Myte/MyteDefinitions.js"></script>
-	<script src="js/Myte/FootstepController.js"></script>
-	<script src="js/Myte/MytePhysics.js"></script>
-	<script src="js/Myte/MyteMovementController.js"></script>
-	<script src="js/Myte/FollowBehavior.js"></script>
-	<script src="js/Myte/MyteRenderer.js"></script>
-	<script src="js/Myte/Myte.js"></script>
-	<script src="js/Myte/MyteStats.js"></script>
-	<script src="js/Myte/MyteBuffController.js"></script>
-	<script src="js/Myte/MyteAI.js"></script>
-	<script src="js/Myte/StateMachine.js"></script>
-	<script src="js/Myte/Input/MyteBaseHandler.js"></script>
-	<script src="js/Myte/Input/MyteInputHandler.js"></script>
-	<script src="js/Myte/Input/MyteTouchHandler.js"></script>
-	<script src="js/Myte/Input/MyteClickHandler.js"></script>
-	<script src="js/Myte/Input/MyteRubbingHandler.js"></script>
-	<script src="js/Myte/MyteDialogue.js"></script>
-	<script src="js/Myte/MyteSpeech.js"></script>
-	<!-- QUEUE -->
-	<script src="js/Myte/Queue/Actions/BaseActions.js"></script>
-	<script src="js/Myte/Queue/Actions/MoveActions.js"></script>
-	<script src="js/Myte/Queue/Actions/ObjectInteractions.js"></script>
-	<script src="js/Myte/Queue/Actions/SocialActions.js"></script>
-	<script src="js/Myte/Queue/Actions/StateActions.js"></script>
-	<script src="js/Myte/Queue/Actions/CarryActions.js"></script>
-	<script src="js/Myte/Queue/Actions/ReactiveActions.js"></script>
-	<script src="js/Myte/Queue/MyteQueue.js"></script>
-	<script src="js/Myte/Queue/ActionManager.js"></script>
-	<!-- MAP -->
-	<script src="js/Map/Camera.js"></script>
-	<script src="js/Map/GameMapLoader.js"></script>
-	<script src="js/Map/GameMap.js"></script>
-	<script src="js/Map/GameZone.js"></script>
-	<script src="js/Map/MapEnvironmentManager.js"></script>
-	<script src="js/Map/GameMapParticleSystem.js"></script>
-	<script src="js/Map/Grid/TileMapLoader.js"></script>
-	<script src="js/Map/MapTransitionManager.js"></script>
-	<script src="js/Map/MapRenderer.js"></script>
-	<script src="js/Map/MapObjects/MapObjectInputController.js"></script>
-	<script src="js/Map/MapObjects/MapObject.js"></script>
-	<script src="js/Map/MapObjects/DroppedMapItem.js"></script>
-	<!-- ANIMATED -->
-	<script src="js/Map/MapObjects/AnimationController.js"></script>
-	<script src="js/Map/MapObjects/AnimatedMapObject.js"></script>
-	<script src="js/Map/MapObjects/MapObjectBases.js"></script>
-	<!-- INTERACTIVE -->
-	<script src="js/Map/MapObjects/Interactive/FountainMapObject.js"></script>
-	<script src="js/Map/MapObjects/Interactive/LightMapObject.js"></script>
-	<script src="js/Map/MapObjects/Interactive/TreasureChestMapObject.js"></script>
-	<script src="js/Map/MapObjects/Interactive/PortalMapObject.js"></script>
-	<!-- MOVEMENT BODY -->
-	<script src="js/Map/MapObjects/MovementBody.js"></script>
-	<!-- MOVING -->
-	<script src="js/Map/MapObjects/Moving/MovingMapObject.js"></script>
-	<script src="js/Map/MapObjects/Moving/BallMapObject.js"></script>
-	<!-- AMBIENT CREATURES -->
-	<script src="js/Map/MapObjects/AmbientCreature/AmbientCreatureMapObject.js"></script>
-	<script src="js/Map/MapObjects/AmbientCreature/HiveMapObject.js"></script>
-	<script src="js/Map/MapObjects/AmbientCreature/PollinatorCreatureMapObject.js"></script>
-	<script src="js/Map/MapObjects/AmbientCreature/BirdMapObject.js"></script>
-	<!-- NPC -->
-	<script src="js/Map/MapObjects/NPC/PatrolGuardMapObject.js"></script>
-	<script src="js/Map/MapObjects/NPC/NpcMapObject.js"></script>
-	<!-- BARRIERS -->
-	<script src="js/Map/MapObjects/Barrier/DoorMapObject.js"></script>
-	<script src="js/Map/MapObjects/Barrier/FenceMapObject.js"></script>
-	<script src="js/Map/MapObjects/Barrier/GateMapObject.js"></script>
-	<!-- PLANTS -->
-	<script src="js/Map/MapObjects/GrowingPlant/GrowingPlantMapObject.js"></script>
-	<script src="js/Map/MapObjects/GrowingPlant/BreedingFlowerMapObject.js"></script>
-	<script src="js/Map/MapObjects/GrowingPlant/NightBloomMapObject.js"></script>
-	<script src="js/Map/MapObjects/GrowingPlant/CropPlantMapObject.js"></script>
-	<script src="js/Map/MapObjects/GrowingPlant/TreeMapObject.js"></script>
-	<script src="js/Map/MapObjects/GrowingPlant/FruitTreeMapObject.js"></script>
-	<script src="js/Map/MapObjects/GrowingPlant/TreeStumpMapObject.js"></script>
-	<!-- MAP OBJECT FACTORY -->
-	<script src="js/Map/MapObjectFactory.js"></script>
-	<!-- MAP GRID -->
-	<script src="js/Map/Grid/GameMapGrid.js"></script>
-	<script src="js/Map/Grid/AStarPathfinder.js"></script>
-	<!-- UI -->
-	<script src="js/UI/Core/UIComponent.js"></script>
-	<script src="js/UI/Overlays/CompactChipStripUI.js"></script>
-	<script src="js/UI/Core/CursorManager.js"></script>
-	<script src="js/UI/Container/ToolManager.js"></script>
-	<script src="js/UI/Map/SelectionManager.js"></script>
-	<script src="js/UI/Map/QueueTargetManager.js"></script>
-	<script src="js/UI/Container/ActionSidebarManager.js"></script>
-	<script src="js/UI/Overlays/CompactQueueUI.js"></script>
-	<script src="js/UI/Overlays/BuffOverlayUI.js"></script>
-	<script src="js/UI/Container/MyteListManager.js"></script>
-	<script src="js/UI/Container/HUDManager.js"></script>
-	<script src="js/UI/Map/OffscreenMyteIndicatorManager.js"></script>
-	<script src="js/UI/Container/ScreenManager.js"></script>
-	<script src="js/UI/Core/UserInterface.js"></script>
-	<script src="js/UI/Core/ModalWindow.js"></script>
-	<script src="js/UI/Debug/DebugOverlayUI.js"></script>
-	<script src="js/UI/Debug/AuditHarness.js"></script>
-	<script src="js/UI/Debug/QueueUI.js"></script>
-	<script src="js/UI/Panels/SoundPanel.js"></script>
-	<script src="js/UI/Panels/SettingsPanel.js"></script>
-	<script src="js/UI/Panels/ViewPanel.js"></script>
-	<script src="js/UI/Panels/DebugPanel.js"></script>
-	<script src="js/UI/Container/GameLogManager.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js" defer></script>
+	<script src="js/bundle.js"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

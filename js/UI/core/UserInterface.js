@@ -5,6 +5,9 @@ class UserInterface {
         this.debugOverlay = new DebugOverlayUI(parent);
         this.debug = this.debugOverlay;
         this.isActive = false;
+		this.lastSoundHour = null;
+		this.boundControlClickSound = this.handleControlClickSound.bind(this);
+		this.boundTimeMilestoneSound = this.handleTimeMilestoneSound.bind(this);
 
         // Initialize all UI components
         this.toolManager = new ToolManager(this);
@@ -39,7 +42,15 @@ class UserInterface {
         this.settingsPanel = new SettingsPanel(this);
         this.viewPanel = new ViewPanel(this);
         this.debugPanel = new DebugPanel(this);
+        this.myteInfoPanel = new MyteInfoPanel(this);
+        this.userProfilePanel = new UserProfilePanel(this);
+        this.shopPanel = new ShopPanel(this);
         this.gameLogManager = new GameLogManager(this);
+
+		document.addEventListener('click', this.boundControlClickSound);
+		const gameTime = this.parent.core?.gameTime;
+		this.lastSoundHour = gameTime?.getCurrentHour?.() ?? null;
+		gameTime?.subscribe?.('hour', this.boundTimeMilestoneSound);
         this.soundMenu = this.soundPanel;
         this.settingsMenu = this.settingsPanel;
         this.viewMenu = this.viewPanel;
@@ -79,6 +90,27 @@ class UserInterface {
     playSound(sound) {
         this.parent.core.soundManager.playUISound(sound);
     }
+
+	handleControlClickSound(event) {
+		const control = event.target.closest?.('button, [role="button"]');
+		if (!control || !document.body.contains(control)) return;
+		if (control.disabled || event.defaultPrevented) return;
+		if (control.dataset.modalTrigger === 'true') return;
+		if (control.closest('.window-panel__controls, #sound-settings-panel')) return;
+
+		this.parent.core?.soundManager?.playWhenReady?.(SiteConfig.ui.interactionSounds.click);
+	}
+
+	handleTimeMilestoneSound(timeData = {}) {
+		const hour = Number(timeData.hour);
+		if (!Number.isFinite(hour) || hour === this.lastSoundHour) return;
+		this.lastSoundHour = hour;
+
+		const sounds = SiteConfig.ui.interactionSounds;
+		const cue = sounds.timeMilestones[hour];
+		if (!cue) return;
+		this.parent.core?.soundManager?.playWhenReady?.(sounds.timeMilestone, cue);
+	}
 
     // Public methods
     setSelected(obj) {
@@ -121,15 +153,24 @@ class UserInterface {
         this.buffOverlayUI.update();
         this.offscreenMyteIndicatorManager.update();
         this.compactQueueUI?.update?.();
+        this.myteInfoPanel?.update?.();
     }
 
     dispose() {
+		document.removeEventListener('click', this.boundControlClickSound);
+		this.parent.core?.gameTime?.unsubscribe?.('hour', this.boundTimeMilestoneSound);
         this.debugOverlay?.dispose?.();
         this.debugOverlay = null;
         this.debug = null;
         this.debugPanel?.dispose?.();
         this.debugPanel = null;
         this.debugMenu = null;
+        this.myteInfoPanel?.dispose?.();
+        this.myteInfoPanel = null;
+        this.userProfilePanel?.dispose?.();
+        this.userProfilePanel = null;
+        this.shopPanel?.dispose?.();
+        this.shopPanel = null;
         this.settingsPanel?.dispose?.();
         this.settingsPanel = null;
         this.settingsMenu = null;
@@ -163,5 +204,7 @@ class UserInterface {
         this.myteListManager = null;
         this.compactQueueUI?.dispose?.();
         this.compactQueueUI = null;
+		this.boundControlClickSound = null;
+		this.boundTimeMilestoneSound = null;
     }
 }

@@ -206,6 +206,11 @@ class InputSystem {
 	 * @param {MouseEvent} event 
 	 */
 	handleMouseDown(event) {
+	  this.state.mouse.x = event.pageX;
+	  this.state.mouse.y = event.pageY;
+	  this.state.mouse.clientX = event.clientX;
+	  this.state.mouse.clientY = event.clientY;
+
 	  // Update mouse state
 	  this.state.mouse.pressed = true;
 	  this.state.mouse.button = event.button;
@@ -317,6 +322,11 @@ class InputSystem {
 	 * @param {MouseEvent} event 
 	 */
 	handleClick(event) {
+	  this.state.mouse.x = event.pageX;
+	  this.state.mouse.y = event.pageY;
+	  this.state.mouse.clientX = event.clientX;
+	  this.state.mouse.clientY = event.clientY;
+
 	  const gestureConfig = this.getGestureConfig();
 	  const doubleClickInterval = gestureConfig.doubleClickInterval ?? 300;
 	  const now = Date.now();

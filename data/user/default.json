@@ -1,5 +1,5 @@
 {
-  "data_version": 1,
+  "data_version": 2,
   "username": "Guest",
   "userId": "default",
   "lastLogin": "2026-01-01T00:00:00.000Z",
@@ -49,30 +49,5 @@
       "variant": "acorn"
     }
   ],
-  "mytes": [
-    {
-      "id": "1",
-      "name": "Myte",
-      "species": "snail",
-      "posX": 0,
-      "posY": 0,
-      "slotId": "myte-slot-1",
-      "slotLabel": "Myte's Slot",
-      "slotX": 0,
-      "slotY": 0,
-      "hasSlotPosition": false,
-      "isActive": false,
-      "goal": 0,
-      "followGoal": 0,
-      "autonomyGoal": 1,
-      "stats": {
-        "health": 100,
-        "mood": 100,
-        "energy": 75,
-        "boredom": 28,
-        "comfort": 72,
-        "confidence": 58
-      }
-    }
-  ]
+  "mytes": []
 }

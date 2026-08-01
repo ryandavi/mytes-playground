@@ -32,21 +32,8 @@ class SoundManager {
 	constructor(parent, options = {}) {
 
 		this.parent = parent;
-		// Check if we have browser audio support
-
-		if (typeof Tone == "undefined") {
-			console.warn("Tone.js is not loaded");
-			return;
-		}
-
-		this.hasAudioSupport = 'AudioContext' in window || 'webkitAudioContext' in window;
-		if (!this.hasAudioSupport) {
-			console.warn('Audio is not supported in this browser');
-			return;
-		}
-
-		// Core properties
 		this.initialized = false;
+		this.initAttempted = false;
 		this.soundEnabled = options.soundEnabled !== false;
 		this.musicEnabled = options.musicEnabled !== false;
 		this.ambientEnabled = options.ambientEnabled !== false;
@@ -59,6 +46,14 @@ class SoundManager {
 			ui: options.uiVolume ?? 0.72,
 			ambient: options.ambientVolume ?? 0.42
 		};
+
+		// Audio is optional. The simulation and UI remain usable when the CDN is
+		// unavailable or the browser has no Web Audio implementation.
+		this.hasAudioSupport =
+			typeof Tone !== 'undefined' &&
+			('AudioContext' in window || 'webkitAudioContext' in window);
+
+		// Core properties
 		this.categoryMix = {
 			music: 0.88,
 			ambient: 0.82,
@@ -72,7 +67,7 @@ class SoundManager {
 		};
 
 		this.criticalSounds = [
-			"ui_click", "ui_select", "ball_hit",
+			"ui_click", "ui_select", "ui_coin_tick", "ui_coin_chime", "ui_time_chime", "ball_hit",
 		];
 
 		this.speech = null;
@@ -378,6 +373,7 @@ class SoundManager {
 
 	init() {
 		if (this.initialized) return Promise.resolve();
+		if (!this.hasAudioSupport || typeof Tone === 'undefined') return Promise.resolve();
 
 		// Prevent multiple init attempts in rapid succession
 		if (this.initAttempted) {
@@ -587,6 +583,13 @@ class SoundManager {
 		}
 
 		return sound;
+	}
+
+	playWhenReady(id, options = {}) {
+		if (!this.soundEnabled || !this.synthPresets[id]) return Promise.resolve(null);
+		if (this.initialized) return Promise.resolve(this.play(id, options));
+
+		return this.init().then(() => this.initialized ? this.play(id, options) : null);
 	}
 
 	stop(id) {

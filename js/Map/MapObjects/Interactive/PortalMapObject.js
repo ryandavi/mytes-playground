@@ -2,13 +2,16 @@ class PortalMapObject extends InteractiveMapObject {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
 
-        this.targetMap = options.targetMap || null;
-        this.targetSpawnPoint = options.targetSpawnPoint || null;
-        this.targetPortalId = options.targetPortalId || null;
-        this.portalId = String(options.portalId || options.id || `${type}_${variant}_${posX}_${posY}`);
-        this.isActive = options.isActive !== undefined ? options.isActive : true;
-        this.activationRadius = options.activationRadius || 75;
-        this.transitionDuration = options.transitionDuration || 1000;
+        this.targetMap = options.targetMap ?? this.getConfig('targetMap', null);
+        this.targetSpawnPoint = options.targetSpawnPoint ?? this.getConfig('targetSpawnPoint', null);
+        this.targetPortalId = options.targetPortalId ?? this.getConfig('targetPortalId', null);
+        this.portalId = String(
+            options.portalId ??
+            this.getConfig('portalId', options.id ?? `${type}_${variant}_${posX}_${posY}`)
+        );
+        this.isActive = options.isActive ?? this.getConfig('isActive', true);
+        this.activationRadius = options.activationRadius ?? this.getConfig('activationRadius', 75);
+        this.transitionDuration = options.transitionDuration ?? this.getConfig('transitionDuration', 1000);
 
         this.isAnimating = false;
         this.particleSystem = null;

@@ -6,7 +6,7 @@ class TreasureChestMapObject extends withItemDrops(MultiStateMapObject) {
         this.canClose = this.getConfig('canClose', false);
 
         // Add initial items if provided
-        this.addItems(options.items || []);
+        this.addItems(options.items ?? this.getConfig('items', []));
     }
 
     getStateClassNames() {

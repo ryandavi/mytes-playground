@@ -188,6 +188,71 @@
 					return { synth, note: "E6", duration: "32n" };
 				}
 			},
+			"ui_coin_tick": {
+				type: "ui",
+				baseVolume: 0.48,
+				create: () => {
+					const synth = new Tone.FMSynth({
+						harmonicity: 5,
+						modulationIndex: 7,
+						oscillator: { type: "sine" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.075,
+							sustain: 0,
+							release: 0.04
+						},
+						modulation: { type: "square" },
+						modulationEnvelope: {
+							attack: 0.001,
+							decay: 0.05,
+							sustain: 0,
+							release: 0.03
+						}
+					}).toDestination();
+					return { synth, note: "B5", duration: "32n" };
+				}
+			},
+			"ui_coin_chime": {
+				type: "ui",
+				baseVolume: 0.54,
+				create: () => {
+					const synth = new Tone.Synth({
+						oscillator: { type: "triangle" },
+						envelope: {
+							attack: 0.002,
+							decay: 0.12,
+							sustain: 0.05,
+							release: 0.14
+						}
+					}).toDestination();
+					return {
+						synth,
+						notes: ["E5", "B5"],
+						durations: ["16n", "16n"]
+					};
+				}
+			},
+			"ui_time_chime": {
+				type: "ui",
+				baseVolume: 0.44,
+				create: () => {
+					const synth = new Tone.Synth({
+						oscillator: { type: "sine" },
+						envelope: {
+							attack: 0.01,
+							decay: 0.18,
+							sustain: 0.05,
+							release: 0.35
+						}
+					}).toDestination();
+					return {
+						synth,
+						notes: ["C5", "G5", "C6"],
+						durations: ["16n", "16n", "8n"]
+					};
+				}
+			},
 			"ui_select": {
 				type: "ui",
 				baseVolume: 0.5,

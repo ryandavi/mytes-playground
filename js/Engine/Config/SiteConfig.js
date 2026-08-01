@@ -192,6 +192,12 @@ const SiteConfig = Object.freeze({
         }),
     }),
 
+    debug: Object.freeze({
+        currencyPresets: Object.freeze([10, 100, 500, 1000]),
+        itemStep: 1,
+        statStep: 5,
+    }),
+
     // ── Object interaction flags ──────────────────────────────────────────────
 
     objects: Object.freeze({
@@ -279,9 +285,27 @@ const SiteConfig = Object.freeze({
 
     myte: Object.freeze({
 
-        // Starter roster size. Existing smaller pre-release rosters are filled
-        // from the enabled species catalog without replacing saved Mytes.
-        initialRosterCount: 3,
+        starterRoster: Object.freeze([
+            Object.freeze({
+                id: '1',
+                name: 'Snail',
+                species: 'snail',
+                slotId: 'myte-slot-snail-1',
+                slotLabel: "Snail's Slot"
+            }),
+            Object.freeze({
+                id: '2',
+                name: 'Snail 2',
+                species: 'snail',
+                slotId: 'myte-slot-snail-2',
+                slotLabel: "Snail 2's Slot"
+            })
+        ]),
+
+        homeSlotLayout: Object.freeze({
+            spacing: 224,
+            slotSize: 192
+        }),
 
         // Default animation frame rate for sprite sheets
         defaultAnimationFPS: 8,
@@ -705,7 +729,7 @@ const SiteConfig = Object.freeze({
 
     camera: Object.freeze({
         // Follow mode used when no Myte is active (e.g. after deactivation or undeploy)
-        defaultFollowMode: 'CURSOR_EDGE',   // key of CAMERA_FOLLOW_MODES
+        defaultFollowMode: 'DRAG_TO_PAN',   // key of CAMERA_FOLLOW_MODES
 
         // Movement easing (higher = slower/smoother)
         easing:         10,
@@ -753,6 +777,32 @@ const SiteConfig = Object.freeze({
     // ── HUD feedback ─────────────────────────────────────────────────────────
 
     ui: Object.freeze({
+        currencySymbols: Object.freeze({
+            coins: '¢',
+        }),
+        interactionSounds: Object.freeze({
+            click: 'ui_click',
+            modalOpen: 'ui_select',
+            modalClose: 'ui_hover',
+            zoom: 'ui_drag_item',
+            zoomInPitch: 1.12,
+            zoomOutPitch: 0.82,
+            zoomVolume: 0.36,
+            panStart: 'ui_drag_item',
+            panEnd: 'ui_drop_item',
+            panThresholdPx: 4,
+            panStartVolume: 0.3,
+            panEndVolume: 0.26,
+            pet: 'myte_happy',
+            petOverdone: 'ui_error',
+            timeMilestone: 'ui_time_chime',
+            timeMilestones: Object.freeze({
+                0: Object.freeze({ pitchScale: 0.72, volume: 0.34 }),
+                6: Object.freeze({ pitchScale: 1.05, volume: 0.42 }),
+                12: Object.freeze({ pitchScale: 1.2, volume: 0.46 }),
+                19: Object.freeze({ pitchScale: 0.88, volume: 0.38 }),
+            }),
+        }),
         hud: Object.freeze({
             updateIntervalMs: 250,
             seasonGlyphs: Object.freeze({
@@ -767,10 +817,20 @@ const SiteConfig = Object.freeze({
                 maxDurationMs: 1400,
                 maxScale: 1.1,
                 scalePerLogMagnitude: 0.025,
-                tickMinDelta: 3,
+                tickMinDelta: 1,
                 tickStartIntervalMs: 190,
                 tickEndIntervalMs: 90,
                 finalChimeMinDelta: 10,
+                sound: Object.freeze({
+                    tickId: 'ui_coin_tick',
+                    chimeId: 'ui_coin_chime',
+                    gainTickVolume: 0.34,
+                    spendTickVolume: 0.22,
+                    gainPitchStart: 0.92,
+                    spendPitchStart: 0.78,
+                    pitchRise: 0.16,
+                    chimeVolume: 0.5,
+                }),
             }),
         }),
     }),

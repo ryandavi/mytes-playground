@@ -40,9 +40,20 @@ class MyteListManager extends UIComponent {
         state.className = 'myte-state';
         details.appendChild(state);
 
+        const infoButton = document.createElement('button');
+        infoButton.type = 'button';
+        infoButton.className = 'myte-info-button';
+        infoButton.textContent = 'Info';
+        infoButton.setAttribute('aria-label', `Open information for ${myte.name}`);
+        infoButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.parent.myteInfoPanel?.openFor?.(myte);
+        });
+
         // Build thumbnail
         thumbnail.appendChild(spriteContainer);
         thumbnail.appendChild(details);
+        thumbnail.appendChild(infoButton);
 
         // Add click handler
         thumbnail.addEventListener('click', () => {
@@ -65,7 +76,7 @@ class MyteListManager extends UIComponent {
         const frameSize = myte.definition?.visual?.frameSize || {};
         const width = Number(frameSize.width) || 192;
         const height = Number(frameSize.height) || 192;
-        const thumbSize = 48;
+        const thumbSize = spriteContainer.clientWidth || 48;
         const scale = Math.min(thumbSize / width, thumbSize / height);
         const spriteSheet = MyteDefinitionRegistry.getSpriteSheetConfig(myte.definition);
 

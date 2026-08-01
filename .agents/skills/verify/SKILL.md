@@ -5,7 +5,7 @@ description: Drive the Neko app in a headless browser to verify changes end-to-e
 
 # Verifying Neko changes
 
-The app is served by XAMPP at `http://localhost/genes/chat/neko/index.php` (check with `curl -s -o /dev/null -w "%{http_code}" <url>` → 200). No build step for JS; SCSS compiles with `npx sass css/style.scss css/style.css --no-source-map`; new JS files must be added to `scripts/script-manifest.json` **by hand** then `node scripts/build-manifest.js` (fail-loud: it reports unlisted files, never auto-adds). `npm run …` may fail with a spurious `Cannot read properties of undefined (reading 'stdin')` in Git Bash — run the underlying `node scripts/…` command directly.
+The app is served by XAMPP at `http://localhost/genes/chat/neko/index.html` (check for HTTP 200). JavaScript is bundled for the single HTML/GitHub Pages entry: add new JS files to `scripts/script-manifest.json` **by hand**, then run `node scripts/build-manifest.js` (fail-loud: it reports unlisted files, never auto-adds). SCSS compiles with `npx sass css/style.scss css/style.css --no-source-map`.
 
 ## Driving it
 
