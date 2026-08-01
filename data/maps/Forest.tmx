@@ -92,12 +92,6 @@
     <property name="variant" value="blue_portal"/>
    </properties>
   </object>
-  <object id="3" name="Spawn" x="384" y="448" width="192" height="192">
-   <properties>
-    <property name="displayName" value="Forest Clearing"/>
-    <property name="type" value="myte"/>
-   </properties>
-  </object>
   <object id="4" name="Tree" x="96" y="96" width="64" height="128">
    <properties><property name="variant" value="tree_pine"/></properties>
   </object>

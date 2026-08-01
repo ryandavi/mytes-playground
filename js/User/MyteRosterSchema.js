@@ -46,6 +46,11 @@ class MyteRosterSchema {
         const name = String(entry.name || entry.displayName || `Myte ${index + 1}`).trim() || `Myte ${index + 1}`;
         const slotId = String(entry.slotId || `myte-slot-${index + 1}`);
         const slotLabel = String(entry.slotLabel || `${name}'s Slot`).trim() || `${name}'s Slot`;
+        const starter = SiteConfig.myte.starterRoster?.find(candidate =>
+            String(candidate.id) === String(entry.id || index + 1) ||
+            candidate.slotId === slotId
+        );
+        const homeMapId = String(entry.homeMapId || starter?.homeMapId || SiteConfig.world.defaultMap);
         const stats = entry.stats || {};
         const defaults = this.statDefaults();
         const slotX = Number.isFinite(Number(entry.slotX)) ? Number(entry.slotX) : 0;
@@ -62,6 +67,7 @@ class MyteRosterSchema {
             species,
             slotId,
             slotLabel,
+            homeMapId,
             slotX,
             slotY,
             hasSlotPosition: hasExplicitSlotPosition,
@@ -94,6 +100,7 @@ class MyteRosterSchema {
             posY: myte.posY,
             slotId: myte.elements?.wrapper?.id || `myte-slot-${index + 1}`,
             slotLabel: myte.elements?.wrapper?.querySelector?.('.myte-home-label .name')?.textContent?.trim?.() || `${myte.name}'s Slot`,
+            homeMapId: myte.homeMapId || SiteConfig.world.defaultMap,
             isActive: !!myte.isActive,
             goal: myte.goal ?? null,
             followGoal: myte.followGoal ?? null,
@@ -121,7 +128,12 @@ class MyteRosterSchema {
         }
 
         myte.name = rosterEntry.name || myte.name;
+        myte.homeMapId = rosterEntry.homeMapId || SiteConfig.world.defaultMap;
         myte.element.dataset.myteName = myte.name;
+        myte.element.dataset.myteHomeMap = myte.homeMapId;
+        if (myte.elements.wrapper) {
+            myte.elements.wrapper.dataset.myteHomeMap = myte.homeMapId;
+        }
         myte.duplicate?.setAttribute?.('data-myte-name', myte.name);
 
         const displayNameElements = [

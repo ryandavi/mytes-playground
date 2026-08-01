@@ -278,7 +278,7 @@ const SiteConfig = Object.freeze({
 
     // World defaults
     world: Object.freeze({
-        defaultMap: 'Outside',
+        defaultMap: 'House',
     }),
 
     // ── Myte defaults ─────────────────────────────────────────────────────────
@@ -291,14 +291,16 @@ const SiteConfig = Object.freeze({
                 name: 'Snail',
                 species: 'snail',
                 slotId: 'myte-slot-snail-1',
-                slotLabel: "Snail's Slot"
+                slotLabel: "Snail's Slot",
+                homeMapId: 'House'
             }),
             Object.freeze({
                 id: '2',
                 name: 'Snail 2',
                 species: 'snail',
                 slotId: 'myte-slot-snail-2',
-                slotLabel: "Snail 2's Slot"
+                slotLabel: "Snail 2's Slot",
+                homeMapId: 'Outside'
             })
         ]),
 

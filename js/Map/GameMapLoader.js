@@ -90,7 +90,8 @@ class GameMapLoader {
             'Free-roaming mytes can be tapped again to bring them back into follow mode.',
             'Dragging a myte onto its slot sends it home.',
             'Different maps can have their own zones for resting, wandering, and social behavior.',
-            'Double-click the map to queue an A* move for your active myte.'
+            'Double-click the map to queue an A* move for your active myte.',
+            'With no active myte, double-click a portal to open its destination.'
         ];
 
         return Utility.randomChoice(tips);
