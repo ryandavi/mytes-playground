@@ -243,6 +243,21 @@ class PortalMapObject extends InteractiveMapObject {
         });
     }
 
+    handleDoubleClick(event) {
+        if (!this.activeMyte) {
+            if (!this.active || this.isAnimating || !this.isActive || !this.hasTransitionDestination()) {
+                return;
+            }
+
+            event?.originalEvent?.preventDefault?.();
+            this.selectInUi?.();
+            this.beginTransition(null);
+            return;
+        }
+
+        super.handleDoubleClick(event);
+    }
+
     getPortalWindowTitle() {
         return this.getDisplayName();
     }
@@ -300,7 +315,23 @@ class PortalMapObject extends InteractiveMapObject {
         if (titleElement.textContent !== nextTitle) {
             titleElement.textContent = nextTitle;
         }
-        titleElement.title = nextTitle;
+        titleElement.title = this.getInteractionHint();
+    }
+
+    getInteractionHint() {
+        const destination = this.getPortalWindowTitle();
+        const activeMyte = this.activeMyte;
+        return activeMyte
+            ? `Double-click to send ${activeMyte.name} to ${destination}.`
+            : `Double-click to open ${destination}.`;
+    }
+
+    syncInteractionHint() {
+        if (!this.element) return;
+        const hint = this.getInteractionHint();
+        this.element.title = hint;
+        this.element.setAttribute('aria-label', hint);
+        this.element.dataset.userNavigable = String(!this.activeMyte);
     }
 
     updatePortalDom({ refreshTitle = false } = {}) {
@@ -310,6 +341,7 @@ class PortalMapObject extends InteractiveMapObject {
         this.updatePortalStateClasses();
         this.ensurePortalWindow();
         this.syncPortalWindowTitle();
+        this.syncInteractionHint();
 
         if (this.targetMap) {
             this.element.dataset.targetMap = this.targetMap;
@@ -362,7 +394,7 @@ class PortalMapObject extends InteractiveMapObject {
             if (!liveTitleElement) return;
 
             liveTitleElement.textContent = displayName;
-            liveTitleElement.title = displayName;
+            liveTitleElement.title = this.getInteractionHint();
         }).catch(error => {
             Utility.warnDebug(`[PortalMapObject] Failed to refresh portal title for ${this.targetMap}:`, error);
         });

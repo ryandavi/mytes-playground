@@ -346,7 +346,7 @@ const SiteConfig = Object.freeze({
 
     // World defaults
     world: Object.freeze({
-        defaultMap: 'Outside',
+        defaultMap: 'House',
     }),
 
     // ── Myte defaults ─────────────────────────────────────────────────────────
@@ -359,14 +359,16 @@ const SiteConfig = Object.freeze({
                 name: 'Snail',
                 species: 'snail',
                 slotId: 'myte-slot-snail-1',
-                slotLabel: "Snail's Slot"
+                slotLabel: "Snail's Slot",
+                homeMapId: 'House'
             }),
             Object.freeze({
                 id: '2',
                 name: 'Snail 2',
                 species: 'snail',
                 slotId: 'myte-slot-snail-2',
-                slotLabel: "Snail 2's Slot"
+                slotLabel: "Snail 2's Slot",
+                homeMapId: 'Outside'
             })
         ]),
 
@@ -13324,6 +13326,11 @@ class MyteRosterSchema {
         const name = String(entry.name || entry.displayName || `Myte ${index + 1}`).trim() || `Myte ${index + 1}`;
         const slotId = String(entry.slotId || `myte-slot-${index + 1}`);
         const slotLabel = String(entry.slotLabel || `${name}'s Slot`).trim() || `${name}'s Slot`;
+        const starter = SiteConfig.myte.starterRoster?.find(candidate =>
+            String(candidate.id) === String(entry.id || index + 1) ||
+            candidate.slotId === slotId
+        );
+        const homeMapId = String(entry.homeMapId || starter?.homeMapId || SiteConfig.world.defaultMap);
         const stats = entry.stats || {};
         const defaults = this.statDefaults();
         const slotX = Number.isFinite(Number(entry.slotX)) ? Number(entry.slotX) : 0;
@@ -13340,6 +13347,7 @@ class MyteRosterSchema {
             species,
             slotId,
             slotLabel,
+            homeMapId,
             slotX,
             slotY,
             hasSlotPosition: hasExplicitSlotPosition,
@@ -13372,6 +13380,7 @@ class MyteRosterSchema {
             posY: myte.posY,
             slotId: myte.elements?.wrapper?.id || `myte-slot-${index + 1}`,
             slotLabel: myte.elements?.wrapper?.querySelector?.('.myte-home-label .name')?.textContent?.trim?.() || `${myte.name}'s Slot`,
+            homeMapId: myte.homeMapId || SiteConfig.world.defaultMap,
             isActive: !!myte.isActive,
             goal: myte.goal ?? null,
             followGoal: myte.followGoal ?? null,
@@ -13399,7 +13408,12 @@ class MyteRosterSchema {
         }
 
         myte.name = rosterEntry.name || myte.name;
+        myte.homeMapId = rosterEntry.homeMapId || SiteConfig.world.defaultMap;
         myte.element.dataset.myteName = myte.name;
+        myte.element.dataset.myteHomeMap = myte.homeMapId;
+        if (myte.elements.wrapper) {
+            myte.elements.wrapper.dataset.myteHomeMap = myte.homeMapId;
+        }
         myte.duplicate?.setAttribute?.('data-myte-name', myte.name);
 
         const displayNameElements = [
@@ -15326,6 +15340,7 @@ class ContainerManager {
                 species: speciesId,
                 slotId: wrapper.id || `myte-slot-${index + 1}`,
                 slotLabel: slotNameElement?.textContent?.trim?.() || `${name}'s Slot`,
+                homeMapId: wrapper.dataset?.myteHomeMap || SiteConfig.world.defaultMap,
                 slotX,
                 slotY,
                 hasSlotPosition: wrapper.style.left !== '' || wrapper.style.top !== ''
@@ -15360,6 +15375,7 @@ class ContainerManager {
         wrapper.className = `myte-slot ${rosterEntry.species}`;
         wrapper.dataset.myteSpecies = rosterEntry.species;
         wrapper.dataset.myteId = rosterEntry.id;
+        wrapper.dataset.myteHomeMap = rosterEntry.homeMapId || SiteConfig.world.defaultMap;
 
         if (rosterEntry.hasSlotPosition && Number.isFinite(rosterEntry.slotX)) {
             wrapper.style.left = `${rosterEntry.slotX}px`;
@@ -32001,7 +32017,8 @@ class GameMapLoader {
             'Free-roaming mytes can be tapped again to bring them back into follow mode.',
             'Dragging a myte onto its slot sends it home.',
             'Different maps can have their own zones for resting, wandering, and social behavior.',
-            'Double-click the map to queue an A* move for your active myte.'
+            'Double-click the map to queue an A* move for your active myte.',
+            'With no active myte, double-click a portal to open its destination.'
         ];
 
         return Utility.randomChoice(tips);
@@ -37015,12 +37032,31 @@ class MapTransitionManager {
         Utility.logDebug(`[MapTransition] slot synced for ${myte.name} to (${position.x}, ${position.y})`);
     }
 
-    // After a map change, sync every inactive myte's slot to the map spawn
-    // so that home positions are correct regardless of who is active.
+    // Each Myte owns one home slot on one map. Nonresident slots are detached
+    // from the world entirely; the Myte's deployed world element is independent.
     _syncAllMyteSlotsToSpawn(map) {
         const spawnPoint = map?.getSpawnPoint?.('myte') ?? map?.getSpawnPoint?.('default');
-        if (!spawnPoint) return;
         const mytes = this.container.mytes ?? [];
+        const mapId = map?.id;
+        const residentMytes = mytes.filter(myte => myte.homeMapId === mapId);
+        const residentSet = new Set(residentMytes);
+        const slotLayer = map?.layers?.objects;
+
+        mytes.forEach(myte => {
+            const slotEl = myte.dropTarget ?? myte.element?.closest?.('.myte-slot');
+            if (!slotEl) return;
+
+            slotEl.hidden = false;
+            if (residentSet.has(myte) && slotLayer) {
+                if (slotEl.parentElement !== slotLayer) {
+                    slotLayer.appendChild(slotEl);
+                }
+            } else {
+                slotEl.remove();
+            }
+        });
+
+        if (!spawnPoint) return;
         const layout = SiteConfig.myte.homeSlotLayout;
         const spacing = layout.spacing;
         const slotSize = layout.slotSize;
@@ -37039,7 +37075,7 @@ class MapTransitionManager {
         ];
         const placed = [];
 
-        mytes.forEach((myte, index) => {
+        residentMytes.forEach((myte, index) => {
             const candidates = offsets.slice(index).concat(offsets.slice(0, index));
             const offset = candidates.find(candidate => {
                 const x = spawnPoint.x + candidate.x;
@@ -37068,12 +37104,52 @@ class MapTransitionManager {
 
     _centerCameraOnMyte(myte) {
         if (!myte || !this.container.camera) return;
-        this.container.camera.centerToPosition(myte.posX, myte.posY, myte.size, true);
+        this._centerCameraOnPosition({ x: myte.posX, y: myte.posY }, myte.size);
+    }
+
+    _centerCameraOnPosition(position, size = { width: 0, height: 0 }) {
+        if (!position || !this.container.camera) return;
+        this.container.camera.centerToPosition(position.x, position.y, size, true);
         this.container.camera.updateTransform(
             this.container.camera.posX,
             this.container.camera.posY,
             this.container.camera.zoomLevel
         );
+    }
+
+    _getViewerCameraFocus(map, options = {}) {
+        const arrival = this._resolveArrivalDestination(map, {
+            myte: null,
+            targetPortalId: options.targetPortalId,
+            targetSpawnPoint: options.targetSpawnPoint,
+            sourceMapId: options.sourceMapId,
+            sourcePortalId: options.sourcePortalId
+        });
+
+        if (arrival?.type === 'portal') {
+            return {
+                position: arrival.position,
+                size: { width: 0, height: 0 }
+            };
+        }
+
+        if (options.targetSpawnPoint && arrival?.position) {
+            const slotSize = SiteConfig.myte.homeSlotLayout.slotSize;
+            return {
+                position: arrival.position,
+                size: { width: slotSize, height: slotSize }
+            };
+        }
+
+        const dimensions = map?.dimensions;
+        if (!dimensions) return null;
+        return {
+            position: {
+                x: dimensions.width / 2,
+                y: dimensions.height / 2
+            },
+            size: { width: 0, height: 0 }
+        };
     }
 
     async _waitForRevealReadiness(map, mapId) {
@@ -37228,6 +37304,9 @@ class MapTransitionManager {
             this.currentMapId = mapId;
 
             this.container.gameMap = newMap;
+            // Canvas dimensions changed with the map. Camera bounds must be
+            // recomputed now, before arrival framing, rather than after reveal.
+            this.container.invalidateCanvasRect?.();
 
             if (newMap.gridSystem && document.body.classList.contains('debug')) {
                 Utility.logDebug('[MapTransitionManager] Reinitializing GridSystem debug mode');
@@ -37247,6 +37326,7 @@ class MapTransitionManager {
 
             const activeMyte = options.myte || this.container.activeMyte || null;
             this._prepareMyteForTransition(activeMyte);
+            this.container.camera?.cancelDragPan?.();
 
             if (!options.preserveCamera && this.container.camera) {
                 // Reserved for future custom camera reset behavior.
@@ -37271,13 +37351,17 @@ class MapTransitionManager {
                     }
                 }
 
-                let firstMyte = this.container.mytes[0];
                 if (activeMyte) {
-                    firstMyte = activeMyte;
+                    this._centerCameraOnMyte(activeMyte);
+                } else {
+                    const viewerFocus = this._getViewerCameraFocus(newMap, {
+                        targetPortalId,
+                        targetSpawnPoint: spawnPoint,
+                        sourceMapId: this.previousMapId,
+                        sourcePortalId
+                    });
+                    this._centerCameraOnPosition(viewerFocus?.position, viewerFocus?.size);
                 }
-
-
-                this._centerCameraOnMyte(firstMyte);
             }
 
             await this._waitForRevealReadiness(newMap, mapId);
@@ -42087,6 +42171,21 @@ class PortalMapObject extends InteractiveMapObject {
         });
     }
 
+    handleDoubleClick(event) {
+        if (!this.activeMyte) {
+            if (!this.active || this.isAnimating || !this.isActive || !this.hasTransitionDestination()) {
+                return;
+            }
+
+            event?.originalEvent?.preventDefault?.();
+            this.selectInUi?.();
+            this.beginTransition(null);
+            return;
+        }
+
+        super.handleDoubleClick(event);
+    }
+
     getPortalWindowTitle() {
         return this.getDisplayName();
     }
@@ -42144,7 +42243,23 @@ class PortalMapObject extends InteractiveMapObject {
         if (titleElement.textContent !== nextTitle) {
             titleElement.textContent = nextTitle;
         }
-        titleElement.title = nextTitle;
+        titleElement.title = this.getInteractionHint();
+    }
+
+    getInteractionHint() {
+        const destination = this.getPortalWindowTitle();
+        const activeMyte = this.activeMyte;
+        return activeMyte
+            ? `Double-click to send ${activeMyte.name} to ${destination}.`
+            : `Double-click to open ${destination}.`;
+    }
+
+    syncInteractionHint() {
+        if (!this.element) return;
+        const hint = this.getInteractionHint();
+        this.element.title = hint;
+        this.element.setAttribute('aria-label', hint);
+        this.element.dataset.userNavigable = String(!this.activeMyte);
     }
 
     updatePortalDom({ refreshTitle = false } = {}) {
@@ -42154,6 +42269,7 @@ class PortalMapObject extends InteractiveMapObject {
         this.updatePortalStateClasses();
         this.ensurePortalWindow();
         this.syncPortalWindowTitle();
+        this.syncInteractionHint();
 
         if (this.targetMap) {
             this.element.dataset.targetMap = this.targetMap;
@@ -42206,7 +42322,7 @@ class PortalMapObject extends InteractiveMapObject {
             if (!liveTitleElement) return;
 
             liveTitleElement.textContent = displayName;
-            liveTitleElement.title = displayName;
+            liveTitleElement.title = this.getInteractionHint();
         }).catch(error => {
             Utility.warnDebug(`[PortalMapObject] Failed to refresh portal title for ${this.targetMap}:`, error);
         });

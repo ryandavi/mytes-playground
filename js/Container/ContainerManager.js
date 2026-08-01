@@ -566,6 +566,7 @@ class ContainerManager {
                 species: speciesId,
                 slotId: wrapper.id || `myte-slot-${index + 1}`,
                 slotLabel: slotNameElement?.textContent?.trim?.() || `${name}'s Slot`,
+                homeMapId: wrapper.dataset?.myteHomeMap || SiteConfig.world.defaultMap,
                 slotX,
                 slotY,
                 hasSlotPosition: wrapper.style.left !== '' || wrapper.style.top !== ''
@@ -600,6 +601,7 @@ class ContainerManager {
         wrapper.className = `myte-slot ${rosterEntry.species}`;
         wrapper.dataset.myteSpecies = rosterEntry.species;
         wrapper.dataset.myteId = rosterEntry.id;
+        wrapper.dataset.myteHomeMap = rosterEntry.homeMapId || SiteConfig.world.defaultMap;
 
         if (rosterEntry.hasSlotPosition && Number.isFinite(rosterEntry.slotX)) {
             wrapper.style.left = `${rosterEntry.slotX}px`;
