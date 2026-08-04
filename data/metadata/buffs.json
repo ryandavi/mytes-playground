@@ -9,7 +9,7 @@
       "priority": 80,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "😴",
+      "icon": "sleep",
       "excludes": ["well_rested", "charged_up"],
       "description": "Low energy drags movement and makes it harder to stay upbeat.",
       "effects": {
@@ -38,7 +38,7 @@
       "priority": 100,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "😵",
+      "icon": "sleep",
       "excludes": ["well_rested", "charged_up", "energized"],
       "description": "Completely drained. Movement is heavily slowed until energy returns.",
       "effects": {
@@ -66,7 +66,7 @@
       "priority": 75,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "🤒",
+      "icon": "frown",
       "description": "Poor health makes movement sluggish and drains energy faster.",
       "effects": {
         "movement": {
@@ -93,7 +93,7 @@
       "priority": 65,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "🍽️",
+      "icon": "bowl",
       "description": "Growing hunger makes it harder to focus.",
       "excludes": ["nourished"],
       "effects": {
@@ -118,7 +118,7 @@
       "priority": 110,
       "durationMs": 300000,
       "cancellable": false,
-      "icon": "💤",
+      "icon": "sleep",
       "description": "After fainting, a little more rest is needed before heading out again.",
       "effects": {
         "movement": {
@@ -137,7 +137,7 @@
       "priority": 95,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "😫",
+      "icon": "frown",
       "description": "Severe hunger. Eating becomes the only priority.",
       "excludes": ["nourished"],
       "effects": {
@@ -162,7 +162,7 @@
       "priority": 30,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "🌟",
+      "icon": "sparkle",
       "description": "High spirits make movement and recovery feel a little lighter.",
       "effects": {
         "movement": {
@@ -188,7 +188,7 @@
       "priority": 70,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "😔",
+      "icon": "frown",
       "excludes": ["spirited"],
       "description": "Low mood weighs on momentum and slows emotional recovery.",
       "effects": {
@@ -215,7 +215,7 @@
       "priority": 28,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "😌",
+      "icon": "smile",
       "description": "Deep comfort makes the world feel right. Fun holds steady and energy comes back easier.",
       "effects": {
         "stats": {
@@ -239,7 +239,7 @@
       "priority": 26,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "💪",
+      "icon": "sparkle",
       "description": "High confidence keeps energy flowing and adds a little extra spring.",
       "effects": {
         "movement": {
@@ -266,7 +266,7 @@
       "priority": 65,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "😰",
+      "icon": "frown",
       "description": "Low confidence creates hesitation and makes everything feel harder.",
       "effects": {
         "movement": {
@@ -293,7 +293,7 @@
       "priority": 60,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "🌀",
+      "icon": "loop",
       "excludes": ["spirited"],
       "description": "Boredom makes it harder to settle until something fun breaks the loop.",
       "effects": {
@@ -322,7 +322,7 @@
       "durationMs": 120000,
       "reapplyCooldownMs": 45000,
       "cancellable": true,
-      "icon": "⭐",
+      "icon": "star",
       "description": "A good rest keeps energy recovery strong and fun loss softer.",
       "effects": {
         "movement": {
@@ -351,7 +351,7 @@
       "durationMs": 90000,
       "reapplyCooldownMs": 12000,
       "cancellable": true,
-      "icon": "⚡",
+      "icon": "bolt",
       "description": "Recent play keeps energy up and makes fun easier to maintain.",
       "effects": {
         "movement": {
@@ -377,7 +377,7 @@
       "durationMs": 75000,
       "reapplyCooldownMs": 15000,
       "cancellable": true,
-      "icon": "🤝",
+      "icon": "social",
       "description": "Positive social time steadies fun and confidence for a while.",
       "effects": {
         "movement": {
@@ -402,7 +402,7 @@
       "durationMs": 90000,
       "stackMode": "replace",
       "cancellable": true,
-      "icon": "🍽️",
+      "icon": "bowl",
       "description": "Well-fed and energized. Activities burn much less energy until it wears off.",
       "excludes": ["hungry", "starving"],
       "effects": {
@@ -424,7 +424,7 @@
       "durationMs": 45000,
       "reapplyCooldownMs": 45000,
       "cancellable": true,
-      "icon": "🔋",
+      "icon": "bolt",
       "description": "A full recharge creates a short spark of momentum.",
       "onApply": {
         "funBoost": 2
@@ -452,7 +452,7 @@
       "durationMs": 60000,
       "reapplyCooldownMs": 60000,
       "cancellable": true,
-      "icon": "🤩",
+      "icon": "sparkle",
       "description": "Finding something exciting leaves a lasting rush.",
       "onApply": {
         "funBoost": 6,
@@ -482,7 +482,7 @@
       "durationMs": 75000,
       "reapplyCooldownMs": 20000,
       "cancellable": true,
-      "icon": "🌾",
+      "icon": "wheat",
       "description": "Gathering something grown leaves a warm, satisfied glow.",
       "onApply": {
         "funBoost": 4,
@@ -511,7 +511,7 @@
       "durationMs": 45000,
       "reapplyCooldownMs": 15000,
       "cancellable": true,
-      "icon": "💧",
+      "icon": "droplet",
       "description": "A fresh drink leaves a light boost and a clearer head.",
       "onApply": {
         "funBoost": 3
@@ -539,7 +539,7 @@
       "durationMs": 50000,
       "reapplyCooldownMs": 25000,
       "cancellable": true,
-      "icon": "🌸",
+      "icon": "flower",
       "description": "A pleasant scent lingers and softens the mood for a while.",
       "onApply": {
         "funBoost": 3,
@@ -566,7 +566,7 @@
       "durationMs": 60000,
       "reapplyCooldownMs": 20000,
       "cancellable": true,
-      "icon": "🔍",
+      "icon": "search",
       "description": "A fresh sense of curiosity makes the world feel a little less dull.",
       "effects": {
         "stats": {
@@ -588,7 +588,7 @@
       "durationMs": 25000,
       "reapplyCooldownMs": 30000,
       "cancellable": true,
-      "icon": "😤",
+      "icon": "frown",
       "description": "Being woken up mid-rest leaves a sour feeling.",
       "onApply": {
         "funBoost": -3
@@ -608,7 +608,7 @@
       "durationMs": 45000,
       "reapplyCooldownMs": 10000,
       "cancellable": true,
-      "icon": "✨",
+      "icon": "sparkle",
       "description": "A pleasant interaction leaves a small afterglow.",
       "onApply": {
         "funBoost": 5
@@ -628,7 +628,7 @@
       "durationMs": 50000,
       "reapplyCooldownMs": 30000,
       "cancellable": true,
-      "icon": "💡",
+      "icon": "bulb",
       "description": "A fresh bit of light makes the world feel better.",
       "onApply": {
         "funBoost": 5
@@ -652,7 +652,7 @@
       "durationMs": 55000,
       "reapplyCooldownMs": 60000,
       "cancellable": true,
-      "icon": "🎵",
+      "icon": "music",
       "description": "Starting the music lifts the mood right away.",
       "onApply": {
         "funBoost": 4
@@ -675,7 +675,7 @@
       "durationMs": 60000,
       "reapplyCooldownMs": 8000,
       "cancellable": true,
-      "icon": "🐾",
+      "icon": "paw",
       "description": "Gentle petting leaves a cozy, content feeling behind.",
       "onApply": {
         "funBoost": 5,
@@ -697,7 +697,7 @@
       "durationMs": 30000,
       "reapplyCooldownMs": 20000,
       "cancellable": true,
-      "icon": "🤯",
+      "icon": "warning",
       "description": "Too much fussing leaves the myte a little rattled.",
       "onApply": {
         "funBoost": -2,
@@ -721,7 +721,7 @@
       "priority": 14,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "🌊",
+      "icon": "droplet",
       "description": "The fountain's sound softens the moment while you stay nearby.",
       "effects": {
         "stats": {
@@ -738,7 +738,7 @@
       "priority": 14,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "🕯️",
+      "icon": "bulb",
       "description": "Warm light makes the space feel safer and more comfortable.",
       "effects": {
         "stats": {
@@ -754,7 +754,7 @@
       "priority": 14,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "🎶",
+      "icon": "music",
       "description": "Nearby music keeps things lively while it plays.",
       "effects": {
         "stats": {
@@ -772,7 +772,7 @@
       "priority": 12,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "🛌",
+      "icon": "bed",
       "description": "This area supports rest and comfort while you remain inside.",
       "effects": {
         "stats": {
@@ -790,7 +790,7 @@
       "priority": 12,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "🎮",
+      "icon": "ball",
       "description": "Play feels more rewarding while you're in this area.",
       "effects": {
         "stats": {
@@ -808,7 +808,7 @@
       "priority": 12,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "🎉",
+      "icon": "social",
       "description": "Social spaces keep fun and confidence steadier over time.",
       "effects": {
         "stats": {
@@ -826,7 +826,7 @@
       "priority": 72,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "⚠️",
+      "icon": "warning",
       "description": "Danger keeps the myte on edge while they remain inside.",
       "effects": {
         "stats": {
@@ -843,7 +843,7 @@
       "priority": 15,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "🫂",
+      "icon": "social",
       "description": "Being near another myte brings a warm sense of connection.",
       "effects": {
         "stats": {
@@ -861,7 +861,7 @@
       "priority": 60,
       "durationMs": 0,
       "cancellable": false,
-      "icon": "😣",
+      "icon": "frown",
       "description": "Exhaustion or low spirits make everything feel harder.",
       "effects": {
         "movement": {

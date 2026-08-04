@@ -3,7 +3,7 @@ class ShopPanel extends WorldModal {
         super(parent, {
             id: 'world-shop-panel',
             title: 'Shop',
-            icon: '🛒',
+            icon: 'shop',
             closeOnBackdrop: true,
             draggable: true
         });
@@ -97,7 +97,7 @@ class ShopPanel extends WorldModal {
         purchase.appendChild(button);
         row.append(image, details, purchase);
 
-        this.itemRows.set(item.id, { stock, button, entry });
+        this.itemRows.set(item.id, { stock, button, entry, image });
         this.syncStock(entry.itemId);
         return row;
     }
@@ -113,6 +113,11 @@ class ShopPanel extends WorldModal {
         );
         this.syncStock(itemId);
         this.setDialogue(result.reason, result);
+
+        if (result.ok) {
+            const row = this.itemRows.get(ItemRegistry.resolveIdSync(itemId));
+            container.inventory?.playAcquisition(result.item.id, row?.image ?? null);
+        }
     }
 
     setDialogue(reason, result = {}) {

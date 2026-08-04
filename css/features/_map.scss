@@ -541,7 +541,7 @@
         pointer-events: none;
         user-select: none;
         cursor: grabbing;
-        z-index: var(--z-drag) !important;
+        z-index: var(--z-dragged) !important;
 
         > .sprite {
             animation-name: wiggle2;

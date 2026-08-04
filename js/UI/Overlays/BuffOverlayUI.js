@@ -1,20 +1,22 @@
-const BUFF_CATEGORY_LABELS = Object.freeze({
-    energy: '⚡',
-    health: '❤️',
-    satiety: '🍽️',
-    fun: '🎉',
-    mood: '😊',
-    boredom: '😴',
-    comfort: '🛋️',
-    confidence: '✨',
-    social: '👥',
-    play: '🎉',
-    recovery: '⭐',
-    food: '🍽️',
-    event: '✨',
-    aura: '🌟',
-    zone: '📍',
-    general: '⭐'
+// Sprite symbol per buff category — the fallback when a buff declares no icon
+// of its own in data/metadata/buffs.json.
+const BUFF_CATEGORY_ICONS = Object.freeze({
+    energy: 'bolt',
+    health: 'heart',
+    satiety: 'bowl',
+    fun: 'ball',
+    mood: 'smile',
+    boredom: 'sleep',
+    comfort: 'bed',
+    confidence: 'sparkle',
+    social: 'social',
+    play: 'ball',
+    recovery: 'star',
+    food: 'bowl',
+    event: 'sparkle',
+    aura: 'star',
+    zone: 'pin',
+    general: 'star'
 });
 
 // Fixed display order for exclusive groups — buffs in these groups always appear
@@ -46,15 +48,11 @@ class BuffOverlayUI extends CompactChipStripUI {
         });
     }
 
+    getIconName(buff) {
+        return buff.icon || BUFF_CATEGORY_ICONS[buff.category] || null;
+    }
+
     getShortLabel(buff) {
-        if (buff.icon) {
-            return buff.icon;
-        }
-
-        if (buff.category && BUFF_CATEGORY_LABELS[buff.category]) {
-            return BUFF_CATEGORY_LABELS[buff.category];
-        }
-
         const words = String(buff.label || '')
             .split(/[^a-zA-Z0-9]+/)
             .filter(Boolean);
@@ -78,6 +76,7 @@ class BuffOverlayUI extends CompactChipStripUI {
             index,
             className: `buff-chip kind-${buff.kind} category-${buff.category}${buff.cancellable ? ' is-cancellable' : ''}`,
             label: buff.label,
+            icon: this.getIconName(buff),
             shortLabel: this.getShortLabel(buff),
             badgeText: buff.stacks > 1 ? String(buff.stacks) : null,
             progressRatio: buff.progressRatio,

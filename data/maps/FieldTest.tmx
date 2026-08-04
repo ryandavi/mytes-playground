@@ -5,6 +5,9 @@
   <property name="displayName" value="Field Test"/>
   <property name="location" value="outside"/>
   <property name="name" value="Field Test"/>
+  <property name="region" value="overworld"/>
+  <property name="worldX" value="2"/>
+  <property name="worldY" value="0"/>
  </properties>
  <tileset firstgid="1" source="../tilesets/walls3.tsx"/>
  <layer id="1" name="Grass" width="40" height="43">

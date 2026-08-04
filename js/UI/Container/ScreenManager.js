@@ -25,31 +25,20 @@ class ScreenManager extends UIComponent {
         }
 
         if (localStorage.getItem(ScreenManager.STORAGE_KEY) === '1') {
-            this.parent.containerWrapper.classList.add('is-fullscreen');
-            this.fullscreenButton?.classList.add('active');
-            const camera = this.parent.parent.camera;
-            if (camera) {
-                requestAnimationFrame(() => {
-                    const anchor = camera.getViewportCenterAnchor?.();
-                    camera.zoomTo(camera.zoomLevel, { anchor, immediate: true });
-                });
-            }
+            this.setFullscreen(true);
         }
     }
 
     toggleFullscreen() {
-        const camera = this.parent.parent.camera;
-        const anchor = camera?.getViewportCenterAnchor ? camera.getViewportCenterAnchor() : null;
+        this.setFullscreen(!this.parent.containerWrapper.classList.contains('is-fullscreen'));
+    }
 
-        const isNowFullscreen = this.parent.containerWrapper.classList.toggle('is-fullscreen');
-        this.fullscreenButton?.classList.toggle('active', isNowFullscreen);
-        localStorage.setItem(ScreenManager.STORAGE_KEY, isNowFullscreen ? '1' : '0');
-
-        if (camera && anchor) {
-            requestAnimationFrame(() => {
-                camera.zoomTo(camera.zoomLevel, { anchor, immediate: true });
-            });
-        }
+    // Re-framing the camera is left to the container's ResizeObserver: the class
+    // change is what resizes the stage, and the observer already reacts to that.
+    setFullscreen(isFullscreen) {
+        this.parent.containerWrapper.classList.toggle('is-fullscreen', isFullscreen);
+        this.fullscreenButton?.classList.toggle('active', isFullscreen);
+        localStorage.setItem(ScreenManager.STORAGE_KEY, isFullscreen ? '1' : '0');
     }
 
     initializeHeaderState() {

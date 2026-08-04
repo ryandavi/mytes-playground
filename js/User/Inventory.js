@@ -256,6 +256,73 @@ class Inventory {
         return removedQuantity > 0;
     }
 
+    // Newest stack of a variant — where a freshly added item landed.
+    getStackElement(nameOrVariant) {
+        const canonicalVariant = ItemRegistry.resolveIdSync(nameOrVariant) || ItemRegistry.normalizeId(nameOrVariant);
+        const matches = this.items.filter(item => item.variant === canonicalVariant);
+        return matches[matches.length - 1]?.element ?? null;
+    }
+
+    // Cosmetic only — the item is already in `this.items` by the time this runs.
+    // `sourceElement` is where the item came from on screen (a shop row sprite);
+    // omit it to just flash the slot.
+    playAcquisition(nameOrVariant, sourceElement = null) {
+        const targetElement = this.getStackElement(nameOrVariant);
+        if (!targetElement) return;
+
+        if (!sourceElement) {
+            this.flashItem(targetElement);
+            return;
+        }
+
+        this.flyItemTo(sourceElement, targetElement, () => this.flashItem(targetElement));
+    }
+
+    flashItem(itemElement) {
+        if (!itemElement) return;
+        itemElement.classList.remove('is-acquired');
+        // Restart the animation: without a reflow the class re-add is coalesced
+        // away and a second purchase of the same stack shows nothing.
+        void itemElement.offsetWidth;
+        itemElement.classList.add('is-acquired');
+        itemElement.addEventListener(
+            'animationend',
+            () => itemElement.classList.remove('is-acquired'),
+            { once: true }
+        );
+    }
+
+    flyItemTo(sourceElement, targetElement, onArrival) {
+        const from = sourceElement.getBoundingClientRect();
+        const to = targetElement.getBoundingClientRect();
+        if (!from.width || !to.width) {
+            onArrival?.();
+            return;
+        }
+
+        // Clone rather than rebuild: item sprites are spritesheet frames sized by
+        // per-element custom properties and a `zoom`, none of which survive being
+        // copied onto a plain div.
+        const sprite = sourceElement.cloneNode(true);
+        sprite.removeAttribute('id');
+        sprite.removeAttribute('draggable');
+        sprite.removeAttribute('tabindex');
+
+        const ghost = document.createElement('div');
+        ghost.className = 'item-acquisition-ghost';
+        ghost.style.left = `${from.left + (from.width / 2)}px`;
+        ghost.style.top = `${from.top + (from.height / 2)}px`;
+        ghost.style.setProperty('--fly-x', `${(to.left + (to.width / 2)) - (from.left + (from.width / 2))}px`);
+        ghost.style.setProperty('--fly-y', `${(to.top + (to.height / 2)) - (from.top + (from.height / 2))}px`);
+        ghost.appendChild(sprite);
+        document.body.appendChild(ghost);
+
+        ghost.addEventListener('animationend', () => {
+            ghost.remove();
+            onArrival?.();
+        }, { once: true });
+    }
+
     updateItemDisplay(item) {
         const quantityDisplay = item.element.querySelector('.item-quantity');
         if (quantityDisplay) {

@@ -927,11 +927,85 @@ class ActionSidebarManager extends UIComponent {
         return button;
     }
 
+    // Direct UI interactions (open shop, talk) sit above the queued actions and
+    // work with no active myte, since they are the player acting, not a myte.
+    renderSidebarInteractions(actionGroups, selectedObject) {
+        const interactions = selectedObject?.getSidebarInteractions?.() ?? [];
+        if (interactions.length === 0) return false;
+
+        const groupElement = document.createElement('div');
+        groupElement.className = 'action-group interactions';
+
+        const title = document.createElement('h3');
+        title.textContent = this.getCategoryTitle('interactions');
+        groupElement.appendChild(title);
+
+        const actionList = document.createElement('ul');
+        interactions.forEach(interaction => {
+            const button = document.createElement('button');
+            button.textContent = interaction.label;
+            button.classList.add('primary-action');
+            if (interaction.description) button.title = interaction.description;
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                interaction.run?.();
+            });
+
+            const li = document.createElement('li');
+            li.appendChild(button);
+            actionList.appendChild(li);
+        });
+
+        groupElement.appendChild(actionList);
+        actionGroups.appendChild(groupElement);
+        return true;
+    }
+
+    // "Home" means two different things depending on where the myte is: walk back
+    // to its slot on this map, or walk back across the world to its own map.
+    renderGoHomeAction(actionGroups, myte) {
+        const container = this.parent.parent;
+        const isVisiting = myte.isVisiting;
+        if (!isVisiting && myte.isAtHomePosition?.(1)) return;
+
+        const button = document.createElement('button');
+        button.textContent = isVisiting
+            ? `Send Home to ${container.getMapDisplayName(myte.homeMapId)}`
+            : 'Go Home';
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (isVisiting) {
+                container.sendMyteHome(myte);
+                return;
+            }
+
+            myte.clearHomeSlotHold?.();
+            myte.queue.clear();
+            myte.setMode(MOVE_TYPES.GOHOME);
+        });
+
+        const groupElement = document.createElement('div');
+        groupElement.className = 'action-group movement';
+        const title = document.createElement('h3');
+        title.textContent = 'Movement';
+        const actionList = document.createElement('ul');
+        const li = document.createElement('li');
+        li.appendChild(button);
+        actionList.appendChild(li);
+        groupElement.append(title, actionList);
+        actionGroups.appendChild(groupElement);
+    }
+
     updateActionList(selectedObject) {
         const actionGroups = this.actionControls.querySelector('.action-groups');
         const previousScrollTop = actionGroups.scrollTop;
         actionGroups.innerHTML = '';
         const activeMyte = this.parent.getActiveMyte();
+
+        this.renderSidebarInteractions(actionGroups, selectedObject);
 
         if (selectedObject instanceof DroppedMapItem) {
             this.actionControls.classList.add('is-visible');
@@ -1031,27 +1105,8 @@ class ActionSidebarManager extends UIComponent {
             actionGroups.appendChild(groupElement);
         });
 
-        if (selectedObject === activeMyte && activeMyte && !activeMyte.isAtHomePosition?.(1)) {
-            const groupEl = document.createElement('div');
-            groupEl.className = 'action-group movement';
-            const h3 = document.createElement('h3');
-            h3.textContent = 'Movement';
-            const ul = document.createElement('ul');
-            const li = document.createElement('li');
-            const btn = document.createElement('button');
-            btn.textContent = 'Go Home';
-            btn.addEventListener('click', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                activeMyte.clearHomeSlotHold?.();
-                activeMyte.queue.clear();
-                activeMyte.setMode(MOVE_TYPES.GOHOME);
-            });
-            li.appendChild(btn);
-            ul.appendChild(li);
-            groupEl.appendChild(h3);
-            groupEl.appendChild(ul);
-            actionGroups.appendChild(groupEl);
+        if (selectedObject === activeMyte && activeMyte) {
+            this.renderGoHomeAction(actionGroups, activeMyte);
         }
 
         if (actionGroups.children.length > 0) {

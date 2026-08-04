@@ -4,6 +4,8 @@ class GameLogManager extends ModalWindow {
     static MAX_ENTRIES = 200;
     static STORED_ENTRIES = 50;
     static STORAGE_KEY = 'myteGameLog';
+    // Sprite symbol used when a log template declares no icon of its own.
+    static DEFAULT_ICON = 'star';
 
     constructor(parent) {
         super(parent, {
@@ -155,7 +157,7 @@ class GameLogManager extends ModalWindow {
 
         this.addEntry({
             text,
-            icon: template.icon ?? '•',
+            icon: template.icon ?? GameLogManager.DEFAULT_ICON,
             category: template.category ?? 'system',
             rarity: template.rarity ?? null,
             time: this.getGameTimeStamp(),
@@ -207,7 +209,7 @@ class GameLogManager extends ModalWindow {
 
         const icon = document.createElement('span');
         icon.className = 'icon';
-        icon.textContent = entry.icon;
+        Utility.renderIconLabel(icon, entry.icon);
 
         const text = document.createElement('span');
         text.className = 'text';

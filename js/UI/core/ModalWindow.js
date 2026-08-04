@@ -659,7 +659,7 @@ constructor(parent, options = {}) {
 		button.type = 'button';
 		button.className = this.options.fullscreenButtonSelector.replace(/^\./, '');
 		button.setAttribute('aria-label', 'Maximize');
-		button.textContent = '⛶';
+		button.appendChild(Utility.createIcon('maximize'));
 		const closeButton = controls.querySelector(this.options.closeButtonSelector);
 		controls.insertBefore(button, closeButton);
 	}

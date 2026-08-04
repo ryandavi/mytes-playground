@@ -60,6 +60,9 @@
   --state-warning-accent: #fbbc04;
   --state-error-accent: #ea4335;
   --border-subtle: #eee;
+  --scrollbar-size: 8px;
+  --scrollbar-thumb: var(--button-dark);
+  --scrollbar-track: transparent;
   --button-outline-color: rgb(25, 24, 20);
   --button-text-color: #5b5a51;
   --button-icon-color: #c0beb0;
@@ -90,6 +93,9 @@
   --z-loading: 5000;
   --z-toast: 9000;
   --z-drag: 100000;
+  /* The thing currently under the cursor must clear every drop target, which
+     all sit at --z-drag. */
+  --z-dragged: 100001;
   --z-floating-debug: 1000000;
   --size-shell-width: 635px;
   --size-stage-height: 500px;
@@ -126,6 +132,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.icon-sprite {
+  display: none;
+}
+
+svg.icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  fill: currentColor;
 }
 
 body,
@@ -481,9 +498,21 @@ body.editor-body {
 }
 .editor-panel .editor-panel__content {
   flex: 1;
-  overflow-y: auto;
   min-height: 0;
-  scrollbar-color: var(--button-dark) transparent;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.editor-panel .editor-panel__content::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+.editor-panel .editor-panel__content::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+.editor-panel .editor-panel__content::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
 }
 
 .editor-rail .editor-rail__search {
@@ -590,7 +619,19 @@ body.editor-body {
   padding: var(--padding);
   gap: var(--gap);
   overflow-y: auto;
-  scrollbar-color: var(--button-dark) transparent;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.editor-workspace .editor-workspace__stage-wrap::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+.editor-workspace .editor-workspace__stage-wrap::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+.editor-workspace .editor-workspace__stage-wrap::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
 }
 .editor-workspace .editor-stage {
   border-top: var(--border-width) solid var(--button-dark);
@@ -964,6 +1005,21 @@ body.editor-body {
   font-size: 11px;
   max-height: 120px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.editor-findings::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+.editor-findings::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+.editor-findings::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+.editor-findings {
   flex-shrink: 0;
 }
 .editor-findings[hidden] {
@@ -1169,9 +1225,37 @@ body.editor-body {
 }
 .editor-panel.editor-inspector--split > .editor-panel__content {
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.editor-panel.editor-inspector--split > .editor-panel__content::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+.editor-panel.editor-inspector--split > .editor-panel__content::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+.editor-panel.editor-inspector--split > .editor-panel__content::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
 }
 .editor-panel.editor-inspector--split > .editor-inspector--base {
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.editor-panel.editor-inspector--split > .editor-inspector--base::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+.editor-panel.editor-inspector--split > .editor-inspector--base::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+.editor-panel.editor-inspector--split > .editor-inspector--base::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+.editor-panel.editor-inspector--split > .editor-inspector--base {
   border-left: var(--border-width) solid var(--border-subtle);
   opacity: 0.8;
 }
@@ -1195,6 +1279,21 @@ body.editor-body {
 
 .editor-sprite-grid {
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.editor-sprite-grid::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+.editor-sprite-grid::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+.editor-sprite-grid::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+.editor-sprite-grid {
   padding: var(--space-md) var(--padding);
   max-height: 320px;
   flex-shrink: 0;
@@ -1242,6 +1341,21 @@ body.editor-body {
   gap: var(--space-xs);
   padding: var(--space-sm) var(--padding);
   overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.editor-sprite-sequence::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+.editor-sprite-sequence::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+.editor-sprite-sequence::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+.editor-sprite-sequence {
   background-color: var(--surface-sunken, var(--surface-app));
   border-top: var(--border-width) solid var(--border-subtle);
   min-height: 80px;

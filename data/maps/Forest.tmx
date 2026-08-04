@@ -5,6 +5,9 @@
   <property name="displayName" value="Forest Clearing"/>
   <property name="location" value="outside"/>
   <property name="name" value="Forest"/>
+  <property name="region" value="overworld"/>
+  <property name="worldX" value="1"/>
+  <property name="worldY" value="2"/>
  </properties>
  <tileset firstgid="1" source="../tilesets/walls3.tsx"/>
  <layer id="1" name="Grass" width="30" height="30">

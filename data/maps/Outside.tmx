@@ -4,6 +4,9 @@
   <property name="description" value="Bliss"/>
   <property name="location" value="outside"/>
   <property name="name" value="Home"/>
+  <property name="region" value="overworld"/>
+  <property name="worldX" value="1"/>
+  <property name="worldY" value="1"/>
  </properties>
  <tileset firstgid="1" source="../tilesets/walls3.tsx"/>
  <layer id="1" name="Grass" width="30" height="40">

@@ -153,9 +153,8 @@ body.editor-body {
 
     .editor-panel__content {
         flex: 1;
-        overflow-y: auto;
         min-height: 0;
-        scrollbar-color: var(--button-dark) transparent;
+        @include scroll-area;
     }
 }
 
@@ -266,8 +265,7 @@ body.editor-body {
         flex-direction: column;
         padding: var(--padding);
         gap: var(--gap);
-        overflow-y: auto;
-        scrollbar-color: var(--button-dark) transparent;
+        @include scroll-area;
     }
 
     .editor-stage {
@@ -675,7 +673,7 @@ body.editor-body {
     padding: var(--space-sm) var(--space-base);
     font-size: 11px;
     max-height: 120px;
-    overflow-y: auto;
+    @include scroll-area;
     flex-shrink: 0;
 
     &[hidden] {
@@ -899,11 +897,11 @@ body.editor-body {
     }
 
     > .editor-panel__content {
-        overflow-y: auto;
+        @include scroll-area;
     }
 
     > .editor-inspector--base {
-        overflow-y: auto;
+        @include scroll-area;
         border-left: var(--border-width) solid var(--border-subtle);
         opacity: 0.8;
     }
@@ -931,7 +929,7 @@ body.editor-body {
 }
 
 .editor-sprite-grid {
-    overflow: auto;
+    @include scroll-area(both);
     padding: var(--space-md) var(--padding);
     max-height: 320px;
     flex-shrink: 0;
@@ -983,7 +981,7 @@ body.editor-body {
     align-items: flex-end;
     gap: var(--space-xs);
     padding: var(--space-sm) var(--padding);
-    overflow-x: auto;
+    @include scroll-area(x);
     background-color: var(--surface-sunken, var(--surface-app));
     border-top: var(--border-width) solid var(--border-subtle);
     min-height: 80px;

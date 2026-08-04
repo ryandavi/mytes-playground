@@ -47,6 +47,15 @@ class MyteDialogue {
         }
     }
 
+    // A wordless bubble: `name` is a sprite symbol, not text to read.
+    showIcon(name, style = 'thought') {
+        this.messageQueue.push({ text: '', icon: name, style });
+
+        if (!this.isDisplaying) {
+            this.displayNextMessage();
+        }
+    }
+
     // Display the next message in the queue
     async displayNextMessage() {
         if (this.isDestroyed || this.messageQueue.length === 0 || this.isDisplaying) {
@@ -54,7 +63,7 @@ class MyteDialogue {
         }
 
 
-        const { text, style } = this.messageQueue.shift();
+        const { text, icon, style } = this.messageQueue.shift();
         this.isDisplaying = true;
 
         // Remove all style classes first
@@ -63,7 +72,7 @@ class MyteDialogue {
         this.dialogue.classList.add(style);
 
         // Update text and show dialogue
-        this.textElement.textContent = text;
+        Utility.renderIconLabel(this.textElement, icon, text);
         await this.wait(50); // Small delay before showing
         this.dialogue.classList.add('is-visible');
 

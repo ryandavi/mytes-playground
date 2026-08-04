@@ -213,7 +213,10 @@ class Myte {
 		const {
 			goal = this.goal,
 			followGoal = this.followGoal,
-			autonomyGoal = this.autonomyGoal
+			autonomyGoal = this.autonomyGoal,
+			// A myte arriving from another map steps out of a portal, not out of
+			// its slot — its slot isn't on this map at all.
+			snapToHome = true
 		} = options;
 
 		this.isActive = true;
@@ -230,13 +233,13 @@ class Myte {
 		this.cancelInactivityFreeRoam();
 		this.resetGoHomeState();
 		this.footstepController?.reset?.();
-		this.snapToHomePosition();
+		if (snapToHome) this.snapToHomePosition();
 		this.posZ = 0;
 		this.physicsController?.reset?.();
 		const homeSlotDirection = this.getHomeSlotDirection();
 		this.setDirection(homeSlotDirection);
 		this.stateMachine?.resetToIdle?.(homeSlotDirection);
-		this.playSlotExitSound();
+		if (snapToHome) this.playSlotExitSound();
 
 		this.syncSelectionState();
 		if (this.isActiveMyte) {
@@ -362,7 +365,26 @@ class Myte {
 		};
 	}
 
+	// Whether the map being played is the one this myte's home slot sits on.
+	// Off its home map the slot is detached from the DOM, so every home-relative
+	// behaviour has to be suppressed.
+	get isOnHomeMap() {
+		const currentMapId = this.parent?.gameMap?.id;
+		return !currentMapId || !this.homeMapId || this.homeMapId === currentMapId;
+	}
+
+	// Deployed on a map that isn't its own — it walked over to visit.
+	get isVisiting() {
+		return this.isActive && !this.isOnHomeMap;
+	}
+
 	getHomePosition() {
+		// A detached slot measures as (0, 0), which would drag the myte to the map
+		// corner. Its current spot is the honest answer.
+		if (!this.isOnHomeMap) {
+			return { x: this.posX, y: this.posY };
+		}
+
 		// Derived from DOM layout (getLocalOffset walks offsetParents), so cache it —
 		// AI thinks and GOHOME movement read this constantly. Invalidated whenever the
 		// slot element moves (setWrapperPosition, map transitions, container resize).

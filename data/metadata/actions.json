@@ -4,7 +4,7 @@
     {
       "id": "astar-move",
       "label": "A* Move To",
-      "icon": "🏃",
+      "icon": "move",
       "description": "Move to a location using A* pathfinding",
       "category": "movement",
       "tags": ["purposeful_movement"],
@@ -20,7 +20,7 @@
     {
       "id": "being_carried",
       "label": "Being Carried",
-      "icon": "🪁",
+      "icon": "carry",
       "description": "Being carried by another Myte",
       "category": "carry",
       "tags": ["social", "comfort_giving"],
@@ -38,7 +38,7 @@
     {
       "id": "carry",
       "label": "Carry",
-      "icon": "🫂",
+      "icon": "carry",
       "description": "Carry another Myte around",
       "category": "carry",
       "tags": ["social"],
@@ -55,7 +55,7 @@
     {
       "id": "carry_pickup",
       "label": "Pick Up",
-      "icon": "🤲",
+      "icon": "carry",
       "description": "Pick up another Myte",
       "category": "carry",
       "tags": ["social"],
@@ -73,7 +73,7 @@
     {
       "id": "carry_putdown",
       "label": "Put Down",
-      "icon": "📍",
+      "icon": "pin",
       "description": "Put down a carried Myte",
       "category": "carry",
       "tags": ["social"],
@@ -91,7 +91,7 @@
     {
       "id": "chase",
       "label": "Chase",
-      "icon": "🏃",
+      "icon": "move",
       "description": "Chase another Myte",
       "category": "social",
       "tags": ["playful", "social"],
@@ -109,7 +109,7 @@
     {
       "id": "circle",
       "label": "Circle",
-      "icon": "🔄",
+      "icon": "loop",
       "description": "Move in a circular pattern",
       "category": "movement",
       "tags": ["playful"],
@@ -130,7 +130,7 @@
     {
       "id": "close_chest",
       "label": "Close Chest",
-      "icon": "🔒",
+      "icon": "lock",
       "description": "Approach and close a treasure chest",
       "category": "interactions",
       "tags": ["stimulating"],
@@ -147,7 +147,7 @@
     {
       "id": "dance",
       "label": "Dance",
-      "icon": "💃",
+      "icon": "music",
       "description": "Perform a happy dance",
       "category": "state",
       "tags": ["playful", "creative"],
@@ -166,7 +166,7 @@
     {
       "id": "deep_inspect",
       "label": "Inspect Oddly",
-      "icon": "🔬",
+      "icon": "search",
       "description": "Investigate an object from several odd angles",
       "category": "interactions",
       "tags": ["stimulating", "risky"],
@@ -192,7 +192,7 @@
     {
       "id": "drink_fountain",
       "label": "Drink",
-      "icon": "💧",
+      "icon": "droplet",
       "description": "Drink from a fountain",
       "category": "interactions",
       "tags": ["soothing", "food"],
@@ -214,7 +214,7 @@
     {
       "id": "drop_item",
       "label": "Drop Item",
-      "icon": "📤",
+      "icon": "pin",
       "description": "Drop the item currently being carried",
       "category": "carry",
       "queue": {
@@ -230,7 +230,7 @@
     {
       "id": "eat_element",
       "label": "Eat",
-      "icon": "🍽️",
+      "icon": "bowl",
       "description": "Consume an edible object",
       "category": "interactions",
       "tags": ["food"],
@@ -257,7 +257,7 @@
     {
       "id": "emote_at",
       "label": "Emote At",
-      "icon": "💬",
+      "icon": "speech",
       "description": "Approach a target and show an expression",
       "category": "social",
       "tags": ["social", "soothing"],
@@ -274,7 +274,7 @@
     {
       "id": "expression",
       "label": "Express",
-      "icon": "😊",
+      "icon": "smile",
       "description": "Show an emotion or expression overlay",
       "category": "state",
       "queue": {
@@ -291,7 +291,7 @@
     {
       "id": "follow_mouse",
       "label": "Follow Mouse",
-      "icon": "🖱️",
+      "icon": "pointer",
       "description": "Follow the mouse cursor",
       "category": "movement",
       "tags": ["purposeful_movement"],
@@ -307,7 +307,7 @@
     {
       "id": "follow_object",
       "label": "Follow",
-      "icon": "🔗",
+      "icon": "link",
       "description": "Follow another Myte or creature",
       "category": "movement",
       "tags": ["purposeful_movement", "social"],
@@ -325,7 +325,7 @@
     {
       "id": "give_item",
       "label": "Give Item",
-      "icon": "🎁",
+      "icon": "gift",
       "description": "Give the held item to another Myte",
       "category": "carry",
       "tags": ["social"],
@@ -341,7 +341,7 @@
     {
       "id": "go_to_object",
       "label": "Go To",
-      "icon": "🏃",
+      "icon": "move",
       "description": "Move to a specific object or Myte",
       "category": "movement",
       "tags": ["purposeful_movement"],
@@ -360,7 +360,7 @@
     {
       "id": "greet",
       "label": "Greet",
-      "icon": "👋",
+      "icon": "wave",
       "description": "Greet another Myte with a wave",
       "category": "social",
       "tags": ["social"],
@@ -379,7 +379,7 @@
     {
       "id": "kiss",
       "label": "Kiss",
-      "icon": "💋",
+      "icon": "heart",
       "description": "Share a synchronized kiss with another Myte",
       "category": "social",
       "tags": ["social", "affection"],
@@ -398,7 +398,7 @@
     {
       "id": "high_five",
       "label": "High Five",
-      "icon": "✋",
+      "icon": "wave",
       "description": "Celebrate together with another Myte",
       "category": "social",
       "tags": ["social", "playful"],
@@ -417,7 +417,7 @@
     {
       "id": "kiss_receive",
       "label": "Kiss (receive)",
-      "icon": "💋",
+      "icon": "heart",
       "description": "Respond to a synchronized kiss",
       "category": "social",
       "tags": ["social", "affection"],
@@ -436,7 +436,7 @@
     {
       "id": "high_five_receive",
       "label": "High Five (receive)",
-      "icon": "✋",
+      "icon": "wave",
       "description": "Respond to a synchronized high five",
       "category": "social",
       "tags": ["social", "playful"],
@@ -455,7 +455,7 @@
     {
       "id": "greet_receive",
       "label": "Greet (receive)",
-      "icon": "👋",
+      "icon": "wave",
       "description": "Respond to a greeting from another Myte",
       "category": "social",
       "tags": ["social"],
@@ -474,7 +474,7 @@
     {
       "id": "guard",
       "label": "Guard",
-      "icon": "🛡️",
+      "icon": "shield",
       "description": "Guard a position, returning if wandered too far",
       "category": "movement",
       "tags": ["purposeful_movement"],
@@ -494,7 +494,7 @@
     {
       "id": "harvest",
       "label": "Harvest",
-      "icon": "🌾",
+      "icon": "wheat",
       "description": "Harvest a ready crop",
       "category": "interactions",
       "tags": ["stimulating", "food"],
@@ -519,7 +519,7 @@
     {
       "id": "hide",
       "label": "Hide",
-      "icon": "🙈",
+      "icon": "hide",
       "description": "Hide behind an object from something scary",
       "category": "reactive",
       "tags": ["restful", "soothing"],
@@ -538,7 +538,7 @@
     {
       "id": "hold_item",
       "label": "Carry Item",
-      "icon": "✊",
+      "icon": "grab",
       "description": "Carry an item",
       "category": "carry",
       "tags": ["purposeful_movement"],
@@ -554,7 +554,7 @@
     {
       "id": "idle",
       "label": "Idle",
-      "icon": "⏸️",
+      "icon": "pause",
       "description": "Stay in place for a moment",
       "category": "state",
       "queue": {
@@ -568,7 +568,7 @@
     {
       "id": "inspect",
       "label": "Inspect",
-      "icon": "🔍",
+      "icon": "search",
       "description": "Pause beside an object and inspect it naturally",
       "category": "interactions",
       "tags": ["stimulating"],
@@ -594,7 +594,7 @@
     {
       "id": "interact_object",
       "label": "Use",
-      "icon": "👆",
+      "icon": "pointer",
       "description": "Approach an object and use its main interaction",
       "category": "interactions",
       "tags": ["stimulating"],
@@ -685,7 +685,7 @@
     {
       "id": "jump",
       "label": "Jump",
-      "icon": "⬆️",
+      "icon": "arrow-up",
       "description": "Jump with physics-based movement",
       "category": "movement",
       "tags": ["playful"],
@@ -706,7 +706,7 @@
     {
       "id": "move",
       "label": "Move To",
-      "icon": "🏃",
+      "icon": "move",
       "description": "Move to a specific location",
       "category": "movement",
       "tags": ["purposeful_movement"],
@@ -721,7 +721,7 @@
     {
       "id": "nudge_ball",
       "label": "Nudge Ball",
-      "icon": "⚽",
+      "icon": "ball",
       "description": "Run into a ball to get it rolling",
       "category": "interactions",
       "tags": ["playful"],
@@ -751,7 +751,7 @@
     {
       "id": "open_chest",
       "label": "Open Chest",
-      "icon": "📦",
+      "icon": "chest",
       "description": "Approach and open a treasure chest",
       "category": "interactions",
       "tags": ["stimulating", "risky"],
@@ -775,7 +775,7 @@
     {
       "id": "patrol",
       "label": "Patrol",
-      "icon": "👀",
+      "icon": "eye",
       "description": "Walk back and forth between two points",
       "category": "movement",
       "tags": ["purposeful_movement"],
@@ -795,7 +795,7 @@
     {
       "id": "pick_flower",
       "label": "Pick Flower",
-      "icon": "🌸",
+      "icon": "flower",
       "description": "Pick a flower from a plant",
       "category": "interactions",
       "tags": ["stimulating", "creative"],
@@ -819,7 +819,7 @@
     {
       "id": "pickup_item",
       "label": "Pick Up",
-      "icon": "🤲",
+      "icon": "chest",
       "description": "Pick up an item and carry it",
       "category": "carry",
       "tags": ["purposeful_movement"],
@@ -836,7 +836,7 @@
     {
       "id": "play_fetch",
       "label": "Play Fetch",
-      "icon": "🎾",
+      "icon": "ball",
       "description": "Play fetch with a throwable object",
       "category": "social",
       "tags": ["playful", "social"],
@@ -866,7 +866,7 @@
     {
       "id": "play_tag",
       "label": "Play Tag",
-      "icon": "🏷️",
+      "icon": "tag",
       "description": "Play tag with another Myte",
       "category": "social",
       "tags": ["playful", "social"],
@@ -885,7 +885,7 @@
     {
       "id": "run_away",
       "label": "Run Away",
-      "icon": "🏃",
+      "icon": "move",
       "description": "Run away from a scary object or Myte",
       "category": "reactive",
       "tags": ["purposeful_movement"],
@@ -903,7 +903,7 @@
     {
       "id": "run_from",
       "label": "Run Away",
-      "icon": "🚪",
+      "icon": "door",
       "description": "Run away from an object",
       "category": "reactive",
       "tags": ["purposeful_movement"],
@@ -921,7 +921,7 @@
     {
       "id": "run_laps",
       "label": "Run Laps",
-      "icon": "🔁",
+      "icon": "loop",
       "description": "Run laps around a target",
       "category": "movement",
       "tags": ["playful"],
@@ -942,7 +942,7 @@
     {
       "id": "show_affection",
       "label": "Show Affection",
-      "icon": "❤️",
+      "icon": "heart",
       "description": "Show affection to another Myte",
       "category": "social",
       "tags": ["social", "comfort_giving", "soothing"],
@@ -962,7 +962,7 @@
     {
       "id": "simple_sleep",
       "label": "Take a Nap",
-      "icon": "😴",
+      "icon": "sleep",
       "description": "Take a quick nap with gentle floating animation",
       "category": "state",
       "tags": ["restful"],
@@ -980,7 +980,7 @@
     {
       "id": "sleep",
       "label": "Sleep",
-      "icon": "😴",
+      "icon": "sleep",
       "description": "Take a deep sleep with bobbing animation",
       "category": "state",
       "tags": ["restful"],
@@ -998,7 +998,7 @@
     {
       "id": "smell_flower",
       "label": "Smell Flower",
-      "icon": "🌺",
+      "icon": "flower",
       "description": "Approach and smell a flower",
       "category": "interactions",
       "tags": ["stimulating", "soothing", "comfort_giving"],
@@ -1021,7 +1021,7 @@
     {
       "id": "spin",
       "label": "Spin",
-      "icon": "🌀",
+      "icon": "loop",
       "description": "Spin around in place",
       "category": "state",
       "tags": ["playful"],
@@ -1041,7 +1041,7 @@
     {
       "id": "trample_flower",
       "label": "Trample",
-      "icon": "👟",
+      "icon": "flower",
       "description": "Trample a flower",
       "category": "interactions",
       "tags": ["stimulating"],
@@ -1065,7 +1065,7 @@
     {
       "id": "use_surface_slot",
       "label": "Use Surface",
-      "icon": "🛏️",
+      "icon": "bed",
       "description": "Use a slotted surface and settle into position",
       "category": "interactions",
       "tags": ["restful", "comfort_giving"],
@@ -1099,7 +1099,7 @@
     {
       "id": "wander",
       "label": "Wander",
-      "icon": "🌀",
+      "icon": "loop",
       "description": "Wander randomly within a radius",
       "category": "movement",
       "tags": ["purposeful_movement"],
@@ -1119,7 +1119,7 @@
     {
       "id": "watch",
       "label": "Watch",
-      "icon": "👁️",
+      "icon": "eye",
       "description": "Watch another Myte from nearby",
       "category": "social",
       "tags": ["social", "stimulating"],
@@ -1137,7 +1137,7 @@
     {
       "id": "water_plant",
       "label": "Water Plant",
-      "icon": "🪣",
+      "icon": "watering",
       "description": "Water a crop plant",
       "category": "interactions",
       "tags": ["stimulating", "creative"],
@@ -1161,7 +1161,7 @@
     {
       "id": "zigzag",
       "label": "Zigzag",
-      "icon": "↔️",
+      "icon": "arrow-lr",
       "description": "Move in a zigzag pattern",
       "category": "movement",
       "tags": ["playful"],
@@ -1182,7 +1182,7 @@
     {
       "id": "shake_tree",
       "label": "Shake Tree",
-      "icon": "🌳",
+      "icon": "tree",
       "description": "Shake a grown tree to collect fruit or seeds",
       "category": "interactions",
       "tags": ["stimulating"],
@@ -1207,7 +1207,7 @@
     {
       "id": "chop_tree",
       "label": "Chop Tree",
-      "icon": "🪓",
+      "icon": "axe",
       "description": "Chop down a grown tree, turning it into a stump",
       "category": "interactions",
       "tags": ["stimulating", "creative"],
@@ -1232,7 +1232,7 @@
     {
       "id": "remove_stump",
       "label": "Remove Stump",
-      "icon": "🪵",
+      "icon": "axe",
       "description": "Dig out and remove a tree stump",
       "category": "interactions",
       "tags": ["stimulating"],

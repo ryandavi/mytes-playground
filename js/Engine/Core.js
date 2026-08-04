@@ -187,6 +187,12 @@ class MyteCore {
                 throw new Error('Failed to load shop metadata.');
             }
 
+            this.loadingManager.setMessage("Mapping the world...");
+            const worldDataLoaded = await WorldGraph.preload();
+            if (!worldDataLoaded) {
+                throw new Error('Failed to load world metadata.');
+            }
+
             this.loadingManager.setMessage("Loading action data...");
             const actionDataLoaded = await ActionDefinitionRegistry.preload();
             if (!actionDataLoaded) {

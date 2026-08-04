@@ -237,6 +237,23 @@ class MapTransitionManager {
         });
     }
 
+    // Re-place every myte home slot for `map` — resident slots into the object
+    // layer around the spawn point, non-resident slots detached. Public because
+    // relocating a myte's home between maps needs the same placement pass.
+    syncMyteHomeSlots(map = this.container.gameMap) {
+        this._syncAllMyteSlotsToSpawn(map);
+    }
+
+    // Where a myte arriving from `sourceMapId` should appear on `map` — the
+    // portal that leads back there when there is one, else the spawn point.
+    resolveArrivalFrom(myte, sourceMapId, map = this.container.gameMap) {
+        return this._resolveArrivalDestination(map, { myte, sourceMapId });
+    }
+
+    placeMyteAtArrival(myte, arrival) {
+        this._applyMyteArrival(myte, arrival);
+    }
+
     _prepareMyteForTransition(myte) {
         if (!myte) return;
         myte.queue?.clear?.();
@@ -402,6 +419,16 @@ class MapTransitionManager {
             return this._finishSuccessfulTransition(options, isInitialLoad);
         }
 
+        // A portal takes whoever walked into it, and nobody else. Every other
+        // deployed myte stays on the map being left, standing where it stands,
+        // until the player comes back for it.
+        if (!isInitialLoad) {
+            this.container.mytePresence?.parkOthers(
+                sourceMapId,
+                options.myte ?? this.container.activeMyte ?? null
+            );
+        }
+
         let newMap;
         let loadError = null;
 
@@ -504,6 +531,9 @@ class MapTransitionManager {
                     this._centerCameraOnPosition(viewerFocus?.position, viewerFocus?.size);
                 }
             }
+
+            // Anyone left standing on this map last time is still standing there.
+            this.container.mytePresence?.restoreOn(newMap.id);
 
             await this._waitForRevealReadiness(newMap, mapId);
 

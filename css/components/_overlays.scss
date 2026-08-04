@@ -118,6 +118,15 @@
             font-size: 1rem;
             font-weight: 700;
             line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            >svg.icon {
+                width: 18px;
+                height: 18px;
+                fill: currentColor;
+            }
         }
 
         .compact-chip__meter {
@@ -185,6 +194,11 @@
 
                 .compact-chip__label {
                     font-size: 0.9rem;
+
+                    >svg.icon {
+                        width: 16px;
+                        height: 16px;
+                    }
                 }
             }
         }

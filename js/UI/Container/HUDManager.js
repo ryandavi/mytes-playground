@@ -6,6 +6,8 @@ class HUDManager extends UIComponent {
         this.moodElement = this.hudElement?.querySelector('.mood') || null;
         this.energyElement = this.hudElement?.querySelector('.energy') || null;
         this.clockElement = this.parent.containerWrapper.querySelector('.date-time .clock');
+        this.clockTextElement = this.clockElement?.querySelector('.clock__time') ?? null;
+        this.clockSeasonElement = this.clockElement?.querySelector('.clock__season') ?? null;
         this.coinElement = this.parent.containerWrapper.querySelector('.coin-count');
         this.currentMoodEffect = null;
         this._lastUpdate = 0;
@@ -34,6 +36,7 @@ class HUDManager extends UIComponent {
             moodEffect: null,
             clock: null,
             clockTitle: null,
+            season: null,
             coins: null
         };
     }
@@ -135,19 +138,24 @@ class HUDManager extends UIComponent {
     }
 
     updateClock() {
-        if (!this.clockElement) return;
+        if (!this.clockTextElement || !this.clockSeasonElement) return;
 
         const gameTime = this.parent.parent?.core?.gameTime;
         if (!gameTime) return;
 
         const season = gameTime.getCurrentSeason?.();
-        const glyph = SiteConfig.ui.hud.seasonGlyphs[season] ?? '';
-        const clock = `${gameTime.getFormattedTime()}${glyph ? ` ${glyph}` : ''}`;
+        const seasonIcon = SiteConfig.ui.hud.seasonIcons[season] ?? '';
+        const clock = gameTime.getFormattedTime();
         const title = gameTime.getFormattedDate();
 
         if (this.lastRenderedState.clock !== clock) {
-            this.clockElement.textContent = clock;
+            this.clockTextElement.textContent = clock;
             this.lastRenderedState.clock = clock;
+        }
+        if (this.lastRenderedState.season !== seasonIcon) {
+            Utility.setIcon(this.clockSeasonElement, seasonIcon);
+            this.clockSeasonElement.hidden = !seasonIcon;
+            this.lastRenderedState.season = seasonIcon;
         }
         if (this.lastRenderedState.clockTitle !== title) {
             this.clockElement.title = title;
@@ -291,6 +299,8 @@ class HUDManager extends UIComponent {
         this.moodElement = null;
         this.energyElement = null;
         this.clockElement = null;
+        this.clockTextElement = null;
+        this.clockSeasonElement = null;
         this.coinElement = null;
         this.numberFormatter = null;
         this.currentMoodEffect = null;

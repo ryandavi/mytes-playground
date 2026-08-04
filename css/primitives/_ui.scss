@@ -134,6 +134,42 @@
     padding: 0.75rem;
 }
 
+// Every scrolling region should read the same: one track width, one thumb
+// colour, on every engine. Before this existed each component hand-rolled its
+// own mix of `overflow` / `scrollbar-width` / `scrollbar-color`, so the sidebar
+// action list had a thin bar while the info panel beside it had a fat native
+// one. Use this instead of setting overflow directly.
+//
+// $axis: y (default) | x | both — only the scrolling axis is set, the cross
+// axis is left alone so nothing that relied on visible overflow gets clipped.
+@mixin scroll-area($axis: y) {
+    @if $axis == both {
+        overflow: auto;
+    } @else if $axis == x {
+        overflow-x: auto;
+    } @else {
+        overflow-y: auto;
+    }
+
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+
+    // Safari and older Chromium ignore the two standard properties above.
+    &::-webkit-scrollbar {
+        width: var(--scrollbar-size);
+        height: var(--scrollbar-size);
+    }
+
+    &::-webkit-scrollbar-track {
+        background: var(--scrollbar-track);
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb);
+        border-radius: 999px;
+    }
+}
+
 @mixin pill-label {
     background: var(--surface-pill-muted, #e0e0e0);
     border-radius: 3px;

@@ -69,6 +69,10 @@
     --state-error-accent: #ea4335;
     --border-subtle: #eee;
 
+    --scrollbar-size: 8px;
+    --scrollbar-thumb: var(--button-dark);
+    --scrollbar-track: transparent;
+
     --button-outline-color: rgb(25, 24, 20);
     --button-text-color: #5b5a51;
     --button-icon-color: #c0beb0;
@@ -103,6 +107,9 @@
     --z-loading: 5000;
     --z-toast: 9000;
     --z-drag: 100000;
+    /* The thing currently under the cursor must clear every drop target, which
+       all sit at --z-drag. */
+    --z-dragged: 100001;
     --z-floating-debug: 1000000;
 
     --size-shell-width: 635px;

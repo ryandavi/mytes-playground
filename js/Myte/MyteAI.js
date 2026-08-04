@@ -193,7 +193,7 @@ class MyteAI {
 
 		this._lastBubblePrefix = prefix;
 		this._lastBubbleTime = now;
-		this.myte.dialogue?.showMessage(icon, 'thought');
+		this.myte.dialogue?.showIcon(icon, 'thought');
 	}
 
     selectCandidate(candidates) {

@@ -1566,8 +1566,9 @@
 			},
 			"obj_flower_rustle": {
 				type: "sfx",
-				baseVolume: 0.16,
-				variation: { volumeSteps: [0.92, 1] },
+				category: "footsteps",
+				baseVolume: 0.3,
+				variation: { pitchRange: 0.035, volumeSteps: [0.92, 1] },
 				create: () => {
 					const synth = new Tone.NoiseSynth({
 						noise: { type: "pink" },
