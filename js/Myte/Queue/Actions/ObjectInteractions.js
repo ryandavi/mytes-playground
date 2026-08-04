@@ -218,7 +218,17 @@ class InteractObjectAction extends GoToObjectAction {
         if (hasCustomPress) {
             this.target.press(this.myte.parent);
         } else {
-            this.target?.interact?.(this.myte);
+            // `interact` returns false when the object is still on cooldown or is
+            // already mid-interaction with this Myte. The walk still happened, so
+            // without a word the Myte appears to arrive and do nothing.
+            const interacted = this.target?.interact?.(this.myte);
+            if (interacted === false && this.userInitiated) {
+                const targetName = this.getQueueTargetLabel(this.target);
+                MyteCore.instance?.toastManager?.warning(
+                    `${targetName || 'That'} isn't ready to be used again yet.`,
+                    'Still Resetting'
+                );
+            }
         }
 
         const interactionType = this.target?.getConfig?.('interaction.type');
@@ -262,6 +272,31 @@ class SurfaceSlotAction extends GoToObjectAction {
         }
 
         return true;
+    }
+
+    // Only reached when canPerform said no. Returning null means "not applicable
+    // here", which keeps the action hidden rather than showing it disabled.
+    static explain(selected, active) {
+        if (!active || !(selected instanceof MapObject) || !selected.getActionConfig?.('use_surface_slot')) {
+            return null;
+        }
+        if (active.queue.isCarrying()) {
+            return `${active.name} is carrying something.`;
+        }
+        if (selected.isActionOccupied?.('use_surface_slot', active)) {
+            return 'Every spot is taken.';
+        }
+
+        const actionConfig = selected.getActionConfig('use_surface_slot', {});
+        const benefit = actionConfig.benefit ?? 'energy';
+        if (benefit === 'energy') {
+            const threshold = SiteConfig.stats.restEnergyThreshold ?? 90;
+            const energy = active.stats?.energy ?? 0;
+            if (energy >= threshold) {
+                return `${active.name} isn't tired enough to rest yet.`;
+            }
+        }
+        return null;
     }
 
     static getRequiredOptions(selected) {
@@ -347,10 +382,24 @@ class SurfaceSlotAction extends GoToObjectAction {
         };
     }
 
+    // Surface a refusal the player can act on. A blocked action completes silently
+    // on the next update, so without this the queue just empties and the Myte stands
+    // there — which reads as the game ignoring the click. Only user-initiated
+    // attempts report; the AI retries constantly and would spam toasts.
+    reportRefusal(message, title = 'Not Now') {
+        if (!this.userInitiated) return;
+        MyteCore.instance?.toastManager?.warning(message, title);
+    }
+
     start() {
         if (!this.resolveAndClaimSlot()) {
             this._blocked = true;
             this.clearDebugPath();
+            const targetName = this.getQueueTargetLabel(this.target);
+            this.reportRefusal(
+                `${targetName || 'That'} has no free spot for ${this.myte.name} right now.`,
+                'Occupied'
+            );
             return;
         }
 
@@ -733,6 +782,11 @@ class SurfaceSlotAction extends GoToObjectAction {
             ) ?? null;
             if (this.target?.sockets?.get?.(this._selectedSlotId) && !this._attachment) {
                 this._blocked = true;
+                // Lost the race: the seat was claimed during the approach walk.
+                this.reportRefusal(
+                    `${this.getQueueTargetLabel(this.target) || 'That spot'} was taken before ${this.myte.name} could settle in.`,
+                    'Occupied'
+                );
                 return true;
             }
             this.phase = 'rest';
@@ -828,7 +882,6 @@ class SurfaceSlotAction extends GoToObjectAction {
         if (this._attachment) {
             this.myte.container?.attachments?.detach?.(this.myte, { exitPosition });
             this._attachment = null;
-            this._reserved = false;
         } else if (this._restingWithCollisionDisabled) {
             this.myte.checkForCollisions = this._previousCollisionSetting;
             this._restingWithCollisionDisabled = false;

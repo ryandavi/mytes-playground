@@ -3,7 +3,12 @@
 .app-shell {
     background-color: var(--surface-app);
     border-radius: var(--border-radius-outer);
-    width: var(--size-shell-width);
+    // The shell has a fixed design width, but it must never exceed the viewport:
+    // at 635px on a 390px phone it overhung by ~122px each side and made the whole
+    // page scroll sideways. `min()` keeps the desktop size and clamps small screens.
+    width: min(var(--size-shell-width), 100%);
+    max-width: 100%;
+    box-sizing: border-box;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
@@ -43,6 +48,17 @@
         display: flex;
         gap: var(--space-2xl);
         align-items: center;
+        // Without these the header's nowrap contents plus the 2xl gap set a floor
+        // of ~419px, which overhangs any phone viewport. Wrapping lets it reflow
+        // instead of pushing the page sideways.
+        flex-wrap: wrap;
+        min-width: 0;
+
+        // The generous gap is a desktop luxury; it is the main offender at phone
+        // widths, so tighten it rather than dropping header content.
+        @media (max-width: 480px) {
+            gap: var(--space-sm);
+        }
 
         >.logo {
             display: flex;

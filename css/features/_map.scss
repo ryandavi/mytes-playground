@@ -372,6 +372,24 @@
 .map-object {
     position: fixed;
 
+    &.trample-reactive {
+        > .sprite {
+            transform-origin: center bottom;
+            transition: transform var(--trample-press-duration) var(--ease-emphasis);
+        }
+
+        &.is-trampled > .sprite {
+            transform:
+                translate(var(--trample-shift-x), var(--trample-shift-y))
+                skewX(var(--trample-bend))
+                scale(var(--trample-stretch), var(--trample-squash));
+        }
+
+        &.is-recovering > .sprite {
+            transition-duration: var(--trample-recovery-duration);
+        }
+    }
+
 
     .sway {
         animation-delay: inherit;
@@ -425,6 +443,31 @@
         pointer-events: none;
         transform-origin: center;
         z-index: 0;
+    }
+
+    > .npc-nameplate {
+        @include help-paper;
+        --help-paper-padding: var(--space-2xs) var(--space-xs);
+        position: absolute;
+        left: 50%;
+        top: 0;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: max-content;
+        transform: translate(-50%, calc(-100% - var(--npc-lift, 0px) - var(--space-2xs)));
+        pointer-events: none;
+
+        > .npc-nameplate__name {
+            font-weight: bold;
+            color: var(--text-base);
+        }
+
+        > .npc-nameplate__role {
+            color: var(--text-muted);
+            font-size: 8px;
+        }
     }
 
     &.interactive {

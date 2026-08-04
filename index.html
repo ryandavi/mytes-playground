@@ -475,6 +475,15 @@
 						<label for="notifications-toggle">Notifications</label>
 					</div>
 				</div>
+				<div class="setting-item">
+					<label>Save Data</label>
+					<div class="setting-actions">
+						<button id="export-save" type="button" class="secondary">Export</button>
+						<button id="import-save" type="button" class="secondary">Import</button>
+						<input type="file" id="import-save-file" accept="application/json,.json" hidden>
+					</div>
+					<p class="setting-hint">Your Mytes live only in this browser. Export a backup before clearing site data.</p>
+				</div>
 			</div>
 		</div>
 		<div class="window-panel__footer">
@@ -572,7 +581,7 @@
 
 	<!-- SCRIPTS:BEGIN -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js" defer></script>
-	<script src="js/bundle.js"></script>
+	<script src="js/bundle.js?v=2bba058b6b39"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

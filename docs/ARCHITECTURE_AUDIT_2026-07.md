@@ -1162,10 +1162,11 @@ applyShadowState(obj) {
 | T7 completion | Complete headlessly | Myte social affordances and capability broad-phases are in place; affordance/candidate baseline diff pending. |
 | T6/T6b socket and attachment rollout | Complete headlessly | Couch-seat, hold-anchor, and Myte-carry parity tests pass; browser interaction, transition, and editor checks pending. |
 | T13 paired social | Complete headlessly | Syntax/content checks pass; synchronized approach, refusal, and expression behavior require browser review. |
-| T15 follower system | Complete headlessly | Breadcrumb arc lookup and dead-band checks pass; six-follower/door and closed-door fallback cases require browser review. |
+| T15 follower system | Complete | Six-follower doorway case **passes** on the `DoorTest.tmx` fixture (2026-08-03 Group A) after fixing a rank-scaling defect in `FollowBehavior`'s trail/A* gate. Closed-door fallback case still unreviewed. |
 | T12 validation/regression harness | Partial | Content validation now covers capabilities, sockets, and spatial region shapes; the live invariant sweeper covers registry populations, relationships, attachments, socket occupancy, and both parent/child despawn cleanup. `__audit.autoplay()` samples those invariants over a five-minute simulation-time AI run and returns a structured report; completing a clean browser run remains pending. |
-| T8 movement consolidation | Partial | The behavior-neutral `MovementBody` math component is loaded before movers; Ball, `MovingMapObject`, and ambient creatures now share speed limiting/direction selection without changing collision, friction, timing, or AI. Collision/stuck/axis-slide migration and browser species observation remain pending. |
-| T9, T10, and T11 | Not started | Region/room and wall work remains after T8 and its browser regression gate. |
+| T8 movement consolidation | **Complete** | Occupancy sampling, axis-slide/probe resolution and stuck detection all moved into `MovementBody`; the ambient-creature and NPC stuck loops are deleted. Proven behaviour-identical by a 312,000-case differential test plus a live per-species movement pass (2026-08-03 Group B). |
+| T9 region system | **Substantially complete** | `SpatialRegion` + `RegionManager` landed; Zone migrated to a region consumer, lighting rooms published as `room`-layer regions, entity `currentRoomId`/`currentZoneIds`/`isIndoors` on the shared mixin with cell-crossing gating (18 recomputes / 291 calls), and door↔room topology derived at load. Remaining: tilemask room authoring, flood-fill enclosure detection (deferred by design), creature zone opt-in (a data choice). Water detection deliberately left in the grid — it is audio falloff, not a region system. |
+| T10 and T11 | Not started | Wall build/render and customization; now unblocked by the T9 geometry layer. |
 
 ### 2026-07-10 live browser pass (Codex app)
 
@@ -1231,6 +1232,185 @@ The 30-minute T17 mood/bubble observation is **cancelled by owner direction** an
 A temporary six-Myte browser profile (the permanent starter roster remains three) verified the shared breadcrumb behavior on FieldTest. The leader plus five followers remained in strict ID order along one trail; all five `following` relations stayed pointed at leader 1; follower A* calls were **zero**; only the leader invoked A* (two calls while resolving a partial reachable destination); final invariants were empty and there were no page errors. Evidence is stored in `docs/audit-baselines/follow-FieldTest-6mytes.json`.
 
 This is a **partial pass** for T15 rather than a claim that the complete doorway criterion passed. FieldTest's door is freestanding, so pathfinding routed above it instead of forcing traversal. Four Mytes crossed the door's x-line and the final two remained correctly spaced in the tail when the leader's partial path ended. An attempted House case did open the door, but the selected destination was unreachable and dominated the result with fallback replanning, so it was rejected as an invalid acceptance scenario. The shared-trail/no-follower-A* contract is green; a purpose-built one-cell forced-door fixture is still required to test the exact doorway criterion mechanically.
+
+> **Closed 2026-08-03** by the `DoorTest.tmx` fixture — see the Group A entry below.
+
+---
+
+# Addendum — 2026-08-03 Group A: gate-clearing bundle
+
+Four small, independent items chosen to remove the ambiguity hanging over the browser gate. All verified headlessly through the project Playwright workflow against the real app.
+
+## Stale facts this pass corrected
+
+- **`index.php` no longer exists.** The app is `index.html`, and `scripts/build-manifest.js` now emits a **single tracked `js/bundle.js`** which the page loads as its only script. There is no multi-script development mode and no `index.bundled.*`; the bundle is **not** gitignored, contrary to the T14 note. **Consequence: every JS edit requires `node scripts/build-manifest.js` before it is live in the browser.** References to `index.php` elsewhere in this document (§Boot & loop, §Rendering, and the 2026-07-09/07-10 addenda) and in `docs/CODEX_GOALS.md` §T14 are stale; they are left as written because those sections are historical records. `docs/SMOKE_CHECKLIST.md` is already correct.
+- `SiteConfig.myte.initialRosterCount` (cited in the three-Myte pass) **does not exist**; the roster comes from `user.savedMytes` → DOM `.myte-slot` wrappers → `createFallbackRosterData()`.
+
+## Results
+
+| Item | Result | Evidence |
+|---|---|---|
+| **WT-7** BigInt validation-cache key | **Done** | Per-search cache now buckets by packed collider signature and keys by packed position (plain doubles); the BigInt key survives only on the out-of-search LRU path, where entity/collider vary. 108 recorded searches across Outside/House/FieldTest are **byte-identical** before/after, and total search time fell **139.7 ms → 79.6 ms (43%)**. Key construction alone benched 14.9x. |
+| **Missing FieldTest assets** | **Done** | `metal_door.png` is a **palette recolour of `door.png`** — identical 800x256 pixel data, 7-entry palette remapped to cool steel, so the silhouette and all 5 open/close frames are exactly right. `npc_slime.png` (256x128, 8 frames of 64x64) is a crude procedurally-drawn blob; the config URL moved from the never-existing `.gif` to `.png`. Both are logged as placeholders in `docs/OLD/NEEDED_ART.md`. |
+| **Console/network gate** | **Green** | Boot + Outside/House/FieldTest transitions now produce **0 console errors and 0 failed requests**. Beyond the two assets, this needed a real fix: `GameMapLoader.getMapDisplayName` treated "file found but declares no `displayName`" as "file not found" and kept probing three legacy paths. `Outside.tmx` has no map-level `displayName`, so every load emitted three 404s. It now stops probing once a candidate file loads. |
+| **T14 boot-from-bundle** | **Verified** | Moot as originally written — the bundle is the only load path, so a clean boot *is* the bundle verification. Confirmed clean above. |
+| **T15 doorway criterion** | **Pass** | New fixture `data/maps/DoorTest.tmx`; recording `docs/audit-baselines/follow-DoorTest-6mytes.json`. |
+
+## T15 — what the doorway fixture found
+
+`DoorTest.tmx` is 30x16 cells: a full-height wall at column 15 with a single three-cell (96px) opening, so there is exactly one route between the rooms. The runtime-verified walkable rows of that column are stored in the recording, so a map edit opening a second route shows up as a diff.
+
+Two corrections to the criterion as originally written:
+
+- **A literal 1-cell (32px) door is impossible.** A Myte collider is 96x58; 32px admits nobody. 96px is the narrowest gap that passes one Myte and refuses two abreast (116px needed). This is why the earlier FieldTest and House attempts could not be made to work.
+- **"Single file" is not enforced by collision.** Mytes are deliberately non-blocking to each other (T3: `kind: 'myte'` never contributes to walkability), so up to four colliders overlap inside the gap while passing. The meaningful property is *ordering along the trail*, now measured directly as `orderViolationSamples`.
+
+**The run exposed a real defect in `FollowBehavior`, now fixed.** Followers chose between the shared trail and an A* fallback by gating on *distance to the leader* (`trailReach = maxDistance * 2` = 140px), but `followDistance` scales with trail rank (28/56/84/112/140px for ranks 1-5). The tail of any line longer than ~3 therefore exceeded its own reach and dropped to A* **while the trail was perfectly intact** — precisely the accordion failure the 2026-07-08 follow design warned about, and invisible on FieldTest because that run's line never got long enough to trigger it.
+
+The fix replaces the leader-distance gate with genuine trail consumption: `BreadcrumbTrail` gained `nearest()`, `indexBehind()` and `stepFrom()`, and a follower now steers to the next crumb a short hop ahead of its own nearest crumb, never past its slot. Every segment is ground the leader physically walked, so it is pre-validated; `trailReach` is repurposed to mean *how far off the trail* a follower may drift before falling back, which correctly does not scale with rank.
+
+This was A/B-verified rather than assumed. With an identical clustered start, the **original** code makes 34 follower A* calls (Mytes 5 and 6) and fails; the new code makes **0** and passes, stable across repeated runs.
+
+Final numbers: all six arrive, `followerPathCalls: 0` (leader: 1 initial path), `orderViolationSamples: 0/8`, all five `following` relations pointed at the leader, `__audit.invariants() === []`, zero page errors.
+
+**Harness note for re-runs:** followers must start clustered within `trailReach` of the leader. A strung-out start puts the tail off-trail *before any trail exists*, and those Mytes correctly path to the trail once — a start-up artifact that reads as a follow regression if the scenario is not set up this way.
+
+## Not done in this pass
+
+The remaining browser queue is unchanged: **T8** (collision/stuck/axis-slide migration into `MovementBody`, plus per-species observation), then **T9/T10/T11** (regions/rooms, walls, wall customization), **T12** schema coverage as those land, and the **P13** profile/heap protocols. The editor PHP security review remains untouched.
+
+---
+
+# Addendum — 2026-08-03 Group C: UX / comfort pass
+
+Items 3 and 5 of the UX audit plan, plus a check on the thought-bubble item. Independent of the entity architecture work.
+
+## Thought bubbles were already built
+
+The plan's "highest charm-per-effort" item — `lastDecisionLabel` → `MyteSpeech` — **already ships**: `MyteAI.showNeedBubble()` maps the winning drive's label prefix to an icon (`SiteConfig.ai.needBubbles.icons`) and calls `myte.dialogue.showMessage(icon, 'thought')`, throttled by `minIntervalMs` with an immediate show on a drive *change*. No work needed.
+
+One coverage gap, left deliberately: the labels actually produced are `dropped_item, eat, home_comfort, idle, play, safe_return, wander`, but `wander` and `idle` have no icon, so a wandering Myte is silent. That reads as correct — a bubble on every idle tick would be noise, not legibility. Conversely `rest`, `social` and `interaction` have icons but no matching label prefix; harmless, but it means those icons are currently dead config.
+
+## Reduced motion (UX pass 5) — done
+
+The audit said there were zero `prefers-reduced-motion` rules; by now there was exactly one (a coin-count transition). There is now a real implementation in `css/core/_reduced-motion.scss`, driven by two OR'd triggers: the OS `prefers-reduced-motion: reduce` query, and a `body.reduce-motion` class.
+
+**This also fixes a dangling toggle.** `animationsEnabled` was exposed in Settings > Graphics and persisted to user preferences but **consumed nowhere** — the same defect class as the `tutorialsEnabled` toggle flagged in the 2026-07-05 spot-check. It now drives the body class, so the existing toggle finally does something and no new UI was needed. `MyteCore.applyMotionPreference()` owns the class, `watchMotionPreference()` re-applies if the OS preference changes mid-session, and `SettingsPanel.applyGraphicsSettings()` applies live on toggle (previewing before save, like the effects and weather toggles).
+
+**The obvious implementation would have broken three systems.** The usual `*{ animation: none !important }` snippet is unsafe here, because these depend on animation/transition events actually firing:
+
+| System | Event | Breakage if suppressed |
+|---|---|---|
+| `ToastSystem` | `animationend` on the progress bar | toasts never auto-dismiss |
+| `MyteDialogue` | `transitionend` on bubble opacity | `isDisplaying` never clears — a Myte shows **one** thought bubble and then never another |
+| `MapTransitionManager` | `transitionend` on the overlay | map transitions stall |
+
+So the partial only ever clears `animation`, never `transition`; leaves the toast progress bar and the loading indicators (spinner, progress blocks, loading icon) alone; and replaces the three `forwards` animations (`whisperFloat`, `collect`, `consume`) with static fades of the same timing rather than removing them, so their end states still land. Selectors are written to match the compiled output exactly and win on source order, so the partial must stay **last** in `style.scss`.
+
+Verified: OS query off/on → class absent/present; in-game toggle → class present; `thought`/`alert` animations resolve to `none`, `whisper` to `whisperFade`, and the bubble's opacity transition survives at `0.5s`. Toast and thought-bubble behaviour are **identical A/B with the class on and off**, confirming nothing regressed.
+
+## Feedback legibility (UX pass 3) — partially done
+
+Three concrete silent failures now explain themselves, following the established `toastManager.warning(msg, title)` pattern gated on `userInitiated` (so the AI, which retries constantly, never spams):
+
+1. **Occupied seat, at claim time** — `SurfaceSlotAction.start()` set `_blocked` and `update()` immediately returned complete, so the queue emptied and the Myte just stood there. This is precisely the "invoking Sit emptied the queue without moving or seating the Myte; no toast explained the refusal" observation from the 2026-07-10 live pass. Now: *"Test Couch has no free spot for Snail 2 right now."* Verified by filling both couch sockets and issuing a user-initiated sit.
+2. **Occupied seat, lost during the approach walk** — the settle-time attach failure had the same silent path.
+3. **Interaction cooldown** — `MapObject.interact()` returns `false` on cooldown, but the Myte had already walked over, so it appeared to arrive and do nothing.
+
+Also: clicking a sidebar button whose options resolve to `null` used to swallow the click entirely; it now refreshes the list and says why.
+
+**The structural gap is not fixed and is bigger than this pass.** `ActionManager.getAvailableActions()` filters by `canPerformAction()` and the sidebar renders only survivors, so an unavailable action is simply *absent* — there is no way to show it disabled with a reason. That is the real cause of the 2026-07-10 "BED advertises `sittable` but exposes no Rest action" report: `SurfaceSlotAction.canPerform` returns `false` when energy is above `restEnergyThreshold`, and the player is told nothing. Fixing it properly means changing `canPerform` from a boolean to a reason-returning contract across ~55 action classes — worth doing, but it is its own task, not a UX polish item.
+
+## Still open in the UX plan (Group C)
+
+Passes 1 (first-five-minutes), 2 (input-feel on desktop *and* touch), 4 (mobile layout), and 6 (session-flow) are untouched, as is the contrast check in pass 5. Two further dangling settings found while working: `graphicsQuality` and `notificationsEnabled` are both persisted and consumed nowhere.
+
+---
+
+# Addendum — 2026-08-03 Group B: T8 completion and the T9 region primitive
+
+## T8 — MovementBody consolidation: complete
+
+`MovementBody` previously held three math helpers. It now owns the plumbing that was duplicated across the movers, while each mover keeps its own *response* — which is the distinction the original audit drew ("the behaviors are appropriately different; the plumbing is not"):
+
+| Added to `MovementBody` | Replaced |
+|---|---|
+| `canOccupy`, `isPathClear` | `AmbientCreatureMapObject.canOccupyPosition` / `isPathToPositionClear` |
+| `resolveMove` (full step → axis slide → angular probes) | `AmbientCreatureMapObject.tryAlternateMovement` |
+| `trackStuck` / `getStuckCount` / `resetStuck` | the `blockedFrames` + `stuckFrames` counters on ambient creatures **and** the separate `stuckFrames` loop in `NpcMapObject._checkStuck` |
+
+Responses stay where they belong: creatures bounce and re-pick a heading, NPCs open the blocking door and repath. `BallMapObject` was intentionally left alone — its elastic bounce is genuinely different physics, not duplicated plumbing. Myte-side stuck handling (`MytePhysics`, `AStarMoveAction`) is likewise untouched, per the original instruction not to fold `MyteMovementController` into this.
+
+`blockedFrames` / `stuckFrames` survive as getters over the shared counters so the bird and pollinator debug panels keep working.
+
+**Verification — and a note on why it is not a whole-sim trace.** The first attempt recorded creature positions across a stepped simulation and diffed before/after. That approach is invalid here and the numbers said so: with *identical code*, two runs differed in 470 of 1260 mover-samples. Seeding `Math.random` was not enough, because a run-dependent number of real RAF frames advances creature *state* (flight angles, phase timers, hover/idle switches) during boot, and neutralising RAF entirely stops the game booting. Creature motion is chaotic; any harness jitter is amplified until traces are meaningless.
+
+So the exactness claim is carried by a **differential test of the extracted functions** instead (`difftest.js`): the pre-refactor algorithms, copied verbatim, run against the new methods over randomised obstacle layouts and event sequences. **312,000 cases — 200k `resolveMove`, 100k `isPathClear`, 12k `trackStuck` sequences — zero mismatches.** A live pass then confirms birds, butterflies and NPCs all still move on all three maps with zero console errors. (Balls read as "not moving" in that pass, which is correct: a ball is at rest until kicked.)
+
+## T9 — SpatialRegion + RegionManager: primitive landed, consumers migrated
+
+Two new files, `js/Map/Regions/SpatialRegion.js` and `RegionManager.js`.
+
+- **`SpatialRegion`** carries geometry (`rect` | `polygon` | `tilemask`) and an opaque `properties` payload, and nothing else. Behaviour lives in whichever system consumes the layer — the discipline that stops this becoming a vague god-object. `contains()` is bounds-first, then O(1) for tilemasks and an even-odd ray cast for polygons (so concave/L-shaped rooms answer correctly). `intersectionRatio()` delegates **straight back to `RectUtils.getIntersectionRatio` for rect shapes**, because Zone's touching/halfway/fully thresholds depend on that exact number and must not drift.
+- **`RegionManager`** stores regions by typed layer, answers `regionsAt(x, y, layer)` via a bounds-first broad phase (a linear scan is cheaper than an index at a few dozen regions per map), maintains reverse occupant sets, and caches per-entity membership keyed on grid-cell crossing with `entered`/`exited` deltas. `forget(entity)` gives despawn one cleanup path alongside the other registries.
+
+**Zone is now a consumer, not a geometry owner.** Each zone registers its rect as a `zone`-layer region; `getIntersectionLevel` and `getCenterPoint` read from it; enter/exit maintain the region's occupant set, so *"who is in this zone"* is answerable for the first time (the old `mytesInZone` held ids only and nothing queried it).
+
+**Zone effect cadence is deliberately unchanged.** The roadmap suggested moving membership to cell-crossing only, but `onMyteStay` feeds `applyStatEffectsPerMs(effects, deltaTime)` — it *must* run every frame or per-ms stat accumulation silently stops. Membership caching is available on `RegionManager` for consumers that want it; Zone does not use it, and that is the correct call rather than an oversight.
+
+**Lighting rooms are published as `room`-layer regions.** `MapEnvironmentManager` keeps `roomVolumes` and every line of its lighting maths — nothing renders differently. What changes is that room geometry is no longer private to the lighting system, so indoor/outdoor checks, occupancy and the coming wall/enclosure work have a real place to read it from instead of inventing a fourth representation. Regions preserve the authored polygon (offset from Tiled's object-relative points back to world space) where the lighting normaliser discards it.
+
+**Verified:** on all three maps every zone has a region with identical bounds, every lighting room volume has a matching region, and **150 sampled intersection ratios are byte-identical** between the region and the original `RectUtils` call. Zone occupancy tracks a Myte in and back out (`mytesInZone` and the region's occupant set agree in both directions). Zero console errors; 108 recorded pathfinder searches still byte-identical to the pre-Group-A baseline.
+
+## Room semantics (completed same day)
+
+- **Entities know where they are.** `currentRoom`, `currentRoomId`, `currentRooms`, `currentZones`, `currentZoneIds` and `isIndoors` are on the shared entity mixin (`js/Engine/Entity.js`), so Mytes and map objects both get them. Overlapping rooms resolve innermost-first (smallest area wins), so a nook inside a hall reads as the nook. `isIndoors` answers the shelter question in one expression — `currentRoom?.properties.indoor` with the per-map `location` as fallback — which is all the stats/AI work needs, with no new system.
+- **Membership is cell-crossing gated.** `GameMap.update` calls `updateMembership(myte, { layers: ['room'] })` every frame; it returns immediately unless the entity changed grid cell. Measured on House: **18 recomputes across 291 calls**, with `currentRoomId` correct at all 4 room centres.
+- **Door↔room topology is derived at load.** `GameMap.buildDoorRoomTopology()` probes outward along both axes from each DOOR/GATE centre (a door sits *in* a wall, so its own centre is usually in neither room) and records `connectsRooms` on the door plus `doors` / `adjacentRooms` on each room region. Verified on House: the kitchen↔playroom door links both rooms; the door at y=944 links none, which is correct — it is below every room's south edge, i.e. an exterior door.
+
+**Zone-effect cadence was left per-frame**, deliberately. The roadmap proposed cell-crossing membership for zones too, but `onMyteStay` feeds `applyStatEffectsPerMs(effects, deltaTime)`; throttling it would silently stop per-ms stat accumulation. Rooms have no such constraint and are gated; zones are not. This is a decision, not an omission.
+
+## Correction: the water tile-scan is not a region system
+
+The audit listed water detection as the third parallel region representation. Reading the actual code, it is not: `GameMap._getWaterTileProximity` is a **distance-weighted falloff for ambient audio**, called only from `_updateProximitySounds` to fade the lake loop as a Myte walks away. The zone half of that check (`water_lake` / `water_river`) already goes through Zone and is therefore now region-backed; the tile half answers *"how close is the nearest water tile"*, which the region primitive does not and should not model.
+
+Folding it in would also violate the audit's own rule — *"Tiles/terrain stay grid-cell data. Never wrap tiles in objects."* **Left where it is.** The genuine duplication was Zone vs lighting rooms, and that is now unified.
+
+## What T9 still does not do
+
+Tilemask room authoring (the schema supports it, no map uses it), auto flood-fill enclosure detection (deferred to post-P11 by design), and zone effects opting in for creatures (a per-type gameplay data choice, not a missing mechanism). T10/T11 remain untouched and now have the geometry layer they were waiting on.
+
+---
+
+# Addendum — 2026-08-03 Action legibility and the last dangling settings
+
+## The `canPerform` reason contract
+
+The structural gap flagged in the Group C entry is closed. `canPerform` returned a bare boolean, so an unavailable action simply vanished from the sidebar — the real cause of *"the BED advertises `sittable` but exposes no Rest action"* (energy was above `restEnergyThreshold`, silently).
+
+Rather than rewrite ~55 action classes, the contract is **opt-in and backwards compatible**. `ActionManager.explainAction(id, selected, active)` returns `{ available, reason }`, and an action may explain itself two ways:
+
+1. `canPerform` returns `{ ok: false, reason: '...' }` instead of a boolean — plain booleans keep working untouched;
+2. or the class defines `static explain(selected, active)`, consulted only when `canPerform` already said no.
+
+`canPerformAction` is now a thin wrapper over `explainAction`, so every existing caller is unaffected. `SurfaceSlotAction` implements `explain` (carrying / all spots taken / not tired enough) as the reference case.
+
+The sidebar renders unavailable-but-explained actions as **disabled buttons with the reason on hover** (`.is-unavailable`), while actions with *no* reason stay hidden — you should not see "Harvest" greyed out on a couch. Verified end to end: selecting the House bed with a rested Myte now shows **Rest, disabled, "Snail isn't tired enough to rest yet."**, and the action becomes genuinely available once energy drops.
+
+One thing the first cut got wrong and is worth recording: returning a reason for the `!active` case turned the sidebar into a wall of ten identical "No Myte is deployed." buttons. That is a global state, not a fact about any action, so it now returns no reason and renders nothing.
+
+## The last two dangling settings
+
+Both were persisted and consumed nowhere, same class as `animationsEnabled` and `tutorialsEnabled`:
+
+- **`graphicsQuality`** now scales the particle budget. `ParticleSystem.setQualityLevel()` multiplies the configured `maxParticles` (low 0.35 / medium 1 / high 1.5) and trims live particles immediately through the normal pooled release path, so lowering quality takes effect at once rather than whenever the current crop expires. Measured: 900 base → 315 / 900 / 1350.
+- **`notificationsEnabled`** now gates toasts — but only `info` and `success`. Warnings and errors always show, because those are either the answer to something the player just did (a refused action) or a real failure, and swallowing them is exactly how the game becomes unexplainable again. Verified: info suppressed, warning still shown, info restored on re-enable.
+
+`tutorialsEnabled` remains dangling; it has no consumer to wire to until a hint system exists, and inventing one is a design decision rather than a fix.
+
+## Regression after the action/settings work
+
+108 recorded pathfinder searches still byte-identical to the pre-Group-A baseline; 0 console errors and 0 failed requests across boot and three map transitions; six-Myte doorway follow still 0 follower A\* calls and 0 order violations; occupied-seat refusal still fires; reduced-motion A/B still identical; region and room suites pass.
 
 ---
 
@@ -1319,3 +1499,65 @@ Recheck after retuning: the home-slot comments in `SiteConfig.js:47-57` state ne
 **Step 4 — browser pass:** 30-minute observation with 2 deployed mytes: mood cycles through ≥ 4 distinct moods; need bubbles ≤ 1 per 5 min per myte; mytes visibly alternate eat/play/social/rest rather than firefighting one need.
 
 **Files:** `SiteConfig.js`, `MyteStats.js`, `BaseActions.js`, `data/metadata/actions.json`, `data/map-objects/types.json` (hunger→satiety), `scripts/validate-content-data.js`, `scripts/simulate-stats.js`. **Out of scope:** AI drive formulas (`MyteAI` scoring), buff definitions, zone effect values — retune those only if Step 4 observation demands it, as a separate task.
+
+---
+
+# Addendum — 2026-08-03 UX passes, persistence hardening, and hop locomotion
+
+## Hop locomotion (`HopMotion`)
+
+`js/Map/MapObjects/HopMotion.js` gives monsters discrete leaps instead of gliding. It does **not** decide where to go — the existing pathfinder/wander keeps setting velocity; HopMotion gates when that velocity may apply, scales it to a deliberate leap distance, and arcs `posZ`. A type becomes hoppy through config alone:
+
+```json
+"movement": { "style": "hop", "hop": { "distance": 22, "height": 15, "airMs": 320, "restMs": 520 } }
+```
+
+- **`distance` is the anti-drift control.** Without it, ground covered per leap is an emergent product of speed × air time and the creature looks like it is skating. With it, one leap covers a set distance regardless of the AI's speed.
+- **Rest is randomised** (`restVarianceMs`) so a group of slimes desynchronises instead of pulsing in lockstep.
+- **Animation states**: `onHopStart` → `jump`, apex → `fall`, landing → `land`, each falling back through the directional/idle animation via the new `AnimatedMapObject.playFirstAvailableAnimation`. Slime art for `jump`/`fall` does not exist yet — recorded in `docs/OLD/NEEDED_ART.md`; the hop works and simply reads better once drawn.
+- **Frogs, later**: `setEnabled(false)` returns full throttle and no arc, so a creature that both walks *and* leaps switches gait at runtime. HopMotion is a modifier on locomotion, not a monopoly.
+
+Measured on FieldTest: 8 leaps in 6 s, arc peaking at 14.9 of the configured 15, **all travel airborne with zero grounded drift**. NPC aggro and pathing unaffected.
+
+## Selection: single click no longer steals control
+
+Clicking a deployed Myte in the world used to switch the controlled Myte immediately. Now, in SELECT mode a single click only **selects** (the sidebar shows what the controlled Myte can do with it) and a **double click** transfers control. Outside SELECT (drag flows) the old immediate activation is kept, since those need a controlled Myte at once; double-clicking the Myte you already control still triggers its existing dance easter egg.
+
+## Error visibility
+
+Boot failures already showed the fatal banner, but anything thrown *after* boot only reached the console — for a player the game just quietly misbehaved. `MyteCore.installGlobalErrorHandlers()` now surfaces `error` and `unhandledrejection` as a toast, **deduplicated and rate-limited** (a throw inside the game loop repeats every frame; 60 toasts a second is worse than silence) and capped at 3 distinct errors per session. Verified: first error toasts, 20 repeats are muted, a *different* error still reports.
+
+**Bug found while wiring this:** `applyNotificationPreference()` was being called at Core init line ~172, but `toastManager` is not constructed until ~189 — optional chaining meant it silently no-opped, so the saved notifications preference never applied at boot. Both it and the error handlers now run immediately after the toast system exists.
+
+## Save/persistence hardening
+
+localStorage is the only copy of a player's Mytes, and the corruption path **deleted it** (`localStorage.removeItem`) with nothing but a console warning.
+
+- **Corrupt saves are quarantined, not destroyed** — moved to `<key>.corrupt` for possible hand-recovery.
+- **Rolling backup**: each successful write promotes the previous known-good save to `<key>.bak`, and only if it actually parses (so a bad save cannot overwrite a good backup). A corrupt load falls back to it and says so.
+- **Export / import** in Settings → Misc: a dated JSON download and an upload that validates, backs up what it replaces, then reloads. Doubles as a bug-report attachment.
+- Quota/private-mode failures were already caught (June gap) and still toast.
+
+Verified: export round-trips through import restoring a mutated value; junk files are rejected with readable reasons; a deliberately corrupted save is quarantined, recovered, and the user still loads.
+
+## UX passes 1, 2, 4, 6
+
+Run against the real app across four viewports (1440/820/390/320).
+
+**Pass 1 — first five minutes: a real gap, now fixed.** A cold profile boots in ~565 ms with 2 Mytes, **none deployed, no active Myte, zero onboarding text and zero toasts** — nothing tells a new player what to do. Two staged first-run hints now explain waking a Myte and interacting with the world. Crucially this is gated on **`tutorialsEnabled`** — the setting that had been persisted-but-unconsumed since the July audit, which explicitly suggested it become "the flag for the first-run toast sequence when that gets built". A new `hasSeenIntro` preference stops re-onboarding, and re-enabling the toggle resets it so the setting doesn't read as broken.
+
+**Pass 2 — input feel: 108 of 124 visible interactive elements were below the ~44 px touch minimum** (window controls at 30×30, volume sliders 26 px tall). Fixed under `@media (pointer: coarse)` only — that targets actual touch input rather than guessing from viewport width, so desktop density is deliberately untouched and a small desktop window keeps its compact controls.
+
+**Pass 4 — mobile layout: the page scrolled sideways on every phone width.** Three distinct causes, all fixed and re-measured:
+1. `--size-shell-width: 635px` was applied as a fixed width — on a 390 px phone the shell overhung ~122 px each side (the arithmetic matched the measurement exactly). Now `min(var(--size-shell-width), 100%)`.
+2. The header was a non-wrapping flex row with a `2xl` gap, setting a ~419 px floor. Now wraps, with a tighter gap under 480 px.
+3. The **action sidebar was entirely off-screen and unreachable** — it is parked beside the shell via `translate(calc(100% + 20px))`, which only works when there is space to the right. Under 960 px it now overlays the stage. *Provisional*: a proper phone treatment (bottom sheet / dismissible drawer) is a design decision, not a mechanical one.
+4. The Myte-info tab strip overflowed by a few px; it now scrolls with tighter padding on small screens.
+
+Result: **no horizontal page overflow at 1440, 820, 390 or 320**, and no UI chrome left outside the viewport.
+
+**Pass 6 — session flow: sound.** Map, active Myte, deployed count, currency and play time all survive a reload correctly. The one gap is a design question rather than a defect: there is **no "welcome back" signal** after time away — a returning player sees no acknowledgement and no summary of what changed. Recorded, not invented, since it needs a design call on stat-decay communication.
+
+## Still open
+
+UX pass 5's contrast check (the reduced-motion half shipped earlier), the mobile sidebar's real design treatment, the "welcome back" moment, `P13` profiling protocols, walls (T10/T11), and the **editor PHP security review** — still the only hard gate before public hosting.

@@ -1571,6 +1571,12 @@ const RectUtils = {
         return this.getRectIntersection(b1, b2) !== null;
     },
 
+    getRectGap(a, b) {
+        const dx = Math.max(b.left - a.right, a.left - b.right, 0);
+        const dy = Math.max(b.top - a.bottom, a.top - b.bottom, 0);
+        return Math.hypot(dx, dy);
+    },
+
     checkBoxCollision(entityA, entityB, options = {}) {
         const boundsA = this.getEntityColliderBounds(entityA);
         const boundsB = this.getEntityColliderBounds(entityB);
@@ -7220,6 +7226,8 @@ class ToastSystem {
 	  this.toasts = new Map(); // Store toast elements by ID
 	  this.counter = 0; // For generating unique IDs
 	  this.maxToasts = 5;
+	  // Driven by the Settings > Misc > Notifications toggle (see setNotificationsEnabled).
+	  this.notificationsEnabled = true;
 	  
 	  // Toast default configuration
 	  this.defaults = {
@@ -7265,6 +7273,14 @@ class ToastSystem {
 	show(options = {}) {
 	  // Merge default options with provided options
 	  const config = {...this.defaults, ...options};
+
+	  // Settings > Misc > Notifications. Suppresses ambient chatter only —
+	  // warnings and errors always show, because those are either the answer to
+	  // something the player just did (a refused action) or a real failure, and
+	  // silently swallowing them is how the game becomes unexplainable.
+	  if (this.notificationsEnabled === false && (config.type === 'info' || config.type === 'success')) {
+		return null;
+	  }
 	  
 	  // Generate unique ID for this toast
 	  const id = `toast-${++this.counter}`;
@@ -7514,6 +7530,11 @@ class ToastSystem {
 	  }
 	}
 	
+	setNotificationsEnabled(enabled = true) {
+	  this.notificationsEnabled = enabled !== false;
+	  return this;
+	}
+
 	info(content, title = 'Information', options = {}) {
 	  return this.show({
 		type: 'info',
@@ -7647,6 +7668,130 @@ class MyteCore {
         document.body.classList.toggle('debug', params.has('debug'));
     }
 
+    /**
+     * Toggle the `reduce-motion` body class that css/core/_reduced-motion.scss keys
+     * off. Motion is reduced when EITHER the OS asks for it OR the in-game
+     * Graphics > Animations toggle is off — the OS request is treated as binding
+     * rather than as a default the game may override.
+     *
+     * @param {boolean} [animationsEnabled] live value from SettingsPanel; falls back
+     *                                      to the saved preference when omitted.
+     */
+    applyMotionPreference(animationsEnabled = undefined) {
+        const preferred = animationsEnabled ?? this.user?.preferences?.animationsEnabled;
+        const systemPrefersReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+        document.body.classList.toggle('reduce-motion', preferred === false || systemPrefersReduced);
+    }
+
+    /**
+     * Push the Settings > Misc > Notifications preference into the toast system.
+     * Like `animationsEnabled`, this setting was persisted but consumed nowhere.
+     *
+     * @param {boolean} [enabled] live value from SettingsPanel; falls back to the
+     *                            saved preference when omitted.
+     */
+    applyNotificationPreference(enabled = undefined) {
+        const preferred = enabled ?? this.user?.preferences?.notificationsEnabled;
+        this.toastManager?.setNotificationsEnabled?.(preferred !== false);
+    }
+
+    /**
+     * First-run hints.
+     *
+     * A UX pass on a cold profile found a brand-new player arrives with no Myte
+     * deployed, no active Myte, and **nothing on screen explaining what to do** —
+     * the world just sits there. These two toasts are the minimum that makes the
+     * first interaction discoverable without instruction.
+     *
+     * This is also what the long-dangling `tutorialsEnabled` setting was always
+     * meant to gate (per the 2026-07-05 audit note), so it finally does something.
+     */
+    showFirstRunHints() {
+        const preferences = this.user?.preferences;
+        if (!preferences) return;
+        if (preferences.tutorialsEnabled === false) return;
+        if (preferences.hasSeenIntro) return;
+
+        this.user.setPreference?.('hasSeenIntro', true);
+
+        this.toastManager?.info?.(
+            'Your Mytes are resting in their slots below. Click one to wake it up and send it into the world.',
+            'Welcome',
+            { duration: 12000 }
+        );
+
+        // Second beat, after the first has had time to be read.
+        setTimeout(() => {
+            this.toastManager?.info?.(
+                'Click something in the world to see what your Myte can do with it. Double-click another Myte to take control of it.',
+                'Getting Around',
+                { duration: 12000 }
+            );
+        }, 9000);
+    }
+
+    /**
+     * Make post-boot runtime errors visible.
+     *
+     * Boot failures already show the fatal banner, but anything thrown *after*
+     * boot only reached the console — so for a player the game just quietly
+     * misbehaves. These handlers surface it once, in plain language.
+     *
+     * Rate-limited and deduplicated: a throw inside the game loop repeats every
+     * frame, and 60 toasts a second is worse than silence.
+     */
+    installGlobalErrorHandlers() {
+        if (this._errorHandlersInstalled) return;
+        this._errorHandlersInstalled = true;
+
+        this._reportedErrors = new Map();
+        const REPEAT_MUTE_MS = 30000;
+        const MAX_DISTINCT = 3;
+
+        const report = (label, detail) => {
+            const key = `${label}:${detail}`.slice(0, 200);
+            const now = Date.now();
+            const lastSeen = this._reportedErrors.get(key);
+            if (lastSeen && (now - lastSeen) < REPEAT_MUTE_MS) return;
+            this._reportedErrors.set(key, now);
+
+            // Stop nagging once several distinct errors have surfaced — at that
+            // point the session is already broken and more toasts add nothing.
+            if (this._reportedErrors.size > MAX_DISTINCT) return;
+
+            this.toastManager?.error?.(
+                'Something went wrong. The game may misbehave — reloading usually fixes it.',
+                'Unexpected Error'
+            );
+        };
+
+        this._onWindowError = (event) => {
+            report('error', event?.message ?? String(event?.error ?? 'unknown'));
+        };
+        this._onUnhandledRejection = (event) => {
+            const reason = event?.reason;
+            report('rejection', reason?.message ?? String(reason ?? 'unknown'));
+        };
+
+        window.addEventListener('error', this._onWindowError);
+        window.addEventListener('unhandledrejection', this._onUnhandledRejection);
+    }
+
+    removeGlobalErrorHandlers() {
+        if (!this._errorHandlersInstalled) return;
+        window.removeEventListener('error', this._onWindowError);
+        window.removeEventListener('unhandledrejection', this._onUnhandledRejection);
+        this._errorHandlersInstalled = false;
+    }
+
+    // Re-apply if the OS preference changes mid-session.
+    watchMotionPreference() {
+        const query = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+        if (!query?.addEventListener || this._motionPreferenceHandler) return;
+        this._motionPreferenceHandler = () => this.applyMotionPreference();
+        query.addEventListener('change', this._motionPreferenceHandler);
+    }
+
     async init() {
         try {
             this.applyRuntimeModeFlags();
@@ -7679,6 +7824,10 @@ class MyteCore {
 
             this.loadingManager.setMessage("Loading user data...");
             await this.initializeUser();
+            this.applyMotionPreference();
+            this.watchMotionPreference();
+            // Notification preference is applied once toastManager exists (below) —
+            // there is nothing to configure before that.
 
             this.loadingManager.setMessage("Setting up world...");
             const container = await this.createContainer(this.config.container.primaryId);
@@ -7696,6 +7845,10 @@ class MyteCore {
             this.loadingManager.completeLoading();
 
             this.toastManager = new ToastSystem(document.body);
+            this.applyNotificationPreference();
+            // Only meaningful once there is a toast system to report through.
+            this.installGlobalErrorHandlers();
+            this.showFirstRunHints();
 
         } catch (error) {
             console.error('Failed to initialize MyteCore:', error);
@@ -7927,6 +8080,7 @@ class MyteCore {
         this.user = null;
 
         this.removeAudioUnlockListeners();
+        this.removeGlobalErrorHandlers();
         this.soundManager?.dispose();
         this.soundManager = null;
         document.removeEventListener('visibilitychange', this.boundHandleVisibilityChange);
@@ -9860,6 +10014,13 @@ class Particle {
 }
 
 class ParticleSystem {
+    // Particle budget multipliers per Settings > Graphics quality level.
+    static QUALITY_PARTICLE_SCALE = Object.freeze({
+        low: 0.35,
+        medium: 1,
+        high: 1.5
+    });
+
     static DEFAULT_PRESETS = Object.freeze({
         SPARKLE: {
             type: 'sparkle',
@@ -10215,6 +10376,9 @@ class ParticleSystem {
         this.parent = parent;
         this.container = options.container || parent?.layers?.particles || parent?.container || null;
         this.maxParticles = Math.max(1, ParticleDataUtils.toFiniteNumber(options.maxParticles, 600));
+        // Retained so quality changes scale from the configured budget rather than
+        // compounding off whatever the previous quality level left behind.
+        this.baseMaxParticles = this.maxParticles;
         this.effectsEnabled = options.effectsEnabled !== false;
         this.tickInterval = Math.max(
             1,
@@ -10264,6 +10428,30 @@ class ParticleSystem {
 
     isEffectsEnabled() {
         return this.effectsEnabled !== false;
+    }
+
+    /**
+     * Scale the particle budget from the Settings > Graphics quality level.
+     *
+     * This is what makes that dropdown do something: it was persisted as
+     * `graphicsQuality` and consumed nowhere. `maxParticles` is already enforced
+     * in the spawn path, so scaling it is the whole mechanism.
+     */
+    setQualityLevel(level = 'medium') {
+        const scale = ParticleSystem.QUALITY_PARTICLE_SCALE[String(level).toLowerCase()]
+            ?? ParticleSystem.QUALITY_PARTICLE_SCALE.medium;
+        const next = Math.max(1, Math.round(this.baseMaxParticles * scale));
+        if (next === this.maxParticles) return this;
+
+        this.maxParticles = next;
+        // Trim immediately so lowering quality takes effect now, not once the
+        // current crop of particles happens to expire. Oldest first, via the same
+        // pooled release path everything else uses.
+        while (this.particles.length > this.maxParticles) {
+            this.releaseParticle(this.particles[0], 'quality');
+        }
+        this.debug.sync();
+        return this;
     }
 
     setEffectsEnabled(enabled = true) {
@@ -13478,7 +13666,10 @@ const USER_DEFAULT_PREFERENCES = Object.freeze({
     tutorialsEnabled: true,
     autoSaveEnabled: true,
     language: 'en',
-    notificationsEnabled: true
+    notificationsEnabled: true,
+    // Set once the first-run hints have been shown, so returning players are not
+    // re-onboarded. Turning `tutorialsEnabled` back on resets this (SettingsPanel).
+    hasSeenIntro: false
 });
 
 class User {
@@ -13670,8 +13861,29 @@ class User {
         try {
             parsed = JSON.parse(savedData);
         } catch (e) {
-            console.warn('[User] Corrupted save data, resetting.', e);
-            localStorage.removeItem(storageKey);
+            // Never delete a corrupt save outright — for a pet game that is the
+            // player's only copy of their Mytes. Quarantine it, try the rolling
+            // backup, and say what happened.
+            console.warn('[User] Corrupted save data.', e);
+            this._quarantineCorruptSave(storageKey, savedData);
+
+            const recovered = this._loadBackup(storageKey);
+            if (recovered) {
+                this.core?.toastManager?.warning?.(
+                    'Your save was damaged, so the previous backup was loaded instead. Recent progress may be missing.',
+                    'Save Recovered'
+                );
+                const migratedBackup = this._migrateUserData(recovered);
+                if (migratedBackup) {
+                    this.applyUserData(migratedBackup);
+                    return true;
+                }
+            }
+
+            this.core?.toastManager?.error?.(
+                'Your save could not be read and no backup was available. A copy of the damaged data was kept.',
+                'Save Unreadable'
+            );
             return false;
         }
 
@@ -13680,6 +13892,87 @@ class User {
 
         this.applyUserData(migrated);
         return true;
+    }
+
+    _backupKey(storageKey) { return `${storageKey}.bak`; }
+    _corruptKey(storageKey) { return `${storageKey}.corrupt`; }
+
+    // Keep the damaged blob under a separate key so it can be inspected or
+    // hand-recovered later. Best effort: if even this write fails, we are out of
+    // storage and there is nothing useful left to do.
+    _quarantineCorruptSave(storageKey, rawData) {
+        try {
+            localStorage.setItem(this._corruptKey(storageKey), rawData);
+        } catch (error) {
+            console.warn('[User] Could not quarantine corrupt save:', error);
+        }
+    }
+
+    _loadBackup(storageKey) {
+        try {
+            const backup = localStorage.getItem(this._backupKey(storageKey));
+            return backup ? JSON.parse(backup) : null;
+        } catch (error) {
+            console.warn('[User] Backup save is unreadable too:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Serialize the current user to a portable JSON string — the export half of
+     * export/import, and a useful bug-report attachment.
+     */
+    exportUserData() {
+        return JSON.stringify({
+            exportedAt: new Date().toISOString(),
+            userId: this.userId,
+            data: this.serializeUserData()
+        }, null, 2);
+    }
+
+    /**
+     * Replace the current save from an exported blob.
+     *
+     * Accepts both the wrapped export shape and a bare save, so a file pulled
+     * straight out of localStorage also works.
+     *
+     * @returns {{ ok: boolean, error?: string }}
+     */
+    importUserData(json) {
+        let parsed;
+        try {
+            parsed = typeof json === 'string' ? JSON.parse(json) : json;
+        } catch (error) {
+            return { ok: false, error: 'That file is not valid JSON.' };
+        }
+
+        const payload = parsed?.data ?? parsed;
+        if (!payload || typeof payload !== 'object') {
+            return { ok: false, error: 'That file does not contain save data.' };
+        }
+
+        const migrated = this._migrateUserData(payload);
+        if (!migrated) {
+            return { ok: false, error: 'That save is from an unsupported version.' };
+        }
+
+        // Snapshot what is about to be replaced, so an accidental import of the
+        // wrong file is recoverable.
+        const storageKey = this.getStorageKey();
+        if (storageKey) {
+            const current = localStorage.getItem(storageKey);
+            if (current) {
+                try {
+                    localStorage.setItem(this._backupKey(storageKey), current);
+                } catch (error) {
+                    console.warn('[User] Could not back up before import:', error);
+                }
+            }
+        }
+
+        this.applyUserData(migrated);
+        this.saveUserData();
+        return { ok: true };
     }
 
     // User authentication and profile methods
@@ -13851,7 +14144,23 @@ class User {
         if (!storageKey) return;
 
         try {
-            localStorage.setItem(storageKey, JSON.stringify(this.serializeUserData()));
+            const serialized = JSON.stringify(this.serializeUserData());
+
+            // Roll the last known-good save into a backup before overwriting, so a
+            // corrupt or partial write is recoverable rather than terminal. Only
+            // promote a previous value that actually parses — otherwise a bad save
+            // would overwrite a good backup.
+            const previous = localStorage.getItem(storageKey);
+            if (previous && previous !== serialized) {
+                try {
+                    JSON.parse(previous);
+                    localStorage.setItem(this._backupKey(storageKey), previous);
+                } catch {
+                    // Previous value was already damaged — leave the older backup be.
+                }
+            }
+
+            localStorage.setItem(storageKey, serialized);
 
             const lastUserIdKey = this.core?.config?.userData?.lastUserIdKey;
             if (lastUserIdKey) {
@@ -15555,6 +15864,10 @@ class ContainerManager {
     }
 
     setActiveMyte(myte) {
+        if (myte && !myte.isActive) {
+            return false;
+        }
+
         const previousActiveMyte = this.activeMyte;
         this.activeMyte = myte;
 
@@ -15583,17 +15896,13 @@ class ContainerManager {
             m.syncSelectionState();
         });
 
-        // start it if it's not active
-        if (myte && !myte.isActive) {
-            myte.startWithOptions({ goal: DEFAULT_MODE });
-        }
-
         this.ui.myteListManager.updateMytesList(myte);
         this.ui.debugPanel?.updateButtons();
         this.ui.viewPanel?.updateButtonStates();
         this.ui.setSelected(null);
 
         this.eventManager?.emit('container:active_myte_changed', { myte });
+        return true;
     }
 
     deactivateActiveMyte(myte = this.activeMyte) {
@@ -15882,12 +16191,19 @@ class ContainerInputManager {
       if (!this.isEnabled) return;
       if (event.originalEvent && event.originalEvent.defaultPrevented) return;
 
+      const target = event.originalEvent?.target;
+      if (this.container.ui.isTool(UIToolModes.SELECT) &&
+          this.canStartWorldGestureFromTarget(target)) {
+        this.container.ui.setSelected(null);
+        return;
+      }
+
       // Handle element click for active Myte
       if (this.container.activeMyte &&
         this.container.activeMyte.isActive &&
         this.container.ui.isTool(UIToolModes.SELECT)) {
 
-        const element = event.originalEvent?.target;
+        const element = target;
         if (element && this.isClickableElement(element)) {
           // this.container.ui.setSelected(element);
         }
@@ -16338,6 +16654,54 @@ const EntityDefaults = {
 };
 
 const EntityMethods = {
+
+	// ── Region membership ─────────────────────────────────────────────────────
+	// Backed by RegionManager (js/Map/Regions/). Room membership is recomputed
+	// only when the entity crosses a grid cell; zone membership is written by
+	// Zone itself, because its thresholds are intersection-ratio based and a
+	// centre-point test cannot reproduce them.
+
+	getRegionManager() {
+		return this.gameMap?.regionManager ??
+			this.parent?.gameMap?.regionManager ??
+			this.container?.gameMap?.regionManager ??
+			null;
+	},
+
+	get currentRooms() {
+		return this.getRegionManager()?.getMembership(this, 'room') ?? [];
+	},
+
+	// Innermost room wins when volumes overlap: the smaller area is the more
+	// specific answer (a nook inside a hall reads as the nook).
+	get currentRoom() {
+		const rooms = this.currentRooms;
+		if (rooms.length <= 1) return rooms[0] ?? null;
+		return rooms.reduce((best, room) =>
+			(room.bounds.width * room.bounds.height) < (best.bounds.width * best.bounds.height) ? room : best
+		);
+	},
+
+	get currentRoomId() {
+		return this.currentRoom?.id ?? null;
+	},
+
+	get currentZones() {
+		return this.getRegionManager()?.getMembership(this, 'zone') ?? [];
+	},
+
+	get currentZoneIds() {
+		return this.currentZones.map(region => region.id);
+	},
+
+	// Per-map `location` is the fallback; a room refines it. This is the whole
+	// "is this entity sheltered" question — one expression, no new system.
+	get isIndoors() {
+		const room = this.currentRoom;
+		if (room) return room.properties?.indoor !== false;
+		const location = String(this.gameMap?.location ?? this.parent?.gameMap?.location ?? '').toLowerCase();
+		return location === 'inside' || location === 'interior' || location === 'house';
+	},
 
 	resolveDepthOffsetValue(depthLine, depthOffset, colliderBottom, sizeHeight) {
 		const resolveExplicitDepth = value => {
@@ -18452,6 +18816,7 @@ class MyteMovementController {
         const step = m.stats.getSpeed() * ((m._dt ?? 16.667) / 16.667);
         const originalX = m.posX;
         const originalY = m.posY;
+        let movementBlocked = false;
 
         if (Number.isFinite(distance) && distance !== 0) {
             const moveX = (dx / distance) * step;
@@ -18466,7 +18831,7 @@ class MyteMovementController {
                 if (this.canMoveToPosition(newX, m.posY)) {
                     m.posX = newX;
                     if (m.checkForCollisions && gridSystem) {
-                        const potentialColliders = gridSystem.getPotentialColliders(m);
+                        const potentialColliders = gridSystem.getPotentialColliders(m, { includeActors: true });
                         for (const collider of potentialColliders) {
                             if (m.parent.checkCollision(m, collider)) {
                                 m.posX = originalX;
@@ -18484,7 +18849,7 @@ class MyteMovementController {
                     let doorOpenedX = false;
                     if (m.checkForCollisions && gridSystem) {
                         m.posX = newX;
-                        const potentialColliders = gridSystem.getPotentialColliders(m);
+                        const potentialColliders = gridSystem.getPotentialColliders(m, { includeActors: true });
                         m.posX = originalX;
                         for (const collider of potentialColliders) {
                             if (m.tryOpenCollider(collider, 'x')) { doorOpenedX = true; break; }
@@ -18504,7 +18869,7 @@ class MyteMovementController {
                             xBlocked = true;
                             if (m.checkForCollisions && gridSystem) {
                                 m.posX = newX;
-                                const potentialColliders = gridSystem.getPotentialColliders(m);
+                                const potentialColliders = gridSystem.getPotentialColliders(m, { includeActors: true });
                                 m.posX = originalX;
                                 for (const collider of potentialColliders) m.tryOpenCollider(collider, 'x');
                             }
@@ -18518,7 +18883,7 @@ class MyteMovementController {
                 if (this.canMoveToPosition(m.posX, newY)) {
                     m.posY = newY;
                     if (m.checkForCollisions && gridSystem) {
-                        const potentialColliders = gridSystem.getPotentialColliders(m);
+                        const potentialColliders = gridSystem.getPotentialColliders(m, { includeActors: true });
                         for (const collider of potentialColliders) {
                             if (m.parent.checkCollision(m, collider)) {
                                 m.posY = originalY;
@@ -18536,7 +18901,7 @@ class MyteMovementController {
                     let doorOpenedY = false;
                     if (m.checkForCollisions && gridSystem) {
                         m.posY = newY;
-                        const potentialColliders = gridSystem.getPotentialColliders(m);
+                        const potentialColliders = gridSystem.getPotentialColliders(m, { includeActors: true });
                         m.posY = originalY;
                         for (const collider of potentialColliders) {
                             if (m.tryOpenCollider(collider, 'y')) { doorOpenedY = true; break; }
@@ -18556,7 +18921,7 @@ class MyteMovementController {
                             yBlocked = true;
                             if (m.checkForCollisions && gridSystem) {
                                 m.posY = newY;
-                                const potentialColliders = gridSystem.getPotentialColliders(m);
+                                const potentialColliders = gridSystem.getPotentialColliders(m, { includeActors: true });
                                 m.posY = originalY;
                                 for (const collider of potentialColliders) m.tryOpenCollider(collider, 'y');
                             }
@@ -18574,9 +18939,11 @@ class MyteMovementController {
                     if (this.canMoveToPosition(originalX, slideY)) m.posY = slideY;
                 }
             }
+
+            movementBlocked = xBlocked || yBlocked;
         }
 
-        if (distance < step) m.snapPositionToTarget(doXAxis, doYAxis);
+        if (distance < step && !movementBlocked) m.snapPositionToTarget(doXAxis, doYAxis);
         m.ensureFiniteCoordinates('moveTowardsTarget:end');
         m.setDirection(m.getDirection());
         m.setSpritePosition(m.posX, m.posY);
@@ -18587,7 +18954,7 @@ class MyteMovementController {
         if (!m.checkForCollisions) return [];
         const gridSystem = m.parent?.gameMap?.gridSystem;
         if (!gridSystem || !m.parent?.checkCollision) return [];
-        return gridSystem.getPotentialColliders(m).filter(collider =>
+        return gridSystem.getPotentialColliders(m, { includeActors: true }).filter(collider =>
             collider && collider !== m && !collider.isPickedUp && m.parent.checkCollision(m, collider)
         );
     }
@@ -18686,6 +19053,55 @@ class BreadcrumbTrail {
         }
         return { ...this.points[0] };
     }
+
+    // Nearest recorded crumb to (x, y), with its distance.
+    nearest(x, y) {
+        let bestIndex = -1;
+        let bestDistance = Infinity;
+        for (let index = 0; index < this.points.length; index++) {
+            const point = this.points[index];
+            const distance = Math.hypot(point.x - x, point.y - y);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = index;
+            }
+        }
+        return { index: bestIndex, distance: bestDistance };
+    }
+
+    // Index of the crumb sitting `distance` behind the newest one by arc length.
+    indexBehind(distance) {
+        let remaining = Math.max(0, Number(distance) || 0);
+        for (let index = this.points.length - 1; index > 0; index--) {
+            const segmentLength = Math.hypot(
+                this.points[index].x - this.points[index - 1].x,
+                this.points[index].y - this.points[index - 1].y
+            );
+            if (remaining <= segmentLength) return index;
+            remaining -= segmentLength;
+        }
+        return 0;
+    }
+
+    /**
+     * The next crumb a follower at (x, y) should steer toward: a short hop forward
+     * along ground the leader physically walked, never past the follower's own slot.
+     *
+     * Steering by short trail hops (rather than straight at the slot point) is what
+     * lets an arbitrarily long line thread a doorway — every segment is pre-validated,
+     * so no follower needs A* while the trail holds. Returns null only when the
+     * follower is genuinely off the trail (teleport, closed door, map change), which
+     * is the caller's signal to fall back to a real path search.
+     */
+    stepFrom(x, y, slotDistance, { maxOffTrail = 96, lookAhead = 2 } = {}) {
+        if (this.points.length === 0) return null;
+        const { index, distance } = this.nearest(x, y);
+        if (index < 0 || distance > maxOffTrail) return null;
+
+        const slotIndex = this.indexBehind(slotDistance);
+        if (index >= slotIndex) return this.pointBehind(slotDistance);
+        return { ...this.points[Math.min(index + lookAhead, slotIndex)] };
+    }
 }
 
 class FollowBehavior {
@@ -18703,6 +19119,10 @@ class FollowBehavior {
         this.followDistance = baseFollowDistance * Math.max(1, trailIndex + 1);
         this.smoothingMs = options.smoothingMs ?? 250;
         this.repathInterval = options.repathInterval ?? 450;
+        // How far OFF the shared trail this follower may drift and still steer by it.
+        // Deliberately not a distance to the leader: a follower at trail rank N sits
+        // N*gap behind by design, so gating on leader distance pushed the tail of a
+        // long line into the A* fallback while the trail was perfectly intact.
         this.trailReach = options.trailReach ?? this.maxDistance * 2;
         this.isMoving = false;
         this.smoothedTarget = null;
@@ -18750,9 +19170,12 @@ class FollowBehavior {
         }
         this.isMoving = true;
 
-        const trailPoint = this.target.breadcrumbTrail?.pointBehind(this.followDistance) ?? null;
-        const destination = trailPoint ?? this._ownSideTarget();
-        if (trailPoint && distance <= this.trailReach) {
+        const trailStep = this.target.breadcrumbTrail?.stepFrom(
+            this.follower.posX, this.follower.posY, this.followDistance,
+            { maxOffTrail: this.trailReach }
+        ) ?? null;
+        const destination = trailStep ?? this._ownSideTarget();
+        if (trailStep) {
             this._pathAction = null;
             this.follower.setTarget(destination.x, destination.y);
             this.follower.moveTowardsTarget();
@@ -19042,6 +19465,7 @@ class Myte {
 		// Mytes are spatially indexed for queries but never block cells or
 		// colliders, and ContainerManager (not grid culling) owns their update.
 		this.contributesToWalkability = false;
+		this.actorCollision = this.definition.physics?.actorCollision !== false;
 		this.excludeFromCulling = true;
 		this._gridRegistered = null;   // GridSystem instance we're currently indexed in
 
@@ -23782,6 +24206,7 @@ class MyteTouchHandler extends DragHandler {
                 this.dragStartedInFreeRoam = myte.goal === MOVE_TYPES.FREEROAM;
                 myte.playSound('ui_pickup_item');
                 myte.isDragging = true;
+                myte.queue.clear();
                 this.dragStartPosition = { x: myte.posX, y: myte.posY };
                 myte.parent.camera.beginTemporaryFollow(myte, CAMERA_FOLLOW_MODES.CHARACTER);
                 myte.reset();
@@ -24163,16 +24588,38 @@ class MyteClickHandler extends MyteBaseHandler {
 			}
 
 			event.stopPropagation();
+
+			// Outside SELECT (drag and friends), keep activating immediately —
+			// those flows need a controlled myte straight away.
+			if (!this.myte.parent.ui.isTool(UIToolModes.SELECT)) {
+				if (!this.myte.isActiveMyte) {
+					this.myte.parent.setActiveMyte(this.myte);
+				}
+				return;
+			}
+
+			// In SELECT mode a single click only *selects* — it shows what the
+			// controlled myte can do with this one. Switching who you control is a
+			// double click, so brushing past a myte no longer hijacks control.
+			this.myte.parent.ui.setSelected(this.myte);
+
+			const now = Date.now();
+			const isDoubleClick = (now - this.lastClickTime) < this.config.doubleClickTimeout;
+			if (!isDoubleClick) {
+				this.lastClickTime = now;
+				return;
+			}
+			this.lastClickTime = 0;
+
 			if (!this.myte.isActiveMyte) {
 				this.myte.parent.setActiveMyte(this.myte);
+				return;
 			}
-			if (this.myte.parent.ui.isTool(UIToolModes.SELECT)) {
-				this.myte.parent.ui.setSelected(this.myte);
-				if (this.myte.isActiveMyte &&
-					!this.myte.isDragging &&
-					this.myte.parent.getPressDuration() < this.config.clickPressDuration) {
-					this._onClick(event);
-				}
+
+			// Double-clicking the myte you already control keeps its old easter egg.
+			if (!this.myte.isDragging &&
+				this.myte.parent.getPressDuration() < this.config.clickPressDuration) {
+				this._onDoubleClick(event);
 			}
 		}
 	}
@@ -27658,7 +28105,17 @@ class InteractObjectAction extends GoToObjectAction {
         if (hasCustomPress) {
             this.target.press(this.myte.parent);
         } else {
-            this.target?.interact?.(this.myte);
+            // `interact` returns false when the object is still on cooldown or is
+            // already mid-interaction with this Myte. The walk still happened, so
+            // without a word the Myte appears to arrive and do nothing.
+            const interacted = this.target?.interact?.(this.myte);
+            if (interacted === false && this.userInitiated) {
+                const targetName = this.getQueueTargetLabel(this.target);
+                MyteCore.instance?.toastManager?.warning(
+                    `${targetName || 'That'} isn't ready to be used again yet.`,
+                    'Still Resetting'
+                );
+            }
         }
 
         const interactionType = this.target?.getConfig?.('interaction.type');
@@ -27702,6 +28159,31 @@ class SurfaceSlotAction extends GoToObjectAction {
         }
 
         return true;
+    }
+
+    // Only reached when canPerform said no. Returning null means "not applicable
+    // here", which keeps the action hidden rather than showing it disabled.
+    static explain(selected, active) {
+        if (!active || !(selected instanceof MapObject) || !selected.getActionConfig?.('use_surface_slot')) {
+            return null;
+        }
+        if (active.queue.isCarrying()) {
+            return `${active.name} is carrying something.`;
+        }
+        if (selected.isActionOccupied?.('use_surface_slot', active)) {
+            return 'Every spot is taken.';
+        }
+
+        const actionConfig = selected.getActionConfig('use_surface_slot', {});
+        const benefit = actionConfig.benefit ?? 'energy';
+        if (benefit === 'energy') {
+            const threshold = SiteConfig.stats.restEnergyThreshold ?? 90;
+            const energy = active.stats?.energy ?? 0;
+            if (energy >= threshold) {
+                return `${active.name} isn't tired enough to rest yet.`;
+            }
+        }
+        return null;
     }
 
     static getRequiredOptions(selected) {
@@ -27787,10 +28269,24 @@ class SurfaceSlotAction extends GoToObjectAction {
         };
     }
 
+    // Surface a refusal the player can act on. A blocked action completes silently
+    // on the next update, so without this the queue just empties and the Myte stands
+    // there — which reads as the game ignoring the click. Only user-initiated
+    // attempts report; the AI retries constantly and would spam toasts.
+    reportRefusal(message, title = 'Not Now') {
+        if (!this.userInitiated) return;
+        MyteCore.instance?.toastManager?.warning(message, title);
+    }
+
     start() {
         if (!this.resolveAndClaimSlot()) {
             this._blocked = true;
             this.clearDebugPath();
+            const targetName = this.getQueueTargetLabel(this.target);
+            this.reportRefusal(
+                `${targetName || 'That'} has no free spot for ${this.myte.name} right now.`,
+                'Occupied'
+            );
             return;
         }
 
@@ -28173,6 +28669,11 @@ class SurfaceSlotAction extends GoToObjectAction {
             ) ?? null;
             if (this.target?.sockets?.get?.(this._selectedSlotId) && !this._attachment) {
                 this._blocked = true;
+                // Lost the race: the seat was claimed during the approach walk.
+                this.reportRefusal(
+                    `${this.getQueueTargetLabel(this.target) || 'That spot'} was taken before ${this.myte.name} could settle in.`,
+                    'Occupied'
+                );
                 return true;
             }
             this.phase = 'rest';
@@ -28268,7 +28769,6 @@ class SurfaceSlotAction extends GoToObjectAction {
         if (this._attachment) {
             this.myte.container?.attachments?.detach?.(this.myte, { exitPosition });
             this._attachment = null;
-            this._reserved = false;
         } else if (this._restingWithCollisionDisabled) {
             this.myte.checkForCollisions = this._previousCollisionSetting;
             this._restingWithCollisionDisabled = false;
@@ -30806,16 +31306,80 @@ class ActionManager {
     }
 
     static canPerformAction(actionId, selected, active) {
-        if (!active) {
-            return false;
-        }
+        return this.explainAction(actionId, selected, active).available;
+    }
+
+    /**
+     * Why is this action available, or not?
+     *
+     * Actions historically answered availability with a bare boolean, so an
+     * unavailable action simply vanished from the sidebar and the player was never
+     * told why ("the bed advertises `sittable` but shows no Rest action" — because
+     * energy was above the rest threshold, silently).
+     *
+     * Two opt-in ways for an action to explain itself, both backwards compatible:
+     *   1. `canPerform` may return `{ ok: false, reason: '...' }` instead of a
+     *      boolean. Plain booleans keep working untouched.
+     *   2. A class may define `static explain(selected, active)` returning a reason
+     *      string, used when `canPerform` said no without saying why.
+     *
+     * @returns {{ available: boolean, reason: string|null }}
+     */
+    static explainAction(actionId, selected, active) {
+        // No reason here on purpose: "no Myte is deployed" is a global state, not a
+        // fact about this action. Attaching it per-action turned the sidebar into a
+        // wall of identical disabled buttons.
+        if (!active) return { available: false, reason: null };
 
         const ActionClass = this.actions.get(actionId);
         if (!ActionClass || typeof ActionClass.canPerform !== 'function') {
-            return false;
+            return { available: false, reason: null };
         }
 
-        return !!ActionClass.canPerform(selected, active);
+        let verdict;
+        try {
+            verdict = ActionClass.canPerform(selected, active);
+        } catch (error) {
+            console.warn(`[ActionManager] canPerform threw for "${actionId}":`, error);
+            return { available: false, reason: null };
+        }
+
+        if (verdict && typeof verdict === 'object') {
+            const available = verdict.ok === true;
+            return { available, reason: available ? null : (verdict.reason ?? null) };
+        }
+
+        if (verdict) return { available: true, reason: null };
+
+        let reason = null;
+        if (typeof ActionClass.explain === 'function') {
+            try {
+                reason = ActionClass.explain(selected, active) ?? null;
+            } catch (error) {
+                console.warn(`[ActionManager] explain threw for "${actionId}":`, error);
+            }
+        }
+        return { available: false, reason };
+    }
+
+    /**
+     * Actions that are currently unavailable but can say why. These are worth
+     * surfacing to the player as disabled entries; an action with no reason is
+     * simply irrelevant here (you cannot "harvest" a couch) and stays hidden.
+     */
+    static getExplainedUnavailableActions(selected, active) {
+        const explained = [];
+        for (const [id, ActionClass] of this.actions) {
+            const { available, reason } = this.explainAction(id, selected, active);
+            if (available || !reason) continue;
+            explained.push({
+                ...this.getMetadata(id, ActionClass),
+                ...this.getActionPresentation(id, selected),
+                ActionClass,
+                unavailableReason: reason
+            });
+        }
+        return explained.sort((a, b) => a.priority - b.priority);
     }
 
     // Resolve options for an action from a UI selection context
@@ -31990,6 +32554,12 @@ class GameMapLoader {
                         this.mapDisplayNames.set(normalized, displayName);
                         return displayName;
                     }
+
+                    // The file was found but declares no map-level displayName — a
+                    // content choice, not a missing file. Stop probing here: the
+                    // remaining candidate paths are legacy locations that no longer
+                    // exist, and walking them only emits console 404s.
+                    return fallback;
                 } catch (error) {
                     Utility.warnDebug(`[GameMapLoader] Could not resolve display name for ${normalized} from ${path}:`, error);
                 }
@@ -32098,6 +32668,342 @@ class GameMapLoader {
             this.currentMap = previousMap;
             throw error;
         }
+    }
+}
+;
+/* -- js/Map/Regions/SpatialRegion.js -- */
+// ─────────────────────────────────────────────────────────────────────────────
+// SpatialRegion — one geometry primitive for every "area of the map" concept.
+//
+// Before this, three parallel representations existed: Zone (rect only, buffs),
+// environment.rooms (rect + optional polygon, lighting only), and an ad-hoc
+// terrain-tile proximity scan for water. Rooms would have been a fourth.
+//
+// A region owns GEOMETRY and an opaque `properties` payload. It owns no
+// behaviour: what a region *means* lives in whichever system consumes its layer
+// (Zone applies buffs, MapEnvironmentManager applies lighting). That separation
+// is what keeps this from becoming a vague god-object.
+// ─────────────────────────────────────────────────────────────────────────────
+class SpatialRegion {
+    /**
+     * @param {object} data
+     *   id         unique within its layer
+     *   layer      'zone' | 'room' | 'trigger' | 'lighting-opening'
+     *   shape      { kind: 'rect', bounds }
+     *            | { kind: 'polygon', points, bounds? }
+     *            | { kind: 'tilemask', cells, cellSize, bounds? }
+     *   properties layer-specific payload, untouched by this class
+     */
+    constructor(data = {}) {
+        this.id = data.id;
+        this.layer = data.layer ?? 'zone';
+        this.properties = data.properties ?? {};
+        this.shape = SpatialRegion.normalizeShape(data.shape);
+        this.bounds = this.shape.bounds;
+        this.source = data.source ?? null;
+    }
+
+    static normalizeShape(shape) {
+        if (!shape) return { kind: 'rect', bounds: { x: 0, y: 0, width: 0, height: 0 } };
+
+        if (shape.kind === 'polygon') {
+            const points = shape.points ?? [];
+            return { kind: 'polygon', points, bounds: shape.bounds ?? SpatialRegion.boundsOfPoints(points) };
+        }
+
+        if (shape.kind === 'tilemask') {
+            const cellSize = shape.cellSize ?? 32;
+            // Store as a Set of packed cell keys so `contains` is O(1).
+            const cells = shape.cells instanceof Set
+                ? shape.cells
+                : new Set((shape.cells ?? []).map(c => (Array.isArray(c) ? `${c[0]},${c[1]}` : `${c.x},${c.y}`)));
+            return {
+                kind: 'tilemask',
+                cells,
+                cellSize,
+                bounds: shape.bounds ?? SpatialRegion.boundsOfCells(cells, cellSize)
+            };
+        }
+
+        return { kind: 'rect', bounds: shape.bounds ?? shape };
+    }
+
+    static boundsOfPoints(points) {
+        if (!points?.length) return { x: 0, y: 0, width: 0, height: 0 };
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const p of points) {
+            minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+            minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+        }
+        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    }
+
+    static boundsOfCells(cells, cellSize) {
+        if (!cells?.size) return { x: 0, y: 0, width: 0, height: 0 };
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const key of cells) {
+            const [cx, cy] = key.split(',').map(Number);
+            minX = Math.min(minX, cx); maxX = Math.max(maxX, cx);
+            minY = Math.min(minY, cy); maxY = Math.max(maxY, cy);
+        }
+        return {
+            x: minX * cellSize,
+            y: minY * cellSize,
+            width: (maxX - minX + 1) * cellSize,
+            height: (maxY - minY + 1) * cellSize
+        };
+    }
+
+    // Bounds test first — cheap rejection before any polygon/tilemask work.
+    boundsContain(x, y) {
+        const b = this.bounds;
+        return x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height;
+    }
+
+    contains(x, y) {
+        if (!this.boundsContain(x, y)) return false;
+
+        if (this.shape.kind === 'rect') return true;
+
+        if (this.shape.kind === 'tilemask') {
+            const cs = this.shape.cellSize;
+            return this.shape.cells.has(`${Math.floor(x / cs)},${Math.floor(y / cs)}`);
+        }
+
+        // Polygon: even-odd ray cast. Handles concave shapes (L-shaped rooms).
+        const pts = this.shape.points;
+        let inside = false;
+        for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+            const xi = pts[i].x, yi = pts[i].y;
+            const xj = pts[j].x, yj = pts[j].y;
+            const intersects = ((yi > y) !== (yj > y)) &&
+                (x < ((xj - xi) * (y - yi)) / ((yj - yi) || Number.EPSILON) + xi);
+            if (intersects) inside = !inside;
+        }
+        return inside;
+    }
+
+    /**
+     * Fraction of `rect` that lies inside this region.
+     *
+     * Rect regions get the exact analytic answer (identical to the pre-existing
+     * `RectUtils.getIntersectionRatio`, which Zone thresholds depend on — this
+     * must not drift). Non-rect shapes sample instead, since there is no cheap
+     * exact answer for arbitrary polygons.
+     */
+    intersectionRatio(rect) {
+        if (this.shape.kind === 'rect') {
+            return RectUtils.getIntersectionRatio(rect, this.bounds);
+        }
+
+        const samples = 5;
+        let hits = 0;
+        for (let i = 0; i < samples; i++) {
+            for (let j = 0; j < samples; j++) {
+                const x = rect.x + (rect.width * ((i + 0.5) / samples));
+                const y = rect.y + (rect.height * ((j + 0.5) / samples));
+                if (this.contains(x, y)) hits++;
+            }
+        }
+        return hits / (samples * samples);
+    }
+
+    getCenterPoint() {
+        const b = this.bounds;
+        return { x: b.x + (b.width / 2), y: b.y + (b.height / 2) };
+    }
+}
+;
+/* -- js/Map/Regions/RegionManager.js -- */
+// ─────────────────────────────────────────────────────────────────────────────
+// RegionManager — the one place that answers "which areas is this entity in?"
+//
+// Layers are independent and unhierarchical on purpose: a zone may sit inside a
+// room, and a zone may straddle two rooms. No containment tree is enforced.
+//
+// Membership is cached per entity and recomputed only when the entity crosses a
+// grid cell, not every frame. Reverse occupant sets are maintained so a region
+// can list who is inside it for free — something the old per-frame Zone scan
+// could not do.
+// ─────────────────────────────────────────────────────────────────────────────
+class RegionManager {
+    constructor(map, { cellSize = 32 } = {}) {
+        this.map = map;
+        this.cellSize = cellSize;
+        this.regions = new Map();               // regionKey -> SpatialRegion
+        this.byLayer = new Map();               // layer -> Set<SpatialRegion>
+        this.occupants = new Map();             // regionKey -> Set<entity>
+        this._membership = new Map();           // entity -> { cellKey, byLayer: Map<layer, Set<regionKey>> }
+    }
+
+    static key(layer, id) {
+        return `${layer}:${id}`;
+    }
+
+    add(region) {
+        if (!region) return null;
+        const key = RegionManager.key(region.layer, region.id);
+        this.regions.set(key, region);
+        if (!this.byLayer.has(region.layer)) this.byLayer.set(region.layer, new Set());
+        this.byLayer.get(region.layer).add(region);
+        this.occupants.set(key, new Set());
+        return region;
+    }
+
+    remove(region) {
+        if (!region) return;
+        const key = RegionManager.key(region.layer, region.id);
+        this.regions.delete(key);
+        this.byLayer.get(region.layer)?.delete(region);
+        this.occupants.delete(key);
+    }
+
+    get(layer, id) {
+        return this.regions.get(RegionManager.key(layer, id)) ?? null;
+    }
+
+    all(layer = null) {
+        if (layer === null) return [...this.regions.values()];
+        return [...(this.byLayer.get(layer) ?? [])];
+    }
+
+    /**
+     * Regions containing a point. Bounds-first broad phase; with a few dozen
+     * regions per map a linear scan over bounds is cheaper than maintaining a
+     * spatial index. Add a cell index only if region counts grow materially.
+     */
+    regionsAt(x, y, layer = null) {
+        const pool = layer === null ? this.regions.values() : (this.byLayer.get(layer) ?? []);
+        const found = [];
+        for (const region of pool) {
+            if (region.contains(x, y)) found.push(region);
+        }
+        return found;
+    }
+
+    getOccupants(region) {
+        if (!region) return [];
+        return [...(this.occupants.get(RegionManager.key(region.layer, region.id)) ?? [])];
+    }
+
+    /**
+     * Directly record occupancy, for consumers that decide membership by their own
+     * rule rather than the default point test. Zone uses this: its thresholds are
+     * intersection-ratio based (touching / halfway / fully), which a centre-point
+     * test cannot reproduce, and its effects must stay per-frame so that per-ms
+     * stat accumulation keeps its existing cadence.
+     */
+    setOccupant(region, entity, inside) {
+        if (!region || !entity) return;
+        const key = RegionManager.key(region.layer, region.id);
+        const set = this.occupants.get(key);
+        if (!set) return;
+
+        if (inside) set.add(entity);
+        else set.delete(entity);
+
+        // Mirror into the entity's membership record so `getMembership` answers the
+        // same thing whichever path wrote it — consumer-driven (here) or the
+        // default point test in updateMembership.
+        let record = this._membership.get(entity);
+        if (!record) {
+            record = { cellKey: null, byLayer: new Map() };
+            this._membership.set(entity, record);
+        }
+        let layerKeys = record.byLayer.get(region.layer);
+        if (!layerKeys) {
+            layerKeys = new Set();
+            record.byLayer.set(region.layer, layerKeys);
+        }
+        if (inside) layerKeys.add(key);
+        else layerKeys.delete(key);
+    }
+
+    _cellKeyFor(entity) {
+        const cs = this.cellSize;
+        return `${Math.floor(entity.posX / cs)},${Math.floor(entity.posY / cs)}`;
+    }
+
+    /**
+     * Recompute an entity's membership if it has crossed a grid cell.
+     *
+     * @param {object} entity
+     * @param {object} options
+     *   layers  which layers to evaluate (default: all)
+     *   test    (region, entity) => boolean — lets a consumer impose its own
+     *           containment rule (Zone's intersection thresholds, for example)
+     *           instead of the default centre-point test
+     *   force   recompute even without a cell crossing
+     * @returns {{ entered: SpatialRegion[], exited: SpatialRegion[], changed: boolean }}
+     */
+    updateMembership(entity, { layers = null, test = null, force = false } = {}) {
+        const cellKey = this._cellKeyFor(entity);
+        let record = this._membership.get(entity);
+
+        if (!record) {
+            record = { cellKey: null, byLayer: new Map() };
+            this._membership.set(entity, record);
+        } else if (!force && record.cellKey === cellKey) {
+            return { entered: [], exited: [], changed: false };
+        }
+
+        record.cellKey = cellKey;
+        const targetLayers = layers ?? [...this.byLayer.keys()];
+        const entered = [];
+        const exited = [];
+
+        for (const layer of targetLayers) {
+            const previous = record.byLayer.get(layer) ?? new Set();
+            const current = new Set();
+
+            for (const region of this.byLayer.get(layer) ?? []) {
+                const inside = test
+                    ? test(region, entity)
+                    : region.contains(entity.posX, entity.posY);
+                if (!inside) continue;
+
+                const key = RegionManager.key(region.layer, region.id);
+                current.add(key);
+                if (!previous.has(key)) {
+                    entered.push(region);
+                    this.occupants.get(key)?.add(entity);
+                }
+            }
+
+            for (const key of previous) {
+                if (current.has(key)) continue;
+                const region = this.regions.get(key);
+                if (region) exited.push(region);
+                this.occupants.get(key)?.delete(entity);
+            }
+
+            record.byLayer.set(layer, current);
+        }
+
+        return { entered, exited, changed: entered.length > 0 || exited.length > 0 };
+    }
+
+    getMembership(entity, layer) {
+        const keys = this._membership.get(entity)?.byLayer.get(layer);
+        if (!keys) return [];
+        return [...keys].map(key => this.regions.get(key)).filter(Boolean);
+    }
+
+    // Single cleanup path — called from despawn alongside the other registries.
+    forget(entity) {
+        const record = this._membership.get(entity);
+        if (!record) return;
+        for (const keys of record.byLayer.values()) {
+            for (const key of keys) this.occupants.get(key)?.delete(entity);
+        }
+        this._membership.delete(entity);
+    }
+
+    clear() {
+        this.regions.clear();
+        this.byLayer.clear();
+        this.occupants.clear();
+        this._membership.clear();
     }
 }
 ;
@@ -32405,6 +33311,12 @@ class GameMap {
 		this.location = mapData.environment.location;
 
 		this.gridSystem = new GridSystem(this);
+		// One geometry store for every area concept (zones now, lighting rooms
+		// below, enclosures later). Must exist before ZoneManager, which registers
+		// each zone's geometry into it.
+		this.regionManager = new RegionManager(this, {
+			cellSize: this.gridSystem?.config?.cellSize ?? 32
+		});
 		this.zoneManager = new ZoneManager(this);
 
 		Utility.logDebug('Tile map dimensions:', this.dimensions);
@@ -32483,6 +33395,10 @@ class GameMap {
             await this.environmentManager.initialize(mapData);
         }
 
+        // Rooms exist by now (the environment manager registers them), and objects
+        // are placed, so door topology can be derived.
+        this.buildDoorRoomTopology();
+
 		// Notify the sound system of this map's audio context and begin proximity polling
 		const sm = this.soundManager;
 		if (sm) {
@@ -32535,6 +33451,67 @@ class GameMap {
 		}
 
 		sm.setProximitySounds(sounds);
+	}
+
+	/**
+	 * Derive which rooms each DOOR/GATE connects, at map load.
+	 *
+	 * A door sits *in* a wall, so its own centre usually lies in neither room. The
+	 * rooms it joins are found by probing outward along both axes from the door's
+	 * centre — whichever rooms those probes land in are the ones it connects.
+	 *
+	 * Doors already toggle grid walkability; this only annotates the topology, so
+	 * nothing about movement or collision changes. Stored on the region
+	 * (`properties.doors` / `adjacentRooms`) and on the door object (`connectsRooms`).
+	 */
+	buildDoorRoomTopology() {
+		const regionManager = this.regionManager;
+		if (!regionManager) return;
+
+		const rooms = regionManager.all('room');
+		for (const room of rooms) {
+			room.properties.doors = [];
+			room.properties.adjacentRooms = [];
+		}
+		if (rooms.length === 0) return;
+
+		const cellSize = this.gridSystem?.config?.cellSize ?? 32;
+		const doors = this.objects.filter(obj => ['DOOR', 'GATE'].includes(obj.type));
+
+		for (const door of doors) {
+			const rect = door.getRegionRect?.('collider') ?? {
+				x: door.posX, y: door.posY,
+				width: door.size?.width ?? 0, height: door.size?.height ?? 0
+			};
+			const cx = rect.x + (rect.width / 2);
+			const cy = rect.y + (rect.height / 2);
+
+			// Probe far enough to clear the wall the door is set into.
+			const reach = cellSize * 1.5;
+			const probes = [
+				{ x: cx, y: cy - reach }, { x: cx, y: cy + reach },
+				{ x: cx - reach, y: cy }, { x: cx + reach, y: cy }
+			];
+
+			const connected = new Set();
+			for (const probe of probes) {
+				for (const room of regionManager.regionsAt(probe.x, probe.y, 'room')) {
+					connected.add(room);
+				}
+			}
+
+			const connectedRooms = [...connected];
+			door.connectsRooms = connectedRooms.map(room => room.id);
+
+			for (const room of connectedRooms) {
+				room.properties.doors.push(door.id);
+				for (const other of connectedRooms) {
+					if (other !== room && !room.properties.adjacentRooms.includes(other.id)) {
+						room.properties.adjacentRooms.push(other.id);
+					}
+				}
+			}
+		}
 	}
 
 	// Returns the ground-center position of a myte's collider — the best single point
@@ -32996,10 +33973,22 @@ class GameMap {
             this.activeObjectsCount = this.objects.length;
         }
 
-        // Zone updates for active mytes
+        // Zone updates for active mytes.
+        //
+        // Zone effects stay per-frame on purpose: onMyteStay feeds
+        // applyStatEffectsPerMs(effects, deltaTime), so throttling this to cell
+        // crossings would silently stop per-ms stat accumulation. Room membership
+        // below has no such constraint and IS cell-crossing gated — updateMembership
+        // returns immediately when the entity has not changed cell.
         if (this.zoneManager) {
             this.mytes.forEach(myte => {
                 if (myte.isActive) this.zoneManager.update(myte, deltaTime);
+            });
+        }
+
+        if (this.regionManager) {
+            this.mytes.forEach(myte => {
+                if (myte.isActive) this.regionManager.updateMembership(myte, { layers: ['room'] });
             });
         }
 
@@ -33100,6 +34089,11 @@ class GameMap {
             this.zoneManager = null;
         }
 
+        if (this.regionManager) {
+            this.regionManager.clear();
+            this.regionManager = null;
+        }
+
         // Clear layer references
         this.layers = {};
 
@@ -33143,6 +34137,17 @@ class Zone {
         };
         this.displayName = data.properties?.displayName || this.type;
 
+        // Geometry now lives in the shared region store; Zone keeps only the
+        // behaviour (thresholds, buffs, stat effects). `this.bounds` is retained
+        // as a read-only convenience for the many existing callers.
+        this.region = map?.regionManager?.add(new SpatialRegion({
+            id: this.id,
+            layer: 'zone',
+            shape: { kind: 'rect', bounds: this.bounds },
+            properties: this.properties,
+            source: this
+        })) ?? null;
+
         // Track Mytes in the zone
         this.mytesInZone = new Set();
 
@@ -33183,6 +34188,7 @@ class Zone {
     }
 
     getCenterPoint() {
+        if (this.region) return this.region.getCenterPoint();
         return {
             x: this.bounds.x + (this.bounds.width / 2),
             y: this.bounds.y + (this.bounds.height / 2)
@@ -33286,7 +34292,11 @@ class Zone {
     }
 
     getIntersectionLevel(myteRect) {
-        const ratio = RectUtils.getIntersectionRatio(myteRect, this.bounds);
+        // Rect regions delegate straight back to RectUtils, so the thresholds
+        // below see byte-identical ratios to the pre-region implementation.
+        const ratio = this.region
+            ? this.region.intersectionRatio(myteRect)
+            : RectUtils.getIntersectionRatio(myteRect, this.bounds);
         if (ratio <= 0) return null;
         if (ratio >= 0.95) return ZONE_THRESHOLD.FULLY;
         if (ratio >= 0.5) return ZONE_THRESHOLD.HALFWAY;
@@ -33314,10 +34324,12 @@ class Zone {
             // Myte just entered the zone and meets threshold
             this.onMyteEnter(myte);
             this.mytesInZone.add(myte.id);
+            this.map?.regionManager?.setOccupant?.(this.region, myte, true);
         } else if (!meetsThreshold && wasInZone) {
             // Myte no longer meets threshold
             this.onMyteExit(myte);
             this.mytesInZone.delete(myte.id);
+            this.map?.regionManager?.setOccupant?.(this.region, myte, false);
         } else if (meetsThreshold) {
             // Myte stays in zone and still meets threshold
             this.onMyteStay(myte, deltaTime);
@@ -33597,6 +34609,7 @@ class MapEnvironmentManager {
         this.config = this.resolveConfig();
         this.roomVolumes = this.buildRoomVolumes();
         this.lightOpenings = this.buildLightOpenings();
+        this.registerRoomRegions();
         this._timeData = this.getTimeData();
         this.currentAtmosphere = this.resolveAtmosphereState(this._timeData);
         this.targetAtmosphere = Utility.deepClone(this.currentAtmosphere);
@@ -33895,6 +34908,59 @@ class MapEnvironmentManager {
                 mode: String(props.lightingMode || props.roomLightingMode || defaults.mode || 'mixed').toLowerCase()
             }
         };
+    }
+
+    /**
+     * Publish the lighting rooms into the shared region store as layer `room`.
+     *
+     * Lighting keeps its own `roomVolumes` and all of its maths — this does not
+     * change how anything renders. The point is that room geometry stops being
+     * private to the lighting system, so indoor/outdoor checks, occupancy queries
+     * and the future wall/enclosure work have somewhere real to read it from
+     * instead of inventing a fourth representation.
+     *
+     * Regions keep the authored polygon where one exists (Tiled stores polygon
+     * points relative to the object origin, so they are offset back to world
+     * space here); the lighting normaliser discards it and uses bounds only.
+     */
+    registerRoomRegions() {
+        const regionManager = this.gameMap?.regionManager;
+        if (!regionManager) return;
+
+        for (const existing of regionManager.all('room')) {
+            regionManager.remove(existing);
+        }
+
+        const authored = Array.isArray(this.mapData?.environment?.rooms)
+            ? this.mapData.environment.rooms
+            : [];
+        const polygonById = new Map();
+        for (const room of authored) {
+            if (!Array.isArray(room?.polygon) || room.polygon.length < 3) continue;
+            const originX = Number(room.bounds?.x) || 0;
+            const originY = Number(room.bounds?.y) || 0;
+            polygonById.set(
+                String(room.id).toLowerCase(),
+                room.polygon.map(p => ({ x: originX + (Number(p.x) || 0), y: originY + (Number(p.y) || 0) }))
+            );
+        }
+
+        for (const volume of this.roomVolumes) {
+            const polygon = polygonById.get(String(volume.id).toLowerCase());
+            regionManager.add(new SpatialRegion({
+                id: volume.id,
+                layer: 'room',
+                shape: polygon
+                    ? { kind: 'polygon', points: polygon, bounds: volume.bounds }
+                    : { kind: 'rect', bounds: volume.bounds },
+                properties: {
+                    displayName: volume.displayName,
+                    indoor: true,
+                    lighting: volume.lighting
+                },
+                source: volume
+            }));
+        }
     }
 
     buildLightOpenings() {
@@ -39313,7 +40379,7 @@ class MapObject {
 	playConfiguredSound(type) {
 		const soundEffect = this.getConfig(`soundEffects.${type}`);
 		if (soundEffect && this.gameMap?.soundManager) {
-			this.gameMap.soundManager.play(soundEffect);
+			this.gameMap.soundManager.playWhenReady(soundEffect);
 		}
 	}
 
@@ -40412,6 +41478,23 @@ const withAnimation = (BaseClass) => class extends BaseClass {
         if (!this.animation) return false;
         this.currentAnimation = animationName;
         return this.animation.play(animationName, onComplete);
+    }
+
+    // Does this object actually have art for a state? Lets callers request optional
+    // states (hop jump/fall, say) and fall back cleanly when the sheet lacks them,
+    // instead of recording a currentAnimation that never renders.
+    hasAnimation(animationName) {
+        return !!this.animation?.config?.animations?.[animationName];
+    }
+
+    // Play the first state that exists. Returns the name used, or null.
+    playFirstAvailableAnimation(...names) {
+        for (const name of names) {
+            if (!name || !this.hasAnimation(name)) continue;
+            this.playAnimation(name);
+            return name;
+        }
+        return null;
     }
 
     updateAnimation(deltaTime) {
@@ -42383,6 +43466,170 @@ class PortalMapObject extends InteractiveMapObject {
     }
 }
 ;
+/* -- js/Map/MapObjects/HopMotion.js -- */
+// ─────────────────────────────────────────────────────────────────────────────
+// HopMotion — reusable hop/bounce locomotion for creatures that should travel in
+// discrete leaps rather than gliding (slimes, frogs, bunnies, chicks…).
+//
+// It deliberately does NOT decide *where* to go. Whatever already drives the
+// entity — the NPC pathfinder, a patrol route, a wander — keeps setting velocity
+// as usual; HopMotion only gates *when* that velocity may apply, scales it so a
+// leap covers a deliberate distance, and arcs `posZ` while airborne. A type
+// becomes hoppy through config alone, with no AI change and no subclass:
+//
+//   "movement": { "style": "hop", "hop": { "distance": 26, "height": 16 } }
+//
+// Creatures that do BOTH (a frog that walks, then leaps) call `setEnabled(false)`
+// to fall back to ordinary continuous movement and `setEnabled(true)` to hop
+// again — the component is a modifier on locomotion, not a locomotion monopoly.
+//
+// Pair with `MovementBody` (speed limiting, obstacle resolution, stuck
+// detection). The two are independent and compose.
+// ─────────────────────────────────────────────────────────────────────────────
+class HopMotion {
+    static DEFAULTS = Object.freeze({
+        // Ground covered by one leap, in px. This is the honest way to keep a
+        // hopper from *drifting*: without it, distance is an emergent product of
+        // speed and air time and a creature can look like it is skating.
+        // Null falls back to whatever velocity the AI set.
+        distance: null,
+        height: 14,          // px at the top of the arc
+        airMs: 340,          // time off the ground per leap
+        restMs: 420,         // grounded pause between leaps
+        restVarianceMs: 220, // randomised so a group desynchronises
+        landSound: null,
+        // Optional animation states. Missing ones fall back (see NpcMapObject),
+        // so configuring these before the art exists is harmless.
+        animations: Object.freeze({ jump: 'jump', fall: 'fall', land: null })
+    });
+
+    constructor(owner, config = {}) {
+        this.owner = owner;
+        this.enabled = true;
+        this.configure(config);
+
+        this.phase = 'rest';
+        this.rising = false;
+        this.elapsed = 0;
+        this.restDuration = this._rollRestDuration();
+        // Start part-way into the first rest so co-spawned creatures do not hop in
+        // lockstep.
+        this.elapsed = Math.random() * this.restDuration;
+    }
+
+    configure(config = {}) {
+        const merged = { ...HopMotion.DEFAULTS, ...(config ?? {}) };
+        merged.animations = { ...HopMotion.DEFAULTS.animations, ...(config?.animations ?? {}) };
+        this.config = merged;
+        return this;
+    }
+
+    // For creatures that alternate gaits (frogs walk *and* leap). Disabled means
+    // "move normally": full throttle, grounded, no arc.
+    setEnabled(enabled = true) {
+        const next = enabled !== false;
+        if (this.enabled === next) return this;
+        this.enabled = next;
+        if (!next) this.reset();
+        return this;
+    }
+
+    _rollRestDuration() {
+        const { restMs, restVarianceMs } = this.config;
+        return Math.max(0, restMs + ((Math.random() - 0.5) * 2 * restVarianceMs));
+    }
+
+    isAirborne() {
+        return this.enabled && this.phase === 'air';
+    }
+
+    isRising() {
+        return this.isAirborne() && this.rising;
+    }
+
+    // Fraction of the arc completed, 0..1 (0 while grounded).
+    getArcProgress() {
+        if (this.phase !== 'air') return 0;
+        return Math.min(1, this.elapsed / Math.max(1, this.config.airMs));
+    }
+
+    /**
+     * Per-tick speed that makes one leap cover exactly `distance` px. Returns null
+     * when no distance is configured, leaving the AI's velocity untouched.
+     */
+    getLeapSpeed(tickDelta) {
+        const { distance, airMs } = this.config;
+        if (!Number.isFinite(distance) || distance <= 0) return null;
+        const ticks = Math.max(1, airMs / Math.max(1, tickDelta));
+        return distance / ticks;
+    }
+
+    /**
+     * Advance the hop cycle.
+     *
+     * @param {number} tickDelta
+     * @param {boolean} wantsToMove is the entity trying to travel? A stationary
+     *        creature stays grounded rather than hopping on the spot.
+     * @returns {number} velocity throttle for this tick: 1 airborne, 0 grounded,
+     *          always 1 when disabled. Callers multiply their velocity by it.
+     */
+    update(tickDelta, wantsToMove) {
+        if (!this.enabled) return 1;
+
+        const delta = Number.isFinite(tickDelta) && tickDelta > 0 ? tickDelta : 16.667;
+        this.elapsed += delta;
+
+        if (this.phase === 'rest') {
+            this.owner.posZ = 0;
+            this.rising = false;
+            if (!wantsToMove) {
+                // Hold at the ready so travel resumes promptly instead of waiting
+                // out a fresh full rest.
+                this.elapsed = Math.min(this.elapsed, this.restDuration);
+                return 0;
+            }
+            if (this.elapsed < this.restDuration) return 0;
+
+            this.phase = 'air';
+            this.elapsed = 0;
+            this.rising = true;
+            this.owner.onHopStart?.();
+            return 1;
+        }
+
+        const progress = this.getArcProgress();
+        // Simple sine arc: 0 at both ends, peak at mid-flight.
+        this.owner.posZ = Math.sin(progress * Math.PI) * this.config.height;
+
+        // Apex crossing drives the jump → fall animation swap.
+        if (this.rising && progress >= 0.5) {
+            this.rising = false;
+            this.owner.onHopApex?.();
+        }
+
+        if (progress < 1) return 1;
+
+        this.phase = 'rest';
+        this.elapsed = 0;
+        this.rising = false;
+        this.restDuration = this._rollRestDuration();
+        this.owner.posZ = 0;
+        this.owner.onHopLand?.();
+        if (this.config.landSound) {
+            this.owner.gameMap?.soundManager?.play?.(this.config.landSound);
+        }
+        return 0;
+    }
+
+    reset() {
+        this.phase = 'rest';
+        this.rising = false;
+        this.elapsed = 0;
+        this.restDuration = this._rollRestDuration();
+        if (this.owner) this.owner.posZ = 0;
+    }
+}
+;
 /* -- js/Map/MapObjects/MovementBody.js -- */
 // Shared, behavior-neutral movement math for map-object movers. Collision
 // response and AI remain owned by each mover because their semantics differ.
@@ -42416,7 +43663,125 @@ class MovementBody {
         if (Math.abs(x) > Math.abs(y)) return x > 0 ? 'E' : 'W';
         return y > 0 ? 'S' : 'N';
     }
+
+    // ── Occupancy sampling ────────────────────────────────────────────────────
+
+    // Can the owner stand at (x, y)? Defers to the grid; permissive with no grid,
+    // matching the pre-extraction behaviour of every caller.
+    canOccupy(x, y) {
+        const gridSystem = this.owner?.gameMap?.gridSystem;
+        if (!gridSystem) return true;
+        const clearsWorld = gridSystem.isEntityPositionValid?.(this.owner, x, y) ?? true;
+        if (!clearsWorld) return false;
+        return gridSystem.isActorPositionValid?.(this.owner, x, y) ?? true;
+    }
+
+    // Sample the straight line to (x, y) at `stepSize` intervals. Cheap
+    // pre-flight check for "could I fly/walk straight there", not a path search.
+    isPathClear(targetX, targetY, stepSize = 12) {
+        const dx = targetX - this.owner.posX;
+        const dy = targetY - this.owner.posY;
+        const distance = Math.hypot(dx, dy);
+        if (distance <= 1) return this.canOccupy(targetX, targetY);
+
+        const steps = Math.max(1, Math.ceil(distance / stepSize));
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            if (!this.canOccupy(this.owner.posX + (dx * t), this.owner.posY + (dy * t))) return false;
+        }
+        return true;
+    }
+
+    // ── Movement resolution ───────────────────────────────────────────────────
+
+    /**
+     * Resolve an intended step against obstacles, in escalating order: the full
+     * step, then each axis alone (slide along the wall), then angular probes
+     * around the heading. Returns where the owner may actually land and with what
+     * velocity; `moved: false` means every option was blocked and the caller
+     * should apply its own response (bounce, repath, give up).
+     *
+     * Pure math — it never writes to the owner. Callers assign the result.
+     */
+    resolveMove(nextX, nextY, options = {}) {
+        const velocity = this.owner.velocity;
+        const { posX, posY } = this.owner;
+        const canOccupy = options.canOccupy ?? ((x, y) => this.canOccupy(x, y));
+
+        if (canOccupy(nextX, nextY)) {
+            return { moved: true, x: nextX, y: nextY, vx: velocity.x, vy: velocity.y };
+        }
+        if (canOccupy(nextX, posY)) {
+            return { moved: true, x: nextX, y: posY, vx: velocity.x, vy: 0 };
+        }
+        if (canOccupy(posX, nextY)) {
+            return { moved: true, x: posX, y: nextY, vx: 0, vy: velocity.y };
+        }
+
+        const probeSpeed = options.probeSpeed ?? this.getSpeed(velocity);
+        const angleOffsets = options.angleOffsets ?? MovementBody.DEFAULT_PROBE_ANGLES;
+        const baseAngle = Math.atan2(velocity.y, velocity.x || 0.0001);
+
+        for (const offset of angleOffsets) {
+            const testVx = Math.cos(baseAngle + offset) * probeSpeed;
+            const testVy = Math.sin(baseAngle + offset) * probeSpeed;
+            const testX = posX + testVx;
+            const testY = posY + testVy;
+            if (canOccupy(testX, testY)) {
+                return { moved: true, x: testX, y: testY, vx: testVx, vy: testVy };
+            }
+        }
+
+        return { moved: false, x: posX, y: posY, vx: velocity.x, vy: velocity.y };
+    }
+
+    // ── Stuck detection ───────────────────────────────────────────────────────
+
+    /**
+     * Shared "I meant to move but didn't" counter. Each mover keeps its own
+     * *response* — creatures bounce and re-pick a heading, NPCs open doors and
+     * repath — but the detection is the same in all of them, so it lives here.
+     *
+     * @param {string} name       counter id, so one owner can run several
+     * @param {boolean} intending was movement actually attempted this tick?
+     * @param {number} moved      displacement achieved
+     * @param {object} options    { minDistance, threshold }
+     * @returns {boolean} true on the tick the threshold trips (counter auto-resets)
+     */
+    trackStuck(name, intending, moved, { minDistance = 0.5, threshold = 6 } = {}) {
+        this._stuckCounters ??= new Map();
+
+        if (!intending || moved >= minDistance) {
+            this._stuckCounters.set(name, 0);
+            return false;
+        }
+
+        const next = (this._stuckCounters.get(name) ?? 0) + 1;
+        if (next >= threshold) {
+            this._stuckCounters.set(name, 0);
+            return true;
+        }
+        this._stuckCounters.set(name, next);
+        return false;
+    }
+
+    getStuckCount(name) {
+        return this._stuckCounters?.get(name) ?? 0;
+    }
+
+    resetStuck(name = null) {
+        if (!this._stuckCounters) return;
+        if (name === null) this._stuckCounters.clear();
+        else this._stuckCounters.set(name, 0);
+    }
 }
+
+// Slide angles tried around the blocked heading, nearest-first.
+MovementBody.DEFAULT_PROBE_ANGLES = Object.freeze([
+    Math.PI / 4, -Math.PI / 4,
+    Math.PI / 2, -Math.PI / 2,
+    (3 * Math.PI) / 4, -(3 * Math.PI) / 4
+]);
 ;
 /* -- js/Map/MapObjects/Moving/MovingMapObject.js -- */
 // MovingMapObject composes animation + movement directly from MapObject.
@@ -42431,6 +43796,7 @@ class MovingMapObject extends withAnimation(MapObject) {
 		this.maxSpeed = this.getConfig('maxSpeed', 5);
 		this.acceleration = this.getConfig('acceleration', 0.1);
 		this.friction = this.getConfig('friction', 0.98);
+		this.resolveMovementCollisions = this.getConfig('physics.resolveMovementCollisions', false);
 
 		this.isMoving = false;
 		this.targetX = posX;
@@ -42536,10 +43902,16 @@ class MovingMapObject extends withAnimation(MapObject) {
 		super.tickUpdate(tickDelta);
 
 		if (this.isMoving) {
-			this.setPosition(
-				this.posX + this.velocity.x,
-				this.posY + this.velocity.y
-			);
+			const nextX = this.posX + this.velocity.x;
+			const nextY = this.posY + this.velocity.y;
+			if (this.resolveMovementCollisions) {
+				const resolved = this.movementBody.resolveMove(nextX, nextY);
+				this.velocity.x = resolved.vx;
+				this.velocity.y = resolved.vy;
+				if (resolved.moved) this.setPosition(resolved.x, resolved.y);
+			} else {
+				this.setPosition(nextX, nextY);
+			}
 		}
 
 		this.velocity.x *= this.friction;
@@ -43465,8 +44837,6 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         this.restDuration = 0;
         this.seekCooldown = 0;
 
-        this.blockedFrames = 0;
-        this.stuckFrames = 0;
         this.lastBlockedReason = 'none';
         this.lastMoveDelta = { x: 0, y: 0 };
 
@@ -43714,58 +45084,31 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         }
     }
 
+    // Thin wrappers over the shared movement plumbing. Kept as named methods
+    // because species subclasses and the AI call them directly.
     canOccupyPosition(x, y) {
-        const gridSystem = this.gameMap?.gridSystem;
-        if (!gridSystem) return true;
-        return gridSystem.isEntityPositionValid?.(this, x, y) ?? true;
+        return this.movementBody.canOccupy(x, y);
     }
 
     isPathToPositionClear(targetX, targetY, stepSize = 12) {
-        const dx = targetX - this.posX;
-        const dy = targetY - this.posY;
-        const distance = Math.hypot(dx, dy);
-        if (distance <= 1) return this.canOccupyPosition(targetX, targetY);
-
-        const steps = Math.max(1, Math.ceil(distance / stepSize));
-        for (let i = 1; i <= steps; i++) {
-            const t = i / steps;
-            if (!this.canOccupyPosition(this.posX + dx * t, this.posY + dy * t)) return false;
-        }
-        return true;
+        return this.movementBody.isPathClear(targetX, targetY, stepSize);
     }
 
     tryAlternateMovement(nextX, nextY) {
-        if (this.canOccupyPosition(nextX, nextY)) {
-            return { moved: true, x: nextX, y: nextY, vx: this.velocity.x, vy: this.velocity.y };
-        }
-        if (this.canOccupyPosition(nextX, this.posY)) {
-            return { moved: true, x: nextX, y: this.posY, vx: this.velocity.x, vy: 0 };
-        }
-        if (this.canOccupyPosition(this.posX, nextY)) {
-            return { moved: true, x: this.posX, y: nextY, vx: 0, vy: this.velocity.y };
-        }
-
-        const baseAngle = Math.atan2(this.velocity.y, this.velocity.x || 0.0001);
-        const speed = Math.max(this.speed * 0.6, Math.hypot(this.velocity.x, this.velocity.y));
-        const angleOffsets = [Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, (3 * Math.PI) / 4, -(3 * Math.PI) / 4];
-
-        for (const offset of angleOffsets) {
-            const testVx = Math.cos(baseAngle + offset) * speed;
-            const testVy = Math.sin(baseAngle + offset) * speed;
-            const testX = this.posX + testVx;
-            const testY = this.posY + testVy;
-            if (this.canOccupyPosition(testX, testY)) {
-                return { moved: true, x: testX, y: testY, vx: testVx, vy: testVy };
-            }
-        }
-
-        return { moved: false, x: this.posX, y: this.posY, vx: this.velocity.x, vy: this.velocity.y };
+        // Probe speed keeps a floor of 60% of cruising speed so a nearly-stopped
+        // creature still probes far enough to clear the obstacle it is touching.
+        return this.movementBody.resolveMove(nextX, nextY, {
+            probeSpeed: Math.max(this.speed * 0.6, this.movementBody.getSpeed())
+        });
     }
+
+    // Debug panels read these; the counters themselves live on the shared body.
+    get blockedFrames() { return this.movementBody.getStuckCount('blocked'); }
+    get stuckFrames()   { return this.movementBody.getStuckCount('stalled'); }
 
     recoverFromStuckState(reason = 'stuck') {
         this.lastBlockedReason = reason;
-        this.blockedFrames = 0;
-        this.stuckFrames = 0;
+        this.movementBody.resetStuck();
         this.seekCooldown = 1500 + Math.random() * 1500;
         if (this.restingTarget) this.clearTargetRest();
 
@@ -43865,15 +45208,18 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         const nextY = this.posY + this.velocity.y;
         const result = this.tryAlternateMovement(nextX, nextY);
 
+        // Two independent stuck signals, shared detection (MovementBody) with a
+        // creature-specific response: `blocked` counts rejected move attempts,
+        // `stalled` counts ticks where velocity existed but no ground was covered.
+        const blockedTripped = this.movementBody.trackStuck('blocked', !result.moved, 0, { threshold: 8 });
+
         if (result.moved) {
             this.posX = result.x;
             this.posY = result.y;
             this.velocity.x = result.vx;
             this.velocity.y = result.vy;
-            this.blockedFrames = 0;
             this.lastBlockedReason = 'none';
         } else {
-            this.blockedFrames++;
             if (this.restingTarget) this.abandonTargetRest('blocked by obstacle');
             this.bounceAwayFromObstacle();
         }
@@ -43883,14 +45229,15 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         this.updateDirection();
 
         const movementAmount = Math.hypot(this.posX - this.renderState.posX, this.posY - this.renderState.posY);
-        if (!this.isIdle && !this.isRestingOnTarget && movementAmount < 0.1 && Math.hypot(this.velocity.x, this.velocity.y) > 0.05) {
-            this.stuckFrames++;
-        } else {
-            this.stuckFrames = 0;
-        }
+        const isTryingToMove = !this.isIdle && !this.isRestingOnTarget &&
+            Math.hypot(this.velocity.x, this.velocity.y) > 0.05;
+        const stalledTripped = this.movementBody.trackStuck('stalled', isTryingToMove, movementAmount, {
+            minDistance: 0.1,
+            threshold: 20
+        });
 
-        if (this.blockedFrames >= 8 || this.stuckFrames >= 20 || !this.canOccupyPosition(this.posX, this.posY)) {
-            this.recoverFromStuckState(this.blockedFrames >= 8 ? 'blocked repeatedly' : 'stuck in place');
+        if (blockedTripped || stalledTripped || !this.canOccupyPosition(this.posX, this.posY)) {
+            this.recoverFromStuckState(blockedTripped ? 'blocked repeatedly' : 'stuck in place');
         }
 
         if ((this.posX !== oldX || this.posY !== oldY) && this.gameMap?.gridSystem) {
@@ -44809,8 +46156,7 @@ class BirdMapObject extends AmbientCreatureMapObject {
     recoverFromStuckState(reason = 'stuck') {
         if (this.mode === 'airborne' || this.mode === 'landing') {
             this.lastBlockedReason = reason;
-            this.blockedFrames = 0;
-            this.stuckFrames = 0;
+            this.movementBody.resetStuck();
 
             if (this.isFleeing) {
                 this._fleeDest = null;
@@ -45359,14 +46705,31 @@ class NpcMapObject extends MovingMapObject {
 		this.wanderRadius   = this.getConfig('wanderRadius', 100);
 		this.wanderInterval = this.getConfig('wanderInterval', 3000);
 		this.wanderTimer    = 0;
+		this.wanderHeading  = Math.random() * Math.PI * 2;
+		this.wanderStepMin  = this.getConfig('wanderStepMin', this.wanderRadius * 0.35);
+		this.wanderStepMax  = this.getConfig('wanderStepMax', this.wanderRadius * 0.7);
+		this.wanderTurnMax  = this.getConfig('wanderTurnMaxDegrees', 75) * (Math.PI / 180);
+
+		this.chaseStopDistance = this.getConfig('chaseStopDistance', 12);
+		this.chaseResumeDistance = this.getConfig('chaseResumeDistance', 28);
+		this._holdingChaseDistance = false;
 
 		// ── Stuck detection (door opening / path recovery) ────────────────────
+		// The counter itself lives on the shared MovementBody; only the previous
+		// sample position is NPC state.
 		this._prevPosX   = posX;
 		this._prevPosY   = posY;
-		this.stuckFrames = 0;
+
+		// ── Locomotion style ──────────────────────────────────────────────────
+		// Purely data-driven: `movement.style: "hop"` in types.json makes a monster
+		// travel in leaps instead of gliding. No AI changes, no subclass.
+		this.hopMotion = this.getConfig('movement.style') === 'hop'
+			? new HopMotion(this, this.getConfig('movement.hop', {}))
+			: null;
 
 		// DOM element for the alert status indicator (! / !!)
 		this.alertIndicator = null;
+		this.nameplateElement = null;
 	}
 
 	// Always simulate even when outside the camera viewport.
@@ -45376,14 +46739,42 @@ class NpcMapObject extends MovingMapObject {
 
 	render(container, parent) {
 		const element = super.render(container, parent);
-		element.classList.add('npc-entity', `npc-${this.aiState}`);
+		const entityCategory = this.type === 'NPC' ? 'npc' : 'monster';
+		element.classList.add(`${entityCategory}-entity`, `npc-${this.aiState}`);
+		if (this.type === 'NPC' && this.getConfig('identityPlate.enabled', false)) {
+			this.renderIdentityPlate(element);
+		}
 
 		return element;
 	}
 
-	handleSingleClick() {
-		super.handleSingleClick();
-		this.openConfiguredShop();
+	getIdentity() {
+		const shop = ShopRegistry.getShop(this.getConfig('shopId', null));
+		return {
+			name: this.getConfig('name', null) || shop?.shopkeeper?.name || this.getDisplayName(),
+			role: this.getConfig('functionLabel', null) || (shop ? 'Shop' : this.getConfig('role', null))
+		};
+	}
+
+	renderIdentityPlate(element) {
+		const identity = this.getIdentity();
+		const plate = document.createElement('div');
+		plate.className = 'npc-nameplate';
+
+		const name = document.createElement('span');
+		name.className = 'npc-nameplate__name';
+		name.textContent = identity.name;
+		plate.appendChild(name);
+
+		if (identity.role) {
+			const role = document.createElement('span');
+			role.className = 'npc-nameplate__role';
+			role.textContent = identity.role;
+			plate.appendChild(role);
+		}
+
+		element.appendChild(plate);
+		this.nameplateElement = plate;
 	}
 
 	handleDoubleClick(event) {
@@ -45480,37 +46871,31 @@ class NpcMapObject extends MovingMapObject {
 	// Detects when the NPC hasn't moved despite trying to, then attempts to
 	// open a blocking door and optionally recomputes the path.
 	_checkStuck() {
-		if (!this.isMoving) {
-			this._prevPosX = this.posX;
-			this._prevPosY = this.posY;
-			this.stuckFrames = 0;
-			return;
-		}
-
+		// Detection is shared (MovementBody.trackStuck); the response below —
+		// open the blocking door, then repath — is NPC-specific and stays here.
 		const moved = Math.hypot(this.posX - this._prevPosX, this.posY - this._prevPosY);
-		if (moved < 0.5) {
-			this.stuckFrames++;
-			if (this.stuckFrames >= 6) {
-				this._tryOpenNearbyDoors();
-				this.stuckFrames = 0;
-				// Recompute path to escape the blockage.
-				if (this.aggroTarget && this.aiState === NPC_STATES.CHASE) {
-					const cx = this.aggroTarget.posX + (this.aggroTarget.size?.width  || 0) / 2;
-					const cy = this.aggroTarget.posY + (this.aggroTarget.size?.height || 0) / 2;
-					this._computePath(cx, cy);
-				} else if (this.aiState === NPC_STATES.RETURN) {
-					this._computePath(
-						this.homeX + this.size.width  / 2,
-						this.homeY + this.size.height / 2
-					);
-				}
-			}
-		} else {
-			this.stuckFrames = 0;
-		}
+		const tripped = this.movementBody.trackStuck('npc', this.isMoving, moved, {
+			minDistance: 0.5,
+			threshold: 6
+		});
 
 		this._prevPosX = this.posX;
 		this._prevPosY = this.posY;
+		if (!tripped) return;
+
+		this._tryOpenNearbyDoors();
+
+		// Recompute path to escape the blockage.
+		if (this.aggroTarget && this.aiState === NPC_STATES.CHASE) {
+			const cx = this.aggroTarget.posX + (this.aggroTarget.size?.width  || 0) / 2;
+			const cy = this.aggroTarget.posY + (this.aggroTarget.size?.height || 0) / 2;
+			this._computePath(cx, cy);
+		} else if (this.aiState === NPC_STATES.RETURN) {
+			this._computePath(
+				this.homeX + this.size.width  / 2,
+				this.homeY + this.size.height / 2
+			);
+		}
 	}
 
 	// ── Target detection ──────────────────────────────────────────────────────
@@ -45591,14 +46976,43 @@ class NpcMapObject extends MovingMapObject {
 			return;
 		}
 
-		// Periodic wander within home area.
+		if (this.currentPath && this.pathIndex < this.currentPath.length) {
+			this._advanceAlongPath();
+			return;
+		}
+
+		// Continue broadly forward with gentle turns. Choosing every destination
+		// independently around home made short routes alternate across the spawn
+		// point, which read as mechanical back-and-forth pacing.
 		this.wanderTimer += tickDelta;
 		if (this.wanderTimer >= this.wanderInterval && !this.isMoving) {
 			this.wanderTimer = 0;
-			const wx = this.homeX + (Math.random() - 0.5) * this.wanderRadius * 2;
-			const wy = this.homeY + (Math.random() - 0.5) * this.wanderRadius * 2;
+			this._chooseWanderPath();
+		}
+	}
+
+	_chooseWanderPath() {
+		const homeDistance = Math.hypot(this.posX - this.homeX, this.posY - this.homeY);
+		if (homeDistance >= this.wanderRadius * 0.8) {
+			this.wanderHeading = Math.atan2(this.homeY - this.posY, this.homeX - this.posX) +
+				((Math.random() - 0.5) * this.wanderTurnMax);
+		} else {
+			this.wanderHeading += (Math.random() - 0.5) * this.wanderTurnMax * 2;
+		}
+
+		const step = this.wanderStepMin + Math.random() * Math.max(0, this.wanderStepMax - this.wanderStepMin);
+		let wx = this.posX + Math.cos(this.wanderHeading) * step;
+		let wy = this.posY + Math.sin(this.wanderHeading) * step;
+		const fromHomeX = wx - this.homeX;
+		const fromHomeY = wy - this.homeY;
+		const fromHomeDistance = Math.hypot(fromHomeX, fromHomeY);
+		if (fromHomeDistance > this.wanderRadius) {
+			wx = this.homeX + (fromHomeX / fromHomeDistance) * this.wanderRadius;
+			wy = this.homeY + (fromHomeY / fromHomeDistance) * this.wanderRadius;
+		}
+
+		if (!this._computePath(wx + this.size.width / 2, wy + this.size.height / 2)) {
 			this.setTarget(wx, wy);
-			// MovingMapObject's tickUpdate auto-calls moveToward when reachedTarget is false.
 			this.reachedTarget = false;
 		}
 	}
@@ -45623,6 +47037,24 @@ class NpcMapObject extends MovingMapObject {
 
 		if (this.getDistanceTo(this.aggroTarget) > this.chaseRadius) {
 			this._enterState(NPC_STATES.RETURN);
+			return;
+		}
+
+		const colliderGap = RectUtils.getRectGap(
+			RectUtils.getEntityColliderBounds(this),
+			RectUtils.getEntityColliderBounds(this.aggroTarget)
+		);
+		if (this._holdingChaseDistance && colliderGap < this.chaseResumeDistance) {
+			this.currentPath = null;
+			this.stopMoving();
+			this.reachedTarget = true;
+			return;
+		}
+		this._holdingChaseDistance = colliderGap <= this.chaseStopDistance;
+		if (this._holdingChaseDistance) {
+			this.currentPath = null;
+			this.stopMoving();
+			this.reachedTarget = true;
 			return;
 		}
 
@@ -45669,12 +47101,78 @@ class NpcMapObject extends MovingMapObject {
 			case NPC_STATES.RETURN: this._updateReturn(tickDelta); break;
 		}
 
+		// Hoppers travel in leaps: the AI above still decides the heading, this only
+		// gates when that velocity may apply. Sits between AI and physics so nothing
+		// else needs to know about it.
+		this._applyHopMotion(tickDelta);
+
 		// Physics / velocity application (MovingMapObject → AnimatedMapObject → MapObject).
 		super.tickUpdate(tickDelta);
 	}
 
+	_applyHopMotion(tickDelta) {
+		if (!this.hopMotion?.enabled) return;
+
+		const speed = Math.hypot(this.velocity.x, this.velocity.y);
+		const wantsToMove = this.isMoving && speed > 0.01;
+		const throttle = this.hopMotion.update(tickDelta, wantsToMove);
+
+		if (throttle !== 1) {
+			// Grounded: hold position but keep the heading, so the next leap
+			// continues toward the same waypoint rather than re-deciding from rest.
+			this.velocity.x *= throttle;
+			this.velocity.y *= throttle;
+			return;
+		}
+
+		// Airborne: rescale to the configured leap distance so the creature covers
+		// deliberate ground per hop instead of skating along at walking speed.
+		const leapSpeed = this.hopMotion.getLeapSpeed(tickDelta);
+		if (leapSpeed && speed > 0.0001) {
+			const remainingX = this.targetX - this.posX;
+			const remainingY = this.targetY - this.posY;
+			const remainingDistance = Math.hypot(remainingX, remainingY);
+			if (remainingDistance <= leapSpeed) {
+				this.velocity.x = remainingX;
+				this.velocity.y = remainingY;
+				if (remainingDistance <= 0.01) {
+					this.stopMoving();
+					this.reachedTarget = true;
+				}
+			} else {
+				this.velocity.x = (this.velocity.x / speed) * leapSpeed;
+				this.velocity.y = (this.velocity.y / speed) * leapSpeed;
+			}
+		}
+	}
+
+	// ── Hop animation states ──────────────────────────────────────────────────
+	// Each falls back to art that exists, so a hopper without jump/fall frames
+	// simply keeps its directional/idle animation rather than blanking out.
+
+	_hopAnimation(key) {
+		return this.hopMotion?.config?.animations?.[key] ?? null;
+	}
+
+	onHopStart() {
+		this.playFirstAvailableAnimation?.(this._hopAnimation('jump'), this.getMovementDirection?.(), 'idle');
+	}
+
+	onHopApex() {
+		this.playFirstAvailableAnimation?.(this._hopAnimation('fall'), this.getMovementDirection?.(), 'idle');
+	}
+
+	onHopLand() {
+		this.playFirstAvailableAnimation?.(this._hopAnimation('land'), 'idle');
+	}
+
 	update(deltaTime) {
 		super.update(deltaTime);
+		if (this.hopMotion) {
+			this.setSpriteVerticalLift(this.posZ);
+			this.computeShadowVisual();
+		}
+		this.nameplateElement?.style.setProperty('--npc-lift', `${Math.max(0, this.posZ || 0)}px`);
 	}
 
 	// ── Cleanup ───────────────────────────────────────────────────────────────
@@ -45684,6 +47182,7 @@ class NpcMapObject extends MovingMapObject {
 			this.alertIndicator.remove();
 			this.alertIndicator = null;
 		}
+		this.nameplateElement = null;
 		super.remove();
 	}
 }
@@ -45693,8 +47192,14 @@ applyEntityMixin(NpcMapObject);
 ;
 /* -- js/Map/MapObjects/Barrier/DoorMapObject.js -- */
 class DoorMapObject extends OpenableMapObject {
-    getApproachMode() {
-        return 'front';
+    getApproachConfig() {
+        return {
+            allowedSides: 'any',
+            gap: this.getConfig('interaction.approachGap'),
+            align: 'center',
+            alignTo: 'collider',
+            myteAlignTo: 'collider'
+        };
     }
 
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
@@ -45984,6 +47489,8 @@ class DoorMapObject extends OpenableMapObject {
             obj !== this &&
             obj.active !== false &&
             obj.collider &&
+            (obj.getConfig?.('physics.collision', false) ||
+             obj.getConfig?.('physics.actorCollision', false)) &&
             this.isEntityInDoorway(obj)
         );
 
@@ -46071,6 +47578,20 @@ class DoorMapObject extends OpenableMapObject {
         return this.trySetOpenState(!this.isOpen, {
             triggeredBy: 'debug',
             parent
+        });
+    }
+
+    handleDoubleClick(event) {
+        if (this.activeMyte) {
+            super.handleDoubleClick(event);
+            return;
+        }
+
+        if (!this.active || this.isAnimating) return;
+        this.selectInUi();
+        this.trySetOpenState(!this.isOpen, {
+            triggeredBy: 'user',
+            parent: this.container ?? this.parent
         });
     }
 
@@ -46696,8 +48217,149 @@ class GrowingPlantMapObject extends withItemDrops(InteractiveMapObject) {
     }
 }
 
-// Static decorative flower — no growth stages, but supports item drops for pick interactions.
-class FlowerMapObject extends withItemDrops(MapObject) {}
+// Composes automatic bend/squash feedback onto decorative foliage and growing crops.
+const withTrampleResponse = BaseClass => class extends BaseClass {
+    constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
+        super(parent, type, variant, posX, posY, config, options);
+        this._trampleActorState = new Map();
+        this._trampleVisual = null;
+        this._trampleVisualActive = false;
+        this._trampleRecovering = false;
+        this._trampleOverlapping = false;
+        this._trampleRecoverUntil = 0;
+        this._trampleVisualDirty = false;
+    }
+
+    render(container, parent) {
+        const element = super.render(container, parent);
+        element.classList.add('trample-reactive');
+        return element;
+    }
+
+    getNearbyTrampleActors() {
+        const radius = this.getFiniteConfigNumber('trampleResponse.detectionRadius', 0);
+        if (radius <= 0) return [];
+
+        return this.gameMap?.worldQuery?.findNearby({
+            x: this.posX + (this.size.width / 2),
+            y: this.posY + (this.size.height / 2),
+            radius,
+            kind: [WORLD_ENTITY_KINDS.MYTE, WORLD_ENTITY_KINDS.OBJECT],
+            measureFrom: 'center',
+            exclude: this,
+            filter: actor => actor.kind === WORLD_ENTITY_KINDS.MYTE ||
+                actor.getConfig?.('physics.actorCollision', false)
+        }) ?? [];
+    }
+
+    triggerTrampleResponse(actor, movementX, movementY) {
+        const minimumMovement = this.getFiniteConfigNumber('trampleResponse.minimumMovement', 0);
+        const magnitude = Math.hypot(movementX, movementY);
+        if (magnitude < minimumMovement) return false;
+
+        let directionX = movementX / magnitude;
+        const directionY = movementY / magnitude;
+        if (Math.abs(directionX) < 0.15) {
+            const actorCenterX = actor.posX + ((actor.size?.width ?? 0) / 2);
+            const foliageCenterX = this.posX + (this.size.width / 2);
+            directionX = Math.sign(actorCenterX - foliageCenterX) || 1;
+        }
+
+        this._trampleVisual = {
+            pressDuration: this.getFiniteConfigNumber('trampleResponse.pressDuration', 0),
+            recoveryDuration: this.getFiniteConfigNumber('trampleResponse.recoveryDuration', 0),
+            bend: -directionX * this.getFiniteConfigNumber('trampleResponse.bendDegrees', 0),
+            shiftX: directionX * this.getFiniteConfigNumber('trampleResponse.horizontalShift', 0),
+            shiftY: Math.abs(directionY) * this.getFiniteConfigNumber('trampleResponse.verticalShift', 0),
+            squash: this.getFiniteConfigNumber('trampleResponse.squashScale', 1),
+            stretch: this.getFiniteConfigNumber('trampleResponse.stretchScale', 1)
+        };
+        this._trampleVisualDirty = true;
+        this.playConfiguredSound('step');
+        return true;
+    }
+
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
+        if (!this.getConfig('trampleResponse.enabled', false)) return;
+
+        const now = SimClock.now();
+        const responseBounds = RectUtils.getEntityColliderBounds(this);
+        const seenActors = new Set();
+        let hasOverlap = false;
+
+        for (const actor of this.getNearbyTrampleActors()) {
+            const actorId = actor.worldId ?? actor.id;
+            seenActors.add(actorId);
+            const previous = this._trampleActorState.get(actorId);
+            const overlapping = RectUtils.boundsOverlap(
+                responseBounds,
+                RectUtils.getEntityColliderBounds(actor)
+            );
+            const movementX = previous
+                ? actor.posX - previous.x
+                : (actor.targetX ?? actor.posX) - actor.posX;
+            const movementY = previous
+                ? actor.posY - previous.y
+                : (actor.targetY ?? actor.posY) - actor.posY;
+
+            let responded = previous?.overlapping && previous.responded === true;
+            if (overlapping && !responded) {
+                responded = this.triggerTrampleResponse(actor, movementX, movementY);
+            }
+            hasOverlap = hasOverlap || overlapping;
+
+            this._trampleActorState.set(actorId, {
+                x: actor.posX,
+                y: actor.posY,
+                overlapping,
+                responded: overlapping && responded
+            });
+        }
+
+        for (const actorId of this._trampleActorState.keys()) {
+            if (!seenActors.has(actorId)) this._trampleActorState.delete(actorId);
+        }
+
+        if (this._trampleOverlapping && !hasOverlap && this._trampleVisual) {
+            this._trampleRecoverUntil = now + this._trampleVisual.recoveryDuration;
+        }
+        this._trampleOverlapping = hasOverlap;
+    }
+
+    update(deltaTime) {
+        super.update(deltaTime);
+        if (!this.element) return;
+
+        const now = SimClock.now();
+        const active = !!this._trampleVisual && this._trampleOverlapping;
+        const recovering = !!this._trampleVisual && !active && now < this._trampleRecoverUntil;
+        if (this._trampleVisualDirty && this._trampleVisual) {
+            const visual = this._trampleVisual;
+            this.element.style.setProperty('--trample-bend', `${visual.bend}deg`);
+            this.element.style.setProperty('--trample-shift-x', `${visual.shiftX}px`);
+            this.element.style.setProperty('--trample-shift-y', `${visual.shiftY}px`);
+            this.element.style.setProperty('--trample-squash', visual.squash);
+            this.element.style.setProperty('--trample-stretch', visual.stretch);
+            this.element.style.setProperty('--trample-press-duration', `${visual.pressDuration}ms`);
+            this.element.style.setProperty('--trample-recovery-duration', `${visual.recoveryDuration}ms`);
+            this._trampleVisualDirty = false;
+        }
+
+        if (active !== this._trampleVisualActive) {
+            this.element.classList.toggle('is-trampled', active);
+            this._trampleVisualActive = active;
+        }
+        if (recovering !== this._trampleRecovering) {
+            this.element.classList.toggle('is-recovering', recovering);
+            this._trampleRecovering = recovering;
+        }
+    }
+};
+
+class FoliageMapObject extends withTrampleResponse(withItemDrops(MapObject)) {}
+
+class FlowerMapObject extends FoliageMapObject {}
 ;
 /* -- js/Map/MapObjects/GrowingPlant/BreedingFlowerMapObject.js -- */
 class BreedingFlowerMapObject extends GrowingPlantMapObject {
@@ -47060,7 +48722,7 @@ class NightBloomMapObject extends BreedingFlowerMapObject {
 }
 ;
 /* -- js/Map/MapObjects/GrowingPlant/CropPlantMapObject.js -- */
-class CropPlantMapObject extends GrowingPlantMapObject {
+class CropPlantMapObject extends withTrampleResponse(GrowingPlantMapObject) {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         
@@ -47786,8 +49448,20 @@ class MapObjectFactory {
         return this;
     }
 
+    static resolveVariantType(type, variant) {
+        const normalizedType = this.normalizeType(type);
+        const overrides = this.TYPE_CONFIGS[normalizedType]?.variantTypeOverrides;
+        if (!overrides || variant == null) {
+            return normalizedType;
+        }
+
+        const variantId = String(variant);
+        const overrideType = overrides[variantId] ?? overrides[variantId.toLowerCase()];
+        return overrideType ? this.normalizeType(overrideType) : normalizedType;
+    }
+
     static create(type, variant, x, y, options = {}) {
-        type = this.normalizeType(type);
+        type = this.resolveVariantType(type, variant);
         const { parent: resolvedParent = null, ...factoryOptions } = options;
 
         const typeConfig = this.getTypeConfig(type);
@@ -47866,7 +49540,7 @@ class MapObjectFactory {
 
 // Set up the factory with default registrations
 MapObjectFactory.registry
-    .register('GRASS', MapObject)
+    .register('GRASS', FoliageMapObject)
     .register('FLOWER', FlowerMapObject)
     .register('TREE', TreeMapObject)
     .register('FRUIT_TREE', FruitTreeMapObject)
@@ -47882,6 +49556,7 @@ MapObjectFactory.registry
     .register('BALL', BallMapObject)
     .register('PATROL_GUARD', PatrolGuardMapObject)
     .register('NPC', NpcMapObject)
+    .register('MONSTER', NpcMapObject)
     .register('BUTTERFLY', ButterflyMapObject)
     .register('BEE', BeeMapObject)
     .register('HIVE', HiveMapObject)
@@ -48036,6 +49711,18 @@ class GridSystem {
     // !config.physics?.walkable check.
     _blocksMovement(obj) {
         return !this._isPassthrough(obj) && !obj?.config?.physics?.walkable;
+    }
+
+    _hasActorCollision(obj) {
+        return obj?.actorCollision === true || obj?.config?.physics?.actorCollision === true;
+    }
+
+    _actorsCollide(entity, candidate) {
+        return !!entity && !!candidate && entity !== candidate &&
+            entity.checkForCollisions !== false && candidate.checkForCollisions !== false &&
+            entity.active !== false && candidate.active !== false &&
+            !entity.isPickedUp && !candidate.isPickedUp &&
+            this._hasActorCollision(entity) && this._hasActorCollision(candidate);
     }
 
     // Add this method to update grid cells with terrain data
@@ -48723,7 +50410,7 @@ class GridSystem {
     }
 
     // Get all potential colliders for an entity
-    getPotentialColliders(entity) {
+    getPotentialColliders(entity, options = {}) {
         // Get all cells that the entity overlaps
         const cells = this.getObjectCells(entity);
         const potentialColliders = new Set();
@@ -48746,15 +50433,48 @@ class GridSystem {
                 });
             }
 
-            // Add non-walkable objects from the cell
+            // Static obstacles always participate. Dynamic actors opt in for
+            // real-time body collision without making their grid cells unwalkable.
             cell.objects.forEach(obj => {
-                if (obj !== entity && this._blocksMovement(obj)) {
+                if (obj !== entity && (
+                    this._blocksMovement(obj) ||
+                    (options.includeActors === true && this._actorsCollide(entity, obj))
+                )) {
                     potentialColliders.add(obj);
                 }
             });
         });
 
         return Array.from(potentialColliders);
+    }
+
+    isActorPositionValid(entity, x, y) {
+        if (!this._hasActorCollision(entity)) return true;
+
+        const bounds = RectUtils.getEntityColliderBounds(entity, x, y);
+        const cells = this.getObjectCellsForArea(bounds.left, bounds.top, bounds.width, bounds.height);
+        const candidates = new Set();
+        cells.forEach(cell => cell.objects.forEach(candidate => candidates.add(candidate)));
+
+        const currentBounds = RectUtils.getEntityColliderBounds(entity);
+        for (const candidate of candidates) {
+            if (!this._actorsCollide(entity, candidate)) continue;
+
+            const candidateBounds = RectUtils.getEntityColliderBounds(candidate);
+            const nextOverlap = RectUtils.getRectIntersection(bounds, candidateBounds);
+            if (!nextOverlap) continue;
+
+            // Spawned/restored actors may begin overlapped. Permit only movement
+            // that reduces that overlap so they can separate without tunnelling in.
+            const currentOverlap = RectUtils.getRectIntersection(currentBounds, candidateBounds);
+            const nextArea = nextOverlap.width * nextOverlap.height;
+            const currentArea = currentOverlap ? currentOverlap.width * currentOverlap.height : 0;
+            if (currentArea > 0 && nextArea < currentArea) continue;
+
+            return false;
+        }
+
+        return true;
     }
 
     // OPTIMIZATION: Improved boundary checking for object cells
@@ -49484,6 +51204,10 @@ class GridSystem {
 // Set to true to re-enable verbose A* validation logs
 const PATHFINDER_VERBOSE = false;
 
+// Shared stand-in for "entity has no collider" so the zero-size validation path
+// does not allocate a fresh literal on every check.
+const PATHFINDER_ZERO_COLLIDER = { width: 0, height: 0, offsetX: 0, offsetY: 0 };
+
 class AStarPathfinder {
     constructor(gridSystem) {
         this.gridSystem = gridSystem;
@@ -49617,6 +51341,40 @@ class AStarPathfinder {
             this._entityValidationSeeds.set(entity, seed);
         }
         return seed;
+    }
+
+    /**
+     * Pack a rounded world position into one exact double (24 signed bits per axis).
+     * Within a single findPath the entity never changes, so position + collider fully
+     * identify a validation check — no entity seed needed in the key.
+     */
+    _packPositionKey(x, y) {
+        const px = Math.max(-8388608, Math.min(8388607, Math.round(x))) + 8388608;
+        const py = Math.max(-8388608, Math.min(8388607, Math.round(y))) + 8388608;
+        return px * 16777216 + py;
+    }
+
+    /**
+     * Pack a collider's size/offset into one number (12 bits each). A search uses at
+     * most two colliders — the entity's own and the buffer-inflated one from LOS
+     * smoothing — so this cheaply buckets the per-search cache by collider.
+     */
+    _packColliderKey(collider) {
+        const w = Math.max(0, Math.min(4095, Math.round(collider?.width ?? 0)));
+        const h = Math.max(0, Math.min(4095, Math.round(collider?.height ?? 0)));
+        const ox = Math.max(-2048, Math.min(2047, Math.round(collider?.offsetX ?? 0))) + 2048;
+        const oy = Math.max(-2048, Math.min(2047, Math.round(collider?.offsetY ?? 0))) + 2048;
+        return ((w * 4096 + h) * 4096 + ox) * 4096 + oy;
+    }
+
+    _getSearchCacheBucket(collider) {
+        const colliderKey = this._packColliderKey(collider);
+        let bucket = this._activeSearchCache.get(colliderKey);
+        if (!bucket) {
+            bucket = new Map();
+            this._activeSearchCache.set(colliderKey, bucket);
+        }
+        return bucket;
     }
 
     _getValidationCacheKey(entity, colliderWorldX, colliderWorldY, collider) {
@@ -50331,23 +52089,25 @@ class AStarPathfinder {
         }
 
         // --- Proceed with Collider Validation ---
-        // During a findPath run, use the per-search cache (unbounded, no staleness);
-        // outside a search, fall back to the persistent LRU.
-        const cache = this._activeSearchCache ?? this.validationCache;
+        // During a findPath run the entity is fixed, so the per-search cache buckets by
+        // packed collider signature and keys by packed position — plain numbers, no
+        // BigInt allocation on the hottest line of the search. Outside a search, fall
+        // back to the persistent LRU with its full entity-aware key.
+        const searchCache = this._activeSearchCache;
         const colWidth = collider.width;
         const colHeight = collider.height;
         const hasColliderSize = colWidth > 0 && colHeight > 0;
 
         if (!hasColliderSize) {
-            const zeroSizeCacheKey = this._getValidationCacheKey(entity, entityX, entityY, {
-                width: 0,
-                height: 0,
-                offsetX: 0,
-                offsetY: 0
-            });
-            const zeroCached = cache.get(zeroSizeCacheKey);
+            const zeroCache = searchCache
+                ? this._getSearchCacheBucket(PATHFINDER_ZERO_COLLIDER)
+                : this.validationCache;
+            const zeroSizeCacheKey = searchCache
+                ? this._packPositionKey(entityX, entityY)
+                : this._getValidationCacheKey(entity, entityX, entityY, PATHFINDER_ZERO_COLLIDER);
+            const zeroCached = zeroCache.get(zeroSizeCacheKey);
             if (zeroCached !== undefined) return zeroCached;
-            cache.set(zeroSizeCacheKey, true);
+            zeroCache.set(zeroSizeCacheKey, true);
             return true; // No collider means no collision
         }
 
@@ -50357,7 +52117,10 @@ class AStarPathfinder {
         const colliderBottom = colliderWorldY + colHeight;
 
         // --- Caching ---
-        const cacheKey = this._getValidationCacheKey(entity, colliderWorldX, colliderWorldY, collider);
+        const cache = searchCache ? this._getSearchCacheBucket(collider) : this.validationCache;
+        const cacheKey = searchCache
+            ? this._packPositionKey(colliderWorldX, colliderWorldY)
+            : this._getValidationCacheKey(entity, colliderWorldX, colliderWorldY, collider);
         const cached = cache.get(cacheKey);
         if (cached !== undefined) {
             return cached;
@@ -52047,6 +53810,10 @@ class SelectionManager extends UIComponent {
 
 
     setSelected(obj) {
+        if (this.selectedObject === obj) {
+            return;
+        }
+
         const deselect = (object) => {
             if (!object) return;
 
@@ -52080,8 +53847,7 @@ class SelectionManager extends UIComponent {
         // Deselect current object
         if (this.selectedObject) deselect(this.selectedObject);
 
-        // Toggle selection
-        this.selectedObject = this.selectedObject === obj ? null : obj;
+        this.selectedObject = obj;
 
         // Select new object
         if (this.selectedObject) select(this.selectedObject);
@@ -52461,6 +54227,14 @@ class ActionSidebarManager extends UIComponent {
             button.classList.add('is-in-progress');
             titleParts.push('Action in progress');
         }
+
+        // Unavailable-but-explained: visible, disabled, and it says why on hover.
+        if (action.unavailableReason) {
+            button.disabled = true;
+            button.classList.add('is-unavailable');
+            button.setAttribute('aria-disabled', 'true');
+            titleParts.push(action.unavailableReason);
+        }
         if (titleParts.length) {
             button.title = titleParts.join('\n');
         }
@@ -52514,6 +54288,17 @@ class ActionSidebarManager extends UIComponent {
                     userInitiated: true
                 };
                 activeMyte.queue.interrupt(action.id, payload);
+                this.updateActions(selectedObject);
+            } else {
+                // The button was rendered, so the player expects something to happen.
+                // Options resolve to null when the action's requirements stopped being
+                // met between render and click; refresh the list and say so rather
+                // than swallowing the click.
+                this.parent?.showMessage?.(
+                    `${activeMyte.name} can't do that right now.`,
+                    'warning',
+                    action.label || 'Unavailable'
+                );
                 this.updateActions(selectedObject);
             }
         });
@@ -52577,7 +54362,12 @@ class ActionSidebarManager extends UIComponent {
         const busyCount = activeMyte?.queue?.count() ?? 0;
         const subjectId = selectedObject?.id ?? selectedObject?.constructor?.name ?? 'selected';
         const targetId = actionContext.currentTarget?.id ?? actionContext.currentTarget?.constructor?.name ?? '';
-        return `${subjectId}|busy=${busyCount}|current=${actionContext.currentActionId}|target=${targetId}|phase=${actionContext.currentAction?.phase ?? ''}|actions=${availableActions.map(a => a.id).join(',')}`;
+        // Blocked actions are part of what gets rendered, so a change in *their*
+        // reasons must invalidate the cache too, or a stale explanation sticks.
+        const blocked = ActionManager.getExplainedUnavailableActions(selectedObject, activeMyte)
+            .map(a => `${a.id}:${a.unavailableReason}`)
+            .join(',');
+        return `${subjectId}|busy=${busyCount}|current=${actionContext.currentActionId}|target=${targetId}|phase=${actionContext.currentAction?.phase ?? ''}|actions=${availableActions.map(a => a.id).join(',')}|blocked=${blocked}`;
     }
 
     appendInfoRow(container, label, value, className = 'state-info') {
@@ -53079,28 +54869,6 @@ class ActionSidebarManager extends UIComponent {
         return button;
     }
 
-    _createActivateMyteButton(selectedObject) {
-        const button = document.createElement('button');
-        button.textContent = 'Activate';
-        button.classList.add('primary-action');
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-
-            if (!(selectedObject instanceof Myte) || selectedObject.isActive) return;
-
-            selectedObject.startWithOptions({
-                goal: DEFAULT_MODE,
-                followGoal: selectedObject.followGoal,
-                autonomyGoal: selectedObject.autonomyGoal
-            });
-            selectedObject.parent?.setActiveMyte?.(selectedObject);
-            selectedObject.holdInHomeSlotUntilPointerLeaves?.();
-            this.parent.selectionManager?.setSelected?.(selectedObject);
-        });
-        return button;
-    }
-
     updateActionList(selectedObject) {
         const actionGroups = this.actionControls.querySelector('.action-groups');
         const previousScrollTop = actionGroups.scrollTop;
@@ -53124,14 +54892,6 @@ class ActionSidebarManager extends UIComponent {
         }
 
         if (this.isInactiveHomeMyteSelection(selectedObject)) {
-            const groupEl = document.createElement('div');
-            groupEl.className = 'action-group major-action';
-            const ul = document.createElement('ul');
-            const li = document.createElement('li');
-            li.appendChild(this._createActivateMyteButton(selectedObject));
-            ul.appendChild(li);
-            groupEl.appendChild(ul);
-            actionGroups.appendChild(groupEl);
             this.actionControls.classList.add('is-visible');
             actionGroups.scrollTop = previousScrollTop;
             return;
@@ -53165,7 +54925,13 @@ class ActionSidebarManager extends UIComponent {
 
         const availableActions = ActionManager.getAvailableActions(selectedObject, activeMyte);
         const majorAction = this.getMajorAction(selectedObject, activeMyte, availableActions);
-        const groupedActions = availableActions
+
+        // Actions that are unavailable *and* can say why are shown disabled with the
+        // reason, instead of vanishing. Actions with no reason stay hidden — they are
+        // simply irrelevant to this selection.
+        const blockedActions = ActionManager.getExplainedUnavailableActions(selectedObject, activeMyte);
+
+        const groupedActions = [...availableActions, ...blockedActions]
             .filter(action => action.id !== majorAction?.id)
             .reduce((groups, action) => {
                 const cat = action.category;
@@ -53609,6 +55375,11 @@ class MyteListManager extends UIComponent {
 
         // Add click handler
         thumbnail.addEventListener('click', () => {
+            if (!myte.isActive) {
+                this.parent.setSelected?.(myte);
+                return;
+            }
+
             if (myte === this.parent.getActiveMyte()) {
                 this.parent.parent.deactivateActiveMyte?.(myte);
                 return;
@@ -59056,16 +60827,101 @@ class SettingsPanel extends ModalWindow {
             tutorialsToggle.checked = this.settings.gameplay.tutorials;
             tutorialsToggle.onchange = () => {
                 this.settings.gameplay.tutorials = tutorialsToggle.checked;
+                // Re-enabling hints should actually show them again, otherwise the
+                // toggle reads as broken to anyone who turned it off and back on.
+                if (tutorialsToggle.checked) {
+                    this.getUser()?.setPreference?.('hasSeenIntro', false);
+                }
             };
         }
     }
 
+    // Export/import of the whole save. localStorage is the only copy of a player's
+    // Mytes, so a clear-site-data click is otherwise unrecoverable; the exported
+    // file also doubles as a bug-report attachment.
+    setupSaveDataControls() {
+        const exportButton = this.modalElement.querySelector('#export-save');
+        if (exportButton) {
+            exportButton.onclick = () => this.exportSave();
+        }
+
+        const importButton = this.modalElement.querySelector('#import-save');
+        const importInput = this.modalElement.querySelector('#import-save-file');
+        if (importButton && importInput) {
+            importButton.onclick = () => importInput.click();
+            importInput.onchange = async () => {
+                const file = importInput.files?.[0];
+                importInput.value = '';
+                if (file) await this.importSave(file);
+            };
+        }
+    }
+
+    exportSave() {
+        const user = this.getUser();
+        if (!user?.exportUserData) {
+            this.parent?.showMessage?.('No save data to export.', 'warning', 'Export');
+            return;
+        }
+
+        try {
+            // Flush pending changes first so the export matches what is on screen.
+            user.saveUserData();
+            const blob = new Blob([user.exportUserData()], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const stamp = new Date().toISOString().slice(0, 10);
+            link.href = url;
+            link.download = `neko-save-${stamp}.json`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            this.playSound('success');
+            this.parent?.showMessage?.('Save exported.', 'success', 'Export');
+        } catch (error) {
+            console.error('Failed to export save:', error);
+            this.playSound('error');
+            this.parent?.showMessage?.('Could not export your save.', 'error', 'Export');
+        }
+    }
+
+    async importSave(file) {
+        const user = this.getUser();
+        if (!user?.importUserData) return;
+
+        let text;
+        try {
+            text = await file.text();
+        } catch (error) {
+            console.error('Failed to read save file:', error);
+            this.playSound('error');
+            this.parent?.showMessage?.('Could not read that file.', 'error', 'Import');
+            return;
+        }
+
+        const result = user.importUserData(text);
+        if (!result.ok) {
+            this.playSound('error');
+            this.parent?.showMessage?.(result.error, 'error', 'Import');
+            return;
+        }
+
+        this.playSound('success');
+        // Roster and world are built at boot, so a reload is the honest way to
+        // apply an imported save rather than half-swapping live state.
+        this.parent?.showMessage?.('Save imported — reloading…', 'success', 'Import');
+        setTimeout(() => window.location.reload(), 1200);
+    }
+
     setupMiscSettings() {
+        this.setupSaveDataControls();
         const notificationsToggle = this.modalElement.querySelector('#notifications-toggle');
         if (notificationsToggle) {
             notificationsToggle.checked = this.settings.misc.notifications;
             notificationsToggle.onchange = () => {
                 this.settings.misc.notifications = notificationsToggle.checked;
+                this.getCore()?.applyNotificationPreference?.(notificationsToggle.checked);
             };
         }
     }
@@ -59082,6 +60938,10 @@ class SettingsPanel extends ModalWindow {
         return this.settings?.graphics?.weather !== false;
     }
 
+    isAnimationsEnabled() {
+        return this.settings?.graphics?.animations !== false;
+    }
+
     applyGraphicsSettings() {
         const container = this.parent?.parent || null;
         const particleSystem = container?.gameMap?.particleSystem || null;
@@ -59093,7 +60953,14 @@ class SettingsPanel extends ModalWindow {
         if (particleSystem?.setWeatherEnabled) {
             particleSystem.setWeatherEnabled(this.isWeatherEnabled());
         }
+        if (particleSystem?.setQualityLevel) {
+            particleSystem.setQualityLevel(this.settings?.graphics?.quality ?? 'medium');
+        }
         environmentManager?.refreshDisplaySettings?.();
+
+        // Apply live, before save, so the toggle previews itself like the effects
+        // and weather toggles above do.
+        this.getCore()?.applyMotionPreference?.(this.isAnimationsEnabled());
     }
 
     getCore() {

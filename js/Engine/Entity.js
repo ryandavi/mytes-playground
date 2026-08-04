@@ -21,6 +21,54 @@ const EntityDefaults = {
 
 const EntityMethods = {
 
+	// ── Region membership ─────────────────────────────────────────────────────
+	// Backed by RegionManager (js/Map/Regions/). Room membership is recomputed
+	// only when the entity crosses a grid cell; zone membership is written by
+	// Zone itself, because its thresholds are intersection-ratio based and a
+	// centre-point test cannot reproduce them.
+
+	getRegionManager() {
+		return this.gameMap?.regionManager ??
+			this.parent?.gameMap?.regionManager ??
+			this.container?.gameMap?.regionManager ??
+			null;
+	},
+
+	get currentRooms() {
+		return this.getRegionManager()?.getMembership(this, 'room') ?? [];
+	},
+
+	// Innermost room wins when volumes overlap: the smaller area is the more
+	// specific answer (a nook inside a hall reads as the nook).
+	get currentRoom() {
+		const rooms = this.currentRooms;
+		if (rooms.length <= 1) return rooms[0] ?? null;
+		return rooms.reduce((best, room) =>
+			(room.bounds.width * room.bounds.height) < (best.bounds.width * best.bounds.height) ? room : best
+		);
+	},
+
+	get currentRoomId() {
+		return this.currentRoom?.id ?? null;
+	},
+
+	get currentZones() {
+		return this.getRegionManager()?.getMembership(this, 'zone') ?? [];
+	},
+
+	get currentZoneIds() {
+		return this.currentZones.map(region => region.id);
+	},
+
+	// Per-map `location` is the fallback; a room refines it. This is the whole
+	// "is this entity sheltered" question — one expression, no new system.
+	get isIndoors() {
+		const room = this.currentRoom;
+		if (room) return room.properties?.indoor !== false;
+		const location = String(this.gameMap?.location ?? this.parent?.gameMap?.location ?? '').toLowerCase();
+		return location === 'inside' || location === 'interior' || location === 'house';
+	},
+
 	resolveDepthOffsetValue(depthLine, depthOffset, colliderBottom, sizeHeight) {
 		const resolveExplicitDepth = value => {
 			if (value === null || value === undefined ||

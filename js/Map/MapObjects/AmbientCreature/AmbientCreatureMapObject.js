@@ -70,8 +70,6 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         this.restDuration = 0;
         this.seekCooldown = 0;
 
-        this.blockedFrames = 0;
-        this.stuckFrames = 0;
         this.lastBlockedReason = 'none';
         this.lastMoveDelta = { x: 0, y: 0 };
 
@@ -319,58 +317,31 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         }
     }
 
+    // Thin wrappers over the shared movement plumbing. Kept as named methods
+    // because species subclasses and the AI call them directly.
     canOccupyPosition(x, y) {
-        const gridSystem = this.gameMap?.gridSystem;
-        if (!gridSystem) return true;
-        return gridSystem.isEntityPositionValid?.(this, x, y) ?? true;
+        return this.movementBody.canOccupy(x, y);
     }
 
     isPathToPositionClear(targetX, targetY, stepSize = 12) {
-        const dx = targetX - this.posX;
-        const dy = targetY - this.posY;
-        const distance = Math.hypot(dx, dy);
-        if (distance <= 1) return this.canOccupyPosition(targetX, targetY);
-
-        const steps = Math.max(1, Math.ceil(distance / stepSize));
-        for (let i = 1; i <= steps; i++) {
-            const t = i / steps;
-            if (!this.canOccupyPosition(this.posX + dx * t, this.posY + dy * t)) return false;
-        }
-        return true;
+        return this.movementBody.isPathClear(targetX, targetY, stepSize);
     }
 
     tryAlternateMovement(nextX, nextY) {
-        if (this.canOccupyPosition(nextX, nextY)) {
-            return { moved: true, x: nextX, y: nextY, vx: this.velocity.x, vy: this.velocity.y };
-        }
-        if (this.canOccupyPosition(nextX, this.posY)) {
-            return { moved: true, x: nextX, y: this.posY, vx: this.velocity.x, vy: 0 };
-        }
-        if (this.canOccupyPosition(this.posX, nextY)) {
-            return { moved: true, x: this.posX, y: nextY, vx: 0, vy: this.velocity.y };
-        }
-
-        const baseAngle = Math.atan2(this.velocity.y, this.velocity.x || 0.0001);
-        const speed = Math.max(this.speed * 0.6, Math.hypot(this.velocity.x, this.velocity.y));
-        const angleOffsets = [Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, (3 * Math.PI) / 4, -(3 * Math.PI) / 4];
-
-        for (const offset of angleOffsets) {
-            const testVx = Math.cos(baseAngle + offset) * speed;
-            const testVy = Math.sin(baseAngle + offset) * speed;
-            const testX = this.posX + testVx;
-            const testY = this.posY + testVy;
-            if (this.canOccupyPosition(testX, testY)) {
-                return { moved: true, x: testX, y: testY, vx: testVx, vy: testVy };
-            }
-        }
-
-        return { moved: false, x: this.posX, y: this.posY, vx: this.velocity.x, vy: this.velocity.y };
+        // Probe speed keeps a floor of 60% of cruising speed so a nearly-stopped
+        // creature still probes far enough to clear the obstacle it is touching.
+        return this.movementBody.resolveMove(nextX, nextY, {
+            probeSpeed: Math.max(this.speed * 0.6, this.movementBody.getSpeed())
+        });
     }
+
+    // Debug panels read these; the counters themselves live on the shared body.
+    get blockedFrames() { return this.movementBody.getStuckCount('blocked'); }
+    get stuckFrames()   { return this.movementBody.getStuckCount('stalled'); }
 
     recoverFromStuckState(reason = 'stuck') {
         this.lastBlockedReason = reason;
-        this.blockedFrames = 0;
-        this.stuckFrames = 0;
+        this.movementBody.resetStuck();
         this.seekCooldown = 1500 + Math.random() * 1500;
         if (this.restingTarget) this.clearTargetRest();
 
@@ -470,15 +441,18 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         const nextY = this.posY + this.velocity.y;
         const result = this.tryAlternateMovement(nextX, nextY);
 
+        // Two independent stuck signals, shared detection (MovementBody) with a
+        // creature-specific response: `blocked` counts rejected move attempts,
+        // `stalled` counts ticks where velocity existed but no ground was covered.
+        const blockedTripped = this.movementBody.trackStuck('blocked', !result.moved, 0, { threshold: 8 });
+
         if (result.moved) {
             this.posX = result.x;
             this.posY = result.y;
             this.velocity.x = result.vx;
             this.velocity.y = result.vy;
-            this.blockedFrames = 0;
             this.lastBlockedReason = 'none';
         } else {
-            this.blockedFrames++;
             if (this.restingTarget) this.abandonTargetRest('blocked by obstacle');
             this.bounceAwayFromObstacle();
         }
@@ -488,14 +462,15 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         this.updateDirection();
 
         const movementAmount = Math.hypot(this.posX - this.renderState.posX, this.posY - this.renderState.posY);
-        if (!this.isIdle && !this.isRestingOnTarget && movementAmount < 0.1 && Math.hypot(this.velocity.x, this.velocity.y) > 0.05) {
-            this.stuckFrames++;
-        } else {
-            this.stuckFrames = 0;
-        }
+        const isTryingToMove = !this.isIdle && !this.isRestingOnTarget &&
+            Math.hypot(this.velocity.x, this.velocity.y) > 0.05;
+        const stalledTripped = this.movementBody.trackStuck('stalled', isTryingToMove, movementAmount, {
+            minDistance: 0.1,
+            threshold: 20
+        });
 
-        if (this.blockedFrames >= 8 || this.stuckFrames >= 20 || !this.canOccupyPosition(this.posX, this.posY)) {
-            this.recoverFromStuckState(this.blockedFrames >= 8 ? 'blocked repeatedly' : 'stuck in place');
+        if (blockedTripped || stalledTripped || !this.canOccupyPosition(this.posX, this.posY)) {
+            this.recoverFromStuckState(blockedTripped ? 'blocked repeatedly' : 'stuck in place');
         }
 
         if ((this.posX !== oldX || this.posY !== oldY) && this.gameMap?.gridSystem) {

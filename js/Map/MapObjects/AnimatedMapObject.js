@@ -26,6 +26,23 @@ const withAnimation = (BaseClass) => class extends BaseClass {
         return this.animation.play(animationName, onComplete);
     }
 
+    // Does this object actually have art for a state? Lets callers request optional
+    // states (hop jump/fall, say) and fall back cleanly when the sheet lacks them,
+    // instead of recording a currentAnimation that never renders.
+    hasAnimation(animationName) {
+        return !!this.animation?.config?.animations?.[animationName];
+    }
+
+    // Play the first state that exists. Returns the name used, or null.
+    playFirstAvailableAnimation(...names) {
+        for (const name of names) {
+            if (!name || !this.hasAnimation(name)) continue;
+            this.playAnimation(name);
+            return name;
+        }
+        return null;
+    }
+
     updateAnimation(deltaTime) {
         if (!this.animation || this.animation.paused) return;
         this.animation.update(deltaTime);

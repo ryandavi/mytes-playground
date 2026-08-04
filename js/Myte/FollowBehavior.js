@@ -31,6 +31,55 @@ class BreadcrumbTrail {
         }
         return { ...this.points[0] };
     }
+
+    // Nearest recorded crumb to (x, y), with its distance.
+    nearest(x, y) {
+        let bestIndex = -1;
+        let bestDistance = Infinity;
+        for (let index = 0; index < this.points.length; index++) {
+            const point = this.points[index];
+            const distance = Math.hypot(point.x - x, point.y - y);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = index;
+            }
+        }
+        return { index: bestIndex, distance: bestDistance };
+    }
+
+    // Index of the crumb sitting `distance` behind the newest one by arc length.
+    indexBehind(distance) {
+        let remaining = Math.max(0, Number(distance) || 0);
+        for (let index = this.points.length - 1; index > 0; index--) {
+            const segmentLength = Math.hypot(
+                this.points[index].x - this.points[index - 1].x,
+                this.points[index].y - this.points[index - 1].y
+            );
+            if (remaining <= segmentLength) return index;
+            remaining -= segmentLength;
+        }
+        return 0;
+    }
+
+    /**
+     * The next crumb a follower at (x, y) should steer toward: a short hop forward
+     * along ground the leader physically walked, never past the follower's own slot.
+     *
+     * Steering by short trail hops (rather than straight at the slot point) is what
+     * lets an arbitrarily long line thread a doorway — every segment is pre-validated,
+     * so no follower needs A* while the trail holds. Returns null only when the
+     * follower is genuinely off the trail (teleport, closed door, map change), which
+     * is the caller's signal to fall back to a real path search.
+     */
+    stepFrom(x, y, slotDistance, { maxOffTrail = 96, lookAhead = 2 } = {}) {
+        if (this.points.length === 0) return null;
+        const { index, distance } = this.nearest(x, y);
+        if (index < 0 || distance > maxOffTrail) return null;
+
+        const slotIndex = this.indexBehind(slotDistance);
+        if (index >= slotIndex) return this.pointBehind(slotDistance);
+        return { ...this.points[Math.min(index + lookAhead, slotIndex)] };
+    }
 }
 
 class FollowBehavior {
@@ -48,6 +97,10 @@ class FollowBehavior {
         this.followDistance = baseFollowDistance * Math.max(1, trailIndex + 1);
         this.smoothingMs = options.smoothingMs ?? 250;
         this.repathInterval = options.repathInterval ?? 450;
+        // How far OFF the shared trail this follower may drift and still steer by it.
+        // Deliberately not a distance to the leader: a follower at trail rank N sits
+        // N*gap behind by design, so gating on leader distance pushed the tail of a
+        // long line into the A* fallback while the trail was perfectly intact.
         this.trailReach = options.trailReach ?? this.maxDistance * 2;
         this.isMoving = false;
         this.smoothedTarget = null;
@@ -95,9 +148,12 @@ class FollowBehavior {
         }
         this.isMoving = true;
 
-        const trailPoint = this.target.breadcrumbTrail?.pointBehind(this.followDistance) ?? null;
-        const destination = trailPoint ?? this._ownSideTarget();
-        if (trailPoint && distance <= this.trailReach) {
+        const trailStep = this.target.breadcrumbTrail?.stepFrom(
+            this.follower.posX, this.follower.posY, this.followDistance,
+            { maxOffTrail: this.trailReach }
+        ) ?? null;
+        const destination = trailStep ?? this._ownSideTarget();
+        if (trailStep) {
             this._pathAction = null;
             this.follower.setTarget(destination.x, destination.y);
             this.follower.moveTowardsTarget();

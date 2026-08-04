@@ -1,6 +1,10 @@
 // Set to true to re-enable verbose A* validation logs
 const PATHFINDER_VERBOSE = false;
 
+// Shared stand-in for "entity has no collider" so the zero-size validation path
+// does not allocate a fresh literal on every check.
+const PATHFINDER_ZERO_COLLIDER = { width: 0, height: 0, offsetX: 0, offsetY: 0 };
+
 class AStarPathfinder {
     constructor(gridSystem) {
         this.gridSystem = gridSystem;
@@ -134,6 +138,40 @@ class AStarPathfinder {
             this._entityValidationSeeds.set(entity, seed);
         }
         return seed;
+    }
+
+    /**
+     * Pack a rounded world position into one exact double (24 signed bits per axis).
+     * Within a single findPath the entity never changes, so position + collider fully
+     * identify a validation check — no entity seed needed in the key.
+     */
+    _packPositionKey(x, y) {
+        const px = Math.max(-8388608, Math.min(8388607, Math.round(x))) + 8388608;
+        const py = Math.max(-8388608, Math.min(8388607, Math.round(y))) + 8388608;
+        return px * 16777216 + py;
+    }
+
+    /**
+     * Pack a collider's size/offset into one number (12 bits each). A search uses at
+     * most two colliders — the entity's own and the buffer-inflated one from LOS
+     * smoothing — so this cheaply buckets the per-search cache by collider.
+     */
+    _packColliderKey(collider) {
+        const w = Math.max(0, Math.min(4095, Math.round(collider?.width ?? 0)));
+        const h = Math.max(0, Math.min(4095, Math.round(collider?.height ?? 0)));
+        const ox = Math.max(-2048, Math.min(2047, Math.round(collider?.offsetX ?? 0))) + 2048;
+        const oy = Math.max(-2048, Math.min(2047, Math.round(collider?.offsetY ?? 0))) + 2048;
+        return ((w * 4096 + h) * 4096 + ox) * 4096 + oy;
+    }
+
+    _getSearchCacheBucket(collider) {
+        const colliderKey = this._packColliderKey(collider);
+        let bucket = this._activeSearchCache.get(colliderKey);
+        if (!bucket) {
+            bucket = new Map();
+            this._activeSearchCache.set(colliderKey, bucket);
+        }
+        return bucket;
     }
 
     _getValidationCacheKey(entity, colliderWorldX, colliderWorldY, collider) {
@@ -848,23 +886,25 @@ class AStarPathfinder {
         }
 
         // --- Proceed with Collider Validation ---
-        // During a findPath run, use the per-search cache (unbounded, no staleness);
-        // outside a search, fall back to the persistent LRU.
-        const cache = this._activeSearchCache ?? this.validationCache;
+        // During a findPath run the entity is fixed, so the per-search cache buckets by
+        // packed collider signature and keys by packed position — plain numbers, no
+        // BigInt allocation on the hottest line of the search. Outside a search, fall
+        // back to the persistent LRU with its full entity-aware key.
+        const searchCache = this._activeSearchCache;
         const colWidth = collider.width;
         const colHeight = collider.height;
         const hasColliderSize = colWidth > 0 && colHeight > 0;
 
         if (!hasColliderSize) {
-            const zeroSizeCacheKey = this._getValidationCacheKey(entity, entityX, entityY, {
-                width: 0,
-                height: 0,
-                offsetX: 0,
-                offsetY: 0
-            });
-            const zeroCached = cache.get(zeroSizeCacheKey);
+            const zeroCache = searchCache
+                ? this._getSearchCacheBucket(PATHFINDER_ZERO_COLLIDER)
+                : this.validationCache;
+            const zeroSizeCacheKey = searchCache
+                ? this._packPositionKey(entityX, entityY)
+                : this._getValidationCacheKey(entity, entityX, entityY, PATHFINDER_ZERO_COLLIDER);
+            const zeroCached = zeroCache.get(zeroSizeCacheKey);
             if (zeroCached !== undefined) return zeroCached;
-            cache.set(zeroSizeCacheKey, true);
+            zeroCache.set(zeroSizeCacheKey, true);
             return true; // No collider means no collision
         }
 
@@ -874,7 +914,10 @@ class AStarPathfinder {
         const colliderBottom = colliderWorldY + colHeight;
 
         // --- Caching ---
-        const cacheKey = this._getValidationCacheKey(entity, colliderWorldX, colliderWorldY, collider);
+        const cache = searchCache ? this._getSearchCacheBucket(collider) : this.validationCache;
+        const cacheKey = searchCache
+            ? this._packPositionKey(colliderWorldX, colliderWorldY)
+            : this._getValidationCacheKey(entity, colliderWorldX, colliderWorldY, collider);
         const cached = cache.get(cacheKey);
         if (cached !== undefined) {
             return cached;

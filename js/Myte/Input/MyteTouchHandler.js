@@ -23,6 +23,7 @@ class MyteTouchHandler extends DragHandler {
                 this.dragStartedInFreeRoam = myte.goal === MOVE_TYPES.FREEROAM;
                 myte.playSound('ui_pickup_item');
                 myte.isDragging = true;
+                myte.queue.clear();
                 this.dragStartPosition = { x: myte.posX, y: myte.posY };
                 myte.parent.camera.beginTemporaryFollow(myte, CAMERA_FOLLOW_MODES.CHARACTER);
                 myte.reset();

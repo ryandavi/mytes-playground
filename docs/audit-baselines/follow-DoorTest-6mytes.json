@@ -1,0 +1,507 @@
+{
+  "scenario": "Six-Myte shared breadcrumb trail through the DoorTest single opening",
+  "map": "DoorTest",
+  "geometry": {
+    "gridWidth": 30,
+    "gridHeight": 16,
+    "wallColumn": 15,
+    "openRows": [
+      6,
+      7,
+      8
+    ]
+  },
+  "roster": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6"
+  ],
+  "result": "pass",
+  "allArrivedRightRoom": true,
+  "followerPathCalls": 0,
+  "pathCallsByMyte": {
+    "1": 1
+  },
+  "maxSimultaneouslyInDoorway": 4,
+  "orderViolationSamples": 0,
+  "note": "Mytes are intentionally non-blocking to each other (T3 grid design: kind=myte never contributes to walkability), so the 96px gap does not physically serialise them - colliders may overlap while passing. Ordering along the trail is the meaningful single-file property and is measured by orderViolationSamples.",
+  "followingTargets": [
+    "1",
+    "1",
+    "1",
+    "1",
+    "1"
+  ],
+  "finalPositions": [
+    {
+      "id": "1",
+      "x": 642,
+      "y": 110
+    },
+    {
+      "id": "2",
+      "x": 575,
+      "y": 98
+    },
+    {
+      "id": "3",
+      "x": 504,
+      "y": 94
+    },
+    {
+      "id": "4",
+      "x": 493,
+      "y": 95
+    },
+    {
+      "id": "5",
+      "x": 472,
+      "y": 95
+    },
+    {
+      "id": "6",
+      "x": 447,
+      "y": 96
+    }
+  ],
+  "invariants": [],
+  "pageErrors": [],
+  "sampleCount": 8,
+  "samples": [
+    {
+      "t": 3543,
+      "trailPoints": 1,
+      "mytes": [
+        {
+          "id": "1",
+          "x": 200,
+          "y": 224,
+          "side": "left",
+          "offTrail": 0,
+          "inDoorway": false
+        },
+        {
+          "id": "2",
+          "x": 178,
+          "y": 224,
+          "side": "left",
+          "offTrail": 22,
+          "inDoorway": false
+        },
+        {
+          "id": "3",
+          "x": 156,
+          "y": 224,
+          "side": "left",
+          "offTrail": 44,
+          "inDoorway": false
+        },
+        {
+          "id": "4",
+          "x": 134,
+          "y": 224,
+          "side": "left",
+          "offTrail": 66,
+          "inDoorway": false
+        },
+        {
+          "id": "5",
+          "x": 112,
+          "y": 224,
+          "side": "left",
+          "offTrail": 88,
+          "inDoorway": false
+        },
+        {
+          "id": "6",
+          "x": 90,
+          "y": 224,
+          "side": "left",
+          "offTrail": 110,
+          "inDoorway": false
+        }
+      ]
+    },
+    {
+      "t": 4561,
+      "trailPoints": 5,
+      "mytes": [
+        {
+          "id": "1",
+          "x": 250,
+          "y": 171,
+          "side": "left",
+          "offTrail": 0,
+          "inDoorway": false
+        },
+        {
+          "id": "2",
+          "x": 181,
+          "y": 222,
+          "side": "left",
+          "offTrail": 19,
+          "inDoorway": false
+        },
+        {
+          "id": "3",
+          "x": 177,
+          "y": 222,
+          "side": "left",
+          "offTrail": 23,
+          "inDoorway": false
+        },
+        {
+          "id": "4",
+          "x": 183,
+          "y": 224,
+          "side": "left",
+          "offTrail": 17,
+          "inDoorway": false
+        },
+        {
+          "id": "5",
+          "x": 173,
+          "y": 224,
+          "side": "left",
+          "offTrail": 27,
+          "inDoorway": false
+        },
+        {
+          "id": "6",
+          "x": 151,
+          "y": 224,
+          "side": "left",
+          "offTrail": 49,
+          "inDoorway": false
+        }
+      ]
+    },
+    {
+      "t": 5567,
+      "trailPoints": 9,
+      "mytes": [
+        {
+          "id": "1",
+          "x": 292,
+          "y": 126,
+          "side": "left",
+          "offTrail": 0,
+          "inDoorway": false
+        },
+        {
+          "id": "2",
+          "x": 239,
+          "y": 180,
+          "side": "left",
+          "offTrail": 9,
+          "inDoorway": false
+        },
+        {
+          "id": "3",
+          "x": 227,
+          "y": 191,
+          "side": "left",
+          "offTrail": 8,
+          "inDoorway": false
+        },
+        {
+          "id": "4",
+          "x": 222,
+          "y": 201,
+          "side": "left",
+          "offTrail": 2,
+          "inDoorway": false
+        },
+        {
+          "id": "5",
+          "x": 207,
+          "y": 217,
+          "side": "left",
+          "offTrail": 7,
+          "inDoorway": false
+        },
+        {
+          "id": "6",
+          "x": 200,
+          "y": 224,
+          "side": "left",
+          "offTrail": 0,
+          "inDoorway": false
+        }
+      ]
+    },
+    {
+      "t": 6579,
+      "trailPoints": 13,
+      "mytes": [
+        {
+          "id": "1",
+          "x": 354,
+          "y": 96,
+          "side": "left",
+          "offTrail": 0,
+          "inDoorway": true
+        },
+        {
+          "id": "2",
+          "x": 291,
+          "y": 126,
+          "side": "left",
+          "offTrail": 1,
+          "inDoorway": false
+        },
+        {
+          "id": "3",
+          "x": 271,
+          "y": 148,
+          "side": "left",
+          "offTrail": 4,
+          "inDoorway": false
+        },
+        {
+          "id": "4",
+          "x": 263,
+          "y": 156,
+          "side": "left",
+          "offTrail": 7,
+          "inDoorway": false
+        },
+        {
+          "id": "5",
+          "x": 249,
+          "y": 172,
+          "side": "left",
+          "offTrail": 4,
+          "inDoorway": false
+        },
+        {
+          "id": "6",
+          "x": 232,
+          "y": 190,
+          "side": "left",
+          "offTrail": 4,
+          "inDoorway": false
+        }
+      ]
+    },
+    {
+      "t": 7596,
+      "trailPoints": 18,
+      "mytes": [
+        {
+          "id": "1",
+          "x": 431,
+          "y": 96,
+          "side": "left",
+          "offTrail": 0,
+          "inDoorway": true
+        },
+        {
+          "id": "2",
+          "x": 360,
+          "y": 99,
+          "side": "left",
+          "offTrail": 3,
+          "inDoorway": true
+        },
+        {
+          "id": "3",
+          "x": 316,
+          "y": 108,
+          "side": "left",
+          "offTrail": 5,
+          "inDoorway": false
+        },
+        {
+          "id": "4",
+          "x": 306,
+          "y": 113,
+          "side": "left",
+          "offTrail": 5,
+          "inDoorway": false
+        },
+        {
+          "id": "5",
+          "x": 290,
+          "y": 127,
+          "side": "left",
+          "offTrail": 1,
+          "inDoorway": false
+        },
+        {
+          "id": "6",
+          "x": 274,
+          "y": 146,
+          "side": "left",
+          "offTrail": 8,
+          "inDoorway": false
+        }
+      ]
+    },
+    {
+      "t": 8602,
+      "trailPoints": 22,
+      "mytes": [
+        {
+          "id": "1",
+          "x": 505,
+          "y": 94,
+          "side": "right",
+          "offTrail": 0,
+          "inDoorway": false
+        },
+        {
+          "id": "2",
+          "x": 435,
+          "y": 96,
+          "side": "right",
+          "offTrail": 7,
+          "inDoorway": true
+        },
+        {
+          "id": "3",
+          "x": 377,
+          "y": 98,
+          "side": "left",
+          "offTrail": 2,
+          "inDoorway": true
+        },
+        {
+          "id": "4",
+          "x": 366,
+          "y": 98,
+          "side": "left",
+          "offTrail": 6,
+          "inDoorway": true
+        },
+        {
+          "id": "5",
+          "x": 345,
+          "y": 100,
+          "side": "left",
+          "offTrail": 5,
+          "inDoorway": true
+        },
+        {
+          "id": "6",
+          "x": 321,
+          "y": 106,
+          "side": "left",
+          "offTrail": 8,
+          "inDoorway": false
+        }
+      ]
+    },
+    {
+      "t": 9609,
+      "trailPoints": 27,
+      "mytes": [
+        {
+          "id": "1",
+          "x": 579,
+          "y": 97,
+          "side": "right",
+          "offTrail": 0,
+          "inDoorway": false
+        },
+        {
+          "id": "2",
+          "x": 509,
+          "y": 94,
+          "side": "right",
+          "offTrail": 3,
+          "inDoorway": false
+        },
+        {
+          "id": "3",
+          "x": 439,
+          "y": 96,
+          "side": "right",
+          "offTrail": 3,
+          "inDoorway": true
+        },
+        {
+          "id": "4",
+          "x": 428,
+          "y": 96,
+          "side": "left",
+          "offTrail": 3,
+          "inDoorway": true
+        },
+        {
+          "id": "5",
+          "x": 407,
+          "y": 97,
+          "side": "left",
+          "offTrail": 2,
+          "inDoorway": true
+        },
+        {
+          "id": "6",
+          "x": 382,
+          "y": 97,
+          "side": "left",
+          "offTrail": 5,
+          "inDoorway": true
+        }
+      ]
+    },
+    {
+      "t": 10632,
+      "trailPoints": 31,
+      "mytes": [
+        {
+          "id": "1",
+          "x": 642,
+          "y": 110,
+          "side": "right",
+          "offTrail": 0,
+          "inDoorway": false
+        },
+        {
+          "id": "2",
+          "x": 575,
+          "y": 98,
+          "side": "right",
+          "offTrail": 4,
+          "inDoorway": false
+        },
+        {
+          "id": "3",
+          "x": 504,
+          "y": 94,
+          "side": "right",
+          "offTrail": 3,
+          "inDoorway": false
+        },
+        {
+          "id": "4",
+          "x": 493,
+          "y": 95,
+          "side": "right",
+          "offTrail": 2,
+          "inDoorway": false
+        },
+        {
+          "id": "5",
+          "x": 472,
+          "y": 95,
+          "side": "right",
+          "offTrail": 3,
+          "inDoorway": false
+        },
+        {
+          "id": "6",
+          "x": 447,
+          "y": 96,
+          "side": "right",
+          "offTrail": 5,
+          "inDoorway": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-class CropPlantMapObject extends GrowingPlantMapObject {
+class CropPlantMapObject extends withTrampleResponse(GrowingPlantMapObject) {
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
         

@@ -301,6 +301,12 @@ class GameMap {
 		this.location = mapData.environment.location;
 
 		this.gridSystem = new GridSystem(this);
+		// One geometry store for every area concept (zones now, lighting rooms
+		// below, enclosures later). Must exist before ZoneManager, which registers
+		// each zone's geometry into it.
+		this.regionManager = new RegionManager(this, {
+			cellSize: this.gridSystem?.config?.cellSize ?? 32
+		});
 		this.zoneManager = new ZoneManager(this);
 
 		Utility.logDebug('Tile map dimensions:', this.dimensions);
@@ -379,6 +385,10 @@ class GameMap {
             await this.environmentManager.initialize(mapData);
         }
 
+        // Rooms exist by now (the environment manager registers them), and objects
+        // are placed, so door topology can be derived.
+        this.buildDoorRoomTopology();
+
 		// Notify the sound system of this map's audio context and begin proximity polling
 		const sm = this.soundManager;
 		if (sm) {
@@ -431,6 +441,67 @@ class GameMap {
 		}
 
 		sm.setProximitySounds(sounds);
+	}
+
+	/**
+	 * Derive which rooms each DOOR/GATE connects, at map load.
+	 *
+	 * A door sits *in* a wall, so its own centre usually lies in neither room. The
+	 * rooms it joins are found by probing outward along both axes from the door's
+	 * centre — whichever rooms those probes land in are the ones it connects.
+	 *
+	 * Doors already toggle grid walkability; this only annotates the topology, so
+	 * nothing about movement or collision changes. Stored on the region
+	 * (`properties.doors` / `adjacentRooms`) and on the door object (`connectsRooms`).
+	 */
+	buildDoorRoomTopology() {
+		const regionManager = this.regionManager;
+		if (!regionManager) return;
+
+		const rooms = regionManager.all('room');
+		for (const room of rooms) {
+			room.properties.doors = [];
+			room.properties.adjacentRooms = [];
+		}
+		if (rooms.length === 0) return;
+
+		const cellSize = this.gridSystem?.config?.cellSize ?? 32;
+		const doors = this.objects.filter(obj => ['DOOR', 'GATE'].includes(obj.type));
+
+		for (const door of doors) {
+			const rect = door.getRegionRect?.('collider') ?? {
+				x: door.posX, y: door.posY,
+				width: door.size?.width ?? 0, height: door.size?.height ?? 0
+			};
+			const cx = rect.x + (rect.width / 2);
+			const cy = rect.y + (rect.height / 2);
+
+			// Probe far enough to clear the wall the door is set into.
+			const reach = cellSize * 1.5;
+			const probes = [
+				{ x: cx, y: cy - reach }, { x: cx, y: cy + reach },
+				{ x: cx - reach, y: cy }, { x: cx + reach, y: cy }
+			];
+
+			const connected = new Set();
+			for (const probe of probes) {
+				for (const room of regionManager.regionsAt(probe.x, probe.y, 'room')) {
+					connected.add(room);
+				}
+			}
+
+			const connectedRooms = [...connected];
+			door.connectsRooms = connectedRooms.map(room => room.id);
+
+			for (const room of connectedRooms) {
+				room.properties.doors.push(door.id);
+				for (const other of connectedRooms) {
+					if (other !== room && !room.properties.adjacentRooms.includes(other.id)) {
+						room.properties.adjacentRooms.push(other.id);
+					}
+				}
+			}
+		}
 	}
 
 	// Returns the ground-center position of a myte's collider — the best single point
@@ -892,10 +963,22 @@ class GameMap {
             this.activeObjectsCount = this.objects.length;
         }
 
-        // Zone updates for active mytes
+        // Zone updates for active mytes.
+        //
+        // Zone effects stay per-frame on purpose: onMyteStay feeds
+        // applyStatEffectsPerMs(effects, deltaTime), so throttling this to cell
+        // crossings would silently stop per-ms stat accumulation. Room membership
+        // below has no such constraint and IS cell-crossing gated — updateMembership
+        // returns immediately when the entity has not changed cell.
         if (this.zoneManager) {
             this.mytes.forEach(myte => {
                 if (myte.isActive) this.zoneManager.update(myte, deltaTime);
+            });
+        }
+
+        if (this.regionManager) {
+            this.mytes.forEach(myte => {
+                if (myte.isActive) this.regionManager.updateMembership(myte, { layers: ['room'] });
             });
         }
 
@@ -994,6 +1077,11 @@ class GameMap {
         if (this.zoneManager) {
             this.zoneManager.dispose();
             this.zoneManager = null;
+        }
+
+        if (this.regionManager) {
+            this.regionManager.clear();
+            this.regionManager = null;
         }
 
         // Clear layer references

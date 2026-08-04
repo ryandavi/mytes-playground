@@ -141,6 +141,18 @@ class GridSystem {
         return !this._isPassthrough(obj) && !obj?.config?.physics?.walkable;
     }
 
+    _hasActorCollision(obj) {
+        return obj?.actorCollision === true || obj?.config?.physics?.actorCollision === true;
+    }
+
+    _actorsCollide(entity, candidate) {
+        return !!entity && !!candidate && entity !== candidate &&
+            entity.checkForCollisions !== false && candidate.checkForCollisions !== false &&
+            entity.active !== false && candidate.active !== false &&
+            !entity.isPickedUp && !candidate.isPickedUp &&
+            this._hasActorCollision(entity) && this._hasActorCollision(candidate);
+    }
+
     // Add this method to update grid cells with terrain data
     updateCellTerrain(gridX, gridY, terrainType) {
         if (gridX < 0 || gridX >= this.gridWidth ||
@@ -826,7 +838,7 @@ class GridSystem {
     }
 
     // Get all potential colliders for an entity
-    getPotentialColliders(entity) {
+    getPotentialColliders(entity, options = {}) {
         // Get all cells that the entity overlaps
         const cells = this.getObjectCells(entity);
         const potentialColliders = new Set();
@@ -849,15 +861,48 @@ class GridSystem {
                 });
             }
 
-            // Add non-walkable objects from the cell
+            // Static obstacles always participate. Dynamic actors opt in for
+            // real-time body collision without making their grid cells unwalkable.
             cell.objects.forEach(obj => {
-                if (obj !== entity && this._blocksMovement(obj)) {
+                if (obj !== entity && (
+                    this._blocksMovement(obj) ||
+                    (options.includeActors === true && this._actorsCollide(entity, obj))
+                )) {
                     potentialColliders.add(obj);
                 }
             });
         });
 
         return Array.from(potentialColliders);
+    }
+
+    isActorPositionValid(entity, x, y) {
+        if (!this._hasActorCollision(entity)) return true;
+
+        const bounds = RectUtils.getEntityColliderBounds(entity, x, y);
+        const cells = this.getObjectCellsForArea(bounds.left, bounds.top, bounds.width, bounds.height);
+        const candidates = new Set();
+        cells.forEach(cell => cell.objects.forEach(candidate => candidates.add(candidate)));
+
+        const currentBounds = RectUtils.getEntityColliderBounds(entity);
+        for (const candidate of candidates) {
+            if (!this._actorsCollide(entity, candidate)) continue;
+
+            const candidateBounds = RectUtils.getEntityColliderBounds(candidate);
+            const nextOverlap = RectUtils.getRectIntersection(bounds, candidateBounds);
+            if (!nextOverlap) continue;
+
+            // Spawned/restored actors may begin overlapped. Permit only movement
+            // that reduces that overlap so they can separate without tunnelling in.
+            const currentOverlap = RectUtils.getRectIntersection(currentBounds, candidateBounds);
+            const nextArea = nextOverlap.width * nextOverlap.height;
+            const currentArea = currentOverlap ? currentOverlap.width * currentOverlap.height : 0;
+            if (currentArea > 0 && nextArea < currentArea) continue;
+
+            return false;
+        }
+
+        return true;
     }
 
     // OPTIMIZATION: Improved boundary checking for object cells

@@ -1,0 +1,118 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Reduced motion
+//
+// Two triggers, deliberately OR'd:
+//   1. `prefers-reduced-motion: reduce` — the OS-level request.
+//   2. `body.reduce-motion` — the in-game Graphics > Animations toggle. That
+//      setting was persisted but consumed nowhere before this; MyteCore now
+//      applies the class, so the toggle finally does something.
+//
+// DELIBERATELY NOT A BLANKET RESET. The usual `*{ animation: none !important }`
+// snippet would break real behaviour here, because three systems depend on
+// animation/transition events actually firing:
+//
+//   • `ToastSystem`          — `animationend` on the toast progress bar drives
+//                              auto-dismiss. Kill it and toasts never leave.
+//   • `MyteDialogue`         — `transitionend` on the bubble's opacity clears
+//                              `isDisplaying`. Kill it and a Myte shows one
+//                              thought bubble, then never another.
+//   • `MapTransitionManager` — `transitionend` on the overlay.
+//
+// So this file only ever clears `animation`, never `transition`, and leaves the
+// toast progress bar and loading indicators (spinner, progress blocks, loading
+// icon) alone — those are transient and communicate that work is happening.
+//
+// Selectors below are written to match the compiled output exactly, so they tie
+// on specificity with the rules they override and win on source order. This
+// partial must therefore stay LAST in `style.scss`.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@mixin reduced-motion-rules {
+    // ── Ambient infinite loops ────────────────────────────────────────────────
+    // Perpetual background movement is the main comfort problem; stop outright.
+    .map-object .sway,
+    .map-object.portal.active,
+    .map-object.portal.is-drag-over,
+    .map-object.portal .interactive-hitbox,
+    .destination-marker .ring,
+    .inventory-drop-indicator {
+        animation: none;
+    }
+
+    .map-object.trample-reactive > .sprite {
+        transition: none;
+    }
+
+    // ── Status blinking / pulsing ─────────────────────────────────────────────
+    // Rapid opacity flashing is a photosensitivity trigger. The battery still
+    // reports its level through the sprite frame, so stilling it loses nothing.
+    .interactive-myte > .inner-wrapper > .above-wrapper > .battery {
+        &.blinking,
+        &.critical-pulse,
+        &.charging,
+        &.rapid-charging {
+            animation: none;
+        }
+    }
+
+    .interactive-myte > .inner-wrapper > .dialogue {
+        // Shake is exactly what reduced-motion exists to remove. The alert bubble
+        // still appears and is still styled as an alert.
+        &.alert.is-visible {
+            animation: none;
+        }
+
+        // Pops scale the bubble in. Dropping the animation makes the bubble
+        // appear instantly; its opacity *transition* is untouched, so
+        // MyteDialogue still gets the `transitionend` it depends on.
+        &.thought.is-visible,
+        &.emoji.is-visible {
+            animation: none;
+        }
+
+        // `whisperFloat` both fades and drifts upward, and it is `forwards` — the
+        // element depends on the animation's end state to stay hidden. Swap in a
+        // static fade with the same timing rather than removing it, so that end
+        // state still lands.
+        &.whisper.is-visible {
+            animation-name: whisperFade;
+        }
+    }
+
+    // ── Travel-based one-shots ────────────────────────────────────────────────
+    // `collect` and `consume` are both `forwards`, so they are replaced by static
+    // fades rather than removed — same reason as whisper above.
+    .app-shell > .app-stage > .canvas > .layer > .dropped-item > .dropped-item-sprite.collected {
+        animation-name: collectFade;
+    }
+
+    .consumption-effect {
+        animation-name: consumeFade;
+    }
+}
+
+// Static counterparts to the `forwards` animations: same end state, no travel.
+@keyframes whisperFade {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@keyframes collectFade {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@keyframes consumeFade {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    @include reduced-motion-rules;
+}
+
+body.reduce-motion {
+    @include reduced-motion-rules;
+}

@@ -1,6 +1,12 @@
 class DoorMapObject extends OpenableMapObject {
-    getApproachMode() {
-        return 'front';
+    getApproachConfig() {
+        return {
+            allowedSides: 'any',
+            gap: this.getConfig('interaction.approachGap'),
+            align: 'center',
+            alignTo: 'collider',
+            myteAlignTo: 'collider'
+        };
     }
 
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
@@ -290,6 +296,8 @@ class DoorMapObject extends OpenableMapObject {
             obj !== this &&
             obj.active !== false &&
             obj.collider &&
+            (obj.getConfig?.('physics.collision', false) ||
+             obj.getConfig?.('physics.actorCollision', false)) &&
             this.isEntityInDoorway(obj)
         );
 
@@ -377,6 +385,20 @@ class DoorMapObject extends OpenableMapObject {
         return this.trySetOpenState(!this.isOpen, {
             triggeredBy: 'debug',
             parent
+        });
+    }
+
+    handleDoubleClick(event) {
+        if (this.activeMyte) {
+            super.handleDoubleClick(event);
+            return;
+        }
+
+        if (!this.active || this.isAnimating) return;
+        this.selectInUi();
+        this.trySetOpenState(!this.isOpen, {
+            triggeredBy: 'user',
+            parent: this.container ?? this.parent
         });
     }
 

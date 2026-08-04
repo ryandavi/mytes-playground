@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const repoRoot = path.resolve(__dirname, '..');
 const manifestPath = path.join(__dirname, 'script-manifest.json');
@@ -99,7 +100,7 @@ function validateManifest(manifest) {
 	}
 }
 
-function buildEntryBlock(manifest, defaultEol) {
+function buildEntryBlock(manifest, defaultEol, bundleVersion) {
 	const cdnEntry = manifest.find((entry) => entry.cdn === true);
 	const lines = [];
 
@@ -107,23 +108,23 @@ function buildEntryBlock(manifest, defaultEol) {
 		lines.push(`\t<script src="${cdnEntry.src}" defer></script>`);
 	}
 
-	lines.push('\t<script src="js/bundle.js"></script>');
+    lines.push(`\t<script src="js/bundle.js?v=${bundleVersion}"></script>`);
 
 	return lines.join(defaultEol) + defaultEol;
 }
 
-function rewriteScriptBlock(filePath, manifest) {
+function rewriteScriptBlock(filePath, manifest, bundleVersion) {
 	const absolutePath = path.join(repoRoot, filePath);
 	const source = fs.readFileSync(absolutePath, 'utf8');
 	const original = source.replace(/\r\n?/g, '\n');
-	const nextContent = rewriteScriptBlockContent(original, manifest).replace(/\n/g, '\r\n');
+    const nextContent = rewriteScriptBlockContent(original, manifest, bundleVersion).replace(/\n/g, '\r\n');
 
 	if (nextContent !== source) {
 		fs.writeFileSync(absolutePath, nextContent, 'utf8');
 	}
 }
 
-function rewriteScriptBlockContent(original, manifest) {
+function rewriteScriptBlockContent(original, manifest, bundleVersion) {
 	const eol = original.includes('\r\n') ? '\r\n' : '\n';
 	const blockPattern = new RegExp(
 		`(^[\\t ]*${escapeRegExp(markerStart)}[\\t ]*$)([\\s\\S]*?)(^[\\t ]*${escapeRegExp(markerEnd)}[\\t ]*$)`,
@@ -134,7 +135,7 @@ function rewriteScriptBlockContent(original, manifest) {
 		throw new Error(`Missing ${markerStart} / ${markerEnd} markers in HTML entry file.`);
 	}
 
-	const generatedBlock = buildEntryBlock(manifest, eol);
+    const generatedBlock = buildEntryBlock(manifest, eol, bundleVersion);
 	return original.replace(blockPattern, `$1${eol}${generatedBlock}$3`);
 }
 
@@ -147,7 +148,9 @@ function writeBundle(manifest) {
 		segments.push(`/* -- ${normalizePath(entry.src)} -- */\n${source}`);
 	}
 
-	fs.writeFileSync(bundlePath, `${segments.join(';\n')}\n`, 'utf8');
+    const bundle = `${segments.join(';\n')}\n`;
+    fs.writeFileSync(bundlePath, bundle, 'utf8');
+    return crypto.createHash('sha256').update(bundle).digest('hex').slice(0, 12);
 }
 
 function escapeRegExp(value) {
@@ -157,8 +160,8 @@ function escapeRegExp(value) {
 function main() {
 	const manifest = readJson(manifestPath);
 	validateManifest(manifest);
-	writeBundle(manifest);
-	targetFiles.forEach((filePath) => rewriteScriptBlock(filePath, manifest));
+    const bundleVersion = writeBundle(manifest);
+    targetFiles.forEach((filePath) => rewriteScriptBlock(filePath, manifest, bundleVersion));
 }
 
 try {

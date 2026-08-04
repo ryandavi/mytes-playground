@@ -1218,7 +1218,7 @@ class MapObject {
 	playConfiguredSound(type) {
 		const soundEffect = this.getConfig(`soundEffects.${type}`);
 		if (soundEffect && this.gameMap?.soundManager) {
-			this.gameMap.soundManager.play(soundEffect);
+			this.gameMap.soundManager.playWhenReady(soundEffect);
 		}
 	}
 

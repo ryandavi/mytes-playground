@@ -135,16 +135,101 @@ class SettingsPanel extends ModalWindow {
             tutorialsToggle.checked = this.settings.gameplay.tutorials;
             tutorialsToggle.onchange = () => {
                 this.settings.gameplay.tutorials = tutorialsToggle.checked;
+                // Re-enabling hints should actually show them again, otherwise the
+                // toggle reads as broken to anyone who turned it off and back on.
+                if (tutorialsToggle.checked) {
+                    this.getUser()?.setPreference?.('hasSeenIntro', false);
+                }
             };
         }
     }
 
+    // Export/import of the whole save. localStorage is the only copy of a player's
+    // Mytes, so a clear-site-data click is otherwise unrecoverable; the exported
+    // file also doubles as a bug-report attachment.
+    setupSaveDataControls() {
+        const exportButton = this.modalElement.querySelector('#export-save');
+        if (exportButton) {
+            exportButton.onclick = () => this.exportSave();
+        }
+
+        const importButton = this.modalElement.querySelector('#import-save');
+        const importInput = this.modalElement.querySelector('#import-save-file');
+        if (importButton && importInput) {
+            importButton.onclick = () => importInput.click();
+            importInput.onchange = async () => {
+                const file = importInput.files?.[0];
+                importInput.value = '';
+                if (file) await this.importSave(file);
+            };
+        }
+    }
+
+    exportSave() {
+        const user = this.getUser();
+        if (!user?.exportUserData) {
+            this.parent?.showMessage?.('No save data to export.', 'warning', 'Export');
+            return;
+        }
+
+        try {
+            // Flush pending changes first so the export matches what is on screen.
+            user.saveUserData();
+            const blob = new Blob([user.exportUserData()], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const stamp = new Date().toISOString().slice(0, 10);
+            link.href = url;
+            link.download = `neko-save-${stamp}.json`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            this.playSound('success');
+            this.parent?.showMessage?.('Save exported.', 'success', 'Export');
+        } catch (error) {
+            console.error('Failed to export save:', error);
+            this.playSound('error');
+            this.parent?.showMessage?.('Could not export your save.', 'error', 'Export');
+        }
+    }
+
+    async importSave(file) {
+        const user = this.getUser();
+        if (!user?.importUserData) return;
+
+        let text;
+        try {
+            text = await file.text();
+        } catch (error) {
+            console.error('Failed to read save file:', error);
+            this.playSound('error');
+            this.parent?.showMessage?.('Could not read that file.', 'error', 'Import');
+            return;
+        }
+
+        const result = user.importUserData(text);
+        if (!result.ok) {
+            this.playSound('error');
+            this.parent?.showMessage?.(result.error, 'error', 'Import');
+            return;
+        }
+
+        this.playSound('success');
+        // Roster and world are built at boot, so a reload is the honest way to
+        // apply an imported save rather than half-swapping live state.
+        this.parent?.showMessage?.('Save imported — reloading…', 'success', 'Import');
+        setTimeout(() => window.location.reload(), 1200);
+    }
+
     setupMiscSettings() {
+        this.setupSaveDataControls();
         const notificationsToggle = this.modalElement.querySelector('#notifications-toggle');
         if (notificationsToggle) {
             notificationsToggle.checked = this.settings.misc.notifications;
             notificationsToggle.onchange = () => {
                 this.settings.misc.notifications = notificationsToggle.checked;
+                this.getCore()?.applyNotificationPreference?.(notificationsToggle.checked);
             };
         }
     }
@@ -161,6 +246,10 @@ class SettingsPanel extends ModalWindow {
         return this.settings?.graphics?.weather !== false;
     }
 
+    isAnimationsEnabled() {
+        return this.settings?.graphics?.animations !== false;
+    }
+
     applyGraphicsSettings() {
         const container = this.parent?.parent || null;
         const particleSystem = container?.gameMap?.particleSystem || null;
@@ -172,7 +261,14 @@ class SettingsPanel extends ModalWindow {
         if (particleSystem?.setWeatherEnabled) {
             particleSystem.setWeatherEnabled(this.isWeatherEnabled());
         }
+        if (particleSystem?.setQualityLevel) {
+            particleSystem.setQualityLevel(this.settings?.graphics?.quality ?? 'medium');
+        }
         environmentManager?.refreshDisplaySettings?.();
+
+        // Apply live, before save, so the toggle previews itself like the effects
+        // and weather toggles above do.
+        this.getCore()?.applyMotionPreference?.(this.isAnimationsEnabled());
     }
 
     getCore() {
