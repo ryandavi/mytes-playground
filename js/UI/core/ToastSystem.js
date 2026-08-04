@@ -9,6 +9,8 @@ class ToastSystem {
 	  this.toasts = new Map(); // Store toast elements by ID
 	  this.counter = 0; // For generating unique IDs
 	  this.maxToasts = 5;
+	  // Driven by the Settings > Misc > Notifications toggle (see setNotificationsEnabled).
+	  this.notificationsEnabled = true;
 	  
 	  // Toast default configuration
 	  this.defaults = {
@@ -54,6 +56,14 @@ class ToastSystem {
 	show(options = {}) {
 	  // Merge default options with provided options
 	  const config = {...this.defaults, ...options};
+
+	  // Settings > Misc > Notifications. Suppresses ambient chatter only —
+	  // warnings and errors always show, because those are either the answer to
+	  // something the player just did (a refused action) or a real failure, and
+	  // silently swallowing them is how the game becomes unexplainable.
+	  if (this.notificationsEnabled === false && (config.type === 'info' || config.type === 'success')) {
+		return null;
+	  }
 	  
 	  // Generate unique ID for this toast
 	  const id = `toast-${++this.counter}`;
@@ -303,6 +313,11 @@ class ToastSystem {
 	  }
 	}
 	
+	setNotificationsEnabled(enabled = true) {
+	  this.notificationsEnabled = enabled !== false;
+	  return this;
+	}
+
 	info(content, title = 'Information', options = {}) {
 	  return this.show({
 		type: 'info',

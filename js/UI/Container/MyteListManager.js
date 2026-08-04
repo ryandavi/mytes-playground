@@ -57,6 +57,11 @@ class MyteListManager extends UIComponent {
 
         // Add click handler
         thumbnail.addEventListener('click', () => {
+            if (!myte.isActive) {
+                this.parent.setSelected?.(myte);
+                return;
+            }
+
             if (myte === this.parent.getActiveMyte()) {
                 this.parent.parent.deactivateActiveMyte?.(myte);
                 return;

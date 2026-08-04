@@ -285,6 +285,14 @@ class ActionSidebarManager extends UIComponent {
             button.classList.add('is-in-progress');
             titleParts.push('Action in progress');
         }
+
+        // Unavailable-but-explained: visible, disabled, and it says why on hover.
+        if (action.unavailableReason) {
+            button.disabled = true;
+            button.classList.add('is-unavailable');
+            button.setAttribute('aria-disabled', 'true');
+            titleParts.push(action.unavailableReason);
+        }
         if (titleParts.length) {
             button.title = titleParts.join('\n');
         }
@@ -338,6 +346,17 @@ class ActionSidebarManager extends UIComponent {
                     userInitiated: true
                 };
                 activeMyte.queue.interrupt(action.id, payload);
+                this.updateActions(selectedObject);
+            } else {
+                // The button was rendered, so the player expects something to happen.
+                // Options resolve to null when the action's requirements stopped being
+                // met between render and click; refresh the list and say so rather
+                // than swallowing the click.
+                this.parent?.showMessage?.(
+                    `${activeMyte.name} can't do that right now.`,
+                    'warning',
+                    action.label || 'Unavailable'
+                );
                 this.updateActions(selectedObject);
             }
         });
@@ -401,7 +420,12 @@ class ActionSidebarManager extends UIComponent {
         const busyCount = activeMyte?.queue?.count() ?? 0;
         const subjectId = selectedObject?.id ?? selectedObject?.constructor?.name ?? 'selected';
         const targetId = actionContext.currentTarget?.id ?? actionContext.currentTarget?.constructor?.name ?? '';
-        return `${subjectId}|busy=${busyCount}|current=${actionContext.currentActionId}|target=${targetId}|phase=${actionContext.currentAction?.phase ?? ''}|actions=${availableActions.map(a => a.id).join(',')}`;
+        // Blocked actions are part of what gets rendered, so a change in *their*
+        // reasons must invalidate the cache too, or a stale explanation sticks.
+        const blocked = ActionManager.getExplainedUnavailableActions(selectedObject, activeMyte)
+            .map(a => `${a.id}:${a.unavailableReason}`)
+            .join(',');
+        return `${subjectId}|busy=${busyCount}|current=${actionContext.currentActionId}|target=${targetId}|phase=${actionContext.currentAction?.phase ?? ''}|actions=${availableActions.map(a => a.id).join(',')}|blocked=${blocked}`;
     }
 
     appendInfoRow(container, label, value, className = 'state-info') {
@@ -903,28 +927,6 @@ class ActionSidebarManager extends UIComponent {
         return button;
     }
 
-    _createActivateMyteButton(selectedObject) {
-        const button = document.createElement('button');
-        button.textContent = 'Activate';
-        button.classList.add('primary-action');
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-
-            if (!(selectedObject instanceof Myte) || selectedObject.isActive) return;
-
-            selectedObject.startWithOptions({
-                goal: DEFAULT_MODE,
-                followGoal: selectedObject.followGoal,
-                autonomyGoal: selectedObject.autonomyGoal
-            });
-            selectedObject.parent?.setActiveMyte?.(selectedObject);
-            selectedObject.holdInHomeSlotUntilPointerLeaves?.();
-            this.parent.selectionManager?.setSelected?.(selectedObject);
-        });
-        return button;
-    }
-
     updateActionList(selectedObject) {
         const actionGroups = this.actionControls.querySelector('.action-groups');
         const previousScrollTop = actionGroups.scrollTop;
@@ -948,14 +950,6 @@ class ActionSidebarManager extends UIComponent {
         }
 
         if (this.isInactiveHomeMyteSelection(selectedObject)) {
-            const groupEl = document.createElement('div');
-            groupEl.className = 'action-group major-action';
-            const ul = document.createElement('ul');
-            const li = document.createElement('li');
-            li.appendChild(this._createActivateMyteButton(selectedObject));
-            ul.appendChild(li);
-            groupEl.appendChild(ul);
-            actionGroups.appendChild(groupEl);
             this.actionControls.classList.add('is-visible');
             actionGroups.scrollTop = previousScrollTop;
             return;
@@ -989,7 +983,13 @@ class ActionSidebarManager extends UIComponent {
 
         const availableActions = ActionManager.getAvailableActions(selectedObject, activeMyte);
         const majorAction = this.getMajorAction(selectedObject, activeMyte, availableActions);
-        const groupedActions = availableActions
+
+        // Actions that are unavailable *and* can say why are shown disabled with the
+        // reason, instead of vanishing. Actions with no reason stay hidden — they are
+        // simply irrelevant to this selection.
+        const blockedActions = ActionManager.getExplainedUnavailableActions(selectedObject, activeMyte);
+
+        const groupedActions = [...availableActions, ...blockedActions]
             .filter(action => action.id !== majorAction?.id)
             .reduce((groups, action) => {
                 const cat = action.category;

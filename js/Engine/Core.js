@@ -46,6 +46,130 @@ class MyteCore {
         document.body.classList.toggle('debug', params.has('debug'));
     }
 
+    /**
+     * Toggle the `reduce-motion` body class that css/core/_reduced-motion.scss keys
+     * off. Motion is reduced when EITHER the OS asks for it OR the in-game
+     * Graphics > Animations toggle is off — the OS request is treated as binding
+     * rather than as a default the game may override.
+     *
+     * @param {boolean} [animationsEnabled] live value from SettingsPanel; falls back
+     *                                      to the saved preference when omitted.
+     */
+    applyMotionPreference(animationsEnabled = undefined) {
+        const preferred = animationsEnabled ?? this.user?.preferences?.animationsEnabled;
+        const systemPrefersReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+        document.body.classList.toggle('reduce-motion', preferred === false || systemPrefersReduced);
+    }
+
+    /**
+     * Push the Settings > Misc > Notifications preference into the toast system.
+     * Like `animationsEnabled`, this setting was persisted but consumed nowhere.
+     *
+     * @param {boolean} [enabled] live value from SettingsPanel; falls back to the
+     *                            saved preference when omitted.
+     */
+    applyNotificationPreference(enabled = undefined) {
+        const preferred = enabled ?? this.user?.preferences?.notificationsEnabled;
+        this.toastManager?.setNotificationsEnabled?.(preferred !== false);
+    }
+
+    /**
+     * First-run hints.
+     *
+     * A UX pass on a cold profile found a brand-new player arrives with no Myte
+     * deployed, no active Myte, and **nothing on screen explaining what to do** —
+     * the world just sits there. These two toasts are the minimum that makes the
+     * first interaction discoverable without instruction.
+     *
+     * This is also what the long-dangling `tutorialsEnabled` setting was always
+     * meant to gate (per the 2026-07-05 audit note), so it finally does something.
+     */
+    showFirstRunHints() {
+        const preferences = this.user?.preferences;
+        if (!preferences) return;
+        if (preferences.tutorialsEnabled === false) return;
+        if (preferences.hasSeenIntro) return;
+
+        this.user.setPreference?.('hasSeenIntro', true);
+
+        this.toastManager?.info?.(
+            'Your Mytes are resting in their slots below. Click one to wake it up and send it into the world.',
+            'Welcome',
+            { duration: 12000 }
+        );
+
+        // Second beat, after the first has had time to be read.
+        setTimeout(() => {
+            this.toastManager?.info?.(
+                'Click something in the world to see what your Myte can do with it. Double-click another Myte to take control of it.',
+                'Getting Around',
+                { duration: 12000 }
+            );
+        }, 9000);
+    }
+
+    /**
+     * Make post-boot runtime errors visible.
+     *
+     * Boot failures already show the fatal banner, but anything thrown *after*
+     * boot only reached the console — so for a player the game just quietly
+     * misbehaves. These handlers surface it once, in plain language.
+     *
+     * Rate-limited and deduplicated: a throw inside the game loop repeats every
+     * frame, and 60 toasts a second is worse than silence.
+     */
+    installGlobalErrorHandlers() {
+        if (this._errorHandlersInstalled) return;
+        this._errorHandlersInstalled = true;
+
+        this._reportedErrors = new Map();
+        const REPEAT_MUTE_MS = 30000;
+        const MAX_DISTINCT = 3;
+
+        const report = (label, detail) => {
+            const key = `${label}:${detail}`.slice(0, 200);
+            const now = Date.now();
+            const lastSeen = this._reportedErrors.get(key);
+            if (lastSeen && (now - lastSeen) < REPEAT_MUTE_MS) return;
+            this._reportedErrors.set(key, now);
+
+            // Stop nagging once several distinct errors have surfaced — at that
+            // point the session is already broken and more toasts add nothing.
+            if (this._reportedErrors.size > MAX_DISTINCT) return;
+
+            this.toastManager?.error?.(
+                'Something went wrong. The game may misbehave — reloading usually fixes it.',
+                'Unexpected Error'
+            );
+        };
+
+        this._onWindowError = (event) => {
+            report('error', event?.message ?? String(event?.error ?? 'unknown'));
+        };
+        this._onUnhandledRejection = (event) => {
+            const reason = event?.reason;
+            report('rejection', reason?.message ?? String(reason ?? 'unknown'));
+        };
+
+        window.addEventListener('error', this._onWindowError);
+        window.addEventListener('unhandledrejection', this._onUnhandledRejection);
+    }
+
+    removeGlobalErrorHandlers() {
+        if (!this._errorHandlersInstalled) return;
+        window.removeEventListener('error', this._onWindowError);
+        window.removeEventListener('unhandledrejection', this._onUnhandledRejection);
+        this._errorHandlersInstalled = false;
+    }
+
+    // Re-apply if the OS preference changes mid-session.
+    watchMotionPreference() {
+        const query = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+        if (!query?.addEventListener || this._motionPreferenceHandler) return;
+        this._motionPreferenceHandler = () => this.applyMotionPreference();
+        query.addEventListener('change', this._motionPreferenceHandler);
+    }
+
     async init() {
         try {
             this.applyRuntimeModeFlags();
@@ -78,6 +202,10 @@ class MyteCore {
 
             this.loadingManager.setMessage("Loading user data...");
             await this.initializeUser();
+            this.applyMotionPreference();
+            this.watchMotionPreference();
+            // Notification preference is applied once toastManager exists (below) —
+            // there is nothing to configure before that.
 
             this.loadingManager.setMessage("Setting up world...");
             const container = await this.createContainer(this.config.container.primaryId);
@@ -95,6 +223,10 @@ class MyteCore {
             this.loadingManager.completeLoading();
 
             this.toastManager = new ToastSystem(document.body);
+            this.applyNotificationPreference();
+            // Only meaningful once there is a toast system to report through.
+            this.installGlobalErrorHandlers();
+            this.showFirstRunHints();
 
         } catch (error) {
             console.error('Failed to initialize MyteCore:', error);
@@ -326,6 +458,7 @@ class MyteCore {
         this.user = null;
 
         this.removeAudioUnlockListeners();
+        this.removeGlobalErrorHandlers();
         this.soundManager?.dispose();
         this.soundManager = null;
         document.removeEventListener('visibilitychange', this.boundHandleVisibilityChange);

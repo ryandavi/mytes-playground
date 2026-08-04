@@ -79,6 +79,12 @@ const RectUtils = {
         return this.getRectIntersection(b1, b2) !== null;
     },
 
+    getRectGap(a, b) {
+        const dx = Math.max(b.left - a.right, a.left - b.right, 0);
+        const dy = Math.max(b.top - a.bottom, a.top - b.bottom, 0);
+        return Math.hypot(dx, dy);
+    },
+
     checkBoxCollision(entityA, entityB, options = {}) {
         const boundsA = this.getEntityColliderBounds(entityA);
         const boundsB = this.getEntityColliderBounds(entityB);

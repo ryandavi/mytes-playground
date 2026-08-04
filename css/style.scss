@@ -19,5 +19,10 @@
 // map
 @use 'features/map';
 
+// accessibility — must stay last: these tie on specificity with the rules they
+// override and win on source order (see core/_reduced-motion.scss)
+@use 'core/touch-targets';
+@use 'core/reduced-motion';
+
 // fonts
 @import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap');

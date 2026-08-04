@@ -187,8 +187,20 @@ class MapObjectFactory {
         return this;
     }
 
+    static resolveVariantType(type, variant) {
+        const normalizedType = this.normalizeType(type);
+        const overrides = this.TYPE_CONFIGS[normalizedType]?.variantTypeOverrides;
+        if (!overrides || variant == null) {
+            return normalizedType;
+        }
+
+        const variantId = String(variant);
+        const overrideType = overrides[variantId] ?? overrides[variantId.toLowerCase()];
+        return overrideType ? this.normalizeType(overrideType) : normalizedType;
+    }
+
     static create(type, variant, x, y, options = {}) {
-        type = this.normalizeType(type);
+        type = this.resolveVariantType(type, variant);
         const { parent: resolvedParent = null, ...factoryOptions } = options;
 
         const typeConfig = this.getTypeConfig(type);
@@ -267,7 +279,7 @@ class MapObjectFactory {
 
 // Set up the factory with default registrations
 MapObjectFactory.registry
-    .register('GRASS', MapObject)
+    .register('GRASS', FoliageMapObject)
     .register('FLOWER', FlowerMapObject)
     .register('TREE', TreeMapObject)
     .register('FRUIT_TREE', FruitTreeMapObject)
@@ -283,6 +295,7 @@ MapObjectFactory.registry
     .register('BALL', BallMapObject)
     .register('PATROL_GUARD', PatrolGuardMapObject)
     .register('NPC', NpcMapObject)
+    .register('MONSTER', NpcMapObject)
     .register('BUTTERFLY', ButterflyMapObject)
     .register('BEE', BeeMapObject)
     .register('HIVE', HiveMapObject)

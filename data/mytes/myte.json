@@ -11,6 +11,7 @@
     "runAwayDistance": 300
   },
   "physics": {
+    "actorCollision": true,
     "gravity": 0.3,
     "terminalVelocity": 12,
     "jumpHeight": 10,

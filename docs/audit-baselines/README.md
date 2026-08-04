@@ -17,3 +17,14 @@ Record on **Outside** and **House** at minimum. Re-record baselines whenever `da
 Depth and affordance recordings for Outside, House, and FieldTest were captured from the current post-migration working tree using the project Playwright workflow. No pre-migration recordings existed, so these establish future reference points but do not constitute before/after zero-diff acceptance results. `autoplay-FieldTest-60s.json` is the clean 13-sample rerun after fixing the initial-map registry leak; `autoplay-FieldTest-5m.json` is the formal clean 61-sample/default-duration gate.
 
 `follow-FieldTest-6mytes.json` records the temporary six-Myte shared-trail run. It proves ordered breadcrumb following with zero follower A* calls and clean relations/invariants, but is intentionally marked partial because FieldTest does not force traversal through its freestanding door.
+
+## 2026-08-03 doorway fixture
+
+`follow-DoorTest-6mytes.json` closes the doorway criterion left open above, using the purpose-built `data/maps/DoorTest.tmx` fixture: two rooms joined by exactly one 96px-tall opening in a full-height wall, verified at runtime (the recording includes the walkable rows of the wall column, so a map edit that opened a second route would show up in the diff).
+
+Two things this recording is careful about:
+
+- **A literal one-cell (32px) door is impossible.** A Myte collider is 96x58, so 32px admits nobody. 96px is the narrowest opening that passes one Myte and refuses two abreast (which would need 116px).
+- **"Single file" is not enforced by collision.** Mytes are deliberately non-blocking to each other (T3: `kind: 'myte'` never contributes to walkability), so colliders may overlap while passing through the gap. The meaningful property is *ordering along the trail*, recorded as `orderViolationSamples`.
+
+Re-run with the scenario in the audit's 2026-08-03 Group A entry. Followers must start clustered within `trailReach` of the leader; a strung-out start puts the tail off-trail before any trail exists, and those Mytes correctly path to the trail once — a start-up artifact, not a follow regression.

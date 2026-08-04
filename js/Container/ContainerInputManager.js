@@ -173,12 +173,19 @@ class ContainerInputManager {
       if (!this.isEnabled) return;
       if (event.originalEvent && event.originalEvent.defaultPrevented) return;
 
+      const target = event.originalEvent?.target;
+      if (this.container.ui.isTool(UIToolModes.SELECT) &&
+          this.canStartWorldGestureFromTarget(target)) {
+        this.container.ui.setSelected(null);
+        return;
+      }
+
       // Handle element click for active Myte
       if (this.container.activeMyte &&
         this.container.activeMyte.isActive &&
         this.container.ui.isTool(UIToolModes.SELECT)) {
 
-        const element = event.originalEvent?.target;
+        const element = target;
         if (element && this.isClickableElement(element)) {
           // this.container.ui.setSelected(element);
         }

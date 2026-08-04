@@ -40,23 +40,23 @@
 
 @keyframes sway {
     0% {
-        transform: skewX(0deg);
+        rotate: 0deg;
     }
 
     20% {
-        transform: skewX(3deg);
+        rotate: 3deg;
     }
 
     50% {
-        transform: skewX(-3deg);
+        rotate: -3deg;
     }
 
     80% {
-        transform: skewX(3deg);
+        rotate: 3deg;
     }
 
     100% {
-        transform: skewX(0deg);
+        rotate: 0deg;
     }
 }
 

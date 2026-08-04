@@ -63,6 +63,12 @@ class GameMapLoader {
                         this.mapDisplayNames.set(normalized, displayName);
                         return displayName;
                     }
+
+                    // The file was found but declares no map-level displayName — a
+                    // content choice, not a missing file. Stop probing here: the
+                    // remaining candidate paths are legacy locations that no longer
+                    // exist, and walking them only emits console 404s.
+                    return fallback;
                 } catch (error) {
                     Utility.warnDebug(`[GameMapLoader] Could not resolve display name for ${normalized} from ${path}:`, error);
                 }

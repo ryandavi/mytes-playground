@@ -1,6 +1,25 @@
 {
   "schemaVersion": 1,
+  "FOLIAGE": {
+    "abstract": true,
+    "trampleResponse": {
+      "enabled": true,
+      "pressDuration": 180,
+      "recoveryDuration": 700,
+      "detectionRadius": 112,
+      "minimumMovement": 0.2,
+      "bendDegrees": 14,
+      "horizontalShift": 5,
+      "verticalShift": 2,
+      "squashScale": 0.72,
+      "stretchScale": 1.1
+    },
+    "soundEffects": {
+      "step": "obj_flower_rustle"
+    }
+  },
   "GRASS": {
+    "baseType": "FOLIAGE",
     "category": "nature",
     "variants": [
       "grass_1",
@@ -427,6 +446,7 @@
     }
   },
   "FLOWER": {
+    "baseType": "FOLIAGE",
     "category": "nature",
     "variants": [
       "flower_1",
@@ -1697,6 +1717,20 @@
       "wheat",
       "berry"
     ],
+    "variantConfigs": {
+      "carrot": {
+        "trampleResponse": {
+          "squashScale": 0.82,
+          "stretchScale": 1.06
+        }
+      },
+      "berry": {
+        "trampleResponse": {
+          "squashScale": 0.88,
+          "stretchScale": 1.03
+        }
+      }
+    },
     "interaction": {
       "type": "tend"
     },
@@ -1705,6 +1739,18 @@
       "water_plant"
     ],
     "animation": "sway",
+    "trampleResponse": {
+      "enabled": true,
+      "pressDuration": 220,
+      "recoveryDuration": 700,
+      "detectionRadius": 112,
+      "minimumMovement": 0.2,
+      "bendDegrees": 10,
+      "horizontalShift": 4,
+      "verticalShift": 0,
+      "squashScale": 1,
+      "stretchScale": 1
+    },
     "size": {
       "width": 64,
       "height": 128
@@ -1833,7 +1879,8 @@
       }
     },
     "soundEffects": {
-      "harvest": "obj_crop_harvest"
+      "harvest": "obj_crop_harvest",
+      "step": "obj_flower_rustle"
     }
   },
   "BREEDING_FLOWER": {
@@ -2558,7 +2605,10 @@
       "guard"
     ],
     "physics": {
-      "collision": true
+      "collision": true,
+      "walkable": true,
+      "actorCollision": true,
+      "resolveMovementCollisions": true
     },
     "speed": 2,
     "waitTime": 1000,
@@ -2806,13 +2856,20 @@
   "NPC": {
     "category": "moving",
     "variants": [
-      "slime",
-      "ghost",
       "goblin"
     ],
+    "variantTypeOverrides": {
+      "slime": "MONSTER",
+      "ghost": "MONSTER"
+    },
+    "identityPlate": {
+      "enabled": true
+    },
     "physics": {
       "collision": false,
-      "walkable": true
+      "walkable": true,
+      "actorCollision": true,
+      "resolveMovementCollisions": true
     },
     "speed": 1.5,
     "aggroRadius": 220,
@@ -2821,6 +2878,11 @@
     "pathRefreshInterval": 900,
     "wanderRadius": 120,
     "wanderInterval": 3500,
+    "wanderStepMin": 48,
+    "wanderStepMax": 88,
+    "wanderTurnMaxDegrees": 70,
+    "chaseStopDistance": 12,
+    "chaseResumeDistance": 30,
     "pathWaypointThreshold": 20,
     "capabilities": {
       "canOpenDoors": false,
@@ -2838,7 +2900,7 @@
       "renderType": "animated",
       "defaultState": "idle",
       "spriteSheet": {
-        "url": "images/MapObjects/npc_slime.gif",
+        "url": "images/MapObjects/npc_slime.png",
         "size": {
           "width": 256,
           "height": 128
@@ -2945,15 +3007,8 @@
       }
     },
     "variantConfigs": {
-      "ghost": {
-        "speed": 2,
-        "aggroRadius": 300,
-        "capabilities": {
-          "canSwim": true,
-          "canWade": true
-        }
-      },
       "goblin": {
+        "role": "Villager",
         "speed": 2.5,
         "capabilities": {
           "canOpenDoors": true,
@@ -2990,6 +3045,58 @@
           "y": 16,
           "width": 32,
           "height": 32
+        }
+      }
+    }
+  },
+  "MONSTER": {
+    "baseType": "NPC",
+    "category": "monster",
+    "sidebarTypeLabel": "Monster",
+    "variants": [
+      "slime",
+      "ghost"
+    ],
+    "identityPlate": {
+      "enabled": false
+    },
+    "variantConfigs": {
+      "slime": {
+        "movement": {
+          "style": "hop",
+          "hop": {
+            "distance": 22,
+            "height": 15,
+            "airMs": 320,
+            "restMs": 520,
+            "restVarianceMs": 220,
+            "animations": {
+              "jump": null,
+              "fall": null,
+              "land": null
+            }
+          }
+        },
+        "visual": {
+          "shadow": {
+            "enabled": true,
+            "widthRatio": 0.5,
+            "heightRatio": 0.12,
+            "anchorX": 0.5,
+            "anchorY": 0.86,
+            "maxOpacity": 0.24,
+            "minOpacity": 0.08,
+            "minScale": 0.68,
+            "blur": 1
+          }
+        }
+      },
+      "ghost": {
+        "speed": 2,
+        "aggroRadius": 300,
+        "capabilities": {
+          "canSwim": true,
+          "canWade": true
         }
       }
     }
@@ -3973,6 +4080,7 @@
     "interaction": {
       "type": "toggle",
       "radius": 100,
+      "approachGap": 20,
       "canToggle": true
     },
     "ai": {

@@ -244,5 +244,146 @@ class GrowingPlantMapObject extends withItemDrops(InteractiveMapObject) {
     }
 }
 
-// Static decorative flower — no growth stages, but supports item drops for pick interactions.
-class FlowerMapObject extends withItemDrops(MapObject) {}
+// Composes automatic bend/squash feedback onto decorative foliage and growing crops.
+const withTrampleResponse = BaseClass => class extends BaseClass {
+    constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
+        super(parent, type, variant, posX, posY, config, options);
+        this._trampleActorState = new Map();
+        this._trampleVisual = null;
+        this._trampleVisualActive = false;
+        this._trampleRecovering = false;
+        this._trampleOverlapping = false;
+        this._trampleRecoverUntil = 0;
+        this._trampleVisualDirty = false;
+    }
+
+    render(container, parent) {
+        const element = super.render(container, parent);
+        element.classList.add('trample-reactive');
+        return element;
+    }
+
+    getNearbyTrampleActors() {
+        const radius = this.getFiniteConfigNumber('trampleResponse.detectionRadius', 0);
+        if (radius <= 0) return [];
+
+        return this.gameMap?.worldQuery?.findNearby({
+            x: this.posX + (this.size.width / 2),
+            y: this.posY + (this.size.height / 2),
+            radius,
+            kind: [WORLD_ENTITY_KINDS.MYTE, WORLD_ENTITY_KINDS.OBJECT],
+            measureFrom: 'center',
+            exclude: this,
+            filter: actor => actor.kind === WORLD_ENTITY_KINDS.MYTE ||
+                actor.getConfig?.('physics.actorCollision', false)
+        }) ?? [];
+    }
+
+    triggerTrampleResponse(actor, movementX, movementY) {
+        const minimumMovement = this.getFiniteConfigNumber('trampleResponse.minimumMovement', 0);
+        const magnitude = Math.hypot(movementX, movementY);
+        if (magnitude < minimumMovement) return false;
+
+        let directionX = movementX / magnitude;
+        const directionY = movementY / magnitude;
+        if (Math.abs(directionX) < 0.15) {
+            const actorCenterX = actor.posX + ((actor.size?.width ?? 0) / 2);
+            const foliageCenterX = this.posX + (this.size.width / 2);
+            directionX = Math.sign(actorCenterX - foliageCenterX) || 1;
+        }
+
+        this._trampleVisual = {
+            pressDuration: this.getFiniteConfigNumber('trampleResponse.pressDuration', 0),
+            recoveryDuration: this.getFiniteConfigNumber('trampleResponse.recoveryDuration', 0),
+            bend: -directionX * this.getFiniteConfigNumber('trampleResponse.bendDegrees', 0),
+            shiftX: directionX * this.getFiniteConfigNumber('trampleResponse.horizontalShift', 0),
+            shiftY: Math.abs(directionY) * this.getFiniteConfigNumber('trampleResponse.verticalShift', 0),
+            squash: this.getFiniteConfigNumber('trampleResponse.squashScale', 1),
+            stretch: this.getFiniteConfigNumber('trampleResponse.stretchScale', 1)
+        };
+        this._trampleVisualDirty = true;
+        this.playConfiguredSound('step');
+        return true;
+    }
+
+    tickUpdate(tickDelta) {
+        super.tickUpdate(tickDelta);
+        if (!this.getConfig('trampleResponse.enabled', false)) return;
+
+        const now = SimClock.now();
+        const responseBounds = RectUtils.getEntityColliderBounds(this);
+        const seenActors = new Set();
+        let hasOverlap = false;
+
+        for (const actor of this.getNearbyTrampleActors()) {
+            const actorId = actor.worldId ?? actor.id;
+            seenActors.add(actorId);
+            const previous = this._trampleActorState.get(actorId);
+            const overlapping = RectUtils.boundsOverlap(
+                responseBounds,
+                RectUtils.getEntityColliderBounds(actor)
+            );
+            const movementX = previous
+                ? actor.posX - previous.x
+                : (actor.targetX ?? actor.posX) - actor.posX;
+            const movementY = previous
+                ? actor.posY - previous.y
+                : (actor.targetY ?? actor.posY) - actor.posY;
+
+            let responded = previous?.overlapping && previous.responded === true;
+            if (overlapping && !responded) {
+                responded = this.triggerTrampleResponse(actor, movementX, movementY);
+            }
+            hasOverlap = hasOverlap || overlapping;
+
+            this._trampleActorState.set(actorId, {
+                x: actor.posX,
+                y: actor.posY,
+                overlapping,
+                responded: overlapping && responded
+            });
+        }
+
+        for (const actorId of this._trampleActorState.keys()) {
+            if (!seenActors.has(actorId)) this._trampleActorState.delete(actorId);
+        }
+
+        if (this._trampleOverlapping && !hasOverlap && this._trampleVisual) {
+            this._trampleRecoverUntil = now + this._trampleVisual.recoveryDuration;
+        }
+        this._trampleOverlapping = hasOverlap;
+    }
+
+    update(deltaTime) {
+        super.update(deltaTime);
+        if (!this.element) return;
+
+        const now = SimClock.now();
+        const active = !!this._trampleVisual && this._trampleOverlapping;
+        const recovering = !!this._trampleVisual && !active && now < this._trampleRecoverUntil;
+        if (this._trampleVisualDirty && this._trampleVisual) {
+            const visual = this._trampleVisual;
+            this.element.style.setProperty('--trample-bend', `${visual.bend}deg`);
+            this.element.style.setProperty('--trample-shift-x', `${visual.shiftX}px`);
+            this.element.style.setProperty('--trample-shift-y', `${visual.shiftY}px`);
+            this.element.style.setProperty('--trample-squash', visual.squash);
+            this.element.style.setProperty('--trample-stretch', visual.stretch);
+            this.element.style.setProperty('--trample-press-duration', `${visual.pressDuration}ms`);
+            this.element.style.setProperty('--trample-recovery-duration', `${visual.recoveryDuration}ms`);
+            this._trampleVisualDirty = false;
+        }
+
+        if (active !== this._trampleVisualActive) {
+            this.element.classList.toggle('is-trampled', active);
+            this._trampleVisualActive = active;
+        }
+        if (recovering !== this._trampleRecovering) {
+            this.element.classList.toggle('is-recovering', recovering);
+            this._trampleRecovering = recovering;
+        }
+    }
+};
+
+class FoliageMapObject extends withTrampleResponse(withItemDrops(MapObject)) {}
+
+class FlowerMapObject extends FoliageMapObject {}

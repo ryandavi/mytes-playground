@@ -181,6 +181,21 @@
                 }
             }
 
+            // Side-by-side buttons within one setting (save export/import).
+            .setting-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: var(--space-xs);
+                margin-top: 8px;
+            }
+
+            // Explanatory line under a control — for stakes the label cannot carry.
+            .setting-hint {
+                margin: 6px 0 0 0;
+                font-size: 0.8em;
+                color: var(--text-muted);
+            }
+
             &.dropdown {
                 label {
                     margin-bottom: 8px;
@@ -243,6 +258,10 @@
     min-width: 0;
     padding-inline: var(--space-base);
     flex-shrink: 0;
+    // Four tabs at desktop padding exceed a phone's width. Scroll the strip
+    // rather than letting the last tab fall off the edge unreachable.
+    overflow-x: auto;
+    scrollbar-width: thin;
 
     >button {
         @include button-base;
@@ -251,6 +270,12 @@
         padding: var(--space-sm) var(--space-lg);
         font-size: 13px;
         cursor: pointer;
+        flex-shrink: 0;
+        white-space: nowrap;
+
+        @media (max-width: 480px) {
+            padding-inline: var(--space-sm);
+        }
 
         &:hover {
             background-color: var(--button-hover);

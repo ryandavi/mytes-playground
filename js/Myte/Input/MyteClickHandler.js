@@ -125,16 +125,38 @@ class MyteClickHandler extends MyteBaseHandler {
 			}
 
 			event.stopPropagation();
+
+			// Outside SELECT (drag and friends), keep activating immediately —
+			// those flows need a controlled myte straight away.
+			if (!this.myte.parent.ui.isTool(UIToolModes.SELECT)) {
+				if (!this.myte.isActiveMyte) {
+					this.myte.parent.setActiveMyte(this.myte);
+				}
+				return;
+			}
+
+			// In SELECT mode a single click only *selects* — it shows what the
+			// controlled myte can do with this one. Switching who you control is a
+			// double click, so brushing past a myte no longer hijacks control.
+			this.myte.parent.ui.setSelected(this.myte);
+
+			const now = Date.now();
+			const isDoubleClick = (now - this.lastClickTime) < this.config.doubleClickTimeout;
+			if (!isDoubleClick) {
+				this.lastClickTime = now;
+				return;
+			}
+			this.lastClickTime = 0;
+
 			if (!this.myte.isActiveMyte) {
 				this.myte.parent.setActiveMyte(this.myte);
+				return;
 			}
-			if (this.myte.parent.ui.isTool(UIToolModes.SELECT)) {
-				this.myte.parent.ui.setSelected(this.myte);
-				if (this.myte.isActiveMyte &&
-					!this.myte.isDragging &&
-					this.myte.parent.getPressDuration() < this.config.clickPressDuration) {
-					this._onClick(event);
-				}
+
+			// Double-clicking the myte you already control keeps its old easter egg.
+			if (!this.myte.isDragging &&
+				this.myte.parent.getPressDuration() < this.config.clickPressDuration) {
+				this._onDoubleClick(event);
 			}
 		}
 	}

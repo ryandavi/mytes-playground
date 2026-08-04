@@ -97,14 +97,31 @@ class NpcMapObject extends MovingMapObject {
 		this.wanderRadius   = this.getConfig('wanderRadius', 100);
 		this.wanderInterval = this.getConfig('wanderInterval', 3000);
 		this.wanderTimer    = 0;
+		this.wanderHeading  = Math.random() * Math.PI * 2;
+		this.wanderStepMin  = this.getConfig('wanderStepMin', this.wanderRadius * 0.35);
+		this.wanderStepMax  = this.getConfig('wanderStepMax', this.wanderRadius * 0.7);
+		this.wanderTurnMax  = this.getConfig('wanderTurnMaxDegrees', 75) * (Math.PI / 180);
+
+		this.chaseStopDistance = this.getConfig('chaseStopDistance', 12);
+		this.chaseResumeDistance = this.getConfig('chaseResumeDistance', 28);
+		this._holdingChaseDistance = false;
 
 		// ── Stuck detection (door opening / path recovery) ────────────────────
+		// The counter itself lives on the shared MovementBody; only the previous
+		// sample position is NPC state.
 		this._prevPosX   = posX;
 		this._prevPosY   = posY;
-		this.stuckFrames = 0;
+
+		// ── Locomotion style ──────────────────────────────────────────────────
+		// Purely data-driven: `movement.style: "hop"` in types.json makes a monster
+		// travel in leaps instead of gliding. No AI changes, no subclass.
+		this.hopMotion = this.getConfig('movement.style') === 'hop'
+			? new HopMotion(this, this.getConfig('movement.hop', {}))
+			: null;
 
 		// DOM element for the alert status indicator (! / !!)
 		this.alertIndicator = null;
+		this.nameplateElement = null;
 	}
 
 	// Always simulate even when outside the camera viewport.
@@ -114,14 +131,42 @@ class NpcMapObject extends MovingMapObject {
 
 	render(container, parent) {
 		const element = super.render(container, parent);
-		element.classList.add('npc-entity', `npc-${this.aiState}`);
+		const entityCategory = this.type === 'NPC' ? 'npc' : 'monster';
+		element.classList.add(`${entityCategory}-entity`, `npc-${this.aiState}`);
+		if (this.type === 'NPC' && this.getConfig('identityPlate.enabled', false)) {
+			this.renderIdentityPlate(element);
+		}
 
 		return element;
 	}
 
-	handleSingleClick() {
-		super.handleSingleClick();
-		this.openConfiguredShop();
+	getIdentity() {
+		const shop = ShopRegistry.getShop(this.getConfig('shopId', null));
+		return {
+			name: this.getConfig('name', null) || shop?.shopkeeper?.name || this.getDisplayName(),
+			role: this.getConfig('functionLabel', null) || (shop ? 'Shop' : this.getConfig('role', null))
+		};
+	}
+
+	renderIdentityPlate(element) {
+		const identity = this.getIdentity();
+		const plate = document.createElement('div');
+		plate.className = 'npc-nameplate';
+
+		const name = document.createElement('span');
+		name.className = 'npc-nameplate__name';
+		name.textContent = identity.name;
+		plate.appendChild(name);
+
+		if (identity.role) {
+			const role = document.createElement('span');
+			role.className = 'npc-nameplate__role';
+			role.textContent = identity.role;
+			plate.appendChild(role);
+		}
+
+		element.appendChild(plate);
+		this.nameplateElement = plate;
 	}
 
 	handleDoubleClick(event) {
@@ -218,37 +263,31 @@ class NpcMapObject extends MovingMapObject {
 	// Detects when the NPC hasn't moved despite trying to, then attempts to
 	// open a blocking door and optionally recomputes the path.
 	_checkStuck() {
-		if (!this.isMoving) {
-			this._prevPosX = this.posX;
-			this._prevPosY = this.posY;
-			this.stuckFrames = 0;
-			return;
-		}
-
+		// Detection is shared (MovementBody.trackStuck); the response below —
+		// open the blocking door, then repath — is NPC-specific and stays here.
 		const moved = Math.hypot(this.posX - this._prevPosX, this.posY - this._prevPosY);
-		if (moved < 0.5) {
-			this.stuckFrames++;
-			if (this.stuckFrames >= 6) {
-				this._tryOpenNearbyDoors();
-				this.stuckFrames = 0;
-				// Recompute path to escape the blockage.
-				if (this.aggroTarget && this.aiState === NPC_STATES.CHASE) {
-					const cx = this.aggroTarget.posX + (this.aggroTarget.size?.width  || 0) / 2;
-					const cy = this.aggroTarget.posY + (this.aggroTarget.size?.height || 0) / 2;
-					this._computePath(cx, cy);
-				} else if (this.aiState === NPC_STATES.RETURN) {
-					this._computePath(
-						this.homeX + this.size.width  / 2,
-						this.homeY + this.size.height / 2
-					);
-				}
-			}
-		} else {
-			this.stuckFrames = 0;
-		}
+		const tripped = this.movementBody.trackStuck('npc', this.isMoving, moved, {
+			minDistance: 0.5,
+			threshold: 6
+		});
 
 		this._prevPosX = this.posX;
 		this._prevPosY = this.posY;
+		if (!tripped) return;
+
+		this._tryOpenNearbyDoors();
+
+		// Recompute path to escape the blockage.
+		if (this.aggroTarget && this.aiState === NPC_STATES.CHASE) {
+			const cx = this.aggroTarget.posX + (this.aggroTarget.size?.width  || 0) / 2;
+			const cy = this.aggroTarget.posY + (this.aggroTarget.size?.height || 0) / 2;
+			this._computePath(cx, cy);
+		} else if (this.aiState === NPC_STATES.RETURN) {
+			this._computePath(
+				this.homeX + this.size.width  / 2,
+				this.homeY + this.size.height / 2
+			);
+		}
 	}
 
 	// ── Target detection ──────────────────────────────────────────────────────
@@ -329,14 +368,43 @@ class NpcMapObject extends MovingMapObject {
 			return;
 		}
 
-		// Periodic wander within home area.
+		if (this.currentPath && this.pathIndex < this.currentPath.length) {
+			this._advanceAlongPath();
+			return;
+		}
+
+		// Continue broadly forward with gentle turns. Choosing every destination
+		// independently around home made short routes alternate across the spawn
+		// point, which read as mechanical back-and-forth pacing.
 		this.wanderTimer += tickDelta;
 		if (this.wanderTimer >= this.wanderInterval && !this.isMoving) {
 			this.wanderTimer = 0;
-			const wx = this.homeX + (Math.random() - 0.5) * this.wanderRadius * 2;
-			const wy = this.homeY + (Math.random() - 0.5) * this.wanderRadius * 2;
+			this._chooseWanderPath();
+		}
+	}
+
+	_chooseWanderPath() {
+		const homeDistance = Math.hypot(this.posX - this.homeX, this.posY - this.homeY);
+		if (homeDistance >= this.wanderRadius * 0.8) {
+			this.wanderHeading = Math.atan2(this.homeY - this.posY, this.homeX - this.posX) +
+				((Math.random() - 0.5) * this.wanderTurnMax);
+		} else {
+			this.wanderHeading += (Math.random() - 0.5) * this.wanderTurnMax * 2;
+		}
+
+		const step = this.wanderStepMin + Math.random() * Math.max(0, this.wanderStepMax - this.wanderStepMin);
+		let wx = this.posX + Math.cos(this.wanderHeading) * step;
+		let wy = this.posY + Math.sin(this.wanderHeading) * step;
+		const fromHomeX = wx - this.homeX;
+		const fromHomeY = wy - this.homeY;
+		const fromHomeDistance = Math.hypot(fromHomeX, fromHomeY);
+		if (fromHomeDistance > this.wanderRadius) {
+			wx = this.homeX + (fromHomeX / fromHomeDistance) * this.wanderRadius;
+			wy = this.homeY + (fromHomeY / fromHomeDistance) * this.wanderRadius;
+		}
+
+		if (!this._computePath(wx + this.size.width / 2, wy + this.size.height / 2)) {
 			this.setTarget(wx, wy);
-			// MovingMapObject's tickUpdate auto-calls moveToward when reachedTarget is false.
 			this.reachedTarget = false;
 		}
 	}
@@ -361,6 +429,24 @@ class NpcMapObject extends MovingMapObject {
 
 		if (this.getDistanceTo(this.aggroTarget) > this.chaseRadius) {
 			this._enterState(NPC_STATES.RETURN);
+			return;
+		}
+
+		const colliderGap = RectUtils.getRectGap(
+			RectUtils.getEntityColliderBounds(this),
+			RectUtils.getEntityColliderBounds(this.aggroTarget)
+		);
+		if (this._holdingChaseDistance && colliderGap < this.chaseResumeDistance) {
+			this.currentPath = null;
+			this.stopMoving();
+			this.reachedTarget = true;
+			return;
+		}
+		this._holdingChaseDistance = colliderGap <= this.chaseStopDistance;
+		if (this._holdingChaseDistance) {
+			this.currentPath = null;
+			this.stopMoving();
+			this.reachedTarget = true;
 			return;
 		}
 
@@ -407,12 +493,78 @@ class NpcMapObject extends MovingMapObject {
 			case NPC_STATES.RETURN: this._updateReturn(tickDelta); break;
 		}
 
+		// Hoppers travel in leaps: the AI above still decides the heading, this only
+		// gates when that velocity may apply. Sits between AI and physics so nothing
+		// else needs to know about it.
+		this._applyHopMotion(tickDelta);
+
 		// Physics / velocity application (MovingMapObject → AnimatedMapObject → MapObject).
 		super.tickUpdate(tickDelta);
 	}
 
+	_applyHopMotion(tickDelta) {
+		if (!this.hopMotion?.enabled) return;
+
+		const speed = Math.hypot(this.velocity.x, this.velocity.y);
+		const wantsToMove = this.isMoving && speed > 0.01;
+		const throttle = this.hopMotion.update(tickDelta, wantsToMove);
+
+		if (throttle !== 1) {
+			// Grounded: hold position but keep the heading, so the next leap
+			// continues toward the same waypoint rather than re-deciding from rest.
+			this.velocity.x *= throttle;
+			this.velocity.y *= throttle;
+			return;
+		}
+
+		// Airborne: rescale to the configured leap distance so the creature covers
+		// deliberate ground per hop instead of skating along at walking speed.
+		const leapSpeed = this.hopMotion.getLeapSpeed(tickDelta);
+		if (leapSpeed && speed > 0.0001) {
+			const remainingX = this.targetX - this.posX;
+			const remainingY = this.targetY - this.posY;
+			const remainingDistance = Math.hypot(remainingX, remainingY);
+			if (remainingDistance <= leapSpeed) {
+				this.velocity.x = remainingX;
+				this.velocity.y = remainingY;
+				if (remainingDistance <= 0.01) {
+					this.stopMoving();
+					this.reachedTarget = true;
+				}
+			} else {
+				this.velocity.x = (this.velocity.x / speed) * leapSpeed;
+				this.velocity.y = (this.velocity.y / speed) * leapSpeed;
+			}
+		}
+	}
+
+	// ── Hop animation states ──────────────────────────────────────────────────
+	// Each falls back to art that exists, so a hopper without jump/fall frames
+	// simply keeps its directional/idle animation rather than blanking out.
+
+	_hopAnimation(key) {
+		return this.hopMotion?.config?.animations?.[key] ?? null;
+	}
+
+	onHopStart() {
+		this.playFirstAvailableAnimation?.(this._hopAnimation('jump'), this.getMovementDirection?.(), 'idle');
+	}
+
+	onHopApex() {
+		this.playFirstAvailableAnimation?.(this._hopAnimation('fall'), this.getMovementDirection?.(), 'idle');
+	}
+
+	onHopLand() {
+		this.playFirstAvailableAnimation?.(this._hopAnimation('land'), 'idle');
+	}
+
 	update(deltaTime) {
 		super.update(deltaTime);
+		if (this.hopMotion) {
+			this.setSpriteVerticalLift(this.posZ);
+			this.computeShadowVisual();
+		}
+		this.nameplateElement?.style.setProperty('--npc-lift', `${Math.max(0, this.posZ || 0)}px`);
 	}
 
 	// ── Cleanup ───────────────────────────────────────────────────────────────
@@ -422,6 +574,7 @@ class NpcMapObject extends MovingMapObject {
 			this.alertIndicator.remove();
 			this.alertIndicator = null;
 		}
+		this.nameplateElement = null;
 		super.remove();
 	}
 }

@@ -1,0 +1,60 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Touch target sizing
+//
+// A UX audit (2026-08-03) found 108 of 124 visible interactive elements below the
+// ~44px minimum recommended for touch — window controls at 30x30, volume sliders
+// 26px tall. On a mouse that density is fine and deliberate, so this only applies
+// where the primary input is a finger.
+//
+// `pointer: coarse` is the honest test: it targets touch devices rather than
+// guessing from viewport width, so a small window on a desktop keeps its compact
+// controls while a large tablet gets the bigger ones.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@media (pointer: coarse) {
+    button,
+    [role="button"],
+    select,
+    input[type="checkbox"],
+    input[type="file"] {
+        min-height: 44px;
+    }
+
+    // Icon-only controls are square, so they need the floor on both axes.
+    .window-controls button,
+    .app-fullscreen-btn,
+    .toast-close {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    // Range inputs ignore min-height on the track; grow the thumb and give the
+    // control real vertical room to be grabbed.
+    input[type="range"] {
+        height: 44px;
+
+        &::-webkit-slider-thumb {
+            width: 28px;
+            height: 28px;
+        }
+
+        &::-moz-range-thumb {
+            width: 28px;
+            height: 28px;
+        }
+    }
+
+    // Checkbox rows: enlarge the box and keep the label a comfortable tap partner.
+    .checkbox-wrapper {
+        min-height: 44px;
+
+        input[type="checkbox"] {
+            width: 24px;
+            height: 24px;
+        }
+
+        label {
+            padding: var(--space-xs) 0;
+        }
+    }
+}

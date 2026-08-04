@@ -6,6 +6,10 @@ class SelectionManager extends UIComponent {
 
 
     setSelected(obj) {
+        if (this.selectedObject === obj) {
+            return;
+        }
+
         const deselect = (object) => {
             if (!object) return;
 
@@ -39,8 +43,7 @@ class SelectionManager extends UIComponent {
         // Deselect current object
         if (this.selectedObject) deselect(this.selectedObject);
 
-        // Toggle selection
-        this.selectedObject = this.selectedObject === obj ? null : obj;
+        this.selectedObject = obj;
 
         // Select new object
         if (this.selectedObject) select(this.selectedObject);

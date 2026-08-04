@@ -33,6 +33,17 @@ class Zone {
         };
         this.displayName = data.properties?.displayName || this.type;
 
+        // Geometry now lives in the shared region store; Zone keeps only the
+        // behaviour (thresholds, buffs, stat effects). `this.bounds` is retained
+        // as a read-only convenience for the many existing callers.
+        this.region = map?.regionManager?.add(new SpatialRegion({
+            id: this.id,
+            layer: 'zone',
+            shape: { kind: 'rect', bounds: this.bounds },
+            properties: this.properties,
+            source: this
+        })) ?? null;
+
         // Track Mytes in the zone
         this.mytesInZone = new Set();
 
@@ -73,6 +84,7 @@ class Zone {
     }
 
     getCenterPoint() {
+        if (this.region) return this.region.getCenterPoint();
         return {
             x: this.bounds.x + (this.bounds.width / 2),
             y: this.bounds.y + (this.bounds.height / 2)
@@ -176,7 +188,11 @@ class Zone {
     }
 
     getIntersectionLevel(myteRect) {
-        const ratio = RectUtils.getIntersectionRatio(myteRect, this.bounds);
+        // Rect regions delegate straight back to RectUtils, so the thresholds
+        // below see byte-identical ratios to the pre-region implementation.
+        const ratio = this.region
+            ? this.region.intersectionRatio(myteRect)
+            : RectUtils.getIntersectionRatio(myteRect, this.bounds);
         if (ratio <= 0) return null;
         if (ratio >= 0.95) return ZONE_THRESHOLD.FULLY;
         if (ratio >= 0.5) return ZONE_THRESHOLD.HALFWAY;
@@ -204,10 +220,12 @@ class Zone {
             // Myte just entered the zone and meets threshold
             this.onMyteEnter(myte);
             this.mytesInZone.add(myte.id);
+            this.map?.regionManager?.setOccupant?.(this.region, myte, true);
         } else if (!meetsThreshold && wasInZone) {
             // Myte no longer meets threshold
             this.onMyteExit(myte);
             this.mytesInZone.delete(myte.id);
+            this.map?.regionManager?.setOccupant?.(this.region, myte, false);
         } else if (meetsThreshold) {
             // Myte stays in zone and still meets threshold
             this.onMyteStay(myte, deltaTime);

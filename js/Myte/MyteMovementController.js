@@ -408,6 +408,7 @@ class MyteMovementController {
         const step = m.stats.getSpeed() * ((m._dt ?? 16.667) / 16.667);
         const originalX = m.posX;
         const originalY = m.posY;
+        let movementBlocked = false;
 
         if (Number.isFinite(distance) && distance !== 0) {
             const moveX = (dx / distance) * step;
@@ -422,7 +423,7 @@ class MyteMovementController {
                 if (this.canMoveToPosition(newX, m.posY)) {
                     m.posX = newX;
                     if (m.checkForCollisions && gridSystem) {
-                        const potentialColliders = gridSystem.getPotentialColliders(m);
+                        const potentialColliders = gridSystem.getPotentialColliders(m, { includeActors: true });
                         for (const collider of potentialColliders) {
                             if (m.parent.checkCollision(m, collider)) {
                                 m.posX = originalX;
@@ -440,7 +441,7 @@ class MyteMovementController {
                     let doorOpenedX = false;
                     if (m.checkForCollisions && gridSystem) {
                         m.posX = newX;
-                        const potentialColliders = gridSystem.getPotentialColliders(m);
+                        const potentialColliders = gridSystem.getPotentialColliders(m, { includeActors: true });
                         m.posX = originalX;
                         for (const collider of potentialColliders) {
                             if (m.tryOpenCollider(collider, 'x')) { doorOpenedX = true; break; }
@@ -460,7 +461,7 @@ class MyteMovementController {
                             xBlocked = true;
                             if (m.checkForCollisions && gridSystem) {
                                 m.posX = newX;
-                                const potentialColliders = gridSystem.getPotentialColliders(m);
+                                const potentialColliders = gridSystem.getPotentialColliders(m, { includeActors: true });
                                 m.posX = originalX;
                                 for (const collider of potentialColliders) m.tryOpenCollider(collider, 'x');
                             }
@@ -474,7 +475,7 @@ class MyteMovementController {
                 if (this.canMoveToPosition(m.posX, newY)) {
                     m.posY = newY;
                     if (m.checkForCollisions && gridSystem) {
-                        const potentialColliders = gridSystem.getPotentialColliders(m);
+                        const potentialColliders = gridSystem.getPotentialColliders(m, { includeActors: true });
                         for (const collider of potentialColliders) {
                             if (m.parent.checkCollision(m, collider)) {
                                 m.posY = originalY;
@@ -492,7 +493,7 @@ class MyteMovementController {
                     let doorOpenedY = false;
                     if (m.checkForCollisions && gridSystem) {
                         m.posY = newY;
-                        const potentialColliders = gridSystem.getPotentialColliders(m);
+                        const potentialColliders = gridSystem.getPotentialColliders(m, { includeActors: true });
                         m.posY = originalY;
                         for (const collider of potentialColliders) {
                             if (m.tryOpenCollider(collider, 'y')) { doorOpenedY = true; break; }
@@ -512,7 +513,7 @@ class MyteMovementController {
                             yBlocked = true;
                             if (m.checkForCollisions && gridSystem) {
                                 m.posY = newY;
-                                const potentialColliders = gridSystem.getPotentialColliders(m);
+                                const potentialColliders = gridSystem.getPotentialColliders(m, { includeActors: true });
                                 m.posY = originalY;
                                 for (const collider of potentialColliders) m.tryOpenCollider(collider, 'y');
                             }
@@ -530,9 +531,11 @@ class MyteMovementController {
                     if (this.canMoveToPosition(originalX, slideY)) m.posY = slideY;
                 }
             }
+
+            movementBlocked = xBlocked || yBlocked;
         }
 
-        if (distance < step) m.snapPositionToTarget(doXAxis, doYAxis);
+        if (distance < step && !movementBlocked) m.snapPositionToTarget(doXAxis, doYAxis);
         m.ensureFiniteCoordinates('moveTowardsTarget:end');
         m.setDirection(m.getDirection());
         m.setSpritePosition(m.posX, m.posY);
@@ -543,7 +546,7 @@ class MyteMovementController {
         if (!m.checkForCollisions) return [];
         const gridSystem = m.parent?.gameMap?.gridSystem;
         if (!gridSystem || !m.parent?.checkCollision) return [];
-        return gridSystem.getPotentialColliders(m).filter(collider =>
+        return gridSystem.getPotentialColliders(m, { includeActors: true }).filter(collider =>
             collider && collider !== m && !collider.isPickedUp && m.parent.checkCollision(m, collider)
         );
     }

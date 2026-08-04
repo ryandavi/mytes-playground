@@ -52,16 +52,80 @@ class ActionManager {
     }
 
     static canPerformAction(actionId, selected, active) {
-        if (!active) {
-            return false;
-        }
+        return this.explainAction(actionId, selected, active).available;
+    }
+
+    /**
+     * Why is this action available, or not?
+     *
+     * Actions historically answered availability with a bare boolean, so an
+     * unavailable action simply vanished from the sidebar and the player was never
+     * told why ("the bed advertises `sittable` but shows no Rest action" — because
+     * energy was above the rest threshold, silently).
+     *
+     * Two opt-in ways for an action to explain itself, both backwards compatible:
+     *   1. `canPerform` may return `{ ok: false, reason: '...' }` instead of a
+     *      boolean. Plain booleans keep working untouched.
+     *   2. A class may define `static explain(selected, active)` returning a reason
+     *      string, used when `canPerform` said no without saying why.
+     *
+     * @returns {{ available: boolean, reason: string|null }}
+     */
+    static explainAction(actionId, selected, active) {
+        // No reason here on purpose: "no Myte is deployed" is a global state, not a
+        // fact about this action. Attaching it per-action turned the sidebar into a
+        // wall of identical disabled buttons.
+        if (!active) return { available: false, reason: null };
 
         const ActionClass = this.actions.get(actionId);
         if (!ActionClass || typeof ActionClass.canPerform !== 'function') {
-            return false;
+            return { available: false, reason: null };
         }
 
-        return !!ActionClass.canPerform(selected, active);
+        let verdict;
+        try {
+            verdict = ActionClass.canPerform(selected, active);
+        } catch (error) {
+            console.warn(`[ActionManager] canPerform threw for "${actionId}":`, error);
+            return { available: false, reason: null };
+        }
+
+        if (verdict && typeof verdict === 'object') {
+            const available = verdict.ok === true;
+            return { available, reason: available ? null : (verdict.reason ?? null) };
+        }
+
+        if (verdict) return { available: true, reason: null };
+
+        let reason = null;
+        if (typeof ActionClass.explain === 'function') {
+            try {
+                reason = ActionClass.explain(selected, active) ?? null;
+            } catch (error) {
+                console.warn(`[ActionManager] explain threw for "${actionId}":`, error);
+            }
+        }
+        return { available: false, reason };
+    }
+
+    /**
+     * Actions that are currently unavailable but can say why. These are worth
+     * surfacing to the player as disabled entries; an action with no reason is
+     * simply irrelevant here (you cannot "harvest" a couch) and stays hidden.
+     */
+    static getExplainedUnavailableActions(selected, active) {
+        const explained = [];
+        for (const [id, ActionClass] of this.actions) {
+            const { available, reason } = this.explainAction(id, selected, active);
+            if (available || !reason) continue;
+            explained.push({
+                ...this.getMetadata(id, ActionClass),
+                ...this.getActionPresentation(id, selected),
+                ActionClass,
+                unavailableReason: reason
+            });
+        }
+        return explained.sort((a, b) => a.priority - b.priority);
     }
 
     // Resolve options for an action from a UI selection context

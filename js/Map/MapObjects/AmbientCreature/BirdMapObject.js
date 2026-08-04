@@ -572,8 +572,7 @@ class BirdMapObject extends AmbientCreatureMapObject {
     recoverFromStuckState(reason = 'stuck') {
         if (this.mode === 'airborne' || this.mode === 'landing') {
             this.lastBlockedReason = reason;
-            this.blockedFrames = 0;
-            this.stuckFrames = 0;
+            this.movementBody.resetStuck();
 
             if (this.isFleeing) {
                 this._fleeDest = null;

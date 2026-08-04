@@ -82,6 +82,23 @@
         display: flex;
         overflow: hidden;
 
+        // The translate above parks the sidebar in the empty space beside the
+        // shell — which only exists on wide screens. Below that, it lands
+        // off-viewport and the action list becomes unreachable (found in the
+        // 2026-08-03 mobile pass). Overlay it on the stage instead.
+        //
+        // Provisional: a proper phone treatment (bottom sheet / dismissible
+        // drawer) is a design decision, not a mechanical one. This makes actions
+        // reachable in the meantime.
+        @media (max-width: 960px) {
+            transform: none;
+            right: var(--space-sm);
+            top: var(--space-sm);
+            width: min(var(--size-sidebar-width), calc(100% - (var(--space-sm) * 2)));
+            max-height: calc(var(--size-stage-height) - (var(--space-sm) * 2));
+            z-index: 5;
+        }
+
         >.action-controls {
             display: none;
             width: 100%;
@@ -342,6 +359,15 @@
                     button {
                         width: 100%;
                         padding: 0.5rem;
+
+                        // Unavailable but explained: shown rather than hidden, so the
+                        // player can see the action exists and learn why it is not
+                        // offered. The reason is on the button's title attribute.
+                        &.is-unavailable {
+                            opacity: 0.5;
+                            cursor: not-allowed;
+                            font-style: italic;
+                        }
                     }
                 }
             }

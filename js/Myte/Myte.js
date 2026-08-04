@@ -36,6 +36,7 @@ class Myte {
 		// Mytes are spatially indexed for queries but never block cells or
 		// colliders, and ContainerManager (not grid culling) owns their update.
 		this.contributesToWalkability = false;
+		this.actorCollision = this.definition.physics?.actorCollision !== false;
 		this.excludeFromCulling = true;
 		this._gridRegistered = null;   // GridSystem instance we're currently indexed in
 

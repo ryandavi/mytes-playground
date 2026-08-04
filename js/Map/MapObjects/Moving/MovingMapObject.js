@@ -10,6 +10,7 @@ class MovingMapObject extends withAnimation(MapObject) {
 		this.maxSpeed = this.getConfig('maxSpeed', 5);
 		this.acceleration = this.getConfig('acceleration', 0.1);
 		this.friction = this.getConfig('friction', 0.98);
+		this.resolveMovementCollisions = this.getConfig('physics.resolveMovementCollisions', false);
 
 		this.isMoving = false;
 		this.targetX = posX;
@@ -115,10 +116,16 @@ class MovingMapObject extends withAnimation(MapObject) {
 		super.tickUpdate(tickDelta);
 
 		if (this.isMoving) {
-			this.setPosition(
-				this.posX + this.velocity.x,
-				this.posY + this.velocity.y
-			);
+			const nextX = this.posX + this.velocity.x;
+			const nextY = this.posY + this.velocity.y;
+			if (this.resolveMovementCollisions) {
+				const resolved = this.movementBody.resolveMove(nextX, nextY);
+				this.velocity.x = resolved.vx;
+				this.velocity.y = resolved.vy;
+				if (resolved.moved) this.setPosition(resolved.x, resolved.y);
+			} else {
+				this.setPosition(nextX, nextY);
+			}
 		}
 
 		this.velocity.x *= this.friction;

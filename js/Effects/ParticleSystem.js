@@ -1271,6 +1271,13 @@ class Particle {
 }
 
 class ParticleSystem {
+    // Particle budget multipliers per Settings > Graphics quality level.
+    static QUALITY_PARTICLE_SCALE = Object.freeze({
+        low: 0.35,
+        medium: 1,
+        high: 1.5
+    });
+
     static DEFAULT_PRESETS = Object.freeze({
         SPARKLE: {
             type: 'sparkle',
@@ -1626,6 +1633,9 @@ class ParticleSystem {
         this.parent = parent;
         this.container = options.container || parent?.layers?.particles || parent?.container || null;
         this.maxParticles = Math.max(1, ParticleDataUtils.toFiniteNumber(options.maxParticles, 600));
+        // Retained so quality changes scale from the configured budget rather than
+        // compounding off whatever the previous quality level left behind.
+        this.baseMaxParticles = this.maxParticles;
         this.effectsEnabled = options.effectsEnabled !== false;
         this.tickInterval = Math.max(
             1,
@@ -1675,6 +1685,30 @@ class ParticleSystem {
 
     isEffectsEnabled() {
         return this.effectsEnabled !== false;
+    }
+
+    /**
+     * Scale the particle budget from the Settings > Graphics quality level.
+     *
+     * This is what makes that dropdown do something: it was persisted as
+     * `graphicsQuality` and consumed nowhere. `maxParticles` is already enforced
+     * in the spawn path, so scaling it is the whole mechanism.
+     */
+    setQualityLevel(level = 'medium') {
+        const scale = ParticleSystem.QUALITY_PARTICLE_SCALE[String(level).toLowerCase()]
+            ?? ParticleSystem.QUALITY_PARTICLE_SCALE.medium;
+        const next = Math.max(1, Math.round(this.baseMaxParticles * scale));
+        if (next === this.maxParticles) return this;
+
+        this.maxParticles = next;
+        // Trim immediately so lowering quality takes effect now, not once the
+        // current crop of particles happens to expire. Oldest first, via the same
+        // pooled release path everything else uses.
+        while (this.particles.length > this.maxParticles) {
+            this.releaseParticle(this.particles[0], 'quality');
+        }
+        this.debug.sync();
+        return this;
     }
 
     setEffectsEnabled(enabled = true) {

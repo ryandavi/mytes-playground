@@ -781,6 +781,10 @@ class ContainerManager {
     }
 
     setActiveMyte(myte) {
+        if (myte && !myte.isActive) {
+            return false;
+        }
+
         const previousActiveMyte = this.activeMyte;
         this.activeMyte = myte;
 
@@ -809,17 +813,13 @@ class ContainerManager {
             m.syncSelectionState();
         });
 
-        // start it if it's not active
-        if (myte && !myte.isActive) {
-            myte.startWithOptions({ goal: DEFAULT_MODE });
-        }
-
         this.ui.myteListManager.updateMytesList(myte);
         this.ui.debugPanel?.updateButtons();
         this.ui.viewPanel?.updateButtonStates();
         this.ui.setSelected(null);
 
         this.eventManager?.emit('container:active_myte_changed', { myte });
+        return true;
     }
 
     deactivateActiveMyte(myte = this.activeMyte) {

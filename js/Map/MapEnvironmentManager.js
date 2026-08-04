@@ -157,6 +157,7 @@ class MapEnvironmentManager {
         this.config = this.resolveConfig();
         this.roomVolumes = this.buildRoomVolumes();
         this.lightOpenings = this.buildLightOpenings();
+        this.registerRoomRegions();
         this._timeData = this.getTimeData();
         this.currentAtmosphere = this.resolveAtmosphereState(this._timeData);
         this.targetAtmosphere = Utility.deepClone(this.currentAtmosphere);
@@ -455,6 +456,59 @@ class MapEnvironmentManager {
                 mode: String(props.lightingMode || props.roomLightingMode || defaults.mode || 'mixed').toLowerCase()
             }
         };
+    }
+
+    /**
+     * Publish the lighting rooms into the shared region store as layer `room`.
+     *
+     * Lighting keeps its own `roomVolumes` and all of its maths — this does not
+     * change how anything renders. The point is that room geometry stops being
+     * private to the lighting system, so indoor/outdoor checks, occupancy queries
+     * and the future wall/enclosure work have somewhere real to read it from
+     * instead of inventing a fourth representation.
+     *
+     * Regions keep the authored polygon where one exists (Tiled stores polygon
+     * points relative to the object origin, so they are offset back to world
+     * space here); the lighting normaliser discards it and uses bounds only.
+     */
+    registerRoomRegions() {
+        const regionManager = this.gameMap?.regionManager;
+        if (!regionManager) return;
+
+        for (const existing of regionManager.all('room')) {
+            regionManager.remove(existing);
+        }
+
+        const authored = Array.isArray(this.mapData?.environment?.rooms)
+            ? this.mapData.environment.rooms
+            : [];
+        const polygonById = new Map();
+        for (const room of authored) {
+            if (!Array.isArray(room?.polygon) || room.polygon.length < 3) continue;
+            const originX = Number(room.bounds?.x) || 0;
+            const originY = Number(room.bounds?.y) || 0;
+            polygonById.set(
+                String(room.id).toLowerCase(),
+                room.polygon.map(p => ({ x: originX + (Number(p.x) || 0), y: originY + (Number(p.y) || 0) }))
+            );
+        }
+
+        for (const volume of this.roomVolumes) {
+            const polygon = polygonById.get(String(volume.id).toLowerCase());
+            regionManager.add(new SpatialRegion({
+                id: volume.id,
+                layer: 'room',
+                shape: polygon
+                    ? { kind: 'polygon', points: polygon, bounds: volume.bounds }
+                    : { kind: 'rect', bounds: volume.bounds },
+                properties: {
+                    displayName: volume.displayName,
+                    indoor: true,
+                    lighting: volume.lighting
+                },
+                source: volume
+            }));
+        }
     }
 
     buildLightOpenings() {

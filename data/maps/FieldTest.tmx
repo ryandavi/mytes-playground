@@ -517,12 +517,12 @@
     <property name="variant" value="goblin"/>
    </properties>
   </object>
-  <object id="49" name="NPC" x="736" y="704" width="64" height="64">
+ <object id="49" name="MONSTER" x="736" y="704" width="64" height="64">
    <properties>
     <property name="variant" value="slime"/>
    </properties>
   </object>
-  <object id="50" name="NPC" x="96" y="704" width="64" height="64">
+ <object id="50" name="MONSTER" x="96" y="704" width="64" height="64">
    <properties>
     <property name="variant" value="ghost"/>
    </properties>

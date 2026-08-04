@@ -22,7 +22,10 @@ const USER_DEFAULT_PREFERENCES = Object.freeze({
     tutorialsEnabled: true,
     autoSaveEnabled: true,
     language: 'en',
-    notificationsEnabled: true
+    notificationsEnabled: true,
+    // Set once the first-run hints have been shown, so returning players are not
+    // re-onboarded. Turning `tutorialsEnabled` back on resets this (SettingsPanel).
+    hasSeenIntro: false
 });
 
 class User {
@@ -214,8 +217,29 @@ class User {
         try {
             parsed = JSON.parse(savedData);
         } catch (e) {
-            console.warn('[User] Corrupted save data, resetting.', e);
-            localStorage.removeItem(storageKey);
+            // Never delete a corrupt save outright — for a pet game that is the
+            // player's only copy of their Mytes. Quarantine it, try the rolling
+            // backup, and say what happened.
+            console.warn('[User] Corrupted save data.', e);
+            this._quarantineCorruptSave(storageKey, savedData);
+
+            const recovered = this._loadBackup(storageKey);
+            if (recovered) {
+                this.core?.toastManager?.warning?.(
+                    'Your save was damaged, so the previous backup was loaded instead. Recent progress may be missing.',
+                    'Save Recovered'
+                );
+                const migratedBackup = this._migrateUserData(recovered);
+                if (migratedBackup) {
+                    this.applyUserData(migratedBackup);
+                    return true;
+                }
+            }
+
+            this.core?.toastManager?.error?.(
+                'Your save could not be read and no backup was available. A copy of the damaged data was kept.',
+                'Save Unreadable'
+            );
             return false;
         }
 
@@ -224,6 +248,87 @@ class User {
 
         this.applyUserData(migrated);
         return true;
+    }
+
+    _backupKey(storageKey) { return `${storageKey}.bak`; }
+    _corruptKey(storageKey) { return `${storageKey}.corrupt`; }
+
+    // Keep the damaged blob under a separate key so it can be inspected or
+    // hand-recovered later. Best effort: if even this write fails, we are out of
+    // storage and there is nothing useful left to do.
+    _quarantineCorruptSave(storageKey, rawData) {
+        try {
+            localStorage.setItem(this._corruptKey(storageKey), rawData);
+        } catch (error) {
+            console.warn('[User] Could not quarantine corrupt save:', error);
+        }
+    }
+
+    _loadBackup(storageKey) {
+        try {
+            const backup = localStorage.getItem(this._backupKey(storageKey));
+            return backup ? JSON.parse(backup) : null;
+        } catch (error) {
+            console.warn('[User] Backup save is unreadable too:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Serialize the current user to a portable JSON string — the export half of
+     * export/import, and a useful bug-report attachment.
+     */
+    exportUserData() {
+        return JSON.stringify({
+            exportedAt: new Date().toISOString(),
+            userId: this.userId,
+            data: this.serializeUserData()
+        }, null, 2);
+    }
+
+    /**
+     * Replace the current save from an exported blob.
+     *
+     * Accepts both the wrapped export shape and a bare save, so a file pulled
+     * straight out of localStorage also works.
+     *
+     * @returns {{ ok: boolean, error?: string }}
+     */
+    importUserData(json) {
+        let parsed;
+        try {
+            parsed = typeof json === 'string' ? JSON.parse(json) : json;
+        } catch (error) {
+            return { ok: false, error: 'That file is not valid JSON.' };
+        }
+
+        const payload = parsed?.data ?? parsed;
+        if (!payload || typeof payload !== 'object') {
+            return { ok: false, error: 'That file does not contain save data.' };
+        }
+
+        const migrated = this._migrateUserData(payload);
+        if (!migrated) {
+            return { ok: false, error: 'That save is from an unsupported version.' };
+        }
+
+        // Snapshot what is about to be replaced, so an accidental import of the
+        // wrong file is recoverable.
+        const storageKey = this.getStorageKey();
+        if (storageKey) {
+            const current = localStorage.getItem(storageKey);
+            if (current) {
+                try {
+                    localStorage.setItem(this._backupKey(storageKey), current);
+                } catch (error) {
+                    console.warn('[User] Could not back up before import:', error);
+                }
+            }
+        }
+
+        this.applyUserData(migrated);
+        this.saveUserData();
+        return { ok: true };
     }
 
     // User authentication and profile methods
@@ -395,7 +500,23 @@ class User {
         if (!storageKey) return;
 
         try {
-            localStorage.setItem(storageKey, JSON.stringify(this.serializeUserData()));
+            const serialized = JSON.stringify(this.serializeUserData());
+
+            // Roll the last known-good save into a backup before overwriting, so a
+            // corrupt or partial write is recoverable rather than terminal. Only
+            // promote a previous value that actually parses — otherwise a bad save
+            // would overwrite a good backup.
+            const previous = localStorage.getItem(storageKey);
+            if (previous && previous !== serialized) {
+                try {
+                    JSON.parse(previous);
+                    localStorage.setItem(this._backupKey(storageKey), previous);
+                } catch {
+                    // Previous value was already damaged — leave the older backup be.
+                }
+            }
+
+            localStorage.setItem(storageKey, serialized);
 
             const lastUserIdKey = this.core?.config?.userData?.lastUserIdKey;
             if (lastUserIdKey) {

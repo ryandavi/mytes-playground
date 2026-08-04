@@ -227,6 +227,13 @@
     "src": "js/Map/GameMapLoader.js"
   },
   {
+    "src": "js/Map/Regions/SpatialRegion.js",
+    "commentLine": "<!-- Regions: shared geometry primitive, loaded before its consumers -->"
+  },
+  {
+    "src": "js/Map/Regions/RegionManager.js"
+  },
+  {
     "src": "js/Map/GameMap.js"
   },
   {
@@ -278,6 +285,10 @@
   },
   {
     "src": "js/Map/MapObjects/Interactive/PortalMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/HopMotion.js",
+    "commentLine": "<!-- Shared locomotion components, loaded before the movers that compose them -->"
   },
   {
     "src": "js/Map/MapObjects/MovementBody.js",
