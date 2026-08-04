@@ -1,59 +1,3 @@
-const ACTION_CHIP_LABELS = Object.freeze({
-    'astar-move': '🏃',
-    'move': '🏃',
-    'go_to_object': '🏃',
-    'idle': '💤',
-    'expression': '😊',
-    'dance': '💃',
-    'simple_sleep': '😴',
-    'sleep': '😴',
-    'jump': '⬆️',
-    'circle': '🔄',
-    'zigzag': '↔️',
-    'run_laps': '🔁',
-    'patrol': '👀',
-    'wander': '🌀',
-    'guard': '🛡️',
-    'follow_mouse': '🖱️',
-    'follow_object': '🔗',
-    'inspect': '🔍',
-    'deep_inspect': '🔬',
-    'interact_object': '👆',
-    'use_surface_slot': '🛏️',
-    'nudge_ball': '⚽',
-    'eat_element': '🍽️',
-    'open_chest': '📦',
-    'close_chest': '🔒',
-    'pick_flower': '🌸',
-    'trample_flower': '👟',
-    'smell_flower': '🌺',
-    'drink_fountain': '💧',
-    'water_plant': '🪣',
-    'harvest': '🌾',
-    'shake_tree': '🌳',
-    'chop_tree': '🪓',
-    'remove_stump': '🪵',
-    'show_affection': '❤️',
-    'greet': '👋',
-    'greet_receive': '👋',
-    'watch': '👁️',
-    'chase': '🏃',
-    'emote_at': '💬',
-    'play_tag': '🏷️',
-    'play_fetch': '🎾',
-    'carry_pickup': '🤲',
-    'carry': '🫂',
-    'being_carried': '🪁',
-    'carry_putdown': '📍',
-    'pickup_item': '🤲',
-    'hold_item': '✊',
-    'drop_item': '📤',
-    'give_item': '🎁',
-    'run_away': '🏃',
-    'run_from': '🚪',
-    'hide': '🙈'
-});
-
 class CompactQueueUI extends CompactChipStripUI {
     // Returns grouped items: consecutive runs of the same action ID are collapsed
     // into one entry with a count. Each entry: { item, id, count, items, queueStartIndex }
@@ -93,20 +37,16 @@ class CompactQueueUI extends CompactChipStripUI {
         return item.getQueueDescription?.() || '';
     }
 
-    getShortLabel(item) {
-        const explicitIcon = item.constructor?.metadata?.icon;
-        if (explicitIcon) {
-            return explicitIcon;
-        }
+    // Sprite symbol name from actions.json. Actions without one fall back to the
+    // initials produced by getShortLabel.
+    getIconName(item) {
+        return item.constructor?.metadata?.icon || null;
+    }
 
+    getShortLabel(item) {
         const explicit = item.constructor?.metadata?.labelShort;
         if (explicit) {
             return explicit;
-        }
-
-        const actionId = item.constructor?.metadata?.id;
-        if (actionId && ACTION_CHIP_LABELS[actionId]) {
-            return ACTION_CHIP_LABELS[actionId];
         }
 
         const words = this.getQueueTitle(item)
@@ -169,6 +109,7 @@ class CompactQueueUI extends CompactChipStripUI {
             index: chipIndex,
             className: `queue-chip ${item.constructor?.metadata?.category || ''} action-${item.constructor?.metadata?.id || 'unknown'}${chipIndex === 0 ? ' is-current' : ''}${isHidden ? ' is-hidden-action' : ''}`,
             label: title,
+            icon: this.getIconName(item),
             shortLabel: this.getShortLabel(item),
             badgeText: count > 1 ? String(count) : null,
             progressRatio,

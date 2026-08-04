@@ -9,6 +9,8 @@
 </head>
 
 <body>
+	<!-- Icon sprite (images/icons/sprite.svg) is injected here by IconSprite.js -->
+
 	<div class="test"></div>
 	<div id="customCursor"></div>
 
@@ -25,9 +27,13 @@
 				<div class="energy">Energy</div>
 			</div>
 			<div class="date-time">
-				<div class="clock">--:--</div>
+				<div class="clock">
+						<span class="clock__time">--:--</span>
+						<svg class="icon clock__season" aria-hidden="true" hidden><use></use></svg>
+					</div>
 			</div>
 			<div class="user-summary">
+				<div class="coin-count">¢ 0</div>
 				<div class="user">
 					<button type="button" class="username" aria-label="Open user profile">
 						<svg class="user-icon" aria-hidden="true" viewBox="0 0 16 16">
@@ -36,9 +42,8 @@
 						<span class="username__text">Guest</span>
 					</button>
 				</div>
-				<div class="coin-count">¢ 0</div>
 			</div>
-			<button type="button" class="app-fullscreen-btn fullscreen-btn" aria-label="Toggle fullscreen">⛶</button>
+			<button type="button" class="app-fullscreen-btn fullscreen-btn" aria-label="Toggle fullscreen"><svg class="icon" aria-hidden="true"><use href="#icon-maximize"></use></svg></button>
 		</div>
 		<!-- END HEADER -->
 		<!-- HAND CONTROLS -->
@@ -46,79 +51,40 @@
 			<!-- RADIO BUTTONS -->
 			<input type="radio" name="hand" value="left" id="hand-select" checked>
 			<label class="button" for="hand-select">
-				<svg id="hand_pointer_icon" class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10.5 12">
-					<path id="Pointer"
-						d="m8.44,7.59h-2.46l1.06,2.22c.22.47.02,1.03-.44,1.25-.47.22-1.03.02-1.25-.44l-1.09-2.29-1.76,2.07c-.11.13-.27.2-.43.2-.07,0-.13-.01-.19-.03-.22-.08-.37-.29-.37-.53V1.41c0-.22.13-.42.33-.51.2-.09.44-.06.6.09l6.38,5.63c.18.15.24.4.15.62-.08.22-.29.36-.53.36Z" />
-				</svg>
+				<svg class="icon" aria-hidden="true"><use href="#icon-pointer"></use></svg>
 				<span class="text"><u>S</u>elect</span>
 			</label>
 			<input type="radio" name="hand" value="left" id="hand-drag">
-			<label class="button" class="button" for="hand-drag">
-				<svg id="hand_grab_icon" class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10.5 12">
-					<path id="Grab"
-						d="m10.12,3.38v2.82c0,1.17-.6,2.2-1.5,2.8v3H2.62v-3l-1.25-.91c-.63-.46-1-1.2-1-1.97v-1.62c0-.34.16-.67.42-.88l.7-.56v1.07c0,.21.17.38.38.38s.38-.17.38-.38V1.12c0-.62.5-1.12,1.12-1.12s1.08.46,1.12,1.05c.2-.18.46-.3.76-.3.62,0,1.12.5,1.12,1.12v.13c.2-.3.55-.5.94-.5.55,0,1.01.4,1.1.92.17-.1.37-.17.58-.17.62,0,1.12.5,1.12,1.12Z" />
-				</svg>
+			<label class="button" for="hand-drag">
+				<svg class="icon" aria-hidden="true"><use href="#icon-grab"></use></svg>
 				<span class="text"><u>D</u>rag</span>
 			</label>
 			<input type="radio" name="hand" value="right" id="hand-pet">
 			<label class="button" for="hand-pet">
-				<svg id="hand_pet_icon" class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10.5 12">
-					<path id="Paw"
-						d="m1.12,5.63c-.62,0-1.12-.5-1.12-1.12s.5-1.12,1.12-1.12,1.12.5,1.12,1.12-.5,1.12-1.12,1.12Zm8.62,3.38c0,1.24-1.01,2.25-2.25,2.25-1.21.04-1.69-.75-2.25-.75s-1.04.79-2.25.75c-1.24,0-2.25-1-2.25-2.25,0-.84.46-1.57,1.14-1.95.64-.36,1.1-1.43,1.58-2.29.37-.67,1.08-1.01,1.78-1.01s1.42.33,1.78,1.01c.47.85.96,1.95,1.57,2.29.68.38,1.14,1.11,1.14,1.95ZM2.25,1.88c0-.62.5-1.12,1.12-1.12s1.12.5,1.12,1.12-.5,1.13-1.12,1.13-1.12-.5-1.12-1.13Zm3.75,0c0-.62.5-1.12,1.12-1.12s1.12.5,1.12,1.12-.5,1.13-1.12,1.13-1.12-.5-1.12-1.13Zm4.5,2.63c0,.62-.5,1.12-1.12,1.12s-1.12-.5-1.12-1.12.5-1.12,1.12-1.12,1.12.5,1.12,1.12Z" />
-				</svg>
+				<svg class="icon" aria-hidden="true"><use href="#icon-paw"></use></svg>
 				<span class="text"><u>P</u>et</span>
 			</label>
 			<!-- RADIO BUTTONS-->
-			<button id="settings-toggle" class="hand-control-btn" title="Settings">
-				<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12">
-					<path
-						d="m10.21,10.1c-.07,0-.13-.02-.19-.05l-1.09-.63c-.42.35-.9.63-1.42.82v1.26c0,.18-.12.33-.29.37-.39.08-.79.13-1.21.13s-.82-.05-1.21-.13c-.17-.04-.29-.19-.29-.37v-1.26c-.53-.19-1.01-.46-1.42-.82l-1.1.63c-.06.04-.13.05-.19.05-.51,0-1.5-1.99-1.5-2.32,0-.13.07-.26.19-.33l1.09-.63c-.05-.27-.08-.54-.08-.82s.03-.55.08-.82l-1.09-.63c-.12-.07-.19-.2-.19-.33,0-.4,1.03-2.32,1.5-2.32.07,0,.13.02.19.05l1.1.63c.42-.35.9-.63,1.42-.82V.5c0-.18.12-.33.29-.37.39-.08.79-.13,1.21-.13s.82.05,1.21.13c.17.04.29.19.29.37v1.26c.53.19,1.01.46,1.42.82l1.09-.63c.06-.04.13-.05.19-.05.51,0,1.5,1.99,1.5,2.32,0,.13-.07.26-.19.33l-1.09.63c.05.27.08.54.08.82s-.03.55-.08.82l1.09.63c.12.07.19.2.19.33,0,.4-1.03,2.32-1.5,2.32Zm-2.33-4.1c0-1.03-.84-1.88-1.88-1.88s-1.88.84-1.88,1.88.84,1.88,1.88,1.88,1.88-.84,1.88-1.88Z" />
-			</svg>
-
-
-
-			</button>
 			<!-- BUTTONS -->
-			<button id="sound-toggle" class="hand-control-btn" title="Toggle Sound">
-
-				<svg class="icon icon-sound-on" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12">
-					<path id="Sound_On"
-						d="m7.2,2.4v7.2c0,.24-.14.45-.35.55-.08.04-.16.05-.25.05-.14,0-.29-.05-.4-.15l-2.53-2.25h-1.57c-.5,0-.9-.4-.9-.9v-1.8c0-.5.4-.9.9-.9h1.57l2.53-2.25c.18-.16.43-.2.64-.1.22.1.35.31.35.55Zm2.4,3.6c0,.54-.24,1.04-.66,1.39-.08.07-.18.1-.28.1-.13,0-.26-.06-.35-.17-.16-.19-.13-.48.06-.63.21-.17.33-.43.33-.69s-.12-.52-.33-.69c-.19-.16-.22-.44-.06-.63.16-.19.44-.22.63-.06.42.35.66.85.66,1.39Zm1.8,0c0,1.07-.48,2.08-1.33,2.78-.08.07-.18.1-.29.1-.13,0-.26-.06-.35-.16-.16-.19-.13-.48.06-.63.64-.52,1-1.28,1-2.08s-.36-1.56-1-2.08c-.19-.16-.22-.44-.06-.63.16-.19.44-.22.63-.06.84.69,1.33,1.7,1.33,2.78Z" />
-				</svg>
-
-				<svg class="icon icon-sound-off" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12">
-					<path id="Sound_Off"
-						d="m11.91,10.63c-.15.19-.43.23-.63.08L.17,2c-.2-.15-.23-.44-.08-.63.09-.11.22-.17.35-.17.1,0,.19.03.28.1l3.3,2.59,2.17-1.93c.18-.16.43-.2.64-.1.22.1.35.31.35.55v3.97l1.02.8c-.05-.17,0-.36.15-.48.21-.17.33-.43.33-.69s-.12-.52-.33-.69c-.19-.16-.22-.44-.06-.63.16-.19.44-.22.63-.06.42.35.66.85.66,1.39s-.24,1.04-.66,1.39c-.08.07-.18.1-.28.1,0,0-.02,0-.03,0l.83.65s.03-.04.05-.06c.64-.52,1-1.28,1-2.08s-.36-1.56-1-2.08c-.19-.16-.22-.44-.06-.63.16-.19.44-.22.63-.06.84.69,1.33,1.7,1.33,2.78s-.45,2-1.24,2.69l1.67,1.3c.2.15.23.44.08.63ZM1.66,4.32l5.54,4.34v.94c0,.24-.14.45-.35.55-.08.04-.16.05-.25.05-.14,0-.29-.05-.4-.15l-2.53-2.25h-1.57c-.5,0-.9-.4-.9-.9v-1.8c0-.34.19-.63.46-.78Z" />
-				</svg>
-
-
-
+			<button id="settings-toggle" class="hand-control-btn" title="Settings">
+				<svg class="icon" aria-hidden="true"><use href="#icon-gear"></use></svg>
 			</button>
-
-		<!-- BUTTONS -->
-		<button id="view-toggle" class="hand-control-btn" title="View Controls">
-			<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12">
-				<path d="M6,2C3.24,2,0.9,3.68,0,6c0.9,2.32,3.24,4,6,4s5.1-1.68,6-4C11.1,3.68,8.76,2,6,2z M6,8.5C4.62,8.5,3.5,7.38,3.5,6 S4.62,3.5,6,3.5S8.5,4.62,8.5,6S7.38,8.5,6,8.5z M6,5C5.45,5,5,5.45,5,6s0.45,1,1,1s1-0.45,1-1S6.55,5,6,5z"/>
-			</svg>
-		</button>
-		<!-- BUTTONS -->
-		<button id="log-toggle" class="hand-control-btn" title="Event Log">
-			<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12">
-				<path d="M1,2h2v2H1V2z M4,2h7v2H4V2z M1,5h2v2H1V5z M4,5h7v2H4V5z M1,8h2v2H1V8z M4,8h7v2H4V8z"/>
-			</svg>
-		</button>
-		<!-- BUTTONS -->
-		<button id="debug-toggle" class="hand-control-btn" title="Toggle Debug">
-
-			<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12">
-				<path
-			d="m12,6.75c0,.41-.34.75-.75.75h-1.5v.75c0,.35-.07.69-.19,1l1.47,1.46c.29.29.29.77,0,1.06-.15.15-.34.22-.53.22s-.38-.07-.53-.22l-1.27-1.27c-.53.45-1.2.74-1.95.74h-.38v-5.63c0-.21-.17-.37-.37-.37s-.37.17-.37.37v5.63h-.38c-.75,0-1.43-.28-1.95-.74l-1.27,1.27c-.15.15-.34.22-.53.22s-.38-.07-.53-.22c-.29-.29-.29-.77,0-1.06l1.47-1.46c-.11-.32-.19-.65-.19-1v-.75H.75C.34,7.5,0,7.16,0,6.75s.34-.75.75-.75h1.5v-1.19l-1.28-1.28c-.29-.29-.29-.77,0-1.06s.77-.29,1.06,0l1.28,1.28h5.38l1.28-1.28c.29-.29.77-.29,1.06,0s.29.77,0,1.06l-1.28,1.28v1.19h1.5c.41,0,.75.34.75.75Zm-3.75-3.75H3.75v-.75c0-1.24,1.01-2.25,2.25-2.25s2.25,1.01,2.25,2.25v.75Z" />
-			</svg>
-
-
-		</button>
-
-
+			<button id="sound-toggle" class="hand-control-btn" title="Toggle Sound">
+				<svg class="icon icon-sound-on" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
+				<svg class="icon icon-sound-off" aria-hidden="true"><use href="#icon-sound-off"></use></svg>
+			</button>
+			<button id="view-toggle" class="hand-control-btn" title="View Controls">
+				<svg class="icon" aria-hidden="true"><use href="#icon-eye"></use></svg>
+			</button>
+			<button id="log-toggle" class="hand-control-btn" title="Event Log">
+				<svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
+			</button>
+			<button id="world-map-toggle" class="hand-control-btn" title="World Map">
+				<svg class="icon" aria-hidden="true"><use href="#icon-world-map"></use></svg>
+			</button>
+			<button id="debug-toggle" class="hand-control-btn" title="Toggle Debug">
+				<svg class="icon" aria-hidden="true"><use href="#icon-bug"></use></svg>
+			</button>
 			<!-- END BUTTONS -->
 		</div>
 		<!-- END HAND CONTROLS -->
@@ -140,11 +106,11 @@
 				<div id="loading-modal" class="window-panel">
 					<div class="window-panel__header">
 						<div class="window-panel__title">
-							<div class="icon">📂</div>
+							<svg class="icon" aria-hidden="true"><use href="#icon-folder"></use></svg>
 							<div class="text">Loading Mytes...</div>
 						</div>
 						<div class="window-panel__controls">
-							<button class="modal-close-btn">&times;</button>
+							<button class="modal-close-btn"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
 						</div>
 					</div>
 					<div class="window-panel__content">
@@ -181,41 +147,6 @@
 					<div class="ignore dot cursor-dot debug"></div>
 				</div>
 				<div class="layer foreground">
-					<!-- MYTE CONTAINER — slots are generated by ContainerManager.setupMytes() -->
-					<!-- END MYTE CONTAINER -->
-					<!-- Myte 2 -->
-					<!--
-							<div class="myteContainer">
-								<div id="myteWrapper-2" class="myteWrapper worm" data-myte-species="worm">
-									<div class="home-name">
-										<div class="name tooltip">Pookie's Home</div>
-									</div>
-									<div class="home-wrapper"></div>
-
-
-									<div id="myte-pookie2" class="interactive-myte" data-myte-name="Pookie" data-myte-species="worm" draggable="false">
-										<div class="inner-wrapper">
-											<div class="sprite"></div>
-											<div class="collidebox"></div>
-											<div class="name-wrapper">
-												<span class="before">x</span>
-												<div class="name tooltip">Pookie</div>
-											</div>
-
-											<div class="commands"></div>
-
-											<div class="dialogue">
-												<span class="text">Hiii</span>
-											</div>
-
-											<div class="above-wrapper">
-												<div class="battery"></div>
-											</div>
-										</div>
-									</div>
-								</div>
-							</div>
-						-->
 				</div>
 				<div class="layer environment-front"></div>
 				<div class="layer effects"></div>
@@ -257,13 +188,13 @@
 	<div id="sound-settings-panel" class="window-panel">
 		<div class="window-panel__header">
 			<h2 class="window-panel__title">
-				<span class="icon">🔊</span>
+				<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
 				<span class="text">Sounds Settings</span>
 			</h2>
 			<div class="window-panel__controls">
-				<button class="modal-minimize-btn">&#128469;</button>
-				<button class="modal-fullscreen-btn">&#x26F6;</button>
-				<button class="modal-close-btn">&times;</button>
+				<button class="modal-minimize-btn"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
+				<button class="modal-fullscreen-btn"><svg class="icon" aria-hidden="true"><use href="#icon-maximize"></use></svg></button>
+				<button class="modal-close-btn"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
 			</div>
 		</div>
 		<div class="window-panel__content">
@@ -323,13 +254,13 @@
 	<div id="myte-info-panel" class="window-panel myte-info">
 		<div class="window-panel__header">
 			<h2 class="window-panel__title">
-				<span class="icon" aria-hidden="true">i</span>
+				<svg class="icon" aria-hidden="true"><use href="#icon-info"></use></svg>
 				<span class="text">Myte Information</span>
 			</h2>
 			<div class="window-panel__controls">
-				<button class="modal-minimize-btn" aria-label="Minimize">&#128469;</button>
-				<button class="modal-fullscreen-btn" aria-label="Maximize">&#x26F6;</button>
-				<button class="modal-close-btn" aria-label="Close">&times;</button>
+				<button class="modal-minimize-btn" aria-label="Minimize"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
+				<button class="modal-fullscreen-btn" aria-label="Maximize"><svg class="icon" aria-hidden="true"><use href="#icon-maximize"></use></svg></button>
+				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
 			</div>
 		</div>
 		<div class="window-panel__content">
@@ -355,12 +286,12 @@
 	<div id="user-profile-panel" class="window-panel user-profile">
 		<div class="window-panel__header">
 			<h2 class="window-panel__title">
-				<span class="icon" aria-hidden="true">☺</span>
+				<svg class="icon" aria-hidden="true"><use href="#icon-user"></use></svg>
 				<span class="text">User Profile</span>
 			</h2>
 			<div class="window-panel__controls">
-				<button class="modal-minimize-btn" aria-label="Minimize">&#128469;</button>
-				<button class="modal-close-btn" aria-label="Close">&times;</button>
+				<button class="modal-minimize-btn" aria-label="Minimize"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
+				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
 			</div>
 		</div>
 		<div class="window-panel__content user-profile__content">
@@ -384,13 +315,13 @@
 	<div id="game-settings-panel" class="window-panel">
 		<div class="window-panel__header">
 			<h2 class="window-panel__title">
-				<span class="icon">⚙️</span>
+				<svg class="icon" aria-hidden="true"><use href="#icon-gear"></use></svg>
 				<span class="text">Game Settings</span>
 			</h2>
 			<div class="window-panel__controls">
-				<button class="modal-minimize-btn">&#128469;</button>
-				<button class="modal-fullscreen-btn">&#x26F6;</button>
-				<button class="modal-close-btn">&times;</button>
+				<button class="modal-minimize-btn"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
+				<button class="modal-fullscreen-btn"><svg class="icon" aria-hidden="true"><use href="#icon-maximize"></use></svg></button>
+				<button class="modal-close-btn"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
 			</div>
 		</div>
 		<div class="window-panel__content">
@@ -497,12 +428,12 @@
 	<div id="game-log-panel" class="window-panel">
 		<div class="window-panel__header">
 			<h2 class="window-panel__title">
-				<span class="icon">📜</span>
+				<svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
 				<span class="text">Event Log</span>
 			</h2>
 			<div class="window-panel__controls">
-				<button class="modal-minimize-btn">&#128469;</button>
-				<button class="modal-close-btn">&times;</button>
+				<button class="modal-minimize-btn"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
+				<button class="modal-close-btn"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
 			</div>
 		</div>
 		<div class="window-panel__content game-log">
@@ -513,15 +444,33 @@
 			</div>
 		</div>
 	</div>
+	<!-- WORLD MAP PANEL -->
+	<div id="world-map-panel" class="window-panel world-map">
+		<div class="window-panel__header">
+			<h2 class="window-panel__title">
+				<svg class="icon" aria-hidden="true"><use href="#icon-world-map"></use></svg>
+				<span class="text">World Map</span>
+			</h2>
+			<div class="window-panel__controls">
+				<button class="modal-minimize-btn" aria-label="Minimize"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
+				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
+			</div>
+		</div>
+		<div class="window-panel__content world-map__content">
+			<div class="world-map__canvas"></div>
+			<div class="world-map__detail"></div>
+		</div>
+	</div>
+	<!-- END WORLD MAP PANEL -->
 	<div id="view-panel" class="window-panel">
 		<div class="window-panel__header">
 			<h2 class="window-panel__title">
-				<span class="icon">🔍</span>
+				<svg class="icon" aria-hidden="true"><use href="#icon-eye"></use></svg>
 				<span class="text">View</span>
 			</h2>
 			<div class="window-panel__controls">
-				<button class="modal-minimize-btn">&#128469;</button>
-				<button class="modal-close-btn">&times;</button>
+				<button class="modal-minimize-btn"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
+				<button class="modal-close-btn"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
 			</div>
 		</div>
 		<div class="window-panel__content">
@@ -564,13 +513,13 @@
 	<div id="game-debug-panel" class="window-panel">
 		<div class="window-panel__header">
 			<h2 class="window-panel__title">
-				<span class="icon">⚙️</span>
+				<svg class="icon" aria-hidden="true"><use href="#icon-bug"></use></svg>
 				<span class="text">Debug Menu</span>
 			</h2>
 			<div class="window-panel__controls">
-				<button class="modal-minimize-btn">&#128469;</button>
-				<button class="modal-fullscreen-btn">&#x26F6;</button>
-				<button class="modal-close-btn">&times;</button>
+				<button class="modal-minimize-btn"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
+				<button class="modal-fullscreen-btn"><svg class="icon" aria-hidden="true"><use href="#icon-maximize"></use></svg></button>
+				<button class="modal-close-btn"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
 			</div>
 		</div>
 		<div class="window-panel__content">
@@ -581,7 +530,7 @@
 
 	<!-- SCRIPTS:BEGIN -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js" defer></script>
-	<script src="js/bundle.js?v=2bba058b6b39"></script>
+	<script src="js/bundle.js?v=9e159657c6d3"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

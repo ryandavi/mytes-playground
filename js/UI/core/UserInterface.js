@@ -41,6 +41,7 @@ class UserInterface {
         this.soundPanel = new SoundPanel(this);
         this.settingsPanel = new SettingsPanel(this);
         this.viewPanel = new ViewPanel(this);
+        this.worldMapPanel = new WorldMapPanel(this);
         this.debugPanel = new DebugPanel(this);
         this.myteInfoPanel = new MyteInfoPanel(this);
         this.userProfilePanel = new UserProfilePanel(this);
@@ -180,6 +181,8 @@ class UserInterface {
         this.viewPanel?.dispose?.();
         this.viewPanel = null;
         this.viewMenu = null;
+        this.worldMapPanel?.dispose?.();
+        this.worldMapPanel = null;
 
         this.screenManager?.dispose?.();
         this.toolManager?.dispose?.();

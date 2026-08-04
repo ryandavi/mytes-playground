@@ -89,6 +89,19 @@
     .consumption-effect {
         animation-name: consumeFade;
     }
+
+    // The purchase ghost is `forwards` and its `animationend` triggers the slot
+    // flash, so swap in a static fade rather than removing the animation.
+    .item-acquisition-ghost {
+        animation-name: item-acquisition-fade;
+    }
+
+    // The outline pulse repeats three times; hold a steady outline for the same
+    // span instead. Its `animationend` still clears the class.
+    .item.is-acquired {
+        animation-name: item-acquired-steady;
+        animation-iteration-count: 1;
+    }
 }
 
 // Static counterparts to the `forwards` animations: same end state, no travel.
@@ -107,6 +120,11 @@
 @keyframes consumeFade {
     0% { opacity: 1; }
     100% { opacity: 0; }
+}
+
+@keyframes item-acquired-steady {
+    0%, 95% { outline: 2px solid var(--state-success-accent); outline-offset: 2px; }
+    100%    { outline: 0 solid transparent; outline-offset: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

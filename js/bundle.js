@@ -28,6 +28,9 @@ const AppConfig = Object.freeze({
 
     content: Object.freeze({
         shopsPath: 'data/metadata/shops.json',
+        // The world has no manifest: WorldGraph discovers it by following the
+        // portals in data/maps/*.tmx out from SiteConfig.world.defaultMap.
+        mapsPath: 'data/maps',
     }),
 
     // ── DOM wiring ────────────────────────────────────────────────────────────
@@ -347,6 +350,25 @@ const SiteConfig = Object.freeze({
     // World defaults
     world: Object.freeze({
         defaultMap: 'House',
+
+        // Summoning a myte that lives on another map makes it walk over rather
+        // than refusing. Distance is measured in map transitions (WorldGraph).
+        travel: Object.freeze({
+            maxDistance: 3,
+            // How long a map takes to cross is measured from the map file: the
+            // walk from the portal it came in by to the portal it is leaving
+            // through, at the traveller's own speed. This flat figure is only
+            // the fallback for a map whose geometry says nothing useful.
+            durationPerMap: 12000,
+            // No map should be crossable in a blink just because its portals
+            // happen to sit next to each other.
+            minLegDuration: 3000,
+            // How close to a portal counts as having reached it, when the portal
+            // itself does not say.
+            portalArrivalRadius: 48,
+            // Progress ticks that reach the UI while a myte is en route.
+            progressInterval: 4000,
+        }),
     }),
 
     // ── Myte defaults ─────────────────────────────────────────────────────────
@@ -502,15 +524,16 @@ const SiteConfig = Object.freeze({
         // (wander/idle stay silent on purpose — bubbling every think is noise).
         needBubbles: Object.freeze({
             minIntervalMs: 6000,
+            // Sprite symbol names from the #icon-sprite block in index.html.
             icons: Object.freeze({
-                safe_return:  '🏠',
-                home_comfort: '🏠',
-                rest:         '💤',
-                eat:          '🍎',
-                social:       '❤️',
-                play:         '⚽',
-                interaction:  '✨',
-                dropped_item: '👀',
+                safe_return:  'home',
+                home_comfort: 'home',
+                rest:         'sleep',
+                eat:          'bowl',
+                social:       'heart',
+                play:         'ball',
+                interaction:  'sparkle',
+                dropped_item: 'eye',
             }),
         }),
 
@@ -875,11 +898,11 @@ const SiteConfig = Object.freeze({
         }),
         hud: Object.freeze({
             updateIntervalMs: 250,
-            seasonGlyphs: Object.freeze({
-                spring: '🌱',
-                summer: '☀',
-                autumn: '🍂',
-                winter: '❄',
+            seasonIcons: Object.freeze({
+                spring: 'sprout',
+                summer: 'sun',
+                autumn: 'leaf',
+                winter: 'snowflake',
             }),
             numericAnimation: Object.freeze({
                 minDurationMs: 200,
@@ -980,6 +1003,62 @@ class Utility {
 	static topOnlyTags = ['button', 'textarea', 'input', 'select', 'iframe', 'canvas']; // tags they sit on top of
 
 
+    /********************************************
+     * icons — symbols live in the #icon-sprite block in index.html
+    ********************************************/
+	static SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+
+	static createIcon(name, className = 'icon') {
+		const svg = document.createElementNS(this.SVG_NAMESPACE, 'svg');
+		svg.setAttribute('class', className);
+		svg.setAttribute('aria-hidden', 'true');
+		svg.appendChild(document.createElementNS(this.SVG_NAMESPACE, 'use'));
+		this.setIcon(svg, name);
+		return svg;
+	}
+
+	// Fill `element` with a sprite icon, falling back to short text when the
+	// symbol name is missing. Reuses the existing <svg> so repeated updates on a
+	// live chip don't churn the DOM.
+	// Symbol ids are kebab-case by construction. Anything else — notably an emoji
+	// left in restored localStorage data — is rendered as text rather than
+	// becoming a <use> pointing at a symbol that does not exist.
+	static isIconName(value) {
+		return typeof value === 'string' && /^[a-z0-9-]+$/.test(value);
+	}
+
+	static renderIconLabel(element, name, fallbackText = '') {
+		if (!element) return;
+
+		if (!this.isIconName(name)) {
+			fallbackText = typeof name === 'string' && name ? name : fallbackText;
+			name = null;
+		}
+
+		if (name) {
+			const existing = element.firstElementChild;
+			if (existing?.tagName === 'svg') {
+				this.setIcon(existing, name);
+				return;
+			}
+			element.replaceChildren(this.createIcon(name));
+			return;
+		}
+
+		if (element.firstElementChild) element.replaceChildren();
+		if (element.textContent !== fallbackText) element.textContent = fallbackText;
+	}
+
+	static setIcon(svg, name) {
+		const use = svg?.querySelector?.('use');
+		if (!use) return;
+		if (name) {
+			use.setAttribute('href', `#icon-${name}`);
+		} else {
+			use.removeAttribute('href');
+		}
+	}
+
 	static createRandomGenerator(seed) {
 		return function() {
 		  // Simple mulberry32 algorithm
@@ -1033,6 +1112,16 @@ class Utility {
 
 	static formatNumber(value) {
 		return this.numberFormatter.format(Number(value) || 0);
+	}
+
+	// Rough spoken duration for a wait the player is being told about — "half a
+	// minute", not "31.4s". Under a minute reads in seconds, above it in minutes.
+	static formatDuration(milliseconds) {
+		const seconds = Math.max(0, Math.round((Number(milliseconds) || 0) / 1000));
+		if (seconds < 60) return `${Math.max(5, Math.round(seconds / 5) * 5)} sec`;
+
+		const minutes = Math.round(seconds / 60);
+		return `${minutes} min`;
 	}
 
 	static formatCurrency(currencyId, value) {
@@ -1597,6 +1686,66 @@ const RectUtils = {
         return isColliding;
     }
 };
+;
+/* -- js/UI/Core/IconSprite.js -- */
+// ─────────────────────────────────────────────────────────────────────────────
+// IconSprite — pulls images/icons/sprite.svg into the document so that every
+// <use href="#icon-name"> in the page resolves.
+//
+// The sprite lives in one file rather than inline in each page, so index.html
+// and ui-gallery.html share exactly one set of glyph definitions. Inlining it
+// (rather than referencing the file directly from `use`) is what lets CSS
+// `fill: currentColor` reach the symbols.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class IconSprite {
+    static PATH = 'images/icons/sprite.svg';
+    static HOST_ID = 'icon-sprite-host';
+    static loadPromise = null;
+
+    static load() {
+        if (this.loadPromise) return this.loadPromise;
+        if (document.getElementById(this.HOST_ID)) {
+            this.loadPromise = Promise.resolve(true);
+            return this.loadPromise;
+        }
+
+        this.loadPromise = fetch(this.PATH)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load icon sprite: ${response.status} ${response.statusText}`);
+                }
+                return response.text();
+            })
+            .then(markup => {
+                this.inject(markup);
+                return true;
+            })
+            .catch(error => {
+                console.error('[IconSprite] Failed to load icon sprite:', error);
+                return false;
+            });
+
+        return this.loadPromise;
+    }
+
+    static inject(markup) {
+        const host = document.createElement('div');
+        host.id = this.HOST_ID;
+        host.hidden = true;
+        // The sprite is authored markup, not user content — but parse it as a
+        // document rather than assigning innerHTML on a live node so that no
+        // scripts inside it could ever execute.
+        const parsed = new DOMParser().parseFromString(markup, 'image/svg+xml');
+        const sprite = parsed.querySelector('svg');
+        if (!sprite) throw new Error('Icon sprite contains no <svg> root.');
+
+        host.appendChild(document.importNode(sprite, true));
+        document.body.prepend(host);
+    }
+}
+
+IconSprite.load();
 ;
 /* -- js/UI/Core/TooltipSystem.js -- */
 class TooltipSystem {
@@ -5072,8 +5221,9 @@ function createDefaultSpeciesVoices() {
 			},
 			"obj_flower_rustle": {
 				type: "sfx",
-				baseVolume: 0.16,
-				variation: { volumeSteps: [0.92, 1] },
+				category: "footsteps",
+				baseVolume: 0.3,
+				variation: { pitchRange: 0.035, volumeSteps: [0.92, 1] },
 				create: () => {
 					const synth = new Tone.NoiseSynth({
 						noise: { type: "pink" },
@@ -7807,6 +7957,12 @@ class MyteCore {
             const shopDataLoaded = await ShopRegistry.preload();
             if (!shopDataLoaded) {
                 throw new Error('Failed to load shop metadata.');
+            }
+
+            this.loadingManager.setMessage("Mapping the world...");
+            const worldDataLoaded = await WorldGraph.preload();
+            if (!worldDataLoaded) {
+                throw new Error('Failed to load world metadata.');
             }
 
             this.loadingManager.setMessage("Loading action data...");
@@ -14465,6 +14621,73 @@ class Inventory {
         return removedQuantity > 0;
     }
 
+    // Newest stack of a variant — where a freshly added item landed.
+    getStackElement(nameOrVariant) {
+        const canonicalVariant = ItemRegistry.resolveIdSync(nameOrVariant) || ItemRegistry.normalizeId(nameOrVariant);
+        const matches = this.items.filter(item => item.variant === canonicalVariant);
+        return matches[matches.length - 1]?.element ?? null;
+    }
+
+    // Cosmetic only — the item is already in `this.items` by the time this runs.
+    // `sourceElement` is where the item came from on screen (a shop row sprite);
+    // omit it to just flash the slot.
+    playAcquisition(nameOrVariant, sourceElement = null) {
+        const targetElement = this.getStackElement(nameOrVariant);
+        if (!targetElement) return;
+
+        if (!sourceElement) {
+            this.flashItem(targetElement);
+            return;
+        }
+
+        this.flyItemTo(sourceElement, targetElement, () => this.flashItem(targetElement));
+    }
+
+    flashItem(itemElement) {
+        if (!itemElement) return;
+        itemElement.classList.remove('is-acquired');
+        // Restart the animation: without a reflow the class re-add is coalesced
+        // away and a second purchase of the same stack shows nothing.
+        void itemElement.offsetWidth;
+        itemElement.classList.add('is-acquired');
+        itemElement.addEventListener(
+            'animationend',
+            () => itemElement.classList.remove('is-acquired'),
+            { once: true }
+        );
+    }
+
+    flyItemTo(sourceElement, targetElement, onArrival) {
+        const from = sourceElement.getBoundingClientRect();
+        const to = targetElement.getBoundingClientRect();
+        if (!from.width || !to.width) {
+            onArrival?.();
+            return;
+        }
+
+        // Clone rather than rebuild: item sprites are spritesheet frames sized by
+        // per-element custom properties and a `zoom`, none of which survive being
+        // copied onto a plain div.
+        const sprite = sourceElement.cloneNode(true);
+        sprite.removeAttribute('id');
+        sprite.removeAttribute('draggable');
+        sprite.removeAttribute('tabindex');
+
+        const ghost = document.createElement('div');
+        ghost.className = 'item-acquisition-ghost';
+        ghost.style.left = `${from.left + (from.width / 2)}px`;
+        ghost.style.top = `${from.top + (from.height / 2)}px`;
+        ghost.style.setProperty('--fly-x', `${(to.left + (to.width / 2)) - (from.left + (from.width / 2))}px`);
+        ghost.style.setProperty('--fly-y', `${(to.top + (to.height / 2)) - (from.top + (from.height / 2))}px`);
+        ghost.appendChild(sprite);
+        document.body.appendChild(ghost);
+
+        ghost.addEventListener('animationend', () => {
+            ghost.remove();
+            onArrival?.();
+        }, { once: true });
+    }
+
     updateItemDisplay(item) {
         const quantityDisplay = item.element.querySelector('.item-quantity');
         if (quantityDisplay) {
@@ -15119,6 +15342,8 @@ class ContainerManager {
         this.inventory = null;
 
         this.transitionManager = new MapTransitionManager(this);
+        this.mytePresence = new MytePresenceManager(this);
+        this.travelManager = new MyteTravelManager(this);
         this.userIsActive = true;
 
         this._cachedCanvasRect = null;
@@ -15127,6 +15352,12 @@ class ContainerManager {
             this._cachedCanvasRect = null;
             this._cachedContainerRect = null;
             this.mytes.forEach(myte => myte.invalidateHomePositionCache?.());
+            // Re-frame against the new viewport. Without this the camera keeps
+            // the bounds it was clamped to at the old size, so a map smaller
+            // than the viewport stays pinned where it was and a larger one can
+            // sit outside its limits — visible whenever no myte is active,
+            // since character-follow otherwise re-centres every frame.
+            this.camera?.handleViewportResize();
         };
         // Window resize alone misses container size changes that happen without a
         // resize event (e.g. the is-fullscreen class applied from localStorage at
@@ -15961,10 +16192,96 @@ class ContainerManager {
             }
         });
 
+        this.travelManager?.tickUpdate(tickDelta);
+
         if (this.timeManager) this.timeManager.tickUpdate?.(tickDelta);
     }
 
+    getMapDisplayName(mapId) {
+        return this.core?.mapLoader?.getCachedMapDisplayName?.(mapId)
+            || this.core?.mapLoader?.humanizeMapId?.(mapId)
+            || String(mapId ?? 'somewhere');
+    }
 
+    // The map a myte is actually on: the one it is crossing, the one you are
+    // playing if it is out here with you, the one you left it standing on, or —
+    // failing all of those — its own map, where it is asleep in its slot.
+    getMyteMapId(myte) {
+        return this.mytePresence?.getMapId(myte) ?? myte?.homeMapId ?? null;
+    }
+
+    // Send a visiting myte back to its own map. It leaves the map now and is
+    // back in its slot once the walk finishes.
+    sendMyteHome(myte) {
+        const result = this.travelManager.requestReturn(myte);
+
+        if (result.ok) {
+            this.ui?.showMessage?.(
+                `${myte.name} is heading back to ${this.getMapDisplayName(result.destination)}.`,
+                'info',
+                'Heading Home'
+            );
+        }
+
+        return result;
+    }
+
+    // Summon a myte that lives on another map: it walks over rather than being
+    // unavailable. Returns the MyteTravelManager result so callers can report it.
+    summonMyte(myte) {
+        const result = this.travelManager.requestTravel(myte);
+        const displayName = mapId => this.getMapDisplayName(mapId);
+
+        if (result.ok) {
+            this.ui?.showMessage?.(
+                `${myte.name} is on its way from ${displayName(result.origin)} — about ${Utility.formatDuration(result.journey.duration)}.`,
+                'info',
+                'On the way'
+            );
+        } else if (result.reason === MYTE_TRAVEL_RESULTS.TOO_FAR) {
+            this.ui?.showMessage?.(
+                `${myte.name} is ${result.distance} maps away in ${displayName(result.origin)} — too far to walk here.`,
+                'warning',
+                'Too Far'
+            );
+        } else if (result.reason === MYTE_TRAVEL_RESULTS.UNREACHABLE) {
+            this.ui?.showMessage?.(
+                `${myte.name} can't find a route here from ${displayName(result.origin)}.`,
+                'warning',
+                'No Route'
+            );
+        } else if (result.reason === MYTE_TRAVEL_RESULTS.ALREADY_TRAVELLING) {
+            this.ui?.showMessage?.(`${myte.name} is already on the way.`, 'info', 'On the way');
+        }
+
+        return result;
+    }
+
+    // Walk the active myte to another map instead of jumping the camera there.
+    // It heads for the portal on the way, steps through it, and carries on until
+    // it arrives — the player can watch the whole trip, or take over at any
+    // point by giving it something else to do.
+    travelActiveMyteTo(mapId) {
+        const myte = this.activeMyte;
+        if (!myte) return { ok: false, reason: MYTE_TRAVEL_RESULTS.UNREACHABLE };
+
+        const result = this.travelManager.requestEscortedTravel(myte, mapId);
+        const displayName = this.getMapDisplayName(mapId);
+
+        if (result.ok) {
+            this.ui?.showMessage?.(
+                result.distance === 1
+                    ? `${myte.name} is heading for the way to ${displayName}.`
+                    : `${myte.name} is heading for ${displayName}, ${result.distance} maps away.`,
+                'info',
+                'On the way'
+            );
+        } else if (result.reason === MYTE_TRAVEL_RESULTS.UNREACHABLE) {
+            this.ui?.showMessage?.(`No route leads to ${displayName} from here.`, 'warning', 'No Route');
+        }
+
+        return result;
+    }
 
     dispose() {
         window.removeEventListener('resize', this._boundInvalidateCanvasRect);
@@ -15979,6 +16296,11 @@ class ContainerManager {
         });
         this.mytes = [];
         this.activeMyte = null;
+
+        this.travelManager?.dispose();
+        this.travelManager = null;
+        this.mytePresence?.dispose();
+        this.mytePresence = null;
 
         if (this.camera) {
             this.camera.dispose();
@@ -19642,7 +19964,10 @@ class Myte {
 		const {
 			goal = this.goal,
 			followGoal = this.followGoal,
-			autonomyGoal = this.autonomyGoal
+			autonomyGoal = this.autonomyGoal,
+			// A myte arriving from another map steps out of a portal, not out of
+			// its slot — its slot isn't on this map at all.
+			snapToHome = true
 		} = options;
 
 		this.isActive = true;
@@ -19659,13 +19984,13 @@ class Myte {
 		this.cancelInactivityFreeRoam();
 		this.resetGoHomeState();
 		this.footstepController?.reset?.();
-		this.snapToHomePosition();
+		if (snapToHome) this.snapToHomePosition();
 		this.posZ = 0;
 		this.physicsController?.reset?.();
 		const homeSlotDirection = this.getHomeSlotDirection();
 		this.setDirection(homeSlotDirection);
 		this.stateMachine?.resetToIdle?.(homeSlotDirection);
-		this.playSlotExitSound();
+		if (snapToHome) this.playSlotExitSound();
 
 		this.syncSelectionState();
 		if (this.isActiveMyte) {
@@ -19791,7 +20116,26 @@ class Myte {
 		};
 	}
 
+	// Whether the map being played is the one this myte's home slot sits on.
+	// Off its home map the slot is detached from the DOM, so every home-relative
+	// behaviour has to be suppressed.
+	get isOnHomeMap() {
+		const currentMapId = this.parent?.gameMap?.id;
+		return !currentMapId || !this.homeMapId || this.homeMapId === currentMapId;
+	}
+
+	// Deployed on a map that isn't its own — it walked over to visit.
+	get isVisiting() {
+		return this.isActive && !this.isOnHomeMap;
+	}
+
 	getHomePosition() {
+		// A detached slot measures as (0, 0), which would drag the myte to the map
+		// corner. Its current spot is the honest answer.
+		if (!this.isOnHomeMap) {
+			return { x: this.posX, y: this.posY };
+		}
+
 		// Derived from DOM layout (getLocalOffset walks offsetParents), so cache it —
 		// AI thinks and GOHOME movement read this constantly. Invalidated whenever the
 		// slot element moves (setWrapperPosition, map transitions, container resize).
@@ -22195,7 +22539,7 @@ class MyteAI {
 
 		this._lastBubblePrefix = prefix;
 		this._lastBubbleTime = now;
-		this.myte.dialogue?.showMessage(icon, 'thought');
+		this.myte.dialogue?.showIcon(icon, 'thought');
 	}
 
     selectCandidate(candidates) {
@@ -24987,6 +25331,15 @@ class MyteDialogue {
         }
     }
 
+    // A wordless bubble: `name` is a sprite symbol, not text to read.
+    showIcon(name, style = 'thought') {
+        this.messageQueue.push({ text: '', icon: name, style });
+
+        if (!this.isDisplaying) {
+            this.displayNextMessage();
+        }
+    }
+
     // Display the next message in the queue
     async displayNextMessage() {
         if (this.isDestroyed || this.messageQueue.length === 0 || this.isDisplaying) {
@@ -24994,7 +25347,7 @@ class MyteDialogue {
         }
 
 
-        const { text, style } = this.messageQueue.shift();
+        const { text, icon, style } = this.messageQueue.shift();
         this.isDisplaying = true;
 
         // Remove all style classes first
@@ -25003,7 +25356,7 @@ class MyteDialogue {
         this.dialogue.classList.add(style);
 
         // Update text and show dialogue
-        this.textElement.textContent = text;
+        Utility.renderIconLabel(this.textElement, icon, text);
         await this.wait(50); // Small delay before showing
         this.dialogue.classList.add('is-visible');
 
@@ -31579,6 +31932,10 @@ class Camera {
 		this.useInstantMovement = false;
 		this.limitToBounds = false;
 
+		// Last viewport size the camera framed against — needed to work out which
+		// world point was centred before a resize.
+		this._viewportSize = null;
+
 		// Drag
 		this.isDragging = false;
 		this.dragStartX = 0;
@@ -31831,6 +32188,35 @@ class Camera {
 		}
 
 		return targetZoom;
+	}
+
+	// The viewport changed size (window resize, fullscreen toggle). Re-frame so
+	// the world point that was centred stays centred and the map is re-clamped
+	// to the new bounds — which is what centres a map smaller than the viewport
+	// instead of leaving it pinned to the left.
+	//
+	// Always immediate: the player didn't move the camera, the window moved
+	// under it. Easing here reads as the map drifting on its own.
+	handleViewportResize() {
+		const viewportRect = this.parent.getContainerRect();
+		const canvasRect = this.parent.getCanvasRect();
+		// Before the first map exists there is nothing to frame, and clamping
+		// against a zero-size canvas would throw the camera across the stage.
+		if (!viewportRect?.width || !viewportRect?.height) return;
+		if (!canvasRect?.width || !canvasRect?.height) return;
+
+		const previous = this._viewportSize ?? viewportRect;
+		this._viewportSize = { width: viewportRect.width, height: viewportRect.height };
+
+		this.zoomTo(this.zoomLevel, {
+			immediate: true,
+			anchor: {
+				screenX: viewportRect.width / 2,
+				screenY: viewportRect.height / 2,
+				worldX: (previous.width / 2) / this.zoomLevel - this.posX,
+				worldY: (previous.height / 2) / this.zoomLevel - this.posY
+			}
+		});
 	}
 
 	zoomBy(delta, options = {}) {
@@ -32668,6 +33054,300 @@ class GameMapLoader {
             this.currentMap = previousMap;
             throw error;
         }
+    }
+}
+;
+/* -- js/Map/WorldGraph.js -- */
+// ─────────────────────────────────────────────────────────────────────────────
+// WorldGraph — how the maps of the world connect to each other.
+//
+// A map file describes itself completely: its `region` and `worldX`/`worldY`
+// place it on the world map, its Portal objects say what it connects to, and its
+// Spawn objects say where a traveller arrives. So the graph is *discovered*
+// rather than declared — start at the default map, read its portals, follow them
+// into their targets, and repeat. Adding a connected map to the world is a
+// matter of dropping the .tmx in and pointing a portal at it.
+//
+// There is no world manifest to keep in step: a map is part of the world when
+// something opens onto it, which is the same rule the player experiences. A map
+// nothing links to is not in the world graph — it can still be loaded directly,
+// it just isn't anywhere yet. Portals are treated as bidirectional when both
+// sides declare each other, and one-way otherwise.
+//
+// Distance is hop count — the number of map transitions a traveller makes —
+// which is what "is this myte too far away to walk over?" actually means.
+//
+// Each map's geometry comes out of the same .tmx pass: map size, portal centres,
+// spawn points. That is what lets a journey be measured in the ground a
+// traveller actually has to cover — the walk from the portal it came in by to
+// the portal it is leaving through — rather than a flat per-map timer, and it
+// works for maps that are not loaded, which is most of them.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class WorldGraph {
+    static nodes = new Map();
+    static edges = new Map();
+    static geometry = new Map();
+    static preloaded = false;
+    static preloadPromise = null;
+
+    static normalizeId(mapId) {
+        return String(mapId || '').replace(/\.tmx$/i, '');
+    }
+
+    static async preload() {
+        if (this.preloaded) return true;
+        if (this.preloadPromise) return this.preloadPromise;
+
+        this.preloadPromise = (async () => {
+            await this.discover();
+            this.preloaded = true;
+            return true;
+        })();
+
+        return this.preloadPromise;
+    }
+
+    // Walk out from the starting maps through every portal, reading each map file
+    // once. Whatever a portal points at becomes part of the world, so long as the
+    // file is really there — a typo in a targetMap leaves an edge to nowhere
+    // rather than inventing a map.
+    static async discover(startingMaps = [SiteConfig.world.defaultMap]) {
+        this.nodes.clear();
+        this.edges.clear();
+        this.geometry.clear();
+
+        const seeds = startingMaps.map(id => this.normalizeId(id)).filter(Boolean);
+        const pending = [...new Set(seeds)];
+        const visited = new Set(pending);
+
+        while (pending.length > 0) {
+            // One frontier at a time, so sibling maps are read in parallel.
+            const frontier = await Promise.all(
+                pending.splice(0).map(async id => [id, await this._readMapGeometry(id)])
+            );
+
+            frontier.forEach(([mapId, geometry]) => {
+                if (!geometry) {
+                    visited.delete(mapId);
+                    return;
+                }
+
+                this.geometry.set(mapId, geometry);
+                this.nodes.set(mapId, Object.freeze({
+                    id: mapId,
+                    region: geometry.region,
+                    displayName: geometry.displayName,
+                    layout: geometry.layout
+                }));
+                this.edges.set(mapId, new Map());
+
+                geometry.portals.forEach(portal => {
+                    if (visited.has(portal.targetMap)) return;
+                    visited.add(portal.targetMap);
+                    pending.push(portal.targetMap);
+                });
+            });
+        }
+
+        // Edges last: a portal only counts once the map it points at is known.
+        this.geometry.forEach((geometry, mapId) => {
+            geometry.portals.forEach(portal => {
+                if (!this.nodes.has(portal.targetMap)) return;
+                this.edges.get(mapId).set(portal.targetMap, portal);
+            });
+        });
+    }
+
+    static _emptyGeometry() {
+        return Object.freeze({
+            width: 0,
+            height: 0,
+            region: 'world',
+            displayName: '',
+            layout: Object.freeze({ x: 0, y: 0 }),
+            portals: Object.freeze([]),
+            spawns: new Map()
+        });
+    }
+
+    // Everything the world needs to know about a map, straight from the map: how
+    // big it is, where it sits on the world map, what it connects to and where a
+    // traveller arrives. Returns null when there is no such map file, which is
+    // how a portal pointing at nothing is told apart from an empty map.
+    static async _readMapGeometry(mapId) {
+        try {
+            const response = await fetch(`${AppConfig.content.mapsPath}/${mapId}.tmx`);
+            if (!response.ok) return null;
+
+            const xml = new DOMParser().parseFromString(await response.text(), 'text/xml');
+            const number = (node, attribute) => Number(node?.getAttribute(attribute)) || 0;
+            const mapNode = xml.querySelector('map');
+            if (!mapNode || xml.querySelector('parsererror')) return null;
+
+            // The map's own <properties>, walked as direct children rather than
+            // queried: a selector would happily reach down into an object's
+            // properties instead, and `:scope` is unreliable across XML parsers.
+            const mapProperties = new Map();
+            [...mapNode.children]
+                .filter(child => child.tagName === 'properties')
+                .forEach(properties => {
+                    [...properties.children].forEach(property => {
+                        mapProperties.set(property.getAttribute('name'), property.getAttribute('value'));
+                    });
+                });
+            const mapProperty = key => mapProperties.get(key) ?? null;
+
+            const portals = [];
+            const spawns = new Map();
+
+            [...xml.querySelectorAll('objectgroup > object')].forEach(node => {
+                const name = node.getAttribute('name');
+                if (name !== 'Portal' && name !== 'Spawn') return;
+
+                const property = key => node.querySelector(`property[name="${key}"]`)?.getAttribute('value') || null;
+                const center = Object.freeze({
+                    x: number(node, 'x') + number(node, 'width') / 2,
+                    y: number(node, 'y') + number(node, 'height') / 2
+                });
+
+                if (name === 'Spawn') {
+                    spawns.set(property('type') || 'default', center);
+                    return;
+                }
+
+                const targetMap = this.normalizeId(property('targetMap'));
+                if (!targetMap) return;
+
+                portals.push(Object.freeze({
+                    portalId: property('portalId'),
+                    targetMap,
+                    targetPortalId: property('targetPortalId'),
+                    center
+                }));
+            });
+
+            return Object.freeze({
+                width: number(mapNode, 'width') * number(mapNode, 'tilewidth'),
+                height: number(mapNode, 'height') * number(mapNode, 'tileheight'),
+                region: mapProperty('region') || 'world',
+                displayName: mapProperty('displayName') || mapProperty('name') || '',
+                layout: Object.freeze({
+                    x: Number(mapProperty('worldX')) || 0,
+                    y: Number(mapProperty('worldY')) || 0
+                }),
+                portals: Object.freeze(portals),
+                spawns
+            });
+        } catch (error) {
+            Utility.warnDebug(`[WorldGraph] Could not read geometry for ${mapId}:`, error);
+            return null;
+        }
+    }
+
+    static getGeometry(mapId) {
+        return this.geometry.get(this.normalizeId(mapId)) ?? this._emptyGeometry();
+    }
+
+    // The portal on `mapId` that leads to `targetMapId`, as the map file knows
+    // it — available whether or not that map is the one currently loaded.
+    static getPortalTo(mapId, targetMapId) {
+        return this.edges.get(this.normalizeId(mapId))?.get(this.normalizeId(targetMapId)) ?? null;
+    }
+
+    // Where a traveller stands when it arrives on `mapId` from `fromMapId`: the
+    // portal facing back the way it came, or the spawn point when it is starting
+    // out rather than arriving.
+    static getEntryPoint(mapId, fromMapId = null) {
+        const geometry = this.getGeometry(mapId);
+        const back = fromMapId ? this.getPortalTo(mapId, fromMapId) : null;
+        return back?.center
+            ?? geometry.spawns.get('myte')
+            ?? geometry.spawns.get('default')
+            ?? { x: geometry.width / 2, y: geometry.height / 2 };
+    }
+
+    // How far a traveller walks to cross `mapId` on its way from `fromMapId` to
+    // `toMapId`, in map pixels. Straight-line: obstacles make the real path
+    // longer, but this is a schedule, not a simulation.
+    static getCrossingDistance(mapId, fromMapId, toMapId) {
+        const entry = this.getEntryPoint(mapId, fromMapId);
+        const exit = this.getPortalTo(mapId, toMapId)?.center;
+        if (!exit) return 0;
+        return Math.hypot(exit.x - entry.x, exit.y - entry.y);
+    }
+
+    static getMaps() {
+        return [...this.nodes.values()];
+    }
+
+    static getMap(mapId) {
+        return this.nodes.get(this.normalizeId(mapId)) || null;
+    }
+
+    // Every edge as a flat list, for a world-map view to draw lines from.
+    static getConnections() {
+        const connections = [];
+        this.edges.forEach((targets, fromMapId) => {
+            targets.forEach((portal, toMapId) => {
+                connections.push({
+                    from: fromMapId,
+                    to: toMapId,
+                    portalId: portal.portalId,
+                    // A link is two-way only when the far side also points back.
+                    bidirectional: this.edges.get(toMapId)?.has(fromMapId) ?? false
+                });
+            });
+        });
+        return connections;
+    }
+
+    static getNeighbors(mapId) {
+        return [...(this.edges.get(this.normalizeId(mapId))?.keys() ?? [])];
+    }
+
+    // Shortest sequence of maps from `fromMapId` to `toMapId`, inclusive of both.
+    // Returns null when the two are not connected. Breadth-first: every edge is
+    // one transition, so the first path found is the shortest.
+    static getRoute(fromMapId, toMapId) {
+        const from = this.normalizeId(fromMapId);
+        const to = this.normalizeId(toMapId);
+        if (!this.nodes.has(from) || !this.nodes.has(to)) return null;
+        if (from === to) return [from];
+
+        const cameFrom = new Map([[from, null]]);
+        const queue = [from];
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+
+            for (const neighbor of this.getNeighbors(current)) {
+                if (cameFrom.has(neighbor)) continue;
+                cameFrom.set(neighbor, current);
+
+                if (neighbor === to) {
+                    const route = [];
+                    for (let step = to; step !== null; step = cameFrom.get(step)) {
+                        route.unshift(step);
+                    }
+                    return route;
+                }
+
+                queue.push(neighbor);
+            }
+        }
+
+        return null;
+    }
+
+    // Number of map transitions between two maps, or Infinity when unreachable.
+    static getDistance(fromMapId, toMapId) {
+        const route = this.getRoute(fromMapId, toMapId);
+        return route ? route.length - 1 : Infinity;
+    }
+
+    static areConnected(fromMapId, toMapId) {
+        return Number.isFinite(this.getDistance(fromMapId, toMapId));
     }
 }
 ;
@@ -38162,6 +38842,23 @@ class MapTransitionManager {
         });
     }
 
+    // Re-place every myte home slot for `map` — resident slots into the object
+    // layer around the spawn point, non-resident slots detached. Public because
+    // relocating a myte's home between maps needs the same placement pass.
+    syncMyteHomeSlots(map = this.container.gameMap) {
+        this._syncAllMyteSlotsToSpawn(map);
+    }
+
+    // Where a myte arriving from `sourceMapId` should appear on `map` — the
+    // portal that leads back there when there is one, else the spawn point.
+    resolveArrivalFrom(myte, sourceMapId, map = this.container.gameMap) {
+        return this._resolveArrivalDestination(map, { myte, sourceMapId });
+    }
+
+    placeMyteAtArrival(myte, arrival) {
+        this._applyMyteArrival(myte, arrival);
+    }
+
     _prepareMyteForTransition(myte) {
         if (!myte) return;
         myte.queue?.clear?.();
@@ -38327,6 +39024,16 @@ class MapTransitionManager {
             return this._finishSuccessfulTransition(options, isInitialLoad);
         }
 
+        // A portal takes whoever walked into it, and nobody else. Every other
+        // deployed myte stays on the map being left, standing where it stands,
+        // until the player comes back for it.
+        if (!isInitialLoad) {
+            this.container.mytePresence?.parkOthers(
+                sourceMapId,
+                options.myte ?? this.container.activeMyte ?? null
+            );
+        }
+
         let newMap;
         let loadError = null;
 
@@ -38430,6 +39137,9 @@ class MapTransitionManager {
                 }
             }
 
+            // Anyone left standing on this map last time is still standing there.
+            this.container.mytePresence?.restoreOn(newMap.id);
+
             await this._waitForRevealReadiness(newMap, mapId);
 
             return this._finishSuccessfulTransition(options, isInitialLoad);
@@ -38521,6 +39231,973 @@ class MapTransitionManager {
         }
         this.transitionElement = null;
         this.messageElement = null;
+    }
+}
+;
+/* -- js/Map/MytePresenceManager.js -- */
+// ─────────────────────────────────────────────────────────────────────────────
+// MytePresenceManager — where each myte is, and whether that is here.
+//
+// Only one map is loaded at a time, but mytes exist on all of them. Three states
+// cover it: in its home slot, deployed on the map being played, or *parked* —
+// deployed on some other map, waiting for you to come back to it.
+//
+// Parking is what makes portals behave. A myte follows you through a portal only
+// if it is the one that walked into it; anyone else you had out stays on the map
+// you left, standing where you left them, and is put back exactly there when you
+// return. Without it every deployed myte teleported along with the camera.
+//
+// The DOM side of "off the map" lives here too, because a parked myte, a myte
+// crossing a map it hasn't reached yet, and a myte visiting somewhere you are
+// not all need the same thing: hidden, not ticking, and not pretending to be
+// tucked up in a home slot it is nowhere near.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class MytePresenceManager {
+    constructor(container) {
+        this.container = container;
+        this.parked = new Map();
+    }
+
+    // ── Where is it? ─────────────────────────────────────────────────────────
+
+    // The map a myte is standing on, or null when it is in its slot at home.
+    getMapId(myte) {
+        const travelling = this.container?.travelManager?.getCurrentLegMapId?.(myte);
+        if (travelling) return travelling;
+        if (this.parked.has(myte)) return this.parked.get(myte).mapId;
+        if (myte?.isActive) return this.container?.gameMap?.id ?? null;
+        return null;
+    }
+
+    isParked(myte) {
+        return this.parked.has(myte);
+    }
+
+    forget(myte) {
+        return this.parked.delete(myte);
+    }
+
+    clear() {
+        this.parked.clear();
+    }
+
+    // ── Being on and off the map ─────────────────────────────────────────────
+
+    // Whether the home slot renders as holding this myte. `startWithOptions` and
+    // `stop` normally own these classes, but a myte that is out on a map the
+    // player isn't looking at belongs to neither.
+    setSlotOccupied(myte, occupied) {
+        myte?.element?.classList.toggle('is-deactivated', !occupied);
+        myte?.elements?.wrapper?.classList.toggle('empty', !occupied);
+    }
+
+    // Take a myte off the loaded map without sending it home: it is still out
+    // there, just not here. `stop()` would snap it into a slot that may be on a
+    // different map entirely.
+    takeOffMap(myte) {
+        if (!myte) return;
+
+        if (this.container.activeMyte === myte) {
+            this.container.deactivateActiveMyte(myte);
+        }
+
+        myte.queue?.clear?.();
+        myte.clearHomeSlotHold?.();
+        myte.cancelInactivityFreeRoam?.();
+        myte.isActive = false;
+        myte.duplicate?.classList.add('is-deactivated');
+        this.setSlotOccupied(myte, false);
+    }
+
+    // ── Parking ──────────────────────────────────────────────────────────────
+
+    // Leaving `mapId`: everyone out except `traveller` stays behind on it.
+    // Travellers are left alone — the travel manager is already accounting for
+    // where they are, leg by leg.
+    parkOthers(mapId, traveller = null) {
+        if (!mapId) return;
+
+        this.container.mytes?.forEach(myte => {
+            if (myte === traveller || !myte.isActive) return;
+            if (this.container.travelManager?.isTravelling(myte)) return;
+            this.park(myte, mapId);
+        });
+    }
+
+    park(myte, mapId) {
+        this.parked.set(myte, {
+            mapId,
+            x: myte.posX,
+            y: myte.posY,
+            goal: myte.goal,
+            followGoal: myte.followGoal,
+            autonomyGoal: myte.autonomyGoal
+        });
+        this.takeOffMap(myte);
+    }
+
+    // Arriving on `mapId`: put back everyone who was left standing on it.
+    restoreOn(mapId) {
+        if (!mapId) return;
+
+        [...this.parked.entries()].forEach(([myte, parked]) => {
+            if (parked.mapId !== mapId) return;
+            this.parked.delete(myte);
+
+            // Refused (recovering, say) — it stays off the map rather than being
+            // put back in a state it can't be in.
+            const restored = myte.startWithOptions({
+                goal: parked.goal,
+                followGoal: parked.followGoal,
+                autonomyGoal: parked.autonomyGoal,
+                snapToHome: false
+            });
+            if (!restored) return;
+
+            myte.clearHomeSlotHold?.();
+            myte.setPosition(parked.x, parked.y);
+            myte.setTarget(parked.x, parked.y);
+            myte.setSpritePosition(parked.x, parked.y);
+        });
+    }
+
+    dispose() {
+        this.parked.clear();
+        this.container = null;
+    }
+}
+;
+/* -- js/Map/RouteTravelManager.js -- */
+// ─────────────────────────────────────────────────────────────────────────────
+// RouteTravelManager — anyone walking across the world to somewhere else.
+//
+// A journey is a sequence of legs along a WorldGraph route: on each leg the
+// traveller is *in* `route[legIndex]` and heading for `route[legIndex + 1]`,
+// crossing it by walking from the portal it came in by to the portal it is
+// leaving through. It is genuinely somewhere the whole time, which is what
+// makes meeting it in transit possible:
+//
+//   • Whenever the leg's map is the one being played, the traveller is deployed
+//     on it and walks to the portal it is heading for. Follow the route and you
+//     will meet it crossing.
+//   • On any other map it simulates as a timer, because only one map is loaded.
+//     The timer is the real walk measured off the map file — how far apart the
+//     two portals are, divided by how fast the traveller moves — so crossing a
+//     map off-screen takes as long as crossing it on-screen.
+//
+// Two kinds of journey, sharing all of the above:
+//
+//   • Simulated — the traveller is not with the player. This manager deploys and
+//     withdraws it as the played map changes, and steps it to the next leg
+//     itself when it reaches the exit portal (or when the timer says it did).
+//   • Escorted — the traveller *is* the player's active myte, so the portals do
+//     the transitions for real. Nothing is deployed or withdrawn; the manager
+//     just keeps pointing it at the next portal and follows along, re-routing if
+//     the player wanders off through a different one.
+//
+// Subclasses supply what it means for their kind of traveller to be put on a
+// map, taken off it, and told to walk somewhere. Mytes do this through their
+// action queue and home slots; an NPC on a daily schedule would do the same
+// through whatever moves it. The route, the legs, the timing and the portal
+// bookkeeping are the same problem for both and live here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ROUTE_TRAVEL_RESULTS = Object.freeze({
+    STARTED: 'started',
+    ALREADY_HERE: 'alreadyHere',
+    ALREADY_TRAVELLING: 'alreadyTravelling',
+    UNREACHABLE: 'unreachable',
+    TOO_FAR: 'tooFar'
+});
+
+const ROUTE_TRAVEL_DIRECTIONS = Object.freeze({
+    VISIT: 'visit',
+    RETURN: 'return'
+});
+
+class RouteTravelManager {
+    constructor(container) {
+        this.container = container;
+        this.journeys = new Map();
+    }
+
+    get config() {
+        return SiteConfig.world.travel;
+    }
+
+    get currentMapId() {
+        return this.container?.gameMap?.id ?? null;
+    }
+
+    isTravelling(traveller) {
+        return this.journeys.has(traveller);
+    }
+
+    getJourney(traveller) {
+        return this.journeys.get(traveller) ?? null;
+    }
+
+    getDirection(traveller) {
+        return this.getJourney(traveller)?.direction ?? null;
+    }
+
+    isEscorting(traveller) {
+        return this.getJourney(traveller)?.escorted === true;
+    }
+
+    // Travelling out of the player's hands, as opposed to an escort — which is
+    // the player walking it somewhere and leaves it entirely theirs.
+    isTravellingAlone(traveller) {
+        const journey = this.getJourney(traveller);
+        return !!journey && !journey.escorted;
+    }
+
+    // The map a traveller is currently crossing.
+    getCurrentLegMapId(traveller) {
+        const journey = this.getJourney(traveller);
+        return journey ? journey.route[journey.legIndex] : null;
+    }
+
+    getDestination(traveller) {
+        return this.getJourney(traveller)?.destination ?? null;
+    }
+
+    // ── Journey lifecycle ────────────────────────────────────────────────────
+
+    startJourney(traveller, origin, destination, options = {}) {
+        const {
+            direction = ROUTE_TRAVEL_DIRECTIONS.VISIT,
+            escorted = false,
+            maxDistance = this.config.maxDistance
+        } = options;
+
+        if (!traveller || !origin || !destination) {
+            return { ok: false, reason: ROUTE_TRAVEL_RESULTS.UNREACHABLE, origin, destination, direction };
+        }
+
+        if (this.isTravelling(traveller)) {
+            return {
+                ok: false,
+                reason: ROUTE_TRAVEL_RESULTS.ALREADY_TRAVELLING,
+                journey: this.getJourney(traveller),
+                direction
+            };
+        }
+
+        if (origin === destination) {
+            return { ok: false, reason: ROUTE_TRAVEL_RESULTS.ALREADY_HERE, origin, destination, direction };
+        }
+
+        const route = WorldGraph.getRoute(origin, destination);
+        if (!route) {
+            return { ok: false, reason: ROUTE_TRAVEL_RESULTS.UNREACHABLE, origin, destination, direction };
+        }
+
+        const distance = route.length - 1;
+        if (Number.isFinite(maxDistance) && distance > maxDistance) {
+            return { ok: false, reason: ROUTE_TRAVEL_RESULTS.TOO_FAR, origin, destination, route, distance, direction };
+        }
+
+        const now = SimClock.now();
+        const legs = this.measureRoute(traveller, route);
+        const journey = {
+            traveller,
+            origin,
+            destination,
+            route,
+            legs,
+            distance,
+            direction,
+            escorted,
+            legIndex: 0,
+            // SimClock: travel is gameplay time and must pause with the tab.
+            startedAt: now,
+            legStartedAt: now,
+            duration: legs.reduce((total, leg) => total + leg.duration, 0),
+            elapsedBeforeLeg: 0,
+            lastProgressAt: now,
+            isOnStage: false,
+            // Where it had got to when the player last walked out on it.
+            stagePosition: null
+        };
+
+        this.journeys.set(traveller, journey);
+        this.onJourneyStarted(journey);
+        this.syncPresence(journey);
+        this.startLeg(journey);
+
+        return {
+            ok: true,
+            reason: ROUTE_TRAVEL_RESULTS.STARTED,
+            journey, origin, destination, route, distance, direction
+        };
+    }
+
+    // How long each map on the route actually takes to walk across, measured off
+    // the map files so it holds for maps that are not loaded. Falls back to the
+    // flat per-map duration only when a map's geometry says nothing useful.
+    measureRoute(traveller, route) {
+        const speed = Math.max(this.getTravellerSpeed(traveller), 0.001);
+        const minimum = this.config.minLegDuration ?? 0;
+
+        return route.slice(0, -1).map((mapId, index) => {
+            const distance = WorldGraph.getCrossingDistance(mapId, route[index - 1] ?? null, route[index + 1]);
+            const duration = distance > 0
+                ? Math.max(distance / speed, minimum)
+                : this.config.durationPerMap;
+            return { mapId, from: route[index - 1] ?? null, to: route[index + 1], distance, duration };
+        });
+    }
+
+    getLeg(journey) {
+        return journey.legs[journey.legIndex] ?? null;
+    }
+
+    getLegDuration(journey) {
+        return this.getLeg(journey)?.duration ?? this.config.durationPerMap;
+    }
+
+    cancelTravel(traveller, { keepDeployed = false } = {}) {
+        const journey = this.journeys.get(traveller);
+        if (!journey) return false;
+
+        this.journeys.delete(traveller);
+        if (!keepDeployed) this.withdrawFromMap(journey);
+        this.onJourneyAbandoned(journey, { keepDeployed });
+        this.refreshUi();
+        return true;
+    }
+
+    getProgress(traveller) {
+        const journey = this.getJourney(traveller);
+        if (!journey || journey.duration <= 0) return 1;
+        const elapsed = journey.elapsedBeforeLeg + (SimClock.now() - journey.legStartedAt);
+        return Utility.clamp(elapsed / journey.duration, 0, 1);
+    }
+
+    getRemainingTime(traveller) {
+        const journey = this.getJourney(traveller);
+        if (!journey) return 0;
+        return Math.max(0, journey.duration * (1 - this.getProgress(traveller)));
+    }
+
+    // ── Ticking ──────────────────────────────────────────────────────────────
+
+    tickUpdate() {
+        if (this.journeys.size === 0) return;
+
+        const now = SimClock.now();
+        // Snapshot: completing a journey mutates the map being iterated.
+        [...this.journeys.values()].forEach(journey => {
+            if (this.shouldAbandon(journey)) {
+                this.cancelTravel(journey.traveller, { keepDeployed: true });
+                return;
+            }
+
+            if (journey.escorted) {
+                this.tickEscortedJourney(journey, now);
+                return;
+            }
+
+            this.syncPresence(journey);
+
+            if (this.hasFinishedLeg(journey, now)) {
+                this.advanceLeg(journey, now);
+                return;
+            }
+
+            // It stopped for some reason — a cleared queue, a shove, a nap that
+            // ended. It is on its way somewhere, so send it on again.
+            if (journey.isOnStage && this.isIdle(journey.traveller)) {
+                this.walkToExitPortal(journey);
+            }
+
+            this.emitProgress(journey, now);
+        });
+    }
+
+    // The player is walking the route themselves, so the portals move them for
+    // real: a leg ends when the map they are standing in becomes the next one.
+    tickEscortedJourney(journey, now) {
+        const currentMapId = this.currentMapId;
+        if (!currentMapId) return;
+
+        if (currentMapId === journey.destination) {
+            this.completeJourney(journey);
+            return;
+        }
+
+        if (currentMapId !== journey.route[journey.legIndex]) {
+            const legIndex = journey.route.indexOf(currentMapId);
+            if (legIndex >= 0) {
+                // Straight on to the next map of the route.
+                journey.elapsedBeforeLeg += now - journey.legStartedAt;
+                journey.legIndex = legIndex;
+                journey.legStartedAt = now;
+                this.startLeg(journey);
+            } else if (!this.rerouteFrom(journey, currentMapId, now)) {
+                // Off the map graph entirely — nothing sensible left to escort.
+                this.cancelTravel(journey.traveller, { keepDeployed: true });
+            }
+            return;
+        }
+
+        // Only nudge an idle traveller: an escorted myte is still the player's,
+        // and their orders come first.
+        if (this.isIdle(journey.traveller)) {
+            this.walkToExitPortal(journey);
+        }
+
+        this.emitProgress(journey, now);
+    }
+
+    // The player took a different portal. Keep the destination, redraw the route
+    // from wherever they have ended up.
+    rerouteFrom(journey, mapId, now) {
+        const route = WorldGraph.getRoute(mapId, journey.destination);
+        if (!route) return false;
+
+        journey.route = route;
+        journey.legs = this.measureRoute(journey.traveller, route);
+        journey.distance = route.length - 1;
+        journey.legIndex = 0;
+        journey.legStartedAt = now;
+        journey.elapsedBeforeLeg = 0;
+        journey.duration = journey.legs.reduce((total, leg) => total + leg.duration, 0);
+        journey.stagePosition = null;
+        this.startLeg(journey);
+        return true;
+    }
+
+    // A leg is done when the traveller is actually standing at the portal it was
+    // walking to. Off-stage it cannot be watched, so the measured crossing time
+    // stands in for the walk; on-stage the timer is only a backstop for a
+    // traveller that has somehow been stopped from getting there.
+    hasFinishedLeg(journey, now) {
+        if (journey.isOnStage) {
+            if (this.hasReachedExitPortal(journey)) return true;
+            return now - journey.legStartedAt >= this.getLegDuration(journey) * 3;
+        }
+
+        return now - journey.legStartedAt >= this.getLegDuration(journey);
+    }
+
+    hasReachedExitPortal(journey) {
+        const traveller = journey.traveller;
+        const portal = this.findExitPortal(journey);
+        if (!portal) return false;
+
+        const center = portal.getPortalCenter?.() ?? { x: portal.posX, y: portal.posY };
+        const position = this.getTravellerCenter(traveller);
+        const radius = portal.getInteractionRadius?.() ?? this.config.portalArrivalRadius ?? 48;
+        return Math.hypot(center.x - position.x, center.y - position.y) <= radius;
+    }
+
+    // One map crossed: step through the portal into the next map on the route.
+    advanceLeg(journey, now) {
+        this.withdrawFromMap(journey);
+
+        journey.elapsedBeforeLeg += now - journey.legStartedAt;
+        journey.legIndex++;
+        journey.legStartedAt = now;
+
+        if (journey.legIndex >= journey.route.length - 1) {
+            this.completeJourney(journey);
+            return;
+        }
+
+        this.syncPresence(journey);
+        this.startLeg(journey);
+        this.refreshUi();
+    }
+
+    startLeg(journey) {
+        this.onLegStarted(journey);
+        if (journey.escorted || journey.isOnStage) this.walkToExitPortal(journey);
+    }
+
+    completeJourney(journey) {
+        this.journeys.delete(journey.traveller);
+        this.onJourneyArrived(journey);
+    }
+
+    emitProgress(journey, now) {
+        if (now - journey.lastProgressAt < this.config.progressInterval) return;
+        journey.lastProgressAt = now;
+        this.emit('travel_progress', {
+            journey,
+            progress: this.getProgress(journey.traveller)
+        });
+    }
+
+    // ── Presence ─────────────────────────────────────────────────────────────
+
+    // Deploy or withdraw the traveller so that it is on screen exactly when the
+    // player is standing in the map it is crossing. Escorted travellers are the
+    // player's own and are never moved on or off by this.
+    syncPresence(journey) {
+        if (journey.escorted) return;
+
+        const shouldBeOnStage = this.getCurrentLegMapId(journey.traveller) === this.currentMapId;
+        if (shouldBeOnStage === journey.isOnStage) return;
+
+        if (shouldBeOnStage) {
+            this.placeOnStage(journey);
+        } else {
+            this.withdrawFromMap(journey);
+        }
+    }
+
+    placeOnStage(journey) {
+        if (!this.container?.gameMap) return;
+        if (!this.deployTraveller(journey)) return;
+
+        // Coming back to a leg already in progress: resume where it had got to.
+        // Re-placing it at the entrance every time the player looks in would
+        // mean it never appears to get anywhere.
+        const resumed = journey.stagePosition?.legIndex === journey.legIndex
+            ? journey.stagePosition
+            : null;
+
+        if (resumed) {
+            this.moveTravellerTo(journey.traveller, resumed.x, resumed.y);
+        } else {
+            this.placeArrivingFrom(journey.traveller, journey.route[journey.legIndex - 1] ?? null);
+            this.settleIntoLeg(journey);
+        }
+
+        journey.isOnStage = true;
+        this.walkToExitPortal(journey);
+    }
+
+    getLegProgress(journey) {
+        const duration = this.getLegDuration(journey);
+        if (duration <= 0) return 1;
+        return Utility.clamp((SimClock.now() - journey.legStartedAt) / duration, 0, 1);
+    }
+
+    // Walking in on a traveller that is halfway across a map should find it
+    // halfway across, not standing at the door it came in by. Placing it at the
+    // entrance is what made travellers look like they pop into a map at the
+    // moment you arrive — they had been crossing it for a while by then.
+    settleIntoLeg(journey) {
+        const progress = this.getLegProgress(journey);
+        const portal = this.findExitPortal(journey);
+        if (!portal || progress <= 0.05) return;
+
+        const traveller = journey.traveller;
+        const from = this.getTravellerCenter(traveller);
+        const to = portal.getPortalCenter?.() ?? { x: portal.posX, y: portal.posY };
+
+        let x = from.x + (to.x - from.x) * progress - (traveller.size?.width ?? 0) / 2;
+        let y = from.y + (to.y - from.y) * progress - (traveller.size?.height ?? 0) / 2;
+
+        // Partway along the straight line may be inside a wall; the grid knows
+        // where a body that size can actually stand.
+        const valid = this.container?.gameMap?.gridSystem?.findNearestValidPositionForEntity?.(traveller, x, y, 12);
+        if (valid) {
+            x = valid.x;
+            y = valid.y;
+        }
+
+        this.moveTravellerTo(traveller, x, y);
+    }
+
+    // Owns `isOnStage` so no caller can leave the flag disagreeing with the DOM.
+    // An escorted traveller is never taken off the map by us: it is the one the
+    // player is playing, and it leaves maps the way they do, through portals.
+    withdrawFromMap(journey) {
+        if (journey.escorted || !journey.isOnStage) return;
+
+        const traveller = journey.traveller;
+        const position = this.getTravellerPosition(traveller);
+        journey.stagePosition = { x: position.x, y: position.y, legIndex: journey.legIndex };
+        journey.isOnStage = false;
+        this.undeployTraveller(journey);
+    }
+
+    // Send it toward the portal that leads to the next map on its route, so a
+    // player watching sees it cross rather than idle.
+    walkToExitPortal(journey) {
+        const portal = this.findExitPortal(journey);
+        if (portal) this.walkToPortal(journey, portal);
+    }
+
+    // Walking to a portal and going through it are different things, and only
+    // the traveller the player is with does the second one. Overridable for
+    // exactly that reason.
+    walkToPortal(journey, portal) {
+        const center = portal.getPortalCenter?.() ?? {
+            x: portal.posX + (portal.size?.width ?? 0) / 2,
+            y: portal.posY + (portal.size?.height ?? 0) / 2
+        };
+        this.walkTo(journey.traveller, center);
+    }
+
+    findExitPortal(journey) {
+        const nextMapId = journey.route[journey.legIndex + 1];
+        if (!nextMapId || this.currentMapId !== journey.route[journey.legIndex]) return null;
+
+        return (this.container?.gameMap?.objects ?? []).find(object =>
+            object instanceof PortalMapObject && object.getResolvedTargetMapId?.() === nextMapId
+        ) ?? null;
+    }
+
+    dispose() {
+        this.journeys.clear();
+        this.container = null;
+    }
+
+    // ── Hooks ────────────────────────────────────────────────────────────────
+    // What it means for this kind of traveller to walk, to be put on a map, and
+    // to get where it was going. Everything above is the same for all of them.
+
+    // Map pixels per millisecond.
+    getTravellerSpeed(traveller) {
+        return (traveller?.speed ?? 1) / 16.667;
+    }
+
+    getTravellerPosition(traveller) {
+        return { x: traveller?.posX ?? 0, y: traveller?.posY ?? 0 };
+    }
+
+    getTravellerCenter(traveller) {
+        const position = this.getTravellerPosition(traveller);
+        return {
+            x: position.x + (traveller?.size?.width ?? 0) / 2,
+            y: position.y + (traveller?.size?.height ?? 0) / 2
+        };
+    }
+
+    // Whether the traveller has stopped and needs sending on again.
+    isIdle(_traveller) {
+        return false;
+    }
+
+    // Something happened that means this journey should stop being managed —
+    // the player picked the traveller up, say. Ends the journey where it stands.
+    shouldAbandon(_journey) {
+        return false;
+    }
+
+    moveTravellerTo(traveller, x, y) {
+        traveller?.setPosition?.(x, y);
+        traveller?.setTarget?.(x, y);
+        traveller?.setSpritePosition?.(x, y);
+    }
+
+    // Put the traveller down on the map being played. Returns false if it can't
+    // be deployed right now, and the journey carries on off-screen instead.
+    deployTraveller(_journey) {
+        return false;
+    }
+
+    undeployTraveller(_journey) {}
+
+    placeArrivingFrom(_traveller, _sourceMapId) {}
+
+    walkTo(_traveller, _point) {}
+
+    onJourneyStarted(_journey) {}
+    onLegStarted(_journey) {}
+    onJourneyArrived(_journey) {}
+    onJourneyAbandoned(_journey, _options) {}
+
+    refreshUi() {}
+
+    emit(_name, _detail) {}
+}
+;
+/* -- js/Map/MyteTravelManager.js -- */
+// ─────────────────────────────────────────────────────────────────────────────
+// MyteTravelManager — a myte walking across the world to a different map.
+//
+// The route, the legs and the timing are RouteTravelManager's job; what is here
+// is everything that makes the traveller a *myte*: home slots, the active myte,
+// the action queue it walks with, and the myte list that reports on it.
+//
+//   • A summoned myte leaves its home slot the moment the journey starts, so the
+//     slot reads empty on its home map — it is not there any more.
+//   • Taking control of a traveller mid-route cancels the journey — you caught
+//     it, so it stays with you rather than carrying on without you.
+//   • Home never moves. A visit ends either by walking back (requestReturn) or
+//     by the player putting the myte away on its own map.
+//
+// An escorted journey is the other way round: the myte is already the one you
+// are playing, and the route is walked for real, portal by portal. That is what
+// the world map's Travel button does when a myte is out — it plots the way
+// rather than teleporting the camera there.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MYTE_TRAVEL_RESULTS = ROUTE_TRAVEL_RESULTS;
+const MYTE_TRAVEL_DIRECTIONS = ROUTE_TRAVEL_DIRECTIONS;
+
+class MyteTravelManager extends RouteTravelManager {
+    // Whether summoning is even an option, without starting anything — the UI
+    // needs this to decide what a myte thumbnail should say and do.
+    canTravel(myte) {
+        const destination = this.currentMapId;
+        const origin = this.whereIs(myte);
+        if (!myte || !destination || !origin) return false;
+        if (myte.isActive || this.isTravelling(myte)) return false;
+        if (origin === destination) return false;
+        return WorldGraph.getDistance(origin, destination) <= this.config.maxDistance;
+    }
+
+    // Wherever it actually is — the map you left it standing on, not the map it
+    // sleeps on. A myte parked two maps away walks from there.
+    whereIs(myte) {
+        return this.container.getMyteMapId?.(myte) ?? myte?.homeMapId ?? null;
+    }
+
+    // Summon a myte from wherever it is to the map being played.
+    requestTravel(myte) {
+        return this.startJourney(myte, this.whereIs(myte), this.currentMapId, {
+            direction: MYTE_TRAVEL_DIRECTIONS.VISIT
+        });
+    }
+
+    // Send a visiting myte back to its own map, where it settles into its slot.
+    requestReturn(myte) {
+        return this.startJourney(myte, this.currentMapId, myte?.homeMapId ?? null, {
+            direction: MYTE_TRAVEL_DIRECTIONS.RETURN
+        });
+    }
+
+    // Walk the myte you are playing to another map, through every portal on the
+    // way. No distance limit: you are going with it.
+    requestEscortedTravel(myte, destination) {
+        return this.startJourney(myte, this.currentMapId, destination, {
+            direction: MYTE_TRAVEL_DIRECTIONS.VISIT,
+            escorted: true,
+            maxDistance: Infinity
+        });
+    }
+
+    // ── Hooks ────────────────────────────────────────────────────────────────
+
+    // `getSpeed` is per animation frame, and legs are measured in milliseconds.
+    getTravellerSpeed(myte) {
+        return (myte?.stats?.getSpeed?.() ?? myte?.speed ?? 1) / 16.667;
+    }
+
+    isIdle(myte) {
+        return !!myte?.queue?.isEmpty?.();
+    }
+
+    shouldAbandon(journey) {
+        const isActiveMyte = this.container.activeMyte === journey.traveller;
+        // Grabbing a passing traveller ends the journey — you caught it, so it
+        // stays with you. An escort is the mirror image: it lasts exactly as
+        // long as the myte is the one you are walking around with.
+        return journey.escorted ? !isActiveMyte : isActiveMyte;
+    }
+
+    deployTraveller(journey) {
+        // Queue-only: it is passing through on business, not free-roaming.
+        const started = journey.traveller.startWithOptions({
+            goal: MOVE_TYPES.QUEUE_ONLY,
+            snapToHome: false
+        });
+        // Refused (recovering, say) — it keeps crossing off-screen rather than
+        // being marked present while invisible.
+        if (!started) return false;
+
+        journey.traveller.clearHomeSlotHold?.();
+        return true;
+    }
+
+    // Pull a deployed myte off the map without sending it to a home slot that
+    // isn't here. It has stepped through a portal; it is simply elsewhere now —
+    // the same "out there, not here" state a myte you left behind is in.
+    undeployTraveller(journey) {
+        this.presence?.takeOffMap(journey.traveller);
+    }
+
+    // Put a myte down on the map being played, having come from `sourceMapId`.
+    // Always lands it somewhere on *this* map: with no arrival to resolve it
+    // would otherwise keep the coordinates of the map it just left and walk
+    // from wherever that map's portal happened to be.
+    placeArrivingFrom(myte, sourceMapId) {
+        const map = this.container.gameMap;
+        const transitionManager = this.container.transitionManager;
+
+        const arrival = transitionManager?.resolveArrivalFrom(myte, sourceMapId, map);
+        if (arrival) {
+            transitionManager.placeMyteAtArrival(myte, arrival);
+            return;
+        }
+
+        // Its own slot is the honest entry point on its own map.
+        if (myte.isOnHomeMap) {
+            myte.snapToHomePosition?.();
+            return;
+        }
+
+        const dimensions = map?.dimensions;
+        if (!dimensions) return;
+        this.moveTravellerTo(
+            myte,
+            (dimensions.width - (myte.size?.width ?? 0)) / 2,
+            (dimensions.height - (myte.size?.height ?? 0)) / 2
+        );
+    }
+
+    walkTo(myte, point) {
+        myte.queue?.interrupt?.('astar-move', { target: { x: point.x, y: point.y } });
+    }
+
+    // An escorted myte does not merely walk to the portal, it uses it — through
+    // the same approach-then-interact path a double-click takes, so the map
+    // really does change under the player. A myte travelling on its own must not
+    // do that: it is crossing maps of its own, not taking the player with it.
+    walkToPortal(journey, portal) {
+        if (!journey.escorted) {
+            super.walkToPortal(journey, portal);
+            return;
+        }
+
+        portal.press?.(this.container);
+    }
+
+    onJourneyStarted(journey) {
+        const myte = journey.traveller;
+
+        if (journey.escorted) {
+            // The route is the myte's orders for the duration; its own movement
+            // mode gets it back when it arrives.
+            journey.previousGoal = myte.goal;
+            journey.isOnStage = true;
+            myte.setMode(MOVE_TYPES.QUEUE_ONLY);
+        } else {
+            // The journey owns the myte from here — the player is no longer
+            // driving it. This also makes a later `activeMyte === myte`
+            // unambiguous: it can only mean the player grabbed it in transit.
+            if (this.container.activeMyte === myte) {
+                this.container.deactivateActiveMyte(myte);
+            }
+
+            // It has left its slot. The slot reads empty until it walks back.
+            this._setSlotOccupied(myte, false);
+
+            if (myte.isActive && this.getCurrentLegMapId(myte) === this.currentMapId) {
+                // Already standing on the first leg's map — it simply starts
+                // walking rather than being re-placed at an entrance it never
+                // used.
+                journey.isOnStage = true;
+                myte.queue?.clear?.();
+                myte.setMode(MOVE_TYPES.QUEUE_ONLY);
+            }
+        }
+
+        this.refreshUi();
+        this.emit('travel_started', { journey });
+    }
+
+    onJourneyArrived(journey) {
+        const myte = journey.traveller;
+
+        if (journey.escorted) {
+            this._restoreEscortedMode(journey);
+            this._finish(journey);
+            return;
+        }
+
+        if (journey.direction === MYTE_TRAVEL_DIRECTIONS.RETURN) {
+            this._settleAtHome(myte);
+            this._finish(journey);
+            return;
+        }
+
+        // The player may have moved on while the myte was walking. It carries on
+        // from the map it actually reached — restarting from home would send it
+        // back through maps it has already crossed, over and over.
+        if (this.currentMapId !== journey.destination) {
+            const onwards = this.startJourney(myte, journey.destination, this.currentMapId, {
+                direction: MYTE_TRAVEL_DIRECTIONS.VISIT
+            });
+            if (onwards.ok) return;
+
+            // The player is somewhere it can't walk to from here. It gives up on
+            // the visit and heads back to its own slot rather than being
+            // stranded on a map nobody is loading.
+            this._settleAtHome(myte);
+            this._finish(journey);
+            return;
+        }
+
+        // The home slot stays where it is — this is a visit. Skipping the home
+        // snap is what keeps the myte from teleporting to a slot on another map.
+        myte.startWithOptions({
+            goal: DEFAULT_MODE,
+            followGoal: myte.followGoal,
+            autonomyGoal: myte.autonomyGoal,
+            snapToHome: false
+        });
+        myte.clearHomeSlotHold?.();
+        this.placeArrivingFrom(myte, journey.route[journey.route.length - 2] ?? journey.origin);
+        // It is here now, not wherever it was parked when you called it.
+        this.presence?.forget(myte);
+
+        // Summoning a myte is a request to control it, so it takes over on
+        // arrival rather than silently joining the others in follow mode.
+        this.container.setActiveMyte(myte);
+        this._finish(journey);
+    }
+
+    onJourneyAbandoned(journey, { keepDeployed = false } = {}) {
+        if (journey.escorted) {
+            this._restoreEscortedMode(journey);
+            return;
+        }
+
+        // Home is the only place a myte can rest, so an abandoned journey ends
+        // there rather than leaving it nowhere.
+        if (!keepDeployed) this._settleAtHome(journey.traveller);
+    }
+
+    refreshUi() {
+        this.container?.ui?.myteListManager?.updateMytesList?.(this.container.activeMyte);
+    }
+
+    emit(name, detail = {}) {
+        this.container?.eventManager?.emit(`myte:${name}`, {
+            ...detail,
+            myte: detail.journey?.traveller ?? detail.myte ?? null
+        });
+    }
+
+    // ── Myte housekeeping ────────────────────────────────────────────────────
+
+    get presence() {
+        return this.container?.mytePresence ?? null;
+    }
+
+    _restoreEscortedMode(journey) {
+        const myte = journey.traveller;
+        if (!myte.isActive || journey.previousGoal == null) return;
+        myte.setMode(journey.previousGoal);
+    }
+
+    // Back on its own map: drop into the slot it left. The slot only becomes
+    // visible again when the player travels there. It is no longer standing
+    // about on any other map, so any memory of that goes with it.
+    _settleAtHome(myte) {
+        this.presence?.forget(myte);
+        myte.invalidateHomePositionCache?.();
+        this._setSlotOccupied(myte, true);
+        if (myte.isOnHomeMap) myte.snapToHomePosition?.();
+    }
+
+    _setSlotOccupied(myte, occupied) {
+        this.presence?.setSlotOccupied(myte, occupied);
+    }
+
+    _finish(journey) {
+        this.container.core?.user?.saveUserData?.();
+        this.refreshUi();
+        this.emit('travel_arrived', { journey });
     }
 }
 ;
@@ -39450,6 +41127,11 @@ class MapObject {
 
 	// Hook for subclasses to inject their own status rows without rewriting the base logic.
 	_getSidebarStatusRows() { return []; }
+
+	// Player-facing interactions that open UI directly instead of queueing a myte
+	// action — opening a shop, talking to an NPC. Each entry is
+	// { id, label, run() }; the sidebar renders them above the queued actions.
+	getSidebarInteractions() { return []; }
 
 	getSidebarDetailRows() {
 		const rows = [];
@@ -46794,6 +48476,21 @@ class NpcMapObject extends MovingMapObject {
 		return true;
 	}
 
+	getSidebarInteractions() {
+		const interactions = super.getSidebarInteractions();
+		const shop = ShopRegistry.getShop(this.getConfig('shopId', null));
+
+		if (shop) {
+			interactions.push({
+				id: 'open_shop',
+				label: `Open ${shop.name}`,
+				run: () => this.openConfiguredShop()
+			});
+		}
+
+		return interactions;
+	}
+
 	// ── Pathfinding helpers ───────────────────────────────────────────────────
 
 	// Runs A* from current position to (targetCenterX, targetCenterY).
@@ -53149,7 +54846,7 @@ class CompactChipStripUI extends UIComponent {
         element.classList.toggle('has-progress', config.progressRatio != null);
         element.setAttribute('aria-label', [config.tooltipTitle, ...(config.tooltipLines || [])].filter(Boolean).join(' - '));
 
-        refs.label.textContent = config.shortLabel || '';
+        Utility.renderIconLabel(refs.label, config.icon, config.shortLabel || '');
         refs.badge.textContent = config.badgeText || '';
 
         if (config.progressRatio == null) {
@@ -54869,11 +56566,85 @@ class ActionSidebarManager extends UIComponent {
         return button;
     }
 
+    // Direct UI interactions (open shop, talk) sit above the queued actions and
+    // work with no active myte, since they are the player acting, not a myte.
+    renderSidebarInteractions(actionGroups, selectedObject) {
+        const interactions = selectedObject?.getSidebarInteractions?.() ?? [];
+        if (interactions.length === 0) return false;
+
+        const groupElement = document.createElement('div');
+        groupElement.className = 'action-group interactions';
+
+        const title = document.createElement('h3');
+        title.textContent = this.getCategoryTitle('interactions');
+        groupElement.appendChild(title);
+
+        const actionList = document.createElement('ul');
+        interactions.forEach(interaction => {
+            const button = document.createElement('button');
+            button.textContent = interaction.label;
+            button.classList.add('primary-action');
+            if (interaction.description) button.title = interaction.description;
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                interaction.run?.();
+            });
+
+            const li = document.createElement('li');
+            li.appendChild(button);
+            actionList.appendChild(li);
+        });
+
+        groupElement.appendChild(actionList);
+        actionGroups.appendChild(groupElement);
+        return true;
+    }
+
+    // "Home" means two different things depending on where the myte is: walk back
+    // to its slot on this map, or walk back across the world to its own map.
+    renderGoHomeAction(actionGroups, myte) {
+        const container = this.parent.parent;
+        const isVisiting = myte.isVisiting;
+        if (!isVisiting && myte.isAtHomePosition?.(1)) return;
+
+        const button = document.createElement('button');
+        button.textContent = isVisiting
+            ? `Send Home to ${container.getMapDisplayName(myte.homeMapId)}`
+            : 'Go Home';
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (isVisiting) {
+                container.sendMyteHome(myte);
+                return;
+            }
+
+            myte.clearHomeSlotHold?.();
+            myte.queue.clear();
+            myte.setMode(MOVE_TYPES.GOHOME);
+        });
+
+        const groupElement = document.createElement('div');
+        groupElement.className = 'action-group movement';
+        const title = document.createElement('h3');
+        title.textContent = 'Movement';
+        const actionList = document.createElement('ul');
+        const li = document.createElement('li');
+        li.appendChild(button);
+        actionList.appendChild(li);
+        groupElement.append(title, actionList);
+        actionGroups.appendChild(groupElement);
+    }
+
     updateActionList(selectedObject) {
         const actionGroups = this.actionControls.querySelector('.action-groups');
         const previousScrollTop = actionGroups.scrollTop;
         actionGroups.innerHTML = '';
         const activeMyte = this.parent.getActiveMyte();
+
+        this.renderSidebarInteractions(actionGroups, selectedObject);
 
         if (selectedObject instanceof DroppedMapItem) {
             this.actionControls.classList.add('is-visible');
@@ -54973,27 +56744,8 @@ class ActionSidebarManager extends UIComponent {
             actionGroups.appendChild(groupElement);
         });
 
-        if (selectedObject === activeMyte && activeMyte && !activeMyte.isAtHomePosition?.(1)) {
-            const groupEl = document.createElement('div');
-            groupEl.className = 'action-group movement';
-            const h3 = document.createElement('h3');
-            h3.textContent = 'Movement';
-            const ul = document.createElement('ul');
-            const li = document.createElement('li');
-            const btn = document.createElement('button');
-            btn.textContent = 'Go Home';
-            btn.addEventListener('click', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                activeMyte.clearHomeSlotHold?.();
-                activeMyte.queue.clear();
-                activeMyte.setMode(MOVE_TYPES.GOHOME);
-            });
-            li.appendChild(btn);
-            ul.appendChild(li);
-            groupEl.appendChild(h3);
-            groupEl.appendChild(ul);
-            actionGroups.appendChild(groupEl);
+        if (selectedObject === activeMyte && activeMyte) {
+            this.renderGoHomeAction(actionGroups, activeMyte);
         }
 
         if (actionGroups.children.length > 0) {
@@ -55013,62 +56765,6 @@ class ActionSidebarManager extends UIComponent {
 }
 ;
 /* -- js/UI/Overlays/CompactQueueUI.js -- */
-const ACTION_CHIP_LABELS = Object.freeze({
-    'astar-move': '🏃',
-    'move': '🏃',
-    'go_to_object': '🏃',
-    'idle': '💤',
-    'expression': '😊',
-    'dance': '💃',
-    'simple_sleep': '😴',
-    'sleep': '😴',
-    'jump': '⬆️',
-    'circle': '🔄',
-    'zigzag': '↔️',
-    'run_laps': '🔁',
-    'patrol': '👀',
-    'wander': '🌀',
-    'guard': '🛡️',
-    'follow_mouse': '🖱️',
-    'follow_object': '🔗',
-    'inspect': '🔍',
-    'deep_inspect': '🔬',
-    'interact_object': '👆',
-    'use_surface_slot': '🛏️',
-    'nudge_ball': '⚽',
-    'eat_element': '🍽️',
-    'open_chest': '📦',
-    'close_chest': '🔒',
-    'pick_flower': '🌸',
-    'trample_flower': '👟',
-    'smell_flower': '🌺',
-    'drink_fountain': '💧',
-    'water_plant': '🪣',
-    'harvest': '🌾',
-    'shake_tree': '🌳',
-    'chop_tree': '🪓',
-    'remove_stump': '🪵',
-    'show_affection': '❤️',
-    'greet': '👋',
-    'greet_receive': '👋',
-    'watch': '👁️',
-    'chase': '🏃',
-    'emote_at': '💬',
-    'play_tag': '🏷️',
-    'play_fetch': '🎾',
-    'carry_pickup': '🤲',
-    'carry': '🫂',
-    'being_carried': '🪁',
-    'carry_putdown': '📍',
-    'pickup_item': '🤲',
-    'hold_item': '✊',
-    'drop_item': '📤',
-    'give_item': '🎁',
-    'run_away': '🏃',
-    'run_from': '🚪',
-    'hide': '🙈'
-});
-
 class CompactQueueUI extends CompactChipStripUI {
     // Returns grouped items: consecutive runs of the same action ID are collapsed
     // into one entry with a count. Each entry: { item, id, count, items, queueStartIndex }
@@ -55108,20 +56804,16 @@ class CompactQueueUI extends CompactChipStripUI {
         return item.getQueueDescription?.() || '';
     }
 
-    getShortLabel(item) {
-        const explicitIcon = item.constructor?.metadata?.icon;
-        if (explicitIcon) {
-            return explicitIcon;
-        }
+    // Sprite symbol name from actions.json. Actions without one fall back to the
+    // initials produced by getShortLabel.
+    getIconName(item) {
+        return item.constructor?.metadata?.icon || null;
+    }
 
+    getShortLabel(item) {
         const explicit = item.constructor?.metadata?.labelShort;
         if (explicit) {
             return explicit;
-        }
-
-        const actionId = item.constructor?.metadata?.id;
-        if (actionId && ACTION_CHIP_LABELS[actionId]) {
-            return ACTION_CHIP_LABELS[actionId];
         }
 
         const words = this.getQueueTitle(item)
@@ -55184,6 +56876,7 @@ class CompactQueueUI extends CompactChipStripUI {
             index: chipIndex,
             className: `queue-chip ${item.constructor?.metadata?.category || ''} action-${item.constructor?.metadata?.id || 'unknown'}${chipIndex === 0 ? ' is-current' : ''}${isHidden ? ' is-hidden-action' : ''}`,
             label: title,
+            icon: this.getIconName(item),
             shortLabel: this.getShortLabel(item),
             badgeText: count > 1 ? String(count) : null,
             progressRatio,
@@ -55220,23 +56913,25 @@ class CompactQueueUI extends CompactChipStripUI {
 }
 ;
 /* -- js/UI/Overlays/BuffOverlayUI.js -- */
-const BUFF_CATEGORY_LABELS = Object.freeze({
-    energy: '⚡',
-    health: '❤️',
-    satiety: '🍽️',
-    fun: '🎉',
-    mood: '😊',
-    boredom: '😴',
-    comfort: '🛋️',
-    confidence: '✨',
-    social: '👥',
-    play: '🎉',
-    recovery: '⭐',
-    food: '🍽️',
-    event: '✨',
-    aura: '🌟',
-    zone: '📍',
-    general: '⭐'
+// Sprite symbol per buff category — the fallback when a buff declares no icon
+// of its own in data/metadata/buffs.json.
+const BUFF_CATEGORY_ICONS = Object.freeze({
+    energy: 'bolt',
+    health: 'heart',
+    satiety: 'bowl',
+    fun: 'ball',
+    mood: 'smile',
+    boredom: 'sleep',
+    comfort: 'bed',
+    confidence: 'sparkle',
+    social: 'social',
+    play: 'ball',
+    recovery: 'star',
+    food: 'bowl',
+    event: 'sparkle',
+    aura: 'star',
+    zone: 'pin',
+    general: 'star'
 });
 
 // Fixed display order for exclusive groups — buffs in these groups always appear
@@ -55268,15 +56963,11 @@ class BuffOverlayUI extends CompactChipStripUI {
         });
     }
 
+    getIconName(buff) {
+        return buff.icon || BUFF_CATEGORY_ICONS[buff.category] || null;
+    }
+
     getShortLabel(buff) {
-        if (buff.icon) {
-            return buff.icon;
-        }
-
-        if (buff.category && BUFF_CATEGORY_LABELS[buff.category]) {
-            return BUFF_CATEGORY_LABELS[buff.category];
-        }
-
         const words = String(buff.label || '')
             .split(/[^a-zA-Z0-9]+/)
             .filter(Boolean);
@@ -55300,6 +56991,7 @@ class BuffOverlayUI extends CompactChipStripUI {
             index,
             className: `buff-chip kind-${buff.kind} category-${buff.category}${buff.cancellable ? ' is-cancellable' : ''}`,
             label: buff.label,
+            icon: this.getIconName(buff),
             shortLabel: this.getShortLabel(buff),
             badgeText: buff.stacks > 1 ? String(buff.stacks) : null,
             progressRatio: buff.progressRatio,
@@ -55374,19 +57066,7 @@ class MyteListManager extends UIComponent {
         thumbnail.appendChild(infoButton);
 
         // Add click handler
-        thumbnail.addEventListener('click', () => {
-            if (!myte.isActive) {
-                this.parent.setSelected?.(myte);
-                return;
-            }
-
-            if (myte === this.parent.getActiveMyte()) {
-                this.parent.parent.deactivateActiveMyte?.(myte);
-                return;
-            }
-
-            this.parent.setActiveMyte(myte);
-        });
+        thumbnail.addEventListener('click', () => this.handleThumbnailClick(myte));
 
         this.applyThumbnailState(thumbnail, myte);
 
@@ -55411,9 +57091,83 @@ class MyteListManager extends UIComponent {
         spriteInner.style.transformOrigin = 'top left';
     }
 
+    // One click, one meaning: take control of this myte. What that costs depends
+    // on where it is — deploy it from its slot, call it across the world, or
+    // simply switch to it.
+    handleThumbnailClick(myte) {
+        const container = this.parent.parent;
+
+        // An escorted myte is still the one you are playing, so clicking it means
+        // what it always means — only a myte off walking on its own is untouchable.
+        if (this.getTravelManager()?.isTravellingAlone(myte)) {
+            this.parent.showMessage?.(`${myte.name} is already on the way.`, 'info', 'On the way');
+            return;
+        }
+
+        if (!myte.isActive) {
+            if (!myte.isOnHomeMap) {
+                container.summonMyte?.(myte);
+                return;
+            }
+
+            // Resting in its slot on this map — wake it and take control.
+            if (!myte.startWithOptions({
+                goal: DEFAULT_MODE,
+                followGoal: myte.followGoal,
+                autonomyGoal: myte.autonomyGoal
+            })) return;
+
+            myte.clearHomeSlotHold?.();
+            this.parent.setActiveMyte(myte);
+            return;
+        }
+
+        if (myte === this.parent.getActiveMyte()) {
+            container.deactivateActiveMyte?.(myte);
+            return;
+        }
+
+        this.parent.setActiveMyte(myte);
+    }
+
+    getTravelManager() {
+        return this.parent.parent.travelManager ?? null;
+    }
+
+    getMapDisplayName(mapId) {
+        const mapLoader = this.parent.parent.core?.mapLoader;
+        return mapLoader?.getCachedMapDisplayName?.(mapId)
+            || mapLoader?.humanizeMapId?.(mapId)
+            || String(mapId ?? 'Unknown');
+    }
+
+    // Resting in a slot on a map the player isn't in.
+    isAway(myte) {
+        return !!myte && !myte.isActive && !myte.isOnHomeMap;
+    }
+
     getMyteStateLabel(myte) {
+        const travelManager = this.getTravelManager();
+        if (travelManager?.isEscorting(myte)) {
+            return 'Walking';
+        }
+
+        if (travelManager?.isTravelling(myte)) {
+            return travelManager.getDirection(myte) === MYTE_TRAVEL_DIRECTIONS.RETURN
+                ? 'Heading Home'
+                : 'Travelling';
+        }
+
+        if (this.isAway(myte)) {
+            return travelManager?.canTravel(myte) ? 'Away' : 'Too Far';
+        }
+
         if (!myte?.isActive) {
             return 'Inactive';
+        }
+
+        if (myte.isVisiting && myte !== this.parent.getActiveMyte()) {
+            return 'Visiting';
         }
 
         if (myte === this.parent.getActiveMyte()) {
@@ -55439,9 +57193,15 @@ class MyteListManager extends UIComponent {
         thumbnail.classList.toggle('deployed', myte.isActive);
         thumbnail.classList.toggle('free-roam', isFreeRoam);
         thumbnail.classList.toggle('in-slot', isInSlot);
+        thumbnail.classList.toggle('is-away', this.isAway(myte));
+        thumbnail.classList.toggle('is-travelling', !!this.getTravelManager()?.isTravellingAlone(myte));
         thumbnail.dataset.myteState = stateLabel;
         thumbnail.querySelector('.myte-state').textContent = stateLabel;
-        thumbnail.title = `${myte.name}: ${stateLabel}`;
+        // Where it is, not where it lives — a myte left standing on another map
+        // is "away" there, not at home.
+        thumbnail.title = this.isAway(myte)
+            ? `${myte.name}: ${stateLabel} in ${this.getMapDisplayName(this.parent.parent.getMyteMapId?.(myte) ?? myte.homeMapId)}`
+            : `${myte.name}: ${stateLabel}`;
     }
 
     initMytesList() {
@@ -55495,6 +57255,8 @@ class HUDManager extends UIComponent {
         this.moodElement = this.hudElement?.querySelector('.mood') || null;
         this.energyElement = this.hudElement?.querySelector('.energy') || null;
         this.clockElement = this.parent.containerWrapper.querySelector('.date-time .clock');
+        this.clockTextElement = this.clockElement?.querySelector('.clock__time') ?? null;
+        this.clockSeasonElement = this.clockElement?.querySelector('.clock__season') ?? null;
         this.coinElement = this.parent.containerWrapper.querySelector('.coin-count');
         this.currentMoodEffect = null;
         this._lastUpdate = 0;
@@ -55523,6 +57285,7 @@ class HUDManager extends UIComponent {
             moodEffect: null,
             clock: null,
             clockTitle: null,
+            season: null,
             coins: null
         };
     }
@@ -55624,19 +57387,24 @@ class HUDManager extends UIComponent {
     }
 
     updateClock() {
-        if (!this.clockElement) return;
+        if (!this.clockTextElement || !this.clockSeasonElement) return;
 
         const gameTime = this.parent.parent?.core?.gameTime;
         if (!gameTime) return;
 
         const season = gameTime.getCurrentSeason?.();
-        const glyph = SiteConfig.ui.hud.seasonGlyphs[season] ?? '';
-        const clock = `${gameTime.getFormattedTime()}${glyph ? ` ${glyph}` : ''}`;
+        const seasonIcon = SiteConfig.ui.hud.seasonIcons[season] ?? '';
+        const clock = gameTime.getFormattedTime();
         const title = gameTime.getFormattedDate();
 
         if (this.lastRenderedState.clock !== clock) {
-            this.clockElement.textContent = clock;
+            this.clockTextElement.textContent = clock;
             this.lastRenderedState.clock = clock;
+        }
+        if (this.lastRenderedState.season !== seasonIcon) {
+            Utility.setIcon(this.clockSeasonElement, seasonIcon);
+            this.clockSeasonElement.hidden = !seasonIcon;
+            this.lastRenderedState.season = seasonIcon;
         }
         if (this.lastRenderedState.clockTitle !== title) {
             this.clockElement.title = title;
@@ -55780,6 +57548,8 @@ class HUDManager extends UIComponent {
         this.moodElement = null;
         this.energyElement = null;
         this.clockElement = null;
+        this.clockTextElement = null;
+        this.clockSeasonElement = null;
         this.coinElement = null;
         this.numberFormatter = null;
         this.currentMoodEffect = null;
@@ -56047,31 +57817,20 @@ class ScreenManager extends UIComponent {
         }
 
         if (localStorage.getItem(ScreenManager.STORAGE_KEY) === '1') {
-            this.parent.containerWrapper.classList.add('is-fullscreen');
-            this.fullscreenButton?.classList.add('active');
-            const camera = this.parent.parent.camera;
-            if (camera) {
-                requestAnimationFrame(() => {
-                    const anchor = camera.getViewportCenterAnchor?.();
-                    camera.zoomTo(camera.zoomLevel, { anchor, immediate: true });
-                });
-            }
+            this.setFullscreen(true);
         }
     }
 
     toggleFullscreen() {
-        const camera = this.parent.parent.camera;
-        const anchor = camera?.getViewportCenterAnchor ? camera.getViewportCenterAnchor() : null;
+        this.setFullscreen(!this.parent.containerWrapper.classList.contains('is-fullscreen'));
+    }
 
-        const isNowFullscreen = this.parent.containerWrapper.classList.toggle('is-fullscreen');
-        this.fullscreenButton?.classList.toggle('active', isNowFullscreen);
-        localStorage.setItem(ScreenManager.STORAGE_KEY, isNowFullscreen ? '1' : '0');
-
-        if (camera && anchor) {
-            requestAnimationFrame(() => {
-                camera.zoomTo(camera.zoomLevel, { anchor, immediate: true });
-            });
-        }
+    // Re-framing the camera is left to the container's ResizeObserver: the class
+    // change is what resizes the stage, and the observer already reacts to that.
+    setFullscreen(isFullscreen) {
+        this.parent.containerWrapper.classList.toggle('is-fullscreen', isFullscreen);
+        this.fullscreenButton?.classList.toggle('active', isFullscreen);
+        localStorage.setItem(ScreenManager.STORAGE_KEY, isFullscreen ? '1' : '0');
     }
 
     initializeHeaderState() {
@@ -56135,6 +57894,7 @@ class UserInterface {
         this.soundPanel = new SoundPanel(this);
         this.settingsPanel = new SettingsPanel(this);
         this.viewPanel = new ViewPanel(this);
+        this.worldMapPanel = new WorldMapPanel(this);
         this.debugPanel = new DebugPanel(this);
         this.myteInfoPanel = new MyteInfoPanel(this);
         this.userProfilePanel = new UserProfilePanel(this);
@@ -56274,6 +58034,8 @@ class UserInterface {
         this.viewPanel?.dispose?.();
         this.viewPanel = null;
         this.viewMenu = null;
+        this.worldMapPanel?.dispose?.();
+        this.worldMapPanel = null;
 
         this.screenManager?.dispose?.();
         this.toolManager?.dispose?.();
@@ -56965,7 +58727,7 @@ constructor(parent, options = {}) {
 		button.type = 'button';
 		button.className = this.options.fullscreenButtonSelector.replace(/^\./, '');
 		button.setAttribute('aria-label', 'Maximize');
-		button.textContent = '⛶';
+		button.appendChild(Utility.createIcon('maximize'));
 		const closeButton = controls.querySelector(this.options.closeButtonSelector);
 		controls.insertBefore(button, closeButton);
 	}
@@ -57122,9 +58884,7 @@ class WorldModal extends ModalWindow {
         header.className = 'window-panel__header world-modal__header';
         const title = document.createElement('h2');
         title.className = 'window-panel__title world-modal__title';
-        this.iconElement = document.createElement('span');
-        this.iconElement.className = 'icon';
-        this.iconElement.setAttribute('aria-hidden', 'true');
+        this.iconElement = Utility.createIcon('');
         this.titleTextElement = document.createElement('span');
         this.titleTextElement.className = 'text';
         title.append(this.iconElement, this.titleTextElement);
@@ -57165,9 +58925,10 @@ class WorldModal extends ModalWindow {
         if (this.titleTextElement) this.titleTextElement.textContent = String(title || '');
     }
 
+    // `icon` is a sprite symbol name from the #icon-sprite block in index.html.
     setIcon(icon) {
         if (!this.iconElement) return;
-        this.iconElement.textContent = String(icon || '');
+        Utility.setIcon(this.iconElement, icon);
         this.iconElement.hidden = !icon;
     }
 
@@ -57890,7 +59651,7 @@ class ShopPanel extends WorldModal {
         super(parent, {
             id: 'world-shop-panel',
             title: 'Shop',
-            icon: '🛒',
+            icon: 'shop',
             closeOnBackdrop: true,
             draggable: true
         });
@@ -57984,7 +59745,7 @@ class ShopPanel extends WorldModal {
         purchase.appendChild(button);
         row.append(image, details, purchase);
 
-        this.itemRows.set(item.id, { stock, button, entry });
+        this.itemRows.set(item.id, { stock, button, entry, image });
         this.syncStock(entry.itemId);
         return row;
     }
@@ -58000,6 +59761,11 @@ class ShopPanel extends WorldModal {
         );
         this.syncStock(itemId);
         this.setDialogue(result.reason, result);
+
+        if (result.ok) {
+            const row = this.itemRows.get(ItemRegistry.resolveIdSync(itemId));
+            container.inventory?.playAcquisition(result.item.id, row?.image ?? null);
+        }
     }
 
     setDialogue(reason, result = {}) {
@@ -61196,6 +62962,524 @@ class ViewPanel extends ModalWindow {
     }
 }
 ;
+/* -- js/UI/Panels/WorldMapPanel.js -- */
+// ─────────────────────────────────────────────────────────────────────────────
+// WorldMapPanel — the world as WorldGraph knows it: every map as a node placed
+// on the layout grid from its own .tmx worldX/worldY, every portal link as a
+// connector, and hop distance from wherever the player currently is.
+//
+// Travel means two different things depending on what is out. With no myte
+// deployed the camera simply goes there. With one out, moving between maps is
+// the myte's job, so Travel plots the walk instead: it heads for the portal on
+// the way, steps through, and carries on until it arrives.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class WorldMapPanel extends ModalWindow {
+    constructor(parent) {
+        super(parent, {
+            id: 'world-map-panel',
+            buttonId: 'world-map-toggle',
+            closeOnOutsideClick: false,
+            position: 'top-right',
+            draggable: true,
+            // A world of any size deserves the whole window when you want it —
+            // the chart grows into whatever room it is given.
+            fullscreen: true,
+            closeButtonSelector: '.modal-close-btn',
+            // Maximizing resizes every cell, so both the measured links and the
+            // centring have to be redone for the new size.
+            onMaximize: () => {
+                this.layoutConnectors();
+                this.centerOnCurrentMap();
+            }
+        });
+
+        this.selectedMapId = null;
+        this.nodeElements = new Map();
+        this.gridElement = null;
+        this.linksElement = null;
+        this.resizeObserver = null;
+        this.panHandler = null;
+        this.panFrom = null;
+        this.init();
+    }
+
+    buttonLeftClick(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggle();
+        return false;
+    }
+
+    buttonRightClick(e) {
+        this.buttonLeftClick(e);
+    }
+
+    // ModalWindow owns `this.container`, so the game container needs its own name.
+    get gameContainer() {
+        return this.parent.parent;
+    }
+
+    get currentMapId() {
+        return this.gameContainer.gameMap?.id ?? null;
+    }
+
+    open() {
+        this.render();
+        // Before the window is shown, not after: a panel that is not `is-visible`
+        // yet is still laid out and measurable, so the chart can be scrolled into
+        // place without the player watching it slide there.
+        this.centerOnCurrentMap();
+        super.open();
+    }
+
+    // Open looking at where you are. Scroll offsets clamp themselves, so a chart
+    // that already fits is left exactly as the grid centred it — centring can
+    // never push an outlying map out of view in a small world.
+    centerOnCurrentMap() {
+        const canvas = this.getCanvas();
+        const node = this.nodeElements.get(this.currentMapId);
+        if (!canvas || !node) return;
+
+        canvas.scrollLeft = node.offsetLeft + (node.offsetWidth / 2) - (canvas.clientWidth / 2);
+        canvas.scrollTop = node.offsetTop + (node.offsetHeight / 2) - (canvas.clientHeight / 2);
+    }
+
+    getCanvas() {
+        return this.modalElement?.querySelector('.world-map__canvas') ?? null;
+    }
+
+    render() {
+        const canvas = this.modalElement?.querySelector('.world-map__canvas');
+        const detail = this.modalElement?.querySelector('.world-map__detail');
+        if (!canvas || !detail) return;
+
+        const maps = WorldGraph.getMaps();
+        if (maps.length === 0) {
+            canvas.replaceChildren(this.buildEmptyState('No maps are charted yet.'));
+            detail.replaceChildren();
+            return;
+        }
+
+        if (!this.selectedMapId || !WorldGraph.getMap(this.selectedMapId)) {
+            this.selectedMapId = this.currentMapId ?? maps[0].id;
+        }
+
+        this.renderGrid(canvas, maps);
+        this.renderDetail(detail);
+    }
+
+    buildEmptyState(message) {
+        const empty = document.createElement('div');
+        empty.className = 'window-empty-state';
+        empty.textContent = message;
+        return empty;
+    }
+
+    // Layout coords are small integers, so the grid is sized from their extent
+    // rather than hard-coded — giving a map worldX/worldY is enough to chart it.
+    getLayoutExtent(maps) {
+        const xs = maps.map(map => Number(map.layout?.x) || 0);
+        const ys = maps.map(map => Number(map.layout?.y) || 0);
+        return {
+            minX: Math.min(...xs),
+            minY: Math.min(...ys),
+            columns: Math.max(...xs) - Math.min(...xs) + 1,
+            rows: Math.max(...ys) - Math.min(...ys) + 1
+        };
+    }
+
+    // The chart is its own element inside the canvas: the canvas is the window
+    // onto it, the chart is as big as the world needs. That way a world too big
+    // for the panel scrolls instead of squeezing its maps into slivers, and the
+    // connector SVG still spans exactly the charted area.
+    renderGrid(canvas, maps) {
+        // Selecting a map re-renders the chart; where the player had panned to is
+        // not part of what changed, so it survives the rebuild.
+        const scrolledTo = { x: canvas.scrollLeft, y: canvas.scrollTop };
+        const extent = this.getLayoutExtent(maps);
+        const grid = document.createElement('div');
+        grid.className = 'world-map__grid';
+        grid.style.setProperty('--world-map-columns', extent.columns);
+        grid.style.setProperty('--world-map-rows', extent.rows);
+        this.linksElement = this.buildConnectors();
+        grid.appendChild(this.linksElement);
+
+        this.nodeElements.clear();
+        maps.forEach(map => {
+            const node = this.buildNode(map, extent);
+            this.nodeElements.set(map.id, node);
+            grid.appendChild(node);
+        });
+
+        canvas.replaceChildren(grid);
+        canvas.scrollTo(scrolledTo.x, scrolledTo.y);
+        this.gridElement = grid;
+        // Cells resize with the window; the lines between them are measured, so
+        // they have to be re-measured whenever that happens.
+        this.observeGrid(grid);
+        this.layoutConnectors();
+        this.enablePanning(canvas);
+    }
+
+    // A chart bigger than its window is dragged around, the same gesture as
+    // panning the world itself. DragHandler is the shared pointer-drag primitive
+    // — mouse and touch, thresholds, cleanup — so this only has to say what a
+    // drag means here: move the view the opposite way to the hand.
+    enablePanning(canvas) {
+        if (this.panHandler) return;
+
+        this.panHandler = new DragHandler({
+            element: canvas,
+            canDrag: () => this.canPan(),
+            onDragStart: () => {
+                this.panFrom = {
+                    scrollX: canvas.scrollLeft,
+                    scrollY: canvas.scrollTop,
+                    pointerX: this.panHandler.initialTouchPos.x + window.scrollX,
+                    pointerY: this.panHandler.initialTouchPos.y + window.scrollY,
+                    moved: false
+                };
+                canvas.classList.add('is-panning');
+            },
+            onDragUpdate: ({ x, y }) => {
+                if (!this.panFrom) return;
+
+                const dx = x - this.panFrom.pointerX;
+                const dy = y - this.panFrom.pointerY;
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.panFrom.moved = true;
+
+                canvas.scrollLeft = this.panFrom.scrollX - dx;
+                canvas.scrollTop = this.panFrom.scrollY - dy;
+            },
+            onDragEnd: () => {
+                canvas.classList.remove('is-panning');
+                // Letting go over a map node would otherwise read as picking it.
+                if (this.panFrom?.moved) this.swallowNextClick(canvas);
+                this.panFrom = null;
+            }
+        });
+    }
+
+    canPan() {
+        const canvas = this.getCanvas();
+        if (!canvas) return false;
+        return canvas.scrollWidth > canvas.clientWidth + 1 ||
+            canvas.scrollHeight > canvas.clientHeight + 1;
+    }
+
+    swallowNextClick(canvas) {
+        const swallow = event => {
+            event.stopPropagation();
+            event.preventDefault();
+        };
+        canvas.addEventListener('click', swallow, { capture: true, once: true });
+        // Nothing to swallow if the drag ended on empty ground.
+        setTimeout(() => canvas.removeEventListener('click', swallow, { capture: true }), 0);
+    }
+
+    // One SVG behind the nodes, one line per link. The endpoints are filled in
+    // by layoutConnectors from where the nodes really are — grid-cell units
+    // cannot do it, because the gap between cells is a fixed size while the
+    // cells themselves stretch, so the two only agree at one window size.
+    buildConnectors() {
+        const svg = document.createElementNS(Utility.SVG_NAMESPACE, 'svg');
+        svg.setAttribute('class', 'world-map__links');
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.setAttribute('aria-hidden', 'true');
+
+        const drawn = new Set();
+        WorldGraph.getConnections().forEach(connection => {
+            const key = [connection.from, connection.to].sort().join('|');
+            if (connection.bidirectional && drawn.has(key)) return;
+            drawn.add(key);
+
+            const line = document.createElementNS(Utility.SVG_NAMESPACE, 'line');
+            line.dataset.from = connection.from;
+            line.dataset.to = connection.to;
+            line.setAttribute('class', connection.bidirectional ? 'world-map__link' : 'world-map__link is-one-way');
+            svg.appendChild(line);
+        });
+
+        return svg;
+    }
+
+    observeGrid(grid) {
+        if (!this.resizeObserver) {
+            this.resizeObserver = new ResizeObserver(() => this.layoutConnectors());
+        }
+
+        this.resizeObserver.disconnect();
+        this.resizeObserver.observe(grid);
+    }
+
+    // Draw each link between the two nodes as they actually sit, in the SVG's
+    // own pixel space, anchored on the side or corner that faces the other node.
+    // Which of the two it is comes from the world layout rather than the pixels:
+    // maps sharing a row are joined side to side, maps sharing a column top to
+    // bottom, and anything else corner to corner.
+    layoutConnectors() {
+        const grid = this.gridElement;
+        const svg = this.linksElement;
+        if (!grid || !svg || !grid.clientWidth || !grid.clientHeight) return;
+
+        svg.setAttribute('viewBox', `0 0 ${grid.clientWidth} ${grid.clientHeight}`);
+        this.getCanvas()?.classList.toggle('is-pannable', this.canPan());
+
+        svg.querySelectorAll('line').forEach(line => {
+            const from = this.getNodeBox(line.dataset.from);
+            const to = this.getNodeBox(line.dataset.to);
+            if (!from || !to) {
+                line.setAttribute('x1', 0);
+                line.setAttribute('y1', 0);
+                line.setAttribute('x2', 0);
+                line.setAttribute('y2', 0);
+                return;
+            }
+
+            const heading = this.getHeading(line.dataset.from, line.dataset.to, from, to);
+            const start = this.getAnchorPoint(from, heading);
+            const end = this.getAnchorPoint(to, { x: -heading.x, y: -heading.y });
+            line.setAttribute('x1', start.x);
+            line.setAttribute('y1', start.y);
+            line.setAttribute('x2', end.x);
+            line.setAttribute('y2', end.y);
+        });
+    }
+
+    // Which way the second map lies from the first, as one of the eight compass
+    // directions of the layout grid. Falls back to where the nodes ended up when
+    // two maps claim the same square.
+    getHeading(fromMapId, toMapId, fromBox, toBox) {
+        const from = WorldGraph.getMap(fromMapId)?.layout;
+        const to = WorldGraph.getMap(toMapId)?.layout;
+        const heading = {
+            x: Math.sign((Number(to?.x) || 0) - (Number(from?.x) || 0)),
+            y: Math.sign((Number(to?.y) || 0) - (Number(from?.y) || 0))
+        };
+
+        if (heading.x || heading.y) return heading;
+        return { x: Math.sign(toBox.x - fromBox.x), y: Math.sign(toBox.y - fromBox.y) };
+    }
+
+    // Where on a node a link is tied. Straight across, that is the middle of the
+    // facing side. Diagonally, it is the middle of the corner's curve — the point
+    // the eye reads as the corner once the sharp one has been rounded away, and
+    // the reason a line aimed at the box's true corner looks like it stops short.
+    getAnchorPoint(box, heading) {
+        const arcInset = box.radius * (1 - Math.SQRT1_2);
+
+        return {
+            x: box.x + heading.x * (box.halfWidth - (heading.y === 0 ? 0 : arcInset)),
+            y: box.y + heading.y * (box.halfHeight - (heading.x === 0 ? 0 : arcInset))
+        };
+    }
+
+    // Node geometry in the chart's coordinates — offsets, not client rects, so
+    // it is unaffected by the canvas being scrolled or the stage transformed.
+    getNodeBox(mapId) {
+        const node = this.nodeElements.get(mapId);
+        if (!node) return null;
+
+        const halfWidth = node.offsetWidth / 2;
+        const halfHeight = node.offsetHeight / 2;
+
+        return {
+            x: node.offsetLeft + halfWidth,
+            y: node.offsetTop + halfHeight,
+            halfWidth,
+            halfHeight,
+            // A node's corner is a curve, not a point, and a link tied to the
+            // sharp corner of the box lands out in the open where the rounding
+            // has already pulled the edge away.
+            radius: Math.min(
+                parseFloat(getComputedStyle(node).borderTopLeftRadius) || 0,
+                halfWidth,
+                halfHeight
+            )
+        };
+    }
+
+    buildNode(map, extent) {
+        const node = document.createElement('button');
+        node.type = 'button';
+        node.className = 'world-map__node button';
+        node.dataset.mapId = map.id;
+        node.style.gridColumn = String((Number(map.layout?.x) || 0) - extent.minX + 1);
+        node.style.gridRow = String((Number(map.layout?.y) || 0) - extent.minY + 1);
+
+        const name = document.createElement('span');
+        name.className = 'world-map__node-name';
+        name.textContent = this.gameContainer.getMapDisplayName(map.id);
+
+        // Rows are a fixed height, so an empty badge row buys no evenness — it
+        // just puts the name off centre. A node with nothing to report gets none.
+        const badges = document.createElement('span');
+        badges.className = 'world-map__node-badges';
+        const residents = this.getResidents(map.id).length;
+        const travellers = this.getTravellerNames(map.id).length;
+        if (residents > 0) badges.appendChild(this.buildBadge(`${residents} home`, 'is-resident'));
+        if (travellers > 0) badges.appendChild(this.buildBadge(`${travellers} passing`, 'is-traveller'));
+
+        node.append(name);
+        if (badges.childElementCount > 0) node.appendChild(badges);
+        node.classList.toggle('is-current', map.id === this.currentMapId);
+        node.classList.toggle('is-selected', map.id === this.selectedMapId);
+        node.classList.toggle('is-unreachable', !WorldGraph.areConnected(this.currentMapId, map.id));
+        node.addEventListener('click', () => {
+            this.selectedMapId = map.id;
+            this.render();
+        });
+
+        return node;
+    }
+
+    buildBadge(text, modifier) {
+        const badge = document.createElement('span');
+        badge.className = `world-map__badge ${modifier}`;
+        badge.textContent = text;
+        return badge;
+    }
+
+    getResidents(mapId) {
+        return (this.gameContainer.mytes ?? []).filter(myte => myte.homeMapId === mapId);
+    }
+
+    // Every branch renders the same set of parts — heading, four rows, one
+    // action — so switching maps never resizes the window.
+    renderDetail(detail) {
+        const map = WorldGraph.getMap(this.selectedMapId);
+        if (!map) {
+            detail.replaceChildren(this.buildEmptyState('Select a map.'));
+            return;
+        }
+
+        const isHere = map.id === this.currentMapId;
+        const distance = WorldGraph.getDistance(this.currentMapId, map.id);
+        const residents = this.getResidents(map.id);
+        const neighbors = WorldGraph.getNeighbors(map.id).map(id => this.gameContainer.getMapDisplayName(id));
+
+        const head = document.createElement('div');
+        head.className = 'world-map__detail-head';
+        const heading = document.createElement('h3');
+        heading.className = 'world-map__detail-title';
+        heading.textContent = this.gameContainer.getMapDisplayName(map.id);
+        const region = document.createElement('span');
+        region.className = 'world-map__detail-region';
+        region.textContent = this.humanize(map.region);
+        head.append(heading, region);
+
+        const rows = document.createElement('div');
+        rows.className = 'world-map__rows';
+        this.appendDetailRow(rows, 'Distance', this.getDistanceLabel(isHere, distance));
+        this.appendDetailRow(rows, 'Connects to', neighbors.join(', ') || 'Nowhere');
+        this.appendDetailRow(rows, 'Mytes', residents.map(myte => myte.name).join(', ') || 'None');
+        this.appendDetailRow(rows, 'Travellers', this.getTravellerNames(map.id).join(', ') || 'None');
+
+        // The action row is always present even when empty — it is what keeps the
+        // panel the same height whether or not there is somewhere to travel to.
+        const actions = document.createElement('div');
+        actions.className = 'world-map__detail-actions';
+        if (!isHere) actions.appendChild(this.buildTravelButton(map, distance));
+
+        detail.replaceChildren(head, rows, actions);
+    }
+
+    getDistanceLabel(isHere, distance) {
+        if (isHere) return 'You are here';
+        if (!Number.isFinite(distance)) return 'No known route';
+        return `${distance} map${distance === 1 ? '' : 's'} away`;
+    }
+
+    // Mytes crossing this map right now — the world map is the one place the
+    // player can see where a traveller has got to.
+    getTravellerNames(mapId) {
+        const travelManager = this.gameContainer.travelManager;
+        return (this.gameContainer.mytes ?? [])
+            .filter(myte => travelManager?.getCurrentLegMapId?.(myte) === mapId)
+            .map(myte => myte.name);
+    }
+
+    appendDetailRow(container, label, value) {
+        const row = document.createElement('div');
+        row.className = 'world-map__row';
+        const labelNode = document.createElement('span');
+        labelNode.className = 'world-map__row-label';
+        labelNode.textContent = label;
+        const valueNode = document.createElement('span');
+        valueNode.className = 'world-map__row-value';
+        valueNode.textContent = value;
+        row.append(labelNode, valueNode);
+        container.appendChild(row);
+    }
+
+    humanize(value) {
+        const text = String(value || '');
+        return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
+    buildTravelButton(map, distance) {
+        const activeMyte = this.gameContainer.activeMyte;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'world-map__travel';
+        // With a myte out, travelling is a walk it takes, not a jump the camera
+        // makes — so the button says what will actually happen.
+        button.textContent = activeMyte ? 'Walk There' : 'Travel Here';
+
+        if (!Number.isFinite(distance)) {
+            button.disabled = true;
+            button.title = 'No portal route leads there.';
+            return button;
+        }
+
+        if (activeMyte) {
+            const travelManager = this.gameContainer.travelManager;
+            const isHeadingHere = travelManager?.isEscorting(activeMyte) &&
+                travelManager.getDestination(activeMyte) === map.id;
+
+            button.textContent = isHeadingHere ? 'Stop Walking' : 'Walk There';
+            button.title = isHeadingHere
+                ? `${activeMyte.name} keeps going until it arrives, or you stop it.`
+                : `${activeMyte.name} walks there through every portal on the way.`;
+
+            button.addEventListener('click', () => {
+                if (isHeadingHere) {
+                    travelManager.cancelTravel(activeMyte, { keepDeployed: true });
+                    this.render();
+                    return;
+                }
+
+                // Changing your mind mid-walk just changes where it is walking.
+                travelManager?.cancelTravel(activeMyte, { keepDeployed: true });
+                this.gameContainer.travelActiveMyteTo(map.id);
+                this.close();
+            });
+
+            return button;
+        }
+
+        button.addEventListener('click', () => {
+            this.gameContainer.loadMap(map.id);
+            this.close();
+        });
+
+        return button;
+    }
+
+    dispose() {
+        this.resizeObserver?.disconnect();
+        this.resizeObserver = null;
+        this.panHandler?.dispose();
+        this.panHandler = null;
+        this.panFrom = null;
+        this.gridElement = null;
+        this.linksElement = null;
+        this.nodeElements.clear();
+        super.dispose();
+    }
+}
+;
 /* -- js/UI/Panels/DebugPanel.js -- */
 class DebugPanel extends ModalWindow {
     constructor(parent) {
@@ -62372,6 +64656,8 @@ class GameLogManager extends ModalWindow {
     static MAX_ENTRIES = 200;
     static STORED_ENTRIES = 50;
     static STORAGE_KEY = 'myteGameLog';
+    // Sprite symbol used when a log template declares no icon of its own.
+    static DEFAULT_ICON = 'star';
 
     constructor(parent) {
         super(parent, {
@@ -62523,7 +64809,7 @@ class GameLogManager extends ModalWindow {
 
         this.addEntry({
             text,
-            icon: template.icon ?? '•',
+            icon: template.icon ?? GameLogManager.DEFAULT_ICON,
             category: template.category ?? 'system',
             rarity: template.rarity ?? null,
             time: this.getGameTimeStamp(),
@@ -62575,7 +64861,7 @@ class GameLogManager extends ModalWindow {
 
         const icon = document.createElement('span');
         icon.className = 'icon';
-        icon.textContent = entry.icon;
+        Utility.renderIconLabel(icon, entry.icon);
 
         const text = document.createElement('span');
         text.className = 'text';

@@ -279,6 +279,25 @@ const SiteConfig = Object.freeze({
     // World defaults
     world: Object.freeze({
         defaultMap: 'House',
+
+        // Summoning a myte that lives on another map makes it walk over rather
+        // than refusing. Distance is measured in map transitions (WorldGraph).
+        travel: Object.freeze({
+            maxDistance: 3,
+            // How long a map takes to cross is measured from the map file: the
+            // walk from the portal it came in by to the portal it is leaving
+            // through, at the traveller's own speed. This flat figure is only
+            // the fallback for a map whose geometry says nothing useful.
+            durationPerMap: 12000,
+            // No map should be crossable in a blink just because its portals
+            // happen to sit next to each other.
+            minLegDuration: 3000,
+            // How close to a portal counts as having reached it, when the portal
+            // itself does not say.
+            portalArrivalRadius: 48,
+            // Progress ticks that reach the UI while a myte is en route.
+            progressInterval: 4000,
+        }),
     }),
 
     // ── Myte defaults ─────────────────────────────────────────────────────────
@@ -434,15 +453,16 @@ const SiteConfig = Object.freeze({
         // (wander/idle stay silent on purpose — bubbling every think is noise).
         needBubbles: Object.freeze({
             minIntervalMs: 6000,
+            // Sprite symbol names from the #icon-sprite block in index.html.
             icons: Object.freeze({
-                safe_return:  '🏠',
-                home_comfort: '🏠',
-                rest:         '💤',
-                eat:          '🍎',
-                social:       '❤️',
-                play:         '⚽',
-                interaction:  '✨',
-                dropped_item: '👀',
+                safe_return:  'home',
+                home_comfort: 'home',
+                rest:         'sleep',
+                eat:          'bowl',
+                social:       'heart',
+                play:         'ball',
+                interaction:  'sparkle',
+                dropped_item: 'eye',
             }),
         }),
 
@@ -807,11 +827,11 @@ const SiteConfig = Object.freeze({
         }),
         hud: Object.freeze({
             updateIntervalMs: 250,
-            seasonGlyphs: Object.freeze({
-                spring: '🌱',
-                summer: '☀',
-                autumn: '🍂',
-                winter: '❄',
+            seasonIcons: Object.freeze({
+                spring: 'sprout',
+                summer: 'sun',
+                autumn: 'leaf',
+                winter: 'snowflake',
             }),
             numericAnimation: Object.freeze({
                 minDurationMs: 200,

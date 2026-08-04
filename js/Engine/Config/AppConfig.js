@@ -27,6 +27,9 @@ const AppConfig = Object.freeze({
 
     content: Object.freeze({
         shopsPath: 'data/metadata/shops.json',
+        // The world has no manifest: WorldGraph discovers it by following the
+        // portals in data/maps/*.tmx out from SiteConfig.world.defaultMap.
+        mapsPath: 'data/maps',
     }),
 
     // ── DOM wiring ────────────────────────────────────────────────────────────

@@ -5,6 +5,9 @@
   <property name="displayName" value="Door Test"/>
   <property name="location" value="inside"/>
   <property name="name" value="Door Test"/>
+  <property name="region" value="sandbox"/>
+  <property name="worldX" value="3"/>
+  <property name="worldY" value="2"/>
  </properties>
  <tileset firstgid="1" source="../tilesets/walls3.tsx"/>
  <layer id="1" name="Grass" width="30" height="16">

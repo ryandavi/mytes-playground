@@ -290,6 +290,11 @@ class MapObject {
 	// Hook for subclasses to inject their own status rows without rewriting the base logic.
 	_getSidebarStatusRows() { return []; }
 
+	// Player-facing interactions that open UI directly instead of queueing a myte
+	// action — opening a shop, talking to an NPC. Each entry is
+	// { id, label, run() }; the sidebar renders them above the queued actions.
+	getSidebarInteractions() { return []; }
+
 	getSidebarDetailRows() {
 		const rows = [];
 

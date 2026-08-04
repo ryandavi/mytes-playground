@@ -154,7 +154,7 @@ class CompactChipStripUI extends UIComponent {
         element.classList.toggle('has-progress', config.progressRatio != null);
         element.setAttribute('aria-label', [config.tooltipTitle, ...(config.tooltipLines || [])].filter(Boolean).join(' - '));
 
-        refs.label.textContent = config.shortLabel || '';
+        Utility.renderIconLabel(refs.label, config.icon, config.shortLabel || '');
         refs.badge.textContent = config.badgeText || '';
 
         if (config.progressRatio == null) {

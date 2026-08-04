@@ -30,6 +30,10 @@ class Camera {
 		this.useInstantMovement = false;
 		this.limitToBounds = false;
 
+		// Last viewport size the camera framed against — needed to work out which
+		// world point was centred before a resize.
+		this._viewportSize = null;
+
 		// Drag
 		this.isDragging = false;
 		this.dragStartX = 0;
@@ -282,6 +286,35 @@ class Camera {
 		}
 
 		return targetZoom;
+	}
+
+	// The viewport changed size (window resize, fullscreen toggle). Re-frame so
+	// the world point that was centred stays centred and the map is re-clamped
+	// to the new bounds — which is what centres a map smaller than the viewport
+	// instead of leaving it pinned to the left.
+	//
+	// Always immediate: the player didn't move the camera, the window moved
+	// under it. Easing here reads as the map drifting on its own.
+	handleViewportResize() {
+		const viewportRect = this.parent.getContainerRect();
+		const canvasRect = this.parent.getCanvasRect();
+		// Before the first map exists there is nothing to frame, and clamping
+		// against a zero-size canvas would throw the camera across the stage.
+		if (!viewportRect?.width || !viewportRect?.height) return;
+		if (!canvasRect?.width || !canvasRect?.height) return;
+
+		const previous = this._viewportSize ?? viewportRect;
+		this._viewportSize = { width: viewportRect.width, height: viewportRect.height };
+
+		this.zoomTo(this.zoomLevel, {
+			immediate: true,
+			anchor: {
+				screenX: viewportRect.width / 2,
+				screenY: viewportRect.height / 2,
+				worldX: (previous.width / 2) / this.zoomLevel - this.posX,
+				worldY: (previous.height / 2) / this.zoomLevel - this.posY
+			}
+		});
 	}
 
 	zoomBy(delta, options = {}) {

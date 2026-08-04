@@ -75,7 +75,7 @@
 
         &.is-droppable {
             > .myte-home-slot {
-                z-index: 100000;
+                z-index: var(--z-drag);
                 opacity: 1;
                 display: block;
                 @include is-droppable;
@@ -372,7 +372,7 @@
         pointer-events: none;
         user-select: none;
         cursor: grab;
-        z-index: var(--z-drag) !important;
+        z-index: var(--z-dragged) !important;
 
         > .inner-wrapper > .sprite {
             animation-name: wiggle2;

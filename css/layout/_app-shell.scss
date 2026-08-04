@@ -46,7 +46,7 @@
     >.header {
         flex: 0 0 100%;
         display: flex;
-        gap: var(--space-2xl);
+        gap: var(--space-xl);
         align-items: center;
         // Without these the header's nowrap contents plus the 2xl gap set a floor
         // of ~419px, which overhangs any phone viewport. Wrapping lets it reflow
@@ -72,9 +72,20 @@
         }
 
         >.fullscreen-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             padding: 0;
             width: 40px;
             height: 40px;
+
+            >.icon {
+                fill: var(--button-icon-color);
+            }
+
+            &.active >.icon {
+                fill: var(--button-active-icon-color);
+            }
         }
 
         >.active-pet {
@@ -153,6 +164,18 @@
             padding: var(--space-xs) var(--space-sm);
             color: var(--text-base);
             white-space: nowrap;
+
+            >.clock {
+                display: flex;
+                align-items: center;
+                gap: var(--space-xs);
+
+                >.clock__season {
+                    width: 12px;
+                    height: 12px;
+                    fill: currentColor;
+                }
+            }
         }
     }
 
@@ -203,6 +226,27 @@
 
                 &.is-active {
                     transform: translateY(-1px);
+                }
+
+                // Lives on another map. Desaturated, but still clickable — that
+                // is how you call it over.
+                &.is-away {
+                    opacity: 0.55;
+
+                    // On the wrapper, not the inner sprite: MyteListManager sets
+                    // the inner element's `filter` inline for species tinting.
+                    .myte-sprite {
+                        filter: grayscale(0.8);
+                    }
+                }
+
+                &.is-travelling {
+                    opacity: 0.85;
+
+                    .myte-state {
+                        color: var(--state-info-accent);
+                        opacity: 1;
+                    }
                 }
 
                 .myte-sprite {

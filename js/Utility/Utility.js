@@ -53,6 +53,62 @@ class Utility {
 	static topOnlyTags = ['button', 'textarea', 'input', 'select', 'iframe', 'canvas']; // tags they sit on top of
 
 
+    /********************************************
+     * icons — symbols live in the #icon-sprite block in index.html
+    ********************************************/
+	static SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+
+	static createIcon(name, className = 'icon') {
+		const svg = document.createElementNS(this.SVG_NAMESPACE, 'svg');
+		svg.setAttribute('class', className);
+		svg.setAttribute('aria-hidden', 'true');
+		svg.appendChild(document.createElementNS(this.SVG_NAMESPACE, 'use'));
+		this.setIcon(svg, name);
+		return svg;
+	}
+
+	// Fill `element` with a sprite icon, falling back to short text when the
+	// symbol name is missing. Reuses the existing <svg> so repeated updates on a
+	// live chip don't churn the DOM.
+	// Symbol ids are kebab-case by construction. Anything else — notably an emoji
+	// left in restored localStorage data — is rendered as text rather than
+	// becoming a <use> pointing at a symbol that does not exist.
+	static isIconName(value) {
+		return typeof value === 'string' && /^[a-z0-9-]+$/.test(value);
+	}
+
+	static renderIconLabel(element, name, fallbackText = '') {
+		if (!element) return;
+
+		if (!this.isIconName(name)) {
+			fallbackText = typeof name === 'string' && name ? name : fallbackText;
+			name = null;
+		}
+
+		if (name) {
+			const existing = element.firstElementChild;
+			if (existing?.tagName === 'svg') {
+				this.setIcon(existing, name);
+				return;
+			}
+			element.replaceChildren(this.createIcon(name));
+			return;
+		}
+
+		if (element.firstElementChild) element.replaceChildren();
+		if (element.textContent !== fallbackText) element.textContent = fallbackText;
+	}
+
+	static setIcon(svg, name) {
+		const use = svg?.querySelector?.('use');
+		if (!use) return;
+		if (name) {
+			use.setAttribute('href', `#icon-${name}`);
+		} else {
+			use.removeAttribute('href');
+		}
+	}
+
 	static createRandomGenerator(seed) {
 		return function() {
 		  // Simple mulberry32 algorithm
@@ -106,6 +162,16 @@ class Utility {
 
 	static formatNumber(value) {
 		return this.numberFormatter.format(Number(value) || 0);
+	}
+
+	// Rough spoken duration for a wait the player is being told about — "half a
+	// minute", not "31.4s". Under a minute reads in seconds, above it in minutes.
+	static formatDuration(milliseconds) {
+		const seconds = Math.max(0, Math.round((Number(milliseconds) || 0) / 1000));
+		if (seconds < 60) return `${Math.max(5, Math.round(seconds / 5) * 5)} sec`;
+
+		const minutes = Math.round(seconds / 60);
+		return `${minutes} min`;
 	}
 
 	static formatCurrency(currencyId, value) {

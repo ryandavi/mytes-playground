@@ -186,6 +186,21 @@ class NpcMapObject extends MovingMapObject {
 		return true;
 	}
 
+	getSidebarInteractions() {
+		const interactions = super.getSidebarInteractions();
+		const shop = ShopRegistry.getShop(this.getConfig('shopId', null));
+
+		if (shop) {
+			interactions.push({
+				id: 'open_shop',
+				label: `Open ${shop.name}`,
+				run: () => this.openConfiguredShop()
+			});
+		}
+
+		return interactions;
+	}
+
 	// ── Pathfinding helpers ───────────────────────────────────────────────────
 
 	// Runs A* from current position to (targetCenterX, targetCenterY).

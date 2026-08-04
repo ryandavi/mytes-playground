@@ -96,7 +96,14 @@
             font-size: 16px;
             margin: 0;
             display: flex;
+            align-items: center;
             gap: var(--gap);
+
+            >svg.icon {
+                width: 18px;
+                height: 18px;
+                fill: currentColor;
+            }
         }
 
         >.window-panel__controls {
@@ -113,6 +120,16 @@
                 justify-content: center;
                 font-size: 22px;
                 margin-left: auto;
+
+                >svg.icon {
+                    width: 12px;
+                    height: 12px;
+                    fill: var(--button-icon-color);
+                }
+
+                &:hover >svg.icon {
+                    fill: var(--button-active-icon-color);
+                }
             }
         }
     }
@@ -121,8 +138,7 @@
         padding: var(--padding);
         padding-top: calc(var(--padding) + var(--border-width));
         flex: 1;
-        overflow-y: auto;
-        scrollbar-color: var(--button-dark) transparent;
+        @include scroll-area;
 
         .text-content {
             margin: var(--border-width);
@@ -260,8 +276,7 @@
     flex-shrink: 0;
     // Four tabs at desktop padding exceed a phone's width. Scroll the strip
     // rather than letting the last tab fall off the edge unreachable.
-    overflow-x: auto;
-    scrollbar-width: thin;
+    @include scroll-area(x);
 
     >button {
         @include button-base;
@@ -295,8 +310,12 @@
 .window-tab-body {
     min-width: 0;
     min-height: 0;
-    overflow: auto;
+    @include scroll-area(both);
     @include frame-sunken;
+
+    // Panels whose tabs hold different amounts of content set this to the
+    // height of their tallest tab, so switching tabs never resizes the window.
+    block-size: var(--window-tab-body-size, auto);
 
     >[role='tabpanel'][hidden] {
         display: none !important;
@@ -325,6 +344,8 @@
 }
 
 .info-row {
+    --info-row-height: 44px;
+
     display: grid;
     grid-template-columns: 140px minmax(0, 1fr);
     align-items: center;
@@ -342,7 +363,7 @@
         align-items: center;
         justify-content: center;
         min-width: 0;
-        min-height: 44px;
+        min-height: var(--info-row-height);
         margin: 0;
         padding: var(--space-sm);
         text-align: center;
@@ -382,7 +403,7 @@
         height: 100%;
         margin: 0;
         padding: 0;
-        overflow-y: auto;
+        @include scroll-area;
         list-style: none;
         font-size: 0.75rem;
         line-height: 1.4;
@@ -410,7 +431,15 @@
             >.icon {
                 grid-column: 1;
                 grid-row: 1;
-                text-align: center;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+
+                >svg.icon {
+                    width: 12px;
+                    height: 12px;
+                    fill: var(--text-muted);
+                }
             }
 
             >.text {
@@ -751,7 +780,7 @@ body.ui-gallery-page {
     >.world-modal__body {
         min-height: 0;
         padding: var(--space-lg);
-        overflow-y: auto;
+        @include scroll-area;
     }
 
 }
@@ -1167,6 +1196,7 @@ body.ui-gallery-page {
 
 #user-profile-panel {
     width: min(560px, calc(100vw - (var(--padding-outer) * 2)));
+    height: min(var(--size-stage-height), calc(100vh - (var(--padding-outer) * 2)));
 
     .user-profile__content {
         display: grid;
@@ -1203,14 +1233,6 @@ body.ui-gallery-page {
     .user-profile__id {
         color: var(--text-muted);
         font-size: 0.75rem;
-    }
-
-    .user-profile__body {
-        overflow: auto;
-    }
-
-    .user-profile__body .info-list {
-        min-height: 100%;
     }
 
 }
@@ -1264,4 +1286,254 @@ body.ui-gallery-page {
             }
         }
     }
+}
+
+// ─── World Map ─────────────────────────────────────────────────────────────
+
+.window-panel.world-map {
+    // The detail block is a fixed frame: its head and action row are pinned and
+    // only the rows between them scroll, so reading a map with many neighbours
+    // never resizes the window.
+    --world-map-detail-height: 212px;
+    --world-map-node-height: 48px;
+    // A cell never shrinks past a legible node — below that the chart scrolls,
+    // which is what keeps a fifty-map world from becoming fifty slivers — and
+    // never grows past a node-shaped one, so a four-map world in a maximized
+    // window is a chart with room around it rather than four vast slabs.
+    --world-map-node-min-width: 116px;
+    --world-map-node-max-width: 200px;
+
+    width: min(520px, calc(100vw - var(--space-2xl)));
+
+    // Maximized, the extra room goes into the chart: bigger nodes, more of the
+    // world before anything has to scroll.
+    &.is-fullscreen {
+        --world-map-node-height: 72px;
+        --world-map-node-min-width: 148px;
+        --world-map-node-max-width: 260px;
+    }
+
+    >.world-map__content {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+        // The detail block is fixed height; the canvas is what yields if the
+        // window is ever shorter than the two together.
+        min-height: 0;
+    }
+}
+
+.world-map__canvas {
+    @include frame-sunken;
+    // The window onto the chart: it takes whatever height the panel has spare,
+    // so maximizing the window really does show more world.
+    flex: 1;
+    min-height: calc((var(--world-map-node-height) * 3) + var(--space-lg) * 2);
+    @include scroll-area(both);
+    padding: var(--space-sm);
+    // Same surface and dither scale as the game stage, so the world map reads as
+    // a view of the same ground rather than a diagram of it.
+    --dither-size: 12px;
+    background-color: var(--surface-stage);
+    @include dither-pattern;
+
+    // Only offer the grab when there is somewhere to go; `is-panning` is set for
+    // the duration of the drag so the cursor doesn't flicker over the nodes.
+    &.is-pannable {
+        cursor: grab;
+    }
+
+    &.is-panning,
+    &.is-panning * {
+        cursor: grabbing;
+        user-select: none;
+    }
+}
+
+// The chart itself. Cells stretch to fill a roomy window and stop at a legible
+// minimum in a cramped one, at which point the canvas around it scrolls.
+.world-map__grid {
+    display: grid;
+    position: relative;
+    grid-template-columns: repeat(
+        var(--world-map-columns, 1),
+        minmax(var(--world-map-node-min-width), var(--world-map-node-max-width))
+    );
+    grid-template-rows: repeat(var(--world-map-rows, 1), var(--world-map-node-height));
+    // Wide enough that the connector lines between nodes actually read.
+    gap: var(--space-lg);
+    min-width: 100%;
+    min-height: 100%;
+    // Nodes keep their proportions rather than stretching into slabs; the spare
+    // room in a big window becomes margin around the chart instead.
+    align-content: center;
+    justify-content: center;
+}
+
+// Sits behind the nodes and spans the whole chart, so link endpoints are
+// expressed in grid-cell units and stay aligned at any panel size.
+.world-map__links {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.world-map__link {
+    stroke: var(--button-dark);
+    stroke-width: 3;
+    vector-effect: non-scaling-stroke;
+
+    &.is-one-way {
+        stroke-dasharray: 5 4;
+    }
+}
+
+.world-map__node {
+    @include button-base;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2xs);
+    padding: var(--space-xs);
+    text-align: center;
+    cursor: pointer;
+    overflow: hidden;
+
+    &.is-selected {
+        @include button-pressed;
+        outline: 2px solid var(--header-mid);
+        outline-offset: -2px;
+    }
+
+    // The map you are standing in, marked the way the title bar marks a focused
+    // window rather than with a colour the palette does not have.
+    &.is-current {
+        border-color: var(--header-mid);
+        color: var(--text-base);
+
+        >.world-map__node-name {
+            font-weight: 700;
+        }
+    }
+
+    // No portal route leads here from where you are. Still selectable — you can
+    // read about it, you just cannot walk there.
+    &.is-unreachable:not(.is-selected) {
+        opacity: 0.5;
+    }
+}
+
+.world-map__node-name {
+    font-size: 0.8em;
+    line-height: 1.1;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.world-map__node-badges {
+    display: flex;
+    gap: var(--space-2xs);
+}
+
+.world-map__badge {
+    background-color: var(--surface-pill-muted);
+    border-radius: var(--radius-xs);
+    padding: 0 var(--space-2xs);
+    font-size: 0.6em;
+    line-height: 12px;
+    color: var(--text-subtle);
+    white-space: nowrap;
+
+    &.is-traveller {
+        background-color: var(--header-mid);
+        color: var(--text-on-accent);
+    }
+}
+
+.world-map__detail {
+    @include surface-inset;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: var(--world-map-detail-height);
+    padding: var(--space-md);
+}
+
+.world-map__detail-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-md);
+    padding-bottom: 0;
+    margin-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.world-map__detail-title {
+    margin: 0;
+    font-size: 1em;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.world-map__detail-region {
+    flex: 0 0 auto;
+    font-size: 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+// The only part that scrolls. Values wrap in full rather than being truncated —
+// the scroll is what protects the panel height.
+.world-map__rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    min-height: 0;
+    @include scroll-area;
+    padding-right: var(--space-2xs);
+}
+
+.world-map__row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-md);
+    font-size: 0.8em;
+    min-width: 0;
+
+    >.world-map__row-label {
+        flex: 0 0 116px;
+        color: var(--text-muted);
+        white-space: nowrap;
+    }
+
+    >.world-map__row-value {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+}
+
+.world-map__detail-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    // Reserved whether or not it holds a button, so the map you are standing in
+    // is the same height as any other.
+    height: 40px;
+    margin-top: var(--space-sm);
+}
+
+// Compact and right-aligned: the map grid above is the subject here, and a
+// full-width call to action outweighed it.
+.world-map__travel {
+    padding: var(--space-2xs) var(--space-lg);
+    font-size: 0.85em;
 }

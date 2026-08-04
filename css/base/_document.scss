@@ -18,6 +18,20 @@ body {
     justify-content: center;
 }
 
+// The sprite only holds <symbol> definitions; it must never occupy layout.
+.icon-sprite {
+    display: none;
+}
+
+// Every glyph is a <use> of a 12x12 symbol, so the referencing <svg> carries no
+// viewBox of its own and needs an explicit box to size against.
+svg.icon {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    fill: currentColor;
+}
+
 body,
 input,
 textarea,

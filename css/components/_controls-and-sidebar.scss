@@ -124,7 +124,7 @@
                 color: var(--text-muted);
                 margin-top: 0;
                 min-height: 0;
-                overflow-y: auto;
+                @include scroll-area;
 
                 &.is-visible {
                     display: flex;
@@ -311,11 +311,15 @@
             }
 
             >.action-groups {
-                overflow-y: auto;
-                scrollbar-width: thin;
+                @include scroll-area;
                 min-height: 0;
-                padding: var(--padding);
-                padding-top: 0;
+
+                // Inset with margin, not padding, so this matches the gutter of
+                // the .other-info / .selected-info panels above it — and so the
+                // scrollbar lands on the same vertical line as theirs instead of
+                // hugging the sidebar frame.
+                margin: 0 var(--padding) var(--padding);
+                padding: 0;
 
                 .action-group {
                     +.action-group {
@@ -333,11 +337,11 @@
                             margin-top: 0;
                             border-top: none;
                         }
+                    }
 
-                        .primary-action {
-                            width: 100%;
-                            font-weight: 700;
-                        }
+                    .primary-action {
+                        width: 100%;
+                        font-weight: 700;
                     }
 
                     h3 {

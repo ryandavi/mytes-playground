@@ -56,19 +56,7 @@ class MyteListManager extends UIComponent {
         thumbnail.appendChild(infoButton);
 
         // Add click handler
-        thumbnail.addEventListener('click', () => {
-            if (!myte.isActive) {
-                this.parent.setSelected?.(myte);
-                return;
-            }
-
-            if (myte === this.parent.getActiveMyte()) {
-                this.parent.parent.deactivateActiveMyte?.(myte);
-                return;
-            }
-
-            this.parent.setActiveMyte(myte);
-        });
+        thumbnail.addEventListener('click', () => this.handleThumbnailClick(myte));
 
         this.applyThumbnailState(thumbnail, myte);
 
@@ -93,9 +81,83 @@ class MyteListManager extends UIComponent {
         spriteInner.style.transformOrigin = 'top left';
     }
 
+    // One click, one meaning: take control of this myte. What that costs depends
+    // on where it is — deploy it from its slot, call it across the world, or
+    // simply switch to it.
+    handleThumbnailClick(myte) {
+        const container = this.parent.parent;
+
+        // An escorted myte is still the one you are playing, so clicking it means
+        // what it always means — only a myte off walking on its own is untouchable.
+        if (this.getTravelManager()?.isTravellingAlone(myte)) {
+            this.parent.showMessage?.(`${myte.name} is already on the way.`, 'info', 'On the way');
+            return;
+        }
+
+        if (!myte.isActive) {
+            if (!myte.isOnHomeMap) {
+                container.summonMyte?.(myte);
+                return;
+            }
+
+            // Resting in its slot on this map — wake it and take control.
+            if (!myte.startWithOptions({
+                goal: DEFAULT_MODE,
+                followGoal: myte.followGoal,
+                autonomyGoal: myte.autonomyGoal
+            })) return;
+
+            myte.clearHomeSlotHold?.();
+            this.parent.setActiveMyte(myte);
+            return;
+        }
+
+        if (myte === this.parent.getActiveMyte()) {
+            container.deactivateActiveMyte?.(myte);
+            return;
+        }
+
+        this.parent.setActiveMyte(myte);
+    }
+
+    getTravelManager() {
+        return this.parent.parent.travelManager ?? null;
+    }
+
+    getMapDisplayName(mapId) {
+        const mapLoader = this.parent.parent.core?.mapLoader;
+        return mapLoader?.getCachedMapDisplayName?.(mapId)
+            || mapLoader?.humanizeMapId?.(mapId)
+            || String(mapId ?? 'Unknown');
+    }
+
+    // Resting in a slot on a map the player isn't in.
+    isAway(myte) {
+        return !!myte && !myte.isActive && !myte.isOnHomeMap;
+    }
+
     getMyteStateLabel(myte) {
+        const travelManager = this.getTravelManager();
+        if (travelManager?.isEscorting(myte)) {
+            return 'Walking';
+        }
+
+        if (travelManager?.isTravelling(myte)) {
+            return travelManager.getDirection(myte) === MYTE_TRAVEL_DIRECTIONS.RETURN
+                ? 'Heading Home'
+                : 'Travelling';
+        }
+
+        if (this.isAway(myte)) {
+            return travelManager?.canTravel(myte) ? 'Away' : 'Too Far';
+        }
+
         if (!myte?.isActive) {
             return 'Inactive';
+        }
+
+        if (myte.isVisiting && myte !== this.parent.getActiveMyte()) {
+            return 'Visiting';
         }
 
         if (myte === this.parent.getActiveMyte()) {
@@ -121,9 +183,15 @@ class MyteListManager extends UIComponent {
         thumbnail.classList.toggle('deployed', myte.isActive);
         thumbnail.classList.toggle('free-roam', isFreeRoam);
         thumbnail.classList.toggle('in-slot', isInSlot);
+        thumbnail.classList.toggle('is-away', this.isAway(myte));
+        thumbnail.classList.toggle('is-travelling', !!this.getTravelManager()?.isTravellingAlone(myte));
         thumbnail.dataset.myteState = stateLabel;
         thumbnail.querySelector('.myte-state').textContent = stateLabel;
-        thumbnail.title = `${myte.name}: ${stateLabel}`;
+        // Where it is, not where it lives — a myte left standing on another map
+        // is "away" there, not at home.
+        thumbnail.title = this.isAway(myte)
+            ? `${myte.name}: ${stateLabel} in ${this.getMapDisplayName(this.parent.parent.getMyteMapId?.(myte) ?? myte.homeMapId)}`
+            : `${myte.name}: ${stateLabel}`;
     }
 
     initMytesList() {

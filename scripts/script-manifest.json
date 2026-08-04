@@ -18,6 +18,9 @@
     "src": "js/Utility/RectUtils.js"
   },
   {
+    "src": "js/UI/Core/IconSprite.js"
+  },
+  {
     "src": "js/UI/Core/TooltipSystem.js"
   },
   {
@@ -227,6 +230,9 @@
     "src": "js/Map/GameMapLoader.js"
   },
   {
+    "src": "js/Map/WorldGraph.js"
+  },
+  {
     "src": "js/Map/Regions/SpatialRegion.js",
     "commentLine": "<!-- Regions: shared geometry primitive, loaded before its consumers -->"
   },
@@ -250,6 +256,16 @@
   },
   {
     "src": "js/Map/MapTransitionManager.js"
+  },
+  {
+    "src": "js/Map/MytePresenceManager.js"
+  },
+  {
+    "src": "js/Map/RouteTravelManager.js",
+    "commentLine": "<!-- Travel: generic route walking, then the myte-flavoured manager built on it -->"
+  },
+  {
+    "src": "js/Map/MyteTravelManager.js"
   },
   {
     "src": "js/Map/MapRenderer.js"
@@ -442,6 +458,9 @@
   },
   {
     "src": "js/UI/Panels/ViewPanel.js"
+  },
+  {
+    "src": "js/UI/Panels/WorldMapPanel.js"
   },
   {
     "src": "js/UI/Panels/DebugPanel.js"

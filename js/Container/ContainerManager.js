@@ -36,6 +36,8 @@ class ContainerManager {
         this.inventory = null;
 
         this.transitionManager = new MapTransitionManager(this);
+        this.mytePresence = new MytePresenceManager(this);
+        this.travelManager = new MyteTravelManager(this);
         this.userIsActive = true;
 
         this._cachedCanvasRect = null;
@@ -44,6 +46,12 @@ class ContainerManager {
             this._cachedCanvasRect = null;
             this._cachedContainerRect = null;
             this.mytes.forEach(myte => myte.invalidateHomePositionCache?.());
+            // Re-frame against the new viewport. Without this the camera keeps
+            // the bounds it was clamped to at the old size, so a map smaller
+            // than the viewport stays pinned where it was and a larger one can
+            // sit outside its limits — visible whenever no myte is active,
+            // since character-follow otherwise re-centres every frame.
+            this.camera?.handleViewportResize();
         };
         // Window resize alone misses container size changes that happen without a
         // resize event (e.g. the is-fullscreen class applied from localStorage at
@@ -878,10 +886,96 @@ class ContainerManager {
             }
         });
 
+        this.travelManager?.tickUpdate(tickDelta);
+
         if (this.timeManager) this.timeManager.tickUpdate?.(tickDelta);
     }
 
+    getMapDisplayName(mapId) {
+        return this.core?.mapLoader?.getCachedMapDisplayName?.(mapId)
+            || this.core?.mapLoader?.humanizeMapId?.(mapId)
+            || String(mapId ?? 'somewhere');
+    }
 
+    // The map a myte is actually on: the one it is crossing, the one you are
+    // playing if it is out here with you, the one you left it standing on, or —
+    // failing all of those — its own map, where it is asleep in its slot.
+    getMyteMapId(myte) {
+        return this.mytePresence?.getMapId(myte) ?? myte?.homeMapId ?? null;
+    }
+
+    // Send a visiting myte back to its own map. It leaves the map now and is
+    // back in its slot once the walk finishes.
+    sendMyteHome(myte) {
+        const result = this.travelManager.requestReturn(myte);
+
+        if (result.ok) {
+            this.ui?.showMessage?.(
+                `${myte.name} is heading back to ${this.getMapDisplayName(result.destination)}.`,
+                'info',
+                'Heading Home'
+            );
+        }
+
+        return result;
+    }
+
+    // Summon a myte that lives on another map: it walks over rather than being
+    // unavailable. Returns the MyteTravelManager result so callers can report it.
+    summonMyte(myte) {
+        const result = this.travelManager.requestTravel(myte);
+        const displayName = mapId => this.getMapDisplayName(mapId);
+
+        if (result.ok) {
+            this.ui?.showMessage?.(
+                `${myte.name} is on its way from ${displayName(result.origin)} — about ${Utility.formatDuration(result.journey.duration)}.`,
+                'info',
+                'On the way'
+            );
+        } else if (result.reason === MYTE_TRAVEL_RESULTS.TOO_FAR) {
+            this.ui?.showMessage?.(
+                `${myte.name} is ${result.distance} maps away in ${displayName(result.origin)} — too far to walk here.`,
+                'warning',
+                'Too Far'
+            );
+        } else if (result.reason === MYTE_TRAVEL_RESULTS.UNREACHABLE) {
+            this.ui?.showMessage?.(
+                `${myte.name} can't find a route here from ${displayName(result.origin)}.`,
+                'warning',
+                'No Route'
+            );
+        } else if (result.reason === MYTE_TRAVEL_RESULTS.ALREADY_TRAVELLING) {
+            this.ui?.showMessage?.(`${myte.name} is already on the way.`, 'info', 'On the way');
+        }
+
+        return result;
+    }
+
+    // Walk the active myte to another map instead of jumping the camera there.
+    // It heads for the portal on the way, steps through it, and carries on until
+    // it arrives — the player can watch the whole trip, or take over at any
+    // point by giving it something else to do.
+    travelActiveMyteTo(mapId) {
+        const myte = this.activeMyte;
+        if (!myte) return { ok: false, reason: MYTE_TRAVEL_RESULTS.UNREACHABLE };
+
+        const result = this.travelManager.requestEscortedTravel(myte, mapId);
+        const displayName = this.getMapDisplayName(mapId);
+
+        if (result.ok) {
+            this.ui?.showMessage?.(
+                result.distance === 1
+                    ? `${myte.name} is heading for the way to ${displayName}.`
+                    : `${myte.name} is heading for ${displayName}, ${result.distance} maps away.`,
+                'info',
+                'On the way'
+            );
+        } else if (result.reason === MYTE_TRAVEL_RESULTS.UNREACHABLE) {
+            this.ui?.showMessage?.(`No route leads to ${displayName} from here.`, 'warning', 'No Route');
+        }
+
+        return result;
+    }
 
     dispose() {
         window.removeEventListener('resize', this._boundInvalidateCanvasRect);
@@ -896,6 +990,11 @@ class ContainerManager {
         });
         this.mytes = [];
         this.activeMyte = null;
+
+        this.travelManager?.dispose();
+        this.travelManager = null;
+        this.mytePresence?.dispose();
+        this.mytePresence = null;
 
         if (this.camera) {
             this.camera.dispose();

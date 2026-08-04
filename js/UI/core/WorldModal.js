@@ -49,9 +49,7 @@ class WorldModal extends ModalWindow {
         header.className = 'window-panel__header world-modal__header';
         const title = document.createElement('h2');
         title.className = 'window-panel__title world-modal__title';
-        this.iconElement = document.createElement('span');
-        this.iconElement.className = 'icon';
-        this.iconElement.setAttribute('aria-hidden', 'true');
+        this.iconElement = Utility.createIcon('');
         this.titleTextElement = document.createElement('span');
         this.titleTextElement.className = 'text';
         title.append(this.iconElement, this.titleTextElement);
@@ -92,9 +90,10 @@ class WorldModal extends ModalWindow {
         if (this.titleTextElement) this.titleTextElement.textContent = String(title || '');
     }
 
+    // `icon` is a sprite symbol name from the #icon-sprite block in index.html.
     setIcon(icon) {
         if (!this.iconElement) return;
-        this.iconElement.textContent = String(icon || '');
+        Utility.setIcon(this.iconElement, icon);
         this.iconElement.hidden = !icon;
     }
 
