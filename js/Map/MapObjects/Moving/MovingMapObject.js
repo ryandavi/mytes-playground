@@ -24,12 +24,19 @@ class MovingMapObject extends withAnimation(MapObject) {
 	// ── Bounds ────────────────────────────────────────────────────────────────
 
 	_defaultBounds() {
-		return { left: 0, right: 500, top: 0, bottom: 500 };
+		const dimensions = this.gameMap?.dimensions;
+		return {
+			left: 0,
+			right: dimensions?.width ?? 500,
+			top: 0,
+			bottom: dimensions?.height ?? 500
+		};
 	}
 
 	updateBounds(parent) {
-		if (!parent?.getMaxDimensions) return;
-		const { width, height } = parent.getMaxDimensions();
+		const dimensions = parent?.dimensions ?? parent?.getMaxDimensions?.();
+		if (!dimensions) return;
+		const { width, height } = dimensions;
 		this.bounds = { left: 0, right: width, top: 0, bottom: height };
 	}
 
@@ -146,7 +153,7 @@ class MovingMapObject extends withAnimation(MapObject) {
 
 	render(container, parent) {
 		const element = super.render(container, parent);
-		this.updateBounds(parent);
+		this.updateBounds(this.gameMap ?? parent);
 		element.classList.add('moving-object');
 		return element;
 	}

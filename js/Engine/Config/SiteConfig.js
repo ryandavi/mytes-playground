@@ -804,7 +804,7 @@ const SiteConfig = Object.freeze({
         }),
         interactionSounds: Object.freeze({
             click: 'ui_click',
-            modalOpen: 'ui_select',
+            modalOpen: 'ui_modal_open',
             modalClose: 'ui_hover',
             zoom: 'ui_drag_item',
             zoomInPitch: 1.12,

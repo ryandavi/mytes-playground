@@ -36,11 +36,12 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         this.moveThreshold = options.moveThreshold || 0.025;
         this.direction = 'S';
 
+        const mapDimensions = parent?.dimensions;
         this.bounds = {
             left: 0,
-            right: options.mapWidth || 500,
+            right: options.mapWidth || mapDimensions?.width || 500,
             top: 0,
-            bottom: options.mapHeight || 500
+            bottom: options.mapHeight || mapDimensions?.height || 500
         };
 
         this.hoverHeightBase = this.getConfig('hoverHeight', 18);
@@ -417,8 +418,9 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         const element = super.render(container, parent);
         element.classList.add('animated-map-object');
 
-        if (parent?.getMaxDimensions) {
-            const { width, height } = parent.getMaxDimensions();
+        const boundsSource = this.gameMap?.dimensions ?? parent?.getMaxDimensions?.();
+        if (boundsSource) {
+            const { width, height } = boundsSource;
             this.bounds = { left: 0, right: width, top: 0, bottom: height };
         }
 

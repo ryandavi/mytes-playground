@@ -225,23 +225,9 @@ class ParticleRendererPool {
         if (!view) return;
         view.layerKey = '';
         view.element.remove();
-        view.last = {
-            transform: '',
-            opacity: '',
-            width: '',
-            height: '',
-            backgroundImage: '',
-            backgroundPosition: '',
-            backgroundSize: '',
-            backgroundColor: '',
-            borderRadius: '',
-            zIndex: '',
-            visibility: '',
-            display: '',
-            mixBlendMode: '',
-            className: ''
-        };
-        view.element.className = 'particle';
+        // Keep the cache aligned with the element's retained inline styles.
+        // On reuse, flushParticle can then clear properties from the previous
+        // render type (such as a generic particle's circular background).
         this.pool.push(view);
     }
 

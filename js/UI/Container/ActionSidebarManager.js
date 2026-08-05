@@ -927,10 +927,36 @@ class ActionSidebarManager extends UIComponent {
         return button;
     }
 
-    // Direct UI interactions (open shop, talk) sit above the queued actions and
-    // work with no active myte, since they are the player acting, not a myte.
-    renderSidebarInteractions(actionGroups, selectedObject) {
-        const interactions = selectedObject?.getSidebarInteractions?.() ?? [];
+    createSidebarInteractionButton(interaction, { prominent = false } = {}) {
+        const button = document.createElement('button');
+        button.textContent = interaction.label;
+        if (prominent) button.classList.add('primary-action');
+        if (interaction.description) button.title = interaction.description;
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            interaction.run?.();
+        });
+        return button;
+    }
+
+    renderMajorSidebarInteraction(actionGroups, interaction) {
+        if (!interaction) return false;
+
+        const groupElement = document.createElement('div');
+        groupElement.className = 'action-group major-action';
+        const actionList = document.createElement('ul');
+        const li = document.createElement('li');
+        li.appendChild(this.createSidebarInteractionButton(interaction, { prominent: true }));
+        actionList.appendChild(li);
+        groupElement.appendChild(actionList);
+        actionGroups.appendChild(groupElement);
+        return true;
+    }
+
+    // Direct UI interactions work with no active myte, since they are the player
+    // acting rather than a queued creature action.
+    renderSidebarInteractions(actionGroups, interactions) {
         if (interactions.length === 0) return false;
 
         const groupElement = document.createElement('div');
@@ -942,18 +968,8 @@ class ActionSidebarManager extends UIComponent {
 
         const actionList = document.createElement('ul');
         interactions.forEach(interaction => {
-            const button = document.createElement('button');
-            button.textContent = interaction.label;
-            button.classList.add('primary-action');
-            if (interaction.description) button.title = interaction.description;
-            button.addEventListener('click', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                interaction.run?.();
-            });
-
             const li = document.createElement('li');
-            li.appendChild(button);
+            li.appendChild(this.createSidebarInteractionButton(interaction));
             actionList.appendChild(li);
         });
 
@@ -1005,7 +1021,13 @@ class ActionSidebarManager extends UIComponent {
         actionGroups.innerHTML = '';
         const activeMyte = this.parent.getActiveMyte();
 
-        this.renderSidebarInteractions(actionGroups, selectedObject);
+        const sidebarInteractions = selectedObject?.getSidebarInteractions?.() ?? [];
+        const majorSidebarInteraction = sidebarInteractions.find(interaction => interaction.major === true) ?? null;
+        this.renderMajorSidebarInteraction(actionGroups, majorSidebarInteraction);
+        this.renderSidebarInteractions(
+            actionGroups,
+            sidebarInteractions.filter(interaction => interaction !== majorSidebarInteraction)
+        );
 
         if (selectedObject instanceof DroppedMapItem) {
             this.actionControls.classList.add('is-visible');
@@ -1056,7 +1078,9 @@ class ActionSidebarManager extends UIComponent {
         }
 
         const availableActions = ActionManager.getAvailableActions(selectedObject, activeMyte);
-        const majorAction = this.getMajorAction(selectedObject, activeMyte, availableActions);
+        const majorAction = majorSidebarInteraction
+            ? null
+            : this.getMajorAction(selectedObject, activeMyte, availableActions);
 
         // Actions that are unavailable *and* can say why are shown disabled with the
         // reason, instead of vanishing. Actions with no reason stay hidden — they are

@@ -18,6 +18,8 @@ class DragHandler {
         // Drag end callback
         this.onDragEnd = options.onDragEnd || (() => {});
 
+        this.inputSystem = InputSystem.getInstance();
+
         // State tracking
         this.isDragging = false;
         this.initialTouchPos = { x: 0, y: 0 };
@@ -66,10 +68,15 @@ class DragHandler {
         // Check if dragging is allowed
         if (!this.canDrag()) return;
 
-        event.preventDefault();
-
         const pos = this.getEventPosition(event);
         if (!pos) return;
+
+        // Map-object drags listen globally and may overlap a Myte's much larger
+        // sprite hitbox. Claim this press before either handler can move so only
+        // the entity the user actually pressed is picked up.
+        if (!this.inputSystem.claimDrag(this)) return;
+
+        event.preventDefault();
 
         // Store initial touch/click position
         this.initialTouchPos = { ...pos };
@@ -213,6 +220,7 @@ class DragHandler {
         this.touchId = null;
         this.preventScroll = false;
         this.moveThreshold = false;
+        this.inputSystem.releaseDrag(this);
     }
 
     dispose() {

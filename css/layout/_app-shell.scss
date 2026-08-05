@@ -88,73 +88,40 @@
             }
         }
 
-        >.active-pet {
-            gap: var(--space-base);
-            display: none;
-            cursor: pointer;
-            padding: var(--space-xs);
+        >.username {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
+            padding: var(--space-xs) var(--space-sm);
+            color: var(--text-base);
+            font-size: inherit;
+            white-space: nowrap;
+            @include surface-inset;
 
-            &.is-visible {
-                display: flex;
-            }
-
-            &:focus-visible {
-                outline: var(--border-width) solid var(--header-mid);
-                outline-offset: var(--space-2xs);
+            >.user-icon {
+                width: 16px;
+                height: 16px;
+                fill: currentColor;
             }
         }
 
-        >.user-summary {
-            display: flex;
-            align-items: center;
-            gap: var(--space-sm);
+        >.coin-count {
+            min-width: 4em;
+            padding: var(--space-xs) var(--space-sm);
+            color: var(--text-base);
+            text-align: right;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+            transform-origin: center;
+            transition: color var(--motion-base) var(--ease-ui);
+            @include surface-inset;
 
-            >.user >.username {
-                display: inline-flex;
-                align-items: center;
-                gap: var(--space-xs);
-                padding: var(--space-2xs);
-                border: 0;
-                background: transparent;
-                color: var(--header-dark);
-                text-decoration: underline;
-                white-space: nowrap;
-
-                &:hover {
-                    color: var(--header-mid);
-                    background: transparent;
-                }
-
-                &:active {
-                    border: 0;
-                    background: transparent;
-                }
-
-                >.user-icon {
-                    width: 16px;
-                    height: 16px;
-                    fill: currentColor;
-                }
+            &.is-gaining {
+                color: var(--state-success-accent);
             }
 
-            >.coin-count {
-                min-width: 4em;
-                padding: var(--space-xs) var(--space-sm);
-                color: var(--text-base);
-                text-align: right;
-                white-space: nowrap;
-                font-variant-numeric: tabular-nums;
-                transform-origin: center;
-                transition: color var(--motion-base) var(--ease-ui);
-                @include surface-inset;
-
-                &.is-gaining {
-                    color: var(--state-success-accent);
-                }
-
-                &.is-spending {
-                    color: var(--state-error-accent);
-                }
+            &.is-spending {
+                color: var(--state-error-accent);
             }
         }
 
@@ -180,7 +147,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-        >.header >.user-summary >.coin-count {
+        >.header >.coin-count {
             transition: none;
         }
     }
@@ -314,10 +281,6 @@
             }
         }
     }
-}
-
-.app-shell:not(.is-fullscreen) >.header >.active-pet.is-visible {
-    display: none;
 }
 
 .app-shell.is-fullscreen {

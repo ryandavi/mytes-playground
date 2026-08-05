@@ -295,6 +295,17 @@ class MapObject {
 	// { id, label, run() }; the sidebar renders them above the queued actions.
 	getSidebarInteractions() { return []; }
 
+	getMajorSidebarInteraction() {
+		return this.getSidebarInteractions().find(interaction => interaction.major === true) ?? null;
+	}
+
+	runMajorSidebarInteraction() {
+		const interaction = this.getMajorSidebarInteraction();
+		if (!interaction) return false;
+		interaction.run?.();
+		return true;
+	}
+
 	getSidebarDetailRows() {
 		const rows = [];
 
@@ -1681,6 +1692,8 @@ class MapObject {
 			fn(this, event);
 			return;
 		}
+
+		if (this.runMajorSidebarInteraction()) return;
 
 		const debugOverlay = this.container?.ui?.debugOverlay;
 		if (debugOverlay?.isDirectWorldInteractionEnabled?.()) {

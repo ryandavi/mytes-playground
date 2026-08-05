@@ -3,7 +3,7 @@ class ScreenManager extends UIComponent {
         super(parent);
         this.headerElement = this.parent.containerWrapper.querySelector('.header');
         this.fullscreenButton = this.parent.containerWrapper.querySelector('.fullscreen-btn');
-        this.userButtonElement = this.headerElement?.querySelector('.user .username') || null;
+        this.userButtonElement = this.headerElement?.querySelector('.username') || null;
         this.userTextElement = this.userButtonElement?.querySelector('.username__text') || null;
         this.listenerCleanup = [];
     }

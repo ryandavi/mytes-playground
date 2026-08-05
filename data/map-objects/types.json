@@ -3070,6 +3070,15 @@
             "airMs": 320,
             "restMs": 520,
             "restVarianceMs": 220,
+            "jumpSound": "obj_slime_jump",
+            "landSound": "obj_slime_land",
+            "drop": {
+              "itemId": "slime_ball",
+              "chance": 0.0125,
+              "cooldownMs": 30000,
+              "radius": 160,
+              "maxNearby": 3
+            },
             "animations": {
               "jump": null,
               "fall": null,
@@ -3078,6 +3087,16 @@
           }
         },
         "visual": {
+          "animations": {
+            "N": {
+              "frames": [[0, 0], [1, 0], [2, 0], [3, 0]],
+              "loop": true
+            },
+            "W": {
+              "frames": [[0, 0], [1, 0], [2, 0], [3, 0]],
+              "loop": true
+            }
+          },
           "shadow": {
             "enabled": true,
             "widthRatio": 0.5,

@@ -810,49 +810,26 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .header > .fullscreen-btn.active > .icon {
   fill: var(--button-active-icon-color);
 }
-.app-shell > .header > .active-pet {
-  gap: var(--space-base);
-  display: none;
-  cursor: pointer;
-  padding: var(--space-xs);
-}
-.app-shell > .header > .active-pet.is-visible {
-  display: flex;
-}
-.app-shell > .header > .active-pet:focus-visible {
-  outline: var(--border-width) solid var(--header-mid);
-  outline-offset: var(--space-2xs);
-}
-.app-shell > .header > .user-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-.app-shell > .header > .user-summary > .user > .username {
+.app-shell > .header > .username {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: var(--space-2xs);
-  border: 0;
-  background: transparent;
-  color: var(--header-dark);
-  text-decoration: underline;
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--text-base);
+  font-size: inherit;
   white-space: nowrap;
+  background-color: var(--surface-ui-inset, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-bottom-color: var(--button-light);
+  border-right-color: var(--button-light);
+  border-radius: var(--border-radius);
 }
-.app-shell > .header > .user-summary > .user > .username:hover {
-  color: var(--header-mid);
-  background: transparent;
-}
-.app-shell > .header > .user-summary > .user > .username:active {
-  border: 0;
-  background: transparent;
-}
-.app-shell > .header > .user-summary > .user > .username > .user-icon {
+.app-shell > .header > .username > .user-icon {
   width: 16px;
   height: 16px;
   fill: currentColor;
 }
-.app-shell > .header > .user-summary > .coin-count {
+.app-shell > .header > .coin-count {
   min-width: 4em;
   padding: var(--space-xs) var(--space-sm);
   color: var(--text-base);
@@ -867,10 +844,10 @@ body.debug .map-object > .interactive-hitbox {
   border-right-color: var(--button-light);
   border-radius: var(--border-radius);
 }
-.app-shell > .header > .user-summary > .coin-count.is-gaining {
+.app-shell > .header > .coin-count.is-gaining {
   color: var(--state-success-accent);
 }
-.app-shell > .header > .user-summary > .coin-count.is-spending {
+.app-shell > .header > .coin-count.is-spending {
   color: var(--state-error-accent);
 }
 .app-shell > .header > .date-time {
@@ -895,7 +872,7 @@ body.debug .map-object > .interactive-hitbox {
   fill: currentColor;
 }
 @media (prefers-reduced-motion: reduce) {
-  .app-shell > .header > .user-summary > .coin-count {
+  .app-shell > .header > .coin-count {
     transition: none;
   }
 }
@@ -1011,10 +988,6 @@ body.debug .map-object > .interactive-hitbox {
 }
 .app-shell .bottom > .inventory-grid > .item {
   cursor: pointer;
-}
-
-.app-shell:not(.is-fullscreen) > .header > .active-pet.is-visible {
-  display: none;
 }
 
 .app-shell.is-fullscreen {
@@ -3185,7 +3158,7 @@ body.ui-gallery-page .ui-gallery__state-label {
 }
 
 .window-panel.world-map {
-  --world-map-detail-height: 212px;
+  --world-map-detail-height: 236px;
   --world-map-node-height: 48px;
   --world-map-node-min-width: 116px;
   --world-map-node-max-width: 200px;
@@ -3291,16 +3264,14 @@ body.ui-gallery-page .ui-gallery__state-label {
   overflow: hidden;
 }
 .world-map__node.is-selected {
-  --dither-fill-color: var(--surface-ui-pressed);
   background-color: var(--surface-ui-pressed, var(--button-hover));
   border-top-color: var(--button-dark);
   border-left-color: var(--button-dark);
   border-right-color: var(--button-light);
   border-bottom-color: var(--button-light);
-  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
-  background-size: var(--dither-size, 6px);
-  background-color: var(--dither-fill-color, var(--button-hover));
-  color: var(--button-active-text-color, var(--text-base));
+  background-color: var(--surface-ui-pressed);
+  background-image: none;
+  color: var(--button-active-text-color);
   outline: 2px solid var(--header-mid);
   outline-offset: -2px;
 }
@@ -3341,6 +3312,10 @@ body.ui-gallery-page .ui-gallery__state-label {
 .world-map__badge.is-traveller {
   background-color: var(--header-mid);
   color: var(--text-on-accent);
+}
+.world-map__badge.is-poi {
+  background-color: var(--state-warning-accent);
+  color: var(--text-base);
 }
 
 .world-map__detail {

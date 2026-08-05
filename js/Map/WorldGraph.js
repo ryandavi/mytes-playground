@@ -78,7 +78,8 @@ class WorldGraph {
                     id: mapId,
                     region: geometry.region,
                     displayName: geometry.displayName,
-                    layout: geometry.layout
+                    layout: geometry.layout,
+                    pointsOfInterest: geometry.pointsOfInterest
                 }));
                 this.edges.set(mapId, new Map());
 
@@ -107,6 +108,7 @@ class WorldGraph {
             displayName: '',
             layout: Object.freeze({ x: 0, y: 0 }),
             portals: Object.freeze([]),
+            pointsOfInterest: Object.freeze([]),
             spawns: new Map()
         });
     }
@@ -139,13 +141,19 @@ class WorldGraph {
             const mapProperty = key => mapProperties.get(key) ?? null;
 
             const portals = [];
+            const pointsOfInterest = [];
             const spawns = new Map();
 
             [...xml.querySelectorAll('objectgroup > object')].forEach(node => {
                 const name = node.getAttribute('name');
+                const property = key => node.querySelector(`property[name="${key}"]`)?.getAttribute('value') || null;
+                const shopId = property('shopId');
+                if (shopId) {
+                    pointsOfInterest.push(Object.freeze({ type: 'shop', id: shopId }));
+                }
+
                 if (name !== 'Portal' && name !== 'Spawn') return;
 
-                const property = key => node.querySelector(`property[name="${key}"]`)?.getAttribute('value') || null;
                 const center = Object.freeze({
                     x: number(node, 'x') + number(node, 'width') / 2,
                     y: number(node, 'y') + number(node, 'height') / 2
@@ -177,6 +185,7 @@ class WorldGraph {
                     y: Number(mapProperty('worldY')) || 0
                 }),
                 portals: Object.freeze(portals),
+                pointsOfInterest: Object.freeze(pointsOfInterest),
                 spawns
             });
         } catch (error) {

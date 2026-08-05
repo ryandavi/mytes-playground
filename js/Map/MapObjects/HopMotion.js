@@ -28,7 +28,9 @@ class HopMotion {
         airMs: 340,          // time off the ground per leap
         restMs: 420,         // grounded pause between leaps
         restVarianceMs: 220, // randomised so a group desynchronises
+        jumpSound: null,
         landSound: null,
+        drop: null,
         // Optional animation states. Missing ones fall back (see NpcMapObject),
         // so configuring these before the art exists is harmless.
         animations: Object.freeze({ jump: 'jump', fall: 'fall', land: null })
@@ -125,6 +127,9 @@ class HopMotion {
             this.elapsed = 0;
             this.rising = true;
             this.owner.onHopStart?.();
+            if (this.config.jumpSound) {
+                this.owner.gameMap?.soundManager?.play?.(this.config.jumpSound);
+            }
             return 1;
         }
 
