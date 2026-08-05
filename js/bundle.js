@@ -875,7 +875,7 @@ const SiteConfig = Object.freeze({
         }),
         interactionSounds: Object.freeze({
             click: 'ui_click',
-            modalOpen: 'ui_select',
+            modalOpen: 'ui_modal_open',
             modalClose: 'ui_hover',
             zoom: 'ui_drag_item',
             zoomInPitch: 1.12,
@@ -2791,6 +2791,8 @@ class DragHandler {
         // Drag end callback
         this.onDragEnd = options.onDragEnd || (() => {});
 
+        this.inputSystem = InputSystem.getInstance();
+
         // State tracking
         this.isDragging = false;
         this.initialTouchPos = { x: 0, y: 0 };
@@ -2839,10 +2841,15 @@ class DragHandler {
         // Check if dragging is allowed
         if (!this.canDrag()) return;
 
-        event.preventDefault();
-
         const pos = this.getEventPosition(event);
         if (!pos) return;
+
+        // Map-object drags listen globally and may overlap a Myte's much larger
+        // sprite hitbox. Claim this press before either handler can move so only
+        // the entity the user actually pressed is picked up.
+        if (!this.inputSystem.claimDrag(this)) return;
+
+        event.preventDefault();
 
         // Store initial touch/click position
         this.initialTouchPos = { ...pos };
@@ -2986,6 +2993,7 @@ class DragHandler {
         this.touchId = null;
         this.preventScroll = false;
         this.moveThreshold = false;
+        this.inputSystem.releaseDrag(this);
     }
 
     dispose() {
@@ -3925,6 +3933,26 @@ function createDefaultSpeciesVoices() {
 						synth,
 						notes: ["C5", "G5"],
 						durations: ["16n", "8n"]
+					};
+				}
+			},
+			"ui_modal_open": {
+				type: "ui",
+				baseVolume: 0.5,
+				create: () => {
+					const synth = new Tone.Synth({
+						oscillator: { type: "triangle" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.06,
+							sustain: 0.05,
+							release: 0.06
+						}
+					}).toDestination();
+					return {
+						synth,
+						notes: ["C5", "G5"],
+						durations: ["16n", "16n"]
 					};
 				}
 			},
@@ -5121,6 +5149,46 @@ function createDefaultSpeciesVoices() {
 						}
 					}).toDestination();
 					return { synth, note: "G3", duration: "16n" };
+				}
+			},
+			"obj_slime_jump": {
+				type: "sfx",
+				category: "entities",
+				baseVolume: 0.85,
+				variation: { pitchRange: 0.025, volumeSteps: [0.94, 1] },
+				create: () => {
+					const synth = new Tone.MembraneSynth({
+						pitchDecay: 0.055,
+						octaves: 3.5,
+						oscillator: { type: "triangle" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.16,
+							sustain: 0,
+							release: 0.1
+						}
+					}).toDestination();
+					return { synth, note: "D3", duration: "16n" };
+				}
+			},
+			"obj_slime_land": {
+				type: "sfx",
+				category: "entities",
+				baseVolume: 0.78,
+				variation: { pitchRange: 0.02, volumeSteps: [0.92, 0.96, 1] },
+				create: () => {
+					const synth = new Tone.MembraneSynth({
+						pitchDecay: 0.045,
+						octaves: 2.5,
+						oscillator: { type: "triangle" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.14,
+							sustain: 0,
+							release: 0.09
+						}
+					}).toDestination();
+					return { synth, note: "A2", duration: "16n" };
 				}
 			},
 			"obj_butterfly": {
@@ -9124,23 +9192,9 @@ class ParticleRendererPool {
         if (!view) return;
         view.layerKey = '';
         view.element.remove();
-        view.last = {
-            transform: '',
-            opacity: '',
-            width: '',
-            height: '',
-            backgroundImage: '',
-            backgroundPosition: '',
-            backgroundSize: '',
-            backgroundColor: '',
-            borderRadius: '',
-            zIndex: '',
-            visibility: '',
-            display: '',
-            mixBlendMode: '',
-            className: ''
-        };
-        view.element.className = 'particle';
+        // Keep the cache aligned with the element's retained inline styles.
+        // On reuse, flushParticle can then clear properties from the previous
+        // render type (such as a generic particle's circular background).
         this.pool.push(view);
     }
 
@@ -33138,7 +33192,8 @@ class WorldGraph {
                     id: mapId,
                     region: geometry.region,
                     displayName: geometry.displayName,
-                    layout: geometry.layout
+                    layout: geometry.layout,
+                    pointsOfInterest: geometry.pointsOfInterest
                 }));
                 this.edges.set(mapId, new Map());
 
@@ -33167,6 +33222,7 @@ class WorldGraph {
             displayName: '',
             layout: Object.freeze({ x: 0, y: 0 }),
             portals: Object.freeze([]),
+            pointsOfInterest: Object.freeze([]),
             spawns: new Map()
         });
     }
@@ -33199,13 +33255,19 @@ class WorldGraph {
             const mapProperty = key => mapProperties.get(key) ?? null;
 
             const portals = [];
+            const pointsOfInterest = [];
             const spawns = new Map();
 
             [...xml.querySelectorAll('objectgroup > object')].forEach(node => {
                 const name = node.getAttribute('name');
+                const property = key => node.querySelector(`property[name="${key}"]`)?.getAttribute('value') || null;
+                const shopId = property('shopId');
+                if (shopId) {
+                    pointsOfInterest.push(Object.freeze({ type: 'shop', id: shopId }));
+                }
+
                 if (name !== 'Portal' && name !== 'Spawn') return;
 
-                const property = key => node.querySelector(`property[name="${key}"]`)?.getAttribute('value') || null;
                 const center = Object.freeze({
                     x: number(node, 'x') + number(node, 'width') / 2,
                     y: number(node, 'y') + number(node, 'height') / 2
@@ -33237,6 +33299,7 @@ class WorldGraph {
                     y: Number(mapProperty('worldY')) || 0
                 }),
                 portals: Object.freeze(portals),
+                pointsOfInterest: Object.freeze(pointsOfInterest),
                 spawns
             });
         } catch (error) {
@@ -41133,6 +41196,17 @@ class MapObject {
 	// { id, label, run() }; the sidebar renders them above the queued actions.
 	getSidebarInteractions() { return []; }
 
+	getMajorSidebarInteraction() {
+		return this.getSidebarInteractions().find(interaction => interaction.major === true) ?? null;
+	}
+
+	runMajorSidebarInteraction() {
+		const interaction = this.getMajorSidebarInteraction();
+		if (!interaction) return false;
+		interaction.run?.();
+		return true;
+	}
+
 	getSidebarDetailRows() {
 		const rows = [];
 
@@ -42519,6 +42593,8 @@ class MapObject {
 			fn(this, event);
 			return;
 		}
+
+		if (this.runMajorSidebarInteraction()) return;
 
 		const debugOverlay = this.container?.ui?.debugOverlay;
 		if (debugOverlay?.isDirectWorldInteractionEnabled?.()) {
@@ -45179,7 +45255,9 @@ class HopMotion {
         airMs: 340,          // time off the ground per leap
         restMs: 420,         // grounded pause between leaps
         restVarianceMs: 220, // randomised so a group desynchronises
+        jumpSound: null,
         landSound: null,
+        drop: null,
         // Optional animation states. Missing ones fall back (see NpcMapObject),
         // so configuring these before the art exists is harmless.
         animations: Object.freeze({ jump: 'jump', fall: 'fall', land: null })
@@ -45276,6 +45354,9 @@ class HopMotion {
             this.elapsed = 0;
             this.rising = true;
             this.owner.onHopStart?.();
+            if (this.config.jumpSound) {
+                this.owner.gameMap?.soundManager?.play?.(this.config.jumpSound);
+            }
             return 1;
         }
 
@@ -45492,12 +45573,19 @@ class MovingMapObject extends withAnimation(MapObject) {
 	// ── Bounds ────────────────────────────────────────────────────────────────
 
 	_defaultBounds() {
-		return { left: 0, right: 500, top: 0, bottom: 500 };
+		const dimensions = this.gameMap?.dimensions;
+		return {
+			left: 0,
+			right: dimensions?.width ?? 500,
+			top: 0,
+			bottom: dimensions?.height ?? 500
+		};
 	}
 
 	updateBounds(parent) {
-		if (!parent?.getMaxDimensions) return;
-		const { width, height } = parent.getMaxDimensions();
+		const dimensions = parent?.dimensions ?? parent?.getMaxDimensions?.();
+		if (!dimensions) return;
+		const { width, height } = dimensions;
 		this.bounds = { left: 0, right: width, top: 0, bottom: height };
 	}
 
@@ -45614,7 +45702,7 @@ class MovingMapObject extends withAnimation(MapObject) {
 
 	render(container, parent) {
 		const element = super.render(container, parent);
-		this.updateBounds(parent);
+		this.updateBounds(this.gameMap ?? parent);
 		element.classList.add('moving-object');
 		return element;
 	}
@@ -46485,11 +46573,12 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         this.moveThreshold = options.moveThreshold || 0.025;
         this.direction = 'S';
 
+        const mapDimensions = parent?.dimensions;
         this.bounds = {
             left: 0,
-            right: options.mapWidth || 500,
+            right: options.mapWidth || mapDimensions?.width || 500,
             top: 0,
-            bottom: options.mapHeight || 500
+            bottom: options.mapHeight || mapDimensions?.height || 500
         };
 
         this.hoverHeightBase = this.getConfig('hoverHeight', 18);
@@ -46866,8 +46955,9 @@ class AmbientCreatureMapObject extends AnimatedMapObject {
         const element = super.render(container, parent);
         element.classList.add('animated-map-object');
 
-        if (parent?.getMaxDimensions) {
-            const { width, height } = parent.getMaxDimensions();
+        const boundsSource = this.gameMap?.dimensions ?? parent?.getMaxDimensions?.();
+        if (boundsSource) {
+            const { width, height } = boundsSource;
             this.bounds = { left: 0, right: width, top: 0, bottom: height };
         }
 
@@ -48408,6 +48498,7 @@ class NpcMapObject extends MovingMapObject {
 		this.hopMotion = this.getConfig('movement.style') === 'hop'
 			? new HopMotion(this, this.getConfig('movement.hop', {}))
 			: null;
+		this.lastHopDropAt = -Infinity;
 
 		// DOM element for the alert status indicator (! / !!)
 		this.alertIndicator = null;
@@ -48459,16 +48550,6 @@ class NpcMapObject extends MovingMapObject {
 		this.nameplateElement = plate;
 	}
 
-	handleDoubleClick(event) {
-		if (this.openConfiguredShop()) return;
-		super.handleDoubleClick(event);
-	}
-
-	handleLongPress(event) {
-		if (this.openConfiguredShop()) return;
-		super.handleLongPress(event);
-	}
-
 	openConfiguredShop() {
 		const shopId = this.getConfig('shopId', null);
 		if (!shopId) return false;
@@ -48484,6 +48565,7 @@ class NpcMapObject extends MovingMapObject {
 			interactions.push({
 				id: 'open_shop',
 				label: `Open ${shop.name}`,
+				major: true,
 				run: () => this.openConfiguredShop()
 			});
 		}
@@ -48861,6 +48943,40 @@ class NpcMapObject extends MovingMapObject {
 
 	onHopLand() {
 		this.playFirstAvailableAnimation?.(this._hopAnimation('land'), 'idle');
+		this.tryHopDrop();
+	}
+
+	tryHopDrop() {
+		const config = this.hopMotion?.config?.drop;
+		const item = ItemRegistry.getItemSync(config?.itemId);
+		const chance = Number(config?.chance) || 0;
+		if (!item || chance <= 0 || Math.random() >= chance) return false;
+
+		const now = SimClock.now();
+		const cooldownMs = Math.max(0, Number(config.cooldownMs) || 0);
+		if (now - this.lastHopDropAt < cooldownMs) return false;
+
+		const radius = Math.max(0, Number(config.radius) || 0);
+		const maxNearby = Math.max(0, Number(config.maxNearby) || 0);
+		if (radius > 0 && maxNearby > 0) {
+			const nearby = (this.gameMap?.droppedItems ?? []).filter(drop =>
+				drop.active &&
+				drop.variant === item.id &&
+				Math.hypot(drop.posX - this.posX, drop.posY - this.posY) <= radius
+			).length;
+			if (nearby >= maxNearby) return false;
+		}
+
+		const dropped = this.gameMap?.addDroppedItem(
+			item.type || 'item',
+			item.id,
+			this.posX + (this.size.width / 2),
+			this.posY + (this.size.height / 2)
+		);
+		if (!dropped) return false;
+
+		this.lastHopDropAt = now;
+		return true;
 	}
 
 	update(deltaTime) {
@@ -56566,10 +56682,36 @@ class ActionSidebarManager extends UIComponent {
         return button;
     }
 
-    // Direct UI interactions (open shop, talk) sit above the queued actions and
-    // work with no active myte, since they are the player acting, not a myte.
-    renderSidebarInteractions(actionGroups, selectedObject) {
-        const interactions = selectedObject?.getSidebarInteractions?.() ?? [];
+    createSidebarInteractionButton(interaction, { prominent = false } = {}) {
+        const button = document.createElement('button');
+        button.textContent = interaction.label;
+        if (prominent) button.classList.add('primary-action');
+        if (interaction.description) button.title = interaction.description;
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            interaction.run?.();
+        });
+        return button;
+    }
+
+    renderMajorSidebarInteraction(actionGroups, interaction) {
+        if (!interaction) return false;
+
+        const groupElement = document.createElement('div');
+        groupElement.className = 'action-group major-action';
+        const actionList = document.createElement('ul');
+        const li = document.createElement('li');
+        li.appendChild(this.createSidebarInteractionButton(interaction, { prominent: true }));
+        actionList.appendChild(li);
+        groupElement.appendChild(actionList);
+        actionGroups.appendChild(groupElement);
+        return true;
+    }
+
+    // Direct UI interactions work with no active myte, since they are the player
+    // acting rather than a queued creature action.
+    renderSidebarInteractions(actionGroups, interactions) {
         if (interactions.length === 0) return false;
 
         const groupElement = document.createElement('div');
@@ -56581,18 +56723,8 @@ class ActionSidebarManager extends UIComponent {
 
         const actionList = document.createElement('ul');
         interactions.forEach(interaction => {
-            const button = document.createElement('button');
-            button.textContent = interaction.label;
-            button.classList.add('primary-action');
-            if (interaction.description) button.title = interaction.description;
-            button.addEventListener('click', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                interaction.run?.();
-            });
-
             const li = document.createElement('li');
-            li.appendChild(button);
+            li.appendChild(this.createSidebarInteractionButton(interaction));
             actionList.appendChild(li);
         });
 
@@ -56644,7 +56776,13 @@ class ActionSidebarManager extends UIComponent {
         actionGroups.innerHTML = '';
         const activeMyte = this.parent.getActiveMyte();
 
-        this.renderSidebarInteractions(actionGroups, selectedObject);
+        const sidebarInteractions = selectedObject?.getSidebarInteractions?.() ?? [];
+        const majorSidebarInteraction = sidebarInteractions.find(interaction => interaction.major === true) ?? null;
+        this.renderMajorSidebarInteraction(actionGroups, majorSidebarInteraction);
+        this.renderSidebarInteractions(
+            actionGroups,
+            sidebarInteractions.filter(interaction => interaction !== majorSidebarInteraction)
+        );
 
         if (selectedObject instanceof DroppedMapItem) {
             this.actionControls.classList.add('is-visible');
@@ -56695,7 +56833,9 @@ class ActionSidebarManager extends UIComponent {
         }
 
         const availableActions = ActionManager.getAvailableActions(selectedObject, activeMyte);
-        const majorAction = this.getMajorAction(selectedObject, activeMyte, availableActions);
+        const majorAction = majorSidebarInteraction
+            ? null
+            : this.getMajorAction(selectedObject, activeMyte, availableActions);
 
         // Actions that are unavailable *and* can say why are shown disabled with the
         // reason, instead of vanishing. Actions with no reason stay hidden — they are
@@ -57250,15 +57390,10 @@ class MyteListManager extends UIComponent {
 class HUDManager extends UIComponent {
     constructor(parent) {
         super(parent);
-        this.hudElement = document.querySelector('#hud-active-pet');
-        this.nameElement = this.hudElement?.querySelector('.name') || null;
-        this.moodElement = this.hudElement?.querySelector('.mood') || null;
-        this.energyElement = this.hudElement?.querySelector('.energy') || null;
         this.clockElement = this.parent.containerWrapper.querySelector('.date-time .clock');
         this.clockTextElement = this.clockElement?.querySelector('.clock__time') ?? null;
         this.clockSeasonElement = this.clockElement?.querySelector('.clock__season') ?? null;
         this.coinElement = this.parent.containerWrapper.querySelector('.coin-count');
-        this.currentMoodEffect = null;
         this._lastUpdate = 0;
         this._currencyUnsubscribe = null;
         this._coinAnimationFrame = null;
@@ -57267,22 +57402,7 @@ class HUDManager extends UIComponent {
         this._coinScale = 1;
         this._lastCoinTickAt = -Infinity;
         this.numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-        this.boundOpenMyteInfo = () => {
-            const activeMyte = this.parent.getActiveMyte();
-            if (activeMyte) this.parent.myteInfoPanel?.openFor?.(activeMyte);
-        };
-        this.boundOpenMyteInfoKey = (event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') return;
-            event.preventDefault();
-            this.boundOpenMyteInfo();
-        };
         this.lastRenderedState = {
-            visible: false,
-            myteId: null,
-            name: null,
-            mood: null,
-            energy: null,
-            moodEffect: null,
             clock: null,
             clockTitle: null,
             season: null,
@@ -57295,14 +57415,6 @@ class HUDManager extends UIComponent {
         const initialCoins = Number(core?.user?.currency?.coins) || 0;
         this.renderCoinValue(initialCoins);
 
-        if (this.hudElement) {
-            this.hudElement.tabIndex = 0;
-            this.hudElement.setAttribute('role', 'button');
-            this.hudElement.setAttribute('aria-label', 'Open active Myte information');
-            this.hudElement.addEventListener('click', this.boundOpenMyteInfo);
-            this.hudElement.addEventListener('keydown', this.boundOpenMyteInfoKey);
-        }
-
         if (!this._currencyUnsubscribe && core?.eventManager) {
             this._currencyUnsubscribe = core.eventManager.on('user:currency_changed', (payload) => {
                 if (payload?.type === 'coins') this.animateCoinTotal(payload.total, payload.delta);
@@ -57312,78 +57424,12 @@ class HUDManager extends UIComponent {
         this.update(true);
     }
 
-    getEnergyLabel(ratio) {
-        if (ratio <= 0.1) return 'Critical';
-        if (ratio <= 0.3) return 'Low';
-        if (ratio <= 0.55) return 'Okay';
-        if (ratio <= 0.8) return 'Good';
-        return 'Full';
-    }
-
     update(force = false) {
         const now = performance.now();
         if (!force && now - this._lastUpdate < SiteConfig.ui.hud.updateIntervalMs) return;
         this._lastUpdate = now;
 
         this.updateClock();
-
-        if (!this.hudElement) return;
-
-        const activeMyte = this.parent.getActiveMyte();
-
-        if (!activeMyte) {
-            if (this.lastRenderedState.visible) {
-                this.hudElement.classList.remove('is-visible');
-                this.lastRenderedState.visible = false;
-            }
-            return;
-        }
-
-        if (!this.lastRenderedState.visible) {
-            this.hudElement.classList.add('is-visible');
-            this.lastRenderedState.visible = true;
-        }
-
-        const mood = activeMyte.stats.getDerivedMood?.() ?? 'neutral';
-        const energyRatio = activeMyte.stats.getEnergyRatio();
-        const energy = `${this.getEnergyLabel(energyRatio)} ${Math.round(energyRatio * 100)}%`;
-        const currentAction = activeMyte.queue.getCurrentAction();
-        const actionMetadata = currentAction?.constructor?.metadata;
-        const moodVal = actionMetadata?.effects?.mood ?? 0;
-        const moodEffectText = moodVal !== 0
-            ? `Mood ${moodVal > 0 ? '+' : ''}${moodVal}`
-            : null;
-
-        if (this.lastRenderedState.myteId !== activeMyte.id || this.lastRenderedState.name !== activeMyte.name) {
-            this.nameElement.textContent = activeMyte.name;
-            this.lastRenderedState.myteId = activeMyte.id;
-            this.lastRenderedState.name = activeMyte.name;
-        }
-
-        if (this.lastRenderedState.mood !== mood) {
-            this.moodElement.textContent = mood;
-            this.lastRenderedState.mood = mood;
-        }
-
-        if (this.lastRenderedState.energy !== energy) {
-            this.energyElement.textContent = energy;
-            this.lastRenderedState.energy = energy;
-        }
-
-        if (this.lastRenderedState.moodEffect !== moodEffectText) {
-            this.currentMoodEffect?.remove();
-            this.currentMoodEffect = null;
-
-            if (moodEffectText) {
-                const moodEffect = document.createElement('div');
-                moodEffect.className = 'mood-effect';
-                moodEffect.textContent = moodEffectText;
-                this.hudElement.appendChild(moodEffect);
-                this.currentMoodEffect = moodEffect;
-            }
-
-            this.lastRenderedState.moodEffect = moodEffectText;
-        }
     }
 
     updateClock() {
@@ -57535,26 +57581,17 @@ class HUDManager extends UIComponent {
     }
 
     dispose() {
-        this.hudElement?.removeEventListener('click', this.boundOpenMyteInfo);
-        this.hudElement?.removeEventListener('keydown', this.boundOpenMyteInfoKey);
         this._currencyUnsubscribe?.();
         this._currencyUnsubscribe = null;
         this._coinAnimationToken++;
         if (this._coinAnimationFrame !== null) cancelAnimationFrame(this._coinAnimationFrame);
         this._coinAnimationFrame = null;
         this.resetCoinEmphasis();
-        this.hudElement = null;
-        this.nameElement = null;
-        this.moodElement = null;
-        this.energyElement = null;
         this.clockElement = null;
         this.clockTextElement = null;
         this.clockSeasonElement = null;
         this.coinElement = null;
         this.numberFormatter = null;
-        this.currentMoodEffect = null;
-        this.boundOpenMyteInfo = null;
-        this.boundOpenMyteInfoKey = null;
     }
 }
 ;
@@ -57795,7 +57832,7 @@ class ScreenManager extends UIComponent {
         super(parent);
         this.headerElement = this.parent.containerWrapper.querySelector('.header');
         this.fullscreenButton = this.parent.containerWrapper.querySelector('.fullscreen-btn');
-        this.userButtonElement = this.headerElement?.querySelector('.user .username') || null;
+        this.userButtonElement = this.headerElement?.querySelector('.username') || null;
         this.userTextElement = this.userButtonElement?.querySelector('.username__text') || null;
         this.listenerCleanup = [];
     }
@@ -63318,8 +63355,12 @@ class WorldMapPanel extends ModalWindow {
         badges.className = 'world-map__node-badges';
         const residents = this.getResidents(map.id).length;
         const travellers = this.getTravellerNames(map.id).length;
+        const pointsOfInterest = map.pointsOfInterest?.length ?? 0;
         if (residents > 0) badges.appendChild(this.buildBadge(`${residents} home`, 'is-resident'));
         if (travellers > 0) badges.appendChild(this.buildBadge(`${travellers} passing`, 'is-traveller'));
+        if (pointsOfInterest > 0) {
+            badges.appendChild(this.buildBadge(pointsOfInterest === 1 ? 'Shop' : `${pointsOfInterest} shops`, 'is-poi'));
+        }
 
         node.append(name);
         if (badges.childElementCount > 0) node.appendChild(badges);
@@ -63375,6 +63416,7 @@ class WorldMapPanel extends ModalWindow {
         this.appendDetailRow(rows, 'Connects to', neighbors.join(', ') || 'Nowhere');
         this.appendDetailRow(rows, 'Mytes', residents.map(myte => myte.name).join(', ') || 'None');
         this.appendDetailRow(rows, 'Travellers', this.getTravellerNames(map.id).join(', ') || 'None');
+        this.appendDetailRow(rows, 'Points of interest', this.getPointOfInterestNames(map).join(', ') || 'None');
 
         // The action row is always present even when empty — it is what keeps the
         // panel the same height whether or not there is somewhere to travel to.
@@ -63398,6 +63440,15 @@ class WorldMapPanel extends ModalWindow {
         return (this.gameContainer.mytes ?? [])
             .filter(myte => travelManager?.getCurrentLegMapId?.(myte) === mapId)
             .map(myte => myte.name);
+    }
+
+    getPointOfInterestNames(map) {
+        return (map?.pointsOfInterest ?? []).map(point => {
+            if (point.type === 'shop') {
+                return ShopRegistry.getShop(point.id)?.name || this.humanize(point.id);
+            }
+            return this.humanize(point.id || point.type);
+        });
     }
 
     appendDetailRow(container, label, value) {

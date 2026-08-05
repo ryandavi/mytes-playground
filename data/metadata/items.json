@@ -366,6 +366,21 @@
       "description": "A mysterious night-blooming flower with a delicate scent."
     },
     {
+      "id": "slime_ball",
+      "label": "Slime Ball",
+      "type": "material",
+      "capabilities": {
+        "droppable": true
+      },
+      "visual": {
+        "sprite": {
+          "col": 6,
+          "row": 0
+        }
+      },
+      "description": "A springy glob occasionally left behind by a hopping slime."
+    },
+    {
       "id": "coin",
       "label": "Coin",
       "type": "currency",

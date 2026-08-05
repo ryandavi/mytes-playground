@@ -1294,7 +1294,7 @@ body.ui-gallery-page {
     // The detail block is a fixed frame: its head and action row are pinned and
     // only the rows between them scroll, so reading a map with many neighbours
     // never resizes the window.
-    --world-map-detail-height: 212px;
+    --world-map-detail-height: 236px;
     --world-map-node-height: 48px;
     // A cell never shrinks past a legible node — below that the chart scrolls,
     // which is what keeps a fifty-map world from becoming fifty slivers — and
@@ -1404,7 +1404,10 @@ body.ui-gallery-page {
     overflow: hidden;
 
     &.is-selected {
-        @include button-pressed;
+        @include surface-pressed;
+        background-color: var(--surface-ui-pressed);
+        background-image: none;
+        color: var(--button-active-text-color);
         outline: 2px solid var(--header-mid);
         outline-offset: -2px;
     }
@@ -1453,6 +1456,11 @@ body.ui-gallery-page {
     &.is-traveller {
         background-color: var(--header-mid);
         color: var(--text-on-accent);
+    }
+
+    &.is-poi {
+        background-color: var(--state-warning-accent);
+        color: var(--text-base);
     }
 }
 

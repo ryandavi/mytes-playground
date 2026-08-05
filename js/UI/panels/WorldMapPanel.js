@@ -353,8 +353,12 @@ class WorldMapPanel extends ModalWindow {
         badges.className = 'world-map__node-badges';
         const residents = this.getResidents(map.id).length;
         const travellers = this.getTravellerNames(map.id).length;
+        const pointsOfInterest = map.pointsOfInterest?.length ?? 0;
         if (residents > 0) badges.appendChild(this.buildBadge(`${residents} home`, 'is-resident'));
         if (travellers > 0) badges.appendChild(this.buildBadge(`${travellers} passing`, 'is-traveller'));
+        if (pointsOfInterest > 0) {
+            badges.appendChild(this.buildBadge(pointsOfInterest === 1 ? 'Shop' : `${pointsOfInterest} shops`, 'is-poi'));
+        }
 
         node.append(name);
         if (badges.childElementCount > 0) node.appendChild(badges);
@@ -410,6 +414,7 @@ class WorldMapPanel extends ModalWindow {
         this.appendDetailRow(rows, 'Connects to', neighbors.join(', ') || 'Nowhere');
         this.appendDetailRow(rows, 'Mytes', residents.map(myte => myte.name).join(', ') || 'None');
         this.appendDetailRow(rows, 'Travellers', this.getTravellerNames(map.id).join(', ') || 'None');
+        this.appendDetailRow(rows, 'Points of interest', this.getPointOfInterestNames(map).join(', ') || 'None');
 
         // The action row is always present even when empty — it is what keeps the
         // panel the same height whether or not there is somewhere to travel to.
@@ -433,6 +438,15 @@ class WorldMapPanel extends ModalWindow {
         return (this.gameContainer.mytes ?? [])
             .filter(myte => travelManager?.getCurrentLegMapId?.(myte) === mapId)
             .map(myte => myte.name);
+    }
+
+    getPointOfInterestNames(map) {
+        return (map?.pointsOfInterest ?? []).map(point => {
+            if (point.type === 'shop') {
+                return ShopRegistry.getShop(point.id)?.name || this.humanize(point.id);
+            }
+            return this.humanize(point.id || point.type);
+        });
     }
 
     appendDetailRow(container, label, value) {

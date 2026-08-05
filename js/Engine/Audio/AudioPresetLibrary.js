@@ -273,6 +273,26 @@
 					};
 				}
 			},
+			"ui_modal_open": {
+				type: "ui",
+				baseVolume: 0.5,
+				create: () => {
+					const synth = new Tone.Synth({
+						oscillator: { type: "triangle" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.06,
+							sustain: 0.05,
+							release: 0.06
+						}
+					}).toDestination();
+					return {
+						synth,
+						notes: ["C5", "G5"],
+						durations: ["16n", "16n"]
+					};
+				}
+			},
 			"ui_error": {
 				type: "ui",
 				baseVolume: 0.44,
@@ -1466,6 +1486,46 @@
 						}
 					}).toDestination();
 					return { synth, note: "G3", duration: "16n" };
+				}
+			},
+			"obj_slime_jump": {
+				type: "sfx",
+				category: "entities",
+				baseVolume: 0.85,
+				variation: { pitchRange: 0.025, volumeSteps: [0.94, 1] },
+				create: () => {
+					const synth = new Tone.MembraneSynth({
+						pitchDecay: 0.055,
+						octaves: 3.5,
+						oscillator: { type: "triangle" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.16,
+							sustain: 0,
+							release: 0.1
+						}
+					}).toDestination();
+					return { synth, note: "D3", duration: "16n" };
+				}
+			},
+			"obj_slime_land": {
+				type: "sfx",
+				category: "entities",
+				baseVolume: 0.78,
+				variation: { pitchRange: 0.02, volumeSteps: [0.92, 0.96, 1] },
+				create: () => {
+					const synth = new Tone.MembraneSynth({
+						pitchDecay: 0.045,
+						octaves: 2.5,
+						oscillator: { type: "triangle" },
+						envelope: {
+							attack: 0.001,
+							decay: 0.14,
+							sustain: 0,
+							release: 0.09
+						}
+					}).toDestination();
+					return { synth, note: "A2", duration: "16n" };
 				}
 			},
 			"obj_butterfly": {

@@ -118,6 +118,7 @@ class NpcMapObject extends MovingMapObject {
 		this.hopMotion = this.getConfig('movement.style') === 'hop'
 			? new HopMotion(this, this.getConfig('movement.hop', {}))
 			: null;
+		this.lastHopDropAt = -Infinity;
 
 		// DOM element for the alert status indicator (! / !!)
 		this.alertIndicator = null;
@@ -169,16 +170,6 @@ class NpcMapObject extends MovingMapObject {
 		this.nameplateElement = plate;
 	}
 
-	handleDoubleClick(event) {
-		if (this.openConfiguredShop()) return;
-		super.handleDoubleClick(event);
-	}
-
-	handleLongPress(event) {
-		if (this.openConfiguredShop()) return;
-		super.handleLongPress(event);
-	}
-
 	openConfiguredShop() {
 		const shopId = this.getConfig('shopId', null);
 		if (!shopId) return false;
@@ -194,6 +185,7 @@ class NpcMapObject extends MovingMapObject {
 			interactions.push({
 				id: 'open_shop',
 				label: `Open ${shop.name}`,
+				major: true,
 				run: () => this.openConfiguredShop()
 			});
 		}
@@ -571,6 +563,40 @@ class NpcMapObject extends MovingMapObject {
 
 	onHopLand() {
 		this.playFirstAvailableAnimation?.(this._hopAnimation('land'), 'idle');
+		this.tryHopDrop();
+	}
+
+	tryHopDrop() {
+		const config = this.hopMotion?.config?.drop;
+		const item = ItemRegistry.getItemSync(config?.itemId);
+		const chance = Number(config?.chance) || 0;
+		if (!item || chance <= 0 || Math.random() >= chance) return false;
+
+		const now = SimClock.now();
+		const cooldownMs = Math.max(0, Number(config.cooldownMs) || 0);
+		if (now - this.lastHopDropAt < cooldownMs) return false;
+
+		const radius = Math.max(0, Number(config.radius) || 0);
+		const maxNearby = Math.max(0, Number(config.maxNearby) || 0);
+		if (radius > 0 && maxNearby > 0) {
+			const nearby = (this.gameMap?.droppedItems ?? []).filter(drop =>
+				drop.active &&
+				drop.variant === item.id &&
+				Math.hypot(drop.posX - this.posX, drop.posY - this.posY) <= radius
+			).length;
+			if (nearby >= maxNearby) return false;
+		}
+
+		const dropped = this.gameMap?.addDroppedItem(
+			item.type || 'item',
+			item.id,
+			this.posX + (this.size.width / 2),
+			this.posY + (this.size.height / 2)
+		);
+		if (!dropped) return false;
+
+		this.lastHopDropAt = now;
+		return true;
 	}
 
 	update(deltaTime) {

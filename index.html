@@ -21,28 +21,19 @@
 		<!-- HEADER-->
 		<div class="ignore header">
 			<div class="logo"><img src="images/logo.svg"></div>
-			<div class="active-pet" id="hud-active-pet">
-				<div class="name">Name</div>
-				<div class="mood">Mood</div>
-				<div class="energy">Energy</div>
-			</div>
 			<div class="date-time">
 				<div class="clock">
 						<span class="clock__time">--:--</span>
 						<svg class="icon clock__season" aria-hidden="true" hidden><use></use></svg>
 					</div>
 			</div>
-			<div class="user-summary">
-				<div class="coin-count">¢ 0</div>
-				<div class="user">
-					<button type="button" class="username" aria-label="Open user profile">
-						<svg class="user-icon" aria-hidden="true" viewBox="0 0 16 16">
-							<path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.5 6c.25-3 2.1-4.5 5.5-4.5s5.25 1.5 5.5 4.5h-11Z" />
-						</svg>
-						<span class="username__text">Guest</span>
-					</button>
-				</div>
-			</div>
+			<div class="coin-count">¢ 0</div>
+			<button type="button" class="username" data-modal-trigger="true" aria-label="Open user profile">
+				<svg class="user-icon" aria-hidden="true" viewBox="0 0 16 16">
+					<path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.5 6c.25-3 2.1-4.5 5.5-4.5s5.25 1.5 5.5 4.5h-11Z" />
+				</svg>
+				<span class="username__text">Guest</span>
+			</button>
 			<button type="button" class="app-fullscreen-btn fullscreen-btn" aria-label="Toggle fullscreen"><svg class="icon" aria-hidden="true"><use href="#icon-maximize"></use></svg></button>
 		</div>
 		<!-- END HEADER -->
@@ -530,7 +521,7 @@
 
 	<!-- SCRIPTS:BEGIN -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js" defer></script>
-	<script src="js/bundle.js?v=9e159657c6d3"></script>
+	<script src="js/bundle.js?v=30e01c09e346"></script>
 	<!-- SCRIPTS:END -->
 </body>
 
