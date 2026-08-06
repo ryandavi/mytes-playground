@@ -103,6 +103,32 @@ class DroppedMapItem {
         });
     }
 
+    serializeState() {
+        return {
+            type: this.type,
+            variant: this.variant,
+            posX: this.posX,
+            posY: this.posY,
+            quantity: this.quantity,
+            inventoryType: this.inventoryType,
+            inventoryVariant: this.inventoryVariant,
+            description: this.description,
+            allowAutoCollect: this.allowAutoCollect
+        };
+    }
+
+    restoreState(data = {}) {
+        this.quantity = Math.max(1, Number(data.quantity) || 1);
+        this.inventoryType = data.inventoryType ?? this.inventoryType;
+        this.inventoryVariant = data.inventoryVariant ?? this.inventoryVariant;
+        this.description = data.description ?? this.description;
+        this.allowAutoCollect = data.allowAutoCollect !== false;
+        this.posX = Number.isFinite(data.posX) ? data.posX : this.posX;
+        this.posY = Number.isFinite(data.posY) ? data.posY : this.posY;
+        this.groundY = this.posY;
+        this._applyPosition(this.element);
+    }
+
 
     createItemElement() {
         // Outer container — positioned at ground coordinates, never moves vertically
@@ -144,13 +170,11 @@ class DroppedMapItem {
     }
 
     resolveDepthOffset() {
-        // Dropped items are positioned from their visual center, but the world
-        // sorts depth from the ground-contact line at the bottom of the sprite.
-        return this.size.height / 2;
+        return EntityMethods.resolveDepthOffsetValue(null, this.size.height / 2, null, this.size.height);
     }
 
     getSortY() {
-        return this.posY + this.resolveDepthOffset();
+        return EntityMethods.getSortYValue(this.posY, this.posY, this.resolveDepthOffset());
     }
 
     getDepthPriority() {
@@ -170,7 +194,7 @@ class DroppedMapItem {
         element.style.zIndex = this.getRenderZIndex();
         // dataset.sortY is a devtools inspection aid only
         if (document.body.classList.contains('debug')) {
-            element.dataset.sortY = `${Math.round(this.getSortY() * 100) / 100}`;
+            EntityMethods.writeSortY(element, this.getSortY());
         }
     }
 

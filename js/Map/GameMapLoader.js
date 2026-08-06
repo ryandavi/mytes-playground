@@ -145,6 +145,7 @@ class GameMapLoader {
                 isInitialLoad: options.isInitialLoad || false,
                 allowFallback: options.allowFallback === true
             });
+            container.worldState?.restoreMap?.(map);
 
             this.currentMap = map;
             if (map?.displayName) {
@@ -162,6 +163,7 @@ class GameMapLoader {
         const previousMap = this.currentMap ?? container?.gameMap ?? null;
 
         try {
+            container?.worldState?.captureMap?.(previousMap);
             const map = await this.loadMap(mapId, container, {
                 isInitialLoad: options.isInitialLoad || false,
                 allowFallback: options.allowFallback === true

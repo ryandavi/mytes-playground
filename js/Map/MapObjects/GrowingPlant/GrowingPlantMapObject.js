@@ -217,6 +217,28 @@ class GrowingPlantMapObject extends withItemDrops(InteractiveMapObject) {
         };
     }
 
+    serializeState() {
+        return {
+            ...this.getSaveData(),
+            isWatered: this.isWatered,
+            wateredBoostTimeRemaining: this.wateredBoostTimeRemaining,
+            growthTimeMultiplier: this.growthTimeMultiplier,
+            genes: this.genes ? Utility.deepClone(this.genes) : undefined,
+            pollinationState: this.pollinationState
+        };
+    }
+
+    restoreState(data = {}) {
+        this.restoreFromSaveData(data);
+        this.isWatered = data.isWatered === true;
+        this.wateredBoostTimeRemaining = Number(data.wateredBoostTimeRemaining) || 0;
+        if (Number.isFinite(data.growthTimeMultiplier)) this.growthTimeMultiplier = data.growthTimeMultiplier;
+        if (data.genes) this.genes = Utility.deepClone(data.genes);
+        if (data.pollinationState) this.pollinationState = data.pollinationState;
+        this.growthRate = this.calculateGrowthRate();
+        this.updateWateredVisuals?.();
+    }
+
     restoreFromSaveData(data = {}) {
         if (data.growthStage) {
             this.growthStage = data.growthStage;

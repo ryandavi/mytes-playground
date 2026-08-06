@@ -1,0 +1,3385 @@
+{
+    "music_main": {
+        "type": "music",
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "PolySynth",
+                    "args": [
+                        {
+                            "$toneClass": "Synth"
+                        },
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.05,
+                                "decay": 0.2,
+                                "sustain": 0.8,
+                                "release": 1.5
+                            }
+                        }
+                    ],
+                    "properties": {
+                        "maxPolyphony": 8
+                    },
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "pattern": [
+                {
+                    "note": "C3",
+                    "time": 0,
+                    "duration": "4n"
+                },
+                {
+                    "note": "E3",
+                    "time": "0:1",
+                    "duration": "4n"
+                },
+                {
+                    "note": "G3",
+                    "time": "0:2",
+                    "duration": "4n"
+                },
+                {
+                    "note": "B3",
+                    "time": "0:3",
+                    "duration": "4n"
+                },
+                {
+                    "note": "C4",
+                    "time": "1:0",
+                    "duration": "4n"
+                },
+                {
+                    "note": "B3",
+                    "time": "1:1",
+                    "duration": "4n"
+                },
+                {
+                    "note": "G3",
+                    "time": "1:2",
+                    "duration": "4n"
+                },
+                {
+                    "note": "E3",
+                    "time": "1:3",
+                    "duration": "4n"
+                }
+            ],
+            "tempo": 90,
+            "loop": true
+        }
+    },
+    "music_sunny": {
+        "type": "music",
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "PolySynth",
+                    "args": [
+                        {
+                            "$toneClass": "Synth"
+                        },
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.1,
+                                "decay": 0.3,
+                                "sustain": 0.7,
+                                "release": 2.5
+                            }
+                        }
+                    ],
+                    "properties": {
+                        "maxPolyphony": 10
+                    },
+                    "connections": [],
+                    "destination": true
+                },
+                {
+                    "id": "node1",
+                    "type": "PolySynth",
+                    "args": [
+                        {
+                            "$toneClass": "Synth"
+                        },
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 2,
+                                "decay": 3,
+                                "sustain": 0.5,
+                                "release": 4
+                            }
+                        }
+                    ],
+                    "properties": {
+                        "maxPolyphony": 8,
+                        "volume": {
+                            "value": -13.979400086720375
+                        }
+                    },
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "pad": {
+                "$node": "node1"
+            },
+            "pattern": [
+                {
+                    "note": "C4",
+                    "time": "0:0",
+                    "duration": "4n"
+                },
+                {
+                    "note": "E4",
+                    "time": "0:1",
+                    "duration": "4n"
+                },
+                {
+                    "note": "G4",
+                    "time": "0:2",
+                    "duration": "4n"
+                },
+                {
+                    "note": "C5",
+                    "time": "0:3",
+                    "duration": "4n"
+                },
+                {
+                    "note": "A4",
+                    "time": "1:0",
+                    "duration": "4n"
+                },
+                {
+                    "note": "F4",
+                    "time": "1:2",
+                    "duration": "4n"
+                },
+                {
+                    "note": "D4",
+                    "time": "2:0",
+                    "duration": "4n"
+                },
+                {
+                    "note": "G4",
+                    "time": "2:3",
+                    "duration": "4n"
+                },
+                {
+                    "note": "E4",
+                    "time": "3:0",
+                    "duration": "4n"
+                },
+                {
+                    "note": "C4",
+                    "time": "3:1",
+                    "duration": "4n"
+                },
+                {
+                    "note": "F4",
+                    "time": "3:2",
+                    "duration": "4n"
+                },
+                {
+                    "note": "A4",
+                    "time": "4:0",
+                    "duration": "4n"
+                },
+                {
+                    "note": "G4",
+                    "time": "4:2",
+                    "duration": "4n"
+                },
+                {
+                    "note": "B4",
+                    "time": "5:0",
+                    "duration": "4n"
+                },
+                {
+                    "note": "C5",
+                    "time": "5:2",
+                    "duration": "4n"
+                },
+                {
+                    "note": "D5",
+                    "time": "6:0",
+                    "duration": "4n"
+                }
+            ],
+            "padPattern": [
+                {
+                    "note": [
+                        "C3",
+                        "G3",
+                        "C4"
+                    ],
+                    "time": "0:0",
+                    "duration": "1m"
+                },
+                {
+                    "note": [
+                        "F3",
+                        "A3",
+                        "C4"
+                    ],
+                    "time": "2:0",
+                    "duration": "1m"
+                },
+                {
+                    "note": [
+                        "G3",
+                        "B3",
+                        "D4"
+                    ],
+                    "time": "4:0",
+                    "duration": "1m"
+                },
+                {
+                    "note": [
+                        "C3",
+                        "E3",
+                        "G3"
+                    ],
+                    "time": "6:0",
+                    "duration": "1m"
+                }
+            ],
+            "tempo": 100,
+            "loop": true
+        }
+    },
+    "music_night": {
+        "type": "music",
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "PolySynth",
+                    "args": [
+                        {
+                            "$toneClass": "Synth"
+                        },
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.1,
+                                "decay": 0.2,
+                                "sustain": 0.7,
+                                "release": 2
+                            }
+                        }
+                    ],
+                    "properties": {
+                        "maxPolyphony": 8
+                    },
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "pattern": [
+                {
+                    "note": "G2",
+                    "time": 0,
+                    "duration": "2n"
+                },
+                {
+                    "note": "B2",
+                    "time": "0:2",
+                    "duration": "2n"
+                },
+                {
+                    "note": "D3",
+                    "time": "1:0",
+                    "duration": "2n"
+                },
+                {
+                    "note": "F#3",
+                    "time": "1:2",
+                    "duration": "2n"
+                },
+                {
+                    "note": "G3",
+                    "time": "2:0",
+                    "duration": "2n"
+                },
+                {
+                    "note": "D3",
+                    "time": "2:2",
+                    "duration": "2n"
+                },
+                {
+                    "note": "B2",
+                    "time": "3:0",
+                    "duration": "2n"
+                },
+                {
+                    "note": "G2",
+                    "time": "3:2",
+                    "duration": "2n"
+                }
+            ],
+            "tempo": 70,
+            "loop": true
+        }
+    },
+    "ui_click": {
+        "type": "ui",
+        "baseVolume": 0.56,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "MembraneSynth",
+                    "args": [
+                        {
+                            "pitchDecay": 0.05,
+                            "octaves": 4,
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.1,
+                                "sustain": 0,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "C5",
+            "duration": "16n"
+        }
+    },
+    "ui_hover": {
+        "type": "ui",
+        "baseVolume": 0.3,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "FMSynth",
+                    "args": [
+                        {
+                            "harmonicity": 8,
+                            "modulationIndex": 2,
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.1,
+                                "sustain": 0,
+                                "release": 0.1
+                            },
+                            "modulation": {
+                                "type": "square"
+                            },
+                            "modulationEnvelope": {
+                                "attack": 0.002,
+                                "decay": 0.1,
+                                "sustain": 0,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "E6",
+            "duration": "32n"
+        }
+    },
+    "ui_coin_tick": {
+        "type": "ui",
+        "baseVolume": 0.48,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "FMSynth",
+                    "args": [
+                        {
+                            "harmonicity": 5,
+                            "modulationIndex": 7,
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.075,
+                                "sustain": 0,
+                                "release": 0.04
+                            },
+                            "modulation": {
+                                "type": "square"
+                            },
+                            "modulationEnvelope": {
+                                "attack": 0.001,
+                                "decay": 0.05,
+                                "sustain": 0,
+                                "release": 0.03
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "B5",
+            "duration": "32n"
+        }
+    },
+    "ui_coin_chime": {
+        "type": "ui",
+        "baseVolume": 0.54,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.002,
+                                "decay": 0.12,
+                                "sustain": 0.05,
+                                "release": 0.14
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "E5",
+                "B5"
+            ],
+            "durations": [
+                "16n",
+                "16n"
+            ]
+        }
+    },
+    "ui_time_chime": {
+        "type": "ui",
+        "baseVolume": 0.44,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.01,
+                                "decay": 0.18,
+                                "sustain": 0.05,
+                                "release": 0.35
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "C5",
+                "G5",
+                "C6"
+            ],
+            "durations": [
+                "16n",
+                "16n",
+                "8n"
+            ]
+        }
+    },
+    "ui_select": {
+        "type": "ui",
+        "baseVolume": 0.5,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.1,
+                                "sustain": 0.1,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "C5",
+                "G5"
+            ],
+            "durations": [
+                "16n",
+                "8n"
+            ]
+        }
+    },
+    "ui_modal_open": {
+        "type": "ui",
+        "baseVolume": 0.5,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.06,
+                                "sustain": 0.05,
+                                "release": 0.06
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "C5",
+                "G5"
+            ],
+            "durations": [
+                "16n",
+                "16n"
+            ]
+        }
+    },
+    "ui_error": {
+        "type": "ui",
+        "baseVolume": 0.44,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "AMSynth",
+                    "args": [
+                        {
+                            "harmonicity": 3,
+                            "oscillator": {
+                                "type": "square"
+                            },
+                            "envelope": {
+                                "attack": 0.1,
+                                "decay": 0.2,
+                                "sustain": 0.3,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "C4",
+                "B3"
+            ],
+            "durations": [
+                "16n",
+                "8n"
+            ]
+        }
+    },
+    "ball_hit": {
+        "type": "sfx",
+        "baseVolume": 0.44,
+        "variation": {
+            "pitchRange": 0.014,
+            "volumeSteps": [
+                0.96,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "MembraneSynth",
+                    "args": [
+                        {
+                            "pitchDecay": 0.06,
+                            "octaves": 2.5,
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.18,
+                                "sustain": 0,
+                                "release": 0.08
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "C3",
+            "duration": "16n"
+        }
+    },
+    "myte_battery_charging": {
+        "type": "ui",
+        "baseVolume": 0.28,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.03,
+                                "decay": 0.2,
+                                "sustain": 0.2,
+                                "release": 0.4
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "G4",
+                "C5",
+                "E5"
+            ],
+            "durations": [
+                "16n",
+                "16n",
+                "8n"
+            ]
+        }
+    },
+    "myte_battery_depleting": {
+        "type": "ui",
+        "baseVolume": 0.26,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.01,
+                                "decay": 0.2,
+                                "sustain": 0.1,
+                                "release": 0.3
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "A4",
+                "F4"
+            ],
+            "durations": [
+                "16n",
+                "8n"
+            ]
+        },
+        "awareness": true
+    },
+    "myte_battery_full": {
+        "type": "ui",
+        "baseVolume": 0.34,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "PolySynth",
+                    "args": [
+                        {
+                            "$toneClass": "Synth"
+                        },
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.02,
+                                "decay": 0.1,
+                                "sustain": 0.2,
+                                "release": 0.4
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "C5",
+                "E5",
+                "G5",
+                "C6"
+            ],
+            "durations": [
+                "16n",
+                "16n",
+                "16n",
+                "8n"
+            ]
+        }
+    },
+    "myte_battery_empty": {
+        "type": "ui",
+        "baseVolume": 0.32,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.01,
+                                "decay": 0.1,
+                                "sustain": 0.05,
+                                "release": 0.3
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "C4",
+                "G3"
+            ],
+            "durations": [
+                "16n",
+                "8n"
+            ]
+        },
+        "awareness": true
+    },
+    "ui_pickup_item": {
+        "type": "ui",
+        "category": "notifications",
+        "baseVolume": 0.72,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.002,
+                                "decay": 0.09,
+                                "sustain": 0,
+                                "release": 0.08
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                },
+                {
+                    "id": "node1",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.12,
+                                "sustain": 0,
+                                "release": 0.12
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "body": {
+                    "$node": "node0"
+                },
+                "sparkle": {
+                    "$node": "node1"
+                }
+            },
+            "volume": 0.9
+        },
+        "triggerProfile": "pickupSparkle"
+    },
+    "ui_drag_item": {
+        "type": "ui",
+        "baseVolume": 0.2,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.06,
+                                "sustain": 0,
+                                "release": 0.08
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "B5",
+            "duration": "32n"
+        }
+    },
+    "ui_drop_item": {
+        "type": "ui",
+        "baseVolume": 0.26,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.1,
+                                "sustain": 0,
+                                "release": 0.2
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "A5",
+                "E5"
+            ],
+            "durations": [
+                "32n",
+                "8n"
+            ]
+        }
+    },
+    "footstep_grass_1": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "E2",
+            "noiseType": "pink",
+            "filterFrequency": 1400,
+            "thumpVolume": 0.85,
+            "textureVolume": 0.45
+        }
+    },
+    "footstep_grass_2": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "F2",
+            "noiseType": "brown",
+            "filterFrequency": 1250,
+            "thumpVolume": 0.82,
+            "textureVolume": 0.42
+        }
+    },
+    "footstep_path_1": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "G2",
+            "noiseType": "white",
+            "filterFrequency": 2200,
+            "thumpVolume": 0.72,
+            "textureVolume": 0.34
+        }
+    },
+    "footstep_path_2": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "A2",
+            "noiseType": "white",
+            "filterFrequency": 2400,
+            "thumpVolume": 0.68,
+            "textureVolume": 0.32
+        }
+    },
+    "footstep_floor_1": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "B2",
+            "noiseType": "white",
+            "filterFrequency": 2600,
+            "thumpVolume": 0.62,
+            "textureVolume": 0.26
+        }
+    },
+    "footstep_floor_2": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "C3",
+            "noiseType": "white",
+            "filterFrequency": 2800,
+            "thumpVolume": 0.6,
+            "textureVolume": 0.24
+        }
+    },
+    "footstep_ground_1": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "D2",
+            "noiseType": "brown",
+            "filterFrequency": 1100,
+            "thumpVolume": 0.82,
+            "textureVolume": 0.3
+        }
+    },
+    "footstep_ground_2": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "E2",
+            "noiseType": "brown",
+            "filterFrequency": 1200,
+            "thumpVolume": 0.8,
+            "textureVolume": 0.28
+        }
+    },
+    "footstep_sand_1": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "C2",
+            "noiseType": "pink",
+            "filterFrequency": 950,
+            "thumpVolume": 0.55,
+            "textureVolume": 0.55
+        }
+    },
+    "footstep_sand_2": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "D2",
+            "noiseType": "pink",
+            "filterFrequency": 900,
+            "thumpVolume": 0.52,
+            "textureVolume": 0.58
+        }
+    },
+    "footstep_mud_1": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "B1",
+            "noiseType": "brown",
+            "filterFrequency": 800,
+            "thumpVolume": 0.72,
+            "textureVolume": 0.48
+        }
+    },
+    "footstep_mud_2": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "C2",
+            "noiseType": "brown",
+            "filterFrequency": 760,
+            "thumpVolume": 0.7,
+            "textureVolume": 0.5
+        }
+    },
+    "footstep_water_1": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "F2",
+            "noiseType": "pink",
+            "filterFrequency": 1800,
+            "thumpVolume": 0.5,
+            "textureVolume": 0.62
+        }
+    },
+    "footstep_water_2": {
+        "type": "sfx",
+        "category": "footsteps",
+        "factory": "footstep",
+        "options": {
+            "note": "G2",
+            "noiseType": "pink",
+            "filterFrequency": 1700,
+            "thumpVolume": 0.48,
+            "textureVolume": 0.64
+        }
+    },
+    "myte_slot_exit": {
+        "type": "sfx",
+        "baseVolume": 0.34,
+        "variation": {
+            "pitchRange": 0.012
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.003,
+                                "decay": 0.12,
+                                "sustain": 0.05,
+                                "release": 0.18
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "D5",
+                "A5",
+                "D6"
+            ],
+            "durations": [
+                "32n",
+                "32n",
+                "16n"
+            ]
+        }
+    },
+    "myte_slot_enter": {
+        "type": "sfx",
+        "baseVolume": 0.32,
+        "variation": {
+            "pitchRange": 0.012
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.002,
+                                "decay": 0.14,
+                                "sustain": 0,
+                                "release": 0.22
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "G5",
+                "D5"
+            ],
+            "durations": [
+                "32n",
+                "8n"
+            ]
+        }
+    },
+    "myte_happy": {
+        "type": "sfx",
+        "baseVolume": 0.38,
+        "variation": {
+            "pitchRange": 0.016,
+            "volumeSteps": [
+                0.96,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.01,
+                                "decay": 0.1,
+                                "sustain": 0.3,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "G5",
+                "C6"
+            ],
+            "durations": [
+                "16n",
+                "8n"
+            ]
+        }
+    },
+    "myte_sad": {
+        "type": "sfx",
+        "baseVolume": 0.34,
+        "variation": {
+            "pitchRange": 0.012
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.01,
+                                "decay": 0.2,
+                                "sustain": 0.2,
+                                "release": 0.4
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "C4",
+                "A3"
+            ],
+            "durations": [
+                "8n",
+                "8n"
+            ]
+        },
+        "awareness": true
+    },
+    "myte_jump": {
+        "type": "sfx",
+        "baseVolume": 0.28,
+        "variation": {
+            "pitchRange": 0.014
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.1,
+                                "sustain": 0,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "G4",
+            "duration": "16n"
+        }
+    },
+    "myte_land": {
+        "type": "sfx",
+        "baseVolume": 0.32,
+        "variation": {
+            "pitchRange": 0.01,
+            "volumeSteps": [
+                0.94,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.1,
+                                "sustain": 0,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "G4",
+            "duration": "16n"
+        }
+    },
+    "myte_eat": {
+        "type": "sfx",
+        "baseVolume": 0.24,
+        "variation": {
+            "volumeSteps": [
+                0.92,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "NoiseSynth",
+                    "args": [
+                        {
+                            "noise": {
+                                "type": "pink"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.15,
+                                "sustain": 0,
+                                "release": 0.05
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "duration": "16n"
+        }
+    },
+    "myte_sleep": {
+        "type": "sfx",
+        "baseVolume": 0.16,
+        "variation": {
+            "volumeSteps": [
+                0.95,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "NoiseSynth",
+                    "args": [
+                        {
+                            "noise": {
+                                "type": "pink"
+                            },
+                            "envelope": {
+                                "attack": 0.2,
+                                "decay": 0.3,
+                                "sustain": 0.1,
+                                "release": 0.4
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "duration": "4n"
+        }
+    },
+    "myte_pickup": {
+        "type": "sfx",
+        "baseVolume": 0.32,
+        "variation": {
+            "pitchRange": 0.014
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.1,
+                                "sustain": 0.1,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "C4",
+                "E4",
+                "G4"
+            ],
+            "durations": [
+                "32n",
+                "32n",
+                "8n"
+            ]
+        }
+    },
+    "myte_putdown": {
+        "type": "sfx",
+        "baseVolume": 0.3,
+        "variation": {
+            "pitchRange": 0.012
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.1,
+                                "sustain": 0.1,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "G4",
+                "E4",
+                "C4"
+            ],
+            "durations": [
+                "32n",
+                "32n",
+                "8n"
+            ]
+        }
+    },
+    "env_wind": {
+        "type": "ambient",
+        "baseVolume": 0.22,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Noise",
+                    "args": [
+                        "brown"
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node1"
+                    ]
+                },
+                {
+                    "id": "node1",
+                    "type": "AutoFilter",
+                    "args": [
+                        {
+                            "frequency": 0.1,
+                            "depth": 0.8,
+                            "baseFrequency": 100,
+                            "octaves": 2.5
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node2"
+                    ]
+                },
+                {
+                    "id": "node2",
+                    "type": "Filter",
+                    "args": [
+                        {
+                            "frequency": 800,
+                            "type": "lowpass",
+                            "rolloff": -24
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "noise": {
+                    "$node": "node0"
+                },
+                "autoFilter": {
+                    "$node": "node1"
+                },
+                "filter": {
+                    "$node": "node2"
+                }
+            },
+            "loop": true,
+            "volume": 0.22
+        }
+    },
+    "env_water": {
+        "type": "ambient",
+        "baseVolume": 0.12,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Noise",
+                    "args": [
+                        "pink"
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node1"
+                    ]
+                },
+                {
+                    "id": "node1",
+                    "type": "AutoFilter",
+                    "args": [
+                        {
+                            "frequency": 0.2,
+                            "depth": 0.5,
+                            "baseFrequency": 200,
+                            "octaves": 1.5
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node2"
+                    ]
+                },
+                {
+                    "id": "node2",
+                    "type": "Filter",
+                    "args": [
+                        {
+                            "frequency": 1000,
+                            "type": "lowpass",
+                            "rolloff": -24
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "noise": {
+                    "$node": "node0"
+                },
+                "autoFilter": {
+                    "$node": "node1"
+                },
+                "filter": {
+                    "$node": "node2"
+                }
+            },
+            "loop": true,
+            "volume": 0.12
+        }
+    },
+    "env_birds": {
+        "type": "ambient",
+        "baseVolume": 0.14,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "AMSynth",
+                    "args": [
+                        {
+                            "harmonicity": 8,
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.08,
+                                "sustain": 0,
+                                "release": 0.08
+                            },
+                            "modulation": {
+                                "type": "square"
+                            },
+                            "modulationEnvelope": {
+                                "attack": 0.001,
+                                "decay": 0.3,
+                                "sustain": 0,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "loop": true,
+            "loopInterval": 30,
+            "volume": 0.14
+        },
+        "patternGenerator": {
+            "kind": "birdChirps",
+            "count": 20,
+            "spacing": 2,
+            "jitter": 2,
+            "notes": [
+                "C7",
+                "D7",
+                "E7",
+                "G7",
+                "A7"
+            ],
+            "trillChance": 0.5,
+            "trillOffset": 0.1,
+            "duration": "32n"
+        }
+    },
+    "env_cricket": {
+        "type": "ambient",
+        "baseVolume": 0.008,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "AMSynth",
+                    "args": [
+                        {
+                            "harmonicity": 10,
+                            "oscillator": {
+                                "type": "square"
+                            },
+                            "envelope": {
+                                "attack": 0.005,
+                                "decay": 0.04,
+                                "sustain": 0,
+                                "release": 0.01
+                            },
+                            "modulation": {
+                                "type": "square"
+                            },
+                            "modulationEnvelope": {
+                                "attack": 0.005,
+                                "decay": 0.04,
+                                "sustain": 0,
+                                "release": 0.01
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "loop": true,
+            "loopInterval": 15
+        },
+        "patternGenerator": {
+            "kind": "pulseGroups",
+            "groups": 8,
+            "spacing": 1.5,
+            "jitter": 8,
+            "pulses": 3,
+            "pulseSpacing": 0.08,
+            "note": "A7",
+            "duration": "64n"
+        }
+    },
+    "env_indoor_cozy": {
+        "type": "ambient",
+        "baseVolume": 0.09,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Noise",
+                    "args": [
+                        "brown"
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node1"
+                    ]
+                },
+                {
+                    "id": "node1",
+                    "type": "AutoFilter",
+                    "args": [
+                        {
+                            "frequency": 0.06,
+                            "depth": 0.15,
+                            "baseFrequency": 280,
+                            "octaves": 0.8
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node2"
+                    ]
+                },
+                {
+                    "id": "node2",
+                    "type": "Filter",
+                    "args": [
+                        {
+                            "frequency": 320,
+                            "type": "lowpass",
+                            "rolloff": -48
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "noise": {
+                    "$node": "node0"
+                },
+                "autoFilter": {
+                    "$node": "node1"
+                },
+                "filter": {
+                    "$node": "node2"
+                }
+            },
+            "loop": true,
+            "volume": 0.09
+        }
+    },
+    "env_water_lake": {
+        "type": "ambient",
+        "baseVolume": 0.55,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Noise",
+                    "args": [
+                        "pink"
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node1"
+                    ]
+                },
+                {
+                    "id": "node1",
+                    "type": "AutoFilter",
+                    "args": [
+                        {
+                            "frequency": 0.06,
+                            "depth": 0.55,
+                            "baseFrequency": 180,
+                            "octaves": 1.8
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node2"
+                    ]
+                },
+                {
+                    "id": "node2",
+                    "type": "Filter",
+                    "args": [
+                        {
+                            "frequency": 900,
+                            "type": "lowpass",
+                            "rolloff": -24
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "noise": {
+                    "$node": "node0"
+                },
+                "autoFilter": {
+                    "$node": "node1"
+                },
+                "filter": {
+                    "$node": "node2"
+                }
+            },
+            "loop": true,
+            "volume": 0.55
+        }
+    },
+    "env_water_river": {
+        "type": "ambient",
+        "baseVolume": 0.18,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Noise",
+                    "args": [
+                        "pink"
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node1"
+                    ]
+                },
+                {
+                    "id": "node1",
+                    "type": "AutoFilter",
+                    "args": [
+                        {
+                            "frequency": 0.28,
+                            "depth": 0.7,
+                            "baseFrequency": 350,
+                            "octaves": 2.2
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node2"
+                    ]
+                },
+                {
+                    "id": "node2",
+                    "type": "Filter",
+                    "args": [
+                        {
+                            "frequency": 1600,
+                            "type": "lowpass",
+                            "rolloff": -12
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "noise": {
+                    "$node": "node0"
+                },
+                "autoFilter": {
+                    "$node": "node1"
+                },
+                "filter": {
+                    "$node": "node2"
+                }
+            },
+            "loop": true,
+            "volume": 0.18
+        }
+    },
+    "obj_chest_open": {
+        "type": "sfx",
+        "baseVolume": 0.32,
+        "variation": {
+            "pitchRange": 0.01
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "MetalSynth",
+                    "args": [
+                        {
+                            "frequency": 200,
+                            "envelope": {
+                                "attack": 0.01,
+                                "decay": 0.3,
+                                "sustain": 0,
+                                "release": 0.6
+                            },
+                            "harmonicity": 3.1,
+                            "modulationIndex": 32,
+                            "resonance": 4000,
+                            "octaves": 1.5
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "G3",
+            "duration": "8n"
+        }
+    },
+    "obj_chest_close": {
+        "type": "sfx",
+        "baseVolume": 0.26,
+        "variation": {
+            "pitchRange": 0.01,
+            "volumeSteps": [
+                0.94,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "MetalSynth",
+                    "args": [
+                        {
+                            "frequency": 150,
+                            "envelope": {
+                                "attack": 0.01,
+                                "decay": 0.2,
+                                "sustain": 0,
+                                "release": 0.2
+                            },
+                            "harmonicity": 3.5,
+                            "modulationIndex": 40,
+                            "resonance": 3000,
+                            "octaves": 1
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "D3",
+            "duration": "8n"
+        }
+    },
+    "obj_door_open": {
+        "type": "sfx",
+        "baseVolume": 0.26,
+        "variation": {
+            "pitchRange": 0.008
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "MembraneSynth",
+                    "args": [
+                        {
+                            "pitchDecay": 0.02,
+                            "octaves": 1.5,
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.18,
+                                "sustain": 0,
+                                "release": 0.12
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "E3",
+                "G3"
+            ],
+            "durations": [
+                "32n",
+                "8n"
+            ]
+        }
+    },
+    "obj_door_close": {
+        "type": "sfx",
+        "baseVolume": 0.22,
+        "variation": {
+            "pitchRange": 0.008,
+            "volumeSteps": [
+                0.94,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "MembraneSynth",
+                    "args": [
+                        {
+                            "pitchDecay": 0.015,
+                            "octaves": 1,
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.14,
+                                "sustain": 0,
+                                "release": 0.08
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "C3",
+            "duration": "8n"
+        }
+    },
+    "obj_gate_open": {
+        "type": "sfx",
+        "baseVolume": 0.3,
+        "variation": {
+            "pitchRange": 0.008
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "MetalSynth",
+                    "args": [
+                        {
+                            "frequency": 120,
+                            "envelope": {
+                                "attack": 0.01,
+                                "decay": 0.18,
+                                "sustain": 0,
+                                "release": 0.2
+                            },
+                            "harmonicity": 2.5,
+                            "modulationIndex": 18,
+                            "resonance": 2200,
+                            "octaves": 1
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "A2",
+            "duration": "8n"
+        }
+    },
+    "obj_gate_close": {
+        "type": "sfx",
+        "baseVolume": 0.26,
+        "variation": {
+            "pitchRange": 0.008,
+            "volumeSteps": [
+                0.94,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "MetalSynth",
+                    "args": [
+                        {
+                            "frequency": 90,
+                            "envelope": {
+                                "attack": 0.01,
+                                "decay": 0.14,
+                                "sustain": 0,
+                                "release": 0.15
+                            },
+                            "harmonicity": 2.2,
+                            "modulationIndex": 16,
+                            "resonance": 1800,
+                            "octaves": 0.8
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "F2",
+            "duration": "8n"
+        }
+    },
+    "obj_fountain_on": {
+        "type": "sfx",
+        "baseVolume": 0.24,
+        "variation": {
+            "volumeSteps": [
+                0.94,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "NoiseSynth",
+                    "args": [
+                        {
+                            "noise": {
+                                "type": "pink"
+                            },
+                            "envelope": {
+                                "attack": 0.01,
+                                "decay": 0.35,
+                                "sustain": 0,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node1"
+                    ]
+                },
+                {
+                    "id": "node1",
+                    "type": "Filter",
+                    "args": [
+                        {
+                            "frequency": 1800,
+                            "type": "bandpass",
+                            "Q": 2
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "duration": "8n"
+        }
+    },
+    "obj_fountain_off": {
+        "type": "sfx",
+        "baseVolume": 0.2,
+        "variation": {
+            "volumeSteps": [
+                0.94,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "NoiseSynth",
+                    "args": [
+                        {
+                            "noise": {
+                                "type": "pink"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.18,
+                                "sustain": 0,
+                                "release": 0.08
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node1"
+                    ]
+                },
+                {
+                    "id": "node1",
+                    "type": "Filter",
+                    "args": [
+                        {
+                            "frequency": 900,
+                            "type": "lowpass",
+                            "Q": 1
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "duration": "16n"
+        }
+    },
+    "obj_fountain": {
+        "type": "ambient",
+        "baseVolume": 0.16,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Noise",
+                    "args": [
+                        "pink"
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node1"
+                    ]
+                },
+                {
+                    "id": "node1",
+                    "type": "AutoFilter",
+                    "args": [
+                        {
+                            "frequency": 0.5,
+                            "depth": 0.3,
+                            "baseFrequency": 1500,
+                            "octaves": 1
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node2"
+                    ]
+                },
+                {
+                    "id": "node2",
+                    "type": "Filter",
+                    "args": [
+                        {
+                            "frequency": 2000,
+                            "type": "bandpass",
+                            "Q": 2,
+                            "rolloff": -24
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "noise": {
+                    "$node": "node0"
+                },
+                "autoFilter": {
+                    "$node": "node1"
+                },
+                "filter": {
+                    "$node": "node2"
+                }
+            },
+            "loop": true,
+            "volume": 0.16
+        }
+    },
+    "obj_lantern": {
+        "type": "sfx",
+        "baseVolume": 0.14,
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "AMSynth",
+                    "args": [
+                        {
+                            "harmonicity": 2.5,
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.1,
+                                "decay": 0.5,
+                                "sustain": 0.3,
+                                "release": 0.5
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "E5",
+            "duration": "8n"
+        }
+    },
+    "obj_lantern_on": {
+        "type": "sfx",
+        "baseVolume": 0.18,
+        "variation": {
+            "pitchRange": 0.008
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "AMSynth",
+                    "args": [
+                        {
+                            "harmonicity": 2.5,
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.02,
+                                "decay": 0.24,
+                                "sustain": 0.15,
+                                "release": 0.25
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "C5",
+                "E5"
+            ],
+            "durations": [
+                "32n",
+                "8n"
+            ]
+        }
+    },
+    "obj_lantern_off": {
+        "type": "sfx",
+        "baseVolume": 0.16,
+        "variation": {
+            "pitchRange": 0.008
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "AMSynth",
+                    "args": [
+                        {
+                            "harmonicity": 1.8,
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.14,
+                                "sustain": 0,
+                                "release": 0.12
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "B4",
+            "duration": "16n"
+        }
+    },
+    "obj_portal_depart": {
+        "type": "sfx",
+        "baseVolume": 0.34,
+        "variation": {
+            "pitchRange": 0.006
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "AMSynth",
+                    "args": [
+                        {
+                            "harmonicity": 2.2,
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.01,
+                                "decay": 0.18,
+                                "sustain": 0.08,
+                                "release": 0.24
+                            },
+                            "modulation": {
+                                "type": "triangle"
+                            },
+                            "modulationEnvelope": {
+                                "attack": 0.02,
+                                "decay": 0.15,
+                                "sustain": 0.05,
+                                "release": 0.18
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "E4",
+                "B4",
+                "E5"
+            ],
+            "durations": [
+                "32n",
+                "32n",
+                "16n"
+            ]
+        }
+    },
+    "obj_portal_arrive": {
+        "type": "sfx",
+        "baseVolume": 0.34,
+        "variation": {
+            "pitchRange": 0.006
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "AMSynth",
+                    "args": [
+                        {
+                            "harmonicity": 1.9,
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.005,
+                                "decay": 0.22,
+                                "sustain": 0.1,
+                                "release": 0.3
+                            },
+                            "modulation": {
+                                "type": "sine"
+                            },
+                            "modulationEnvelope": {
+                                "attack": 0.01,
+                                "decay": 0.18,
+                                "sustain": 0.06,
+                                "release": 0.2
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "B4",
+                "E5",
+                "G5"
+            ],
+            "durations": [
+                "32n",
+                "32n",
+                "8n"
+            ]
+        }
+    },
+    "obj_crop_harvest": {
+        "type": "sfx",
+        "baseVolume": 0.22,
+        "variation": {
+            "volumeSteps": [
+                0.94,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "NoiseSynth",
+                    "args": [
+                        {
+                            "noise": {
+                                "type": "white"
+                            },
+                            "envelope": {
+                                "attack": 0.005,
+                                "decay": 0.1,
+                                "sustain": 0,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [
+                        "node1"
+                    ],
+                    "destination": true
+                },
+                {
+                    "id": "node1",
+                    "type": "Filter",
+                    "args": [
+                        3000,
+                        "lowpass"
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "duration": "16n"
+        }
+    },
+    "obj_ball_bounce": {
+        "type": "sfx",
+        "baseVolume": 0.28,
+        "variation": {
+            "pitchRange": 0.016,
+            "volumeSteps": [
+                0.96,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "MembraneSynth",
+                    "args": [
+                        {
+                            "pitchDecay": 0.05,
+                            "octaves": 3,
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.2,
+                                "sustain": 0,
+                                "release": 0.2
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "G3",
+            "duration": "16n"
+        }
+    },
+    "obj_slime_jump": {
+        "type": "sfx",
+        "category": "entities",
+        "baseVolume": 0.18,
+        "variation": {
+            "pitchRange": 0.025,
+            "volumeSteps": [
+                0.94,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "MembraneSynth",
+                    "args": [
+                        {
+                            "pitchDecay": 0.055,
+                            "octaves": 3.5,
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.16,
+                                "sustain": 0,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "D3",
+            "duration": "16n"
+        }
+    },
+    "obj_slime_land": {
+        "type": "sfx",
+        "category": "entities",
+        "baseVolume": 0.14,
+        "variation": {
+            "pitchRange": 0.02,
+            "volumeSteps": [
+                0.92,
+                0.96,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "MembraneSynth",
+                    "args": [
+                        {
+                            "pitchDecay": 0.045,
+                            "octaves": 2.5,
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.14,
+                                "sustain": 0,
+                                "release": 0.09
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "note": "A2",
+            "duration": "16n"
+        }
+    },
+    "obj_butterfly": {
+        "type": "sfx",
+        "baseVolume": 0.18,
+        "variation": {
+            "pitchRange": 0.018
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "AMSynth",
+                    "args": [
+                        {
+                            "harmonicity": 2,
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.01,
+                                "decay": 0.1,
+                                "sustain": 0,
+                                "release": 0.1
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "A6",
+                "C7"
+            ],
+            "durations": [
+                "32n",
+                "32n"
+            ]
+        }
+    },
+    "obj_butterfly_flutter": {
+        "type": "sfx",
+        "category": "ambient",
+        "baseVolume": 0.2,
+        "variation": {
+            "pitchRange": 0.012,
+            "volumeSteps": [
+                0.94,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "FMSynth",
+                    "args": [
+                        {
+                            "harmonicity": 2.2,
+                            "modulationIndex": 1.4,
+                            "oscillator": {
+                                "type": "sine"
+                            },
+                            "envelope": {
+                                "attack": 0.004,
+                                "decay": 0.08,
+                                "sustain": 0,
+                                "release": 0.06
+                            },
+                            "modulation": {
+                                "type": "triangle"
+                            },
+                            "modulationEnvelope": {
+                                "attack": 0.001,
+                                "decay": 0.05,
+                                "sustain": 0,
+                                "release": 0.05
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "E6",
+                "G6"
+            ],
+            "durations": [
+                "64n",
+                "32n"
+            ]
+        }
+    },
+    "obj_butterfly_land": {
+        "type": "sfx",
+        "category": "ambient",
+        "baseVolume": 0.16,
+        "variation": {
+            "pitchRange": 0.01
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.002,
+                                "decay": 0.09,
+                                "sustain": 0,
+                                "release": 0.12
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "D6",
+                "A5"
+            ],
+            "durations": [
+                "64n",
+                "32n"
+            ]
+        }
+    },
+    "obj_flower_pick": {
+        "type": "sfx",
+        "baseVolume": 0.24,
+        "variation": {
+            "pitchRange": 0.014
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.005,
+                                "decay": 0.12,
+                                "sustain": 0,
+                                "release": 0.25
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "notes": [
+                "E5",
+                "G5"
+            ],
+            "durations": [
+                "32n",
+                "16n"
+            ]
+        }
+    },
+    "obj_flower_rustle": {
+        "type": "sfx",
+        "category": "footsteps",
+        "baseVolume": 0.3,
+        "variation": {
+            "pitchRange": 0.035,
+            "volumeSteps": [
+                0.92,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "NoiseSynth",
+                    "args": [
+                        {
+                            "noise": {
+                                "type": "pink"
+                            },
+                            "envelope": {
+                                "attack": 0.002,
+                                "decay": 0.07,
+                                "sustain": 0,
+                                "release": 0.04
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "duration": "32n"
+        }
+    },
+    "obj_flower_trample": {
+        "type": "sfx",
+        "baseVolume": 0.18,
+        "variation": {
+            "volumeSteps": [
+                0.94,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "NoiseSynth",
+                    "args": [
+                        {
+                            "noise": {
+                                "type": "brown"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.15,
+                                "sustain": 0,
+                                "release": 0.08
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "duration": "8n"
+        }
+    },
+    "obj_flower_trample_step": {
+        "type": "sfx",
+        "baseVolume": 0.16,
+        "variation": {
+            "volumeSteps": [
+                0.92,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "NoiseSynth",
+                    "args": [
+                        {
+                            "noise": {
+                                "type": "brown"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.08,
+                                "sustain": 0,
+                                "release": 0.05
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "$node": "node0"
+            },
+            "duration": "16n"
+        }
+    },
+    "obj_crop_tend": {
+        "type": "sfx",
+        "baseVolume": 0.18,
+        "variation": {
+            "pitchRange": 0.01,
+            "volumeSteps": [
+                0.95,
+                1
+            ]
+        },
+        "factory": "graph",
+        "graph": {
+            "nodes": [
+                {
+                    "id": "node0",
+                    "type": "NoiseSynth",
+                    "args": [
+                        {
+                            "noise": {
+                                "type": "pink"
+                            },
+                            "envelope": {
+                                "attack": 0.002,
+                                "decay": 0.08,
+                                "sustain": 0,
+                                "release": 0.05
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                },
+                {
+                    "id": "node1",
+                    "type": "Synth",
+                    "args": [
+                        {
+                            "oscillator": {
+                                "type": "triangle"
+                            },
+                            "envelope": {
+                                "attack": 0.001,
+                                "decay": 0.06,
+                                "sustain": 0,
+                                "release": 0.08
+                            }
+                        }
+                    ],
+                    "properties": {},
+                    "connections": [],
+                    "destination": true
+                }
+            ]
+        },
+        "output": {
+            "synth": {
+                "body": {
+                    "$node": "node0"
+                },
+                "pluck": {
+                    "$node": "node1"
+                }
+            },
+            "volume": 0.9
+        },
+        "triggerProfile": "cropTend"
+    }
+}

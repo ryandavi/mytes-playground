@@ -1,10 +1,11 @@
 {
   "private": true,
   "scripts": {
+    "prepare": "node scripts/build-manifest.js",
     "build:scripts": "node scripts/build-manifest.js",
     "build:bundle": "node scripts/build-manifest.js",
     "sim:stats": "node scripts/simulate-stats.js",
-    "validate:content": "node scripts/validate-content-data.js",
+    "validate:content": "node scripts/validate-content-data.js && node scripts/check-time-sources.js && node scripts/check-text-encoding.js",
     "sass:build": "sass css/style.scss css/style.css --no-source-map",
     "sass:watch": "sass --watch css/style.scss css/style.css --no-source-map"
   },

@@ -56,6 +56,17 @@ class CropPlantMapObject extends withTrampleResponse(GrowingPlantMapObject) {
         return !!this.harvestable;
     }
 
+    serializeState() {
+        return { ...super.serializeState(), harvestable: this.harvestable, quality: this.quality };
+    }
+
+    restoreState(data = {}) {
+        super.restoreState(data);
+        this.harvestable = data.harvestable === true || this.growthStage === this.harvestableStage;
+        this.quality = Math.max(1, Number(data.quality) || 1);
+        this.updateHarvestableVisuals(this.harvestable);
+    }
+
     getSidebarDetailRows() {
         return [
             ...super.getSidebarDetailRows(),

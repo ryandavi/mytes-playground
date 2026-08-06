@@ -15,6 +15,8 @@ class ContainerManager {
         this.worldRegistry = new WorldRegistry(this);
         this.relationships = new EntityRelationships(this.worldRegistry);
         this.attachments = new AttachmentSystem(this.worldRegistry, this.relationships);
+        this.notify = new Notify(this);
+        this.worldState = new WorldState(this, core.user);
 
         this.element = document.getElementById(elementId);
         this.containerWrapper = this.element.closest('.app-shell');
@@ -623,12 +625,9 @@ class ContainerManager {
             .replace(/[^a-z0-9_-]+/g, '-');
 
         // Safe DOM construction — never use innerHTML with save-data values.
-        const homeLabel = document.createElement('div');
-        homeLabel.className = 'myte-home-label';
-        const homeLabelName = document.createElement('div');
-        homeLabelName.className = 'name tooltip';
-        homeLabelName.textContent = rosterEntry.slotLabel;
-        homeLabel.appendChild(homeLabelName);
+        const homeLabel = FloatingLabel.build('myte-home-label', [
+            { text: rosterEntry.slotLabel, className: 'name tooltip', tag: 'div' }
+        ]);
 
         const homeSlot = document.createElement('div');
         homeSlot.className = 'myte-home-slot';
@@ -647,16 +646,10 @@ class ContainerManager {
         const sprite = document.createElement('div');
         sprite.className = 'sprite';
 
-        const nameWrapper = document.createElement('div');
-        nameWrapper.className = 'name-wrapper';
-        const before = document.createElement('span');
-        before.className = 'before';
-        before.textContent = 'x';
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'name tooltip';
-        nameDiv.textContent = rosterEntry.name;
-        nameWrapper.appendChild(before);
-        nameWrapper.appendChild(nameDiv);
+        const nameWrapper = FloatingLabel.build('name-wrapper', [
+            { text: 'x', className: 'before' },
+            { text: rosterEntry.name, className: 'name tooltip', tag: 'div' }
+        ]);
 
         const commands = document.createElement('div');
         commands.className = 'commands';
@@ -805,7 +798,7 @@ class ContainerManager {
         //  add active if myte isnt null
         if (myte !== null) {
             myte.setStartTime();
-            this.ui.hudManager.update();
+            this.ui.hudManager.update(true);
         }
 
         // Set other mytes to free roam

@@ -335,7 +335,13 @@ class OpenableMapObject extends DirectionalAnimatedMapObject {
 
     emitToggleEvent(state) {
         const eventName = this.getToggleEventName();
-        if (!eventName || !this.gameMap?.eventManager) return;
+        if (!this.gameMap?.eventManager) return;
+
+        this.gameMap.eventManager.emit('world:action_availability_changed', {
+            object: this,
+            state
+        });
+        if (!eventName) return;
 
         this.gameMap.eventManager.emit(eventName, {
             object: this,
@@ -837,12 +843,41 @@ const withPickup = (Base) => class extends Base {
 // Reads from `flightSound` config key (set in constructor mergedConfig or types.json):
 //   landSound, landVolume, flySound, flyVolumeBase, flyVolumeScale, flyVolumeMin,
 //   flyVolumeMax, speedThreshold, cooldownMin, cooldownVariance
+// Optional `flapSyncAnimations: [names]` switches flySound from the default
+// speed+cooldown retrigger (good for a continuous buzz/hum) to firing once per
+// wing-flap animation loop when one of the named animations is playing (good
+// for a light, non-repetitive flap sound like a butterfly's).
 // Apply: class Foo extends withFlightSounds(BaseClass) { ... }
 const withFlightSounds = (Base) => class extends Base {
     constructor(...args) {
         super(...args);
         const cfg = this.getConfig('flightSound', {});
         this._flightSoundCooldown = (cfg.cooldownMin ?? 300) + Math.random() * (cfg.cooldownVariance ?? 400);
+    }
+
+    playAnimation(animationName, onComplete) {
+        const cfg = this.getConfig('flightSound', null);
+        if (cfg?.flapSyncAnimations?.includes(animationName)) {
+            super.playAnimation(animationName, () => {
+                this._playFlapSound(cfg);
+                onComplete?.();
+            });
+            return;
+        }
+        super.playAnimation(animationName, onComplete);
+    }
+
+    _playFlapSound(cfg) {
+        const soundManager = this.gameMap?.soundManager;
+        if (!soundManager || !cfg.flySound) return;
+        const currentSpeed = Math.hypot(this.velocity?.x ?? 0, this.velocity?.y ?? 0);
+        const speedRatio = currentSpeed / Math.max(this.speed, 0.01);
+        const volume = Utility.clamp(
+            (cfg.flyVolumeBase ?? 0.35) + speedRatio * (cfg.flyVolumeScale ?? 0.13),
+            cfg.flyVolumeMin ?? 0.3,
+            cfg.flyVolumeMax ?? 0.5
+        );
+        soundManager.play(cfg.flySound, { volume, source: this });
     }
 
     tickUpdate(tickDelta) {
@@ -857,13 +892,20 @@ const withFlightSounds = (Base) => class extends Base {
         if (!cfg) return;
         const soundManager = this.gameMap?.soundManager;
         if (!soundManager) return;
-        const currentSpeed = Math.hypot(this.velocity?.x ?? 0, this.velocity?.y ?? 0);
 
         if (!wasRestingOnTarget && this.isRestingOnTarget) {
-            if (cfg.landSound) soundManager.play(cfg.landSound, { volume: cfg.landVolume ?? 0.5 });
+            if (cfg.landSound) soundManager.play(cfg.landSound, {
+                volume: cfg.landVolume ?? 0.5,
+                source: this
+            });
             return;
         }
 
+        // Flap-synced creatures get their flySound from the animation loop
+        // instead (see playAnimation above), not from this speed-based retrigger.
+        if (cfg.flapSyncAnimations) return;
+
+        const currentSpeed = Math.hypot(this.velocity?.x ?? 0, this.velocity?.y ?? 0);
         if (!this.isIdle && !this.isRestingOnTarget && currentSpeed > (cfg.speedThreshold ?? 0.18) && this._flightSoundCooldown <= 0 && cfg.flySound) {
             const speedRatio = currentSpeed / Math.max(this.speed, 0.01);
             const volume = Utility.clamp(
@@ -871,7 +913,7 @@ const withFlightSounds = (Base) => class extends Base {
                 cfg.flyVolumeMin ?? 0.3,
                 cfg.flyVolumeMax ?? 0.5
             );
-            soundManager.play(cfg.flySound, { volume });
+            soundManager.play(cfg.flySound, { volume, source: this });
             this._flightSoundCooldown = (cfg.cooldownMin ?? 300) + Math.random() * (cfg.cooldownVariance ?? 400);
         }
     }

@@ -5,6 +5,11 @@ class HUDManager extends UIComponent {
         this.clockTextElement = this.clockElement?.querySelector('.clock__time') ?? null;
         this.clockSeasonElement = this.clockElement?.querySelector('.clock__season') ?? null;
         this.coinElement = this.parent.containerWrapper.querySelector('.coin-count');
+        this.activeMyteElement = this.parent.containerWrapper.querySelector('.hud-active-myte');
+        this.activeMyteNameElement = this.activeMyteElement?.querySelector('.hud-active-myte__name');
+        this.activeMyteThoughtElement = this.activeMyteElement?.querySelector('.hud-active-myte__thought');
+        this.activeMyteMeters = new Map([...this.activeMyteElement?.querySelectorAll?.('[data-vital]') ?? []]
+            .map(element => [element.dataset.vital, element.querySelector('span')]));
         this._lastUpdate = 0;
         this._currencyUnsubscribe = null;
         this._coinAnimationFrame = null;
@@ -19,6 +24,12 @@ class HUDManager extends UIComponent {
             season: null,
             coins: null
         };
+        if (this.activeMyteElement) {
+            this.activeMyteElement.onclick = () => {
+                const myte = this.parent.parent?.getActiveMyte?.();
+                if (myte) this.parent.myteInfoPanel?.openFor?.(myte);
+            };
+        }
     }
 
     init() {
@@ -41,6 +52,41 @@ class HUDManager extends UIComponent {
         this._lastUpdate = now;
 
         this.updateClock();
+        this.updateActiveMyte();
+    }
+
+    updateActiveMyte() {
+        const myte = this.parent.getActiveMyte?.();
+        if (!this.activeMyteElement) return;
+        this.activeMyteElement.hidden = !myte;
+        if (!myte) return;
+
+        this.activeMyteNameElement.textContent = myte.name || 'Myte';
+        const stats = myte.stats;
+        const values = {
+            energy: stats?.getEnergyRatio?.() ?? 0,
+            satiety: stats?.getSatietyRatio?.() ?? 0,
+            mood: ((stats?.getFunRatio?.() ?? 0) + (stats?.getSocialRatio?.() ?? 0) +
+                (stats?.getComfortRatio?.() ?? 0)) / 3
+        };
+        for (const [id, fill] of this.activeMyteMeters) {
+            const percent = Math.round(Utility.clamp(values[id] ?? 0, 0, 1) * 100);
+            fill.style.width = `${percent}%`;
+            fill.parentElement.setAttribute('aria-label', `${id} ${percent}%`);
+        }
+
+        const pressures = myte.ai?.getPressuresSnapshot?.() ?? {};
+        const driveLabel = SiteConfig.ui.labels.drives[pressures.dominantDrive] ?? 'Settling in';
+        const decisionDisplay = this.parent.actionSidebarManager
+            ?.getAiDecisionDisplay?.(myte.ai?.lastDecisionLabel);
+        const decision = decisionDisplay
+            ? [decisionDisplay.primary, ...decisionDisplay.details].filter(Boolean).join(' > ')
+            : '';
+        const thought = decision
+            ? `${driveLabel} ${Math.round((pressures.maxPressure ?? 0) * 100)}% - ${decision}`
+            : driveLabel;
+        this.activeMyteThoughtElement.textContent = thought;
+        this.activeMyteThoughtElement.title = thought;
     }
 
     updateClock() {
@@ -202,6 +248,10 @@ class HUDManager extends UIComponent {
         this.clockTextElement = null;
         this.clockSeasonElement = null;
         this.coinElement = null;
+        this.activeMyteElement = null;
+        this.activeMyteNameElement = null;
+        this.activeMyteThoughtElement = null;
+        this.activeMyteMeters.clear();
         this.numberFormatter = null;
     }
 }

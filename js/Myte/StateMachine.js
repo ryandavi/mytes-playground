@@ -44,7 +44,7 @@ class StateController {
 
 	// Milliseconds spent in the current state. Returns 0 if no state is active.
 	getStateDuration() {
-		return this.stateEnteredAt != null ? (performance.now() - this.stateEnteredAt) : 0;
+		return this.stateEnteredAt != null ? (SimClock.now() - this.stateEnteredAt) : 0;
 	}
 
 	// Iterates in priority order; first passing check wins.
@@ -78,7 +78,7 @@ class StateController {
 		const prevState = this.currentState;
 		this.previousState = prevState;
 		this.currentState = newState;
-		this.stateEnteredAt = performance.now();
+		this.stateEnteredAt = SimClock.now();
 		this.onEnter?.(newState, prevState, this.stateConfig[newState]);
 		return true;
 	}

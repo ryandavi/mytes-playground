@@ -128,7 +128,7 @@ class HopMotion {
             this.rising = true;
             this.owner.onHopStart?.();
             if (this.config.jumpSound) {
-                this.owner.gameMap?.soundManager?.play?.(this.config.jumpSound);
+                this.owner.gameMap?.soundManager?.play?.(this.config.jumpSound, { source: this.owner });
             }
             return 1;
         }
@@ -152,7 +152,7 @@ class HopMotion {
         this.owner.posZ = 0;
         this.owner.onHopLand?.();
         if (this.config.landSound) {
-            this.owner.gameMap?.soundManager?.play?.(this.config.landSound);
+            this.owner.gameMap?.soundManager?.play?.(this.config.landSound, { source: this.owner });
         }
         return 0;
     }

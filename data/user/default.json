@@ -10,6 +10,7 @@
     "musicEnabled": true,
     "ambientEnabled": true,
     "footstepsEnabled": true,
+    "spatialAudioEnabled": true,
     "masterVolume": 1,
     "sfxVolume": 0.82,
     "footstepsVolume": 0.72,
@@ -26,6 +27,7 @@
     "weatherEffectsEnabled": true,
     "difficulty": "normal",
     "tutorialsEnabled": true,
+    "interactionHintsEnabled": true,
     "autoSaveEnabled": true,
     "language": "en",
     "notificationsEnabled": true

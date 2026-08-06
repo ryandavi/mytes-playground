@@ -11,6 +11,14 @@
       "sortOrder": 10
     },
     {
+      "id": "snail2",
+      "label": "Snail 2",
+      "definitionFile": "snail2.json",
+      "enabled": true,
+      "essential": false,
+      "sortOrder": 15
+    },
+    {
       "id": "worm",
       "label": "Worm",
       "definitionFile": "worm.json",

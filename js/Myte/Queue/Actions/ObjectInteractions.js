@@ -224,9 +224,9 @@ class InteractObjectAction extends GoToObjectAction {
             const interacted = this.target?.interact?.(this.myte);
             if (interacted === false && this.userInitiated) {
                 const targetName = this.getQueueTargetLabel(this.target);
-                MyteCore.instance?.toastManager?.warning(
+                this.myte.container?.notify?.warn(
                     `${targetName || 'That'} isn't ready to be used again yet.`,
-                    'Still Resetting'
+                    { title: 'Still Resetting' }
                 );
             }
         }
@@ -388,7 +388,7 @@ class SurfaceSlotAction extends GoToObjectAction {
     // attempts report; the AI retries constantly and would spam toasts.
     reportRefusal(message, title = 'Not Now') {
         if (!this.userInitiated) return;
-        MyteCore.instance?.toastManager?.warning(message, title);
+        this.myte.container?.notify?.warn(message, { title });
     }
 
     start() {
@@ -1286,35 +1286,17 @@ class CloseChestAction extends GoToObjectAction {
 }
 
 // Pick a flower — animates a pick, drops the flower item on the ground, marks plant as deflowered
-class PickFlowerAction extends GoToObjectAction {
-    static metadata = { id: 'pick_flower' };
-
-    static _isFlower(obj) {
-        if (!obj) return false;
-        if (typeof obj.isSidebarFlowerObject === 'function') {
-            return obj.isSidebarFlowerObject();
-        }
-
-        const name = obj?.constructor?.name ?? '';
-        if (name.includes('Flower') || name.includes('Bloom')) return true;
-        const type = obj?.type?.toUpperCase?.();
-        return type === 'FLOWER' || type === 'GRASS';
-    }
-
-    static canPerform(selected, active) {
-        if (!active || !PickFlowerAction._isFlower(selected) || active.queue.isCarrying()) return false;
-        if (typeof selected.bloomState === 'string' && selected.bloomState !== 'open') return false;
-        return selected.isDeflowered?.() !== true;
-    }
-
-    static getRequiredOptions(selected) {
-        return { target: selected };
-    }
-
+class TimedInteractionAction extends GoToObjectAction {
     constructor(myte, options) {
-        super(myte, { ...PickFlowerAction.metadata.defaultOptions, ...options });
+        super(myte, options);
         this.phase = 'approach';
         this.animationTimer = 0;
+        this.interactionSpec = this.constructor.metadata.timedInteraction ?? {};
+    }
+
+    static canPerformCapability(selected, active, capability, predicate = null) {
+        return !!active && !!selected?.capabilities?.[capability] &&
+            !active.queue.isCarrying() && (!predicate || predicate(selected));
     }
 
     update(tickDelta) {
@@ -1322,45 +1304,67 @@ class PickFlowerAction extends GoToObjectAction {
             const arrived = super.update(tickDelta);
             if (!arrived) return false;
             if (this.didAbortApproach()) return true;
-            this.phase = 'pick';
-            this.animationTimer = this.pickAnimationDuration;
+            this.phase = this.interactionSpec.phase ?? 'interact';
+            this.animationTimer = this[this.interactionSpec.durationKey] ?? this.duration;
             this.faceTarget();
-            startInteractionSoundPulse(this, {
-                soundIds: ['obj_flower_rustle', 'obj_flower_pick'],
-                intervalMs: 180,
-                jitterMs: 65,
-                volume: 0.78
-            });
+            const sound = this.interactionSpec.sound;
+            if (sound) {
+                startInteractionSoundPulse(this, {
+                    soundIds: sound.ids,
+                    intervalMs: sound.intervalMs,
+                    jitterMs: sound.jitterMs,
+                    volume: sound.volume
+                });
+            }
+            const startCall = this.interactionSpec.onStartCall;
+            if (startCall) this.target?.[startCall]?.();
             return false;
         }
-
-        if (this.phase === 'pick') {
-            this.faceTarget();
-            tickInteractionSoundPulse(this, tickDelta);
-            this.animationTimer -= tickDelta;
-            return this.animationTimer <= 0;
-        }
-
-        return true;
+        this.faceTarget();
+        tickInteractionSoundPulse(this, tickDelta);
+        this.animationTimer -= tickDelta;
+        return this.animationTimer <= 0;
     }
 
     interrupt() {
-        this._interrupted = true;
         stopInteractionSoundPulse(this);
-        super.interrupt();
+        super.interrupt?.();
     }
 
     cancel() {
-        this._interrupted = true;
         stopInteractionSoundPulse(this);
         super.cancel?.();
     }
 
+    performInteraction() {}
+
     complete() {
-        if (this._interrupted) return;
         stopInteractionSoundPulse(this);
         this.faceTarget();
         super.complete();
+        if (this.didAbortApproach()) return;
+        this.performInteraction();
+        if (this.interactionSpec.postIdle !== false && this.postActionIdleDuration > 0) {
+            this.myte.queue.addIdle(this.postActionIdleDuration);
+        }
+    }
+}
+
+class PickFlowerAction extends TimedInteractionAction {
+    static metadata = { id: 'pick_flower' };
+
+    static canPerform(selected, active) {
+        return this.canPerformCapability(selected, active, 'pickableFlower', target =>
+            (typeof target.bloomState !== 'string' || target.bloomState === 'open') &&
+            target.isDeflowered?.() !== true
+        );
+    }
+
+    static getRequiredOptions(selected) {
+        return { target: selected };
+    }
+
+    performInteraction() {
         this._dropFlowerItem();
         this.target?.setDeflowered?.();
         this.target?.playConfiguredSound?.('pick');
@@ -1380,70 +1384,21 @@ class PickFlowerAction extends GoToObjectAction {
 }
 
 // Trample a flower — stomps through it, negative mood
-class TrampleFlowerAction extends GoToObjectAction {
+class TrampleFlowerAction extends TimedInteractionAction {
     static metadata = { id: 'trample_flower' };
 
     static canPerform(selected, active) {
-        return active && PickFlowerAction._isFlower(selected) && !active.queue.isCarrying();
+        return this.canPerformCapability(selected, active, 'pickableFlower');
     }
 
     static getRequiredOptions(selected) {
         return { target: selected };
     }
 
-    constructor(myte, options) {
-        super(myte, options);
-        this.phase = 'approach';
-        this.animationTimer = 0;
-    }
-
-    update(tickDelta) {
-        if (this.phase === 'approach') {
-            const arrived = super.update(tickDelta);
-            if (!arrived) return false;
-            if (this.didAbortApproach()) return true;
-            this.phase = 'trample';
-            this.animationTimer = this.trampleAnimationDuration;
-            this.faceTarget();
-            startInteractionSoundPulse(this, {
-                soundIds: ['obj_flower_trample_step', 'obj_flower_trample'],
-                intervalMs: 100,
-                jitterMs: 35,
-                volume: 0.72
-            });
-            return false;
-        }
-
-        if (this.phase === 'trample') {
-            this.faceTarget();
-            tickInteractionSoundPulse(this, tickDelta);
-            this.animationTimer -= tickDelta;
-            return this.animationTimer <= 0;
-        }
-
-        return true;
-    }
-
-    interrupt() {
-        stopInteractionSoundPulse(this);
-        super.interrupt?.();
-    }
-
-    cancel() {
-        stopInteractionSoundPulse(this);
-        super.cancel?.();
-    }
-
-    complete() {
-        stopInteractionSoundPulse(this);
-        this.faceTarget();
-        super.complete();
+    performInteraction() {
         this.target?.playConfiguredSound?.('trample');
         this.target?.remove?.();
         this.myte.queue.addExpression('surprise', 200, 1);
-        if (this.postActionIdleDuration > 0) {
-            this.myte.queue.addIdle(this.postActionIdleDuration);
-        }
     }
 }
 
@@ -1452,7 +1407,7 @@ class SmellFlowerAction extends GoToObjectAction {
     static metadata = { id: 'smell_flower' };
 
     static canPerform(selected, active) {
-        if (!active || !PickFlowerAction._isFlower(selected) || active.queue.isCarrying()) return false;
+        if (!active || !selected?.capabilities?.pickableFlower || active.queue.isCarrying()) return false;
         if (typeof selected.bloomState === 'string' && selected.bloomState !== 'open') return false;
         return true;
     }
@@ -1491,143 +1446,43 @@ class DrinkFromFountainAction extends GoToObjectAction {
 }
 
 // Water a CropPlantMapObject
-class WaterPlantAction extends GoToObjectAction {
+class WaterPlantAction extends TimedInteractionAction {
     static metadata = { id: 'water_plant' };
 
     static canPerform(selected, active) {
-        return active &&
-               selected?.constructor?.name === 'CropPlantMapObject' &&
-               (typeof selected.canWater !== 'function' || selected.canWater()) &&
-               !active.queue.isCarrying();
+        return this.canPerformCapability(selected, active, 'waterable', target =>
+            typeof target.canWater !== 'function' || target.canWater()
+        );
     }
 
     static getRequiredOptions(selected, active) {
         return { target: selected };
     }
 
-    constructor(myte, options) {
-        super(myte, options);
-        this.phase = 'approach';
-        this.animationTimer = 0;
-    }
-
-    update(tickDelta) {
-        if (this.phase === 'approach') {
-            const arrived = super.update(tickDelta);
-            if (!arrived) return false;
-            if (this.didAbortApproach()) return true;
-            this.phase = 'water';
-            this.animationTimer = this.waterAnimationDuration;
-            this.faceTarget();
-            startInteractionSoundPulse(this, {
-                soundIds: ['obj_crop_tend', 'obj_crop_tend'],
-                intervalMs: 150,
-                jitterMs: 50,
-                volume: 0.64
-            });
-            return false;
-        }
-
-        if (this.phase === 'water') {
-            this.faceTarget();
-            tickInteractionSoundPulse(this, tickDelta);
-            this.animationTimer -= tickDelta;
-            return this.animationTimer <= 0;
-        }
-
-        return true;
-    }
-
-    interrupt() {
-        stopInteractionSoundPulse(this);
-        super.interrupt?.();
-    }
-
-    cancel() {
-        stopInteractionSoundPulse(this);
-        super.cancel?.();
-    }
-
-    complete() {
-        stopInteractionSoundPulse(this);
-        this.faceTarget();
-        super.complete();
+    performInteraction() {
         if (this.target?.water) {
             this.target.water();
-        }
-        if (this.postActionIdleDuration > 0) {
-            this.myte.queue.addIdle(this.postActionIdleDuration);
         }
     }
 }
 
 // Harvest a CropPlantMapObject — approach, animate, then harvest drops to ground
-class HarvestAction extends GoToObjectAction {
+class HarvestAction extends TimedInteractionAction {
     static metadata = { id: 'harvest' };
 
     static canPerform(selected, active) {
-        return active &&
-               selected?.constructor?.name === 'CropPlantMapObject' &&
-               selected.isReadyToHarvest?.() &&
-               !active.queue.isCarrying();
+        return this.canPerformCapability(selected, active, 'harvestable', target => target.isReadyToHarvest?.());
     }
 
     static getRequiredOptions(selected, active) {
         return { target: selected };
-    }
-
-    constructor(myte, options) {
-        super(myte, options);
-        this.phase = 'approach';
-        this.animationTimer = 0;
     }
 
     getQueueTitle() {
         return 'Harvest Crop';
     }
 
-    update(tickDelta) {
-        if (this.phase === 'approach') {
-            const arrived = super.update(tickDelta);
-            if (!arrived) return false;
-            if (this.didAbortApproach()) return true;
-            this.phase = 'harvest';
-            this.animationTimer = this.harvestAnimationDuration;
-            this.faceTarget();
-            startInteractionSoundPulse(this, {
-                soundIds: ['obj_crop_tend', 'obj_crop_harvest'],
-                intervalMs: 165,
-                jitterMs: 65,
-                volume: 0.72
-            });
-            return false;
-        }
-
-        if (this.phase === 'harvest') {
-            this.faceTarget();
-            tickInteractionSoundPulse(this, tickDelta);
-            this.animationTimer -= tickDelta;
-            return this.animationTimer <= 0;
-        }
-
-        return true;
-    }
-
-    interrupt() {
-        stopInteractionSoundPulse(this);
-        super.interrupt?.();
-    }
-
-    cancel() {
-        stopInteractionSoundPulse(this);
-        super.cancel?.();
-    }
-
-    complete() {
-        stopInteractionSoundPulse(this);
-        this.faceTarget();
-        super.complete();
-        if (this.didAbortApproach()) return;
+    performInteraction() {
         if (typeof this.target?.performHarvest === 'function') {
             this.target.performHarvest(this.myte.parent, this.myte);
         } else if (this.target?.harvest) {
@@ -1635,161 +1490,57 @@ class HarvestAction extends GoToObjectAction {
         }
         if (!this.suppressPostEffects) {
             this.myte.queue.addExpression('excited', 300, 1);
-            if (this.postActionIdleDuration > 0) {
-                this.myte.queue.addIdle(this.postActionIdleDuration);
-            }
         }
     }
 }
 
-class ShakeTreeAction extends GoToObjectAction {
+class ShakeTreeAction extends TimedInteractionAction {
     static metadata = { id: 'shake_tree' };
 
     static canPerform(selected, active) {
-        return active &&
-               selected instanceof TreeMapObject &&
-               (typeof selected.canShake !== 'function' || selected.canShake()) &&
-               !active.queue.isCarrying();
+        return this.canPerformCapability(selected, active, 'shakeable', target =>
+            typeof target.canShake !== 'function' || target.canShake()
+        );
     }
 
     static getRequiredOptions(selected) {
         return { target: selected };
     }
 
-    constructor(myte, options) {
-        super(myte, options);
-        this.phase = 'approach';
-        this.animationTimer = 0;
-    }
-
-    update(tickDelta) {
-        if (this.phase === 'approach') {
-            const arrived = super.update(tickDelta);
-            if (!arrived) return false;
-            if (this.didAbortApproach()) return true;
-            this.phase = 'shake';
-            this.animationTimer = this.shakeAnimationDuration ?? 1000;
-            this.faceTarget();
-            this.target?.shake?.();
-            return false;
-        }
-
-        if (this.phase === 'shake') {
-            this.faceTarget();
-            this.animationTimer -= tickDelta;
-            return this.animationTimer <= 0;
-        }
-
-        return true;
-    }
-
-    complete() {
-        this.faceTarget();
-        super.complete();
+    performInteraction() {
         this.myte.queue.addExpression('excited', 300, 1);
-        if (this.postActionIdleDuration > 0) {
-            this.myte.queue.addIdle(this.postActionIdleDuration);
-        }
     }
 }
 
-class ChopTreeAction extends GoToObjectAction {
+class ChopTreeAction extends TimedInteractionAction {
     static metadata = { id: 'chop_tree' };
 
     static canPerform(selected, active) {
-        return active &&
-               selected instanceof TreeMapObject &&
-               (typeof selected.canChop !== 'function' || selected.canChop()) &&
-               !active.queue.isCarrying();
+        return this.canPerformCapability(selected, active, 'choppable', target =>
+            typeof target.canChop !== 'function' || target.canChop()
+        );
     }
 
     static getRequiredOptions(selected) {
         return { target: selected };
     }
 
-    constructor(myte, options) {
-        super(myte, options);
-        this.phase = 'approach';
-        this.animationTimer = 0;
-    }
-
-    update(tickDelta) {
-        if (this.phase === 'approach') {
-            const arrived = super.update(tickDelta);
-            if (!arrived) return false;
-            if (this.didAbortApproach()) return true;
-            this.phase = 'chop';
-            this.animationTimer = this.chopAnimationDuration ?? 2000;
-            this.faceTarget();
-            this.target?.chop?.();
-            return false;
-        }
-
-        if (this.phase === 'chop') {
-            this.faceTarget();
-            this.animationTimer -= tickDelta;
-            return this.animationTimer <= 0;
-        }
-
-        return true;
-    }
-
-    complete() {
-        this.faceTarget();
-        super.complete();
-        if (this.postActionIdleDuration > 0) {
-            this.myte.queue.addIdle(this.postActionIdleDuration);
-        }
-    }
 }
 
-class RemoveStumpAction extends GoToObjectAction {
+class RemoveStumpAction extends TimedInteractionAction {
     static metadata = { id: 'remove_stump' };
 
     static canPerform(selected, active) {
-        return active &&
-               selected?.constructor?.name === 'TreeStumpMapObject' &&
-               (typeof selected.canRemoveStump !== 'function' || selected.canRemoveStump()) &&
-               !active.queue.isCarrying();
+        return this.canPerformCapability(selected, active, 'removableStump', target =>
+            typeof target.canRemoveStump !== 'function' || target.canRemoveStump()
+        );
     }
 
     static getRequiredOptions(selected) {
         return { target: selected };
     }
 
-    constructor(myte, options) {
-        super(myte, options);
-        this.phase = 'approach';
-        this.animationTimer = 0;
-    }
-
-    update(tickDelta) {
-        if (this.phase === 'approach') {
-            const arrived = super.update(tickDelta);
-            if (!arrived) return false;
-            if (this.didAbortApproach()) return true;
-            this.phase = 'remove';
-            this.animationTimer = this.removeAnimationDuration ?? 1500;
-            this.faceTarget();
-            this.target?.removeStump?.();
-            return false;
-        }
-
-        if (this.phase === 'remove') {
-            this.faceTarget();
-            this.animationTimer -= tickDelta;
-            return this.animationTimer <= 0;
-        }
-
-        return true;
-    }
-
-    complete() {
-        this.faceTarget();
-        super.complete();
+    performInteraction() {
         this.myte.queue.addExpression('excited', 300, 1);
-        if (this.postActionIdleDuration > 0) {
-            this.myte.queue.addIdle(this.postActionIdleDuration);
-        }
     }
 }

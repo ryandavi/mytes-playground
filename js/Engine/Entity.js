@@ -104,6 +104,11 @@ const EntityMethods = {
 		return resolvedY + resolvedDepthOffset;
 	},
 
+	writeSortY(element, sortY) {
+		if (!element || !Number.isFinite(sortY)) return;
+		element.dataset.sortY = `${Math.round(sortY * 100) / 100}`;
+	},
+
 	// Returns the map's shared AStarPathfinder. All pathfinding goes through
 	// one instance per map — no per-entity copies needed.
 	get pathfinder() {

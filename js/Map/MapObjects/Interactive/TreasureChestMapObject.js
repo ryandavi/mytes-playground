@@ -378,6 +378,16 @@ class TreasureChestMapObject extends withItemDrops(MultiStateMapObject) {
         return element;
     }
 
+    serializeState() {
+        return { state: this.state, items: Utility.deepClone(this.items) };
+    }
+
+    restoreState(data = {}) {
+        this.state = data.state ?? this.state;
+        this.items = this.normalizeItems(data.items ?? this.items);
+        this.updateElementState();
+    }
+
 
 
 

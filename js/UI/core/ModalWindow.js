@@ -55,6 +55,7 @@ constructor(parent, options = {}) {
     this.lastClickTime = 0; // For double-click detection
     this.dragPointerId = null;
 	this.tabBinding = null;
+	this.previouslyFocusedElement = null;
 
     // Bind methods to maintain correct 'this' context
     this.open = this.open.bind(this);
@@ -535,6 +536,9 @@ constructor(parent, options = {}) {
 	 */
 	open() {
 		if (!this.modalElement || this.isVisible) return;
+		this.previouslyFocusedElement = document.activeElement instanceof HTMLElement
+			? document.activeElement
+			: null;
 		this.modalElement.inert = false;
 		this.modalElement.setAttribute('aria-hidden', 'false');
 	
@@ -590,6 +594,7 @@ constructor(parent, options = {}) {
 	close() {
 		if (!this.modalElement || !this.isVisible) return;
 		this.handleDragEnd();
+		this.restoreFocusBeforeClose();
 
 		// Save the current state for tracking
 		const wasFullscreen = this.isFullscreen;
@@ -636,6 +641,24 @@ constructor(parent, options = {}) {
 		const index = ModalWindow.activeWindows.indexOf(this);
 		if (index !== -1) {
 			ModalWindow.activeWindows.splice(index, 1);
+		}
+	}
+
+	restoreFocusBeforeClose() {
+		const activeElement = document.activeElement;
+		if (!(activeElement instanceof HTMLElement) || !this.modalElement.contains(activeElement)) return;
+
+		const candidates = [this.previouslyFocusedElement, this.buttonElement];
+		for (const candidate of candidates) {
+			if (!(candidate instanceof HTMLElement) ||
+				!candidate.isConnected ||
+				candidate.closest('[inert]') ||
+				candidate.disabled) continue;
+			candidate.focus({ preventScroll: true });
+			if (document.activeElement === candidate) break;
+		}
+		if (this.modalElement.contains(document.activeElement)) {
+			activeElement.blur();
 		}
 	}
 

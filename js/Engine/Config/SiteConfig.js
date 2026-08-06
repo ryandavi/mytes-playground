@@ -269,6 +269,13 @@ const SiteConfig = Object.freeze({
     }),
 
     actions: Object.freeze({
+        queueDefaults: Object.freeze({
+            idleDuration: 200,
+            expressionDuration: 50,
+            danceDuration: 2000,
+            jumpHeight: 100,
+            putDownDuration: 100,
+        }),
         surfaceSlot: Object.freeze({
             // Prefer the entry side unless another allowed exit shortens the
             // route to the next queued target by at least this many pixels.
@@ -303,6 +310,15 @@ const SiteConfig = Object.freeze({
     // ── Myte defaults ─────────────────────────────────────────────────────────
 
     myte: Object.freeze({
+
+        progression: Object.freeze({
+            baseXpPerAction: 1,
+            accomplishmentWeight: 8,
+            noveltyWeight: 1.5,
+            exertionWeight: 1,
+            xpPerLevel: 100,
+            levelExponent: 1.2,
+        }),
 
         starterRoster: Object.freeze([
             Object.freeze({
@@ -419,6 +435,11 @@ const SiteConfig = Object.freeze({
             targetCooldownDuration: 30000,
             // Window over which repeat history penalties accumulate
             repeatWindow:           90000,
+            activityIntervalBase:   1.24,
+            activityIntervalWeight: 0.42,
+            boredomIntervalWeight:  0.18,
+            lowEnergyThreshold:     0.3,
+            lowEnergyIntervalScale: 1.22,
         }),
 
         // Perception radii (px)
@@ -446,6 +467,24 @@ const SiteConfig = Object.freeze({
             // Flat deductions per history entry (scaled by recency)
             historyLabelPenalty:    12,
             historyTargetPenalty:   18,
+            selectionJitterMin:     0.9,
+            selectionJitterMax:     1.1,
+        }),
+
+        wander: Object.freeze({
+            edgePaddingCells:       3,
+            minDistanceCells:       4,
+            targetAttempts:         18,
+            originSnapRadius:       8,
+            candidateSnapRadius:    16,
+            curiositySnapRadius:    10,
+            homeTargetSnapRadius:   10,
+            defaultConfidence:      0.55,
+            confidenceRadiusBase:   0.3,
+            confidenceRadiusWeight: 0.7,
+            curiosityPlayThreshold: 0.48,
+            curiosityTraitThreshold: 0.55,
+            noveltyThreshold:       0.55,
         }),
 
         // Thought-bubble feedback when a myte commits to a need-driven decision.
@@ -796,9 +835,75 @@ const SiteConfig = Object.freeze({
         panInertiaMinSpeed: 0.5,
     }),
 
+    // ── Spatial audio ────────────────────────────────────────────────────────
+
+    audio: Object.freeze({
+        mapSpatial: Object.freeze({
+            fullVolumeRadius: 64,
+            // Floor for the audible range — the effective range grows with viewport
+            // size (see viewportRangeMultiplier) so a bigger screen doesn't shrink
+            // the world relative to what's audible.
+            maxDistance: 512,
+            rolloffExponent: 1.25,
+            // Effective maxDistance = max(maxDistance, viewport half-diagonal * this).
+            // Keeps "can I hear it" roughly matched to "can I see it" at any window size.
+            viewportRangeMultiplier: 1.1,
+            // Sounds flagged `awareness: true` in their preset stay faintly audible
+            // beyond maxDistance (out to maxDistance * this) so the player gets a cue
+            // to look around, capped at awarenessVolumeCap.
+            awarenessRangeMultiplier: 1.8,
+            awarenessVolumeCap: 0.22,
+        }),
+        waterProximityRadius: 128,
+    }),
+
     // ── HUD feedback ─────────────────────────────────────────────────────────
 
     ui: Object.freeze({
+        panels: Object.freeze([
+            Object.freeze({ id: 'sound-settings-panel', icon: 'sound-on', title: 'Sound Settings', controls: Object.freeze(['minimize', 'fullscreen', 'close']) }),
+            Object.freeze({
+                id: 'myte-info-panel', icon: 'info', title: 'Myte Information', controls: Object.freeze(['minimize', 'fullscreen', 'close']),
+                tabs: Object.freeze({ className: 'myte-info__tabs', ariaLabel: 'Myte information', after: '.myte-info__summary', attribute: 'data-myte-info-tab', panelId: 'myte-info-tabpanel', items: Object.freeze([
+                    Object.freeze({ id: 'myte-info-tab-general', value: 'general', label: 'General' }),
+                    Object.freeze({ id: 'myte-info-tab-needs', value: 'needs', label: 'Needs' }),
+                    Object.freeze({ id: 'myte-info-tab-behavior', value: 'behavior', label: 'Behavior' }),
+                    Object.freeze({ id: 'myte-info-tab-drives', value: 'drives', label: 'Drives' }),
+                    Object.freeze({ id: 'myte-info-tab-debug', value: 'debug', label: 'Debug', hidden: true }),
+                ]) }),
+            }),
+            Object.freeze({
+                id: 'user-profile-panel', icon: 'user', title: 'User Profile', controls: Object.freeze(['minimize', 'close']),
+                tabs: Object.freeze({ className: 'user-profile__tabs', ariaLabel: 'User profile', after: '.user-profile__identity', attribute: 'data-user-profile-tab', items: Object.freeze([
+                    Object.freeze({ value: 'account', label: 'Account' }),
+                    Object.freeze({ value: 'progress', label: 'Progress' }),
+                ]) }),
+            }),
+            Object.freeze({ id: 'game-settings-panel', icon: 'gear', title: 'Game Settings', controls: Object.freeze(['minimize', 'fullscreen', 'close']) }),
+            Object.freeze({ id: 'game-log-panel', icon: 'list', title: 'Event Log', controls: Object.freeze(['minimize', 'close']), tabs: Object.freeze({ className: 'game-log-filters', ariaLabel: 'Event categories', items: Object.freeze([]) }) }),
+            Object.freeze({ id: 'world-map-panel', icon: 'world-map', title: 'World Map', controls: Object.freeze(['minimize', 'close']) }),
+            Object.freeze({ id: 'view-panel', icon: 'eye', title: 'View', controls: Object.freeze(['minimize', 'close']) }),
+            Object.freeze({ id: 'game-debug-panel', icon: 'bug', title: 'Debug Menu', controls: Object.freeze(['minimize', 'fullscreen', 'close']) }),
+        ]),
+        labels: Object.freeze({
+            actionCategories: Object.freeze({
+                movement: 'Movement', state: 'State', interactions: 'Interactions',
+                play: 'Play', reactive: 'Reactive', carrying: 'Active Actions',
+            }),
+            myteBehaviors: Object.freeze({
+                FOLLOW: 'Following', FREEROAM: 'Free Roam', GRAVITY: 'Gravity',
+                GOHOME: 'Going Home', QUEUE_ONLY: 'Queued',
+            }),
+            slotStates: Object.freeze({
+                empty: 'Empty', home: 'At Home', freeroam: 'Free Roam',
+                returning: 'Returning', deployed: 'Deployed',
+            }),
+            drives: Object.freeze({
+                eatDrive: 'Hunger', restDrive: 'Rest', playDrive: 'Play',
+                socialDrive: 'Social', exploreDrive: 'Explore',
+                comfortDrive: 'Comfort', safetyDrive: 'Safety',
+            }),
+        }),
         currencySymbols: Object.freeze({
             coins: '¢',
         }),

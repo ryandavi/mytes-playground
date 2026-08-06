@@ -130,7 +130,7 @@ class TooltipSystem {
                 : Math.max(gutter, viewportHeight - tooltipRect.height - gutter);
         }
 
-        let left = anchorRect.left;
+        let left = anchorRect.left + (anchorRect.width - tooltipRect.width) / 2;
         if (left + tooltipRect.width > viewportWidth - gutter) {
             left = viewportWidth - tooltipRect.width - gutter;
         }

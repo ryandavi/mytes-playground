@@ -38,6 +38,7 @@ class SoundManager {
 		this.musicEnabled = options.musicEnabled !== false;
 		this.ambientEnabled = options.ambientEnabled !== false;
 		this.footstepsEnabled = options.footstepsEnabled !== false;
+		this.spatialAudioEnabled = options.spatialAudioEnabled !== false;
 		this.volume = {
 			master: options.masterVolume ?? 1,
 			sfx: options.sfxVolume ?? 0.82,
@@ -94,7 +95,7 @@ class SoundManager {
 		this.speciesVoices = Utility.deepClone(this.defaultSpeciesVoices);
 
 		// Sound definitions using Tone.js synthesis
-		this.synthPresets = createAudioPresetLibrary(this);
+        this.synthPresets = {};
 
 		// Current map audio context — updated on each map load via setMapContext()
 		this._mapContext = { location: 'outside', ambientOverride: null, musicOverride: null };
@@ -104,6 +105,13 @@ class SoundManager {
 		this._proximitySounds = new Set();
 	}
 
+	async loadPresetData() {
+		const loaded = await AudioPresetLibrary.preload();
+		if (!loaded) return false;
+		this.synthPresets = AudioPresetLibrary.create(this);
+		return true;
+	}
+
 	createFootstepPreset({
 		note = "E2",
 		noiseType = "pink",
@@ -111,6 +119,7 @@ class SoundManager {
 		thumpVolume = 0.8,
 		textureVolume = 0.4
 	} = {}) {
+		const panner = new Tone.Panner(0).toDestination();
 		const thump = new Tone.MembraneSynth({
 			pitchDecay: 0.015,
 			octaves: 1.2,
@@ -121,7 +130,7 @@ class SoundManager {
 				sustain: 0,
 				release: 0.04
 			}
-		}).toDestination();
+		}).connect(panner);
 		const texture = new Tone.NoiseSynth({
 			noise: { type: noiseType },
 			envelope: {
@@ -135,11 +144,12 @@ class SoundManager {
 			frequency: filterFrequency,
 			type: "lowpass",
 			rolloff: -24
-		}).toDestination();
+		}).connect(panner);
 		texture.connect(filter);
 
 		return {
 			synth: { thump, texture, filter },
+			panner,
 			volume: 0.98,
 			trigger: ({ sound, effectiveVolume, options, manager }) => {
 				const pitchScale = options.pitchScale ?? (1 + manager.getCenteredVariation(0.03));
@@ -240,8 +250,92 @@ class SoundManager {
 		const pitchScale = options.pitchScale ?? (1 + this.getCenteredVariation(0.03));
 		this.play(soundId, {
 			volume: (options.volume !== undefined ? options.volume : 1) * (speedNormalized >= 1 ? 1.02 : 0.96),
-			pitchScale
+			pitchScale,
+			source: options.source
 		});
+	}
+
+	resolveMapAudioSource(source) {
+		if (!source) return null;
+		const x = Number(source.x ?? source.posX);
+		const y = Number(source.y ?? source.posY);
+		if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+		const width = Number(source.width ?? source.size?.width ?? 0);
+		const height = Number(source.height ?? source.size?.height ?? 0);
+		return {
+			x: x + (Number.isFinite(width) ? width / 2 : 0),
+			y: y + (Number.isFinite(height) ? height / 2 : 0)
+		};
+	}
+
+	getMapAudioListener() {
+		const container = this.parent?.getFirstContainer?.();
+		const camera = container?.camera;
+		const anchor = camera?.getViewportCenterAnchor?.();
+		if (!Number.isFinite(anchor?.worldX) || !Number.isFinite(anchor?.worldY)) return null;
+
+		const extents = camera?.getViewportWorldHalfExtents?.() || {};
+		return {
+			x: anchor.worldX,
+			y: anchor.worldY,
+			halfWidth: extents.halfWidth,
+			halfHeight: extents.halfHeight
+		};
+	}
+
+	// Effective audible range grows with viewport size so the game world doesn't
+	// feel relatively "smaller" (i.e. more audible) on a large screen — see
+	// SiteConfig.audio.mapSpatial.viewportRangeMultiplier.
+	getMapSpatialRange(listener) {
+		const config = SiteConfig.audio.mapSpatial;
+		if (!Number.isFinite(listener?.halfWidth) || !Number.isFinite(listener?.halfHeight)) {
+			return config.maxDistance;
+		}
+
+		const viewportRadius = Math.hypot(listener.halfWidth, listener.halfHeight);
+		return Math.max(config.maxDistance, viewportRadius * config.viewportRangeMultiplier);
+	}
+
+	getMapSpatialVolume(source, listener = this.getMapAudioListener(), options = {}) {
+		if (!this.spatialAudioEnabled) return 1;
+
+		const sourcePosition = this.resolveMapAudioSource(source);
+		if (!sourcePosition || !listener) return 1;
+
+		const config = SiteConfig.audio.mapSpatial;
+		const maxDistance = this.getMapSpatialRange(listener);
+		const distance = Math.hypot(sourcePosition.x - listener.x, sourcePosition.y - listener.y);
+
+		if (distance <= config.fullVolumeRadius) return 1;
+
+		if (distance < maxDistance) {
+			const range = Math.max(1, maxDistance - config.fullVolumeRadius);
+			const remaining = 1 - ((distance - config.fullVolumeRadius) / range);
+			return Math.pow(Utility.clamp(remaining, 0, 1), config.rolloffExponent);
+		}
+
+		// Beyond normal range — "awareness" sounds (Myte needs, alerts) stay faintly
+		// audible a bit further out so the player knows to look around.
+		if (!options.awareness) return 0;
+
+		const awarenessMax = maxDistance * config.awarenessRangeMultiplier;
+		if (distance >= awarenessMax) return 0;
+
+		const awarenessRange = Math.max(1, awarenessMax - maxDistance);
+		const remaining = 1 - ((distance - maxDistance) / awarenessRange);
+		return Math.pow(Utility.clamp(remaining, 0, 1), config.rolloffExponent) * config.awarenessVolumeCap;
+	}
+
+	// Left/right stereo position of a map-space source relative to the viewport
+	// center, normalized to [-1, 1] across the visible half-width.
+	getMapSpatialPan(source, listener = this.getMapAudioListener()) {
+		if (!this.spatialAudioEnabled) return 0;
+
+		const sourcePosition = this.resolveMapAudioSource(source);
+		if (!sourcePosition || !listener || !Number.isFinite(listener.halfWidth) || listener.halfWidth <= 0) return 0;
+
+		return Utility.clamp((sourcePosition.x - listener.x) / listener.halfWidth, -1, 1);
 	}
 
 	playFootstepPreview() {
@@ -264,6 +358,7 @@ class SoundManager {
 		if (!sound || typeof sound !== 'object') return;
 		if (sound.synth) this.disposeSynthElements(sound.synth);
 		if (sound.pad) this.disposeSynthElements(sound.pad);
+		if (sound.panner) sound.panner.dispose();
 	}
 
 	disposeSynthElements(target) {
@@ -422,6 +517,28 @@ class SoundManager {
 
 	}
 
+	getAudioContext() {
+		if (typeof Tone === 'undefined') return null;
+		return Tone.getContext?.() ?? Tone.context ?? null;
+	}
+
+	/**
+	 * A context that was unlocked once can still be suspended again by the
+	 * browser (backgrounded tab, autoplay policy re-arming). Resuming does not
+	 * need a fresh gesture, so this is safe to call from lifecycle events.
+	 */
+	resumeIfSuspended() {
+		if (!this.initialized) return false;
+
+		const context = this.getAudioContext();
+		if (context?.state !== 'suspended') return false;
+
+		Promise.resolve(context.resume?.()).catch(err => {
+			console.warn('Failed to resume audio context:', err);
+		});
+		return true;
+	}
+
 	preloadSounds() {
 		this.criticalSounds.forEach(id => {
 			if (this.synthPresets[id]) {
@@ -493,6 +610,9 @@ class SoundManager {
 
 		const soundCategory = this.resolveSoundCategory(id, preset);
 		if (!this.initialized || !this.isCategoryEnabled(soundCategory)) return;
+		const listener = this.getMapAudioListener();
+		const spatialVolume = this.getMapSpatialVolume(options.source, listener, { awareness: !!preset.awareness });
+		if (spatialVolume <= 0) return;
 
 		// Prevent rapid triggering of the same sound
 		const now = Date.now();
@@ -506,10 +626,14 @@ class SoundManager {
 		const sound = this.synths.get(id) || this.createSynth(id);
 		if (!sound) return;
 
+		if (sound.panner) {
+			sound.panner.pan.value = this.getMapSpatialPan(options.source, listener);
+		}
+
 		const categoryVolume = this.getCategoryVolume(soundCategory);
 		const requestedVolume = options.volume !== undefined ? options.volume : 1;
 		const playback = this.resolvePlaybackModifiers(preset, soundCategory, options);
-		const effectiveVolume = requestedVolume * playback.volumeMultiplier * categoryVolume * sound.baseVolume;
+		const effectiveVolume = requestedVolume * playback.volumeMultiplier * categoryVolume * sound.baseVolume * spatialVolume;
 		const schedulingPadding = 0.002;
 		const getSafeScheduleTime = (offsetSeconds = 0) => {
 			const baseNow = Tone.now();
@@ -1300,29 +1424,6 @@ class SoundManager {
 
 
 
-
-	speakAnimalText(text, options) {
-		return this.speech.speak(text, options);
-	}
-
-	speakAnimalWithEmotion(text, emotion, options) {
-		return this.speech.speakWithEmotion(text, emotion, options);
-	}
-
-	showAnimalDialog(text, options, callback) {
-		return this.speech.showDialog(text, options, callback);
-	}
-
-	playObjectSound(objectType, action) {
-		const soundId = `obj_${objectType.toLowerCase()}_${action.toLowerCase()}`;
-		const fallbackId = `obj_${objectType.toLowerCase()}`;
-
-		if (this.synthPresets[soundId]) {
-			this.play(soundId);
-		} else if (this.synthPresets[fallbackId]) {
-			this.play(fallbackId);
-		}
-	}
 
 	playMyteSound(action, options = {}) {
 		const normalizedAction = String(action || '').toLowerCase();

@@ -2,6 +2,7 @@
 
 class MapObject {
 	static nextObjectId = 1;
+	static configPathCache = new Map();
 
 	constructor(parent, type, variant, posX, posY, config = {}) {
 		this.id = config.id ?? `${type.toLowerCase()}_${MapObject.nextObjectId++}`;
@@ -349,7 +350,11 @@ class MapObject {
 
 	getConfig(path, ...args) {
 		const defaultValue = args.length > 0 ? args[0] : null;
-		const keys = path.split('.');
+		let keys = MapObject.configPathCache.get(path);
+		if (!keys) {
+			keys = path.split('.');
+			MapObject.configPathCache.set(path, keys);
+		}
 		let current = this.config;
 		for (const key of keys) {
 			if (current === undefined || current === null || !Object.prototype.hasOwnProperty.call(current, key)) {
@@ -553,6 +558,14 @@ class MapObject {
 		return this.getConfig(`actionConfigs.${actionId}`, defaultValue);
 	}
 
+	getActionStateToken() {
+		if (typeof this.isOpen === 'boolean') return this.isOpen ? 'open' : 'closed';
+		if (this.getConfig('interaction.type') === 'light') {
+			return this.isEnabled?.() ? 'enabled' : 'disabled';
+		}
+		return this.visualState ?? null;
+	}
+
 	getApproachConfig(actionId = null) {
 		const actionConfig = actionId ? this.getActionConfig(actionId, null) : null;
 		if (actionConfig && Object.prototype.hasOwnProperty.call(actionConfig, 'approachConfig')) {
@@ -583,7 +596,7 @@ class MapObject {
 	// ── Direction helpers ─────────────────────────────────────────────────────
 
 	static processDirectionConfig(baseConfig, direction) {
-		const config = JSON.parse(JSON.stringify(baseConfig));
+		const config = Utility.deepClone(baseConfig);
 		if (!config.directionConfigs) return config;
 
 		const normalizedDirection = MapObject.normalizeFacingDirection(direction, config.directionConfigs);
@@ -768,6 +781,13 @@ class MapObject {
 			}
 		}
 
+		if (Array.isArray(when.contextGates)) {
+			for (const gate of when.contextGates) {
+				const actual = this.resolveAffordanceContextValue(context, gate.path);
+				if (!this.passesAffordanceNumericGate(actual, gate)) return false;
+			}
+		}
+
 		if (when.novelty) {
 			const noveltyScore = context.getNoveltyScore?.(this);
 			if (!this.passesAffordanceNumericGate(noveltyScore, when.novelty)) {
@@ -779,10 +799,12 @@ class MapObject {
 	}
 
 	getConfiguredAiAffordances(context = {}, actor = null) {
-		const configuredAffordances = this.getConfig('ai.affordances', []);
-		if (!Array.isArray(configuredAffordances)) {
-			return [];
-		}
+		const defaults = this.getConfig('ai.defaultAffordances', []);
+		const configured = this.getConfig('ai.affordances', []);
+		const configuredAffordances = [
+			...(Array.isArray(defaults) ? defaults : []),
+			...(Array.isArray(configured) ? configured : [])
+		];
 
 		return configuredAffordances
 			.map(entry => this.normalizeAiAffordanceEntry(entry))
@@ -793,26 +815,6 @@ class MapObject {
 
 	getAiAffordances(context = {}, actor = null) {
 		const affordances = this.getConfiguredAiAffordances(context, actor);
-
-		if (this.isReadyToHarvest?.()) {
-			affordances.push({ actionId: 'harvest', purpose: 'harvest', chain: true });
-		} else if (this.canWater?.() && (context.energy ?? 1) > 0.4) {
-			affordances.push({ actionId: 'water_plant', purpose: 'tend', chain: true });
-		}
-
-		if (this.canBeInspectedByAi()) {
-			affordances.push({ actionId: 'inspect', purpose: 'inspect' });
-		}
-
-		if (
-			this.canBeInspectedByAi() &&
-			(context.curiosity ?? 0) > 0.78 &&
-			(1 - (context.fun ?? 1)) > 0.42 &&
-			(context.getNoveltyScore?.(this) ?? 0.4) > 0.55
-		) {
-			affordances.push({ actionId: 'deep_inspect', purpose: 'inspect' });
-		}
-
 		return affordances.filter((affordance, index, list) => {
 			const key = `${affordance.actionId}:${affordance.purpose ?? ''}`;
 			return list.findIndex(item => `${item.actionId}:${item.purpose ?? ''}` === key) === index;
@@ -1072,29 +1074,6 @@ class MapObject {
 		return true;
 	}
 
-	getActionOccupant(actionId) {
-		if (actionId === 'use_surface_slot') {
-			return this.sockets.list().flatMap(socket => this.sockets.occupantsOf(socket.id))[0] ?? null;
-		}
-		return null;
-	}
-
-	getActionSlotOccupants(actionId) {
-		if (actionId === 'use_surface_slot') {
-			return new Map(this.sockets.list().flatMap(socket =>
-				this.sockets.occupantsOf(socket.id).map(occupant => [socket.id, occupant])
-			));
-		}
-		return new Map();
-	}
-
-	getActionSlotOccupant(actionId, slotId) {
-		if (actionId === 'use_surface_slot' && this.sockets?.get?.(slotId)) {
-			return this.sockets.occupantsOf(slotId)[0] ?? null;
-		}
-		return null;
-	}
-
 	isActionSlotOccupied(actionId, slotId, actor = null) {
 		if (actionId === 'use_surface_slot' && this.sockets?.get?.(slotId)) {
 			return !this.sockets.hasCapacity(slotId, actor);
@@ -1121,24 +1100,6 @@ class MapObject {
 	claimActionSlot(actionId, slotId, actor = null) {
 		if (actionId === 'use_surface_slot' && this.sockets?.get?.(slotId)) {
 			return this.sockets._claim(slotId, actor);
-		}
-		return false;
-	}
-
-	claimActionOccupancy(actionId, actor = null) {
-		if (actionId === 'use_surface_slot') {
-			return !this.isActionOccupied(actionId, actor);
-		}
-		return true;
-	}
-
-	releaseActionOccupancy(actionId, actor = null) {
-		if (actionId === 'use_surface_slot') {
-			let released = false;
-			for (const socket of this.sockets.list()) {
-				released = this.sockets._release(socket.id, actor) || released;
-			}
-			return released;
 		}
 		return false;
 	}
@@ -1234,7 +1195,7 @@ class MapObject {
 	playConfiguredSound(type) {
 		const soundEffect = this.getConfig(`soundEffects.${type}`);
 		if (soundEffect && this.gameMap?.soundManager) {
-			this.gameMap.soundManager.playWhenReady(soundEffect);
+			this.gameMap.soundManager.playWhenReady(soundEffect, { source: this });
 		}
 	}
 
@@ -1391,6 +1352,62 @@ class MapObject {
 
 	// ── Render ────────────────────────────────────────────────────────────────
 
+	bindAffordanceTooltip() {
+		if (!this.element) return;
+		const tooltip = TooltipSystem.getInstance();
+		this.element.addEventListener('mouseenter', () => {
+			if (!this.areInteractionHintsEnabled()) return;
+			const activeMyte = this.activeMyte;
+			const sidebar = this.container?.ui?.actionSidebarManager;
+			const available = activeMyte ? ActionManager.getAvailableActions(this, activeMyte) : [];
+			const action = activeMyte
+				? sidebar?.getMajorAction?.(this, activeMyte, available)
+				: null;
+			const actionLabel = action
+				? (sidebar?.getActionLabel?.(action, this) ?? action.label)
+				: this.getFallbackAffordanceTooltipAction(activeMyte);
+			tooltip.show({
+				anchor: this.element,
+				content: this.createAffordanceTooltipContent(actionLabel)
+			});
+		});
+		this.element.addEventListener('mouseleave', () => {
+			if (tooltip.isVisibleFor(this.element)) tooltip.hide();
+		});
+	}
+
+	areInteractionHintsEnabled() {
+		return this.core?.user?.preferences?.interactionHintsEnabled !== false;
+	}
+
+	getAffordanceTooltipTitle() {
+		return this.getDisplayName();
+	}
+
+	getFallbackAffordanceTooltipAction(_activeMyte) {
+		const actionId = this.getMajorActionPreferenceIds()[0];
+		if (!actionId) return null;
+		return ActionManager.getActionPresentation(actionId, this).label
+			?? ActionManager.getMetadata(actionId)?.label
+			?? null;
+	}
+
+	createAffordanceTooltipContent(actionLabel) {
+		const content = document.createElement('div');
+		const title = document.createElement('strong');
+		title.className = 'ui-tooltip__title';
+		title.textContent = this.getAffordanceTooltipTitle();
+
+		content.append(title);
+		if (actionLabel) {
+			const action = document.createElement('span');
+			action.className = 'ui-tooltip__body';
+			action.textContent = actionLabel;
+			content.append(action);
+		}
+		return content;
+	}
+
 	render(container, parent) {
 		const divElement = document.createElement('div');
 		divElement.classList.add('map-object', this.variant);
@@ -1452,6 +1469,7 @@ class MapObject {
 		}
 
 		this.element = divElement;
+		this.bindAffordanceTooltip();
 		this._spriteElement = null;
 		container.appendChild(divElement);
 		this.captureSpriteBaseStyles();

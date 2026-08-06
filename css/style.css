@@ -777,7 +777,7 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .header {
   flex: 0 0 100%;
   display: flex;
-  gap: var(--space-xl);
+  gap: var(--space-md);
   align-items: center;
   flex-wrap: wrap;
   min-width: 0;
@@ -795,6 +795,77 @@ body.debug .map-object > .interactive-hitbox {
   height: 1.2em;
   top: 0.125em;
   position: relative;
+}
+.app-shell > .header > .hud-active-myte {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  box-sizing: border-box;
+  width: 180px;
+  height: 40px;
+  max-width: 100%;
+  flex: 0 0 180px;
+  padding: var(--space-2xs) var(--space-sm);
+  color: var(--text-base);
+  text-align: left;
+  background-color: var(--surface-ui-inset, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-bottom-color: var(--button-light);
+  border-right-color: var(--button-light);
+  border-radius: var(--border-radius);
+}
+.app-shell > .header > .hud-active-myte[hidden] {
+  display: none;
+}
+.app-shell > .header > .hud-active-myte > .icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  fill: currentColor;
+}
+.app-shell > .header > .hud-active-myte > .hud-active-myte__content {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "name thought" "meters meters";
+  gap: var(--space-2xs);
+  min-width: 0;
+  flex: 1;
+}
+.app-shell > .header > .hud-active-myte > .hud-active-myte__content > .hud-active-myte__name {
+  grid-area: name;
+  font-weight: 700;
+}
+.app-shell > .header > .hud-active-myte > .hud-active-myte__content > .hud-active-myte__meters {
+  grid-area: meters;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2xs);
+}
+.app-shell > .header > .hud-active-myte > .hud-active-myte__content > .hud-active-myte__meters > .hud-vital {
+  height: 5px;
+  overflow: hidden;
+  background: var(--surface-ui-inset);
+  border: 1px solid var(--button-dark);
+}
+.app-shell > .header > .hud-active-myte > .hud-active-myte__content > .hud-active-myte__meters > .hud-vital > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--state-info-accent);
+}
+.app-shell > .header > .hud-active-myte > .hud-active-myte__content > .hud-active-myte__meters > .hud-vital[data-vital=satiety] > span {
+  background: var(--state-warning-accent);
+}
+.app-shell > .header > .hud-active-myte > .hud-active-myte__content > .hud-active-myte__meters > .hud-vital[data-vital=mood] > span {
+  background: var(--state-success-accent);
+}
+.app-shell > .header > .hud-active-myte > .hud-active-myte__content > .hud-active-myte__thought {
+  grid-area: thought;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.75em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .app-shell > .header > .fullscreen-btn {
   display: flex;
@@ -3424,8 +3495,11 @@ body.ui-gallery-page .ui-gallery__state-label {
   position: absolute;
   top: var(--floating-help-paper-top, calc(100% + 8px));
   left: var(--floating-help-paper-left, 0);
-  min-width: var(--floating-help-paper-min-width, 180px);
-  max-width: var(--floating-help-paper-max-width, min(240px, 60vw));
+  width: -moz-max-content;
+  width: max-content;
+  min-width: 0;
+  max-width: var(--floating-help-paper-max-width, min(280px, 100vw - var(--space-lg) * 2));
+  overflow-wrap: anywhere;
   text-align: left;
   opacity: 0;
   transform: translateY(var(--floating-help-paper-offset, -4px));
@@ -3447,8 +3521,12 @@ body.ui-gallery-page .ui-gallery__state-label {
 .ui-tooltip .ui-tooltip__body {
   display: block;
 }
+.ui-tooltip .ui-tooltip__title {
+  font-weight: 700;
+}
 .ui-tooltip .ui-tooltip__body {
   margin-top: 2px;
+  font-weight: 400;
 }
 
 .myte-overlay-row {
@@ -3636,6 +3714,59 @@ body.ui-gallery-page .ui-gallery__state-label {
   .app-stage .myte-buff-overlay .compact-chip .compact-chip__label > svg.icon {
     width: 16px;
     height: 16px;
+  }
+}
+
+.audio-unlock {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-lg);
+  z-index: var(--z-overlay);
+  transform: translateX(-50%);
+  width: -moz-max-content;
+  width: max-content;
+  max-width: calc(100% - var(--space-3xl));
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  filter: var(--shadow);
+  font-size: 11px;
+  line-height: 1.3;
+  opacity: 0;
+  transition: opacity var(--motion-base) var(--ease-ui);
+}
+.audio-unlock[hidden] {
+  display: none;
+}
+.audio-unlock.is-visible {
+  opacity: 1;
+}
+.audio-unlock > .icon {
+  fill: var(--text-muted);
+  width: 16px;
+  height: 16px;
+}
+.audio-unlock .audio-unlock__enable {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  white-space: nowrap;
+}
+.audio-unlock .audio-unlock__enable > .icon {
+  fill: var(--button-icon-color);
+  width: 16px;
+  height: 16px;
+}
+@media (max-width: 700px) {
+  .audio-unlock .audio-unlock__text {
+    display: none;
   }
 }
 
@@ -3906,6 +4037,9 @@ body.ui-gallery-page .ui-gallery__state-label {
   margin: 0 auto;
   position: relative;
   z-index: var(--z-drag);
+}
+.interactive-myte.snail2 {
+  --size-myte: 96px;
 }
 .interactive-myte.is-selected .sprite {
   outline: 2px dashed green;

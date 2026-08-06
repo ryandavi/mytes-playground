@@ -9,12 +9,11 @@ class SettingsPanel extends ModalWindow {
                 weather: true
             },
             gameplay: {
-                difficulty: 'normal',
                 tutorials: true,
+                interactionHints: true,
                 autoSave: true
             },
             misc: {
-                language: 'en',
                 notifications: true
             }
         };
@@ -140,6 +139,22 @@ class SettingsPanel extends ModalWindow {
                 if (tutorialsToggle.checked) {
                     this.getUser()?.setPreference?.('hasSeenIntro', false);
                 }
+            };
+        }
+
+        const interactionHintsToggle = this.modalElement.querySelector('#interaction-hints-toggle');
+        if (interactionHintsToggle) {
+            interactionHintsToggle.checked = this.settings.gameplay.interactionHints;
+            interactionHintsToggle.onchange = () => {
+                this.settings.gameplay.interactionHints = interactionHintsToggle.checked;
+            };
+        }
+
+        const autoSaveToggle = this.modalElement.querySelector('#autosave-toggle');
+        if (autoSaveToggle) {
+            autoSaveToggle.checked = this.settings.gameplay.autoSave;
+            autoSaveToggle.onchange = () => {
+                this.settings.gameplay.autoSave = autoSaveToggle.checked;
             };
         }
     }
@@ -294,12 +309,11 @@ class SettingsPanel extends ModalWindow {
                 weather: preferences.weatherEffectsEnabled
             },
             gameplay: {
-                difficulty: preferences.difficulty,
                 tutorials: preferences.tutorialsEnabled,
+                interactionHints: preferences.interactionHintsEnabled,
                 autoSave: preferences.autoSaveEnabled
             },
             misc: {
-                language: preferences.language,
                 notifications: preferences.notificationsEnabled
             }
         });
@@ -313,10 +327,9 @@ class SettingsPanel extends ModalWindow {
             animationsEnabled: normalized.graphics.animations,
             timeOfDayOverlayEnabled: normalized.graphics.timeOfDayOverlay,
             weatherEffectsEnabled: normalized.graphics.weather,
-            difficulty: normalized.gameplay.difficulty,
             tutorialsEnabled: normalized.gameplay.tutorials,
+            interactionHintsEnabled: normalized.gameplay.interactionHints,
             autoSaveEnabled: normalized.gameplay.autoSave,
-            language: normalized.misc.language,
             notificationsEnabled: normalized.misc.notifications
         };
     }
@@ -335,6 +348,9 @@ class SettingsPanel extends ModalWindow {
             Object.entries(nextPreferences).forEach(([key, value]) => {
                 user.setPreference(key, value);
             });
+            if (!nextPreferences.interactionHintsEnabled) {
+                TooltipSystem.getInstance().hide();
+            }
             this.playSound('success');
         } catch (error) {
             console.error('Failed to save settings:', error);

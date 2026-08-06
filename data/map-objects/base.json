@@ -7,6 +7,43 @@
   "dragInSelectMode": false,
   "rubbable": false,
   "canInspect": true,
+  "ai": {
+    "defaultAffordances": [
+      {
+        "actionId": "harvest",
+        "purpose": "harvest",
+        "chain": true,
+        "when": { "method": "isReadyToHarvest" }
+      },
+      {
+        "actionId": "water_plant",
+        "purpose": "tend",
+        "chain": true,
+        "when": {
+          "method": "canWater",
+          "notMethod": "isReadyToHarvest",
+          "contextGate": { "path": "energy", "op": "gt", "value": 0.4 }
+        }
+      },
+      {
+        "actionId": "inspect",
+        "purpose": "inspect",
+        "when": { "method": "canBeInspectedByAi" }
+      },
+      {
+        "actionId": "deep_inspect",
+        "purpose": "inspect",
+        "when": {
+          "method": "canBeInspectedByAi",
+          "contextGates": [
+            { "path": "curiosity", "op": "gt", "value": 0.78 },
+            { "path": "fun", "op": "lt", "value": 0.58 }
+          ],
+          "novelty": { "op": "gt", "value": 0.55 }
+        }
+      }
+    ]
+  },
   "canPickUp": false,
   "particleEffects": false,
   "lightEmission": false,

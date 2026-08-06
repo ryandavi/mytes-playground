@@ -202,7 +202,7 @@ class PickupItemAction extends MyteAction {
 
     start() {
         super.start();
-        this.startedAt = performance.now();
+        this.startedAt = SimClock.now();
         this.lastProgressAt = this.startedAt;
         this.lastDistance = this._getDistanceToTarget();
         if (this.target) {
@@ -219,7 +219,7 @@ class PickupItemAction extends MyteAction {
             return true;
         }
 
-        const now = performance.now();
+        const now = SimClock.now();
         const distance = this._getDistanceToTarget();
         if (distance + 4 < this.lastDistance) {
             this.lastDistance = distance;
@@ -293,7 +293,7 @@ class PickupItemAction extends MyteAction {
         });
         this.approachAction.start();
         this.replanCount++;
-        this.lastReplanAt = performance.now();
+        this.lastReplanAt = SimClock.now();
         this.lastTargetPosition = this.target ? { x: this.target.posX, y: this.target.posY } : null;
     }
 
@@ -302,7 +302,7 @@ class PickupItemAction extends MyteAction {
             return false;
         }
 
-        const now = performance.now();
+        const now = SimClock.now();
         if (now - this.lastReplanAt < 150) {
             return false;
         }

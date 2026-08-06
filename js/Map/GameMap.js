@@ -417,26 +417,30 @@ class GameMap {
 
 	_updateProximitySounds() {
 		const sm = this.soundManager;
-		const myte = this.activeMyte;
-		if (!sm || !myte) return;
+		const listener = sm?.getMapAudioListener?.();
+		if (!sm || !listener) return;
 
 		// Map<soundId, volumeMultiplier 0–1> — zones give full 1.0, tiles scale by distance
 		const sounds = new Map();
 
-		// Water zones take priority — they declare lake vs river explicitly and play at full volume
+		// The visible map center is the listener for both free camera and character follow.
+		// Water zones take priority — they declare lake vs river explicitly and play at full volume.
 		if (this.zoneManager) {
 			for (const zone of this.zoneManager.getZonesOfType('water_lake')) {
-				if (zone.containsMyte(myte)) { sounds.set('env_water_lake', 1.0); break; }
+				if (zone.region?.contains(listener.x, listener.y)) { sounds.set('env_water_lake', 1.0); break; }
 			}
 			for (const zone of this.zoneManager.getZonesOfType('water_river')) {
-				if (zone.containsMyte(myte)) { sounds.set('env_water_river', 1.0); break; }
+				if (zone.region?.contains(listener.x, listener.y)) { sounds.set('env_water_river', 1.0); break; }
 			}
 		}
 
 		// Fall back to tile scan — volume scales with proximity (louder as you get closer)
 		if (sounds.size === 0 && this.gridSystem) {
-			const { x, y } = this._myteGroundPos(myte);
-			const vol = this._getWaterTileProximity(x, y, 96);
+			const vol = this._getWaterTileProximity(
+				listener.x,
+				listener.y,
+				SiteConfig.audio.waterProximityRadius
+			);
 			if (vol > 0) sounds.set('env_water_lake', vol);
 		}
 

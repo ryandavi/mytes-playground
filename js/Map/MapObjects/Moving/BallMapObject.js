@@ -88,7 +88,7 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
             if (this.dropBounceCount < this.maxDropBounces && speed > 1.5) {
                 this.verticalVelocity = speed * this.dropBounceFactor;
                 this.dropBounceCount++;
-                this.gameMap?.soundManager?.play('obj_ball_bounce');
+                this.gameMap?.soundManager?.play('obj_ball_bounce', { source: this });
             } else {
                 this.verticalVelocity = 0;
                 this.isDropBouncing = false;
@@ -215,7 +215,7 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
     reactToNearbyCreature(myte) {
         if (this.isDragging || this.isPickedUp || this.pendingPickup) return;
 
-        const now = performance.now();
+        const now = SimClock.now();
         if (now - this.lastPushTime < this.pushCooldown) return;
 
         // Only react to moving mytes
@@ -279,7 +279,7 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
             }
             this.lastPushTime = now;
 
-            this.gameMap?.soundManager?.play('ball_hit');
+            this.gameMap?.soundManager?.play('ball_hit', { source: this });
 
             // Make the creature react
             myte.queue.addExpression('happy');
@@ -303,7 +303,7 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
             return false;
         }
 
-        const now = performance.now();
+        const now = SimClock.now();
         if (now - this.lastPushTime < this.pushCooldown * 0.35) {
             return false;
         }
@@ -365,7 +365,7 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
             this.element.setAttribute('data-moving', 'true');
         }
 
-        this.gameMap?.soundManager?.play('ball_hit');
+        this.gameMap?.soundManager?.play('ball_hit', { source: this });
         return true;
     }
     
@@ -488,7 +488,7 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
         }
 
         if (bouncedX || bouncedY) {
-            this.gameMap?.soundManager?.play('ball_hit');
+            this.gameMap?.soundManager?.play('ball_hit', { source: this });
             this._triggerImpactHop();
             this.updateBallAnimation();
         }
@@ -544,7 +544,7 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
         }
 
         if (bounced) {
-            this.gameMap?.soundManager?.play('ball_hit');
+            this.gameMap?.soundManager?.play('ball_hit', { source: this });
             this._triggerImpactHop();
             this.updateBallAnimation();
         }

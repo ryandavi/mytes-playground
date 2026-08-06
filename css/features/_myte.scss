@@ -103,6 +103,13 @@
     position: relative;
     z-index: var(--z-drag);
 
+    // Species with a smaller logical `size` in their definition (see snail2.json)
+    // shrink the sprite/collision box to match; the roster's home slot tile
+    // stays full-size so the grid layout doesn't shift.
+    &.snail2 {
+        --size-myte: 96px;
+    }
+
 
 
 

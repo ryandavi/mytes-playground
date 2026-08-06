@@ -22,6 +22,7 @@ class MyteCore {
 
         this.loadingManager = new LoadingManager(this.config.loading);
         this.boundUnlockAudio = null;
+        this.audioUnlockPrompt = null;
         this.boundHandleVisibilityChange = this.handleVisibilityChange.bind(this);
 
         this.soundManager = new SoundManager(this, {
@@ -173,7 +174,14 @@ class MyteCore {
     async init() {
         try {
             this.applyRuntimeModeFlags();
+            PanelRegistry.renderAll();
             this.loadingManager.initialize();
+
+            this.loadingManager.setMessage("Loading audio definitions...");
+            const audioDataLoaded = await this.soundManager.loadPresetData();
+            if (!audioDataLoaded) {
+                throw new Error('Failed to load audio metadata.');
+            }
 
             this.loadingManager.setMessage("Loading item data...");
             const itemDataLoaded = await ItemRegistry.preload();
@@ -242,7 +250,32 @@ class MyteCore {
     }
 
     initializeAudio() {
+        this.audioUnlockPrompt = new AudioUnlockPrompt(this);
+        this.audioUnlockPrompt.init();
         this.setupAudioUnlockListeners();
+    }
+
+    /**
+     * Single entry point for starting audio — used by both the gesture
+     * listeners and the explicit "Enable Sound" button, so the two can never
+     * disagree about whether the prompt should still be up.
+     */
+    async unlockAudio() {
+        if (this.soundManager.initialized) return true;
+
+        try {
+            await this.soundManager.init();
+        } catch (error) {
+            console.error('Failed to initialize audio after user interaction:', error);
+            return false;
+        }
+
+        if (!this.soundManager.initialized) return false;
+
+        this.removeAudioUnlockListeners();
+        this.audioUnlockPrompt?.hide();
+        setTimeout(() => this.soundManager.startAllSounds(), this.config.sound.unlockDelay);
+        return true;
     }
 
     getFirstContainer() {
@@ -252,18 +285,7 @@ class MyteCore {
     setupAudioUnlockListeners() {
         if (this.boundUnlockAudio) return;
 
-        this.boundUnlockAudio = async () => {
-            if (this.soundManager.initialized) return;
-            try {
-                await this.soundManager.init();
-                this.removeAudioUnlockListeners();
-                if (this.soundManager.initialized) {
-                    setTimeout(() => this.soundManager.startAllSounds(), this.config.sound.unlockDelay);
-                }
-            } catch (error) {
-                console.error('Failed to initialize audio after user interaction:', error);
-            }
-        };
+        this.boundUnlockAudio = () => this.unlockAudio();
 
         MyteCore.AUDIO_UNLOCK_EVENTS.forEach(event => {
             document.addEventListener(event, this.boundUnlockAudio);
@@ -399,6 +421,12 @@ class MyteCore {
             if (!this._rafHandle) {
                 this._rafHandle = requestAnimationFrame(this._updateFrame);
             }
+
+            // Browsers suspend the AudioContext on backgrounded tabs and do not
+            // always resume it with the page, which leaves audio dead with no
+            // further gesture coming.
+            this.soundManager?.resumeIfSuspended();
+            this.audioUnlockPrompt?.refresh();
         }
     }
 
@@ -464,6 +492,8 @@ class MyteCore {
         this.user = null;
 
         this.removeAudioUnlockListeners();
+        this.audioUnlockPrompt?.dispose();
+        this.audioUnlockPrompt = null;
         this.removeGlobalErrorHandlers();
         this.soundManager?.dispose();
         this.soundManager = null;
