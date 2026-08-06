@@ -30,6 +30,7 @@ class WorldGraph {
     static geometry = new Map();
     static preloaded = false;
     static preloadPromise = null;
+    static discoverPromise = null;
 
     static normalizeId(mapId) {
         return String(mapId || '').replace(/\.tmx$/i, '');
@@ -53,9 +54,19 @@ class WorldGraph {
     // file is really there — a typo in a targetMap leaves an edge to nowhere
     // rather than inventing a map.
     static async discover(startingMaps = [SiteConfig.world.defaultMap]) {
-        this.nodes.clear();
-        this.edges.clear();
-        this.geometry.clear();
+        if (this.discoverPromise) return this.discoverPromise;
+        this.discoverPromise = this._discover(startingMaps);
+        try {
+            return await this.discoverPromise;
+        } finally {
+            this.discoverPromise = null;
+        }
+    }
+
+    static async _discover(startingMaps) {
+        const nodes = new Map();
+        const edges = new Map();
+        const geometryByMap = new Map();
 
         const seeds = startingMaps.map(id => this.normalizeId(id)).filter(Boolean);
         const pending = [...new Set(seeds)];
@@ -73,15 +84,15 @@ class WorldGraph {
                     return;
                 }
 
-                this.geometry.set(mapId, geometry);
-                this.nodes.set(mapId, Object.freeze({
+                geometryByMap.set(mapId, geometry);
+                nodes.set(mapId, Object.freeze({
                     id: mapId,
                     region: geometry.region,
                     displayName: geometry.displayName,
                     layout: geometry.layout,
                     pointsOfInterest: geometry.pointsOfInterest
                 }));
-                this.edges.set(mapId, new Map());
+                edges.set(mapId, new Map());
 
                 geometry.portals.forEach(portal => {
                     if (visited.has(portal.targetMap)) return;
@@ -92,12 +103,16 @@ class WorldGraph {
         }
 
         // Edges last: a portal only counts once the map it points at is known.
-        this.geometry.forEach((geometry, mapId) => {
+        geometryByMap.forEach((geometry, mapId) => {
             geometry.portals.forEach(portal => {
-                if (!this.nodes.has(portal.targetMap)) return;
-                this.edges.get(mapId).set(portal.targetMap, portal);
+                if (!nodes.has(portal.targetMap)) return;
+                edges.get(mapId).set(portal.targetMap, portal);
             });
         });
+
+        this.nodes = nodes;
+        this.edges = edges;
+        this.geometry = geometryByMap;
     }
 
     static _emptyGeometry() {

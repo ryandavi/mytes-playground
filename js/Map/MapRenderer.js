@@ -54,7 +54,7 @@ class MapRenderer {
             }
 
             if (debugMode && rs.sortY !== undefined) {
-                obj.element.dataset.sortY = `${Math.round(rs.sortY * 100) / 100}`;
+                EntityMethods.writeSortY(obj.element, rs.sortY);
             }
 
             // Visibility (culled objects are hidden, not removed)
@@ -100,7 +100,7 @@ class MapRenderer {
         obj.element.style.top    = `${rs.posY}px`;
         if (rs.zIndex !== undefined) obj.element.style.zIndex = rs.zIndex;
         if (rs.sortY !== undefined && document.body.classList.contains('debug')) {
-            obj.element.dataset.sortY = `${Math.round(rs.sortY * 100) / 100}`;
+            EntityMethods.writeSortY(obj.element, rs.sortY);
         }
 
         if (rs.bgPosition !== null && rs.bgPosition !== undefined) {

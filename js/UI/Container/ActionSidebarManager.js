@@ -3,23 +3,57 @@ class ActionSidebarManager extends UIComponent {
         super(parent);
         this.actionControls = this.parent.containerWrapper.querySelector('#action-controls');
         this.currentSelectedObject = null;
-        this.lastInfoRefreshAt = 0;
-        this.infoRefreshInterval = 250;
         this._otherInfoCache = null;
         this._otherInfoStructureKey = null;
         this._otherInfoRowMap = new Map();
-        this._lastAvailableActionsKey = null;
+        this._eventUnsubscribers = [];
+        this._refreshQueued = false;
+    }
+
+    init() {
+        const eventManager = this.parent.parent.eventManager;
+        if (!eventManager) return;
+
+        const invalidateActions = ({ myte = null, object = null } = {}) => {
+            const activeMyte = this.parent.getActiveMyte();
+            if (myte && myte !== activeMyte && myte !== this.currentSelectedObject) return;
+            if (object && object !== this.currentSelectedObject) return;
+            this.queueRefresh(true);
+        };
+        const invalidateDetails = ({ myte = null } = {}) => {
+            if (myte && myte !== this.currentSelectedObject) return;
+            this.queueRefresh(false);
+        };
+
+        ['myte:queue_changed', 'myte:mode_changed', 'myte:started', 'myte:stopped',
+            'container:active_myte_changed', 'myte:stats_changed', 'world:action_availability_changed',
+            'chest:opened', 'plant:matured', 'plant:pollinated', 'plant:mutated']
+            .forEach(event => this._eventUnsubscribers.push(eventManager.on(event, invalidateActions)));
+        ['myte:ai_decision_changed']
+            .forEach(event => this._eventUnsubscribers.push(eventManager.on(event, invalidateDetails)));
+    }
+
+    queueRefresh(actionsChanged) {
+        this._refreshActions = this._refreshActions || actionsChanged;
+        if (this._refreshQueued) return;
+        this._refreshQueued = true;
+        queueMicrotask(() => {
+            this._refreshQueued = false;
+            const selected = this.currentSelectedObject;
+            if (!selected) return;
+            if ((selected instanceof MapObject && (selected.active === false || !selected.element)) ||
+                (selected instanceof DroppedMapItem && (selected.collected || !selected.active))) {
+                this.parent.selectionManager.setSelected(null);
+                return;
+            }
+            if (this._refreshActions) this.updateActionList(selected);
+            this._refreshActions = false;
+            this.renderOtherInfo(selected);
+        });
     }
 
     getCategoryTitle(category) {
-        const titles = {
-            movement: 'Movement',
-            state: 'State',
-            interactions: 'Interactions',
-            play: 'Play',
-            reactive: 'Reactive',
-            carrying: 'Active Actions'
-        };
+        const titles = SiteConfig.ui.labels.actionCategories;
         return titles[category] || category;
     }
 
@@ -111,13 +145,7 @@ class ActionSidebarManager extends UIComponent {
 
     getMyteBehaviorLabel(myte) {
         const goalKey = myte?.getMoveType?.(myte.goal) || '';
-        const labels = {
-            FOLLOW: 'Following',
-            FREEROAM: 'Free Roam',
-            GRAVITY: 'Gravity',
-            GOHOME: 'Going Home',
-            QUEUE_ONLY: 'Queued'
-        };
+        const labels = SiteConfig.ui.labels.myteBehaviors;
 
         return labels[goalKey] || this.humanizeLabel(goalKey || 'Unknown');
     }
@@ -163,23 +191,12 @@ class ActionSidebarManager extends UIComponent {
     }
 
     getSlotStateLabel(myte) {
-        if (!myte) {
-            return 'Empty';
-        }
-
-        if (!myte.isActive) {
-            return 'At Home';
-        }
-
-        if (myte.goal === MOVE_TYPES.FREEROAM) {
-            return 'Free Roam';
-        }
-
-        if (myte.goal === MOVE_TYPES.GOHOME) {
-            return 'Returning';
-        }
-
-        return 'Deployed';
+        const labels = SiteConfig.ui.labels.slotStates;
+        if (!myte) return labels.empty;
+        if (!myte.isActive) return labels.home;
+        if (myte.goal === MOVE_TYPES.FREEROAM) return labels.freeroam;
+        if (myte.goal === MOVE_TYPES.GOHOME) return labels.returning;
+        return labels.deployed;
     }
 
     getSelectionPositionInfo(selectedObject) {
@@ -205,33 +222,7 @@ class ActionSidebarManager extends UIComponent {
     }
 
     getActionLabel(action, selectedObject) {
-        if (!action) {
-            return '';
-        }
-
-        if (selectedObject?.constructor?.name === 'CropPlantMapObject' && action.id === 'harvest') {
-            return 'Harvest Crop';
-        }
-
-        if (selectedObject instanceof PortalMapObject && action.id === 'interact_object') {
-            return 'Use Portal';
-        }
-
-        if (selectedObject instanceof DoorMapObject && action.id === 'interact_object') {
-            return `${selectedObject.isOpen ? 'Close' : 'Open'} Door`;
-        }
-
-        if (selectedObject?.type?.toUpperCase?.() === 'GATE' && action.id === 'interact_object') {
-            return `${selectedObject.isOpen ? 'Close' : 'Open'} Gate`;
-        }
-
-        if (selectedObject?.getConfig?.('interaction.type') === 'light' && action.id === 'interact_object') {
-            const objectLabel = selectedObject.getDisplayName?.() || selectedObject.type || 'Light';
-            const isEnabled = selectedObject.isEnabled?.();
-            return `${isEnabled ? 'Turn Off' : 'Turn On'} ${objectLabel}`;
-        }
-
-        return action.label;
+        return action?.label ?? '';
     }
 
     getMajorAction(selectedObject, activeMyte, availableActions = []) {
@@ -294,7 +285,7 @@ class ActionSidebarManager extends UIComponent {
             titleParts.push(action.unavailableReason);
         }
         if (titleParts.length) {
-            button.title = titleParts.join('\n');
+            this.bindTooltip(button, titleParts.join(' - '));
         }
         if (prominent) {
             button.classList.add('primary-action');
@@ -364,6 +355,20 @@ class ActionSidebarManager extends UIComponent {
         return button;
     }
 
+    bindTooltip(element, text) {
+        if (!element || !text) return;
+        const tooltip = TooltipSystem.getInstance();
+        element.setAttribute('aria-label', text);
+        element.addEventListener('mouseenter', () => tooltip.show({ anchor: element, text }));
+        element.addEventListener('mouseleave', () => {
+            if (tooltip.isVisibleFor(element)) tooltip.hide();
+        });
+        element.addEventListener('focus', () => tooltip.show({ anchor: element, text }));
+        element.addEventListener('blur', () => {
+            if (tooltip.isVisibleFor(element)) tooltip.hide();
+        });
+    }
+
     emptyActionList() {
         const actionGroups = this.actionControls.querySelector('.action-groups');
         actionGroups.innerHTML = '';
@@ -372,104 +377,6 @@ class ActionSidebarManager extends UIComponent {
         const otherInfo = this.actionControls.querySelector('.other-info');
         otherInfo.innerHTML = '';
         otherInfo.classList.remove('is-visible');
-    }
-
-    update() {
-        const activeMyte = this.parent.getActiveMyte();
-        if (!this.currentSelectedObject) {
-            return;
-        }
-
-        if (this.currentSelectedObject instanceof MapObject &&
-            (this.currentSelectedObject.active === false || !this.currentSelectedObject.element)) {
-            this.parent.selectionManager.setSelected(null);
-            return;
-        }
-
-        if (this.currentSelectedObject instanceof DroppedMapItem &&
-            (this.currentSelectedObject.collected || !this.currentSelectedObject.active)) {
-            this.parent.selectionManager.setSelected(null);
-            return;
-        }
-
-        const availableKey = this._buildAvailableActionsKey(this.currentSelectedObject, activeMyte);
-        if (availableKey !== this._lastAvailableActionsKey) {
-            this._lastAvailableActionsKey = availableKey;
-            this.updateActionList(this.currentSelectedObject);
-        }
-
-        const now = performance.now();
-        if (now - this.lastInfoRefreshAt < this.infoRefreshInterval) {
-            return;
-        }
-
-        this.lastInfoRefreshAt = now;
-        this.renderOtherInfo(this.currentSelectedObject);
-    }
-
-    _buildAvailableActionsKey(selectedObject, activeMyte) {
-        if (!selectedObject) return '';
-        if (this.isInactiveHomeMyteSelection(selectedObject)) {
-            return `inactive-home-myte:${selectedObject.id ?? selectedObject.name ?? 'myte'}`;
-        }
-        if (selectedObject instanceof DroppedMapItem) {
-            return `dropped:${selectedObject.variant}|collected=${selectedObject.collected}|busy=${activeMyte?.queue?.count() ?? 0}`;
-        }
-        const availableActions = ActionManager.getAvailableActions(selectedObject, activeMyte);
-        const actionContext = this.getCurrentActionContext(selectedObject, activeMyte);
-        const busyCount = activeMyte?.queue?.count() ?? 0;
-        const subjectId = selectedObject?.id ?? selectedObject?.constructor?.name ?? 'selected';
-        const targetId = actionContext.currentTarget?.id ?? actionContext.currentTarget?.constructor?.name ?? '';
-        // Blocked actions are part of what gets rendered, so a change in *their*
-        // reasons must invalidate the cache too, or a stale explanation sticks.
-        const blocked = ActionManager.getExplainedUnavailableActions(selectedObject, activeMyte)
-            .map(a => `${a.id}:${a.unavailableReason}`)
-            .join(',');
-        return `${subjectId}|busy=${busyCount}|current=${actionContext.currentActionId}|target=${targetId}|phase=${actionContext.currentAction?.phase ?? ''}|actions=${availableActions.map(a => a.id).join(',')}|blocked=${blocked}`;
-    }
-
-    appendInfoRow(container, label, value, className = 'state-info') {
-        const info = document.createElement('div');
-        info.classList.add(className);
-        const labelSpan = document.createElement('span');
-        labelSpan.textContent = label;
-        const valueSpan = document.createElement('span');
-        valueSpan.textContent = value;
-        info.append(labelSpan, ': ', valueSpan);
-        container.append(info);
-        return info;
-    }
-
-    getNeedFulfillmentLabel(percent) {
-        if (percent <= 15) return 'Critical';
-        if (percent <= 35) return 'Low';
-        if (percent <= 65) return 'Okay';
-        if (percent <= 85) return 'Good';
-        return 'Full';
-    }
-
-    appendNeedMeter(container, label, percent, tone) {
-        const wrapper = document.createElement('div');
-        wrapper.classList.add('state-info', 'need-info');
-
-        const heading = document.createElement('div');
-        heading.classList.add('need-label');
-        heading.textContent = `${label}: ${percent}% ${tone}`;
-
-        const meter = document.createElement('div');
-        meter.classList.add('need-meter');
-        meter.setAttribute('role', 'progressbar');
-        meter.setAttribute('aria-valuemin', '0');
-        meter.setAttribute('aria-valuemax', '100');
-        meter.setAttribute('aria-valuenow', String(percent));
-
-        const fill = document.createElement('div');
-        fill.classList.add('need-meter-fill');
-        fill.style.width = `${Utility.clamp(percent, 0, 100)}%`;
-        meter.append(fill);
-
-        wrapper.append(heading, meter);
-        container.append(wrapper);
     }
 
     appendSectionHeader(rows, key, title, className = 'info-section-title') {
@@ -597,7 +504,7 @@ class ActionSidebarManager extends UIComponent {
                 });
 
                 if (Array.isArray(snapshot.needs) && snapshot.needs.length) {
-                    const driveLabels = { eatDrive: 'Hunger', restDrive: 'Rest', playDrive: 'Play', socialDrive: 'Social', exploreDrive: 'Explore', comfortDrive: 'Comfort', safetyDrive: 'Safety' };
+                    const driveLabels = SiteConfig.ui.labels.drives;
                     rows.push({ label: '__header_urgency', value: 'Urgency', className: 'needs-title' });
                     snapshot.needs.forEach(({ id, percent }) => {
                         const label = driveLabels[id] ?? id;
@@ -835,11 +742,9 @@ class ActionSidebarManager extends UIComponent {
         const targetName = selectedInfo.querySelector('.target-info .name');
         const activeMyte = this.parent.getActiveMyte();
         this.currentSelectedObject = selectedObject;
-        this.lastInfoRefreshAt = 0;
         this._otherInfoCache = null;
         this._otherInfoStructureKey = null;
         this._otherInfoRowMap.clear();
-        this._lastAvailableActionsKey = null;
 
         selectedInfo.classList.remove('self-selected', 'myte-interaction', 'map-interaction', 'element-interaction');
         this.emptyActionList();
@@ -1141,10 +1046,11 @@ class ActionSidebarManager extends UIComponent {
     }
 
     dispose() {
+        this._eventUnsubscribers.forEach(unsubscribe => unsubscribe());
+        this._eventUnsubscribers = [];
         this.currentSelectedObject = null;
         this._otherInfoCache = null;
         this._otherInfoRowMap.clear();
-        this._lastAvailableActionsKey = null;
         this.actionControls = null;
     }
 }

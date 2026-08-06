@@ -38,6 +38,11 @@ class SoundPanel extends ModalWindow {
                 id: 'footsteps-enabled',
                 property: 'footstepsEnabled',
                 preference: 'footstepsEnabled'
+            },
+            spatialAudioEnabled: {
+                id: 'spatial-audio-enabled',
+                property: 'spatialAudioEnabled',
+                preference: 'spatialAudioEnabled'
             }
         };
 
@@ -121,6 +126,10 @@ class SoundPanel extends ModalWindow {
         if (this.buttonElement) {
             this.buttonElement.classList.toggle('muted', !(soundManager.soundEnabled || soundManager.musicEnabled));
         }
+
+        // Muting while audio is still locked should retire the unlock prompt,
+        // and un-muting should bring it back if the gate is still closed.
+        this.getCore()?.audioUnlockPrompt?.refresh();
 
         this.categories.forEach((category) => {
             const slider = document.getElementById(`${category}-volume`);
@@ -217,6 +226,7 @@ class SoundPanel extends ModalWindow {
             soundManager.soundEnabled = defaults.soundEnabled;
             soundManager.musicEnabled = defaults.musicEnabled;
             soundManager.footstepsEnabled = defaults.footstepsEnabled;
+            soundManager.spatialAudioEnabled = defaults.spatialAudioEnabled;
             soundManager.setMasterVolume(defaults.masterVolume);
             soundManager.setCategoryVolume('sfx', defaults.sfxVolume);
             soundManager.setCategoryVolume('footsteps', defaults.footstepsVolume);

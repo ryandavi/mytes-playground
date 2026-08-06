@@ -145,7 +145,7 @@ class PortalMapObject extends InteractiveMapObject {
     playPortalSound(type) {
         const soundEffect = this.getConfig(`soundEffects.${type}`);
         if (soundEffect && this.gameMap?.soundManager) {
-            this.gameMap.soundManager.play(soundEffect);
+            this.gameMap.soundManager.play(soundEffect, { source: this });
         }
     }
 
@@ -262,6 +262,17 @@ class PortalMapObject extends InteractiveMapObject {
         return this.getDisplayName();
     }
 
+    getAffordanceTooltipTitle() {
+        const destination = this.getPortalWindowTitle();
+        return destination.toLowerCase().startsWith('portal')
+            ? destination
+            : `Portal to ${destination}`;
+    }
+
+    getFallbackAffordanceTooltipAction() {
+        return this.getActionConfig?.('interact_object')?.label ?? 'Use Portal';
+    }
+
     getDisplayName() {
         if (this.targetMap) {
             const mapLoader = this.core?.mapLoader;
@@ -315,7 +326,7 @@ class PortalMapObject extends InteractiveMapObject {
         if (titleElement.textContent !== nextTitle) {
             titleElement.textContent = nextTitle;
         }
-        titleElement.title = this.getInteractionHint();
+        titleElement.title = this.areInteractionHintsEnabled() ? this.getInteractionHint() : '';
     }
 
     getInteractionHint() {
@@ -329,7 +340,7 @@ class PortalMapObject extends InteractiveMapObject {
     syncInteractionHint() {
         if (!this.element) return;
         const hint = this.getInteractionHint();
-        this.element.title = hint;
+        this.element.title = this.areInteractionHintsEnabled() ? hint : '';
         this.element.setAttribute('aria-label', hint);
         this.element.dataset.userNavigable = String(!this.activeMyte);
     }
@@ -363,7 +374,7 @@ class PortalMapObject extends InteractiveMapObject {
         const title = document.createElement('div');
         title.className = 'portal-panel__title';
         title.textContent = this.getPortalWindowTitle();
-        title.title = this.getPortalWindowTitle();
+        title.title = this.areInteractionHintsEnabled() ? this.getPortalWindowTitle() : '';
 
         const content = document.createElement('div');
         content.className = 'content portal-panel__content';
@@ -394,7 +405,7 @@ class PortalMapObject extends InteractiveMapObject {
             if (!liveTitleElement) return;
 
             liveTitleElement.textContent = displayName;
-            liveTitleElement.title = this.getInteractionHint();
+            liveTitleElement.title = this.areInteractionHintsEnabled() ? this.getInteractionHint() : '';
         }).catch(error => {
             Utility.warnDebug(`[PortalMapObject] Failed to refresh portal title for ${this.targetMap}:`, error);
         });

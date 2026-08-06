@@ -48,7 +48,8 @@ class FootstepController {
         soundManager.playFootstep(surfaceTag, {
             foot,
             volume: baseVolume,
-            speedNormalized
+            speedNormalized,
+            source: this.myte
         });
 
         this.lastTriggerAt = now;

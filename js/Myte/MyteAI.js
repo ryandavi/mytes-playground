@@ -33,8 +33,6 @@ class MyteAI {
         this.lastCandidateSnapshot = [];
 
         this._tickTime = 0;
-        this._scaryObjectDetectedThisTick = false;
-
         this._lastBubblePrefix = null;
         this._lastBubbleTime = -Infinity;
     }
@@ -65,7 +63,6 @@ class MyteAI {
 
     tickUpdate(tickDelta) {
         this._tickTime++;
-        this._scaryObjectDetectedThisTick = false;
 
         if (!this.canPlan()) {
             this.resetThinking();
@@ -99,11 +96,16 @@ class MyteAI {
     }
 
     getThinkInterval() {
+        const timing = SiteConfig.ai.timing;
         const activity = this.myte.stats?.getTraitNormalized?.('activity') ?? 0.5;
         const funRatio = this.myte.stats?.getFunRatio?.() ?? 0.75;
         const energy = this.myte.stats?.getEnergyRatio?.() ?? 1;
-        const activityModifier = 1.24 - (activity * 0.42) - ((1 - funRatio) * 0.18);
-        const energyModifier = energy < 0.3 ? 1.22 : 1;
+        const activityModifier = timing.activityIntervalBase -
+            (activity * timing.activityIntervalWeight) -
+            ((1 - funRatio) * timing.boredomIntervalWeight);
+        const energyModifier = energy < timing.lowEnergyThreshold
+            ? timing.lowEnergyIntervalScale
+            : 1;
 
         return Utility.clamp(
             this.baseThinkInterval * activityModifier * energyModifier,
@@ -144,6 +146,7 @@ class MyteAI {
         this.pruneMemory();
 
         const context = this.buildContext();
+        this._applyPerceptionEffects(context);
         const candidates = [
             this.buildSafeReturnCandidate(context),
             this.buildRestCandidate(context),
@@ -177,6 +180,7 @@ class MyteAI {
         this.lastDecisionLabel = chosen.label;
         this.lastDecisionTime = SimClock.now();
         this.lastDecisionTargetKey = chosen.targetKey ?? null;
+        this.myte.parent?.eventManager?.emit('myte:ai_decision_changed', { myte: this.myte });
     }
 
     // Surface the winning drive as a thought bubble so the AI's choices are
@@ -206,7 +210,10 @@ class MyteAI {
         let chosenRoll = -Infinity;
 
         for (const candidate of shortlist) {
-            const roll = candidate.score * (0.9 + (Math.random() * 0.2));
+            const { selectionJitterMin, selectionJitterMax } = SiteConfig.ai.scoring;
+            const jitter = selectionJitterMin +
+                (Math.random() * (selectionJitterMax - selectionJitterMin));
+            const roll = candidate.score * jitter;
             if (roll > chosenRoll) {
                 chosen = candidate;
                 chosenRoll = roll;
@@ -282,10 +289,24 @@ class MyteAI {
         const home = this.getHomePosition();
         const distanceFromHome = this.myte.getDistanceToPoint(home.x, home.y);
         const preferences = this.getAIPreferences();
-        const nearbyLights = nearbyObjects.filter(target => target?.getConfig?.('interaction.type') === 'light');
-        const nearbyActiveLights = nearbyLights.filter(target => target?.isEnabled?.());
-        const nearbyMusicSources = nearbyObjects.filter(target => target?.isMusicSource?.());
-        const nearbyActiveMusicSources = nearbyMusicSources.filter(target => target?.isActiveMusicSource?.());
+        const nearbyLights = [];
+        const nearbyActiveLights = [];
+        const nearbyMusicSources = [];
+        const nearbyActiveMusicSources = [];
+        let hasScaryNearby = false;
+        for (const target of nearbyObjects) {
+            if (target?.getConfig?.('interaction.type') === 'light') {
+                nearbyLights.push(target);
+                if (target.isEnabled?.()) nearbyActiveLights.push(target);
+            }
+            if (target?.isMusicSource?.()) {
+                nearbyMusicSources.push(target);
+                if (target.isActiveMusicSource?.()) nearbyActiveMusicSources.push(target);
+            }
+            if ((target?.getAIMetadata?.()?.scaryStrength ?? 0) > 0) {
+                hasScaryNearby = true;
+            }
+        }
         const ambientLightLevel = Utility.clamp(timeData.lightLevel ?? 1, 0, 1);
         const localLightLevel = Utility.clamp(ambientLightLevel + Math.min(nearbyActiveLights.length * 0.28, 0.6), 0, 1);
 
@@ -293,17 +314,6 @@ class MyteAI {
         const drives = this._computeDrives(snapshot, {
             distanceFromHome, nearbyObjects, isExhausted
         });
-
-        if (!this._scaryObjectDetectedThisTick) {
-            const hasScaryNearby = nearbyObjects.some(target => {
-                const meta = target.getAIMetadata?.();
-                return (meta?.scaryStrength ?? 0) > 0;
-            });
-            if (hasScaryNearby) {
-                this._scaryObjectDetectedThisTick = true;
-                snapshot.stats?.applyConfidenceDelta?.(-0.05);
-            }
-        }
 
         const lightNeed = Utility.clamp(
             (0.45 - localLightLevel) / 0.45, 0, 1
@@ -327,12 +337,19 @@ class MyteAI {
             nearbyLights, nearbyActiveLights,
             nearbyMusicSources, nearbyActiveMusicSources,
             nearbyMytes, nearbySocialMytes, nearbyObjects, droppedItems,
+            hasScaryNearby,
             nearbyZones, activeZones,
             activeZoneTypes: activeZones.map(zone => zone.type),
             home, distanceFromHome,
             getNoveltyScore: (target) => this.getNoveltyScore(target),
             drives
         };
+    }
+
+    _applyPerceptionEffects(context) {
+        if (context.hasScaryNearby) {
+            context.stats?.applyConfidenceDelta?.(-0.05);
+        }
     }
 
     buildSafeReturnCandidate(context) {
@@ -1187,6 +1204,7 @@ class MyteAI {
             accomplishment: entry.accomplishment,
             exertion: entry.exertion
         });
+        this.myte.stats?.awardExperience?.(entry);
 
         this.pruneMemory();
     }
@@ -1210,12 +1228,12 @@ class MyteAI {
     }
 
     getNearbyMytes(radius, capability = null) {
-        const cacheKey = capability ?? '';
-        if (this._nearbyMytesCache && this._nearbyMytesRadius === radius &&
-            this._nearbyMytesCapability === cacheKey &&
-            this._nearbyMytesTime === this._tickTime) {
-            return this._nearbyMytesCache;
+        if (this._nearbyMytesCacheTime !== this._tickTime) {
+            this._nearbyMytesCacheTime = this._tickTime;
+            this._nearbyMytesCache = new Map();
         }
+        const cacheKey = `${radius}|${capability ?? ''}`;
+        if (this._nearbyMytesCache.has(cacheKey)) return this._nearbyMytesCache.get(cacheKey);
         const worldQuery = this.myte.parent?.gameMap?.worldQuery;
         const result = worldQuery?.findNearby({
             x: this.myte.posX,
@@ -1225,10 +1243,7 @@ class MyteAI {
             capability,
             exclude: this.myte
         }) ?? [];
-        this._nearbyMytesCache = result;
-        this._nearbyMytesRadius = radius;
-        this._nearbyMytesCapability = cacheKey;
-        this._nearbyMytesTime = this._tickTime;
+        this._nearbyMytesCache.set(cacheKey, result);
         return result;
     }
 
@@ -1281,17 +1296,7 @@ class MyteAI {
     }
 
     getAffordancesForTarget(target, context) {
-        const affordances = target?.getAiAffordances?.(context, this.myte) ?? [];
-        return affordances.filter((affordance, index, list) => {
-            const key = `${affordance.actionId}:${affordance.purpose ?? ''}`;
-            return list.findIndex(item => `${item.actionId}:${item.purpose ?? ''}` === key) === index;
-        });
-    }
-
-    canInspectTarget(target) {
-        return target?.getConfig?.('canInspect', true) !== false &&
-            target?.getConfig?.('interaction.type') !== 'teleport' &&
-            target?.type?.toUpperCase?.() !== 'PORTAL';
+        return target?.getAiAffordances?.(context, this.myte) ?? [];
     }
 
     getPlayAnchorTarget(targets) {
@@ -1311,7 +1316,12 @@ class MyteAI {
 
     findHomeComfortTarget(home = this.getHomePosition()) {
         const gridSystem = this.myte.parent?.gameMap?.gridSystem;
-        return gridSystem?.findNearestValidPositionForEntity?.(this.myte, home.x, home.y, 10) ?? home;
+        return gridSystem?.findNearestValidPositionForEntity?.(
+            this.myte,
+            home.x,
+            home.y,
+            SiteConfig.ai.wander.homeTargetSnapRadius
+        ) ?? home;
     }
 
     getWanderBounds(worldBounds) {
@@ -1323,8 +1333,8 @@ class MyteAI {
         const cellSize = gridSystem?.config?.cellSize ?? 32;
         // Keep mytes well away from the map edge — 3 cells minimum so they don't try to
         // path into border colliders or visually hug the wall.
-        const paddingX = cellSize * 3;
-        const paddingY = cellSize * 3;
+        const paddingX = cellSize * SiteConfig.ai.wander.edgePaddingCells;
+        const paddingY = cellSize * SiteConfig.ai.wander.edgePaddingCells;
         const left = worldBounds.left + paddingX;
         const top = worldBounds.top + paddingY;
         const right = worldBounds.right - this.myte.size.width - paddingX;
@@ -1369,18 +1379,27 @@ class MyteAI {
         const origin = this.mode === MOVE_AUTONOMY_TYPES.WANDER
             ? { x: this.myte.posX, y: this.myte.posY }
             : localContext.home;
-        const confidence = localContext?.confidence ?? 0.55;
-        const confidenceRadius = this.safeAreaRadius * (0.3 + confidence * 0.7);
+        const wanderConfig = SiteConfig.ai.wander;
+        const confidence = localContext?.confidence ?? wanderConfig.defaultConfidence;
+        const confidenceRadius = this.safeAreaRadius * (
+            wanderConfig.confidenceRadiusBase +
+            confidence * wanderConfig.confidenceRadiusWeight
+        );
         const maxRadius = this.mode === MOVE_AUTONOMY_TYPES.WANDER
             ? this.wanderRadius
             : confidenceRadius;
-        const safeOrigin = gridSystem?.findNearestValidPositionForEntity?.(this.myte, origin.x, origin.y, 8) ?? origin;
+        const safeOrigin = gridSystem?.findNearestValidPositionForEntity?.(
+            this.myte,
+            origin.x,
+            origin.y,
+            wanderConfig.originSnapRadius
+        ) ?? origin;
 
         const cellSize = gridSystem?.config?.cellSize ?? 32;
         // Minimum distance: 4 cells. Shorter hops look jittery and random.
-        const minWanderDist = cellSize * 4;
+        const minWanderDist = cellSize * wanderConfig.minDistanceCells;
 
-        for (let attempt = 0; attempt < 18; attempt++) {
+        for (let attempt = 0; attempt < wanderConfig.targetAttempts; attempt++) {
             const angle = Math.random() * Math.PI * 2;
             const distance = minWanderDist + Math.random() * maxRadius;
             const candidate = {
@@ -1393,7 +1412,12 @@ class MyteAI {
             }
 
             // Snap radius of 16 gives a wider berth from collider edges than 8
-            const safe = gridSystem?.findNearestValidPositionForEntity?.(this.myte, candidate.x, candidate.y, 16);
+            const safe = gridSystem?.findNearestValidPositionForEntity?.(
+                this.myte,
+                candidate.x,
+                candidate.y,
+                wanderConfig.candidateSnapRadius
+            );
 
             if (safe &&
                 this.isWithinWanderBounds(safe, wanderBounds) &&
@@ -1409,15 +1433,17 @@ class MyteAI {
     }
 
     findCuriosityWanderTarget(context) {
-        if (context.drives.playDrive < 0.48 && context.curiosity < 0.55) {
+        const wanderConfig = SiteConfig.ai.wander;
+        if (context.drives.playDrive < wanderConfig.curiosityPlayThreshold &&
+            context.curiosity < wanderConfig.curiosityTraitThreshold) {
             return null;
         }
 
         const interestingTarget = context.nearbyObjects
-            .filter(target => this.canInspectTarget(target))
+            .filter(target => target?.canBeInspectedByAi?.())
             .sort((a, b) => this.getNoveltyScore(b) - this.getNoveltyScore(a))[0];
 
-        if (!interestingTarget || this.getNoveltyScore(interestingTarget) < 0.55) {
+        if (!interestingTarget || this.getNoveltyScore(interestingTarget) < wanderConfig.noveltyThreshold) {
             return null;
         }
 
@@ -1430,13 +1456,20 @@ class MyteAI {
             this.myte,
             center.x - (this.myte.size.width / 2),
             center.y - (this.myte.size.height / 2),
-            10
+            wanderConfig.curiositySnapRadius
         ) ?? null;
     }
 
     getTargetKey(target) {
         if (!target) return null;
-        return `${target.type ?? target.constructor?.name ?? 'target'}:${target.id ?? `${target.posX},${target.posY}`}`;
+        const stableId = target.worldId ?? target.id;
+        if (stableId == null) {
+            if (Utility.isDebugEnabled()) {
+                throw new Error('[MyteAI] Queryable targets require a stable id.');
+            }
+            return null;
+        }
+        return `${target.type ?? target.constructor?.name ?? 'target'}:${stableId}`;
     }
 
     getNoveltyScore(target) {

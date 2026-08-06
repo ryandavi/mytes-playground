@@ -21,6 +21,25 @@ class FruitTreeMapObject extends TreeMapObject {
         return this.growthStage === 'grown' && this.hasFruit;
     }
 
+    serializeState() {
+        return {
+            ...super.serializeState(),
+            hasFruit: this.hasFruit,
+            fruitRegrowthElapsed: this._fruitRegrowthElapsed
+        };
+    }
+
+    restoreState(data = {}) {
+        super.restoreState(data);
+        this.hasFruit = data.hasFruit === true;
+        this._fruitRegrowthElapsed = Utility.clamp(
+            Number(data.fruitRegrowthElapsed) || 0,
+            0,
+            this.fruitRegrowthTime
+        );
+        this._updateFruitVisuals();
+    }
+
     // ── growth callback ──────────────────────────────────────────────────────
 
     onGrowthStageComplete(stage) {

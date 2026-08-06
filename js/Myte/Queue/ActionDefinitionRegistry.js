@@ -99,7 +99,8 @@ class ActionDefinitionRegistry {
             soothing: num(t.soothing),
             repeatMode: t.repeatMode ?? 'diminishing',
             ai: this._normalizeAiBlock(definition),
-            purposeOverrides: this._normalizePurposeOverrides(definition.purposeOverrides)
+            purposeOverrides: this._normalizePurposeOverrides(definition.purposeOverrides),
+            timedInteraction: Utility.deepClone(definition.timedInteraction ?? null)
         };
     }
 

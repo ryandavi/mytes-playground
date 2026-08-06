@@ -1,9 +1,10 @@
-const USER_DATA_VERSION = 2;
+const USER_DATA_VERSION = 3;
 const USER_DEFAULT_PREFERENCES = Object.freeze({
     soundEnabled: true,
     musicEnabled: true,
     ambientEnabled: true,
     footstepsEnabled: true,
+    spatialAudioEnabled: true,
     masterVolume: 1,
     sfxVolume: 0.82,
     footstepsVolume: 0.72,
@@ -18,10 +19,9 @@ const USER_DEFAULT_PREFERENCES = Object.freeze({
     animationsEnabled: true,
     timeOfDayOverlayEnabled: true,
     weatherEffectsEnabled: true,
-    difficulty: 'normal',
     tutorialsEnabled: true,
+    interactionHintsEnabled: true,
     autoSaveEnabled: true,
-    language: 'en',
     notificationsEnabled: true,
     // Set once the first-run hints have been shown, so returning players are not
     // re-onboarded. Turning `tutorialsEnabled` back on resets this (SettingsPanel).
@@ -46,6 +46,7 @@ class User {
         this.activeMytes = [];
         this.savedMytes = [];   // serialized myte state restored on load
         this.currentMapId = null;
+        this.worldState = { version: 1, maps: {} };
 
         // User preferences
         this.preferences = User.getDefaultPreferences();
@@ -85,16 +86,9 @@ class User {
     }
 
     serializeUserData() {
+        this.core?.getFirstContainer?.()?.worldState?.captureMap?.(this.core.getFirstContainer().gameMap);
         const trackedMytes = Array.isArray(this.activeMytes) ? this.activeMytes : [];
-        const inventoryData = this.inventory ?
-            this.inventory.items.map(item => ({
-                name: item.name,
-                quantity: item.quantity,
-                type: item.type,
-                variant: item.variant,
-                description: item.description || ''
-            })) :
-            this.items.map(item => ({
+        const inventoryData = (this.inventory?.items ?? this.items).map(item => ({
                 name: item.name,
                 quantity: item.quantity,
                 type: item.type,
@@ -109,6 +103,7 @@ class User {
             lastLogin: this.lastLogin,
             dateCreated: this.dateCreated,
             currentMapId: this.currentMapId,
+            worldState: this.worldState,
             inventory: inventoryData,
             mytes: trackedMytes.map((myte, index) => MyteRosterSchema.serializeMyte(myte, index)),
             preferences: this.preferences,
@@ -124,6 +119,9 @@ class User {
         this.lastLogin = userData.lastLogin ? new Date(userData.lastLogin) : this.lastLogin;
         this.dateCreated = userData.dateCreated ? new Date(userData.dateCreated) : this.dateCreated;
         this.currentMapId = userData.currentMapId ?? this.currentMapId;
+        this.worldState = userData.worldState?.version === 1
+            ? Utility.deepClone(userData.worldState)
+            : { version: 1, maps: {} };
 
         if (Array.isArray(userData.mytes)) {
             this.savedMytes = userData.mytes.map(m => ({ ...m }));
@@ -195,6 +193,11 @@ class User {
                 migrated.mytes = MyteRosterSchema.createStarterRoster(migrated.mytes);
             }
             migrated.data_version = 2;
+        }
+
+        if (migrated.data_version < 3) {
+            migrated.worldState = { version: 1, maps: {} };
+            migrated.data_version = 3;
         }
 
         if (migrated.data_version === USER_DATA_VERSION) {
@@ -340,29 +343,6 @@ class User {
         this.loadUserData();
     }
 
-    logout() {
-        this.saveUserData();
-        this.username = null;
-        this.userId = null;
-    }
-
-    // Myte management
-    addMyte(myte) {
-        this.activeMytes.push(myte);
-        this.stats.mytesHatched++;
-        this._scheduleSave();
-    }
-
-    removeMyte(myteId) {
-        const index = this.activeMytes.findIndex(myte => myte.id === myteId);
-        if (index !== -1) {
-            this.activeMytes.splice(index, 1);
-            this._scheduleSave();
-            return true;
-        }
-        return false;
-    }
-
     // Currency management
     setCurrency(type, total) {
         if (!Object.prototype.hasOwnProperty.call(this.currency, type)) return false;
@@ -408,20 +388,6 @@ class User {
         return false;
     }
 
-    // Achievement system
-    unlockAchievement(achievementId) {
-        if (!this.achievements.has(achievementId)) {
-            this.achievements.set(achievementId, {
-                unlockedDate: new Date(),
-                claimed: false
-            });
-            this.stats.achievementsUnlocked++;
-            this._scheduleSave();
-            return true;
-        }
-        return false;
-    }
-
     // Load data from JSON file
     async loadUserDataFromFile(fileName) {
         try {
@@ -453,6 +419,7 @@ class User {
         soundManager.musicEnabled     = p.musicEnabled;
         soundManager.ambientEnabled   = p.ambientEnabled ?? true;
         soundManager.footstepsEnabled = p.footstepsEnabled;
+        soundManager.spatialAudioEnabled = p.spatialAudioEnabled ?? true;
         soundManager.volume.master  = p.masterVolume;
         soundManager.volume.sfx     = p.sfxVolume;
         soundManager.volume.footsteps = p.footstepsVolume;
@@ -468,6 +435,7 @@ class User {
             'musicEnabled',
             'ambientEnabled',
             'footstepsEnabled',
+            'spatialAudioEnabled',
             'masterVolume',
             'sfxVolume',
             'footstepsVolume',
@@ -534,6 +502,7 @@ class User {
     // Debounced save — use this for frequent mutations (myte add/remove, currency, prefs).
     // Flushes at most once per 2 seconds; logout/unload calls saveUserData() directly.
     _scheduleSave() {
+        if (this.preferences.autoSaveEnabled === false) return;
         if (this._saveTimer) return;
         this._saveTimer = setTimeout(() => {
             this._saveTimer = null;

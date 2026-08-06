@@ -29,6 +29,7 @@
     "physics": {
       "walkable": true
     },
+    "capabilities": { "pickableFlower": true },
     "animation": "sway",
     "canInspect": false,
     "majorActionId": [
@@ -459,6 +460,7 @@
     "physics": {
       "walkable": true
     },
+    "capabilities": { "pickableFlower": true },
     "interaction": {
       "type": "mood_boost"
     },
@@ -574,6 +576,7 @@
     "physics": {
       "collision": true
     },
+    "capabilities": { "shakeable": true, "choppable": true },
     "canInspect": true,
     "label": "Pine Tree",
     "majorActionId": [
@@ -702,6 +705,7 @@
     "physics": {
       "collision": true
     },
+    "capabilities": { "removableStump": true },
     "canInspect": true,
     "label": "Tree Stump",
     "majorActionId": [
@@ -1432,6 +1436,14 @@
         }
       ]
     },
+    "actionConfigs": {
+      "interact_object": {
+        "labelByState": {
+          "enabled": "Turn Off {label}",
+          "disabled": "Turn On {label}"
+        }
+      }
+    },
     "aura": {
       "radius": 160,
       "checkInterval": 500
@@ -1734,10 +1746,14 @@
     "interaction": {
       "type": "tend"
     },
+    "capabilities": { "waterable": true, "harvestable": true },
     "majorActionId": [
       "harvest",
       "water_plant"
     ],
+    "actionConfigs": {
+      "harvest": { "label": "Harvest Crop" }
+    },
     "animation": "sway",
     "trampleResponse": {
       "enabled": true,
@@ -3399,6 +3415,27 @@
               "height": 8,
               "x": 18,
               "y": 36
+            },
+            "interaction": {
+              "type": "box",
+              "x": -4,
+              "y": -4,
+              "width": 58,
+              "height": 58
+            },
+            "select": {
+              "type": "box",
+              "x": 0,
+              "y": 0,
+              "width": 50,
+              "height": 50
+            },
+            "hit": {
+              "type": "box",
+              "x": 12,
+              "y": 12,
+              "width": 25,
+              "height": 25
             }
           },
           "anchors": {
@@ -4109,6 +4146,11 @@
           "purpose": "toggle"
         }
       ]
+    },
+    "actionConfigs": {
+      "interact_object": {
+        "labelByState": { "open": "Close Door", "closed": "Open Door" }
+      }
     },
     "canInspect": true,
     "directionConfigs": {
@@ -5692,6 +5734,9 @@
       "interact_object"
     ],
     "interactionOnly": true,
+    "actionConfigs": {
+      "interact_object": { "label": "Use Portal" }
+    },
     "particleEffects": true,
     "lightEmission": true,
     "canInspect": false,
@@ -6127,6 +6172,11 @@
           "purpose": "toggle"
         }
       ]
+    },
+    "actionConfigs": {
+      "interact_object": {
+        "labelByState": { "open": "Close Gate", "closed": "Open Gate" }
+      }
     },
     "autoConnect": false,
     "size": {

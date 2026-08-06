@@ -27,6 +27,10 @@ class DoorMapObject extends OpenableMapObject {
 
     emitToggleEvent(state) {
         if (!this.gameMap?.eventManager) return;
+        this.gameMap.eventManager.emit('world:action_availability_changed', {
+            object: this,
+            state
+        });
         this.gameMap.eventManager.emit(this.getToggleEventName(), {
             door: this,
             state,
@@ -457,5 +461,15 @@ class DoorMapObject extends OpenableMapObject {
                 }
             });
         }
+    }
+
+    serializeState() {
+        return { isOpen: this.isOpen };
+    }
+
+    restoreState(data = {}) {
+        this.isOpen = data.isOpen === true;
+        this.updateCollisionState();
+        this.updateElementState?.(this.isOpen ? 'open' : 'closed');
     }
 }

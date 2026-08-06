@@ -151,20 +151,10 @@ class NpcMapObject extends MovingMapObject {
 
 	renderIdentityPlate(element) {
 		const identity = this.getIdentity();
-		const plate = document.createElement('div');
-		plate.className = 'npc-nameplate';
-
-		const name = document.createElement('span');
-		name.className = 'npc-nameplate__name';
-		name.textContent = identity.name;
-		plate.appendChild(name);
-
-		if (identity.role) {
-			const role = document.createElement('span');
-			role.className = 'npc-nameplate__role';
-			role.textContent = identity.role;
-			plate.appendChild(role);
-		}
+		const plate = FloatingLabel.build('npc-nameplate', [
+			{ text: identity.name, className: 'npc-nameplate__name' },
+			{ text: identity.role, className: 'npc-nameplate__role' }
+		]);
 
 		element.appendChild(plate);
 		this.nameplateElement = plate;
@@ -294,6 +284,13 @@ class NpcMapObject extends MovingMapObject {
 				this.homeX + this.size.width  / 2,
 				this.homeY + this.size.height / 2
 			);
+		} else if (this.aiState === NPC_STATES.IDLE) {
+			// A blocked wander target would otherwise be retried forever
+			// (e.g. a hopping slime bouncing in place against an obstacle).
+			this.currentPath = null;
+			this.stopMoving();
+			this.wanderTimer = 0;
+			this._chooseWanderPath();
 		}
 	}
 

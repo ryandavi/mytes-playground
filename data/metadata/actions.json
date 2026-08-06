@@ -504,6 +504,10 @@
         "implementationClass": "HarvestAction",
         "options": { "harvestAnimationDuration": 833, "postActionIdleDuration": 500 }
       },
+      "timedInteraction": {
+        "phase": "harvest", "durationKey": "harvestAnimationDuration",
+        "sound": { "ids": ["obj_crop_tend", "obj_crop_harvest"], "intervalMs": 165, "jitterMs": 65, "volume": 0.72 }
+      },
       "traits": { "exertion": 1, "novelty": 3 },
       "effects": { "fun": 5, "energy": -1, "satiety": 10, "mood": 8 },
       "ai": {
@@ -805,6 +809,10 @@
         "implementationClass": "PickFlowerAction",
         "options": { "pickAnimationDuration": 750, "approachConfig": "adjacent" }
       },
+      "timedInteraction": {
+        "phase": "pick", "durationKey": "pickAnimationDuration", "postIdle": false,
+        "sound": { "ids": ["obj_flower_rustle", "obj_flower_pick"], "intervalMs": 180, "jitterMs": 65, "volume": 0.78 }
+      },
       "traits": { "novelty": 3, "soothing": 2 },
       "effects": { "fun": 5, "comfort": 2, "energy": -1, "mood": 4 },
       "ai": {
@@ -1051,6 +1059,10 @@
         "implementationClass": "TrampleFlowerAction",
         "options": { "approachConfig": "adjacent", "trampleAnimationDuration": 367, "postActionIdleDuration": 400 }
       },
+      "timedInteraction": {
+        "phase": "trample", "durationKey": "trampleAnimationDuration",
+        "sound": { "ids": ["obj_flower_trample_step", "obj_flower_trample"], "intervalMs": 100, "jitterMs": 35, "volume": 0.72 }
+      },
       "traits": { "exertion": 1, "novelty": 2 },
       "effects": { "fun": 3, "comfort": -2, "energy": -1, "mood": -3 },
       "ai": {
@@ -1147,6 +1159,10 @@
         "implementationClass": "WaterPlantAction",
         "options": { "waterAnimationDuration": 600, "postActionIdleDuration": 500 }
       },
+      "timedInteraction": {
+        "phase": "water", "durationKey": "waterAnimationDuration",
+        "sound": { "ids": ["obj_crop_tend"], "intervalMs": 150, "jitterMs": 50, "volume": 0.64 }
+      },
       "traits": { "exertion": 1, "novelty": 2, "soothing": 1 },
       "effects": { "fun": 3, "comfort": 2, "energy": -1, "mood": 4 },
       "ai": {
@@ -1193,6 +1209,7 @@
         "implementationClass": "ShakeTreeAction",
         "options": { "shakeAnimationDuration": 1000, "postActionIdleDuration": 1200 }
       },
+      "timedInteraction": { "phase": "shake", "durationKey": "shakeAnimationDuration", "onStartCall": "shake" },
       "traits": { "exertion": 2, "novelty": 4, "risk": 1 },
       "effects": { "fun": 6, "energy": -2, "mood": 5 },
       "ai": {
@@ -1218,6 +1235,7 @@
         "implementationClass": "ChopTreeAction",
         "options": { "chopAnimationDuration": 2000, "postActionIdleDuration": 1200 }
       },
+      "timedInteraction": { "phase": "chop", "durationKey": "chopAnimationDuration", "onStartCall": "chop" },
       "traits": { "exertion": 3, "novelty": 3, "risk": 1 },
       "effects": { "fun": 5, "energy": -3 },
       "ai": {
@@ -1243,6 +1261,7 @@
         "implementationClass": "RemoveStumpAction",
         "options": { "removeAnimationDuration": 1500, "postActionIdleDuration": 1200 }
       },
+      "timedInteraction": { "phase": "remove", "durationKey": "removeAnimationDuration", "onStartCall": "removeStump" },
       "traits": { "exertion": 2, "novelty": 2 },
       "effects": { "fun": 4, "energy": -2, "mood": 3 },
       "ai": {

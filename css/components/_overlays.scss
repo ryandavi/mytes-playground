@@ -20,8 +20,13 @@
         display: block;
     }
 
+    .ui-tooltip__title {
+        font-weight: 700;
+    }
+
     .ui-tooltip__body {
         margin-top: 2px;
+        font-weight: 400;
     }
 }
 
@@ -201,6 +206,63 @@
                     }
                 }
             }
+        }
+    }
+}
+
+// Sits over the stage until the browser's autoplay gate is cleared. Any click
+// anywhere clears it, so this only has to be visible and explain itself — the
+// button is for players who want something explicit to press.
+.audio-unlock {
+    position: absolute;
+    left: 50%;
+    bottom: var(--space-lg);
+    z-index: var(--z-overlay);
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: calc(100% - var(--space-3xl));
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    @include surface-raised;
+    filter: var(--shadow);
+    font-size: 11px;
+    line-height: 1.3;
+    opacity: 0;
+    transition: opacity var(--motion-base) var(--ease-ui);
+
+    &[hidden] {
+        display: none;
+    }
+
+    &.is-visible {
+        opacity: 1;
+    }
+
+    >.icon {
+        fill: var(--text-muted);
+        width: 16px;
+        height: 16px;
+    }
+
+    .audio-unlock__enable {
+        display: flex;
+        align-items: center;
+        gap: var(--space-xs);
+        padding: var(--space-xs) var(--space-md);
+        white-space: nowrap;
+
+        >.icon {
+            fill: var(--button-icon-color);
+            width: 16px;
+            height: 16px;
+        }
+    }
+
+    @media (max-width: 700px) {
+        .audio-unlock__text {
+            display: none;
         }
     }
 }

@@ -316,6 +316,25 @@ class MyteStats {
         return 'neutral';
     }
 
+    awardExperience({ accomplishment = 0, novelty = 0, exertion = 0 } = {}) {
+        const config = SiteConfig.myte.progression;
+        const gained = Math.max(0, Math.round(
+            config.baseXpPerAction +
+            Math.max(0, accomplishment) * config.accomplishmentWeight +
+            Math.max(0, novelty) * config.noveltyWeight +
+            Math.max(0, exertion) * config.exertionWeight
+        ));
+        this.experience += gained;
+        let threshold = Math.round(config.xpPerLevel * Math.pow(this.level, config.levelExponent));
+        while (this.experience >= threshold) {
+            this.experience -= threshold;
+            this.level++;
+            threshold = Math.round(config.xpPerLevel * Math.pow(this.level, config.levelExponent));
+            this.myte.parent?.eventManager?.emit?.('myte:level_up', { myte: this.myte, level: this.level });
+        }
+        return gained;
+    }
+
     _getMoodSpeedMultiplier() {
         switch (this.getDerivedMood()) {
             case 'excited':   return 1.5;
@@ -998,6 +1017,7 @@ class MyteStats {
             this.maybeSignalNeeds();
         }
         this.updateBatteryDisplay();
+        this.emitUiStateChange();
     }
 
     updateInHomeSlot(deltaTime) {
@@ -1018,6 +1038,22 @@ class MyteStats {
             this.updateHealth(cfg.homeSlotHealthRegenRate * dt);
         }
         this.updateBatteryDisplay();
+        this.emitUiStateChange();
+    }
+
+    emitUiStateChange() {
+        const stateKey = [
+            this.health,
+            this.energy,
+            this.fun,
+            this.social,
+            this.satiety,
+            this.comfort,
+            this.confidence * 100
+        ].map(value => Math.round(value)).join('|');
+        if (stateKey === this._lastUiStateKey) return;
+        this._lastUiStateKey = stateKey;
+        this.myte.parent?.eventManager?.emit('myte:stats_changed', { myte: this.myte });
     }
 
     // --- Status ---

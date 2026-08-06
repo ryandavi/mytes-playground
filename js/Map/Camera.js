@@ -267,6 +267,16 @@ class Camera {
 		};
 	}
 
+	// World-unit half-width/half-height of the visible viewport at the current
+	// zoom — used by SoundManager to scale spatial audio range with screen size.
+	getViewportWorldHalfExtents() {
+		const viewportRect = this.parent.getContainerRect();
+		return {
+			halfWidth: (viewportRect.width / 2) / this.zoomLevel,
+			halfHeight: (viewportRect.height / 2) / this.zoomLevel
+		};
+	}
+
 	zoomTo(zoom, options = {}) {
 		const previousZoom = this.targetZoomLevel;
 		const targetZoom = this._clampZoom(zoom);

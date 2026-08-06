@@ -127,7 +127,7 @@ class MyteRenderer {
 		}
 		// dataset.sortY is a devtools inspection aid only
 		if (document.body.classList.contains('debug')) {
-			this.duplicate.dataset.sortY = `${Math.round(this.getSortY(y) * 100) / 100}`;
+			EntityMethods.writeSortY(this.duplicate, this.getSortY(y));
 		}
 	}
 

@@ -21,6 +21,18 @@
 		<!-- HEADER-->
 		<div class="ignore header">
 			<div class="logo"><img src="images/logo.svg"></div>
+			<button type="button" class="hud-active-myte" hidden aria-label="Open active Myte details">
+				<svg class="icon" aria-hidden="true"><use href="#icon-paw"></use></svg>
+				<span class="hud-active-myte__content">
+					<span class="hud-active-myte__name">Myte</span>
+					<span class="hud-active-myte__meters">
+						<span class="hud-vital" data-vital="energy" title="Energy"><span></span></span>
+						<span class="hud-vital" data-vital="satiety" title="Satiety"><span></span></span>
+						<span class="hud-vital" data-vital="mood" title="Mood"><span></span></span>
+					</span>
+					<span class="hud-active-myte__thought"></span>
+				</span>
+			</button>
 			<div class="date-time">
 				<div class="clock">
 						<span class="clock__time">--:--</span>
@@ -125,6 +137,16 @@
 				</div>
 			</div>
 			<!-- END LOADING SCREEN -->
+			<!-- AUDIO UNLOCK PROMPT -->
+			<div class="audio-unlock ignore" id="audio-unlock" role="status" hidden>
+				<svg class="icon" aria-hidden="true"><use href="#icon-sound-off"></use></svg>
+				<span class="audio-unlock__text">Click anywhere to turn on sound.</span>
+				<button type="button" class="audio-unlock__enable" id="audio-unlock-button">
+					<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
+					<span class="text">Enable Sound</span>
+				</button>
+			</div>
+			<!-- END AUDIO UNLOCK PROMPT -->
 			<!-- CANVAS -->
 			<div class="canvas">
 				<!-- map objects -->
@@ -177,17 +199,6 @@
 	</div>
 	<!-- SOUND SETTINGS -->
 	<div id="sound-settings-panel" class="window-panel">
-		<div class="window-panel__header">
-			<h2 class="window-panel__title">
-				<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
-				<span class="text">Sounds Settings</span>
-			</h2>
-			<div class="window-panel__controls">
-				<button class="modal-minimize-btn"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
-				<button class="modal-fullscreen-btn"><svg class="icon" aria-hidden="true"><use href="#icon-maximize"></use></svg></button>
-				<button class="modal-close-btn"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
-			</div>
-		</div>
 		<div class="window-panel__content">
 			<div class="settings-group">
 				<div class="setting-item">
@@ -234,6 +245,12 @@
 						<label for="footsteps-enabled">Footsteps</label>
 					</div>
 				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" id="spatial-audio-enabled" checked>
+						<label for="spatial-audio-enabled">Spatial Audio</label>
+					</div>
+				</div>
 			</div>
 		</div>
 		<div class="window-panel__footer">
@@ -243,17 +260,6 @@
 	<!-- END SOUND SETTINGS -->
 	<!-- MYTE INFORMATION PANEL -->
 	<div id="myte-info-panel" class="window-panel myte-info">
-		<div class="window-panel__header">
-			<h2 class="window-panel__title">
-				<svg class="icon" aria-hidden="true"><use href="#icon-info"></use></svg>
-				<span class="text">Myte Information</span>
-			</h2>
-			<div class="window-panel__controls">
-				<button class="modal-minimize-btn" aria-label="Minimize"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
-				<button class="modal-fullscreen-btn" aria-label="Maximize"><svg class="icon" aria-hidden="true"><use href="#icon-maximize"></use></svg></button>
-				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
-			</div>
-		</div>
 		<div class="window-panel__content">
 			<div class="myte-info__summary">
 				<div class="myte-info__portrait" aria-hidden="true"></div>
@@ -262,29 +268,12 @@
 					<div class="myte-info__species">Species</div>
 				</div>
 			</div>
-			<div class="window-tabs myte-info__tabs" role="tablist" aria-label="Myte information">
-				<button id="myte-info-tab-general" type="button" role="tab" aria-controls="myte-info-tabpanel" data-myte-info-tab="general">General</button>
-				<button id="myte-info-tab-needs" type="button" role="tab" aria-controls="myte-info-tabpanel" data-myte-info-tab="needs">Needs</button>
-				<button id="myte-info-tab-behavior" type="button" role="tab" aria-controls="myte-info-tabpanel" data-myte-info-tab="behavior">Behavior</button>
-				<button id="myte-info-tab-drives" type="button" role="tab" aria-controls="myte-info-tabpanel" data-myte-info-tab="drives">Drives</button>
-				<button id="myte-info-tab-debug" type="button" role="tab" aria-controls="myte-info-tabpanel" data-myte-info-tab="debug" hidden>Debug</button>
-			</div>
 			<div id="myte-info-tabpanel" class="window-tab-body myte-info__body" role="tabpanel"></div>
 		</div>
 	</div>
 	<!-- END MYTE INFORMATION PANEL -->
 	<!-- USER PROFILE PANEL -->
 	<div id="user-profile-panel" class="window-panel user-profile">
-		<div class="window-panel__header">
-			<h2 class="window-panel__title">
-				<svg class="icon" aria-hidden="true"><use href="#icon-user"></use></svg>
-				<span class="text">User Profile</span>
-			</h2>
-			<div class="window-panel__controls">
-				<button class="modal-minimize-btn" aria-label="Minimize"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
-				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
-			</div>
-		</div>
 		<div class="window-panel__content user-profile__content">
 			<section class="user-profile__identity">
 				<div class="user-profile__avatar" aria-hidden="true">G</div>
@@ -293,10 +282,6 @@
 					<div class="user-profile__id">User ID: default</div>
 				</div>
 			</section>
-			<div class="window-tabs user-profile__tabs" role="tablist" aria-label="User profile">
-				<button type="button" role="tab" data-user-profile-tab="account">Account</button>
-				<button type="button" role="tab" data-user-profile-tab="progress">Progress</button>
-			</div>
 			<div class="window-tab-body user-profile__body" role="tabpanel"></div>
 		</div>
 	</div>
@@ -304,17 +289,6 @@
 
 	<!-- GAME SETTINGS PANEL -->
 	<div id="game-settings-panel" class="window-panel">
-		<div class="window-panel__header">
-			<h2 class="window-panel__title">
-				<svg class="icon" aria-hidden="true"><use href="#icon-gear"></use></svg>
-				<span class="text">Game Settings</span>
-			</h2>
-			<div class="window-panel__controls">
-				<button class="modal-minimize-btn"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
-				<button class="modal-fullscreen-btn"><svg class="icon" aria-hidden="true"><use href="#icon-maximize"></use></svg></button>
-				<button class="modal-close-btn"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
-			</div>
-		</div>
 		<div class="window-panel__content">
 			<!-- Graphics Settings -->
 			<div class="settings-group">
@@ -356,19 +330,16 @@
 			<!-- Gameplay Settings -->
 			<div class="settings-group">
 				<h3 class="settings-group-title">Gameplay</h3>
-				<div class="setting-item dropdown">
-					<label for="difficulty-select">Difficulty</label>
-					<select id="difficulty-select">
-						<option value="easy">Easy</option>
-						<option value="normal" selected>Normal</option>
-						<option value="hard">Hard</option>
-						<option value="nightmare">Nightmare</option>
-					</select>
-				</div>
 				<div class="setting-item">
 					<div class="checkbox-wrapper">
 						<input type="checkbox" id="tutorials-toggle" checked>
 						<label for="tutorials-toggle">Show Tutorials</label>
+					</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" id="interaction-hints-toggle" checked>
+						<label for="interaction-hints-toggle">Show Object Hints</label>
 					</div>
 				</div>
 				<div class="setting-item">
@@ -381,16 +352,6 @@
 			<!-- Miscellaneous Settings -->
 			<div class="settings-group">
 				<h3 class="settings-group-title">Miscellaneous</h3>
-				<div class="setting-item dropdown">
-					<label for="language-select">Language</label>
-					<select id="language-select">
-						<option value="en" selected>English</option>
-						<option value="es">Spanish</option>
-						<option value="fr">French</option>
-						<option value="de">German</option>
-						<option value="ja">Japanese</option>
-					</select>
-				</div>
 				<div class="setting-item">
 					<div class="checkbox-wrapper">
 						<input type="checkbox" id="notifications-toggle" checked>
@@ -417,18 +378,7 @@
 
 	<!-- VIEW PANEL -->
 	<div id="game-log-panel" class="window-panel">
-		<div class="window-panel__header">
-			<h2 class="window-panel__title">
-				<svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
-				<span class="text">Event Log</span>
-			</h2>
-			<div class="window-panel__controls">
-				<button class="modal-minimize-btn"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
-				<button class="modal-close-btn"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
-			</div>
-		</div>
 		<div class="window-panel__content game-log">
-			<div class="window-tabs game-log-filters" role="tablist" aria-label="Event categories"></div>
 			<div class="window-tab-body game-log-body" role="tabpanel" aria-label="Event entries">
 				<ul class="game-log-list"></ul>
 				<div class="window-empty-state game-log-empty">No events recorded yet.</div>
@@ -437,16 +387,6 @@
 	</div>
 	<!-- WORLD MAP PANEL -->
 	<div id="world-map-panel" class="window-panel world-map">
-		<div class="window-panel__header">
-			<h2 class="window-panel__title">
-				<svg class="icon" aria-hidden="true"><use href="#icon-world-map"></use></svg>
-				<span class="text">World Map</span>
-			</h2>
-			<div class="window-panel__controls">
-				<button class="modal-minimize-btn" aria-label="Minimize"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
-				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
-			</div>
-		</div>
 		<div class="window-panel__content world-map__content">
 			<div class="world-map__canvas"></div>
 			<div class="world-map__detail"></div>
@@ -454,16 +394,6 @@
 	</div>
 	<!-- END WORLD MAP PANEL -->
 	<div id="view-panel" class="window-panel">
-		<div class="window-panel__header">
-			<h2 class="window-panel__title">
-				<svg class="icon" aria-hidden="true"><use href="#icon-eye"></use></svg>
-				<span class="text">View</span>
-			</h2>
-			<div class="window-panel__controls">
-				<button class="modal-minimize-btn"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
-				<button class="modal-close-btn"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
-			</div>
-		</div>
 		<div class="window-panel__content">
 			<div class="settings-group">
 				<h3 class="settings-group-title">Zoom</h3>
@@ -502,17 +432,6 @@
 	<!-- END VIEW PANEL -->
 	<!-- GAME SETTINGS PANEL -->
 	<div id="game-debug-panel" class="window-panel">
-		<div class="window-panel__header">
-			<h2 class="window-panel__title">
-				<svg class="icon" aria-hidden="true"><use href="#icon-bug"></use></svg>
-				<span class="text">Debug Menu</span>
-			</h2>
-			<div class="window-panel__controls">
-				<button class="modal-minimize-btn"><svg class="icon" aria-hidden="true"><use href="#icon-minimize"></use></svg></button>
-				<button class="modal-fullscreen-btn"><svg class="icon" aria-hidden="true"><use href="#icon-maximize"></use></svg></button>
-				<button class="modal-close-btn"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
-			</div>
-		</div>
 		<div class="window-panel__content">
 
 		</div>
@@ -520,8 +439,7 @@
 	<!-- END GAME SETTINGS PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js" defer></script>
-	<script src="js/bundle.js?v=30e01c09e346"></script>
+	<script src="js/bundle.js?v=4365054ad907"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

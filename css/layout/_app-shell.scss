@@ -46,7 +46,7 @@
     >.header {
         flex: 0 0 100%;
         display: flex;
-        gap: var(--space-xl);
+        gap: var(--space-md);
         align-items: center;
         // Without these the header's nowrap contents plus the 2xl gap set a floor
         // of ~419px, which overhangs any phone viewport. Wrapping lets it reflow
@@ -68,6 +68,79 @@
                 height: 1.2em;
                 top: 0.125em;
                 position: relative;
+            }
+        }
+
+        >.hud-active-myte {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
+            box-sizing: border-box;
+            width: 180px;
+            height: 40px;
+            max-width: 100%;
+            flex: 0 0 180px;
+            padding: var(--space-2xs) var(--space-sm);
+            color: var(--text-base);
+            text-align: left;
+            @include surface-inset;
+
+            &[hidden] { display: none; }
+
+            >.icon {
+                width: 16px;
+                height: 16px;
+                flex: 0 0 auto;
+                fill: currentColor;
+            }
+
+            >.hud-active-myte__content {
+                display: grid;
+                grid-template-columns: auto minmax(0, 1fr);
+                grid-template-areas:
+                    "name thought"
+                    "meters meters";
+                gap: var(--space-2xs);
+                min-width: 0;
+                flex: 1;
+
+                >.hud-active-myte__name {
+                    grid-area: name;
+                    font-weight: 700;
+                }
+
+                >.hud-active-myte__meters {
+                    grid-area: meters;
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: var(--space-2xs);
+
+                    >.hud-vital {
+                        height: 5px;
+                        overflow: hidden;
+                        background: var(--surface-ui-inset);
+                        border: 1px solid var(--button-dark);
+
+                        >span {
+                            display: block;
+                            height: 100%;
+                            width: 0;
+                            background: var(--state-info-accent);
+                        }
+
+                        &[data-vital="satiety"] >span { background: var(--state-warning-accent); }
+                        &[data-vital="mood"] >span { background: var(--state-success-accent); }
+                    }
+                }
+
+                >.hud-active-myte__thought {
+                    grid-area: thought;
+                    overflow: hidden;
+                    color: var(--text-muted);
+                    font-size: 0.75em;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
             }
         }
 

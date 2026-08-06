@@ -666,6 +666,62 @@ function validateZones() {
     });
 }
 
+function validateAudioPresets() {
+    const presets = readJson('data/metadata/audio-presets.json');
+    if (!isPlainObject(presets) || Object.keys(presets).length === 0) {
+        fail('data/metadata/audio-presets.json must contain at least one preset.');
+        return;
+    }
+
+    const visitReferences = (value, nodeIds, label) => {
+        if (Array.isArray(value)) {
+            value.forEach((entry, index) => visitReferences(entry, nodeIds, `${label}[${index}]`));
+            return;
+        }
+        if (!isPlainObject(value)) return;
+        if (value.$node && !nodeIds.has(value.$node)) {
+            fail(`${label} references unknown audio node "${value.$node}".`);
+        }
+        Object.entries(value).forEach(([key, entry]) => visitReferences(entry, nodeIds, `${label}.${key}`));
+    };
+
+    Object.entries(presets).forEach(([presetId, preset]) => {
+        const label = `Audio preset "${presetId}"`;
+        if (!isPlainObject(preset)) {
+            fail(`${label} must be a plain object.`);
+            return;
+        }
+        if (typeof preset.type !== 'string') fail(`${label}.type must be a string.`);
+        if (preset.factory === 'footstep') {
+            if (!isPlainObject(preset.options)) fail(`${label}.options must be a plain object.`);
+            return;
+        }
+        if (preset.factory !== 'graph' || !Array.isArray(preset.graph?.nodes)) {
+            fail(`${label} must use a graph or footstep factory.`);
+            return;
+        }
+
+        const nodeIds = new Set();
+        preset.graph.nodes.forEach((node, index) => {
+            if (!isPlainObject(node) || typeof node.id !== 'string' || typeof node.type !== 'string') {
+                fail(`${label}.graph.nodes[${index}] requires string id and type.`);
+                return;
+            }
+            if (nodeIds.has(node.id)) fail(`${label} duplicates node id "${node.id}".`);
+            nodeIds.add(node.id);
+        });
+        preset.graph.nodes.forEach((node, index) => {
+            (node.connections ?? []).forEach(targetId => {
+                if (!nodeIds.has(targetId)) {
+                    fail(`${label}.graph.nodes[${index}] connects to unknown node "${targetId}".`);
+                }
+            });
+            visitReferences(node.args, nodeIds, `${label}.graph.nodes[${index}].args`);
+        });
+        visitReferences(preset.output, nodeIds, `${label}.output`);
+    });
+}
+
 function run() {
     validateNoLegacyFiles();
     validateMytes();
@@ -674,6 +730,7 @@ function run() {
     validateActions();
     validateMapObjects();
     validateZones();
+    validateAudioPresets();
 
     if (warnings.length) {
         console.warn('Warnings:');

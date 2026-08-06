@@ -22,7 +22,8 @@ class MyteRubbingHandler extends MyteBaseHandler {
 	_applyPettingResult(rubCount, overdone) {
 		const sounds = SiteConfig.ui.interactionSounds;
 		this.myte.parent?.core?.soundManager?.playWhenReady?.(
-			overdone ? sounds.petOverdone : sounds.pet
+			overdone ? sounds.petOverdone : sounds.pet,
+			{ source: this.myte }
 		);
 
 		this.myte.queue.interrupt('expression', {

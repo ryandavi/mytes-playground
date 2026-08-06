@@ -1,8 +1,7 @@
 [
   {
-    "src": "https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js",
-    "cdn": true,
-    "commentLine": "<!-- EXTERNAL -->"
+    "src": "js/vendor/Tone.min.js",
+    "commentLine": "<!-- VENDORED -->"
   },
   {
     "src": "js/Engine/Config/AppConfig.js",
@@ -21,7 +20,13 @@
     "src": "js/UI/Core/IconSprite.js"
   },
   {
+    "src": "js/UI/Core/PanelRegistry.js"
+  },
+  {
     "src": "js/UI/Core/TooltipSystem.js"
+  },
+  {
+    "src": "js/UI/Core/FloatingLabel.js"
   },
   {
     "src": "js/Engine/ItemRegistry.js"
@@ -70,7 +75,13 @@
     "blankLineBefore": true
   },
   {
+    "src": "js/UI/Core/AudioUnlockPrompt.js"
+  },
+  {
     "src": "js/Engine/SimClock.js"
+  },
+  {
+    "src": "js/Engine/Notify.js"
   },
   {
     "src": "js/Engine/Core.js"
@@ -80,6 +91,42 @@
   },
   {
     "src": "js/Engine/SpriteAnimator.js"
+  },
+  {
+    "src": "js/Effects/Particles/ParticleMath.js"
+  },
+  {
+    "src": "js/Effects/Particles/ParticleDataUtils.js"
+  },
+  {
+    "src": "js/Effects/Particles/ParticleRandom.js"
+  },
+  {
+    "src": "js/Effects/Particles/ParticlePool.js"
+  },
+  {
+    "src": "js/Effects/Particles/ParticlePointTracker.js"
+  },
+  {
+    "src": "js/Effects/Particles/ParticleRendererPool.js"
+  },
+  {
+    "src": "js/Effects/Particles/ParticleRenderer.js"
+  },
+  {
+    "src": "js/Effects/Particles/ParticleBehaviorRegistry.js"
+  },
+  {
+    "src": "js/Effects/Particles/ParticleConfigResolver.js"
+  },
+  {
+    "src": "js/Effects/Particles/ParticleDebugSystem.js"
+  },
+  {
+    "src": "js/Effects/Particles/ParticleEmitter.js"
+  },
+  {
+    "src": "js/Effects/Particles/Particle.js"
   },
   {
     "src": "js/Effects/ParticleSystem.js"
@@ -228,6 +275,9 @@
   },
   {
     "src": "js/Map/GameMapLoader.js"
+  },
+  {
+    "src": "js/Map/WorldState.js"
   },
   {
     "src": "js/Map/WorldGraph.js"

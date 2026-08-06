@@ -23,7 +23,13 @@ class ActionManager {
         const config = selected?.getActionConfig?.(actionId, null);
         if (!config || typeof config !== 'object') return {};
         const out = {};
-        if (config.label) out.label = config.label;
+        const stateToken = selected?.getActionStateToken?.();
+        const stateLabel = stateToken ? config.labelByState?.[stateToken] : null;
+        const label = stateLabel ?? config.label;
+        if (label) {
+            const objectLabel = selected?.getDisplayName?.() || selected?.type || 'Object';
+            out.label = String(label).replaceAll('{label}', objectLabel);
+        }
         if (config.description) out.description = config.description;
         const priority = Number(config.priority);
         if (Number.isFinite(priority)) out.priority = priority;
@@ -151,14 +157,6 @@ class ActionManager {
         return { ...metadata.defaultOptions, ...options };
     }
 
-    // One-call helper: resolve options and enqueue on a Myte
-    static enqueue(actionId, myte, selected) {
-        const options = this.getActionOptions(actionId, selected, myte);
-        if (!options) return false;
-        myte.queue.add(actionId, options);
-        return true;
-    }
-
     static getAvailableActions(selected, active) {
         const available = [];
         for (const [id, ActionClass] of this.actions) {
@@ -171,33 +169,6 @@ class ActionManager {
             }
         }
         return available.sort((a, b) => a.priority - b.priority);
-    }
-
-    static getActionsByCategory(selected, active) {
-        return this.getAvailableActions(selected, active).reduce((groups, action) => {
-            const cat = action.category;
-            if (!groups[cat]) groups[cat] = [];
-            groups[cat].push(action);
-            return groups;
-        }, {});
-    }
-
-    static getMovementActions() {
-        return Array.from(this.actions.entries())
-            .filter(([id, ActionClass]) => this.getMetadata(id, ActionClass)?.isMovementAction)
-            .map(([, ActionClass]) => ActionClass);
-    }
-
-    static getInterruptibleActions() {
-        return Array.from(this.actions.entries())
-            .filter(([id, ActionClass]) => this.getMetadata(id, ActionClass)?.isInterruptible)
-            .map(([, ActionClass]) => ActionClass);
-    }
-
-    static getMoodAffectingActions() {
-        return Array.from(this.actions.entries())
-            .filter(([id, ActionClass]) => (this.getMetadata(id, ActionClass)?.effects?.mood ?? 0) !== 0)
-            .map(([, ActionClass]) => ActionClass);
     }
 
     static validateDefinitions() {

@@ -246,9 +246,9 @@ class AStarMoveAction extends MyteAction {
 
         if (this._actionComplete && this.userInitiated) {
             const targetName = this.getQueueTargetLabel(this.target);
-            MyteCore.instance?.toastManager?.warning(
+            this.myte.container?.notify?.warn(
                 `${this.myte.name} can't find a path${targetName ? ` to ${targetName}` : ''}.`,
-                "Can't Reach"
+                { title: "Can't Reach" }
             );
         }
     }
@@ -362,9 +362,9 @@ class AStarMoveAction extends MyteAction {
             if (this.userInitiated && !this._abortToastShown) {
                 this._abortToastShown = true;
                 const targetName = this.getQueueTargetLabel(this.target);
-                MyteCore.instance?.toastManager?.warning(
+                this.myte.container?.notify?.warn(
                     `${this.myte.name} got stuck and can't reach ${targetName || 'that location'}.`,
-                    "Can't Reach"
+                    { title: "Can't Reach" }
                 );
             }
             return false;
@@ -455,9 +455,9 @@ class GoToObjectAction extends PositionableAction {
             if (this.userInitiated && !this._abortToastShown) {
                 this._abortToastShown = true;
                 const targetName = this.getQueueTargetLabel(this.target);
-                MyteCore.instance?.toastManager?.warning(
+                this.myte.container?.notify?.warn(
                     `${this.myte.name} can't reach ${targetName || 'that location'}.`,
-                    "Can't Reach"
+                    { title: "Can't Reach" }
                 );
             }
         }
@@ -617,7 +617,7 @@ class GoToObjectAction extends PositionableAction {
         this._resolvedApproachConfig = this._resolveApproachConfig();
         this.buildApproachPlan();
         this._lastTargetSnapshot = this._captureTargetSnapshot();
-        this._lastTargetReplanAt = performance.now();
+        this._lastTargetReplanAt = SimClock.now();
 
         // If buildApproachPlan found no reachable position, abort immediately
         // rather than walking to the nearest fence wall.
@@ -967,7 +967,7 @@ class GoToObjectAction extends PositionableAction {
     }
 
     update() {
-        const now = performance.now();
+        const now = SimClock.now();
         if (this._targetMovedSignificantly() && now - this._lastTargetReplanAt >= 150) {
             this.currentTargetIndex = 0;
             this.buildApproachPlan();
@@ -1003,7 +1003,7 @@ class GoToObjectAction extends PositionableAction {
             this._blacklistApproachPos(this.targetPos);
             this.buildApproachPlan();
             this._lastTargetSnapshot = this._captureTargetSnapshot();
-            this._lastTargetReplanAt = performance.now();
+            this._lastTargetReplanAt = SimClock.now();
             if (!this.targetPos && !this.targetPoints) {
                 this.markApproachOutcome('aborted');
                 return true;
@@ -1044,7 +1044,7 @@ class GoToObjectAction extends PositionableAction {
                 this._blacklistApproachPos(this.targetPos);
                 this.buildApproachPlan();
                 this._lastTargetSnapshot = this._captureTargetSnapshot();
-                this._lastTargetReplanAt = performance.now();
+                this._lastTargetReplanAt = SimClock.now();
                 if (!this.targetPos && !this.targetPoints) {
                     this.markApproachOutcome('aborted');
                     return true;
@@ -1104,7 +1104,7 @@ class GoToObjectAction extends PositionableAction {
                 this._blacklistApproachPos(this.targetPos);
                 this.buildApproachPlan();
                 this._lastTargetSnapshot = this._captureTargetSnapshot();
-                this._lastTargetReplanAt = performance.now();
+                this._lastTargetReplanAt = SimClock.now();
 
                 if (this.targetPoints?.length || this.targetPos) {
                     return false;

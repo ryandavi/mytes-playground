@@ -149,7 +149,6 @@ class UserInterface {
         this.debugOverlay.update();
         this.cursorManager.update();
         this.queueTargetManager.update();
-        this.actionSidebarManager.update();
         this.hudManager.update();
         this.buffOverlayUI.update();
         this.offscreenMyteIndicatorManager.update();

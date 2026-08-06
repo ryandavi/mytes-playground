@@ -203,9 +203,9 @@ class Myte {
 
 	startWithOptions(options = {}) {
 		if (!this.isActive && this.buffs?.findBuffById?.('recovering')) {
-			MyteCore.instance?.toastManager?.warning(
+			this.container?.notify?.warn(
 				`${this.name} is still recovering.`,
-				'Recovering'
+				{ title: 'Recovering' }
 			);
 			return false;
 		}
@@ -896,11 +896,11 @@ class Myte {
 
 		const normalized = String(sound).trim();
 		if (/^(ui_|obj_|env_|music_|footstep_)/.test(normalized)) {
-			soundManager.play(normalized);
+			soundManager.play(normalized, { source: this });
 			return;
 		}
 
-		soundManager.playMyteSound(normalized, { species: this.species });
+		soundManager.playMyteSound(normalized, { species: this.species, source: this });
 	}
 
 	playSlotEnterSound() { this.playSound('slot_enter'); }

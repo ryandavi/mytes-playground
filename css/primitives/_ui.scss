@@ -119,8 +119,10 @@
     position: absolute;
     top: var(--floating-help-paper-top, calc(100% + 8px));
     left: var(--floating-help-paper-left, 0);
-    min-width: var(--floating-help-paper-min-width, 180px);
-    max-width: var(--floating-help-paper-max-width, min(240px, 60vw));
+    width: max-content;
+    min-width: 0;
+    max-width: var(--floating-help-paper-max-width, min(280px, calc(100vw - (var(--space-lg) * 2))));
+    overflow-wrap: anywhere;
     text-align: left;
     opacity: 0;
     transform: translateY(var(--floating-help-paper-offset, -4px));
