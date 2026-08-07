@@ -929,6 +929,10 @@
     "capabilities": {
       "musicSource": true
     },
+    "draggable": true,
+    "dragInSelectMode": true,
+    "storable": true,
+    "snapToGrid": true,
     "aura": {
       "radius": 180,
       "moodBoost": 0.15,
@@ -949,7 +953,16 @@
     },
     "visual": {
       "renderPriority": 2,
-      "animates": true
+      "animates": true,
+      "spriteSheet": {
+        "url": "images/MapObjects/music_box.png",
+        "frameSize": {
+          "width": 100,
+          "height": 100,
+          "offsetX": 18,
+          "offsetY": 36
+        }
+      }
     },
     "soundEffects": {
       "on": "ui_select",
@@ -1026,31 +1039,13 @@
     "consumable": true,
     "variantConfigs": {
       "apple": {
-        "label": "Apple",
-        "effects": {
-          "energy": 22,
-          "fun": 10,
-          "health": 5,
-          "satiety": 35
-        }
+        "label": "Apple"
       },
       "turnip": {
-        "label": "Turnip",
-        "effects": {
-          "energy": 14,
-          "fun": 4,
-          "health": 2,
-          "satiety": 22
-        }
+        "label": "Turnip"
       },
       "acorn": {
-        "label": "Acorn",
-        "effects": {
-          "energy": 9,
-          "fun": 6,
-          "health": 1,
-          "satiety": 16
-        }
+        "label": "Acorn"
       }
     },
     "spatial": {
@@ -1102,6 +1097,9 @@
     "physics": {
       "collision": true
     },
+	"capabilities": {
+	  "lootContainer": true
+	},
     "interaction": {
       "type": "open"
     },
@@ -1116,10 +1114,11 @@
     "scale": 2,
     "interactionTouchThreshold": 16,
     "approachConfig": {
-      "allowedSides": [
-        "bottom"
-      ],
+      "allowedSides": "any",
+      "preferredSide": "bottom",
       "align": "center",
+      "alignTo": "collider",
+      "myteAlignTo": "collider",
       "gap": 0
     },
     "spatial": {
@@ -1264,6 +1263,20 @@
     "physics": {
       "collision": true
     },
+	"capabilities": {
+	  "drinkSource": true
+	},
+	"ai": {
+	  "affordances": [
+		{
+		  "actionId": "drink_fountain",
+		  "purpose": "soothe",
+		  "when": {
+			"capability": "drinkSource"
+		  }
+		}
+	  ]
+	},
     "interaction": {
       "type": "mood_boost",
       "radius": 150
@@ -4419,6 +4432,8 @@
       "sittable": true
     },
     "draggable": true,
+    "dragInSelectMode": true,
+    "storable": true,
     "snapToGrid": true,
     "ai": {
       "affordances": [
@@ -5625,6 +5640,11 @@
       }
     },
     "spatial": {
+      "autoFitRegions": [
+        "interaction",
+        "hit",
+        "select"
+      ],
       "regions": {
         "collider": {
           "type": "box",
@@ -5666,6 +5686,8 @@
       "walkable": true
     },
     "draggable": true,
+    "dragInSelectMode": true,
+    "storable": true,
     "snapToGrid": true,
     "size": {
       "width": 192,

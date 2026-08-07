@@ -34,7 +34,17 @@ const EntityMethods = {
 			null;
 	},
 
+	getAttachmentSystem() {
+		return this.container?.attachments ??
+			this.parent?.attachments ??
+			this.gameMap?.parent?.attachments ??
+			this.parent?.gameMap?.parent?.attachments ??
+			null;
+	},
+
 	get currentRooms() {
+		const parent = this.getAttachmentSystem()?.getAttachment(this)?.parent;
+		if (parent) return parent.currentRooms ?? [];
 		return this.getRegionManager()?.getMembership(this, 'room') ?? [];
 	},
 

@@ -1,171 +1,201 @@
 # Remaining Architecture Work — August 2026
 
-**Source:** `docs/ARCHITECTURE_AUDIT_2026-07.md` and its addenda  
-**Reconciled against:** the current working tree on 2026-08-05  
-**Purpose:** a clean execution list containing only work that is still open, without the July audit's completed implementation history.
+**Reconciled against:** the working tree on 2026-08-06  
+**Current owner decision:** wall implementation remains postponed; long-duration performance tests are not required.  
+**Detailed wall contract:** [`WALL_SYSTEM_AND_SPRITESHEET_SPEC_2026-08.md`](WALL_SYSTEM_AND_SPRITESHEET_SPEC_2026-08.md)
 
 ## Executive summary
 
-The foundation work is substantially complete. World registration and queries, relationship cleanup, sockets and attachments, data-driven capabilities and affordances, shared movement plumbing, spatial regions, authored room semantics, follower trails, pathfinder final-pass work, stat retuning, persistence hardening, and the five-minute invariant autoplay have all landed.
+All non-wall work previously listed in this document is complete. The only unfinished architecture milestone is the intentionally postponed wall system:
 
-The remaining architecture-critical sequence is:
+1. T10 — wall generation and walls-up/walls-down/cutaway rendering.
+2. T11 — independent face finishes, persistence, openings, and wall attachments.
+3. The wall-specific portion of T12 — schema validation and invariants that cannot exist until T10/T11 do.
 
-1. Build the wall prototype and its render modes (**T10 / roadmap Phase 11**).
-2. Add persistent wall customization and wall-face attachments (**T11 / roadmap Phase 12**).
-3. Complete wall-aware schema validation and the formal browser regression gate (**T12 / Phase 14**).
-4. Run the long-session performance and heap protocols (**Phase 13**).
-5. Complete the editor PHP security review before any public hosting.
+Long-session trace/heap work has been removed from the completion gate by owner direction. Wall implementation must still receive proportional performance validation when it eventually lands, using the pre-wall DOM baseline below.
 
-Walls are therefore the next implementation milestone, not an exploratory future item. `SpatialRegion`, room membership, door-room topology, `SocketSet`, and `AttachmentSystem` already provide their prerequisites.
+## 1. Postponed wall work
 
-## 1. Architecture-critical implementation
+### 1.1 T10 — wall generation and render modes
 
-### 1.1 T10 — WallBuilder, WallRun, and render modes
+**Status:** postponed; not implemented.
 
-**Status:** not started. The expected files `js/Map/Walls/WallBuilder.js` and `js/Map/Walls/WallRun.js` do not exist.
+Expected new runtime files remain absent:
 
-Implement the wall architecture specified in the July audit:
+- `js/Map/Walls/WallBuilder.js`
+- `js/Map/Walls/WallRun.js` or an equivalent render-segment class
 
-- Author wall bases in a Tiled wall layer, starting with House.
-- Merge contiguous compatible wall cells into render-only `WallRun` segments; do not create a ticking interactive entity per tile.
-- Compose each run from repeatable body/top/cap pieces and keep collision in grid data.
-- Mark wall cells for the existing line-of-sight system.
-- Add **walls up**, **walls down**, and **cutaway** display modes to the View panel.
-- Re-evaluate cutaway on active-Myte room changes or meaningful camera movement, not every frame.
-- Keep collision, room membership, and line of sight unchanged when only the visual mode changes.
+Required outcome:
 
-**Dependencies already landed:** room regions, `currentRoomId`, door-room topology, grid collision, LOS checks, depth sorting, and View-panel infrastructure.
+- Author semantic wall-base cells on a Tiled `Walls` layer, starting with House.
+- Compute a fence-style N/E/S/W four-bit neighbor mask at map load.
+- Resolve all 16 raw masks into isolated/end/straight/corner/T/cross construction pieces.
+- Merge horizontal straight centers where safe; keep vertical walls depth-safe through per-cell or short segments.
+- Render walls as non-interactive geometry with no per-wall tick.
+- Add walls-up, walls-down, and cutaway modes.
+- Cut away the obscuring south/front boundary only; north/back and east/west side walls remain full height.
+- Keep collision, LOS, rooms, and door topology identical across visual modes.
 
-**External decision/input still needed:** confirm the first wall material asset. The audit permits a placeholder for the prototype, but the repeatable strip/cap/top layout must be settled before production art is authored.
+The old July repeated-strip proposal is no longer authoritative. The complete replacement design, including sprite dimensions and layer packing, is in the dedicated wall specification linked above.
 
-**Acceptance gate:**
+### 1.2 T11 — face finishes, openings, persistence, and attachments
 
-- House renders three-tile-high wall runs.
-- Walls-down retains identical collision.
-- Cutaway reveals the active Myte indoors.
-- Pathfinding and LOS respect walls.
-- Grid state is byte-identical across visual mode switches.
-- Run count stays within roughly twice the room-perimeter estimate.
-- The largest map maintains 60 fps and stays within the DOM budget established before implementation.
+**Status:** blocked on T10; not implemented.
 
-### 1.2 T11 — Wall customization and wall-face attachments
+Required outcome:
 
-**Status:** blocked on T10; not started. `data/map-objects/wall-materials.json` does not exist.
+- Add `data/map-objects/wall-materials.json` with separate construction and finish registries.
+- Store material independently on cardinal faces (`north`, `south`, `east`, `west`).
+- Derive interior/exterior from the adjacent room; support two interior faces on a room-to-room wall.
+- Persist finish overrides against map cell ranges plus face, never generated run ids.
+- Model doors/windows as reserved gaps with jambs; window cells clear LOS where declared.
+- Expose face surface sockets using the existing attachment system.
+- Reserve attachment intervals and reject overlaps.
+- Make attached decorations follow their owning face’s cutaway visibility.
+- Add editor support in the same schema-changing work.
 
-Implement:
+### 1.3 Wall-specific T12 closure
 
-- `wall-materials.json` using the common sprite-sheet cell layout from the audit.
-- Independent per-face material ids for interior/exterior faces.
-- Stable wall-run ids and `wallCustomizations` overrides that survive regeneration.
-- Map-scoped serialization of paint/wallpaper/custom material state.
-- Face surface sockets with interval reservation.
-- Painting attachment through the existing `AttachmentSystem`.
-- Window gaps that split run segments and clear LOS blocking for their cells.
-- Cutaway behavior that hides attached wall decorations with their owning segment.
-- Editor support for the new schema in the same change set.
+After T10/T11 land:
 
-**Acceptance gate:** paint survives map reload and wall regeneration; a painting attaches through the generic attachment API, survives mode switches, and hides in cutaway; overlapping face placements are rejected; window gaps affect rendering and LOS without corrupting room topology.
+- Validate construction/finish sheets, mask maps, face overrides, gaps, and customization records.
+- Assert deterministic segment ids for diagnostics while ensuring persistence does not depend on them.
+- Add face-interval, attachment-ownership, and regeneration-cleanup invariants.
+- Assert byte-identical grid/LOS/room state across wall display modes.
+- Run a focused browser matrix for all wall modes, editor save/reload, paint persistence, paintings, doors, and windows.
 
-### 1.3 Phase 9 conversion closure audit
+## 2. Wall art contract at a glance
 
-**Status:** no explicit completion ledger exists for the roadmap's “map-object conversion sweep.” Most enabling work landed through T6 and T7, so this should be a focused closure audit, not a new subsystem.
+The detailed specification is authoritative. These are the asset-author essentials:
 
-Confirm that remaining object-specific occupancy and interaction state is expressed through sockets, capabilities, affordances, and relationships where appropriate. In particular, review chest occupancy, fountain drink approaches, bed sleep sockets, and any legacy surface-slot branches. Delete only code proven superseded by the shared systems.
+- Map cell: 32 px.
+- Prototype full height: 96 px/three cells.
+- Walls are painted as logical one-cell bases in Tiled.
+- Structural connection frames begin as 16 columns, one per raw neighbor mask.
+- Each full frame canvas is 32 × 96 px.
+- Each walls-down stub frame is 32 × 28 px by default.
+- Construction art contains tops, caps, corners, junctions, and jamb trim.
+- Paint/wallpaper is a transparent directional face overlay, separate from construction.
+- Finish sheets provide aligned north/south/east/west full and stub pieces.
+- East and west finish pieces remain separate because the two sides may use different materials.
+- Horizontal centers may repeat along X; vertical pieces must preserve local depth sorting.
+- Exact atlas rectangles live in `wall-materials.json`, never renderer constants.
 
-**Acceptance gate:** a new sittable and a new edible type are discoverable from data alone; no type-name branch is needed in Myte AI; couch/bed/chest/fountain behavior remains unchanged.
+## 3. Non-wall architecture work completed on 2026-08-06
 
-## 2. Region and attachment follow-through
+### 3.1 Phase 9 conversion closure
 
-### 2.1 Author a real irregular-room fixture
+The remaining chest/fountain/bed sweep is closed:
 
-`SpatialRegion` supports `tilemask`, but no map currently authors a tilemask room. Add an L-shaped room fixture and verify `contains()` at its concave corner. This closes architectural acceptance criterion 7 with real map data rather than unit-level capability alone.
+- BED already uses directional `SocketSet` sleep sockets; no legacy rest-position occupancy ledger remains.
+- FOUNTAIN now advertises `capabilities.drinkSource` and its AI affordance is data in `types.json`; `DrinkFromFountainAction` checks the capability rather than the class name.
+- TREASURE_CHEST now advertises `capabilities.lootContainer`; open/close actions check that capability rather than constructor names.
+- Chest animation/open state is intrinsic object state, not shared occupancy, so converting it into a socket or relationship would be artificial.
+- Fountain approach remains the shared adjacent `GoToObjectAction` approach contract; it does not need a reserved seat-like socket.
+- New sittable and edible types remain discoverable from data with no MyteAI type branch.
 
-### 2.2 Attached-child room inheritance
+### 3.2 Authored irregular-room fixture
 
-The audit's mounted-entity scenario requires attached children to inherit room membership from their parent and skip redundant scans while attached. Current `Entity.currentRooms` reads only the entity's own RegionManager membership and does not consult `AttachmentSystem.getAttachment(child)`.
+Complete:
 
-Add parent membership inheritance for attached children, then restore independent membership on detach. Verify a carried/seated Myte crosses a room boundary with its parent and reports the same `currentRoomId` without a second region scan.
+- Added `data/maps/RegionTest.tmx` with an authored `tilemask="111/100/100"` L-shaped room.
+- `TileMapLoader` parses compact object-local tilemasks into absolute grid cells.
+- `MapEnvironmentManager` preserves tilemasks when registering room regions.
+- Content validation asserts both arms are present and the concave cell remains outside.
+- Browser verification confirmed the runtime shape is `tilemask`, its three arm probes are inside, and the concave-corner probe is outside.
 
-### 2.3 Deferred enclosure and zone choices
+### 3.3 Attached-child room inheritance
 
-- Auto flood-fill room/enclosure generation remains deferred until after the wall system; it must emit the same `SpatialRegion` schema as authored rooms.
-- Whether ambient creatures receive zone effects remains a gameplay/data decision. The mechanism exists; opt in per creature type only after deciding desired behavior.
+Complete:
 
-## 3. Validation, regression, and performance gates
+- `Entity.currentRooms` follows the attachment parent while attached.
+- Attaching removes stale independent room membership from reverse occupant sets.
+- `GameMap` skips redundant room scans for attached Mytes.
+- Detaching forces immediate independent membership recomputation.
+- Browser verification moved an attached Myte into and out of the L-shaped room through its parent, confirmed zero independent scans/membership while attached, then confirmed correct room restoration on detach.
 
-### 3.1 Finish T12 / Phase 14 after walls land
+## 4. Player-experience work completed on 2026-08-06
 
-Current coverage already includes capabilities, sockets, spatial-region shapes, registry/relationship/attachment invariants, and a clean five-minute autoplay recording. Remaining work is:
+### 4.1 Mobile action treatment
 
-- Extend `scripts/validate-content-data.js` for wall materials, run ids, face overrides, gaps, and customization records.
-- Extend invariant checks for WallRun ids, face intervals, attachment ownership, and regeneration cleanup.
-- Add wall-mode grid/LOS equality assertions.
-- Run the full manual browser smoke matrix, especially drag, rub, long-press, surface-slot actions, carry, door opening, map transitions, wall modes, and editor save/reload.
-- Keep editor schema handling in lockstep with every new wall field.
+The provisional narrow-screen overlay is replaced by a dismissible bottom drawer:
 
-### 3.2 Phase 13 performance and heap protocol
+- fixed to the lower viewport at widths up to 960 px
+- constrained to 70dvh/scene height
+- uses the existing raised Windows-style panel and button treatment
+- includes an accessible close button
+- closes on Escape
+- clears selection on dismiss so selecting a target reopens it predictably
 
-The formal profile/heap gate remains open even though the five-minute invariant autoplay is green.
+Browser verification at 390 × 844 confirmed fixed positioning, visible controls, a reachable close button, and selection cleanup.
 
-Run and record:
+### 4.2 Contrast
 
-- A pre-wall DOM node count and an explicit wall DOM budget.
-- A 60-second DevTools trace on the busiest map with all creatures active: no long task over 50 ms, no layout thrash, and flat style-recalculation behavior.
-- A 30-minute autoplay with ten map transitions and three heap snapshots.
-- Detached-DOM, listener, timer, registry, relationship, attachment, and socket-occupancy diffs after forced GC.
-- Affordance-evaluation allocation/GC pressure under load.
+The shared text tokens now provide:
 
-**Acceptance gate:** heap is flat after despawn/transition cycles and there is no listener or timer growth.
+- `--text-default` as the canonical alias for `--text-base`
+- `--text-muted: #5b5a51`
+- `--text-subtle: #49483f`
 
-## 4. Player-experience work still open
+The muted token measures approximately 5.28:1 against the primary `#ece9d8` application surface, clearing WCAG AA’s 4.5:1 threshold for normal/small text. Disabled-control colors are not used as ordinary informational text.
 
-These are not wall prerequisites, but the July audit explicitly leaves them unfinished:
+### 4.3 Welcome-back moment
 
-1. **Mobile action sidebar treatment.** The current narrow-screen overlay is documented in SCSS as provisional. Design and implement a reachable, dismissible drawer or bottom-sheet treatment that fits the Windows 98–XP visual language.
-2. **Contrast check.** Reduced motion is complete, but small text and muted text on tan surfaces still need a measured contrast review and corrections through design tokens.
-3. **Welcome-back moment.** Persistence is hardened, but returning after time away has no acknowledgement or summary. Define what elapsed time and stat changes should be communicated without punishing absence.
+Save schema version 4 records `lastSavedAt`. Returns after six hours receive a short elapsed-time toast stating that Mytes are unchanged and time away never drains their needs. There is no offline stat decay or absence penalty. The duration threshold and toast duration live in `SiteConfig.ui.welcomeBack`.
 
-## 5. Public-hosting hard gate
+Browser reload verification confirmed the two-day message and persistence migration path.
 
-### Editor PHP security review
+## 5. Editor PHP security gate completed on 2026-08-06
 
-This remains the only hard pre-public gate called out by the July audit. Review `editor/api/bootstrap.php`, `load.php`, `save.php`, `validate.php`, and `assets.php` for path traversal, arbitrary file access/write, extension and MIME validation, request-size limits, malformed JSON handling, authentication/authorization assumptions, CSRF exposure, error disclosure, and safe response headers.
+Reviewed and hardened `bootstrap.php`, `load.php`, `save.php`, `validate.php`, and `assets.php`:
 
-Do not expose the editor publicly until this review is complete and its findings are fixed and regression-tested.
+- file ids remain allowlisted and canonical paths are checked inside the project root
+- Windows path comparisons are normalized safely
+- traversal and unknown ids are rejected
+- POST endpoints require `application/json`
+- malformed JSON and oversized bodies receive explicit 4xx responses
+- body length is bounded while reading, not only after allocation
+- cross-site POSTs are rejected by fetch metadata/origin checks
+- remote access is denied by default
+- remote access requires both `NEKO_EDITOR_ALLOW_REMOTE=true` and web-server-authenticated user identity
+- internal exceptions are logged server-side and return generic messages without filesystem paths
+- JSON responses are no-store, nosniff, frame-denied, no-referrer, and use a restrictive CSP
+- asset traversal follows real paths, rejects symlink escapes, validates image MIME, and rejects scripted SVG files
+- saves retain conflict detection, validation, backup creation, and atomic replacement
 
-## 6. Explicitly deferred feature work
+Endpoint checks confirmed 200 for allowlisted reads, 400 for traversal, 415 for non-JSON POSTs, 403 for cross-origin POSTs, and 200 for a same-origin validation request. All PHP files pass `php -l`.
 
-The audit describes these as future capabilities, not unfinished foundations. Keep them out of the wall milestone unless the product roadmap promotes them:
+The editor is safe-by-default for public hosting because it remains unavailable remotely unless explicit server authentication is configured. Do not set the remote-enable environment flag without that authentication layer.
 
-- Hats/accessories using `accessory.head` sockets and equip UI.
-- Car/train-style mounts and generic moving-platform riders.
-- Database-backed world customization; keep map-scoped JSON/localStorage until customizable rooms require server storage.
-- Automatic RoomBuilder flood fill after wall runs are stable.
-- Static pathfinding clearance fields, an optional follow-up optimization beyond the completed T16 pass.
-- Image-format conversion for large spritesheets, best batched with new species or wall art.
+## 6. Verification completed
 
-## 7. Work that is already closed
+- SCSS compiled from source.
+- Browser bundle rebuilt from the manifest.
+- `npm run validate:content` passed, including content, time-source, and text-encoding checks.
+- App returned HTTP 200 and booted with zero console/page errors.
+- Initial House baseline: 882 DOM nodes, 23 objects, two Mytes, clean invariants.
+- Toolbar panel controls were present and opened without errors.
+- Irregular room, attachment inheritance, mobile drawer, and welcome-back reload checks passed.
+- Long-duration performance/heap testing is not required per owner direction and is not an open completion item.
 
-Do not reopen these while executing the remaining list:
+## 7. Explicitly deferred feature work
 
-- Phases 1–8: cleanup/config, registry, WorldQuery, relationships, sockets/attachments, capability migration, and MovementBody.
-- T9's region primitive and authored room semantics, aside from the explicit fixtures/follow-through above.
-- T14 production bundle work.
-- T15 follower trail and forced-door acceptance fixture.
-- T16 pathfinder final pass and its packed per-search validation key follow-up.
-- T17 stat bugs, retuning, recovering state, and simulation assertions.
-- Action-unavailability reason contract and the graphics/notifications/tutorial settings wiring.
-- Reduced motion, first-run hints, touch target sizing, horizontal-overflow fixes, persistence quarantine/backup/export/import, and runtime error visibility.
-- Current capability/socket/region validation and five-minute registry invariant autoplay.
+These remain future features, not unfinished architecture:
 
-## Recommended execution order
+- Wall system T10/T11 and post-wall validation described above.
+- Automatic room/enclosure flood fill after walls stabilize.
+- Hats/accessories and equip UI.
+- Cars/trains and generic moving-platform riders.
+- Database-backed world customization.
+- Static pathfinding clearance fields.
+- Ambient-creature zone-effect opt-in, pending gameplay direction.
+- Image-format conversion, best batched with new art.
 
-1. Establish wall art placeholder and pre-wall DOM/performance baselines.
-2. Implement T10 on House and pass wall-mode/LOS/pathfinding acceptance.
-3. Add the irregular-room and attached-child membership fixtures while wall/room integration is fresh.
-4. Implement T11 customization, face sockets, painting, windows, persistence, and editor parity.
-5. Run the Phase 9 conversion closure audit.
-6. Extend T12 validation and run the full Phase 14 browser matrix.
-7. Run Phase 13 trace and heap protocols.
-8. Complete mobile/contrast/welcome-back UX work.
-9. Complete the editor PHP security review before public hosting.
+## 8. Next work when walls resume
+
+1. Author the placeholder construction and finish sheets using the dedicated sprite contract.
+2. Record the semantic House `Walls` layer.
+3. Implement mask calculation and structural rendering before customization.
+4. Verify depth behavior, collision, LOS, rooms, and the +300-node wall budget.
+5. Add finishes, openings, persistence, attachments, and editor parity.
+6. Close wall-specific T12 validation.

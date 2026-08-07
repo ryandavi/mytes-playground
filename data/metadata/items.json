@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "visual": {
     "spriteSheet": {
       "url": "images/items/items.png",
@@ -17,6 +17,15 @@
       "capabilities": {
         "droppable": true
       },
+      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "use": {
+        "action": "feed",
+        "target": "myte",
+        "consume": true,
+        "effects": { "satiety": 16, "energy": 7, "fun": 7, "health": 1 },
+        "saturationMs": 50000
+      },
+      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
       "visual": {
         "sprite": {
           "col": 0,
@@ -32,6 +41,15 @@
       "capabilities": {
         "droppable": true
       },
+      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "use": {
+        "action": "feed",
+        "target": "myte",
+        "consume": true,
+        "effects": { "satiety": 24, "energy": 10, "fun": 4, "health": 2 },
+        "saturationMs": 75000
+      },
+      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
       "aliases": [
         "yellow_turnip"
       ],
@@ -50,6 +68,15 @@
       "capabilities": {
         "droppable": true
       },
+      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "use": {
+        "action": "feed",
+        "target": "myte",
+        "consume": true,
+        "effects": { "satiety": 32, "energy": 16, "fun": 8, "health": 4 },
+        "saturationMs": 90000
+      },
+      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
       "aliases": [
         "red_apple"
       ],
@@ -68,6 +95,15 @@
       "capabilities": {
         "droppable": true
       },
+      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "use": {
+        "action": "feed",
+        "target": "myte",
+        "consume": true,
+        "effects": { "satiety": 12, "energy": 12, "fun": 12, "health": 2 },
+        "saturationMs": 45000
+      },
+      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
       "visual": {
         "sprite": {
           "col": 5,
@@ -83,6 +119,13 @@
       "capabilities": {
         "droppable": false
       },
+      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "world": {
+        "mode": "map_object",
+        "objectType": "MUSIC_BOX",
+        "variant": "music_box",
+        "storable": true
+      },
       "visual": {
         "sprite": {
           "col": 0,
@@ -92,12 +135,111 @@
       "description": "A magical music box. Mytes love to play with it."
     },
     {
+      "id": "bed",
+      "label": "Bed",
+      "type": "furniture",
+      "capabilities": { "droppable": false },
+      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "world": {
+        "mode": "map_object",
+        "objectType": "BED",
+        "variant": "bed",
+        "storable": true
+      },
+      "visual": { "image": { "url": "images/MapObjects/bed.gif" } },
+      "description": "A cozy bed where Mytes can rest."
+    },
+    {
+      "id": "bed_long",
+      "label": "Long Bed",
+      "type": "furniture",
+      "capabilities": { "droppable": false },
+      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "world": {
+        "mode": "map_object",
+        "objectType": "BED",
+        "variant": "bed_long",
+        "storable": true
+      },
+      "visual": { "image": { "url": "images/MapObjects/bed_long.gif" } },
+      "description": "A cozy long bed where Mytes can rest."
+    },
+    {
+      "id": "bed_big",
+      "label": "Big Bed",
+      "type": "furniture",
+      "capabilities": { "droppable": false },
+      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "world": {
+        "mode": "map_object",
+        "objectType": "BED",
+        "variant": "bed_big",
+        "storable": true
+      },
+      "visual": { "image": { "url": "images/MapObjects/bed_big.png" } },
+      "description": "A roomy bed where Mytes can rest."
+    },
+    {
+      "id": "bed_big_long",
+      "label": "Big Long Bed",
+      "type": "furniture",
+      "capabilities": { "droppable": false },
+      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "world": {
+        "mode": "map_object",
+        "objectType": "BED",
+        "variant": "bed_big_long",
+        "storable": true
+      },
+      "visual": { "image": { "url": "images/MapObjects/bed_big_long.png" } },
+      "description": "A roomy long bed where Mytes can rest."
+    },
+    {
+      "id": "large_bed",
+      "label": "Large Bed",
+      "type": "furniture",
+      "capabilities": { "droppable": false },
+      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "world": {
+        "mode": "map_object",
+        "objectType": "BED",
+        "variant": "large_bed",
+        "storable": true
+      },
+      "visual": { "image": { "url": "images/MapObjects/bed_big_long.png" } },
+      "description": "A large bed where Mytes can rest."
+    },
+    {
+      "id": "rug_default",
+      "label": "Rug",
+      "type": "furniture",
+      "capabilities": { "droppable": false },
+      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "world": {
+        "mode": "map_object",
+        "objectType": "RUG",
+        "variant": "rug_default",
+        "storable": true
+      },
+      "visual": { "image": { "url": "images/MapObjects/rug.gif" } },
+      "description": "A soft rug for decorating a Myte's home."
+    },
+    {
       "id": "tomato",
       "label": "Tomato",
       "type": "food",
       "capabilities": {
         "droppable": true
       },
+      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "use": {
+        "action": "feed",
+        "target": "myte",
+        "consume": true,
+        "effects": { "satiety": 20, "energy": 10, "fun": 7, "health": 3 },
+        "saturationMs": 65000
+      },
+      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
       "visual": {
         "sprite": {
           "col": 3,
@@ -113,6 +255,15 @@
       "capabilities": {
         "droppable": true
       },
+      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "use": {
+        "action": "feed",
+        "target": "myte",
+        "consume": true,
+        "effects": { "satiety": 26, "energy": 11, "fun": 5, "health": 4 },
+        "saturationMs": 80000
+      },
+      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
       "visual": {
         "sprite": {
           "col": 2,
@@ -128,6 +279,15 @@
       "capabilities": {
         "droppable": true
       },
+      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "use": {
+        "action": "feed",
+        "target": "myte",
+        "consume": true,
+        "effects": { "satiety": 10, "energy": 5, "fun": 1, "health": 1 },
+        "saturationMs": 35000
+      },
+      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
       "visual": {
         "sprite": {
           "col": 1,
@@ -143,6 +303,15 @@
       "capabilities": {
         "droppable": true
       },
+      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "use": {
+        "action": "feed",
+        "target": "myte",
+        "consume": true,
+        "effects": { "satiety": 11, "energy": 9, "fun": 13, "health": 2 },
+        "saturationMs": 40000
+      },
+      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
       "visual": {
         "sprite": {
           "col": 4,
@@ -406,6 +575,15 @@
         "health",
         "health_potion"
       ],
+      "inventory": { "stackLimit": 20, "primaryAction": "use" },
+      "use": {
+        "action": "heal",
+        "target": "myte",
+        "consume": true,
+        "effects": { "health": 25 },
+        "expressions": ["surprised", "happy"],
+        "consumeTime": 800
+      },
       "visual": {
         "sprite": {
           "col": 3,

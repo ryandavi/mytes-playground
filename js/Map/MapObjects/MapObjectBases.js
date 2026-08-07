@@ -844,9 +844,8 @@ const withPickup = (Base) => class extends Base {
 //   landSound, landVolume, flySound, flyVolumeBase, flyVolumeScale, flyVolumeMin,
 //   flyVolumeMax, speedThreshold, cooldownMin, cooldownVariance
 // Optional `flapSyncAnimations: [names]` switches flySound from the default
-// speed+cooldown retrigger (good for a continuous buzz/hum) to firing once per
-// wing-flap animation loop when one of the named animations is playing (good
-// for a light, non-repetitive flap sound like a butterfly's).
+// speed-based retrigger to animation-loop cues. Both paths share the cooldown;
+// a fast wing animation must not create an unbounded stream of audio voices.
 // Apply: class Foo extends withFlightSounds(BaseClass) { ... }
 const withFlightSounds = (Base) => class extends Base {
     constructor(...args) {
@@ -869,7 +868,7 @@ const withFlightSounds = (Base) => class extends Base {
 
     _playFlapSound(cfg) {
         const soundManager = this.gameMap?.soundManager;
-        if (!soundManager || !cfg.flySound) return;
+        if (!soundManager || !cfg.flySound || this._flightSoundCooldown > 0) return;
         const currentSpeed = Math.hypot(this.velocity?.x ?? 0, this.velocity?.y ?? 0);
         const speedRatio = currentSpeed / Math.max(this.speed, 0.01);
         const volume = Utility.clamp(
@@ -878,6 +877,7 @@ const withFlightSounds = (Base) => class extends Base {
             cfg.flyVolumeMax ?? 0.5
         );
         soundManager.play(cfg.flySound, { volume, source: this });
+        this._flightSoundCooldown = (cfg.cooldownMin ?? 300) + Math.random() * (cfg.cooldownVariance ?? 400);
     }
 
     tickUpdate(tickDelta) {

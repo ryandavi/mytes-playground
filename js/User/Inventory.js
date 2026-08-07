@@ -11,7 +11,13 @@ class Inventory {
             containerDrop: this.handleContainerDrop.bind(this),
             myteDragOver: this.handleMyteDragOver.bind(this),
             myteDragLeave: this.handleMyteDragLeave.bind(this),
-            myteDrop: this.handleMyteDrop.bind(this)
+            myteDrop: this.handleMyteDrop.bind(this),
+            inventoryDragOver: this.handleInventoryDragOver.bind(this),
+            inventoryDragLeave: this.handleInventoryDragLeave.bind(this),
+            inventoryDrop: this.handleInventoryDrop.bind(this),
+            placementPointerMove: this.handlePlacementPointerMove.bind(this),
+            placementPointerDown: this.handlePlacementPointerDown.bind(this),
+            placementKeyDown: this.handlePlacementKeyDown.bind(this)
         };
         this.containerElements = [];
         this.boundMyteElements = new WeakSet();
@@ -33,7 +39,9 @@ class Inventory {
             lastFeedTime: {},
             isDragging: false,
             myteTarget: null,
-            activeDropTargets: new Set()
+            activeDropTargets: new Set(),
+            placementItem: null,
+            placementDescriptor: null
         };
 
         // Initialize
@@ -48,7 +56,12 @@ class Inventory {
 
     createDropIndicator() {
         this.dropIndicator = document.createElement('div');
-        this.dropIndicator.className = 'inventory-drop-indicator';
+        this.dropIndicator.className = 'drop-target inventory-drop-indicator';
+        this.dropPreview = document.createElement('div');
+        this.dropPreview.className = 'inventory-placement-preview';
+        this.dropTargetCollider = document.createElement('div');
+        this.dropTargetCollider.className = 'drop-target-collider';
+        this.dropIndicator.append(this.dropPreview, this.dropTargetCollider);
         // Attached to world layer on first drag, not document.body
     }
 
@@ -65,7 +78,7 @@ class Inventory {
         return TooltipSystem.getInstance();
     }
 
-    createTooltipContent(name, description = '') {
+    createTooltipContent(name, description = '', definition = null) {
         const content = document.createElement('div');
 
         const title = document.createElement('strong');
@@ -80,6 +93,27 @@ class Inventory {
             content.appendChild(body);
         }
 
+        const effects = definition?.use?.effects || {};
+        const effectLabels = { satiety: 'Fullness', energy: 'Energy', fun: 'Fun', health: 'Health', comfort: 'Comfort' };
+        const effectSummary = Object.entries(effects)
+            .filter(([, value]) => Number.isFinite(value) && value !== 0)
+            .map(([stat, value]) => `${effectLabels[stat] || stat} ${value > 0 ? '+' : ''}${value}`)
+            .join(' · ');
+        if (effectSummary) {
+            const details = document.createElement('span');
+            details.className = 'ui-tooltip__body inventory-item-effects';
+            details.textContent = effectSummary;
+            content.appendChild(details);
+        }
+
+        const action = definition?.inventory?.primaryAction;
+        if (action) {
+            const hint = document.createElement('span');
+            hint.className = 'ui-tooltip__body inventory-item-hint';
+            hint.textContent = `Double-click to ${action}.`;
+            content.appendChild(hint);
+        }
+
         return content;
     }
 
@@ -88,7 +122,8 @@ class Inventory {
             anchor: itemElement,
             content: this.createTooltipContent(
                 itemElement.dataset.name || '',
-                itemElement.dataset.description || ''
+                itemElement.dataset.description || '',
+                ItemRegistry.getItemSync(itemElement.dataset.variant || itemElement.dataset.name)
             ),
             autoHideMs
         });
@@ -105,7 +140,8 @@ class Inventory {
             anchor: itemElement,
             content: this.createTooltipContent(
                 itemElement.dataset.name || '',
-                itemElement.dataset.description || ''
+                itemElement.dataset.description || '',
+                ItemRegistry.getItemSync(itemElement.dataset.variant || itemElement.dataset.name)
             ),
             autoHideMs
         });
@@ -131,23 +167,38 @@ class Inventory {
         itemElement.addEventListener('mouseleave', () => this.hideItemTooltip(itemElement));
         itemElement.addEventListener('focus', () => this.showItemTooltip(itemElement));
         itemElement.addEventListener('blur', () => this.hideItemTooltip(itemElement));
-        itemElement.addEventListener('click', () => this.toggleItemTooltip(itemElement));
+        itemElement.addEventListener('click', () => {
+            this.hideItemTooltip(itemElement);
+            this.parent?.ui?.setSelected?.(itemElement);
+        });
+        itemElement.addEventListener('dblclick', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.activateItemElement(itemElement);
+        });
+        itemElement.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            this.activateItemElement(itemElement);
+        });
 
         return itemElement;
     }
 
     loadItems(itemsArray) {
-        // Clear existing items
         this.items = [];
         this.inventoryElement.innerHTML = '';
 
-        // Load new items
         itemsArray.forEach(itemData => {
             try {
                 const normalizedItem = this.normalizeItemData(itemData);
-                const itemElement = this.createItemElement(normalizedItem);
-                this.inventoryElement.appendChild(itemElement);
-                this.items.push({ ...normalizedItem, element: itemElement });
+                this.addItem(
+                    normalizedItem.name,
+                    normalizedItem.quantity,
+                    normalizedItem.type,
+                    normalizedItem.description,
+                    normalizedItem.variant
+                );
             } catch (error) {
                 console.error(`Failed to load item: ${itemData.name}`, error);
             }
@@ -171,13 +222,14 @@ class Inventory {
         });
 
         let remainingQuantity = Math.max(0, Number(quantity) || 0);
+        const stackSize = ItemRegistry.getStackLimit(normalizedItem.variant, this.config.stackSize);
         const matchingStacks = this.items.filter(item => item.variant === normalizedItem.variant);
 
         matchingStacks.forEach(existingItem => {
             if (remainingQuantity <= 0) return;
 
             const currentQuantity = Number(existingItem.quantity) || 0;
-            const availableSpace = Math.max(0, this.config.stackSize - currentQuantity);
+            const availableSpace = Math.max(0, stackSize - currentQuantity);
             if (availableSpace <= 0) return;
 
             const quantityToAdd = Math.min(availableSpace, remainingQuantity);
@@ -194,7 +246,7 @@ class Inventory {
                 return false;
             }
 
-            const stackQuantity = Math.min(this.config.stackSize, remainingQuantity);
+            const stackQuantity = Math.min(stackSize, remainingQuantity);
             const stackItem = {
                 ...normalizedItem,
                 quantity: stackQuantity
@@ -211,10 +263,11 @@ class Inventory {
 
     getAvailableCapacity(nameOrVariant) {
         const canonicalVariant = ItemRegistry.resolveIdSync(nameOrVariant) || ItemRegistry.normalizeId(nameOrVariant);
+        const stackSize = ItemRegistry.getStackLimit(canonicalVariant, this.config.stackSize);
         const stackCapacity = this.items
             .filter(item => item.variant === canonicalVariant)
-            .reduce((total, item) => total + Math.max(0, this.config.stackSize - (Number(item.quantity) || 0)), 0);
-        const emptySlotCapacity = Math.max(0, this.config.maxItems - this.items.length) * this.config.stackSize;
+            .reduce((total, item) => total + Math.max(0, stackSize - (Number(item.quantity) || 0)), 0);
+        const emptySlotCapacity = Math.max(0, this.config.maxItems - this.items.length) * stackSize;
         return stackCapacity + emptySlotCapacity;
     }
 
@@ -242,6 +295,9 @@ class Inventory {
 
             if (newQuantity === 0) {
                 this.hideItemTooltip(item.element);
+                if (this.parent?.ui?.selectionManager?.getSelectedObject?.() === item.element) {
+                    this.parent.ui.setSelected(null);
+                }
                 item.element.remove();
                 this.items = this.items.filter(existingItem => existingItem !== item);
                 return;
@@ -250,6 +306,9 @@ class Inventory {
             item.quantity = newQuantity;
             item.element.dataset.quantity = newQuantity;
             this.updateItemDisplay(item);
+            if (this.parent?.ui?.selectionManager?.getSelectedObject?.() === item.element) {
+                this.parent.ui.actionSidebarManager?.updateActions?.(item.element);
+            }
         });
 
         this.updateInventoryDisplay();
@@ -335,11 +394,152 @@ class Inventory {
         this.inventoryElement.classList.toggle('full', this.items.length >= this.config.maxItems);
     }
 
+    activateItemElement(itemElement) {
+        const definition = ItemRegistry.getItemSync(itemElement?.dataset.variant || itemElement?.dataset.name);
+        if (!definition) return false;
+
+        const primaryAction = definition.inventory?.primaryAction ||
+            (definition.use?.target === 'myte' ? 'use' : null);
+
+        if (primaryAction === 'place') {
+            return this.beginPlacement(itemElement);
+        }
+
+        if (primaryAction === 'feed' || primaryAction === 'use') {
+            const myte = this.parent?.activeMyte;
+            if (!myte?.isActive) {
+                this.parent?.ui?.showMessage?.(`Select an active Myte to use ${definition.label}.`, 'warning', 'Inventory');
+                return false;
+            }
+            return this.useItemOnMyte(itemElement, myte, definition);
+        }
+
+        this.showItemTooltip(itemElement, 2200);
+        return false;
+    }
+
+    getConfiguredItemUse(definition, itemType) {
+        const typeDefaults = this.config.itemTypes[itemType] || {};
+        const use = definition?.use || {};
+        return {
+            ...typeDefaults,
+            ...use,
+            effects: use.effects || typeDefaults.effects || {},
+            expressions: use.expressions || typeDefaults.expressions || []
+        };
+    }
+
+    useItemOnMyte(itemElement, myte, definition = null, pointer = {}) {
+        if (!itemElement || !myte) return false;
+
+        const now = SimClock.now();
+        if (now - (this.state.lastFeedTime[myte.id] ?? -Infinity) < this.config.feedCooldown) {
+            this.parent?.ui?.showMessage?.(`${myte.name || 'This Myte'} needs a moment before another item.`, 'warning', 'Inventory');
+            return false;
+        }
+
+        const itemType = String(itemElement.dataset.type || '').toUpperCase();
+        const itemDefinition = definition || ItemRegistry.getItemSync(itemElement.dataset.variant || itemElement.dataset.name);
+        const itemConfig = this.getConfiguredItemUse(itemDefinition, itemType);
+        if (itemDefinition?.inventory?.primaryAction === 'place' && itemDefinition?.use?.target !== 'myte') {
+            return false;
+        }
+        if (!itemDefinition?.use?.target && !this.config.itemTypes[itemType]) return false;
+
+        const itemData = {
+            name: itemElement.dataset.name,
+            variant: itemElement.dataset.variant || itemElement.dataset.name,
+            type: itemType,
+            description: itemElement.dataset.description || ''
+        };
+
+        if (!this.removeItem(itemData.variant || itemData.name)) return false;
+
+        if (itemConfig.action === 'feed' || itemType === 'FOOD') {
+            this.startFeedingSequence(myte, itemData, itemConfig, pointer);
+        } else {
+            this.applyItemEffects(myte, itemType, itemConfig);
+            this.parent.soundManager?.play(itemConfig.sound || 'myte_happy');
+        }
+
+        this.state.lastFeedTime[myte.id] = now;
+        return true;
+    }
+
+    beginPlacement(itemElement) {
+        if (!itemElement || !ItemRegistry.getItemSync(itemElement.dataset.variant || itemElement.dataset.name)?.world) {
+            return false;
+        }
+        this.cancelPlacement();
+        this.state.placementItem = itemElement;
+        this.state.draggedItem = itemElement;
+        this.state.placementDescriptor = this.getPlacementDescriptor(itemElement);
+        itemElement.classList.add('is-placing');
+        this.inventoryElement.classList.add('is-placing-item');
+        this.parent?.ui?.showMessage?.('Click the map to place it. Press Esc to cancel.', 'info', 'Placement');
+        return true;
+    }
+
+    cancelPlacement() {
+        this.state.placementItem?.classList.remove('is-placing');
+        this.inventoryElement.classList.remove('is-placing-item');
+        if (!this.state.isDragging) this.state.draggedItem = null;
+        this.state.placementItem = null;
+        this.state.placementDescriptor = null;
+        this._hideIndicator();
+    }
+
+    handlePlacementPointerMove(event) {
+        if (!this.state.placementItem) return;
+        const target = document.elementFromPoint(event.clientX, event.clientY);
+        if (target?.closest?.('.app-stage, .container')) {
+            this._updateIndicator(event.clientX, event.clientY);
+        } else {
+            this._hideIndicator();
+        }
+    }
+
+    handlePlacementPointerDown(event) {
+        if (!this.state.placementItem) return;
+        if (event.button === 2) {
+            event.preventDefault();
+            this.cancelPlacement();
+            return;
+        }
+        if (event.button !== 0 || !event.target.closest?.('.app-stage, .container')) return;
+        if (event.target.closest?.('.world-myte, .interactableObject, .dropped-item')) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        this._updateIndicator(event.clientX, event.clientY);
+        if (this.state.dropValid === false) return;
+
+        const itemElement = this.state.placementItem;
+        const worldPos = this.state.snappedDropPos
+            ? this.getPlacementPosition(this.state.snappedDropPos)
+            : this.parent.inputHandler.screenToWorldCoordinates(event.clientX, event.clientY);
+        const placed = this.placeInventoryItem(itemElement, worldPos.x, worldPos.y);
+        if (placed) this.cancelPlacement();
+    }
+
+    handlePlacementKeyDown(event) {
+        if (event.key === 'Escape' && this.state.placementItem) {
+            event.preventDefault();
+            this.cancelPlacement();
+        }
+    }
+
     // Drag and Drop Event Handlers
     setupEventListeners() {
         // Inventory events
         this.inventoryElement.addEventListener('dragstart', this.boundHandlers.dragStart);
         this.inventoryElement.addEventListener('dragend', this.boundHandlers.dragEnd);
+        this.inventoryElement.addEventListener('dragover', this.boundHandlers.inventoryDragOver);
+        this.inventoryElement.addEventListener('dragleave', this.boundHandlers.inventoryDragLeave);
+        this.inventoryElement.addEventListener('drop', this.boundHandlers.inventoryDrop);
+        document.addEventListener('pointermove', this.boundHandlers.placementPointerMove);
+        document.addEventListener('pointerdown', this.boundHandlers.placementPointerDown, true);
+        document.addEventListener('keydown', this.boundHandlers.placementKeyDown);
 
         // Container events
         this.containerElements = Array.from(document.querySelectorAll('.app-stage, .container'));
@@ -358,6 +558,7 @@ class Inventory {
 
         this.state.draggedItem = e.target;
         this.state.isDragging = true;
+        this.state.placementDescriptor = this.getPlacementDescriptor(e.target);
         this.tooltipSystem.hide();
 
         if (e.dataTransfer) {
@@ -393,6 +594,7 @@ class Inventory {
     handleDragEnd(e) {
         this.state.isDragging = false;
         this.state.draggedItem = null;
+        this.state.placementDescriptor = null;
 
         document.querySelectorAll('.app-stage, .container').forEach(container => {
             container.classList.remove('is-drag-over');
@@ -406,6 +608,67 @@ class Inventory {
 
         // Hide drop indicator
         this.dropIndicator.style.display = 'none';
+    }
+
+    handleInventoryDragOver(event) {
+        const droppedItem = typeof DroppedMapItem !== 'undefined' ? DroppedMapItem.storageDragItem : null;
+        if (!droppedItem) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        this.inventoryElement.classList.add('is-store-target');
+    }
+
+    handleInventoryDragLeave(event) {
+        if (event.relatedTarget && this.inventoryElement.contains(event.relatedTarget)) return;
+        this.inventoryElement.classList.remove('is-store-target');
+    }
+
+    handleInventoryDrop(event) {
+        const droppedItem = typeof DroppedMapItem !== 'undefined' ? DroppedMapItem.storageDragItem : null;
+        if (!droppedItem) return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.inventoryElement.classList.remove('is-store-target');
+        this.storeDroppedItem(droppedItem);
+    }
+
+    storeDroppedItem(droppedItem) {
+        if (!droppedItem?.active || droppedItem.collected) return false;
+        const entry = droppedItem.getInventoryEntryData?.(droppedItem.quantity || 1);
+        if (!entry || !this.canAddItem(entry.variant, entry.quantity)) {
+            this.parent?.ui?.showMessage?.('There is not enough inventory space.', 'warning', 'Inventory Full');
+            return false;
+        }
+
+        if (!this.addItem(entry.name, entry.quantity, entry.type, entry.description, entry.variant)) return false;
+        this.playAcquisition(entry.variant);
+        droppedItem.collected = true;
+        droppedItem.remove?.();
+        this.parent?.ui?.setSelected?.(null);
+        this.parent.soundManager?.play('ui_pickup_item');
+        return true;
+    }
+
+    storeMapObject(object) {
+        const itemDef = ItemRegistry.findItemForWorldObject(object);
+        if (!itemDef || object.isInUse?.()) return false;
+        if (!this.canAddItem(itemDef.id, 1)) {
+            this.parent?.ui?.showMessage?.('There is not enough inventory space.', 'warning', 'Inventory Full');
+            return false;
+        }
+
+        if (!this.addItem(itemDef.label, 1, itemDef.type, itemDef.description, itemDef.id)) return false;
+        this.playAcquisition(itemDef.id);
+        object.remove?.();
+        this.parent?.ui?.setSelected?.(null);
+        this.parent.soundManager?.play('ui_pickup_item');
+        return true;
+    }
+
+    isPointInside(clientX, clientY) {
+        const rect = this.inventoryElement?.getBoundingClientRect?.();
+        return !!rect && clientX >= rect.left && clientX <= rect.right &&
+            clientY >= rect.top && clientY <= rect.bottom;
     }
 
     handleContainerDragOver(e) {
@@ -424,7 +687,7 @@ class Inventory {
 
     _hideIndicator() {
         this.dropIndicator.style.display = 'none';
-        this.dropIndicator.classList.remove('invalid');
+        this.dropIndicator.classList.remove('is-drop-valid', 'is-drop-invalid');
         if (this.dropIndicator.parentElement) {
             this.dropIndicator.parentElement.removeChild(this.dropIndicator);
         }
@@ -441,19 +704,20 @@ class Inventory {
         }
 
         const worldPos = this.parent.inputHandler.screenToWorldCoordinates(clientX, clientY);
-        const itemSize = this._getDragItemSize();
+        const descriptor = this.state.placementDescriptor || this.getPlacementDescriptor();
+        const { width, height } = descriptor;
         const gridSystem = this.parent.gameMap?.gridSystem;
         const map = this.parent.gameMap;
 
-        let snappedX = worldPos.x - itemSize / 2;
-        let snappedY = worldPos.y - itemSize / 2;
+        let snappedX = worldPos.x - width / 2;
+        let snappedY = worldPos.y - height / 2;
 
         if (gridSystem) {
             const s = gridSystem.snapToGrid(
                 snappedX,
                 snappedY,
-                itemSize,
-                itemSize,
+                width,
+                height,
                 gridSystem.config.cellSize,
                 { useCenter: false }
             );
@@ -461,52 +725,161 @@ class Inventory {
             snappedY = s.y;
         }
 
-        this.state.snappedDropPos = { x: snappedX, y: snappedY, size: itemSize };
-        this.state.dropValid = this._isDropPositionValid(snappedX, snappedY, itemSize, gridSystem, map);
+        this.state.snappedDropPos = { x: snappedX, y: snappedY, width, height, descriptor };
+        this.state.dropValid = this._isDropPositionValid(snappedX, snappedY, descriptor, gridSystem, map);
 
-        this.dropIndicator.style.width  = `${itemSize}px`;
-        this.dropIndicator.style.height = `${itemSize}px`;
+        this.dropIndicator.style.width  = `${width}px`;
+        this.dropIndicator.style.height = `${height}px`;
         this.dropIndicator.style.left   = `${snappedX}px`;
         this.dropIndicator.style.top    = `${snappedY}px`;
+        this.updatePlacementPreview(descriptor);
         this.dropIndicator.style.display = 'block';
-        this.dropIndicator.classList.toggle('invalid', !this.state.dropValid);
+        this.dropIndicator.classList.toggle('is-drop-valid', this.state.dropValid);
+        this.dropIndicator.classList.toggle('is-drop-invalid', !this.state.dropValid);
     }
 
-    _isDropPositionValid(snappedX, snappedY, itemSize, gridSystem, map) {
+    _isDropPositionValid(snappedX, snappedY, descriptor, gridSystem, map) {
         if (!gridSystem || !map) return true;
 
-        // Bounds check
+        const collider = descriptor.collider || {};
+        const bounds = {
+            x: snappedX + (collider.x ?? 0),
+            y: snappedY + (collider.y ?? 0),
+            width: collider.width ?? descriptor.width,
+            height: collider.height ?? descriptor.height
+        };
         const mapW = map.dimensions?.width ?? Infinity;
         const mapH = map.dimensions?.height ?? Infinity;
-        if (snappedX < 0 || snappedY < 0 || snappedX + itemSize > mapW || snappedY + itemSize > mapH) {
+        if (bounds.x < 0 || bounds.y < 0 || bounds.x + bounds.width > mapW || bounds.y + bounds.height > mapH) {
             return false;
         }
 
-        // Check all grid cells the item overlaps
         const cellSize = gridSystem.config.cellSize;
-        const startGX = Math.floor(snappedX / cellSize);
-        const startGY = Math.floor(snappedY / cellSize);
-        const endGX   = Math.floor((snappedX + itemSize - 1) / cellSize);
-        const endGY   = Math.floor((snappedY + itemSize - 1) / cellSize);
+        const startGX = Math.floor(bounds.x / cellSize);
+        const startGY = Math.floor(bounds.y / cellSize);
+        const endGX   = Math.floor((bounds.x + bounds.width - 1) / cellSize);
+        const endGY   = Math.floor((bounds.y + bounds.height - 1) / cellSize);
 
         for (let gx = startGX; gx <= endGX; gx++) {
             for (let gy = startGY; gy <= endGY; gy++) {
                 const cell = gridSystem.grid[gx]?.[gy];
-                if (!cell || !cell.walkable) return false;
+                if (!cell || (cell.tileWalkable ?? cell.walkable) === false) return false;
+                if (!descriptor.overlappable) {
+                    const hasBlocker = [...(cell.objects || [])].some(object =>
+                        object.getConfig?.('visual.overlappable', false) !== true
+                    );
+                    if (hasBlocker) return false;
+                }
             }
         }
 
         return true;
     }
 
-    _getDragItemSize() {
-        const type = this.state.draggedItem?.dataset?.type?.toUpperCase();
-        // Food items and most inventory items are 32px in world space
-        return 32;
+    getPlacementDescriptor(itemElement = this.state.draggedItem) {
+        const itemDef = ItemRegistry.getItemSync(itemElement?.dataset?.variant || itemElement?.dataset?.name);
+        const world = itemDef?.world || {};
+        if (world.mode !== 'map_object') {
+            const imageUrl = itemDef?.visual?.image?.url || null;
+            const sprite = itemDef?.sprite || null;
+            return {
+                mode: world.mode || 'dropped_item',
+                width: 32,
+                height: 32,
+                anchor: 'center',
+                collider: null,
+                overlappable: true,
+                previewImage: imageUrl || (sprite ? itemDef.spriteSheetUrl : null),
+                previewFit: imageUrl ? 'contain' : 'sprite-frame',
+                previewBackgroundPosition: sprite ? `${sprite.x}px ${sprite.y}px` : 'center',
+                previewFrame: sprite ? { width: sprite.width, height: sprite.height, left: 0, top: 0 } : null
+            };
+        }
+
+        let config = MapObjectFactory.mergeConfigs(world.objectType, world.variant || itemDef.id, {
+            configOverrides: { inventoryItemId: itemDef.id }
+        });
+        if (config.directionConfigs) {
+            config = MapObject.processDirectionConfig(config, config.direction || 'S');
+        }
+        const scale = Number(config.scale) || 1;
+        const width = (Number(config.size?.width) || 64) * scale;
+        const height = (Number(config.size?.height) || 64) * scale;
+        const colliderRegion = config.spatial?.regions?.collider;
+        const spriteSheet = config.visual?.spriteSheet || config.spriteConfig?.spriteSheet || {};
+        const frameSize = spriteSheet.frameSize || config.spriteConfig?.spriteSheet?.frameSize || null;
+
+        return {
+            mode: 'map_object',
+            width,
+            height,
+            anchor: 'top-left',
+            collider: colliderRegion ? {
+                x: (colliderRegion.x ?? colliderRegion.offsetX ?? 0) * scale,
+                y: (colliderRegion.y ?? colliderRegion.offsetY ?? 0) * scale,
+                width: (colliderRegion.width ?? config.size?.width ?? 64) * scale,
+                height: (colliderRegion.height ?? config.size?.height ?? 64) * scale
+            } : null,
+            overlappable: config.visual?.overlappable === true,
+            previewImage: spriteSheet.url || itemDef.visual?.image?.url || null,
+            previewFit: 'world-sprite',
+            previewBackgroundPosition: '0 0',
+            previewTransform: config.transformStyle || '',
+            previewFrame: frameSize ? {
+                width: Number(frameSize.width) || width,
+                height: Number(frameSize.height) || height,
+                left: -(Number(config.spriteFrameOffset?.offsetX ?? frameSize.offsetX) || 0),
+                top: -(Number(config.spriteFrameOffset?.offsetY ?? frameSize.offsetY) || 0)
+            } : null
+        };
+    }
+
+    updatePlacementPreview(descriptor) {
+        const hasPreview = !!descriptor.previewImage;
+        this.dropPreview.style.display = '';
+        this.dropPreview.classList.toggle('is-placeholder', !hasPreview);
+        this.dropPreview.textContent = hasPreview ? '' : '?';
+        this.dropPreview.style.backgroundImage = hasPreview ? `url('${descriptor.previewImage}')` : '';
+        this.dropPreview.style.transform = hasPreview ? descriptor.previewTransform : '';
+        this.dropPreview.style.backgroundPosition = hasPreview ? (descriptor.previewBackgroundPosition || '0 0') : '';
+        this.dropPreview.style.backgroundRepeat = hasPreview ? 'no-repeat' : '';
+        this.dropPreview.style.backgroundSize = descriptor.previewFit === 'contain' ? 'contain' : '';
+		if (hasPreview) {
+			const previewImage = descriptor.previewImage;
+			Utility.monitorImageAsset(previewImage, () => {
+				if (this.state.placementDescriptor?.previewImage !== previewImage) return;
+				this.dropPreview.style.backgroundImage = 'none';
+				this.dropPreview.classList.add('is-placeholder');
+				this.dropPreview.textContent = '?';
+			});
+		}
+        this.dropPreview.style.width = descriptor.previewFrame ? `${descriptor.previewFrame.width}px` : '';
+        this.dropPreview.style.height = descriptor.previewFrame ? `${descriptor.previewFrame.height}px` : '';
+        this.dropPreview.style.left = descriptor.previewFrame ? `${descriptor.previewFrame.left}px` : '';
+        this.dropPreview.style.top = descriptor.previewFrame ? `${descriptor.previewFrame.top}px` : '';
+
+        const collider = descriptor.collider;
+        this.dropTargetCollider.style.display = collider ? '' : 'none';
+        if (!collider) return;
+        this.dropTargetCollider.style.left = `${collider.x}px`;
+        this.dropTargetCollider.style.top = `${collider.y}px`;
+        this.dropTargetCollider.style.width = `${collider.width}px`;
+        this.dropTargetCollider.style.height = `${collider.height}px`;
+    }
+
+    getPlacementPosition(snappedPlacement) {
+        if (snappedPlacement.descriptor?.anchor === 'top-left') {
+            return { x: snappedPlacement.x, y: snappedPlacement.y };
+        }
+        return {
+            x: snappedPlacement.x + snappedPlacement.width / 2,
+            y: snappedPlacement.y + snappedPlacement.height / 2
+        };
     }
 
     handleContainerDrop(e) {
         e.preventDefault();
+        e.stopPropagation();
         if (!this.state.draggedItem) return;
 
         // Check if we dropped on a Myte first
@@ -520,14 +893,12 @@ class Inventory {
         const layerForeground = container.querySelector('.layer.foreground');
         if (!layerForeground) return;
 
-        const { name, variant, type } = this.state.draggedItem.dataset;
-
         // Use the exact snapped position the indicator showed, or fall back to cursor
         let posX, posY;
         if (this.state.snappedDropPos) {
-            const sz = this.state.snappedDropPos.size ?? 32;
-            posX = this.state.snappedDropPos.x + sz / 2;
-            posY = this.state.snappedDropPos.y + sz / 2;
+            const placementPos = this.getPlacementPosition(this.state.snappedDropPos);
+            posX = placementPos.x;
+            posY = placementPos.y;
         } else {
             const worldPos = this.parent.inputHandler.screenToWorldCoordinates(e.clientX, e.clientY);
             posX = worldPos.x;
@@ -539,55 +910,64 @@ class Inventory {
             return;
         }
 
-        let success = false;
+        const success = this.placeInventoryItem(this.state.draggedItem, posX, posY);
 
-        // Droppable items (food, crops, picked flowers, etc.) spawn as physics world items.
-        // The item registry's droppable flag controls this — map-placeable objects (e.g. music_box)
-        // go through resolveDroppedMapObject instead.
+        this._hideIndicator();
+        document.querySelectorAll('.app-stage, .container').forEach(el => el.classList.remove('is-drag-over'));
+
+        if (success) this.parent.soundManager?.play('ui_drop_item');
+    }
+
+    placeInventoryItem(itemElement, posX, posY) {
+        if (!itemElement) return false;
+        const { name, variant, type } = itemElement.dataset;
         const itemDef = ItemRegistry.getItemSync(variant || name);
-        if (itemDef?.droppable) {
+        const world = itemDef?.world || {};
+        let placed = null;
+
+        if (world.mode === 'dropped_item' || itemDef?.droppable) {
             const itemVariant = variant || name;
-            const dropped = this.parent.gameMap.addDroppedItem(
+            placed = this.parent.gameMap.addDroppedItem(
                 itemDef.type?.toUpperCase() || 'ITEM',
                 itemVariant,
                 posX,
                 posY
             );
-            // Store variant so collect() resolves back to the correct registry entry
-            if (dropped) {
-                dropped.inventoryVariant = itemVariant;
-                dropped.inventoryName = name;
-                dropped.userDropSource = 'inventory';
-                dropped.offeredToMytes = String(itemDef.type || '').toUpperCase() === 'FOOD';
-                dropped.allowAutoCollect = dropped.offeredToMytes ? false : dropped.allowAutoCollect;
-                if (dropped.offeredToMytes) {
-                    this.notifyNearbyMytesOfDroppedFood(dropped);
-                }
+            if (placed) {
+                placed.inventoryVariant = itemVariant;
+                placed.inventoryName = name;
+                placed.inventoryType = type;
+                placed.userDropSource = 'inventory';
+                placed.offeredToMytes = world.offeredToMytes === true || String(itemDef.type || '').toUpperCase() === 'FOOD';
+                placed.allowAutoCollect = placed.offeredToMytes ? false : placed.allowAutoCollect;
+                if (placed.offeredToMytes) this.notifyNearbyMytesOfDroppedFood(placed);
             }
-            success = !!dropped;
+        } else if (world.mode === 'map_object') {
+            placed = this.parent.gameMap.addObject(
+                world.objectType,
+                world.variant || itemDef.id,
+                posX,
+                posY,
+                { configOverrides: { inventoryItemId: itemDef.id } }
+            );
+            if (placed?.triggerDropBounce) placed.triggerDropBounce();
         } else {
             const resolvedObject = this.resolveDroppedMapObject({ name, type, variant });
-            if (!resolvedObject) {
-                Utility.warnDebug(`Inventory item "${name}" is not placeable on the map.`);
-                return;
+            if (resolvedObject) {
+                placed = this.parent.gameMap.addObject(resolvedObject.type, resolvedObject.variant, posX, posY);
             }
-            const object = this.parent.gameMap.addObject(
-                resolvedObject.type,
-                resolvedObject.variant,
-                posX,
-                posY
-            );
-            if (object?.triggerDropBounce) object.triggerDropBounce();
-            success = !!object;
         }
 
-        this._hideIndicator();
-        document.querySelectorAll('.app-stage, .container').forEach(el => el.classList.remove('is-drag-over'));
-
-        if (success) {
-            this.removeItem(variant || name);
-            this.parent.soundManager?.play('ui_drop_item');
+        if (!placed) {
+            this.parent?.ui?.showMessage?.(`${itemDef?.label || name} cannot be placed here.`, 'warning', 'Inventory');
+            return false;
         }
+
+        if (!this.removeItem(variant || name)) {
+            placed.remove?.();
+            return false;
+        }
+        return true;
     }
 
     // Myte Interaction Methods
@@ -608,7 +988,12 @@ class Inventory {
         e.stopPropagation();
         this.state.myteTarget = e.currentTarget;
         const itemType = this.state.draggedItem?.dataset.type;
-        const isValid = !!this.config.itemTypes[itemType];
+        const definition = ItemRegistry.getItemSync(
+            this.state.draggedItem?.dataset.variant || this.state.draggedItem?.dataset.name
+        );
+        const isValid = definition?.inventory?.primaryAction === 'place'
+            ? definition?.use?.target === 'myte'
+            : !!(definition?.use?.target === 'myte' || this.config.itemTypes[itemType]);
         e.currentTarget.classList.toggle('is-drag-over', isValid);
         e.currentTarget.classList.toggle('is-drop-rejected', !isValid);
         document.querySelectorAll('.container').forEach(c => c.classList.remove('is-drag-over'));
@@ -628,40 +1013,13 @@ class Inventory {
 
         if (!myte) return;
 
-        // Check feeding cooldown (SimClock: gameplay cooldown; -Infinity default so
-        // the first feed isn't blocked while SimClock is still near zero)
-        const now = SimClock.now();
-        if (now - (this.state.lastFeedTime[myte.id] ?? -Infinity) < this.config.feedCooldown) {
-            return;
-        }
-
-        const itemType = this.state.draggedItem.dataset.type;
-        const itemConfig = this.config.itemTypes[itemType];
-        const draggedItemData = {
-            name: this.state.draggedItem.dataset.name,
-            variant: this.state.draggedItem.dataset.variant || this.state.draggedItem.dataset.name,
-            type: itemType,
-            description: this.state.draggedItem.dataset.description || ''
-        };
-
-        if (!itemConfig) return;
-
-        this.removeItem(draggedItemData.variant || draggedItemData.name);
-
-        if (itemType === 'FOOD') {
-            this.startFeedingSequence(myte, draggedItemData, itemConfig, {
-                clientX: e.clientX,
-                clientY: e.clientY
-            });
-        } else {
-            this.applyItemEffects(myte, itemType, itemConfig);
-
-            const soundMap = { FOOD: 'myte_eat', TOY: 'myte_happy', MEDICINE: 'myte_happy', FLOWER: 'myte_happy', HEALTH: 'myte_happy' };
-            this.parent.soundManager?.play(soundMap[itemType] || 'ui_drop_item');
-        }
-
-        // Update cooldown
-        this.state.lastFeedTime[myte.id] = now;
+        const definition = ItemRegistry.getItemSync(
+            this.state.draggedItem.dataset.variant || this.state.draggedItem.dataset.name
+        );
+        this.useItemOnMyte(this.state.draggedItem, myte, definition, {
+            clientX: e.clientX,
+            clientY: e.clientY
+        });
 
         myteElement.classList.remove('is-drag-over', 'is-drop-rejected');
         this.state.myteTarget = null;
@@ -703,6 +1061,13 @@ class Inventory {
         if (itemConfig?.saturationMs) {
             myte.buffs?.applyBuff?.('nourished', { durationMs: itemConfig.saturationMs, source });
         }
+        (Array.isArray(itemConfig?.buffs) ? itemConfig.buffs : []).forEach(buff => {
+            if (!buff?.id) return;
+            myte.buffs?.applyBuff?.(buff.id, {
+                durationMs: buff.durationMs,
+                source
+            });
+        });
     }
 
     emitItemParticles(myte, itemType, options = {}) {
@@ -747,7 +1112,7 @@ class Inventory {
         for (let index = 0; index < burstCount; index++) {
             const delay = animationDuration + Math.round(((consumeTime - animationDuration) * index) / Math.max(1, burstCount));
             window.setTimeout(() => {
-                if (!myte?.active) return;
+                if (!myte?.isActive) return;
                 this.emitItemParticles(myte, 'FOOD', {
                     anchorId: 'mouth.item',
                     count: 4,
@@ -757,7 +1122,7 @@ class Inventory {
         }
 
         window.setTimeout(() => {
-            if (!myte?.active) return;
+            if (!myte?.isActive) return;
             this.applyConfiguredItemEffects(myte, itemConfig, { source: 'inventory_food' });
             this.parent.soundManager?.play('myte_eat');
         }, consumeTime);
@@ -838,16 +1203,14 @@ class Inventory {
             (myte.ai?.objectSearchRadius == null || myte.getDistanceTo?.(droppedItem) <= myte.ai.objectSearchRadius)
         );
 
-        nearbyMytes.forEach((myte) => {
-            if (myte.goal === MOVE_TYPES.FREEROAM) {
-                myte.ai?.resetThinking?.();
-                if (myte.ai?.canPlan?.()) {
-                    myte.ai.planNextAction();
-                }
-            } else {
-                myte.ai?.reactToOfferedFood?.(droppedItem);
-            }
-        });
+        const activeMyte = this.parent?.activeMyte;
+        if (nearbyMytes.includes(activeMyte) && activeMyte.ai?.reactToOfferedFood?.(droppedItem)) {
+            return;
+        }
+
+        droppedItem.offeredToMytes = false;
+        droppedItem.allowAutoCollect = false;
+        nearbyMytes.forEach(myte => myte.ai?.resetThinking?.());
     }
 
     findMyteFromElement(element) {
@@ -913,6 +1276,12 @@ class Inventory {
     dispose() {
         this.inventoryElement?.removeEventListener('dragstart', this.boundHandlers.dragStart);
         this.inventoryElement?.removeEventListener('dragend', this.boundHandlers.dragEnd);
+        this.inventoryElement?.removeEventListener('dragover', this.boundHandlers.inventoryDragOver);
+        this.inventoryElement?.removeEventListener('dragleave', this.boundHandlers.inventoryDragLeave);
+        this.inventoryElement?.removeEventListener('drop', this.boundHandlers.inventoryDrop);
+        document.removeEventListener('pointermove', this.boundHandlers.placementPointerMove);
+        document.removeEventListener('pointerdown', this.boundHandlers.placementPointerDown, true);
+        document.removeEventListener('keydown', this.boundHandlers.placementKeyDown);
 
         this.containerElements.forEach(container => {
             container.removeEventListener('dragover', this.boundHandlers.containerDragOver);
@@ -930,6 +1299,7 @@ class Inventory {
         this.mutationObserver?.disconnect();
         this.mutationObserver = null;
         clearTimeout(this._indicatorHideTimer);
+        this.cancelPlacement();
 
         this.dropIndicator?.remove();
         this.tooltipSystem.hide();

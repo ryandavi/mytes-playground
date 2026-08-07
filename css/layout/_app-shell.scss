@@ -46,7 +46,7 @@
     >.header {
         flex: 0 0 100%;
         display: flex;
-        gap: var(--space-md);
+        gap: var(--space-sm);
         align-items: center;
         // Without these the header's nowrap contents plus the 2xl gap set a floor
         // of ~419px, which overhangs any phone viewport. Wrapping lets it reflow
@@ -74,12 +74,11 @@
         >.hud-active-myte {
             display: inline-flex;
             align-items: center;
-            gap: var(--space-xs);
             box-sizing: border-box;
-            width: 180px;
+            width: 230px;
             height: 40px;
             max-width: 100%;
-            flex: 0 0 180px;
+            flex: 0 0 230px;
             padding: var(--space-2xs) var(--space-sm);
             color: var(--text-base);
             text-align: left;
@@ -87,26 +86,24 @@
 
             &[hidden] { display: none; }
 
-            >.icon {
-                width: 16px;
-                height: 16px;
-                flex: 0 0 auto;
-                fill: currentColor;
-            }
-
             >.hud-active-myte__content {
                 display: grid;
                 grid-template-columns: auto minmax(0, 1fr);
                 grid-template-areas:
                     "name thought"
                     "meters meters";
-                gap: var(--space-2xs);
+                column-gap: var(--space-md);
+                row-gap: var(--space-2xs);
+                align-items: baseline;
                 min-width: 0;
                 flex: 1;
 
                 >.hud-active-myte__name {
                     grid-area: name;
+                    overflow: hidden;
                     font-weight: 700;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
                 }
 
                 >.hud-active-myte__meters {

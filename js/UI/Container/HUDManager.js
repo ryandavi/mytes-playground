@@ -22,11 +22,15 @@ class HUDManager extends UIComponent {
             clock: null,
             clockTitle: null,
             season: null,
-            coins: null
+            coins: null,
+            activeMyteVisible: false,
+            activeMyteName: this.activeMyteNameElement?.textContent ?? null,
+            activeMyteThought: this.activeMyteThoughtElement?.textContent ?? null,
+            activeMyteMeters: new Map()
         };
         if (this.activeMyteElement) {
             this.activeMyteElement.onclick = () => {
-                const myte = this.parent.parent?.getActiveMyte?.();
+                const myte = this.parent.getActiveMyte?.();
                 if (myte) this.parent.myteInfoPanel?.openFor?.(myte);
             };
         }
@@ -58,10 +62,18 @@ class HUDManager extends UIComponent {
     updateActiveMyte() {
         const myte = this.parent.getActiveMyte?.();
         if (!this.activeMyteElement) return;
-        this.activeMyteElement.hidden = !myte;
+        const isVisible = !!myte;
+        if (this.lastRenderedState.activeMyteVisible !== isVisible) {
+            this.activeMyteElement.hidden = !isVisible;
+            this.lastRenderedState.activeMyteVisible = isVisible;
+        }
         if (!myte) return;
 
-        this.activeMyteNameElement.textContent = myte.name || 'Myte';
+        const name = myte.name || 'Myte';
+        if (this.lastRenderedState.activeMyteName !== name) {
+            this.activeMyteNameElement.textContent = name;
+            this.lastRenderedState.activeMyteName = name;
+        }
         const stats = myte.stats;
         const values = {
             energy: stats?.getEnergyRatio?.() ?? 0,
@@ -71,8 +83,11 @@ class HUDManager extends UIComponent {
         };
         for (const [id, fill] of this.activeMyteMeters) {
             const percent = Math.round(Utility.clamp(values[id] ?? 0, 0, 1) * 100);
-            fill.style.width = `${percent}%`;
-            fill.parentElement.setAttribute('aria-label', `${id} ${percent}%`);
+            if (this.lastRenderedState.activeMyteMeters.get(id) !== percent) {
+                fill.style.width = `${percent}%`;
+                fill.parentElement.setAttribute('aria-label', `${id} ${percent}%`);
+                this.lastRenderedState.activeMyteMeters.set(id, percent);
+            }
         }
 
         const pressures = myte.ai?.getPressuresSnapshot?.() ?? {};
@@ -85,8 +100,11 @@ class HUDManager extends UIComponent {
         const thought = decision
             ? `${driveLabel} ${Math.round((pressures.maxPressure ?? 0) * 100)}% - ${decision}`
             : driveLabel;
-        this.activeMyteThoughtElement.textContent = thought;
-        this.activeMyteThoughtElement.title = thought;
+        if (this.lastRenderedState.activeMyteThought !== thought) {
+            this.activeMyteThoughtElement.textContent = thought;
+            this.activeMyteThoughtElement.title = thought;
+            this.lastRenderedState.activeMyteThought = thought;
+        }
     }
 
     updateClock() {

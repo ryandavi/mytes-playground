@@ -7,15 +7,17 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === basename(__FILE__)) {
 
 // Route all errors to a JSON response so nothing leaks as HTML.
 set_error_handler(function (int $errno, string $errstr, string $errfile, int $errline): bool {
+	error_log("Neko editor PHP error: $errstr in $errfile:$errline");
     editor_json_response(500, [
         'ok'    => false,
-        'error' => ['code' => 'php_error', 'message' => "$errstr in $errfile:$errline"],
+		'error' => ['code' => 'server_error', 'message' => 'The editor API encountered an internal error.'],
     ]);
 });
 set_exception_handler(function (Throwable $e): void {
+	error_log('Neko editor exception: ' . $e);
     editor_json_response(500, [
         'ok'    => false,
-        'error' => ['code' => 'php_exception', 'message' => $e->getMessage()],
+		'error' => ['code' => 'server_error', 'message' => 'The editor API encountered an internal error.'],
     ]);
 });
 
@@ -23,6 +25,7 @@ set_exception_handler(function (Throwable $e): void {
 
 // Root of the project (two levels up from editor/api/).
 define('EDITOR_PROJECT_ROOT', realpath(__DIR__ . '/../../'));
+const EDITOR_MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 
 const EDITOR_FILES = [
     'mytes.base'            => 'data/mytes/myte.json',
@@ -42,13 +45,58 @@ const EDITOR_ASSET_DIRS = [
     'mytes'       => 'images',
 ];
 
+function editor_path_is_within(string $path, string $root): bool
+{
+	$normalize = static function (string $value): string {
+		$value = rtrim(str_replace('\\', '/', $value), '/');
+		return DIRECTORY_SEPARATOR === '\\' ? strtolower($value) : $value;
+	};
+	$path = $normalize($path);
+	$root = $normalize($root);
+	return $path === $root || str_starts_with($path, $root . '/');
+}
+
+function editor_require_local_access(): void
+{
+	if (PHP_SAPI === 'cli') return;
+	$allowRemote = filter_var(getenv('NEKO_EDITOR_ALLOW_REMOTE') ?: 'false', FILTER_VALIDATE_BOOL);
+	$authenticatedUser = $_SERVER['REMOTE_USER'] ?? $_SERVER['PHP_AUTH_USER'] ?? '';
+	if ($allowRemote && $authenticatedUser !== '') return;
+
+	$address = $_SERVER['REMOTE_ADDR'] ?? '';
+	if (!in_array($address, ['127.0.0.1', '::1'], true)) {
+		editor_fail(403, 'local_only', 'The editor API is local-only. Configure authentication before enabling remote access.');
+	}
+}
+
+function editor_require_same_origin(): void
+{
+	$fetchSite = strtolower($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '');
+	if ($fetchSite === 'cross-site') {
+		editor_fail(403, 'cross_site_request', 'Cross-site editor requests are not allowed.');
+	}
+
+	$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+	if ($origin === '') return;
+	$isHttps = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off');
+	$expectedOrigin = ($isHttps ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? '');
+	if ($expectedOrigin === 'http://' || strcasecmp(rtrim($origin, '/'), $expectedOrigin) !== 0) {
+		editor_fail(403, 'cross_site_request', 'Cross-site editor requests are not allowed.');
+	}
+}
+
 // ── Response helpers ─────────────────────────────────────────────────────────
 
 function editor_json_response(int $status, array $payload): never
 {
     http_response_code($status);
+	header_remove('X-Powered-By');
     header('Content-Type: application/json; charset=utf-8');
     header('X-Content-Type-Options: nosniff');
+	header('Cache-Control: no-store');
+	header('Content-Security-Policy: default-src \'none\'; frame-ancestors \'none\'');
+	header('Referrer-Policy: no-referrer');
+	header('X-Frame-Options: DENY');
     echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -73,13 +121,25 @@ function editor_require_method(string $method): void
 
 function editor_request_body(): array
 {
-    $raw = file_get_contents('php://input');
-    if (strlen($raw) > 2 * 1024 * 1024) {
-        editor_fail(413, 'payload_too_large', 'Request body exceeds the 2 MB limit.');
-    }
+	editor_require_same_origin();
+	$contentType = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0]));
+	if ($contentType !== 'application/json') {
+		editor_fail(415, 'unsupported_media_type', 'Content-Type must be application/json.');
+	}
+	$contentLength = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+	if ($contentLength > EDITOR_MAX_REQUEST_BYTES) {
+		editor_fail(413, 'payload_too_large', 'Request body exceeds the 2 MB limit.');
+	}
+	$raw = file_get_contents('php://input', false, null, 0, EDITOR_MAX_REQUEST_BYTES + 1);
+	if ($raw === false || strlen($raw) > EDITOR_MAX_REQUEST_BYTES) {
+		editor_fail(413, 'payload_too_large', 'Request body exceeds the 2 MB limit.');
+	}
     $data = json_decode($raw, true);
     if (!is_array($data) || array_is_list($data)) {
-        editor_fail(400, 'bad_request', 'Request body must be a JSON object.');
+		$message = json_last_error() === JSON_ERROR_NONE
+			? 'Request body must be a JSON object.'
+			: 'Request body contains malformed JSON.';
+		editor_fail(400, 'bad_request', $message);
     }
     return $data;
 }
@@ -104,10 +164,10 @@ function editor_resolve_file(string $fileId): array
     // can still validate the canonical form).
     $canonical = EDITOR_PROJECT_ROOT . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative);
     $resolvedDir = realpath(dirname($canonical));
-    if ($resolvedDir !== false && strpos($resolvedDir . DIRECTORY_SEPARATOR, EDITOR_PROJECT_ROOT . DIRECTORY_SEPARATOR) !== 0) {
+    if ($resolvedDir !== false && !editor_path_is_within($resolvedDir, EDITOR_PROJECT_ROOT)) {
         editor_fail(400, 'bad_request', "File id resolves outside the project root.");
     }
-    if ($absolute !== false && strpos($absolute, EDITOR_PROJECT_ROOT . DIRECTORY_SEPARATOR) !== 0) {
+    if ($absolute !== false && !editor_path_is_within($absolute, EDITOR_PROJECT_ROOT)) {
         editor_fail(400, 'bad_request', "File id resolves outside the project root.");
     }
 
@@ -153,11 +213,11 @@ function editor_read_json(string $absolutePath): array
 {
     $raw = file_get_contents($absolutePath);
     if ($raw === false) {
-        editor_fail(500, 'malformed_json', "Could not read file: $absolutePath");
+        editor_fail(500, 'read_failed', 'Could not read the requested content file.');
     }
     $data = json_decode($raw, true);
     if ($data === null) {
-        editor_fail(500, 'malformed_json', "File is not valid JSON: $absolutePath — " . json_last_error_msg());
+        editor_fail(500, 'malformed_json', 'The requested content file is not valid JSON.');
     }
     return $data;
 }
@@ -617,14 +677,14 @@ function editor_backup_file(string $absolutePath): ?string
 
     if (!is_dir($backupDir)) {
         if (!mkdir($backupDir, 0755, true)) {
-            editor_fail(500, 'write_failed', "Could not create backup directory: $backupDir");
+            editor_fail(500, 'write_failed', 'Could not create the backup directory.');
         }
     }
 
     $timestamp  = date('Y-m-d\TH-i-s');
     $backupPath = $backupDir . "/$basename.$timestamp.json";
     if (!copy($absNorm, $backupPath)) {
-        editor_fail(500, 'write_failed', "Could not create backup: $backupPath");
+        editor_fail(500, 'write_failed', 'Could not create the content backup.');
     }
 
     // Prune: keep only the 20 most recent backups for this basename.
@@ -664,10 +724,12 @@ function editor_atomic_write(string $absolutePath, array $content): void
     $tmp  = $dir . DIRECTORY_SEPARATOR . basename($absolutePath) . '.tmp.' . bin2hex(random_bytes(4));
     if (file_put_contents($tmp, $json) === false) {
         @unlink($tmp);
-        editor_fail(500, 'write_failed', "Could not write temp file: $tmp");
+        editor_fail(500, 'write_failed', 'Could not write the temporary content file.');
     }
     if (!rename($tmp, $absolutePath)) {
         @unlink($tmp);
-        editor_fail(500, 'write_failed', "Could not rename temp file to: $absolutePath");
+        editor_fail(500, 'write_failed', 'Could not replace the content file atomically.');
     }
 }
+
+editor_require_local_access();

@@ -348,6 +348,13 @@ class TileMapLoader {
 			const gid = parseInt(objectEl.getAttribute('gid') || '0');
 			const rotation = parseFloat(objectEl.getAttribute('rotation') || '0');
 
+			const objectProperties = this.parseProperties(objectEl.querySelector('properties'));
+			const inheritedObjectProperties = {};
+			['draggable', 'storable'].forEach(propertyName => {
+				if (group.properties?.[propertyName] !== undefined) {
+					inheritedObjectProperties[propertyName] = group.properties[propertyName];
+				}
+			});
 			const object = {
 				id,
 				x,
@@ -360,7 +367,10 @@ class TileMapLoader {
 				gid,
 				rotation,
 				visible: objectEl.getAttribute('visible') !== '0',
-				properties: this.parseProperties(objectEl.querySelector('properties'))
+				properties: {
+					...inheritedObjectProperties,
+					...(objectProperties || {})
+				}
 			};
 
 			// Parse polygon/polyline if present
@@ -487,6 +497,13 @@ class TileMapLoader {
 				lightingKind === 'room' ||
 				(groupName === 'LIGHTING' && !!roomId);
 			if (isRoomVolume) {
+				const cellSize = Number(obj.properties?.cellSize) || mapData.tileWidth || 32;
+				const tilemask = this.parseTilemask(
+					obj.properties?.tilemask,
+					obj.x,
+					obj.y,
+					cellSize
+				);
 				mapData.environment.rooms.push({
 					id: String(roomId || displayName).toLowerCase().replace(/[^a-z0-9_-]+/g, '_'),
 					displayName,
@@ -497,6 +514,7 @@ class TileMapLoader {
 						height: obj.height
 					},
 					polygon: Array.isArray(obj.polygon) ? obj.polygon : null,
+					tilemask: tilemask ? { cells: tilemask, cellSize } : null,
 					properties: {
 						...obj.properties
 					}
@@ -526,6 +544,30 @@ class TileMapLoader {
 
 			return true;
 		});
+	}
+
+	/**
+	 * Parse a compact, object-local Tiled room mask. Rows are separated by `/`,
+	 * `;`, or a newline; `1`/`#` marks a member cell and `0`/`.` an empty cell.
+	 * The returned cells use absolute map-grid coordinates, which is the canonical
+	 * SpatialRegion tilemask representation.
+	 */
+	parseTilemask(rawMask, originX, originY, cellSize = 32) {
+		if (typeof rawMask !== 'string' || rawMask.trim() === '') return null;
+		const rows = rawMask.trim().split(/[\/;\r\n]+/).map(row => row.trim()).filter(Boolean);
+		if (rows.length === 0) return null;
+
+		const originCellX = Math.floor((Number(originX) || 0) / cellSize);
+		const originCellY = Math.floor((Number(originY) || 0) / cellSize);
+		const cells = [];
+		rows.forEach((row, rowIndex) => {
+			[...row.replace(/\s+/g, '')].forEach((value, columnIndex) => {
+				if (value === '1' || value === '#') {
+					cells.push([originCellX + columnIndex, originCellY + rowIndex]);
+				}
+			});
+		});
+		return cells.length > 0 ? cells : null;
 	}
 
 	createSpawnsFromObjects(mapData) {

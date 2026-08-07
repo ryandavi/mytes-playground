@@ -61,6 +61,7 @@ class MapObjectInputController {
 				object.container?.camera?.beginTemporaryFollow?.(object);
 				if (object.container?.ui) object.container.ui.setSelected(object);
 				object.playConfiguredSound?.('pickup');
+				this._removeStorageDragPreview();
 				if (object.getConfig('directionConfigs', null) && SiteConfig.objects.canRotate) {
 					object._rotateKeyHandler = (e) => {
 						if ((e.key === 'r' || e.key === 'R') && object.isDragging) {
@@ -72,6 +73,8 @@ class MapObjectInputController {
 				}
 			},
 			onDragMove: (event) => {
+				const clientX = event.originalEvent?.clientX ?? event.position?.clientX;
+				const clientY = event.originalEvent?.clientY ?? event.position?.clientY;
 				const world = object.container?.inputHandler?.screenToWorldCoordinates
 					? object.container.inputHandler.screenToWorldCoordinates(event.position.x, event.position.y, {
 						element: object
@@ -85,15 +88,22 @@ class MapObjectInputController {
 				object.updatePosition();
 				object.container?.camera?.focusOn?.(object);
 				object.showDropTarget();
+				this._updateStorageDragPreview(clientX, clientY);
 			},
-			onDragEnd: () => {
+			onDragEnd: (event) => {
 				object.isDragging = false;
 				object.container?.camera?.endTemporaryFollow?.(object);
 				object.element.classList.remove('dragging');
 				object.hideDropTarget();
+				object.container?.inventory?.inventoryElement?.classList.remove('is-store-target', 'is-store-target-invalid');
+				this._removeStorageDragPreview();
 				if (object._rotateKeyHandler) {
 					window.removeEventListener('keydown', object._rotateKeyHandler);
 					object._rotateKeyHandler = null;
+				}
+				const originalEvent = event?.originalEvent;
+				if (originalEvent && object.container?.inventory?.isPointInside?.(originalEvent.clientX, originalEvent.clientY)) {
+					if (object.container.inventory.storeMapObject(object)) return;
 				}
 				if (object.getConfig('snapToGrid', false)) object.snapToGrid();
 				if (object.container?.clampEntityPosition) {
@@ -132,6 +142,55 @@ class MapObjectInputController {
 				object.handleMovedEvent();
 			}
 		});
+	}
+
+	_updateStorageDragPreview(clientX, clientY) {
+		const object = this.object;
+		const inventory = object.container?.inventory;
+		const inventoryElement = inventory?.inventoryElement;
+		const isOverInventory = Number.isFinite(clientX) && Number.isFinite(clientY) &&
+			inventory?.isPointInside?.(clientX, clientY) === true;
+		const itemDefinition = ItemRegistry.findItemForWorldObject(object);
+		const canStore = !!itemDefinition && !object.isInUse?.() && inventory?.canAddItem?.(itemDefinition.id, 1) === true;
+
+		inventoryElement?.classList.toggle('is-store-target', isOverInventory && canStore);
+		inventoryElement?.classList.toggle('is-store-target-invalid', isOverInventory && !canStore);
+
+		if (!isOverInventory) {
+			this._removeStorageDragPreview();
+			return;
+		}
+
+		if (!object._storageDragPreview) {
+			const preview = object.element?.cloneNode?.(true);
+			if (!preview) return;
+			preview.removeAttribute('data-object-id');
+			preview.classList.add('map-object-storage-ghost');
+			preview.setAttribute('aria-hidden', 'true');
+			Object.assign(preview.style, {
+				position: 'fixed',
+				width: `${object.size.width}px`,
+				height: `${object.size.height}px`,
+				pointerEvents: 'none',
+				zIndex: 'var(--z-dragged)',
+				transformOrigin: 'center'
+			});
+			document.body.appendChild(preview);
+			object._storageDragPreview = preview;
+			object.element?.classList.add('is-storage-preview-source');
+		}
+
+		const zoom = object.container?.camera?.zoomLevel || 1;
+		object._storageDragPreview.style.left = `${clientX}px`;
+		object._storageDragPreview.style.top = `${clientY}px`;
+		object._storageDragPreview.style.transform = `translate(-50%, -50%) scale(${zoom})`;
+	}
+
+	_removeStorageDragPreview() {
+		const object = this.object;
+		object.element?.classList.remove('is-storage-preview-source');
+		object._storageDragPreview?.remove();
+		object._storageDragPreview = null;
 	}
 
 	initRubbingComponent() {
@@ -468,6 +527,8 @@ class MapObjectInputController {
 
 	dispose() {
 		const object = this.object;
+		this._removeStorageDragPreview();
+		object.container?.inventory?.inventoryElement?.classList.remove('is-store-target', 'is-store-target-invalid');
 		if (object._rotateKeyHandler) {
 			window.removeEventListener('keydown', object._rotateKeyHandler);
 			object._rotateKeyHandler = null;

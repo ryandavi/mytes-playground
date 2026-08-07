@@ -241,6 +241,10 @@ function validateItems() {
     }
 
     const items = Array.isArray(itemCatalog.items) ? itemCatalog.items : [];
+    const mapObjectCatalog = readJson('data/map-objects/types.json') || {};
+    const mapObjectTypes = new Set(Object.keys(mapObjectCatalog).map(type => String(type).toUpperCase()));
+    const primaryActions = new Set(['feed', 'use', 'place', 'inspect']);
+    const worldModes = new Set(['dropped_item', 'map_object']);
     ensureUniqueIds(items, 'data/metadata/items.json items', entry => normalizeId(entry.id));
 
     const claimedIds = new Map();
@@ -251,6 +255,30 @@ function validateItems() {
 
     items.forEach((item) => {
         const itemId = normalizeId(item.id);
+        const stackLimit = item.inventory?.stackLimit;
+        if (stackLimit !== undefined && (!Number.isInteger(stackLimit) || stackLimit < 1)) {
+            fail(`Item "${itemId}" inventory.stackLimit must be a positive integer.`);
+        }
+        const primaryAction = item.inventory?.primaryAction;
+        if (primaryAction !== undefined && !primaryActions.has(primaryAction)) {
+            fail(`Item "${itemId}" has unknown inventory.primaryAction "${primaryAction}".`);
+        }
+        const worldMode = item.world?.mode;
+        if (worldMode !== undefined && !worldModes.has(worldMode)) {
+            fail(`Item "${itemId}" has unknown world.mode "${worldMode}".`);
+        }
+        if (worldMode === 'map_object') {
+            const objectType = String(item.world?.objectType || '').toUpperCase();
+            if (!mapObjectTypes.has(objectType)) {
+                fail(`Item "${itemId}" references unknown map object type "${item.world?.objectType}".`);
+            }
+            if (!normalizeId(item.world?.variant)) {
+                fail(`Item "${itemId}" with world.mode "map_object" requires world.variant.`);
+            }
+        }
+        if (item.use?.target === 'myte' && !isPlainObject(item.use.effects)) {
+            fail(`Item "${itemId}" targeting a Myte requires use.effects.`);
+        }
         const aliases = Array.isArray(item.aliases) ? item.aliases : [];
         aliases.forEach((alias) => {
             const normalizedAlias = normalizeId(alias);
@@ -722,6 +750,33 @@ function validateAudioPresets() {
     });
 }
 
+function validateRegionFixture() {
+	const fixturePath = 'data/maps/RegionTest.tmx';
+	if (!exists(fixturePath)) {
+		fail(`${fixturePath} is required as the authored irregular-room acceptance fixture.`);
+		return;
+	}
+
+	const source = readText(fixturePath);
+	const match = source.match(/<property\s+name="tilemask"\s+value="([^"]+)"\s*\/>/i);
+	if (!match) {
+		fail(`${fixturePath} must author a compact tilemask property.`);
+		return;
+	}
+
+	const rows = match[1].split(/[\/;\r\n]+/).map(row => row.trim()).filter(Boolean);
+	const occupied = new Set();
+	rows.forEach((row, y) => [...row].forEach((value, x) => {
+		if (value === '1' || value === '#') occupied.add(`${x},${y}`);
+	}));
+	if (!occupied.has('0,0') || !occupied.has('2,0') || !occupied.has('0,2')) {
+		fail(`${fixturePath} tilemask must include both arms of the L-shaped room.`);
+	}
+	if (occupied.has('1,1')) {
+		fail(`${fixturePath} tilemask concave corner must remain outside the room.`);
+	}
+}
+
 function run() {
     validateNoLegacyFiles();
     validateMytes();
@@ -731,6 +786,7 @@ function run() {
     validateMapObjects();
     validateZones();
     validateAudioPresets();
+	validateRegionFixture();
 
     if (warnings.length) {
         console.warn('Warnings:');

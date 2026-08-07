@@ -347,6 +347,29 @@ class DoorMapObject extends OpenableMapObject {
         return [];
     }
 
+    getQueuedInteractionOptions() {
+        return { desiredOpenState: !this.isOpen };
+    }
+
+    performQueuedInteraction(myte, parent, { desiredOpenState } = {}) {
+        if (!this.active || !myte || this.isAnimating) return false;
+
+        const shouldOpen = typeof desiredOpenState === 'boolean' ? desiredOpenState : !this.isOpen;
+        if (this.isOpen === shouldOpen) return true;
+        const changed = this.trySetOpenState(shouldOpen, {
+            triggeredBy: 'manual',
+            actor: myte,
+            parent
+        });
+
+        if (!changed && !shouldOpen) {
+            myte.container?.notify?.warn?.('Move clear of the doorway before closing it.', {
+                title: 'Doorway Blocked'
+            });
+        }
+        return changed;
+    }
+
     press(parent) {
         const myte = this.activeMyte;
         if (!this.active || !myte || this.isAnimating) return false;
@@ -354,16 +377,9 @@ class DoorMapObject extends OpenableMapObject {
         this.selectInUi();
 
         const desiredState = this.isOpen ? 'closed' : 'open';
-        const interact = () => {
-            if (desiredState === 'closed' && this.isEntityInDoorway(myte, 16)) {
-                return false;
-            }
-            this.trySetOpenState(desiredState === 'open', {
-                triggeredBy: 'manual',
-                actor: myte,
-                parent
-            });
-        };
+        const interact = () => this.performQueuedInteraction(myte, parent, {
+            desiredOpenState: desiredState === 'open'
+        });
 
         if (this.isInInteractionRange(myte, this.getInteractionRadius())) {
             interact();

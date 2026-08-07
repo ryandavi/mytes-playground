@@ -447,6 +447,12 @@ class MapEnvironmentManager {
                 width: Number(bounds.width) || 0,
                 height: Number(bounds.height) || 0
             },
+			tilemask: Array.isArray(source.tilemask?.cells)
+				? {
+					cells: source.tilemask.cells,
+					cellSize: Number(source.tilemask.cellSize) || 32
+				}
+				: null,
             lighting: {
                 ambientFloor: Number(props.ambientFloor ?? props.roomAmbientFloor ?? defaults.ambientFloor ?? 0.18),
                 ambientCeiling: Number(props.ambientCeiling ?? props.roomAmbientCeiling ?? defaults.ambientCeiling ?? 0.72),
@@ -483,7 +489,11 @@ class MapEnvironmentManager {
             ? this.mapData.environment.rooms
             : [];
         const polygonById = new Map();
+		const tilemaskById = new Map();
         for (const room of authored) {
+			if (Array.isArray(room?.tilemask?.cells) && room.tilemask.cells.length > 0) {
+				tilemaskById.set(String(room.id).toLowerCase(), room.tilemask);
+			}
             if (!Array.isArray(room?.polygon) || room.polygon.length < 3) continue;
             const originX = Number(room.bounds?.x) || 0;
             const originY = Number(room.bounds?.y) || 0;
@@ -495,12 +505,15 @@ class MapEnvironmentManager {
 
         for (const volume of this.roomVolumes) {
             const polygon = polygonById.get(String(volume.id).toLowerCase());
+			const tilemask = tilemaskById.get(String(volume.id).toLowerCase()) ?? volume.tilemask;
             regionManager.add(new SpatialRegion({
                 id: volume.id,
                 layer: 'room',
-                shape: polygon
-                    ? { kind: 'polygon', points: polygon, bounds: volume.bounds }
-                    : { kind: 'rect', bounds: volume.bounds },
+                shape: tilemask
+					? { kind: 'tilemask', cells: tilemask.cells, cellSize: tilemask.cellSize, bounds: volume.bounds }
+					: polygon
+						? { kind: 'polygon', points: polygon, bounds: volume.bounds }
+						: { kind: 'rect', bounds: volume.bounds },
                 properties: {
                     displayName: volume.displayName,
                     indoor: true,

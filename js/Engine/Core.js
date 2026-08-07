@@ -109,6 +109,26 @@ class MyteCore {
         }, 9000);
     }
 
+	showWelcomeBack() {
+		const summary = this.user?.returnSummary;
+		if (!summary) return;
+
+		const hours = Math.max(1, Math.floor(summary.awayMs / (60 * 60 * 1000)));
+		const days = Math.floor(hours / 24);
+		const awayLabel = days >= 2
+			? `${days} days`
+			: hours >= 24
+				? 'a day'
+				: `${hours} hour${hours === 1 ? '' : 's'}`;
+
+		this.toastManager?.info?.(
+			`You were away for ${awayLabel}. Your Mytes are just as you left them—time away never drains their needs.`,
+			'Welcome Back',
+			{ duration: SiteConfig.ui.welcomeBack.toastDurationMs }
+		);
+		this.user.returnSummary = null;
+	}
+
     /**
      * Make post-boot runtime errors visible.
      *
@@ -240,6 +260,7 @@ class MyteCore {
             this.applyNotificationPreference();
             // Only meaningful once there is a toast system to report through.
             this.installGlobalErrorHandlers();
+			this.showWelcomeBack();
             this.showFirstRunHints();
 
         } catch (error) {

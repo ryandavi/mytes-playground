@@ -2,15 +2,31 @@ class ActionSidebarManager extends UIComponent {
     constructor(parent) {
         super(parent);
         this.actionControls = this.parent.containerWrapper.querySelector('#action-controls');
+		this.sidebar = this.actionControls?.closest('.sidebar') ?? null;
         this.currentSelectedObject = null;
         this._otherInfoCache = null;
         this._otherInfoStructureKey = null;
         this._otherInfoRowMap = new Map();
         this._eventUnsubscribers = [];
         this._refreshQueued = false;
+		this.boundCloseSidebar = () => this.parent.selectionManager.setSelected(null);
+		this.boundSidebarKeydown = event => {
+			if (event.key === 'Escape' && this.sidebar?.classList.contains('is-open')) {
+				this.boundCloseSidebar();
+			}
+		};
     }
 
     init() {
+		this.closeButton = document.createElement('button');
+		this.closeButton.type = 'button';
+		this.closeButton.className = 'action-sidebar-close';
+		this.closeButton.setAttribute('aria-label', 'Close actions');
+		this.closeButton.textContent = '×';
+		this.closeButton.addEventListener('click', this.boundCloseSidebar);
+		this.actionControls?.prepend(this.closeButton);
+		document.addEventListener('keydown', this.boundSidebarKeydown);
+
         const eventManager = this.parent.parent.eventManager;
         if (!eventManager) return;
 
@@ -26,10 +42,10 @@ class ActionSidebarManager extends UIComponent {
         };
 
         ['myte:queue_changed', 'myte:mode_changed', 'myte:started', 'myte:stopped',
-            'container:active_myte_changed', 'myte:stats_changed', 'world:action_availability_changed',
+            'container:active_myte_changed', 'world:action_availability_changed',
             'chest:opened', 'plant:matured', 'plant:pollinated', 'plant:mutated']
             .forEach(event => this._eventUnsubscribers.push(eventManager.on(event, invalidateActions)));
-        ['myte:ai_decision_changed']
+        ['myte:ai_decision_changed', 'myte:stats_changed']
             .forEach(event => this._eventUnsubscribers.push(eventManager.on(event, invalidateDetails)));
     }
 
@@ -118,6 +134,17 @@ class ActionSidebarManager extends UIComponent {
         return this.parent.parent.mytes?.find?.(myte => myte.dropTarget === slotElement) ?? null;
     }
 
+    isInventoryItemSelection(selectedObject) {
+        return selectedObject instanceof Element &&
+            selectedObject.classList.contains('item') &&
+            selectedObject.closest('#inventory') === this.parent.parent.inventory?.inventoryElement;
+    }
+
+    getInventoryItemDefinition(selectedObject) {
+        if (!this.isInventoryItemSelection(selectedObject)) return null;
+        return ItemRegistry.getItemSync?.(selectedObject.dataset.variant || selectedObject.dataset.name) ?? null;
+    }
+
     getTargetTypeLabel(selectedObject, activeMyte) {
         if (selectedObject instanceof Myte) {
             return this.getMyteTypeLabel(selectedObject);
@@ -130,6 +157,12 @@ class ActionSidebarManager extends UIComponent {
         if (selectedObject instanceof DroppedMapItem) {
             const itemDef = ItemRegistry.getItemSync?.(selectedObject.variant);
             return this.humanizeLabel(itemDef?.type || 'Item', { uppercase: true });
+        }
+
+
+        if (this.isInventoryItemSelection(selectedObject)) {
+            const itemDef = this.getInventoryItemDefinition(selectedObject);
+            return this.humanizeLabel(itemDef?.type || selectedObject.dataset.type || 'Item', { uppercase: true });
         }
 
         if (selectedObject?.classList?.contains('myte-slot')) {
@@ -553,6 +586,38 @@ class ActionSidebarManager extends UIComponent {
             ]);
         }
 
+
+        if (this.isInventoryItemSelection(selectedObject)) {
+            const itemDef = this.getInventoryItemDefinition(selectedObject);
+            const quantity = Number(selectedObject.dataset.quantity) || 1;
+            const effects = itemDef?.use?.effects || {};
+            const effectLabels = {
+                satiety: 'Fullness',
+                energy: 'Energy',
+                fun: 'Fun',
+                health: 'Health',
+                social: 'Social',
+                comfort: 'Comfort'
+            };
+
+            this.appendSectionHeader(rows, 'item', 'Item');
+            this.appendInfoRows(rows, [
+                { label: 'Quantity', value: String(quantity) },
+                { label: 'Description', value: itemDef?.description || selectedObject.dataset.description || null }
+            ]);
+
+            const effectRows = Object.entries(effects)
+                .filter(([, value]) => Number.isFinite(value) && value !== 0)
+                .map(([stat, value]) => ({
+                    label: effectLabels[stat] || this.humanizeLabel(stat),
+                    value: `${value > 0 ? '+' : ''}${value}`
+                }));
+            if (effectRows.length) {
+                this.appendSectionHeader(rows, 'effects', 'Effects');
+                this.appendInfoRows(rows, effectRows);
+            }
+        }
+
         if (selectedObject instanceof MapObject) {
             rows.push(...this.getObjectStateRows(selectedObject));
         }
@@ -741,7 +806,13 @@ class ActionSidebarManager extends UIComponent {
         const targetType = selectedInfo.querySelector('.target-info .type');
         const targetName = selectedInfo.querySelector('.target-info .name');
         const activeMyte = this.parent.getActiveMyte();
+		const selectionChanged = selectedObject !== this.currentSelectedObject;
         this.currentSelectedObject = selectedObject;
+		if (!selectedObject) {
+			this.sidebar?.classList.remove('is-open');
+		} else if (selectionChanged) {
+			this.sidebar?.classList.add('is-open');
+		}
         this._otherInfoCache = null;
         this._otherInfoStructureKey = null;
         this._otherInfoRowMap.clear();
@@ -774,6 +845,12 @@ class ActionSidebarManager extends UIComponent {
                     const itemDef = ItemRegistry.getItemSync?.(selectedObject.variant);
                     targetName.textContent = itemDef?.name || selectedObject.variant || 'Item';
                     this.actionControls.classList.add('is-visible');
+                } else if (this.isInventoryItemSelection(selectedObject)) {
+                    const itemDef = this.getInventoryItemDefinition(selectedObject);
+                    selectedInfo.classList.add('element-interaction');
+                    interactionType.textContent = 'Inventory Item';
+                    targetType.textContent = this.getTargetTypeLabel(selectedObject, activeMyte);
+                    targetName.textContent = itemDef?.label || selectedObject.dataset.name || 'Item';
                 } else if (selectedObject?.classList?.contains('myte-slot')) {
                     selectedInfo.classList.add('map-interaction');
                     targetType.textContent = this.getTargetTypeLabel(selectedObject, activeMyte);
@@ -830,6 +907,109 @@ class ActionSidebarManager extends UIComponent {
             });
         });
         return button;
+    }
+
+    renderInventoryItemAction(actionGroups, selectedObject, activeMyte) {
+        const itemDef = this.getInventoryItemDefinition(selectedObject);
+        if (!itemDef) return false;
+
+        const primaryAction = itemDef.inventory?.primaryAction ||
+            (itemDef.use?.target === 'myte' ? 'use' : null);
+        if (!primaryAction) return false;
+
+        const requiresMyte = primaryAction !== 'place';
+        const button = document.createElement('button');
+        button.classList.add('primary-action');
+        button.textContent = primaryAction === 'place'
+            ? 'Place in World'
+            : (primaryAction === 'feed' ? 'Feed Active Myte' : 'Use on Active Myte');
+        button.disabled = requiresMyte && !activeMyte?.isActive;
+        if (button.disabled) {
+            button.classList.add('is-unavailable');
+            button.setAttribute('aria-disabled', 'true');
+            this.bindTooltip(button, 'Select an active Myte first.');
+        }
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (button.disabled) return;
+            this.parent.parent.inventory?.activateItemElement?.(selectedObject);
+        });
+
+        const group = document.createElement('div');
+        group.className = 'action-group major-action inventory-item-action';
+        const list = document.createElement('ul');
+        const item = document.createElement('li');
+        item.appendChild(button);
+        list.appendChild(item);
+        group.appendChild(list);
+        actionGroups.appendChild(group);
+        return true;
+    }
+
+    getInventoryStorageState(selectedObject) {
+        const inventory = this.parent.parent.inventory;
+        if (!inventory || !selectedObject) return null;
+
+        if (selectedObject instanceof DroppedMapItem) {
+            if (!selectedObject.active || selectedObject.collected) return null;
+            const entry = selectedObject.getInventoryEntryData?.(selectedObject.quantity || 1);
+            if (!entry) return null;
+            const hasCapacity = inventory.canAddItem(entry.variant, entry.quantity);
+            return {
+                canStore: hasCapacity,
+                unavailableReason: hasCapacity ? null : 'There is not enough inventory space.',
+                store: () => inventory.storeDroppedItem(selectedObject)
+            };
+        }
+
+        if (selectedObject instanceof MapObject) {
+            const itemDefinition = ItemRegistry.findItemForWorldObject(selectedObject);
+            if (!itemDefinition) return null;
+            const inUse = selectedObject.isInUse?.() === true;
+            const hasCapacity = inventory.canAddItem(itemDefinition.id, 1);
+            return {
+                canStore: !inUse && hasCapacity,
+                unavailableReason: inUse
+                    ? 'This object is currently in use.'
+                    : (hasCapacity ? null : 'There is not enough inventory space.'),
+                store: () => inventory.storeMapObject(selectedObject)
+            };
+        }
+
+        return null;
+    }
+
+    renderInventoryStorageAction(actionGroups, selectedObject) {
+        const storage = this.getInventoryStorageState(selectedObject);
+        if (!storage) return false;
+
+        const groupElement = document.createElement('div');
+        groupElement.className = 'action-group inventory-actions';
+        const title = document.createElement('h3');
+        title.textContent = 'Inventory';
+        const actionList = document.createElement('ul');
+        const li = document.createElement('li');
+        const button = document.createElement('button');
+        button.textContent = 'Store in Inventory';
+        button.disabled = !storage.canStore;
+        if (storage.unavailableReason) {
+            button.classList.add('is-unavailable');
+            button.setAttribute('aria-disabled', 'true');
+            this.bindTooltip(button, storage.unavailableReason);
+        }
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!storage.canStore) return;
+            if (!storage.store()) this.updateActions(selectedObject);
+        });
+
+        li.appendChild(button);
+        actionList.appendChild(li);
+        groupElement.append(title, actionList);
+        actionGroups.appendChild(groupElement);
+        return true;
     }
 
     createSidebarInteractionButton(interaction, { prominent = false } = {}) {
@@ -934,6 +1114,13 @@ class ActionSidebarManager extends UIComponent {
             sidebarInteractions.filter(interaction => interaction !== majorSidebarInteraction)
         );
 
+        if (this.isInventoryItemSelection(selectedObject)) {
+            this.renderInventoryItemAction(actionGroups, selectedObject, activeMyte);
+            this.actionControls.classList.add('is-visible');
+            actionGroups.scrollTop = previousScrollTop;
+            return;
+        }
+
         if (selectedObject instanceof DroppedMapItem) {
             this.actionControls.classList.add('is-visible');
             if (activeMyte && !selectedObject.collected) {
@@ -946,6 +1133,7 @@ class ActionSidebarManager extends UIComponent {
                 groupEl.appendChild(ul);
                 actionGroups.appendChild(groupEl);
             }
+            this.renderInventoryStorageAction(actionGroups, selectedObject);
             actionGroups.scrollTop = previousScrollTop;
             return;
         }
@@ -1015,6 +1203,8 @@ class ActionSidebarManager extends UIComponent {
             actionGroups.appendChild(majorActionElement);
         }
 
+        this.renderInventoryStorageAction(actionGroups, selectedObject);
+
         Object.entries(groupedActions).forEach(([category, actions]) => {
             const groupElement = document.createElement('div');
             groupElement.className = `action-group ${category}`;
@@ -1046,11 +1236,16 @@ class ActionSidebarManager extends UIComponent {
     }
 
     dispose() {
+		document.removeEventListener('keydown', this.boundSidebarKeydown);
+		this.closeButton?.removeEventListener('click', this.boundCloseSidebar);
+		this.closeButton?.remove();
         this._eventUnsubscribers.forEach(unsubscribe => unsubscribe());
         this._eventUnsubscribers = [];
         this.currentSelectedObject = null;
         this._otherInfoCache = null;
         this._otherInfoRowMap.clear();
         this.actionControls = null;
+		this.sidebar = null;
+		this.closeButton = null;
     }
 }

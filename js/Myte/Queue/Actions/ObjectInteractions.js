@@ -176,7 +176,10 @@ class InteractObjectAction extends GoToObjectAction {
     }
 
     static getRequiredOptions(selected) {
-        const options = { target: selected };
+        const options = {
+            target: selected,
+            ...(selected.getQueuedInteractionOptions?.() || {})
+        };
         if (selected instanceof PortalMapObject) {
             options.interactionAnimationDuration = 0;
             options.postActionIdleDuration = 0;
@@ -188,6 +191,7 @@ class InteractObjectAction extends GoToObjectAction {
         super(myte, options);
         this.phase = 'approach';
         this.animationTimer = 0;
+        this.desiredOpenState = options.desiredOpenState;
     }
 
     update(tickDelta) {
@@ -214,8 +218,13 @@ class InteractObjectAction extends GoToObjectAction {
         this.faceTarget();
         super.complete();
 
-        const hasCustomPress = typeof this.target?.press === 'function' && this.target.press !== MapObject.prototype.press;
-        if (hasCustomPress) {
+        if (this.didAbortApproach()) return;
+
+        if (typeof this.target?.performQueuedInteraction === 'function') {
+            this.target.performQueuedInteraction(this.myte, this.myte.parent, {
+                desiredOpenState: this.desiredOpenState
+            });
+        } else if (typeof this.target?.press === 'function' && this.target.press !== MapObject.prototype.press) {
             this.target.press(this.myte.parent);
         } else {
             // `interact` returns false when the object is still on cooldown or is
@@ -1164,13 +1173,18 @@ class EatElementAction extends GoToObjectAction {
             return;
         }
 
+        const itemDefinition = ItemRegistry.getItemSync?.(
+            this.target.inventoryVariant || this.target.variant
+        );
         // Apply nutritional benefits when the eating animation finishes
         this.myte.stats.applyStatEffects(
+            itemDefinition?.use?.effects ??
             this.target.getConsumableEffects?.() ??
             this.target.getConfig?.('effects', null) ??
             SiteConfig.food.effects
         );
         const saturationMs =
+            itemDefinition?.use?.saturationMs ??
             this.target.getConsumableSaturationMs?.() ??
             this.target.getConfig?.('saturationMs') ??
             SiteConfig.food.saturationMs;
@@ -1187,7 +1201,7 @@ class OpenChestAction extends GoToObjectAction {
 
     static canPerform(selected, active) {
         return active &&
-               selected?.constructor?.name === 'TreasureChestMapObject' &&
+			   selected?.capabilities?.lootContainer &&
                selected.state === 'closed' &&
                !active.queue.isCarrying();
     }
@@ -1225,6 +1239,7 @@ class OpenChestAction extends GoToObjectAction {
     complete() {
         this.faceTarget();
         super.complete();
+        if (this.didAbortApproach()) return;
         this.target?.open?.(this.myte.parent);
         this.myte.queue.addExpression('excited', 300, 2);
         if (this.receiveIdleDuration > 0) {
@@ -1239,7 +1254,7 @@ class CloseChestAction extends GoToObjectAction {
 
     static canPerform(selected, active) {
         return active &&
-               selected?.constructor?.name === 'TreasureChestMapObject' &&
+			   selected?.capabilities?.lootContainer &&
                selected.state === 'opened' &&
                selected.canClose === true &&
                !active.queue.isCarrying();
@@ -1278,6 +1293,7 @@ class CloseChestAction extends GoToObjectAction {
     complete() {
         this.faceTarget();
         super.complete();
+        if (this.didAbortApproach()) return;
         this.target?.close?.(this.myte.parent);
         if (this.postActionIdleDuration > 0) {
             this.myte.queue.addIdle(this.postActionIdleDuration);
@@ -1430,7 +1446,7 @@ class DrinkFromFountainAction extends GoToObjectAction {
 
     static canPerform(selected, active) {
         return active &&
-               selected?.constructor?.name === 'FountainMapObject' &&
+			   selected?.capabilities?.drinkSource &&
                !active.queue.isCarrying();
     }
 

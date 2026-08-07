@@ -169,6 +169,16 @@ class GameMap {
             : `data/maps/${mapId}.tmx`;
     }
 
+    getAuthoredObjectConfigOverrides(type, properties = {}) {
+        const overrides = { ...(properties || {}) };
+        const typeConfig = MapObjectFactory.getTypeConfig(type);
+        if (this.properties?.lockFurniture === true && typeConfig?.storable === true) {
+            if (overrides.draggable === undefined) overrides.draggable = false;
+            if (overrides.storable === undefined) overrides.storable = false;
+        }
+        return overrides;
+    }
+
     createMapInitializationError(phase, mapId, attemptedPath, cause) {
         const reason = cause?.message || String(cause || 'Unknown error');
         const error = new Error(`Failed to ${phase} map "${mapId}" from "${attemptedPath}": ${reason}`);
@@ -299,6 +309,7 @@ class GameMap {
 		this.displayName = mapData.displayName;
 		this.description = mapData.description;
 		this.location = mapData.environment.location;
+		this.properties = { ...(mapData.properties || {}) };
 
 		this.gridSystem = new GridSystem(this);
 		// One geometry store for every area concept (zones now, lighting rooms
@@ -352,15 +363,16 @@ class GameMap {
 		}
 
         // Add objects
-        if (mapData.objects) {
+		if (mapData.objects) {
 			for (const objData of mapData.objects) {
 				const type = objData.type.toUpperCase();
+				const typeConfig = MapObjectFactory.getTypeConfig(type);
+				const configOverrides = this.getAuthoredObjectConfigOverrides(type, objData.properties);
 
 				// Bottom-align: if the tile placeholder in the map is shorter than the
 				// object's JSON-defined height, shift Y up so the bottoms coincide.
 				let posY = objData.y;
 				if (objData.tileHeight > 0) {
-					const typeConfig = MapObjectFactory.getTypeConfig(type);
 					const jsonHeight = typeConfig?.size?.height;
 					if (jsonHeight && jsonHeight !== objData.tileHeight) {
 						posY = objData.y + objData.tileHeight - jsonHeight;
@@ -368,7 +380,7 @@ class GameMap {
 				}
 
 				this.addObject(type, objData.variant, objData.x, posY, {
-					configOverrides: objData.properties,
+					configOverrides,
 					id: objData.id
 				});
 			}
@@ -982,7 +994,10 @@ class GameMap {
 
         if (this.regionManager) {
             this.mytes.forEach(myte => {
-                if (myte.isActive) this.regionManager.updateMembership(myte, { layers: ['room'] });
+                const isAttached = !!this.parent?.attachments?.getAttachment?.(myte);
+                if (myte.isActive && !isAttached) {
+                    this.regionManager.updateMembership(myte, { layers: ['room'] });
+                }
             });
         }
 
