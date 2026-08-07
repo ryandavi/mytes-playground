@@ -344,6 +344,7 @@ class ContainerInputManager {
     const blockedSelector = [
       '.world-myte',
       '.map-object',
+      '.dropped-item',
       '.myte-slot',
       '.interactive-hitbox',
       '.map-object-slot',

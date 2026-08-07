@@ -10,6 +10,20 @@ $item-color-medicine: #98fb98;
 
     padding: var(--space-xl);
 
+    &.is-store-target {
+        outline: var(--border-width) solid var(--state-success-accent);
+        outline-offset: calc(-1 * var(--border-width));
+    }
+
+    &.is-store-target-invalid {
+        outline: var(--border-width) solid var(--state-error-accent);
+        outline-offset: calc(-1 * var(--border-width));
+    }
+
+    &.is-placing-item {
+        cursor: crosshair;
+    }
+
     &.is-empty {
         opacity: 0.7;
 
@@ -83,6 +97,10 @@ $item-color-medicine: #98fb98;
         transform: scale(0.95);
     }
 
+    &.is-selected {
+        @include is-selected;
+    }
+
     &.dragging {
         opacity: 0.7;
         pointer-events: none;
@@ -92,6 +110,36 @@ $item-color-medicine: #98fb98;
     &.is-acquired {
         animation: item-acquired 0.9s var(--ease-ui) 3;
     }
+
+    &.is-placing {
+        outline: var(--border-width) solid var(--header-mid);
+        filter: brightness(1.15);
+    }
+
+    &.is-visual-placeholder {
+        display: grid;
+        place-items: center;
+        border: var(--border-width) inset var(--button-mid);
+        background: var(--surface-ui-inset);
+
+        &::before {
+            content: '?';
+            color: var(--text-muted);
+            font-weight: bold;
+        }
+    }
+}
+
+.dropped-item.is-being-stored {
+    opacity: 0.55;
+}
+
+.dropped-item-storage-ghost {
+    position: fixed;
+    z-index: var(--z-dragged);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    image-rendering: pixelated;
 }
 
 // Ghost of a purchased item travelling from the shop row into its slot.
@@ -141,13 +189,28 @@ $item-color-medicine: #98fb98;
     position: absolute;
     pointer-events: none;
     display: none;
-    z-index: 9999;
-    animation: drop-indicator-pulse 0.8s ease-in-out infinite;
+    z-index: var(--z-dragged);
 
-    @include inventory-drop-valid;
+    > .inventory-placement-preview {
+        position: absolute;
+        inset: 0;
+        image-rendering: pixelated;
+        opacity: 0.55;
+        transform-origin: center;
 
-    &.invalid {
-        @include inventory-drop-invalid;
+        &.is-placeholder {
+            display: grid;
+            place-items: center;
+            border: var(--border-width) dashed currentColor;
+            background: var(--surface-ui-inset);
+            color: var(--text-muted);
+            font-size: min(24px, 50%);
+            font-weight: bold;
+        }
+    }
+
+    &.is-drop-invalid > .inventory-placement-preview {
+        filter: grayscale(0.65);
     }
 }
 

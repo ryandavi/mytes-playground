@@ -1,4 +1,8 @@
 class PortalMapObject extends InteractiveMapObject {
+	hasGeneratedVisual() {
+		return this.usesFallbackVisual === true;
+	}
+
     constructor(parent, type, variant, posX, posY, config = {}, options = {}) {
         super(parent, type, variant, posX, posY, config, options);
 

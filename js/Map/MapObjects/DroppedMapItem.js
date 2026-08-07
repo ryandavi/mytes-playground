@@ -16,6 +16,8 @@ class BaseMapObject {
 }
 
 class DroppedMapItem {
+    static storageDragItem = null;
+
     constructor(parent, type, variant, posX, posY) {
         if (posY === undefined) {
             posY = posX;
@@ -93,13 +95,99 @@ class DroppedMapItem {
 
     _setupClickHandling() {
         if (!this.element) return;
-        let pressStartTime = 0;
-        this.element.addEventListener('pointerdown', () => { pressStartTime = Date.now(); });
-        this.element.addEventListener('pointerup', (e) => {
-            if (e.button !== 0) return;
-            if (Date.now() - pressStartTime > 400) return; // ignore long press
-            const container = this.parent?.parent;
-            container?.ui?.setSelected?.(this);
+        this.element.draggable = false;
+        const threshold = SiteConfig.interaction.gestures.clickMoveThreshold;
+        let pointerState = null;
+        let dragGhost = null;
+
+        const clearStorageDrag = () => {
+            this.storageDragActive = false;
+            if (DroppedMapItem.storageDragItem === this) DroppedMapItem.storageDragItem = null;
+            this.element?.classList.remove('is-being-stored');
+            this.parent?.parent?.inventory?.inventoryElement?.classList.remove('is-store-target');
+            dragGhost?.remove();
+            dragGhost = null;
+        };
+
+        const removePointerListeners = () => {
+            window.removeEventListener('pointermove', handlePointerMove, true);
+            window.removeEventListener('pointerup', handlePointerEnd, true);
+            window.removeEventListener('pointercancel', handlePointerEnd, true);
+        };
+
+        const beginStorageDrag = () => {
+            this.storageDragActive = true;
+            DroppedMapItem.storageDragItem = this;
+            this.element.classList.add('is-being-stored');
+            dragGhost = this.spriteElement?.cloneNode(true) ?? null;
+            if (dragGhost) {
+                dragGhost.classList.add('dropped-item-storage-ghost');
+                document.body.appendChild(dragGhost);
+            }
+        };
+
+        const updateStorageDrag = (event) => {
+            if (dragGhost) {
+                dragGhost.style.left = `${event.clientX}px`;
+                dragGhost.style.top = `${event.clientY}px`;
+            }
+            const inventory = this.parent?.parent?.inventory;
+            inventory?.inventoryElement?.classList.toggle(
+                'is-store-target',
+                inventory.isPointInside(event.clientX, event.clientY)
+            );
+        };
+
+        const handlePointerMove = (event) => {
+            if (!pointerState || event.pointerId !== pointerState.pointerId) return;
+            const distance = Math.hypot(
+                event.clientX - pointerState.startX,
+                event.clientY - pointerState.startY
+            );
+            if (!pointerState.dragging && distance >= threshold) {
+                pointerState.dragging = true;
+                beginStorageDrag();
+            }
+            if (!pointerState.dragging) return;
+            event.preventDefault();
+            event.stopPropagation();
+            updateStorageDrag(event);
+        };
+
+        const handlePointerEnd = (event) => {
+            if (!pointerState || event.pointerId !== pointerState.pointerId) return;
+            const wasDragging = pointerState.dragging;
+            const inventory = this.parent?.parent?.inventory;
+            const shouldStore = wasDragging && inventory?.isPointInside(event.clientX, event.clientY);
+            pointerState = null;
+            removePointerListeners();
+            clearStorageDrag();
+
+            event.stopPropagation();
+            if (wasDragging) {
+                event.preventDefault();
+                if (shouldStore) inventory.storeDroppedItem(this);
+                return;
+            }
+
+            if (this.active && !this.collected) {
+                this.parent?.parent?.ui?.setSelected?.(this);
+            }
+        };
+
+        this.element.addEventListener('pointerdown', (event) => {
+            if (event.button !== 0 || !this.active || this.collected) return;
+            event.preventDefault();
+            event.stopPropagation();
+            pointerState = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                dragging: false
+            };
+            window.addEventListener('pointermove', handlePointerMove, true);
+            window.addEventListener('pointerup', handlePointerEnd, true);
+            window.addEventListener('pointercancel', handlePointerEnd, true);
         });
     }
 
@@ -112,8 +200,11 @@ class DroppedMapItem {
             quantity: this.quantity,
             inventoryType: this.inventoryType,
             inventoryVariant: this.inventoryVariant,
+            inventoryName: this.inventoryName,
             description: this.description,
-            allowAutoCollect: this.allowAutoCollect
+            allowAutoCollect: this.allowAutoCollect,
+            userDropSource: this.userDropSource,
+            offeredToMytes: this.offeredToMytes
         };
     }
 
@@ -121,8 +212,11 @@ class DroppedMapItem {
         this.quantity = Math.max(1, Number(data.quantity) || 1);
         this.inventoryType = data.inventoryType ?? this.inventoryType;
         this.inventoryVariant = data.inventoryVariant ?? this.inventoryVariant;
+        this.inventoryName = data.inventoryName ?? this.inventoryName;
         this.description = data.description ?? this.description;
         this.allowAutoCollect = data.allowAutoCollect !== false;
+        this.userDropSource = data.userDropSource ?? this.userDropSource;
+        this.offeredToMytes = data.offeredToMytes === true;
         this.posX = Number.isFinite(data.posX) ? data.posX : this.posX;
         this.posY = Number.isFinite(data.posY) ? data.posY : this.posY;
         this.groundY = this.posY;
@@ -274,11 +368,13 @@ class DroppedMapItem {
     }
 
     getConsumableEffects() {
-        return this.getItemDefinition()?.effects ?? SiteConfig.food.effects;
+        const definition = this.getItemDefinition();
+        return definition?.use?.effects ?? definition?.effects ?? SiteConfig.food.effects;
     }
 
     getConsumableSaturationMs() {
-        return this.getItemDefinition()?.saturationMs ?? SiteConfig.food.saturationMs;
+        const definition = this.getItemDefinition();
+        return definition?.use?.saturationMs ?? definition?.saturationMs ?? SiteConfig.food.saturationMs;
     }
 
     updatePosition() {
@@ -296,7 +392,7 @@ class DroppedMapItem {
     }
 
     update(mytes = null, deltaTime = 16.667) {
-        if (this.collected) return;
+        if (this.collected || this.storageDragActive) return;
 
         // Accept a single myte or a list of candidate collectors.
         const candidateMytes = Array.isArray(mytes) ? mytes : (mytes ? [mytes] : []);

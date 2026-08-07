@@ -38,6 +38,38 @@ const DEFAULT_CAMERA_FOLLOW_MODE = CAMERA_FOLLOW_MODES.CHARACTER;
 
 class Utility {
 	static numberFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+	static imageAssetStates = new Map();
+	static imageAssetErrorHandlers = new Map();
+
+	static monitorImageAsset(url, onError) {
+		if (!url || typeof onError !== 'function') return;
+		const state = this.imageAssetStates.get(url);
+		if (state === 'loaded') return;
+		if (state === 'error') {
+			onError();
+			return;
+		}
+
+		if (!this.imageAssetErrorHandlers.has(url)) {
+			this.imageAssetErrorHandlers.set(url, new Set());
+		}
+		this.imageAssetErrorHandlers.get(url).add(onError);
+		if (state === 'loading') return;
+
+		this.imageAssetStates.set(url, 'loading');
+		const image = new Image();
+		image.onload = () => {
+			this.imageAssetStates.set(url, 'loaded');
+			this.imageAssetErrorHandlers.delete(url);
+		};
+		image.onerror = () => {
+			this.imageAssetStates.set(url, 'error');
+			const handlers = this.imageAssetErrorHandlers.get(url) || [];
+			this.imageAssetErrorHandlers.delete(url);
+			handlers.forEach(handler => handler());
+		};
+		image.src = url;
+	}
 
 
     /********************************************

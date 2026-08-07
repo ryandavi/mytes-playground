@@ -76,6 +76,7 @@ class SoundManager {
 		// Sound generators
 		this.synths = new Map();
 		this.loops = new Map();
+		this.retiredOneShotSynths = new Map();
 		this.currentMusicSynth = null;
 		this.currentMusicPart = null;
 		this.currentMusicLayers = [];
@@ -601,6 +602,28 @@ class SoundManager {
 		return sound;
 	}
 
+	rotateOneShotSynth(id, sound) {
+		const triggerLimit = SiteConfig.audio.oneShotSynthTriggerLimit;
+		if (!sound || this.loops.has(id) || (sound._oneShotTriggerCount || 0) < triggerLimit) {
+			return sound;
+		}
+
+		this.synths.delete(id);
+		const recycleDelay = SiteConfig.audio.oneShotSynthRecycleDelayMs;
+		const timer = setTimeout(() => {
+			this.retiredOneShotSynths.delete(sound);
+			this.disposeSoundResources(sound);
+		}, recycleDelay);
+		this.retiredOneShotSynths.set(sound, timer);
+
+		return this.createSynth(id);
+	}
+
+	recordOneShotTrigger(sound) {
+		if (!sound) return;
+		sound._oneShotTriggerCount = (sound._oneShotTriggerCount || 0) + 1;
+	}
+
 	play(id, options = {}) {
 		const preset = this.synthPresets[id];
 		if (!preset) {
@@ -623,7 +646,9 @@ class SoundManager {
 		this.lastPlayTimes.set(id, now);
 
 		// Create or get synth
-		const sound = this.synths.get(id) || this.createSynth(id);
+		let sound = this.synths.get(id) || this.createSynth(id);
+		if (!sound) return;
+		sound = this.rotateOneShotSynth(id, sound);
 		if (!sound) return;
 
 		if (sound.panner) {
@@ -660,6 +685,7 @@ class SoundManager {
 					},
 					manager: this
 				});
+				this.recordOneShotTrigger(sound);
 				return sound;
 			}
 
@@ -702,6 +728,7 @@ class SoundManager {
 				);
 				reserveScheduleUntil(startTime + Tone.Time(sound.duration).toSeconds());
 			}
+			this.recordOneShotTrigger(sound);
 		} catch (error) {
 			console.warn(`Error playing sound ${id}:`, error.message);
 		}
@@ -1486,6 +1513,12 @@ class SoundManager {
 			loop.stop();
 			loop.dispose();
 		});
+
+		this.retiredOneShotSynths.forEach((timer, sound) => {
+			clearTimeout(timer);
+			this.disposeSoundResources(sound);
+		});
+		this.retiredOneShotSynths.clear();
 
 		// Stop music
 		this.stopMusic();

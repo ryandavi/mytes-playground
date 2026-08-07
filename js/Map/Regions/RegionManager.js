@@ -173,13 +173,21 @@ class RegionManager {
     }
 
     // Single cleanup path — called from despawn alongside the other registries.
-    forget(entity) {
+    forget(entity, layers = null) {
         const record = this._membership.get(entity);
         if (!record) return;
-        for (const keys of record.byLayer.values()) {
+
+        const targetLayers = layers === null ? [...record.byLayer.keys()] : layers;
+        for (const layer of targetLayers) {
+            const keys = record.byLayer.get(layer);
+            if (!keys) continue;
             for (const key of keys) this.occupants.get(key)?.delete(entity);
+            record.byLayer.delete(layer);
         }
-        this._membership.delete(entity);
+
+        if (layers === null || record.byLayer.size === 0) {
+            this._membership.delete(entity);
+        }
     }
 
     clear() {

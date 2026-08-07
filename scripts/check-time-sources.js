@@ -15,6 +15,8 @@ const allowed = [
     /^Myte\/(FootstepController|MyteRenderer)\.js$/,
     /^Myte\/Input\//,
     /^UI\//,
+	// Save timestamps and welcome-back elapsed time are persistence/UI wall-clock data.
+	/^User\/User\.js$/,
     /^Utility\/Utility\.js$/
 ];
 

@@ -280,9 +280,18 @@
                     position: absolute;
                     pointer-events: none;
 
-                    body[data-tool-mode='select'] & {
+                    body[data-tool-mode='select'] &,
+                    body[data-tool-mode='drag'] & {
                         pointer-events: all;
+                        z-index: var(--z-drag) !important;
+                    }
+
+                    body[data-tool-mode='select'] & {
                         cursor: pointer;
+                    }
+
+                    body[data-tool-mode='drag'] & {
+                        cursor: grab;
                     }
 
                     &.is-selected > .dropped-item-sprite {
@@ -423,6 +432,16 @@
         pointer-events: none;
         user-select: none;
         transition: filter 0.2s ease;
+
+        &.is-visual-placeholder {
+            display: grid;
+            place-items: center;
+            box-sizing: border-box;
+            border: var(--border-width) inset var(--button-mid);
+            background: var(--surface-ui-inset);
+            color: var(--text-muted);
+            font-weight: bold;
+        }
 
         > .front,
         .back {
@@ -643,6 +662,14 @@
         background-repeat: no-repeat;
         image-rendering: pixelated;
     }
+}
+
+.map-object.is-storage-preview-source {
+    visibility: hidden;
+}
+
+.map-object-storage-ghost {
+    opacity: 0.8;
 }
 
 // ─── Fence / Gate ─────────────────────────────────────────────────────────

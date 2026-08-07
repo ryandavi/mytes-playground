@@ -103,6 +103,12 @@ class MapRenderer {
             EntityMethods.writeSortY(obj.element, rs.sortY);
         }
 
+        if (!rs.visible) {
+            obj.element.style.visibility = 'hidden';
+        } else if (obj.element.style.visibility === 'hidden') {
+            obj.element.style.visibility = '';
+        }
+
         if (rs.bgPosition !== null && rs.bgPosition !== undefined) {
             const sprite = obj.animation?.sprite || obj._spriteElement || (obj._spriteElement = obj.element.querySelector('.sprite'));
             if (sprite) sprite.style.backgroundPosition = rs.bgPosition;

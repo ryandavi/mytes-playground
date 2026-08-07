@@ -258,6 +258,10 @@ class AttachmentSystem {
 		}
 		children.add(child);
 		this.relationships?.set?.(attachment.relationType, parent, child);
+		// An attached child derives room membership from its spatial parent. Remove
+		// its stale independent room record so reverse occupant sets cannot claim it
+		// is still in the room where it was picked up or seated.
+		child.getRegionManager?.()?.forget?.(child, ['room']);
 		return attachment;
 	}
 
@@ -284,6 +288,12 @@ class AttachmentSystem {
 		if (exit && Number.isFinite(exit.x) && Number.isFinite(exit.y)) {
 			this._setChildPosition(child, exit.x, exit.y);
 		}
+		// Detachment restores independent room membership immediately; callers do
+		// not have to wait for the next cell crossing or simulation frame.
+		child.getRegionManager?.()?.updateMembership?.(child, {
+			layers: ['room'],
+			force: true
+		});
 		child._attachmentRenderZIndex = null;
 		return true;
 	}

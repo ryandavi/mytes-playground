@@ -132,6 +132,9 @@ class MyteAI {
         if (this.myte.queue?.isCarrying?.() || this.myte.queue?.hasUserInitiatedAction?.()) return false;
         if (!item?.isUserOfferedFood?.()) return false;
 
+        const eatDrive = 1 - (this.myte.stats?.getSatietyRatio?.() ?? 0.5);
+        if (eatDrive < SiteConfig.ai.candidates.eat.minDrive) return false;
+
         const aiValues = this._getActionAiValues('eat_element');
         return this.enqueueTargetedAction('eat_element', item, {}, {
             label: 'eat:eat_element',
@@ -960,6 +963,7 @@ class MyteAI {
                     commitmentMs: cfg.commitmentMs,
                     score,
                     execute: () => {
+                        item.allowAutoCollect = true;
                         this.myte.queue.addAStarMove({ x: item.posX, y: item.posY });
                     }
                 };

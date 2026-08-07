@@ -838,6 +838,11 @@ const SiteConfig = Object.freeze({
     // ── Spatial audio ────────────────────────────────────────────────────────
 
     audio: Object.freeze({
+        // Tone.js retains automation history on reused synth parameters. Rotate
+        // frequent one-shot voices before those internal timelines grow without
+        // bound during long sessions, then give the retired voice time to finish.
+        oneShotSynthTriggerLimit: 64,
+        oneShotSynthRecycleDelayMs: 1000,
         mapSpatial: Object.freeze({
             fullVolumeRadius: 64,
             // Floor for the audible range — the effective range grows with viewport
@@ -860,6 +865,11 @@ const SiteConfig = Object.freeze({
     // ── HUD feedback ─────────────────────────────────────────────────────────
 
     ui: Object.freeze({
+		welcomeBack: Object.freeze({
+			// Absences are acknowledged, never simulated as offline stat decay.
+			minAwayMs: 6 * 60 * 60 * 1000,
+			toastDurationMs: 12000,
+		}),
         panels: Object.freeze([
             Object.freeze({ id: 'sound-settings-panel', icon: 'sound-on', title: 'Sound Settings', controls: Object.freeze(['minimize', 'fullscreen', 'close']) }),
             Object.freeze({

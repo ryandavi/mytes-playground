@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="10" height="10" tilewidth="32" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="3">
+ <properties>
+  <property name="description" value="SpatialRegion fixture with an authored L-shaped tilemask room."/>
+  <property name="displayName" value="Region Test"/>
+  <property name="location" value="inside"/>
+  <property name="name" value="Region Test"/>
+ </properties>
+ <tileset firstgid="1" source="../tilesets/walls3.tsx"/>
+ <layer id="1" name="Floor" width="10" height="10">
+  <data encoding="csv">
+85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85,
+85,85,85,85,85,85,85,85,85,85
+  </data>
+ </layer>
+ <layer id="2" name="Collider" width="10" height="10">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0
+  </data>
+ </layer>
+ <objectgroup id="3" name="Rooms">
+  <object id="1" name="LIGHTVOLUME" x="32" y="32" width="96" height="96">
+   <properties>
+    <property name="displayName" value="L Room"/>
+    <property name="roomId" value="l_room"/>
+    <property name="tilemask" value="111/100/100"/>
+    <property name="cellSize" type="int" value="32"/>
+   </properties>
+  </object>
+  <object id="2" name="SPAWN" x="48" y="48" width="32" height="32">
+   <properties><property name="type" value="myte"/></properties>
+  </object>
+ </objectgroup>
+</map>

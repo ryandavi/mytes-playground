@@ -333,17 +333,26 @@ class MapObject {
 	wake() {
 		if (!this.sleeping) return;
 		this.sleeping = false;
+		this.renderState.visible = true;
+		this.renderState.posX = this.posX;
+		this.renderState.posY = this.posY;
+		this.renderState.sortY = this.getSortY();
+		this.renderState.zIndex = this.getRenderZIndex();
 		this.renderState.dirty = true;
 		if (this.animation) this.animation.paused = this._animationPausedBeforeSleep;
+		this.parent?.renderer?.flushOne?.(this);
 	}
 
 	sleep() {
 		if (this.sleeping) return;
 		this.sleeping = true;
+		this.renderState.visible = false;
+		this.renderState.dirty = true;
 		if (this.animation) {
 			this._animationPausedBeforeSleep = this.animation.paused;
 			this.animation.paused = true;
 		}
+		this.parent?.renderer?.flushOne?.(this);
 	}
 
 	// ── Config helpers ────────────────────────────────────────────────────────
@@ -613,6 +622,7 @@ class MapObject {
 		if (dirConfig.spatial) {
 			config.spatial = Utility.deepMerge(config.spatial || {}, dirConfig.spatial);
 		}
+		MapObject.applyAutoFitSpatialRegions(config);
 		if (dirConfig.visual) {
 			config.visual = Utility.deepMerge(config.visual || {}, dirConfig.visual);
 		}
@@ -626,6 +636,22 @@ class MapObject {
 			}
 		}
 		return config;
+	}
+
+	static applyAutoFitSpatialRegions(config) {
+		const autoFitRegions = config.spatial?.autoFitRegions;
+		if (!Array.isArray(autoFitRegions) || !config.size) return;
+
+		config.spatial.regions = config.spatial.regions || {};
+		autoFitRegions.forEach(regionId => {
+			config.spatial.regions[regionId] = {
+				type: 'box',
+				x: 0,
+				y: 0,
+				width: config.size.width,
+				height: config.size.height
+			};
+		});
 	}
 
 	static normalizeFacingDirection(direction, directionConfigs = {}) {
@@ -1208,6 +1234,7 @@ class MapObject {
 		if (!dirConfig) return;
 
 		if (dirConfig.size) {
+			this.config.size = Utility.deepClone(dirConfig.size);
 			this.size = { width: dirConfig.size.width, height: dirConfig.size.height };
 		}
 		if (dirConfig.spatial) {
@@ -1222,6 +1249,7 @@ class MapObject {
 		if (dirConfig.interaction) {
 			this.config.interaction = Utility.deepMerge(this.config.interaction || {}, dirConfig.interaction);
 		}
+		MapObject.applyAutoFitSpatialRegions(this.config);
 		const colliderRegion = this.getRegionConfig('collider');
 		if (colliderRegion) {
 			this.collider = {
@@ -1584,7 +1612,9 @@ class MapObject {
 		['back', 'front'].forEach(part => {
 			const partDiv = document.createElement('div');
 			partDiv.classList.add(part);
-			partDiv.style.backgroundImage = `url('images/MapObjects/${spritePrefix}_${part}.png')`;
+			const imageUrl = `images/MapObjects/${spritePrefix}_${part}.png`;
+			partDiv.style.backgroundImage = `url('${imageUrl}')`;
+			Utility.monitorImageAsset(imageUrl, () => this.markVisualPlaceholder(div));
 			partDiv.style.backgroundSize = 'cover';
 			if (part === 'front' && this.getConfig('animation') === 'sway') {
 				partDiv.classList.add('sway');
@@ -1602,6 +1632,9 @@ class MapObject {
 		const spriteSheet = this.getVisualSpriteSheet();
 		if (spriteSheet.url) {
 			div.style.backgroundImage = `url(${spriteSheet.url})`;
+			Utility.monitorImageAsset(spriteSheet.url, () => this.markVisualPlaceholder(div));
+		} else if (!this.hasGeneratedVisual()) {
+			this.markVisualPlaceholder(div);
 		}
 
 		const frameSize = this.getVisualFrameSize();
@@ -1621,6 +1654,17 @@ class MapObject {
 		}
 
 		container.appendChild(div);
+	}
+
+	hasGeneratedVisual() {
+		return false;
+	}
+
+	markVisualPlaceholder(element) {
+		if (!element) return;
+		element.replaceChildren('?');
+		element.style.backgroundImage = 'none';
+		element.classList.add('is-visual-placeholder');
 	}
 
 	// ── UI / selection ────────────────────────────────────────────────────────

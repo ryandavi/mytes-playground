@@ -1272,6 +1272,10 @@ class GridSystem {
             needsDebugRecreation;
 
         if (!forceUpdate) {
+			// Grid occupancy can change while the camera remains stationary (for
+			// example after furniture is moved or stored). Keep the debug canvas in
+			// sync without forcing a full culling pass.
+			if (this.debugMode && this._debugDirty) this.drawDebugGrid();
             return; // Skip update if not needed
         }
 

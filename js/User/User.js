@@ -1,4 +1,4 @@
-const USER_DATA_VERSION = 3;
+const USER_DATA_VERSION = 4;
 const USER_DEFAULT_PREFERENCES = Object.freeze({
     soundEnabled: true,
     musicEnabled: true,
@@ -37,6 +37,8 @@ class User {
         this.userId = null;
         this.lastLogin = null;
         this.dateCreated = null;
+		this.lastSavedAt = null;
+		this.returnSummary = null;
 
         // Reference to ContainerManager's inventory instance
         this.inventory = null;
@@ -86,6 +88,7 @@ class User {
     }
 
     serializeUserData() {
+		this.lastSavedAt = new Date().toISOString();
         this.core?.getFirstContainer?.()?.worldState?.captureMap?.(this.core.getFirstContainer().gameMap);
         const trackedMytes = Array.isArray(this.activeMytes) ? this.activeMytes : [];
         const inventoryData = (this.inventory?.items ?? this.items).map(item => ({
@@ -102,6 +105,7 @@ class User {
             userId: this.userId,
             lastLogin: this.lastLogin,
             dateCreated: this.dateCreated,
+			lastSavedAt: this.lastSavedAt,
             currentMapId: this.currentMapId,
             worldState: this.worldState,
             inventory: inventoryData,
@@ -118,6 +122,7 @@ class User {
         this.userId = userData.userId ?? this.userId;
         this.lastLogin = userData.lastLogin ? new Date(userData.lastLogin) : this.lastLogin;
         this.dateCreated = userData.dateCreated ? new Date(userData.dateCreated) : this.dateCreated;
+		this.lastSavedAt = userData.lastSavedAt ?? this.lastSavedAt;
         this.currentMapId = userData.currentMapId ?? this.currentMapId;
         this.worldState = userData.worldState?.version === 1
             ? Utility.deepClone(userData.worldState)
@@ -200,6 +205,11 @@ class User {
             migrated.data_version = 3;
         }
 
+		if (migrated.data_version < 4) {
+			migrated.lastSavedAt = null;
+			migrated.data_version = 4;
+		}
+
         if (migrated.data_version === USER_DATA_VERSION) {
             Utility.logDebug(`[User] Migrated save data from v${version} to v${USER_DATA_VERSION}.`);
             return migrated;
@@ -234,6 +244,7 @@ class User {
                 );
                 const migratedBackup = this._migrateUserData(recovered);
                 if (migratedBackup) {
+					this.captureReturnSummary(migratedBackup);
                     this.applyUserData(migratedBackup);
                     return true;
                 }
@@ -249,9 +260,20 @@ class User {
         const migrated = this._migrateUserData(parsed);
         if (!migrated) return false;
 
+		this.captureReturnSummary(migrated);
         this.applyUserData(migrated);
         return true;
     }
+
+	captureReturnSummary(userData) {
+		this.returnSummary = null;
+		const savedAt = Date.parse(userData?.lastSavedAt);
+		if (!Number.isFinite(savedAt)) return;
+
+		const awayMs = Math.max(0, Date.now() - savedAt);
+		if (awayMs < SiteConfig.ui.welcomeBack.minAwayMs) return;
+		this.returnSummary = { awayMs };
+	}
 
     _backupKey(storageKey) { return `${storageKey}.bak`; }
     _corruptKey(storageKey) { return `${storageKey}.corrupt`; }

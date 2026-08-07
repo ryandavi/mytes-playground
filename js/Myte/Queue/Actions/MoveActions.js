@@ -976,6 +976,13 @@ class GoToObjectAction extends PositionableAction {
             this._progressWindow = null;
         }
 
+        if (this.hasReachedInteractionThreshold() === true) {
+            this.markApproachOutcome('arrived');
+            this.faceTarget();
+            this.clearDebugPath();
+            return true;
+        }
+
         // Per-frame stuck detection (true stillness)
         if (!this._lastPos) this._lastPos = { x: this.myte.posX, y: this.myte.posY };
         const moved = Math.hypot(this.myte.posX - this._lastPos.x, this.myte.posY - this._lastPos.y);

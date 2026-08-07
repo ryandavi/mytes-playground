@@ -50,6 +50,19 @@ class MusicBoxMapObject extends withAura(InteractiveMapObject) {
         return this.isPlayingState;
     }
 
+    serializeState() {
+        return {
+            isPlaying: this.isPlayingState,
+            inventoryItemId: this.getConfig('inventoryItemId', null)
+        };
+    }
+
+    restoreState(state = {}) {
+        this.isPlayingState = state.isPlaying === true;
+        if (state.inventoryItemId) this.config.inventoryItemId = state.inventoryItemId;
+        this.updatePlaybackState();
+    }
+
     getAuraExpression() {
         return 'happy';
     }
@@ -79,6 +92,12 @@ class MusicBoxMapObject extends withAura(InteractiveMapObject) {
             );
             this.activeMyte.queue.addExpression('happy', 45, 1);
         }
+    }
+
+    handleDoubleClick(event) {
+        event?.originalEvent?.preventDefault?.();
+        this.togglePlayback(this.container ?? this.parent);
+        this.selectInUi();
     }
 
     updatePlaybackState() {

@@ -83,7 +83,10 @@ class ItemRegistry {
             name: item.label || id,
             type: String(item.type || 'item').toLowerCase(),
             description: item.description || '',
-            droppable: item.capabilities?.droppable === true,
+            inventory: Utility.deepClone(item.inventory || {}),
+            use: Utility.deepClone(item.use || {}),
+            world: Utility.deepClone(item.world || {}),
+            droppable: item.world?.mode === 'dropped_item' || item.capabilities?.droppable === true,
             visual: {
                 ...(item.visual || {}),
                 sprite: itemSprite,
@@ -131,11 +134,48 @@ class ItemRegistry {
         };
     }
 
+    static getStackLimit(rawId, fallback = 99) {
+        const configured = Number(this.getItemSync(rawId)?.inventory?.stackLimit);
+        return Number.isInteger(configured) && configured > 0 ? configured : fallback;
+    }
+
+    static findItemForWorldObject(object) {
+        if (!object) return null;
+        if (object.getConfig?.('storable', false) !== true) return null;
+        const objectType = String(object.type || '').toUpperCase();
+        const variant = this.normalizeId(object.variant);
+        const inventoryItemId = this.resolveIdSync(object.getConfig?.('inventoryItemId'));
+
+        return Array.from(this.items.values()).find(item => {
+            const world = item.world || {};
+            return (!inventoryItemId || item.id === inventoryItemId) &&
+                world.mode === 'map_object' &&
+                world.storable === true &&
+                String(world.objectType || '').toUpperCase() === objectType &&
+                this.normalizeId(world.variant || item.id) === variant;
+        }) || null;
+    }
+
     static applySpriteStyles(element, rawId) {
         if (!element) return false;
+		element.classList.remove('is-visual-placeholder');
 
         const item = this.getItemSync(rawId);
+        const imageUrl = item?.visual?.image?.url;
+        if (imageUrl) {
+            element.style.backgroundImage = `url('${imageUrl}')`;
+            element.style.backgroundPosition = 'center';
+            element.style.backgroundRepeat = 'no-repeat';
+            element.style.backgroundSize = 'contain';
+			Utility.monitorImageAsset(imageUrl, () => {
+				element.style.backgroundImage = 'none';
+				element.classList.add('is-visual-placeholder');
+			});
+            return true;
+        }
         if (!item?.sprite) {
+			element.style.backgroundImage = 'none';
+			element.classList.add('is-visual-placeholder');
             return false;
         }
 
@@ -144,6 +184,10 @@ class ItemRegistry {
         element.style.setProperty('--item-sprite-x', `${item.sprite.x}px`);
         element.style.setProperty('--item-sprite-y', `${item.sprite.y}px`);
         element.style.backgroundImage = `url('${item.spriteSheetUrl || this.itemSheetUrl}')`;
+		Utility.monitorImageAsset(item.spriteSheetUrl || this.itemSheetUrl, () => {
+			element.style.backgroundImage = 'none';
+			element.classList.add('is-visual-placeholder');
+		});
         return true;
     }
 }

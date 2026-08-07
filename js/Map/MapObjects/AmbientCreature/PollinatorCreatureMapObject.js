@@ -117,6 +117,8 @@ class ButterflyMapObject extends withFlightSounds(PollinatorCreatureMapObject) {
                 flyVolumeScale: 0.1,
                 flyVolumeMin: 0.24,
                 flyVolumeMax: 0.4,
+                cooldownMin: 900,
+                cooldownVariance: 700,
                 flapSyncAnimations: ['E', 'W', 'N', 'S', 'flutter']
             },
             ...config
