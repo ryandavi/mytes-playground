@@ -265,8 +265,10 @@ class WorldParticleUtilities {
 
         const viewportRect = container.getContainerRect?.() || { width: 0, height: 0 };
         const zoom = Math.max(0.0001, ParticleDataUtils.toFiniteNumber(camera.zoomLevel, 1));
-        const left = -ParticleDataUtils.toFiniteNumber(camera.posX, 0);
-        const top = -ParticleDataUtils.toFiniteNumber(camera.posY, 0);
+        const left = -ParticleDataUtils.toFiniteNumber(camera.posX, 0) -
+            ParticleDataUtils.toFiniteNumber(map?.getRenderOffset?.().x, 0);
+        const top = -ParticleDataUtils.toFiniteNumber(camera.posY, 0) -
+            ParticleDataUtils.toFiniteNumber(map?.getRenderOffset?.().y, 0);
         const width = viewportRect.width / zoom;
         const height = viewportRect.height / zoom;
 

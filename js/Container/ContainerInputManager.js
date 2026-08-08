@@ -441,10 +441,11 @@ class ContainerInputManager {
     const cameraOffset = this.getCameraOffset(options.includeCamera !== false);
     const elementOffset = this.getElementWorldOffset(options.element);
     const additionalOffset = options.additionalOffset || { x: 0, y: 0 };
+    const renderOffset = this.container.getRenderOffset?.() || { x: 0, y: 0 };
 
     return {
-      x: x - elementOffset.x - cameraOffset.x - additionalOffset.x,
-      y: y - elementOffset.y - cameraOffset.y - additionalOffset.y
+      x: x - elementOffset.x - cameraOffset.x - additionalOffset.x - renderOffset.x,
+      y: y - elementOffset.y - cameraOffset.y - additionalOffset.y - renderOffset.y
     };
   }
 
@@ -452,10 +453,11 @@ class ContainerInputManager {
     const cameraOffset = this.getCameraOffset(options.includeCamera !== false);
     const elementOffset = this.getElementWorldOffset(options.element);
     const additionalOffset = options.additionalOffset || { x: 0, y: 0 };
+    const renderOffset = this.container.getRenderOffset?.() || { x: 0, y: 0 };
 
     return {
-      x: x + cameraOffset.x + elementOffset.x + additionalOffset.x,
-      y: y + cameraOffset.y + elementOffset.y + additionalOffset.y
+      x: x + cameraOffset.x + elementOffset.x + additionalOffset.x + renderOffset.x,
+      y: y + cameraOffset.y + elementOffset.y + additionalOffset.y + renderOffset.y
     };
   }
 

@@ -7,6 +7,28 @@
  * their own overrides on top of these defaults.
  */
 const SiteConfig = Object.freeze({
+    mapRendering: Object.freeze({
+        canvasPaddingCells: Object.freeze({ top: 1, right: 1, bottom: 1, left: 1 }),
+    }),
+
+    // Experimental semantic wall renderer. Turning this off restores the
+    // legacy behavior: authored wall tiles are baked into the background and
+    // no wall geometry, LOS data, controls, or persistence are created.
+	wallSystem: Object.freeze({
+		enabled: true,
+		extendCanvasForWallHeight: true,
+        materialsPath: 'data/map-objects/wall-materials.json',
+        wallTilesetProperty: 'wallTileset',
+        wallWangSetName: 'Wall',
+        defaultConstructionId: 'plaster_wall',
+        defaultFinishId: 'plaster_plain',
+        defaultHeightCells: 5,
+        defaultPresentation: 'cutaway',
+        presentationModes: Object.freeze(['up', 'down', 'cutaway', 'hidden']),
+        cursorCutawayEnabled: true,
+        cutawayDebounceMs: 180,
+        maxGeneratedNodes: 300,
+    }),
 
     // ── Myte stat rates ───────────────────────────────────────────────────────
 

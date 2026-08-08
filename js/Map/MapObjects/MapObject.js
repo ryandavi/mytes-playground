@@ -1033,9 +1033,12 @@ class MapObject {
 		while (gx !== ex || gy !== ey) {
 			const cell = gs.grid[gx]?.[gy];
 			if (cell) {
+				if (cell.wallBlocksLineOfSight) return false;
 				for (const obj of cell.objects) {
 					if (obj === this || obj === other) continue;
-					if (obj.getConfig?.('physics.blocksLineOfSight', false)) return false;
+					if (typeof obj.isLightBlocking === 'function'
+						? obj.isLightBlocking()
+						: obj.getConfig?.('physics.blocksLineOfSight', false)) return false;
 				}
 			}
 			const e2 = 2 * err;
@@ -1282,6 +1285,12 @@ class MapObject {
 			this.element.classList.add(`facing-${normalizedDir.toLowerCase()}`);
 			const spriteEl = this.element.querySelector('.sprite');
 			if (spriteEl) {
+				const spriteSheet = this.getVisualSpriteSheet();
+				if (spriteSheet.url) {
+					spriteEl.style.backgroundImage = `url(${spriteSheet.url})`;
+					Utility.monitorImageAsset(spriteSheet.url, () => this.markVisualPlaceholder(spriteEl));
+				}
+
 				const frameSize = this.getVisualFrameSize();
 				if (frameSize) {
 					const offsetOverride = this.getConfig('spriteFrameOffset');

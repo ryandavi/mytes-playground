@@ -115,6 +115,7 @@ class GridSystem {
             conditionallyWalkable: false,
             conditionType: null,
             conditionId: null,
+            wallBlocksLineOfSight: false,
             terrainType: GridSystem.defaultTerrain,
             originalTerrainType: GridSystem.defaultTerrain,
             posX: x * this.config.cellSize,
@@ -650,19 +651,32 @@ class GridSystem {
         };
     }
 
-    getBoundsForGridOccupancy(obj) {
+    getBoundsForGridOccupancy(obj, position = null) {
+        const posX = Number.isFinite(position?.x) ? position.x : obj.posX;
+        const posY = Number.isFinite(position?.y) ? position.y : obj.posY;
+        const customBounds = obj?.getGridOccupancyBounds?.(posX, posY);
+        if (customBounds) {
+            return {
+                left: customBounds.x,
+                top: customBounds.y,
+                width: customBounds.width,
+                height: customBounds.height,
+                right: customBounds.x + customBounds.width,
+                bottom: customBounds.y + customBounds.height
+            };
+        }
         const offsetX = obj?.collider?.offsetX || 0;
         const offsetY = obj?.collider?.offsetY || 0;
         const width = obj?.collider?.width || obj?.size?.width || 0;
         const height = obj?.collider?.height || obj?.size?.height || 0;
 
         return {
-            left: obj.posX + offsetX,
-            top: obj.posY + offsetY,
+            left: posX + offsetX,
+            top: posY + offsetY,
             width,
             height,
-            right: obj.posX + offsetX + width,
-            bottom: obj.posY + offsetY + height
+            right: posX + offsetX + width,
+            bottom: posY + offsetY + height
         };
     }
 
@@ -906,8 +920,8 @@ class GridSystem {
     }
 
     // OPTIMIZATION: Improved boundary checking for object cells
-    getObjectCells(obj) {
-        const bounds = this.getBoundsForGridOccupancy(obj);
+    getObjectCells(obj, position = null) {
+        const bounds = this.getBoundsForGridOccupancy(obj, position);
         const epsilon = 0.001;
         const startGrid = this.worldToGrid(bounds.left, bounds.top);
         const endGrid = this.worldToGrid(
@@ -1015,11 +1029,19 @@ class GridSystem {
     }
 
     // Helper method to check if an object is within visible bounds
-    isObjectVisible(obj, bounds) {
-        return obj.posX < bounds.right &&
-            obj.posX + obj.size.width > bounds.left &&
-            obj.posY < bounds.bottom &&
-            obj.posY + obj.size.height > bounds.top;
+    isObjectVisible(obj, bounds, position = null) {
+        const posX = Number.isFinite(position?.x) ? position.x : obj.posX;
+        const posY = Number.isFinite(position?.y) ? position.y : obj.posY;
+        const objectBounds = obj?.getCullingBounds?.(posX, posY) || {
+            x: posX,
+            y: posY,
+            width: obj.size.width,
+            height: obj.size.height
+        };
+        return objectBounds.x < bounds.right &&
+            objectBounds.x + objectBounds.width > bounds.left &&
+            objectBounds.y < bounds.bottom &&
+            objectBounds.y + objectBounds.height > bounds.top;
     }
 
     // Remove object from grid - optimized to use pre-computed cells
@@ -1028,7 +1050,7 @@ class GridSystem {
 
         const trackedX = Number.isFinite(obj._gridOccupancyX) ? obj._gridOccupancyX : obj.posX;
         const trackedY = Number.isFinite(obj._gridOccupancyY) ? obj._gridOccupancyY : obj.posY;
-        const cells = this.getObjectCells({ ...obj, posX: trackedX, posY: trackedY });
+        const cells = this.getObjectCells(obj, { x: trackedX, y: trackedY });
         cells.forEach(cell => {
             cell.objects.delete(obj);
 
@@ -1068,7 +1090,7 @@ class GridSystem {
         }
 
         // Get old and new cells
-        const oldCells = this.getObjectCells({ ...obj, posX: oldX, posY: oldY });
+        const oldCells = this.getObjectCells(obj, { x: oldX, y: oldY });
         const newCells = this.getObjectCells(obj);
 
         // Track cells that need terrain update
@@ -1143,7 +1165,7 @@ class GridSystem {
 
         // Check visibility state for active objects management
         if (this.lastCullingBounds && !obj.excludeFromCulling) {
-            const wasVisible = this.isObjectVisible({ ...obj, posX: oldX, posY: oldY }, this.lastCullingBounds);
+            const wasVisible = this.isObjectVisible(obj, this.lastCullingBounds, { x: oldX, y: oldY });
             const isVisible = this.isObjectVisible(obj, this.lastCullingBounds);
 
             if (isVisible && !wasVisible) {
@@ -1290,12 +1312,13 @@ class GridSystem {
         const viewportWidth = viewport.width / camera.zoomLevel;
         const viewportHeight = viewport.height / camera.zoomLevel;
         const pad = this.config.cullingPadding;
+        const renderOffset = this.parent.getRenderOffset?.() || { x: 0, y: 0 };
 
         const bounds = {
-            left: Math.max(0, -camera.posX - pad),
-            top: Math.max(0, -camera.posY - pad),
-            right: Math.min(this.parent.dimensions.width, -camera.posX + viewportWidth + pad),
-            bottom: Math.min(this.parent.dimensions.height, -camera.posY + viewportHeight + pad)
+            left: Math.max(0, -camera.posX - renderOffset.x - pad),
+            top: Math.max(0, -camera.posY - renderOffset.y - pad),
+            right: Math.min(this.parent.dimensions.width, -camera.posX - renderOffset.x + viewportWidth + pad),
+            bottom: Math.min(this.parent.dimensions.height, -camera.posY - renderOffset.y + viewportHeight + pad)
         };
 
         // Store for reference in other methods
@@ -1320,6 +1343,13 @@ class GridSystem {
                     if (!obj.excludeFromCulling) nextActive.add(obj);
                 });
             }
+        }
+
+        // Drag placement updates grid occupancy once the drop is committed. Keep
+        // the actively dragged object awake while its camera-followed visual moves
+        // away from the cells that still own it.
+        for (const obj of this.activeObjects) {
+            if (obj.isDragging) nextActive.add(obj);
         }
 
         // Wake objects that just entered the viewport
@@ -1443,6 +1473,7 @@ class GridSystem {
                     this.grid[x][y].conditionallyWalkable = !!sourceCell.conditionallyWalkable;
                     this.grid[x][y].conditionType = sourceCell.conditionType || null;
                     this.grid[x][y].conditionId = sourceCell.conditionId ?? null;
+                    this.grid[x][y].wallBlocksLineOfSight = sourceCell.wallBlocksLineOfSight === true;
 
                     // Update combined walkability
                     this.grid[x][y].walkable = this.grid[x][y].tileWalkable && this.grid[x][y].objectWalkable;

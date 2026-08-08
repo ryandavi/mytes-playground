@@ -282,7 +282,14 @@ class MyteCore {
      * disagree about whether the prompt should still be up.
      */
     async unlockAudio() {
-        if (this.soundManager.initialized) return true;
+        // Already running — still tear the prompt down. Audio can start through
+        // paths that never reach this method (playWhenReady calls
+        // SoundManager.init() directly), which used to leave the overlay up over
+        // audible music with an Enable Sound button that did nothing.
+        if (this.soundManager.initialized) {
+            this.onAudioInitialized();
+            return true;
+        }
 
         try {
             await this.soundManager.init();
@@ -293,10 +300,15 @@ class MyteCore {
 
         if (!this.soundManager.initialized) return false;
 
-        this.removeAudioUnlockListeners();
-        this.audioUnlockPrompt?.hide();
+        this.onAudioInitialized();
         setTimeout(() => this.soundManager.startAllSounds(), this.config.sound.unlockDelay);
         return true;
+    }
+
+    // Single teardown for the unlock affordance, whichever path started audio.
+    onAudioInitialized() {
+        this.removeAudioUnlockListeners();
+        this.audioUnlockPrompt?.hide();
     }
 
     getFirstContainer() {

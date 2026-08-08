@@ -87,6 +87,18 @@ class ViewPanel extends ModalWindow {
         });
 
         this._followMytBtn = this.modalElement.querySelector('.follow-mode-btn[data-mode="0"]');
+
+        this._wallControls = this.modalElement.querySelector('.wall-presentation-controls');
+        if (this._wallControls) this._wallControls.hidden = SiteConfig.wallSystem?.enabled !== true;
+        this._wallModeBtns = this.modalElement.querySelectorAll('.wall-mode-btn');
+        this._wallModeBtns.forEach(btn => {
+            btn.onclick = () => {
+                this._getContainer()?.gameMap?.wallBuilder?.setPresentationMode(btn.dataset.wallMode);
+                this.updateWallMode();
+            };
+        });
+        const events = this._getContainer()?.eventManager;
+          this._wallReadyUnsubscribe = events?.on?.('wall:ready', payload => this.updateWallMode(payload?.builder)) || null;
     }
 
     updateButtonStates() {
@@ -104,10 +116,14 @@ class ViewPanel extends ModalWindow {
                 if (el) el.onclick = null;
             });
             this._followModeBtns?.forEach(btn => { btn.onclick = null; });
+            this._wallModeBtns?.forEach(btn => { btn.onclick = null; });
         }
         if (this._shakeToggle)   this._shakeToggle.onchange = null;
         if (this._inertiaToggle) this._inertiaToggle.onchange = null;
         this._followModeBtns = null;
+        this._wallModeBtns = null;
+        this._wallReadyUnsubscribe?.();
+        this._wallReadyUnsubscribe = null;
         this._shakeToggle    = null;
         this._inertiaToggle  = null;
         super.dispose();
@@ -132,10 +148,22 @@ class ViewPanel extends ModalWindow {
         });
     }
 
+      updateWallMode(builderOverride) {
+          const builder = arguments.length > 0
+              ? builderOverride
+              : this._getContainer()?.gameMap?.wallBuilder;
+        if (this._wallControls) this._wallControls.hidden = SiteConfig.wallSystem?.enabled !== true;
+        this._wallModeBtns?.forEach(btn => {
+            btn.classList.toggle('active', builder?.presentation === btn.dataset.wallMode);
+            btn.disabled = !builder;
+        });
+    }
+
     open() {
         this.updateZoomLabel();
         this.updateFollowMode();
         this.updateButtonStates();
+        this.updateWallMode();
         super.open();
     }
 }

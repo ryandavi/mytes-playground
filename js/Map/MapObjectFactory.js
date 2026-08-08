@@ -303,6 +303,7 @@ MapObjectFactory.registry
     .register('BED', DirectionalMapObject)
     .register('COUCH', DirectionalMapObject)
     .register('DOOR', DoorMapObject)
+    .register('WINDOW', WindowMapObject)
     .register('PORTAL', PortalMapObject)
     .register('GATE', GateMapObject)
     .register('FENCE', FenceMapObject)	

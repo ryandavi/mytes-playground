@@ -52,9 +52,10 @@
   --surface-toast-error: #fce8e6;
   --black: rgb(25, 24, 20);
   --text-base: rgb(25, 24, 20);
-  --text-muted: #666;
+  --text-default: var(--text-base);
+  --text-muted: #5b5a51;
   --text-on-accent: white;
-  --text-subtle: #555;
+  --text-subtle: #49483f;
   --state-info-accent: #4285f4;
   --state-success-accent: #34a853;
   --state-warning-accent: #fbbc04;

@@ -4136,6 +4136,98 @@
       }
     }
   },
+  "WINDOW": {
+    "category": "static",
+    "variants": ["default", "double"],
+    "label": "Window",
+    "draggable": true,
+    "dragInSelectMode": true,
+    "snapToGrid": true,
+    "canInspect": true,
+    "physics": {
+      "collision": false,
+      "walkable": true,
+      "blocksLineOfSight": false
+    },
+    "interaction": {
+      "interactive": false
+    },
+    "wallOpeningConfig": {
+      "openingHeight": 64,
+      "sillHeight": 32,
+      "adjustableSillHeight": true,
+      "minSillHeight": 0,
+      "maxSillHeight": 64,
+      "sillHeightStep": 32,
+      "continuesTopTrim": true,
+      "placementOffset": { "x": 0 }
+    },
+    "variantConfigs": {
+      "default": {
+        "label": "Wood Window"
+      },
+      "double": {
+        "label": "Double Wood Window",
+        "directionConfigs": {
+          "E": {
+            "size": { "width": 64, "height": 128 },
+            "visual": {
+              "spriteSheet": {
+                "url": "images/MapObjects/window_wood_double_vertical.png"
+              }
+            }
+          },
+          "W": {
+            "size": { "width": 64, "height": 128 },
+            "visual": {
+              "spriteSheet": {
+                "url": "images/MapObjects/window_wood_double_vertical.png"
+              }
+            }
+          },
+          "S": {
+            "size": { "width": 128, "height": 64 },
+            "visual": {
+              "spriteSheet": {
+                "url": "images/MapObjects/window_wood_double.png"
+              }
+            }
+          },
+          "N": {
+            "size": { "width": 128, "height": 64 },
+            "visual": {
+              "spriteSheet": {
+                "url": "images/MapObjects/window_wood_double.png"
+              }
+            }
+          }
+        }
+      }
+    },
+    "directionConfigs": {
+      "E": { "size": { "width": 64, "height": 64 } },
+      "W": { "size": { "width": 64, "height": 64 } },
+      "S": { "size": { "width": 64, "height": 64 } },
+      "N": { "size": { "width": 64, "height": 64 } },
+      "Horizontal": "S",
+      "Vertical": "E",
+      "Right": "E",
+      "Left": "W",
+      "Up": "N",
+      "Down": "S"
+    },
+    "spatial": {
+      "autoFitRegions": ["select"]
+    },
+    "visual": {
+      "renderPriority": 3,
+      "renderType": "single",
+      "overlappable": true,
+      "spriteSheet": {
+        "url": "images/MapObjects/window_wood.png"
+      }
+    }
+  },
   "DOOR": {
     "category": "interactive",
     "variants": [
@@ -4144,7 +4236,8 @@
       "fancy_door"
     ],
     "physics": {
-      "collision": true
+      "collision": true,
+      "blocksLineOfSight": true
     },
     "interaction": {
       "type": "toggle",
@@ -4166,6 +4259,13 @@
       }
     },
     "canInspect": true,
+    "draggable": true,
+    "dragInSelectMode": true,
+    "snapToGrid": true,
+    "wallOpeningConfig": {
+      "openingHeight": 128,
+      "sillHeight": 0
+    },
     "directionConfigs": {
       "E": {
         "size": {

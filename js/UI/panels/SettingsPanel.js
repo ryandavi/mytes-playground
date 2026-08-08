@@ -6,6 +6,7 @@ class SettingsPanel extends ModalWindow {
                 effects: true,
                 animations: true,
                 timeOfDayOverlay: true,
+                lighting: true,
                 weather: true
             },
             gameplay: {
@@ -114,6 +115,15 @@ class SettingsPanel extends ModalWindow {
             timeOfDayOverlayToggle.checked = this.settings.graphics.timeOfDayOverlay;
             timeOfDayOverlayToggle.onchange = () => {
                 this.settings.graphics.timeOfDayOverlay = timeOfDayOverlayToggle.checked;
+                this.applyGraphicsSettings();
+            };
+        }
+
+        const lightingToggle = this.modalElement.querySelector('#lighting-toggle');
+        if (lightingToggle) {
+            lightingToggle.checked = this.settings.graphics.lighting;
+            lightingToggle.onchange = () => {
+                this.settings.graphics.lighting = lightingToggle.checked;
                 this.applyGraphicsSettings();
             };
         }
@@ -257,6 +267,10 @@ class SettingsPanel extends ModalWindow {
         return this.settings?.graphics?.timeOfDayOverlay !== false;
     }
 
+    isLightingEnabled() {
+        return this.settings?.graphics?.lighting !== false;
+    }
+
     isWeatherEnabled() {
         return this.settings?.graphics?.weather !== false;
     }
@@ -306,6 +320,7 @@ class SettingsPanel extends ModalWindow {
                 effects: preferences.effectsEnabled,
                 animations: preferences.animationsEnabled,
                 timeOfDayOverlay: preferences.timeOfDayOverlayEnabled,
+                lighting: preferences.lightingEnabled,
                 weather: preferences.weatherEffectsEnabled
             },
             gameplay: {
@@ -326,6 +341,7 @@ class SettingsPanel extends ModalWindow {
             effectsEnabled: normalized.graphics.effects,
             animationsEnabled: normalized.graphics.animations,
             timeOfDayOverlayEnabled: normalized.graphics.timeOfDayOverlay,
+            lightingEnabled: normalized.graphics.lighting,
             weatherEffectsEnabled: normalized.graphics.weather,
             tutorialsEnabled: normalized.gameplay.tutorials,
             interactionHintsEnabled: normalized.gameplay.interactionHints,

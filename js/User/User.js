@@ -18,6 +18,7 @@ const USER_DEFAULT_PREFERENCES = Object.freeze({
     effectsEnabled: true,
     animationsEnabled: true,
     timeOfDayOverlayEnabled: true,
+    lightingEnabled: true,
     weatherEffectsEnabled: true,
     tutorialsEnabled: true,
     interactionHintsEnabled: true,

@@ -406,20 +406,22 @@ class Camera {
 		const fallbackClientX = e.clientX ?? ((e.pageX ?? window.scrollX) - window.scrollX);
 		const fallbackClientY = e.clientY ?? ((e.pageY ?? window.scrollY) - window.scrollY);
 		const pointerPoint = this._getRawContainerPointFromClient(fallbackClientX, fallbackClientY);
+		const renderOffset = this.parent.getRenderOffset?.() || { x: 0, y: 0 };
 
 		const followTarget = this.getCurrentFollowTarget();
 		if (this.followMode === CAMERA_FOLLOW_MODES.CHARACTER && followTarget) {
 			return {
 				screenX: containerRect.width / 2,
 				screenY: containerRect.height / 2,
-				worldX: followTarget.posX + (followTarget.size.width / 2),
-				worldY: followTarget.posY + (followTarget.size.height / 2)
+				worldX: followTarget.posX + (followTarget.size.width / 2) + renderOffset.x,
+				worldY: followTarget.posY + (followTarget.size.height / 2) + renderOffset.y
 			};
 		}
 
 		const pageX = e.pageX ?? (fallbackClientX + window.scrollX);
 		const pageY = e.pageY ?? (fallbackClientY + window.scrollY);
-		const worldPoint = this.parent.inputHandler?.screenToWorldCoordinates
+		const convertsToWorld = typeof this.parent.inputHandler?.screenToWorldCoordinates === 'function';
+		const worldPoint = convertsToWorld
 			? this.parent.inputHandler.screenToWorldCoordinates(pageX, pageY)
 			: {
 				x: pointerPoint.x / this.zoomLevel - this.posX,
@@ -429,8 +431,8 @@ class Camera {
 		return {
 			screenX: pointerPoint.x,
 			screenY: pointerPoint.y,
-			worldX: worldPoint.x,
-			worldY: worldPoint.y
+			worldX: worldPoint.x + (convertsToWorld ? renderOffset.x : 0),
+			worldY: worldPoint.y + (convertsToWorld ? renderOffset.y : 0)
 		};
 	}
 
@@ -708,8 +710,9 @@ class Camera {
 		const worldCenterX = viewportWorld.width  / 2 - this.posX;
 		const worldCenterY = viewportWorld.height / 2 - this.posY;
 
-		const dx = followTarget.posX - worldCenterX;
-		const dy = followTarget.posY - worldCenterY;
+		const renderOffset = this.parent.getRenderOffset?.() || { x: 0, y: 0 };
+		const dx = followTarget.posX + renderOffset.x - worldCenterX;
+		const dy = followTarget.posY + renderOffset.y - worldCenterY;
 
 		if (Math.abs(dx) > threshX || Math.abs(dy) > threshY) {
 			this._applyCenter(followTarget.posX, followTarget.posY, followTarget.size, false, canvasRect, viewportRect);
@@ -758,9 +761,10 @@ class Camera {
 
 	_calculateCenterPosition(x, y, viewportRect, elementRect) {
 		const viewportWorld = this._getViewportWorldSize(viewportRect);
+		const renderOffset = this.parent.getRenderOffset?.() || { x: 0, y: 0 };
 		return {
-			x: this.isScrollable.x ? -(x + elementRect.width  / 2 - viewportWorld.width  / 2) : this.posX,
-			y: this.isScrollable.y ? -(y + elementRect.height / 2 - viewportWorld.height / 2) : this.posY,
+			x: this.isScrollable.x ? -(x + renderOffset.x + elementRect.width  / 2 - viewportWorld.width  / 2) : this.posX,
+			y: this.isScrollable.y ? -(y + renderOffset.y + elementRect.height / 2 - viewportWorld.height / 2) : this.posY,
 		};
 	}
 
@@ -846,10 +850,10 @@ class Camera {
 			const first = this.parent.mytes[0];
 			this.centerToPosition(first.posX, first.posY, first.size, immediate);
 		} else {
-			const canvasRect = this.parent.getCanvasRect();
+			const dimensions = this.parent.gameMap?.dimensions || this.parent.getCanvasRect();
 			this.centerToPosition(
-				canvasRect.width  / 2,
-				canvasRect.height / 2,
+				dimensions.width  / 2,
+				dimensions.height / 2,
 				{ width: 0, height: 0 },
 				immediate
 			);

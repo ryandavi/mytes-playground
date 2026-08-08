@@ -55,8 +55,10 @@ class OffscreenMyteIndicatorManager extends UIComponent {
         const safeZoom = Number.isFinite(camera?.zoomLevel) && camera.zoomLevel > 0
             ? camera.zoomLevel
             : 1;
-        const left = Number.isFinite(camera?.posX) ? -camera.posX : 0;
-        const top = Number.isFinite(camera?.posY) ? -camera.posY : 0;
+        const left = (Number.isFinite(camera?.posX) ? -camera.posX : 0) -
+            (this.parent?.gameMap?.getRenderOffset?.().x || 0);
+        const top = (Number.isFinite(camera?.posY) ? -camera.posY : 0) -
+            (this.parent?.gameMap?.getRenderOffset?.().y || 0);
         const width = viewportWidth / safeZoom;
         const height = viewportHeight / safeZoom;
 

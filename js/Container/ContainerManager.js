@@ -345,13 +345,17 @@ class ContainerManager {
         return this.getDepthZIndex(resolvedY + resolvedHeight, priority);
     }
 
+    // Gameplay extent, not render extent. Callers bound moving objects with
+    // this, and the canvas is now larger than the map by the wall render
+    // insets — that headroom is drawing space, not somewhere to roam.
     getMaxDimensions() {
         const container = this.getContainerRect();
         const canvas = this.getCanvasRect();
+        const insets = this.gameMap?.renderInsets ?? { top: 0, right: 0, bottom: 0, left: 0 };
 
         return {
-            width: this.camera?.isScrollable.x ? canvas.width : container.width,
-            height: this.camera?.isScrollable.y ? canvas.height : container.height
+            width: this.camera?.isScrollable.x ? canvas.width - insets.left - insets.right : container.width,
+            height: this.camera?.isScrollable.y ? canvas.height - insets.top - insets.bottom : container.height
         };
     }
 
@@ -379,12 +383,13 @@ class ContainerManager {
         }
 
         const world = this.inputHandler.screenToWorldCoordinates(mousePos.x, mousePos.y);
-        const canvasRect = this.getCanvasRect();
+        const worldBounds = this.getWorldBounds();
+        const renderOffset = this.getRenderOffset();
 
-        return world.x >= 0 &&
-            world.y >= 0 &&
-            world.x <= canvasRect.width &&
-            world.y <= canvasRect.height;
+        return world.x >= worldBounds.left - renderOffset.x &&
+            world.y >= worldBounds.top - renderOffset.y &&
+            world.x <= worldBounds.right + (this.gameMap?.renderInsets?.right || 0) &&
+            world.y <= worldBounds.bottom + (this.gameMap?.renderInsets?.bottom || 0);
     }
 
     drawTargetDot() {
@@ -462,11 +467,11 @@ class ContainerManager {
     getCanvasRect() {
         if (this._cachedCanvasRect) return this._cachedCanvasRect;
         let rect = this.getRect(this.canvas);
-        const configuredWidth = Number.isFinite(this.gameMap?.dimensions?.width)
-            ? this.gameMap.dimensions.width
+        const configuredWidth = Number.isFinite(this.gameMap?.renderDimensions?.width)
+            ? this.gameMap.renderDimensions.width
             : Number.parseFloat(this.canvas.style.width);
-        const configuredHeight = Number.isFinite(this.gameMap?.dimensions?.height)
-            ? this.gameMap.dimensions.height
+        const configuredHeight = Number.isFinite(this.gameMap?.renderDimensions?.height)
+            ? this.gameMap.renderDimensions.height
             : Number.parseFloat(this.canvas.style.height);
 
         const fallbackWidth = Math.max(
@@ -501,15 +506,20 @@ class ContainerManager {
     }
 
     getWorldBounds() {
-        const canvasRect = this.getCanvasRect();
+        const width = this.gameMap?.dimensions?.width ?? this.getCanvasRect().width;
+        const height = this.gameMap?.dimensions?.height ?? this.getCanvasRect().height;
         return {
             left: 0,
             top: 0,
-            right: canvasRect.width,
-            bottom: canvasRect.height,
-            width: canvasRect.width,
-            height: canvasRect.height
+            right: width,
+            bottom: height,
+            width,
+            height
         };
+    }
+
+    getRenderOffset() {
+        return this.gameMap?.getRenderOffset?.() || { x: 0, y: 0 };
     }
 
     getEntityBoundsAt(entity, x = 0, y = 0, options = {}) {
@@ -531,11 +541,16 @@ class ContainerManager {
         return rect;
     }
 
+    // World-space position of a DOM element inside the map layers. The
+    // offsetParent walk lands on .layer, which the wall render insets push in
+    // from the canvas edge, so that inset has to come back off to stay in the
+    // same coordinate space as posX/posY.
     getLocalOffset(el) {
         const rect = this.getOffset(el);
         const container = this.getOffset(this.element);
-        const x = rect.x - container.x;
-        const y = rect.y - container.y;
+        const renderOffset = this.getRenderOffset();
+        const x = rect.x - container.x - renderOffset.x;
+        const y = rect.y - container.y - renderOffset.y;
         return {
             x, y,
             left: x,

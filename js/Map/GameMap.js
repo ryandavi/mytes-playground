@@ -8,6 +8,8 @@ class GameMap {
         this.displayName = null;
         this.id = null;
         this.dimensions = null;
+        this.renderInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+        this.renderDimensions = null;
 
         // Layer references
         this.layers = {
@@ -25,6 +27,9 @@ class GameMap {
         this.gridSystem = null;
         this.particleSystem = null;
         this.environmentManager = null;
+        this.wallBuilder = null;
+        this.wallMaterialRegistry = null;
+        this.wallTileOverlay = null;
         this.renderer = new MapRenderer();
         // Handles a missing gridSystem (falls back to registry scans), so safe
         // to construct before the map initializes.
@@ -85,6 +90,86 @@ class GameMap {
         return this.core?.eventManager || null;
     }
 
+    getRenderOffset() {
+        return { x: this.renderInsets.left, y: this.renderInsets.top };
+    }
+
+    resolveWallRenderTopInset(mapData) {
+        if (SiteConfig.wallSystem?.enabled !== true ||
+            SiteConfig.wallSystem?.extendCanvasForWallHeight !== true ||
+            !mapData?.walls?.cells?.length) return 0;
+        const cellSize = this.gridSystem?.config?.cellSize || mapData.tileHeight || 32;
+        return Math.max(...mapData.walls.cells.map(cell =>
+            Math.max(1, Number(cell.heightCells) || SiteConfig.wallSystem.defaultHeightCells) * cellSize
+        ));
+    }
+
+    resolveRenderPadding(mapData = this.mapData) {
+        const cellSize = this.gridSystem?.config?.cellSize || mapData?.tileHeight || 32;
+        const cells = SiteConfig.mapRendering?.canvasPaddingCells || {};
+        return Object.fromEntries(['top', 'right', 'bottom', 'left'].map(side => [
+            side,
+            Math.max(0, Number(cells[side]) || 0) * cellSize
+        ]));
+    }
+
+    setRenderInsets(insets = {}) {
+        this.renderInsets = Object.fromEntries(['top', 'right', 'bottom', 'left'].map(side => [
+            side,
+            Math.max(0, Number(insets[side]) || 0)
+        ]));
+        this.renderDimensions = {
+            width: this.dimensions.width + this.renderInsets.left + this.renderInsets.right,
+            height: this.dimensions.height + this.renderInsets.top + this.renderInsets.bottom
+        };
+        const canvas = this.parent.canvas;
+        for (const [side, value] of Object.entries(this.renderInsets)) {
+            canvas.style.setProperty(`--map-render-inset-${side}`, `${value}px`);
+        }
+        canvas.style.width = `${this.renderDimensions.width}px`;
+        canvas.style.height = `${this.renderDimensions.height}px`;
+        this.parent.invalidateCanvasRect?.();
+    }
+
+    setWallAwareRenderInsets(mapData, wallTop = this.resolveWallRenderTopInset(mapData)) {
+        const padding = this.resolveRenderPadding(mapData);
+        this.setRenderInsets({ ...padding, top: padding.top + wallTop });
+    }
+
+    // Flat top-down art for the wall tiles the map author placed in Tiled. The
+    // baked background omits them, so without this the 'hidden' wall
+    // presentation leaves bare floor where the walls stand.
+    async createWallTileOverlay(mapData) {
+        this.removeWallTileOverlay();
+
+        const url = await this.tileMapLoader?.createWallTileOverlayUrl?.(mapData);
+        const layer = this.layers.groundDecor || this.layers.background;
+        if (!url || !layer) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'wall-tile-overlay';
+        overlay.style.cssText = [
+            'position:absolute', 'left:0', 'top:0',
+            `width:${this.dimensions.width}px`, `height:${this.dimensions.height}px`,
+            `background-image:url(${url})`, 'background-repeat:no-repeat',
+            'pointer-events:none'
+        ].join(';');
+        layer.appendChild(overlay);
+        this.wallTileOverlay = overlay;
+        this.syncWallTileOverlay();
+    }
+
+    syncWallTileOverlay() {
+        if (this.wallTileOverlay) {
+            this.wallTileOverlay.hidden = this.wallBuilder?.presentation !== 'hidden';
+        }
+    }
+
+    removeWallTileOverlay() {
+        this.wallTileOverlay?.remove();
+        this.wallTileOverlay = null;
+    }
+
     get soundManager() {
         return this.core?.soundManager || null;
     }
@@ -114,6 +199,15 @@ class GameMap {
         }
 
         return this.core?.user?.preferences?.timeOfDayOverlayEnabled !== false;
+    }
+
+    getLightingEnabledSetting() {
+        const liveSetting = this.ui?.settingsPanel?.isLightingEnabled?.();
+        if (typeof liveSetting === 'boolean') {
+            return liveSetting;
+        }
+
+        return this.core?.user?.preferences?.lightingEnabled !== false;
     }
 
     getWeatherEffectsEnabledSetting() {
@@ -322,9 +416,8 @@ class GameMap {
 
 		Utility.logDebug('Tile map dimensions:', this.dimensions);
 
-		// set canvas
-		this.parent.canvas.style.width = `${this.dimensions.width}px`;
-		this.parent.canvas.style.height = `${this.dimensions.height}px`;
+		// Extend render space northward for wall art without changing gameplay coordinates.
+		this.setWallAwareRenderInsets(mapData);
 
 		// Set background from map
 		const bgUrl = await this.tileMapLoader.createMapBackgroundUrl(mapData);
@@ -396,6 +489,21 @@ class GameMap {
             this.environmentManager = new MapEnvironmentManager(this);
             await this.environmentManager.initialize(mapData);
         }
+
+		if (SiteConfig.wallSystem?.enabled === true && mapData.walls) {
+			this.wallMaterialRegistry = new WallMaterialRegistry(this.core?.resourceManager || null);
+			await this.wallMaterialRegistry.load();
+			this.wallBuilder = new WallBuilder(this, mapData.walls, this.wallMaterialRegistry);
+			await this.wallBuilder.initialize();
+			const constructionIds = new Set(mapData.walls.cells.map(cell => cell.constructionId));
+			const tallestConstruction = SiteConfig.wallSystem.extendCanvasForWallHeight === true
+				? Math.max(0, ...[...constructionIds]
+					.map(id => Number(this.wallMaterialRegistry.getConstruction(id)?.height) || 0))
+				: 0;
+			this.setWallAwareRenderInsets(mapData, tallestConstruction);
+			await this.createWallTileOverlay(mapData);
+		}
+		this.eventManager?.emit('wall:ready', { mapId: this.id, builder: this.wallBuilder });
 
         // Rooms exist by now (the environment manager registers them), and objects
         // are placed, so door topology can be derived.
@@ -661,6 +769,7 @@ class GameMap {
             width: 1000,
             height: 1000
         };
+        this.setWallAwareRenderInsets(this.mapData, 0);
 
         // Set a background color
         if (this.layers.background) {
@@ -1001,6 +1110,8 @@ class GameMap {
             });
         }
 
+		this.wallBuilder?.updateActiveRoom?.();
+
         // Update dropped items (physics + magnet collection). Any deployed myte can
         // collect — not just the controlled one — so background mytes that walk over a
         // chest drop actually pick it up.
@@ -1029,6 +1140,7 @@ class GameMap {
         if (this.environmentManager) {
             this.environmentManager.update(deltaTime);
         }
+
     }
 
     dispose() {
@@ -1042,6 +1154,13 @@ class GameMap {
             this.parent?.worldRegistry?.remove(item);
         });
         this.droppedItems = [];
+
+		if (this.wallBuilder) {
+			this.wallBuilder.dispose();
+			this.wallBuilder = null;
+			this.wallMaterialRegistry = null;
+		}
+		this.removeWallTileOverlay();
 
         // Clean up objects
         this.objects.forEach(obj => {

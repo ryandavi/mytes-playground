@@ -490,6 +490,9 @@ class SoundManager {
 		return Tone.start()
 			.then(() => {
 				this.initialized = true;
+				// Tell Core audio is live no matter who called init() — the unlock
+				// prompt has to come down even when this was not a gesture path.
+				this.parent?.onAudioInitialized?.();
 
 				// Set up master volume
 				Tone.Destination.volume.value = Tone.gainToDb(this.volume.master);

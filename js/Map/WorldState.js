@@ -35,7 +35,8 @@ class WorldState {
         const droppedItems = map.droppedItems
             .filter(item => item.active && !item.collected)
             .map(item => item.serializeState());
-        const snapshot = { mapId: map.id, objects, droppedItems, savedAt: Date.now() };
+        const walls = map.wallBuilder?.serializeState?.() ?? null;
+        const snapshot = { mapId: map.id, objects, droppedItems, walls, savedAt: Date.now() };
         this.payload.maps[map.id] = snapshot;
         return snapshot;
     }
@@ -58,6 +59,9 @@ class WorldState {
         for (const data of snapshot.droppedItems ?? []) {
             const item = map.addDroppedItem(data.type, data.variant, data.posX, data.posY);
             item.restoreState(data);
+        }
+        if (snapshot.walls && map.wallBuilder) {
+            map.wallBuilder.restoreState(snapshot.walls);
         }
         return true;
     }

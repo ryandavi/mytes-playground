@@ -25,6 +25,7 @@ class SocketSet {
 		this.owner = owner;
 		this.socketsConfig = socketsConfig && typeof socketsConfig === 'object' ? socketsConfig : {};
 		this._occupants = new Map();
+		this._surfaceIntervals = new Map();
 	}
 
 	_getFacing() {
@@ -55,7 +56,47 @@ class SocketSet {
 		const occupants = this._occupants.get(socketId);
 		if (!occupants || !occupants.delete(candidate)) return false;
 		if (occupants.size === 0) this._occupants.delete(socketId);
+		this.releaseSurfaceInterval(socketId, candidate);
 		return true;
+	}
+
+	reserveSurfaceInterval(socketId, candidate, u0, u1) {
+		const socket = this.get(socketId);
+		if (!socket || socket.kind !== 'surface') return false;
+		const start = Math.min(Number(u0), Number(u1));
+		const end = Math.max(Number(u0), Number(u1));
+		if (!Number.isFinite(start) || !Number.isFinite(end) || start === end) return false;
+		let intervals = this._surfaceIntervals.get(socketId);
+		if (!intervals) {
+			intervals = [];
+			this._surfaceIntervals.set(socketId, intervals);
+		}
+		if (intervals.some(entry => entry.candidate !== candidate && start < entry.u1 && end > entry.u0)) {
+			return false;
+		}
+		for (let index = intervals.length - 1; index >= 0; index--) {
+			if (intervals[index].candidate === candidate) intervals.splice(index, 1);
+		}
+		intervals.push({ candidate, u0: start, u1: end });
+		return true;
+	}
+
+	releaseSurfaceInterval(socketId, candidate) {
+		const intervals = this._surfaceIntervals.get(socketId);
+		if (!intervals) return false;
+		const next = intervals.filter(entry => entry.candidate !== candidate);
+		if (next.length === intervals.length) return false;
+		if (next.length > 0) this._surfaceIntervals.set(socketId, next);
+		else this._surfaceIntervals.delete(socketId);
+		return true;
+	}
+
+	surfaceIntervals(socketId) {
+		return (this._surfaceIntervals.get(socketId) || []).map(entry => ({
+			candidate: entry.candidate,
+			u0: entry.u0,
+			u1: entry.u1
+		}));
 	}
 
 	// Resolved socket definition for the owner's CURRENT facing (byFacing
@@ -108,7 +149,11 @@ class SocketSet {
 		if (socket.kind === 'surface') {
 			const point = surfacePoint && typeof surfacePoint === 'object' ? surfacePoint : null;
 			if (!point || !Array.isArray(socket.area?.xFactor) || !Array.isArray(socket.area?.yFactor)) return null;
-			const u = Utility.clamp(Number(point.u), 0, 1);
+			const rawU = Number(point.u);
+			const surfaceLength = Math.max(1, Number(socket.surfaceLength) || width);
+			const u = socket.uMode === 'distance'
+				? Utility.clamp(rawU / surfaceLength, 0, 1)
+				: Utility.clamp(rawU, 0, 1);
 			const v = Utility.clamp(Number(point.v), 0, 1);
 			const [minX, maxX] = socket.area.xFactor;
 			const [minY, maxY] = socket.area.yFactor;
@@ -228,6 +273,20 @@ class AttachmentSystem {
 			this.detach(child);
 		}
 		if (!sockets._claim(socketId, child)) return null;
+		if (socket.kind === 'surface') {
+			const surfaceLength = Math.max(1, Number(socket.surfaceLength) || Number(parent.size?.width) || 1);
+			const center = Number(options.surfacePoint?.u ?? 0.5);
+			const centerDistance = socket.uMode === 'distance' ? center : center * surfaceLength;
+			const halfWidth = Math.max(0.5, Number(options.surfaceWidth ?? child.size?.width ?? 1) / 2);
+			const interval = options.surfaceInterval || {
+				u0: centerDistance - halfWidth,
+				u1: centerDistance + halfWidth
+			};
+			if (!sockets.reserveSurfaceInterval(socketId, child, interval.u0, interval.u1)) {
+				sockets._release(socketId, child);
+				return null;
+			}
+		}
 
 		const attachment = existing ?? {
 			parent,

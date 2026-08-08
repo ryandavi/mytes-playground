@@ -777,6 +777,54 @@ function validateRegionFixture() {
 	}
 }
 
+function validateWallMaterials() {
+    const filePath = 'data/map-objects/wall-materials.json';
+    const data = readJson(filePath);
+    if (!isPlainObject(data) || data.schemaVersion !== 2) {
+        fail(`${filePath} must use schemaVersion 2.`);
+        return;
+    }
+    for (const [id, construction] of Object.entries(data.constructions || {})) {
+        if (!Array.isArray(construction.maskMap) || construction.maskMap.length !== 16 ||
+            construction.maskMap.some(column => !Number.isInteger(column) || column < 0 || column > 15)) {
+            fail(`${filePath} construction "${id}" must map every neighbor mask 0-15.`);
+        }
+        if (!Array.isArray(construction.debugMaskColors) || construction.debugMaskColors.length !== 16 ||
+            construction.debugMaskColors.some(color => !/^#[0-9a-f]{6}$/i.test(color))) {
+            fail(`${filePath} construction "${id}" requires 16 debug mask colors.`);
+        }
+        if (!Array.isArray(construction.debugMaskLabels) || construction.debugMaskLabels.length !== 16) {
+            fail(`${filePath} construction "${id}" requires 16 debug mask labels.`);
+        }
+        if (construction.height !== 160 || construction.stubHeight !== 28 || construction.cellSize !== 32) {
+            fail(`${filePath} prototype construction "${id}" must be 32x160 with a 28px stub.`);
+        }
+        if (!exists(construction.sheet)) fail(`${filePath} references missing ${construction.sheet}.`);
+    }
+    for (const [id, finish] of Object.entries(data.finishes || {})) {
+        if (!exists(finish.sheet)) fail(`${filePath} references missing ${finish.sheet}.`);
+        if (!Array.isArray(finish.maskMap) || finish.maskMap.length !== 16 ||
+            !Number.isFinite(finish.bands?.full?.baseY) || !Number.isFinite(finish.bands?.stub?.baseY)) {
+            fail(`${filePath} finish "${id}" requires 16 mask columns and full/stub bands.`);
+        }
+    }
+    const house = readText('data/maps/House.tmx');
+    const wallTileset = readText('data/tilesets/walls3.tsx');
+    if (!/name="wallTileset"[^>]+value="true"/i.test(wallTileset)) {
+        fail('The authored wall tileset requires wallTileset=true.');
+    }
+    if (!/<wangset name="Wall"/i.test(wallTileset)) {
+        fail('The authored wall tileset requires the canonical Wall Wang set.');
+    }
+    for (const property of ['wallConstructionId', 'wallFinishId', 'wallHeightCells', 'wallConnectGroup', 'blocksLineOfSight']) {
+        if (!new RegExp(`name="${property}"`, 'i').test(house)) fail(`House.tmx wall defaults require ${property}.`);
+    }
+    if (!/name="WallAttachment"/i.test(house)) fail('House.tmx requires the painting WallAttachment fixture.');
+    if (!/displayName" value="Bedroom"[\s\S]+wallFinishId" value="wallpaper_blue_flower"/i.test(house)) {
+        fail('House.tmx Bedroom requires its room-level wallpaper finish example.');
+    }
+}
+
 function run() {
     validateNoLegacyFiles();
     validateMytes();
@@ -787,6 +835,7 @@ function run() {
     validateZones();
     validateAudioPresets();
 	validateRegionFixture();
+    validateWallMaterials();
 
     if (warnings.length) {
         console.warn('Warnings:');

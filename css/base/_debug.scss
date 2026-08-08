@@ -63,6 +63,10 @@ body.debug {
     }
 
     &.cursor-dot {
+        // Must be absolute, not fixed: the camera's transform on .canvas would
+        // make a fixed dot resolve against the extended render box (which is
+        // shifted by the wall render insets) instead of the world-space layer.
+        position: absolute;
         background-color: blueviolet;
         transform: translate(-100%, -100%);
     }

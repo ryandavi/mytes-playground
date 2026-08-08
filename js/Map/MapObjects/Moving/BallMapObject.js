@@ -753,7 +753,20 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
             if (this.debug) {
                 Utility.logDebug("Ball boundaries set:", this.bounds);
             }
+
+            this.clampIntoBounds();
         }
+    }
+
+    // World state restores posX/posY verbatim, so a ball that escaped once
+    // stays escaped across reloads unless it is pulled back in here.
+    clampIntoBounds() {
+        const x = Math.max(this.bounds.left, Math.min(this.bounds.right - this.size.width, this.posX));
+        const y = Math.max(this.bounds.top, Math.min(this.bounds.bottom - this.size.height, this.posY));
+        if (x === this.posX && y === this.posY) return;
+
+        Utility.warnDebug(`[Ball] position (${this.posX}, ${this.posY}) was outside bounds — clamped to (${x}, ${y})`);
+        this.setPosition(x, y);
     }
 
     getSpeed(velocity = this.velocity) {

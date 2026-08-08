@@ -16,6 +16,7 @@ class EditorStore {
         'mytes.base':            1,
         'map-objects.base':      1,
         'map-objects.types':     1,
+        'wall-materials':        1,
         'items':                 1,
         'actions':               2,
         'buffs':                 1,
@@ -85,9 +86,10 @@ class EditorStore {
     }
 
     async loadAll() {
-        const [mytes, mapObjects, items, actions, buffs, zones, environmentPresets] = await Promise.all([
+        const [mytes, mapObjects, wallMaterials, items, actions, buffs, zones, environmentPresets] = await Promise.all([
             this.loadMytes(),
             this.loadMapObjects(),
+            this.loadWallMaterials(),
             this.loadItems(),
             this.loadMetadataList('actions', 'Actions', 'actions', { writable: true }),
             this.loadMetadataList('buffs', 'Buffs', 'buffs', { writable: true }),
@@ -95,9 +97,39 @@ class EditorStore {
             this.loadMetadataList('environment-presets', 'Environment', 'presets', { writable: true })
         ]);
 
-        this.domains = [mytes, mapObjects, items, actions, buffs, zones, environmentPresets];
+        this.domains = [mytes, mapObjects, wallMaterials, items, actions, buffs, zones, environmentPresets];
         this.domainsById = new Map(this.domains.map(domain => [domain.id, domain]));
         return this.domains;
+    }
+
+    async loadWallMaterials() {
+        const doc = await this.loadDocument('wall-materials');
+        const records = [];
+        for (const section of ['constructions', 'finishes', 'fixtures']) {
+            for (const [id, entry] of Object.entries(doc.content[section] || {})) {
+                records.push({
+                    id: `${section}:${id}`,
+                    label: id,
+                    hint: section,
+                    fileId: 'wall-materials',
+                    basePath: [section, id],
+                    base: null,
+                    override: null,
+                    merged: entry,
+                    layered: false,
+                    sourceFile: doc.path
+                });
+            }
+        }
+        return {
+            id: 'wall-materials',
+            label: 'Wall Materials',
+            previewType: 'summary',
+            writable: true,
+            schemaVersion: doc.content.schemaVersion,
+            sourceFile: doc.path,
+            records
+        };
     }
 
     // ── Mytes ────────────────────────────────────────────────────────────────

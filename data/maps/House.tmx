@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="11" nextobjectid="120">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="11" nextobjectid="123">
  <properties>
   <property name="description" value="A cozy place for your Mytes"/>
   <property name="displayName" value="Your Home"/>
@@ -78,7 +78,14 @@
 0,0,0,0,0,0,0,0,0,0,0,62,64,0,0,0,0,62,64,0,0,0,0,0,0,0,0,0,0,0
 </data>
  </layer>
- <layer id="4" name="Collider" width="30" height="30">
+ <layer id="4" name="Walls" width="30" height="30">
+  <properties>
+   <property name="blocksLineOfSight" type="bool" value="true"/>
+   <property name="wallConnectGroup" value="plaster_wall"/>
+   <property name="wallConstructionId" value="plaster_wall"/>
+   <property name="wallFinishId" value="plaster_plain"/>
+   <property name="wallHeightCells" type="int" value="5"/>
+  </properties>
   <data encoding="csv">
 1,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,3,
 26,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,26,
@@ -117,6 +124,7 @@
    <properties>
     <property name="displayName" value="Bedroom"/>
     <property name="type" value="rest"/>
+    <property name="wallFinishId" value="wallpaper_blue_flower"/>
    </properties>
   </object>
   <object id="95" name="Zone" x="32" y="480" width="320" height="448">
@@ -147,14 +155,47 @@
   <properties>
    <property name="displayName" value="Your House"/>
   </properties>
+  <object id="120" name="WallAttachment" x="128" y="0" width="20" height="16">
+   <properties>
+    <property name="attachmentHeight" type="int" value="16"/>
+    <property name="attachmentWidth" type="int" value="20"/>
+    <property name="childId" value="house_painting_1"/>
+    <property name="face" value="south"/>
+    <property name="fixture" value="painting"/>
+    <property name="socketId" value="surface"/>
+    <property name="u" type="float" value="16"/>
+    <property name="v" type="float" value="0.48"/>
+   </properties>
+  </object>
+  <object id="121" name="Window" x="320" y="0" width="32" height="32">
+   <properties>
+    <property name="blocksLineOfSight" type="bool" value="false"/>
+    <property name="continuesTopTrim" type="bool" value="true"/>
+    <property name="openingHeight" type="int" value="64"/>
+    <property name="sillHeight" type="int" value="32"/>
+    <property name="wallOpening" type="bool" value="true"/>
+   </properties>
+  </object>
+  <object id="122" name="Window" x="576" y="0" width="128" height="64">
+   <properties>
+    <property name="blocksLineOfSight" type="bool" value="false"/>
+    <property name="continuesTopTrim" type="bool" value="true"/>
+    <property name="openingHeight" type="int" value="64"/>
+    <property name="sillHeight" type="int" value="32"/>
+    <property name="variant" value="double"/>
+    <property name="wallOpening" type="bool" value="true"/>
+   </properties>
+  </object>
   <object id="5" name="Door" x="576" y="704" width="32" height="96">
    <properties>
     <property name="direction" value="Right"/>
+    <property name="openingHeight" type="int" value="128"/>
    </properties>
   </object>
   <object id="7" name="Door" x="416" y="928" width="128" height="32">
    <properties>
     <property name="direction" value="Horizontal"/>
+    <property name="openingHeight" type="int" value="128"/>
    </properties>
   </object>
   <object id="113" name="Rug" x="640" y="576" width="192" height="128">

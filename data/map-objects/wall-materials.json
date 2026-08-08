@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 2,
+  "constructions": {
+    "plaster_wall": {
+      "sheet": "images/walls/construction-plaster.png",
+      "cellSize": 32,
+      "height": 160,
+      "stubHeight": 28,
+      "maskMap": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      "debugMaskColors": [
+        "#000000", "#800000", "#008000", "#808000",
+        "#000080", "#800080", "#008080", "#c0c0c0",
+        "#808080", "#ff0000", "#00ff00", "#ffff00",
+        "#0000ff", "#ff00ff", "#00ffff", "#ffffff"
+      ],
+      "debugMaskLabels": [
+        "isolated", "N", "E", "N+E",
+        "S", "N+S", "E+S", "N+E+S",
+        "W", "N+W", "E+W", "N+E+W",
+        "S+W", "N+S+W", "E+S+W", "N+E+S+W"
+      ],
+      "bands": {
+        "full": { "baseY": 0 },
+        "stub": { "baseY": 160 }
+      }
+    }
+  },
+  "finishes": {
+    "plaster_plain": {
+      "sheet": "images/walls/finish-plaster-plain.png",
+      "maskMap": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      "bands": {
+        "full": { "baseY": 0 },
+        "stub": { "baseY": 160 }
+      }
+    },
+    "wallpaper_blue_flower": {
+      "sheet": "images/walls/finish-wallpaper-blue-flower.png",
+      "maskMap": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      "bands": {
+        "full": { "baseY": 0 },
+        "stub": { "baseY": 160 }
+      }
+    }
+  },
+  "fixtures": {
+    "painting": { "defaultWidth": 20, "defaultHeight": 16 }
+  }
+}

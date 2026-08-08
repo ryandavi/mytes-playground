@@ -1,4 +1,8 @@
-class DoorMapObject extends OpenableMapObject {
+class DoorMapObject extends withWallOpeningPlacement(OpenableMapObject) {
+    isLightBlocking() {
+        return !this.isOpen && super.isLightBlocking();
+    }
+
     getApproachConfig() {
         return {
             allowedSides: 'any',

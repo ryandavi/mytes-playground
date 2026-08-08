@@ -257,6 +257,15 @@
                 flex: 0 0 auto;
                 min-width: 36px;
             }
+
+            &.camera-options {
+                align-items: stretch;
+                flex-direction: column;
+
+                >.setting-item {
+                    width: 100%;
+                }
+            }
         }
 
         .view-zoom-label {

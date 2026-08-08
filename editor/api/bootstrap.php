@@ -32,6 +32,7 @@ const EDITOR_FILES = [
     'mytes.species-catalog' => 'data/mytes/species.json',
     'map-objects.base'      => 'data/map-objects/base.json',
     'map-objects.types'     => 'data/map-objects/types.json',
+    'wall-materials'        => 'data/map-objects/wall-materials.json',
     'items'                 => 'data/metadata/items.json',
     'actions'               => 'data/metadata/actions.json',
     'buffs'                 => 'data/metadata/buffs.json',
@@ -277,6 +278,10 @@ function editor_validate(string $fileId, array $content): array
         // base is a flat config object — no list-level rules beyond generic ones
     } elseif ($fileId === 'map-objects.types') {
         $findings = array_merge($findings, editor_validate_map_objects_types($content));
+    } elseif ($fileId === 'wall-materials') {
+        if (($content['schemaVersion'] ?? null) !== 1 || !isset($content['constructions'], $content['finishes'])) {
+            $findings[] = ['level' => 'error', 'path' => '', 'message' => 'Wall materials require schemaVersion 1, constructions, and finishes.'];
+        }
     }
 
     return $findings;

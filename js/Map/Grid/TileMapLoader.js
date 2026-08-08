@@ -63,11 +63,12 @@ class TileMapLoader {
 		return images;
 	}
 
-	_renderLayerToCanvas(ctx, layer, tilesetImages, tilesets, mapWidth, tileWidth, tileHeight) {
+	_renderLayerToCanvas(ctx, layer, tilesetImages, tilesets, mapWidth, tileWidth, tileHeight, skippedIndices = null, onlyIndices = null) {
 		if (layer.opacity <= 0) return;
 		ctx.globalAlpha = layer.opacity;
 		layer.data.forEach((gid, index) => {
-			if (gid === 0) return;
+			if (gid === 0 || skippedIndices?.has(index)) return;
+			if (onlyIndices && !onlyIndices.has(index)) return;
 			const x = (index % mapWidth) * tileWidth;
 			const y = Math.floor(index / mapWidth) * tileHeight;
 			const tileset = this.findTilesetForGid(gid, tilesets);
@@ -189,6 +190,7 @@ class TileMapLoader {
 
 			// Create spawns from objects with specific names
 			this.createSpawnsFromObjects(mapData);
+			this.extractWallData(mapData);
 			
 
 			// Extract terrain types from map data
@@ -238,16 +240,27 @@ class TileMapLoader {
 			// Basic tileset info
 			const tileset = {
 				name: tilesetData.getAttribute('name'),
+				source: tilesetPath,
+				properties: this.parseProperties(tilesetData.querySelector(':scope > properties')),
 				tileWidth: parseInt(tilesetData.getAttribute('tilewidth')),
 				tileHeight: parseInt(tilesetData.getAttribute('tileheight')),
 				tileCount: parseInt(tilesetData.getAttribute('tilecount')),
 				columns: parseInt(tilesetData.getAttribute('columns')),
 				firstgid,
+				wallTileIds: new Set(),
 				tiles: {},
 				imageSource: '',
 				imageWidth: 0,
 				imageHeight: 0
 			};
+			const wallWangSetName = String(SiteConfig.wallSystem.wallWangSetName || 'Wall').toLowerCase();
+			for (const wangSet of tilesetData.querySelectorAll('wangset')) {
+				if (String(wangSet.getAttribute('name') || '').toLowerCase() !== wallWangSetName) continue;
+				for (const wangTile of wangSet.querySelectorAll('wangtile')) {
+					const tileId = Number(wangTile.getAttribute('tileid'));
+					if (Number.isInteger(tileId)) tileset.wallTileIds.add(tileId);
+				}
+			}
 	
 			// Parse tileset image
 			const imageEl = tilesetData.querySelector('image');
@@ -293,6 +306,7 @@ class TileMapLoader {
 		const opacity = parseFloat(layerEl.getAttribute('opacity') || '1');
 
 		const layer = {
+			id: Number(layerEl.getAttribute('id')) || null,
 			name,
 			width,
 			height,
@@ -318,6 +332,130 @@ class TileMapLoader {
 		}
 
 		return layer;
+	}
+
+	extractWallData(mapData) {
+		if (SiteConfig.wallSystem?.enabled !== true) {
+			mapData.walls = null;
+			return;
+		}
+
+		const defaults = {
+			constructionId: mapData.properties?.wallConstructionId || SiteConfig.wallSystem.defaultConstructionId,
+			finishId: mapData.properties?.wallFinishId || SiteConfig.wallSystem.defaultFinishId,
+			heightCells: Number(mapData.properties?.wallHeightCells) || SiteConfig.wallSystem.defaultHeightCells,
+			connectGroup: mapData.properties?.wallConnectGroup || mapData.properties?.wallConstructionId || SiteConfig.wallSystem.defaultConstructionId,
+			blocksLineOfSight: mapData.properties?.blocksLineOfSight !== false
+		};
+		const cells = [];
+		mapData.layers.forEach(layer => {
+			const layerProperties = layer.properties || {};
+			const layerDefaults = {
+				constructionId: layerProperties.wallConstructionId || defaults.constructionId,
+				finishId: layerProperties.wallFinishId || defaults.finishId,
+				heightCells: Number(layerProperties.wallHeightCells) || defaults.heightCells,
+				connectGroup: layerProperties.wallConnectGroup || layerProperties.wallConstructionId || defaults.connectGroup,
+				blocksLineOfSight: layerProperties.blocksLineOfSight ?? defaults.blocksLineOfSight
+			};
+			layer.data.forEach((gid, index) => {
+				if (!gid) return;
+				const tileset = this.findTilesetForGid(gid, mapData.tilesets);
+				const tileProperties = tileset?.tiles?.[gid - tileset.firstgid]?.properties || {};
+				const localTileId = gid - tileset.firstgid;
+				const marker = SiteConfig.wallSystem.wallTilesetProperty;
+				const isWallTile = tileProperties.wall === true || tileset.wallTileIds?.has(localTileId);
+				if (tileset?.properties?.[marker] !== true || !isWallTile) return;
+				cells.push({
+					x: index % mapData.width,
+					y: Math.floor(index / mapData.width),
+					gid,
+					sourceLayerId: layer.id,
+					sourceLayerName: layer.name,
+					sourceIndex: index,
+					constructionId: tileProperties.wallConstructionId || layerDefaults.constructionId,
+					finishId: tileProperties.wallFinishId || layerDefaults.finishId,
+					heightCells: Number(tileProperties.wallHeightCells) || layerDefaults.heightCells,
+					connectGroup: tileProperties.wallConnectGroup || layerDefaults.connectGroup,
+					blocksLineOfSight: tileProperties.blocksLineOfSight ?? layerDefaults.blocksLineOfSight
+				});
+			});
+		});
+		if (cells.length === 0) {
+			mapData.walls = null;
+			return;
+		}
+
+		const openings = [];
+		const attachments = [];
+		const faceOverrides = [];
+		mapData.objects = mapData.objects.filter(object => {
+			const type = String(object.properties?.type || object.name || object.type || '').toUpperCase();
+			if (type === 'WALLFINISHOVERRIDE') {
+				const fromX = Number(object.properties?.fromX ?? Math.floor(object.x / mapData.tileWidth));
+				const fromY = Number(object.properties?.fromY ?? Math.floor(object.y / mapData.tileHeight));
+				const toX = Number(object.properties?.toX ?? Math.ceil((object.x + object.width) / mapData.tileWidth) - 1);
+				const toY = Number(object.properties?.toY ?? Math.ceil((object.y + object.height) / mapData.tileHeight) - 1);
+				faceOverrides.push({
+					mapId: mapData.id,
+					axis: fromY === toY ? 'horizontal' : 'vertical',
+					cells: { from: [fromX, fromY], to: [toX, toY] },
+					face: String(object.properties?.face || 'south').toLowerCase(),
+					finishId: object.properties?.finishId || defaults.finishId
+				});
+				return false;
+			}
+			if (type === 'WALLATTACHMENT') {
+				const childId = String(object.properties?.childId || object.id);
+				const cellX = Math.floor(object.x / mapData.tileWidth);
+				const cellY = Math.floor(object.y / mapData.tileHeight);
+				attachments.push({
+					id: childId,
+					childId,
+					mapId: mapData.id,
+					cells: { from: [cellX, cellY], to: [cellX, cellY] },
+					face: String(object.properties?.face || 'south').toLowerCase(),
+					socketId: object.properties?.socketId || 'surface',
+					u: Number(object.properties?.u ?? 0.5),
+					v: Number(object.properties?.v ?? 0.5),
+					width: Number(object.properties?.attachmentWidth || object.width || mapData.tileWidth),
+					height: Number(object.properties?.attachmentHeight || object.height || mapData.tileHeight),
+					fixture: object.properties?.fixture || 'painting'
+				});
+				return false;
+			}
+
+			if (type === 'DOOR' || type === 'WINDOW' || object.properties?.wallOpening === true) {
+				const x0 = Math.floor(object.x / mapData.tileWidth);
+				const y0 = Math.floor(object.y / mapData.tileHeight);
+				const x1 = Math.max(x0, Math.ceil((object.x + Math.max(object.width, mapData.tileWidth)) / mapData.tileWidth) - 1);
+				const y1 = Math.max(y0, Math.ceil((object.y + Math.max(object.height, mapData.tileHeight)) / mapData.tileHeight) - 1);
+				const openingCells = [];
+				for (let x = x0; x <= x1; x++) {
+					for (let y = y0; y <= y1; y++) openingCells.push([x, y]);
+				}
+				openings.push({
+					id: String(object.id),
+					type: type === 'WINDOW' ? 'window' : 'door',
+					cells: openingCells,
+					axis: object.width >= object.height ? 'horizontal' : 'vertical',
+					openingHeight: Number(object.properties?.openingHeight) || (type === 'WINDOW' ? 64 : 128),
+					sillHeight: type === 'WINDOW' ? Number(object.properties?.sillHeight ?? 32) : 0,
+					continuesTopTrim: object.properties?.continuesTopTrim === true,
+					blocksLineOfSight: false
+				});
+			}
+			return true;
+		});
+
+		mapData.walls = { defaults, cells, openings, attachments, faceOverrides };
+	}
+
+	getWallIndicesForLayer(walls, layer) {
+		if (!walls?.cells?.length) return null;
+		const indices = walls.cells
+			.filter(cell => cell.sourceLayerId === layer.id)
+			.map(cell => cell.sourceIndex);
+		return indices.length > 0 ? new Set(indices) : null;
 	}
 
 	parseObjectGroup(groupEl, mapData) {
@@ -646,12 +784,47 @@ class TileMapLoader {
 
 			const tilesetImages = await this._loadTilesetImages(tilesets);
 			for (const layer of layers.filter(l => l.visible)) {
-				this._renderLayerToCanvas(ctx, layer, tilesetImages, tilesets, width, tileWidth, tileHeight);
+				const skippedIndices = SiteConfig.wallSystem?.enabled === true
+					? this.getWallIndicesForLayer(mapData.walls, layer)
+					: null;
+				this._renderLayerToCanvas(ctx, layer, tilesetImages, tilesets, width, tileWidth, tileHeight, skippedIndices);
 			}
 
 			return canvas.toDataURL('image/png');
 		} catch (e) {
 			console.error('Error creating map background:', e);
+			return null;
+		}
+	}
+
+	// The baked background deliberately omits the authored wall tiles because
+	// WallBuilder redraws them as tall pieces. This bakes the inverse — only
+	// those tiles — so the 'hidden' presentation can still show the flat walls
+	// the map author laid down in Tiled.
+	async createWallTileOverlayUrl(mapData) {
+		if (SiteConfig.wallSystem?.enabled !== true || !mapData?.walls?.cells?.length) return null;
+
+		try {
+			const { layers, tilesets, tileWidth, tileHeight, width, height } = mapData.TileData;
+			const canvas = document.createElement('canvas');
+			canvas.width = width * tileWidth;
+			canvas.height = height * tileHeight;
+			const ctx = canvas.getContext('2d');
+
+			const tilesetImages = await this._loadTilesetImages(tilesets);
+			let rendered = false;
+			for (const layer of layers.filter(l => l.visible)) {
+				const wallIndices = this.getWallIndicesForLayer(mapData.walls, layer);
+				if (!wallIndices) continue;
+				this._renderLayerToCanvas(
+					ctx, layer, tilesetImages, tilesets, width, tileWidth, tileHeight, null, wallIndices
+				);
+				rendered = true;
+			}
+
+			return rendered ? canvas.toDataURL('image/png') : null;
+		} catch (e) {
+			console.error('Error creating wall tile overlay:', e);
 			return null;
 		}
 	}
@@ -685,6 +858,12 @@ generateGridData(mapData, gridConfig = {}) {
     }
 
     const visibleLayers = tileLayers.filter(l => l.visible);
+    const wallIndicesByLayer = new Map(visibleLayers.map(layer => [
+        layer.id,
+        SiteConfig.wallSystem?.enabled === true
+            ? this.getWallIndicesForLayer(mapData.walls, layer)
+            : null
+    ]));
 
     for (let ty = 0; ty < height; ty++) {
         for (let tx = 0; tx < width; tx++) {
@@ -693,6 +872,7 @@ generateGridData(mapData, gridConfig = {}) {
             const index = ty * width + tx;
 
             for (const layer of visibleLayers) {
+                if (wallIndicesByLayer.get(layer.id)?.has(index)) continue;
                 const gid = layer.data[index];
                 if (gid === 0) continue;
 
@@ -719,6 +899,27 @@ generateGridData(mapData, gridConfig = {}) {
                     }
                 }
             }
+        }
+    }
+
+    if (SiteConfig.wallSystem?.enabled === true && mapData.walls) {
+        const openingsByCell = new Map();
+        for (const opening of mapData.walls.openings) {
+            for (const [x, y] of opening.cells) openingsByCell.set(`${x},${y}`, opening);
+        }
+        for (const wall of mapData.walls.cells) {
+            const cell = grid[wall.x]?.[wall.y];
+            if (!cell) continue;
+            const opening = openingsByCell.get(`${wall.x},${wall.y}`);
+            if (opening?.type === 'door') {
+                cell.wallBlocksLineOfSight = false;
+                continue;
+            }
+            cell.walkable = false;
+            cell.tileWalkable = false;
+            cell.wallBlocksLineOfSight = opening
+                ? opening.blocksLineOfSight === true
+                : wall.blocksLineOfSight !== false;
         }
     }
 
@@ -784,6 +985,7 @@ generateGridData(mapData, gridConfig = {}) {
 			objects: [], // Initialize with empty array
 			terrainTypes: TileMapData.terrainTypes, // Pass along terrain types
 			properties: TileMapData.properties || {}, // Pass through all properties
+			walls: TileMapData.walls,
 			TileData: {
 				layers: TileMapData.layers,
 				tilesets: TileMapData.tilesets,

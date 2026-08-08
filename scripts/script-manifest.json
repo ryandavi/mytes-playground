@@ -290,6 +290,12 @@
     "src": "js/Map/Regions/RegionManager.js"
   },
   {
+    "src": "js/Map/Walls/WallMaterialRegistry.js"
+  },
+  {
+    "src": "js/Map/Walls/WallBuilder.js"
+  },
+  {
     "src": "js/Map/GameMap.js"
   },
   {
@@ -388,8 +394,15 @@
     "src": "js/Map/MapObjects/NPC/NpcMapObject.js"
   },
   {
+    "src": "js/Map/MapObjects/Barrier/WallOpeningPlacement.js",
+    "commentLine": "<!-- WALL OPENINGS -->"
+  },
+  {
     "src": "js/Map/MapObjects/Barrier/DoorMapObject.js",
     "commentLine": "<!-- BARRIERS -->"
+  },
+  {
+    "src": "js/Map/MapObjects/Barrier/WindowMapObject.js"
   },
   {
     "src": "js/Map/MapObjects/Barrier/FenceMapObject.js"

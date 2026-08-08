@@ -460,7 +460,8 @@ class MapEnvironmentManager {
                 shadowColor: props.shadowColor || this.config?.lighting?.darknessColor || 'rgba(18, 18, 28, 1)',
                 feather: Number(props.feather ?? props.roomFeather ?? defaults.feather ?? 36),
                 mode: String(props.lightingMode || props.roomLightingMode || defaults.mode || 'mixed').toLowerCase()
-            }
+            },
+            wallFinishId: props.wallFinishId || null
         };
     }
 
@@ -517,6 +518,7 @@ class MapEnvironmentManager {
                 properties: {
                     displayName: volume.displayName,
                     indoor: true,
+                    wallFinishId: volume.wallFinishId,
                     lighting: volume.lighting
                 },
                 source: volume
@@ -563,9 +565,15 @@ class MapEnvironmentManager {
         return this.gameMap?.getTimeOfDayOverlayEnabledSetting?.() !== false;
     }
 
+    isLightingEnabled() {
+        return this.gameMap?.getLightingEnabledSetting?.() !== false;
+    }
+
     refreshDisplaySettings() {
         this._atmosphereSignature = '';
+        this._lightingSignature = '';
         this.renderAtmosphere(true);
+        this.renderLighting(true);
     }
 
     recomputeAtmosphereTarget(immediate = false) {
@@ -963,6 +971,7 @@ class MapEnvironmentManager {
         const zoom = this.gameMap?.camera?.zoomLevel || 1;
         const cameraX = this.gameMap?.camera?.posX || 0;
         const cameraY = this.gameMap?.camera?.posY || 0;
+        const renderOffset = this.gameMap?.getRenderOffset?.() || { x: 0, y: 0 };
         const overscan = Math.max(0, Number(this.config?.lighting?.overscan ?? 64));
         const safeZoom = Math.max(zoom, 0.001);
         const viewportWidth = bounds?.width || 0;
@@ -978,10 +987,10 @@ class MapEnvironmentManager {
             cameraX,
             cameraY,
             overscan,
-            worldLeft: ((viewportOffsetLeft - overscan) / safeZoom) - cameraX,
-            worldTop: ((viewportOffsetTop - overscan) / safeZoom) - cameraY,
-            worldRight: ((viewportOffsetLeft + viewportWidth + overscan) / safeZoom) - cameraX,
-            worldBottom: ((viewportOffsetTop + viewportHeight + overscan) / safeZoom) - cameraY
+            worldLeft: ((viewportOffsetLeft - overscan) / safeZoom) - cameraX - renderOffset.x,
+            worldTop: ((viewportOffsetTop - overscan) / safeZoom) - cameraY - renderOffset.y,
+            worldRight: ((viewportOffsetLeft + viewportWidth + overscan) / safeZoom) - cameraX - renderOffset.x,
+            worldBottom: ((viewportOffsetTop + viewportHeight + overscan) / safeZoom) - cameraY - renderOffset.y
         };
     }
 
@@ -1033,9 +1042,10 @@ class MapEnvironmentManager {
     }
 
     worldToScreenPoint(worldX, worldY, view = this.getViewportMetrics()) {
+        const renderOffset = this.gameMap?.getRenderOffset?.() || { x: 0, y: 0 };
         return {
-            x: ((worldX + view.cameraX) * view.zoom) - view.viewportOffsetLeft,
-            y: ((worldY + view.cameraY) * view.zoom) - view.viewportOffsetTop
+            x: ((worldX + renderOffset.x + view.cameraX) * view.zoom) - view.viewportOffsetLeft,
+            y: ((worldY + renderOffset.y + view.cameraY) * view.zoom) - view.viewportOffsetTop
         };
     }
 
@@ -1106,7 +1116,7 @@ class MapEnvironmentManager {
             ? Array.from(this.gameMap.gridSystem.activeObjects)
             : (this.gameMap?.objects || []);
 
-        return objects
+        const objectBlockers = objects
             .filter(object => object?.isLightBlocking?.())
             .map(object => object.getLightBlockerGeometry?.())
             .filter(Boolean)
@@ -1116,6 +1126,13 @@ class MapEnvironmentManager {
                 width: geometry.width,
                 height: geometry.height
             }, view, 24));
+        const wallBlockers = this.gameMap?.wallBuilder?.getLightBlockers?.() || [];
+        return objectBlockers.concat(wallBlockers.filter(geometry => this.intersectsView({
+            x: geometry.left,
+            y: geometry.top,
+            width: geometry.width,
+            height: geometry.height
+        }, view, 24)));
     }
 
     findRoomContainingPoint(worldX, worldY) {
@@ -1269,7 +1286,7 @@ class MapEnvironmentManager {
         this.resizeLightingCanvases(view);
 
         const lightingConfig = this.config?.lighting || {};
-        if (lightingConfig.enabled === false) {
+        if (lightingConfig.enabled === false || !this.isLightingEnabled()) {
             this.clearLightingCanvases(view);
             this.lightingOverlay.style.opacity = '0';
             return;

@@ -12,8 +12,8 @@
             }
 
             > .canvas > .layer {
-                width: 100%;
-                height: 100%;
+                width: calc(100% - var(--map-render-inset-left, 0px) - var(--map-render-inset-right, 0px));
+                height: calc(100% - var(--map-render-inset-top, 0px) - var(--map-render-inset-bottom, 0px));
             }
         }
 
@@ -65,11 +65,13 @@
             border-radius: var(--border-radius);
 
             > .layer {
-                min-width: 100%;
-                min-height: 100%;
+                min-width: calc(100% - var(--map-render-inset-left, 0px) - var(--map-render-inset-right, 0px));
+                width: calc(100% - var(--map-render-inset-left, 0px) - var(--map-render-inset-right, 0px));
+                min-height: calc(100% - var(--map-render-inset-top, 0px) - var(--map-render-inset-bottom, 0px));
+                height: calc(100% - var(--map-render-inset-top, 0px) - var(--map-render-inset-bottom, 0px));
                 position: absolute;
-                top: 0;
-                left: 0;
+                top: var(--map-render-inset-top, 0px);
+                left: var(--map-render-inset-left, 0px);
 
                 &.tile-map > .tile-layer {
                     @include layer-fill;
@@ -86,6 +88,23 @@
 
                 &.ground-decor {
                     z-index: 0;
+                }
+
+                &.foreground {
+                    .wall-piece,
+                    .wall-decoration {
+                        position: absolute;
+                        pointer-events: none;
+                        user-select: none;
+                        image-rendering: pixelated;
+                    }
+
+                    .wall-decoration--painting {
+                        box-sizing: border-box;
+                        background: var(--surface-tooltip);
+                        border: var(--space-2xs) solid var(--black);
+                        box-shadow: inset 0 0 0 var(--space-2xs) var(--button-mid);
+                    }
                 }
 
                 &.environment-back,
@@ -379,7 +398,7 @@
 // ─── Map Objects ──────────────────────────────────────────────────────────
 
 .map-object {
-    position: fixed;
+    position: absolute;
 
     &.trample-reactive {
         > .sprite {
@@ -670,6 +689,15 @@
 
 .map-object-storage-ghost {
     opacity: 0.8;
+}
+
+.map-object.wall-window {
+    overflow: visible;
+
+    > .sprite {
+        background-repeat: no-repeat;
+        background-size: 100% 100%;
+    }
 }
 
 // ─── Fence / Gate ─────────────────────────────────────────────────────────

@@ -321,6 +321,12 @@
 				</div>
 				<div class="setting-item">
 					<div class="checkbox-wrapper">
+						<input type="checkbox" id="lighting-toggle" checked>
+						<label for="lighting-toggle">Night Lighting</label>
+					</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
 						<input type="checkbox" id="weather-toggle" checked>
 						<label for="weather-toggle">Show Weather</label>
 					</div>
@@ -415,16 +421,27 @@
 				<button class="follow-mode-btn" data-mode="6" title="Follow active Myte only when it nears the edge">Leash</button>
 				<button class="follow-mode-btn" data-mode="7" title="Slowly pan across the map">Cinematic</button>
 			</div>
-			<div class="settings-group">
+			<div class="settings-group camera-options">
 				<h3 class="settings-group-title">Camera Options</h3>
-				<label class="settings-toggle" title="Shake the camera on impact events">
-					<input type="checkbox" id="view-shake-toggle" checked>
-					Camera Shake
-				</label>
-				<label class="settings-toggle" title="Camera coasts to a stop after dragging">
-					<input type="checkbox" id="view-inertia-toggle" checked>
-					Pan Inertia
-				</label>
+				<div class="setting-item">
+					<div class="checkbox-wrapper" title="Shake the camera on impact events">
+						<input type="checkbox" id="view-shake-toggle" checked>
+						<label for="view-shake-toggle">Camera Shake</label>
+					</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper" title="Camera coasts to a stop after dragging">
+						<input type="checkbox" id="view-inertia-toggle" checked>
+						<label for="view-inertia-toggle">Pan Inertia</label>
+					</div>
+				</div>
+			</div>
+			<div class="settings-group wall-presentation-controls">
+				<h3 class="settings-group-title">Experimental Walls</h3>
+				<button class="wall-mode-btn" data-wall-mode="up">Walls Up</button>
+				<button class="wall-mode-btn" data-wall-mode="down">Walls Down</button>
+				<button class="wall-mode-btn" data-wall-mode="cutaway">Cutaway</button>
+				<button class="wall-mode-btn" data-wall-mode="hidden">Hide Walls</button>
 			</div>
 		</div>
 	</div>
@@ -438,7 +455,7 @@
 	<!-- END GAME SETTINGS PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="js/bundle.js?v=09884d7d3ab9"></script>
+	<script src="js/bundle.js?v=f9d92bde105f"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

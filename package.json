@@ -7,6 +7,7 @@
     "sim:stats": "node scripts/simulate-stats.js",
     "validate:content": "node scripts/validate-content-data.js && node scripts/check-time-sources.js && node scripts/check-text-encoding.js",
     "sass:build": "sass css/style.scss css/style.css --no-source-map",
+    "build:wall-sprites": "node scripts/generate-wall-sprites.js",
     "sass:watch": "sass --watch css/style.scss css/style.css --no-source-map"
   },
   "devDependencies": {

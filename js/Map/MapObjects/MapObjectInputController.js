@@ -56,6 +56,7 @@ class MapObjectInputController {
 				object._dragOriginX = object.posX;
 				object._dragOriginY = object.posY;
 				object._dragOriginDirection = object.getConfig('facingDirection', null);
+				object.onPlacementDragStart?.();
 				object.syncRenderLayer();
 				object.element.classList.add('dragging');
 				object.container?.camera?.beginTemporaryFollow?.(object);
@@ -80,7 +81,9 @@ class MapObjectInputController {
 						element: object
 					})
 					: { x: object.posX, y: object.posY };
-				const clampedWorld = object.container?.clampEntityPosition
+				const clampedWorld = typeof object.clampPlacementPosition === 'function'
+					? object.clampPlacementPosition(world.x, world.y)
+					: object.container?.clampEntityPosition
 					? object.container.clampEntityPosition(object, world.x, world.y)
 					: world;
 				object.posX = clampedWorld.x;
@@ -107,14 +110,16 @@ class MapObjectInputController {
 				}
 				if (object.getConfig('snapToGrid', false)) object.snapToGrid();
 				if (object.container?.clampEntityPosition) {
-					const clampedWorld = object.container.clampEntityPosition(object, object.posX, object.posY);
+					const clampedWorld = typeof object.clampPlacementPosition === 'function'
+						? object.clampPlacementPosition(object.posX, object.posY)
+						: object.container.clampEntityPosition(object, object.posX, object.posY);
 					object.posX = clampedWorld.x;
 					object.posY = clampedWorld.y;
 					object.updatePosition();
 				}
 				const isValid = object.checkDropValidity(object.posX, object.posY);
 				if (!isValid) {
-					const safePosition = object.gameMap?.gridSystem?.findNearestValidPositionForEntity?.(
+					const safePosition = object.restoreInvalidDropToOrigin?.() === true ? null : object.gameMap?.gridSystem?.findNearestValidPositionForEntity?.(
 						object,
 						object.posX,
 						object.posY,
@@ -139,6 +144,7 @@ class MapObjectInputController {
 					object.playConfiguredSound?.('drop');
 				}
 				object.syncRenderLayer();
+				object.onPlacementDragEnd?.();
 				object.handleMovedEvent();
 			}
 		});
