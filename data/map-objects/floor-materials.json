@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "tileSheet": "images/floors/floors.png",
+  "tileSize": 32,
+  "defaultFinishId": "floor_boards",
+  "finishes": {
+    "floor_boards": {
+      "tile": 0,
+      "palette": {
+        "body": "#d6b88f",
+        "grain": "#c7a87f",
+        "seam": "#b2926a"
+      }
+    },
+    "floor_tile_check": {
+      "tile": 1,
+      "palette": {
+        "body": "#e2ded3",
+        "grain": "#cec9bc",
+        "seam": "#bcb6a8"
+      }
+    },
+    "floor_carpet": {
+      "tile": 2,
+      "palette": {
+        "body": "#a89eb2",
+        "grain": "#b2a9bb",
+        "seam": "#9c92a7"
+      }
+    },
+    "floor_carpet_sage": {
+      "template": "floor_carpet",
+      "color": "#9caf88"
+    },
+    "floor_boards_walnut": {
+      "template": "floor_boards",
+      "color": "#8f6b4a"
+    },
+    "floor_tile_slate": {
+      "template": "floor_tile_check",
+      "color": "#9aa3ab"
+    }
+  }
+}

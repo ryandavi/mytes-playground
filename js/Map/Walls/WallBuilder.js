@@ -713,10 +713,42 @@ class WallBuilder {
     }
 
     // One frame per cell — the whole cutaway is a sprite swap.
+    /**
+     * The mask to DRAW a cell with, which is not always its connectivity mask.
+     *
+     * Where an opening removes the whole of a neighbour at this height, the wall
+     * genuinely ends at this cell — so it is drawn as a free end, rounded and
+     * capped, instead of being sliced off square by the aperture next door. That
+     * end art already exists: it is the mask with the arm toward the opening
+     * dropped, so nothing new is authored and nothing is drawn outside the cell
+     * (which is what would have overlapped the door).
+     *
+     * A doorway does NOT do this at full height: 128 of 160 leaves a lintel, the
+     * wall carries on overhead, and rounding the arm off would cut the wall in
+     * half. Lowered to a 28px stub the same doorway removes the neighbour
+     * completely, and then the end is real. Connectivity, collision and line of
+     * sight are untouched — this only decides which frame gets blitted.
+     */
+    renderMask(cell, state, construction) {
+        let mask = cell.mask;
+        const stateHeight = this.getStateHeight(state, construction);
+        for (const direction of WallBuilder.DIRECTIONS) {
+            if ((mask & direction.bit) === 0) continue;
+            const neighbour = this.cells.get(`${cell.x + direction.dx},${cell.y + direction.dy}`);
+            const opening = neighbour?.opening;
+            if (!opening) continue;
+            const sill = Number(opening.sillHeight) || 0;
+            const openingHeight = Number(opening.openingHeight) || 0;
+            if (sill <= 0 && openingHeight >= stateHeight) mask &= ~direction.bit;
+        }
+        return mask;
+    }
+
     drawWallFrame(context, piece, cell, x, state, construction) {
         const frame = this.registry.getFrame(piece.constructionId, state);
         if (!frame) return;
-        const sourceX = construction.maskMap[cell.mask] * construction.cellSize;
+        const mask = this.renderMask(cell, state, construction);
+        const sourceX = construction.maskMap[mask] * construction.cellSize;
         context.drawImage(
             frame,
             sourceX, 0, construction.cellSize, construction.frameHeight,
@@ -737,7 +769,7 @@ class WallBuilder {
             piece.constructionId, this.resolveFaceFinishId(cell, 'south'), state
         );
         if (!overlay) return;
-        const overlayX = cell.mask * construction.cellSize;
+        const overlayX = mask * construction.cellSize;
         context.drawImage(
             overlay,
             overlayX, 0, construction.cellSize, construction.frameHeight,
@@ -1130,7 +1162,8 @@ class WallBuilder {
     /**
      * The aperture is a hole straight through the wall. Clearing where no wall
      * is drawn does nothing, so a lowered cell simply loses its door along with
-     * the rest of the wall and needs no special case.
+     * the rest of the wall and needs no special case — but it has to be cleared
+     * over the WHOLE depth the art occupies, which reaches past the baseline.
      *
      * Side insets apply only at the ends of the opening, never between its
      * cells, so a multi-cell window still reads as one hole.
@@ -1150,7 +1183,18 @@ class WallBuilder {
         const left = x + (horizontal && opening.isStart ? insets.left : 0);
         const right = x + construction.cellSize - (horizontal && opening.isEnd ? insets.right : 0);
         if (right <= left) return;
-        context.clearRect(left, bottom - height, right - left, height);
+
+        // A wall running SOUTH draws past its own baseline, down into the next
+        // cell's footprint. An opening that reaches the floor passes through
+        // that stretch as well, so the hole runs to the bottom of the frame
+        // rather than stopping at the baseline — otherwise a doorway in a
+        // north-south wall leaves a sliver of wall hanging under each of its
+        // cells. A sill keeps the baseline, because the wall below a window is
+        // solid and that stretch is part of it.
+        const top = bottom - height;
+        const depth = (sillHeight > 0 ? bottom : construction.frameHeight) - top;
+        if (depth <= 0) return;
+        context.clearRect(left, top, right - left, depth);
     }
 
     // World Y of the wall top over [x0, x1), taking the lowest point in that

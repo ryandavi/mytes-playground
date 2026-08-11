@@ -14,6 +14,27 @@ const SiteConfig = Object.freeze({
     // Experimental semantic wall renderer. Turning this off restores the
     // legacy behavior: authored wall tiles are baked into the background and
     // no wall geometry, LOS data, controls, or persistence are created.
+	floorSystem: Object.freeze({
+		enabled: true,
+		materialsPath: 'data/map-objects/floor-materials.json',
+		// A room with no authored floorFinishId keeps whatever the map's own
+		// tile layers already draw. Customisation is opt-in per room, so adding
+		// the system changes nothing until a room asks for it.
+		defaultFinishId: null,
+		// Grow each room's floor by this many cells so it runs UNDER the wall
+		// that encloses it. A room's bounds stop one cell short of that wall,
+		// and the wall covers only its centred thickness, so without any bleed a
+		// strip of the map's own ground shows along every outer edge.
+		//
+		// Half a cell, because that is the wall's CENTRELINE: the wall is
+		// `thickness` centred in its cell, so its middle sits at
+		// (cell - thickness) / 2 + thickness / 2 = cell / 2, whatever the
+		// thickness is. The floor therefore ends buried under the wall — no
+		// ground strip inside, and nothing spilling past the wall's outer face
+		// onto the exterior, which is what a full cell did.
+		edgeBleedCells: 0.5
+	}),
+
 	wallSystem: Object.freeze({
 		enabled: true,
 		extendCanvasForWallHeight: true,

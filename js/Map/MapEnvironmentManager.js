@@ -461,7 +461,8 @@ class MapEnvironmentManager {
                 feather: Number(props.feather ?? props.roomFeather ?? defaults.feather ?? 36),
                 mode: String(props.lightingMode || props.roomLightingMode || defaults.mode || 'mixed').toLowerCase()
             },
-            wallFinishId: props.wallFinishId || null
+            wallFinishId: props.wallFinishId || null,
+            floorFinishId: props.floorFinishId || null
         };
     }
 
@@ -519,6 +520,7 @@ class MapEnvironmentManager {
                     displayName: volume.displayName,
                     indoor: true,
                     wallFinishId: volume.wallFinishId,
+                    floorFinishId: volume.floorFinishId,
                     lighting: volume.lighting
                 },
                 source: volume

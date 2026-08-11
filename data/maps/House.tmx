@@ -123,6 +123,7 @@
   <object id="94" name="Zone" x="608" y="480" width="320" height="448">
    <properties>
     <property name="displayName" value="Bedroom"/>
+    <property name="floorFinishId" value="floor_carpet_sage"/>
     <property name="type" value="rest"/>
     <property name="wallFinishId" value="wallpaper_blue_flower"/>
    </properties>
@@ -130,6 +131,7 @@
   <object id="95" name="Zone" x="32" y="480" width="320" height="448">
    <properties>
     <property name="displayName" value="Playroom"/>
+    <property name="floorFinishId" value="floor_boards"/>
     <property name="type" value="play"/>
     <property name="wallFinishId" value="paint_sage"/>
    </properties>
@@ -137,12 +139,14 @@
   <object id="96" name="Zone" x="32" y="31" width="448" height="417">
    <properties>
     <property name="displayName" value="Kitchen"/>
+    <property name="floorFinishId" value="floor_tile_check"/>
     <property name="type" value="food"/>
    </properties>
   </object>
   <object id="97" name="Zone" x="480" y="32" width="448" height="416">
    <properties>
     <property name="displayName" value="Chatroom"/>
+    <property name="floorFinishId" value="floor_boards_walnut"/>
     <property name="type" value="social"/>
     <property name="wallFinishId" value="paint_terracotta"/>
    </properties>

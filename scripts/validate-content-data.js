@@ -838,6 +838,90 @@ function decodePng(relPath) {
 // following the foot, a column filled where it should be transparent, an end
 // that no longer tiles into the body. Runtime clipping hides most of it, so the
 // invariants are asserted here against the authored pixels.
+// Floor finishes. Much less to police than walls — a floor tile has no
+// silhouette to agree with — but the recolour contract still bites: every pixel
+// must be one of the declared palette tones, or a template floor keeps stray
+// pixels at the TEMPLATE's colour and the borrowed floor comes out speckled
+// with someone else's palette.
+function validateFloorMaterials() {
+    const filePath = 'data/map-objects/floor-materials.json';
+    if (!exists(filePath)) return;
+    const data = readJson(filePath);
+    if (!isPlainObject(data) || data.schemaVersion !== 1) {
+        fail(`${filePath} must use schemaVersion 1.`);
+        return;
+    }
+    if (data.tileSheet && !exists(data.tileSheet)) {
+        fail(`${filePath} references missing ${data.tileSheet}.`);
+        return;
+    }
+    const size = Number(data.tileSize) || 32;
+    const sheet = data.tileSheet ? decodePng(data.tileSheet) : null;
+    if (sheet && sheet.height !== size) {
+        fail(`${data.tileSheet} is ${sheet.height}px tall; floor tiles must be ${size}px square.`);
+    }
+
+    for (const [id, finish] of Object.entries(data.finishes || {})) {
+        const indexed = Number.isInteger(finish.tile);
+        if (indexed === (typeof finish.template === 'string')) {
+            fail(`${filePath} finish "${id}" needs exactly one of "tile" or "template".`);
+            continue;
+        }
+        if (finish.palette && Object.values(finish.palette).some(c => !/^#[0-9a-f]{6}$/i.test(c))) {
+            fail(`${filePath} finish "${id}" palette slots must be #rrggbb.`);
+        }
+        if (typeof finish.template === 'string') {
+            const template = data.finishes?.[finish.template];
+            if (!template?.palette?.body) {
+                fail(`${filePath} finish "${id}" templates on "${finish.template}", which needs a palette with a "body" slot.`);
+            }
+            if (!/^#[0-9a-f]{3,8}$/i.test(finish.color || '')) {
+                fail(`${filePath} finish "${id}" templates on "${finish.template}" and must declare a "color".`);
+            }
+            continue;
+        }
+        if (!sheet) continue;
+        if ((finish.tile + 1) * size > sheet.width) {
+            fail(`${data.tileSheet} has no tile ${finish.tile} for finish "${id}".`);
+            continue;
+        }
+        // A palette is only needed to be BORROWED from. A hand-drawn tile that
+        // no template points at can use any colours it likes, so the tone check
+        // only runs once the finish opts in by declaring one. The opacity check
+        // always runs: a hole shows the map's own ground through the room.
+        const declared = isPlainObject(finish.palette) && Object.keys(finish.palette).length > 0;
+        const borrowedBy = Object.entries(data.finishes)
+            .filter(([, other]) => other.template === id)
+            .map(([otherId]) => otherId);
+        if (!declared && borrowedBy.length) {
+            fail(`${filePath} finish "${id}" is used as a template by ${borrowedBy.join(', ')}, ` +
+                'so it must declare the palette they recolour through.');
+        }
+        const tones = Object.values(finish.palette || {}).map(c =>
+            [1, 3, 5].map(i => parseInt(c.substr(i, 2), 16)));
+        let undeclared = 0;
+        let transparent = 0;
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const i = (((y * sheet.width) + (finish.tile * size) + x) * 4);
+                if (sheet.pixels[i + 3] !== 255) { transparent++; continue; }
+                if (!declared) continue;
+                const known = tones.some(t => [0, 1, 2].every(k => sheet.pixels[i + k] === t[k]));
+                if (!known) undeclared++;
+            }
+        }
+        if (transparent) {
+            fail(`${data.tileSheet} tile ${finish.tile} ("${id}") has ${transparent} non-opaque pixels; ` +
+                "a floor tile must be solid or the map's own ground shows through the room.");
+        }
+        if (undeclared) {
+            fail(`${data.tileSheet} tile ${finish.tile} ("${id}") uses ${undeclared} pixels that are not in its ` +
+                'declared palette. Every tone must be declared or a template borrowing this tile keeps ' +
+                "them at this finish's colour.");
+        }
+    }
+}
+
 function validateWallPaintSheet(data) {
     const construction = Object.values(data.constructions || {})[0];
     if (!data.paintSheet || !exists(data.paintSheet) || !construction) return;
@@ -1159,6 +1243,7 @@ function run() {
     validateAudioPresets();
 	validateRegionFixture();
     validateWallMaterials();
+validateFloorMaterials();
 
     if (warnings.length) {
         console.warn('Warnings:');

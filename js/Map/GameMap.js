@@ -33,6 +33,8 @@ class GameMap {
         this.environmentManager = null;
         this.wallBuilder = null;
         this.wallMaterialRegistry = null;
+        this.floorBuilder = null;
+        this.floorMaterialRegistry = null;
         this.wallTileOverlay = null;
         this.renderer = new MapRenderer();
         // Handles a missing gridSystem (falls back to registry scans), so safe
@@ -547,6 +549,25 @@ class GameMap {
 			await this.createWallTileOverlay(mapData);
 		}
 		this.eventManager?.emit('wall:ready', { mapId: this.id, builder: this.wallBuilder });
+
+		// Floors are built after rooms exist (the environment manager registers
+		// them) and after walls, so a room's floor lands under the wall art that
+		// borders it. A room with no floorFinishId is skipped entirely, leaving
+		// the map's own authored tile layers untouched.
+		if (SiteConfig.floorSystem?.enabled === true) {
+			try {
+				this.floorMaterialRegistry = new FloorMaterialRegistry(this.parent?.resourceManager ?? null);
+				await this.floorMaterialRegistry.load();
+				this.floorBuilder = new FloorBuilder(this, this.floorMaterialRegistry);
+				this.floorBuilder.build();
+				this.eventManager?.emit('floor:ready', { mapId: this.id, builder: this.floorBuilder });
+			} catch (error) {
+				// A bad floor sheet must not take the map down with it: the
+				// authored ground is still there underneath.
+				Utility.logDebug('Floor system unavailable:', error);
+				this.floorBuilder = null;
+			}
+		}
 
         // Rooms exist by now (the environment manager registers them), and objects
         // are placed, so door topology can be derived.
@@ -1203,6 +1224,13 @@ class GameMap {
 			this.wallBuilder.dispose();
 			this.wallBuilder = null;
 			this.wallMaterialRegistry = null;
+		}
+		// Floor surfaces live in the shared background layer, so they outlive the
+		// map that made them unless they are torn down here with the walls.
+		if (this.floorBuilder) {
+			this.floorBuilder.destroy();
+			this.floorBuilder = null;
+			this.floorMaterialRegistry = null;
 		}
 		this.removeWallTileOverlay();
 

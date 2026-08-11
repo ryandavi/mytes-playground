@@ -15,7 +15,7 @@
 // tones, or recolouring leaves it behind at the template's colour.
 
 const path = require('path');
-const { image, writePng } = require('./lib/png');
+const { image, writePng, readPng } = require('./lib/png');
 
 const OUTPUT = path.resolve(__dirname, '../images/floors/floors.png');
 const TILE = 32;
@@ -75,12 +75,39 @@ function drawTile(target, x0, floor) {
     }
 }
 
-const target = image(FLOORS.length * TILE, TILE);
+// Tiles beyond the ones generated here are HAND-AUTHORED and are copied through
+// untouched. Adding a floor should not mean editing this script: paint a new
+// 32px column onto the right-hand end of floors.png, add a `tile` entry in
+// floor-materials.json pointing at it, and it survives the next regeneration.
+// (If you also want it recolourable, declare its tones in `palette` — the
+// content validator checks every pixel is one of them.)
+function preserveAuthoredTiles(target, generatedWidth) {
+    const existing = readPng(OUTPUT);
+    if (!existing || existing.height !== TILE || existing.width <= generatedWidth) return generatedWidth;
+    const width = existing.width;
+    const merged = image(width, TILE);
+    merged.pixels.set(target.pixels.subarray(0, generatedWidth * 4 * 0), 0);
+    for (let y = 0; y < TILE; y++) {
+        // Regenerated columns first, then everything the artist added after them.
+        target.pixels.copy(merged.pixels, y * width * 4, y * generatedWidth * 4, (y + 1) * generatedWidth * 4);
+        existing.pixels.copy(
+            merged.pixels, (y * width * 4) + (generatedWidth * 4),
+            (y * width * 4) + (generatedWidth * 4), (y + 1) * width * 4
+        );
+    }
+    return { width, pixels: merged.pixels };
+}
+
+const generatedWidth = FLOORS.length * TILE;
+const target = image(generatedWidth, TILE);
 FLOORS.forEach((floor, index) => drawTile(target, index * TILE, floor));
-writePng(OUTPUT, FLOORS.length * TILE, TILE, target.pixels);
+const merged = preserveAuthoredTiles(target, generatedWidth);
+const finalWidth = typeof merged === 'number' ? merged : merged.width;
+const finalPixels = typeof merged === 'number' ? target.pixels : merged.pixels;
+writePng(OUTPUT, finalWidth, TILE, finalPixels);
 
 const hex = color => '#' + color.slice(0, 3).map(v => v.toString(16).padStart(2, '0')).join('');
-console.log(`floors.png ${FLOORS.length * TILE}x${TILE}`);
+console.log(`floors.png ${finalWidth}x${TILE}` + (finalWidth > generatedWidth ? ` (${(finalWidth - generatedWidth) / TILE} hand-authored tile(s) preserved)` : ''));
 FLOORS.forEach((floor, index) => {
     const palette = Object.entries(floor.palette).map(([slot, c]) => `"${slot}": "${hex(c)}"`).join(', ');
     console.log(`  ${floor.id}\n    "tile": ${index}\n    "palette": { ${palette} }`);

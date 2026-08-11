@@ -89,6 +89,12 @@ Doors and windows are opening records on the wall footprint:
 
 Doors and windows are literal transparent rectangles cleared from the composed wall canvas. No separate jamb, outline, glass, or trim sprite is required.
 
+The cleared rectangle must span the whole depth the art occupies, not just down to the baseline. A wall running **south** draws past its own baseline into the next cell footprint, and an opening that reaches the floor passes through that stretch too — clearing only to the baseline leaves a sliver of wall hanging under every cell of a doorway in a north-south wall. An opening with a sill keeps the baseline, because the wall beneath a window is solid.
+
+Where an opening removes the whole of a neighbouring cell at the height being drawn, the wall genuinely **ends** there, so it is drawn as a free end rather than sliced off square: `renderMask` drops the arm pointing into the opening and the existing free-end frame does the rest. No jamb sprite is authored, and nothing is drawn outside the cell — an end cap added alongside the cut would have overlapped the door.
+
+This is height-dependent, and that is the point. A 128px doorway in a 160px wall leaves a lintel, so at full height the arm stays and the wall carries on overhead; lowered to a 28px stub the same doorway removes the neighbour completely and the end is real. It is render-only: connectivity, collision and line of sight all still use the cell's own mask.
+
 ### 3.3 Authored wall fixtures
 
 Wall objects are authored on an object layer, not painted visually above the wall tiles. Tiled's top-down canvas identifies the host wall cell; semantic properties identify the position on the vertical face.

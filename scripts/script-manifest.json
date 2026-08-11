@@ -299,6 +299,12 @@
     "src": "js/Map/Walls/WallBuilder.js"
   },
   {
+    "src": "js/Map/Floors/FloorMaterialRegistry.js"
+  },
+  {
+    "src": "js/Map/Floors/FloorBuilder.js"
+  },
+  {
     "src": "js/Map/GameMap.js"
   },
   {
