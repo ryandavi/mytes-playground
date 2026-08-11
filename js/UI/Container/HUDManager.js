@@ -42,7 +42,7 @@ class HUDManager extends UIComponent {
         this.renderCoinValue(initialCoins);
 
         if (!this._currencyUnsubscribe && core?.eventManager) {
-            this._currencyUnsubscribe = core.eventManager.on('user:currency_changed', (payload) => {
+            this._currencyUnsubscribe = core.eventManager.on(EVENTS.USER_CURRENCY_CHANGED, (payload) => {
                 if (payload?.type === 'coins') this.animateCoinTotal(payload.total, payload.delta);
             });
         }

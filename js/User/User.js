@@ -167,20 +167,11 @@ class User {
     }
 
     syncInventoryFromItems() {
-        if (!this.inventory) return;
-
-        while (this.inventory.items.length > 0) {
-            this.inventory.items.pop();
-        }
-
-        this.items.forEach(item => {
-            this.inventory.addItem(
-                item.variant || item.name,
-                item.quantity,
-                item.type,
-                item.description || ''
-            );
-        });
+        // loadItems is the one reload path: it clears state + DOM and
+        // normalizes through the registry, so names and sprites survive the
+        // round-trip. Duplicating it here is where items used to lose their
+        // display name on import.
+        this.inventory?.loadItems(this.items);
     }
 
     _migrateUserData(data) {
@@ -394,7 +385,7 @@ class User {
     }
 
     _emitCurrencyChanged(type, delta) {
-        this.core?.eventManager?.emit('user:currency_changed', {
+        this.core?.eventManager?.emit(EVENTS.USER_CURRENCY_CHANGED, {
             type,
             delta,
             total: this.currency[type]

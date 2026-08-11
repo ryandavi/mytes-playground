@@ -174,9 +174,9 @@ class CursorManager extends UIComponent {
         }, this.config.throttleDelay);
 
         this._inputUnsubs = [
-            input.on('mouse.move', throttledMove),
-            input.on('mouse.down', () => this.handleMouseDown()),
-            input.on('mouse.up',   () => this.handleMouseUp()),
+            input.on(EVENTS.MOUSE_MOVE, throttledMove),
+            input.on(EVENTS.MOUSE_DOWN, () => this.handleMouseDown()),
+            input.on(EVENTS.MOUSE_UP,   () => this.handleMouseUp()),
         ];
 
         // mouseleave/mouseenter/focusin are not in InputSystem — keep as direct DOM listeners

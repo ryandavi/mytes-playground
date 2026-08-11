@@ -11,6 +11,9 @@
     "src": "js/Engine/Config/SiteConfig.js"
   },
   {
+    "src": "js/Engine/Events.js"
+  },
+  {
     "src": "js/Utility/Utility.js"
   },
   {

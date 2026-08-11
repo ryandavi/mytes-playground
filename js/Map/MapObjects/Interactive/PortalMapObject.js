@@ -454,7 +454,7 @@ class PortalMapObject extends InteractiveMapObject {
     remove() {
         if (this.particleSystem) {
             if (typeof this.particleSystem.destroy === 'function') {
-                this.particleSystem.destroy();
+                this.particleSystem.dispose();
             } else {
                 this.particleSystem.active = false;
             }

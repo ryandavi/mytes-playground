@@ -57,7 +57,7 @@ class MyteMovementController {
             this.resetGoHomeState();
         }
 
-        m.parent?.eventManager?.emit('myte:mode_changed', { myte: m, mode: m.goal });
+        m.parent?.eventManager?.emit(EVENTS.MYTE_MODE_CHANGED, { myte: m, mode: m.goal });
     }
 
     handleModeTransition(previousGoal, nextGoal) {

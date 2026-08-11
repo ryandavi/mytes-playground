@@ -68,7 +68,7 @@ class ParticleEmitter {
         return this;
     }
 
-    destroy() {
+    dispose() {
         this.active = false;
         this.runCleanup();
     }
@@ -106,7 +106,7 @@ class ParticleEmitter {
     tickUpdate(tickDelta, effectsEnabled = true) {
         if (!this.active) return false;
         if (this.shouldDestroyWithSource()) {
-            this.destroy();
+            this.dispose();
             return false;
         }
 

@@ -54,6 +54,10 @@ const SiteConfig = Object.freeze({
         // meet the floor. Objects override it with wallOpeningConfig.apertureInset,
         // which must be at least as large as their art's transparent margin.
         apertureInsetPx: 1,
+        // Opening height fallbacks (px) when an object's wallOpeningConfig
+        // does not declare one. Keyed by lowercased object type; anything
+        // unlisted falls back to the door height.
+        defaultOpeningHeightPx: Object.freeze({ window: 64, door: 128 }),
         cutawayDebounceMs: 180,
         maxGeneratedNodes: 300,
 

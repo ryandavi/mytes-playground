@@ -786,7 +786,7 @@ class GameMapParticleSystem extends ParticleSystem {
             const normalizedKey = String(effectKey).toUpperCase();
             const emitter = record.emitters.get(normalizedKey);
             if (emitter) {
-                emitter.destroy();
+                emitter.dispose();
                 record.emitters.delete(normalizedKey);
             }
 
@@ -794,7 +794,7 @@ class GameMapParticleSystem extends ParticleSystem {
                 delete object.particleEmitters[normalizedKey];
             }
         } else {
-            record.emitters.forEach(emitter => emitter.destroy());
+            record.emitters.forEach(emitter => emitter.dispose());
             record.emitters.clear();
 
             if (object.particleEmitters) {

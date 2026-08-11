@@ -46,7 +46,7 @@ class MyteRubbingHandler extends MyteBaseHandler {
 	}
 
 	dispose() {
-		this.component?.destroy();
+		this.component?.dispose();
 		this.component = null;
 		super.dispose();
 	}

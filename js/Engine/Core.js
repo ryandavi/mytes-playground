@@ -446,6 +446,10 @@ class MyteCore {
                 cancelAnimationFrame(this._rafHandle);
                 this._rafHandle = null;
             }
+            // Hiding the tab is the last reliable moment before a possible
+            // close — beyond here nothing else is guaranteed to run, and the
+            // debounced/5-minute save cadences can be holding unsaved changes.
+            this.user?.saveUserData();
         } else {
             // Reset timing so the first frame after returning doesn't get a huge deltaTime.
             this.tickAccumulator = 0;
@@ -466,6 +470,12 @@ class MyteCore {
     startUpdateLoop() {
         document.removeEventListener('visibilitychange', this.boundHandleVisibilityChange);
         document.addEventListener('visibilitychange', this.boundHandleVisibilityChange);
+
+        // pagehide is the only close signal mobile browsers fire reliably;
+        // visibilitychange→hidden covers desktop. Both flush synchronously.
+        this._boundPageHide ??= () => this.user?.saveUserData();
+        window.removeEventListener('pagehide', this._boundPageHide);
+        window.addEventListener('pagehide', this._boundPageHide);
 
         this._rafHandle = null;
 
@@ -531,6 +541,7 @@ class MyteCore {
         this.soundManager?.dispose();
         this.soundManager = null;
         document.removeEventListener('visibilitychange', this.boundHandleVisibilityChange);
+        if (this._boundPageHide) window.removeEventListener('pagehide', this._boundPageHide);
 
         // Snapshot keys to avoid mutating the Map during iteration
         [...this.containers.keys()].forEach(id => this.removeContainer(id));
@@ -546,7 +557,7 @@ class MyteCore {
         this.gameTime = null;
         TooltipSystem.disposeInstance?.();
 
-        InputSystem.instance?.destroy?.();
+        InputSystem.instance?.dispose?.();
         MyteCore.instance = null;
     }
 }

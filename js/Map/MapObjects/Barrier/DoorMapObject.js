@@ -26,12 +26,12 @@ class DoorMapObject extends withWallOpeningPlacement(OpenableMapObject) {
     }
 
     getToggleEventName() {
-        return 'door_state_changed';
+        return EVENTS.DOOR_STATE_CHANGED;
     }
 
     emitToggleEvent(state) {
         if (!this.gameMap?.eventManager) return;
-        this.gameMap.eventManager.emit('world:action_availability_changed', {
+        this.gameMap.eventManager.emit(EVENTS.WORLD_ACTION_AVAILABILITY_CHANGED, {
             object: this,
             state
         });

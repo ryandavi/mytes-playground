@@ -354,7 +354,7 @@ class RouteTravelManager {
     emitProgress(journey, now) {
         if (now - journey.lastProgressAt < this.config.progressInterval) return;
         journey.lastProgressAt = now;
-        this.emit('travel_progress', {
+        this.emit(EVENTS.TRAVEL_PROGRESS, {
             journey,
             progress: this.getProgress(journey.traveller)
         });

@@ -180,7 +180,7 @@ class MyteDialogue {
     }
 
     // Clean up event listeners
-    destroy() {
+    dispose() {
         this.isDestroyed = true;
         this.pendingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
         this.pendingTimeouts.clear();

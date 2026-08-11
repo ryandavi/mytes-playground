@@ -330,7 +330,7 @@ class MyteStats {
             this.experience -= threshold;
             this.level++;
             threshold = Math.round(config.xpPerLevel * Math.pow(this.level, config.levelExponent));
-            this.myte.parent?.eventManager?.emit?.('myte:level_up', { myte: this.myte, level: this.level });
+            this.myte.parent?.eventManager?.emit?.(EVENTS.MYTE_LEVEL_UP, { myte: this.myte, level: this.level });
         }
         return gained;
     }
@@ -1053,7 +1053,7 @@ class MyteStats {
         ].map(value => Math.round(value)).join('|');
         if (stateKey === this._lastUiStateKey) return;
         this._lastUiStateKey = stateKey;
-        this.myte.parent?.eventManager?.emit('myte:stats_changed', { myte: this.myte });
+        this.myte.parent?.eventManager?.emit(EVENTS.MYTE_STATS_CHANGED, { myte: this.myte });
     }
 
     // --- Status ---
@@ -1093,7 +1093,7 @@ class MyteStats {
         };
     }
 
-    destroy() {
+    dispose() {
         this.clearManagedTimeout(this.batteryHideTimeout, 'batteryHideTimeout');
         this.clearManagedTimeout(this.chargingClassTimeout, 'chargingClassTimeout');
         this.pendingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));

@@ -127,7 +127,7 @@ class InputSystem {
 	/**
 	 * Tear down all event listeners
 	 */
-	destroy() {
+	dispose() {
 	  // Mouse events
 	  document.removeEventListener('mousemove', this.boundHandlers.mouseMove);
 	  document.removeEventListener('mousedown', this.boundHandlers.mouseDown);

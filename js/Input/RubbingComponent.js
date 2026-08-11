@@ -266,12 +266,12 @@ class RubbingComponent extends InputComponent {
   /**
    * Clean up resources
    */
-  destroy() {
+  dispose() {
     // Reset element style if needed
     if (this.element) {
       this.element.style.touchAction = this.originalTouchAction || '';
     }
     
-    super.destroy();
+    super.dispose();
   }
 }

@@ -319,7 +319,7 @@ class ContainerManager {
         this.userIsActive = true;
         this.element?.classList.remove('user-inactive');
         this.activeMyte?.restoreFromInactivityFreeRoam?.();
-        this.eventManager?.emit?.('user_activity_changed', { active: true });
+        this.eventManager?.emit?.(EVENTS.USER_ACTIVITY_CHANGED, { active: true });
     }
 
     handleUserInactive() {
@@ -327,7 +327,7 @@ class ContainerManager {
         this.userIsActive = false;
         this.element?.classList.add('user-inactive');
         this.activeMyte?.enterInactivityFreeRoam?.();
-        this.eventManager?.emit?.('user_activity_changed', { active: false });
+        this.eventManager?.emit?.(EVENTS.USER_ACTIVITY_CHANGED, { active: false });
     }
 
     // Container-specific utility methods
@@ -786,7 +786,7 @@ class ContainerManager {
     handleCollision(entityA, entityB) {
         if (entityA.onCollision) entityA.onCollision(entityB);
         if (entityB.onCollision) entityB.onCollision(entityA);
-        this.core.eventManager.emit('collision', { entityA, entityB });
+        this.core.eventManager.emit(EVENTS.COLLISION, { entityA, entityB });
     }
 
     getEntityColliderBounds(entity, x = entity?.posX ?? 0, y = entity?.posY ?? 0) {
@@ -835,7 +835,7 @@ class ContainerManager {
         this.ui.viewPanel?.updateButtonStates();
         this.ui.setSelected(null);
 
-        this.eventManager?.emit('container:active_myte_changed', { myte });
+        this.eventManager?.emit(EVENTS.CONTAINER_ACTIVE_MYTE_CHANGED, { myte });
         return true;
     }
 
@@ -864,7 +864,7 @@ class ContainerManager {
         this.ui.viewPanel?.updateButtonStates();
         this.ui.setSelected(null);
 
-        this.eventManager?.emit('container:active_myte_changed', { myte: null });
+        this.eventManager?.emit(EVENTS.CONTAINER_ACTIVE_MYTE_CHANGED, { myte: null });
     }
 
     update(deltaTime) {

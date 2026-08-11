@@ -548,7 +548,7 @@ class GameMap {
 			this.setWallAwareRenderInsets(mapData);
 			await this.createWallTileOverlay(mapData);
 		}
-		this.eventManager?.emit('wall:ready', { mapId: this.id, builder: this.wallBuilder });
+		this.eventManager?.emit(EVENTS.WALL_READY, { mapId: this.id, builder: this.wallBuilder });
 
 		// Floors are built after rooms exist (the environment manager registers
 		// them) and after walls, so a room's floor lands under the wall art that
@@ -560,7 +560,7 @@ class GameMap {
 				await this.floorMaterialRegistry.load();
 				this.floorBuilder = new FloorBuilder(this, this.floorMaterialRegistry);
 				this.floorBuilder.build();
-				this.eventManager?.emit('floor:ready', { mapId: this.id, builder: this.floorBuilder });
+				this.eventManager?.emit(EVENTS.FLOOR_READY, { mapId: this.id, builder: this.floorBuilder });
 			} catch (error) {
 				// A bad floor sheet must not take the map down with it: the
 				// authored ground is still there underneath.
@@ -1174,7 +1174,7 @@ class GameMap {
             });
         }
 
-		this.wallBuilder?.updateActiveRoom?.();
+		// Room polling lives inside tick(), throttled with the occlusion checks.
 		this.wallBuilder?.tick?.();
 
         // Update dropped items (physics + magnet collection). Any deployed myte can
@@ -1228,7 +1228,7 @@ class GameMap {
 		// Floor surfaces live in the shared background layer, so they outlive the
 		// map that made them unless they are torn down here with the walls.
 		if (this.floorBuilder) {
-			this.floorBuilder.destroy();
+			this.floorBuilder.dispose();
 			this.floorBuilder = null;
 			this.floorMaterialRegistry = null;
 		}

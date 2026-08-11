@@ -246,7 +246,7 @@ class Myte {
 			this.parent.ui?.debugPanel?.enableButtons?.();
 		}
 
-		this.parent.eventManager?.emit('myte:started', { myte: this });
+		this.parent.eventManager?.emit(EVENTS.MYTE_STARTED, { myte: this });
 		return true;
 	}
 
@@ -290,7 +290,7 @@ class Myte {
 			this.parent.camera.resetView();
 		}
 
-		this.parent.eventManager?.emit('myte:stopped', { myte: this });
+		this.parent.eventManager?.emit(EVENTS.MYTE_STOPPED, { myte: this });
 	}
 
 	_deregisterFromGrid() {
@@ -305,9 +305,9 @@ class Myte {
 		this._deregisterFromGrid();
 		this.queue?.clear?.();
 		this.inputHandler?.dispose?.();
-		this.dialogue?.destroy?.();
+		this.dialogue?.dispose?.();
 		this.buffs?.clear?.();
-		this.stats?.destroy?.();
+		this.stats?.dispose?.();
 		this.targetDot?.remove?.();
 		this.duplicate?.remove?.();
 	}
@@ -958,7 +958,7 @@ class Myte {
 		const particleSystem = this.parent.gameMap.particleSystem;
 		particleSystem.addParticleMethodsToObject(this);
 
-		this.addEventEffect('myte:landed', 'LANDING_DUST', {
+		this.addEventEffect(EVENTS.MYTE_LANDED, 'LANDING_DUST', {
 			storeReference: false,
 			attachmentPoint: 'feet',
 			positionAtFeet: true,

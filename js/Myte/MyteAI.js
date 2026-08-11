@@ -183,7 +183,7 @@ class MyteAI {
         this.lastDecisionLabel = chosen.label;
         this.lastDecisionTime = SimClock.now();
         this.lastDecisionTargetKey = chosen.targetKey ?? null;
-        this.myte.parent?.eventManager?.emit('myte:ai_decision_changed', { myte: this.myte });
+        this.myte.parent?.eventManager?.emit(EVENTS.MYTE_AI_DECISION_CHANGED, { myte: this.myte });
     }
 
     // Surface the winning drive as a thought bubble so the AI's choices are

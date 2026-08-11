@@ -52,7 +52,7 @@ class EntityRelationships {
 	}
 
 	_emitCleared(type, a, b) {
-		this.registry?.container?.core?.eventManager?.emit?.('relationship:cleared', {
+		this.registry?.container?.core?.eventManager?.emit?.(EVENTS.RELATIONSHIP_CLEARED, {
 			type, a, b
 		});
 	}

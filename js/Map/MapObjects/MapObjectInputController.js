@@ -555,7 +555,7 @@ class MapObjectInputController {
 			window.removeEventListener('keydown', object._rotateKeyHandler);
 			object._rotateKeyHandler = null;
 		}
-		Object.values(object.inputComponents).forEach(component => component.destroy());
+		Object.values(object.inputComponents).forEach(component => component.dispose());
 		object.inputComponents = {};
 		object._selectDragCleanup?.();
 		if (object._dropTargetEl) {

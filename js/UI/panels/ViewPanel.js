@@ -109,7 +109,7 @@ class ViewPanel extends ModalWindow {
         }
 
         const events = this._getContainer()?.eventManager;
-          this._wallReadyUnsubscribe = events?.on?.('wall:ready', payload => this.updateWallMode(payload?.builder)) || null;
+          this._wallReadyUnsubscribe = events?.on?.(EVENTS.WALL_READY, payload => this.updateWallMode(payload?.builder)) || null;
     }
 
     updateButtonStates() {

@@ -337,7 +337,7 @@ class OpenableMapObject extends DirectionalAnimatedMapObject {
         const eventName = this.getToggleEventName();
         if (!this.gameMap?.eventManager) return;
 
-        this.gameMap.eventManager.emit('world:action_availability_changed', {
+        this.gameMap.eventManager.emit(EVENTS.WORLD_ACTION_AVAILABILITY_CHANGED, {
             object: this,
             state
         });

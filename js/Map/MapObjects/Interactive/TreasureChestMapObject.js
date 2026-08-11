@@ -346,7 +346,7 @@ class TreasureChestMapObject extends withItemDrops(MultiStateMapObject) {
 
         this.playConfiguredSound('drop');
         this.gameMap?.particleSystem?.burstEffectAtObject(this, 'SPARKLE', { count: 24, spread: 70 });
-        this.gameMap?.eventManager?.emit('chest:opened', { chest: this, items: itemConfigs });
+        this.gameMap?.eventManager?.emit(EVENTS.CHEST_OPENED, { chest: this, items: itemConfigs });
 
         this.items = [];
     }

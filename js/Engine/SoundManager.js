@@ -750,6 +750,16 @@ class SoundManager {
 		const sound = this.synths.get(id);
 		if (!sound) return;
 
+		// A pattern loop keeps re-triggering the synth, so it must be torn down
+		// first regardless of which synth shape the branches below match —
+		// releasing the synth alone leaves the Tone.Part firing it again on the
+		// next loop pass.
+		const loop = this.loops.get(id);
+		if (loop) {
+			try { loop.stop(); loop.dispose(); } catch (_) {}
+			this.loops.delete(id);
+		}
+
 		// Different stop method depending on synth type
 		if (sound.synth?.noise) {
 			// For noise-based synths
@@ -757,12 +767,6 @@ class SoundManager {
 		} else if (typeof sound.synth?.triggerRelease === 'function') {
 			// For envelope-based synths
 			sound.synth.triggerRelease();
-		} else if (sound.loop && this.loops.has(id)) {
-			// For looping patterns
-			const loop = this.loops.get(id);
-			loop.stop();
-			loop.dispose();
-			this.loops.delete(id);
 		} else if (sound.synth && typeof sound.synth === 'object') {
 			Object.values(sound.synth).forEach((element) => {
 				if (!element || typeof element !== 'object') return;
@@ -1404,6 +1408,11 @@ class SoundManager {
 
 					const preset = this.synthPresets[id];
 					if (!preset) return;
+
+					// Music is staged above with MUSIC_GAIN/MUSIC_PAD_GAIN;
+					// the raw category volume here would stomp that staging
+					// and jump the melody ~2x louder on any slider change.
+					if (preset.type === 'music') return;
 
 					const categoryVolume = this.getCategoryVolume(this.resolveSoundCategory(id, preset));
 					const proximityMultiplier = sound.proximityMultiplier ?? 1;

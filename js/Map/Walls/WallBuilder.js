@@ -156,12 +156,34 @@ class WallOpeningSlot {
 }
 
 class WallBuilder {
+    static MASK_HORIZONTAL = 2 | 8;
+    static MASK_VERTICAL = 1 | 4;
+    static MASK_STRAIGHT_H = 10;
+
     static DIRECTIONS = Object.freeze([
         Object.freeze({ name: 'north', dx: 0, dy: -1, bit: 1 }),
         Object.freeze({ name: 'east', dx: 1, dy: 0, bit: 2 }),
         Object.freeze({ name: 'south', dx: 0, dy: 1, bit: 4 }),
         Object.freeze({ name: 'west', dx: -1, dy: 0, bit: 8 })
     ]);
+
+    static isHorizontalMask(mask) {
+        return (mask & WallBuilder.MASK_HORIZONTAL) !== 0;
+    }
+
+    static isVerticalMask(mask) {
+        return (mask & WallBuilder.MASK_VERTICAL) !== 0;
+    }
+
+    static isStraightHorizontal(mask) {
+        return mask === WallBuilder.MASK_STRAIGHT_H;
+    }
+
+    static isEndCapMask(mask) {
+        return WallBuilder.isHorizontalMask(mask) &&
+            !WallBuilder.isVerticalMask(mask) &&
+            !WallBuilder.isStraightHorizontal(mask);
+    }
 
     constructor(gameMap, wallData, registry) {
         this.gameMap = gameMap;
@@ -215,8 +237,8 @@ class WallBuilder {
         this.createAuthoredAttachments(this.wallData.attachments || []);
         const events = this.gameMap.eventManager;
         if (events) {
-            this._unsubscribers.push(events.on('container:active_myte_changed', () => this.commitCutawayRoom(true)));
-            this._unsubscribers.push(events.on('wall:geometry_changed', payload => {
+            this._unsubscribers.push(events.on(EVENTS.CONTAINER_ACTIVE_MYTE_CHANGED, () => this.commitCutawayRoom(true)));
+            this._unsubscribers.push(events.on(EVENTS.WALL_GEOMETRY_CHANGED, payload => {
                 if (payload?.builder === this) return;
                 if (!payload?.mapId || payload.mapId === this.gameMap.id) this.rebuild();
             }));
@@ -286,14 +308,13 @@ class WallBuilder {
     bridgeOpeningGap(opening) {
         const openingCells = opening.cells || [];
         if (openingCells.length === 0 || openingCells.every(([x, y]) => this.cells.has(`${x},${y}`))) return;
-        const horizontal = opening.axis === 'horizontal';
-        const ordered = [...openingCells].sort((a, b) => horizontal ? a[0] - b[0] : a[1] - b[1]);
-        const [startX, startY] = ordered[0];
-        const [endX, endY] = ordered[ordered.length - 1];
-        const before = this.cells.get(`${startX - (horizontal ? 1 : 0)},${startY - (horizontal ? 0 : 1)}`);
-        const after = this.cells.get(`${endX + (horizontal ? 1 : 0)},${endY + (horizontal ? 0 : 1)}`);
+        const { ordered, before, bridgeable } = this._resolveOpeningBridge(
+            openingCells,
+            opening.axis,
+            this.cells
+        );
         const existing = ordered.map(([x, y]) => this.cells.get(`${x},${y}`)).find(Boolean);
-        if (!existing && (!before || !after || before.connectGroup !== after.connectGroup)) return;
+        if (!existing && !bridgeable) return;
         const template = existing || before;
 
         for (const [x, y] of ordered) {
@@ -319,6 +340,21 @@ class WallBuilder {
             if (neighbor && neighbor.connectGroup === cell.connectGroup) mask |= direction.bit;
         }
         return mask;
+    }
+
+    _resolveOpeningBridge(cells, axis, source) {
+        const horizontal = axis === 'horizontal';
+        const ordered = [...cells].sort((a, b) => horizontal ? a[0] - b[0] : a[1] - b[1]);
+        const [startX, startY] = ordered[0];
+        const [endX, endY] = ordered[ordered.length - 1];
+        const before = source.get(`${startX - (horizontal ? 1 : 0)},${startY - (horizontal ? 0 : 1)}`);
+        const after = source.get(`${endX + (horizontal ? 1 : 0)},${endY + (horizontal ? 0 : 1)}`);
+        return {
+            ordered,
+            before,
+            after,
+            bridgeable: !!before && !!after && before.connectGroup === after.connectGroup
+        };
     }
 
     assignFaces(cell) {
@@ -355,7 +391,8 @@ class WallBuilder {
     }
 
     canMergeHorizontal(left, right) {
-        if (!left || !right || left.mask !== 10 || right.mask !== 10 || left.y !== right.y) return false;
+        if (!left || !right || !WallBuilder.isStraightHorizontal(left.mask) ||
+            !WallBuilder.isStraightHorizontal(right.mask) || left.y !== right.y) return false;
         if (right.x !== left.x + 1 || left.constructionId !== right.constructionId || left.heightCells !== right.heightCells) return false;
         return WallMaterialRegistry.DIRECTIONS.every(direction =>
             left.faces[direction].materialId === right.faces[direction].materialId &&
@@ -425,6 +462,7 @@ class WallBuilder {
         ));
         for (const piece of this.pieces) this.createPiece(piece);
         this.createAuthoredAttachments(this.wallData.attachments || []);
+        this.rebindFixtureObjects();
         this.enforceNodeBudget();
         // Geometry changed, so there is no animation to preserve: settle the
         // height field immediately instead of sweeping every wall down again.
@@ -473,7 +511,7 @@ class WallBuilder {
      * so there, occluding the subject is reason enough.
      */
     isCutawayBoundaryCell(cell, subjectRoomIds) {
-        if ((cell.mask & 10) === 0 || (cell.mask & 5) !== 0) return false;
+        if (!WallBuilder.isHorizontalMask(cell.mask) || WallBuilder.isVerticalMask(cell.mask)) return false;
         if (subjectRoomIds.size === 0) return true;
         return this._cutawayRoomIds.has(cell.faces.north.roomId) &&
             subjectRoomIds.has(cell.faces.north.roomId) &&
@@ -513,7 +551,18 @@ class WallBuilder {
         return subjects;
     }
 
+    // Memoized per sim-tick: resolving the cursor subject forces a DOM hit-test
+    // (isMouseInContainer → elementFromPoint), and one evaluation pass asks for
+    // it several times — subjects, signature, and room ids all start here.
     getCursorCutawaySubject() {
+        const now = SimClock.now();
+        if (this._cursorSubjectAt === now) return this._cursorSubject;
+        this._cursorSubjectAt = now;
+        this._cursorSubject = this.resolveCursorCutawaySubject();
+        return this._cursorSubject;
+    }
+
+    resolveCursorCutawaySubject() {
         const container = this.gameMap.container;
         // Player-facing toggle: some people want walls reacting to the cursor,
         // some find it noisy. SiteConfig only supplies the starting value.
@@ -635,9 +684,17 @@ class WallBuilder {
         if (this.presentation !== 'cutaway' || this.pieces.length === 0) return;
         const config = SiteConfig.wallSystem;
         const now = SimClock.now();
-        if (now - this._lastEvaluateAt >= config.cutawayEvaluateThrottleMs &&
-            this.getSubjectSignature() !== this._subjectSignature) {
-            this.refreshCutawayTargets();
+        // One throttled poll covers both the room commit and the occlusion
+        // signature — each resolves the cursor subject, which forces a DOM
+        // hit-test, so neither may run per-frame. The window advances even
+        // when nothing changed; otherwise the signature check itself becomes
+        // the per-frame cost the throttle exists to prevent.
+        if (now - this._lastEvaluateAt >= config.cutawayEvaluateThrottleMs) {
+            this._lastEvaluateAt = now;
+            this.updateActiveRoom();
+            if (this.getSubjectSignature() !== this._subjectSignature) {
+                this.refreshCutawayTargets();
+            }
         }
         // Commit every cell before drawing any piece. A room/material boundary
         // can split one structural run across canvases; drawing the first dirty
@@ -824,7 +881,7 @@ class WallBuilder {
             // to a corner or junction would erase its vertical arm, so those
             // structural cells remain full while the neighboring run handles
             // the height change.
-            if (piece.cells[index]?.mask !== 10) return 'full';
+            if (!WallBuilder.isStraightHorizontal(piece.cells[index]?.mask)) return 'full';
             const nextCut = cut && (index + 1 < count
                 ? cut[index + 1]
                 : this.getNeighborCutState(piece, index, 1));
@@ -928,7 +985,7 @@ class WallBuilder {
             // they can lower when there is room for a valid transition.
             for (let index = 0; index < count; index++) {
                 const mask = piece.cells[index]?.mask ?? 0;
-                if ((mask & 5) !== 0 || (mask & 10) === 0) cut[index] = false;
+                if (WallBuilder.isVerticalMask(mask) || !WallBuilder.isHorizontalMask(mask)) cut[index] = false;
             }
         }
         return cut;
@@ -937,13 +994,13 @@ class WallBuilder {
     isHorizontalOnlyCell(cell) {
         if (!cell) return false;
         const mask = cell?.mask ?? this.computeMask(cell);
-        return (mask & 10) !== 0 && (mask & 5) === 0;
+        return WallBuilder.isHorizontalMask(mask) && !WallBuilder.isVerticalMask(mask);
     }
 
     resolveHorizontalBoundary(chain, cut, boundaryIndex) {
         const boundary = chain[boundaryIndex];
         if (!boundary) return;
-        if (![2, 8].includes(this.computeMask(boundary))) {
+        if (!WallBuilder.isEndCapMask(this.computeMask(boundary))) {
             // This horizontal sequence terminates at a corner, junction, or
             // other structural boundary outside the sequence. Its boundary
             // straight cell must stand so it can transition into the stub run.
@@ -958,7 +1015,7 @@ class WallBuilder {
         const anchor = chain[anchorIndex];
         const transition = chain[transitionIndex];
         if (!anchor || anchor.opening || !transition || transition.opening ||
-            this.computeMask(transition) !== 10) {
+            !WallBuilder.isStraightHorizontal(this.computeMask(transition))) {
             cut.fill(false);
             return;
         }
@@ -968,10 +1025,10 @@ class WallBuilder {
 
     reserveTransitionBesideFullCap(chain, cut, capIndex, inwardDirection) {
         const cap = chain[capIndex];
-        if (!cap || cut[capIndex] || ![2, 8].includes(this.computeMask(cap))) return;
+        if (!cap || cut[capIndex] || !WallBuilder.isEndCapMask(this.computeMask(cap))) return;
         const transitionIndex = capIndex + inwardDirection;
         const transition = chain[transitionIndex];
-        if (transition && this.computeMask(transition) === 10 && !transition.opening) {
+        if (transition && WallBuilder.isStraightHorizontal(this.computeMask(transition)) && !transition.opening) {
             cut[transitionIndex] = false;
         }
     }
@@ -1024,12 +1081,12 @@ class WallBuilder {
     // structural corner whose endpoint stays tall.
     continuesAcrossPieceBoundary(piece, index, direction) {
         const cell = piece.cells[index];
-        if (!cell || cell.mask !== 10) return false;
+        if (!cell || !WallBuilder.isStraightHorizontal(cell.mask)) return false;
         const neighbor = this.cells.get(`${cell.x + direction},${cell.y}`);
         if (!neighbor || neighbor.connectGroup !== cell.connectGroup ||
             neighbor.constructionId !== cell.constructionId ||
             neighbor.heightCells !== cell.heightCells) return false;
-        return this.computeMask(neighbor) === 10;
+        return WallBuilder.isStraightHorizontal(this.computeMask(neighbor));
     }
 
     // Only the candidate host wall cuts away. Wall faces overlap vertically,
@@ -1264,7 +1321,7 @@ class WallBuilder {
         this.gameMap.parent?.canvas?.setAttribute('data-wall-mode', mode);
         this.gameMap.syncWallTileOverlay?.();
         this.evaluateCutaway(true);
-        this.gameMap.eventManager?.emit('wall:presentation_changed', { mapId: this.gameMap.id, mode });
+        this.gameMap.eventManager?.emit(EVENTS.WALL_PRESENTATION_CHANGED, { mapId: this.gameMap.id, mode });
         return true;
     }
 
@@ -1298,7 +1355,7 @@ class WallBuilder {
         });
         this.reindexOpenings();
         this.rebuild();
-        this.gameMap.eventManager?.emit('wall:geometry_changed', { mapId: this.gameMap.id, x, y, builder: this });
+        this.gameMap.eventManager?.emit(EVENTS.WALL_GEOMETRY_CHANGED, { mapId: this.gameMap.id, x, y, builder: this });
     }
 
     findPieceForCell(cellX, cellY) {
@@ -1319,12 +1376,17 @@ class WallBuilder {
         return construction ? (this.cellSize - construction.thickness) / 2 : 0;
     }
 
+    getDefaultOpeningHeight(type) {
+        const defaults = SiteConfig.wallSystem.defaultOpeningHeightPx || {};
+        return Number(defaults[type]) || Number(defaults.door) || 0;
+    }
+
     getOpeningObjectOffset(object, opening = null) {
         const wallOpening = object?.getConfig?.('wallOpeningConfig', {}) || {};
         const offset = object?.getConfig?.('wallOpeningConfig.placementOffset', {}) || {};
         const type = String(object?.type || '').toLowerCase();
         const openingHeight = Number(opening?.openingHeight ?? wallOpening.openingHeight) ||
-            (type === 'window' ? 64 : 128);
+            this.getDefaultOpeningHeight(type);
         const sillHeight = Number(opening?.sillHeight ?? wallOpening.sillHeight) || 0;
         return {
             x: Number(offset.x) || 0,
@@ -1357,7 +1419,7 @@ class WallBuilder {
         const count = Math.max(1, Math.round((axis === 'horizontal' ? object.size.width : object.size.height) / this.cellSize));
         const wallOpening = object?.getConfig?.('wallOpeningConfig', {}) || {};
         const openingHeight = Number(wallOpening.openingHeight) ||
-            (String(object?.type || '').toLowerCase() === 'window' ? 64 : 128);
+            this.getDefaultOpeningHeight(String(object?.type || '').toLowerCase());
 
         return this.getOpeningSillHeights(object).map(sillHeight => {
             const offset = this.getOpeningObjectOffset(object, { openingHeight, sillHeight });
@@ -1410,13 +1472,7 @@ class WallBuilder {
 
     canBridgeOpeningCells(cells, axis) {
         if (cells.every(([x, y]) => this.baseCells.has(`${x},${y}`))) return true;
-        const horizontal = axis === 'horizontal';
-        const ordered = [...cells].sort((a, b) => horizontal ? a[0] - b[0] : a[1] - b[1]);
-        const [startX, startY] = ordered[0];
-        const [endX, endY] = ordered[ordered.length - 1];
-        const before = this.baseCells.get(`${startX - (horizontal ? 1 : 0)},${startY - (horizontal ? 0 : 1)}`);
-        const after = this.baseCells.get(`${endX + (horizontal ? 1 : 0)},${endY + (horizontal ? 0 : 1)}`);
-        return !!before && !!after && before.connectGroup === after.connectGroup;
+        return this._resolveOpeningBridge(cells, axis, this.baseCells).bridgeable;
     }
 
     /**
@@ -1427,8 +1483,8 @@ class WallBuilder {
      */
     isOpeningCellCompatible(mask, axis) {
         return axis === 'horizontal'
-            ? (mask & 10) !== 0 && (mask & 5) === 0
-            : (mask & 5) !== 0 && (mask & 10) === 0;
+            ? WallBuilder.isHorizontalMask(mask) && !WallBuilder.isVerticalMask(mask)
+            : WallBuilder.isVerticalMask(mask) && !WallBuilder.isHorizontalMask(mask);
     }
 
     isOpeningPlacementValid(object, placement) {
@@ -1636,7 +1692,7 @@ class WallBuilder {
         let best = null;
         for (const piece of this.pieces) {
             // Only a straight horizontal run presents a face to this camera.
-            if (!piece.cells.every(cell => (cell.mask & 10) !== 0 && (cell.mask & 5) === 0)) continue;
+            if (!piece.cells.every(cell => this.isHorizontalOnlyCell(cell))) continue;
             const left = piece.x * this.cellSize;
             const right = left + (piece.cells.length * this.cellSize);
             const top = piece.baseline - construction.height;
@@ -1786,6 +1842,22 @@ class WallBuilder {
         }
     }
 
+    // rebuild() recreates every piece and its face surfaces, but a fixture
+    // stays attached to the surface from the previous build — it stops
+    // receiving cut-line updates and keeps the old piece graph alive. Only
+    // fixtures that are currently attached are re-anchored; first-time
+    // binding stays with bindFixtureObjects() so initialize() ordering holds.
+    rebindFixtureObjects() {
+        const attachments = this.gameMap.container?.attachments;
+        if (!attachments) return;
+        for (const record of this.fixtures) {
+            const object = this.gameMap.getObjectById?.(record.id);
+            if (object && attachments.getAttachment(object)) {
+                this.attachFixtureObject(object, record);
+            }
+        }
+    }
+
     beginFixtureMove(object) {
         const id = String(object.id);
         this._movingObjects.set(id, object);
@@ -1823,8 +1895,8 @@ class WallBuilder {
                 const construction = this.registry.getConstruction(cell.constructionId);
                 const inset = (this.cellSize - (construction?.thickness || this.cellSize)) / 2;
                 const mask = this.computeMask(cell);
-                const horizontal = (mask & 10) !== 0;
-                const vertical = (mask & 5) !== 0;
+                const horizontal = WallBuilder.isHorizontalMask(mask);
+                const vertical = WallBuilder.isVerticalMask(mask);
                 const left = (cell.x * this.cellSize) + (horizontal ? 0 : inset);
                 const right = ((cell.x + 1) * this.cellSize) - (horizontal ? 0 : inset);
                 const top = (cell.y * this.cellSize) + (vertical ? 0 : inset);

@@ -327,7 +327,7 @@ class ClickComponent extends InputComponent {
   /**
    * Clean up resources
    */
-  destroy() {
+  dispose() {
     this.cancelLongPressTimer();
     
     // Remove context menu listener if added
@@ -335,6 +335,6 @@ class ClickComponent extends InputComponent {
       this.element.removeEventListener('contextmenu', this.handleContextMenu);
     }
     
-    super.destroy();
+    super.dispose();
   }
 }

@@ -10,7 +10,7 @@ class Notify {
             return true;
         }
         if (channel === 'log') {
-            this.container?.core?.eventManager?.emit?.('game:log', { level, message, title });
+            this.container?.core?.eventManager?.emit?.(EVENTS.GAME_LOG, { level, message, title });
             return true;
         }
         const toast = this.container?.core?.toastManager;

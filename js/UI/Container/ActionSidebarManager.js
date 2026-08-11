@@ -41,11 +41,11 @@ class ActionSidebarManager extends UIComponent {
             this.queueRefresh(false);
         };
 
-        ['myte:queue_changed', 'myte:mode_changed', 'myte:started', 'myte:stopped',
-            'container:active_myte_changed', 'world:action_availability_changed',
-            'chest:opened', 'plant:matured', 'plant:pollinated', 'plant:mutated']
+        [EVENTS.MYTE_QUEUE_CHANGED, EVENTS.MYTE_MODE_CHANGED, EVENTS.MYTE_STARTED, EVENTS.MYTE_STOPPED,
+            EVENTS.CONTAINER_ACTIVE_MYTE_CHANGED, EVENTS.WORLD_ACTION_AVAILABILITY_CHANGED,
+            EVENTS.CHEST_OPENED, EVENTS.PLANT_MATURED, EVENTS.PLANT_POLLINATED, EVENTS.PLANT_MUTATED]
             .forEach(event => this._eventUnsubscribers.push(eventManager.on(event, invalidateActions)));
-        ['myte:ai_decision_changed', 'myte:stats_changed']
+        [EVENTS.MYTE_AI_DECISION_CHANGED, EVENTS.MYTE_STATS_CHANGED]
             .forEach(event => this._eventUnsubscribers.push(eventManager.on(event, invalidateDetails)));
     }
 

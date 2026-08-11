@@ -196,7 +196,7 @@ class MytePhysics {
 		this.isFalling = false;
 		this.isOnSolidGround = false;
 
-		m.parent?.eventManager?.emit('myte:jumped', { myte: m });
+		m.parent?.eventManager?.emit(EVENTS.MYTE_JUMPED, { myte: m });
 
 		const dx = m.targetX - m.posX;
 		if (Math.abs(dx) > 10) {
@@ -213,7 +213,7 @@ class MytePhysics {
 			m.doTouchDamage();
 		}
 		this.reset();
-		m.parent?.eventManager?.emit('myte:landed', { myte: m });
+		m.parent?.eventManager?.emit(EVENTS.MYTE_LANDED, { myte: m });
 	}
 
 	adjustPhysicsForCharacter() {

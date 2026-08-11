@@ -103,7 +103,7 @@ class MyteAction {
     complete() {
         this.myte.stats?.applyActionResult?.(this.buildActionResult());
         this.myte.buffs?.handleActionComplete?.(this);
-        this.myte.parent?.eventManager?.emit('myte:action_completed', {
+        this.myte.parent?.eventManager?.emit(EVENTS.MYTE_ACTION_COMPLETED, {
             myte: this.myte,
             actionId: this.constructor.metadata?.id ?? null,
             target: this.target ?? null,

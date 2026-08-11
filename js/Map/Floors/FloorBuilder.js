@@ -287,7 +287,7 @@ class FloorBuilder {
         this.surfaces.clear();
     }
 
-    destroy() {
+    dispose() {
         this.clear();
         this.container?.remove();
         this.container = null;

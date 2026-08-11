@@ -39,7 +39,13 @@ class EventManager {
     emit(event, data) {
         const handlers = this.handlers.get(event);
         if (handlers) {
-            handlers.forEach(handler => handler(data));
+            handlers.forEach(handler => {
+                try {
+                    handler(data);
+                } catch (error) {
+                    console.error(`[EventManager] Handler failed for "${event}"`, error);
+                }
+            });
         }
     }
 

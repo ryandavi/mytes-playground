@@ -180,7 +180,7 @@ class MyteTravelManager extends RouteTravelManager {
         }
 
         this.refreshUi();
-        this.emit('travel_started', { journey });
+        this.emit(EVENTS.TRAVEL_STARTED, { journey });
     }
 
     onJourneyArrived(journey) {
@@ -285,6 +285,6 @@ class MyteTravelManager extends RouteTravelManager {
     _finish(journey) {
         this.container.core?.user?.saveUserData?.();
         this.refreshUi();
-        this.emit('travel_arrived', { journey });
+        this.emit(EVENTS.TRAVEL_ARRIVED, { journey });
     }
 }

@@ -130,9 +130,9 @@ class InputComponent {
 	
 	/**
 	 * Clean up all subscriptions and resources
-	 * Override in subclasses, but always call super.destroy()
+	 * Override in subclasses, but always call super.dispose()
 	 */
-	destroy() {
+	dispose() {
 	  // Clean up all subscriptions
 	  this.subscriptions.forEach(sub => sub.unsubscribe());
 	  this.subscriptions = [];

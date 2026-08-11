@@ -539,7 +539,7 @@ class DragComponent extends InputComponent {
 	/**
 	 * Clean up resources
 	 */
-	destroy() {
+	dispose() {
 		this.cancelInertia();
 
 		// Remove global handlers
@@ -551,6 +551,6 @@ class DragComponent extends InputComponent {
 			this.element.style.touchAction = '';
 		}
 
-		super.destroy();
+		super.dispose();
 	}
 }

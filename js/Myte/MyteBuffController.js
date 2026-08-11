@@ -40,7 +40,7 @@ class MyteBuffController {
             for (const buff of Array.from(this.activeBuffs.values())) {
                 if (buff.durationMs > 0 && buff.remainingMs <= 0) {
                     this.activeBuffs.delete(buff.instanceId);
-                    this.myte.parent?.eventManager?.emit('myte:buff_expired', { myte: this.myte, buffId: buff.id, reason: 'expired' });
+                    this.myte.parent?.eventManager?.emit(EVENTS.MYTE_BUFF_EXPIRED, { myte: this.myte, buffId: buff.id, reason: 'expired' });
                 }
             }
             this.bumpVersion();
@@ -161,7 +161,7 @@ class MyteBuffController {
             // bumpVersion called below covers both the new buff and removed excludes
         }
         this.bumpVersion();
-        this.myte.parent?.eventManager?.emit('myte:buff_gained', { myte: this.myte, buffId: buff.id });
+        this.myte.parent?.eventManager?.emit(EVENTS.MYTE_BUFF_GAINED, { myte: this.myte, buffId: buff.id });
         return buff;
     }
 
@@ -289,7 +289,7 @@ class MyteBuffController {
         });
         this.activeBuffs.delete(instanceId);
         this.bumpVersion();
-        this.myte.parent?.eventManager?.emit('myte:buff_expired', { myte: this.myte, buffId: buff.id, reason });
+        this.myte.parent?.eventManager?.emit(EVENTS.MYTE_BUFF_EXPIRED, { myte: this.myte, buffId: buff.id, reason });
         return true;
     }
 

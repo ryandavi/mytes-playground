@@ -29,7 +29,7 @@ class GameLogManager extends ModalWindow {
         // the event; a null token value drops the entry (template expected data
         // the payload didn't have).
         this.formatters = {
-            'myte:action_completed': (payload) => ({
+            [EVENTS.MYTE_ACTION_COMPLETED]: (payload) => ({
                 templateId: `action:${payload.actionId}`,
                 values: {
                     myte: payload.myte?.name ?? null,
@@ -37,30 +37,30 @@ class GameLogManager extends ModalWindow {
                 },
                 entity: payload.myte
             }),
-            'chest:opened': (payload) => ({
-                templateId: 'chest:opened',
+            [EVENTS.CHEST_OPENED]: (payload) => ({
+                templateId: EVENTS.CHEST_OPENED,
                 values: { items: this.formatItemList(payload.items) },
                 entity: payload.chest
             }),
-            'plant:matured': (payload) => ({
-                templateId: 'plant:matured',
+            [EVENTS.PLANT_MATURED]: (payload) => ({
+                templateId: EVENTS.PLANT_MATURED,
                 values: { plant: this.getEntityLabel(payload.plant) },
                 entity: payload.plant
             }),
-            'plant:mutated': (payload) => ({
-                templateId: 'plant:mutated',
+            [EVENTS.PLANT_MUTATED]: (payload) => ({
+                templateId: EVENTS.PLANT_MUTATED,
                 values: { plant: this.getEntityLabel(payload.plant) },
                 entity: payload.plant
             }),
-            'plant:pollinated': (payload) => ({
-                templateId: 'plant:pollinated',
+            [EVENTS.PLANT_POLLINATED]: (payload) => ({
+                templateId: EVENTS.PLANT_POLLINATED,
                 values: { plant: this.getEntityLabel(payload.plant) },
                 entity: payload.plant
             }),
-            'user:currency_changed': (payload) => {
+            [EVENTS.USER_CURRENCY_CHANGED]: (payload) => {
                 if (payload.type !== 'coins' || payload.delta <= 0) return null;
                 return {
-                    templateId: 'user:currency_changed',
+                    templateId: EVENTS.USER_CURRENCY_CHANGED,
                     values: {
                         coins: Utility.formatCurrency('coins', payload.delta),
                         total: Utility.formatCurrency('coins', payload.total)

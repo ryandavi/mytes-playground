@@ -30,7 +30,7 @@ class HiveMapObject extends MapObject {
 
     produceHoney() {
         this.onHoneyProduced?.();
-        this.gameMap?.emit?.('hive:honey', { hive: this });
+        this.gameMap?.emit?.(EVENTS.HIVE_HONEY, { hive: this });
     }
 
     render(container, parent) {

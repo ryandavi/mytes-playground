@@ -28,7 +28,7 @@ class MyteQueue {
     }
 
     _emitChanged(reason) {
-        this.myte?.parent?.eventManager?.emit('myte:queue_changed', {
+        this.myte?.parent?.eventManager?.emit(EVENTS.MYTE_QUEUE_CHANGED, {
             myte: this.myte,
             queue: this,
             reason
