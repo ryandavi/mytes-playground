@@ -290,6 +290,9 @@
     "src": "js/Map/Regions/RegionManager.js"
   },
   {
+    "src": "js/Map/Surfaces/FinishPalette.js"
+  },
+  {
     "src": "js/Map/Walls/WallMaterialRegistry.js"
   },
   {
@@ -396,6 +399,9 @@
   {
     "src": "js/Map/MapObjects/Barrier/WallOpeningPlacement.js",
     "commentLine": "<!-- WALL OPENINGS -->"
+  },
+  {
+    "src": "js/Map/MapObjects/Barrier/WallFixturePlacement.js"
   },
   {
     "src": "js/Map/MapObjects/Barrier/DoorMapObject.js",

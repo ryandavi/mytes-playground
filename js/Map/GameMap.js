@@ -1,4 +1,8 @@
 class GameMap {
+    // Contributors to the reserved strip above the map. Walls are the first,
+    // not the only: anything whose art reaches past the top edge answers here.
+    static TOP_OVERHANG_SOURCES = [(map, mapData) => map.resolveWallTopOverhang(mapData)];
+
     constructor(parent, mapData = null) {
         this.parent = parent;
         this.mapData = mapData || {}; // Default empty object if no data provided
@@ -94,14 +98,56 @@ class GameMap {
         return { x: this.renderInsets.left, y: this.renderInsets.top };
     }
 
-    resolveWallRenderTopInset(mapData) {
+    /**
+     * How far anything renders ABOVE the map's top edge. Each contributor
+     * answers for its own content and the map reserves the largest, so a tall
+     * prop or a two-storey building joins by answering the same question rather
+     * than by adding another inset of its own.
+     *
+     * There is one reserved strip and one place that computes it on purpose:
+     * `renderInsets` feeds world-coordinate conversion (ContainerManager) and
+     * the grid overlay, so a contributor applying its own offset instead would
+     * put the cursor and the art in different coordinate systems.
+     */
+    resolveRenderTopOverhang(mapData = this.mapData) {
+        return Math.max(0, ...GameMap.TOP_OVERHANG_SOURCES.map(
+            source => Number(source(this, mapData)) || 0
+        ));
+    }
+
+    // `this.mapData` is the object the map was CONSTRUCTED with, not the loaded
+    // TMX, so it carries no wall cells. Recomputing the overhang from it alone
+    // would quietly reserve nothing and clip every wall — and because the strip
+    // also shifts world-coordinate conversion, the cursor would go with it. Fall
+    // back to the builder, which is the live source once the map is up.
+    wallOverhangCells(mapData) {
+        if (mapData?.walls?.cells?.length) return mapData.walls.cells;
+        return [...(this.wallBuilder?.cells?.values?.() || [])];
+    }
+
+    /**
+     * A wall overflows the top edge only if it is tall enough to clear its own
+     * row: one on row 0 contributes its whole height, one five rows down
+     * contributes nothing. Reserving the tallest wall's height wherever it
+     * stood padded every map with walls, including maps whose walls are nowhere
+     * near the top.
+     *
+     * Derived from `baseline = (y + 0.5) * cell + thickness / 2` and
+     * `top = baseline - 1 - baselineRow`, which reduce to `height - y * cell`.
+     */
+    resolveWallTopOverhang(mapData) {
         if (SiteConfig.wallSystem?.enabled !== true ||
             SiteConfig.wallSystem?.extendCanvasForWallHeight !== true ||
-            !mapData?.walls?.cells?.length) return 0;
+            !this.wallOverhangCells(mapData).length) return 0;
         const cellSize = this.gridSystem?.config?.cellSize || mapData.tileHeight || 32;
-        return Math.max(...mapData.walls.cells.map(cell =>
-            Math.max(1, Number(cell.heightCells) || SiteConfig.wallSystem.defaultHeightCells) * cellSize
-        ));
+        const registry = this.wallMaterialRegistry;
+        return Math.max(0, ...this.wallOverhangCells(mapData).map(cell => {
+            // The construction's own height once materials have loaded; before
+            // that the map's heightCells estimate is all there is.
+            const height = Number(registry?.getConstruction?.(cell.constructionId)?.height) ||
+                (Math.max(1, Number(cell.heightCells) || SiteConfig.wallSystem.defaultHeightCells) * cellSize);
+            return height - ((Number(cell.y) || 0) * cellSize);
+        }));
     }
 
     resolveRenderPadding(mapData = this.mapData) {
@@ -131,9 +177,9 @@ class GameMap {
         this.parent.invalidateCanvasRect?.();
     }
 
-    setWallAwareRenderInsets(mapData, wallTop = this.resolveWallRenderTopInset(mapData)) {
+    setWallAwareRenderInsets(mapData, overhang = this.resolveRenderTopOverhang(mapData)) {
         const padding = this.resolveRenderPadding(mapData);
-        this.setRenderInsets({ ...padding, top: padding.top + wallTop });
+        this.setRenderInsets({ ...padding, top: padding.top + Math.max(0, Number(overhang) || 0) });
     }
 
     // Flat top-down art for the wall tiles the map author placed in Tiled. The
@@ -495,12 +541,9 @@ class GameMap {
 			await this.wallMaterialRegistry.load();
 			this.wallBuilder = new WallBuilder(this, mapData.walls, this.wallMaterialRegistry);
 			await this.wallBuilder.initialize();
-			const constructionIds = new Set(mapData.walls.cells.map(cell => cell.constructionId));
-			const tallestConstruction = SiteConfig.wallSystem.extendCanvasForWallHeight === true
-				? Math.max(0, ...[...constructionIds]
-					.map(id => Number(this.wallMaterialRegistry.getConstruction(id)?.height) || 0))
-				: 0;
-			this.setWallAwareRenderInsets(mapData, tallestConstruction);
+			// Materials are loaded now, so the overhang uses each construction's
+			// real height instead of the map's heightCells estimate.
+			this.setWallAwareRenderInsets(mapData);
 			await this.createWallTileOverlay(mapData);
 		}
 		this.eventManager?.emit('wall:ready', { mapId: this.id, builder: this.wallBuilder });
@@ -913,7 +956,7 @@ class GameMap {
                 return null;
             }
 
-            if (this.gridSystem) {
+            if (this.gridSystem && object.getConfig?.('snapToGrid', false) === true) {
                 try {
                     const newposition = this.gridSystem.snapToGrid(
                         x, y,
@@ -1111,6 +1154,7 @@ class GameMap {
         }
 
 		this.wallBuilder?.updateActiveRoom?.();
+		this.wallBuilder?.tick?.();
 
         // Update dropped items (physics + magnet collection). Any deployed myte can
         // collect — not just the controlled one — so background mytes that walk over a

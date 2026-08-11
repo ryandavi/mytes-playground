@@ -8,6 +8,9 @@ class DragHandler {
         
         // Drag validation callback
         this.canDrag = options.canDrag || (() => true);
+
+        // Pointer-down validation callback (for region-based hit testing)
+        this.canStart = options.canStart || (() => true);
         
         // Drag update callback
         this.onDragUpdate = options.onDragUpdate || (() => {});
@@ -71,6 +74,8 @@ class DragHandler {
         const pos = this.getEventPosition(event);
         if (!pos) return;
 
+        if (!this.canStart(event, pos)) return;
+
         // Map-object drags listen globally and may overlap a Myte's much larger
         // sprite hitbox. Claim this press before either handler can move so only
         // the entity the user actually pressed is picked up.
@@ -99,12 +104,12 @@ class DragHandler {
         document.addEventListener('visibilitychange', this.boundHandleVisibility);
 
         // Initialize drag state
-        this.initializeDrag();
+        this.initializeDrag(event, pos);
     }
 
-    initializeDrag() {
+    initializeDrag(event, position) {
         this.isDragging = true;
-        this.onDragStart();
+        this.onDragStart({ event, position });
     }
 
     getEventPosition(event) {

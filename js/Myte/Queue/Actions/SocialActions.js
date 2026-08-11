@@ -80,7 +80,7 @@ class PairedSocialAction extends PositionableAction {
     }
 
     _resolveApproachSide() {
-        const targetRect = this.getTargetRect(this.target, 'sprite');
+        const targetRect = this.getTargetRect(this.target, 'interaction');
         const myteRect = this.myte.getRect();
         return this.getClosestSideHorizontal(targetRect, myteRect) ?? 'left';
     }
@@ -90,7 +90,7 @@ class PairedSocialAction extends PositionableAction {
     }
 
     _setApproachTarget() {
-        const targetRect = this.getTargetRect(this.target, 'sprite');
+        const targetRect = this.getTargetRect(this.target, 'interaction');
         const myteRect = this.myte.getRect();
         if (!targetRect || !myteRect) return;
         const point = this.calculatePosition(myteRect, targetRect, this.partnerSide, {
@@ -191,7 +191,7 @@ class WatchAction extends PositionableAction {
     update(deltaTime = 0) {
         if (!this.target) return true;
 
-        const targetRect = this.getTargetRect(this.target, 'sprite');
+        const targetRect = this.getTargetRect(this.target, 'interaction');
         const myteRect = this.myte.getRect();
         const horizontal = this.getClosestSideHorizontal(targetRect, myteRect);
         const watchPos = this.calculatePosition(myteRect, targetRect, horizontal, { gap: -5, align: 'bottom-edge' });

@@ -26,6 +26,7 @@ class Camera {
 		this.previousFollowMode = DEFAULT_CAMERA_FOLLOW_MODE;
 		this.temporaryFollowTarget = null;
 		this.temporaryFollowRestoreMode = null;
+		this.temporaryCursorFollow = null;
 		this.isScrollable = { x: true, y: true };
 		this.useInstantMovement = false;
 		this.limitToBounds = false;
@@ -218,6 +219,54 @@ class Camera {
 		}
 
 		this.temporaryFollowRestoreMode = null;
+		return true;
+	}
+
+	beginTemporaryCursorFollow(owner) {
+		if (!owner) return false;
+		if (this.temporaryCursorFollow?.owner === owner) return true;
+		if (this.temporaryCursorFollow) return false;
+
+		this.cancelDragPan();
+		this.temporaryCursorFollow = {
+			owner,
+			mode: this.followMode,
+			position: { x: this.posX, y: this.posY },
+			target: { x: this.targetX, y: this.targetY }
+		};
+		this.setMode(CAMERA_FOLLOW_MODES.LOCKED);
+		return true;
+	}
+
+	updateTemporaryCursorFollow(owner, clientX, clientY) {
+		if (this.temporaryCursorFollow?.owner !== owner) return false;
+		const viewportRect = this.parent.getContainerRect();
+		if (clientX < viewportRect.left || clientX > viewportRect.right ||
+			clientY < viewportRect.top || clientY > viewportRect.bottom) {
+			this.endTemporaryCursorFollow(owner);
+			return false;
+		}
+
+		const zoom = this._getSafeZoomValue();
+		this.followCursorEdge(
+			(clientX - viewportRect.left) / zoom,
+			(clientY - viewportRect.top) / zoom,
+			this.parent.getCanvasRect(),
+			viewportRect
+		);
+		return true;
+	}
+
+	endTemporaryCursorFollow(owner = null) {
+		const state = this.temporaryCursorFollow;
+		if (!state || (owner && state.owner !== owner)) return false;
+		this.temporaryCursorFollow = null;
+		this.setMode(state.mode);
+		this.targetX = state.target.x;
+		this.targetY = state.target.y;
+		this.posX = state.position.x;
+		this.posY = state.position.y;
+		this.updateTransform(this.posX, this.posY, this.zoomLevel);
 		return true;
 	}
 

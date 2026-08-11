@@ -331,6 +331,7 @@ class Myte {
 	// Renderer element forwarding
 	get duplicate() { return this.renderer?.duplicate ?? null; }
 	get sprite() { return this.renderer?.sprite ?? null; }
+	get pointerTarget() { return this.renderer?.pointerTarget ?? null; }
 	get targetDot() { return this.renderer?.targetDot ?? null; }
 	get battery() { return this.renderer?.battery ?? null; }
 	get slotBattery() { return this.renderer?.homeBattery ?? null; }
@@ -622,7 +623,9 @@ class Myte {
 	 ********************************************/
 
 	setDirection(direction) {
-		if (direction !== this.direction) this.direction = direction;
+		if (direction === this.direction) return;
+		this.direction = direction;
+		this.renderer?.syncPointerTarget?.();
 	}
 
 	// Horizontal movement is visually dominant for the side-view sprites, so dx
@@ -753,6 +756,45 @@ class Myte {
 			x, y, left: x, top: y,
 			right: x + width, bottom: y + height,
 			width, height, type: region.type ?? 'box'
+		};
+	}
+
+	getLocalRegionRect(regionId = 'collider', direction = this.direction) {
+		const region = this.getRegionConfig(regionId, direction);
+		if (!region) return null;
+
+		const x = region.x ?? region.offsetX ?? 0;
+		const y = region.y ?? region.offsetY ?? 0;
+		const width = region.width ?? this.size.width;
+		const height = region.height ?? this.size.height;
+		return {
+			x, y, left: x, top: y,
+			right: x + width, bottom: y + height,
+			width, height, type: region.type ?? 'box'
+		};
+	}
+
+	containsWorldPoint(x, y, regionId = 'select') {
+		const rect = this.getRegionRect(regionId);
+		return !!rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+	}
+
+	containsScreenPoint(clientX, clientY, regionId = 'select') {
+		const localPoint = this.screenToLocalPoint(clientX, clientY);
+		const region = this.getLocalRegionRect(regionId);
+		if (!localPoint || !region) return false;
+
+		return localPoint.x >= region.left && localPoint.x <= region.right &&
+			localPoint.y >= region.top && localPoint.y <= region.bottom;
+	}
+
+	screenToLocalPoint(clientX, clientY) {
+		const elementRect = this.duplicate?.getBoundingClientRect?.();
+		if (!elementRect || elementRect.width <= 0 || elementRect.height <= 0) return null;
+
+		return {
+			x: (clientX - elementRect.left) * (this.size.width / elementRect.width),
+			y: (clientY - elementRect.top) * (this.size.height / elementRect.height)
 		};
 	}
 

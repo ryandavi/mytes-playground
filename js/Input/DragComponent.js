@@ -38,6 +38,7 @@ class DragComponent extends InputComponent {
 		this.positionHistory = [];
 		this.touchId = null;
 		this.mouseDownReceived = false; // Track if mousedown was received
+		this.grabOffset = { x: 0, y: 0 };
 
 		// For inertia animation
 		this.inertiaAnimationId = null;
@@ -305,11 +306,18 @@ class DragComponent extends InputComponent {
 		// Apply drag origin offset
 		if (this.element) {
 			const rect = this.element.getBoundingClientRect();
+			const startClientX = this.dragStartPosition.clientX ?? event.position.clientX;
+			const startClientY = this.dragStartPosition.clientY ?? event.position.clientY;
+			this.grabOffset = {
+				x: startClientX - rect.left,
+				y: startClientY - rect.top
+			};
 			this.dragOffset = {
-				x: (event.position.x - rect.left) - (rect.width * this.options.dragOriginX),
-				y: (event.position.y - rect.top) - (rect.height * this.options.dragOriginY)
+				x: this.grabOffset.x - (rect.width * this.options.dragOriginX),
+				y: this.grabOffset.y - (rect.height * this.options.dragOriginY)
 			};
 		} else {
+			this.grabOffset = { x: 0, y: 0 };
 			this.dragOffset = { x: 0, y: 0 };
 		}
 
@@ -318,7 +326,8 @@ class DragComponent extends InputComponent {
 			this.options.onDragStart({
 				originalEvent: event.originalEvent,
 				position: this.dragStartPosition,
-				offset: this.dragOffset
+				offset: this.dragOffset,
+				grabOffset: this.grabOffset
 			});
 		}
 	}

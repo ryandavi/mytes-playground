@@ -69,6 +69,7 @@ class ContainerManager {
             autoDeployMytesOnLoad: false,
             cameraShake: true,
             panInertia: true,
+            wallCursorCutaway: SiteConfig.wallSystem.cursorCutawayEnabled,
         }
 
     }

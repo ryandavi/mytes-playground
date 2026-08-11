@@ -8,11 +8,17 @@ class MyteRubbingHandler extends MyteBaseHandler {
 
 		const rubbing = SiteConfig.interaction.rubbing;
 		this.component = new RubbingComponent(myte, {
-			element: myte.sprite,
+			element: myte.pointerTarget,
 			enabled: true,
 			minRubs: rubbing.minRubs,
 			maxRubs: rubbing.maxRubsMyte,
-			canRub: () => myte.parent.ui?.isTool?.(UIToolModes.PET) === true,
+			canRub: (event) =>
+				myte.parent.ui?.isTool?.(UIToolModes.PET) === true &&
+				myte.containsScreenPoint(
+					event.position.clientX,
+					event.position.clientY,
+					'hit'
+				),
 			onRubComplete: (event) => this._applyPettingResult(event.count, false),
 			onRubOverdone: (event) => this._applyPettingResult(event.count, true)
 		});

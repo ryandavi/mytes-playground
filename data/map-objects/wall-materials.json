@@ -1,49 +1,57 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
+  "paintSheet": "images/walls/paints.png",
   "constructions": {
     "plaster_wall": {
       "sheet": "images/walls/construction-plaster.png",
+      "debugSheet": "images/walls/construction-plaster-debug.png",
+      "capColor": "#cec8b5",
       "cellSize": 32,
       "height": 160,
       "stubHeight": 28,
+      "thickness": 14,
+      "frameHeight": 192,
+      "baselineRow": 182,
       "maskMap": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-      "debugMaskColors": [
-        "#000000", "#800000", "#008000", "#808000",
-        "#000080", "#800080", "#008080", "#c0c0c0",
-        "#808080", "#ff0000", "#00ff00", "#ffff00",
-        "#0000ff", "#ff00ff", "#00ffff", "#ffffff"
-      ],
-      "debugMaskLabels": [
-        "isolated", "N", "E", "N+E",
-        "S", "N+S", "E+S", "N+E+S",
-        "W", "N+W", "E+W", "N+E+W",
-        "S+W", "N+S+W", "E+S+W", "N+E+S+W"
-      ],
+      "transitionColumns": { "rampDown": 16, "rampUp": 17 },
       "bands": {
         "full": { "baseY": 0 },
-        "stub": { "baseY": 160 }
+        "stub": { "baseY": 192 }
+      },
+      "debug": {
+        "maskLabels": [
+          "isolated", "N", "E", "N+E",
+          "S", "N+S", "E+S", "N+E+S",
+          "W", "N+W", "E+W", "N+E+W",
+          "S+W", "N+S+W", "E+S+W", "N+E+S+W"
+        ]
       }
     }
   },
   "finishes": {
     "plaster_plain": {
-      "sheet": "images/walls/finish-plaster-plain.png",
-      "maskMap": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-      "bands": {
-        "full": { "baseY": 0 },
-        "stub": { "baseY": 160 }
-      }
+      "swatch": { "west": 0, "body": 1, "east": 2, "westStop": 3, "eastStop": 4 },
+      "palette": { "body": "#ece7d3", "band": "#f6f3e7", "accent": "#ddd7c4", "shade": "#d3cdba", "light": "#f2eedc" }
     },
     "wallpaper_blue_flower": {
-      "sheet": "images/walls/finish-wallpaper-blue-flower.png",
-      "maskMap": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-      "bands": {
-        "full": { "baseY": 0 },
-        "stub": { "baseY": 160 }
-      }
-    }
+      "swatch": { "west": 5, "body": 6, "east": 7, "westStop": 8, "eastStop": 9 },
+      "palette": { "body": "#b0cae0", "band": "#d6e7f5", "accent": "#a1bad1", "motif": "#4670a2", "light": "#f2eecf" }
+    },
+    "paint_sage": { "template": "plaster_plain", "color": "#9caf88", "baseboard": "#b3c4a1" },
+    "paint_terracotta": { "template": "plaster_plain", "color": "#c98d68", "baseboard": "#dcae8e" }
   },
   "fixtures": {
-    "painting": { "defaultWidth": 20, "defaultHeight": 16 }
+    "painting": {
+      "sheet": "images/walls/fixtures.png",
+      "piece": { "x": 0, "y": 0, "w": 36, "h": 28 },
+      "defaultWidth": 36,
+      "defaultHeight": 28
+    },
+    "painting_still_life": {
+      "sheet": "images/walls/fixtures.png",
+      "piece": { "x": 36, "y": 0, "w": 36, "h": 28 },
+      "defaultWidth": 36,
+      "defaultHeight": 28
+    }
   }
 }

@@ -7,6 +7,7 @@ class MyteRenderer {
 		this.visualRoot = null;
 		this.homeVisualRoot = null;
 		this.sprite = null;
+		this.pointerTarget = null;
 		this.homeSprite = null;
 		this.battery = null;
 		this.homeBattery = null;
@@ -38,12 +39,31 @@ class MyteRenderer {
 		this.visualRoot = this.duplicate.querySelector('.inner-wrapper');
 		this.homeSprite = m.element.querySelector('.sprite');
 		this.sprite = this.duplicate.querySelector('.sprite');
+		this.pointerTarget = document.createElement('div');
+		this.pointerTarget.className = 'myte-pointer-target';
+		this.duplicate.appendChild(this.pointerTarget);
 		this.battery = this.duplicate.querySelector('.battery');
 		this.homeBattery = m.element.querySelector('.battery');
 		this.applyVisualDefinition(m.definition);
 		this.applyVerticalVisuals();
+		this.syncPointerTarget();
 
 		this.duplicate.classList.add('is-deactivated');
+	}
+
+	syncPointerTarget() {
+		if (!this.pointerTarget) return;
+
+		const region = this.myte.getLocalRegionRect('select') ?? {
+			left: 0,
+			top: 0,
+			width: this.myte.size.width,
+			height: this.myte.size.height
+		};
+		this.pointerTarget.style.left = `${region.left}px`;
+		this.pointerTarget.style.top = `${region.top}px`;
+		this.pointerTarget.style.width = `${region.width}px`;
+		this.pointerTarget.style.height = `${region.height}px`;
 	}
 
 	applyVisualDefinition(definition) {

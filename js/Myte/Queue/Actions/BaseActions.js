@@ -205,11 +205,16 @@ class PositionableAction extends MyteAction {
         return { x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height };
     }
 
-    // Get the target's rect. alignTo='collider' uses physics bounds when available,
-    // falling back to sprite bounds. This lets the Myte stop at the right place even
-    // when the sprite has visual padding beyond the interactive area.
+    // Get the target's requested spatial region when available, falling back to
+    // sprite bounds. This lets actions align to semantic geometry instead of visual padding.
     getTargetRect(target, alignTo = 'sprite') {
-        if (target instanceof Myte) return target.getOffsetRect();
+        if (target instanceof Myte) {
+            if (alignTo !== 'sprite') {
+                const region = target.getRegionRect(alignTo);
+                if (region) return region;
+            }
+            return target.getOffsetRect();
+        }
 
         if (alignTo === 'collider' && target?.collider && target.posX !== undefined) {
             return {

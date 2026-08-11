@@ -41,7 +41,8 @@ class Inventory {
             myteTarget: null,
             activeDropTargets: new Set(),
             placementItem: null,
-            placementDescriptor: null
+            placementDescriptor: null,
+            wallPlacementPreview: null
         };
 
         // Initialize
@@ -559,6 +560,7 @@ class Inventory {
         this.state.draggedItem = e.target;
         this.state.isDragging = true;
         this.state.placementDescriptor = this.getPlacementDescriptor(e.target);
+		this.parent.camera?.beginTemporaryCursorFollow?.(this);
         this.tooltipSystem.hide();
 
         if (e.dataTransfer) {
@@ -592,6 +594,7 @@ class Inventory {
     }
 
     handleDragEnd(e) {
+		this.parent.camera?.endTemporaryCursorFollow?.(this);
         this.state.isDragging = false;
         this.state.draggedItem = null;
         this.state.placementDescriptor = null;
@@ -674,6 +677,8 @@ class Inventory {
     handleContainerDragOver(e) {
         if (!this.state.isDragging || this.state.myteTarget) return;
         e.preventDefault();
+		this.parent.camera?.beginTemporaryCursorFollow?.(this);
+		this.parent.camera?.updateTemporaryCursorFollow?.(this, e.clientX, e.clientY);
         clearTimeout(this._indicatorHideTimer);
         e.currentTarget.classList.add('is-drag-over');
         this._updateIndicator(e.clientX, e.clientY);
@@ -681,11 +686,17 @@ class Inventory {
 
     handleContainerDragLeave(e) {
         e.currentTarget.classList.remove('is-drag-over');
+		const bounds = e.currentTarget.getBoundingClientRect();
+		if (e.clientX < bounds.left || e.clientX > bounds.right ||
+			e.clientY < bounds.top || e.clientY > bounds.bottom) {
+			this.parent.camera?.endTemporaryCursorFollow?.(this);
+		}
         // Small delay to avoid flicker when moving between child elements
         this._indicatorHideTimer = setTimeout(() => this._hideIndicator(), 60);
     }
 
     _hideIndicator() {
+		this._endWallPlacementPreview();
         this.dropIndicator.style.display = 'none';
         this.dropIndicator.classList.remove('is-drop-valid', 'is-drop-invalid');
         if (this.dropIndicator.parentElement) {
@@ -711,8 +722,9 @@ class Inventory {
 
         let snappedX = worldPos.x - width / 2;
         let snappedY = worldPos.y - height / 2;
+		const wallPreview = this._syncWallPlacementPreview(descriptor, snappedX, snappedY);
 
-        if (gridSystem) {
+        if (gridSystem && descriptor.snapToGrid) {
             const s = gridSystem.snapToGrid(
                 snappedX,
                 snappedY,
@@ -725,8 +737,38 @@ class Inventory {
             snappedY = s.y;
         }
 
+        let wallPlacement = null;
+        if (descriptor.wallFixture) {
+            wallPlacement = map?.wallBuilder?.resolveFixturePlacement?.(
+				wallPreview,
+				snappedX,
+				snappedY
+			) || null;
+			if (wallPlacement) {
+				snappedX = wallPlacement.position.x;
+				snappedY = wallPlacement.position.y;
+			}
+		} else if (descriptor.wallOpening) {
+			wallPlacement = map?.wallBuilder?.resolveOpeningPlacement?.(
+				wallPreview,
+				snappedX,
+				snappedY
+			) || null;
+			if (wallPlacement) {
+				snappedX = wallPlacement.position.x;
+				snappedY = wallPlacement.position.y;
+			}
+		}
+		if (wallPreview) {
+			wallPreview.posX = snappedX;
+			wallPreview.posY = snappedY;
+			map?.wallBuilder?.refreshMovingObjectReveal?.(wallPreview);
+		}
+
         this.state.snappedDropPos = { x: snappedX, y: snappedY, width, height, descriptor };
-        this.state.dropValid = this._isDropPositionValid(snappedX, snappedY, descriptor, gridSystem, map);
+        this.state.dropValid = descriptor.wallFixture || descriptor.wallOpening
+			? wallPlacement !== null
+			: this._isDropPositionValid(snappedX, snappedY, descriptor, gridSystem, map);
 
         this.dropIndicator.style.width  = `${width}px`;
         this.dropIndicator.style.height = `${height}px`;
@@ -814,6 +856,12 @@ class Inventory {
             width,
             height,
             anchor: 'top-left',
+			snapToGrid: config.snapToGrid === true,
+			wallFixture: config.wallFixture === true,
+			wallOpening: !!config.wallOpeningConfig,
+			wallObjectType: world.objectType,
+			wallVariant: world.variant || itemDef.id,
+			config,
             collider: colliderRegion ? {
                 x: (colliderRegion.x ?? colliderRegion.offsetX ?? 0) * scale,
                 y: (colliderRegion.y ?? colliderRegion.offsetY ?? 0) * scale,
@@ -833,6 +881,48 @@ class Inventory {
             } : null
         };
     }
+
+	_syncWallPlacementPreview(descriptor, x, y) {
+		if (!descriptor?.wallFixture && !descriptor?.wallOpening) {
+			this._endWallPlacementPreview();
+			return null;
+		}
+
+		let preview = this.state.wallPlacementPreview;
+		if (!preview) {
+			const config = descriptor.config || {};
+			preview = {
+				id: 'inventory-wall-placement-preview',
+				type: String(descriptor.wallObjectType || '').toUpperCase(),
+				variant: descriptor.wallVariant,
+				size: { width: descriptor.width, height: descriptor.height },
+				posX: x,
+				posY: y,
+				getConfig: (path, defaultValue = null) => {
+					let current = config;
+					for (const key of String(path || '').split('.')) {
+						if (current === undefined || current === null ||
+							!Object.prototype.hasOwnProperty.call(current, key)) return defaultValue;
+						current = current[key];
+					}
+					return current !== undefined ? current : defaultValue;
+				}
+			};
+			this.state.wallPlacementPreview = preview;
+			this.parent.gameMap?.wallBuilder?.beginPlacementPreview?.(preview);
+		} else {
+			preview.posX = x;
+			preview.posY = y;
+		}
+		return preview;
+	}
+
+	_endWallPlacementPreview() {
+		const preview = this.state.wallPlacementPreview;
+		if (!preview) return;
+		this.parent.gameMap?.wallBuilder?.endPlacementPreview?.(preview);
+		this.state.wallPlacementPreview = null;
+	}
 
     updatePlacementPreview(descriptor) {
         const hasPreview = !!descriptor.previewImage;
@@ -950,7 +1040,11 @@ class Inventory {
                 posY,
                 { configOverrides: { inventoryItemId: itemDef.id } }
             );
-            if (placed?.triggerDropBounce) placed.triggerDropBounce();
+			if (placed?.onPlacementDragEnd && placed.onPlacementDragEnd() !== true) {
+				placed.remove?.();
+				placed = null;
+			}
+			if (placed?.triggerDropBounce) placed.triggerDropBounce();
         } else {
             const resolvedObject = this.resolveDroppedMapObject({ name, type, variant });
             if (resolvedObject) {

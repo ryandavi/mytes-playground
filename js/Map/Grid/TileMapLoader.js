@@ -387,6 +387,7 @@ class TileMapLoader {
 
 		const openings = [];
 		const attachments = [];
+		const fixtures = [];
 		const faceOverrides = [];
 		mapData.objects = mapData.objects.filter(object => {
 			const type = String(object.properties?.type || object.name || object.type || '').toUpperCase();
@@ -424,6 +425,25 @@ class TileMapLoader {
 				return false;
 			}
 
+			// A wall fixture hangs on a face and cuts nothing, so unlike an
+			// opening it records a point rather than a cell footprint — and
+			// unlike a WallAttachment it stays in the object list, because it
+			// becomes a real, draggable map object.
+			if (type === 'PAINTING' || object.properties?.wallFixture === true) {
+				const cellX = Math.floor(object.x / mapData.tileWidth);
+				const cellY = Math.floor(object.y / mapData.tileHeight);
+				fixtures.push({
+					id: String(object.id),
+					mapId: mapData.id,
+					cells: { from: [cellX, cellY], to: [cellX, cellY] },
+					face: String(object.properties?.face || 'south').toLowerCase(),
+					socketId: object.properties?.socketId || 'surface',
+					u: Number(object.properties?.u ?? (object.x - (cellX * mapData.tileWidth))),
+					v: Number(object.properties?.v ?? 0.35)
+				});
+				return true;
+			}
+
 			if (type === 'DOOR' || type === 'WINDOW' || object.properties?.wallOpening === true) {
 				const x0 = Math.floor(object.x / mapData.tileWidth);
 				const y0 = Math.floor(object.y / mapData.tileHeight);
@@ -447,7 +467,7 @@ class TileMapLoader {
 			return true;
 		});
 
-		mapData.walls = { defaults, cells, openings, attachments, faceOverrides };
+		mapData.walls = { defaults, cells, openings, fixtures, attachments, faceOverrides };
 	}
 
 	getWallIndicesForLayer(walls, layer) {

@@ -8,6 +8,8 @@
 
 **Entry point:** `index.html` — loads the generated `js/bundle.js`, whose order comes from `scripts/script-manifest.json`.
 
+No AI attributions. No being including on git commits.
+
 ---
 
 ## UI Aesthetic

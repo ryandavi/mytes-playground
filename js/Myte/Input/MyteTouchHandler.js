@@ -2,7 +2,7 @@
 class MyteTouchHandler extends DragHandler {
     constructor(myte) {
         super({
-            element: myte.sprite,
+            element: myte.pointerTarget,
             parent: myte,
             canDrag: () => {
 
@@ -12,8 +12,10 @@ class MyteTouchHandler extends DragHandler {
                        (myte.inputHandler && myte.inputHandler.clickHandler &&
                         myte.inputHandler.clickHandler.isDragging);
             },
+            canStart: (event, position) =>
+                myte.containsScreenPoint(position.x, position.y, 'pickup'),
 
-            onDragStart: () => {
+            onDragStart: ({ position }) => {
                 // Picking up a myte always transfers control to it, regardless of
                 // whether the drag came from auto-pickup or the explicit DRAG tool.
                 if (!myte.isActiveMyte) {
@@ -25,7 +27,15 @@ class MyteTouchHandler extends DragHandler {
                 myte.isDragging = true;
                 myte.queue.clear();
                 this.dragStartPosition = { x: myte.posX, y: myte.posY };
-                myte.parent.camera.beginTemporaryFollow(myte, CAMERA_FOLLOW_MODES.CHARACTER);
+                myte.parent.camera.beginTemporaryCursorFollow(this);
+                const pointerWorld = myte.parent.inputHandler.screenToWorldCoordinates(
+                    position.x,
+                    position.y
+                );
+                this.grabOffset = {
+                    x: pointerWorld.x - myte.posX,
+                    y: pointerWorld.y - myte.posY
+                };
                 myte.reset();
                 myte.targetDot.classList.add('is-hidden');
                 myte.duplicate.classList.add('is-dragging');
@@ -39,17 +49,14 @@ class MyteTouchHandler extends DragHandler {
                 this._getSurfaceSlotEntries(myte).forEach(({ el }) => el?.classList.add('is-droppable'));
             },
             onDragUpdate: (position) => {
-                const world = myte.parent.inputHandler.screenToWorldCoordinates(position.x, position.y, {
-                    element: myte
-                });
-                const newX = world.x;
-                const newY = world.y;
+                const world = myte.parent.inputHandler.screenToWorldCoordinates(position.x, position.y);
+                const newX = world.x - this.grabOffset.x;
+                const newY = world.y - this.grabOffset.y;
 
                 // Always limit to canvas during drag using collider bounds
                 myte.setTarget(newX, newY, true);
                 myte.setPosition(newX, newY, true);
                 myte.setSpritePosition(newX, newY, true);
-                myte.parent.camera.focusOn?.(myte);
 
                 // Update home drop target
                 const dropTargetRect = myte.parent.getRect(myte.dropTarget);
@@ -85,7 +92,7 @@ class MyteTouchHandler extends DragHandler {
             },
             onDragEnd: () => {
                 myte.queue.clear();
-                myte.parent.camera.endTemporaryFollow(myte);
+                myte.parent.camera.endTemporaryCursorFollow(this);
                 if (myte.goal == MOVE_TYPES.GOHOME) {
                     myte.setMode(myte.previousGoal);
                 }
@@ -163,6 +170,7 @@ class MyteTouchHandler extends DragHandler {
                 // Reset auto-pickup flag
                 this.autoPickup = false;
                 this.dragStartPosition = null;
+                this.grabOffset = null;
                 this.dragStartedInFreeRoam = false;
 
                 // If this was started via click handler auto-drag, let it handle mode switching back
@@ -175,6 +183,7 @@ class MyteTouchHandler extends DragHandler {
         this.myte = myte;
         this.autoPickup = false;
         this.dragStartPosition = null;
+        this.grabOffset = null;
         this.dragStartedInFreeRoam = false;
         this._hoveredSlotEntry = null;
     }

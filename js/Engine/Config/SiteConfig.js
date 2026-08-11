@@ -26,8 +26,28 @@ const SiteConfig = Object.freeze({
         defaultPresentation: 'cutaway',
         presentationModes: Object.freeze(['up', 'down', 'cutaway', 'hidden']),
         cursorCutawayEnabled: true,
+        // Wall openings declare their footprint, but a sprite may carry a
+        // little transparent margin around its frame; clearing the whole
+        // footprint would then show a gap of missing wall around it. The hole
+        // shrinks by this much — per side, and only where the opening does not
+        // meet the floor. Objects override it with wallOpeningConfig.apertureInset,
+        // which must be at least as large as their art's transparent margin.
+        apertureInsetPx: 1,
         cutawayDebounceMs: 180,
         maxGeneratedNodes: 300,
+
+        // Cutaway engine v2 (per-cell state + authored transition frames). A
+        // front wall only cuts when it actually covers the subject on screen,
+        // and only over the cells that do the covering. There is no animation:
+        // a cell is standing or lowered, and the frame that joins the two is
+        // drawn art, so the transition always reads the same way.
+        occlusionMarginPx: 48,          // slack on "does the full wall cover the subject"
+        cutawayPaddingCells: 1,         // reveal this much extra either side of the subject
+        cutawayLowerDelayMs: 80,        // a cell must stay occluding this long before it drops
+        cutawayRaiseDelayMs: 300,       // ...and stay clear this long before it comes back up
+        cutawayEvaluateThrottleMs: 100, // minimum spacing between occlusion re-evaluations
+        // Side (east/west) runs stay full height for now; reserved for a later phase.
+        sideWallOcclusion: false,
     }),
 
     // ── Myte stat rates ───────────────────────────────────────────────────────

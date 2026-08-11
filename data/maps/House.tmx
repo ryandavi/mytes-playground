@@ -131,6 +131,7 @@
    <properties>
     <property name="displayName" value="Playroom"/>
     <property name="type" value="play"/>
+    <property name="wallFinishId" value="paint_sage"/>
    </properties>
   </object>
   <object id="96" name="Zone" x="32" y="31" width="448" height="417">
@@ -143,6 +144,7 @@
    <properties>
     <property name="displayName" value="Chatroom"/>
     <property name="type" value="social"/>
+    <property name="wallFinishId" value="paint_terracotta"/>
    </properties>
   </object>
   <object id="119" name="Bird" x="800" y="352" width="64" height="64">
@@ -155,16 +157,20 @@
   <properties>
    <property name="displayName" value="Your House"/>
   </properties>
-  <object id="120" name="WallAttachment" x="128" y="0" width="20" height="16">
+  <object id="120" name="Painting" x="128" y="0" width="36" height="28">
    <properties>
-    <property name="attachmentHeight" type="int" value="16"/>
-    <property name="attachmentWidth" type="int" value="20"/>
-    <property name="childId" value="house_painting_1"/>
     <property name="face" value="south"/>
-    <property name="fixture" value="painting"/>
-    <property name="socketId" value="surface"/>
     <property name="u" type="float" value="16"/>
-    <property name="v" type="float" value="0.48"/>
+    <property name="v" type="float" value="0.4"/>
+    <property name="variant" value="painting"/>
+   </properties>
+  </object>
+  <object id="123" name="Painting" x="704" y="448" width="36" height="28">
+   <properties>
+    <property name="face" value="south"/>
+    <property name="u" type="float" value="16"/>
+    <property name="v" type="float" value="0.4"/>
+    <property name="variant" value="painting_still_life"/>
    </properties>
   </object>
   <object id="121" name="Window" x="320" y="0" width="32" height="32">

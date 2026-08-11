@@ -97,6 +97,17 @@ class ViewPanel extends ModalWindow {
                 this.updateWallMode();
             };
         });
+        this._wallCursorToggle = this.modalElement.querySelector('#view-wall-cursor-toggle');
+        if (this._wallCursorToggle) {
+            this._wallCursorToggle.checked = this._getContainer()?.settings.wallCursorCutaway ?? true;
+            this._wallCursorToggle.onchange = () => {
+                const container = this._getContainer();
+                if (!container) return;
+                container.settings.wallCursorCutaway = this._wallCursorToggle.checked;
+                container.gameMap?.wallBuilder?.evaluateCutaway(true);
+            };
+        }
+
         const events = this._getContainer()?.eventManager;
           this._wallReadyUnsubscribe = events?.on?.('wall:ready', payload => this.updateWallMode(payload?.builder)) || null;
     }
@@ -118,6 +129,8 @@ class ViewPanel extends ModalWindow {
             this._followModeBtns?.forEach(btn => { btn.onclick = null; });
             this._wallModeBtns?.forEach(btn => { btn.onclick = null; });
         }
+        if (this._wallCursorToggle) this._wallCursorToggle.onchange = null;
+        this._wallCursorToggle = null;
         if (this._shakeToggle)   this._shakeToggle.onchange = null;
         if (this._inertiaToggle) this._inertiaToggle.onchange = null;
         this._followModeBtns = null;
@@ -157,6 +170,10 @@ class ViewPanel extends ModalWindow {
             btn.classList.toggle('active', builder?.presentation === btn.dataset.wallMode);
             btn.disabled = !builder;
         });
+        if (this._wallCursorToggle) {
+            this._wallCursorToggle.checked = this._getContainer()?.settings.wallCursorCutaway ?? true;
+            this._wallCursorToggle.disabled = !builder;
+        }
     }
 
     open() {

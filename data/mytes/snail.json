@@ -36,6 +36,32 @@
             "x": 96,
             "y": 92
           }
+        },
+        "regions": {
+          "interaction": {
+            "x": 43,
+            "y": 26,
+            "width": 105,
+            "height": 166
+          },
+          "hit": {
+            "x": 55,
+            "y": 38,
+            "width": 81,
+            "height": 148
+          },
+          "select": {
+            "x": 51,
+            "y": 34,
+            "width": 89,
+            "height": 158
+          },
+          "pickup": {
+            "x": 55,
+            "y": 38,
+            "width": 81,
+            "height": 148
+          }
         }
       },
       "S": {
@@ -47,6 +73,32 @@
           "mouth.item": {
             "x": 96,
             "y": 120
+          }
+        },
+        "regions": {
+          "interaction": {
+            "x": 43,
+            "y": 23,
+            "width": 105,
+            "height": 169
+          },
+          "hit": {
+            "x": 55,
+            "y": 35,
+            "width": 81,
+            "height": 156
+          },
+          "select": {
+            "x": 51,
+            "y": 31,
+            "width": 89,
+            "height": 161
+          },
+          "pickup": {
+            "x": 55,
+            "y": 35,
+            "width": 81,
+            "height": 156
           }
         }
       },
@@ -72,6 +124,32 @@
             "x": 66,
             "y": 108
           }
+        },
+        "regions": {
+          "interaction": {
+            "x": 15,
+            "y": 33,
+            "width": 164,
+            "height": 146
+          },
+          "hit": {
+            "x": 27,
+            "y": 45,
+            "width": 140,
+            "height": 122
+          },
+          "select": {
+            "x": 23,
+            "y": 41,
+            "width": 148,
+            "height": 130
+          },
+          "pickup": {
+            "x": 27,
+            "y": 45,
+            "width": 140,
+            "height": 122
+          }
         }
       }
     },
@@ -85,24 +163,31 @@
       },
       "interaction": {
         "type": "box",
-        "x": 8,
-        "y": 8,
-        "width": 176,
-        "height": 176
+        "x": 12,
+        "y": 33,
+        "width": 164,
+        "height": 146
       },
       "hit": {
         "type": "box",
-        "x": 32,
-        "y": 80,
-        "width": 128,
-        "height": 100
+        "x": 24,
+        "y": 45,
+        "width": 140,
+        "height": 122
       },
       "select": {
         "type": "box",
-        "x": 8,
-        "y": 8,
-        "width": 176,
-        "height": 176
+        "x": 20,
+        "y": 41,
+        "width": 148,
+        "height": 130
+      },
+      "pickup": {
+        "type": "box",
+        "x": 24,
+        "y": 45,
+        "width": 140,
+        "height": 122
       }
     }
   },

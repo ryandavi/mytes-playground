@@ -143,7 +143,7 @@ class MapObjectFactory {
             if (!response.ok) {
                 throw new Error(`Failed to load configuration: ${response.statusText}`);
             }
-            
+
             const config = await response.json();
             this.initialize(config.baseConfig, config.types);
             this.configSource = configUrl;
@@ -224,7 +224,7 @@ class MapObjectFactory {
 
     static getTypeConfig(type) {
         type = this.normalizeType(type);
-        
+
         return this.TYPE_CONFIGS[type];
     }
 
@@ -304,7 +304,8 @@ MapObjectFactory.registry
     .register('COUCH', DirectionalMapObject)
     .register('DOOR', DoorMapObject)
     .register('WINDOW', WindowMapObject)
+    .register('PAINTING', WallFixtureMapObject)
     .register('PORTAL', PortalMapObject)
     .register('GATE', GateMapObject)
-    .register('FENCE', FenceMapObject)	
+    .register('FENCE', FenceMapObject)
     .setDefaultConstructor(MapObject);

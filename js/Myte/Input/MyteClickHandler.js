@@ -41,15 +41,15 @@ class MyteClickHandler extends MyteBaseHandler {
 		this._on(this.myte.element,     'pointerdown', this._onInactivePointerDown.bind(this));
 		this._on(this.myte.element,     'pointerup',   this._onInactivePointerUp.bind(this));
 		this._on(this.myte.element,     'pointercancel', this._onInactivePointerUp.bind(this));
-		this._on(this.myte.duplicate,   'click',       this._onActiveClick.bind(this));
-		this._on(this.myte.duplicate,   'mousedown',   this._onPressStart.bind(this));
+		this._on(this.myte.pointerTarget, 'click',       this._onActiveClick.bind(this));
+		this._on(this.myte.pointerTarget, 'mousedown',   this._onPressStart.bind(this));
 		this._on(document,              'mouseup',     this._onPressEnd.bind(this));
 		this._on(document,              'mousemove',   this._onMouseMove.bind(this));
 		this._on(this.myte.dropTarget,  'click',       this._onHomeClick.bind(this));
 		this._on(this.myte.dropTarget,  'pointerdown', this._onHomePointerDown.bind(this));
 		this._on(this.myte.dropTarget,  'pointerup',   this._onHomePointerUp.bind(this));
 		this._on(this.myte.dropTarget,  'pointercancel', this._onHomePointerUp.bind(this));
-		this._on(this.myte.duplicate,   'contextmenu', this._onContextMenu.bind(this));
+		this._on(this.myte.pointerTarget, 'contextmenu', this._onContextMenu.bind(this));
 	}
 
 	_onInactiveClick(event) {
@@ -108,22 +108,6 @@ class MyteClickHandler extends MyteBaseHandler {
 
 	_onActiveClick(event) {
 		if (this.myte.isActive && !this.isDragging) {
-			// In SELECT mode, prefer map objects that sit under the cursor.
-			// The myte sprite is large; without this the myte swallows all
-			// clicks within its bounding box even when a map object is the
-			// intended target.
-			if (this.myte.parent.ui.isTool(UIToolModes.SELECT)) {
-				const mapObjectEl = this._findMapObjectAt(event.clientX, event.clientY);
-				if (mapObjectEl) {
-					mapObjectEl.dispatchEvent(new MouseEvent('click', {
-						bubbles: true, cancelable: true,
-						clientX: event.clientX, clientY: event.clientY,
-						view: window
-					}));
-					return;
-				}
-			}
-
 			event.stopPropagation();
 
 			// Outside SELECT (drag and friends), keep activating immediately —
@@ -159,17 +143,6 @@ class MyteClickHandler extends MyteBaseHandler {
 				this._onDoubleClick(event);
 			}
 		}
-	}
-
-	_findMapObjectAt(clientX, clientY) {
-		const elements = document.elementsFromPoint(clientX, clientY);
-		for (const el of elements) {
-			if (this.myte.duplicate?.contains(el)) continue;
-			const mapEl = el.classList?.contains('map-object') ? el
-			            : el.closest?.('.map-object');
-			if (mapEl) return mapEl;
-		}
-		return null;
 	}
 
 	_onContextMenu(event) {

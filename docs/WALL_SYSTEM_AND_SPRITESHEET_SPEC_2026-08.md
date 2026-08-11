@@ -89,6 +89,18 @@ Doors and windows are opening records on the wall footprint:
 
 Doors and windows are literal transparent rectangles cleared from the composed wall canvas. No separate jamb, outline, glass, or trim sprite is required.
 
+### 3.3 Authored wall fixtures
+
+Wall objects are authored on an object layer, not painted visually above the wall tiles. Tiled's top-down canvas identifies the host wall cell; semantic properties identify the position on the vertical face.
+
+- Set the object name/type to a registered wall-object type such as `Painting`, `Window`, or `Door`.
+- Place its object rectangle over the wall footprint cells it belongs to. Do not compensate for the runtime wall's projected height by moving the object north in Tiled.
+- A painting uses `face=south`, pixel distance `u` along the host wall run, normalized vertical center `v` from `0` at the face top to `1` at the wall foot, and its inventory/map-object `variant`.
+- A door or window rectangle covers its complete wall-cell footprint. `openingHeight`, `sillHeight`, `continuesTopTrim`, direction/variant, and `wallOpening=true` describe its aperture.
+- A future registered fixture type may use `wallFixture=true`; it follows the same `face`/`u`/`v` contract.
+
+The loader resolves the owning generated wall from these semantic values. Tiled therefore previews the footprint and object identity, while the runtime/debug view is authoritative for the projected face height and final art alignment.
+
 ## 4. Neighbor mask
 
 Use the same four-bit input convention as `FenceMapObject`:
@@ -133,7 +145,7 @@ Each generated piece exposes a stable sort baseline. Full-height art is drawn up
 
 Door and window apertures do not split an otherwise compatible horizontal render run. This keeps cutaway presentation continuous across openings instead of lowering isolated wall fragments.
 
-The render canvas includes configurable per-side breathing room from `SiteConfig.mapRendering.canvasPaddingCells`, initially one 32 px cell on every side. When walls are enabled, the north inset additionally includes the tallest wall construction used by the map. Layers begin at the left/top inset, so walls on row zero remain inside the canvas. Gameplay coordinates, grid bounds, rooms, pathfinding, and authored object positions remain unchanged; camera, pointer, lighting, culling, particle, and offscreen-indicator projections translate through the render insets.
+The render canvas includes configurable per-side breathing room from `SiteConfig.mapRendering.canvasPaddingCells`, initially one 32 px cell on every side. When walls are enabled, the north inset additionally includes the tallest wall construction used by the map. Layers begin at the left/top inset, so walls on row zero remain inside the canvas. Gameplay coordinates, grid bounds, rooms, pathfinding, and authored object positions remain unchanged; camera, pointer, lighting, culling, particle, and offscreen-indicator projections translate through the render insets. Debug mode extends a distinct dashed guide grid through this render-only padding without representing those guide cells as walkable map space.
 
 Generated run ids are diagnostic only. Paint and attachments must not persist against them because extending or splitting a wall changes run boundaries.
 
@@ -184,13 +196,32 @@ Seam requirements:
 
 ### 6.3 Face-finish sheet
 
-A finish sheet contains only paintable surface pixels. Everything outside the relevant face plane and structural outline is transparent.
+Superseded by schema v3. A finish no longer carries per-mask frames: the construction's silhouette is the only copy of the wall's geometry, and the registry derives a paint mask from it as "every opaque pixel that is not `capColor`", then clips the finish to that. A finish that had to match the construction pixel-for-pixel across 16 masks × 2 bands cost 32 authored frames per paint; it now costs three columns, plus two optional ones.
 
-Finish sheets use the same 16 mask columns and full/stub rows as construction sheets. This provides explicit isolated, end, corner, T-junction, cross, horizontal, and vertical tiles for every paint or wallpaper material. A finish column must share the construction column's clipped footprint; one-sided corners cannot paint through their empty half.
+A finish authors **`cellSize`-wide, `frameHeight`-tall columns** on the shared `paintSheet` — `west`, `body`, `east`, plus optional `westStop`/`eastStop` — each drawn at `y = 0`, so a swatch row is a frame row and nothing extrapolates a region the artist did not draw (including the stretch below the baseline, where a wall carries on south).
 
-Pure vertical columns remain transparent because vertical walls use construction color. A one-sided corner or end inherits the visible finish from its connected horizontal neighbor unless that corner has an explicit face override. This carries room wallpaper into the turning tile without projecting wallpaper onto the vertical run.
+The `body` column tiles along a run. An **end column** takes over on its half of a cell wherever the wall's silhouette genuinely runs out. End columns are not about the rounded outline — the mask already enforces that — they are where the finish states how *its own horizontal structure* resolves at a free end: a skirting returns around the foot, a dado tapers, a plain paint does nothing. The engine must not infer this; a bottom band is not necessarily a skirting. An end column must match the body pixel-for-pixel away from its free edge, since a cell can terminate on one side and continue on the other.
 
-A paint color or wallpaper pattern is a finish material, not a new construction sheet. Runtime customization remains a face `materialId` swap, while the mask selects the correct corner or junction artwork within that material.
+Pure vertical cells stay unpainted because vertical walls use construction color. Where one horizontal arm meets a wall running **south** out of the same cell, that south wall occupies the armless half, so paint stops at the post and two room finishes meet on neutral ground.
+
+That stop applies only to a south arm. A **north** arm sits behind the face and interrupts nothing, so a cell with one horizontal arm and no south arm is an ordinary free end: paint runs out to the silhouette's own rounded edge. Those are the building's front corners — treating them as posts left the band inset by a full wall thickness, short of the corner it should wrap.
+
+At a stop the silhouette does not end — it rounds **downward** into the south wall, by the same `4 2 1 1` a free end climbs. The free-end columns are therefore the wrong art in both directions: they curve up where the geometry curves down. The finish uses `westStop`/`eastStop`, authored against that dive (read unclamped off the E+S and S+W elbows) and at the position they are used, so they need no shifting. A finish that omits them falls back to `body`, which leaves the band flat and strands construction colour between it and the foot. `paintRegion` reports each side as a `{column, offset}` pair, or `null` where the finish carries on into the next cell.
+
+Five columns per finish, then: `body`, two that curve up for free ends, two that curve down for stops.
+
+**Transparency rule (finish columns).** A finish column is opaque from row 0 down to *that column's own foot*, and transparent everywhere else. Two consequences, both of which have been got wrong:
+
+- A column with no wall in it — the nine pixels west of a `west` column's free edge, everything east of an `east` column's — stays **empty**. Do not fill it on the grounds that the paint mask clips it anyway.
+- Nothing is drawn **below** the foot. That stretch belongs to the cell south of this one, which paints its own face over it.
+
+Runtime clipping hides a violation of either rule, so it survives testing and surfaces later as a stray edge — when the art is hand-authored, reused at an offset, or drawn somewhere the mask happens not to cover. `generate-wall-sprites.js` encodes this: `footProfile` returns `-1` for a column with no wall, and `paintColumn` skips it.
+
+**These invariants are enforced, not just described.** `validate-content-data.js` decodes the paint sheet and the construction sheet and asserts, per pixel column: that a finish column's foot matches the silhouette it is authored against (`west`←mask 2, `body`←10, `east`←8, `westStop`←6, `eastStop`←12 — the same pairing the generator uses); that a column with no wall in it is empty; that the declared `palette.band` colour is the bottom-most pixel, so the band follows the foot wherever it curves; and that an end column matches `body` wherever their feet agree, so it cannot step mid-run. Each of those is a bug that shipped at least once, and every one of them is invisible at runtime because the paint mask clips the evidence.
+
+A finish with no art of its own declares `template` plus `color`, and inherits the template's columns recolored by exact-match palette substitution. Slots named in `palette` map through `color`/`baseboard`/`accent`; unnamed slots keep the template's per-channel offset from its own body tone, so patterns hold their contrast. This exists so a color-only paint is not the one finish that cannot resolve at an end.
+
+A paint color or wallpaper pattern is a finish material, not a new construction sheet. Runtime customization remains a face `materialId` swap.
 
 ### 6.4 Layer order
 
@@ -218,7 +249,12 @@ The camera is fixed with north at screen-back and south at screen-front.
 
 ### Walls down
 
-- Every wall uses its stub band.
+- Horizontal/front-facing wall runs use their stub band. Vertical/side boundary walls remain full height so the room keeps a stable dollhouse silhouette.
+- The horizontal cell beside a tall structural end, corner, height change, or side wall uses the authored one-cell stepped transition between full height and the stub. The stepped profile is intentional pixel art and must not be replaced by a diagonal slope. The side-wall cell itself does not cut away.
+- A pure horizontal end cap may join a lowered run of any length. It does not need its own adjacent transition; the run only needs one valid transition somewhere before it meets full-height structure. A completely lowered freestanding run retains one full-height anchor and transition, allowing the opposite end cap to remain a stub.
+- A transition is valid only when its lowered edge directly touches a stub and its raised edge touches a full-height cell. Paint and room-face seams do not create structural cutaway boundaries, neighboring canvases commit from one height-field snapshot, and two transition tiles must never sit directly beside one another.
+- While a wall object is placed or dragged, its complete candidate span plus cutaway padding stays stubbed. Transitions are pushed outside that protected span so they never draw behind a painting, window, or other wall object.
+- A finish/material seam is not a structural end. Cutaway state and ramps continue across separate render pieces at that seam, with each piece retaining its own finish; changing wall color never creates an abrupt height step.
 - Collision, LOS, openings, room membership, sockets, and attachments remain unchanged.
 
 ### Cutaway
@@ -231,7 +267,8 @@ The camera is fixed with north at screen-back and south at screen-front.
 - East/west side walls remain full height and use construction color only; paint and wallpaper are not projected onto their narrow profile.
 - The front segment owns its own end caps. A side-wall corner/post remains with the side segment when the front segment cuts away.
 - Decorations attached to a hidden/collapsed face hide or reposition with that owning face.
-- While a door or window is being moved, every generated wall is temporarily rendered at full height. Completing or cancelling placement restores the selected presentation without hiding the opening object.
+- A mounted map object keeps its canonical wall-face position while presentation changes; cutaway visibility must never resize its logical attachment surface or move it for a frame.
+- While a wall object is being moved, only its candidate host cells temporarily rise. Completing or cancelling placement restores the selected presentation.
 - Room/cell transitions must remain stable for 180 ms before changing the cutaway.
 - Maps without authored rooms never proximity-hide walls. Cutaway changes only when the active Myte enters or leaves a room.
 - Re-evaluate on active-room changes, wall edits, or meaningful camera changes—not every frame.
@@ -283,7 +320,7 @@ Persist customization against map geometry and face:
 
 Cell/range keys survive run merging, splitting, and regeneration. On load, `WallBuilder` intersects overrides with newly generated segments.
 
-Wall-state payload version 4 persists opening records as well as presentation, face finishes, and attachments, so moved doors and windows recreate their sockets and cutouts on reload. Version 3 made room-authored finishes canonical after the prototype's short demonstration overrides; older experimental face overrides are discarded once during migration.
+Wall-state payload version 6 persists opening and fixture records as well as presentation, face finishes, and attachments, so moved wall objects recreate their sockets and cutouts on reload. Version 6 also migrates the prototype's top-edge fixture height into the canonical center-based `v` coordinate.
 
 ## 9. Wall attachments
 
@@ -295,7 +332,7 @@ Every generated face exposes a surface socket through the existing `SocketSet`/`
 - Overlapping intervals are rejected.
 - Doors/windows pre-reserve their opening intervals.
 - Attachment serialization uses the map cell range, face, socket id, and child id—not a transient run id.
-- Paintings, shelves, and similar objects inherit visibility from the owning face.
+- Paintings, openings, shelves, and similar wall objects sort one depth step in front of their owning wall. Dragged wall objects use the shared dragged-object layer and remain visible even when cutaway is disabled.
 
 No wall-specific attachment API should be introduced.
 
@@ -332,6 +369,7 @@ Cost controls:
 - Every 0–15 neighbor mask has an intentional structural result.
 - Tiled preview and runtime connectivity agree.
 - Horizontal seams, vertical continuation, corners, T-junctions, crosses, and cutout edges are pixel-clean.
+- Tall side walls blend into lowered horizontal walls with one-cell ramps, including where adjacent render pieces use different face finishes.
 - Inside/outside/shared-room face assignment follows adjacent room membership.
 - North/back interiors and south/front exteriors display as specified.
 - Side walls remain visible in cutaway and depth-sort locally correctly.

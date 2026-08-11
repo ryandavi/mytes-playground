@@ -51,15 +51,22 @@ class MapObjectInputController {
 			dragThreshold: object.getConfig('dragThreshold', SiteConfig.interaction.mapObject.dragThreshold),
 			dragTimeThreshold: 0,
 			preventDefaultsForDrag: true,
-			onDragStart: () => {
+			onDragStart: (event) => {
 				object.isDragging = true;
 				object._dragOriginX = object.posX;
 				object._dragOriginY = object.posY;
 				object._dragOriginDirection = object.getConfig('facingDirection', null);
 				object.onPlacementDragStart?.();
 				object.syncRenderLayer();
-				object.element.classList.add('dragging');
-				object.container?.camera?.beginTemporaryFollow?.(object);
+				object.element.classList.add('is-dragging');
+				object.container?.camera?.beginTemporaryCursorFollow?.(this);
+				const pointerWorld = object.container?.inputHandler?.screenToWorldCoordinates?.(
+					event.position.clientX,
+					event.position.clientY
+				);
+				object._dragGrabOffset = pointerWorld
+					? { x: pointerWorld.x - object.posX, y: pointerWorld.y - object.posY }
+					: { x: 0, y: 0 };
 				if (object.container?.ui) object.container.ui.setSelected(object);
 				object.playConfiguredSound?.('pickup');
 				this._removeStorageDragPreview();
@@ -76,11 +83,13 @@ class MapObjectInputController {
 			onDragMove: (event) => {
 				const clientX = event.originalEvent?.clientX ?? event.position?.clientX;
 				const clientY = event.originalEvent?.clientY ?? event.position?.clientY;
+				const screenX = Number.isFinite(clientX) ? clientX : event.position.x;
+				const screenY = Number.isFinite(clientY) ? clientY : event.position.y;
 				const world = object.container?.inputHandler?.screenToWorldCoordinates
-					? object.container.inputHandler.screenToWorldCoordinates(event.position.x, event.position.y, {
-						element: object
-					})
+					? object.container.inputHandler.screenToWorldCoordinates(screenX, screenY)
 					: { x: object.posX, y: object.posY };
+				world.x -= object._dragGrabOffset?.x ?? 0;
+				world.y -= object._dragGrabOffset?.y ?? 0;
 				const clampedWorld = typeof object.clampPlacementPosition === 'function'
 					? object.clampPlacementPosition(world.x, world.y)
 					: object.container?.clampEntityPosition
@@ -89,14 +98,15 @@ class MapObjectInputController {
 				object.posX = clampedWorld.x;
 				object.posY = clampedWorld.y;
 				object.updatePosition();
-				object.container?.camera?.focusOn?.(object);
+				object.onPlacementDragMove?.();
 				object.showDropTarget();
 				this._updateStorageDragPreview(clientX, clientY);
 			},
 			onDragEnd: (event) => {
 				object.isDragging = false;
-				object.container?.camera?.endTemporaryFollow?.(object);
-				object.element.classList.remove('dragging');
+				object._dragGrabOffset = null;
+				object.container?.camera?.endTemporaryCursorFollow?.(this);
+				object.element.classList.remove('is-dragging');
 				object.hideDropTarget();
 				object.container?.inventory?.inventoryElement?.classList.remove('is-store-target', 'is-store-target-invalid');
 				this._removeStorageDragPreview();
@@ -106,7 +116,13 @@ class MapObjectInputController {
 				}
 				const originalEvent = event?.originalEvent;
 				if (originalEvent && object.container?.inventory?.isPointInside?.(originalEvent.clientX, originalEvent.clientY)) {
-					if (object.container.inventory.storeMapObject(object)) return;
+					if (object.container.inventory.storeMapObject(object)) {
+						// Storing skips the placement path entirely, so anything
+						// that latched state on drag start has to be released
+						// here or it stays latched forever.
+						object.onPlacementStored?.();
+						return;
+					}
 				}
 				if (object.getConfig('snapToGrid', false)) object.snapToGrid();
 				if (object.container?.clampEntityPosition) {

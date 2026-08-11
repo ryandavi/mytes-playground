@@ -381,6 +381,10 @@
         cursor: grab;
         z-index: var(--z-dragged) !important;
 
+        > .myte-pointer-target {
+            pointer-events: none;
+        }
+
         > .inner-wrapper > .sprite {
             animation-name: wiggle2;
             animation-duration: 0.6s;
@@ -400,6 +404,13 @@
     &.world-myte {
         position: absolute;
         cursor: grab;
+        pointer-events: none;
+
+        > .myte-pointer-target {
+            position: absolute;
+            pointer-events: auto;
+            cursor: inherit;
+        }
 
         &.is-droppable {
             transition: outline var(--motion-fast) var(--ease-ui);

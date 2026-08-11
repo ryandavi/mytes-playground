@@ -257,8 +257,9 @@ class GridSystem {
         this._debugCanvas = null;
         this._debugCtx = null;
 
-        const w = this.parent.dimensions.width;
-        const h = this.parent.dimensions.height;
+        const insets = this.parent.renderInsets || { top: 0, right: 0, bottom: 0, left: 0 };
+        const w = this.parent.renderDimensions?.width || this.parent.dimensions.width;
+        const h = this.parent.renderDimensions?.height || this.parent.dimensions.height;
 
         const canvas = document.createElement('canvas');
         canvas.width = w;
@@ -266,7 +267,7 @@ class GridSystem {
         canvas.className = 'debug-grid-canvas ignore';
         canvas.setAttribute('aria-hidden', 'true');
         canvas.tabIndex = -1;
-        canvas.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
+        canvas.style.cssText = `position:absolute;top:${-insets.top}px;left:${-insets.left}px;pointer-events:none;`;
         this.parent.layers.debug.appendChild(canvas);
 
         this._debugCanvas = canvas;
@@ -285,12 +286,27 @@ class GridSystem {
 
         const cs = this.config.cellSize;
         const showTerrain = this.config.showTerrainColors;
+        const insets = this.parent.renderInsets || { top: 0, left: 0 };
+
+        // Render padding is not gameplay space, but it is still useful to see
+        // its scale and alignment while debugging projected wall art. Dashed
+        // blue cells distinguish it from the authoritative gameplay grid.
+        ctx.save();
+        ctx.strokeStyle = 'rgba(80,180,255,0.35)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        for (let px = 0; px < w; px += cs) {
+            for (let py = 0; py < h; py += cs) {
+                ctx.strokeRect(px + 0.5, py + 0.5, Math.min(cs, w - px) - 1, Math.min(cs, h - py) - 1);
+            }
+        }
+        ctx.restore();
 
         for (let x = 0; x < this.gridWidth; x++) {
             for (let y = 0; y < this.gridHeight; y++) {
                 const cell = this.grid[x][y];
-                const px = x * cs;
-                const py = y * cs;
+                const px = insets.left + (x * cs);
+                const py = insets.top + (y * cs);
                 const s = cs - 1;
 
                 if (!cell.walkable) {

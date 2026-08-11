@@ -99,11 +99,17 @@
                         image-rendering: pixelated;
                     }
 
-                    .wall-decoration--painting {
+                    // Placeholder for a fixture with no art yet; anything that
+                    // ships a sprite gets --art and draws that instead.
+                    .wall-decoration--painting:not(.wall-decoration--art) {
                         box-sizing: border-box;
                         background: var(--surface-tooltip);
                         border: var(--space-2xs) solid var(--black);
                         box-shadow: inset 0 0 0 var(--space-2xs) var(--button-mid);
+                    }
+
+                    .wall-decoration--art {
+                        background-repeat: no-repeat;
                     }
                 }
 

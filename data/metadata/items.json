@@ -17,15 +17,27 @@
       "capabilities": {
         "droppable": true
       },
-      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "feed"
+      },
       "use": {
         "action": "feed",
         "target": "myte",
         "consume": true,
-        "effects": { "satiety": 16, "energy": 7, "fun": 7, "health": 1 },
+        "effects": {
+          "satiety": 16,
+          "energy": 7,
+          "fun": 7,
+          "health": 1
+        },
         "saturationMs": 50000
       },
-      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
+      "world": {
+        "mode": "dropped_item",
+        "offeredToMytes": true,
+        "storable": true
+      },
       "visual": {
         "sprite": {
           "col": 0,
@@ -41,15 +53,27 @@
       "capabilities": {
         "droppable": true
       },
-      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "feed"
+      },
       "use": {
         "action": "feed",
         "target": "myte",
         "consume": true,
-        "effects": { "satiety": 24, "energy": 10, "fun": 4, "health": 2 },
+        "effects": {
+          "satiety": 24,
+          "energy": 10,
+          "fun": 4,
+          "health": 2
+        },
         "saturationMs": 75000
       },
-      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
+      "world": {
+        "mode": "dropped_item",
+        "offeredToMytes": true,
+        "storable": true
+      },
       "aliases": [
         "yellow_turnip"
       ],
@@ -68,15 +92,27 @@
       "capabilities": {
         "droppable": true
       },
-      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "feed"
+      },
       "use": {
         "action": "feed",
         "target": "myte",
         "consume": true,
-        "effects": { "satiety": 32, "energy": 16, "fun": 8, "health": 4 },
+        "effects": {
+          "satiety": 32,
+          "energy": 16,
+          "fun": 8,
+          "health": 4
+        },
         "saturationMs": 90000
       },
-      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
+      "world": {
+        "mode": "dropped_item",
+        "offeredToMytes": true,
+        "storable": true
+      },
       "aliases": [
         "red_apple"
       ],
@@ -95,15 +131,27 @@
       "capabilities": {
         "droppable": true
       },
-      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "feed"
+      },
       "use": {
         "action": "feed",
         "target": "myte",
         "consume": true,
-        "effects": { "satiety": 12, "energy": 12, "fun": 12, "health": 2 },
+        "effects": {
+          "satiety": 12,
+          "energy": 12,
+          "fun": 12,
+          "health": 2
+        },
         "saturationMs": 45000
       },
-      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
+      "world": {
+        "mode": "dropped_item",
+        "offeredToMytes": true,
+        "storable": true
+      },
       "visual": {
         "sprite": {
           "col": 5,
@@ -119,7 +167,10 @@
       "capabilities": {
         "droppable": false
       },
-      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
       "world": {
         "mode": "map_object",
         "objectType": "MUSIC_BOX",
@@ -138,90 +189,144 @@
       "id": "bed",
       "label": "Bed",
       "type": "furniture",
-      "capabilities": { "droppable": false },
-      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
       "world": {
         "mode": "map_object",
         "objectType": "BED",
         "variant": "bed",
         "storable": true
       },
-      "visual": { "image": { "url": "images/MapObjects/bed.gif" } },
+      "visual": {
+        "image": {
+          "url": "images/MapObjects/bed.gif"
+        }
+      },
       "description": "A cozy bed where Mytes can rest."
     },
     {
       "id": "bed_long",
       "label": "Long Bed",
       "type": "furniture",
-      "capabilities": { "droppable": false },
-      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
       "world": {
         "mode": "map_object",
         "objectType": "BED",
         "variant": "bed_long",
         "storable": true
       },
-      "visual": { "image": { "url": "images/MapObjects/bed_long.gif" } },
+      "visual": {
+        "image": {
+          "url": "images/MapObjects/bed_long.gif"
+        }
+      },
       "description": "A cozy long bed where Mytes can rest."
     },
     {
       "id": "bed_big",
       "label": "Big Bed",
       "type": "furniture",
-      "capabilities": { "droppable": false },
-      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
       "world": {
         "mode": "map_object",
         "objectType": "BED",
         "variant": "bed_big",
         "storable": true
       },
-      "visual": { "image": { "url": "images/MapObjects/bed_big.png" } },
+      "visual": {
+        "image": {
+          "url": "images/MapObjects/bed_big.png"
+        }
+      },
       "description": "A roomy bed where Mytes can rest."
     },
     {
       "id": "bed_big_long",
       "label": "Big Long Bed",
       "type": "furniture",
-      "capabilities": { "droppable": false },
-      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
       "world": {
         "mode": "map_object",
         "objectType": "BED",
         "variant": "bed_big_long",
         "storable": true
       },
-      "visual": { "image": { "url": "images/MapObjects/bed_big_long.png" } },
+      "visual": {
+        "image": {
+          "url": "images/MapObjects/bed_big_long.png"
+        }
+      },
       "description": "A roomy long bed where Mytes can rest."
     },
     {
       "id": "large_bed",
       "label": "Large Bed",
       "type": "furniture",
-      "capabilities": { "droppable": false },
-      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
       "world": {
         "mode": "map_object",
         "objectType": "BED",
         "variant": "large_bed",
         "storable": true
       },
-      "visual": { "image": { "url": "images/MapObjects/bed_big_long.png" } },
+      "visual": {
+        "image": {
+          "url": "images/MapObjects/bed_big_long.png"
+        }
+      },
       "description": "A large bed where Mytes can rest."
     },
     {
       "id": "rug_default",
       "label": "Rug",
       "type": "furniture",
-      "capabilities": { "droppable": false },
-      "inventory": { "stackLimit": 99, "primaryAction": "place" },
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
       "world": {
         "mode": "map_object",
         "objectType": "RUG",
         "variant": "rug_default",
         "storable": true
       },
-      "visual": { "image": { "url": "images/MapObjects/rug.gif" } },
+      "visual": {
+        "image": {
+          "url": "images/MapObjects/rug.gif"
+        }
+      },
       "description": "A soft rug for decorating a Myte's home."
     },
     {
@@ -231,15 +336,27 @@
       "capabilities": {
         "droppable": true
       },
-      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "feed"
+      },
       "use": {
         "action": "feed",
         "target": "myte",
         "consume": true,
-        "effects": { "satiety": 20, "energy": 10, "fun": 7, "health": 3 },
+        "effects": {
+          "satiety": 20,
+          "energy": 10,
+          "fun": 7,
+          "health": 3
+        },
         "saturationMs": 65000
       },
-      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
+      "world": {
+        "mode": "dropped_item",
+        "offeredToMytes": true,
+        "storable": true
+      },
       "visual": {
         "sprite": {
           "col": 3,
@@ -255,15 +372,27 @@
       "capabilities": {
         "droppable": true
       },
-      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "feed"
+      },
       "use": {
         "action": "feed",
         "target": "myte",
         "consume": true,
-        "effects": { "satiety": 26, "energy": 11, "fun": 5, "health": 4 },
+        "effects": {
+          "satiety": 26,
+          "energy": 11,
+          "fun": 5,
+          "health": 4
+        },
         "saturationMs": 80000
       },
-      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
+      "world": {
+        "mode": "dropped_item",
+        "offeredToMytes": true,
+        "storable": true
+      },
       "visual": {
         "sprite": {
           "col": 2,
@@ -279,15 +408,27 @@
       "capabilities": {
         "droppable": true
       },
-      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "feed"
+      },
       "use": {
         "action": "feed",
         "target": "myte",
         "consume": true,
-        "effects": { "satiety": 10, "energy": 5, "fun": 1, "health": 1 },
+        "effects": {
+          "satiety": 10,
+          "energy": 5,
+          "fun": 1,
+          "health": 1
+        },
         "saturationMs": 35000
       },
-      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
+      "world": {
+        "mode": "dropped_item",
+        "offeredToMytes": true,
+        "storable": true
+      },
       "visual": {
         "sprite": {
           "col": 1,
@@ -303,15 +444,27 @@
       "capabilities": {
         "droppable": true
       },
-      "inventory": { "stackLimit": 99, "primaryAction": "feed" },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "feed"
+      },
       "use": {
         "action": "feed",
         "target": "myte",
         "consume": true,
-        "effects": { "satiety": 11, "energy": 9, "fun": 13, "health": 2 },
+        "effects": {
+          "satiety": 11,
+          "energy": 9,
+          "fun": 13,
+          "health": 2
+        },
         "saturationMs": 40000
       },
-      "world": { "mode": "dropped_item", "offeredToMytes": true, "storable": true },
+      "world": {
+        "mode": "dropped_item",
+        "offeredToMytes": true,
+        "storable": true
+      },
       "visual": {
         "sprite": {
           "col": 4,
@@ -575,13 +728,21 @@
         "health",
         "health_potion"
       ],
-      "inventory": { "stackLimit": 20, "primaryAction": "use" },
+      "inventory": {
+        "stackLimit": 20,
+        "primaryAction": "use"
+      },
       "use": {
         "action": "heal",
         "target": "myte",
         "consume": true,
-        "effects": { "health": 25 },
-        "expressions": ["surprised", "happy"],
+        "effects": {
+          "health": 25
+        },
+        "expressions": [
+          "surprised",
+          "happy"
+        ],
         "consumeTime": 800
       },
       "visual": {
@@ -591,6 +752,82 @@
         }
       },
       "description": "A healing orb. Restores your myte's health when collected."
+    },
+    {
+      "id": "painting",
+      "label": "Landscape Painting",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "PAINTING",
+        "variant": "painting",
+        "storable": true
+      },
+      "description": "A framed landscape. Hangs on any wall."
+    },
+    {
+      "id": "painting_still_life",
+      "label": "Still Life Painting",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "PAINTING",
+        "variant": "painting_still_life",
+        "storable": true
+      },
+      "description": "A framed still life. Hangs on any wall."
+    },
+    {
+      "id": "window",
+      "label": "Wood Window",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "WINDOW",
+        "variant": "default",
+        "storable": true
+      },
+      "description": "A wooden window. Fits into a straight run of wall."
+    },
+    {
+      "id": "wooden_door",
+      "label": "Wooden Door",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "DOOR",
+        "variant": "default",
+        "storable": true
+      },
+      "description": "A wooden door. Fits into a straight run of wall."
     }
   ]
 }

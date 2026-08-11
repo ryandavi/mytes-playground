@@ -4136,12 +4136,55 @@
       }
     }
   },
+  "PAINTING": {
+    "category": "static",
+    "variants": ["painting", "painting_still_life"],
+    "label": "Painting",
+    "draggable": true,
+    "dragInSelectMode": true,
+    "storable": true,
+    "snapToGrid": false,
+    "canInspect": true,
+    "wallFixture": true,
+    "physics": {
+      "collision": false,
+      "walkable": true,
+      "blocksLineOfSight": false
+    },
+    "interaction": {
+      "interactive": false
+    },
+    "size": { "width": 36, "height": 28 },
+    "visual": {
+      "renderType": "single",
+      "overlappable": true
+    },
+    "variantConfigs": {
+      "painting": {
+        "label": "Landscape Painting",
+        "wallFixtureId": "painting",
+        "visual": {
+          "renderType": "single",
+          "spriteSheet": { "url": "images/walls/fixtures/painting.png" }
+        }
+      },
+      "painting_still_life": {
+        "label": "Still Life Painting",
+        "wallFixtureId": "painting_still_life",
+        "visual": {
+          "renderType": "single",
+          "spriteSheet": { "url": "images/walls/fixtures/painting-still-life.png" }
+        }
+      }
+    }
+  },
   "WINDOW": {
     "category": "static",
     "variants": ["default", "double"],
     "label": "Window",
     "draggable": true,
     "dragInSelectMode": true,
+    "storable": true,
     "snapToGrid": true,
     "canInspect": true,
     "physics": {
@@ -4157,10 +4200,11 @@
       "sillHeight": 32,
       "adjustableSillHeight": true,
       "minSillHeight": 0,
-      "maxSillHeight": 64,
+      "maxSillHeight": 96,
       "sillHeightStep": 32,
       "continuesTopTrim": true,
-      "placementOffset": { "x": 0 }
+      "placementOffset": { "x": 0 },
+      "apertureInset": { "top": 1, "right": 1, "bottom": 3, "left": 1 }
     },
     "variantConfigs": {
       "default": {
@@ -4230,6 +4274,7 @@
   },
   "DOOR": {
     "category": "interactive",
+    "storable": true,
     "variants": [
       "wooden_door",
       "metal_door",
@@ -4264,7 +4309,8 @@
     "snapToGrid": true,
     "wallOpeningConfig": {
       "openingHeight": 128,
-      "sillHeight": 0
+      "sillHeight": 0,
+      "apertureInset": 0
     },
     "directionConfigs": {
       "E": {
