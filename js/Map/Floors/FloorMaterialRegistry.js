@@ -11,28 +11,22 @@
 // (see FinishPalette). That is the one piece worth having in common, and it is
 // in common rather than copied.
 // ─────────────────────────────────────────────────────────────────────────────
-class FloorMaterialRegistry {
+class FloorMaterialRegistry extends SurfaceMaterialRegistry {
     // Floors have no baseboard; a floor's own keys drive its slots directly.
     static PALETTE_OVERRIDES = Object.freeze({ body: 'color', grain: 'grain', seam: 'seam' });
 
     constructor(resourceManager = null) {
-        this.resourceManager = resourceManager;
-        this.schemaVersion = 0;
-        this.finishes = new Map();
+        super(resourceManager);
         this.tileSheet = null;
         this.tileSize = 32;
         this.defaultFinishId = null;
-        this.images = new Map();
         this.tiles = new Map();
     }
 
     async load(path = SiteConfig.floorSystem.materialsPath) {
-        const response = await fetch(path);
-        if (!response.ok) throw new Error(`Unable to load floor materials: ${response.status}`);
-        const data = await response.json();
+        const data = await this.fetchDefinition(path, 'floor materials');
         this.validate(data);
-        this.schemaVersion = data.schemaVersion;
-        this.finishes = new Map(Object.entries(data.finishes));
+        this.setCommonDefinition(data);
         this.tileSheet = data.tileSheet || null;
         this.tileSize = Number(data.tileSize) || 32;
         this.defaultFinishId = data.defaultFinishId || null;
@@ -64,19 +58,7 @@ class FloorMaterialRegistry {
 
     async loadImages() {
         if (!this.tileSheet) return;
-        const image = this.resourceManager
-            ? await this.resourceManager.loadSprite('floor-tile-sheet', this.tileSheet)
-            : await new Promise((resolve, reject) => {
-                const candidate = new Image();
-                candidate.onload = () => resolve(candidate);
-                candidate.onerror = () => reject(new Error(`Unable to load ${this.tileSheet}`));
-                candidate.src = this.tileSheet;
-            });
-        this.images.set('floor-tile-sheet', image);
-    }
-
-    getFinish(id) {
-        return this.finishes.get(id) || null;
+        await this.loadImageRecords([['floor-tile-sheet', this.tileSheet]]);
     }
 
     /**
@@ -85,26 +67,15 @@ class FloorMaterialRegistry {
      * @returns {HTMLCanvasElement|null}
      */
     getTile(finishId) {
-        if (this.tiles.has(finishId)) return this.tiles.get(finishId);
-        const tile = this.buildTile(finishId);
-        this.tiles.set(finishId, tile);
-        return tile;
+        return this.resolveFinishAsset(finishId, {
+            cache: this.tiles,
+            paletteOverrides: FloorMaterialRegistry.PALETTE_OVERRIDES,
+            buildDirect: finish => this.buildDirectTile(finish),
+            recolor: (source, substitutions) => FinishPalette.recolor(source, substitutions)
+        });
     }
 
-    buildTile(finishId) {
-        const finish = this.getFinish(finishId);
-        if (!finish) return null;
-
-        if (typeof finish.template === 'string') {
-            const template = this.getFinish(finish.template);
-            const source = this.getTile(finish.template);
-            if (!source || !template?.palette) return null;
-            return FinishPalette.recolor(
-                source,
-                FinishPalette.resolve(template.palette, finish, FloorMaterialRegistry.PALETTE_OVERRIDES)
-            );
-        }
-
+    buildDirectTile(finish) {
         const sheet = this.images.get('floor-tile-sheet');
         if (!sheet || !Number.isInteger(finish.tile)) return null;
         const canvas = document.createElement('canvas');

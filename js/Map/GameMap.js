@@ -31,10 +31,12 @@ class GameMap {
         this.gridSystem = null;
         this.particleSystem = null;
         this.environmentManager = null;
+        this.roomEnclosureDetector = null;
         this.wallBuilder = null;
         this.wallMaterialRegistry = null;
         this.floorBuilder = null;
         this.floorMaterialRegistry = null;
+        this.surfaceCustomizer = null;
         this.wallTileOverlay = null;
         this.renderer = new MapRenderer();
         // Handles a missing gridSystem (falls back to registry scans), so safe
@@ -62,6 +64,7 @@ class GameMap {
         // Flag to track initialization state
         this.initialized = false;
         this.backgroundReadyPromise = Promise.resolve();
+        this.generatedObjectUrls = new Set();
     }
 
     get container() {
@@ -192,7 +195,9 @@ class GameMap {
 
         const url = await this.tileMapLoader?.createWallTileOverlayUrl?.(mapData);
         const layer = this.layers.groundDecor || this.layers.background;
-        if (!url || !layer) return;
+        if (!url) return;
+        this.trackGeneratedObjectUrl(url);
+        if (!layer) return;
 
         const overlay = document.createElement('div');
         overlay.className = 'wall-tile-overlay';
@@ -216,6 +221,20 @@ class GameMap {
     removeWallTileOverlay() {
         this.wallTileOverlay?.remove();
         this.wallTileOverlay = null;
+    }
+
+    trackGeneratedObjectUrl(url) {
+        if (typeof url === 'string' && url.startsWith('blob:')) this.generatedObjectUrls.add(url);
+        return url;
+    }
+
+    revokeGeneratedObjectUrls() {
+        const urls = [...this.generatedObjectUrls];
+        this.generatedObjectUrls.clear();
+        if (urls.length === 0) return;
+        Promise.resolve(this.backgroundReadyPromise)
+            .catch(() => {})
+            .finally(() => urls.forEach(url => URL.revokeObjectURL(url)));
     }
 
     get soundManager() {
@@ -256,6 +275,15 @@ class GameMap {
         }
 
         return this.core?.user?.preferences?.lightingEnabled !== false;
+    }
+
+    getLightingDitherEnabledSetting() {
+        const liveSetting = this.ui?.settingsPanel?.isLightingDitherEnabled?.();
+        if (typeof liveSetting === 'boolean') {
+            return liveSetting;
+        }
+
+        return this.core?.user?.preferences?.lightingDitherEnabled !== false;
     }
 
     getWeatherEffectsEnabledSetting() {
@@ -454,8 +482,8 @@ class GameMap {
 		this.properties = { ...(mapData.properties || {}) };
 
 		this.gridSystem = new GridSystem(this);
-		// One geometry store for every area concept (zones now, lighting rooms
-		// below, enclosures later). Must exist before ZoneManager, which registers
+		// One geometry store for every area concept: zones, authored rooms, and
+		// runtime wall enclosures. Must exist before ZoneManager, which registers
 		// each zone's geometry into it.
 		this.regionManager = new RegionManager(this, {
 			cellSize: this.gridSystem?.config?.cellSize ?? 32
@@ -470,6 +498,7 @@ class GameMap {
 		// Set background from map
 		const bgUrl = await this.tileMapLoader.createMapBackgroundUrl(mapData);
 		if (bgUrl) {
+			this.trackGeneratedObjectUrl(bgUrl);
 			this.setBackground({
 				url: bgUrl,
 				color: mapData.background?.color || '#f0f0f0'
@@ -547,6 +576,7 @@ class GameMap {
 			// real height instead of the map's heightCells estimate.
 			this.setWallAwareRenderInsets(mapData);
 			await this.createWallTileOverlay(mapData);
+			this.roomEnclosureDetector = new RoomEnclosureDetector(this);
 		}
 		this.eventManager?.emit(EVENTS.WALL_READY, { mapId: this.id, builder: this.wallBuilder });
 
@@ -567,6 +597,9 @@ class GameMap {
 				Utility.logDebug('Floor system unavailable:', error);
 				this.floorBuilder = null;
 			}
+		}
+		if (this.wallBuilder || this.floorBuilder) {
+			this.surfaceCustomizer = new SurfaceCustomizer(this);
 		}
 
         // Rooms exist by now (the environment manager registers them), and objects
@@ -1220,6 +1253,16 @@ class GameMap {
         });
         this.droppedItems = [];
 
+		if (this.surfaceCustomizer) {
+			this.surfaceCustomizer.dispose();
+			this.surfaceCustomizer = null;
+		}
+
+		if (this.roomEnclosureDetector) {
+			this.roomEnclosureDetector.dispose();
+			this.roomEnclosureDetector = null;
+		}
+
 		if (this.wallBuilder) {
 			this.wallBuilder.dispose();
 			this.wallBuilder = null;
@@ -1233,6 +1276,12 @@ class GameMap {
 			this.floorMaterialRegistry = null;
 		}
 		this.removeWallTileOverlay();
+		const backgroundLayer = this.layers.background;
+		const backgroundImage = backgroundLayer?.style?.backgroundImage || '';
+		if ([...this.generatedObjectUrls].some(url => backgroundImage.includes(url))) {
+			backgroundLayer.style.backgroundImage = '';
+		}
+		this.revokeGeneratedObjectUrls();
 
         // Clean up objects
         this.objects.forEach(obj => {

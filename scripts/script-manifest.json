@@ -293,7 +293,13 @@
     "src": "js/Map/Regions/RegionManager.js"
   },
   {
+    "src": "js/Map/Regions/RoomEnclosureDetector.js"
+  },
+  {
     "src": "js/Map/Surfaces/FinishPalette.js"
+  },
+  {
+    "src": "js/Map/Surfaces/SurfaceMaterialRegistry.js"
   },
   {
     "src": "js/Map/Walls/WallMaterialRegistry.js"
@@ -306,6 +312,9 @@
   },
   {
     "src": "js/Map/Floors/FloorBuilder.js"
+  },
+  {
+    "src": "js/Map/Surfaces/SurfaceCustomizer.js"
   },
   {
     "src": "js/Map/GameMap.js"
@@ -530,6 +539,12 @@
   },
   {
     "src": "js/UI/Panels/SoundPanel.js"
+  },
+  {
+    "src": "js/UI/Panels/SurfaceCustomizePanel.js"
+  },
+  {
+    "src": "js/UI/Panels/WallBuildPanel.js"
   },
   {
     "src": "js/UI/Panels/SettingsPanel.js"

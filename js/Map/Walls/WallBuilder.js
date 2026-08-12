@@ -99,11 +99,9 @@ class WallDecoration {
         this.element.style.backgroundPosition = `${-fixture.piece.x}px ${-fixture.piece.y}px`;
     }
 
-    // Hidden once the cut line passes below the decoration's own top, rather
-    // than whenever its piece happens to be stubbed.
     applyWallCut(cutY = this._cutY) {
         this._cutY = cutY;
-        this.element.hidden = Number.isFinite(cutY) && cutY > this.posY;
+        WallBuilder.applyFixtureCut(this.element, cutY, this.posY, this.size.height);
     }
 
     dispose() {
@@ -179,6 +177,27 @@ class WallBuilder {
         return mask === WallBuilder.MASK_STRAIGHT_H;
     }
 
+    /**
+     * One presentation rule for everything hanging on a wall face - authored
+     * decoration and placed map object alike.
+     *
+     * The two drifted apart once already: a lowered wall hid its own authored
+     * paintings while the ones the player hung stayed at their standing Y,
+     * floating in mid-air over the floor. Hidden once the cut line passes
+     * below the fixture's own top, which is the rule the decorations already
+     * used - never "whenever the piece is stubbed", or a fixture low on a wall
+     * would vanish while the wall behind it is still there.
+     */
+    static applyFixtureCut(element, cutY, posY, height = 0) {
+        if (!element) return;
+        const behavior = SiteConfig.wallSystem.fixtureCutBehavior;
+        const cut = Number.isFinite(cutY) && cutY > posY;
+        element.classList.toggle('is-wall-cut', behavior === 'hide' && cut);
+        element.style.clipPath = (behavior === 'clip' && cut && height > 0)
+            ? `inset(${Utility.clamp(cutY - posY, 0, height)}px 0 0 0)`
+            : '';
+    }
+
     static isEndCapMask(mask) {
         return WallBuilder.isHorizontalMask(mask) &&
             !WallBuilder.isVerticalMask(mask) &&
@@ -193,6 +212,7 @@ class WallBuilder {
         this.layer = gameMap.layers.objects;
         this.cells = new Map();
         this.baseCells = new Map();
+        this.authoredBaseCells = new Map();
         this.openingKeys = new Set();
         this.openingByCell = new Map();
         this.authoredOpenings = (wallData.openings || []).map(opening => Utility.deepClone(opening));
@@ -209,6 +229,7 @@ class WallBuilder {
         this._movingOpeningIds = new Set();
         this._movingObjects = new Map();
         this._movingRevealPieceIds = new Map();
+        this._presentationOverride = null;
         this._activeCutawayKey = null;
         this._cutawayRoomIds = new Set();
         this._pendingCutawayKey = null;
@@ -221,7 +242,9 @@ class WallBuilder {
     async initialize() {
         for (const source of this.wallData.cells || []) {
             const key = `${source.x},${source.y}`;
-            this.baseCells.set(key, { ...source, opening: null });
+            const cell = { ...source, opening: null };
+            this.authoredBaseCells.set(key, Utility.deepClone(cell));
+            this.baseCells.set(key, cell);
         }
         this.normalizeOpeningFootprints();
         this.authoredOpenings = Utility.deepClone(this.openings);
@@ -1325,6 +1348,24 @@ class WallBuilder {
         return true;
     }
 
+    /**
+     * Build and Customize must show every wall and everything mounted on one:
+     * a cut-away wall fades its fixtures out, and a fixture you cannot see is
+     * a fixture you cannot click. Presentation only - the mode the player chose
+     * is restored on the way out.
+     */
+    setPresentationOverride(mode = null) {
+        if (mode === null) {
+            if (this._presentationOverride === null) return false;
+            const restore = this._presentationOverride;
+            this._presentationOverride = null;
+            return this.setPresentationMode(restore);
+        }
+        if (this._presentationOverride !== null) return false;
+        this._presentationOverride = this.presentation;
+        return this.setPresentationMode(mode);
+    }
+
     setFaceFinish(record) {
         if (!record || !this.registry.getFinish(record.finishId) ||
             !WallMaterialRegistry.DIRECTIONS.includes(record.face) ||
@@ -1340,7 +1381,7 @@ class WallBuilder {
         return true;
     }
 
-    setWallCell(x, y, data = null) {
+    setWallCell(x, y, data = null, options = {}) {
         const key = `${x},${y}`;
         if (data === null) this.baseCells.delete(key);
         else this.baseCells.set(key, {
@@ -1353,9 +1394,36 @@ class WallBuilder {
             heightCells: data.heightCells || this.wallData.defaults.heightCells,
             connectGroup: data.connectGroup || this.wallData.defaults.connectGroup
         });
+        if (options.deferRebuild === true) return;
         this.reindexOpenings();
         this.rebuild();
-        this.gameMap.eventManager?.emit(EVENTS.WALL_GEOMETRY_CHANGED, { mapId: this.gameMap.id, x, y, builder: this });
+        if (options.emit !== false) {
+            this.gameMap.eventManager?.emit(EVENTS.WALL_GEOMETRY_CHANGED, { mapId: this.gameMap.id, x, y, builder: this });
+        }
+    }
+
+    applyWallCellChanges(changes = []) {
+        const normalized = changes.filter(change => Number.isInteger(change?.x) && Number.isInteger(change?.y));
+        if (normalized.length === 0) return false;
+        const previousCells = new Map([...this.baseCells].map(([key, cell]) => [key, { ...cell }]));
+        try {
+            for (const change of normalized) {
+                this.setWallCell(change.x, change.y, change.data ?? null, { deferRebuild: true });
+            }
+            this.reindexOpenings();
+            this.rebuild();
+        } catch (error) {
+            this.baseCells = previousCells;
+            this.reindexOpenings();
+            this.rebuild();
+            throw error;
+        }
+        this.gameMap.eventManager?.emit(EVENTS.WALL_GEOMETRY_CHANGED, {
+            mapId: this.gameMap.id,
+            cells: normalized.map(({ x, y }) => ({ x, y })),
+            builder: this
+        });
+        return true;
     }
 
     findPieceForCell(cellX, cellY) {
@@ -1912,16 +1980,64 @@ class WallBuilder {
 
     serializeState() {
         return {
-            version: 6,
+            version: 7,
             presentation: this.presentation,
             faceOverrides: this.faceOverrides.map(record => Utility.deepClone(record)),
             attachments: this.decorations.map(decoration => Utility.deepClone(decoration.wallAttachmentRecord)),
             fixtures: this.fixtures.map(record => Utility.deepClone(record)),
-            openings: this.openings.map(opening => Utility.deepClone(opening))
+            openings: this.openings.map(opening => Utility.deepClone(opening)),
+            cellDeltas: this.serializeCellDeltas()
         };
     }
 
+    serializeCellDeltas() {
+        const fields = ['constructionId', 'finishId', 'heightCells', 'connectGroup'];
+        const deltas = [];
+        for (const [key, authored] of this.authoredBaseCells) {
+            if (!this.baseCells.has(key)) {
+                deltas.push({ x: authored.x, y: authored.y, removed: true });
+            }
+        }
+        for (const [key, cell] of this.baseCells) {
+            const authored = this.authoredBaseCells.get(key);
+            const changed = !authored || fields.some(field => cell[field] !== authored[field]);
+            if (!changed) continue;
+            deltas.push(Object.fromEntries([
+                ['x', cell.x],
+                ['y', cell.y],
+                ...fields.map(field => [field, cell[field]])
+            ]));
+        }
+        return deltas.sort((a, b) => a.y - b.y || a.x - b.x);
+    }
+
     restoreState(state = {}) {
+        if (state.version >= 7 && Array.isArray(state.cellDeltas)) {
+            this.baseCells = new Map([...this.authoredBaseCells].map(([key, cell]) => [
+                key,
+                Utility.deepClone(cell)
+            ]));
+            for (const delta of state.cellDeltas) {
+                const x = Number(delta.x);
+                const y = Number(delta.y);
+                if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+                const key = `${x},${y}`;
+                if (delta.removed === true) {
+                    this.baseCells.delete(key);
+                    continue;
+                }
+                this.baseCells.set(key, {
+                    ...this.wallData.defaults,
+                    x,
+                    y,
+                    constructionId: delta.constructionId || this.wallData.defaults.constructionId,
+                    finishId: delta.finishId || this.wallData.defaults.finishId,
+                    heightCells: delta.heightCells || this.wallData.defaults.heightCells,
+                    connectGroup: delta.connectGroup || this.wallData.defaults.connectGroup,
+                    opening: null
+                });
+            }
+        }
         const savedOverrides = state.version >= 3 && Array.isArray(state.faceOverrides)
             ? Utility.deepClone(state.faceOverrides)
             : [];
@@ -1969,6 +2085,10 @@ class WallBuilder {
         this.setPresentationMode(state.version >= 2 && SiteConfig.wallSystem.presentationModes.includes(state.presentation)
             ? state.presentation
             : SiteConfig.wallSystem.defaultPresentation);
+        this.gameMap.eventManager?.emit(EVENTS.WALL_GEOMETRY_CHANGED, {
+            mapId: this.gameMap.id,
+            builder: this
+        });
     }
 
     getFaceOverrideGeometryKey(record) {
@@ -2001,6 +2121,7 @@ class WallBuilder {
         this._pieceByCell.clear();
         this.cells.clear();
         this.baseCells.clear();
+        this.authoredBaseCells.clear();
         this.openingSlots.clear();
     }
 }

@@ -25,6 +25,7 @@ const EVENTS = Object.freeze({
     PLANT_MUTATED: 'plant:mutated',
     PLANT_POLLINATED: 'plant:pollinated',
     RELATIONSHIP_CLEARED: 'relationship:cleared',
+    SURFACE_FINISH_CHANGED: 'surface:finish_changed',
     TRAVEL_ARRIVED: 'travel_arrived',
     TRAVEL_PROGRESS: 'travel_progress',
     TRAVEL_STARTED: 'travel_started',

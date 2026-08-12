@@ -78,6 +78,12 @@
 			<button id="view-toggle" class="hand-control-btn" title="View Controls">
 				<svg class="icon" aria-hidden="true"><use href="#icon-eye"></use></svg>
 			</button>
+			<button id="customize-toggle" class="hand-control-btn" title="Customize Surfaces — paint walls and floors" aria-label="Customize surfaces">
+				<svg class="icon" aria-hidden="true"><use href="#icon-roller"></use></svg>
+			</button>
+			<button id="build-toggle" class="hand-control-btn" title="Build Walls — drag to lay walls" aria-label="Build walls">
+				<svg class="icon" aria-hidden="true"><use href="#icon-wall"></use></svg>
+			</button>
 			<button id="log-toggle" class="hand-control-btn" title="Event Log">
 				<svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
 			</button>
@@ -286,6 +292,87 @@
 	</div>
 	<!-- END USER PROFILE PANEL -->
 
+	<!-- CUSTOMIZE PANEL -->
+	<div id="customize-panel" class="window-panel surface-customize-panel">
+		<div class="window-panel__header">
+			<div class="window-panel__title">
+				<svg class="icon" aria-hidden="true"><use href="#icon-roller"></use></svg>
+				<div class="text">Customize Surface</div>
+			</div>
+			<div class="window-panel__controls">
+				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
+			</div>
+		</div>
+		<div class="window-panel__content">
+			<div class="settings-group">
+				<h3 class="settings-group-title">Surface</h3>
+				<div class="setting-item">
+					<p class="surface-target" aria-live="polite">Nothing selected</p>
+					<p class="setting-hint surface-customize-empty">Hover to highlight a surface, then click a wall or floor to pick its finish. Esc leaves Customize.</p>
+				</div>
+			</div>
+			<fieldset class="settings-group surface-scope" hidden>
+				<legend class="settings-group-title">Paint scope</legend>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="radio" id="surface-scope-stretch" name="surface-wall-scope" value="stretch" checked>
+						<label for="surface-scope-stretch">This stretch</label>
+					</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="radio" id="surface-scope-room" name="surface-wall-scope" value="room">
+						<label for="surface-scope-room">Whole room</label>
+					</div>
+				</div>
+			</fieldset>
+			<div class="settings-group">
+				<h3 class="settings-group-title">Finish</h3>
+				<div class="surface-palette" role="group" aria-label="Surface finishes"></div>
+			</div>
+		</div>
+	</div>
+	<!-- END CUSTOMIZE PANEL -->
+
+	<!-- WALL BUILD PANEL -->
+	<div id="wall-build-panel" class="window-panel wall-build-panel">
+		<div class="window-panel__header">
+			<div class="window-panel__title">
+				<svg class="icon" aria-hidden="true"><use href="#icon-wall"></use></svg>
+				<div class="text">Build Walls</div>
+			</div>
+			<div class="window-panel__controls">
+				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
+			</div>
+		</div>
+		<div class="window-panel__content">
+			<fieldset class="settings-group wall-build-operation">
+				<legend class="settings-group-title">Tool</legend>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="radio" id="wall-build-add" name="wall-build-operation" value="add" checked>
+						<label for="wall-build-add">Add walls</label>
+					</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="radio" id="wall-build-remove" name="wall-build-operation" value="remove">
+						<label for="wall-build-remove">Remove walls</label>
+					</div>
+				</div>
+			</fieldset>
+			<div class="settings-group">
+				<h3 class="settings-group-title">How</h3>
+				<div class="setting-item">
+					<p class="setting-hint">Drag across the map to lay a straight run of wall.</p>
+					<p class="setting-hint">Hold Shift while dragging to outline a whole room.</p>
+					<p class="setting-hint">Esc leaves Build mode. Walls stand at full height while you build.</p>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- END WALL BUILD PANEL -->
+
 	<!-- GAME SETTINGS PANEL -->
 	<div id="game-settings-panel" class="window-panel">
 		<div class="window-panel__content">
@@ -324,6 +411,13 @@
 						<input type="checkbox" id="lighting-toggle" checked>
 						<label for="lighting-toggle">Night Lighting</label>
 					</div>
+				</div>
+				<div class="setting-item dropdown">
+					<label for="lighting-style">Lighting Style</label>
+					<select id="lighting-style">
+						<option value="dithered" selected>Dithered</option>
+						<option value="smooth">Smooth</option>
+					</select>
 				</div>
 				<div class="setting-item">
 					<div class="checkbox-wrapper">
@@ -461,7 +555,7 @@
 	<!-- END GAME SETTINGS PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="js/bundle.js?v=424a27e82797"></script>
+	<script src="js/bundle.js?v=d3d5fbb10623"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

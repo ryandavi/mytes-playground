@@ -36,7 +36,13 @@ class WorldState {
             .filter(item => item.active && !item.collected)
             .map(item => item.serializeState());
         const walls = map.wallBuilder?.serializeState?.() ?? null;
-        const snapshot = { mapId: map.id, objects, droppedItems, walls, savedAt: Date.now() };
+        const floors = Object.fromEntries((map.regionManager?.all('room') || [])
+            .filter(room =>
+                (room.properties?.floorFinishId ?? null) !==
+                (room.properties?.authoredFloorFinishId ?? null)
+            )
+            .map(room => [room.id, room.properties?.floorFinishId ?? null]));
+        const snapshot = { mapId: map.id, objects, droppedItems, walls, floors, savedAt: Date.now() };
         this.payload.maps[map.id] = snapshot;
         return snapshot;
     }
@@ -63,6 +69,18 @@ class WorldState {
         if (snapshot.walls && map.wallBuilder) {
             map.wallBuilder.restoreState(snapshot.walls);
         }
+        this.restoreFloors(map, snapshot);
         return true;
+    }
+
+    restoreFloors(map, snapshot = this.payload.maps[map?.id]) {
+        if (!snapshot?.floors || !map?.floorBuilder) return false;
+        let restored = false;
+        for (const [roomId, finishId] of Object.entries(snapshot.floors)) {
+            if (!map.regionManager?.get('room', roomId)) continue;
+            map.floorBuilder.setRoomFinish(roomId, finishId);
+            restored = true;
+        }
+        return restored;
     }
 }

@@ -101,6 +101,7 @@ class DroppedMapItem {
         let dragGhost = null;
 
         const clearStorageDrag = () => {
+            this.parent?.parent?.camera?.endTemporaryCursorFollow?.(this);
             this.storageDragActive = false;
             if (DroppedMapItem.storageDragItem === this) DroppedMapItem.storageDragItem = null;
             this.element?.classList.remove('is-being-stored');
@@ -118,6 +119,7 @@ class DroppedMapItem {
         const beginStorageDrag = () => {
             this.storageDragActive = true;
             DroppedMapItem.storageDragItem = this;
+            this.parent?.parent?.camera?.beginTemporaryCursorFollow?.(this);
             this.element.classList.add('is-being-stored');
             dragGhost = this.spriteElement?.cloneNode(true) ?? null;
             if (dragGhost) {

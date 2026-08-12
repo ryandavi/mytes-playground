@@ -63,11 +63,15 @@ class Camera {
 		this._boundDrag       = this.drag.bind(this);
 		this._boundEndDrag    = this.endDrag.bind(this);
 		this._boundHandleZoom = this.handleZoom.bind(this);
+		this._boundTemporaryCursorMove = this._handleTemporaryCursorMove.bind(this);
 		this.debouncedResetView = Utility.debounce(() => this.resetView(), 250);
 
 		this.canvas.addEventListener('mousedown', this._boundStartDrag);
 		document.addEventListener('mousemove', this._boundDrag);
 		document.addEventListener('mouseup', this._boundEndDrag);
+		document.addEventListener('pointermove', this._boundTemporaryCursorMove);
+		document.addEventListener('touchmove', this._boundTemporaryCursorMove, { passive: true });
+		document.addEventListener('dragover', this._boundTemporaryCursorMove);
 		this.canvas.addEventListener('wheel', this._boundHandleZoom, { passive: false });
 		window.addEventListener('resize', this.debouncedResetView);
 	}
@@ -231,8 +235,7 @@ class Camera {
 		this.temporaryCursorFollow = {
 			owner,
 			mode: this.followMode,
-			position: { x: this.posX, y: this.posY },
-			target: { x: this.targetX, y: this.targetY }
+			cursor: this._getCurrentClientPosition()
 		};
 		this.setMode(CAMERA_FOLLOW_MODES.LOCKED);
 		return true;
@@ -240,21 +243,44 @@ class Camera {
 
 	updateTemporaryCursorFollow(owner, clientX, clientY) {
 		if (this.temporaryCursorFollow?.owner !== owner) return false;
-		const viewportRect = this.parent.getContainerRect();
-		if (clientX < viewportRect.left || clientX > viewportRect.right ||
-			clientY < viewportRect.top || clientY > viewportRect.bottom) {
-			this.endTemporaryCursorFollow(owner);
-			return false;
-		}
+		if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return false;
+		this.temporaryCursorFollow.cursor = { x: clientX, y: clientY };
+		this._applyTemporaryCursorFollow();
+		return true;
+	}
 
+	_getCurrentClientPosition() {
+		const input = this.parent?.inputHandler?.inputSystem?.state;
+		const touch = input?.activeTouchId !== null && input?.activeTouchId !== undefined
+			? input.touches?.get?.(input.activeTouchId)
+			: null;
+		const source = touch || input?.mouse;
+		return Number.isFinite(source?.clientX) && Number.isFinite(source?.clientY)
+			? { x: source.clientX, y: source.clientY }
+			: null;
+	}
+
+	_handleTemporaryCursorMove(event) {
+		if (!this.temporaryCursorFollow) return;
+		const point = event.touches?.[0] || event.changedTouches?.[0] || event;
+		if (!Number.isFinite(point.clientX) || !Number.isFinite(point.clientY)) return;
+		this.temporaryCursorFollow.cursor = { x: point.clientX, y: point.clientY };
+	}
+
+	_applyTemporaryCursorFollow() {
+		const cursor = this.temporaryCursorFollow?.cursor || this._getCurrentClientPosition();
+		if (!cursor) return;
+
+		const viewportRect = this.parent.getContainerRect();
 		const zoom = this._getSafeZoomValue();
+		const clientX = Math.max(viewportRect.left, Math.min(viewportRect.right, cursor.x));
+		const clientY = Math.max(viewportRect.top, Math.min(viewportRect.bottom, cursor.y));
 		this.followCursorEdge(
 			(clientX - viewportRect.left) / zoom,
 			(clientY - viewportRect.top) / zoom,
 			this.parent.getCanvasRect(),
 			viewportRect
 		);
-		return true;
 	}
 
 	endTemporaryCursorFollow(owner = null) {
@@ -262,11 +288,6 @@ class Camera {
 		if (!state || (owner && state.owner !== owner)) return false;
 		this.temporaryCursorFollow = null;
 		this.setMode(state.mode);
-		this.targetX = state.target.x;
-		this.targetY = state.target.y;
-		this.posX = state.position.x;
-		this.posY = state.position.y;
-		this.updateTransform(this.posX, this.posY, this.zoomLevel);
 		return true;
 	}
 
@@ -976,6 +997,10 @@ class Camera {
 
 	doCameraLogic() {
 		this.sanitizeState();
+		if (this.temporaryCursorFollow) {
+			this._applyTemporaryCursorFollow();
+			return;
+		}
 
 		if (this.followMode === CAMERA_FOLLOW_MODES.DRAG_TO_PAN) return;
 
@@ -1027,6 +1052,9 @@ class Camera {
 		this.canvas.removeEventListener('mousedown', this._boundStartDrag);
 		document.removeEventListener('mousemove', this._boundDrag);
 		document.removeEventListener('mouseup', this._boundEndDrag);
+		document.removeEventListener('pointermove', this._boundTemporaryCursorMove);
+		document.removeEventListener('touchmove', this._boundTemporaryCursorMove);
+		document.removeEventListener('dragover', this._boundTemporaryCursorMove);
 		this.canvas.removeEventListener('wheel', this._boundHandleZoom);
 		window.removeEventListener('resize', this.debouncedResetView);
 

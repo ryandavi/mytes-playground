@@ -40,6 +40,8 @@ class UserInterface {
         // Initialize additional menus
         this.soundPanel = new SoundPanel(this);
         this.settingsPanel = new SettingsPanel(this);
+        this.surfaceCustomizePanel = new SurfaceCustomizePanel(this);
+        this.wallBuildPanel = new WallBuildPanel(this);
         this.viewPanel = new ViewPanel(this);
         this.worldMapPanel = new WorldMapPanel(this);
         this.debugPanel = new DebugPanel(this);
@@ -65,6 +67,8 @@ class UserInterface {
 
         // Notify action manager to update UI
         this.actionSidebarManager.updateActions(null);
+        this.surfaceCustomizePanel?.handleToolModeChanged(mode);
+        this.wallBuildPanel?.handleToolModeChanged(mode);
     }
 
     onSelectionChanged(selectedObject) {
@@ -174,6 +178,10 @@ class UserInterface {
         this.settingsPanel?.dispose?.();
         this.settingsPanel = null;
         this.settingsMenu = null;
+        this.surfaceCustomizePanel?.dispose?.();
+        this.surfaceCustomizePanel = null;
+        this.wallBuildPanel?.dispose?.();
+        this.wallBuildPanel = null;
         this.soundPanel?.dispose?.();
         this.soundPanel = null;
         this.soundMenu = null;

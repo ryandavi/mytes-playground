@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="3">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="5" nextobjectid="5">
  <properties>
   <property name="description" value="Follower doorway fixture: two rooms joined by a single Myte-wide gap."/>
   <property name="displayName" value="Door Test"/>
@@ -54,6 +54,20 @@
   <object id="1" name="SPAWN" x="96" y="224" width="32" height="32">
    <properties>
     <property name="type" value="myte"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="4" name="Rooms">
+  <object id="3" name="LIGHTVOLUME" x="0" y="0" width="480" height="512">
+   <properties>
+    <property name="displayName" value="West Room"/>
+    <property name="roomId" value="west_room"/>
+   </properties>
+  </object>
+  <object id="4" name="LIGHTVOLUME" x="512" y="0" width="448" height="512">
+   <properties>
+    <property name="displayName" value="East Room"/>
+    <property name="roomId" value="east_room"/>
    </properties>
   </object>
  </objectgroup>

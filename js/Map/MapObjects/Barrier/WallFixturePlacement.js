@@ -59,14 +59,12 @@ const withWallFixturePlacement = BaseClass => class extends BaseClass {
         this.getWallBuilder()?.cancelFixtureMove(this);
     }
 
-    /**
-     * Presentation contract with the wall behind it. A fixture is a thing you
-     * own and arrange, not paint on the wall, so lowering the wall must not
-     * delete it — the same call the doors and windows made. The hook stays so a
-     * construction that really wants its fixtures to sink with the wall can.
-     */
-    applyWallCut() {
-        if (this.element) this.element.style.visibility = '';
+    // Presentation contract with the wall behind it: the SAME rule the authored
+    // decorations use, so the two paths cannot drift apart again. The record,
+    // the socket attachment and the authored u/v are untouched - only what is
+    // drawn changes.
+    applyWallCut(cutY) {
+        WallBuilder.applyFixtureCut(this.element, cutY, this.posY, this.size?.height ?? 0);
     }
 };
 

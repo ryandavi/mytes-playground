@@ -99,6 +99,19 @@
                         image-rendering: pixelated;
                     }
 
+                    // A wall fixture lives on the vertical surface. With the
+                    // surface cut away it fades out rather than hanging in the
+                    // air over the floor (SiteConfig.wallSystem.fixtureCutBehavior).
+                    .wall-decoration,
+                    .wall-fixture {
+                        transition: opacity var(--motion-base) var(--ease-ui);
+
+                        &.is-wall-cut {
+                            opacity: 0;
+                            pointer-events: none;
+                        }
+                    }
+
                     // Placeholder for a fixture with no art yet; anything that
                     // ships a sprite gets --art and draws that instead.
                     .wall-decoration--painting:not(.wall-decoration--art) {

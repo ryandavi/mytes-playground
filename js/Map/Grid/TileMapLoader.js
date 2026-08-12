@@ -665,12 +665,7 @@ class TileMapLoader {
 				mapData.environment.rooms.push({
 					id: String(roomId || displayName).toLowerCase().replace(/[^a-z0-9_-]+/g, '_'),
 					displayName,
-					bounds: {
-						x: obj.x,
-						y: obj.y,
-						width: obj.width,
-						height: obj.height
-					},
+					bounds: this.snapRoomBoundsToGrid(obj, cellSize, displayName),
 					polygon: Array.isArray(obj.polygon) ? obj.polygon : null,
 					tilemask: tilemask ? { cells: tilemask, cellSize } : null,
 					properties: {
@@ -702,6 +697,31 @@ class TileMapLoader {
 
 			return true;
 		});
+	}
+
+	/**
+	 * Rooms are drawn on the grid in Tiled, so a bound landing off it is a slip
+	 * of the hand - and an off-grid room edge lands mid-cell, where it leaves a
+	 * strip of floor that belongs to no room and therefore never lights. Snap
+	 * and say so, rather than carrying the slip into every downstream system.
+	 */
+	snapRoomBoundsToGrid(obj, cellSize, displayName) {
+		const snap = value => Math.round((Number(value) || 0) / cellSize) * cellSize;
+		const bounds = {
+			x: snap(obj.x),
+			y: snap(obj.y),
+			width: Math.max(cellSize, snap(obj.x + obj.width) - snap(obj.x)),
+			height: Math.max(cellSize, snap(obj.y + obj.height) - snap(obj.y))
+		};
+		if (bounds.x !== obj.x || bounds.y !== obj.y ||
+			bounds.width !== obj.width || bounds.height !== obj.height) {
+			console.warn(
+				`[TileMapLoader] Room "${displayName}" is off the ${cellSize}px grid ` +
+				`(${obj.x},${obj.y} ${obj.width}x${obj.height}) - snapped to ` +
+				`(${bounds.x},${bounds.y} ${bounds.width}x${bounds.height}).`
+			);
+		}
+		return bounds;
 	}
 
 	/**
@@ -794,6 +814,12 @@ class TileMapLoader {
 		return null;
 	}
 
+	async canvasToObjectUrl(canvas) {
+		const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+		if (!blob) throw new Error('Canvas could not be encoded as a PNG blob');
+		return URL.createObjectURL(blob);
+	}
+
 	async createMapBackgroundUrl(mapData) {
 		try {
 			const { layers, tilesets, tileWidth, tileHeight, width, height } = mapData.TileData;
@@ -810,7 +836,7 @@ class TileMapLoader {
 				this._renderLayerToCanvas(ctx, layer, tilesetImages, tilesets, width, tileWidth, tileHeight, skippedIndices);
 			}
 
-			return canvas.toDataURL('image/png');
+			return await this.canvasToObjectUrl(canvas);
 		} catch (e) {
 			console.error('Error creating map background:', e);
 			return null;
@@ -842,7 +868,7 @@ class TileMapLoader {
 				rendered = true;
 			}
 
-			return rendered ? canvas.toDataURL('image/png') : null;
+			return rendered ? await this.canvasToObjectUrl(canvas) : null;
 		} catch (e) {
 			console.error('Error creating wall tile overlay:', e);
 			return null;

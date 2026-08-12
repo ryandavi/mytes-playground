@@ -8,6 +8,24 @@ Paste-ready blocks from the 2026-08-11 core audit (session on `wall-system`). Fa
 
 Also out of scope here: wall art pipeline phases D1–D4 (live in `WALL_IMPROVEMENT_PLAN_2026-08.md`).
 
+## Reconciled implementation status — 2026-08-11
+
+| Goal | Status | Evidence / next action |
+|---|---|---|
+| G1 Event registry | **Done** | `js/Engine/Events.js` is present and event call sites use the registry. |
+| G2 `dispose()` lifecycle | **Done** | No `destroy()` method calls remain outside the generated bundle. |
+| G3 wall mask/bridge cleanup | **Done** | Named mask predicates and the shared opening bridge analysis are present. |
+| G4 surface customization | **Done** | Shared registry plumbing, the `SurfaceCustomizer` facade, preview/rollback, wall scopes, and the toolbar palette are implemented and browser-verified. |
+| G5 wall/floor persistence | **Done** | Wall state v7 stores authored-baseline `cellDeltas`; changed room floors restore after map transitions; v6 compatibility passed. |
+| G6 room authoring cleanup | **Done** | House and DoorTest author room volumes, the zone-to-room fallback is gone, and interior-room validation is present. |
+| Lighting F-L1–F-L3 | **Done** | Interior gloom, window daylight/spill, map clipping, presentation feathering, and world-X sun offset are implemented and browser-verified. |
+| G7 background blob URLs | **Done** | Baked backgrounds and wall overlays use tracked PNG blob URLs; retired-map URLs are revoked after decode. |
+| G8 lighting follow-ups | **Done** | Multi-level dither, persisted Smooth/Dithered option, and wall-shaped hard room regions are implemented and browser-verified. |
+| G9 enclosure detection | **Done** | Runtime wall flood-fill rooms now feed regions, lighting, floors, topology, membership, and cutaway; browser acceptance passed. |
+| Build-mode UI | **Done** | Axis drag, Shift-rectangle shells, add/remove ghosts, persistence, enclosure refresh, and node-budget rollback/toast are browser-verified. |
+
+All implementation goals in this dispatch are complete. Remaining work is outside this phase: the deferred `editor/` audit listed in the companion plan and optional hands-on visual/feel tuning.
+
 Rules for every task: read `AGENTS.md` first; one branch off `wall-system` per task; no behavior changes unless the goal says so; finish with `node scripts/build-manifest.js`, `node scripts/validate-content-data.js`, `node scripts/check-time-sources.js`, and a headless boot check (app must boot with zero console errors); report raw results.
 
 ---
@@ -75,6 +93,8 @@ Keep `isHorizontalOnlyCell(cell)` delegating to the mask predicate. Semantics mu
 
 ## G4 — Surface customization: shared registry base + Customize paint mode
 
+> **Status 2026-08-11: complete.** Browser acceptance covered exact preview rollback, committed wall/floor changes, event emission, persistence capture, toolbar entry/exit, and palette rendering with zero console errors.
+
 Design of record: `CUSTOMIZE_AND_LIGHTING_PLAN_2026-08.md` §1.2, §3.1. Read it first.
 
 **G4a — `SurfaceMaterialRegistry` base.** `js/Map/Walls/WallMaterialRegistry.js` and `js/Map/Floors/FloorMaterialRegistry.js` duplicate their plumbing: JSON load + schema check, image fetch/decode, template-finish resolution through `FinishPalette`, recolored-canvas caching. Extract a base class into `js/Map/Surfaces/SurfaceMaterialRegistry.js` (same folder as FinishPalette) holding the shared load/decode/template/cache logic; each registry keeps its own schema validation and sheet-geometry logic. No data-file changes, no behavior changes — walls and floors must render byte-identically (compare a House screenshot before/after).
@@ -92,6 +112,8 @@ Design of record: `CUSTOMIZE_AND_LIGHTING_PLAN_2026-08.md` §1.2, §3.1. Read it
 
 ## G5 — Wall/floor persistence completion (WorldState)
 
+> **Status 2026-08-11: complete.** House transition acceptance preserved a changed floor, an added wall, and an authored-wall removal; wall snapshot v7 deltas and v6 compatibility both passed.
+
 Design: `CUSTOMIZE_AND_LIGHTING_PLAN_2026-08.md` §1.2 item 3. Two gaps in `js/Map/WorldState.js` + `WallBuilder.serializeState`:
 
 1. **Floors are not persisted.** `captureMap` gains `floors`: `{ [roomId]: finishId }` for every room region whose `properties.floorFinishId` differs from its authored value (keep the authored value: snapshot it on `MapEnvironmentManager.registerRoomRegions` as `properties.authoredFloorFinishId`). `restoreMap` applies them through `floorBuilder.setRoomFinish` after the floor builder exists — note ordering: WorldState restore currently runs before/after floors depending on the transition path; verify in `MapTransitionManager` and restore floors from wherever `floor:ready` (`EVENTS.FLOOR_READY`) fires if needed.
@@ -105,6 +127,8 @@ Design: `CUSTOMIZE_AND_LIGHTING_PLAN_2026-08.md` §1.2 item 3. Two gaps in `js/M
 
 ## G6 — Room authoring cleanup (kill the zone→room shim)
 
+> **Status 2026-08-11: complete.** House retains the same four room IDs/bounds, DoorTest authors both rooms, RegionTest remains authored, the fallback is removed, and content validation passes.
+
 Design: `CUSTOMIZE_AND_LIGHTING_PLAN_2026-08.md` §1.1. `MapEnvironmentManager.buildRoomVolumes()` fabricates rooms from room-like zones (`['rest','play','food','social']`) on interior maps that author no rooms. Rooms are regions now; zones are behavior volumes — the shim is the last place the two concepts blur.
 
 1. Audit which interior maps actually author `environment.rooms` in their TMX (House, RegionTest, any others under `data/maps/`). For any interior map still relying on the shim, author real room objects in the TMX (same bounds the zones had; copy the zone rect, name it, set lighting props as the shim's defaults produced them).
@@ -115,15 +139,103 @@ Design: `CUSTOMIZE_AND_LIGHTING_PLAN_2026-08.md` §1.1. `MapEnvironmentManager.b
 
 ---
 
-> **Status 2026-08-11 (second pass):** G1–G3 landed by Codex and verified by Fable (acceptance greps clean, headless boot + cutaway + fixture-rebind regression green, zero console errors). G4–G6 above are the next dispatch set; G4 and G5 are independent and can run in parallel, G6 after either. Reserved for Fable (do not attempt): lighting v2 core F-L1..F-L3 and build-mode enclosure detection — see `CUSTOMIZE_AND_LIGHTING_PLAN_2026-08.md`.
+> **Status 2026-08-11 (second pass):** G1–G3 landed by Codex and verified by Fable. G4/G5 independent and parallel; G6 after either.
+>
+> **Status 2026-08-11 (third pass):** Lighting v2 F-L1–F-L3 shipped by Fable; owner follow-ups dispatched as **G8** (dither option + room-region geometry). **G9** (enclosure flood-fill) reassigned from Fable to Codex by owner direction — after G9 lands, build mode (`CUSTOMIZE_AND_LIGHTING_PLAN_2026-08.md` §3.2, needs G5 too) is also open for dispatch. Suggested order: G8a → G8b → G9 (G8b and G9 both touch the room render loops; do not run them in parallel).
+>
+> **Headless harness notes (all goals):** app URL is `index.html` (`index.php` is gone); Playwright works but must pass `executablePath` to `%LOCALAPPDATA%/ms-playwright/chromium-1228/chrome-win64/chrome.exe`; boot wait = `MyteCore.instance` container with `mytes.length > 0 && gameMap.initialized`; a cold profile needs `myte.startWithOptions({})` before `setActiveMyte` accepts it; drive the clock with `GameTime.instance.setTime(hour, minute)` then clear `environmentManager._lightingSignature` and `renderLighting(true)`; run `node scripts/...` directly (`npm run` wrappers fail in sandboxes).
 
 ## G7 — Map background via blob URL (memory)
+
+> **Status 2026-08-11: complete.** Five House/Outside transitions created 12 map PNG blob URLs, revoked the 10 belonging to retired maps exactly once, and left only the active map's two URLs live. Backgrounds and hidden-mode wall overlays remained visible with zero console errors.
 
 **Problem.** `TileMapLoader.createMapBackgroundUrl` and `createWallTileOverlayUrl` return `canvas.toDataURL('image/png')` — a base64 string of the entire baked map. On a large map that is a multi-megabyte string retained twice (the JS string and the CSS `background-image` value), re-created on every map transition.
 
 **Desired.** Return blob URLs: `await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))` → `URL.createObjectURL(blob)`. Track every URL created for the current map (a small set on GameMap or the loader) and `URL.revokeObjectURL` each in `GameMap.dispose()` — after the layers that reference them are cleared, and never before `waitForRevealReady` has finished decoding (the background `Image` in `setBackground` loads the same URL; revoking early would abort it). The wall tile overlay div in GameMap uses the second URL — same lifecycle.
 
 **Acceptance.** Headless: transition House → Outside → House; both maps render their baked background and the wall overlay still appears in the `hidden` wall mode; no console errors; `performance.memory` (or a heap snapshot) shows no accumulation of detached multi-MB strings across five transitions (spot-check is fine — the structural guarantee is the revoke call in dispose).
+
+---
+
+## G8 — Lighting v2 follow-ups: dither option + room-region geometry
+
+> **Status 2026-08-11: complete.** G8a and G8b landed together. Browser verification on House covered Dithered/Smooth live switching and reload persistence, 4-level night alpha quantization, daytime gloom dithering, hard room-region fills with wall paths, walls-down fallback, HTTP 200, and zero console/page errors. Content and time-source validation passed.
+
+Owner-reported defects in the freshly shipped lighting v2 (`js/Map/MapEnvironmentManager.js`; design context in `CUSTOMIZE_AND_LIGHTING_PLAN_2026-08.md` Part 2). Read `renderLighting`, `deriveRoomLightingState`, `drawDitherPass`, `drawFeatheredRectColor/Alpha`, and `WallBuilder.getCutYOver` before writing anything.
+
+### G8a — Dithering applies to all darkness, and becomes a player option
+
+**Problem.** `drawDitherPass` binarizes the darkness canvas against ONE reference alpha — `fillAlpha = darknessOpacity × 255`, which is the *night* darkness. At noon `darknessOpacity ≈ 0` so the pass skips (`fillAlpha < 8`) and the interior daylight gloom renders smooth; at dusk the gloom's mid-range alphas fall below `clearMax` and get force-cleared. The owner wants the dithered look on interior gloom too — and wants smooth vs dithered to be a player choice.
+
+**Fix, part 1 — N-level ordered dither.** Replace the binary classify (clearMax/solidMin/normalize) with multi-level ordered dithering using the same 4×4 Bayer matrix: quantize each pixel's alpha to `levels` steps (config `lighting.dither.levels`, default 4, add to both presets in `data/metadata/environment-presets.json`):
+
+```js
+const q = (a / 255) * levels;             // a = source alpha 0..255
+const base = Math.floor(q);
+const frac = q - base;
+const stepped = frac * 255 > B[row | col] ? base + 1 : base;
+px[i + 3] = Math.round((stepped / levels) * 255);
+```
+
+Drop the `fillAlpha` parameter entirely — the pass no longer needs a reference; it dithers whatever alpha is present (night darkness, gloom, and their dusk blend all quantize consistently). Keep the `pixelSize`/zoom scaling and the `a === 0` early skip. Call it whenever `dither.enabled` and the player option (below) allow — no longer gated on `darknessOpacity`.
+
+**Fix, part 2 — player option.** Settings > Graphics gets "Lighting style: Dithered / Smooth". Follow the existing lighting-toggle pattern exactly: a `settings.graphics.lightingDither` value + `isLightingDitherEnabled()` on `SettingsPanel` (`js/UI/Panels/SettingsPanel.js` — see `isLightingEnabled` at ~line 270), a `getLightingDitherEnabledSetting()` on GameMap delegating to the panel with `user.preferences.lightingDitherEnabled` fallback (add to `USER_DEFAULT_PREFERENCES` in `js/User/User.js`, default `true`), consumed in `renderLighting` where the dither pass is invoked. The panel change handler must call `environmentManager.refreshDisplaySettings()` (it already clears signatures and re-renders). Include the flag in `buildLightingSignature`.
+
+**Test gotcha.** In headless probes, flip `container.ui.settingsPanel.settings.graphics.*`, NOT `user.preferences.*` — the panel value wins while the panel exists.
+
+### G8b — Room light regions follow wall geometry
+
+**Problem (owner report).** With walls up during the day: (1) a room's gloom rect paints over the wall art of the room in front of it — the wall between rooms A (north) and B (south) rises above B's floor into A's screen rect, so A's gloom darkens B's back wall; (2) inside a room the gloom is feathered *inward* (`drawFeatheredRectColor`), so room edges read light and the center dark — backwards.
+
+**Model.** Every camera-facing wall face is lit by the room it opens into — the room to its **south**. So a room R's light region is:
+
+- R's floor rect (its bounds), **plus**
+- the face bands of horizontal wall pieces along R's **north** boundary — R's back wall, rising above R's top edge, **minus**
+- the face bands of horizontal wall pieces along R's **south** boundary — R's front wall's visible face belongs to whatever is south of it (the next room paints it via its own "plus"; exterior means nobody paints it).
+
+A face band for piece P over x-span `[sx0, sx1]` is the world rect from `wallBuilder.getCutYOver(P, sx0, sx1)` (top — this already accounts for cutaway stubs, walls-down, hidden) down to `P.baseline`. Find boundary pieces by iterating `wallBuilder.pieces`: horizontal pieces (`p.cells.every(WallBuilder.isHorizontalMask-ish)` — use the piece's cell masks) whose `baseline` is within `cellSize` of the room bound's y and whose x-range overlaps the room's `[x0, x1]`; clamp each band's x-span to the overlap.
+
+**Implementation.** One helper, used by all four room passes (night lift, day gloom, room color fill, window glow):
+
+```js
+buildRoomLightRegion(room, view) → { path: Path2D|null, bounds: screenRect }
+```
+
+Build the Path2D in screen space (`worldToScreenRect` each rect): add the floor rect and the north bands, then add the south bands — and fill/clip with the `'evenodd'` rule, so the south bands (which lie inside the floor rect) become holes while the north bands (disjoint, above it) stay filled. When there is no `wallBuilder` or no adjacent pieces, return `path: null` and let callers fall back to today's plain rect.
+
+Callers: replace the four `drawFeatheredRect*` room calls in `renderLighting` with: `ctx.save(); ctx.clip(path, 'evenodd');` then fill the region's bounding rect with the flat color/alpha; `ctx.restore()`. **Feather rules change:** in wall presentations `up`/`cutaway`, draw hard-edged (feather 0) — wall art and the dither option carry the transition; in `down`/`hidden`, keep the current soft feathered-rect path (feather × `openWallFeatherScale`, no bands — they'd be stubs anyway). The inward-feather "bright edges" symptom disappears with the hard fill.
+
+`drawFeatheredRectAlpha` (night lift) uses destination-out — clip+`clearRect`-equivalent: inside the clip, fill the bbox with `destination-out` at the lift alpha, same as today's interior fill but region-shaped.
+
+**Signature.** The region depends on wall cut states, so add a cheap wall-state hash to `buildLightingSignature`: `this.gameMap?.wallBuilder?.pieces?.map(p => p.renderPlan?.mode ?? '').join('') ?? ''` plus the presentation (already added as `wallMode`). The 150 ms idle refresh picks up cutaway changes from there.
+
+**Out of scope.** Vertical (east/west) wall faces — side walls keep today's behavior; note any visible seams in the report rather than fixing them.
+
+**Acceptance (headless, House, `GameTime.instance.setTime(12,0)`).** (1) Sample the darkness canvas: a pixel on the face band of the Kitchen's back wall carries the Kitchen's gloom alpha, not the room behind's; a pixel just above a front-wall baseline inside the Bedroom is NOT gloom-painted when that band belongs to the space south of it. (2) Center-vs-edge: floor pixels at a room's center and 4 px inside its boundary have equal alpha (hard fill). (3) Walls-down mode still renders soft feathered rooms, light values unchanged. (4) Dither on/off toggles via the new setting; night look with `levels: 4` is not visibly different from before at `darknessOpacity 0.75` (screenshot compare). (5) Zero console errors; `node scripts/validate-content-data.js` passes.
+
+---
+
+## G9 — Enclosure flood-fill: player-built walls make rooms (reassigned from Fable)
+
+> **Status 2026-08-11: complete.** `RoomEnclosureDetector` debounces wall events, flood-fills exterior/open cells, registers stable tilemask room regions, preserves authored rooms, and refreshes every downstream room consumer. Lighting now reads the shared region store rather than its authored-only staging list. Headless House acceptance passed with zero console/page errors.
+
+The load-bearing piece of build mode (`CUSTOMIZE_AND_LIGHTING_PLAN_2026-08.md` §3.2 item 3), reassigned to Codex by owner direction. Everything downstream already reacts to room regions: lighting gloom/lift, floors, cutaway room topology, door annotations, window daylight.
+
+**New file** `js/Map/Regions/RoomEnclosureDetector.js` (add to `scripts/script-manifest.json` after RegionManager), owned by GameMap (construct after wallBuilder in `applyToGameMap`, dispose in `GameMap.dispose`).
+
+**Trigger.** `EVENTS.WALL_READY` and `EVENTS.WALL_GEOMETRY_CHANGED` for this map (match the subscription pattern in `MapEnvironmentManager.subscribeToWallEvents`). Debounce one macrotask (`queueMicrotask` is too soon; a 0 ms `setTimeout` collapsing repeated geometry events is right) so a drag painting N cells runs one detection.
+
+**Algorithm** (grid-space, `gameMap.gridSystem` dimensions):
+1. Wall set = `wallBuilder.baseCells` keys. Opening cells (`wallBuilder.openingByCell`) count as wall — a doorway must not leak "outside" into a room.
+2. Flood-fill 4-connected from every border cell of the grid that is not a wall → mark exterior.
+3. Remaining non-wall, non-exterior cells → connected components. Discard components smaller than `SiteConfig.rooms.minAreaCells` (add `SiteConfig.rooms = Object.freeze({ autoDetect: true, minAreaCells: 4 })`).
+4. For each component: if it intersects ANY authored room region (layer `'room'`, regions whose `source` came from `MapEnvironmentManager`) — skip it entirely; authored geometry stays authoritative. Otherwise register a `SpatialRegion` with `layer: 'room'`, `id: 'room_auto_' + <index by top-left cell order>` (stable across re-detections for identical geometry), `shape: { kind: 'tilemask', cells: [...'x,y' keys], cellSize }`, `properties: { displayName: 'Room', indoor: true, autoDetected: true, lighting: <roomDefaults from environmentManager.getRoomDefaults()> }`.
+5. Before registering, remove only regions with `properties.autoDetected === true` — never authored ones.
+6. Afterwards, in this order: `gameMap.floorBuilder?.build()`, `gameMap.buildDoorRoomTopology()`, `environmentManager.rebuildWindowLighting()`, and clear `environmentManager._lightingSignature`. WallBuilder's cutaway reads rooms live — no call needed.
+
+**Gotcha.** `MapEnvironmentManager.deriveRoomLightingState` iterates `this.roomVolumes` (its private list), not the region store — auto rooms won't light until that reads regions. Part of this goal: change `deriveRoomLightingState` and the three render loops to iterate `regionManager.all('room')` (each region already carries `properties.lighting`; keep a small adapter so `entry.room.bounds`/`entry.room.lighting` keep their shape). `registerRoomRegions` already publishes authored volumes there, so this unifies the two sources — `roomVolumes` stays only for building/registering.
+
+**Acceptance (headless, House).** (1) `setWallCell` a 4×4 rectangle of walls in open floor → one new `room_auto_*` region whose tilemask is exactly the 2×2 interior; its floor stays unpainted (no `floorFinishId`), it acquires gloom at noon, and its walls cut away when a myte stands in it. (The earlier 4×3/2×1 fixture contradicted `minAreaCells: 4`.) (2) Remove one wall cell → region disappears on the next detection; lighting reverts. (3) Authored rooms (`zone_kitchen` etc.) untouched through both. (4) Map transition House→Outside→House leaves no duplicate regions. (5) Zero console errors.
 
 ---
 

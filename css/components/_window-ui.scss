@@ -236,6 +236,120 @@
     }
 }
 
+.surface-customize-panel {
+    width: 280px;
+
+    .surface-target {
+        margin: 0;
+        font-weight: bold;
+    }
+
+    .surface-palette {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-xs);
+        max-height: 330px;
+        @include scroll-area;
+    }
+
+    .surface-swatch {
+        @include button-base;
+        display: grid;
+        grid-template-columns: 32px minmax(0, 1fr);
+        align-items: center;
+        gap: var(--space-xs);
+        min-height: 42px;
+        padding: var(--space-2xs);
+        text-align: left;
+
+        &:active {
+            @include button-pressed;
+        }
+
+        // The finish this surface already wears.
+        &.is-selected {
+            @include button-pressed;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            border: var(--radius-xs) solid var(--black);
+        }
+
+        span {
+            overflow-wrap: anywhere;
+            text-transform: capitalize;
+        }
+    }
+}
+
+// Both editing panels group their controls the way Settings does; a fieldset
+// carries the group semantics its legend needs, and nothing else changes.
+.surface-customize-panel,
+.wall-build-panel {
+    >.window-panel__content {
+        display: grid;
+        gap: var(--space-lg);
+        align-content: start;
+    }
+
+    fieldset.settings-group {
+        margin: 0;
+        padding: var(--space-xs) var(--space-sm) var(--space-sm);
+        @include frame-sunken;
+
+        >.settings-group-title {
+            padding: 0 var(--space-2xs);
+        }
+    }
+
+    .setting-hint+.setting-hint {
+        margin-top: var(--space-2xs);
+    }
+}
+
+// Customize mode paints surfaces, so for its duration the surfaces are the only
+// things on the map that take a pointer. Without this the foreground layer
+// swallows every click before it can reach a floor canvas underneath it.
+body.customize-mode {
+    .app-shell > .app-stage > .canvas > .layer:not(.background) {
+        pointer-events: none;
+    }
+
+    .wall-piece,
+    .floor-surface {
+        pointer-events: auto !important;
+        cursor: crosshair;
+
+        &:hover {
+            outline: var(--radius-xs) dashed var(--state-info-accent);
+            outline-offset: calc(var(--radius-xs) * -1);
+        }
+    }
+}
+
+.wall-build-panel {
+    width: 250px;
+}
+
+.wall-build-ghost-cell {
+    position: absolute;
+    z-index: var(--z-drag);
+    box-sizing: border-box;
+    border: 1px dashed var(--state-info-accent);
+    background: color-mix(in srgb, var(--state-info-accent) 35%, transparent);
+    pointer-events: none;
+
+    &.is-remove {
+        border-color: var(--color-danger);
+        background: color-mix(in srgb, var(--color-danger) 35%, transparent);
+    }
+}
+
+body.wall-build-mode .app-stage {
+    cursor: crosshair;
+}
+
 
 #view-panel {
     .window-panel__content {

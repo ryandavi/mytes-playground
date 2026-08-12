@@ -30,7 +30,7 @@
 // pixel that is not the cap colour", so the wall's geometry exists in exactly
 // one place and a finish inherits its rounded silhouette for free.
 // ─────────────────────────────────────────────────────────────────────────────
-class WallMaterialRegistry {
+class WallMaterialRegistry extends SurfaceMaterialRegistry {
     static DIRECTIONS = Object.freeze(['north', 'east', 'south', 'west']);
     static AUTHORED_BANDS = Object.freeze(['full', 'stub']);
     static TRANSITIONS = Object.freeze(['rampDown', 'rampUp']);
@@ -45,12 +45,9 @@ class WallMaterialRegistry {
     static PALETTE_OVERRIDES = Object.freeze({ body: 'color', band: 'baseboard', motif: 'accent' });
 
     constructor(resourceManager = null) {
-        this.resourceManager = resourceManager;
-        this.schemaVersion = 0;
+        super(resourceManager);
         this.constructions = new Map();
-        this.finishes = new Map();
         this.fixtures = new Map();
-        this.images = new Map();
         this.overlays = new Map();
         this.frames = new Map();
         this.paintMasks = new Map();
@@ -58,13 +55,10 @@ class WallMaterialRegistry {
     }
 
     async load(path = SiteConfig.wallSystem.materialsPath) {
-        const response = await fetch(path);
-        if (!response.ok) throw new Error(`Unable to load wall materials: ${response.status}`);
-        const data = await response.json();
+        const data = await this.fetchDefinition(path, 'wall materials');
         this.validate(data);
-        this.schemaVersion = data.schemaVersion;
+        this.setCommonDefinition(data);
         this.constructions = new Map(Object.entries(data.constructions));
-        this.finishes = new Map(Object.entries(data.finishes));
         this.fixtures = new Map(Object.entries(data.fixtures || {}));
         this.paintSheet = data.paintSheet || null;
         this.overlays.clear();
@@ -184,17 +178,7 @@ class WallMaterialRegistry {
                 .filter(([, value]) => value.sheet)
                 .map(([id, value]) => [`wall-fixture:${id}`, value.sheet])
         ];
-        await Promise.all(records.map(async ([key, path]) => {
-            const image = this.resourceManager
-                ? await this.resourceManager.loadSprite(key, path)
-                : await new Promise((resolve, reject) => {
-                    const candidate = new Image();
-                    candidate.onload = () => resolve(candidate);
-                    candidate.onerror = () => reject(new Error(`Unable to load ${path}`));
-                    candidate.src = path;
-                });
-            this.images.set(key, image);
-        }));
+        await this.loadImageRecords(records);
     }
 
     /**
@@ -403,28 +387,18 @@ class WallMaterialRegistry {
      * @returns {{west: HTMLCanvasElement, body: HTMLCanvasElement, east: HTMLCanvasElement}|null}
      */
     getSwatchColumns(finishId, construction) {
-        if (this.swatchColumns.has(finishId)) return this.swatchColumns.get(finishId);
-        const columns = this.buildSwatchColumns(finishId, construction);
-        this.swatchColumns.set(finishId, columns);
-        return columns;
+        return this.resolveFinishAsset(finishId, {
+            cache: this.swatchColumns,
+            paletteOverrides: WallMaterialRegistry.PALETTE_OVERRIDES,
+            buildDirect: (finish, id) => this.buildDirectSwatchColumns(finish, id, construction),
+            recolor: (source, substitutions) => Object.fromEntries(Object.entries(source).map(
+                ([name, column]) => [name, FinishPalette.recolor(column, substitutions)]
+            ))
+        });
     }
 
-    buildSwatchColumns(finishId, construction) {
-        const finish = this.getFinish(finishId);
-        if (!finish || !construction) return null;
-
-        if (typeof finish.template === 'string') {
-            const template = this.getFinish(finish.template);
-            const source = this.getSwatchColumns(finish.template, construction);
-            if (!source || !template?.palette) return null;
-            const substitutions = FinishPalette.resolve(
-                template.palette, finish, WallMaterialRegistry.PALETTE_OVERRIDES
-            );
-            return Object.fromEntries(Object.entries(source).map(
-                ([name, column]) => [name, FinishPalette.recolor(column, substitutions)]
-            ));
-        }
-
+    buildDirectSwatchColumns(finish, finishId, construction) {
+        if (!construction) return null;
         const standalone = this.images.get(`wall-swatch:${finishId}`);
         const sheet = standalone || this.images.get('wall-paint-sheet');
         if (!sheet) return null;
@@ -457,10 +431,6 @@ class WallMaterialRegistry {
 
     getConstruction(id) {
         return this.constructions.get(id) || null;
-    }
-
-    getFinish(id) {
-        return this.finishes.get(id) || null;
     }
 
     getConstructionImage(id) {

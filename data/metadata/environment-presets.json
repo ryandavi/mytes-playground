@@ -71,14 +71,32 @@
         "shadowStrength": 0.28,
         "dither": {
           "enabled": true,
-          "pixelSize": 1
+          "pixelSize": 1,
+          "levels": 4
+        },
+        "openWallFeatherScale": 1.0,
+        "roomInteriorGrowCells": 2,
+        "openBoundaryBlendPx": 24,
+        "artMaskScale": 0.5,
+        "openBoundary": {
+          "spillPerCell": 0.3,
+          "spillMax": 0.85
+        },
+        "window": {
+          "daylightPerCell": 0.22,
+          "daylightMax": 0.85,
+          "gloomFloor": 0.55,
+          "spillFactor": 0.16,
+          "glowColor": "rgba(255, 176, 112, 1)",
+          "glowStrength": 0.22
         },
         "roomDefaults": {
           "ambientFloor": 0.05,
           "ambientCeiling": 0.2,
           "fillColor": "rgba(135, 160, 255, 0.16)",
-          "feather": 28,
-          "mode": "local"
+          "feather": 20,
+          "mode": "local",
+          "daylightGloom": 0.22
         }
       }
     },
@@ -144,14 +162,32 @@
         "shadowStrength": 0.36,
         "dither": {
           "enabled": true,
-          "pixelSize": 1
+          "pixelSize": 1,
+          "levels": 4
+        },
+        "openWallFeatherScale": 1.0,
+        "roomInteriorGrowCells": 2,
+        "openBoundaryBlendPx": 24,
+        "artMaskScale": 0.5,
+        "openBoundary": {
+          "spillPerCell": 0.3,
+          "spillMax": 0.85
+        },
+        "window": {
+          "daylightPerCell": 0.22,
+          "daylightMax": 0.85,
+          "gloomFloor": 0.55,
+          "spillFactor": 0.16,
+          "glowColor": "rgba(255, 176, 112, 1)",
+          "glowStrength": 0.22
         },
         "roomDefaults": {
           "ambientFloor": 0.18,
           "ambientCeiling": 0.72,
           "fillColor": "rgba(255, 210, 142, 0.34)",
-          "feather": 40,
-          "mode": "mixed"
+          "feather": 24,
+          "mode": "mixed",
+          "daylightGloom": 0.24
         }
       }
     }

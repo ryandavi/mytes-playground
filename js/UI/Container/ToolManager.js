@@ -26,6 +26,16 @@ class ToolManager extends UIComponent {
                 label: 'Pet',
                 cursor: 'pointer',
                 shortcut: 'p'
+            },
+            [UIToolModes.CUSTOMIZE]: {
+                id: 'customize-toggle',
+                label: 'Customize',
+                cursor: 'pointer'
+            },
+            [UIToolModes.BUILD]: {
+                id: 'build-toggle',
+                label: 'Build',
+                cursor: 'crosshair'
             }
         };
     }
@@ -33,6 +43,9 @@ class ToolManager extends UIComponent {
     applyToolModeState(mode) {
         document.body.dataset.toolMode = mode;
         this.parent.containerWrapper?.setAttribute('data-tool-mode', mode);
+        this.parent.parent?.gameMap?.wallBuilder?.setPresentationOverride(
+            (mode === UIToolModes.BUILD || mode === UIToolModes.CUSTOMIZE) ? 'up' : null
+        );
     }
 
     init() {

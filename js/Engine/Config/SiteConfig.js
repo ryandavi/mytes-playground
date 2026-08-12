@@ -11,6 +11,11 @@ const SiteConfig = Object.freeze({
         canvasPaddingCells: Object.freeze({ top: 1, right: 1, bottom: 1, left: 1 }),
     }),
 
+    rooms: Object.freeze({
+        autoDetect: true,
+        minAreaCells: 4,
+    }),
+
     // Experimental semantic wall renderer. Turning this off restores the
     // legacy behavior: authored wall tiles are baked into the background and
     // no wall geometry, LOS data, controls, or persistence are created.
@@ -58,6 +63,14 @@ const SiteConfig = Object.freeze({
         // does not declare one. Keyed by lowercased object type; anything
         // unlisted falls back to the door height.
         defaultOpeningHeightPx: Object.freeze({ window: 64, door: 128 }),
+        // What happens to a painting when the wall under it drops to a stub.
+        // 'hide'  - fades out with the wall and returns when it stands. A wall
+        //           fixture lives on a vertical surface; drawn at its standing Y
+        //           over a 28px stub it reads as clutter lying on the floor.
+        // 'clip'  - draws only the part still backed by wall. Honest, but at a
+        //           stub it leaves a sliver of frame.
+        // 'keep'  - stays put, whole, at full height.
+        fixtureCutBehavior: 'hide',
         cutawayDebounceMs: 180,
         maxGeneratedNodes: 300,
 
@@ -260,6 +273,8 @@ const SiteConfig = Object.freeze({
     }),
 
     debug: Object.freeze({
+        // Dumps the resolved per-room lighting model on every rebuild.
+        lighting: false,
         currencyPresets: Object.freeze([10, 100, 500, 1000]),
         itemStep: 1,
         statStep: 5,
@@ -371,6 +386,15 @@ const SiteConfig = Object.freeze({
             portalArrivalRadius: 48,
             // Progress ticks that reach the UI while a myte is en route.
             progressInterval: 4000,
+        }),
+
+        // Geographic sun cycle: a map further east (larger authored worldX)
+        // meets sunset a little earlier. A constant per-map minute offset,
+        // deliberately not solar geometry — the global clock stays global,
+        // only the sunrise/sunset window boundaries shift.
+        sunCycle: Object.freeze({
+            minutesPerWorldX: 6,
+            maxOffsetMinutes: 30,
         }),
     }),
 

@@ -7,6 +7,7 @@ class SettingsPanel extends ModalWindow {
                 animations: true,
                 timeOfDayOverlay: true,
                 lighting: true,
+                lightingDither: true,
                 weather: true
             },
             gameplay: {
@@ -129,6 +130,15 @@ class SettingsPanel extends ModalWindow {
         }
 
         const weatherToggle = this.modalElement.querySelector('#weather-toggle');
+        const lightingStyleSelect = this.modalElement.querySelector('#lighting-style');
+        if (lightingStyleSelect) {
+            lightingStyleSelect.value = this.settings.graphics.lightingDither ? 'dithered' : 'smooth';
+            lightingStyleSelect.onchange = () => {
+                this.settings.graphics.lightingDither = lightingStyleSelect.value === 'dithered';
+                this.applyGraphicsSettings();
+            };
+        }
+
         if (weatherToggle) {
             weatherToggle.checked = this.settings.graphics.weather;
             weatherToggle.onchange = () => {
@@ -271,6 +281,10 @@ class SettingsPanel extends ModalWindow {
         return this.settings?.graphics?.lighting !== false;
     }
 
+    isLightingDitherEnabled() {
+        return this.settings?.graphics?.lightingDither !== false;
+    }
+
     isWeatherEnabled() {
         return this.settings?.graphics?.weather !== false;
     }
@@ -321,6 +335,7 @@ class SettingsPanel extends ModalWindow {
                 animations: preferences.animationsEnabled,
                 timeOfDayOverlay: preferences.timeOfDayOverlayEnabled,
                 lighting: preferences.lightingEnabled,
+                lightingDither: preferences.lightingDitherEnabled,
                 weather: preferences.weatherEffectsEnabled
             },
             gameplay: {
@@ -342,6 +357,7 @@ class SettingsPanel extends ModalWindow {
             animationsEnabled: normalized.graphics.animations,
             timeOfDayOverlayEnabled: normalized.graphics.timeOfDayOverlay,
             lightingEnabled: normalized.graphics.lighting,
+            lightingDitherEnabled: normalized.graphics.lightingDither,
             weatherEffectsEnabled: normalized.graphics.weather,
             tutorialsEnabled: normalized.gameplay.tutorials,
             interactionHintsEnabled: normalized.gameplay.interactionHints,

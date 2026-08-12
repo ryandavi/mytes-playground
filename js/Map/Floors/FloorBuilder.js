@@ -67,6 +67,7 @@ class FloorBuilder {
         canvas.width = area.width;
         canvas.height = area.height;
         canvas.className = 'floor-surface';
+        canvas.dataset.roomId = room.id;
         Object.assign(canvas.style, {
             position: 'absolute',
             left: `${area.x}px`,

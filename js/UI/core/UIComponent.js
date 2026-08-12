@@ -1,7 +1,9 @@
 const UIToolModes = {
     SELECT: 'select',
     DRAG: 'drag',
-    PET: 'pet'
+    PET: 'pet',
+    CUSTOMIZE: 'customize',
+    BUILD: 'build'
 };
 
 class UIComponent {

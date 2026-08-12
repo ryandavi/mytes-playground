@@ -778,6 +778,18 @@ function validateRegionFixture() {
 	}
 }
 
+function validateInteriorRooms() {
+    const mapsDir = path.join(repoRoot, 'data/maps');
+    for (const fileName of fs.readdirSync(mapsDir).filter(name => name.endsWith('.tmx'))) {
+        const source = fs.readFileSync(path.join(mapsDir, fileName), 'utf8');
+        const location = source.match(/<property\s+name="location"\s+value="([^"]+)"\s*\/>/i)?.[1]?.toLowerCase();
+        if (!['interior', 'inside', 'house'].includes(location)) continue;
+        const authorsRoom = /<object\b[^>]*\bname="LIGHTVOLUME"/i.test(source) ||
+            /<property\s+name="(?:lightingKind|kind)"\s+value="room"\s*\/>/i.test(source);
+        if (!authorsRoom) warn(`data/maps/${fileName} is interior but authors no room volumes.`);
+    }
+}
+
 // Wall fixtures ship twice on purpose: the wall registry indexes the atlas with
 // a `piece` rect, while the same art as a MAP OBJECT goes through the ordinary
 // sprite pipeline, which reads a file per variant and sets no background
@@ -1242,6 +1254,7 @@ function run() {
     validateZones();
     validateAudioPresets();
 	validateRegionFixture();
+    validateInteriorRooms();
     validateWallMaterials();
 validateFloorMaterials();
 
