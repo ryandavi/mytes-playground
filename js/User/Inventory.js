@@ -471,6 +471,15 @@ class Inventory {
         if (!itemElement || !ItemRegistry.getItemSync(itemElement.dataset.variant || itemElement.dataset.name)?.world) {
             return false;
         }
+
+        // Putting an object into the world is building. Rather than refuse and
+        // leave the player at a dead end, switch modes for them and say so.
+        const gameMode = this.parent?.gameMode;
+        if (gameMode && !gameMode.isBuild()) {
+            if (!gameMode.setMode(GAME_MODES.BUILD)) return false;
+            this.parent?.ui?.showMessage?.('Switched to Build Mode to place this.', 'info', 'Build Mode');
+        }
+
         this.cancelPlacement();
         this.state.placementItem = itemElement;
         this.state.draggedItem = itemElement;

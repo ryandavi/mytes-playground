@@ -966,18 +966,33 @@ class ActionSidebarManager extends UIComponent {
         if (selectedObject instanceof MapObject) {
             const itemDefinition = ItemRegistry.findItemForWorldObject(selectedObject);
             if (!itemDefinition) return null;
-            const inUse = selectedObject.isInUse?.() === true;
+            // Putting furniture away is decorating, and decorating is Build
+            // mode. Gameplay pickups are not furniture and are unaffected.
+            const rules = this.parent.parent.buildRules;
+            if (rules?.isBuildModeObject(selectedObject) && this.parent.parent.gameMode?.isBuild() !== true) {
+                return null;
+            }
+
+            const verdict = rules?.canStoreObject(selectedObject) ?? BuildRules.ALLOWED;
             const hasCapacity = inventory.canAddItem(itemDefinition.id, 1);
             return {
-                canStore: !inUse && hasCapacity,
-                unavailableReason: inUse
-                    ? 'This object is currently in use.'
-                    : (hasCapacity ? null : 'There is not enough inventory space.'),
-                store: () => inventory.storeMapObject(selectedObject)
+                canStore: verdict.allowed && hasCapacity,
+                unavailableReason: verdict.allowed
+                    ? (hasCapacity ? null : 'There is not enough inventory space.')
+                    : verdict.reason,
+                store: () => this.storeWithConfirmation(selectedObject)
             };
         }
 
         return null;
+    }
+
+    // The one place a confirm earns its keep: storing a growing plant throws
+    // its growth away, where moving it would have kept it.
+    storeWithConfirmation(selectedObject) {
+        const warning = this.parent.parent.buildRules?.getStoreWarning(selectedObject);
+        if (warning && !window.confirm(`${warning} Store anyway?`)) return false;
+        return this.parent.parent.inventory.storeMapObject(selectedObject);
     }
 
     renderInventoryStorageAction(actionGroups, selectedObject) {
@@ -1007,6 +1022,41 @@ class ActionSidebarManager extends UIComponent {
 
         li.appendChild(button);
         actionList.appendChild(li);
+        groupElement.append(title, actionList);
+        actionGroups.appendChild(groupElement);
+        return true;
+    }
+
+    /**
+     * Actions that only exist while building. Rotation already worked mid-drag
+     * and nowhere else, which made it invisible — here it is a button on the
+     * selected object, bound to the same R key.
+     */
+    renderBuildActions(actionGroups, selectedObject) {
+        if (this.parent.parent.gameMode?.isBuild() !== true) return false;
+        if (!(selectedObject instanceof MapObject) || !selectedObject.canRotate?.()) return false;
+
+        const groupElement = document.createElement('div');
+        groupElement.className = 'action-group build-actions';
+        const title = document.createElement('h3');
+        title.textContent = 'Build';
+        const actionList = document.createElement('ul');
+
+        for (const [label, direction] of [['Rotate ↻ (R)', 1], ['Rotate ↺ (,)', -1]]) {
+            const li = document.createElement('li');
+            const button = document.createElement('button');
+            button.textContent = label;
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!selectedObject.rotateToNextDirection(direction)) {
+                    this.parent.showMessage("It doesn't fit that way round.", 'warning', 'Rotate');
+                }
+            });
+            li.appendChild(button);
+            actionList.appendChild(li);
+        }
+
         groupElement.append(title, actionList);
         actionGroups.appendChild(groupElement);
         return true;
@@ -1204,6 +1254,7 @@ class ActionSidebarManager extends UIComponent {
         }
 
         this.renderInventoryStorageAction(actionGroups, selectedObject);
+        this.renderBuildActions(actionGroups, selectedObject);
 
         Object.entries(groupedActions).forEach(([category, actions]) => {
             const groupElement = document.createElement('div');

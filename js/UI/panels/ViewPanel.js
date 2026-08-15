@@ -1,27 +1,9 @@
-class ViewPanel extends ModalWindow {
+class ViewPanel extends PanelSection {
     constructor(parent) {
-        super(parent, {
-            id: 'view-panel',
-            buttonId: 'view-toggle',
-            closeOnOutsideClick: false,
-            position: 'top-right',
-            draggable: true,
-            closeButtonSelector: '.modal-close-btn'
-        });
+        super(parent, { tab: 'view' });
 
-        this.init(); // explicit — subclass state is ready before any virtual method call
+        this.init();
         this.setupControls();
-    }
-
-    buttonLeftClick(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.toggle();
-        return false;
-    }
-
-    buttonRightClick(e) {
-        this.buttonLeftClick(e);
     }
 
     getCamera() {
@@ -93,7 +75,9 @@ class ViewPanel extends ModalWindow {
         this._wallModeBtns = this.modalElement.querySelectorAll('.wall-mode-btn');
         this._wallModeBtns.forEach(btn => {
             btn.onclick = () => {
-                this._getContainer()?.gameMap?.wallBuilder?.setPresentationMode(btn.dataset.wallMode);
+                // Same entry point the build panels use, so the two controls
+                // can never disagree about what the player picked.
+                this._getContainer()?.gameMap?.wallBuilder?.setUserPresentationMode(btn.dataset.wallMode);
                 this.updateWallMode();
             };
         });
@@ -176,11 +160,10 @@ class ViewPanel extends ModalWindow {
         }
     }
 
-    open() {
+    onSectionShown() {
         this.updateZoomLabel();
         this.updateFollowMode();
         this.updateButtonStates();
         this.updateWallMode();
-        super.open();
     }
 }

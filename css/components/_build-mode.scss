@@ -1,0 +1,358 @@
+@use '../primitives/ui' as *;
+
+// ── Mode-driven visibility ────────────────────────────────────────────────────
+//
+// The mode is written once, to `data-game-mode` on the body and the shell, and
+// every show/hide follows from it here. No JS toggles visibility.
+
+#build-paused-chip {
+    display: none;
+}
+
+[data-game-mode='build'] #build-paused-chip {
+    display: flex;
+}
+
+// ── Sidebar tool groups ───────────────────────────────────────────────────────
+
+.app-shell > .hand-controls {
+    .tool-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--padding);
+    }
+
+    .tool-group--build {
+        display: none;
+    }
+
+    .tool-group__row {
+        display: flex;
+        flex-direction: row;
+        gap: var(--padding);
+    }
+
+    button.hand-control-btn--half {
+        @include button-base;
+        width: calc((60px - var(--padding)) / 2);
+        height: 36px;
+        min-width: 0;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+
+        > .icon {
+            max-width: 16px;
+            max-height: 16px;
+            fill: var(--button-icon-color);
+        }
+
+        &:hover:not(:disabled) {
+            background-color: var(--surface-ui-pressed);
+            outline: 4px solid var(--button-active-border-color);
+        }
+    }
+
+    // The mode switch is a state, not a panel toggle: it reads as a latching
+    // key, chunky and unmistakably down when Build is on.
+    button.mode-switch {
+        border-width: var(--border-width);
+
+        &.active {
+            @include button-pressed;
+            outline: 4px solid var(--button-active-border-color);
+
+            > .icon {
+                fill: var(--button-active-icon-color);
+            }
+        }
+    }
+
+    button.tool-btn.active {
+        @include surface-pressed;
+        outline: 4px solid var(--button-active-border-color);
+
+        > .icon {
+            fill: var(--button-active-icon-color);
+        }
+    }
+
+    button:disabled {
+        @include button-disabled;
+        cursor: not-allowed;
+
+        > .icon {
+            fill: var(--text-subtle);
+        }
+    }
+}
+
+.app-shell[data-game-mode='build'] > .hand-controls {
+    .tool-group--play {
+        display: none;
+    }
+
+    .tool-group--build {
+        display: flex;
+    }
+}
+
+// ── Stage corner chips ────────────────────────────────────────────────────────
+
+.app-stage > .stage-chip {
+    @include surface-raised;
+    position: absolute;
+    bottom: var(--space-sm);
+    z-index: var(--z-overlay);
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-2xs) var(--space-sm);
+    max-width: 45%;
+    font-size: 12px;
+    color: var(--text-base);
+    line-height: 1.6;
+
+    > .icon {
+        flex: 0 0 auto;
+        width: 14px;
+        height: 14px;
+        fill: var(--button-icon-color);
+    }
+
+    > .text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &--map {
+        left: var(--space-sm);
+        cursor: pointer;
+
+        &:hover {
+            background-color: var(--button-hover);
+        }
+    }
+
+    &--log {
+        right: var(--space-sm);
+        cursor: pointer;
+
+        &:hover {
+            background-color: var(--button-hover);
+        }
+    }
+
+    // Top centre: the frozen world is the most important thing on screen, and
+    // this corner is the only one the other two chips never use, so all three
+    // can be up at once without colliding. Same chip shell as its siblings —
+    // one family of overlays — but amber, because it reports a state rather
+    // than opening a window.
+    &--paused {
+        top: var(--space-sm);
+        bottom: auto;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 70%;
+        background-color: var(--state-warning-accent);
+        color: var(--black);
+        cursor: pointer;
+
+        > .icon {
+            fill: var(--black);
+        }
+
+        &:hover .stage-chip__action {
+            background-color: var(--surface-ui-pressed);
+        }
+    }
+
+    &__action {
+        @include surface-raised;
+        padding: var(--space-2xs) var(--space-sm);
+        margin-inline-start: var(--space-sm);
+        font-weight: 700;
+        color: var(--text-base);
+        white-space: nowrap;
+    }
+
+    &__badge {
+        @include surface-inset;
+        padding-inline: var(--space-2xs);
+        min-width: 18px;
+        text-align: center;
+        font-weight: 700;
+        color: var(--color-danger);
+    }
+}
+
+// The action sidebar overlays the stage on narrow viewports; the log chip
+// would land underneath it.
+@media (max-width: 960px) {
+    .sidebar.right.is-open ~ .app-stage .stage-chip--log,
+    .app-stage .stage-chip--log {
+        max-width: 32%;
+    }
+}
+
+// ── Build grid overlay ────────────────────────────────────────────────────────
+//
+// One repeating-gradient layer sized from the grid, never per-cell DOM.
+
+.canvas.show-build-grid::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: var(--z-overlay);
+    pointer-events: none;
+    background-image:
+        repeating-linear-gradient(to right, var(--build-grid-line) 0 1px, transparent 1px var(--build-grid-size, 32px)),
+        repeating-linear-gradient(to bottom, var(--build-grid-line) 0 1px, transparent 1px var(--build-grid-size, 32px));
+}
+
+// ── Build feedback ────────────────────────────────────────────────────────────
+
+.wall-build-ghost-cell.is-invalid {
+    border-color: var(--color-danger);
+    border-style: solid;
+    background: color-mix(in srgb, var(--color-danger) 45%, transparent);
+}
+
+.build-measure-label {
+    @include surface-raised;
+    position: fixed;
+    z-index: var(--z-drag);
+    padding: var(--space-2xs) var(--space-xs);
+    font-size: 12px;
+    font-weight: 700;
+    pointer-events: none;
+}
+
+.is-placement-invalid {
+    filter: drop-shadow(0 0 0 var(--color-danger)) sepia(1) hue-rotate(-50deg) saturate(4);
+}
+
+.is-refused {
+    animation: build-refuse var(--motion-slow) var(--ease-ui);
+}
+
+@keyframes build-refuse {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}
+
+// ── Wall view segmented control ───────────────────────────────────────────────
+
+.wall-mode-segment {
+    display: flex;
+    width: 100%;
+
+    > button {
+        @include button-base;
+        flex: 1 1 0;
+        padding: var(--space-xs) var(--space-2xs);
+        font-size: 11px;
+        cursor: pointer;
+        border-radius: 0;
+
+        &:first-child { border-start-start-radius: var(--radius-xs); border-end-start-radius: var(--radius-xs); }
+        &:last-child { border-start-end-radius: var(--radius-xs); border-end-end-radius: var(--radius-xs); }
+        &:not(:first-child) { border-left-width: 1px; }
+
+        &:hover { background-color: var(--button-hover); }
+
+        &.active {
+            @include button-pressed;
+            font-weight: 700;
+        }
+    }
+}
+
+// ── Options window ────────────────────────────────────────────────────────────
+
+.options-panel {
+    // Wide enough that four tabs never need to scroll, and a definite height so
+    // the active tab body has a remainder to fill.
+    width: 420px;
+    height: var(--size-stage-height);
+
+    // The window itself never scrolls: the tab strip is pinned and only the
+    // active section moves.
+    > .window-panel__content {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+        padding: 0;
+    }
+
+    .window-tabs {
+        // Overrides the shared strip's horizontal scroll — a settings window
+        // wide enough for its tabs should never hide one behind an edge.
+        overflow: visible;
+        flex-wrap: wrap;
+        flex-shrink: 0;
+        padding: var(--padding) var(--padding) 0;
+
+        > button {
+            padding-inline: var(--space-md);
+        }
+    }
+
+    .options-panel__section {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap);
+        flex: 1 1 auto;
+        min-height: 0;
+        block-size: auto;
+        padding: var(--padding);
+        margin: 0 var(--padding) var(--padding);
+        @include scroll-area(y);
+
+        &[hidden] {
+            display: none;
+        }
+    }
+}
+
+.setting-key {
+    @include surface-inset;
+    padding-inline: var(--space-2xs);
+    margin-inline-start: var(--space-2xs);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.key-legend {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-2xs) var(--space-sm);
+    margin: 0;
+    font-size: 12px;
+
+    > dt {
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    > dd {
+        margin: 0;
+        color: var(--text-muted);
+    }
+}
+
+.surface-palette.is-locked {
+    opacity: 0.7;
+}
+
+// A locked target says so under the cursor as well as on the target line, so
+// the refusal is legible before you click.
+body.build-target-locked .app-stage {
+    cursor: not-allowed;
+}

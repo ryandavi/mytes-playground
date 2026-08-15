@@ -921,7 +921,9 @@
 
 .map-transition {
     @include layer-fill;
-    z-index: 1000;
+    // Above every stage overlay — during a transition the map underneath is
+    // half-built and nothing of it should show through, chips included.
+    z-index: var(--z-loading);
     background-color: var(--black);
     display: flex;
     justify-content: center;

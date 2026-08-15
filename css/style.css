@@ -40,6 +40,7 @@
   --surface-window: var(--button-mid);
   --surface-tooltip: #ffffe1;
   --surface-stage: #eee;
+  --build-grid-line: rgba(25, 24, 20, 0.14);
   --surface-panel-muted: #f5f5f5;
   --surface-pill-muted: #e0e0e0;
   --surface-state-self: #e8f0fe;
@@ -1752,9 +1753,6 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .hand-controls input[type=radio]:checked + label.button {
   outline: 4px solid var(--button-active-border-color);
 }
-.app-shell > .hand-controls button.hand-control-btn#sound-toggle.muted .icon-sound-on, .app-shell > .hand-controls button.hand-control-btn#sound-toggle:not(.muted) .icon-sound-off {
-  display: none;
-}
 .app-shell > .sidebar {
   width: var(--size-sidebar-width);
   max-height: var(--size-stage-height);
@@ -2445,7 +2443,7 @@ body.wall-build-mode .app-stage {
   cursor: crosshair;
 }
 
-#view-panel .window-panel__content .settings-group {
+#view-panel .settings-group {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2453,23 +2451,22 @@ body.wall-build-mode .app-stage {
   gap: 6px;
   width: 100%;
 }
-#view-panel .window-panel__content .settings-group button {
+#view-panel .settings-group button {
   padding: 0.5rem;
   flex: 1 1 calc(50% - var(--gap) / 2);
 }
-#view-panel .window-panel__content .settings-group #view-zoom-out,
-#view-panel .window-panel__content .settings-group #view-zoom-in {
+#view-panel .settings-group #view-zoom-out,
+#view-panel .settings-group #view-zoom-in {
   flex: 0 0 auto;
   min-width: 36px;
 }
-#view-panel .window-panel__content .settings-group.camera-options {
+#view-panel .settings-group.camera-options {
   align-items: stretch;
-  flex-direction: column;
 }
-#view-panel .window-panel__content .settings-group.camera-options > .setting-item {
+#view-panel .settings-group.camera-options > .setting-item {
   width: 100%;
 }
-#view-panel .window-panel__content .view-zoom-label {
+#view-panel .view-zoom-label {
   min-width: 40px;
   text-align: center;
   font-weight: 600;
@@ -2811,78 +2808,74 @@ body.ui-gallery-page .ui-gallery__state-label {
   }
 }
 
-#game-debug-panel .window-panel__content {
-  max-width: 500px;
-  margin: 0 auto;
-}
-#game-debug-panel .window-panel__content .button-group {
+#game-debug-panel .button-group {
   display: flex;
   align-items: center;
   gap: 6px;
   width: 100%;
 }
-#game-debug-panel .window-panel__content .settings-group {
+#game-debug-panel .settings-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
   width: 100%;
 }
-#game-debug-panel .window-panel__content .settings-group + .settings-group {
+#game-debug-panel .settings-group + .settings-group {
   margin-top: 20px;
 }
-#game-debug-panel .window-panel__content .settings-subgroup {
+#game-debug-panel .settings-subgroup {
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 100%;
 }
-#game-debug-panel .window-panel__content .settings-subgroup .debug-button,
-#game-debug-panel .window-panel__content .settings-subgroup .button-group {
+#game-debug-panel .settings-subgroup .debug-button,
+#game-debug-panel .settings-subgroup .button-group {
   width: 100%;
 }
-#game-debug-panel .window-panel__content .settings-subgroup {
+#game-debug-panel .settings-subgroup {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
-#game-debug-panel .window-panel__content .settings-subgroup button.debug-button {
+#game-debug-panel .settings-subgroup button.debug-button {
   padding: 0.5rem;
   flex: 1 1 calc(50% - 6px);
 }
-#game-debug-panel .window-panel__content .settings-subgroup .button-group {
+#game-debug-panel .settings-subgroup .button-group {
   flex: 1 1 calc(50% - 6px);
 }
-#game-debug-panel .window-panel__content .settings-subgroup .button-group button {
+#game-debug-panel .settings-subgroup .button-group button {
   padding: 0.5rem;
 }
-#game-debug-panel .window-panel__content .settings-subgroup button.debug-button--full,
-#game-debug-panel .window-panel__content .settings-subgroup #toggleDebug,
-#game-debug-panel .window-panel__content .settings-subgroup #cycleFollowGoal,
-#game-debug-panel .window-panel__content .settings-subgroup #cycleCamera,
-#game-debug-panel .window-panel__content .settings-subgroup #directWorldInteraction,
-#game-debug-panel .window-panel__content .settings-subgroup #toggleTimePause {
+#game-debug-panel .settings-subgroup button.debug-button--full,
+#game-debug-panel .settings-subgroup #toggleDebug,
+#game-debug-panel .settings-subgroup #cycleFollowGoal,
+#game-debug-panel .settings-subgroup #cycleCamera,
+#game-debug-panel .settings-subgroup #directWorldInteraction,
+#game-debug-panel .settings-subgroup #toggleTimePause {
   flex: 1 1 100%;
 }
-#game-debug-panel .window-panel__content .settings-subgroup #timeScale-group {
+#game-debug-panel .settings-subgroup #timeScale-group {
   flex: 1 1 100%;
 }
-#game-debug-panel .window-panel__content .settings-subgroup .debug-inventory-editor {
+#game-debug-panel .settings-subgroup .debug-inventory-editor {
   flex: 1 1 100%;
 }
-#game-debug-panel .window-panel__content .settings-subgroup #overlayGrid,
-#game-debug-panel .window-panel__content .settings-subgroup #overlayCursorTile,
-#game-debug-panel .window-panel__content .settings-subgroup #overlayMyteFrontTile,
-#game-debug-panel .window-panel__content .settings-subgroup #overlayColliders,
-#game-debug-panel .window-panel__content .settings-subgroup #overlayInteractionRegions,
-#game-debug-panel .window-panel__content .settings-subgroup #overlayHitRegions,
-#game-debug-panel .window-panel__content .settings-subgroup #overlaySelectRegions,
-#game-debug-panel .window-panel__content .settings-subgroup #overlayPickupRegions,
-#game-debug-panel .window-panel__content .settings-subgroup #overlayAnchors {
+#game-debug-panel .settings-subgroup #overlayGrid,
+#game-debug-panel .settings-subgroup #overlayCursorTile,
+#game-debug-panel .settings-subgroup #overlayMyteFrontTile,
+#game-debug-panel .settings-subgroup #overlayColliders,
+#game-debug-panel .settings-subgroup #overlayInteractionRegions,
+#game-debug-panel .settings-subgroup #overlayHitRegions,
+#game-debug-panel .settings-subgroup #overlaySelectRegions,
+#game-debug-panel .settings-subgroup #overlayPickupRegions,
+#game-debug-panel .settings-subgroup #overlayAnchors {
   flex: 1 1 calc(50% - 6px);
 }
-#game-debug-panel .window-panel__content .settings-subgroup .debug-button--detail {
+#game-debug-panel .settings-subgroup .debug-button--detail {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2891,19 +2884,19 @@ body.ui-gallery-page .ui-gallery__state-label {
   padding: 0.65rem 0.75rem;
   text-align: left;
 }
-#game-debug-panel .window-panel__content .settings-subgroup .debug-button--detail .debug-button__content {
+#game-debug-panel .settings-subgroup .debug-button--detail .debug-button__content {
   display: flex;
   align-items: center;
   gap: 0.7rem;
   min-width: 0;
   flex: 1;
 }
-#game-debug-panel .window-panel__content .settings-subgroup .debug-button--detail .debug-button__swatch {
+#game-debug-panel .settings-subgroup .debug-button--detail .debug-button__swatch {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
 }
-#game-debug-panel .window-panel__content .settings-subgroup .debug-button--detail .debug-button__mode-badge {
+#game-debug-panel .settings-subgroup .debug-button--detail .debug-button__mode-badge {
   background: var(--surface-pill-muted, #e0e0e0);
   border-radius: 3px;
   color: var(--text-subtle, #555);
@@ -2912,25 +2905,25 @@ body.ui-gallery-page .ui-gallery__state-label {
   background: var(--surface-state-map);
   color: var(--text-default);
 }
-#game-debug-panel .window-panel__content .settings-subgroup .debug-button--detail .debug-button__text {
+#game-debug-panel .settings-subgroup .debug-button--detail .debug-button__text {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
   min-width: 0;
 }
-#game-debug-panel .window-panel__content .settings-subgroup .debug-button--detail .debug-button__title {
+#game-debug-panel .settings-subgroup .debug-button--detail .debug-button__title {
   font-weight: 700;
   line-height: 1.15;
 }
-#game-debug-panel .window-panel__content .settings-subgroup .debug-button--detail .debug-button__helper {
+#game-debug-panel .settings-subgroup .debug-button--detail .debug-button__helper {
   font-size: 0.7rem;
   line-height: 1.2;
   color: var(--text-muted);
 }
-#game-debug-panel .window-panel__content .settings-subgroup .debug-button--detail .debug-button__helper:empty {
+#game-debug-panel .settings-subgroup .debug-button--detail .debug-button__helper:empty {
   display: none;
 }
-#game-debug-panel .window-panel__content .settings-subgroup .debug-button--detail .debug-button__state {
+#game-debug-panel .settings-subgroup .debug-button--detail .debug-button__state {
   background: var(--surface-pill-muted, #e0e0e0);
   border-radius: 3px;
   color: var(--text-subtle, #555);
@@ -2939,18 +2932,18 @@ body.ui-gallery-page .ui-gallery__state-label {
   text-align: center;
   justify-content: center;
 }
-#game-debug-panel .window-panel__content .settings-subgroup .debug-button--detail.active .debug-button__state {
+#game-debug-panel .settings-subgroup .debug-button--detail.active .debug-button__state {
   background: var(--surface-state-myte);
   color: var(--text-default);
 }
-#game-debug-panel .window-panel__content .settings-subgroup #adjustSpeed,
-#game-debug-panel .window-panel__content .settings-subgroup #timeScale {
+#game-debug-panel .settings-subgroup #adjustSpeed,
+#game-debug-panel .settings-subgroup #timeScale {
   flex: 1;
 }
-#game-debug-panel .window-panel__content .settings-subgroup #adjustSpeed-down,
-#game-debug-panel .window-panel__content .settings-subgroup #adjustSpeed-up,
-#game-debug-panel .window-panel__content .settings-subgroup #timeScale-down,
-#game-debug-panel .window-panel__content .settings-subgroup #timeScale-up {
+#game-debug-panel .settings-subgroup #adjustSpeed-down,
+#game-debug-panel .settings-subgroup #adjustSpeed-up,
+#game-debug-panel .settings-subgroup #timeScale-down,
+#game-debug-panel .settings-subgroup #timeScale-up {
   flex: 0;
   min-width: 50px;
 }
@@ -3708,6 +3701,380 @@ body.ui-gallery-page .ui-gallery__state-label {
 .world-map__travel {
   padding: var(--space-2xs) var(--space-lg);
   font-size: 0.85em;
+}
+
+#build-paused-chip {
+  display: none;
+}
+
+[data-game-mode=build] #build-paused-chip {
+  display: flex;
+}
+
+.app-shell > .hand-controls .tool-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--padding);
+}
+.app-shell > .hand-controls .tool-group--build {
+  display: none;
+}
+.app-shell > .hand-controls .tool-group__row {
+  display: flex;
+  flex-direction: row;
+  gap: var(--padding);
+}
+.app-shell > .hand-controls button.hand-control-btn--half {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  color: var(--button-text-color);
+  width: calc((60px - var(--padding)) / 2);
+  height: 36px;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.app-shell > .hand-controls button.hand-control-btn--half > .icon {
+  max-width: 16px;
+  max-height: 16px;
+  fill: var(--button-icon-color);
+}
+.app-shell > .hand-controls button.hand-control-btn--half:hover:not(:disabled) {
+  background-color: var(--surface-ui-pressed);
+  outline: 4px solid var(--button-active-border-color);
+}
+.app-shell > .hand-controls button.mode-switch {
+  border-width: var(--border-width);
+}
+.app-shell > .hand-controls button.mode-switch.active {
+  --dither-fill-color: var(--surface-ui-pressed);
+  background-color: var(--surface-ui-pressed, var(--button-hover));
+  border-top-color: var(--button-dark);
+  border-left-color: var(--button-dark);
+  border-right-color: var(--button-light);
+  border-bottom-color: var(--button-light);
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
+  background-color: var(--dither-fill-color, var(--button-hover));
+  color: var(--button-active-text-color, var(--text-base));
+  outline: 4px solid var(--button-active-border-color);
+}
+.app-shell > .hand-controls button.mode-switch.active > .icon {
+  fill: var(--button-active-icon-color);
+}
+.app-shell > .hand-controls button.tool-btn.active {
+  background-color: var(--surface-ui-pressed, var(--button-hover));
+  border-top-color: var(--button-dark);
+  border-left-color: var(--button-dark);
+  border-right-color: var(--button-light);
+  border-bottom-color: var(--button-light);
+  outline: 4px solid var(--button-active-border-color);
+}
+.app-shell > .hand-controls button.tool-btn.active > .icon {
+  fill: var(--button-active-icon-color);
+}
+.app-shell > .hand-controls button:disabled {
+  background-color: var(--surface-ui-disabled, var(--button-mid));
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-right-color: var(--button-dark);
+  border-bottom-color: var(--button-dark);
+  color: var(--button-disabled-text-color, var(--button-text-color));
+  text-shadow: 1px 1px 0 var(--button-disabled-highlight, var(--button-light));
+  cursor: default;
+  filter: saturate(0.72);
+}
+.app-shell > .hand-controls button:disabled .icon,
+.app-shell > .hand-controls button:disabled svg {
+  fill: var(--button-disabled-icon-color, var(--button-icon-color));
+  color: var(--button-disabled-icon-color, var(--button-icon-color));
+}
+.app-shell > .hand-controls button:disabled {
+  cursor: not-allowed;
+}
+.app-shell > .hand-controls button:disabled > .icon {
+  fill: var(--text-subtle);
+}
+
+.app-shell[data-game-mode=build] > .hand-controls .tool-group--play {
+  display: none;
+}
+.app-shell[data-game-mode=build] > .hand-controls .tool-group--build {
+  display: flex;
+}
+
+.app-stage > .stage-chip {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  position: absolute;
+  bottom: var(--space-sm);
+  z-index: var(--z-overlay);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-2xs) var(--space-sm);
+  max-width: 45%;
+  font-size: 12px;
+  color: var(--text-base);
+  line-height: 1.6;
+}
+.app-stage > .stage-chip > .icon {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  fill: var(--button-icon-color);
+}
+.app-stage > .stage-chip > .text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-stage > .stage-chip--map {
+  left: var(--space-sm);
+  cursor: pointer;
+}
+.app-stage > .stage-chip--map:hover {
+  background-color: var(--button-hover);
+}
+.app-stage > .stage-chip--log {
+  right: var(--space-sm);
+  cursor: pointer;
+}
+.app-stage > .stage-chip--log:hover {
+  background-color: var(--button-hover);
+}
+.app-stage > .stage-chip--paused {
+  top: var(--space-sm);
+  bottom: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 70%;
+  background-color: var(--state-warning-accent);
+  color: var(--black);
+  cursor: pointer;
+}
+.app-stage > .stage-chip--paused > .icon {
+  fill: var(--black);
+}
+.app-stage > .stage-chip--paused:hover .stage-chip__action {
+  background-color: var(--surface-ui-pressed);
+}
+.app-stage > .stage-chip__action {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  padding: var(--space-2xs) var(--space-sm);
+  margin-inline-start: var(--space-sm);
+  font-weight: 700;
+  color: var(--text-base);
+  white-space: nowrap;
+}
+.app-stage > .stage-chip__badge {
+  background-color: var(--surface-ui-inset, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-bottom-color: var(--button-light);
+  border-right-color: var(--button-light);
+  border-radius: var(--border-radius);
+  padding-inline: var(--space-2xs);
+  min-width: 18px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+@media (max-width: 960px) {
+  .sidebar.right.is-open ~ .app-stage .stage-chip--log,
+  .app-stage .stage-chip--log {
+    max-width: 32%;
+  }
+}
+.canvas.show-build-grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-overlay);
+  pointer-events: none;
+  background-image: repeating-linear-gradient(to right, var(--build-grid-line) 0 1px, transparent 1px var(--build-grid-size, 32px)), repeating-linear-gradient(to bottom, var(--build-grid-line) 0 1px, transparent 1px var(--build-grid-size, 32px));
+}
+
+.wall-build-ghost-cell.is-invalid {
+  border-color: var(--color-danger);
+  border-style: solid;
+  background: color-mix(in srgb, var(--color-danger) 45%, transparent);
+}
+
+.build-measure-label {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  position: fixed;
+  z-index: var(--z-drag);
+  padding: var(--space-2xs) var(--space-xs);
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.is-placement-invalid {
+  filter: drop-shadow(0 0 0 var(--color-danger)) sepia(1) hue-rotate(-50deg) saturate(4);
+}
+
+.is-refused {
+  animation: build-refuse var(--motion-slow) var(--ease-ui);
+}
+
+@keyframes build-refuse {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+.wall-mode-segment {
+  display: flex;
+  width: 100%;
+}
+.wall-mode-segment > button {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  color: var(--button-text-color);
+  flex: 1 1 0;
+  padding: var(--space-xs) var(--space-2xs);
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 0;
+}
+.wall-mode-segment > button:first-child {
+  border-start-start-radius: var(--radius-xs);
+  border-end-start-radius: var(--radius-xs);
+}
+.wall-mode-segment > button:last-child {
+  border-start-end-radius: var(--radius-xs);
+  border-end-end-radius: var(--radius-xs);
+}
+.wall-mode-segment > button:not(:first-child) {
+  border-left-width: 1px;
+}
+.wall-mode-segment > button:hover {
+  background-color: var(--button-hover);
+}
+.wall-mode-segment > button.active {
+  --dither-fill-color: var(--surface-ui-pressed);
+  background-color: var(--surface-ui-pressed, var(--button-hover));
+  border-top-color: var(--button-dark);
+  border-left-color: var(--button-dark);
+  border-right-color: var(--button-light);
+  border-bottom-color: var(--button-light);
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
+  background-color: var(--dither-fill-color, var(--button-hover));
+  color: var(--button-active-text-color, var(--text-base));
+  font-weight: 700;
+}
+
+.options-panel {
+  width: 420px;
+  height: var(--size-stage-height);
+}
+.options-panel > .window-panel__content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+.options-panel .window-tabs {
+  overflow: visible;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  padding: var(--padding) var(--padding) 0;
+}
+.options-panel .window-tabs > button {
+  padding-inline: var(--space-md);
+}
+.options-panel .options-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  flex: 1 1 auto;
+  min-height: 0;
+  block-size: auto;
+  padding: var(--padding);
+  margin: 0 var(--padding) var(--padding);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.options-panel .options-panel__section::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+.options-panel .options-panel__section::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+.options-panel .options-panel__section::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+.options-panel .options-panel__section[hidden] {
+  display: none;
+}
+
+.setting-key {
+  background-color: var(--surface-ui-inset, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-bottom-color: var(--button-light);
+  border-right-color: var(--button-light);
+  border-radius: var(--border-radius);
+  padding-inline: var(--space-2xs);
+  margin-inline-start: var(--space-2xs);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.key-legend {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2xs) var(--space-sm);
+  margin: 0;
+  font-size: 12px;
+}
+.key-legend > dt {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.key-legend > dd {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.surface-palette.is-locked {
+  opacity: 0.7;
+}
+
+body.build-target-locked .app-stage {
+  cursor: not-allowed;
 }
 
 .ui-tooltip {
@@ -5575,7 +5942,7 @@ body[data-tool-mode=drag] .map-object.draggable {
   inset: 0;
   width: 100%;
   height: 100%;
-  z-index: 1000;
+  z-index: var(--z-loading);
   background-color: var(--black);
   display: flex;
   justify-content: center;

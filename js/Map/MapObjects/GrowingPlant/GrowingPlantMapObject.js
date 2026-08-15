@@ -205,6 +205,14 @@ class GrowingPlantMapObject extends withItemDrops(InteractiveMapObject) {
         return rows;
     }
 
+    // Moving a plant carries its growth; storing it puts a seed back in the
+    // bag. Worth asking about once, unless it has nothing to lose yet.
+    getStorageResetWarning() {
+        const firstStage = this.stages?.[0] ?? 'seed';
+        if (this.growthStage === firstStage) return null;
+        return `Storing ${this.getDisplayName()} will reset its growth.`;
+    }
+
     getSaveData() {
         return {
             type: this.type,

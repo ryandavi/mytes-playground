@@ -26,6 +26,12 @@ class ContainerManager {
         this.camera = null;
 
         // Systems and managers
+        this.gameMode = new GameModeManager(this);
+        this.buildRules = new BuildRules(this);
+        this.buildHistory = new BuildHistory(this);
+        // Wall presentation the player picked inside build mode; persists for
+        // the session so re-entering build mode looks the way they left it.
+        this.buildPresentation = SiteConfig.buildMode.defaultPresentation;
         this.ui = new UserInterface(this);
         this.inputHandler = new ContainerInputManager(this);
         this.timeManager = GameTime.instance;
@@ -867,18 +873,25 @@ class ContainerManager {
         this.eventManager?.emit(EVENTS.CONTAINER_ACTIVE_MYTE_CHANGED, { myte: null });
     }
 
+    isSimulationPaused() {
+        return this.core?.simulationPaused === true;
+    }
+
     update(deltaTime) {
         this.drawTargetDot();
-        this.updateUserActivity();
 
-        // Update components
-        this.mytes.forEach(myte => {
-            if (myte.isActive) {
-                myte.update(deltaTime);
-            } else {
-                myte.updateInactive?.(deltaTime);
-            }
-        });
+        // Presentation keeps running while the simulation is frozen — the
+        // camera, the cursor and the UI are how you build.
+        if (!this.isSimulationPaused()) {
+            this.updateUserActivity();
+            this.mytes.forEach(myte => {
+                if (myte.isActive) {
+                    myte.update(deltaTime);
+                } else {
+                    myte.updateInactive?.(deltaTime);
+                }
+            });
+        }
 
         if (this.camera) this.camera.update();
         if (this.ui) this.ui.update();
@@ -1004,6 +1017,12 @@ class ContainerManager {
         this.travelManager = null;
         this.mytePresence?.dispose();
         this.mytePresence = null;
+        this.buildHistory?.dispose();
+        this.buildHistory = null;
+        this.buildRules?.dispose();
+        this.buildRules = null;
+        this.gameMode?.dispose();
+        this.gameMode = null;
 
         if (this.camera) {
             this.camera.dispose();

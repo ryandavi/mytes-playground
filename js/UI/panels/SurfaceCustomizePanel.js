@@ -2,7 +2,6 @@ class SurfaceCustomizePanel extends ModalWindow {
     constructor(parent) {
         super(parent, {
             id: 'customize-panel',
-            buttonId: 'customize-toggle',
             closeOnOutsideClick: false,
             position: 'top-right',
             draggable: true,
@@ -16,6 +15,7 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.scopeElement = this.modalElement?.querySelector('.surface-scope');
         this.emptyElement = this.modalElement?.querySelector('.surface-customize-empty');
         this.targetElement = this.modalElement?.querySelector('.surface-target');
+        this.wallView = new WallViewControl(this, this.modalElement?.querySelector('.wall-view-controls'));
         this.paletteElement?.addEventListener('pointerleave', () => this.revertPreview());
         this.scopeElement?.addEventListener('change', () => this.renderPalette());
         this.parent?.parent?.canvas?.addEventListener('pointerdown', this.boundStagePointerDown, true);
@@ -23,17 +23,6 @@ class SurfaceCustomizePanel extends ModalWindow {
 
     get gameMap() {
         return this.parent?.parent?.gameMap || null;
-    }
-
-    buttonLeftClick(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        if (this.parent.isTool(UIToolModes.CUSTOMIZE)) {
-            this.parent.changeToolMode(UIToolModes.SELECT);
-        } else {
-            this.parent.toolManager.setToolMode(UIToolModes.CUSTOMIZE);
-        }
-        return false;
     }
 
     handleToolModeChanged(mode) {
@@ -45,22 +34,28 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.renderPalette();
         // The panel opens with the mode, not with the first click: entering a
         // mode that says nothing and shows nothing reads as "nothing happened".
-        if (active) this.open();
-        else super.close();
+        if (active) {
+            this.wallView.sync();
+            this.open();
+        } else {
+            super.close();
+        }
     }
 
+    // See WallBuildPanel.close: hand back to the current mode's default tool.
     close() {
-        if (this.parent.isTool(UIToolModes.CUSTOMIZE)) {
-            this.parent.changeToolMode(UIToolModes.SELECT);
+        if (this.parent.isTool(UIToolModes.CUSTOMIZE) &&
+            this.parent.changeToolMode(this.parent.toolManager.getDefaultToolFor())) {
             return;
         }
         super.close();
     }
 
-    handleKeyDown(event) {
-        if (event.key !== 'Escape' || !this.parent.isTool(UIToolModes.CUSTOMIZE)) return;
-        event.preventDefault();
-        this.parent.changeToolMode(UIToolModes.SELECT);
+    // Escape is layered by ContainerInputManager; see WallBuildPanel.
+    handleKeyDown() {}
+
+    get rules() {
+        return this.parent?.parent?.buildRules || null;
     }
 
     handleStagePointerDown(event) {
@@ -81,6 +76,16 @@ class SurfaceCustomizePanel extends ModalWindow {
             const room = this.gameMap?.regionManager?.get('room', floorElement.dataset.roomId);
             if (!room) return;
             this.target = { surface: 'floor', room };
+        }
+        // Alt-click samples what is already there instead of selecting it to
+        // paint - the finish resolvers already answer the question.
+        if (event.altKey) {
+            const sampled = this.getCurrentFinishId();
+            this.renderPalette();
+            if (sampled) {
+                this.parent.showMessage(`Picked up ${sampled.replaceAll('_', ' ')}.`, 'info', 'Eyedropper');
+            }
+            return;
         }
         this.renderPalette();
         this.open();
@@ -105,16 +110,26 @@ class SurfaceCustomizePanel extends ModalWindow {
         return world.y >= (piece.y * cellSize) ? 'north' : 'south';
     }
 
+    // Whether the current target may actually be repainted; the answer is
+    // shown on the target line and disables the palette.
+    checkTarget() {
+        if (!this.target) return BuildRules.deny('Nothing selected.');
+        return this.target.surface === 'floor'
+            ? this.rules?.canPaintRoomFloor(this.target.room) ?? BuildRules.ALLOWED
+            : this.rules?.canPaintWallFace(this.target.piece.cells[0]) ?? BuildRules.ALLOWED;
+    }
+
     describeTarget() {
         if (!this.target) return 'Nothing selected';
+        const lock = this.checkTarget().allowed ? '' : ' 🔒';
         if (this.target.surface === 'floor') {
             const name = this.target.room.properties?.displayName || this.target.room.id;
-            return `Floor — ${name}`;
+            return `Floor — ${name}${lock}`;
         }
         const roomId = this.target.piece.cells[0]?.faces?.[this.target.face]?.roomId;
         const room = roomId ? this.gameMap?.regionManager?.get('room', roomId) : null;
         const where = room ? ` — ${room.properties?.displayName || room.id}` : ' — outside';
-        return `Wall, ${this.target.face} face${where}`;
+        return `Wall, ${this.target.face} face${where}${lock}`;
     }
 
     // What this surface is already painted with, so the palette can say so.
@@ -133,14 +148,14 @@ class SurfaceCustomizePanel extends ModalWindow {
         return this.modalElement?.querySelector('input[name="surface-wall-scope"]:checked')?.value || 'stretch';
     }
 
-    buildRequests(finishId) {
+    buildRequests(finishId, scopeOverride = null) {
         if (!this.target) return [];
         if (this.target.surface === 'floor') {
             return [{ surface: 'floor', roomId: this.target.room.id, finishId }];
         }
 
         const piece = this.target.piece;
-        if (this.getWallScope() !== 'room') {
+        if ((scopeOverride || this.getWallScope()) !== 'room') {
             const first = piece.cells[0];
             const last = piece.cells[piece.cells.length - 1];
             return [{
@@ -178,6 +193,18 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.emptyElement.hidden = !!this.target;
         if (!this.target) return;
 
+        const verdict = this.checkTarget();
+        this.paletteElement.classList.toggle('is-locked', !verdict.allowed);
+        document.body.classList.toggle('build-target-locked', !verdict.allowed);
+        if (!verdict.allowed) {
+            const notice = document.createElement('p');
+            notice.className = 'setting-hint';
+            notice.textContent = verdict.reason;
+            this.paletteElement.appendChild(notice);
+            this.warnLockedOnce(verdict.reason);
+            return;
+        }
+
         const customizer = this.gameMap?.surfaceCustomizer;
         const finishes = customizer?.listFinishes(this.target.surface) || [];
         const currentFinishId = this.getCurrentFinishId();
@@ -209,19 +236,70 @@ class SurfaceCustomizePanel extends ModalWindow {
                 }, 150);
             });
             button.addEventListener('pointerleave', () => clearTimeout(this.hoverTimer));
-            button.addEventListener('click', () => {
-                clearTimeout(this.hoverTimer);
-                customizer.apply(this.buildRequests(finish.id));
-                // The piece the target points at is rebuilt by the paint, so
-                // re-resolve it before the palette re-reads its finish.
-                if (this.target?.surface === 'wall') {
-                    const cell = this.target.piece.cells[0];
-                    this.target.piece = this.gameMap?.wallBuilder?.findPieceForCell(cell.x, cell.y) || this.target.piece;
-                }
-                this.renderPalette();
-            });
+            button.addEventListener('click', () => this.applyFinish(finish.id));
+            // Double-click paints the whole room without touching the scope
+            // radio - the scope machinery already understands the request.
+            button.addEventListener('dblclick', () => this.applyFinish(finish.id, 'room'));
             this.paletteElement.appendChild(button);
         }
+    }
+
+    /**
+     * Paint, and record the inverse. The undo of a paint is the set of finish
+     * ids the targets carried a moment ago, replayed through the same
+     * customizer so persistence and the room lighting rebuild both happen.
+     */
+    applyFinish(finishId, scopeOverride = null) {
+        clearTimeout(this.hoverTimer);
+        const customizer = this.gameMap?.surfaceCustomizer;
+        if (!customizer) return false;
+
+        const requests = this.buildRequests(finishId, scopeOverride);
+        if (requests.length === 0) return false;
+
+        const inverse = this.captureCurrentFinishes(requests);
+        if (!customizer.apply(requests)) return false;
+
+        this.parent.parent?.buildHistory?.push({
+            label: `Paint ${this.target?.surface === 'floor' ? 'Floor' : 'Wall'}`,
+            undo: () => customizer.apply(Utility.deepClone(inverse)),
+            redo: () => customizer.apply(Utility.deepClone(requests))
+        });
+        this.parent.parent?.core?.soundManager?.playWhenReady?.(SiteConfig.buildMode.sounds.paint);
+
+        // The piece the target points at is rebuilt by the paint, so
+        // re-resolve it before the palette re-reads its finish.
+        if (this.target?.surface === 'wall') {
+            const cell = this.target.piece.cells[0];
+            this.target.piece = this.gameMap?.wallBuilder?.findPieceForCell(cell.x, cell.y) || this.target.piece;
+        }
+        this.renderPalette();
+        return true;
+    }
+
+    captureCurrentFinishes(requests) {
+        const builder = this.gameMap?.wallBuilder;
+        return requests.map(request => {
+            if (request.surface === 'floor') {
+                const room = this.gameMap?.regionManager?.get('room', request.roomId);
+                return {
+                    ...request,
+                    finishId: room?.properties?.floorFinishId || SiteConfig.floorSystem?.defaultFinishId || null
+                };
+            }
+            const [cellX, cellY] = request.cells.from;
+            const cell = builder?.cells?.get(`${cellX},${cellY}`);
+            return {
+                ...request,
+                finishId: cell ? builder.resolveFaceFinishId(cell, request.face) : request.finishId
+            };
+        });
+    }
+
+    warnLockedOnce(reason) {
+        if (this._warnedLocked) return;
+        this._warnedLocked = true;
+        this.parent.showMessage(reason, 'info', 'Locked');
     }
 
     getFinishSample(finishId) {
@@ -239,6 +317,9 @@ class SurfaceCustomizePanel extends ModalWindow {
 
     dispose() {
         this.revertPreview();
+        document.body.classList.remove('build-target-locked');
+        this.wallView?.dispose();
+        this.wallView = null;
         this.parent?.parent?.canvas?.removeEventListener('pointerdown', this.boundStagePointerDown, true);
         document.body.classList.remove('customize-mode');
         super.dispose();

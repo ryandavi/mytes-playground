@@ -1,14 +1,6 @@
-class DebugPanel extends ModalWindow {
+class DebugPanel extends PanelSection {
     constructor(parent) {
-        super(parent, {
-            id: 'game-debug-panel',
-            buttonId: 'debug-toggle',
-            closeOnOutsideClick: false,
-            position: 'top-right',
-            draggable: true,
-            closeButtonSelector: '.modal-close-btn',
-            autoInit: false
-        });
+        super(parent, { tab: 'debug' });
 
         const buildObjectOverlayToggle = ({ id, label, key, swatchClass, colorLabel, shapeLabel }) => ({
             id,
@@ -611,22 +603,11 @@ class DebugPanel extends ModalWindow {
         return this.parent?.parent?.timeManager || this.parent?.parent?.core?.gameTime || null;
     }
 
-    buttonLeftClick(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.toggle();
-        return false;
-    }
-
-    buttonRightClick(e) {
-        this.buttonLeftClick(e);
-    }
-
     init() {
         super.init();
 
-        if (this.modalElement) {
-            const buttonContainer = this.modalElement.querySelector('.window-panel__content');
+        if (this.sectionElement) {
+            const buttonContainer = this.sectionElement;
             this.createButtons(buttonContainer);
             this.setupDebugControls();
             this.updateButtonsEnabledState();
@@ -1159,9 +1140,8 @@ class DebugPanel extends ModalWindow {
         document.querySelectorAll('.debug-button.requires-myte, .value-button.requires-myte').forEach(b => b.disabled = true);
     }
 
-    open() {
+    onSectionShown() {
         this.updateButtons();
         this._updateOverlaySubgroupVisibility();
-        super.open();
     }
 }

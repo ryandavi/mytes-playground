@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="12" nextobjectid="129">
  <properties>
+  <property name="buildPolicy" value="full"/>
   <property name="description" value="A cozy place for your Mytes"/>
   <property name="displayName" value="Your Home"/>
   <property name="location" value="inside"/>

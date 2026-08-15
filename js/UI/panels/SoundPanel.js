@@ -1,13 +1,6 @@
-class SoundPanel extends ModalWindow {
+class SoundPanel extends PanelSection {
     constructor(parent) {
-        super(parent, {
-            id: 'sound-settings-panel',
-            buttonId: 'sound-toggle',
-            closeOnOutsideClick: false,
-            draggable: true,
-            position: 'top-right',
-            closeButtonSelector: '.modal-close-btn'
-        });
+        super(parent, { tab: 'sound' });
 
         this.categories = ['master', 'ui', 'ambient', 'sfx', 'footsteps', 'music'];
         this.volumePreferenceMap = {
@@ -48,20 +41,6 @@ class SoundPanel extends ModalWindow {
 
         this.init(); // explicit — subclass state is ready before any virtual method call
         this.initSoundSettings();
-    }
-
-    buttonLeftClick(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.toggleSounds();
-        return false;
-    }
-
-    buttonRightClick(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.toggle();
-        return false;
     }
 
     initSoundSettings() {
@@ -309,8 +288,7 @@ class SoundPanel extends ModalWindow {
         }
     }
 
-    open() {
-        super.open();
+    onSectionShown() {
         this.updateUI();
     }
 }

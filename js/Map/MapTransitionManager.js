@@ -346,6 +346,12 @@ class MapTransitionManager {
         }
 
         this.container.invalidateCanvasRect?.();
+        this.container.gameMode?.handleMapChanged?.();
+        this.core?.eventManager?.emit(EVENTS.MAP_CHANGED, {
+            mapId: resolvedMapId,
+            displayName: this.container.getMapDisplayName?.(resolvedMapId) ?? String(resolvedMapId ?? ''),
+            isInitialLoad
+        });
 
         if (typeof options.onComplete === 'function') {
             options.onComplete(true);
@@ -382,6 +388,13 @@ class MapTransitionManager {
         const sourcePortal = options.sourcePortal || null;
         const sourcePortalId = options.sourcePortalId || sourcePortal?.getPortalReferenceId?.() || null;
         const sameMapTransition = !isInitialLoad && !!mapId && mapId === sourceMapId;
+
+        // Leaving the map mid-build would strand an unfinished edit against a
+        // world state that is about to be recaptured. Finish the session first.
+        if (!isInitialLoad && !sameMapTransition && this.container.gameMode?.isBuild()) {
+            this.container.gameMode.setMode(GAME_MODES.PLAY);
+        }
+
         const transitionCopy = this._buildTransitionCopy(options, mapId);
 
         if (!isInitialLoad) {

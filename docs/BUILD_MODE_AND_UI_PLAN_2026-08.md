@@ -1,5 +1,37 @@
 # Build Mode & UI Restructure Plan — 2026-08
 
+> **Status: implemented 2026-08-15.** W1–W10 all landed in one pass. New files:
+> `js/Engine/GameModeManager.js`, `BuildRules.js`, `BuildHistory.js`,
+> `js/UI/Core/PanelSection.js`, `js/UI/Panels/OptionsPanel.js`,
+> `js/UI/Panels/WallViewControl.js`, `js/UI/Container/BuildModeUI.js`,
+> `js/UI/Overlays/StageChips.js`, `css/components/_build-mode.scss`.
+> Deferred on purpose: the build catalog (W10 item 10) and shop/economy pricing.
+> Rotation ships behind the existing `SiteConfig.objects.canRotate` flag, which
+> is still `false` until rotated art exists.
+>
+> **Deviations from the plan as written**, all found in review:
+> - Build-mode camera is **Locked**, not Pan. Pan claims the left-button drag for
+>   the camera, which swallowed every furniture move. Panning while building is
+>   WASD / arrow keys.
+> - Overlapping objects both offered themselves for a drag and the claim was
+>   first-come, so the rug under a bed could win. `canDrag` now also requires the
+>   object to be the topmost one under the pointer.
+> - Build access can't hang on a new `.tmx` property: browsers cache map files
+>   outside debug mode, so a client with an older `House.tmx` would find its own
+>   house permanently unbuildable. `SiteConfig.world.defaultMap` is `full` in
+>   code; the map property is an override.
+> - The Debug tab is always visible (the sidebar's debug button always was).
+> - The paused chip is top-centre and is also the way out of build mode.
+> - Leaving the map mid-build ends the build session first, and double-click
+>   travel is refused while building.
+>
+> **Sub-updates gated by the pause** (W1b deliverable): SimClock, the fixed-rate
+> tick drain (myte AI/stats/actions, map object `tickUpdate`, particles, game
+> clock), per-frame myte `update`/`updateInactive`, map object `update`, zone
+> effects and dropped-item physics. **Left running:** camera, cursor, UI,
+> tooltips, selection, grid culling, the DOM render flush, attachment transforms,
+> wall cutaway evaluation, room membership and the atmosphere overlay.
+
 Sims-style split of the game into **Play mode** and **Build mode**, plus a sidebar
 declutter: the sidebar becomes tools-only, settings collapse into one tabbed panel,
 and the world map / event log move to corner overlays.

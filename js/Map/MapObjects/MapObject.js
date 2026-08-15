@@ -1172,9 +1172,26 @@ class MapObject {
 
 	// ── Drag helpers ──────────────────────────────────────────────────────────
 
+	/**
+	 * Furniture is build-mode only; gameplay pickups (the ones with a pick-up
+	 * gesture) and mytes are not furniture and keep working in play mode.
+	 */
+	isBuildModeFurniture() {
+		return this.parent?.buildRules?.isBuildModeObject(this) === true;
+	}
+
 	canBeDragged() {
 		if (!this.getConfig('draggable', false)) return false;
 		if (this.isInUse()) return false;
+
+		const gameMode = this.parent?.gameMode;
+		if (this.isBuildModeFurniture()) {
+			if (gameMode?.isBuild() !== true) return false;
+			if (this.parent?.buildRules?.canMoveObject(this).allowed === false) return false;
+			// Move is the furniture tool; Walls and Paint own the pointer.
+			return this.parent?.ui?.isTool(UIToolModes.MOVE) === true;
+		}
+
 		const isDragMode = this.parent?.ui?.isTool(UIToolModes.DRAG);
 		if (isDragMode) {
 			return true;
@@ -1190,6 +1207,12 @@ class MapObject {
 			return this._tempSelectDragActive;
 		}
 		return isSelectedInSelectMode || this._tempSelectDragActive;
+	}
+
+	// Copy for the one confirm build mode asks for: storing throws away state
+	// that moving would have carried along. Null means storing is lossless.
+	getStorageResetWarning() {
+		return null;
 	}
 
 	canStartSelectModeDrag() {
@@ -1331,6 +1354,68 @@ class MapObject {
 
 	_rotateDuringDrag() {
 		this.input._rotateDuringDrag();
+	}
+
+	canRotate() {
+		return SiteConfig.objects.canRotate === true && !!this.getConfig('directionConfigs', null);
+	}
+
+	/**
+	 * Turn to the next facing, with or without a drag in progress. A rotated
+	 * footprint can be a different shape, so the new placement is re-validated
+	 * and refused rather than clamped — silently sliding furniture out from
+	 * under the cursor is worse than not turning.
+	 */
+	rotateToNextDirection(direction = 1) {
+		if (!this.canRotate()) return false;
+
+		const directionConfigs = this.getConfig('directionConfigs', {});
+		const directions = Object.keys(directionConfigs);
+		if (directions.length === 0) return false;
+
+		const current = this.getConfig('facingDirection', directions[0]);
+		const previous = MapObject.normalizeFacingDirection(current, directionConfigs);
+		const index = directions.indexOf(previous);
+		const next = directions[((index + direction) % directions.length + directions.length) % directions.length];
+
+		this.applyFacingDirection(next);
+		const rules = this.parent?.buildRules;
+		if (rules && !rules.canPlaceAt(this, this.posX, this.posY).allowed) {
+			this.applyFacingDirection(previous);
+			this.element?.classList.remove('is-refused');
+			// Reflow so the shake replays when the same object is refused twice.
+			void this.element?.offsetWidth;
+			this.element?.classList.add('is-refused');
+			this.playConfiguredSound?.('drop_error');
+			return false;
+		}
+
+		this.updatePosition();
+		this.handleMovedEvent?.();
+		this.parent?.buildHistory?.push({
+			label: `Rotate ${this.getDisplayName()}`,
+			undo: () => { this.applyFacingDirection(previous); this.updatePosition(); this.handleMovedEvent?.(); },
+			redo: () => { this.applyFacingDirection(next); this.updatePosition(); this.handleMovedEvent?.(); }
+		});
+		return true;
+	}
+
+	// Keyboard nudge: 1px, or a whole cell with Shift. Refused the same way a
+	// rotation is when the new footprint does not fit.
+	nudgeBy(deltaX, deltaY) {
+		const nextX = this.posX + deltaX;
+		const nextY = this.posY + deltaY;
+		if (this.parent?.buildRules?.canPlaceAt(this, nextX, nextY).allowed === false) return false;
+
+		const clamped = typeof this.clampPlacementPosition === 'function'
+			? this.clampPlacementPosition(nextX, nextY)
+			: { x: nextX, y: nextY };
+		this.posX = clamped.x;
+		this.posY = clamped.y;
+		this.updatePosition();
+		this.syncRenderLayer();
+		this.handleMovedEvent?.();
+		return true;
 	}
 
 	showDropTarget() {

@@ -765,12 +765,16 @@ class MapEnvironmentManager {
         });
     }
 
+    // Build mode flattens the world to daylight so finishes read true; the
+    // player's own display settings are untouched and come back on exit.
     isAtmosphereOverlayEnabled() {
-        return this.gameMap?.getTimeOfDayOverlayEnabledSetting?.() !== false;
+        return this.lightingOverride !== true &&
+            this.gameMap?.getTimeOfDayOverlayEnabledSetting?.() !== false;
     }
 
     isLightingEnabled() {
-        return this.gameMap?.getLightingEnabledSetting?.() !== false;
+        return this.lightingOverride !== true &&
+            this.gameMap?.getLightingEnabledSetting?.() !== false;
     }
 
     refreshDisplaySettings() {

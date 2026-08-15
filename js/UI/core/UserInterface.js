@@ -25,6 +25,8 @@ class UserInterface {
         this.compactQueueUI = new CompactQueueUI(this, {
             element: document.getElementById('myte_queue_overlay')
         });
+        this.buildModeUI = new BuildModeUI(this);
+        this.stageChips = new StageChips(this);
     }
 
     init() {
@@ -37,7 +39,9 @@ class UserInterface {
         this.offscreenMyteIndicatorManager.init();
         this.screenManager.init();
 
-        // Initialize additional menus
+        // The Options window owns the shared modal its four tab controllers
+        // bind into, so it has to exist before any of them.
+        this.optionsPanel = new OptionsPanel(this);
         this.soundPanel = new SoundPanel(this);
         this.settingsPanel = new SettingsPanel(this);
         this.surfaceCustomizePanel = new SurfaceCustomizePanel(this);
@@ -49,6 +53,8 @@ class UserInterface {
         this.userProfilePanel = new UserProfilePanel(this);
         this.shopPanel = new ShopPanel(this);
         this.gameLogManager = new GameLogManager(this);
+        this.buildModeUI.init();
+        this.stageChips.init();
 
 		document.addEventListener('click', this.boundControlClickSound);
 		const gameTime = this.parent.core?.gameTime;
@@ -158,6 +164,11 @@ class UserInterface {
         this.offscreenMyteIndicatorManager.update();
         this.compactQueueUI?.update?.();
         this.myteInfoPanel?.update?.();
+        this.buildModeUI?.update?.();
+    }
+
+    get gameMode() {
+        return this.parent?.gameMode || null;
     }
 
     dispose() {
@@ -190,6 +201,12 @@ class UserInterface {
         this.viewMenu = null;
         this.worldMapPanel?.dispose?.();
         this.worldMapPanel = null;
+        this.optionsPanel?.dispose?.();
+        this.optionsPanel = null;
+        this.buildModeUI?.dispose?.();
+        this.buildModeUI = null;
+        this.stageChips?.dispose?.();
+        this.stageChips = null;
 
         this.screenManager?.dispose?.();
         this.toolManager?.dispose?.();

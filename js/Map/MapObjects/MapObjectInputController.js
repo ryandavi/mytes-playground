@@ -47,7 +47,7 @@ class MapObjectInputController {
 			element: object.element,
 			enabled: true,
 			autoActivate: false,
-			canDrag: () => object.active && object.canBeDragged(),
+			canDrag: (event) => object.active && object.canBeDragged() && this.isTopmostAtPointer(event),
 			dragThreshold: object.getConfig('dragThreshold', SiteConfig.interaction.mapObject.dragThreshold),
 			dragTimeThreshold: 0,
 			preventDefaultsForDrag: true,
@@ -115,7 +115,8 @@ class MapObjectInputController {
 					object._rotateKeyHandler = null;
 				}
 				const originalEvent = event?.originalEvent;
-				if (originalEvent && object.container?.inventory?.isPointInside?.(originalEvent.clientX, originalEvent.clientY)) {
+				if (originalEvent && this.canStoreToInventory() &&
+					object.container?.inventory?.isPointInside?.(originalEvent.clientX, originalEvent.clientY)) {
 					if (object.container.inventory.storeMapObject(object)) {
 						// Storing skips the placement path entirely, so anything
 						// that latched state on drag start has to be released
@@ -162,8 +163,70 @@ class MapObjectInputController {
 				object.syncRenderLayer();
 				object.onPlacementDragEnd?.();
 				object.handleMovedEvent();
+				this._pushMoveCommand();
 			}
 		});
+	}
+
+	/**
+	 * A completed drag is one undoable move. The origin was already captured on
+	 * drag start for the invalid-drop restore; those same values are the inverse.
+	 */
+	_pushMoveCommand() {
+		const object = this.object;
+		const history = object.container?.buildHistory;
+		if (!history) return;
+
+		const from = { x: object._dragOriginX, y: object._dragOriginY, direction: object._dragOriginDirection };
+		const to = { x: object.posX, y: object.posY, direction: object.getConfig('facingDirection', null) };
+		if (from.x === to.x && from.y === to.y && from.direction === to.direction) return;
+
+		const place = (state) => {
+			if (state.direction !== null && state.direction !== object.getConfig('facingDirection', null)) {
+				object.applyFacingDirection(state.direction);
+			}
+			object.posX = state.x;
+			object.posY = state.y;
+			object.updatePosition();
+			object.syncRenderLayer();
+			object.handleMovedEvent();
+		};
+
+		history.push({
+			label: `Move ${object.getDisplayName()}`,
+			undo: () => place(from),
+			redo: () => place(to)
+		});
+	}
+
+	/**
+	 * Objects overlap — a bed sits on a rug, a rug spans half a room — and every
+	 * one of them whose box contains the pointer offers to be dragged. The drag
+	 * claim is first-come, so without this the object underneath can win and the
+	 * one you actually clicked never moves. Whatever is drawn on top is what the
+	 * player meant.
+	 */
+	isTopmostAtPointer(event) {
+		const clientX = event?.position?.clientX ?? event?.originalEvent?.clientX;
+		const clientY = event?.position?.clientY ?? event?.originalEvent?.clientY;
+		if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return true;
+
+		const hit = document.elementFromPoint(clientX, clientY);
+		if (!hit) return true;
+		const owner = hit.closest('.map-object, .world-myte');
+		// Nothing of ours under the pointer (a UI overlay, say): leave the
+		// existing behaviour alone rather than blocking every drag.
+		return !owner || owner === this.object.element;
+	}
+
+	// Dropping furniture on the inventory is storing it, so it answers to the
+	// same rule the Store button does.
+	canStoreToInventory() {
+		const object = this.object;
+		const container = object.container;
+		const rules = container?.buildRules;
+		if (rules?.isBuildModeObject(object) && container?.gameMode?.isBuild() !== true) return false;
+		return rules ? rules.canStoreObject(object).allowed : object.isInUse?.() !== true;
 	}
 
 	_updateStorageDragPreview(clientX, clientY) {
@@ -173,7 +236,9 @@ class MapObjectInputController {
 		const isOverInventory = Number.isFinite(clientX) && Number.isFinite(clientY) &&
 			inventory?.isPointInside?.(clientX, clientY) === true;
 		const itemDefinition = ItemRegistry.findItemForWorldObject(object);
-		const canStore = !!itemDefinition && !object.isInUse?.() && inventory?.canAddItem?.(itemDefinition.id, 1) === true;
+		const canStore = !!itemDefinition &&
+			this.canStoreToInventory() &&
+			inventory?.canAddItem?.(itemDefinition.id, 1) === true;
 
 		inventoryElement?.classList.toggle('is-store-target', isOverInventory && canStore);
 		inventoryElement?.classList.toggle('is-store-target-invalid', isOverInventory && !canStore);
@@ -451,9 +516,15 @@ class MapObjectInputController {
 		object._dropTargetEl.style.left = `${snappedPos.x}px`;
 		object._dropTargetEl.style.top = `${snappedPos.y}px`;
 
-		const isValid = object.checkDropValidity(snappedPos.x, snappedPos.y);
+		// Walls have ghosts; objects get the same treatment, from the same
+		// query, so a red footprint always means the same thing.
+		const rules = object.container?.buildRules;
+		const isValid = rules
+			? rules.canPlaceAt(object, snappedPos.x, snappedPos.y).allowed
+			: object.checkDropValidity(snappedPos.x, snappedPos.y);
 		object._dropTargetEl.classList.toggle('is-drop-valid', isValid);
 		object._dropTargetEl.classList.toggle('is-drop-invalid', !isValid);
+		object.element?.classList.toggle('is-placement-invalid', !isValid);
 
 		if (object.collider) {
 			if (!object._dropTargetColliderEl) {
@@ -472,6 +543,7 @@ class MapObjectInputController {
 
 	hideDropTarget() {
 		if (this.object._dropTargetEl) this.object._dropTargetEl.style.display = 'none';
+		this.object.element?.classList.remove('is-placement-invalid');
 	}
 
 	getDropValidationBounds(x = this.object.posX, y = this.object.posY) {

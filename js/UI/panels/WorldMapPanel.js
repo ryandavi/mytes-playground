@@ -13,7 +13,6 @@ class WorldMapPanel extends ModalWindow {
     constructor(parent) {
         super(parent, {
             id: 'world-map-panel',
-            buttonId: 'world-map-toggle',
             closeOnOutsideClick: false,
             position: 'top-right',
             draggable: true,

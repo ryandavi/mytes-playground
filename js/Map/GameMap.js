@@ -79,6 +79,18 @@ class GameMap {
         return this.parent?.ui || null;
     }
 
+    get gameMode() {
+        return this.parent?.gameMode || null;
+    }
+
+    get buildRules() {
+        return this.parent?.buildRules || null;
+    }
+
+    get buildHistory() {
+        return this.parent?.buildHistory || null;
+    }
+
     get camera() {
         return this.parent?.camera || null;
     }
@@ -1152,6 +1164,10 @@ class GameMap {
     }
 
     update(deltaTime) {
+        // Build mode freezes what the world does to itself; everything that
+        // decides what the player sees carries on.
+        const simulate = this.parent?.isSimulationPaused?.() !== true;
+
         if (this.gridSystem) {
             this.updateFrameSkip = (this.updateFrameSkip + 1) % 15;
 
@@ -1166,9 +1182,11 @@ class GameMap {
             this.activeObjectsCount = this.gridSystem.activeObjects.size;
 
             // Animation / visual updates only — no DOM writes here
-            for (const object of this.gridSystem.activeObjects) {
-                if (object.update && !object.sleeping) {
-                    object.update(deltaTime);
+            if (simulate) {
+                for (const object of this.gridSystem.activeObjects) {
+                    if (object.update && !object.sleeping) {
+                        object.update(deltaTime);
+                    }
                 }
             }
 
@@ -1177,8 +1195,10 @@ class GameMap {
             this.renderer.flush(this.gridSystem.activeObjects);
         } else {
             // Fallback when grid system isn't ready
-            for (const object of this.objects) {
-                if (object.update) object.update(deltaTime);
+            if (simulate) {
+                for (const object of this.objects) {
+                    if (object.update) object.update(deltaTime);
+                }
             }
             this.parent?.attachments?.update?.();
             this.renderer.flush(this.objects);
@@ -1192,7 +1212,7 @@ class GameMap {
         // crossings would silently stop per-ms stat accumulation. Room membership
         // below has no such constraint and IS cell-crossing gated — updateMembership
         // returns immediately when the entity has not changed cell.
-        if (this.zoneManager) {
+        if (this.zoneManager && simulate) {
             this.mytes.forEach(myte => {
                 if (myte.isActive) this.zoneManager.update(myte, deltaTime);
             });
@@ -1213,7 +1233,7 @@ class GameMap {
         // Update dropped items (physics + magnet collection). Any deployed myte can
         // collect — not just the controlled one — so background mytes that walk over a
         // chest drop actually pick it up.
-        if (this.droppedItems.length > 0) {
+        if (this.droppedItems.length > 0 && simulate) {
             const deployedMytes = this.mytes?.filter(m => m.isActive) || [];
             this.droppedItems = this.droppedItems.filter(item => {
                 if (item.collected) {

@@ -10,7 +10,6 @@ class GameLogManager extends ModalWindow {
     constructor(parent) {
         super(parent, {
             id: 'game-log-panel',
-            buttonId: 'log-toggle',
             closeOnOutsideClick: false,
             position: 'bottom-right',
             draggable: true,
@@ -87,15 +86,9 @@ class GameLogManager extends ModalWindow {
         this.loadTemplates();
     }
 
-    buttonLeftClick(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.toggle();
-        return false;
-    }
-
-    buttonRightClick(e) {
-        this.buttonLeftClick(e);
+    open() {
+        this.parent.stageChips?.clearUnread();
+        super.open();
     }
 
     _getContainer() {
@@ -184,6 +177,7 @@ class GameLogManager extends ModalWindow {
 
     addEntry(entry) {
         this.entries.push(entry);
+        this.parent.stageChips?.noteLogEntry();
         if (this.entries.length > GameLogManager.MAX_ENTRIES) {
             this.entries.shift();
             this.listElement?.firstElementChild?.remove();

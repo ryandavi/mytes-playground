@@ -1,4 +1,4 @@
-class SettingsPanel extends ModalWindow {
+class SettingsPanel extends PanelSection {
     static getDefaultSettings() {
         return {
             graphics: {
@@ -40,31 +40,13 @@ class SettingsPanel extends ModalWindow {
     }
 
     constructor(parent) {
-        super(parent, {
-            id: 'game-settings-panel',
-            buttonId: 'settings-toggle',
-            closeOnOutsideClick: false,
-            position: 'top-right',
-            draggable: true,
-            closeButtonSelector: '.modal-close-btn'
-        });
+        super(parent, { tab: 'general' });
 
-        this.init(); // explicit — subclass state is ready before any virtual method call
+        this.init();
         this.settings = SettingsPanel.getDefaultSettings();
         this.loadSettings();
         this.setupSettingsControls();
         this.applyGraphicsSettings();
-    }
-
-    buttonLeftClick(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.toggle();
-        return false;
-    }
-
-    buttonRightClick(e) {
-        this.buttonLeftClick(e);
     }
 
     setupSettingsControls() {
@@ -401,10 +383,9 @@ class SettingsPanel extends ModalWindow {
         return false;
     }
 
-    open() {
+    onSectionShown() {
         this.loadSettings();
         this.setupSettingsControls();
         this.applyGraphicsSettings();
-        super.open();
     }
 }

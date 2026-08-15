@@ -289,6 +289,41 @@ const SiteConfig = Object.freeze({
 
     // ── Object interaction flags ──────────────────────────────────────────────
 
+    // ── Build mode ────────────────────────────────────────────────────────────
+    //
+    // Play mode is the game; Build mode freezes the simulation and hands the
+    // map over to the player. Every value the mode switch and its tools read
+    // lives here.
+    buildMode: Object.freeze({
+        // Walls stand differently while building than while playing: cutaway
+        // lets you see enclosed floors and still pick the walls themselves.
+        defaultPresentation: 'cutaway',
+        // Flat daylight while building so finishes read true.
+        neutralLighting: true,
+        // Camera follow mode forced on entry. Locked, not drag-to-pan: pan mode
+        // claims the left-button drag for the camera, which would swallow every
+        // furniture move. Panning while building is WASD / arrow keys.
+        cameraFollowMode: 4,
+        // Zoom applied on entry; null keeps whatever the player had.
+        entryZoom: 0.85,
+        // Undo stack depth. Commands are cheap inverses, not snapshots.
+        historyLimit: 50,
+        // Map property name → policy. A map that declares nothing is 'none',
+        // which keeps every existing map safe until it opts in.
+        defaultPolicy: 'none',
+        policies: Object.freeze(['full', 'limited', 'none']),
+        sounds: Object.freeze({
+            wallPlace: 'ui_drop_item',
+            wallRemove: 'ui_error',
+            paint: 'ui_drag_item',
+            objectPlace: 'ui_drop_item',
+            history: 'ui_hover',
+            rejected: 'ui_error',
+            modeEnter: 'ui_modal_open',
+            modeExit: 'ui_hover',
+        }),
+    }),
+
     objects: Object.freeze({
         // Set to true to allow R-key rotation during drag.
         // Keep false while art for rotated variants isn't ready.
@@ -887,6 +922,9 @@ const SiteConfig = Object.freeze({
     // ── Camera ────────────────────────────────────────────────────────────────
 
     camera: Object.freeze({
+        // Pixels the camera moves per WASD / arrow keypress.
+        keyboardPanStep: 48,
+
         // Follow mode used when no Myte is active (e.g. after deactivation or undeploy)
         defaultFollowMode: 'DRAG_TO_PAN',   // key of CAMERA_FOLLOW_MODES
 
@@ -969,7 +1007,6 @@ const SiteConfig = Object.freeze({
 			toastDurationMs: 12000,
 		}),
         panels: Object.freeze([
-            Object.freeze({ id: 'sound-settings-panel', icon: 'sound-on', title: 'Sound Settings', controls: Object.freeze(['minimize', 'fullscreen', 'close']) }),
             Object.freeze({
                 id: 'myte-info-panel', icon: 'info', title: 'Myte Information', controls: Object.freeze(['minimize', 'fullscreen', 'close']),
                 tabs: Object.freeze({ className: 'myte-info__tabs', ariaLabel: 'Myte information', after: '.myte-info__summary', attribute: 'data-myte-info-tab', panelId: 'myte-info-tabpanel', items: Object.freeze([
@@ -987,11 +1024,17 @@ const SiteConfig = Object.freeze({
                     Object.freeze({ value: 'progress', label: 'Progress' }),
                 ]) }),
             }),
-            Object.freeze({ id: 'game-settings-panel', icon: 'gear', title: 'Game Settings', controls: Object.freeze(['minimize', 'fullscreen', 'close']) }),
+            Object.freeze({
+                id: 'game-settings-panel', icon: 'gear', title: 'Options', controls: Object.freeze(['minimize', 'fullscreen', 'close']),
+                tabs: Object.freeze({ className: 'options-tabs', ariaLabel: 'Options', attribute: 'data-options-tab', items: Object.freeze([
+                    Object.freeze({ id: 'options-tab-general', value: 'general', label: 'General' }),
+                    Object.freeze({ id: 'options-tab-sound', value: 'sound', label: 'Sound' }),
+                    Object.freeze({ id: 'options-tab-view', value: 'view', label: 'View' }),
+                    Object.freeze({ id: 'options-tab-debug', value: 'debug', label: 'Debug' }),
+                ]) }),
+            }),
             Object.freeze({ id: 'game-log-panel', icon: 'list', title: 'Event Log', controls: Object.freeze(['minimize', 'close']), tabs: Object.freeze({ className: 'game-log-filters', ariaLabel: 'Event categories', items: Object.freeze([]) }) }),
             Object.freeze({ id: 'world-map-panel', icon: 'world-map', title: 'World Map', controls: Object.freeze(['minimize', 'close']) }),
-            Object.freeze({ id: 'view-panel', icon: 'eye', title: 'View', controls: Object.freeze(['minimize', 'close']) }),
-            Object.freeze({ id: 'game-debug-panel', icon: 'bug', title: 'Debug Menu', controls: Object.freeze(['minimize', 'fullscreen', 'close']) }),
         ]),
         labels: Object.freeze({
             actionCategories: Object.freeze({

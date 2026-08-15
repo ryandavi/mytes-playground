@@ -597,6 +597,29 @@ class Camera {
 		this.setTarget(newX, newY);
 	}
 
+	/**
+	 * Keyboard pan. Follow modes that re-centre every frame would undo it, so
+	 * this drops the camera into manual pan first — the same thing grabbing the
+	 * map with the mouse does.
+	 */
+	panBy(deltaX, deltaY) {
+		if (this.followMode !== CAMERA_FOLLOW_MODES.DRAG_TO_PAN &&
+			this.followMode !== CAMERA_FOLLOW_MODES.LOCKED) {
+			this.setMode(CAMERA_FOLLOW_MODES.DRAG_TO_PAN);
+		}
+
+		let newX = this.isScrollable.x ? this.targetX - deltaX / this.zoomLevel : this.targetX;
+		let newY = this.isScrollable.y ? this.targetY - deltaY / this.zoomLevel : this.targetY;
+
+		if (this.limitToBounds) {
+			const clamped = this._clampToBounds(newX, newY);
+			newX = clamped.x;
+			newY = clamped.y;
+		}
+
+		this.setTarget(newX, newY);
+	}
+
 	endDrag() {
 		if (!this.isDragging) return;
 		if (this._panSoundStarted) {

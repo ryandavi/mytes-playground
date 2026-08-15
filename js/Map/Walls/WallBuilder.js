@@ -1613,6 +1613,167 @@ class WallBuilder {
         return this.setPresentationMode(mode);
     }
 
+    /**
+     * The player-chosen presentation, shared by the View panel and the build /
+     * customize panels so all three read the same state.
+     */
+    setUserPresentationMode(mode) {
+        // The override slot holds the play-mode presentation to come back to;
+        // picking a mode while building must not overwrite it, or leaving build
+        // mode would "restore" the build-mode choice.
+        return this.setPresentationMode(mode);
+    }
+
+    /**
+     * Build and Customize used to force walls up, which made the floor behind a
+     * south wall unreachable in a small room. The mode is now the player's to
+     * pick — this just seeds it and remembers what play mode was using.
+     */
+    setBuildPresentation(mode = SiteConfig.buildMode.defaultPresentation) {
+        if (this._presentationOverride === null) this._presentationOverride = this.presentation;
+        return this.setPresentationMode(mode);
+    }
+
+    clearBuildPresentation() {
+        return this.setPresentationOverride(null);
+    }
+
+    // ── Build validation ──────────────────────────────────────────────────────
+
+    /**
+     * What stands in the way of laying a wall on this cell, as player-facing
+     * copy. Wall-mounted things are deliberately absent: an opening or a
+     * fixture is *supposed* to share its cell with the wall it sits in.
+     */
+    getCellObstruction(x, y) {
+        const cellSize = this.cellSize;
+        const rect = { x: x * cellSize, y: y * cellSize, width: cellSize, height: cellSize };
+
+        const gridCell = this.gameMap.gridSystem?.grid?.[x]?.[y];
+        for (const object of gridCell?.objects || []) {
+            if (this.openingByCell.has(`${x},${y}`) && String(this.openingByCell.get(`${x},${y}`).id) === String(object.id)) continue;
+            if (this.isWallMountedObject(object)) continue;
+            if (object.config?.physics?.walkable === true && object.contributesToWalkability !== false) continue;
+            return { reason: `${object.getDisplayName?.() || 'Something'} is in the way.`, entity: object };
+        }
+
+        if (this.isPortalApproachCell(x, y)) {
+            return { reason: 'A way out of the map has to stay reachable.', entity: null };
+        }
+
+        if (this.isHomeSlotCell(rect)) {
+            return { reason: 'A Myte needs to be able to reach its slot.', entity: null };
+        }
+
+        const creature = this.findCreatureInRect(rect);
+        if (creature) {
+            return { reason: `${creature.name || 'A Myte'} is standing there.`, entity: creature };
+        }
+
+        return null;
+    }
+
+    /**
+     * What this cell is carrying that would be orphaned by removing it. A wall
+     * holding a door or a painting refuses to go — those have nowhere to fall
+     * back to but a hole in the world.
+     */
+    getCellMounting(x, y) {
+        const opening = this.openingByCell.get(`${x},${y}`);
+        if (opening) {
+            const type = String(opening.type || 'opening').toLowerCase();
+            return { reason: `Remove the ${type} first.`, entity: this.gameMap.getObjectById?.(opening.id) };
+        }
+
+        const piece = this.findPieceForCell(x, y);
+        const fixture = piece && this.fixtures.find(record => {
+            const [cellX, cellY] = record.cells?.from || [record.cellX, record.cellY];
+            return this.findPieceForCell(cellX, cellY)?.id === piece.id;
+        });
+        if (fixture) {
+            const object = this.gameMap.getObjectById?.(fixture.id);
+            return { reason: `Take the ${object?.getDisplayName?.() || 'fixture'} down first.`, entity: object };
+        }
+
+        return null;
+    }
+
+    // Map-baked decoration has no inventory form to return, so the wall under
+    // it is locked rather than merely occupied.
+    hasAuthoredAttachmentAt(x, y) {
+        return (this.wallData.attachments || []).some(record => {
+            const [cellX, cellY] = record.cells?.from || [record.cellX, record.cellY];
+            return cellX === x && cellY === y;
+        });
+    }
+
+    isWallMountedObject(object) {
+        const id = String(object?.id ?? '');
+        return this.openings.some(opening => String(opening.id) === id) ||
+            this.fixtures.some(record => String(record.id) === id) ||
+            this.isWallOpeningObject(object);
+    }
+
+    isWallOpeningObject(object) {
+        return !!object?.getConfig?.('wallOpeningConfig', null);
+    }
+
+    isPortalApproachCell(x, y) {
+        const cellSize = this.cellSize;
+        for (const object of this.gameMap.objects || []) {
+            if (String(object.type).toUpperCase() !== 'PORTAL') continue;
+            const left = Math.floor(object.posX / cellSize) - 1;
+            const top = Math.floor(object.posY / cellSize) - 1;
+            const right = Math.floor((object.posX + object.size.width) / cellSize) + 1;
+            const bottom = Math.floor((object.posY + object.size.height) / cellSize) + 1;
+            if (x >= left && x <= right && y >= top && y <= bottom) return true;
+        }
+        return false;
+    }
+
+    isHomeSlotCell(rect) {
+        return (this.gameMap.container?.mytes || []).some(myte => {
+            const home = myte.getHomePosition?.();
+            if (!home) return false;
+            return RectUtils.boundsOverlap(rect, {
+                x: home.x,
+                y: home.y,
+                width: myte.size?.width ?? this.cellSize,
+                height: myte.size?.height ?? this.cellSize
+            });
+        });
+    }
+
+    findCreatureInRect(rect) {
+        const container = this.gameMap.container;
+        const candidates = [
+            ...(container?.mytes || []).filter(myte => myte.isActive),
+            ...(this.gameMap.objects || []).filter(object => object instanceof MovingMapObject)
+        ];
+        return candidates.find(entity => RectUtils.boundsOverlap(rect, {
+            x: entity.posX,
+            y: entity.posY,
+            width: entity.size?.width ?? 0,
+            height: entity.size?.height ?? 0
+        })) || null;
+    }
+
+    // Shared footprint test for object placement: nothing that is not itself
+    // wall-mounted may sit inside a wall's cell.
+    rectOverlapsWall(bounds) {
+        const cellSize = this.cellSize;
+        const startX = Math.floor(bounds.x / cellSize);
+        const startY = Math.floor(bounds.y / cellSize);
+        const endX = Math.floor((bounds.x + Math.max(1, bounds.width) - 1) / cellSize);
+        const endY = Math.floor((bounds.y + Math.max(1, bounds.height) - 1) / cellSize);
+        for (let x = startX; x <= endX; x += 1) {
+            for (let y = startY; y <= endY; y += 1) {
+                if (this.baseCells.has(`${x},${y}`) && !this.openingByCell.has(`${x},${y}`)) return true;
+            }
+        }
+        return false;
+    }
+
     setFaceFinish(record) {
         if (!record || !this.registry.getFinish(record.finishId) ||
             !WallMaterialRegistry.DIRECTIONS.includes(record.face) ||
@@ -1649,12 +1810,40 @@ class WallBuilder {
         }
     }
 
-    applyWallCellChanges(changes = []) {
+    /**
+     * The authoritative wall edit. Every caller goes through here, so this is
+     * where rejection lives: obstructed or locked cells are filtered out and
+     * reported rather than thrown, and the per-cell prior state comes back as
+     * an inverse change list the undo stack can replay verbatim.
+     *
+     * @returns {{applied: Array, rejected: Array, inverse: Array}|false}
+     */
+    applyWallCellChanges(changes = [], options = {}) {
         const normalized = changes.filter(change => Number.isInteger(change?.x) && Number.isInteger(change?.y));
         if (normalized.length === 0) return false;
+
+        const rules = options.validate === false ? null : this.gameMap.container?.buildRules;
+        const applied = [];
+        const rejected = [];
+        for (const change of normalized) {
+            const verdict = !rules
+                ? BuildRules.ALLOWED
+                : (change.data ?? null) === null
+                    ? rules.canRemoveWallCell(change.x, change.y)
+                    : rules.canBuildWallCell(change.x, change.y);
+            if (verdict.allowed) applied.push(change);
+            else rejected.push({ ...change, reason: verdict.reason });
+        }
+        if (applied.length === 0) return { applied, rejected, inverse: [] };
+
+        const inverse = applied.map(({ x, y }) => {
+            const previous = this.baseCells.get(`${x},${y}`);
+            return { x, y, data: previous ? Utility.deepClone(previous) : null };
+        });
+
         const previousCells = new Map([...this.baseCells].map(([key, cell]) => [key, { ...cell }]));
         try {
-            for (const change of normalized) {
+            for (const change of applied) {
                 this.setWallCell(change.x, change.y, change.data ?? null, { deferRebuild: true });
             }
             this.reindexOpenings();
@@ -1667,10 +1856,10 @@ class WallBuilder {
         }
         this.gameMap.eventManager?.emit(EVENTS.WALL_GEOMETRY_CHANGED, {
             mapId: this.gameMap.id,
-            cells: normalized.map(({ x, y }) => ({ x, y })),
+            cells: applied.map(({ x, y }) => ({ x, y })),
             builder: this
         });
-        return true;
+        return { applied, rejected, inverse };
     }
 
     findPieceForCell(cellX, cellY) {

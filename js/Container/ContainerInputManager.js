@@ -132,36 +132,150 @@ class ContainerInputManager {
   /**
    * Set up keyboard shortcuts
    */
+  /**
+   * The whole keyboard map lives here, in one place, each binding gated on the
+   * mode it belongs to. Anything mode-specific checks `gameMode` rather than
+   * relying on the CSS that hides its button — a shortcut bypasses CSS.
+   */
   setupKeyboardShortcuts() {
-    const toolConfig = this.container.ui?.toolManager?.toolConfig || this.container.ui?.toolConfig || {};
-
-    Object.entries(toolConfig).forEach(([mode, config]) => {
-      if (config && config.shortcut) {
-        this.subscribe('keyboard.down', (event) => {
-          if (!this.isEnabled) return; // Ignore when disabled
-          if (event.key === config.shortcut.toLowerCase()) {
-            this.container.ui.changeToolMode(mode);
-          }
-        });
-      }
-    });
-
-    // Sound toggle
     this.subscribe('keyboard.down', (event) => {
-      if (!this.isEnabled) return; // Ignore when disabled
-      if (event.key === 'm') {
-        // Add null check for sound panel
-        this.container.ui?.soundPanel?.toggleSounds?.();
-      }
-    });
+      if (!this.isEnabled) return;
+      if (event.meta) return;
 
-    // Escape key
-    this.subscribe('keyboard.down', (event) => {
-      if (!this.isEnabled) return; // Ignore when disabled
-      if (event.key === 'escape') {
-        this.handleEscape();
+      const ui = this.container.ui;
+      const gameMode = this.container.gameMode;
+      const isBuild = gameMode?.isBuild() === true;
+
+      if (event.ctrl) {
+        if (!isBuild) return;
+        if (event.key === 'z') {
+          event.originalEvent?.preventDefault();
+          if (event.shift) this.container.buildHistory?.redo();
+          else this.container.buildHistory?.undo();
+        } else if (event.key === 'y') {
+          event.originalEvent?.preventDefault();
+          this.container.buildHistory?.redo();
+        }
+        return;
+      }
+
+      // Tool shortcuts, from the same config that names the buttons. Only the
+      // current mode's tools claim a key, which frees S and D to pan while
+      // building.
+      const toolManager = ui?.toolManager;
+      for (const [mode, config] of Object.entries(toolManager?.toolConfig || {})) {
+        if (config?.shortcut === event.key && toolManager.canUseTool(mode)) {
+          ui.changeToolMode(mode);
+          return;
+        }
+      }
+
+      switch (event.key) {
+        case 'b':
+          gameMode?.toggle();
+          return;
+        case 'm':
+          ui?.worldMapPanel?.toggle();
+          return;
+        case 'l':
+          ui?.gameLogManager?.toggle();
+          return;
+        case 'n':
+          ui?.soundPanel?.toggleSounds?.();
+          return;
+        case 'escape':
+          this.handleEscape();
+          return;
+      }
+
+      if (event.key.length === 1 && 'wasd'.includes(event.key)) {
+        event.originalEvent?.preventDefault();
+        this.panCamera(event.key);
+        return;
+      }
+
+      if (event.key.startsWith('arrow')) {
+        this.nudgeSelectedObject(event);
+        return;
+      }
+
+      if (!isBuild) return;
+
+      switch (event.key) {
+        case 'home':
+        case 'end':
+          event.originalEvent?.preventDefault();
+          this.stepWallPresentation(event.key === 'home' ? -1 : 1);
+          return;
+        case 'delete':
+          event.originalEvent?.preventDefault();
+          this.storeSelectedObject();
+          return;
+        case 'r':
+        case ',':
+        case '.':
+          event.originalEvent?.preventDefault();
+          this.rotateSelectedObject(event.key === ',' ? -1 : 1);
+          return;
       }
     });
+  }
+
+  // The Home/End pair drives whichever wall-view control is on screen, so the
+  // keys and the buttons stay one state.
+  stepWallPresentation(direction) {
+    const ui = this.container.ui;
+    const control = ui?.wallBuildPanel?.wallView || ui?.surfaceCustomizePanel?.wallView;
+    control?.step(direction);
+  }
+
+  storeSelectedObject() {
+    const selected = this.container.ui?.getSelected?.();
+    const storage = this.container.ui?.actionSidebarManager?.getInventoryStorageState?.(selected);
+    if (!storage) return;
+    if (!storage.canStore) {
+      this.container.ui?.showMessage?.(storage.unavailableReason || "That can't be stored.", 'warning', 'Build');
+      return;
+    }
+    storage.store();
+    this.container.ui?.actionSidebarManager?.updateActions?.(null);
+  }
+
+  rotateSelectedObject(direction) {
+    const selected = this.container.ui?.getSelected?.();
+    if (selected?.rotateToNextDirection?.(direction) === false) {
+      this.container.ui?.showMessage?.("It doesn't fit that way round.", 'warning', 'Rotate');
+    }
+  }
+
+  // Arrows nudge the selection while building; with nothing selected they pan,
+  // which is what they do in play mode too.
+  nudgeSelectedObject(event) {
+    const selected = this.container.ui?.getSelected?.();
+    const step = event.shift ? (this.container.gameMap?.gridSystem?.config?.cellSize || 32) : 1;
+    const delta = {
+      arrowleft: [-step, 0], arrowright: [step, 0],
+      arrowup: [0, -step], arrowdown: [0, step]
+    }[event.key];
+    if (!delta) return;
+
+    event.originalEvent?.preventDefault();
+    if (!(selected instanceof MapObject)) {
+      this.container.camera?.panBy(delta[0], delta[1]);
+      return;
+    }
+    if (this.container.buildRules?.canMoveObject(selected).allowed === false) return;
+    selected.nudgeBy?.(delta[0], delta[1]);
+  }
+
+  panCamera(key) {
+    const step = SiteConfig.camera.keyboardPanStep;
+    const delta = { w: [0, -step], a: [-step, 0], s: [0, step], d: [step, 0] }[key];
+    if (delta) this.container.camera?.panBy(delta[0], delta[1]);
+  }
+
+  isSnapModifierHeld() {
+    return this.inputSystem?.state?.keyboard?.pressedKeys?.has('control') === true;
   }
 
   /**
@@ -243,6 +357,10 @@ class ContainerInputManager {
    * A* move the active myte to a screen-space coordinate
    */
   _tryAStarToClick(screenX, screenY) {
+    // Nothing walks anywhere while the world is frozen, and a double-click in
+    // build mode is far more likely to be aimed at a wall or a swatch.
+    if (this.container.gameMode?.isBuild()) return;
+
     const myte = this.container.activeMyte;
     if (!myte?.isActive || !myte.pathfinder || myte.queue.isCarrying()) {
       Utility.logDebug('[astar] blocked: isActive=%s pathfinder=%s carrying=%s', myte?.isActive, !!myte?.pathfinder, myte?.queue.isCarrying());
@@ -298,11 +416,37 @@ class ContainerInputManager {
   /**
    * Handle escape key
    */
+  /**
+   * Escape peels one layer at a time, outermost work first: an in-flight
+   * gesture, then the panel it belongs to, then the mode itself. Each build
+   * panel's own Escape handler is disabled so this ordering is the only one.
+   */
   handleEscape() {
-    // Clear selection
-    this.container.ui.setSelected(null);
+    const ui = this.container.ui;
 
-    // Handle carrying state
+    if (this.container.inventory?.state?.placementItem) {
+      this.container.inventory.cancelPlacement();
+      return;
+    }
+
+    if (ui?.wallBuildPanel?.cancelDrag?.() === true) return;
+
+    if (this.container.gameMode?.isBuild()) {
+      const openBuildPanel = [ui?.wallBuildPanel, ui?.surfaceCustomizePanel].find(panel => panel?.isVisible);
+      if (openBuildPanel) {
+        ui.changeToolMode(UIToolModes.MOVE);
+        return;
+      }
+      if (ui?.getSelected?.()) {
+        ui.setSelected(null);
+        return;
+      }
+      this.container.gameMode.setMode(GAME_MODES.PLAY);
+      return;
+    }
+
+    ui.setSelected(null);
+
     if (this.container.activeMyte?.queue.isCarrying()) {
       this.container.activeMyte.queue.addPutDownMyte();
     }

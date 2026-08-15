@@ -64,12 +64,6 @@
             outline: 4px solid var(--button-active-border-color);
         }
 
-        button.hand-control-btn#sound-toggle {
-            &.muted .icon-sound-on,
-            &:not(.muted) .icon-sound-off {
-                display: none;
-            }
-        }
     }
 
     >.sidebar {

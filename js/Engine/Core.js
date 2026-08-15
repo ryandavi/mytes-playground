@@ -35,6 +35,9 @@ class MyteCore {
         this.lastFrameTime = 0;
         this.tickAccumulator = 0;
         this.isInitialized = false;
+        // Build mode freezes the simulation without stopping the render loop:
+        // camera, cursor and UI stay live so building feels responsive.
+        this.simulationPaused = false;
 
         // Performance monitoring
         this.frameCount = 0;
@@ -490,15 +493,21 @@ class MyteCore {
 
             // Advance simulation clock by the same capped delta so gameplay
             // cooldowns pause when the RAF loop is stopped (e.g. tab hidden).
-            SimClock.advance(deltaTime);
+            // Freezing SimClock is also what makes the build-mode pause safe for
+            // free: every cooldown and state-aging timer reads from it.
+            if (!this.simulationPaused) SimClock.advance(deltaTime);
 
             this.updateFPSCounter(timestamp);
 
             // Accumulate time and drain with fixed-size steps
-            this.tickAccumulator += deltaTime;
-            while (this.tickAccumulator >= this.config.engine.tickInterval) {
-                this.tickUpdate(this.config.engine.tickInterval);
-                this.tickAccumulator -= this.config.engine.tickInterval;
+            if (this.simulationPaused) {
+                this.tickAccumulator = 0;
+            } else {
+                this.tickAccumulator += deltaTime;
+                while (this.tickAccumulator >= this.config.engine.tickInterval) {
+                    this.tickUpdate(this.config.engine.tickInterval);
+                    this.tickAccumulator -= this.config.engine.tickInterval;
+                }
             }
 
             // Variable-rate render/animation update
@@ -513,6 +522,24 @@ class MyteCore {
         this._rafHandle = requestAnimationFrame(this._updateFrame);
     }
 
+
+    /**
+     * Freeze the simulation layers while leaving rendering alone. Paused:
+     * SimClock, the fixed-rate tick drain (myte AI, stats, actions, map object
+     * tickUpdate, particles, game clock), per-frame myte movement/animation,
+     * map object update, zone effects and dropped-item physics. Still running:
+     * camera, cursor, UI, tooltips, selection, culling, the DOM flush, wall
+     * cutaway evaluation and the atmosphere overlay.
+     */
+    setSimulationPaused(flag) {
+        const next = flag === true;
+        if (this.simulationPaused === next) return;
+        this.simulationPaused = next;
+        // Re-baseline so the first unpaused frame does not bill the player for
+        // the time they spent building.
+        this.lastFrameTime = performance.now();
+        this.tickAccumulator = 0;
+    }
 
     tickUpdate(tickDelta) {
         this.containers.forEach(container => container.tickUpdate(tickDelta));

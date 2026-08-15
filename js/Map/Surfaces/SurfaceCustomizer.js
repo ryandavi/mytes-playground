@@ -13,8 +13,23 @@ class SurfaceCustomizer {
         return [...(registry?.finishes || [])].map(([id, finish]) => ({ id, ...finish }));
     }
 
+    /**
+     * Locked walls and floors are dropped here rather than at the panel, so
+     * every caller — palette click, undo replay, a future script — is held to
+     * the same rule.
+     */
     normalizeRequests(request) {
-        return (Array.isArray(request) ? request : [request]).filter(Boolean);
+        const rules = this.gameMap?.container?.buildRules;
+        return (Array.isArray(request) ? request : [request])
+            .filter(Boolean)
+            .filter(entry => {
+                if (!rules) return true;
+                if (entry.surface === 'floor') {
+                    return rules.canPaintRoomFloor(this.gameMap?.regionManager?.get('room', entry.roomId)).allowed;
+                }
+                const [cellX, cellY] = entry.cells?.from || [];
+                return rules.canPaintWallFace({ x: cellX, y: cellY }).allowed;
+            });
     }
 
     capturePreviewState(requests) {

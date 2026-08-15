@@ -352,7 +352,7 @@ body.wall-build-mode .app-stage {
 
 
 #view-panel {
-    .window-panel__content {
+    & {
         .settings-group {
             display: flex;
             align-items: center;
@@ -374,7 +374,7 @@ body.wall-build-mode .app-stage {
 
             &.camera-options {
                 align-items: stretch;
-                flex-direction: column;
+
 
                 >.setting-item {
                     width: 100%;
@@ -701,9 +701,7 @@ body.ui-gallery-page {
 
 // ── Debug panel (ModalWindow) ─────────────────────────────────────────────────
 #game-debug-panel {
-    .window-panel__content {
-        max-width: 500px;
-        margin: 0 auto;
+    & {
 
         .button-group {
             display: flex;
