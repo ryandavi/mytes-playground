@@ -1448,6 +1448,12 @@ class MapObject {
 	render(container, parent) {
 		const divElement = document.createElement('div');
 		divElement.classList.add('map-object', this.variant);
+		// Directional objects get this in applyDirectionalVisuals; everything
+		// else had no route to it at all, so a placed wall fixture never
+		// carried .wall-fixture and quietly ignored the styling that fades an
+		// authored decoration out with the wall it hangs on.
+		const baseCssClass = this.getBaseCssClass?.();
+		if (baseCssClass) divElement.classList.add(baseCssClass);
 		divElement.dataset.objectType = this.type;
 		divElement.dataset.objectId = this.id || '';
 		divElement.dataset.renderLayer = this.getRenderLayerKey();

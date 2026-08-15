@@ -231,6 +231,7 @@ class WallBuilder {
         this._movingRevealPieceIds = new Map();
         this._presentationOverride = null;
         this._activeCutawayKey = null;
+        this._runPieceIds = new Map();
         this._cutawayRoomIds = new Set();
         this._pendingCutawayKey = null;
         this._pendingCutawaySince = 0;
@@ -247,6 +248,7 @@ class WallBuilder {
             this.baseCells.set(key, cell);
         }
         this.normalizeOpeningFootprints();
+        this.pruneOrphanedRecords();
         this.authoredOpenings = Utility.deepClone(this.openings);
         this.reindexOpenings();
         for (const [key, cell] of this.cells) {
@@ -285,6 +287,57 @@ class WallBuilder {
                 startY + (axis === 'vertical' ? index : 0)
             ]);
         }
+    }
+
+    /**
+     * Drops opening and fixture records whose map object is gone.
+     *
+     * Both kinds of record name an object by id, and the object is the only
+     * thing that fills what the record claims: an opening cuts a hole for a
+     * window to sit in, a fixture reserves the patch of wall a painting hangs
+     * on. Lose the object and the claim outlives it — a hole in the wall with
+     * no window in it, which nothing can be placed over because the wall still
+     * says something is there. Records like that survive into the save, so this
+     * runs on load as well, and repairs a save that already carries one.
+     */
+    pruneOrphanedRecords() {
+        const exists = id => !!this.gameMap.getObjectById?.(id);
+        const openings = this.openings.filter(opening => exists(opening.id));
+        const fixtures = this.fixtures.filter(record => exists(record.id));
+        const changed = openings.length !== this.openings.length ||
+            fixtures.length !== this.fixtures.length;
+        this.openings = openings;
+        this.fixtures = fixtures;
+        return changed;
+    }
+
+    /**
+     * Hands back everything this wall holds on behalf of an object that is
+     * leaving the map — stored in the inventory, or discarded because its
+     * placement failed. The counterpart to finishOpeningMove/finishFixtureMove:
+     * those record the claim, this one releases it.
+     */
+    releaseObject(object) {
+        const id = String(object?.id ?? object);
+        this._movingOpeningIds.delete(id);
+        this._movingObjects.delete(id);
+        this._movingRevealPieceIds.delete(id);
+
+        const fixtureCount = this.fixtures.length;
+        this.fixtures = this.fixtures.filter(record => String(record.id) !== id);
+        const hadFixture = this.fixtures.length !== fixtureCount;
+
+        const openingCount = this.openings.length;
+        this.openings = this.openings.filter(opening => String(opening.id) !== id);
+        const hadOpening = this.openings.length !== openingCount;
+        if (hadOpening) {
+            this.openingSlots.delete(id);
+            this.reindexOpenings();
+            this.rebuild();
+            if (String(object?.type).toUpperCase() === 'DOOR') this.gameMap.buildDoorRoomTopology?.();
+        }
+        if (hadOpening || hadFixture) this.evaluateCutaway(true);
+        return hadOpening || hadFixture;
     }
 
     reindexOpenings() {
@@ -483,6 +536,10 @@ class WallBuilder {
         this._pieceByCell = new Map(this.pieces.flatMap(piece =>
             piece.cells.map(cell => [`${cell.x},${cell.y}`, piece])
         ));
+        // Run membership is derived from the piece graph that was just thrown
+        // away; keeping the old answers would raise wall on pieces that no
+        // longer exist and miss the ones that replaced them.
+        this._runPieceIds.clear();
         for (const piece of this.pieces) this.createPiece(piece);
         this.createAuthoredAttachments(this.wallData.attachments || []);
         this.rebindFixtureObjects();
@@ -615,8 +672,29 @@ class WallBuilder {
     getCutawayRoomIds(subject) {
         const point = this.getCutawayPoint(subject);
         if (!point) return [];
-        return (this.gameMap.regionManager?.regionsAt(point.x, point.y, 'room') || [])
-            .map(room => room.id);
+        return this.expandToOpenSpace(
+            this.gameMap.regionManager?.regionsAt(point.x, point.y, 'room') || []
+        ).map(room => room.id);
+    }
+
+    /**
+     * Rooms that are one open space answer as one room here.
+     *
+     * A wall only lowers where its far side is a room you are standing in. On
+     * a wall shared by two rooms that are open to each other — a divider that
+     * stops short, an alcove — that test recognises only the half facing your
+     * room, so one continuous wall stepped down halfway along, at the exact
+     * seam where its far side changes. The grouping comes from the room
+     * enclosure flood fill, which already knows what is walled off from what.
+     */
+    expandToOpenSpace(rooms) {
+        const spaces = new Set(rooms.map(room => room.properties?.openSpaceId).filter(Boolean));
+        if (spaces.size === 0) return rooms;
+        const expanded = new Set(rooms);
+        for (const room of this.gameMap.regionManager?.all('room') || []) {
+            if (spaces.has(room.properties?.openSpaceId)) expanded.add(room);
+        }
+        return [...expanded];
     }
 
     getCurrentCutawayRoomIds() {
@@ -680,12 +758,17 @@ class WallBuilder {
             const construction = this.registry.getConstruction(piece.constructionId);
             if (!construction) continue;
             const cut = this.computeCutCells(piece, construction, subjects);
+            const standing = this.getForcedStandingCells(piece, cut.length);
             piece.cutStates.forEach((state, index) => {
+                if (standing[index]) cut[index] = false;
                 if (cut[index] !== state.desired) {
                     state.desired = cut[index];
                     state.since = now;
                 }
-                if (immediate) state.cut = cut[index];
+                // Holding a cell up because of what is mounted on it is not an
+                // occlusion change, so it does not wait out the raise delay —
+                // the wall is already standing on screen by then anyway.
+                if (immediate || standing[index]) state.cut = cut[index];
             });
         }
         this._lastEvaluateAt = now;
@@ -883,6 +966,25 @@ class WallBuilder {
         }
     }
 
+    // The mirror of expandCutOverOpenings, for the raised span under a moving
+    // object: an opening the span reaches into stands in full.
+    expandStandingOverOpenings(piece, cut) {
+        const spans = new Map();
+        piece.cells.forEach((cell, index) => {
+            if (!cell.opening) return;
+            const id = String(cell.opening.id);
+            const span = spans.get(id) || { from: index, to: index, standing: false };
+            span.from = Math.min(span.from, index);
+            span.to = Math.max(span.to, index);
+            span.standing = span.standing || !cut[index];
+            spans.set(id, span);
+        });
+        for (const span of spans.values()) {
+            if (!span.standing) continue;
+            for (let index = span.from; index <= span.to; index++) cut[index] = false;
+        }
+    }
+
     // Would lowering this cell put a transition tile under an opening?
     hasOpening(piece, index) {
         return !!piece.cells[index]?.opening;
@@ -927,8 +1029,12 @@ class WallBuilder {
         // "Walls Down" is an explicit global presentation, not an occlusion
         // cutaway. Every wall shape must use its stub frame; the transition and
         // structural-anchor rules below intentionally keep some cells standing
-        // and therefore apply only to cutaway mode.
-        if (this.presentation === 'down') return new Array(count).fill(true);
+        // and therefore apply only to cutaway mode — the one exception is the
+        // wall under an object being moved, which stands in every mode and
+        // needs those rules to draw the step back down either side of it.
+        if (this.presentation === 'down' && !this.hasMovingObjectSpans(piece)) {
+            return new Array(count).fill(true);
+        }
 
         const raw = this.getRawCutStates(piece, count);
         if (!raw || !piece.cells.every(cell => this.isHorizontalOnlyCell(cell))) return raw;
@@ -949,11 +1055,20 @@ class WallBuilder {
             return rawByPiece.get(host)?.[index] === true;
         });
 
+        // Everything from here to the transition tidy-up exists to give a
+        // cutaway somewhere sensible to return to full height. "Walls down" has
+        // no such need: its one standing island is the span under the moving
+        // object, and anchoring the run's ends on top of that just raises wall
+        // the player did not ask for.
+        const anchorRun = this.presentation !== 'down';
+
         // Straight endpoints abutting vertical structure remain standing. Pure
         // end caps keep their requested state: a cap can belong to a long stub
         // run as long as that run eventually reaches one valid transition.
-        this.resolveHorizontalBoundary(chain, cut, 0);
-        this.resolveHorizontalBoundary(chain, cut, cut.length - 1);
+        if (anchorRun) {
+            this.resolveHorizontalBoundary(chain, cut, 0);
+            this.resolveHorizontalBoundary(chain, cut, cut.length - 1);
+        }
 
         // Opposing transitions may not touch. This most often happens when a
         // two-cell raised preview straddles a paint seam: extend the standing
@@ -981,13 +1096,15 @@ class WallBuilder {
         // one end anchored at full height, leaving the opposite end cap free to
         // remain a stub. This is the minimum standing area that gives the whole
         // lowered run somewhere logical to return to full height.
-        this.ensureHorizontalChainAnchor(chain, cut);
+        if (anchorRun) {
+            this.ensureHorizontalChainAnchor(chain, cut);
 
-        // A full-height cap cannot itself use the straight transition artwork.
-        // Reserve its inward straight neighbor for that transition whenever the
-        // run beyond it is lowered.
-        this.reserveTransitionBesideFullCap(chain, cut, 0, 1);
-        this.reserveTransitionBesideFullCap(chain, cut, cut.length - 1, -1);
+            // A full-height cap cannot itself use the straight transition
+            // artwork. Reserve its inward straight neighbor for that transition
+            // whenever the run beyond it is lowered.
+            this.reserveTransitionBesideFullCap(chain, cut, 0, 1);
+            this.reserveTransitionBesideFullCap(chain, cut, cut.length - 1, -1);
+        }
 
         const resolvedByCell = new Map(chain.map((cell, index) => [`${cell.x},${cell.y}`, cut[index]]));
         return piece.cells.map(cell => resolvedByCell.get(`${cell.x},${cell.y}`) === true);
@@ -999,16 +1116,33 @@ class WallBuilder {
             // Never cut through half a door or window: an opening is one
             // object, so the lowered run swallows all of its cells or none.
             this.expandCutOverOpenings(piece, cut);
-            // Keep the complete object span lowered while it moves. The padded
-            // cells push any transition away from the art instead of drawing a
+            // Stand the wall under whatever is being moved. The padded cells
+            // push any transition away from the art instead of drawing a
             // height change through a painting or window.
-            this.lowerBehindMovingObjects(piece, cut);
+            // Something being moved keeps its wall up in every mode; something
+            // merely hanging there only in cutaway ("walls down" is the player
+            // asking for the floor plan, and a column under every painting is
+            // not that). Both come from one mask, shared with the desired state.
+            const standing = this.getForcedStandingCells(piece, count);
+            for (let index = 0; index < count; index++) {
+                if (standing[index]) cut[index] = false;
+            }
+            // ...and take any opening that span reaches into up with it, so a
+            // window is never half in a standing wall and half in a stub.
+            this.expandStandingOverOpenings(piece, cut);
             // Vertical arms, corners, and junctions remain tall. Pure horizontal
             // end caps are resolved with their neighboring cells afterward so
             // they can lower when there is room for a valid transition.
-            for (let index = 0; index < count; index++) {
-                const mask = piece.cells[index]?.mask ?? 0;
-                if (WallBuilder.isVerticalMask(mask) || !WallBuilder.isHorizontalMask(mask)) cut[index] = false;
+            //
+            // Not in "walls down": there the whole wall is deliberately a stub,
+            // and the only thing standing is the span under the object being
+            // moved. Applying the structural rules there raises the run's end
+            // cap and corner as well, for no reason the player can see.
+            if (this.presentation !== 'down') {
+                for (let index = 0; index < count; index++) {
+                    const mask = piece.cells[index]?.mask ?? 0;
+                    if (WallBuilder.isVerticalMask(mask) || !WallBuilder.isHorizontalMask(mask)) cut[index] = false;
+                }
             }
         }
         return cut;
@@ -1112,25 +1246,138 @@ class WallBuilder {
         return WallBuilder.isStraightHorizontal(this.computeMask(neighbor));
     }
 
-    // Only the candidate host wall cuts away. Wall faces overlap vertically,
-    // so comparing the dragged object's x-range against every piece would lower
-    // unrelated wall rows that happen to sit above or below the cursor.
-    lowerBehindMovingObjects(piece, cut) {
-        if (this._movingObjects.size === 0) return;
-        const padding = Math.max(0, SiteConfig.wallSystem.cutawayPaddingCells) * this.cellSize;
-        const left = piece.x * this.cellSize;
+    /**
+     * Spans of a wall that must stand, whatever the presentation says.
+     *
+     * Two sources, one rule. Something being MOVED needs its host wall up in
+     * every mode: you cannot judge where a painting goes against a 28px stub,
+     * and a fixture on a lowered wall is hidden outright by the cut rule, so
+     * lowering here made the very thing being placed invisible while placing
+     * it. Something already MOUNTED needs it up in cutaway: a cutaway exists to
+     * see past a wall, and the player's own painting is not what is in the way
+     * — lowering the wall under it just deletes decoration from the room.
+     *
+     * Spans are collected for the whole horizontal RUN, not this render piece.
+     * A run splits into several pieces at every finish and room-face seam, so a
+     * wall shared by two rooms is at least two pieces; matching by piece left
+     * the far side of the seam free to lower, which is how half a wall stayed
+     * standing and the painting on it vanished anyway. Spans carry world x, so
+     * raiseSpans keeps only what actually reaches this piece — including the
+     * padding that spills across a seam.
+     */
+    getMovingSpansForRun(piece) {
+        if (this._movingObjects.size === 0) return [];
+        const run = this.getRunPieceIds(piece);
+        const spans = [];
         for (const object of this._movingObjects.values()) {
-            const spans = this.getMovingObjectRevealSpans(object)
-                .filter(span => span.piece === piece);
-            if (spans.length === 0) continue;
-            for (let index = 0; index < cut.length; index++) {
-                const cellLeft = left + (index * this.cellSize);
-                if (spans.some(span =>
-                    cellLeft + this.cellSize > span.left - padding &&
-                    cellLeft < span.right + padding
-                )) cut[index] = true;
+            spans.push(...this.getMovingObjectRevealSpans(object).filter(span => run.has(span.piece.id)));
+        }
+        return spans;
+    }
+
+    getMountedSpansForRun(piece) {
+        const run = this.getRunPieceIds(piece);
+        const spans = [];
+
+        for (const record of this.fixtures) {
+            if (this._movingObjects.has(String(record.id))) continue;
+            const object = this.gameMap.getObjectById?.(record.id);
+            // Located by where the fixture actually hangs, never by the cell
+            // recorded when it was placed: a later re-split of the run leaves
+            // that cell pointing at a different piece, and the raise then
+            // landed on a wall the painting is nowhere near.
+            const span = object ? this.getFixtureSpan(object) : null;
+            if (span && run.has(span.piece.id)) spans.push(span);
+        }
+
+        // Openings count too — a window is as much "something on this wall" as
+        // a painting is. Doors are excluded by default: a cutaway is usually
+        // looking into a room through the wall its door is in, and a standing
+        // column at every door leaves nothing to cut.
+        const keep = SiteConfig.wallSystem.cutawayKeepStandingOpenings || [];
+        if (keep.length > 0) {
+            for (const opening of this.openings) {
+                if (!keep.includes(opening.type)) continue;
+                if (this._movingOpeningIds.has(String(opening.id))) continue;
+                const [cellX, cellY] = opening.cells?.[0] || [];
+                const host = this.findPieceForCell(cellX, cellY);
+                if (!host || !run.has(host.id)) continue;
+                const bounds = this.getOpeningBounds(opening);
+                spans.push({ piece: host, left: bounds.x, right: bounds.x + bounds.width });
             }
         }
+        return spans;
+    }
+
+    // Where a fixture hangs, as a span on the piece that actually carries it.
+    // The same answer the moving path uses, so a fixture does not shift the
+    // wall it belongs to at the moment it is dropped.
+    getFixtureSpan(object) {
+        const placement = this.getFixturePlacementCandidate(object);
+        return placement ? {
+            piece: placement.piece,
+            left: placement.position.x,
+            right: placement.position.x + object.size.width
+        } : null;
+    }
+
+    // Every render piece belonging to the same structural run as this one.
+    // Memoized for the life of a build: getRawCutStates is called once per
+    // piece in a run while resolving that run, so recomputing the chain each
+    // time is quadratic for no benefit.
+    getRunPieceIds(piece) {
+        const cached = this._runPieceIds.get(piece.id);
+        if (cached) return cached;
+        const ids = new Set([piece.id]);
+        for (const cell of this.getHorizontalCellChain(piece.cells[0])) {
+            const host = this.findPieceForCell(cell.x, cell.y);
+            if (host) ids.add(host.id);
+        }
+        this._runPieceIds.set(piece.id, ids);
+        return ids;
+    }
+
+    /**
+     * Which of this piece's cells may not lower, whatever occlusion wants.
+     *
+     * One answer, asked twice: the renderer applies it so the wall stands the
+     * instant something is dropped on it, and refreshCutawayTargets applies it
+     * to the desired state so the hysteresis in advancePiece cannot spend the
+     * next cutawayRaiseDelayMs asking for a cell the renderer refuses to lower.
+     * While those two disagreed, a run split across render pieces could be
+     * caught mid-argument — one canvas drawn from the corrected state and its
+     * neighbour from the stale one, leaving a step at the seam.
+     */
+    getForcedStandingCells(piece, count = piece.cells.length) {
+        const standing = new Array(count).fill(false);
+        this.raiseSpans(piece, standing, this.getMovingSpansForRun(piece), true);
+        if (this.presentation === 'cutaway') {
+            this.raiseSpans(piece, standing, this.getMountedSpansForRun(piece), true);
+        }
+        return standing;
+    }
+
+    // Stands every cell a span reaches, plus the configured padding either
+    // side. The padding is what pushes the height transition clear of the art
+    // instead of drawing a step through the middle of a painting.
+    raiseSpans(piece, cut, spans, value = false) {
+        if (spans.length === 0) return;
+        const padding = Math.max(0, SiteConfig.wallSystem.cutawayPaddingCells) * this.cellSize;
+        const left = piece.x * this.cellSize;
+        for (let index = 0; index < cut.length; index++) {
+            const cellLeft = left + (index * this.cellSize);
+            if (spans.some(span =>
+                cellLeft + this.cellSize > span.left - padding &&
+                cellLeft < span.right + padding
+            )) cut[index] = value;
+        }
+    }
+
+    // Does a wall object being moved hang on this piece? "Walls down" is
+    // otherwise a uniform state that never consults the per-cell rules, and it
+    // still has to make room for the raised span under the cursor.
+    hasMovingObjectSpans(piece) {
+        return this.getMovingSpansForRun(piece).length > 0;
     }
 
     getMovingObjectRevealSpans(object) {
@@ -1833,6 +2080,13 @@ class WallBuilder {
         }
         for (const record of this.fixtures) {
             if (String(record.id) === String(excludeId)) continue;
+            // Only what hangs on THIS piece. Faces are 160px tall but rows are
+            // 32px apart, so several walls' faces overlap in world space — take
+            // every fixture on the map and a painting on the wall in front
+            // reserves a band of the wall behind it, where nothing is visible
+            // and nothing can be hung.
+            const [cellX, cellY] = record.cells?.from || [record.cellX, record.cellY];
+            if (this.findPieceForCell(cellX, cellY)?.id !== piece.id) continue;
             const other = this.gameMap.getObjectById?.(record.id);
             if (!other) continue;
             obstacles.push({
@@ -1928,6 +2182,11 @@ class WallBuilder {
 
     beginFixtureMove(object) {
         const id = String(object.id);
+        // A fixture in hand is never cut. Detaching stops the wall talking to
+        // it, so a painting picked up off a lowered wall would otherwise keep
+        // the hidden state it had when it was hanging there and be dragged
+        // around invisible.
+        object.applyWallCut?.(null);
         this._movingObjects.set(id, object);
         this._movingRevealPieceIds.set(id, new Set(
             this.getMovingObjectRevealSpans(object).map(span => span.piece.id)
@@ -2078,6 +2337,7 @@ class WallBuilder {
 			}
 		}
         this.normalizeOpeningFootprints();
+        this.pruneOrphanedRecords();
         this.reindexOpenings();
         this.rebuild();
         this.bindOpeningObjects();
@@ -2119,6 +2379,7 @@ class WallBuilder {
         this.decorations = [];
         this.pieces = [];
         this._pieceByCell.clear();
+        this._runPieceIds.clear();
         this.cells.clear();
         this.baseCells.clear();
         this.authoredBaseCells.clear();

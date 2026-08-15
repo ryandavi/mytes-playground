@@ -33,6 +33,12 @@ class GridSystem {
         this.visibleCells = [];
         this.activeObjects = new Set(); // Need Set for uniqueness
         this.lastCullingBounds = null; // Store last culling bounds for reference
+        // Culling reads the grid: an object is awake because a visible cell
+        // holds it. Objects that land on no cell at all therefore have no route
+        // back to being awake, so they are tracked here and culled by their own
+        // culling bounds instead. A wall fixture on the top row of a map is the
+        // usual case — it hangs above y=0, entirely outside the grid.
+        this.offGridObjects = new Set();
 
         // OPTIMIZATION: Make debug mode off by default
         this.debugMode = false;
@@ -1020,6 +1026,7 @@ class GridSystem {
         if (!obj) return; // Safety check
 
         const cells = this.getObjectCells(obj);
+        this.trackGridMembership(obj, cells);
         cells.forEach(cell => {
             cell.objects.add(obj);
 
@@ -1042,6 +1049,14 @@ class GridSystem {
         this._needsCullRefresh = true;
         this.invalidatePathfinderCaches();
         if (this.debugMode && this._blocksMovement(obj)) this._debugDirty = true;
+    }
+
+    // Grid membership is what keeps an object awake, so an object that holds no
+    // cells has to be culled some other way. Kept in step with every write to
+    // cell.objects.
+    trackGridMembership(obj, cells) {
+        if (cells.size === 0) this.offGridObjects.add(obj);
+        else this.offGridObjects.delete(obj);
     }
 
     // Helper method to check if an object is within visible bounds
@@ -1083,6 +1098,7 @@ class GridSystem {
 
         // Remove from active objects
         this.activeObjects.delete(obj);
+        this.offGridObjects.delete(obj);
         this._needsCullRefresh = true;
         delete obj._gridOccupancyX;
         delete obj._gridOccupancyY;
@@ -1108,6 +1124,7 @@ class GridSystem {
         // Get old and new cells
         const oldCells = this.getObjectCells(obj, { x: oldX, y: oldY });
         const newCells = this.getObjectCells(obj);
+        this.trackGridMembership(obj, newCells);
 
         // Track cells that need terrain update
         const needsTerrainUpdate = new Set();
@@ -1330,11 +1347,22 @@ class GridSystem {
         const pad = this.config.cullingPadding;
         const renderOffset = this.parent.getRenderOffset?.() || { x: 0, y: 0 };
 
+        // The viewport as it really is, and the same rect clamped to the map.
+        // Cells only exist inside the map, so the clamped one drives the grid
+        // sweep — but a wall's art stands above y=0 and anything mounted on it
+        // lives out there with it, off the grid entirely. Clamping would put
+        // those objects permanently outside the visible area.
+        const viewBounds = {
+            left: -camera.posX - renderOffset.x - pad,
+            top: -camera.posY - renderOffset.y - pad,
+            right: -camera.posX - renderOffset.x + viewportWidth + pad,
+            bottom: -camera.posY - renderOffset.y + viewportHeight + pad
+        };
         const bounds = {
-            left: Math.max(0, -camera.posX - renderOffset.x - pad),
-            top: Math.max(0, -camera.posY - renderOffset.y - pad),
-            right: Math.min(this.parent.dimensions.width, -camera.posX - renderOffset.x + viewportWidth + pad),
-            bottom: Math.min(this.parent.dimensions.height, -camera.posY - renderOffset.y + viewportHeight + pad)
+            left: Math.max(0, viewBounds.left),
+            top: Math.max(0, viewBounds.top),
+            right: Math.min(this.parent.dimensions.width, viewBounds.right),
+            bottom: Math.min(this.parent.dimensions.height, viewBounds.bottom)
         };
 
         // Store for reference in other methods
@@ -1359,6 +1387,15 @@ class GridSystem {
                     if (!obj.excludeFromCulling) nextActive.add(obj);
                 });
             }
+        }
+
+        // Objects that hold no cell are invisible to the loop above, so they are
+        // tested directly against the viewport. Without this a wall fixture that
+        // hangs above the grid is slept by the first cull refresh after it is
+        // placed and never wakes again — it survives in the save and comes back
+        // on reload, which is exactly how it reads as "the painting vanished".
+        for (const obj of this.offGridObjects) {
+            if (!obj.excludeFromCulling && this.isObjectVisible(obj, viewBounds)) nextActive.add(obj);
         }
 
         // Drag placement updates grid occupancy once the drop is committed. Keep

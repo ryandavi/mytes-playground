@@ -24,7 +24,7 @@
     "effectsEnabled": true,
     "animationsEnabled": true,
     "timeOfDayOverlayEnabled": true,
-    "lightingEnabled": true,
+    "lightingEnabled": false,
     "weatherEffectsEnabled": true,
     "difficulty": "normal",
     "tutorialsEnabled": true,

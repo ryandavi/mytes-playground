@@ -63,6 +63,15 @@ const withWallOpeningPlacement = BaseClass => class extends BaseClass {
         this.gameMap?.wallBuilder?.cancelOpeningMove(this);
     }
 
+    // Leaving the map by any route — stored from the action sidebar, discarded
+    // because placement failed — must fill the hole back in. An opening whose
+    // object is gone is a cutout nothing sits in and nothing can be placed
+    // over, and it persists into the save.
+    remove() {
+        this.gameMap?.wallBuilder?.releaseObject(this);
+        super.remove();
+    }
+
     /**
      * Presentation contract with the wall that hosts this opening.
      *

@@ -12,9 +12,13 @@ const withWallFixturePlacement = BaseClass => class extends BaseClass {
         return this.gameMap?.wallBuilder || null;
     }
 
+    // Deliberately the candidate rather than the resolved placement: a fixture
+    // dragged over an occupied patch of wall is still in front of that wall.
+    // Sorting an invalid position by the floor rule instead drops it behind the
+    // wall art, so the painting blinks out mid-drag and returns on release.
     getRenderZIndex() {
         if (Number.isFinite(this._attachmentRenderZIndex)) return super.getRenderZIndex();
-        const placement = this.getWallBuilder()?.resolveFixturePlacement(this, this.posX, this.posY);
+        const placement = this.getWallBuilder()?.getFixturePlacementCandidate(this, this.posX, this.posY);
         return placement
             ? this.gameMap.getDepthZIndex(placement.piece.baseline) + 1
             : super.getRenderZIndex();
@@ -57,6 +61,14 @@ const withWallFixturePlacement = BaseClass => class extends BaseClass {
     // Dropped into the inventory rather than back onto a wall.
     onPlacementStored() {
         this.getWallBuilder()?.cancelFixtureMove(this);
+    }
+
+    // Leaving the map by any route — stored from the action sidebar, discarded
+    // because placement failed — must hand the patch of wall back, or it stays
+    // reserved for an object that no longer exists.
+    remove() {
+        this.getWallBuilder()?.releaseObject(this);
+        super.remove();
     }
 
     // Presentation contract with the wall behind it: the SAME rule the authored

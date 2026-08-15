@@ -275,7 +275,17 @@ class Camera {
 		const zoom = this._getSafeZoomValue();
 		const clientX = Math.max(viewportRect.left, Math.min(viewportRect.right, cursor.x));
 		const clientY = Math.max(viewportRect.top, Math.min(viewportRect.bottom, cursor.y));
-		this.followCursorEdge(
+		// Dragging borrows the camera, it does not change how the camera works.
+		// Forcing edge scrolling here overrode the player's chosen mode for the
+		// length of every drag, so cursor following turned into edge scrolling
+		// the moment you picked something up. Edge scrolling stays the fallback
+		// for the modes that do not track the pointer at all, since a drag still
+		// has to be able to reach off-screen wall.
+		const follow = this.temporaryCursorFollow?.mode === CAMERA_FOLLOW_MODES.CURSOR
+			? this.followCursor
+			: this.followCursorEdge;
+		follow.call(
+			this,
 			(clientX - viewportRect.left) / zoom,
 			(clientY - viewportRect.top) / zoom,
 			this.parent.getCanvasRect(),

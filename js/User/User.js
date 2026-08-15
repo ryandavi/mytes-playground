@@ -1,4 +1,4 @@
-const USER_DATA_VERSION = 4;
+const USER_DATA_VERSION = 5;
 const USER_DEFAULT_PREFERENCES = Object.freeze({
     soundEnabled: true,
     musicEnabled: true,
@@ -18,7 +18,7 @@ const USER_DEFAULT_PREFERENCES = Object.freeze({
     effectsEnabled: true,
     animationsEnabled: true,
     timeOfDayOverlayEnabled: true,
-    lightingEnabled: true,
+    lightingEnabled: false,
     lightingDitherEnabled: true,
     weatherEffectsEnabled: true,
     tutorialsEnabled: true,
@@ -201,6 +201,14 @@ class User {
 		if (migrated.data_version < 4) {
 			migrated.lastSavedAt = null;
 			migrated.data_version = 4;
+		}
+
+		// v4 → v5: night lighting now ships off. Existing saves carry the old
+		// default explicitly, so without this the new default reaches nobody
+		// who has played before.
+		if (migrated.data_version < 5) {
+			if (migrated.preferences) migrated.preferences.lightingEnabled = false;
+			migrated.data_version = 5;
 		}
 
         if (migrated.data_version === USER_DATA_VERSION) {

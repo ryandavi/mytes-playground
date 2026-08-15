@@ -81,6 +81,13 @@ const SiteConfig = Object.freeze({
         // drawn art, so the transition always reads the same way.
         occlusionMarginPx: 48,          // slack on "does the full wall cover the subject"
         cutawayPaddingCells: 1,         // reveal this much extra either side of the subject
+        // A stretch of wall carrying one of these opening types does not cut
+        // away, the way a wall carrying a fixture does not: lowering it hides
+        // or strands what is mounted there. Doors are left out on purpose — a
+        // cutaway is usually looking into the very room whose door is in that
+        // wall, and a standing column at every door leaves nothing to cut.
+        // Add 'door' here if you would rather doorways stayed at full height.
+        cutawayKeepStandingOpenings: Object.freeze(['window']),
         cutawayLowerDelayMs: 80,        // a cell must stay occluding this long before it drops
         cutawayRaiseDelayMs: 300,       // ...and stay clear this long before it comes back up
         cutawayEvaluateThrottleMs: 100, // minimum spacing between occlusion re-evaluations

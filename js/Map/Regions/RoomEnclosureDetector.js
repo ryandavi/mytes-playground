@@ -69,6 +69,7 @@ class RoomEnclosureDetector {
 
         const authoredRooms = regionManager.all('room').filter(room => room.properties?.autoDetected !== true);
         const visited = new Set(exterior);
+        const components = [];
         const candidates = [];
         const minArea = Math.max(1, Number(SiteConfig.rooms?.minAreaCells) || 1);
         const cellSize = Number(grid.config?.cellSize) || 32;
@@ -92,6 +93,11 @@ class RoomEnclosureDetector {
                     }
                 }
 
+                // Every enclosed component, not just the ones that become
+                // rooms: the same flood fill answers "which authored rooms are
+                // one open space", which is what stops a half-height wall
+                // between two of them from cutting away on one side only.
+                components.push(component);
                 if (component.length < minArea) continue;
                 const intersectsAuthored = component.some(([cellX, cellY]) => {
                     const centerX = (cellX + 0.5) * cellSize;
@@ -121,6 +127,8 @@ class RoomEnclosureDetector {
             source: this
         })));
 
+        this.assignOpenSpaces(components, cellSize);
+
         for (const myte of this.gameMap.mytes || []) {
             regionManager.updateMembership(myte, { layers: ['room'], force: true });
         }
@@ -134,6 +142,32 @@ class RoomEnclosureDetector {
         }
 
         return added;
+    }
+
+    /**
+     * Stamps every room with the id of the enclosed area it belongs to.
+     *
+     * Two rooms only share one when nothing walls them apart — the fill treats
+     * wall cells AND openings as solid, so a doorway between two rooms keeps
+     * them separate, while a half-height divider or a wall that stops short
+     * leaves them as one space. That is the distinction the cutaway needs: a
+     * wall bounding one open area belongs to all of it, so standing anywhere
+     * inside lowers the whole run rather than the half whose far side happens
+     * to be the room you are standing in.
+     */
+    assignOpenSpaces(components, cellSize) {
+        const rooms = this.gameMap?.regionManager?.all('room') || [];
+        for (const room of rooms) room.properties.openSpaceId = null;
+        components.forEach((cells, index) => {
+            const id = `open_${index + 1}`;
+            for (const room of rooms) {
+                if (room.properties.openSpaceId) continue;
+                const inside = cells.some(([cellX, cellY]) =>
+                    room.contains((cellX + 0.5) * cellSize, (cellY + 0.5) * cellSize));
+                if (inside) room.properties.openSpaceId = id;
+            }
+        });
+        return rooms;
     }
 
     dispose() {
