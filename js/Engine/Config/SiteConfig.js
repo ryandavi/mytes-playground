@@ -88,6 +88,14 @@ const SiteConfig = Object.freeze({
         //           stub it leaves a sliver of frame.
         // 'keep'  - stays put, whole, at full height.
         fixtureCutBehavior: 'hide',
+        // Breathing room, in px, kept around anything mounted on a wall when
+        // deciding whether a cell may be torn out. Wall art does not run edge
+        // to edge inside its cell, so a wall that stops exactly at a painting's
+        // or a window's frame reads as if the thing were floating off the end.
+        // Removal treats this much either side of a mounted span as occupied;
+        // building only refuses cells the mounted thing actually covers, since
+        // adding wall beside one is never a problem.
+        mountedClearancePx: 8,
         cutawayDebounceMs: 180,
         maxGeneratedNodes: 300,
 

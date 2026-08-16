@@ -536,9 +536,19 @@ body.customize-mode {
     background: color-mix(in srgb, var(--state-info-accent) 35%, transparent);
     pointer-events: none;
 
+    // Removal is not refusal. Red belongs to "this will not happen" — and
+    // nothing else — so a cell that is genuinely coming out reads in the same
+    // action blue as one going in, hatched to say it is being taken away
+    // rather than added. While removal was drawn in danger red, a legal knock
+    // -through looked identical to a blocked one, and the wall came down
+    // anyway: the preview was saying no while the tool said yes.
     &.is-remove {
-        border-color: var(--color-danger);
-        background: color-mix(in srgb, var(--color-danger) 35%, transparent);
+        border-style: solid;
+        background-image: repeating-linear-gradient(
+            45deg,
+            transparent 0 4px,
+            color-mix(in srgb, var(--state-info-accent) 55%, transparent) 4px 8px
+        );
     }
 }
 

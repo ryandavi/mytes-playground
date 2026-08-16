@@ -54,14 +54,18 @@ class BuildRules {
         // Wall-mounted things are exempt from the obstruction sweep on purpose —
         // an opening or a fixture is SUPPOSED to share a cell with the wall it
         // sits in — but that exemption was reading "this fixture belongs here"
-        // as "anything at all may be built here".
+        // as "anything at all may be built here". No clearance: laying wall
+        // beside a painting is what a wall is for, only laying it across one is
+        // refused.
         const mounted = builder.getCellMounting(x, y);
         if (mounted) return BuildRules.deny(mounted.reason);
 
         // Not about this cell but its neighbours: a wall butting into the side
         // of a door or window turns that opening's cell into a junction and
-        // draws right through it.
-        const junction = builder.getOpeningJunctionConflict(x, y);
+        // draws right through it, and the same arm run into a wall carrying a
+        // painting splits the run out from under it.
+        const junction = builder.getOpeningJunctionConflict(x, y) ||
+            builder.getFixtureJunctionConflict(x, y);
         if (junction) return BuildRules.deny(junction.reason);
 
         return BuildRules.ALLOWED;
@@ -75,7 +79,10 @@ class BuildRules {
         const locked = this.getCellLock(x, y);
         if (locked) return locked;
 
-        const mounted = builder.getCellMounting(x, y);
+        // With clearance, unlike building: wall art does not fill its cell edge
+        // to edge, so a run that stops exactly where a painting or a window
+        // ends leaves it looking like it is hanging off the end of the wall.
+        const mounted = builder.getCellMounting(x, y, builder.getMountedClearancePx());
         if (mounted) return BuildRules.deny(mounted.reason);
 
         return BuildRules.ALLOWED;

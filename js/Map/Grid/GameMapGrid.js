@@ -1045,7 +1045,7 @@ class GridSystem {
         });
 
         // If the object is within current culling bounds, make it active immediately
-        const activationBounds = this.cullingBoundsFor(obj);
+        const activationBounds = this.cullingBoundsFor();
         if (!obj.excludeFromCulling && activationBounds && this.isObjectVisible(obj, activationBounds)) {
             this.activeObjects.add(obj);
         }
@@ -1068,18 +1068,24 @@ class GridSystem {
     /**
      * Which viewport rect decides whether this object is awake.
      *
-     * lastCullingBounds is clamped to the map because the grid sweep may only
-     * visit cells that exist. An off-grid object has no cells and routinely
-     * sits outside that rect — a painting on the top row of walls hangs above
-     * y=0 — so judging it there sleeps it the moment it is moved, and only the
-     * next full culling pass (which does use the unclamped rect) brings it
-     * back. That is the "painting vanishes while I drag it, zooming fixes it"
-     * bug: zoom is what forces the pass.
+     * Always the unclamped one. lastCullingBounds is clamped to the map because
+     * the grid SWEEP may only visit cells that exist — that is a constraint on
+     * iterating cells, not a statement about what the camera can see. The
+     * viewport routinely shows world outside the map rect: wall art stands a
+     * construction's height above row 0, and anything mounted on it hangs out
+     * there too.
+     *
+     * Judging visibility by the clamped rect therefore contradicted the sweep.
+     * A painting on the top row is a member of a cell at y=0, so the sweep put
+     * it in the active set, and then the clamped rect said its sprite — which
+     * lives entirely above y=0 — was off screen and slept it. In production
+     * nothing re-tested it, so the sweep won; with debug on, verifyActiveObjects
+     * ran every 15 frames and the two answers fought, which is the "painting
+     * disappears the moment I turn debug on, and flashes back for one frame
+     * whenever the camera moves" bug.
      */
-    cullingBoundsFor(obj) {
-        return this.offGridObjects.has(obj)
-            ? (this.lastViewBounds || this.lastCullingBounds)
-            : this.lastCullingBounds;
+    cullingBoundsFor() {
+        return this.lastViewBounds || this.lastCullingBounds;
     }
 
     // Helper method to check if an object is within visible bounds
@@ -1220,7 +1226,7 @@ class GridSystem {
         });
 
         // Check visibility state for active objects management
-        const visibilityBounds = this.cullingBoundsFor(obj);
+        const visibilityBounds = this.cullingBoundsFor();
         if (visibilityBounds && !obj.excludeFromCulling) {
             const wasVisible = this.isObjectVisible(obj, visibilityBounds, { x: oldX, y: oldY });
             const isVisible = this.isObjectVisible(obj, visibilityBounds);
@@ -1299,7 +1305,11 @@ class GridSystem {
 
         // Check if any objects in the parent's objects array are within bounds but not active
         this.parent.objects.forEach(obj => {
-            if (this.isObjectVisible(obj, bounds) && !this.activeObjects.has(obj)) {
+            // The unclamped viewport, not the map-clamped rect the cell sweep
+            // runs on — see cullingBoundsFor. Wall art and anything mounted on
+            // it stand above y=0, outside the map but well inside the view.
+            const activationBounds = this.cullingBoundsFor() || bounds;
+            if (this.isObjectVisible(obj, activationBounds) && !this.activeObjects.has(obj)) {
                 this.activeObjects.add(obj);
                 if (obj.wake) obj.wake();
                 missingObjects.push(obj);
@@ -1641,7 +1651,11 @@ class GridSystem {
 
         // Check for objects that should be active but aren't
         this.parent.objects.forEach(obj => {
-            const shouldBeActive = this.isObjectVisible(obj, this.lastCullingBounds);
+            // The same rect the culling pass judges by — see cullingBoundsFor.
+            // This scan only runs in debug mode, so while it used the clamped
+            // rect it was debug mode itself that made wall fixtures vanish.
+            const visibilityBounds = this.cullingBoundsFor() || this.lastCullingBounds;
+            const shouldBeActive = this.isObjectVisible(obj, visibilityBounds);
             const isActive = this.activeObjects.has(obj);
 
             if (shouldBeActive && !isActive) {

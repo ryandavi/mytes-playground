@@ -2592,8 +2592,8 @@ body.customize-mode .wall-piece {
   pointer-events: none;
 }
 .wall-build-ghost-cell.is-remove {
-  border-color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 35%, transparent);
+  border-style: solid;
+  background-image: repeating-linear-gradient(45deg, transparent 0 4px, color-mix(in srgb, var(--state-info-accent) 55%, transparent) 4px 8px);
 }
 
 .value-stepper {

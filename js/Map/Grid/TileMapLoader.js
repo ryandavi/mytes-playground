@@ -948,26 +948,11 @@ generateGridData(mapData, gridConfig = {}) {
         }
     }
 
-    if (SiteConfig.wallSystem?.enabled === true && mapData.walls) {
-        const openingsByCell = new Map();
-        for (const opening of mapData.walls.openings) {
-            for (const [x, y] of opening.cells) openingsByCell.set(`${x},${y}`, opening);
-        }
-        for (const wall of mapData.walls.cells) {
-            const cell = grid[wall.x]?.[wall.y];
-            if (!cell) continue;
-            const opening = openingsByCell.get(`${wall.x},${wall.y}`);
-            if (opening?.type === 'door') {
-                cell.wallBlocksLineOfSight = false;
-                continue;
-            }
-            cell.walkable = false;
-            cell.tileWalkable = false;
-            cell.wallBlocksLineOfSight = opening
-                ? opening.blocksLineOfSight === true
-                : wall.blocksLineOfSight !== false;
-        }
-    }
+    // Wall cells are deliberately NOT stamped here. WallBuilder.syncGridWallState
+    // owns that, and it runs on every wall edit — including the removals that
+    // this pass knew nothing about. Stamping both places left the grid with no
+    // record of what a cell was before a wall stood on it, so a wall torn down
+    // in build mode could never hand its collider back.
 
     return { grid, width: gridWidth, height: gridHeight, cellSize };
 }

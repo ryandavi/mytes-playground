@@ -397,18 +397,69 @@ class WallBuilder {
         this.syncGridWallState();
     }
 
+    /**
+     * Stamp the wall's collision and sight-blocking onto the grid — and, just
+     * as importantly, take it off again.
+     *
+     * A wall cell is the only writer of `tileWalkable` after load, so the state
+     * a cell had BEFORE this stamped it is remembered per cell and handed back
+     * when the wall comes down. Without that hand-back a torn-down wall left an
+     * invisible collider standing exactly where it had been: Mytes pathed
+     * around nothing, sight lines stopped at nothing, and the debug grid drew
+     * the ghost of the wall you had just removed.
+     *
+     * TileMapLoader deliberately no longer stamps wall cells, so the remembered
+     * state is the tile layer's own answer rather than this system's previous
+     * one — otherwise removing an authored wall would restore "unwalkable".
+     */
     syncGridWallState() {
         const gridSystem = this.gameMap.gridSystem;
         if (!gridSystem?.grid) return;
+        const previous = this._gridWallBaseline ||= new Map();
+        const stamped = new Set();
+        let changed = false;
+
         for (const cell of this.baseCells.values()) {
+            const key = `${cell.x},${cell.y}`;
             const gridCell = gridSystem.grid[cell.x]?.[cell.y];
             if (!gridCell) continue;
-            const opening = this.openingByCell.get(`${cell.x},${cell.y}`);
+            if (!previous.has(key)) {
+                previous.set(key, {
+                    tileWalkable: gridCell.tileWalkable,
+                    wallBlocksLineOfSight: gridCell.wallBlocksLineOfSight
+                });
+                changed = true;
+            }
+            stamped.add(key);
+            const opening = this.openingByCell.get(key);
             gridCell.tileWalkable = opening?.type === 'door';
             gridCell.wallBlocksLineOfSight = opening
                 ? opening.blocksLineOfSight === true
                 : cell.blocksLineOfSight !== false;
             gridCell.walkable = gridCell.tileWalkable && gridCell.objectWalkable;
+        }
+
+        for (const [key, baseline] of previous) {
+            if (stamped.has(key)) continue;
+            previous.delete(key);
+            changed = true;
+            const [x, y] = key.split(',').map(Number);
+            const gridCell = gridSystem.grid[x]?.[y];
+            if (!gridCell) continue;
+            gridCell.tileWalkable = baseline.tileWalkable;
+            gridCell.wallBlocksLineOfSight = baseline.wallBlocksLineOfSight;
+            gridCell.walkable = gridCell.tileWalkable && gridCell.objectWalkable;
+        }
+
+        // The pathfinder charges a per-node cost from a wall-adjacency count
+        // precomputed at load, on the assumption that tile walkability never
+        // moves. Build mode moves it, so the count is recomputed whenever the
+        // set of wall cells changes.
+        if (changed) {
+            gridSystem._computeStaticWallCounts?.();
+            // The debug grid is only redrawn when something marks it stale, and
+            // wall edits move the very cells it colours.
+            if (gridSystem.debugMode) gridSystem._debugDirty = true;
         }
         gridSystem.invalidatePathfinderCaches?.();
     }
@@ -2239,26 +2290,120 @@ class WallBuilder {
         return null;
     }
 
+    // Breathing room either side of a mounted span, in px. Configurable
+    // because it is a look, not a rule: it exists so a wall does not stop dead
+    // at the edge of a picture frame.
+    getMountedClearancePx() {
+        const value = Number(SiteConfig.wallSystem.mountedClearancePx);
+        return Number.isFinite(value) && value > 0 ? value : 0;
+    }
+
     /**
-     * What this cell is carrying that would be orphaned by removing it. A wall
-     * holding a door or a painting refuses to go — those have nowhere to fall
-     * back to but a hole in the world.
+     * Everything mounted on the walls, as a horizontal span on the wall ROW
+     * that carries it: `{ row, left, right, kind, reason, entity }`.
+     *
+     * A row rather than a rect, because a fixture's art hangs on the face —
+     * 160px of it, standing rows above the cell it belongs to — so its world
+     * `posY` says nothing about which cell holds it up. Its span is measured
+     * the same way the cutaway measures it (getFixtureSpan, off the piece the
+     * fixture actually hangs on) rather than off the cell recorded at drop
+     * time, which a later re-split of the run leaves pointing elsewhere.
      */
-    getCellMounting(x, y) {
-        const opening = this.openingByCell.get(`${x},${y}`);
-        if (opening) {
+    getMountedWallSpans() {
+        const cellSize = this.cellSize;
+        const spans = [];
+
+        for (const opening of this.openings) {
             const type = String(opening.type || 'opening').toLowerCase();
-            return { reason: `Remove the ${type} first.`, entity: this.gameMap.getObjectById?.(opening.id) };
+            const object = this.gameMap.getObjectById?.(opening.id) || null;
+            for (const [cellX, cellY] of opening.cells || []) {
+                spans.push({
+                    kind: 'opening',
+                    row: cellY,
+                    left: cellX * cellSize,
+                    right: (cellX + 1) * cellSize,
+                    reason: `Remove the ${type} first.`,
+                    entity: object
+                });
+            }
         }
 
-        const piece = this.findPieceForCell(x, y);
-        const fixture = piece && this.fixtures.find(record => {
-            const [cellX, cellY] = record.cells?.from || [record.cellX, record.cellY];
-            return this.findPieceForCell(cellX, cellY)?.id === piece.id;
-        });
-        if (fixture) {
-            const object = this.gameMap.getObjectById?.(fixture.id);
-            return { reason: `Take the ${object?.getDisplayName?.() || 'fixture'} down first.`, entity: object };
+        for (const record of this.fixtures) {
+            const object = this.gameMap.getObjectById?.(record.id);
+            const span = object ? this.getFixtureSpan(object) : null;
+            if (!span) continue;
+            spans.push({
+                kind: 'fixture',
+                row: span.piece.y,
+                left: span.left,
+                right: span.right,
+                reason: `Take the ${object.getDisplayName?.() || 'fixture'} down first.`,
+                entity: object
+            });
+        }
+
+        return spans;
+    }
+
+    /**
+     * What this cell is carrying that the edit would orphan. A wall holding a
+     * door or a painting refuses to go — those have nowhere to fall back to but
+     * a hole in the world — and a wall may not be built across one either.
+     *
+     * Measured as a span on the row, not by which piece the fixture's recorded
+     * cell happens to resolve to. That older test asked "is this fixture on the
+     * same run?", which answered yes for every cell of a long wall — so one
+     * painting locked a whole run against removal — while a painting overhanging
+     * the end of its run into an empty cell answered no, and a wall was built
+     * straight over the canvas.
+     *
+     * @param {number} clearance px of margin either side of the span to count
+     *   as occupied. Removal passes the configured clearance so the wall keeps
+     *   a shoulder under what it carries; building passes 0, because putting
+     *   wall up NEXT to a painting is fine — only covering it is not.
+     */
+    getCellMounting(x, y, clearance = 0) {
+        const left = x * this.cellSize;
+        const right = left + this.cellSize;
+        for (const span of this.getMountedWallSpans()) {
+            if (span.row !== y) continue;
+            if (right <= span.left - clearance || left >= span.right + clearance) continue;
+            return { reason: span.reason, entity: span.entity };
+        }
+        return null;
+    }
+
+    /**
+     * Whether building here would drive an arm into the run a fixture hangs on.
+     *
+     * The fixture counterpart to getOpeningJunctionConflict, and the same shape
+     * of bug: a cell above or below a wall is not that wall's cell, so nothing
+     * in the mounting test looks at it — but connectivity does not care which
+     * edit came first. The new arm turns the cell under the painting into a
+     * junction, that cell stops being part of a straight horizontal run, and
+     * the piece carrying the painting splits underneath it. What the player
+     * sees is a painting that jumps sideways when a wall is built nowhere near
+     * it.
+     */
+    getFixtureJunctionConflict(x, y) {
+        const clearance = this.getMountedClearancePx();
+        const left = (x * this.cellSize) - clearance;
+        const right = left + this.cellSize + (2 * clearance);
+        const group = this.baseCells.get(`${x},${y}`)?.connectGroup ||
+            this.wallData.defaults.connectGroup;
+
+        for (const dy of [-1, 1]) {
+            const neighbor = this.cells.get(`${x},${y + dy}`);
+            if (!neighbor || neighbor.connectGroup !== group) continue;
+            for (const span of this.getMountedWallSpans()) {
+                if (span.kind !== 'fixture' || span.row !== y + dy) continue;
+                if (right <= span.left || left >= span.right) continue;
+                return {
+                    reason: `A wall here would split the wall the ${
+                        span.entity?.getDisplayName?.() || 'fixture'} hangs on.`,
+                    entity: span.entity
+                };
+            }
         }
 
         return null;
@@ -2988,16 +3133,30 @@ class WallBuilder {
         );
     }
 
+    /**
+     * Anchored to the cell the fixture actually hangs over, not to the piece's
+     * origin cell, with `u` measured from that cell's left edge (`uPx` says so,
+     * since a bare `u` of 0..1 is read as a normalized authored offset).
+     *
+     * The piece origin moves whenever the run is edited — extend it leftwards
+     * and it slides, split it and the recorded cell can end up on the half the
+     * fixture is not on — and every read of this record then resolves against
+     * the wrong face. The cell under the fixture is the one thing that stays
+     * true as long as the fixture does.
+     */
     createFixtureRecord(object, placement = this.resolveFixturePlacement(object)) {
         if (!placement) return null;
-        const [cellX, cellY] = [placement.piece.x, placement.piece.y];
+        const center = placement.position.x + (object.size.width / 2);
+        const cellX = Math.floor(center / this.cellSize);
+        const cellY = placement.piece.y;
         return {
             id: String(object.id),
             mapId: this.gameMap.id,
             cells: { from: [cellX, cellY], to: [cellX, cellY] },
             face: 'south',
             socketId: 'surface',
-            u: placement.u,
+            u: center - (cellX * this.cellSize),
+            uPx: true,
             v: placement.v,
             width: object.size.width,
             height: object.size.height
@@ -3011,7 +3170,11 @@ class WallBuilder {
         const construction = this.registry.getConstruction(piece?.constructionId);
         if (!surface || !construction) return false;
 
-        const localU = Number(record.u) <= 1
+        // `uPx` records say outright that u is pixels from the anchor cell's
+        // left edge. Without it the only signal is magnitude, and a fixture
+        // centred within a pixel of that edge reads as a normalized 0..1
+        // offset and jumps half a cell.
+        const localU = record.uPx !== true && Number(record.u) <= 1
             ? Utility.clamp(Number(record.u), 0, 1) * this.cellSize
             : Number(record.u);
         const u = ((cellX - piece.x) * this.cellSize) + localU;
