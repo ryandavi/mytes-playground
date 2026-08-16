@@ -12,6 +12,9 @@ const allowed = [
     // Same reasoning for the wall cutaway: it is presentation, and it has to
     // keep tracking the cursor while build mode holds SimClock stopped.
     /^Map\/Walls\/WallBuilder\.js$/,
+    // The Tiled exporter is a dev tool talking to a file on disk: its Date.now()
+    // is a cache-buster on a fetch, which has to be wall-clock to work at all.
+    /^Map\/Walls\/WallTiledExporter\.js$/,
     /^Map\/Grid\/AStarPathfinder\.js$/,
     /^Map\/MapEnvironmentManager\.js$/,
     /^Map\/MapObjects\/(DroppedMapItem|MapObjectInputController)\.js$/,

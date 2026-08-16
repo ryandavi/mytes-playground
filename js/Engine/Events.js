@@ -1,5 +1,6 @@
 const EVENTS = Object.freeze({
     BUILD_HISTORY_CHANGED: 'build:history_changed',
+    BUILD_POLICY_CHANGED: 'build:policy_changed',
     CAMERA_ZOOM_CHANGED: 'camera:zoom_changed',
     CHEST_OPENED: 'chest:opened',
     COLLISION: 'collision',
@@ -29,6 +30,7 @@ const EVENTS = Object.freeze({
     PLANT_MUTATED: 'plant:mutated',
     PLANT_POLLINATED: 'plant:pollinated',
     RELATIONSHIP_CLEARED: 'relationship:cleared',
+    SIMULATION_RATE_CHANGED: 'simulation:rate_changed',
     SURFACE_FINISH_CHANGED: 'surface:finish_changed',
     TRAVEL_ARRIVED: 'travel_arrived',
     TRAVEL_PROGRESS: 'travel_progress',

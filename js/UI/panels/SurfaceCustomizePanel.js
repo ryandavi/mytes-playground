@@ -16,8 +16,10 @@ class SurfaceCustomizePanel extends ModalWindow {
         });
         this.target = null;
         this.hoverTimer = null;
-        this.highlightElements = [];
-        this.highlightKey = null;
+        // Two independent outlines over the same geometry: what the pointer is
+        // on, and what a click already chose. See `setOverlay`.
+        this.hover = { elements: [], key: null, className: 'paint-hover' };
+        this.selection = { elements: [], key: null, className: 'paint-selection' };
         this.boundStagePointerDown = this.handleStagePointerDown.bind(this);
         this.boundStagePointerMove = this.handleStagePointerMove.bind(this);
         this.init();
@@ -34,16 +36,24 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.targetElement = this.modalElement?.querySelector('.surface-target');
         this.targetRoomElement = this.modalElement?.querySelector('.surface-target__room');
         this.targetSurfaceElement = this.modalElement?.querySelector('.surface-target__surface');
-        this.wallView = new WallViewControl(this, this.modalElement?.querySelector('.wall-view-controls'));
         this.scope = new SegmentControl(this.scopeElement, {
             value: 'stretch',
             onChange: () => this.renderPalette()
         });
-        this.gridToggle = new BuildGridToggle(this, this.modalElement);
-        this.snapToggle = new BuildSnapToggle(this, this.modalElement);
         this.paletteElement?.addEventListener('pointerleave', () => this.revertPreview());
         this.parent?.parent?.canvas?.addEventListener('pointerdown', this.boundStagePointerDown, true);
         this.parent?.parent?.canvas?.addEventListener('pointermove', this.boundStagePointerMove, true);
+        // Both outlines are absolutely positioned over wall pieces the builder
+        // throws away and rebuilds — when a wall is painted, when it changes
+        // height, when the presentation is lowered. Redrawing from the stored
+        // target is what keeps the selection on the wall it belongs to instead
+        // of leaving a rectangle hanging in the air.
+        const events = this.parent?.parent?.eventManager;
+        this.overlayUnsubscribers = [
+            events?.on?.(EVENTS.WALL_GEOMETRY_CHANGED, () => this.redrawOverlays()),
+            events?.on?.(EVENTS.WALL_PRESENTATION_CHANGED, () => this.redrawOverlays()),
+            events?.on?.(EVENTS.SURFACE_FINISH_CHANGED, () => this.redrawOverlays())
+        ];
     }
 
     get gameMap() {
@@ -55,15 +65,12 @@ class SurfaceCustomizePanel extends ModalWindow {
         document.body.classList.toggle('customize-mode', active);
         this.buttonElement?.classList.toggle('active', active);
         this.revertPreview();
-        this.clearHighlight();
-        this.target = null;
+        this.setOverlay(this.hover, null);
+        this.setTarget(null);
         this.renderPalette();
         // The panel opens with the mode, not with the first click: entering a
         // mode that says nothing and shows nothing reads as "nothing happened".
         if (active) {
-            this.wallView.sync();
-            this.gridToggle.sync();
-            this.snapToggle.sync();
             this.open();
         } else {
             super.close();
@@ -87,29 +94,43 @@ class SurfaceCustomizePanel extends ModalWindow {
     }
 
     /**
-     * Outlines exactly the surfaces a click would repaint.
+     * Tints exactly the surfaces a click would repaint.
      *
-     * Keyed on the SURFACE under the pointer, not the piece: one wall piece can
-     * show two rooms' paint at once — a corner post is split down the middle —
-     * so crossing that seam is a new selection even though the piece has not
-     * changed.
+     * The overlay is keyed on the SURFACE under the pointer, not the piece: one
+     * wall piece can show two rooms' paint at once — a corner post is split
+     * down the middle — so crossing that seam is a new target even though the
+     * piece has not changed.
      */
     handleStagePointerMove(event) {
         if (!this.parent.isTool(UIToolModes.SURFACE)) return;
-        const target = this.resolveTarget(event);
-        const key = target
-            ? (target.surface === 'wall'
-                ? `wall:${target.wallSurface.cell.x},${target.wallSurface.cell.y},${target.wallSurface.face}`
-                : `floor:${target.room.id}`)
-            : null;
-        if (key === this.highlightKey) return;
+        this.setOverlay(this.hover, this.resolveTarget(event));
+    }
 
-        this.clearHighlight();
+    /**
+     * The hover tint and the selection outline are the same geometry drawn from
+     * the same kind of target — a run of wall, or a room's floor — so they are
+     * one renderer with two slots and two class names. Only the styling
+     * differs: hover says "this is what you would get", selection says "this is
+     * what you are editing", and both are on screen at once while you move
+     * around a room you have already picked.
+     */
+    setOverlay(slot, target, { force = false } = {}) {
+        const key = SurfaceCustomizePanel.targetKey(target);
+        if (key === slot.key && !force) return;
+
+        this.clearOverlay(slot);
         if (!target) return;
-        this.highlightElements = target.surface === 'wall'
-            ? this.createWallHighlight(target.wallSurface)
-            : [this.createFloorHighlight(target.room)].filter(Boolean);
-        this.highlightKey = this.highlightElements.length > 0 ? key : null;
+        slot.elements = target.surface === 'wall'
+            ? this.createWallOverlay(target.wallSurface, slot.className)
+            : [this.createFloorOverlay(target.room, slot.className)].filter(Boolean);
+        slot.key = slot.elements.length > 0 ? key : null;
+    }
+
+    static targetKey(target) {
+        if (!target) return null;
+        return target.surface === 'wall'
+            ? `wall:${target.wallSurface.cell.x},${target.wallSurface.cell.y},${target.wallSurface.face}`
+            : `floor:${target.room.id}`;
     }
 
     /**
@@ -117,12 +138,12 @@ class SurfaceCustomizePanel extends ModalWindow {
      * corner post is not a rectangle, and a box drawn round it offered paint on
      * the other half — the half belonging to the room next door.
      */
-    createWallHighlight(surface) {
+    createWallOverlay(surface, className) {
         const builder = this.gameMap?.wallBuilder;
         const rects = builder?.getSurfaceRects(builder.getPaintStretchSurfaces(surface)) || [];
         return rects.map(rect => {
             const element = document.createElement('div');
-            element.className = 'wall-paint-highlight';
+            element.className = `surface-paint-overlay ${className}`;
             Object.assign(element.style, {
                 left: `${rect.left}px`,
                 top: `${rect.top}px`,
@@ -135,20 +156,21 @@ class SurfaceCustomizePanel extends ModalWindow {
         });
     }
 
-    // Same tint as the wall highlight, through the floor's own mask — the two
-    // surfaces are the same kind of selection and should not look like two
-    // different features.
-    createFloorHighlight(room) {
+    // Through the floor's own mask, not as a box over it — the two surfaces are
+    // the same kind of selection and should not look like two different
+    // features. A canvas cannot take a CSS border, so the outline the wall gets
+    // from its class reads here as a heavier tint.
+    createFloorOverlay(room, className) {
         return this.gameMap?.floorBuilder?.createRoomOverlay(room, {
-            className: 'floor-paint-highlight',
-            fill: SurfaceCustomizePanel.highlightFill()
+            className: `surface-paint-overlay ${className}`,
+            fill: SurfaceCustomizePanel.overlayFill(className)
         }) ?? null;
     }
 
-    static highlightFill() {
+    static overlayFill(className) {
         const accent = getComputedStyle(document.documentElement)
             .getPropertyValue('--state-info-accent').trim() || '#4285f4';
-        return `color-mix(in srgb, ${accent} 22%, transparent)`;
+        return `color-mix(in srgb, ${accent} ${className === 'paint-selection' ? 34 : 22}%, transparent)`;
     }
 
     /**
@@ -156,31 +178,31 @@ class SurfaceCustomizePanel extends ModalWindow {
      *
      * Walls are resolved from the element because their art rises above the
      * cell they occupy — the cursor on a visible wall is nowhere near that
-     * wall's own tile. Floors are the opposite: resolved from world coordinates,
-     * because the floor canvas is a bounding box with bleed, so hit-testing it
-     * claimed ground belonging to the room next door.
+     * wall's own tile. Floors are the opposite: resolved from world
+     * coordinates, because the floor canvas is a bounding box with bleed, so
+     * hit-testing it would claim ground belonging to the room next door.
      */
     resolveTarget(event) {
         const piece = this.resolveWallPiece(event);
-        // Which surface, not which piece: the face a click lands on is a
-        // property of the slice of art under the pointer, and only the renderer
-        // knows which slice that is.
-        const wallSurface = piece
-            ? this.gameMap?.wallBuilder?.surfaceAtOffset(piece, Math.floor(event.offsetX ?? -1))
-            : null;
-        if (wallSurface) return { surface: 'wall', piece, wallSurface, face: wallSurface.face };
+        if (piece) {
+            // Which surface of the piece, not merely which piece: a corner post
+            // shows two rooms' paint at once, split down the middle, so the
+            // pixel under the cursor is what decides.
+            const surface = this.gameMap?.wallBuilder?.surfaceAtOffset(piece, event.offsetX);
+            if (surface) return { surface: 'wall', wallSurface: surface, piece };
+        }
         const room = this.resolveRoomAt(event);
         return room ? { surface: 'floor', room } : null;
     }
 
     /**
-     * The paintable wall piece under a pointer, or null.
+     * The wall piece under the pointer, if it is one that can be painted.
      *
-     * A wall's canvas is a full frame band whatever the wall is currently
-     * doing, so with the walls lowered most of that box is transparent air
-     * hanging over the floor behind it — and the box, not the art, was catching
-     * every click. The alpha test asks whether the pointer is on the wall you
-     * can actually see; anywhere else falls through to the floor.
+     * A piece's element is the bounding box of art that leans back off the cell
+     * it stands on, so with the walls lowered most of that box is transparent
+     * air hanging over the floor behind it — and the box, not the art, was
+     * catching every click. The alpha test asks whether the pointer is on the
+     * wall you can actually see; anywhere else falls through to the floor.
      *
      * A north-south run is a target like any other — its post is two painted
      * half-cell surfaces — and the alpha test is what keeps the click honest,
@@ -228,10 +250,30 @@ class SurfaceCustomizePanel extends ModalWindow {
         ) ?? null;
     }
 
-    clearHighlight() {
-        for (const element of this.highlightElements) element.remove();
-        this.highlightElements = [];
-        this.highlightKey = null;
+    clearOverlay(slot) {
+        for (const element of slot.elements) element.remove();
+        slot.elements = [];
+        slot.key = null;
+    }
+
+    /**
+     * What is selected, and the outline that says so. The panel names the room
+     * and the face, but a name is not an answer to "which of these four walls
+     * am I about to paint" — the outline is, and until there was one the only
+     * mark on the map was the hover tint, which is under your cursor and
+     * therefore never on the thing you picked a moment ago.
+     */
+    setTarget(target) {
+        this.target = target;
+        this.setOverlay(this.selection, target);
+    }
+
+    // The elements were parented to art that has since been rebuilt, so both
+    // slots are drawn again from scratch rather than moved.
+    redrawOverlays() {
+        if (!this.parent.isTool(UIToolModes.SURFACE)) return;
+        this.setOverlay(this.selection, this.target, { force: true });
+        this.setOverlay(this.hover, null);
     }
 
     handleStagePointerDown(event) {
@@ -243,7 +285,7 @@ class SurfaceCustomizePanel extends ModalWindow {
         if (!target) return;
         event.preventDefault();
         event.stopPropagation();
-        this.target = target;
+        this.setTarget(target);
         // Alt-click samples what is already there instead of selecting it to
         // paint - the finish resolvers already answer the question.
         if (event.altKey) {
@@ -404,7 +446,7 @@ class SurfaceCustomizePanel extends ModalWindow {
         const surface = this.target.wallSurface;
 
         if ((scopeOverride || this.getWallScope()) !== 'room') {
-            // Exactly the surfaces the highlight outlined: same call, same room
+            // Exactly the surfaces the overlay outlined: same call, same room
             // test, same stopping rule. Deriving the painted set separately
             // from the previewed one is what let a click outline one wall and
             // repaint another.
@@ -527,6 +569,7 @@ class SurfaceCustomizePanel extends ModalWindow {
             this.target.wallSurface = builder?.getCellSurfaces(builder.cells.get(`${cell.x},${cell.y}`))
                 ?.find(entry => entry.face === face) || this.target.wallSurface;
         }
+        this.redrawOverlays();
         this.renderPalette();
         return true;
     }
@@ -575,19 +618,16 @@ class SurfaceCustomizePanel extends ModalWindow {
 
     dispose() {
         this.revertPreview();
-        this.clearHighlight();
+        this.clearOverlay(this.hover);
+        this.clearOverlay(this.selection);
+        this.overlayUnsubscribers?.forEach(unsubscribe => unsubscribe?.());
+        this.overlayUnsubscribers = [];
         this.roomNameInput = null;
         this.roomTypeSelect = null;
         this.roomFields = [];
         document.body.classList.remove('build-target-locked');
-        this.wallView?.dispose();
-        this.wallView = null;
         this.scope?.dispose();
         this.scope = null;
-        this.gridToggle?.dispose();
-        this.gridToggle = null;
-        this.snapToggle?.dispose();
-        this.snapToggle = null;
         this.parent?.parent?.canvas?.removeEventListener('pointerdown', this.boundStagePointerDown, true);
         this.parent?.parent?.canvas?.removeEventListener('pointermove', this.boundStagePointerMove, true);
         document.body.classList.remove('customize-mode');

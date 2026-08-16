@@ -71,6 +71,59 @@ Optional wall defaults may be set on the map, layer, or individual tile; the mos
 
 Connectivity depends on `wallConnectGroup`, not paint. Two adjoining plaster walls painted different colors remain structurally connected.
 
+### 3.1.1 Layer convention
+
+The loader is permissive on purpose — it finds wall cells by tileset marker and Wang-set membership, so walls work from any layer, under any name, with no properties at all. That permissiveness is a loading rule, not an authoring one. Maps drifted under it: two test maps kept their walls on a layer named `Collider`, and `Outside` had a `Walls` layer that declared nothing and so silently inherited `SiteConfig`'s plaster defaults. Nothing broke; it just stopped being possible to tell from the map file what the walls were made of.
+
+The convention, enforced by `node scripts/validate-maps.js`:
+
+1. **Wall tiles get their own layer.** Never mixed in with colliders or floors. This is the one rule with teeth: `WallTiledExporter` rewrites a wall layer in full, so a foreign tile on that layer only survives because the exporter goes looking for it and carries it across. The validator reports mixing as an error; everything else is a warning.
+2. **The layer is named `Walls`**, or `Walls <construction>` when a map genuinely needs more than one.
+3. **It declares all four material properties explicitly** — `wallConstructionId`, `wallFinishId`, `wallHeightCells`, `wallConnectGroup` — plus `blocksLineOfSight`, even where the value matches the default. Inheriting silently is how `Outside` ended up plastered.
+4. **It sits last among the tile layers**, after the floors, so Tiled's stacking previews what the game draws.
+5. **Per-room paint belongs on the Room object**, not on a second wall layer. A room's `wallFinishId` (see `House.tmx`) repaints every face bordering it. Split the layer only when the *construction*, *height* or *connect group* differ — splitting on finish alone produces layers that duplicate what the room graph already says.
+
+Material lives on the layer because it cannot live on the tile: tile properties belong to the tileset, so every cell painted with a given Wang tile would be forced to share them. The layer is the only place in a `.tmx` where per-cell material can vary, which is why the exporter groups cells by material tuple and emits one layer per group.
+
+### 3.1.2 Rooms and zones are one rectangle
+
+A **room volume** (`Rooms` group, object named `Room`, carrying `roomId`) is the spatial unit: lighting, floor and wall finishes, the room graph, room naming. A **zone** is a gameplay affordance — the `rest`/`play`/`food`/`social` type the AI seeks out.
+
+In every map these described the same rectangle, authored twice, and the two copies drifted: House's kitchen zone sat one pixel off its own kitchen room, because room bounds are snapped to the grid on load and zone bounds are not. Its Zone objects also carried `floorFinishId`/`wallFinishId` that nothing ever read — those are only consulted on room volumes.
+
+A room volume that declares **`zoneType`** now emits the gameplay zone as well, from the one rectangle:
+
+```xml
+<object id="126" name="Room" x="32" y="32" width="448" height="416">
+ <properties>
+  <property name="roomId" value="zone_kitchen"/>
+  <property name="displayName" value="Kitchen"/>
+  <property name="zoneType" value="food"/>
+  <property name="floorFinishId" value="floor_tile_check"/>
+ </properties>
+</object>
+```
+
+**Rooms and zones are independent.** All four combinations are legal and all four are in use:
+
+| | has a zone | no zone |
+|---|---|---|
+| **has a room** | `Room` + `zoneType` — House's bedroom, kitchen, playroom, chatroom | `Room` alone — House's hallway, DoorTest's two rooms, RegionTest's L room |
+| **no room** | `Zone` alone — Forest's clearing, Outside's lake and chatroom | neither — FieldTest |
+
+A room with no `zoneType` is a space with lighting and finishes that a Myte has no reason to seek out; a hallway is passed through, not visited. A standalone `Zone` is a gameplay affordance in open air — giving Forest's clearing a room volume would invent a lighting volume where none belongs. Merge the two only when one rectangle genuinely describes both, which is precisely the case that used to be authored twice.
+
+`zoneType` is the property name in both forms. Standalone `Zone` objects also still accept the older `type` spelling. When a room emits a zone the two share an id — they are the same space, and one identity is what stops the halves drifting apart again.
+
+`LIGHTVOLUME` is still accepted as an object name but is a lighting-era spelling of `Room`; the shipped maps have been renamed.
+
+**Zone types come in two categories**, both catalogued in `data/metadata/zones.json` and both authored the same way:
+
+- **`stat`** — `rest`, `play`, `food`, `social`, `danger`, `boost`. Applies its `effects` block to a Myte standing inside, per tick.
+- **`ambient`** — `water_lake`, `water_river`. A spatial tag with no effect on a Myte at all; other systems query it by type. The water zones tell the audio system it is standing by a lake rather than a river, which the fallback tile scan cannot distinguish. They carry no `effects` key, so the per-tick apply path short-circuits.
+
+`node scripts/validate-maps.js` fails on a `zoneType` that is not in the catalogue. An unregistered type is not a crash — the zone loads, and can still be found by type — it simply does nothing, which is what makes a typo there expensive to spot.
+
 ### 3.2 Authored openings
 
 Doors and windows are opening records on the wall footprint:
@@ -106,6 +159,26 @@ Wall objects are authored on an object layer, not painted visually above the wal
 - A future registered fixture type may use `wallFixture=true`; it follows the same `face`/`u`/`v` contract.
 
 The loader resolves the owning generated wall from these semantic values. Tiled therefore previews the footprint and object identity, while the runtime/debug view is authoritative for the projected face height and final art alignment.
+
+### 3.4 Round-tripping in-game walls back to Tiled
+
+Walls only ever flowed one way. Tiled painted them, the loader reduced them to cells, and anything built in Build Mode lived as a delta in the player's save that the map file knew nothing about.
+
+`WallTiledExporter` closes the loop. In Build Mode on a local host, **To Tiled** writes the walls currently standing on the map back into the `.tmx` it was loaded from.
+
+- It **patches, never regenerates**: the document is parsed, the wall layers and wall objects are replaced, and every other layer, object, property and attribute is returned untouched. Regenerating from what the runtime models would discard every hand-authored floor layer on the first export.
+- Which layers are wall layers is **not a heuristic** — every authored cell records `sourceLayerId`, so the set is exact.
+- Objects are **updated in place** by id, so authored properties the wall system never reads (variant, custom flags) survive. Records with no element are appended using the map's `nextobjectid`; elements whose record is gone are removed.
+- The **mask ↔ Wang tile mapping is a bijection** over masks 1–15. The `Wall` set is `type="edge"`, so wangid slots 0/2/4/6 are N/E/S/W and line up with the mask bits in §4. Mask 0 — an isolated cell with no wall neighbour — has no Wang tile and cannot have one; it is written with `SiteConfig.wallSystem.wangIsolatedFallbackMask` and reported as a warning. Tiled cannot paint one either.
+- **Bridged cells are not written.** A doorway is usually drawn as a gap in the tile layer with the door object supplying the aperture; the runtime then bridges that gap with cells of its own to keep the run structurally connected. Those carry `bridged: true` and are skipped, so the author's gap survives. The bridge is rebuilt from the opening on the next load either way.
+- **Masks are computed within the exported set**, not from the runtime cells — otherwise the wall beside a doorway would be written as connected and Tiled would preview a wall running on into empty space. The runtime never reads the tile back; it recomputes the mask from cell adjacency on load.
+- **Authored rectangles are never resized.** An object's rectangle is art — a window is drawn elevated, a painting is the size of its picture — and the runtime models cells plus `u`/`v`, not art. Where the footprint derived from the rectangle disagrees with the runtime's, the export warns and leaves the rectangle alone.
+- Writes go through `editor/api/save-map.php`, which is local-only, allowlisted to existing maps in `data/maps`, guarded by a SHA-256 check against the bytes the client patched, backed up under `data/maps/_backup/`, and written atomically. A map edited in Tiled since load returns `409 conflict` rather than overwriting it.
+- On success the **save is re-baselined**: the builder's authored baseline moves to match the file, so `serializeCellDeltas` goes empty and no stale `removed: true` can resurrect to delete a wall that was just authored.
+
+Exporting twice in a row is byte-identical: the second run is a no-op.
+
+The same mask→tile mapping drives the `hidden` presentation, which now draws live from the wall cells rather than from a PNG baked at load. The baked version was a photograph of the map file: walls built in game never appeared in it, and walls torn down in game went on being drawn forever.
 
 ## 4. Neighbor mask
 

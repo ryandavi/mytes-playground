@@ -2572,15 +2572,22 @@ body.customize-mode .wall-piece {
   cursor: crosshair;
 }
 
-.wall-paint-highlight {
+.surface-paint-overlay {
   position: absolute;
   pointer-events: none;
+}
+.surface-paint-overlaycanvas {
+  image-rendering: pixelated;
+}
+
+div.surface-paint-overlay.paint-hover {
   border: var(--radius-xs) dashed var(--state-info-accent);
   background: color-mix(in srgb, var(--state-info-accent) 12%, transparent);
 }
-
-.floor-paint-highlight {
-  image-rendering: pixelated;
+div.surface-paint-overlay.paint-selection {
+  border: var(--radius-xs) solid var(--state-info-accent);
+  background: color-mix(in srgb, var(--state-info-accent) 26%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--button-light) 60%, transparent);
 }
 
 .wall-build-ghost-cell {
@@ -3929,7 +3936,7 @@ body.ui-gallery-page .ui-gallery__state-label {
 }
 
 .app-stage {
-  --stage-chip-row: calc((1.6 * var(--text-size-meta)) + (var(--space-2xs) * 2) + (var(--border-width) * 2));
+  --stage-chip-row: calc((1.3 * var(--text-size-meta)) + (var(--space-2xs) * 4) + (var(--border-width) * 4));
 }
 
 .stage-chip {
@@ -3974,14 +3981,6 @@ body.ui-gallery-page .ui-gallery__state-label {
 }
 .stage-chip--bottom-center {
   bottom: calc(var(--space-sm) + var(--stage-chip-row) + var(--space-xs));
-}
-.stage-chip--bottom-left {
-  bottom: var(--space-sm);
-  left: var(--space-sm);
-}
-.stage-chip--bottom-right {
-  bottom: var(--space-sm);
-  right: var(--space-sm);
 }
 .stage-chip__action {
   flex: 0 0 auto;
@@ -4051,12 +4050,160 @@ body.ui-gallery-page .ui-gallery__state-label {
   transform: translateY(2px);
 }
 
+.stage-dock-row {
+  position: absolute;
+  left: var(--space-sm);
+  right: var(--space-sm);
+  bottom: var(--space-sm);
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: var(--space-xs);
+  min-height: var(--stage-chip-row);
+  pointer-events: none;
+}
+
+.stage-dock {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+  pointer-events: auto;
+}
+.stage-dock--center {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-inline: auto;
+  justify-content: center;
+}
+.stage-dock--end {
+  justify-content: flex-end;
+}
+.stage-dock:empty {
+  pointer-events: none;
+}
+.stage-dock > .stage-chip,
+.stage-dock > .stage-bar {
+  position: static;
+  transform: none;
+  max-width: none;
+  align-self: stretch;
+  min-height: var(--stage-chip-row);
+}
+.stage-dock .stage-chip__badge {
+  align-self: center;
+  line-height: 1.2;
+}
+
+.stage-bar {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2xs) var(--space-sm);
+  padding: var(--space-2xs) var(--space-xs);
+  font-size: var(--text-size-meta);
+  color: var(--text-base);
+  line-height: 1.6;
+}
+.stage-bar[hidden] {
+  display: none;
+}
+.stage-bar .segment-control {
+  width: auto;
+}
+.stage-bar .segment-control > .segment-btn {
+  flex: 0 0 auto;
+  padding: var(--space-2xs);
+}
+.stage-bar .segment-btn > .icon {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+.stage-bar .checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  white-space: nowrap;
+}
+.stage-bar .checkbox-wrapper > label {
+  margin: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.stage-bar__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.stage-bar__action {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  color: var(--button-text-color);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-2xs);
+}
+.stage-bar__action > span {
+  display: none;
+}
+.stage-bar__action {
+  font-size: var(--text-size-meta);
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.stage-bar__action > .icon {
+  width: 12px;
+  height: 12px;
+}
+.stage-bar__action:hover:not(:disabled) {
+  background-color: var(--button-hover);
+}
+.stage-bar__action:disabled {
+  background-color: var(--surface-ui-disabled, var(--button-mid));
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-right-color: var(--button-dark);
+  border-bottom-color: var(--button-dark);
+  color: var(--button-disabled-text-color, var(--button-text-color));
+  text-shadow: 1px 1px 0 var(--button-disabled-highlight, var(--button-light));
+  cursor: default;
+  filter: saturate(0.72);
+}
+.stage-bar__action:disabled .icon,
+.stage-bar__action:disabled svg {
+  fill: var(--button-disabled-icon-color, var(--button-icon-color));
+  color: var(--button-disabled-icon-color, var(--button-icon-color));
+}
+
+[data-game-mode=play] .stage-bar__build-only {
+  display: none;
+}
+
+.stage-bar__debug-only {
+  display: none;
+}
+
+body.debug .stage-bar__debug-only {
+  display: flex;
+}
+
 [data-game-mode=build] .stage-chip--build,
 [data-game-mode=play] .stage-chip--paused {
   display: none;
 }
 
-[data-game-mode=build] .stage-chip--map,
 [data-game-mode=build] .stage-chip--log {
   display: none;
 }

@@ -668,7 +668,7 @@ function editor_validate_map_objects_types(array $content): array
 
 // ── Backup helpers ───────────────────────────────────────────────────────────
 
-function editor_backup_file(string $absolutePath): ?string
+function editor_backup_file(string $absolutePath, string $extension = 'json'): ?string
 {
     if (!file_exists($absolutePath)) {
         return null;
@@ -687,13 +687,13 @@ function editor_backup_file(string $absolutePath): ?string
     }
 
     $timestamp  = date('Y-m-d\TH-i-s');
-    $backupPath = $backupDir . "/$basename.$timestamp.json";
+    $backupPath = $backupDir . "/$basename.$timestamp.$extension";
     if (!copy($absNorm, $backupPath)) {
         editor_fail(500, 'write_failed', 'Could not create the content backup.');
     }
 
     // Prune: keep only the 20 most recent backups for this basename.
-    $existing = glob($backupDir . "/$basename.*.json");
+    $existing = glob($backupDir . "/$basename.*.$extension");
     if ($existing !== false && count($existing) > 20) {
         sort($existing);
         $toDelete = array_slice($existing, 0, count($existing) - 20);
@@ -734,6 +734,25 @@ function editor_atomic_write(string $absolutePath, array $content): void
     if (!rename($tmp, $absolutePath)) {
         @unlink($tmp);
         editor_fail(500, 'write_failed', 'Could not replace the content file atomically.');
+    }
+}
+
+/**
+ * Atomic write for content that is already serialised text — the .tmx maps the
+ * wall exporter patches. Same tmp-then-rename as the JSON path; it just has
+ * nothing to encode or re-indent on the way out.
+ */
+function editor_atomic_write_text(string $absolutePath, string $content): void
+{
+    $dir = dirname($absolutePath);
+    $tmp = $dir . DIRECTORY_SEPARATOR . basename($absolutePath) . '.tmp.' . bin2hex(random_bytes(4));
+    if (file_put_contents($tmp, $content) === false) {
+        @unlink($tmp);
+        editor_fail(500, 'write_failed', 'Could not write the temporary map file.');
+    }
+    if (!rename($tmp, $absolutePath)) {
+        @unlink($tmp);
+        editor_fail(500, 'write_failed', 'Could not replace the map file atomically.');
     }
 }
 

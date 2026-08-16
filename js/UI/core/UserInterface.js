@@ -27,6 +27,7 @@ class UserInterface {
         });
         this.buildModeUI = new BuildModeUI(this);
         this.stageChips = new StageChips(this);
+        this.stageViewBar = new StageViewBar(this);
     }
 
     init() {
@@ -55,6 +56,7 @@ class UserInterface {
         this.gameLogManager = new GameLogManager(this);
         this.buildModeUI.init();
         this.stageChips.init();
+        this.stageViewBar.init();
 
 		document.addEventListener('click', this.boundControlClickSound);
 		const gameTime = this.parent.core?.gameTime;
@@ -144,6 +146,59 @@ class UserInterface {
         return this.toolManager.changeToolMode(mode);
     }
 
+    /**
+     * Writes the walls standing on this map back into its .tmx.
+     *
+     * Deliberately a manual, explicit action rather than something that rides
+     * along with the autosave: it edits a source file that Tiled may also have
+     * open, and the conflict check can only protect a write the author asked
+     * for at a moment they know about.
+     *
+     * It lives here because two controls offer it — the Debug panel's button
+     * and the build bar's shortcut — and neither of them should be the one that
+     * knows how it works.
+     */
+    async exportWallsToTiled(button = null) {
+        const gameMap = this.parent?.gameMap;
+        const toasts = this.parent?.core?.toastManager;
+        if (typeof WallTiledExporter === 'undefined') return;
+        if (!WallTiledExporter.isAvailable(gameMap)) {
+            toasts?.show?.({
+                type: 'warning',
+                title: 'Export unavailable',
+                content: 'Needs the local editor API and a map whose tileset authors the wall wang set.'
+            });
+            return;
+        }
+
+        if (button) button.disabled = true;
+        try {
+            const result = await WallTiledExporter.exportMap(gameMap);
+            if (!result.ok) {
+                toasts?.show?.({
+                    type: result.code === 'conflict' ? 'warning' : 'error',
+                    title: 'Export failed',
+                    content: result.message
+                });
+                console.warn('[WallTiledExporter]', result.code, result.message);
+                return;
+            }
+            const { cells, layers, objectsAdded, objectsUpdated, objectsRemoved } = result.stats;
+            toasts?.show?.({
+                type: 'success',
+                title: 'Walls exported to Tiled',
+                content: `${cells} cells across ${layers} layer${layers === 1 ? '' : 's'} → ${result.path}. ` +
+                    `Objects: ${objectsAdded} added, ${objectsUpdated} updated, ${objectsRemoved} removed.`
+            });
+            for (const warning of result.warnings) {
+                toasts?.show?.({ type: 'warning', title: 'Export warning', content: warning });
+                console.warn('[WallTiledExporter]', warning);
+            }
+        } finally {
+            if (button) button.disabled = false;
+        }
+    }
+
     showMessage(message, type = 'info', title = '') {
         const toastManager = this.parent?.core?.toastManager;
         if (!toastManager || !message) {
@@ -205,6 +260,8 @@ class UserInterface {
         this.optionsPanel = null;
         this.buildModeUI?.dispose?.();
         this.buildModeUI = null;
+        this.stageViewBar?.dispose?.();
+        this.stageViewBar = null;
         this.stageChips?.dispose?.();
         this.stageChips = null;
 

@@ -30,7 +30,14 @@
 85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85,85
 </data>
  </layer>
- <layer id="2" name="Collider" width="30" height="16">
+ <layer id="2" name="Walls" width="30" height="16">
+  <properties>
+   <property name="blocksLineOfSight" type="bool" value="true"/>
+   <property name="wallConnectGroup" value="plaster_wall"/>
+   <property name="wallConstructionId" value="plaster_wall"/>
+   <property name="wallFinishId" value="plaster_plain"/>
+   <property name="wallHeightCells" type="int" value="5"/>
+  </properties>
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -58,13 +65,13 @@
   </object>
  </objectgroup>
  <objectgroup id="4" name="Rooms">
-  <object id="3" name="LIGHTVOLUME" x="0" y="0" width="480" height="512">
+  <object id="3" name="Room" x="0" y="0" width="480" height="512">
    <properties>
     <property name="displayName" value="West Room"/>
     <property name="roomId" value="west_room"/>
    </properties>
   </object>
-  <object id="4" name="LIGHTVOLUME" x="512" y="0" width="448" height="512">
+  <object id="4" name="Room" x="512" y="0" width="448" height="512">
    <properties>
     <property name="displayName" value="East Room"/>
     <property name="roomId" value="east_room"/>

@@ -80,17 +80,12 @@ class ViewPanel extends PanelSection {
 
         this._followMytBtn = this.modalElement.querySelector('.follow-mode-btn[data-mode="0"]');
 
+        // Up / Cutaway / Down / Hidden is not here: it is on the stage bar, in
+        // both modes, because how the walls are drawn is something you change
+        // while playing and not a setting you go and find. What is left is the
+        // modifier for it, which you set once. See StageViewBar.
         this._wallControls = this.modalElement.querySelector('.wall-presentation-controls');
         if (this._wallControls) this._wallControls.hidden = SiteConfig.wallSystem?.enabled !== true;
-        this._wallModeBtns = this.modalElement.querySelectorAll('.wall-mode-btn');
-        this._wallModeBtns.forEach(btn => {
-            btn.onclick = () => {
-                // Same entry point the build panels use, so the two controls
-                // can never disagree about what the player picked.
-                this._getContainer()?.gameMap?.wallBuilder?.setUserPresentationMode(btn.dataset.value);
-                this.updateWallMode();
-            };
-        });
         this._wallCursorToggle = this.modalElement.querySelector('#view-wall-cursor-toggle');
         if (this._wallCursorToggle) {
             this._wallCursorToggle.checked = this._getContainer()?.settings.wallCursorCutaway ?? true;
@@ -121,14 +116,12 @@ class ViewPanel extends PanelSection {
                 if (el) el.onclick = null;
             });
             this._followModeBtns?.forEach(btn => { btn.onclick = null; });
-            this._wallModeBtns?.forEach(btn => { btn.onclick = null; });
         }
         if (this._wallCursorToggle) this._wallCursorToggle.onchange = null;
         this._wallCursorToggle = null;
         if (this._shakeToggle)   this._shakeToggle.onchange = null;
         if (this._inertiaToggle) this._inertiaToggle.onchange = null;
         this._followModeBtns = null;
-        this._wallModeBtns = null;
         this._wallReadyUnsubscribe?.();
         this._wallReadyUnsubscribe = null;
         this._shakeToggle    = null;
@@ -167,10 +160,6 @@ class ViewPanel extends PanelSection {
               ? builderOverride
               : this._getContainer()?.gameMap?.wallBuilder;
         if (this._wallControls) this._wallControls.hidden = SiteConfig.wallSystem?.enabled !== true;
-        this._wallModeBtns?.forEach(btn => {
-            btn.classList.toggle('active', builder?.presentation === btn.dataset.value);
-            btn.disabled = !builder;
-        });
         if (this._wallCursorToggle) {
             this._wallCursorToggle.checked = this._getContainer()?.settings.wallCursorCutaway ?? true;
             this._wallCursorToggle.disabled = !builder;

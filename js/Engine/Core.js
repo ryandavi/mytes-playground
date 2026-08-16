@@ -38,6 +38,10 @@ class MyteCore {
         // Build mode freezes the simulation without stopping the render loop:
         // camera, cursor and UI stay live so building feels responsive.
         this.simulationPaused = false;
+        // How fast the world runs. One multiplier on the frame delta rather
+        // than a knob per system, so a myte's walk, its cooldowns and the wall
+        // clock all speed up together and stay in step with each other.
+        this.simulationSpeed = 1;
 
         // Performance monitoring
         this.frameCount = 0;
@@ -491,19 +495,27 @@ class MyteCore {
             const deltaTime = Math.min(timestamp - this.lastFrameTime, 100);
             this.lastFrameTime = timestamp;
 
+            // Everything downstream of here is billed in world time, not wall
+            // time: one scaled delta feeds the clock, the tick drain and the
+            // per-frame update alike. Scaling them separately is how a sped-up
+            // world ends up with mytes thinking faster than they can walk.
+            const worldDelta = deltaTime * this.simulationSpeed;
+
             // Advance simulation clock by the same capped delta so gameplay
             // cooldowns pause when the RAF loop is stopped (e.g. tab hidden).
             // Freezing SimClock is also what makes the build-mode pause safe for
             // free: every cooldown and state-aging timer reads from it.
-            if (!this.simulationPaused) SimClock.advance(deltaTime);
+            if (!this.simulationPaused) SimClock.advance(worldDelta);
 
+            // Wall time: the FPS readout measures the renderer, which never
+            // speeds up with the world.
             this.updateFPSCounter(timestamp);
 
             // Accumulate time and drain with fixed-size steps
             if (this.simulationPaused) {
                 this.tickAccumulator = 0;
             } else {
-                this.tickAccumulator += deltaTime;
+                this.tickAccumulator += worldDelta;
                 while (this.tickAccumulator >= this.config.engine.tickInterval) {
                     this.tickUpdate(this.config.engine.tickInterval);
                     this.tickAccumulator -= this.config.engine.tickInterval;
@@ -511,7 +523,7 @@ class MyteCore {
             }
 
             // Variable-rate render/animation update
-            this.update(deltaTime);
+            this.update(worldDelta);
 
             this._rafHandle = requestAnimationFrame(this._updateFrame);
         };
@@ -539,6 +551,29 @@ class MyteCore {
         // the time they spent building.
         this.lastFrameTime = performance.now();
         this.tickAccumulator = 0;
+        this.eventManager?.emit?.(EVENTS.SIMULATION_RATE_CHANGED, this.getSimulationRate());
+    }
+
+    /**
+     * How fast the world runs, as a multiple of real time. Zero is not offered
+     * as a speed — stopping the world is `setSimulationPaused`, so that there
+     * is one answer to "is it paused", and resuming returns to the speed the
+     * player last chose rather than to a standstill.
+     */
+    setSimulationSpeed(multiplier) {
+        const next = Math.min(8, Math.max(0.25, Number(multiplier) || 1));
+        if (this.simulationSpeed === next) return this.simulationSpeed;
+        this.simulationSpeed = next;
+        // Whatever has piled up was measured at the old rate; draining it at the
+        // new one would deliver a burst of ticks on the first frame after a
+        // speed-up.
+        this.tickAccumulator = 0;
+        this.eventManager?.emit?.(EVENTS.SIMULATION_RATE_CHANGED, this.getSimulationRate());
+        return this.simulationSpeed;
+    }
+
+    getSimulationRate() {
+        return { paused: this.simulationPaused, speed: this.simulationSpeed };
     }
 
     tickUpdate(tickDelta) {

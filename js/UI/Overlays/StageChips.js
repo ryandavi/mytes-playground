@@ -13,12 +13,6 @@ class StageChips extends UIComponent {
         this.logChip = null;
         this.logBadge = null;
         this.unreadCount = 0;
-        this.unsubscribers = [];
-        this.listenerCleanup = [];
-    }
-
-    get container() {
-        return this.parent.parent;
     }
 
     init() {
@@ -28,26 +22,14 @@ class StageChips extends UIComponent {
         this.logChip = wrapper?.querySelector('#game-log-chip') || null;
         this.logBadge = this.logChip?.querySelector('.stage-chip__badge') || null;
 
-        this.bind(this.mapChip, () => this.parent.worldMapPanel?.toggle());
-        this.bind(this.logChip, () => this.parent.gameLogManager?.toggle());
+        this.bindClick(this.mapChip, () => this.parent.worldMapPanel?.toggle());
+        this.bindClick(this.logChip, () => this.parent.gameLogManager?.toggle());
 
-        const events = this.container?.eventManager;
-        this.unsubscribers.push(
-            events?.on?.(EVENTS.MAP_CHANGED, payload => this.setMapName(payload?.displayName))
-        );
+        this.track(this.container?.eventManager?.on?.(
+            EVENTS.MAP_CHANGED, payload => this.setMapName(payload?.displayName)
+        ));
 
         this.setMapName();
-    }
-
-    bind(element, handler) {
-        if (!element) return;
-        const listener = (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            handler();
-        };
-        element.addEventListener('click', listener);
-        this.listenerCleanup.push(() => element.removeEventListener('click', listener));
     }
 
     setMapName(displayName = null) {
@@ -78,10 +60,7 @@ class StageChips extends UIComponent {
     }
 
     dispose() {
-        this.listenerCleanup.forEach(cleanup => cleanup());
-        this.listenerCleanup = [];
-        this.unsubscribers.forEach(unsubscribe => unsubscribe?.());
-        this.unsubscribers = [];
+        super.dispose();
         this.mapChip = null;
         this.mapLabel = null;
         this.logChip = null;

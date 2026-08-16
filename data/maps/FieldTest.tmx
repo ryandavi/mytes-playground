@@ -104,7 +104,14 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 </data>
  </layer>
- <layer id="5" name="Collider" width="40" height="43">
+ <layer id="5" name="Walls" width="40" height="43">
+  <properties>
+   <property name="blocksLineOfSight" type="bool" value="true"/>
+   <property name="wallConnectGroup" value="plaster_wall"/>
+   <property name="wallConstructionId" value="plaster_wall"/>
+   <property name="wallFinishId" value="plaster_plain"/>
+   <property name="wallHeightCells" type="int" value="5"/>
+  </properties>
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,

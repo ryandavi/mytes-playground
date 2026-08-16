@@ -784,7 +784,9 @@ function validateInteriorRooms() {
         const source = fs.readFileSync(path.join(mapsDir, fileName), 'utf8');
         const location = source.match(/<property\s+name="location"\s+value="([^"]+)"\s*\/>/i)?.[1]?.toLowerCase();
         if (!['interior', 'inside', 'house'].includes(location)) continue;
-        const authorsRoom = /<object\b[^>]*\bname="LIGHTVOLUME"/i.test(source) ||
+        // `Room` is the current spelling; `LIGHTVOLUME` is the lighting-era one
+        // the loader still accepts, so both count as authoring a room volume.
+        const authorsRoom = /<object\b[^>]*\bname="(?:ROOM|LIGHTVOLUME)"/i.test(source) ||
             /<property\s+name="(?:lightingKind|kind)"\s+value="room"\s*\/>/i.test(source);
         if (!authorsRoom) warn(`data/maps/${fileName} is interior but authors no room volumes.`);
     }

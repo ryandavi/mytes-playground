@@ -186,6 +186,13 @@
 </data>
  </layer>
  <layer id="2" name="Walls" width="30" height="40">
+  <properties>
+   <property name="blocksLineOfSight" type="bool" value="true"/>
+   <property name="wallConnectGroup" value="plaster_wall"/>
+   <property name="wallConstructionId" value="plaster_wall"/>
+   <property name="wallFinishId" value="plaster_plain"/>
+   <property name="wallHeightCells" type="int" value="5"/>
+  </properties>
   <data encoding="csv">
 26,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,26,
 23,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,25,
@@ -233,13 +240,13 @@
   <object id="17" name="Zone" x="0" y="64" width="960" height="576">
    <properties>
     <property name="displayName" value="Chatroom"/>
-    <property name="type" value="social"/>
+    <property name="zoneType" value="social"/>
    </properties>
   </object>
   <object id="23" name="Zone" x="224" y="704" width="512" height="480">
    <properties>
     <property name="displayName" value="Lake Pookie"/>
-    <property name="type" value="water_lake"/>
+    <property name="zoneType" value="water_lake"/>
    </properties>
   </object>
  </objectgroup>

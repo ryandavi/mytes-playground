@@ -71,7 +71,6 @@ class ClickComponent extends InputComponent {
    * @param {Object} event Input system event
    */
   handlePressStart = (event) => {
-    if (!this.active) return;
     
     // Check if clicking is allowed
     if (this.options.canClick && !this.options.canClick(event)) {
@@ -85,19 +84,7 @@ class ClickComponent extends InputComponent {
       this.touchId = null;
     }
     
-    // Check if click is within the element
-    if (this.element) {
-      const rect = this.element.getBoundingClientRect();
-      const localPos = {
-        x: event.position.x - rect.left - window.scrollX,
-        y: event.position.y - rect.top - window.scrollY
-      };
-      const isInside = localPos.x >= 0 && localPos.y >= 0 &&
-                      localPos.x <= rect.width &&
-                      localPos.y <= rect.height;
-
-      if (!isInside) return;
-    }
+    if (!this.claimsPress(event)) return;
 
     // Stop propagation if needed
     if (this.options.stopPropagation && event.originalEvent) {
@@ -204,26 +191,13 @@ class ClickComponent extends InputComponent {
    * @param {Object} event Input system event
    */
   handleClick = (event) => {
-    if (!this.active) return;
     
     // Check if clicking is allowed
     if (this.options.canClick && !this.options.canClick(event)) {
       return;
     }
     
-    // Check if click is within the element
-    if (this.element) {
-      const rect = this.element.getBoundingClientRect();
-      const localPos = {
-        x: event.position.x - rect.left - window.scrollX,
-        y: event.position.y - rect.top - window.scrollY
-      };
-      const isInside = localPos.x >= 0 && localPos.y >= 0 &&
-                      localPos.x <= rect.width &&
-                      localPos.y <= rect.height;
-
-      if (!isInside) return;
-    }
+    if (!this.claimsPress(event)) return;
 
     // Stop propagation if needed
     if (this.options.stopPropagation && event.originalEvent) {

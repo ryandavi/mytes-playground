@@ -146,7 +146,10 @@
 // slot sits clear of the bottom row using it, and the offscreen Myte dots keep
 // out of both rows using it.
 .app-stage {
-    --stage-chip-row: calc((1.6 * var(--text-size-meta)) + (var(--space-2xs) * 2) + (var(--border-width) * 2));
+    // Now the height of a *bar*, not a chip: the bottom row holds both, the
+    // bars are the taller of the two, and the docked chips stretch to match.
+    // A segment button inside a bar, plus the bar's own padding and border.
+    --stage-chip-row: calc((1.3 * var(--text-size-meta)) + (var(--space-2xs) * 4) + (var(--border-width) * 4));
 }
 
 .stage-chip {
@@ -181,8 +184,9 @@
     }
 
     // ── Placement slots ──────────────────────────────────────────────────────
-    // Four edges of the stage, named for where they put a chip rather than for
-    // what happens to be in them today.
+    // For the chips that stand alone on the stage. The two that share the
+    // bottom row with the view and speed bars are laid out by `.stage-dock-row`
+    // instead — a row of furniture is one thing, not four corners.
 
     &--top-center,
     &--bottom-center {
@@ -192,11 +196,11 @@
     }
 
     &--top-center    { top: var(--space-sm); }
-    // Above the bottom row, not in it: the map name and the event log already
-    // own the bottom edge, and the audio prompt is wide enough to cross both.
-    &--bottom-center { bottom: calc(var(--space-sm) + var(--stage-chip-row) + var(--space-xs)); }
-    &--bottom-left   { bottom: var(--space-sm); left: var(--space-sm); }
-    &--bottom-right  { bottom: var(--space-sm); right: var(--space-sm); }
+    // Above the dock row, not in it: the row owns the bottom edge, and the
+    // audio prompt is wide enough to cross the whole of it.
+    &--bottom-center {
+        bottom: calc(var(--space-sm) + var(--stage-chip-row) + var(--space-xs));
+    }
 
     // ── Parts ────────────────────────────────────────────────────────────────
 
@@ -290,6 +294,209 @@
     }
 }
 
+// ── Stage docks and bars ─────────────────────────────────────────────────────
+//
+// The bottom edge of the stage is one row of furniture, so it is laid out as
+// one: a dock at each end that lines its contents up, rather than four corners
+// each placed by hand and each having to be told the others' widths. Where you
+// are and how the map is drawn go left; how fast the world is running and what
+// just happened go right.
+//
+// The view and speed controls inside them were three duplicated copies across
+// two build panels and the Options window. Out here they are one copy, on
+// screen in both modes: lowering a wall to see into a room or slowing the world
+// down to watch something should cost no trip to a menu.
+
+// One row pinned across the bottom of the stage, in three slots: a chip at each
+// end and the world's own controls in the middle.
+//
+// The split is by what a control *is*, not by what it happens to sit next to.
+// The chips open panels — where am I, what just happened — and belong at the
+// edges with the rest of the window furniture. The bars change the world in
+// place, they are used together and often in sequence, and a centred pair is
+// both where the eye lands and the only arrangement that does not imply a
+// relationship between, say, wall height and the event log.
+//
+// One row across the bottom of the stage: where you are, the controls that
+// change the world, and what just happened — chips at the ends, controls
+// centred between them.
+//
+// The split is by what a control *is*, not by what it sits next to. The chips
+// open panels and belong at the edges with the rest of the window furniture;
+// the bars change the world in place, are used together, and read as one
+// cluster in the middle.
+//
+// Everything in the row is the same height, so the row is a row and not a
+// staircase: the chips stretch to the bars, and the bars are the taller of the
+// two. The stage is only ~585px wide whatever the viewport does, which is why
+// the build-only controls are as compact as they are — see `.stage-bar`.
+.stage-dock-row {
+    position: absolute;
+    left: var(--space-sm);
+    right: var(--space-sm);
+    bottom: var(--space-sm);
+    z-index: var(--z-overlay);
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: var(--space-xs);
+    min-height: var(--stage-chip-row);
+    pointer-events: none;
+}
+
+.stage-dock {
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-xs);
+    // The chips keep their width; only the control cluster gives ground.
+    flex: 0 0 auto;
+    // The row is inert so the map shows through the gaps between slots; the
+    // slots themselves are not.
+    pointer-events: auto;
+
+    // Centred against the row rather than against whatever the two chips
+    // happen to weigh: auto margins split the leftover space evenly.
+    &--center {
+        flex: 0 1 auto;
+        min-width: 0;
+        margin-inline: auto;
+        justify-content: center;
+    }
+
+    &--end {
+        justify-content: flex-end;
+    }
+
+    // An empty slot must not eat clicks meant for the map behind it — in build
+    // mode the event log stands down and its slot is bare.
+    &:empty {
+        pointer-events: none;
+    }
+
+    > .stage-chip,
+    > .stage-bar {
+        // Docked items are laid out by the dock; the placement modifiers and
+        // the 45% cap belong to the chips still placed on the stage itself —
+        // measured against a content-sized dock, that cap collapses a chip to
+        // 45% of its own text.
+        position: static;
+        transform: none;
+        max-width: none;
+        align-self: stretch;
+        min-height: var(--stage-chip-row);
+    }
+
+    // The unread count must not be able to make its chip taller than the row
+    // it sits in.
+    .stage-chip__badge {
+        align-self: center;
+        line-height: 1.2;
+    }
+}
+
+.stage-bar {
+    @include surface-raised;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--space-2xs) var(--space-sm);
+    padding: var(--space-2xs) var(--space-xs);
+    font-size: var(--text-size-meta);
+    color: var(--text-base);
+    line-height: 1.6;
+
+    &[hidden] {
+        display: none;
+    }
+
+    // The rows inside a panel stretch to the panel's width; out here each is
+    // only as wide as its own buttons, and they sit side by side.
+    .segment-control {
+        width: auto;
+
+        > .segment-btn {
+            flex: 0 0 auto;
+            padding: var(--space-2xs);
+        }
+    }
+
+    // Icon-only segments (pause) still read as the same size as the text ones
+    // beside them.
+    .segment-btn > .icon {
+        display: block;
+        width: 12px;
+        height: 12px;
+    }
+
+    // The panel styling for a checkbox row is scoped to `.settings-group`, so
+    // out here the box and its label would stack into two lines.
+    .checkbox-wrapper {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2xs);
+        white-space: nowrap;
+
+        > label {
+            margin: 0;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+    }
+
+    &__group {
+        display: flex;
+        align-items: center;
+        gap: var(--space-xs);
+    }
+
+    // Icon only: the dev export has to earn its place in a row this tight, and
+    // its tooltip says what it does.
+    &__action {
+        @include button-base;
+        display: flex;
+        align-items: center;
+        gap: var(--space-2xs);
+        padding: var(--space-2xs);
+
+        > span {
+            display: none;
+        }
+
+        font-size: var(--text-size-meta);
+        line-height: 1.3;
+        white-space: nowrap;
+        cursor: pointer;
+
+        > .icon {
+            width: 12px;
+            height: 12px;
+        }
+
+        &:hover:not(:disabled) {
+            background-color: var(--button-hover);
+        }
+
+        &:disabled {
+            @include button-disabled;
+        }
+    }
+}
+
+// Grid, snap and the Tiled export are answers to questions only the build tools
+// ask. The wall row and the speed row are not, so they stay in both modes.
+[data-game-mode='play'] .stage-bar__build-only {
+    display: none;
+}
+
+// A dev tool, so it is absent rather than dead when the debug overlay is off.
+.stage-bar__debug-only {
+    display: none;
+}
+
+body.debug .stage-bar__debug-only {
+    display: flex;
+}
+
 // Build and Paused are the same control in its two states, so they share the
 // top-centre slot and take turns. Play mode offers the way in; build mode shows
 // the frozen world and the way out.
@@ -298,11 +505,11 @@
     display: none;
 }
 
-// The map name and the event log are about the world running. In build mode the
-// world is frozen and you are editing one map — travelling somewhere else or
-// reading what just happened is not the job, and both chips would sit over the
-// floor plan you are working on.
-[data-game-mode='build'] .stage-chip--map,
+// The event log is about the world running. In build mode the world is frozen,
+// so what just happened is not the job and the chip would sit over the floor
+// plan you are working on. The map name stays: it is the only thing on screen
+// that says which map these edits are landing in, which matters more while
+// building than while playing.
 [data-game-mode='build'] .stage-chip--log {
     display: none;
 }

@@ -822,11 +822,11 @@ class ContainerManager {
         return this.settings.buildSnap;
     }
 
+    // One set of switches, on the stage bar — so this is a nudge to re-read the
+    // setting, not a broadcast to several copies of it.
     syncBuildToggles() {
-        for (const panel of [this.ui?.wallBuildPanel, this.ui?.surfaceCustomizePanel]) {
-            panel?.gridToggle?.sync?.();
-            panel?.snapToggle?.sync?.();
-        }
+        this.ui?.stageViewBar?.gridToggle?.sync?.();
+        this.ui?.stageViewBar?.snapToggle?.sync?.();
     }
 
     setActiveMyte(myte) {

@@ -15,6 +15,9 @@ class GameModeManager {
         this.mode = GAME_MODES.PLAY;
         this._restore = null;
         this._seenTutorial = false;
+        // Debug's "Build Anywhere". Off by default even with the debug overlay
+        // on, so the policies themselves stay testable.
+        this.buildAnywhere = false;
     }
 
     get config() {
@@ -43,9 +46,32 @@ class GameModeManager {
      * otherwise find its own house permanently unbuildable.
      */
     getPolicy(gameMap = this.container?.gameMap) {
+        // The single point every rule reads — BuildRules.policy comes through
+        // here — so overriding it opens both the way into the mode and every
+        // per-cell check, rather than letting you enter a mode that then
+        // refuses everything.
+        if (this.buildAnywhere) return 'full';
         const declared = gameMap?.properties?.buildPolicy;
         if (this.config.policies.includes(declared)) return declared;
         return this.isHomeMap(gameMap) ? 'full' : this.config.defaultPolicy;
+    }
+
+    /**
+     * Lets the build tools onto maps that would refuse them. A dev switch: the
+     * edits it permits are saved like any other, so it is off unless asked for.
+     */
+    setBuildAnywhere(flag) {
+        const next = flag === true;
+        if (this.buildAnywhere === next) return next;
+        this.buildAnywhere = next;
+        // Turning it off under your own feet leaves you building on a map that
+        // no longer allows it.
+        if (!next && this.isBuild() && !this.canBuildHere()) this.setMode(GAME_MODES.PLAY);
+        this.container?.eventManager?.emit(EVENTS.BUILD_POLICY_CHANGED, {
+            buildAnywhere: next,
+            policy: this.getPolicy()
+        });
+        return next;
     }
 
     // The player's house, and only that. A myte's `homeMapId` is where it

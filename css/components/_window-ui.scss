@@ -513,19 +513,41 @@ body.customize-mode {
 
 }
 
-// Both highlights are drawn by SurfaceCustomizePanel rather than by :hover: a
+// Both overlays are drawn by SurfaceCustomizePanel rather than by :hover: a
 // wall's finish carries onto the corner column at each end of its run, and a
 // room is not the rectangle its floor canvas occupies. One box over the whole
 // run-plus-corners; a shape-exact tint for the room.
-.wall-paint-highlight {
+//
+// Two of them are on screen at once — what the pointer is over, and what is
+// actually being edited — so they have to be told apart at a glance. Hover is a
+// dashed hint; the selection is a solid, brighter frame, because it stays put
+// while the pointer wanders and it is the answer to "which surface will this
+// colour land on".
+.surface-paint-overlay {
     position: absolute;
     pointer-events: none;
-    border: var(--radius-xs) dashed var(--state-info-accent);
-    background: color-mix(in srgb, var(--state-info-accent) 12%, transparent);
+
+    // The floor overlay is a canvas masked to the room's shape, so its colour
+    // is painted in rather than declared here; only the wall boxes take a
+    // border and a wash.
+    &canvas {
+        image-rendering: pixelated;
+    }
 }
 
-.floor-paint-highlight {
-    image-rendering: pixelated;
+div.surface-paint-overlay {
+    &.paint-hover {
+        border: var(--radius-xs) dashed var(--state-info-accent);
+        background: color-mix(in srgb, var(--state-info-accent) 12%, transparent);
+    }
+
+    &.paint-selection {
+        border: var(--radius-xs) solid var(--state-info-accent);
+        background: color-mix(in srgb, var(--state-info-accent) 26%, transparent);
+        // A pale keyline outside the frame so it survives a dark finish
+        // underneath it, the way the ghost cells stay legible over any floor.
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--button-light) 60%, transparent);
+    }
 }
 
 .wall-build-ghost-cell {

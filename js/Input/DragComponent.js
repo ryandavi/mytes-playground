@@ -108,29 +108,13 @@ class DragComponent extends InputComponent {
 	 * Handle drag start (mousedown/touchstart)
 	 */
 	handleStart = (event) => {
-		if (!this.active) return;
-
 		// Check if we can drag
 		if (this.options.canDrag && !this.options.canDrag(event)) {
 			return;
 		}
-	
-		// Check if the click actually occurred on this element
-		if (this.element) {
-			const elementRect = this.element.getBoundingClientRect();
-			const isInside = (
-				event.position.clientX >= elementRect.left &&
-				event.position.clientX <= elementRect.right &&
-				event.position.clientY >= elementRect.top &&
-				event.position.clientY <= elementRect.bottom
-			);
-			
-			if (!isInside) {
-				return; // Not clicking on this element, don't start drag
-			}
-		}
-	
 
+		// Not on this element, or not on the world at all — see claimsPress.
+		if (!this.claimsPress(event)) return;
 
 		// Store starting information
 		this.dragStartPosition = { ...event.position };

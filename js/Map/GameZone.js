@@ -1,11 +1,23 @@
-// Zone types enum
+// Zone types enum.
+//
+// Two categories, both authored the same way (`zoneType` on a Tiled Zone or
+// Room object) and both catalogued in data/metadata/zones.json:
+//
+//   stat    - applies effects to a Myte standing in it, from the catalogue's
+//             `effects` block. rest/play/food/social/danger/boost.
+//   ambient - a spatial tag with no effect on a Myte at all. Other systems
+//             query it by type; the water zones tell the audio system it is
+//             standing by a lake rather than a river, which a tile scan cannot
+//             distinguish. Deliberately carries no `effects`.
 const ZONE_TYPES = {
     REST: 'rest',
     PLAY: 'play',
     FOOD: 'food',
     SOCIAL: 'social',
     DANGER: 'danger',
-    BOOST: 'boost'
+    BOOST: 'boost',
+    WATER_LAKE: 'water_lake',
+    WATER_RIVER: 'water_river'
 };
 
 // Add these constants at the top of your file

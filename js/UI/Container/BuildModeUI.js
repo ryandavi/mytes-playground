@@ -6,6 +6,10 @@
  * Everything that is merely shown or hidden by mode is CSS, driven from
  * `data-game-mode`. This owns only the state CSS cannot know: whether building
  * is allowed on this map, and whether there is anything left to undo.
+ *
+ * The view controls the build panels used to carry — presentation, grid, snap —
+ * are not here either: they live on the stage bar, on screen in both modes.
+ * See StageViewBar.
  */
 class BuildModeUI extends UIComponent {
     constructor(parent) {
@@ -13,12 +17,7 @@ class BuildModeUI extends UIComponent {
         this.modeButton = null;
         this.undoButton = null;
         this.redoButton = null;
-        this.unsubscribers = [];
-        this.listenerCleanup = [];
-    }
-
-    get container() {
-        return this.parent.parent;
+        this.pausedChip = null;
     }
 
     get gameMode() {
@@ -32,35 +31,26 @@ class BuildModeUI extends UIComponent {
         this.redoButton = wrapper?.querySelector('#build-redo') || null;
         this.pausedChip = wrapper?.querySelector('#build-paused-chip') || null;
 
-        this.bind(this.modeButton, () => this.gameMode?.toggle());
+        this.bindClick(this.modeButton, () => this.gameMode?.toggle());
         // The chip explains the frozen world, so it is also the way out of it —
         // the nearest control to where the player is already looking.
-        this.bind(this.pausedChip, () => this.gameMode?.setMode(GAME_MODES.PLAY));
-        this.bind(this.undoButton, () => this.container?.buildHistory?.undo());
-        this.bind(this.redoButton, () => this.container?.buildHistory?.redo());
+        this.bindClick(this.pausedChip, () => this.gameMode?.setMode(GAME_MODES.PLAY));
+        this.bindClick(this.undoButton, () => this.container?.buildHistory?.undo());
+        this.bindClick(this.redoButton, () => this.container?.buildHistory?.redo());
 
         const events = this.container?.eventManager;
-        this.unsubscribers.push(
+        this.track(
             events?.on?.(EVENTS.GAME_MODE_CHANGED, () => this.syncModeState()),
             events?.on?.(EVENTS.MAP_CHANGED, () => this.syncModeState()),
+            // Debug's "Build Anywhere" changes what this map allows without
+            // changing the mode, and the chip is the thing that has to notice.
+            events?.on?.(EVENTS.BUILD_POLICY_CHANGED, () => this.syncModeState()),
             events?.on?.(EVENTS.BUILD_HISTORY_CHANGED, payload => this.syncHistoryState(payload))
         );
 
         this.gameMode?.applyModeState();
         this.syncModeState();
         this.syncHistoryState();
-    }
-
-    bind(element, handler) {
-        if (!element) return;
-        const listener = (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            if (element.disabled) return;
-            handler();
-        };
-        element.addEventListener('click', listener);
-        this.listenerCleanup.push(() => element.removeEventListener('click', listener));
     }
 
     syncModeState() {
@@ -102,10 +92,10 @@ class BuildModeUI extends UIComponent {
      * layer sized from the grid, never per-cell DOM.
      *
      * The grid used to be tied to the Walls tool, which was a fine default
-     * before there was a setting for it — but once the panels carry a "Show
-     * grid" checkbox, tying it to the tool means the checkbox does nothing at
-     * all under the Surface tool. The setting is the answer; Ctrl-snapping
-     * still summons the grid regardless, since that is what it is snapping to.
+     * before there was a setting for it — but once there is a "Show grid"
+     * switch, tying it to the tool means the switch does nothing at all under
+     * the Surface tool. The setting is the answer; Ctrl-snapping still summons
+     * the grid regardless, since that is what it is snapping to.
      */
     setGridOverlay(visible) {
         const canvas = this.container?.canvas;
@@ -124,10 +114,7 @@ class BuildModeUI extends UIComponent {
     }
 
     dispose() {
-        this.listenerCleanup.forEach(cleanup => cleanup());
-        this.listenerCleanup = [];
-        this.unsubscribers.forEach(unsubscribe => unsubscribe?.());
-        this.unsubscribers = [];
+        super.dispose();
         this.setGridOverlay(false);
         this.modeButton = null;
         this.undoButton = null;

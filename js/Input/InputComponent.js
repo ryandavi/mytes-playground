@@ -27,6 +27,53 @@ class InputComponent {
 	}
 	
 	/**
+	 * Anything drawn over the world that is chrome rather than world: the stage
+	 * chips and bars, the tool sidebars, floating panels, the world-modal layer.
+	 * `.ignore` is the existing convention for "input does not treat this as
+	 * map"; the rest are the containers that were never given the class.
+	 */
+	static UI_SELECTOR = '.ignore, .window-panel, .sidebar, .hand-controls, .modal, .toast';
+
+	/**
+	 * Whether a press belongs to this component.
+	 *
+	 * These components subscribe to *document-level* mouse events and each used
+	 * to answer that question with its own point-in-rect test against its own
+	 * element — three copies of the same arithmetic, and none of them looked at
+	 * what was actually under the cursor. That is why nothing painted over the
+	 * world could block them: a click on a stage chip landed on the chip *and*
+	 * on whichever map object happened to lie beneath it.
+	 *
+	 * The DOM already knows what was clicked, so it is asked first: a press
+	 * whose target is UI chrome is not a press on the world, whatever the
+	 * rectangles say. The rect test still has the final word, because a
+	 * component's element may be a hitbox that is not itself the event target.
+	 *
+	 * Presses only. A drag that legitimately began on the map must keep
+	 * receiving moves when the cursor crosses a bar on its way.
+	 */
+	claimsPress(event) {
+		if (!this.active) return false;
+
+		const target = event?.originalEvent?.target;
+		if (target instanceof Element && target.closest(InputComponent.UI_SELECTOR)) {
+			return false;
+		}
+
+		return this.containsPoint(event);
+	}
+
+	/** Whether the event's point falls inside this component's element. */
+	containsPoint(event) {
+		if (!this.element) return true;
+
+		const rect = this.element.getBoundingClientRect();
+		const x = event?.position?.clientX ?? (event?.position?.x - window.scrollX);
+		const y = event?.position?.clientY ?? (event?.position?.y - window.scrollY);
+		return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+	}
+
+	/**
 	 * Get default options for this component
 	 * Override in subclasses to provide component-specific defaults
 	 * @returns {Object} Default options

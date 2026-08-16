@@ -256,6 +256,35 @@ class DebugPanel extends PanelSection {
                 action: () => this.runPathfindingDebug()
             },
             {
+                // Every map, not just the ones that opted in. Deliberately a
+                // switch rather than something the debug overlay implies, so
+                // the 'limited' and 'none' policies stay testable with the rest
+                // of the debug tools on.
+                id: 'buildAnywhere',
+                section: 'map',
+                subgroup: 'controls',
+                type: 'toggle',
+                label: 'Build Anywhere: ',
+                states: { true: 'ON', false: 'OFF' },
+                getValue: () => this.getGameMode()?.buildAnywhere === true,
+                action: () => {
+                    const gameMode = this.getGameMode();
+                    gameMode?.setBuildAnywhere(!gameMode.buildAnywhere);
+                    this.updateButton('buildAnywhere');
+                }
+            },
+            {
+                // Writes a source .tmx, so it lives here rather than on the
+                // build toolbar: it is an authoring action, not something a
+                // player does to their house.
+                id: 'exportWallsTiled',
+                section: 'map',
+                subgroup: 'controls',
+                type: 'action',
+                label: 'Walls → Tiled',
+                action: (button) => this.parent.exportWallsToTiled(button)
+            },
+            {
                 id: 'toggleTimePause',
                 section: 'time',
                 subgroup: 'controls',
@@ -830,6 +859,10 @@ class DebugPanel extends PanelSection {
         } else {
             this.disableButtons();
         }
+    }
+
+    getGameMode() {
+        return this.parent?.parent?.gameMode || null;
     }
 
     // ─── DOM construction ────────────────────────────────────────────────────

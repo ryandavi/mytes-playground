@@ -96,6 +96,9 @@ class TileMapLoader {
 
 			const mapData = {
 				id: id,
+				// The exporter patches this exact file rather than regenerating
+				// one, so the path it was loaded from is part of the map data.
+				sourcePath: mapPath,
 				name: mapEl.getAttribute('name') || id,
 				width: parseInt(mapEl.getAttribute('width')),
 				height: parseInt(mapEl.getAttribute('height')),
@@ -248,6 +251,7 @@ class TileMapLoader {
 				columns: parseInt(tilesetData.getAttribute('columns')),
 				firstgid,
 				wallTileIds: new Set(),
+				wallWangTiles: new Map(),
 				tiles: {},
 				imageSource: '',
 				imageWidth: 0,
@@ -258,7 +262,16 @@ class TileMapLoader {
 				if (String(wangSet.getAttribute('name') || '').toLowerCase() !== wallWangSetName) continue;
 				for (const wangTile of wangSet.querySelectorAll('wangtile')) {
 					const tileId = Number(wangTile.getAttribute('tileid'));
-					if (Number.isInteger(tileId)) tileset.wallTileIds.add(tileId);
+					if (!Number.isInteger(tileId)) continue;
+					tileset.wallTileIds.add(tileId);
+					// The mask is recomputed from neighbours at runtime, so this
+					// is not how a loaded wall learns its shape. It is what lets
+					// the flat overlay and the Tiled exporter go the other way,
+					// from a mask back to the tile that draws it.
+					const mask = WallWangAtlas.maskFromWangId(wangTile.getAttribute('wangid'));
+					if (mask !== null && !tileset.wallWangTiles.has(mask)) {
+						tileset.wallWangTiles.set(mask, tileId);
+					}
 				}
 			}
 	
@@ -467,7 +480,10 @@ class TileMapLoader {
 			return true;
 		});
 
-		mapData.walls = { defaults, cells, openings, fixtures, attachments, faceOverrides };
+		mapData.walls = {
+			defaults, cells, openings, fixtures, attachments, faceOverrides,
+			wangAtlas: WallWangAtlas.fromTilesets(mapData.tilesets)
+		};
 	}
 
 	getWallIndicesForLayer(walls, layer) {
@@ -612,22 +628,72 @@ class TileMapLoader {
 		return mapDir + tilesetPath;
 	}
 
+	/**
+	 * The gameplay zone half of a room volume.
+	 *
+	 * Rooms and zones are independent: a room needs no zone, a zone needs no
+	 * room, and either may stand alone. This only fires for a room that asks
+	 * for a zone with `zoneType` — House's hallway is a room a Myte passes
+	 * through, not a place it seeks out, so it stays purely spatial.
+	 *
+	 * A zone born from a room takes the room's own id. They are the same space,
+	 * and giving the two halves one identity is what stops them drifting apart
+	 * the way the separately authored pair did.
+	 */
+	createZoneFromRoomVolume(mapData, obj, roomId, displayName) {
+		const zoneType = obj.properties?.zoneType;
+		if (!zoneType) return;
+
+		const id = String(roomId || displayName).toLowerCase().replace(/[^a-z0-9_-]+/g, '_');
+		if (mapData.zones.some(zone => zone.id === id)) return;
+
+		mapData.zones.push({
+			id,
+			type: String(zoneType).toUpperCase(),
+			bounds: { x: obj.x, y: obj.y, width: obj.width, height: obj.height },
+			properties: {
+				...this.extractZoneProperties(obj.properties),
+				type: String(zoneType).toUpperCase()
+			}
+		});
+	}
+
+	/**
+	 * Zone-relevant properties only. A room carries `roomId`, `floorFinishId`
+	 * and `wallFinishId`, which are read off the room and nowhere else —
+	 * copying them onto the zone would recreate by derivation exactly the dead,
+	 * drift-prone duplicate that merging the two objects removed.
+	 */
+	extractZoneProperties(properties = {}) {
+		const roomOnly = new Set(['roomId', 'floorFinishId', 'wallFinishId', 'zoneType', 'tilemask', 'cellSize']);
+		return {
+			visible: properties.visible !== false,
+			strength: properties.strength || 1.0,
+			...Object.fromEntries(
+				Object.entries(properties).filter(([name]) => !roomOnly.has(name))
+			)
+		};
+	}
+
 	createZonesFromObjects(mapData) {
 		mapData.objects = mapData.objects.filter(obj => {
 			if (obj.name.toUpperCase() !== 'ZONE' || !obj.properties) return true;
 
-			const type = (obj.properties.type || 'REST').toUpperCase();
-			const displayName = obj.properties.displayName || obj.properties.type || `zone_${obj.id}`;
+			const zoneType = obj.properties.zoneType || obj.properties.type;
+			const type = (zoneType || 'REST').toUpperCase();
+			const displayName = obj.properties.displayName || zoneType || `zone_${obj.id}`;
 			const id = `zone_${displayName.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+			// A merged room volume may already have emitted this zone.
+			if (mapData.zones.some(zone => zone.id === id)) return false;
 
 			mapData.zones.push({
 				id,
 				type,
 				bounds: { x: obj.x, y: obj.y, width: obj.width, height: obj.height },
 				properties: {
-					visible: obj.properties.visible !== false,
-					strength: obj.properties.strength || 1.0,
-					...obj.properties
+					...this.extractZoneProperties(obj.properties),
+					type
 				}
 			});
 
@@ -652,8 +718,10 @@ class TileMapLoader {
 
 			const isRoomVolume =
 				objName === 'LIGHTVOLUME' ||
+				objName === 'ROOM' ||
 				lightingKind === 'room' ||
-				(groupName === 'LIGHTING' && !!roomId);
+				(groupName === 'LIGHTING' && !!roomId) ||
+				(groupName === 'ROOMS' && !!roomId);
 			if (isRoomVolume) {
 				const cellSize = Number(obj.properties?.cellSize) || mapData.tileWidth || 32;
 				const tilemask = this.parseTilemask(
@@ -672,6 +740,14 @@ class TileMapLoader {
 						...obj.properties
 					}
 				});
+				// One rectangle, both systems. A room volume and a gameplay zone
+				// described the same space in every map, authored twice, and the
+				// two copies drifted — House's kitchen zone sat a pixel off its
+				// own room. A room that declares `zoneType` now emits the zone
+				// too, so there is one rectangle to move in Tiled. The separate
+				// Zone objects are still read (see createZonesFromObjects), so a
+				// map that has not been migrated keeps working.
+				this.createZoneFromRoomVolume(mapData, obj, roomId, displayName);
 				return false;
 			}
 
@@ -843,38 +919,6 @@ class TileMapLoader {
 		}
 	}
 
-	// The baked background deliberately omits the authored wall tiles because
-	// WallBuilder redraws them as tall pieces. This bakes the inverse — only
-	// those tiles — so the 'hidden' presentation can still show the flat walls
-	// the map author laid down in Tiled.
-	async createWallTileOverlayUrl(mapData) {
-		if (SiteConfig.wallSystem?.enabled !== true || !mapData?.walls?.cells?.length) return null;
-
-		try {
-			const { layers, tilesets, tileWidth, tileHeight, width, height } = mapData.TileData;
-			const canvas = document.createElement('canvas');
-			canvas.width = width * tileWidth;
-			canvas.height = height * tileHeight;
-			const ctx = canvas.getContext('2d');
-
-			const tilesetImages = await this._loadTilesetImages(tilesets);
-			let rendered = false;
-			for (const layer of layers.filter(l => l.visible)) {
-				const wallIndices = this.getWallIndicesForLayer(mapData.walls, layer);
-				if (!wallIndices) continue;
-				this._renderLayerToCanvas(
-					ctx, layer, tilesetImages, tilesets, width, tileWidth, tileHeight, null, wallIndices
-				);
-				rendered = true;
-			}
-
-			return rendered ? await this.canvasToObjectUrl(canvas) : null;
-		} catch (e) {
-			console.error('Error creating wall tile overlay:', e);
-			return null;
-		}
-	}
-
 	/**
 	 * Enhanced grid data generation with terrain types
 	 */
@@ -1003,6 +1047,7 @@ generateGridData(mapData, gridConfig = {}) {
 		// Create base map structure
 		const gameMapData = {
 			id: TileMapData.id,
+			sourcePath: TileMapData.sourcePath,
 			name: TileMapData.name,
 			displayName: TileMapData.displayName,
 			description: TileMapData.description || `A ${TileMapData.environment.location} map`,

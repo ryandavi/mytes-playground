@@ -238,8 +238,11 @@ class WallBuilder {
         this.gameMap = gameMap;
         this.wallData = wallData;
         this.registry = registry;
+        this.atlas = wallData.wangAtlas || null;
         this.cellSize = gameMap.gridSystem?.config?.cellSize || 32;
         this.layer = gameMap.layers.objects;
+        this.flatCanvas = null;
+        this._flatDirty = true;
         this.cells = new Map();
         this.baseCells = new Map();
         this.authoredBaseCells = new Map();
@@ -284,11 +287,17 @@ class WallBuilder {
         this.authoredOpenings = Utility.deepClone(this.openings);
         this.reindexOpenings();
         for (const [key, cell] of this.cells) {
-            if (!this.baseCells.has(key)) this.baseCells.set(key, { ...cell, opening: null });
+            // A cell the author never painted, standing here only because an
+            // opening bridged the gap it was drawn into. It behaves as wall from
+            // now on, but it is not authored geometry — the Tiled exporter has
+            // to be able to tell the difference, or a doorway the author drew as
+            // a gap in the tile layer comes back as solid wall.
+            if (!this.baseCells.has(key)) this.baseCells.set(key, { ...cell, opening: null, bridged: true });
         }
         this.reindexOpenings();
         this.commitCutawayRoom(true);
         this.rebuild();
+        await this.createFlatOverlay();
         this.bindOpeningObjects();
         this.bindFixtureObjects();
         this.createAuthoredAttachments(this.wallData.attachments || []);
@@ -1085,6 +1094,7 @@ class WallBuilder {
         // Geometry changed, so there is no animation to preserve: settle the
         // height field immediately instead of sweeping every wall down again.
         this.evaluateCutaway(true);
+        this.invalidateFlatTiles();
     }
 
     createPiece(piece) {
@@ -2153,7 +2163,7 @@ class WallBuilder {
         this.presentation = mode;
         this.commitCutawayRoom(false);
         this.gameMap.parent?.canvas?.setAttribute('data-wall-mode', mode);
-        this.gameMap.syncWallTileOverlay?.();
+        this.syncFlatOverlay();
         this.evaluateCutaway(true);
         this.gameMap.eventManager?.emit(EVENTS.WALL_PRESENTATION_CHANGED, { mapId: this.gameMap.id, mode });
         return true;
@@ -3280,6 +3290,75 @@ class WallBuilder {
             });
     }
 
+    // ── Flat 'hidden' presentation ───────────────────────────────────────────
+    //
+    // 'hidden' shows the walls the way Tiled does: flat, top-down, one tile per
+    // cell. This used to be a PNG baked once at load from the authored tile
+    // layers, which meant it was a photograph of the map file rather than a
+    // view of the world — walls built in game never appeared in it, and walls
+    // torn down in game went on being drawn forever. Drawing from the live
+    // cells costs one canvas and a few hundred blits per wall edit, and it can
+    // never disagree with what is actually standing.
+
+    async createFlatOverlay() {
+        this.disposeFlatOverlay();
+        if (!this.atlas) return null;
+        const layer = this.gameMap.layers.groundDecor || this.gameMap.layers.background;
+        if (!layer) return null;
+
+        const canvas = document.createElement('canvas');
+        canvas.className = 'wall-tile-overlay';
+        canvas.width = this.gameMap.dimensions.width;
+        canvas.height = this.gameMap.dimensions.height;
+        canvas.style.cssText = [
+            'position:absolute', 'left:0', 'top:0',
+            `width:${this.gameMap.dimensions.width}px`,
+            `height:${this.gameMap.dimensions.height}px`,
+            'pointer-events:none'
+        ].join(';');
+        layer.appendChild(canvas);
+        this.flatCanvas = canvas;
+
+        await this.atlas.loadImage(this.gameMap.core?.resourceManager || null);
+        this._flatDirty = true;
+        this.syncFlatOverlay();
+        return canvas;
+    }
+
+    invalidateFlatTiles() {
+        this._flatDirty = true;
+        // Only the mode that shows this pays for redrawing it; every other mode
+        // just carries the dirty flag until it is switched into.
+        if (this.presentation === 'hidden') this.redrawFlatTiles();
+    }
+
+    syncFlatOverlay() {
+        if (!this.flatCanvas) return;
+        const visible = this.presentation === 'hidden';
+        this.flatCanvas.hidden = !visible;
+        if (visible) this.redrawFlatTiles();
+    }
+
+    redrawFlatTiles() {
+        if (!this.flatCanvas || !this.atlas?.image || !this._flatDirty) return;
+        const ctx = this.flatCanvas.getContext('2d');
+        ctx.clearRect(0, 0, this.flatCanvas.width, this.flatCanvas.height);
+        for (const cell of this.cells.values()) {
+            this.atlas.drawCell(
+                ctx,
+                this.computeMask(cell),
+                cell.x * this.cellSize,
+                cell.y * this.cellSize
+            );
+        }
+        this._flatDirty = false;
+    }
+
+    disposeFlatOverlay() {
+        this.flatCanvas?.remove();
+        this.flatCanvas = null;
+    }
+
     serializeState() {
         return {
             version: 7,
@@ -3432,5 +3511,6 @@ class WallBuilder {
         this.baseCells.clear();
         this.authoredBaseCells.clear();
         this.openingSlots.clear();
+        this.disposeFlatOverlay();
     }
 }

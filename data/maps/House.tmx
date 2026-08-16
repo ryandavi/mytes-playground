@@ -120,77 +120,43 @@
 23,4,4,4,4,4,4,4,4,4,4,2,17,0,0,0,0,15,2,4,4,4,4,4,4,4,4,4,4,25
 </data>
  </layer>
- <objectgroup id="9" name="Zones">
-  <object id="94" name="Zone" x="608" y="480" width="320" height="448">
-   <properties>
-    <property name="displayName" value="Bedroom"/>
-    <property name="floorFinishId" value="floor_carpet_sage"/>
-    <property name="type" value="rest"/>
-    <property name="wallFinishId" value="wallpaper_blue_flower"/>
-   </properties>
-  </object>
-  <object id="95" name="Zone" x="32" y="480" width="320" height="448">
-   <properties>
-    <property name="displayName" value="Playroom"/>
-    <property name="floorFinishId" value="floor_boards"/>
-    <property name="type" value="play"/>
-    <property name="wallFinishId" value="paint_sage"/>
-   </properties>
-  </object>
-  <object id="96" name="Zone" x="32" y="31" width="448" height="417">
-   <properties>
-    <property name="displayName" value="Kitchen"/>
-    <property name="floorFinishId" value="floor_tile_check"/>
-    <property name="type" value="food"/>
-   </properties>
-  </object>
-  <object id="97" name="Zone" x="480" y="32" width="448" height="416">
-   <properties>
-    <property name="displayName" value="Chatroom"/>
-    <property name="floorFinishId" value="floor_boards_walnut"/>
-    <property name="type" value="social"/>
-    <property name="wallFinishId" value="paint_terracotta"/>
-   </properties>
-  </object>
-  <object id="119" name="Bird" x="800" y="352" width="64" height="64">
-   <properties>
-    <property name="variant" value="sparrow"/>
-   </properties>
-  </object>
- </objectgroup>
  <objectgroup id="11" name="Rooms">
-  <object id="124" name="LIGHTVOLUME" x="608" y="480" width="320" height="448">
+  <object id="124" name="Room" x="608" y="480" width="320" height="448">
    <properties>
     <property name="displayName" value="Bedroom"/>
     <property name="floorFinishId" value="floor_carpet_sage"/>
     <property name="roomId" value="zone_bedroom"/>
     <property name="wallFinishId" value="wallpaper_blue_flower"/>
+    <property name="zoneType" value="rest"/>
    </properties>
   </object>
-  <object id="125" name="LIGHTVOLUME" x="32" y="480" width="320" height="448">
+  <object id="125" name="Room" x="32" y="480" width="320" height="448">
    <properties>
     <property name="displayName" value="Playroom"/>
     <property name="floorFinishId" value="floor_boards"/>
     <property name="roomId" value="zone_playroom"/>
     <property name="wallFinishId" value="paint_sage"/>
+    <property name="zoneType" value="play"/>
    </properties>
   </object>
-  <object id="126" name="LIGHTVOLUME" x="32" y="31" width="448" height="417">
+  <object id="126" name="Room" x="32" y="32" width="448" height="416">
    <properties>
     <property name="displayName" value="Kitchen"/>
     <property name="floorFinishId" value="floor_tile_check"/>
     <property name="roomId" value="zone_kitchen"/>
+    <property name="zoneType" value="food"/>
    </properties>
   </object>
-  <object id="127" name="LIGHTVOLUME" x="480" y="32" width="448" height="416">
+  <object id="127" name="Room" x="480" y="32" width="448" height="416">
    <properties>
     <property name="displayName" value="Chatroom"/>
     <property name="floorFinishId" value="floor_boards_walnut"/>
     <property name="roomId" value="zone_chatroom"/>
     <property name="wallFinishId" value="paint_terracotta"/>
+    <property name="zoneType" value="social"/>
    </properties>
   </object>
-  <object id="128" name="LIGHTVOLUME" x="384" y="480" width="192" height="448">
+  <object id="128" name="Room" x="384" y="480" width="192" height="448">
    <properties>
     <property name="displayName" value="Hallway"/>
     <property name="roomId" value="zone_hallway"/>
@@ -207,6 +173,8 @@
     <property name="u" type="float" value="16"/>
     <property name="v" type="float" value="0.4"/>
     <property name="variant" value="painting"/>
+    <property name="wallFixture" type="bool" value="true"/>
+    <property name="socketId" value="surface"/>
    </properties>
   </object>
   <object id="123" name="Painting" x="704" y="448" width="36" height="28">
@@ -215,9 +183,11 @@
     <property name="u" type="float" value="16"/>
     <property name="v" type="float" value="0.4"/>
     <property name="variant" value="painting_still_life"/>
+    <property name="wallFixture" type="bool" value="true"/>
+    <property name="socketId" value="surface"/>
    </properties>
   </object>
-  <object id="121" name="Window" x="320" y="0" width="32" height="32">
+  <object id="121" name="Window" x="320" y="0" width="64" height="32">
    <properties>
     <property name="blocksLineOfSight" type="bool" value="false"/>
     <property name="continuesTopTrim" type="bool" value="true"/>
@@ -226,7 +196,7 @@
     <property name="wallOpening" type="bool" value="true"/>
    </properties>
   </object>
-  <object id="122" name="Window" x="576" y="0" width="128" height="64">
+  <object id="122" name="Window" x="576" y="0" width="128" height="32">
    <properties>
     <property name="blocksLineOfSight" type="bool" value="false"/>
     <property name="continuesTopTrim" type="bool" value="true"/>
@@ -240,12 +210,18 @@
    <properties>
     <property name="direction" value="Right"/>
     <property name="openingHeight" type="int" value="128"/>
+    <property name="wallOpening" type="bool" value="true"/>
+    <property name="sillHeight" type="int" value="0"/>
+    <property name="continuesTopTrim" type="bool" value="false"/>
    </properties>
   </object>
   <object id="7" name="Door" x="416" y="928" width="128" height="32">
    <properties>
     <property name="direction" value="Horizontal"/>
     <property name="openingHeight" type="int" value="128"/>
+    <property name="wallOpening" type="bool" value="true"/>
+    <property name="sillHeight" type="int" value="0"/>
+    <property name="continuesTopTrim" type="bool" value="false"/>
    </properties>
   </object>
   <object id="113" name="Rug" x="640" y="576" width="192" height="128">
@@ -295,6 +271,10 @@
   <object id="78" name="Door" x="96" y="448" width="128" height="32">
    <properties>
     <property name="direction" value="Horizontal"/>
+    <property name="wallOpening" type="bool" value="true"/>
+    <property name="openingHeight" type="int" value="128"/>
+    <property name="sillHeight" type="int" value="0"/>
+    <property name="continuesTopTrim" type="bool" value="false"/>
    </properties>
   </object>
   <object id="79" name="Spawn" x="224" y="256" width="192" height="192">
@@ -305,9 +285,13 @@
   <object id="82" name="Door" x="352" y="544" width="32" height="96">
    <properties>
     <property name="direction" value="Left"/>
+    <property name="wallOpening" type="bool" value="true"/>
+    <property name="openingHeight" type="int" value="128"/>
+    <property name="sillHeight" type="int" value="0"/>
+    <property name="continuesTopTrim" type="bool" value="false"/>
    </properties>
   </object>
-  <object id="106" name="Flower" x="62" y="316" width="64" height="64">
+  <object id="106" name="Flower" x="64" y="320" width="64" height="64">
    <properties>
     <property name="variant" value="flower_3"/>
    </properties>
@@ -342,6 +326,11 @@
   </object>
  </objectgroup>
  <objectgroup id="10" name="Mobs">
+  <object id="119" name="Bird" x="800" y="352" width="64" height="64">
+   <properties>
+    <property name="variant" value="sparrow"/>
+   </properties>
+  </object>
   <object id="66" name="Butterfly" x="352" y="160" width="64" height="64">
    <properties>
     <property name="variant" value="small"/>

@@ -17,13 +17,10 @@ class WallBuildPanel extends ModalWindow {
         this.boundPointerUp = this.handlePointerUp.bind(this);
         this.boundPointerLeave = this.clearHover.bind(this);
         this.init();
-        this.wallView = new WallViewControl(this, this.modalElement?.querySelector('.wall-view-controls'));
         this.operationSegment = new SegmentControl(
             this.modalElement?.querySelector('.wall-build-operation-segment') || null,
             { value: 'add', onChange: () => this.renderHoverGhost() }
         );
-        this.gridToggle = new BuildGridToggle(this, this.modalElement);
-        this.snapToggle = new BuildSnapToggle(this, this.modalElement);
         this.rectangleToggle = this.modalElement?.querySelector('#wall-build-rectangle') || null;
         this.parent?.parent?.canvas?.addEventListener('pointerdown', this.boundPointerDown, true);
         this.parent?.parent?.canvas?.addEventListener('pointerleave', this.boundPointerLeave);
@@ -44,9 +41,6 @@ class WallBuildPanel extends ModalWindow {
         const active = mode === UIToolModes.WALL;
         document.body.classList.toggle('wall-build-mode', active);
         if (active) {
-            this.wallView.sync();
-            this.gridToggle.sync();
-            this.snapToggle.sync();
             this.open();
         } else {
             this.cancelDrag();
@@ -398,14 +392,8 @@ class WallBuildPanel extends ModalWindow {
     dispose() {
         this.cancelDrag();
         this.clearHover();
-        this.wallView?.dispose();
-        this.wallView = null;
         this.operationSegment?.dispose();
         this.operationSegment = null;
-        this.gridToggle?.dispose();
-        this.gridToggle = null;
-        this.snapToggle?.dispose();
-        this.snapToggle = null;
         this.parent?.parent?.canvas?.removeEventListener('pointerleave', this.boundPointerLeave);
         this.parent?.parent?.canvas?.removeEventListener('pointerdown', this.boundPointerDown, true);
         document.removeEventListener('pointermove', this.boundPointerMove, true);

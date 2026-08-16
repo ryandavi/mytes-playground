@@ -177,15 +177,6 @@
 				<span class="text">Build Mode — paused</span>
 				<span class="stage-chip__action">Done</span>
 			</button>
-			<button type="button" class="stage-chip stage-chip--bottom-left stage-chip--map ignore" id="world-map-chip" title="World Map (M)">
-				<svg class="icon" aria-hidden="true"><use href="#icon-world-map"></use></svg>
-				<span class="text">—</span>
-			</button>
-			<button type="button" class="stage-chip stage-chip--bottom-right stage-chip--log ignore" id="game-log-chip" title="Event Log (L)">
-				<svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
-				<span class="text">Events</span>
-				<span class="stage-chip__badge" hidden>0</span>
-			</button>
 			<div class="stage-chip stage-chip--bottom-center stage-chip--audio ignore" id="audio-unlock" role="status" hidden>
 				<svg class="icon" aria-hidden="true"><use href="#icon-sound-off"></use></svg>
 				<span class="text">Click anywhere to turn on sound.</span>
@@ -193,6 +184,65 @@
 					<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
 					<span>Enable Sound</span>
 				</button>
+			</div>
+			<!-- STAGE DOCK ROW — the bottom row of the stage, laid out rather than
+			     placed. The two chips open panels and sit at the ends; the controls
+			     between them change the world directly and are centred, which is
+			     where the eye goes and where they belong as one cluster. Wired by
+			     StageViewBar; on screen in both modes. -->
+			<div class="stage-dock-row ignore">
+			<div class="stage-dock stage-dock--start ignore">
+				<button type="button" class="stage-chip stage-chip--map ignore" id="world-map-chip" title="World Map (M)">
+					<svg class="icon" aria-hidden="true"><use href="#icon-world-map"></use></svg>
+					<span class="text">—</span>
+				</button>
+			</div>
+			<div class="stage-dock stage-dock--center ignore">
+				<div class="stage-bar ignore" id="stage-view-bar" role="group" aria-label="View">
+					<div class="wall-view-controls">
+						<div class="segment-control" role="group" aria-label="Wall presentation">
+							<button type="button" class="segment-btn" data-value="up" title="Walls at full height">Up</button>
+							<button type="button" class="segment-btn" data-value="cutaway" title="Lower the walls in front of you">Cutaway</button>
+							<button type="button" class="segment-btn" data-value="down" title="Walls lowered to stubs">Down</button>
+							<button type="button" class="segment-btn" data-value="hidden" title="Hide walls entirely">Hidden</button>
+						</div>
+					</div>
+					<div class="stage-bar__group stage-bar__build-only">
+						<div class="checkbox-wrapper" title="Show the tile grid (G)">
+							<input type="checkbox" class="build-grid-toggle" id="stage-grid-toggle" checked>
+							<label for="stage-grid-toggle">Grid</label>
+						</div>
+						<div class="checkbox-wrapper" title="Dragged objects land on grid cells. Hold Ctrl to do the opposite for one drag.">
+							<input type="checkbox" class="build-snap-toggle" id="stage-snap-toggle" checked>
+							<label for="stage-snap-toggle">Snap</label>
+						</div>
+						<!-- Dev-only shortcut for the Debug panel's own button: writes the
+						     walls standing here back into the .tmx, which is worth having
+						     to hand while actually building them. -->
+						<button type="button" class="stage-bar__action stage-bar__debug-only" id="stage-export-tiled" title="Export walls to Tiled">
+							<svg class="icon" aria-hidden="true"><use href="#icon-wall"></use></svg>
+							<span>Tiled</span>
+						</button>
+					</div>
+				</div>
+				<div class="stage-bar ignore" id="stage-speed-bar" role="group" aria-label="Game speed">
+					<div class="segment-control stage-speed-control" role="group" aria-label="Game speed">
+						<button type="button" class="segment-btn" data-value="pause" title="Pause the world">
+							<svg class="icon" aria-hidden="true"><use href="#icon-pause"></use></svg>
+						</button>
+						<button type="button" class="segment-btn" data-value="1" title="Normal speed">1&times;</button>
+						<button type="button" class="segment-btn" data-value="2" title="Double speed">2&times;</button>
+						<button type="button" class="segment-btn" data-value="4" title="Quadruple speed">4&times;</button>
+					</div>
+				</div>
+			</div>
+			<div class="stage-dock stage-dock--end ignore">
+				<button type="button" class="stage-chip stage-chip--log ignore" id="game-log-chip" title="Event Log (L)">
+					<svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
+					<span class="text">Events</span>
+					<span class="stage-chip__badge" hidden>0</span>
+				</button>
+			</div>
 			</div>
 			<!-- END STAGE CHIPS -->
 		</section>
@@ -292,29 +342,6 @@
 				<h3 class="settings-group-title">Finish</h3>
 				<div class="surface-palette" role="group" aria-label="Surface finishes"></div>
 			</div>
-			<div class="settings-group settings-group--secondary build-view-controls">
-				<h3 class="settings-group-title">View</h3>
-				<div class="wall-view-controls">
-					<div class="segment-control" role="group" aria-label="Wall presentation">
-						<button type="button" class="segment-btn" data-value="up">Up</button>
-						<button type="button" class="segment-btn" data-value="cutaway">Cutaway</button>
-						<button type="button" class="segment-btn" data-value="down">Down</button>
-						<button type="button" class="segment-btn" data-value="hidden">Hidden</button>
-					</div>
-				</div>
-				<div class="setting-item">
-					<div class="checkbox-wrapper">
-						<input type="checkbox" class="build-grid-toggle" id="paint-grid-toggle" checked>
-						<label for="paint-grid-toggle">Show grid <kbd class="setting-key">G</kbd></label>
-					</div>
-				</div>
-				<div class="setting-item">
-					<div class="checkbox-wrapper" title="Dragged objects land on grid cells. Hold Ctrl to do the opposite for one drag.">
-						<input type="checkbox" class="build-snap-toggle" id="paint-snap-toggle" checked>
-						<label for="paint-snap-toggle">Snap to grid <kbd class="setting-key">Ctrl</kbd></label>
-					</div>
-				</div>
-			</div>
 		</div>
 	</div>
 	<!-- END CUSTOMIZE PANEL -->
@@ -342,29 +369,6 @@
 					<div class="checkbox-wrapper" title="Outline a room instead of laying a single run">
 						<input type="checkbox" id="wall-build-rectangle">
 						<label for="wall-build-rectangle">Rectangle <kbd class="setting-key">Shift</kbd></label>
-					</div>
-				</div>
-			</div>
-			<div class="settings-group settings-group--secondary build-view-controls">
-				<h3 class="settings-group-title">View</h3>
-				<div class="wall-view-controls">
-					<div class="segment-control" role="group" aria-label="Wall presentation">
-						<button type="button" class="segment-btn" data-value="up">Up</button>
-						<button type="button" class="segment-btn" data-value="cutaway">Cutaway</button>
-						<button type="button" class="segment-btn" data-value="down">Down</button>
-						<button type="button" class="segment-btn" data-value="hidden">Hidden</button>
-					</div>
-				</div>
-				<div class="setting-item">
-					<div class="checkbox-wrapper">
-						<input type="checkbox" class="build-grid-toggle" id="wall-grid-toggle" checked>
-						<label for="wall-grid-toggle">Show grid <kbd class="setting-key">G</kbd></label>
-					</div>
-				</div>
-				<div class="setting-item">
-					<div class="checkbox-wrapper" title="Dragged objects land on grid cells. Hold Ctrl to do the opposite for one drag.">
-						<input type="checkbox" class="build-snap-toggle" id="wall-snap-toggle" checked>
-						<label for="wall-snap-toggle">Snap to grid <kbd class="setting-key">Ctrl</kbd></label>
 					</div>
 				</div>
 			</div>
@@ -644,12 +648,7 @@
 				</div>
 				<div class="settings-group wall-presentation-controls">
 					<h3 class="settings-group-title">Walls</h3>
-					<div class="segment-control" role="group" aria-label="Wall presentation">
-						<button class="segment-btn wall-mode-btn" data-value="up" title="Walls at full height">Up</button>
-						<button class="segment-btn wall-mode-btn" data-value="cutaway" title="Lower the walls in front of you">Cutaway</button>
-						<button class="segment-btn wall-mode-btn" data-value="down" title="Walls lowered to stubs">Down</button>
-						<button class="segment-btn wall-mode-btn" data-value="hidden" title="Hide walls entirely">Hidden</button>
-					</div>
+					<p class="setting-hint">Up / Cutaway / Down / Hidden is on the map itself, top-left. <kbd class="setting-key">Home</kbd> and <kbd class="setting-key">End</kbd> walk it.</p>
 					<div class="setting-item">
 						<div class="checkbox-wrapper" title="Lower walls the cursor is behind, not just the active Myte">
 							<input type="checkbox" id="view-wall-cursor-toggle" checked>
@@ -683,7 +682,7 @@
 	<!-- END WORLD MAP PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="js/bundle.js?v=bcc395cd5524"></script>
+	<script src="js/bundle.js?v=fdf547d9b9d8"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

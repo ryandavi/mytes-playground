@@ -37,7 +37,6 @@ class GameMap {
         this.floorBuilder = null;
         this.floorMaterialRegistry = null;
         this.surfaceCustomizer = null;
-        this.wallTileOverlay = null;
         this.renderer = new MapRenderer();
         // Handles a missing gridSystem (falls back to registry scans), so safe
         // to construct before the map initializes.
@@ -197,42 +196,6 @@ class GameMap {
     setWallAwareRenderInsets(mapData, overhang = this.resolveRenderTopOverhang(mapData)) {
         const padding = this.resolveRenderPadding(mapData);
         this.setRenderInsets({ ...padding, top: padding.top + Math.max(0, Number(overhang) || 0) });
-    }
-
-    // Flat top-down art for the wall tiles the map author placed in Tiled. The
-    // baked background omits them, so without this the 'hidden' wall
-    // presentation leaves bare floor where the walls stand.
-    async createWallTileOverlay(mapData) {
-        this.removeWallTileOverlay();
-
-        const url = await this.tileMapLoader?.createWallTileOverlayUrl?.(mapData);
-        const layer = this.layers.groundDecor || this.layers.background;
-        if (!url) return;
-        this.trackGeneratedObjectUrl(url);
-        if (!layer) return;
-
-        const overlay = document.createElement('div');
-        overlay.className = 'wall-tile-overlay';
-        overlay.style.cssText = [
-            'position:absolute', 'left:0', 'top:0',
-            `width:${this.dimensions.width}px`, `height:${this.dimensions.height}px`,
-            `background-image:url(${url})`, 'background-repeat:no-repeat',
-            'pointer-events:none'
-        ].join(';');
-        layer.appendChild(overlay);
-        this.wallTileOverlay = overlay;
-        this.syncWallTileOverlay();
-    }
-
-    syncWallTileOverlay() {
-        if (this.wallTileOverlay) {
-            this.wallTileOverlay.hidden = this.wallBuilder?.presentation !== 'hidden';
-        }
-    }
-
-    removeWallTileOverlay() {
-        this.wallTileOverlay?.remove();
-        this.wallTileOverlay = null;
     }
 
     trackGeneratedObjectUrl(url) {
@@ -488,6 +451,7 @@ class GameMap {
 		this.dimensions = mapData.dimensions;
 		this.name = mapData.name;
 		this.id = mapData.id;
+		this.sourcePath = mapData.sourcePath || null;
 		this.displayName = mapData.displayName;
 		this.description = mapData.description;
 		this.location = mapData.environment.location;
@@ -587,7 +551,6 @@ class GameMap {
 			// Materials are loaded now, so the overhang uses each construction's
 			// real height instead of the map's heightCells estimate.
 			this.setWallAwareRenderInsets(mapData);
-			await this.createWallTileOverlay(mapData);
 			this.roomEnclosureDetector = new RoomEnclosureDetector(this);
 		}
 		this.eventManager?.emit(EVENTS.WALL_READY, { mapId: this.id, builder: this.wallBuilder });
@@ -655,10 +618,10 @@ class GameMap {
 		// The visible map center is the listener for both free camera and character follow.
 		// Water zones take priority — they declare lake vs river explicitly and play at full volume.
 		if (this.zoneManager) {
-			for (const zone of this.zoneManager.getZonesOfType('water_lake')) {
+			for (const zone of this.zoneManager.getZonesOfType(ZONE_TYPES.WATER_LAKE)) {
 				if (zone.region?.contains(listener.x, listener.y)) { sounds.set('env_water_lake', 1.0); break; }
 			}
-			for (const zone of this.zoneManager.getZonesOfType('water_river')) {
+			for (const zone of this.zoneManager.getZonesOfType(ZONE_TYPES.WATER_RIVER)) {
 				if (zone.region?.contains(listener.x, listener.y)) { sounds.set('env_water_river', 1.0); break; }
 			}
 		}

@@ -71,7 +71,6 @@ class RubbingComponent extends InputComponent {
    * @param {Object} event Input system event
    */
   handleStart = (event) => {
-    if (!this.active) return;
     
     // Check if rubbing is allowed
     if (this.options.canRub && !this.options.canRub(event)) {
@@ -90,22 +89,11 @@ class RubbingComponent extends InputComponent {
       this.touchId = null;
     }
     
-    // Make sure the interaction is within our element
-    if (this.element) {
-      const rect = this.element.getBoundingClientRect();
-      const localPos = {
-        x: event.position.x - rect.left - window.scrollX,
-        y: event.position.y - rect.top - window.scrollY
-      };
-      const isInside = localPos.x >= 0 && localPos.y >= 0 &&
-                      localPos.x < rect.width &&
-                      localPos.y < rect.height;
+    // Not on this element, or not on the world at all — see claimsPress.
+    if (!this.claimsPress(event)) return;
 
-      if (!isInside) return;
-      
-      // Set touch-action to none for smoother rubbing on touch devices
-      this.element.style.touchAction = 'none';
-    }
+    // Set touch-action to none for smoother rubbing on touch devices
+    if (this.element) this.element.style.touchAction = 'none';
     
     // Initialize rubbing state
     this.isRubbing = true;

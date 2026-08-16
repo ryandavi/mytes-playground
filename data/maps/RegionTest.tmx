@@ -36,7 +36,7 @@
   </data>
  </layer>
  <objectgroup id="3" name="Rooms">
-  <object id="1" name="LIGHTVOLUME" x="32" y="32" width="96" height="96">
+  <object id="1" name="Room" x="32" y="32" width="96" height="96">
    <properties>
     <property name="displayName" value="L Room"/>
     <property name="roomId" value="l_room"/>

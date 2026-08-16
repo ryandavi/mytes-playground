@@ -316,7 +316,13 @@
     "src": "js/Map/Walls/WallMaterialRegistry.js"
   },
   {
+    "src": "js/Map/Walls/WallWangAtlas.js"
+  },
+  {
     "src": "js/Map/Walls/WallBuilder.js"
+  },
+  {
+    "src": "js/Map/Walls/WallTiledExporter.js"
   },
   {
     "src": "js/Map/Floors/FloorMaterialRegistry.js"
@@ -513,6 +519,9 @@
     "src": "js/UI/Overlays/StageChips.js"
   },
   {
+    "src": "js/UI/Overlays/StageViewBar.js"
+  },
+  {
     "src": "js/UI/Overlays/BuffOverlayUI.js"
   },
   {
@@ -535,6 +544,12 @@
   },
   {
     "src": "js/UI/Core/SegmentControl.js"
+  },
+  {
+    "src": "js/UI/Core/BuildSettingToggle.js"
+  },
+  {
+    "src": "js/UI/Core/WallViewControl.js"
   },
   {
     "src": "js/UI/Core/PanelSection.js"
@@ -565,12 +580,6 @@
   },
   {
     "src": "js/UI/Panels/SoundPanel.js"
-  },
-  {
-    "src": "js/UI/Panels/BuildSettingToggle.js"
-  },
-  {
-    "src": "js/UI/Panels/WallViewControl.js"
   },
   {
     "src": "js/UI/Panels/SurfaceCustomizePanel.js"

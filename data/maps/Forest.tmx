@@ -82,7 +82,7 @@
   <object id="1" name="Zone" x="0" y="0" width="960" height="960">
    <properties>
     <property name="displayName" value="Forest Clearing"/>
-    <property name="type" value="social"/>
+    <property name="zoneType" value="social"/>
    </properties>
   </object>
  </objectgroup>

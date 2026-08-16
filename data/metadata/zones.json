@@ -1,46 +1,64 @@
 {
-  "schemaVersion": 1,
-  "zones": [
-    {
-      "id": "rest",
-      "label": "Rest Zone",
-      "effects": {
-        "comfort": 0.0008,
-        "energy": 0.0004
-      }
-    },
-    {
-      "id": "play",
-      "label": "Play Zone",
-      "effects": {
-        "fun": 0.001
-      }
-    },
-    {
-      "id": "social",
-      "label": "Social Zone",
-      "effects": {
-        "social": 0.0008
-      }
-    },
-    {
-      "id": "danger",
-      "label": "Danger Zone",
-      "effects": {
-        "comfort": -0.0006
-      }
-    },
-    {
-      "id": "food",
-      "label": "Food Zone",
-      "effects": {
-        "satiety": 0.0002
-      }
-    },
-    {
-      "id": "boost",
-      "label": "Boost Zone",
-      "effects": []
-    }
-  ]
+ "schemaVersion": 1,
+ "zones": [
+  {
+   "id": "rest",
+   "label": "Rest Zone",
+   "category": "stat",
+   "effects": {
+    "comfort": 0.0008,
+    "energy": 0.0004
+   }
+  },
+  {
+   "id": "play",
+   "label": "Play Zone",
+   "category": "stat",
+   "effects": {
+    "fun": 0.001
+   }
+  },
+  {
+   "id": "social",
+   "label": "Social Zone",
+   "category": "stat",
+   "effects": {
+    "social": 0.0008
+   }
+  },
+  {
+   "id": "danger",
+   "label": "Danger Zone",
+   "category": "stat",
+   "effects": {
+    "comfort": -0.0006
+   }
+  },
+  {
+   "id": "food",
+   "label": "Food Zone",
+   "category": "stat",
+   "effects": {
+    "satiety": 0.0002
+   }
+  },
+  {
+   "id": "boost",
+   "label": "Boost Zone",
+   "category": "stat",
+   "effects": []
+  },
+  {
+   "id": "water_lake",
+   "label": "Lake",
+   "category": "ambient",
+   "ambientSound": "env_water_lake"
+  },
+  {
+   "id": "water_river",
+   "label": "River",
+   "category": "ambient",
+   "ambientSound": "env_water_river"
+  }
+ ]
 }

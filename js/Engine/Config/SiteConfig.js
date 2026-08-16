@@ -63,6 +63,12 @@ const SiteConfig = Object.freeze({
         materialsPath: 'data/map-objects/wall-materials.json',
         wallTilesetProperty: 'wallTileset',
         wallWangSetName: 'Wall',
+        // Which wang tile stands in for a wall cell that has no wall neighbour
+        // at all. An edge wang set has nothing to say about a tile with no
+        // edges, so mask 0 is simply absent from the tileset and Tiled cannot
+        // paint one either. 15 is the all-connections tile, which reads closest
+        // to a lone pillar; change it if the art suggests otherwise.
+        wangIsolatedFallbackMask: 15,
         defaultConstructionId: 'plaster_wall',
         defaultFinishId: 'plaster_plain',
         defaultHeightCells: 5,

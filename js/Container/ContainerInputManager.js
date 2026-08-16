@@ -186,6 +186,13 @@ class ContainerInputManager {
         case 'escape':
           this.handleEscape();
           return;
+        // How the walls are drawn is not a build-mode question — the control
+        // for it is on screen while playing too, so its keys are as well.
+        case 'home':
+        case 'end':
+          event.originalEvent?.preventDefault();
+          this.stepWallPresentation(event.key === 'home' ? -1 : 1);
+          return;
       }
 
       if (event.key.length === 1 && 'wasd'.includes(event.key)) {
@@ -206,11 +213,6 @@ class ContainerInputManager {
           event.originalEvent?.preventDefault();
           this.container.setBuildGridEnabled(this.container.settings?.buildGrid === false);
           return;
-        case 'home':
-        case 'end':
-          event.originalEvent?.preventDefault();
-          this.stepWallPresentation(event.key === 'home' ? -1 : 1);
-          return;
         case 'delete':
           event.originalEvent?.preventDefault();
           this.storeSelectedObject();
@@ -225,12 +227,11 @@ class ContainerInputManager {
     });
   }
 
-  // The Home/End pair drives whichever wall-view control is on screen, so the
-  // keys and the buttons stay one state.
+  // The keys and the buttons are one state: there is a single wall-view control
+  // and it is always on screen, so this drives it rather than hunting for
+  // whichever panel happens to be open.
   stepWallPresentation(direction) {
-    const ui = this.container.ui;
-    const control = ui?.wallBuildPanel?.wallView || ui?.surfaceCustomizePanel?.wallView;
-    control?.step(direction);
+    this.container.ui?.stageViewBar?.wallView?.step(direction);
   }
 
   storeSelectedObject() {
@@ -484,8 +485,9 @@ class ContainerInputManager {
    * @returns {boolean} Whether element is clickable
    */
   isClickableElement(element) {
-    // Ignore elements with ignore class
-    if (element.classList && element.classList.contains('ignore')) {
+    // Chrome over the world, and anything inside it — the class is on the
+    // wrapper, and the click arrives on a button three levels down.
+    if (element.closest?.(InputComponent.UI_SELECTOR)) {
       return false;
     }
 
@@ -508,6 +510,7 @@ class ContainerInputManager {
     }
 
     const blockedSelector = [
+      InputComponent.UI_SELECTOR,
       '.world-myte',
       '.map-object',
       '.dropped-item',
