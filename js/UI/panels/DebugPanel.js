@@ -873,9 +873,17 @@ class DebugPanel extends PanelSection {
                 subgroupTitle.innerText = subgroupLabel;
                 subgroupEl.appendChild(subgroupTitle);
 
-                for (const config of configs) {
-                    const el = this._buildButtonElement(config);
-                    subgroupEl.appendChild(el);
+                // The buttons wrap into a row of their own rather than the
+                // subgroup itself becoming the row — a heading sharing a flex
+                // line with buttons shrinks to the width of its own text, which
+                // is why these titles never took a full line.
+                if (configs.length) {
+                    const row = document.createElement('div');
+                    row.className = 'button-row';
+                    for (const config of configs) {
+                        row.appendChild(this._buildButtonElement(config));
+                    }
+                    subgroupEl.appendChild(row);
                 }
 
                 if (hasInventoryEditor) {
@@ -913,14 +921,15 @@ class DebugPanel extends PanelSection {
 
         if (config.type === 'value') {
             const group = document.createElement('div');
-            group.className = 'button-group';
+            group.className = 'value-stepper';
             group.id = `${config.id}-group`;
             group.dataset.controlId = config.id;
+            button.classList.add('value-stepper__value');
 
             const minusBtn = document.createElement('button');
             minusBtn.id = `${config.id}-down`;
-            minusBtn.className = 'value-button minus';
-            minusBtn.innerHTML = '-';
+            minusBtn.className = 'value-button value-stepper__step minus';
+            minusBtn.innerHTML = '−';
             if (config.requiresActiveMyte) {
                 minusBtn.classList.add('requires-myte');
                 minusBtn.disabled = !this.parent.parent.activeMyte?.isActive;
@@ -928,7 +937,7 @@ class DebugPanel extends PanelSection {
 
             const plusBtn = document.createElement('button');
             plusBtn.id = `${config.id}-up`;
-            plusBtn.className = 'value-button plus';
+            plusBtn.className = 'value-button value-stepper__step plus';
             plusBtn.innerHTML = '+';
             if (config.requiresActiveMyte) {
                 plusBtn.classList.add('requires-myte');
@@ -1025,7 +1034,7 @@ class DebugPanel extends PanelSection {
         add.addEventListener('click', () => this.changeInventoryItem(select.value, Number(quantity.value)));
 
         const actions = document.createElement('div');
-        actions.className = 'button-group debug-inventory-editor__actions';
+        actions.className = 'debug-inventory-editor__actions';
         actions.append(remove, add);
         editor.append(label, select, quantity, actions);
         return editor;

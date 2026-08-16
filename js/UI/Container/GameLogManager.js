@@ -186,6 +186,7 @@ class GameLogManager extends ModalWindow {
         this.persistEntries();
     }
 
+
     renderEntry(entry) {
         if (!this.listElement) return;
 
@@ -270,6 +271,22 @@ class GameLogManager extends ModalWindow {
         const hasVisibleEntry = [...this.listElement.children]
             .some((entry) => !entry.classList.contains('is-hidden'));
         this.emptyElement.hidden = hasVisibleEntry;
+        this.markFirstVisibleEntry();
+    }
+
+    /**
+     * Entries are separated by a rule on their top edge, which the topmost one
+     * must not draw. CSS cannot ask whether the sibling above is filtered out,
+     * so the list says which entry is currently first.
+     */
+    markFirstVisibleEntry() {
+        if (!this.listElement) return;
+        let seen = false;
+        for (const entry of this.listElement.children) {
+            const visible = !entry.classList.contains('is-hidden');
+            entry.classList.toggle('is-first-visible', visible && !seen);
+            if (visible) seen = true;
+        }
     }
 
     getGameTimeStamp() {

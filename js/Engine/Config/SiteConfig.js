@@ -14,6 +14,23 @@ const SiteConfig = Object.freeze({
     rooms: Object.freeze({
         autoDetect: true,
         minAreaCells: 4,
+        // What a room is FOR, as opposed to what it is called. Nothing reads
+        // this yet — it exists so that behaviour which wants to ("eat in the
+        // kitchen", "this room has no bed") has one authored vocabulary to read
+        // rather than parsing display names. `id` is the stable key; `label` is
+        // what the player picks from and what an unnamed room falls back to.
+        defaultType: 'unset',
+        types: Object.freeze([
+            Object.freeze({ id: 'unset', label: 'Unassigned' }),
+            Object.freeze({ id: 'bedroom', label: 'Bedroom' }),
+            Object.freeze({ id: 'kitchen', label: 'Kitchen' }),
+            Object.freeze({ id: 'bathroom', label: 'Bathroom' }),
+            Object.freeze({ id: 'living', label: 'Living Room' }),
+            Object.freeze({ id: 'playroom', label: 'Playroom' }),
+            Object.freeze({ id: 'study', label: 'Study' }),
+            Object.freeze({ id: 'hallway', label: 'Hallway' }),
+            Object.freeze({ id: 'storage', label: 'Storage' }),
+        ]),
     }),
 
     // Experimental semantic wall renderer. Turning this off restores the
@@ -300,10 +317,12 @@ const SiteConfig = Object.freeze({
         defaultPresentation: 'cutaway',
         // Flat daylight while building so finishes read true.
         neutralLighting: true,
-        // Camera follow mode forced on entry. Locked, not drag-to-pan: pan mode
-        // claims the left-button drag for the camera, which would swallow every
-        // furniture move. Panning while building is WASD / arrow keys.
-        cameraFollowMode: 4,
+        // Camera follow mode forced on entry, restored on exit. Drag-to-pan:
+        // grabbing the map is how you get around a floor plan. The tools that
+        // own the left-button drag themselves (Walls, Paint) suppress the
+        // camera's grab — see ToolManager.claimsMapDrag — and dragging an
+        // object already borrows the camera via beginTemporaryCursorFollow.
+        cameraFollowMode: 3,
         // Zoom applied on entry; null keeps whatever the player had.
         entryZoom: 0.85,
         // Undo stack depth. Commands are cheap inverses, not snapshots.
@@ -313,8 +332,22 @@ const SiteConfig = Object.freeze({
         defaultPolicy: 'none',
         policies: Object.freeze(['full', 'limited', 'none']),
         sounds: Object.freeze({
-            wallPlace: 'ui_drop_item',
-            wallRemove: 'ui_error',
+            // One short tick as each cell joins the run, and the same tick
+            // running back down the ladder as cells come out — the sound of
+            // picking tiles, not of masonry. Two different presets read as two
+            // different events and stacked into a drone on a fast drag, because
+            // `ui_drop_item` has a tail longer than the gap between cells.
+            //
+            // `minIntervalMs` is the floor: a flick across the map should not
+            // fire thirty one-shots into the same 200ms.
+            run: Object.freeze({
+                sound: 'ui_click',
+                cycle: 5,
+                basePitch: 0.94,
+                pitchStep: 1.06,
+                volume: 0.22,
+                minIntervalMs: 45,
+            }),
             paint: 'ui_drag_item',
             objectPlace: 'ui_drop_item',
             history: 'ui_hover',
@@ -944,11 +977,71 @@ const SiteConfig = Object.freeze({
         maxZoom:  2.5,
         zoomStep: 0.1,
 
+        // CURSOR: fraction of the viewport in the middle where the camera holds
+        // still (0–1). Without it, cursor following pans for every mouse move
+        // and reads as edge scrolling — there is nowhere to rest the pointer.
+        // Outside the band the remaining travel still reaches both map edges.
+        cursorDeadZone: 0.40,
+
         // CURSOR_EDGE: fraction of viewport that counts as the trigger zone (0–1)
         edgeThreshold: 0.20,
 
-        // CURSOR_EDGE: easing divisor for edge scroll speed (easing / this)
-        edgeScrollEasingDivisor: 3,
+        // The same band while a drag has borrowed the camera. Wider, because
+        // carrying something to the far side of the map is a different job from
+        // looking around: at the browsing threshold you have to pin the pointer
+        // against the edge and wait for the view to catch up, holding an object
+        // the whole time. Starting earlier means the map is already moving by
+        // the time you get there.
+        dragEdgeThreshold: 0.34,
+
+        // Edge scroll speed at the screen edge, in world pixels per second.
+        //
+        // Stated as a speed because that is the thing being tuned. It used to be
+        // a divisor applied to the position easing, which made the number both
+        // backwards (a *larger* divisor scrolled faster) and unmeasurable — the
+        // combination worked out to 0.37 viewports per second at full tilt, so
+        // crossing one screen took nearly three seconds of holding the pointer
+        // against the edge.
+        // Pinned against the screen edge, which is the "go now" gesture. High on
+        // purpose: the cure for waiting at the edge is a fast edge, and the
+        // curve below is what keeps that speed from bleeding into the approach.
+        // Roughly two viewports a second while dragging.
+        edgeScrollSpeed: 1300,
+        dragEdgeScrollSpeed: 2100,
+
+        // Speed at the inner edge of the trigger band, as a fraction of the
+        // above. Without a floor the ramp starts at zero, so crossing into the
+        // band produced no visible movement at all and you had to keep pushing
+        // before anything happened. It only has to be enough to see — at 0.45
+        // entering the band snapped straight to half speed, which is what made
+        // edge scrolling feel like an on/off switch rather than a pedal.
+        edgeScrollMinSpeedFraction: 0.08,
+        dragEdgeScrollMinSpeedFraction: 0.10,
+
+        // Shape of the ramp across the band: speed = floor + (1-floor) * t^curve,
+        // where t is how far into the band the pointer is. 1 is linear, which
+        // spends most of the band already near top speed and leaves no usable
+        // slow range. Above 1 the inner half stays gentle and the acceleration
+        // arrives in the outer quarter, where the pointer is when you mean it.
+        edgeScrollCurve: 2.2,
+
+        // Time constant for easing the camera's actual velocity toward the
+        // wanted one, in seconds. This is what makes it feel eased instead of
+        // linear: it spins up on entry and coasts down on exit rather than
+        // switching between stopped and moving. Small enough (~0.25s to full
+        // speed) that it never reads as the camera lagging your hand.
+        edgeScrollResponseSeconds: 0.09,
+
+        // Below this speed (world px/sec) a decaying velocity is treated as
+        // stopped. An exponential never reaches zero on its own, and a camera
+        // creeping a fraction of a pixel per frame forever drifts the view and
+        // keeps the render path awake.
+        edgeScrollStopSpeed: 8,
+
+        // Longest frame edge scrolling will integrate over, in seconds. A
+        // backgrounded tab or a stalled frame would otherwise resume with one
+        // enormous jump.
+        edgeScrollMaxFrameSeconds: 0.05,
 
         // LEASH: myte must drift beyond this fraction of the viewport before camera moves
         leashThreshold: 0.28,

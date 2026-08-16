@@ -83,24 +83,10 @@ class MapObjectInputController {
 			onDragMove: (event) => {
 				const clientX = event.originalEvent?.clientX ?? event.position?.clientX;
 				const clientY = event.originalEvent?.clientY ?? event.position?.clientY;
-				const screenX = Number.isFinite(clientX) ? clientX : event.position.x;
-				const screenY = Number.isFinite(clientY) ? clientY : event.position.y;
-				const world = object.container?.inputHandler?.screenToWorldCoordinates
-					? object.container.inputHandler.screenToWorldCoordinates(screenX, screenY)
-					: { x: object.posX, y: object.posY };
-				world.x -= object._dragGrabOffset?.x ?? 0;
-				world.y -= object._dragGrabOffset?.y ?? 0;
-				const clampedWorld = typeof object.clampPlacementPosition === 'function'
-					? object.clampPlacementPosition(world.x, world.y)
-					: object.container?.clampEntityPosition
-					? object.container.clampEntityPosition(object, world.x, world.y)
-					: world;
-				object.posX = clampedWorld.x;
-				object.posY = clampedWorld.y;
-				object.updatePosition();
-				object.onPlacementDragMove?.();
-				object.showDropTarget();
-				this._updateStorageDragPreview(clientX, clientY);
+				this.placeAtScreenPoint(
+					Number.isFinite(clientX) ? clientX : event.position.x,
+					Number.isFinite(clientY) ? clientY : event.position.y
+				);
 			},
 			onDragEnd: (event) => {
 				object.isDragging = false;
@@ -301,6 +287,63 @@ class MapObjectInputController {
 				if (object.getConfig('onRubOverdone')) object.handleRubOverdone(event.count);
 			}
 		});
+	}
+
+	/**
+	 * Ctrl held during a drag snaps the object to grid cells; free-drag is the
+	 * default because placement is pixel-based. The modifier is read per move
+	 * rather than latched at drag start, so it can be taken and released
+	 * mid-drag. Same top-left snap the inventory placement path uses, so a
+	 * dragged object and a freshly placed one land on the same cells.
+	 */
+	/**
+	 * Put the dragged object under a screen point. Both the pointer moving and
+	 * the camera moving under a still pointer end up here, because they are the
+	 * same question — where in the world is this bit of screen now — and only
+	 * one of them used to be asked.
+	 */
+	placeAtScreenPoint(screenX, screenY) {
+		const object = this.object;
+		if (!object?.isDragging) return;
+
+		const world = object.container?.inputHandler?.screenToWorldCoordinates
+			? object.container.inputHandler.screenToWorldCoordinates(screenX, screenY)
+			: { x: object.posX, y: object.posY };
+		world.x -= object._dragGrabOffset?.x ?? 0;
+		world.y -= object._dragGrabOffset?.y ?? 0;
+
+		const snappedWorld = this.applySnapModifier(object, world);
+		const clampedWorld = typeof object.clampPlacementPosition === 'function'
+			? object.clampPlacementPosition(snappedWorld.x, snappedWorld.y)
+			: object.container?.clampEntityPosition
+			? object.container.clampEntityPosition(object, snappedWorld.x, snappedWorld.y)
+			: snappedWorld;
+
+		object.posX = clampedWorld.x;
+		object.posY = clampedWorld.y;
+		object.updatePosition();
+		object.onPlacementDragMove?.();
+		object.showDropTarget();
+		this._updateStorageDragPreview(screenX, screenY);
+	}
+
+	// The camera calls this on the owner of its borrow after an edge-scroll step.
+	syncToCursor(clientX, clientY) {
+		this.placeAtScreenPoint(clientX, clientY);
+	}
+
+	applySnapModifier(object, position) {
+		if (object.container?.inputHandler?.shouldSnapToGrid?.() !== true) return position;
+		const gridSystem = object.gameMap?.gridSystem;
+		if (!gridSystem) return position;
+		return gridSystem.snapToGrid(
+			position.x,
+			position.y,
+			object.size?.width ?? 0,
+			object.size?.height ?? 0,
+			gridSystem.config.cellSize,
+			{ useCenter: false }
+		);
 	}
 
 	startDrag() {
@@ -587,8 +630,14 @@ class MapObjectInputController {
 				if (!cell.tileWalkable) return false;
 
 				if (!thisOverlappable) {
+					// Cells hold more than map objects — a myte registers itself
+					// in the grid too, and it has no config to ask. Anything
+					// without one is not a placement blocker: you can drop a
+					// ball on the tile a myte is standing on.
 					const hasBlocker = [...cell.objects].some(
-						obj => obj !== object && !obj.getConfig('visual.overlappable', false)
+						obj => obj !== object &&
+							typeof obj.getConfig === 'function' &&
+							!obj.getConfig('visual.overlappable', false)
 					);
 					if (hasBlocker) return false;
 				}

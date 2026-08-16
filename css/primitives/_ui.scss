@@ -71,7 +71,7 @@
 }
 
 @mixin field-base {
-    padding: var(--padding);
+    padding: var(--field-padding-block) var(--field-padding-inline);
     border-radius: var(--border-radius-inner);
     border: var(--border-width) solid var(--button-dark);
     border-style: solid;

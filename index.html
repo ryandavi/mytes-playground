@@ -52,35 +52,35 @@
 		<div class="hand-controls ignore" id="hand-controls">
 			<!-- PLAY TOOLS -->
 			<div class="tool-group tool-group--play">
-				<input type="radio" name="hand" value="left" id="hand-select" checked>
-				<label class="button" for="hand-select" title="Select (S)">
+				<input type="radio" name="hand" value="left" id="tool-select" checked>
+				<label class="button" for="tool-select" title="Select (S)">
 					<svg class="icon" aria-hidden="true"><use href="#icon-pointer"></use></svg>
 					<span class="text"><u>S</u>elect</span>
 				</label>
-				<input type="radio" name="hand" value="left" id="hand-drag">
-				<label class="button" for="hand-drag" title="Drag (D)">
+				<input type="radio" name="hand" value="left" id="tool-drag">
+				<label class="button" for="tool-drag" title="Drag (D)">
 					<svg class="icon" aria-hidden="true"><use href="#icon-grab"></use></svg>
 					<span class="text"><u>D</u>rag</span>
 				</label>
-				<input type="radio" name="hand" value="right" id="hand-pet">
-				<label class="button" for="hand-pet" title="Pet (P)">
+				<input type="radio" name="hand" value="right" id="tool-pet">
+				<label class="button" for="tool-pet" title="Pet (P)">
 					<svg class="icon" aria-hidden="true"><use href="#icon-paw"></use></svg>
 					<span class="text"><u>P</u>et</span>
 				</label>
 			</div>
 			<!-- BUILD TOOLS -->
 			<div class="tool-group tool-group--build" role="group" aria-label="Build tools">
-				<button id="move-toggle" class="hand-control-btn tool-btn" data-tool-mode="move" title="Move furniture (1)">
+				<button id="tool-move" class="hand-control-btn tool-btn" data-tool-mode="move" title="Select and move furniture (1)">
 					<svg class="icon" aria-hidden="true"><use href="#icon-move"></use></svg>
 					<span class="text">Move</span>
 				</button>
-				<button id="build-toggle" class="hand-control-btn tool-btn" data-tool-mode="build" title="Build walls (2)">
+				<button id="tool-wall" class="hand-control-btn tool-btn" data-tool-mode="wall" title="Build walls (2)">
 					<svg class="icon" aria-hidden="true"><use href="#icon-wall"></use></svg>
-					<span class="text">Walls</span>
+					<span class="text">Wall</span>
 				</button>
-				<button id="customize-toggle" class="hand-control-btn tool-btn" data-tool-mode="customize" title="Paint surfaces (3)">
+				<button id="tool-surface" class="hand-control-btn tool-btn" data-tool-mode="surface" title="Edit surfaces (3)">
 					<svg class="icon" aria-hidden="true"><use href="#icon-roller"></use></svg>
-					<span class="text">Paint</span>
+					<span class="text">Surface</span>
 				</button>
 				<div class="tool-group__row">
 					<button id="build-undo" class="hand-control-btn hand-control-btn--half" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
@@ -91,14 +91,15 @@
 					</button>
 				</div>
 			</div>
-			<!-- MODE SWITCH + OPTIONS -->
-			<button id="build-mode-toggle" class="hand-control-btn mode-switch" title="Build Mode (B)" aria-pressed="false">
-				<svg class="icon" aria-hidden="true"><use href="#icon-wall"></use></svg>
-				<span class="text"><u>B</u>uild</span>
-			</button>
-			<button id="options-toggle" class="hand-control-btn" title="Options">
-				<svg class="icon" aria-hidden="true"><use href="#icon-gear"></use></svg>
-			</button>
+			<!-- OPTIONS — the Build switch lives on the stage, as #build-mode-chip -->
+			<div class="tool-group__row">
+				<button id="sound-mute-toggle" class="hand-control-btn hand-control-btn--half" title="Mute (N)" aria-label="Mute sound" aria-pressed="false">
+					<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
+				</button>
+				<button id="options-toggle" class="hand-control-btn hand-control-btn--half" title="Options" aria-label="Options">
+					<svg class="icon" aria-hidden="true"><use href="#icon-gear"></use></svg>
+				</button>
+			</div>
 		</div>
 		<!-- END HAND CONTROLS -->
 		<!-- CANVAS CONTAINER -->
@@ -147,16 +148,6 @@
 				</div>
 			</div>
 			<!-- END LOADING SCREEN -->
-			<!-- AUDIO UNLOCK PROMPT -->
-			<div class="audio-unlock ignore" id="audio-unlock" role="status" hidden>
-				<svg class="icon" aria-hidden="true"><use href="#icon-sound-off"></use></svg>
-				<span class="audio-unlock__text">Click anywhere to turn on sound.</span>
-				<button type="button" class="audio-unlock__enable" id="audio-unlock-button">
-					<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
-					<span class="text">Enable Sound</span>
-				</button>
-			</div>
-			<!-- END AUDIO UNLOCK PROMPT -->
 			<!-- CANVAS -->
 			<div class="canvas">
 				<!-- map objects -->
@@ -175,22 +166,35 @@
 				<div class="layer effects"></div>
 			</div>
 			<!-- END CANVAS -->
-			<!-- CORNER OVERLAYS -->
-			<button type="button" class="stage-chip stage-chip--paused ignore" id="build-paused-chip" title="Leave Build Mode (B)">
+			<!-- STAGE CHIPS — see css/components/_build-mode.scss for the placement slots -->
+			<button type="button" class="stage-chip stage-chip--top-center stage-chip--build ignore" id="build-mode-chip" title="Build Mode (B)" aria-pressed="false" hidden>
+				<svg class="icon" aria-hidden="true"><use href="#icon-wall"></use></svg>
+				<span class="text">Build</span>
+				<span class="stage-chip__action"><u>B</u></span>
+			</button>
+			<button type="button" class="stage-chip stage-chip--top-center stage-chip--paused ignore" id="build-paused-chip" title="Leave Build Mode (B)">
 				<svg class="icon" aria-hidden="true"><use href="#icon-pause"></use></svg>
 				<span class="text">Build Mode — paused</span>
 				<span class="stage-chip__action">Done</span>
 			</button>
-			<button type="button" class="stage-chip stage-chip--map ignore" id="world-map-chip" title="World Map (M)">
+			<button type="button" class="stage-chip stage-chip--bottom-left stage-chip--map ignore" id="world-map-chip" title="World Map (M)">
 				<svg class="icon" aria-hidden="true"><use href="#icon-world-map"></use></svg>
 				<span class="text">—</span>
 			</button>
-			<button type="button" class="stage-chip stage-chip--log ignore" id="game-log-chip" title="Event Log (L)">
+			<button type="button" class="stage-chip stage-chip--bottom-right stage-chip--log ignore" id="game-log-chip" title="Event Log (L)">
 				<svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
 				<span class="text">Events</span>
 				<span class="stage-chip__badge" hidden>0</span>
 			</button>
-			<!-- END CORNER OVERLAYS -->
+			<div class="stage-chip stage-chip--bottom-center stage-chip--audio ignore" id="audio-unlock" role="status" hidden>
+				<svg class="icon" aria-hidden="true"><use href="#icon-sound-off"></use></svg>
+				<span class="text">Click anywhere to turn on sound.</span>
+				<button type="button" class="stage-chip__action" id="audio-unlock-button">
+					<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
+					<span>Enable Sound</span>
+				</button>
+			</div>
+			<!-- END STAGE CHIPS -->
 		</section>
 		<!-- END CANVAS CONTAINER -->
 		<!-- ACTION CONTROLS MENU -->
@@ -257,7 +261,7 @@
 		<div class="window-panel__header">
 			<div class="window-panel__title">
 				<svg class="icon" aria-hidden="true"><use href="#icon-roller"></use></svg>
-				<div class="text">Customize Surface</div>
+				<div class="text">Surface</div>
 			</div>
 			<div class="window-panel__controls">
 				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
@@ -265,39 +269,50 @@
 		</div>
 		<div class="window-panel__content">
 			<div class="settings-group">
-				<h3 class="settings-group-title">Surface</h3>
-				<div class="setting-item">
-					<p class="surface-target" aria-live="polite">Nothing selected</p>
-					<p class="setting-hint surface-customize-empty">Hover to highlight a surface, then click a wall or floor to pick its finish. Esc leaves Customize.</p>
+				<h3 class="settings-group-title">Selected surface</h3>
+				<p class="surface-target" aria-live="polite">
+					<span class="surface-target__room">Nothing selected</span>
+					<span class="surface-target__surface"></span>
+				</p>
+				<p class="setting-hint surface-customize-empty">Click a wall or floor to choose its finish. <kbd class="setting-key">Alt</kbd> samples the finish already there.</p>
+				<div class="setting-item surface-room-fields" hidden>
+					<label for="surface-room-name">Room name</label>
+					<input type="text" id="surface-room-name" maxlength="24" autocomplete="off" spellcheck="false">
+				</div>
+				<div class="setting-item surface-room-fields" hidden>
+					<label for="surface-room-type">Room type</label>
+					<select id="surface-room-type"></select>
+				</div>
+				<div class="segment-control surface-scope" role="group" aria-label="Paint scope" hidden>
+					<button type="button" class="segment-btn" data-value="stretch">This stretch</button>
+					<button type="button" class="segment-btn" data-value="room">Whole room</button>
 				</div>
 			</div>
-			<fieldset class="settings-group surface-scope" hidden>
-				<legend class="settings-group-title">Paint scope</legend>
-				<div class="setting-item">
-					<div class="checkbox-wrapper">
-						<input type="radio" id="surface-scope-stretch" name="surface-wall-scope" value="stretch" checked>
-						<label for="surface-scope-stretch">This stretch</label>
-					</div>
-				</div>
-				<div class="setting-item">
-					<div class="checkbox-wrapper">
-						<input type="radio" id="surface-scope-room" name="surface-wall-scope" value="room">
-						<label for="surface-scope-room">Whole room</label>
-					</div>
-				</div>
-			</fieldset>
-			<div class="settings-group">
+			<div class="settings-group surface-finish-group" hidden>
 				<h3 class="settings-group-title">Finish</h3>
 				<div class="surface-palette" role="group" aria-label="Surface finishes"></div>
-				<p class="setting-hint">Double-click a swatch to paint the whole room.</p>
 			</div>
-			<div class="settings-group wall-view-controls">
-				<h3 class="settings-group-title">Wall view <span class="setting-key">Home / End</span></h3>
-				<div class="wall-mode-segment" role="group" aria-label="Wall presentation">
-					<button class="wall-view-btn" data-wall-mode="up">Up</button>
-					<button class="wall-view-btn" data-wall-mode="cutaway">Cutaway</button>
-					<button class="wall-view-btn" data-wall-mode="down">Down</button>
-					<button class="wall-view-btn" data-wall-mode="hidden">Hidden</button>
+			<div class="settings-group settings-group--secondary build-view-controls">
+				<h3 class="settings-group-title">View</h3>
+				<div class="wall-view-controls">
+					<div class="segment-control" role="group" aria-label="Wall presentation">
+						<button type="button" class="segment-btn" data-value="up">Up</button>
+						<button type="button" class="segment-btn" data-value="cutaway">Cutaway</button>
+						<button type="button" class="segment-btn" data-value="down">Down</button>
+						<button type="button" class="segment-btn" data-value="hidden">Hidden</button>
+					</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
+						<input type="checkbox" class="build-grid-toggle" id="paint-grid-toggle" checked>
+						<label for="paint-grid-toggle">Show grid <kbd class="setting-key">G</kbd></label>
+					</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper" title="Dragged objects land on grid cells. Hold Ctrl to do the opposite for one drag.">
+						<input type="checkbox" class="build-snap-toggle" id="paint-snap-toggle" checked>
+						<label for="paint-snap-toggle">Snap to grid <kbd class="setting-key">Ctrl</kbd></label>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -309,49 +324,48 @@
 		<div class="window-panel__header">
 			<div class="window-panel__title">
 				<svg class="icon" aria-hidden="true"><use href="#icon-wall"></use></svg>
-				<div class="text">Build Walls</div>
+				<div class="text">Wall</div>
 			</div>
 			<div class="window-panel__controls">
 				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
 			</div>
 		</div>
 		<div class="window-panel__content">
-			<fieldset class="settings-group wall-build-operation">
-				<legend class="settings-group-title">Tool</legend>
-				<div class="setting-item">
-					<div class="checkbox-wrapper">
-						<input type="radio" id="wall-build-add" name="wall-build-operation" value="add" checked>
-						<label for="wall-build-add">Add walls</label>
-					</div>
+			<div class="settings-group wall-build-operation">
+				<h3 class="settings-group-title">Tool</h3>
+				<div class="segment-control wall-build-operation-segment" role="group" aria-label="Wall tool">
+					<button type="button" class="segment-btn active" data-value="add">Add</button>
+					<button type="button" class="segment-btn" data-value="remove">Remove</button>
 				</div>
-				<div class="setting-item">
-					<div class="checkbox-wrapper">
-						<input type="radio" id="wall-build-remove" name="wall-build-operation" value="remove">
-						<label for="wall-build-remove">Remove walls</label>
-					</div>
-				</div>
+				<p class="setting-hint">Drag to lay a run. Hold <kbd class="setting-key">Ctrl</kbd> to invert the tool.</p>
 				<div class="setting-item">
 					<div class="checkbox-wrapper" title="Outline a room instead of laying a single run">
 						<input type="checkbox" id="wall-build-rectangle">
-						<label for="wall-build-rectangle">Rectangle <span class="setting-key">Shift</span></label>
+						<label for="wall-build-rectangle">Rectangle <kbd class="setting-key">Shift</kbd></label>
 					</div>
 				</div>
-			</fieldset>
-			<div class="settings-group wall-view-controls">
-				<h3 class="settings-group-title">Wall view <span class="setting-key">Home / End</span></h3>
-				<div class="wall-mode-segment" role="group" aria-label="Wall presentation">
-					<button class="wall-view-btn" data-wall-mode="up">Up</button>
-					<button class="wall-view-btn" data-wall-mode="cutaway">Cutaway</button>
-					<button class="wall-view-btn" data-wall-mode="down">Down</button>
-					<button class="wall-view-btn" data-wall-mode="hidden">Hidden</button>
-				</div>
 			</div>
-			<div class="settings-group">
-				<h3 class="settings-group-title">How</h3>
+			<div class="settings-group settings-group--secondary build-view-controls">
+				<h3 class="settings-group-title">View</h3>
+				<div class="wall-view-controls">
+					<div class="segment-control" role="group" aria-label="Wall presentation">
+						<button type="button" class="segment-btn" data-value="up">Up</button>
+						<button type="button" class="segment-btn" data-value="cutaway">Cutaway</button>
+						<button type="button" class="segment-btn" data-value="down">Down</button>
+						<button type="button" class="segment-btn" data-value="hidden">Hidden</button>
+					</div>
+				</div>
 				<div class="setting-item">
-					<p class="setting-hint">Drag across the map to lay a straight run of wall.</p>
-					<p class="setting-hint">Hold Shift while dragging to outline a whole room.</p>
-					<p class="setting-hint">Esc cancels the drag, then closes this panel, then leaves Build mode.</p>
+					<div class="checkbox-wrapper">
+						<input type="checkbox" class="build-grid-toggle" id="wall-grid-toggle" checked>
+						<label for="wall-grid-toggle">Show grid <kbd class="setting-key">G</kbd></label>
+					</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper" title="Dragged objects land on grid cells. Hold Ctrl to do the opposite for one drag.">
+						<input type="checkbox" class="build-snap-toggle" id="wall-snap-toggle" checked>
+						<label for="wall-snap-toggle">Snap to grid <kbd class="setting-key">Ctrl</kbd></label>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -365,50 +379,56 @@
 			<!-- Graphics Settings -->
 			<div class="settings-group">
 				<h3 class="settings-group-title">Graphics</h3>
-				<div class="setting-item dropdown">
-					<label for="graphics-quality">Quality</label>
-					<select id="graphics-quality">
-						<option value="low">Low</option>
-						<option value="medium" selected>Medium</option>
-						<option value="high">High</option>
-						<option value="ultra">Ultra</option>
-					</select>
-				</div>
-				<div class="setting-item">
-					<div class="checkbox-wrapper">
-						<input type="checkbox" id="effects-toggle" checked>
-						<label for="effects-toggle">Special Effects</label>
+				<div class="settings-subgroup">
+					<h4 class="settings-subgroup-title">Detail</h4>
+					<div class="setting-item">
+						<label for="graphics-quality">Quality</label>
+						<select id="graphics-quality">
+							<option value="low">Low</option>
+							<option value="medium" selected>Medium</option>
+							<option value="high">High</option>
+							<option value="ultra">Ultra</option>
+						</select>
+					</div>
+					<div class="setting-item">
+						<div class="checkbox-wrapper">
+							<input type="checkbox" id="effects-toggle" checked>
+							<label for="effects-toggle">Special Effects</label>
+						</div>
+					</div>
+					<div class="setting-item">
+						<div class="checkbox-wrapper">
+							<input type="checkbox" id="animations-toggle" checked>
+							<label for="animations-toggle">Animations</label>
+						</div>
 					</div>
 				</div>
-				<div class="setting-item">
-					<div class="checkbox-wrapper">
-						<input type="checkbox" id="animations-toggle" checked>
-						<label for="animations-toggle">Animations</label>
+				<div class="settings-subgroup">
+					<h4 class="settings-subgroup-title">Light &amp; Weather</h4>
+					<div class="setting-item">
+						<div class="checkbox-wrapper">
+							<input type="checkbox" id="lighting-toggle" checked>
+							<label for="lighting-toggle">Night Lighting</label>
+						</div>
 					</div>
-				</div>
-				<div class="setting-item">
-					<div class="checkbox-wrapper">
-						<input type="checkbox" id="time-of-day-overlay-toggle" checked>
-						<label for="time-of-day-overlay-toggle">Show Time of Day Overlay</label>
+					<div class="setting-item">
+						<label for="lighting-style">Lighting Style</label>
+						<select id="lighting-style">
+							<option value="dithered" selected>Dithered</option>
+							<option value="smooth">Smooth</option>
+						</select>
 					</div>
-				</div>
-				<div class="setting-item">
-					<div class="checkbox-wrapper">
-						<input type="checkbox" id="lighting-toggle" checked>
-						<label for="lighting-toggle">Night Lighting</label>
+					<div class="setting-item">
+						<div class="checkbox-wrapper">
+							<input type="checkbox" id="time-of-day-overlay-toggle" checked>
+							<label for="time-of-day-overlay-toggle">Show Time of Day Overlay</label>
+						</div>
 					</div>
-				</div>
-				<div class="setting-item dropdown">
-					<label for="lighting-style">Lighting Style</label>
-					<select id="lighting-style">
-						<option value="dithered" selected>Dithered</option>
-						<option value="smooth">Smooth</option>
-					</select>
-				</div>
-				<div class="setting-item">
-					<div class="checkbox-wrapper">
-						<input type="checkbox" id="weather-toggle" checked>
-						<label for="weather-toggle">Show Weather</label>
+					<div class="setting-item">
+						<div class="checkbox-wrapper">
+							<input type="checkbox" id="weather-toggle" checked>
+							<label for="weather-toggle">Show Weather</label>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -429,159 +449,206 @@
 				</div>
 				<div class="setting-item">
 					<div class="checkbox-wrapper">
+						<input type="checkbox" id="notifications-toggle" checked>
+						<label for="notifications-toggle">Notifications</label>
+					</div>
+				</div>
+				<div class="setting-item">
+					<div class="checkbox-wrapper">
 						<input type="checkbox" id="autosave-toggle" checked>
 						<label for="autosave-toggle">Auto-Save</label>
 					</div>
 				</div>
 			</div>
-			<!-- Miscellaneous Settings -->
-			<div class="settings-group">
-				<h3 class="settings-group-title">Miscellaneous</h3>
-				<div class="setting-item">
-					<div class="checkbox-wrapper">
-						<input type="checkbox" id="notifications-toggle" checked>
-						<label for="notifications-toggle">Notifications</label>
-					</div>
-				</div>
-			</div>
 
 			<div class="settings-group">
-				<h3 class="settings-group-title">Save Data</h3>
-				<div class="setting-item">
-					<div class="setting-actions">
-						<button id="export-save" type="button" class="secondary">Export</button>
-						<button id="import-save" type="button" class="secondary">Import</button>
-						<input type="file" id="import-save-file" accept="application/json,.json" hidden>
-					</div>
-					<p class="setting-hint">Your Mytes live only in this browser. Export a backup before clearing site data.</p>
+				<h3 class="settings-group-title">Keyboard</h3>
+				<div class="settings-subgroup">
+					<h4 class="settings-subgroup-title">Anywhere</h4>
+					<dl class="key-legend">
+						<dt>B</dt><dd>Toggle Build mode</dd>
+						<dt>M</dt><dd>World map</dd>
+						<dt>L</dt><dd>Event log</dd>
+						<dt>N</dt><dd>Mute sound</dd>
+						<dt>WASD</dt><dd>Pan camera</dd>
+						<dt>Esc</dt><dd>Cancel · close · leave Build</dd>
+					</dl>
+				</div>
+				<div class="settings-subgroup">
+					<h4 class="settings-subgroup-title">Playing</h4>
+					<dl class="key-legend">
+						<dt>S / D / P</dt><dd>Select · Drag · Pet</dd>
+						<dt>Arrows</dt><dd>Pan camera</dd>
+					</dl>
+				</div>
+				<div class="settings-subgroup">
+					<h4 class="settings-subgroup-title">Building</h4>
+					<dl class="key-legend">
+						<dt>1 / 2 / 3</dt><dd>Move · Wall · Surface</dd>
+						<dt>Ctrl+Z / Ctrl+Y</dt><dd>Undo · Redo</dd>
+						<dt>Home / End</dt><dd>Cycle wall view</dd>
+						<dt>Delete</dt><dd>Store selected object</dd>
+						<dt>R</dt><dd>Rotate selected object</dd>
+						<dt>Arrows</dt><dd>Nudge selection, or pan camera</dd>
+						<dt>Shift</dt><dd>Held: rectangle wall drag</dd>
+						<dt>Ctrl</dt><dd>Held: invert snap to grid · invert wall tool</dd>
+						<dt>G</dt><dd>Show or hide the grid</dd>
+						<dt>Alt</dt><dd>Click with Surface: sample a finish</dd>
+					</dl>
 				</div>
 			</div>
 			<div class="settings-group">
-				<h3 class="settings-group-title">Keyboard</h3>
-				<dl class="key-legend">
-					<dt>B</dt><dd>Toggle Build mode</dd>
-					<dt>S / D / P</dt><dd>Select · Drag · Pet</dd>
-					<dt>1 / 2 / 3</dt><dd>Move · Walls · Paint (build)</dd>
-					<dt>M</dt><dd>World map</dd>
-					<dt>L</dt><dd>Event log</dd>
-					<dt>N</dt><dd>Mute sound</dd>
-					<dt>Ctrl+Z / Ctrl+Y</dt><dd>Undo · Redo (build)</dd>
-					<dt>Home / End</dt><dd>Cycle wall view (build)</dd>
-					<dt>Delete</dt><dd>Store selected object (build)</dd>
-					<dt>R</dt><dd>Rotate selected object (build)</dd>
-					<dt>Arrows</dt><dd>Nudge selection, or pan camera</dd>
-					<dt>WASD</dt><dd>Pan camera</dd>
-					<dt>Esc</dt><dd>Cancel · close · leave Build</dd>
-				</dl>
+				<h3 class="settings-group-title">Save Data</h3>
+				<p class="setting-hint">Your Mytes live only in this browser. Export a backup before you clear site data or switch machines; importing replaces everything and reloads the game.</p>
+				<div class="setting-actions">
+					<button id="export-save" type="button" class="secondary">Export Save</button>
+					<button id="import-save" type="button" class="secondary">Import Save</button>
+					<input type="file" id="import-save-file" accept="application/json,.json" hidden>
+				</div>
 			</div>
-			<div class="settings-group setting-actions">
-				<button id="restore-defaults" class="secondary">Restore Defaults</button>
-				<button id="save-settings" class="primary">Save</button>
+			<div class="settings-group">
+				<h3 class="settings-group-title">Defaults</h3>
+				<p class="setting-hint">Settings save themselves as you change them — there is nothing to confirm.</p>
+				<div class="setting-actions">
+					<button id="restore-defaults" type="button" class="secondary">Restore Defaults</button>
+				</div>
 			</div>
 			</div>
 			<!-- SOUND -->
 			<div id="sound-settings-panel" class="window-tab-body options-panel__section" role="tabpanel" data-tab-panel="sound" aria-labelledby="options-tab-sound" hidden>
 				<div class="settings-group">
-					<div class="setting-item">
-						<label for="master-volume">Master Volume</label>
-						<input type="range" id="master-volume" min="0" max="100" value="0">
+					<h3 class="settings-group-title">Volume</h3>
+					<div class="setting-item setting-item--stacked">
+						<label for="master-volume">Master <kbd class="setting-key">N</kbd></label>
+						<div class="slider-row">
+							<input type="range" id="master-volume" min="0" max="100" value="0">
+							<button type="button" class="slider-mute" id="master-mute" data-mute-category="master" aria-pressed="false" title="Mute master" aria-label="Mute master">
+								<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
+							</button>
+						</div>
 					</div>
-					<div class="setting-item">
-						<label for="ui-volume">UI Volume</label>
-						<input type="range" id="ui-volume" min="0" max="100" value="0">
-					</div>
-					<div class="setting-item">
-						<label for="ambient-volume">Ambient Volume</label>
-						<input type="range" id="ambient-volume" min="0" max="100" value="0">
-					</div>
-					<div class="setting-item">
-						<label for="sfx-volume">SFX Volume</label>
-						<input type="range" id="sfx-volume" min="0" max="100" value="0">
-					</div>
-					<div class="setting-item">
-						<label for="footsteps-volume">Footsteps Volume</label>
-						<input type="range" id="footsteps-volume" min="0" max="100" value="0">
-					</div>
-					<div class="setting-item">
-						<label for="music-volume">Music Volume</label>
-						<input type="range" id="music-volume" min="0" max="100" value="0">
+					<div class="settings-subgroup">
+						<h4 class="settings-subgroup-title">Mix</h4>
+						<div class="setting-item setting-item--stacked">
+							<label for="music-volume">Music</label>
+							<div class="slider-row">
+								<input type="range" id="music-volume" min="0" max="100" value="0">
+								<button type="button" class="slider-mute" id="music-mute" data-mute-category="music" aria-pressed="false" title="Mute music" aria-label="Mute music">
+									<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
+								</button>
+							</div>
+						</div>
+						<div class="setting-item setting-item--stacked">
+							<label for="ambient-volume">Ambient</label>
+							<div class="slider-row">
+								<input type="range" id="ambient-volume" min="0" max="100" value="0">
+								<button type="button" class="slider-mute" id="ambient-mute" data-mute-category="ambient" aria-pressed="false" title="Mute ambient" aria-label="Mute ambient">
+									<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
+								</button>
+							</div>
+						</div>
+						<div class="setting-item setting-item--stacked">
+							<label for="sfx-volume">Sound Effects</label>
+							<div class="slider-row">
+								<input type="range" id="sfx-volume" min="0" max="100" value="0">
+								<button type="button" class="slider-mute" id="sfx-mute" data-mute-category="sfx" aria-pressed="false" title="Mute sound effects" aria-label="Mute sound effects">
+									<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
+								</button>
+							</div>
+						</div>
+						<div class="setting-item setting-item--stacked">
+							<label for="footsteps-volume">Footsteps</label>
+							<div class="slider-row">
+								<input type="range" id="footsteps-volume" min="0" max="100" value="0">
+								<button type="button" class="slider-mute" id="footsteps-mute" data-mute-category="footsteps" aria-pressed="false" title="Mute footsteps" aria-label="Mute footsteps">
+									<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
+								</button>
+							</div>
+						</div>
+						<div class="setting-item setting-item--stacked">
+							<label for="ui-volume">Interface</label>
+							<div class="slider-row">
+								<input type="range" id="ui-volume" min="0" max="100" value="0">
+								<button type="button" class="slider-mute" id="ui-mute" data-mute-category="ui" aria-pressed="false" title="Mute interface" aria-label="Mute interface">
+									<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
+								</button>
+							</div>
+						</div>
 					</div>
 				</div>
 				<div class="settings-group">
-					<div class="setting-item">
-						<div class="checkbox-wrapper">
-							<input type="checkbox" id="sound-enabled" checked>
-							<label for="sound-enabled">Sound Effects <span class="setting-key">N</span></label>
-						</div>
-					</div>
-					<div class="setting-item">
-						<div class="checkbox-wrapper">
-							<input type="checkbox" id="music-enabled" checked>
-							<label for="music-enabled">Background Music</label>
-						</div>
-					</div>
-					<div class="setting-item">
-						<div class="checkbox-wrapper">
-							<input type="checkbox" id="footsteps-enabled" checked>
-							<label for="footsteps-enabled">Footsteps</label>
-						</div>
-					</div>
+					<h3 class="settings-group-title">Playback</h3>
 					<div class="setting-item">
 						<div class="checkbox-wrapper">
 							<input type="checkbox" id="spatial-audio-enabled" checked>
 							<label for="spatial-audio-enabled">Spatial Audio</label>
 						</div>
 					</div>
+					<p class="setting-hint">Sounds are quieter and panned by how far away they are from the middle of the view.</p>
 				</div>
-				<div class="settings-group setting-actions">
-					<button type="button" id="sound-reset-defaults" class="secondary">Reset Audio Defaults</button>
+				<div class="settings-group">
+					<h3 class="settings-group-title">Defaults</h3>
+					<div class="setting-actions">
+						<button type="button" id="sound-reset-defaults" class="secondary">Restore Defaults</button>
+					</div>
 				</div>
 			</div>
 			<!-- VIEW -->
 			<div id="view-panel" class="window-tab-body options-panel__section" role="tabpanel" data-tab-panel="view" aria-labelledby="options-tab-view" hidden>
-				<div class="settings-group">
-					<h3 class="settings-group-title">Zoom</h3>
-					<button id="view-zoom-out" title="Zoom out">−</button>
-					<span id="view-zoom-label" class="view-zoom-label">100%</span>
-					<button id="view-zoom-in" title="Zoom in">+</button>
-					<button id="view-zoom-reset" title="Reset to 1×">1×</button>
-					<button id="view-jump-myte" title="Center on active Myte">Center Myte</button>
-					<button id="view-jump-fit" title="Fit entire map in view">Fit Map</button>
-					<button id="view-reset-camera" title="Reset camera to default position">Reset Camera</button>
-				</div>
-				<div class="settings-group">
-					<h3 class="settings-group-title">Camera Follow</h3>
-					<button class="follow-mode-btn" data-mode="0" title="Follow active Myte">Myte</button>
-					<button class="follow-mode-btn" data-mode="1" title="Camera follows cursor">Cursor</button>
-					<button class="follow-mode-btn" data-mode="2" title="Camera pans at screen edges">Edge</button>
-					<button class="follow-mode-btn" data-mode="3" title="Drag to pan manually">Pan</button>
-					<button class="follow-mode-btn" data-mode="4" title="Camera does not move">Locked</button>
-					<button class="follow-mode-btn" data-mode="5" title="Zoom out to show all Mytes">Overview</button>
-					<button class="follow-mode-btn" data-mode="6" title="Follow active Myte only when it nears the edge">Leash</button>
-					<button class="follow-mode-btn" data-mode="7" title="Slowly pan across the map">Cinematic</button>
-				</div>
 				<div class="settings-group camera-options">
-					<h3 class="settings-group-title">Camera Options</h3>
-					<div class="setting-item">
-						<div class="checkbox-wrapper" title="Shake the camera on impact events">
-							<input type="checkbox" id="view-shake-toggle" checked>
-							<label for="view-shake-toggle">Camera Shake</label>
+					<h3 class="settings-group-title">Camera</h3>
+					<div class="settings-subgroup">
+						<h4 class="settings-subgroup-title">Zoom</h4>
+						<div class="value-stepper">
+							<button id="view-zoom-out" class="value-stepper__step" title="Zoom out" aria-label="Zoom out">−</button>
+							<button id="view-zoom-label" class="value-stepper__value" title="Reset to 100%">100%</button>
+							<button id="view-zoom-in" class="value-stepper__step" title="Zoom in" aria-label="Zoom in">+</button>
 						</div>
 					</div>
-					<div class="setting-item">
-						<div class="checkbox-wrapper" title="Camera coasts to a stop after dragging">
-							<input type="checkbox" id="view-inertia-toggle" checked>
-							<label for="view-inertia-toggle">Pan Inertia</label>
+					<div class="settings-subgroup">
+						<h4 class="settings-subgroup-title">Jump To</h4>
+						<div class="button-row">
+							<button id="view-jump-myte" title="Center on active Myte">Center Myte</button>
+							<button id="view-jump-fit" title="Fit entire map in view">Fit Map</button>
+							<button id="view-reset-camera" title="Reset camera to default position">Reset Camera</button>
+						</div>
+					</div>
+					<div class="settings-subgroup">
+						<h4 class="settings-subgroup-title">Follow</h4>
+						<div class="button-row">
+							<button class="follow-mode-btn" data-mode="0" title="Follow active Myte">Myte</button>
+							<button class="follow-mode-btn" data-mode="1" title="Camera holds still in the middle of the stage and pans as the cursor nears an edge">Cursor</button>
+							<button class="follow-mode-btn" data-mode="2" title="Camera pans at screen edges">Edge</button>
+							<button class="follow-mode-btn" data-mode="3" title="Drag to pan manually">Pan</button>
+							<button class="follow-mode-btn" data-mode="4" title="Camera does not move">Locked</button>
+							<button class="follow-mode-btn" data-mode="5" title="Zoom out to show all Mytes">Overview</button>
+							<button class="follow-mode-btn" data-mode="6" title="Follow active Myte only when it nears the edge">Leash</button>
+							<button class="follow-mode-btn" data-mode="7" title="Slowly pan across the map">Cinematic</button>
+						</div>
+					</div>
+					<div class="settings-subgroup">
+						<h4 class="settings-subgroup-title">Motion</h4>
+						<div class="setting-item">
+							<div class="checkbox-wrapper" title="Shake the camera on impact events">
+								<input type="checkbox" id="view-shake-toggle" checked>
+								<label for="view-shake-toggle">Camera Shake</label>
+							</div>
+						</div>
+						<div class="setting-item">
+							<div class="checkbox-wrapper" title="Camera coasts to a stop after dragging">
+								<input type="checkbox" id="view-inertia-toggle" checked>
+								<label for="view-inertia-toggle">Pan Inertia</label>
+							</div>
 						</div>
 					</div>
 				</div>
 				<div class="settings-group wall-presentation-controls">
 					<h3 class="settings-group-title">Walls</h3>
-					<div class="wall-mode-segment" role="group" aria-label="Wall presentation">
-						<button class="wall-mode-btn" data-wall-mode="up" title="Walls at full height">Up</button>
-						<button class="wall-mode-btn" data-wall-mode="cutaway" title="Lower the walls in front of you">Cutaway</button>
-						<button class="wall-mode-btn" data-wall-mode="down" title="Walls lowered to stubs">Down</button>
-						<button class="wall-mode-btn" data-wall-mode="hidden" title="Hide walls entirely">Hidden</button>
+					<div class="segment-control" role="group" aria-label="Wall presentation">
+						<button class="segment-btn wall-mode-btn" data-value="up" title="Walls at full height">Up</button>
+						<button class="segment-btn wall-mode-btn" data-value="cutaway" title="Lower the walls in front of you">Cutaway</button>
+						<button class="segment-btn wall-mode-btn" data-value="down" title="Walls lowered to stubs">Down</button>
+						<button class="segment-btn wall-mode-btn" data-value="hidden" title="Hide walls entirely">Hidden</button>
 					</div>
 					<div class="setting-item">
 						<div class="checkbox-wrapper" title="Lower walls the cursor is behind, not just the active Myte">
@@ -616,7 +683,7 @@
 	<!-- END WORLD MAP PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="js/bundle.js?v=aa56153167b2"></script>
+	<script src="js/bundle.js?v=5b1b138f5f3e"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

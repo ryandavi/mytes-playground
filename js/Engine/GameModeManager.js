@@ -216,7 +216,7 @@ class GameModeManager {
         if (this._seenTutorial || this.ui?.settingsPanel?.settings?.gameplay?.tutorials === false) return;
         this._seenTutorial = true;
         this.ui?.showMessage?.(
-            'Time is paused while you build. 1 moves furniture, 2 lays walls, 3 paints surfaces. Ctrl+Z undoes.',
+            'Time is paused while you build. 1 moves furniture, 2 builds wall, 3 paints surface. Ctrl+Z undoes.',
             'info',
             'Build Mode'
         );

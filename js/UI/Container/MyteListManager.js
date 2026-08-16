@@ -87,6 +87,14 @@ class MyteListManager extends UIComponent {
     handleThumbnailClick(myte) {
         const container = this.parent.parent;
 
+        // Taking control hands the camera to a myte and wakes it up, and neither
+        // means anything while the world is frozen. Switching who you play is a
+        // Play-mode decision.
+        if (container.gameMode?.isBuild()) {
+            this.parent.showMessage?.('Leave Build mode to switch Mytes.', 'info', 'Build Mode');
+            return;
+        }
+
         // An escorted myte is still the one you are playing, so clicking it means
         // what it always means — only a myte off walking on its own is untouchable.
         if (this.getTravelManager()?.isTravellingAlone(myte)) {

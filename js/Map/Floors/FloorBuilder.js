@@ -87,6 +87,68 @@ class FloorBuilder {
         return canvas;
     }
 
+    /**
+     * A canvas over one room, filled to the room's own shape.
+     *
+     * The customize highlight used to be a CSS outline on the floor canvas,
+     * which is a bounding box plus edge bleed — so it drew a rectangle around
+     * rooms that are not rectangles, and where two of those boxes overlapped
+     * only one room could ever be hovered. A room with no finish had no canvas
+     * at all and so could not be highlighted or clicked. This paints the shape
+     * itself, and every room has one whether or not it carries a floor.
+     */
+    createRoomOverlay(room, { fill, className = '' } = {}) {
+        const area = this.paintedArea(room);
+        const container = this.ensureContainer();
+        if (!area || !container) return null;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = area.width;
+        canvas.height = area.height;
+        canvas.className = className;
+        Object.assign(canvas.style, {
+            position: 'absolute',
+            left: `${area.x}px`,
+            top: `${area.y}px`,
+            pointerEvents: 'none'
+        });
+
+        // Masked exactly the way a floor is, not merely filled to the room's
+        // cells: `buildMask` is what adds the edge bleed that runs the floor
+        // under the wall enclosing it, and what splits the space with a
+        // neighbouring room down the midline. Filling the bare shape stopped a
+        // cell short of every wall, so the highlight covered less than the
+        // floor it was highlighting.
+        const context = canvas.getContext('2d');
+        context.fillStyle = fill;
+        context.fillRect(0, 0, area.width, area.height);
+        context.globalCompositeOperation = 'destination-in';
+        context.drawImage(this.buildMask(room, area), 0, 0);
+        context.globalCompositeOperation = 'source-over';
+
+        container.appendChild(canvas);
+        return canvas;
+    }
+
+    /**
+     * Whether `outer` is the room `inner` was carved out of.
+     *
+     * A room walled off inside another has to keep its edge bleed — the strip
+     * that runs its floor under its own walls — and the parent must not erase
+     * it, or the new room stops a cell short of every wall it just gained.
+     * The parent yields; the child carves the parent, not the other way round.
+     */
+    encloses(outer, inner) {
+        if (!outer?.bounds || !inner?.bounds) return false;
+        const cellSize = this.cellSize;
+        if (outer.areaInCells(cellSize) <= inner.areaInCells(cellSize)) return false;
+        const a = outer.bounds;
+        const b = inner.bounds;
+        return b.x >= a.x && b.y >= a.y &&
+            b.x + b.width <= a.x + a.width &&
+            b.y + b.height <= a.y + a.height;
+    }
+
     edgeBleed() {
         const cells = Number(SiteConfig.floorSystem?.edgeBleedCells ?? 1);
         return Math.max(0, cells) * (this.registry?.tileSize || this.cellSize);
@@ -166,7 +228,7 @@ class FloorBuilder {
         this.fillShape(context, room, area, this.edgeBleed());
         context.globalCompositeOperation = 'destination-out';
         for (const other of this.gameMap.regionManager?.all('room') ?? []) {
-            if (other.id === room.id) continue;
+            if (other.id === room.id || this.encloses(other, room)) continue;
             this.trimToMidline(context, room, other, area);
             this.fillShape(context, other, area, 0);
         }

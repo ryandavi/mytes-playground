@@ -6,6 +6,12 @@ const jsRoot = path.join(repoRoot, 'js');
 const allowed = [
     /^Engine\/(Core|LoadingManager|ResourceManager|SimClock|SoundManager)\.js$/,
     /^Input\//,
+    // The camera is presentation, not simulation: edge scrolling has to keep
+    // panning at a real-world rate while build mode holds SimClock stopped.
+    /^Map\/Camera\.js$/,
+    // Same reasoning for the wall cutaway: it is presentation, and it has to
+    // keep tracking the cursor while build mode holds SimClock stopped.
+    /^Map\/Walls\/WallBuilder\.js$/,
     /^Map\/Grid\/AStarPathfinder\.js$/,
     /^Map\/MapEnvironmentManager\.js$/,
     /^Map\/MapObjects\/(DroppedMapItem|MapObjectInputController)\.js$/,

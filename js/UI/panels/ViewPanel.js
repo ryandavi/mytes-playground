@@ -23,11 +23,21 @@ class ViewPanel extends PanelSection {
         const zoomOut = q('#view-zoom-out');
         if (zoomOut) zoomOut.onclick = () => this.getCamera()?.zoomOut({ immediate: true });
 
-        const zoomReset = q('#view-zoom-reset');
-        if (zoomReset) zoomReset.onclick = () => { this.getCamera()?.resetZoom(true); this.updateZoomLabel(); };
-
         const zoomIn = q('#view-zoom-in');
         if (zoomIn) zoomIn.onclick = () => this.getCamera()?.zoomIn({ immediate: true });
+
+        // The readout is the reset — the same "click the number to put it back"
+        // the debug panel's speed and time-scale controls use. A separate 1×
+        // button was a second control for something the number already says.
+        this._zoomLabel = q('#view-zoom-label');
+        if (this._zoomLabel) this._zoomLabel.onclick = () => this.getCamera()?.resetZoom(true);
+
+        // Every zoom path emits, so the label follows the wheel and the pinch as
+        // well as these buttons.
+        this._zoomUnsubscribe = this._getContainer()?.eventManager?.on?.(
+            EVENTS.CAMERA_ZOOM_CHANGED, () => this.updateZoomLabel()
+        );
+        this.updateZoomLabel();
 
         // Jump / reset buttons
         this._jumpMyte = q('#view-jump-myte');
@@ -77,7 +87,7 @@ class ViewPanel extends PanelSection {
             btn.onclick = () => {
                 // Same entry point the build panels use, so the two controls
                 // can never disagree about what the player picked.
-                this._getContainer()?.gameMap?.wallBuilder?.setUserPresentationMode(btn.dataset.wallMode);
+                this._getContainer()?.gameMap?.wallBuilder?.setUserPresentationMode(btn.dataset.value);
                 this.updateWallMode();
             };
         });
@@ -105,7 +115,7 @@ class ViewPanel extends PanelSection {
     dispose() {
         if (this.modalElement) {
             const q = (id) => this.modalElement.querySelector(id);
-            ['#view-zoom-out', '#view-zoom-reset', '#view-zoom-in',
+            ['#view-zoom-out', '#view-zoom-label', '#view-zoom-in',
              '#view-jump-myte', '#view-jump-fit', '#view-reset-camera'].forEach(id => {
                 const el = q(id);
                 if (el) el.onclick = null;
@@ -123,15 +133,22 @@ class ViewPanel extends PanelSection {
         this._wallReadyUnsubscribe = null;
         this._shakeToggle    = null;
         this._inertiaToggle  = null;
+        this._zoomUnsubscribe?.();
+        this._zoomUnsubscribe = null;
+        if (this._zoomLabel) this._zoomLabel.onclick = null;
+        this._zoomLabel = null;
         super.dispose();
     }
 
     updateZoomLabel() {
         const camera = this.getCamera();
-        const label = this.modalElement?.querySelector('#view-zoom-label');
-        if (label && camera) {
-            label.textContent = `${Math.round(camera.zoomLevel * 100)}%`;
-        }
+        const label = this._zoomLabel || this.modalElement?.querySelector('#view-zoom-label');
+        if (!label || !camera) return;
+
+        // The target, not the eased current value: the number is a readout of
+        // what you asked for, and it should settle the moment you ask.
+        const zoom = Number.isFinite(camera.targetZoomLevel) ? camera.targetZoomLevel : camera.zoomLevel;
+        label.textContent = `${Math.round(zoom * 100)}%`;
     }
 
     updateFollowMode() {
@@ -151,7 +168,7 @@ class ViewPanel extends PanelSection {
               : this._getContainer()?.gameMap?.wallBuilder;
         if (this._wallControls) this._wallControls.hidden = SiteConfig.wallSystem?.enabled !== true;
         this._wallModeBtns?.forEach(btn => {
-            btn.classList.toggle('active', builder?.presentation === btn.dataset.wallMode);
+            btn.classList.toggle('active', builder?.presentation === btn.dataset.value);
             btn.disabled = !builder;
         });
         if (this._wallCursorToggle) {

@@ -26,22 +26,45 @@
         display: none;
     }
 
+    // A pair of square keys that reads as one control, the way a segmented
+    // control does — no gap down the middle, and only the outer corners
+    // rounded, so the join is a seam rather than two separate buttons.
     .tool-group__row {
         display: flex;
         flex-direction: row;
-        gap: var(--padding);
+        gap: 0;
     }
 
     button.hand-control-btn--half {
         @include button-base;
-        width: calc((60px - var(--padding)) / 2);
-        height: 36px;
+        flex: 1 1 0;
+        width: auto;
         min-width: 0;
+        height: auto;
+        aspect-ratio: 1;
         padding: 0;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
+        border-radius: 0;
+
+        &:first-child {
+            border-start-start-radius: var(--border-radius-outer);
+            border-end-start-radius: var(--border-radius-outer);
+        }
+
+        &:last-child {
+            border-start-end-radius: var(--border-radius-outer);
+            border-end-end-radius: var(--border-radius-outer);
+        }
+
+        // Overlap the shared edge instead of thinning one side's border: a
+        // thinner border would make the second key narrower than the first, and
+        // these have to stay square.
+        &:not(:first-child) {
+            margin-left: calc(var(--border-width) * -1);
+        }
 
         > .icon {
             max-width: 16px;
@@ -55,18 +78,12 @@
         }
     }
 
-    // The mode switch is a state, not a panel toggle: it reads as a latching
-    // key, chunky and unmistakably down when Build is on.
-    button.mode-switch {
-        border-width: var(--border-width);
+    // Muted is a state the button holds, like the mode switch, not a hover.
+    button#sound-mute-toggle.muted {
+        @include button-pressed;
 
-        &.active {
-            @include button-pressed;
-            outline: 4px solid var(--button-active-border-color);
-
-            > .icon {
-                fill: var(--button-active-icon-color);
-            }
+        > .icon {
+            fill: var(--button-active-icon-color);
         }
     }
 
@@ -79,13 +96,12 @@
         }
     }
 
+    // `button-disabled` already dims the glyph; the override that used to sit
+    // here painted it near-black, which read as the most emphatic icon in the
+    // strip rather than the least.
     button:disabled {
         @include button-disabled;
         cursor: not-allowed;
-
-        > .icon {
-            fill: var(--text-subtle);
-        }
     }
 }
 
@@ -99,21 +115,56 @@
     }
 }
 
-// ── Stage corner chips ────────────────────────────────────────────────────────
+// The queue and the buff timers report a simulation that is not running: in
+// build mode they are a frozen readout sitting over the thing you are editing.
+[data-game-mode='build'] .myte-overlay-row {
+    display: none;
+}
 
-.app-stage > .stage-chip {
+// ── Stage chips ───────────────────────────────────────────────────────────────
+//
+// Everything that floats over the map and is not part of the map is a chip: the
+// mode switch, the paused readout, the map name, the event log, the audio
+// unlock prompt. They were three separate treatments before — the chips, the
+// audio prompt with its own shell a pixel off theirs, and a sidebar button —
+// which meant three places to change when the shell changed and three slightly
+// different answers about how an overlay should look.
+//
+// A chip is: a raised plate, an icon, a line of text, and optionally an action
+// pill or a count badge. Placement is a modifier, not part of the identity, so
+// the four slots below are the whole vocabulary of where something can sit and
+// two chips can never quietly land on top of each other.
+//
+// Written as a flat `.stage-chip` block rather than nested under `.app-stage >`.
+// Nesting `&__action` inside a parent selector that ends in a combinator
+// compiles to `.app-stage > .stage-chip__action` — a direct child of the stage
+// with that class, which nothing in the markup is. The action pill and the
+// count badge went unstyled for exactly that reason.
+
+// One chip's height, derived rather than measured. Declared on the stage rather
+// than on the chip because two different things need it: the bottom-centre chip
+// slot sits clear of the bottom row using it, and the offscreen Myte dots keep
+// out of both rows using it.
+.app-stage {
+    --stage-chip-row: calc((1.6 * var(--text-size-meta)) + (var(--space-2xs) * 2) + (var(--border-width) * 2));
+}
+
+.stage-chip {
     @include surface-raised;
     position: absolute;
-    bottom: var(--space-sm);
     z-index: var(--z-overlay);
     display: flex;
     align-items: center;
     gap: var(--space-xs);
     padding: var(--space-2xs) var(--space-sm);
     max-width: 45%;
-    font-size: 12px;
+    font-size: var(--text-size-meta);
     color: var(--text-base);
     line-height: 1.6;
+
+    &[hidden] {
+        display: none;
+    }
 
     > .icon {
         flex: 0 0 auto;
@@ -123,78 +174,153 @@
     }
 
     > .text {
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    &--map {
-        left: var(--space-sm);
-        cursor: pointer;
+    // ── Placement slots ──────────────────────────────────────────────────────
+    // Four edges of the stage, named for where they put a chip rather than for
+    // what happens to be in them today.
 
-        &:hover {
-            background-color: var(--button-hover);
-        }
-    }
-
-    &--log {
-        right: var(--space-sm);
-        cursor: pointer;
-
-        &:hover {
-            background-color: var(--button-hover);
-        }
-    }
-
-    // Top centre: the frozen world is the most important thing on screen, and
-    // this corner is the only one the other two chips never use, so all three
-    // can be up at once without colliding. Same chip shell as its siblings —
-    // one family of overlays — but amber, because it reports a state rather
-    // than opening a window.
-    &--paused {
-        top: var(--space-sm);
-        bottom: auto;
+    &--top-center,
+    &--bottom-center {
         left: 50%;
         transform: translateX(-50%);
-        max-width: 70%;
-        background-color: var(--state-warning-accent);
-        color: var(--black);
-        cursor: pointer;
-
-        > .icon {
-            fill: var(--black);
-        }
-
-        &:hover .stage-chip__action {
-            background-color: var(--surface-ui-pressed);
-        }
+        max-width: 80%;
     }
 
+    &--top-center    { top: var(--space-sm); }
+    // Above the bottom row, not in it: the map name and the event log already
+    // own the bottom edge, and the audio prompt is wide enough to cross both.
+    &--bottom-center { bottom: calc(var(--space-sm) + var(--stage-chip-row) + var(--space-xs)); }
+    &--bottom-left   { bottom: var(--space-sm); left: var(--space-sm); }
+    &--bottom-right  { bottom: var(--space-sm); right: var(--space-sm); }
+
+    // ── Parts ────────────────────────────────────────────────────────────────
+
+    // What pressing the chip does, said as a thing you could press. Raised on
+    // raised would be invisible even once the selector was fixed — the chip and
+    // the pill share a background — so this takes the lighter plate and the lip
+    // under it that `.setting-key` uses for a key, for the same reason: you
+    // should be able to tell by looking that it is pressable.
     &__action {
-        @include surface-raised;
-        padding: var(--space-2xs) var(--space-sm);
-        margin-inline-start: var(--space-sm);
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: var(--space-2xs);
+        padding: 1px var(--space-sm);
+        margin-inline-start: var(--space-2xs);
+        background-color: var(--button-light);
+        border: 1px solid var(--button-dark);
+        border-radius: var(--radius-sm);
+        box-shadow: 0 2px 0 var(--button-dark);
+        font-size: var(--text-size-meta);
         font-weight: 700;
+        line-height: 1.4;
         color: var(--text-base);
         white-space: nowrap;
+
+        .icon {
+            flex: 0 0 auto;
+            width: 14px;
+            height: 14px;
+            fill: var(--button-icon-color);
+        }
     }
 
     &__badge {
         @include surface-inset;
+        flex: 0 0 auto;
+        border-width: 2px;
         padding-inline: var(--space-2xs);
         min-width: 18px;
         text-align: center;
         font-weight: 700;
         color: var(--color-danger);
     }
+
+    // A chip you can press lifts on hover and pushes its action pill in, so the
+    // whole plate reads as one control rather than a label with a button in it.
+    &--build,
+    &--paused,
+    &--map,
+    &--log {
+        cursor: pointer;
+
+        &:hover {
+            background-color: var(--button-hover);
+        }
+
+        &:hover .stage-chip__action {
+            background-color: var(--surface-ui-pressed);
+        }
+
+        &:active .stage-chip__action {
+            box-shadow: none;
+            transform: translateY(2px);
+        }
+    }
+
+    // The audio prompt is the one chip that arrives on its own schedule rather
+    // than with the mode, so it fades in instead of appearing.
+    &--audio {
+        opacity: 0;
+        transition: opacity var(--motion-base) var(--ease-ui);
+
+        &.is-visible {
+            opacity: 1;
+        }
+
+        // Its action is a real button inside a plain plate, not a pill inside a
+        // button, so it carries the press states itself.
+        > .stage-chip__action {
+            cursor: pointer;
+
+            &:hover {
+                background-color: var(--button-hover);
+            }
+
+            &:active {
+                box-shadow: none;
+                transform: translateY(2px);
+            }
+        }
+    }
+}
+
+// Build and Paused are the same control in its two states, so they share the
+// top-centre slot and take turns. Play mode offers the way in; build mode shows
+// the frozen world and the way out.
+[data-game-mode='build'] .stage-chip--build,
+[data-game-mode='play'] .stage-chip--paused {
+    display: none;
+}
+
+// The map name and the event log are about the world running. In build mode the
+// world is frozen and you are editing one map — travelling somewhere else or
+// reading what just happened is not the job, and both chips would sit over the
+// floor plan you are working on.
+[data-game-mode='build'] .stage-chip--map,
+[data-game-mode='build'] .stage-chip--log {
+    display: none;
 }
 
 // The action sidebar overlays the stage on narrow viewports; the log chip
 // would land underneath it.
 @media (max-width: 960px) {
     .sidebar.right.is-open ~ .app-stage .stage-chip--log,
-    .app-stage .stage-chip--log {
+    .stage-chip--log {
         max-width: 32%;
+    }
+}
+
+// The audio prompt's sentence is the first thing to go when there is no room —
+// its icon and its button already say what it is.
+@media (max-width: 700px) {
+    .stage-chip--audio > .text {
+        display: none;
     }
 }
 
@@ -214,6 +340,14 @@
 }
 
 // ── Build feedback ────────────────────────────────────────────────────────────
+
+// Legal, but nothing to do here — a cell that already holds the wall you are
+// drawing. Neither blue nor red: it is simply not part of the edit.
+.wall-build-ghost-cell.is-inert {
+    border-style: dotted;
+    border-color: var(--button-dark);
+    background: transparent;
+}
 
 .wall-build-ghost-cell.is-invalid {
     border-color: var(--color-danger);
@@ -245,29 +379,60 @@
     75% { transform: translateX(4px); }
 }
 
-// ── Wall view segmented control ───────────────────────────────────────────────
+// ── Segmented control ─────────────────────────────────────────────────────────
+//
+// Pick one of a short list, on one line. The build panels reach for this
+// wherever they would otherwise stack a radio and a label per option — in a
+// tool window a two-word choice does not deserve three rows.
 
-.wall-mode-segment {
+.segment-control {
     display: flex;
     width: 100%;
 
-    > button {
+    &[hidden] {
+        display: none;
+    }
+
+    > .segment-btn {
         @include button-base;
         flex: 1 1 0;
-        padding: var(--space-xs) var(--space-2xs);
-        font-size: 11px;
+        min-width: 0;
+        padding: var(--space-xs) 0;
+        font-size: var(--text-size-meta);
+        line-height: 1.3;
         cursor: pointer;
         border-radius: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
 
-        &:first-child { border-start-start-radius: var(--radius-xs); border-end-start-radius: var(--radius-xs); }
-        &:last-child { border-start-end-radius: var(--radius-xs); border-end-end-radius: var(--radius-xs); }
-        &:not(:first-child) { border-left-width: 1px; }
+        &:first-child {
+            border-start-start-radius: var(--radius-xs);
+            border-end-start-radius: var(--radius-xs);
+        }
 
-        &:hover { background-color: var(--button-hover); }
+        &:last-child {
+            border-start-end-radius: var(--radius-xs);
+            border-end-end-radius: var(--radius-xs);
+        }
+
+        // Overlap rather than thin the shared edge, so every segment stays the
+        // same width whatever its position in the row.
+        &:not(:first-child) {
+            margin-left: calc(var(--border-width) * -1);
+        }
+
+        &:hover:not(:disabled) {
+            background-color: var(--button-hover);
+        }
 
         &.active {
             @include button-pressed;
             font-weight: 700;
+        }
+
+        &:disabled {
+            @include button-disabled;
         }
     }
 }
@@ -296,7 +461,12 @@
         overflow: visible;
         flex-wrap: wrap;
         flex-shrink: 0;
-        padding: var(--padding) var(--padding) 0;
+        // Everywhere else the strip sits inside a padded content box and so
+        // ends up inset by its own padding again. This window's content has no
+        // padding of its own, so the margin stands in for it and the tabs line
+        // up over the section below exactly as they do in the other panels.
+        margin-inline: var(--padding);
+        padding-block-start: var(--padding);
 
         > button {
             padding-inline: var(--space-md);
@@ -320,28 +490,48 @@
     }
 }
 
+// A key you press, drawn as a key you could press: a small raised cap with a
+// lip under it. The old flat inset chip read as a badge or a code span — you
+// could not tell from looking that "Shift" meant the Shift key.
 .setting-key {
-    @include surface-inset;
-    padding-inline: var(--space-2xs);
-    margin-inline-start: var(--space-2xs);
-    font-size: 10px;
+    display: inline-block;
+    padding: 1px var(--space-xs);
+    margin-inline: var(--space-2xs);
+    min-width: 1.6em;
+    background-color: var(--button-mid);
+    border: 1px solid var(--button-dark);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 0 var(--button-dark);
+    vertical-align: 1px;
+    font-family: inherit;
+    font-size: var(--text-size-meta);
     font-weight: 700;
-    color: var(--text-muted);
+    line-height: 1.4;
+    text-align: center;
+    color: var(--text-base);
 }
 
+// Three legends under three headings are still one table: split into separate
+// `dl`s each sized its own key column, so "WASD", "Ctrl+Z / Ctrl+Y" and "R" all
+// started their descriptions somewhere different. Borrowing the settings
+// group's columns lines every key up with every other key in the group — and
+// with the labels of any ordinary rows sitting alongside them.
 .key-legend {
     display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--space-2xs) var(--space-sm);
+    grid-template-columns: subgrid;
+    gap: var(--space-2xs) var(--space-md);
     margin: 0;
-    font-size: 12px;
+    font-size: var(--text-size-meta);
 
     > dt {
+        grid-column: 1;
         font-weight: 700;
         white-space: nowrap;
+        color: var(--text-base);
     }
 
     > dd {
+        grid-column: 2;
         margin: 0;
         color: var(--text-muted);
     }
@@ -354,5 +544,17 @@
 // A locked target says so under the cursor as well as on the target line, so
 // the refusal is legible before you click.
 body.build-target-locked .app-stage {
+    cursor: not-allowed;
+}
+
+// Wall tool cursors. `cell` is the one system cursor that means "a square on a
+// grid", which is exactly what a click here does; the ghost under the cursor
+// carries the add/remove colour, and this carries the yes/no. The refusal wins
+// over the crosshair because the answer matters more than the tool.
+body.wall-build-mode .app-stage {
+    cursor: cell;
+}
+
+body.wall-build-mode.wall-build-refused .app-stage {
     cursor: not-allowed;
 }

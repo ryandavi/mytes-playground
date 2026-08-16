@@ -828,6 +828,150 @@
         "storable": true
       },
       "description": "A wooden door. Fits into a straight run of wall."
+    },
+    {
+      "id": "wooden_chest",
+      "label": "Wooden Chest",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "TREASURE_CHEST",
+        "variant": "wooden_chest",
+        "storable": true
+      },
+      "visual": {},
+      "description": "A sturdy wooden chest. Mytes will pry it open for whatever is inside."
+    },
+    {
+      "id": "golden_chest",
+      "label": "Golden Chest",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "TREASURE_CHEST",
+        "variant": "golden_chest",
+        "storable": true
+      },
+      "visual": {},
+      "description": "A gilded chest. Whatever is in it, a Myte will want it."
+    },
+    {
+      "id": "paper_lantern",
+      "label": "Paper Lantern",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "LANTERN",
+        "variant": "paper",
+        "storable": true
+      },
+      "visual": {},
+      "description": "A paper lantern. It warms a small patch of the dark."
+    },
+    {
+      "id": "crystal_lantern",
+      "label": "Crystal Lantern",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "LANTERN",
+        "variant": "crystal",
+        "storable": true
+      },
+      "visual": {},
+      "description": "A crystal lantern, brighter and colder than paper."
+    },
+    {
+      "id": "stone_fountain",
+      "label": "Stone Fountain",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "FOUNTAIN",
+        "variant": "stone",
+        "storable": true
+      },
+      "visual": {},
+      "description": "A stone fountain. Mytes drink from it and stay a while."
+    },
+    {
+      "id": "marble_fountain",
+      "label": "Marble Fountain",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "FOUNTAIN",
+        "variant": "marble",
+        "storable": true
+      },
+      "visual": {},
+      "description": "A marble fountain, for a Myte with taste."
+    },
+    {
+      "id": "ball",
+      "label": "Ball",
+      "type": "toy",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "BALL",
+        "variant": "default",
+        "storable": true
+      },
+      "visual": {
+        "image": {
+          "url": "images/MapObjects/ball.gif"
+        }
+      },
+      "description": "A ball. Mytes will chase it around given half a chance."
     }
   ]
 }

@@ -35,6 +35,11 @@ class Camera {
 		// world point was centred before a resize.
 		this._viewportSize = null;
 
+		// Edge scroll — a live velocity, eased toward what the pointer is asking
+		// for. Seeded here so the first frame has something to ease from.
+		this._edgeScrollLastFrame = null;
+		this._edgeScrollVelocity = { x: 0, y: 0 };
+
 		// Drag
 		this.isDragging = false;
 		this.dragStartX = 0;
@@ -180,6 +185,18 @@ class Camera {
 	// ========== MODE MANAGEMENT ==========
 
 	setMode(i) {
+		this._resetEdgeScroll();
+		// A drag borrows the camera by parking it in LOCKED and remembering the
+		// mode to hand back. Anything that changes the mode while that borrow is
+		// open — entering Build mode mid-drag is the one that bites — has to
+		// change what gets handed back, not the live mode, or the borrow ends by
+		// restoring a mode the player left behind and Build mode comes out of a
+		// placement stuck where the camera will not pan.
+		if (this.temporaryCursorFollow && i !== CAMERA_FOLLOW_MODES.LOCKED) {
+			this.temporaryCursorFollow.mode = i;
+			return;
+		}
+
 		if (this.followMode === CAMERA_FOLLOW_MODES.CURSOR_EDGE && i !== CAMERA_FOLLOW_MODES.CURSOR_EDGE) {
 			this.parent.ui?.cursorManager?.setCursor(CURSOR.POINTER);
 		}
@@ -284,6 +301,8 @@ class Camera {
 		const follow = this.temporaryCursorFollow?.mode === CAMERA_FOLLOW_MODES.CURSOR
 			? this.followCursor
 			: this.followCursorEdge;
+		const before = this.posX;
+		const beforeY = this.posY;
 		follow.call(
 			this,
 			(clientX - viewportRect.left) / zoom,
@@ -291,12 +310,23 @@ class Camera {
 			this.parent.getCanvasRect(),
 			viewportRect
 		);
+
+		// The world moved under a pointer that did not. Whatever borrowed the
+		// camera is positioning something from that pointer, and it only hears
+		// about pointer events — so while edge scrolling ran, the dragged object
+		// sat at the world position it had when you last twitched the mouse and
+		// snapped forward on the next move. Telling the borrower is the whole
+		// fix: it already knows how to place itself from a screen point.
+		if (this.posX !== before || this.posY !== beforeY) {
+			this.temporaryCursorFollow?.owner?.syncToCursor?.(clientX, clientY);
+		}
 	}
 
 	endTemporaryCursorFollow(owner = null) {
 		const state = this.temporaryCursorFollow;
 		if (!state || (owner && state.owner !== owner)) return false;
 		this.temporaryCursorFollow = null;
+		this._resetEdgeScroll();
 		this.setMode(state.mode);
 		return true;
 	}
@@ -332,7 +362,16 @@ class Camera {
 	// ========== ZOOM ==========
 
 	setZoomLevel(zoom) {
+		const previous = this.targetZoomLevel;
 		this.targetZoomLevel = this._clampZoom(zoom);
+		// Readouts subscribe rather than being poked by each caller — the wheel,
+		// the buttons, fit-to-map and reset all land here, and only one of them
+		// used to remember to update the label.
+		if (this.targetZoomLevel !== previous) {
+			this.parent?.eventManager?.emit?.(EVENTS.CAMERA_ZOOM_CHANGED, {
+				zoom: this.targetZoomLevel
+			});
+		}
 	}
 
 	getViewportCenterAnchor() {
@@ -554,6 +593,10 @@ class Camera {
 
 	startDrag(e) {
 		if (this.followMode !== CAMERA_FOLLOW_MODES.DRAG_TO_PAN) return;
+		// Walls and Paint drive their own left-button drag over the map, so the
+		// camera stays out of the way rather than hauling the view along behind
+		// a run of wall.
+		if (this.parent?.ui?.toolManager?.claimsMapDrag?.() === true) return;
 		this._clearZoomAnchor();
 		this.isDragging = true;
 		this.dragStartX = e.clientX;
@@ -696,23 +739,16 @@ class Camera {
 		if (!this.isScrollable.x && !this.isScrollable.y) return;
 		const viewportWorld = this._getViewportWorldSize(viewportRect);
 
-		const mouseXPercent = viewportWorld.width  > 0 ? x / viewportWorld.width  : 0;
-		const mouseYPercent = viewportWorld.height > 0 ? y / viewportWorld.height : 0;
-
-		let cameraX = this.posX;
-		let cameraY = this.posY;
+		let cameraX = this.targetX;
+		let cameraY = this.targetY;
 
 		if (this.isScrollable.x) {
-			cameraX = -Math.max(0, Math.min(
-				mouseXPercent * canvasRect.width - viewportWorld.width / 2,
-				canvasRect.width - viewportWorld.width
-			));
+			const t = this._cursorPanFraction(x, viewportWorld.width);
+			if (t !== null) cameraX = -t * (canvasRect.width - viewportWorld.width);
 		}
 		if (this.isScrollable.y) {
-			cameraY = -Math.max(0, Math.min(
-				mouseYPercent * canvasRect.height - viewportWorld.height / 2,
-				canvasRect.height - viewportWorld.height
-			));
+			const t = this._cursorPanFraction(y, viewportWorld.height);
+			if (t !== null) cameraY = -t * (canvasRect.height - viewportWorld.height);
 		}
 
 		const targetPosition = this.limitToBounds
@@ -721,40 +757,168 @@ class Camera {
 		this.setTarget(targetPosition.x, targetPosition.y);
 	}
 
+	/**
+	 * Where along the map this cursor position points, as 0–1, or null while the
+	 * cursor is resting in the middle band and the camera should hold.
+	 *
+	 * The bands outside the dead zone are stretched back over the whole range,
+	 * so the far edge of the viewport still reaches the far edge of the map —
+	 * a dead zone that ate travel instead of trading it would leave parts of the
+	 * map unreachable in this mode.
+	 */
+	_cursorPanFraction(position, viewportSize) {
+		if (!(viewportSize > 0)) return null;
+
+		const deadZone = Math.min(Math.max(SiteConfig.camera.cursorDeadZone ?? 0, 0), 0.9);
+		const half = deadZone / 2;
+		const live = 0.5 - half;
+		const p = Math.min(Math.max(position / viewportSize, 0), 1);
+
+		if (p >= 0.5 - half && p <= 0.5 + half) return null;
+		if (live <= 0) return null;
+
+		return p < 0.5
+			? (p / live) * 0.5
+			: 0.5 + ((p - (0.5 + half)) / live) * 0.5;
+	}
+
 	followCharacter(x, y, canvasRect, viewportRect, elementRect) {
 		this._applyCenter(x, y, elementRect, false, canvasRect, viewportRect);
 	}
 
+	/**
+	 * Edge scrolling is a velocity, not a destination: the camera moves while
+	 * the pointer is in the band and stops when it leaves. Easing toward a
+	 * target that is only ever a step ahead just added lag — the camera spent
+	 * the whole gesture catching up to a point it never reached — so the
+	 * position and its target move together and position smoothing stays out of
+	 * it. What IS eased is the velocity, which is a different thing: see
+	 * _advanceEdgeVelocity.
+	 */
 	followCursorEdge(x, y, canvasRect, viewportRect) {
 		if (!this.isScrollable.x && !this.isScrollable.y) return;
 		const { horizThresh, vertThresh, viewportWorld } = this._getEdgeThresholds(viewportRect);
+		const seconds = this._edgeScrollFrameSeconds();
+		if (!(seconds > 0)) return;
 
-		let targetX = this.posX;
-		let targetY = this.posY;
-		const easing = this.easing / SiteConfig.camera.edgeScrollEasingDivisor;
+		const velocity = this._edgeScrollVelocity;
+		velocity.x = this._advanceEdgeVelocity(velocity.x, this.isScrollable.x
+			? this._edgeScrollVelocityTarget(x, viewportWorld.width, horizThresh)
+			: 0, seconds);
+		velocity.y = this._advanceEdgeVelocity(velocity.y, this.isScrollable.y
+			? this._edgeScrollVelocityTarget(y, viewportWorld.height, vertThresh)
+			: 0, seconds);
 
-		if (this.isScrollable.x) {
-			if (x < horizThresh) {
-				const intensity = 1 - (x / horizThresh);
-				targetX += (horizThresh - x) / easing * intensity * 2;
-			} else if (x > viewportWorld.width - horizThresh) {
-				const intensity = (x - (viewportWorld.width - horizThresh)) / horizThresh;
-				targetX -= (x - (viewportWorld.width - horizThresh)) / easing * intensity * 2;
-			}
-		}
+		if (velocity.x === 0 && velocity.y === 0) return;
 
-		if (this.isScrollable.y) {
-			if (y < vertThresh) {
-				const intensity = 1 - (y / vertThresh);
-				targetY += (vertThresh - y) / easing * intensity * 2;
-			} else if (y > viewportWorld.height - vertThresh) {
-				const intensity = (y - (viewportWorld.height - vertThresh)) / vertThresh;
-				targetY -= (y - (viewportWorld.height - vertThresh)) / easing * intensity * 2;
-			}
-		}
+		const clamped = this._clampToBounds(
+			this.posX + (velocity.x * seconds),
+			this.posY + (velocity.y * seconds),
+			canvasRect,
+			viewportRect
+		);
 
-		const clamped = this._clampToBounds(targetX, targetY, canvasRect, viewportRect);
+		// Running into the end of the map is a dead stop, not a stall: leaving
+		// the velocity standing means backing off the edge and coming straight
+		// back gets full speed instantly, with none of the ramp you just watched.
+		if (clamped.x === this.posX) velocity.x = 0;
+		if (clamped.y === this.posY) velocity.y = 0;
+		if (clamped.x === this.posX && clamped.y === this.posY) return;
+
 		this.setTarget(clamped.x, clamped.y);
+		this.setPosition(clamped.x, clamped.y);
+	}
+
+	// Edge scrolling holds state between frames — a velocity that eases in and
+	// out — so anything that interrupts it has to drop that state, or the next
+	// gesture inherits the speed of the last one.
+	_resetEdgeScroll() {
+		this._edgeScrollLastFrame = null;
+		this._edgeScrollVelocity = { x: 0, y: 0 };
+	}
+
+	// Wall clock, not SimClock: the camera still pans while the simulation is
+	// paused in build mode, which is exactly when you most need it to.
+	_edgeScrollFrameSeconds() {
+		const now = performance.now();
+		const previous = this._edgeScrollLastFrame;
+		this._edgeScrollLastFrame = now;
+		if (!Number.isFinite(previous)) return 0;
+		return Math.min((now - previous) / 1000, SiteConfig.camera.edgeScrollMaxFrameSeconds);
+	}
+
+	/**
+	 * How fast the camera wants to move along one axis, in world px/sec, from a
+	 * cursor position on that axis. Positive moves the view toward the low edge.
+	 *
+	 * Two separate things decide the feel, and conflating them is what made this
+	 * read as one flat fast speed:
+	 *
+	 *   floor — the speed at the very inner edge of the band, as a fraction of
+	 *   the full speed. It exists so crossing into the band does something; a
+	 *   floor of zero meant you had to keep pushing before anything happened.
+	 *   But it was set high enough (0.45 while dragging) that entering the band
+	 *   *started at almost half speed*, and the whole band above that only ever
+	 *   doubled it. That is the "fast and linear" — it is a step, not a ramp.
+	 *
+	 *   curve — how the remaining speed is distributed across the band. Linear
+	 *   spends most of the band near the top speed, so the useful slow range is
+	 *   a sliver you cannot aim at. An exponent above 1 keeps the inner half
+	 *   gentle and saves the real acceleration for the outer quarter, which is
+	 *   where the pointer is when you actually mean "go".
+	 *
+	 * Pinning the pointer against the edge is still the fastest the camera goes,
+	 * and that top speed is deliberately high — the fix for "waiting at the edge"
+	 * is a faster edge, not a hotter approach to it.
+	 */
+	_edgeScrollVelocityTarget(position, viewportSize, threshold) {
+		if (!(threshold > 0)) return 0;
+
+		const past = position < threshold
+			? threshold - position
+			: (position > viewportSize - threshold ? position - (viewportSize - threshold) : 0);
+		if (past <= 0) return 0;
+
+		const dragging = !!this.temporaryCursorFollow;
+		const speed = dragging
+			? SiteConfig.camera.dragEdgeScrollSpeed
+			: SiteConfig.camera.edgeScrollSpeed;
+		const floor = dragging
+			? SiteConfig.camera.dragEdgeScrollMinSpeedFraction
+			: SiteConfig.camera.edgeScrollMinSpeedFraction;
+
+		const intensity = Utility.clamp(past / threshold, 0, 1);
+		const curve = Math.max(1, SiteConfig.camera.edgeScrollCurve);
+		const ramp = floor + (1 - floor) * Math.pow(intensity, curve);
+
+		const magnitude = speed * ramp;
+		return position < threshold ? magnitude : -magnitude;
+	}
+
+	/**
+	 * Eases the actual velocity toward the wanted one with a fixed time
+	 * constant, so the camera accelerates and decelerates instead of switching
+	 * between moving and not moving.
+	 *
+	 * This is the part that makes it feel eased rather than linear, and it is
+	 * deliberately NOT position smoothing — easing the position toward a target
+	 * a step ahead is what added lag here before. A velocity lag costs nothing
+	 * at full tilt (it converges in about three time constants, and after that
+	 * the camera is simply moving at the speed you asked for) but it removes the
+	 * discontinuity at both ends: entering the band spins up, and leaving it
+	 * coasts to a stop instead of stopping dead under your hand.
+	 */
+	_advanceEdgeVelocity(current, target, seconds) {
+		const tau = SiteConfig.camera.edgeScrollResponseSeconds;
+		if (!(tau > 0)) return target;
+
+		const next = current + ((target - current) * (1 - Math.exp(-seconds / tau)));
+
+		// An exponential decay never actually reaches zero. Without a cutoff the
+		// camera keeps creeping by a fraction of a pixel a frame forever, which
+		// pins the render path awake and drifts the view while you are trying to
+		// read it.
+		return target === 0 && Math.abs(next) < SiteConfig.camera.edgeScrollStopSpeed ? 0 : next;
 	}
 
 	_updateEdgeCursor(x, y, viewportRect) {
@@ -881,7 +1045,9 @@ class Camera {
 
 	_getEdgeThresholds(viewportRect) {
 		const viewportWorld = this._getViewportWorldSize(viewportRect);
-		const t = SiteConfig.camera.edgeThreshold;
+		const t = this.temporaryCursorFollow
+			? SiteConfig.camera.dragEdgeThreshold
+			: SiteConfig.camera.edgeThreshold;
 		return {
 			viewportWorld,
 			horizThresh: viewportWorld.width  * t,
@@ -1037,7 +1203,20 @@ class Camera {
 
 		if (this.followMode === CAMERA_FOLLOW_MODES.DRAG_TO_PAN) return;
 
-		const mouse       = this.parent.inputHandler.getMouseContainerPosition();
+		// Viewport coordinates, NOT world coordinates. Both cursor modes compare
+		// this against the viewport's own size — thresholds, dead zone, pan
+		// fraction — so it has to be measured from the viewport's top-left.
+		//
+		// The default getMouseContainerPosition() converts on to world space,
+		// which subtracts the map's render insets: the strip reserved above the
+		// map for wall art to stand in. That shifted the pointer up by the whole
+		// inset before it was compared against the viewport, so the top edge
+		// triggered across half the screen while the bottom edge could never be
+		// reached at all — the camera panned up and then did nothing — and
+		// cursor mode's pan fraction could never reach 1, which is why the
+		// bottom of the map was unreachable. Dragging was unaffected because
+		// _applyTemporaryCursorFollow measures the pointer itself.
+		const mouse       = this.parent.inputHandler.getMouseContainerPosition({ includeCamera: false });
 		const canvasRect  = this.parent.getCanvasRect();
 		const containerRect = this.parent.getContainerRect();
 		const isMouseInContainer = this.parent.isMouseInContainer();

@@ -240,23 +240,41 @@ class WallMaterialRegistry extends SurfaceMaterialRegistry {
         return canvas;
     }
 
-    // Paintable = opaque and not the cap colour. The wall's top is the one
-    // surface a finish must never touch, and it is the one colour the art
-    // declares, so the mask needs no separate authoring pass.
+    /**
+     * Paintable = opaque, and not one of the colours the construction reserves.
+     *
+     * The cap is always reserved: the wall's top is the one surface a finish
+     * must never touch. `unpaintableColors` reserves any others the art needs to
+     * keep — an outline being the reason it exists. Anything the mask does not
+     * know about is treated as bare wall and gets painted over, which is why an
+     * outline added to the sheet came back in the finish's colour.
+     *
+     * Still no separate authoring pass: the mask is read out of the art, the
+     * construction just says which of its colours are structure rather than
+     * surface.
+     */
     buildPaintMask(constructionId, construction, state) {
         const source = this.frames.get(`${constructionId}|${state}|`);
         if (!source) return null;
         const { canvas, context } = this.frameCanvas(construction);
         context.drawImage(source, 0, 0);
         const image = context.getImageData(0, 0, canvas.width, canvas.height);
-        const cap = [1, 3, 5].map(index => parseInt(construction.capColor.substr(index, 2), 16));
+        const reserved = WallMaterialRegistry.reservedColors(construction);
         const data = image.data;
         for (let index = 0; index < data.length; index += 4) {
-            const isCap = data[index] === cap[0] && data[index + 1] === cap[1] && data[index + 2] === cap[2];
-            data[index + 3] = (data[index + 3] > 0 && !isCap) ? 255 : 0;
+            const isReserved = reserved.some(([r, g, b]) =>
+                data[index] === r && data[index + 1] === g && data[index + 2] === b);
+            data[index + 3] = (data[index + 3] > 0 && !isReserved) ? 255 : 0;
         }
         context.putImageData(image, 0, 0);
         return canvas;
+    }
+
+    // The colours a finish must not cover, as RGB triples.
+    static reservedColors(construction) {
+        return [construction.capColor, ...(construction.unpaintableColors || [])]
+            .filter(Boolean)
+            .map(hex => [1, 3, 5].map(index => parseInt(hex.substr(index, 2), 16)));
     }
 
     /**
@@ -343,11 +361,13 @@ class WallMaterialRegistry extends SurfaceMaterialRegistry {
      * running north-south: construction, not a painted face.
      *
      * Where one horizontal arm meets a wall running SOUTH out of the same cell,
-     * that south wall stands in the armless half, so paint stops at the post and
-     * two room colours meet on neutral ground. The silhouette does not end there
-     * — it rounds DOWNWARD into the south wall, the mirror of a free end — so
-     * the finish uses its stop art, which is authored against that dive at the
-     * position it is used.
+     * the post carries paint too, split west/east exactly as the north-south
+     * case above: it is the side of a room's wall seen edge-on, and it belongs
+     * to the rooms either side of it. Stopping the region at the post left that
+     * half-cell with no overlay pixels at all, so the two half-spans WallBuilder
+     * draws there resolved to nothing — a bare notch of plaster at every front
+     * corner and every junction, on a wall the player had just painted. Back
+     * corners never showed it because a NORTH arm leaves the region full width.
      *
      * A NORTH arm is behind the face and interrupts nothing, so a cell with one
      * horizontal arm and no south arm is an ordinary free end: the paint runs out
@@ -363,14 +383,23 @@ class WallMaterialRegistry extends SurfaceMaterialRegistry {
         const west = (mask & 8) !== 0;
         const freeEnd = side => ({ column: side, offset: 0 });
         if (!east && !west) {
-            return mask === 0
-                ? { start: 0, end: cell, west: freeEnd('west'), east: freeEnd('east') }
-                : null;
+            if (mask === 0) return { start: 0, end: cell, west: freeEnd('west'), east: freeEnd('east') };
+            // A wall running north-south shows its own narrow profile. That IS a
+            // painted surface — it is the side of the room's wall, seen edge on —
+            // so the post band takes paint and WallBuilder splits it down the
+            // middle, west half to the room on the west, east half to the room on
+            // the east. The cap stays construction colour on its own: the
+            // silhouette this overlay is clipped to already excludes capColor.
+            return { start: inset, end: cell - inset, west: null, east: null };
         }
         if ((mask & 4) !== 0 && east !== west) {
+            // No end art: the paint now runs onto the post, whose far edge is
+            // where the silhouette dives into the south wall rather than a free
+            // end. That is the same edge the north-south case resolves against,
+            // and it resolves it the same way — by letting the silhouette cut it.
             return east
-                ? { start: cell - inset, end: cell, west: { column: 'westStop', offset: 0 }, east: null }
-                : { start: 0, end: inset, west: null, east: { column: 'eastStop', offset: 0 } };
+                ? { start: inset, end: cell, west: null, east: null }
+                : { start: 0, end: cell - inset, west: null, east: null };
         }
         return {
             start: 0, end: cell,

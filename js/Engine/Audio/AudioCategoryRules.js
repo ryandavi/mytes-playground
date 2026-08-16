@@ -23,16 +23,34 @@ const AudioCategoryRules = {
 		return 'sfx';
 	},
 
+	// The mute switch that owns each category. Everything answers to
+	// `soundEnabled` first — that is what makes it the master — and then to the
+	// one switch beside its own slider.
+	MUTE_FLAGS: Object.freeze({
+		master: 'soundEnabled',
+		music: 'musicEnabled',
+		ambient: 'ambientEnabled',
+		sfx: 'sfxEnabled',
+		footsteps: 'footstepsEnabled',
+		ui: 'uiEnabled'
+	}),
+
 	isEnabled(soundManager, category) {
+		if (!soundManager.soundEnabled) return false;
 		switch (category) {
 			case 'music':
 				return soundManager.musicEnabled;
 			case 'ambient':
-				return soundManager.soundEnabled && soundManager.ambientEnabled;
+				return soundManager.ambientEnabled;
+			case 'ui':
+				return soundManager.uiEnabled;
+			// Footsteps are mixed through the SFX bus, so silencing effects
+			// silences them too — the switch beside the Footsteps slider only
+			// narrows that further.
 			case 'footsteps':
-				return soundManager.soundEnabled && soundManager.footstepsEnabled;
+				return soundManager.sfxEnabled && soundManager.footstepsEnabled;
 			default:
-				return soundManager.soundEnabled;
+				return soundManager.sfxEnabled;
 		}
 	},
 

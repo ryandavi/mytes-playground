@@ -202,6 +202,10 @@ class ContainerInputManager {
       if (!isBuild) return;
 
       switch (event.key) {
+        case 'g':
+          event.originalEvent?.preventDefault();
+          this.container.setBuildGridEnabled(this.container.settings?.buildGrid === false);
+          return;
         case 'home':
         case 'end':
           event.originalEvent?.preventDefault();
@@ -274,8 +278,24 @@ class ContainerInputManager {
     if (delta) this.container.camera?.panBy(delta[0], delta[1]);
   }
 
+  // Ctrl held inverts whatever the snap setting says, and raises the grid
+  // overlay either way — it is the "do the other thing, just this once" key,
+  // the same job it does for the Walls tool's add/remove.
   isSnapModifierHeld() {
-    return this.inputSystem?.state?.keyboard?.pressedKeys?.has('control') === true;
+    return this.inputSystem?.isKeyPressed?.('control') === true;
+  }
+
+  /**
+   * Whether a dragged object should land on grid cells right now.
+   *
+   * Snapping is the default in build mode: a room laid out by hand is a room
+   * with everything a pixel off, and the grid is the thing the walls and floors
+   * are already built on. Ctrl inverts it for the cases the grid gets wrong.
+   */
+  shouldSnapToGrid() {
+    const enabled = this.container?.settings?.buildSnap !== false &&
+      this.container?.gameMode?.isBuild() === true;
+    return this.isSnapModifierHeld() ? !enabled : enabled;
   }
 
   /**
@@ -287,9 +307,11 @@ class ContainerInputManager {
       if (!this.isEnabled) return;
       if (event.originalEvent && event.originalEvent.defaultPrevented) return;
 
+      // Clicking bare map means "not that one" in every tool, not just Select.
+      // Build mode runs on the Move tool, so a selected object stayed selected
+      // — and kept the sidebar open — no matter where you clicked.
       const target = event.originalEvent?.target;
-      if (this.container.ui.isTool(UIToolModes.SELECT) &&
-          this.canStartWorldGestureFromTarget(target)) {
+      if (this.canStartWorldGestureFromTarget(target)) {
         this.container.ui.setSelected(null);
         return;
       }

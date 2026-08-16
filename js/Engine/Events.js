@@ -1,5 +1,6 @@
 const EVENTS = Object.freeze({
     BUILD_HISTORY_CHANGED: 'build:history_changed',
+    CAMERA_ZOOM_CHANGED: 'camera:zoom_changed',
     CHEST_OPENED: 'chest:opened',
     COLLISION: 'collision',
     CONTAINER_ACTIVE_MYTE_CHANGED: 'container:active_myte_changed',

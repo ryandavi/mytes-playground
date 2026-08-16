@@ -973,8 +973,17 @@ function validateWallPaintSheet(data) {
     // construction art keeps the wall's geometry in exactly one place.
     const SOURCE_MASK = { west: 2, body: 10, east: 8, westStop: 6, eastStop: 12 };
     const constructionArt = decodePng(construction.sheet);
-    const capColor = [1, 3, 5].map(i => parseInt((construction.capColor || '#000000').substr(i, 2), 16));
-    const silhouetteFor = mask => {
+    // The same rule WallMaterialRegistry.buildPaintMask applies: the cap is
+    // always structure, and `unpaintableColors` names any other colour the art
+    // keeps for itself — an outline, typically. Both sides have to agree, or the
+    // validator checks the paint against a silhouette the renderer will not use.
+    const reservedColors = [construction.capColor, ...(construction.unpaintableColors || [])]
+        .filter(Boolean)
+        .map(hex => [1, 3, 5].map(i => parseInt(hex.substr(i, 2), 16)));
+    // `paintable` is what the finish must cover: opaque, minus the reserved
+    // colours. `opaque` is the wall's outer edge, reserved colours included.
+    // With no outline the two are the same profile, which is why one used to do.
+    const silhouetteFor = (mask, includeReserved) => {
         if (!constructionArt || !Number.isInteger(construction.maskMap?.[mask])) return null;
         const baseY = construction.bands?.full?.baseY || 0;
         const column = construction.maskMap[mask] * cell;
@@ -983,16 +992,23 @@ function validateWallPaintSheet(data) {
             let foot = -1;
             for (let y = 0; y < construction.frameHeight; y++) {
                 const i = ((((baseY + y) * constructionArt.width) + column + x) * 4);
-                const paintable = constructionArt.pixels[i + 3] > 0 &&
-                    ![0, 1, 2].every(k => constructionArt.pixels[i + k] === capColor[k]);
-                if (paintable) foot = y;
+                if (constructionArt.pixels[i + 3] === 0) continue;
+                const reserved = reservedColors.some(c =>
+                    [0, 1, 2].every(k => constructionArt.pixels[i + k] === c[k]));
+                // The cap is the wall's top, never its foot — it must not extend
+                // the outer edge the paint is measured against.
+                const isCap = [0, 1, 2].every(k => constructionArt.pixels[i + k] === reservedColors[0][k]);
+                if (!reserved || (includeReserved && !isCap)) foot = y;
             }
             profile.push(foot);
         }
         return profile;
     };
     const silhouettes = Object.fromEntries(
-        Object.entries(SOURCE_MASK).map(([name, mask]) => [name, silhouetteFor(mask)])
+        Object.entries(SOURCE_MASK).map(([name, mask]) => [name, silhouetteFor(mask, false)])
+    );
+    const outerSilhouettes = Object.fromEntries(
+        Object.entries(SOURCE_MASK).map(([name, mask]) => [name, silhouetteFor(mask, true)])
     );
 
     const names = ['west', 'body', 'east', 'westStop', 'eastStop'];
@@ -1016,9 +1032,15 @@ function validateWallPaintSheet(data) {
 
         for (const [name, index] of Object.entries(columns)) {
             const expected = silhouettes[name];
+            const outer = outerSilhouettes[name];
             for (let x = 0; x < cell; x++) {
                 const { first, last, broken } = runOf(index, x);
                 const want = expected ? expected[x] : last;
+                // Paint may end anywhere between the paintable foot and the
+                // wall's outer foot: short of the first leaves bare wall, past
+                // the second spills into the cell below. Between them it lands
+                // on reserved pixels and the mask clips it away.
+                const wantMax = outer ? Math.max(outer[x], want) : want;
                 if (first < 0) {
                     if (want >= 0) {
                         fail(`${data.paintSheet} finish "${id}" column "${name}" x=${x} is empty, but the ` +
@@ -1039,16 +1061,17 @@ function validateWallPaintSheet(data) {
                         "column's own foot and transparent everywhere else.");
                     break;
                 }
-                if (last !== want) {
+                if (last < want || last > wantMax) {
                     fail(`${data.paintSheet} finish "${id}" column "${name}" x=${x} ends at row ${last}, but ` +
-                        `the silhouette it is authored against reaches row ${want}. ` +
+                        `the silhouette it is authored against reaches row ${want}` +
+                        (wantMax !== want ? ` (outer edge row ${wantMax})` : '') + '. ' +
                         (last < want ? 'Paint stops short of the foot.' : 'Paint runs past the foot into the cell below.'));
                     break;
                 }
                 // The band is what makes a foot read as a foot, so it has to END
                 // on one. This is the check that catches a band left flat while
                 // the silhouette curves away from it.
-                if (band) {
+                if (band && last === want) {
                     const foot = (((last * sheet.width) + (index * cell) + x) * 4);
                     if (![0, 1, 2].every(k => sheet.pixels[foot + k] === band[k])) {
                         fail(`${data.paintSheet} finish "${id}" column "${name}" x=${x} does not end on its ` +
@@ -1150,6 +1173,12 @@ function validateWallMaterials() {
         }
         if (!/^#[0-9a-f]{6}$/i.test(construction.capColor || '')) {
             fail(`${filePath} construction "${id}" needs a capColor so paint masks can be derived.`);
+        }
+        if (construction.unpaintableColors !== undefined) {
+            if (!Array.isArray(construction.unpaintableColors) ||
+                construction.unpaintableColors.some(hex => !/^#[0-9a-f]{6}$/i.test(hex || ''))) {
+                fail(`${filePath} construction "${id}" unpaintableColors must be an array of #rrggbb colours.`);
+            }
         }
         if (construction.debugSheet && !exists(construction.debugSheet)) {
             fail(`${filePath} references missing ${construction.debugSheet}.`);

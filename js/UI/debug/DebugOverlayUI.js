@@ -995,6 +995,8 @@ class DebugOverlayUI {
         messages.push({ label: 'Sound',   value: sm.soundEnabled   ? 'On' : 'Off' });
         messages.push({ label: 'Music',   value: sm.musicEnabled   ? 'On' : 'Off' });
         messages.push({ label: 'Ambient', value: sm.ambientEnabled ? 'On' : 'Off' });
+        messages.push({ label: 'SFX',     value: sm.sfxEnabled     ? 'On' : 'Off' });
+        messages.push({ label: 'UI',      value: sm.uiEnabled      ? 'On' : 'Off' });
 
         // Map context
         const ctx = sm._mapContext;

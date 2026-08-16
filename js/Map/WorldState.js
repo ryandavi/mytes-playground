@@ -36,13 +36,36 @@ class WorldState {
             .filter(item => item.active && !item.collected)
             .map(item => item.serializeState());
         const walls = map.wallBuilder?.serializeState?.() ?? null;
-        const floors = Object.fromEntries((map.regionManager?.all('room') || [])
-            .filter(room =>
-                (room.properties?.floorFinishId ?? null) !==
-                (room.properties?.authoredFloorFinishId ?? null)
-            )
-            .map(room => [room.id, room.properties?.floorFinishId ?? null]));
-        const snapshot = { mapId: map.id, objects, droppedItems, walls, floors, savedAt: Date.now() };
+        // Both merged onto what was already stored, never replacing it.
+        // Auto-detected rooms are rebuilt from scratch on every wall change, so
+        // while a removed wall has two rooms merged into one the second room
+        // does not exist to be captured — pruning it here would throw its finish
+        // and its name away, and undoing the wall would bring the room back
+        // bare. Stale ids cost nothing: restoreRooms skips any room that is not
+        // on the map.
+        const rooms = map.regionManager?.all('room') || [];
+        const floors = Object.assign({}, this.payload.maps[map.id]?.floors,
+            Object.fromEntries(rooms
+                .filter(room =>
+                    (room.properties?.floorFinishId ?? null) !==
+                    (room.properties?.authoredFloorFinishId ?? null)
+                )
+                .map(room => [room.id, room.properties?.floorFinishId ?? null])));
+        const roomWalls = Object.assign({}, this.payload.maps[map.id]?.roomWalls,
+            Object.fromEntries(rooms
+                .filter(room => (room.properties?.wallFinishId ?? null) !==
+                    (room.properties?.authoredWallFinishId ?? null))
+                .map(room => [room.id, room.properties?.wallFinishId ?? null])));
+        const roomEdits = Object.assign({}, this.payload.maps[map.id]?.roomEdits,
+            Object.fromEntries(rooms
+                .filter(room =>
+                    typeof room.properties?.playerName === 'string' ||
+                    typeof room.properties?.roomType === 'string')
+                .map(room => [room.id, {
+                    name: room.properties.playerName ?? null,
+                    type: room.properties.roomType ?? null
+                }])));
+        const snapshot = { mapId: map.id, objects, droppedItems, walls, floors, roomWalls, roomEdits, savedAt: Date.now() };
         this.payload.maps[map.id] = snapshot;
         return snapshot;
     }
@@ -69,18 +92,43 @@ class WorldState {
         if (snapshot.walls && map.wallBuilder) {
             map.wallBuilder.restoreState(snapshot.walls);
         }
-        this.restoreFloors(map, snapshot);
+        this.restoreRooms(map, snapshot);
         return true;
     }
 
-    restoreFloors(map, snapshot = this.payload.maps[map?.id]) {
-        if (!snapshot?.floors || !map?.floorBuilder) return false;
+    /**
+     * Re-applies everything the player has done to a room — its finish and the
+     * name they gave it. Called on load and again every time the room set is
+     * recomputed, since auto-detected rooms are rebuilt rather than edited.
+     */
+    restoreRooms(map, snapshot = this.payload.maps[map?.id]) {
+        if (!snapshot || !map?.regionManager) return false;
         let restored = false;
-        for (const [roomId, finishId] of Object.entries(snapshot.floors)) {
-            if (!map.regionManager?.get('room', roomId)) continue;
+
+        for (const [roomId, finishId] of Object.entries(snapshot.floors ?? {})) {
+            if (!map.regionManager.get('room', roomId) || !map.floorBuilder) continue;
             map.floorBuilder.setRoomFinish(roomId, finishId);
             restored = true;
         }
+
+        for (const [roomId, finishId] of Object.entries(snapshot.roomWalls ?? {})) {
+            if (!map.regionManager.get('room', roomId) || !map.wallBuilder) continue;
+            map.wallBuilder.setRoomWallFinish(roomId, finishId);
+            restored = true;
+        }
+
+        for (const [roomId, edit] of Object.entries(snapshot.roomEdits ?? {})) {
+            const room = map.regionManager.get('room', roomId);
+            if (!room) continue;
+            room.properties = {
+                ...room.properties,
+                playerName: edit.name ?? null,
+                roomType: edit.type ?? room.properties.roomType ?? null,
+                displayName: edit.name ?? room.properties.authoredDisplayName ?? room.properties.displayName
+            };
+            restored = true;
+        }
+
         return restored;
     }
 }

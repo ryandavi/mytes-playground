@@ -9,10 +9,257 @@
 > Rotation ships behind the existing `SiteConfig.objects.canRotate` flag, which
 > is still `false` until rotated art exists.
 >
+> **Follow-up pass, 2026-08-15 (same day).** The two W-items left open landed,
+> along with a UI consistency pass:
+> - **W10 `Ctrl` snap** — held during an object drag, snaps to grid cells via
+>   `MapObjectInputController.applySnapModifier`, reusing the same top-left
+>   `gridSystem.snapToGrid` the inventory placement path uses. The grid overlay
+>   was already wired to `isSnapModifierHeld`; only the snap itself was missing.
+> - **W9 floor finishes on merge** — investigated rather than assumed. Authored
+>   (map-baked) rooms are never merged by `RoomEnclosureDetector`, so removing a
+>   wall cannot change their finishes; on the House map, where every room is
+>   authored, this is a non-issue exactly as suspected. **Auto-detected** rooms
+>   are a different story: they are torn down and rebuilt with positional ids on
+>   every `WALL_GEOMETRY_CHANGED`, and their finishes live only in the world-state
+>   snapshot. `BuildHistory.commit` recaptured that snapshot *before* the pending
+>   recompute ran, so the merged-away room's finish was pruned and undo brought
+>   the room back bare. Fixed at the source instead of in the wall command:
+>   `WorldState.captureMap` now merges into the stored `floors` map rather than
+>   replacing it, so a room's finish outlives the room and `restoreFloors` puts
+>   it back when the room returns. This covers redo and reload too, which a
+>   command-local inverse would not have.
+>   Note the surviving finish is the **topmost-leftmost** room's, not the largest
+>   — auto-room ids are assigned by scan order, and that is the rule the id
+>   scheme actually implements.
+> - **Camera is Pan in build mode after all** (reversing the deviation below).
+>   `ToolManager.claimsMapDrag()` marks the tools that own the left-button drag
+>   (Walls, Paint) and `Camera.startDrag` asks before grabbing; object drags
+>   already borrowed the camera through `beginTemporaryCursorFollow`. Restored on
+>   exit by the existing `_restore` block.
+> - **`Ctrl` held with the Walls tool inverts add/remove** for the length of the
+>   drag, without touching the panel radio (`WallBuildPanel.resolveOperation`).
+> - **Paint highlight covers the whole repainted stretch.** A run's south face
+>   carries onto the single-neighbour corner column at each end
+>   (`resolveFaceFinishId`), so the outline is driven from
+>   `WallBuilder.getPaintStretchPieces` rather than `:hover`. Vertical-only walls
+>   are excluded — they show none of that face.
+> - **Panels share one grouping ladder**: `h3.settings-group-title` →
+>   `h4.settings-subgroup-title` → `.setting-item`. The Walls and Paint panels
+>   dropped their sunken fieldsets, checkboxes and radios became one shared
+>   control (a radio was inheriting the text-field rule and stretching to 70% of
+>   the panel), and General's dead Save button was replaced by auto-save plus a
+>   working Restore Defaults.
+> - **Build mode hides what it cannot run**: the queue/buff overlays, every
+>   myte-directed sidebar action, and switching the active myte. What stays is
+>   Store and Rotate.
+> - A sidebar **mute** key returned, paired with Options as a gapless square
+>   segment — the same shape Undo/Redo now use.
+>
+> **Build panel pass, 2026-08-15.** The Walls and Paint windows were carrying
+> seven type sizes, five stacked radio rows and four paragraphs of instructions
+> between them. Cut to two groups each:
+> - New `js/UI/Core/SegmentControl.js` — pick-one-of-a-few on a single line.
+>   `WallViewControl` is now a thin wall-specific layer over it, and the Walls
+>   tool (Add/Remove) and Paint scope (This stretch/Whole room) use it instead of
+>   radio stacks. `.wall-mode-segment` became the generic `.segment-control`.
+> - Type collapsed to three sizes, tokenised: `--text-size-title` for group
+>   headings, `--text-size-body` for anything you act on, `--text-size-meta` for
+>   everything that only explains it. A fourth size is a sign the panel needs
+>   fewer things in it.
+> - `.setting-key` is drawn as a key cap (raised, lipped) rather than a flat
+>   inset chip that read as a code span, and is `<kbd>` in the markup.
+> - The Walls panel's "How" group is gone; its one surviving line lives under
+>   the tool it describes. Options → Keyboard is the reference.
+> - Finish swatches are one column: names are phrases, and half a tool window's
+>   width broke them mid-word.
+> - The panel is capped at the stage height, so the finish list absorbs the
+>   shortfall and scrolls rather than pushing the View controls off the bottom.
+> - **Wall cursor feedback**: a live single-cell ghost under the cursor before
+>   any drag, in the colour of what a click would do, plus `cursor: cell` /
+>   `not-allowed`. A cursor swap alone cannot say *which* cell it means.
+> - **Grid is now the player's to turn off** — `container.settings.buildGrid`,
+>   one setter, a `BuildGridToggle` checkbox in both panels and the `G` key.
+> - **Vertical runs are no longer paint targets.** A wall's standing art is its
+>   south face; a vertical run is seen edge-on and has none, so offering it was
+>   offering a click that changes nothing. Corners still count — they carry the
+>   horizontal run's face across.
+> - **One outline, not three.** The highlight was per-piece, so a run plus its
+>   two corner columns drew three boxes for one repaint. `getPaintStretchBounds`
+>   returns the union box and the panel draws a single `.wall-paint-highlight`.
+> - **Wall runs sound like runs**: one knock per cell, climbing a step each time
+>   and wrapping every `cycle` (`SiteConfig.buildMode.sounds.run`), descending on
+>   removal. `wallRemove` moved off `ui_error` — pulling a wall down is not a
+>   refusal.
+>
+> **Second build panel pass, 2026-08-15.**
+> - **The Paint tool is now the Surfaces tool.** "Paint" implied walls; it does
+>   floors too. Renamed in the tool row, the panel title, the tutorial and the
+>   keyboard legend. `UIToolModes.CUSTOMIZE` is unchanged — the rename is what
+>   the player reads, not what the code calls it.
+> - **Two tiers instead of a flat stack.** Group titles carry a hairline rule;
+>   the View group — identical in both panels, and never the reason you opened
+>   one — is `.settings-group--secondary`: pushed to the bottom, above a
+>   divider, with a quiet uppercase heading at meta size.
+> - **Wall run sound is per cell as the drag crosses it**, not a burst on
+>   commit. `tickRunSound` fires on growth only, so dragging back over cells you
+>   already crossed re-arms them silently, and blocked cells never tick. The
+>   drag paces the sound, so `stepMs`/`maxSteps` are gone from the config.
+> - **The Finish group stands down when nothing is selected** — an empty
+>   heading over an empty box read as something that had failed to load.
+> - **"Selected surface"** as the group title, so the readout under it has a
+>   subject. Swatches sized to sit inside their rows rather than against them.
+> - **Floors are resolved from world coordinates, not from the floor canvas.**
+>   That canvas is a bounding box plus edge bleed, which is why the highlight
+>   was a rectangle around rooms that are not rectangles, why overlapping boxes
+>   meant only one room could ever be hovered, and why a room with no finish
+>   (and so no canvas) could not be selected at all. `regionsAt` answers exactly,
+>   and `FloorBuilder.createRoomOverlay` paints the highlight to the room's own
+>   shape via the same `fillShape` the floors use. Walls stay element-hit-tested:
+>   their art rises above the cell they occupy, so where you see a wall is not
+>   where it is.
+>
+> **Still open, deliberately.** Splitting Surfaces into separate Wall and Floor
+> tools was considered and not done: the real friction is that it is
+> select-surface-then-pick-finish, two clicks per surface with a palette that
+> re-renders under you. Splitting the tool does not fix that; carrying an active
+> finish and clicking surfaces to apply it (a paint bucket) does, and that is a
+> bigger change than this pass.
+>
+> **Third build panel pass, 2026-08-15.**
+> - **Wall sounds are per operation.** `ui_drop_item` and `ui_pickup_item` are
+>   nowhere near each other in level, so one shared volume made pulling a wall
+>   down shout over laying one; `sounds.run` now carries `add` and `remove`
+>   voices, sharing only the ladder length. Removal sits at a third of add.
+> - **A knock now means a wall changed.** `canBuildWallCell` permits adding over
+>   a cell that already holds a wall — legal, but it does nothing — so dragging
+>   along an existing run knocked for every cell without building anything.
+>   `cellWouldChange` applies the same test `commitCells` does, and the ghost,
+>   the cell count and the sound now all agree with what the commit will do.
+>   Cells that are legal but inert draw as a dotted outline: neither blue nor
+>   red, because they are not part of the edit.
+> - **Rooms can be named.** They always were regions with a `displayName`
+>   property; what was missing was any way for the player to set one, so every
+>   room they enclosed was called "Room". The Surfaces panel grows a name field
+>   when a floor is selected. Stored as `playerName` next to `displayName` so
+>   world state can tell "the player called this the Study" from "the map author
+>   called this the Kitchen" and only persist the former; `authoredDisplayName`
+>   is what an undo falls back to. Renames go through BuildHistory like every
+>   other edit, and `WorldState.restoreFloors` became `restoreRooms` since it
+>   now re-applies both the finish and the name after every room recompute.
+>   Auto-detected rooms are numbered ("Room 1", "Room 2") rather than all
+>   sharing one placeholder.
+> - Underlines under group titles are gone — nothing else in the app uses them.
+>   The hierarchy is carried by the secondary group alone, behind the same
+>   divider the window footers use.
+> - The finish palette is a `surface-inset` well, since it scrolls; its rows
+>   dropped the 5px button bevel (a list row is not a button) and their
+>   min-height, which was fighting the content.
+> - The target readout is two lines — room, then surface — with no em dash. The
+>   room is what you are looking for; the surface is which part of it.
+> - The build panels are no longer capped at the stage height. They float beside
+>   the stage rather than over it, and the finish list is what was paying for
+>   the difference.
+>
+> **Fourth build panel pass, 2026-08-15.** The tools are **Wall** and
+> **Surface**, singular, so the pair reads as one row.
+> - **A room inside a room is now a room.** The detector discarded any enclosure
+>   that merely *intersected* an authored room, so walling off a corner of the
+>   Kitchen produced a component that was thrown away on that basis — the new
+>   space could never be selected, named, or given a floor. `unclaimedComponents`
+>   instead matches each authored room to the ONE component holding most of it;
+>   that component *is* the room, and everything else is a space the player
+>   made. Verified: a 5×5 walled off inside the Kitchen becomes `room_auto_1`.
+> - **Innermost region wins.** `SpatialRegion.areaInCells` +
+>   `RegionManager.innermostAt` — a nested room sits inside its parent's bounds,
+>   so the first match is always the outer one. Lives on the region layer rather
+>   than in the panel, because everything that asks "which room is this?" wants
+>   the same answer.
+> - **Walls are hit-tested by pixel, not by box.** A wall's canvas is a full
+>   frame band whatever the wall is currently doing, so with the walls lowered
+>   most of it is transparent air hanging over the floor behind — and the box
+>   was catching every click, which is why a floor under a wall could not be
+>   selected. An alpha test at the pointer falls through to the floor.
+> - **Floor highlight goes through `buildMask`**, the same mask the floor itself
+>   is painted with, so it picks up the edge bleed that runs floor under the
+>   enclosing wall and the midline split with a neighbouring room. Filling the
+>   bare shape stopped a cell short of every wall. Both highlights are now the
+>   same translucent accent — one kind of selection, one look.
+> - **Wall tick is one short sound both ways.** Two presets read as two events
+>   and `ui_drop_item`'s tail is longer than the gap between cells, so a fast
+>   drag stacked into a drone. Now `ui_click`, rising as cells join and falling
+>   as they come out, with `minIntervalMs` so a flick across the map cannot fire
+>   thirty one-shots into the same 200ms.
+> - **Room type shipped.** `SiteConfig.rooms.types` is the authored vocabulary;
+>   the Surface panel carries a name field and a type select when a floor is
+>   selected, both folded into one undoable command and persisted as `roomEdits`
+>   (`{ name, type }`) with the same merge-on-capture treatment the finishes get.
+>   Nothing reads `roomType` yet — it exists so behaviour that wants to ("eat in
+>   the kitchen", "this room has no bed") has one key to read instead of parsing
+>   display names. Not to be confused with **zones**
+>   (`data/metadata/zones.json`), which are stat-effect areas on their own layer.
+> - Panel styling returned to the design system: swatches use the standard
+>   border width, the secondary group is position only (no rule, no restyled
+>   heading), and the finish list has a definite height so the panel does not
+>   change size when you pick a different surface.
+>
+> **Fifth pass, 2026-08-15 — the nesting bugs.** Building a room inside a room
+> exposed four faults, all downstream of one thing: wall faces and room regions
+> disagreeing about what exists.
+> - **Wall faces are re-derived after the room set changes.** Faces resolve
+>   against the region layer, but rooms are recomputed AFTER the geometry change
+>   that prompts them — so a wall raised in the same breath as the room it
+>   encloses was assigned before that room existed and read "Outside" forever,
+>   which also made it unpaintable. The reverse too: tearing a room down left
+>   its walls still pointing at a region that no longer existed, so a stretch of
+>   the Kitchen's wall kept selecting as a deleted room. `refreshRoomFaces` runs
+>   from the detector and rebuilds when any answer moved — a full rebuild,
+>   because face room ids decide how cells merge into pieces.
+> - **`assignFaces` uses `innermostAt`**, so a wall of the inner room belongs to
+>   the inner room rather than to its parent.
+> - **An enclosing room no longer carves its child's edge bleed away.**
+>   `buildMask` erases every other room's cells from a room's mask; for a nested
+>   room that erased the very bleed that runs its floor under its own walls, so
+>   the new room stopped a cell short of every wall. `encloses` makes the parent
+>   yield: the child carves the parent, not the other way round. A room built
+>   inside another therefore gets genuinely separate flooring, with the parent
+>   holed out beneath it.
+> - **A checkbox is not text entry.** `isEditingText` treated every `<input>` as
+>   a text field, so ticking any box in any panel killed every keyboard shortcut
+>   until the player clicked elsewhere — which is why `G` "stopped working"
+>   right after using the Show grid checkbox. Now only real text-entry types
+>   swallow keys.
+> - **The grid follows its setting, not the tool.** It was tied to the Walls
+>   tool, a fine default before there was a setting — but once both panels carry
+>   a "Show grid" checkbox, tying it to the tool means the checkbox does nothing
+>   at all under Surface. Ctrl-snapping still summons the grid regardless, since
+>   that is what it is snapping to.
+> - Form fields: one padding for `select` and `input` alike, and the room name
+>   and type sit label-beside-control so two fields cost two lines instead of
+>   four — which is what was pushing the View controls out of the window.
+> - The Wall panel's hint moved directly under the Add/Remove segment, since
+>   what it explains is inverting that segment.
+>
+> **Sixth pass, 2026-08-15 — one shape for a labelled row.** Putting the room
+> name and type label-beside-control fixed that panel and made it the only place
+> in the app laid out that way, which is worse than the problem it solved. Now
+> every `.setting-item` holding a direct `> label` is a two-column grid: name on
+> the left, control filling the rest. That is the two Options dropdowns, the six
+> Sound sliders and the two room fields — the complete set. Checkbox rows keep
+> the order reversed (the box leads, because that is where the eye checks
+> state); their label lives inside `.checkbox-wrapper`, so `> label` passes them
+> by.
+>
+> Selected with `:has(> label)` rather than a modifier class, so a labelled row
+> added later gets the layout without anyone having to remember a class name —
+> the only kind of consistency that actually holds. First use of `:has` in the
+> codebase; it is well inside the evergreen baseline. The rule needs an explicit
+> `&[hidden] { display: none }` beside it, since `display: grid` otherwise beats
+> the UA rule and un-hides rows a panel means to keep back. `.setting-item.dropdown`
+> is gone — it existed to stack a label, and nothing stacks any more.
+
 > **Deviations from the plan as written**, all found in review:
-> - Build-mode camera is **Locked**, not Pan. Pan claims the left-button drag for
->   the camera, which swallowed every furniture move. Panning while building is
->   WASD / arrow keys.
+> - ~~Build-mode camera is **Locked**, not Pan.~~ Reverted to Pan in the
+>   follow-up pass above, once the tools that own the map drag learned to say so.
 > - Overlapping objects both offered themselves for a drag and the claim was
 >   first-come, so the rug under a bed could win. `canDrag` now also requires the
 >   object to be the topmost one under the pointer.

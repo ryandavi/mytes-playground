@@ -80,6 +80,20 @@ class SpatialRegion {
         };
     }
 
+    /**
+     * Roughly how much ground this covers, in cells.
+     *
+     * Only ever used to rank overlapping regions against each other, which is
+     * why a bounding-box estimate is good enough for rect and polygon: a region
+     * walled off inside another is contained by both, and "the smaller one" is
+     * the one the player means.
+     */
+    areaInCells(cellSize = this.shape.cellSize ?? 32) {
+        if (this.shape.kind === 'tilemask') return this.shape.cells.size;
+        const size = cellSize || 32;
+        return (this.bounds.width * this.bounds.height) / (size * size);
+    }
+
     // Bounds test first — cheap rejection before any polygon/tilemask work.
     boundsContain(x, y) {
         const b = this.bounds;

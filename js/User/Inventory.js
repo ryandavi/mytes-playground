@@ -39,6 +39,7 @@ class Inventory {
             lastFeedTime: {},
             isDragging: false,
             myteTarget: null,
+            chestTarget: null,
             activeDropTargets: new Set(),
             placementItem: null,
             placementDescriptor: null,
@@ -602,8 +603,30 @@ class Inventory {
         this.state.dropValid = true;
     }
 
-    handleDragEnd(e) {
+    handleDragEnd() {
+        this.endDragState();
+    }
+
+    /**
+     * Tear down an inventory drag. Safe to call twice.
+     *
+     * Not driven by `dragend` alone, because `dragend` fires at the source
+     * element and the source element does not always survive the drop: placing
+     * the last of a stack removes its slot from the inventory, and a dragend on
+     * a detached node has no ancestors to bubble through, so the listener on the
+     * inventory never hears it. The drag then never ended — `isDragging` stayed
+     * true and the camera's borrow stayed open, so it kept calling syncToCursor
+     * and the drop indicator followed the pointer around the map forever. Every
+     * drop path calls this itself, and `dragend` still covers the drags that end
+     * without one.
+     */
+    endDragState() {
+        // Only a real HTML5 drag, which always sets this. Click-to-place also
+        // parks an element in `draggedItem`, and that flow ends through
+        // cancelPlacement — clearing it from here would cancel it mid-placement.
+        if (!this.state.isDragging) return;
 		this.parent.camera?.endTemporaryCursorFollow?.(this);
+        this._setChestTarget(null);
         this.state.isDragging = false;
         this.state.draggedItem = null;
         this.state.placementDescriptor = null;
@@ -690,11 +713,70 @@ class Inventory {
 		this.parent.camera?.updateTemporaryCursorFollow?.(this, e.clientX, e.clientY);
         clearTimeout(this._indicatorHideTimer);
         e.currentTarget.classList.add('is-drag-over');
+
+        // A container under the cursor is a place to put things, not a place to
+        // stand something on the floor — so it takes the drop and the placement
+        // indicator gets out of the way.
+        if (this._setChestTarget(this._findChestTarget(e.target))) {
+            this._hideIndicator();
+            return;
+        }
+
         this._updateIndicator(e.clientX, e.clientY);
+    }
+
+    /**
+     * The chest under the pointer, if it can take what is being dragged. Storable
+     * furniture is excluded: dragging a lantern onto a chest means "put the
+     * lantern down there", not "post the lantern into the chest".
+     */
+    _findChestTarget(target) {
+        if (!this.state.draggedItem) return null;
+
+        const element = target?.closest?.('.treasure-chest');
+        if (!element?.dataset?.objectId) return null;
+
+        const { name, variant } = this.state.draggedItem.dataset;
+        if (ItemRegistry.getItemSync(variant || name)?.world?.mode === 'map_object') return null;
+
+        const chest = this.parent.gameMap?.getObjectById?.(element.dataset.objectId);
+        return chest?.canAcceptDeposit?.() === true ? chest : null;
+    }
+
+    _setChestTarget(chest) {
+        if (this.state.chestTarget === chest) return !!chest;
+
+        this.state.chestTarget?.element?.classList.remove('is-drag-over');
+        this.state.chestTarget = chest;
+        chest?.element?.classList.add('is-drag-over');
+        return !!chest;
+    }
+
+    _depositIntoChest(chest) {
+        const { name, variant, type } = this.state.draggedItem.dataset;
+        const itemVariant = variant || name;
+
+        if (!chest.depositItem({ variant: itemVariant, type })) {
+            const reason = chest.getDepositRefusal?.() ||
+                `${ItemRegistry.getItemSync(itemVariant)?.label || name} does not fit in there.`;
+            this.parent?.ui?.showMessage?.(reason, 'warning', 'Chest');
+            return false;
+        }
+
+        if (!this.removeItem(itemVariant)) return false;
+
+        this.parent.soundManager?.play('ui_drop_item');
+        this.parent?.ui?.showMessage?.(
+            `Put ${ItemRegistry.getItemSync(itemVariant)?.label || name} in the chest.`,
+            'info',
+            'Chest'
+        );
+        return true;
     }
 
     handleContainerDragLeave(e) {
         e.currentTarget.classList.remove('is-drag-over');
+        this._setChestTarget(null);
 		const bounds = e.currentTarget.getBoundingClientRect();
 		if (e.clientX < bounds.left || e.clientX > bounds.right ||
 			e.clientY < bounds.top || e.clientY > bounds.bottom) {
@@ -713,6 +795,14 @@ class Inventory {
         }
         this.state.snappedDropPos = null;
         this.state.dropValid = true;
+    }
+
+    // The camera calls this on the owner of its borrow after an edge-scroll
+    // step, so the drop indicator tracks the world rather than freezing on the
+    // screen while the map slides under it.
+    syncToCursor(clientX, clientY) {
+        if (!this.state.isDragging || this.state.chestTarget) return;
+        this._updateIndicator(clientX, clientY);
     }
 
     _updateIndicator(clientX, clientY) {
@@ -980,11 +1070,30 @@ class Inventory {
         e.preventDefault();
         e.stopPropagation();
         if (!this.state.draggedItem) return;
+        try {
+            this._handleContainerDrop(e);
+        } finally {
+            // Whatever the drop decided, the drag is over — see endDragState.
+            this.endDragState();
+        }
+    }
 
+    _handleContainerDrop(e) {
         // Check if we dropped on a Myte first
         const myteElement = e.target.closest('.world-myte, .duplicate');
         if (myteElement) {
             // Handle Myte drop separately
+            return;
+        }
+
+        // Dropping onto a chest puts the item inside it rather than on the floor
+        // in front of it.
+        const chest = this.state.chestTarget || this._findChestTarget(e.target);
+        if (chest) {
+            this._depositIntoChest(chest);
+            this._setChestTarget(null);
+            this._hideIndicator();
+            document.querySelectorAll('.app-stage, .container').forEach(el => el.classList.remove('is-drag-over'));
             return;
         }
 
@@ -1126,6 +1235,7 @@ class Inventory {
 
         myteElement.classList.remove('is-drag-over', 'is-drop-rejected');
         this.state.myteTarget = null;
+        this.endDragState();
     }
 
     applyItemEffects(myte, itemType, itemConfig) {

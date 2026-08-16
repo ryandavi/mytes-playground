@@ -40,6 +40,11 @@ class GridSystem {
         // usual case — it hangs above y=0, entirely outside the grid.
         this.offGridObjects = new Set();
 
+        // The viewport as-is, unclamped by the map rect. lastCullingBounds is
+        // clamped so the grid sweep stays inside the grid; off-grid objects
+        // live outside it by definition and must be judged against this.
+        this.lastViewBounds = null;
+
         // OPTIMIZATION: Make debug mode off by default
         this.debugMode = false;
 
@@ -1040,7 +1045,8 @@ class GridSystem {
         });
 
         // If the object is within current culling bounds, make it active immediately
-        if (!obj.excludeFromCulling && this.lastCullingBounds && this.isObjectVisible(obj, this.lastCullingBounds)) {
+        const activationBounds = this.cullingBoundsFor(obj);
+        if (!obj.excludeFromCulling && activationBounds && this.isObjectVisible(obj, activationBounds)) {
             this.activeObjects.add(obj);
         }
 
@@ -1057,6 +1063,23 @@ class GridSystem {
     trackGridMembership(obj, cells) {
         if (cells.size === 0) this.offGridObjects.add(obj);
         else this.offGridObjects.delete(obj);
+    }
+
+    /**
+     * Which viewport rect decides whether this object is awake.
+     *
+     * lastCullingBounds is clamped to the map because the grid sweep may only
+     * visit cells that exist. An off-grid object has no cells and routinely
+     * sits outside that rect — a painting on the top row of walls hangs above
+     * y=0 — so judging it there sleeps it the moment it is moved, and only the
+     * next full culling pass (which does use the unclamped rect) brings it
+     * back. That is the "painting vanishes while I drag it, zooming fixes it"
+     * bug: zoom is what forces the pass.
+     */
+    cullingBoundsFor(obj) {
+        return this.offGridObjects.has(obj)
+            ? (this.lastViewBounds || this.lastCullingBounds)
+            : this.lastCullingBounds;
     }
 
     // Helper method to check if an object is within visible bounds
@@ -1197,9 +1220,10 @@ class GridSystem {
         });
 
         // Check visibility state for active objects management
-        if (this.lastCullingBounds && !obj.excludeFromCulling) {
-            const wasVisible = this.isObjectVisible(obj, this.lastCullingBounds, { x: oldX, y: oldY });
-            const isVisible = this.isObjectVisible(obj, this.lastCullingBounds);
+        const visibilityBounds = this.cullingBoundsFor(obj);
+        if (visibilityBounds && !obj.excludeFromCulling) {
+            const wasVisible = this.isObjectVisible(obj, visibilityBounds, { x: oldX, y: oldY });
+            const isVisible = this.isObjectVisible(obj, visibilityBounds);
 
             if (isVisible && !wasVisible) {
                 // Object entered visible area
@@ -1367,6 +1391,7 @@ class GridSystem {
 
         // Store for reference in other methods
         this.lastCullingBounds = bounds;
+        this.lastViewBounds = viewBounds;
 
         // Convert to grid coordinates
         const startGrid = this.worldToGrid(bounds.left, bounds.top);

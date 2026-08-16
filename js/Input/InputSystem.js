@@ -3,6 +3,11 @@
  * Implemented as a singleton to be accessed from anywhere in the application.
  */
 class InputSystem {
+	static TEXT_ENTRY_TYPES = new Set([
+	  'text', 'search', 'url', 'tel', 'email', 'password', 'number',
+	  'date', 'datetime-local', 'month', 'week', 'time'
+	]);
+
 	static instance;
 	
 	/**
@@ -731,12 +736,20 @@ class InputSystem {
 	 * @param {HTMLElement} target
 	 * @returns {boolean}
 	 */
+	/**
+	 * Whether keystrokes belong to the page rather than to the game.
+	 *
+	 * Only text ENTRY counts. A checkbox, a radio and a range are all <input>
+	 * too, and treating them as text meant every keyboard shortcut died the
+	 * moment the player ticked a box in a panel and stayed dead until they
+	 * clicked somewhere else — which is how "G does nothing" happens right
+	 * after using the Show grid checkbox.
+	 */
 	isEditingText(target) {
-	  return (
-		target.tagName === 'INPUT' || 
-		target.tagName === 'TEXTAREA' || 
-		target.isContentEditable
-	  );
+	  if (!target) return false;
+	  if (target.isContentEditable || target.tagName === 'TEXTAREA') return true;
+	  if (target.tagName !== 'INPUT') return false;
+	  return InputSystem.TEXT_ENTRY_TYPES.has(String(target.type || 'text').toLowerCase());
 	}
 	
 	/**

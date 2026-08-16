@@ -70,7 +70,7 @@ class RoomEnclosureDetector {
         const authoredRooms = regionManager.all('room').filter(room => room.properties?.autoDetected !== true);
         const visited = new Set(exterior);
         const components = [];
-        const candidates = [];
+        const enclosed = [];
         const minArea = Math.max(1, Number(SiteConfig.rooms?.minAreaCells) || 1);
         const cellSize = Number(grid.config?.cellSize) || 32;
 
@@ -98,16 +98,11 @@ class RoomEnclosureDetector {
                 // one open space", which is what stops a half-height wall
                 // between two of them from cutting away on one side only.
                 components.push(component);
-                if (component.length < minArea) continue;
-                const intersectsAuthored = component.some(([cellX, cellY]) => {
-                    const centerX = (cellX + 0.5) * cellSize;
-                    const centerY = (cellY + 0.5) * cellSize;
-                    return authoredRooms.some(room => room.contains(centerX, centerY));
-                });
-                if (!intersectsAuthored) candidates.push(component);
+                if (component.length >= minArea) enclosed.push(component);
             }
         }
 
+        const candidates = this.unclaimedComponents(enclosed, authoredRooms, cellSize);
         candidates.sort((a, b) => a[0][1] - b[0][1] || a[0][0] - b[0][0]);
         for (const existing of regionManager.all('room')) {
             if (existing.properties?.autoDetected === true) regionManager.remove(existing);
@@ -119,7 +114,10 @@ class RoomEnclosureDetector {
             layer: 'room',
             shape: { kind: 'tilemask', cells, cellSize },
             properties: {
-                displayName: 'Room',
+                // A placeholder until the player names it in the Surfaces
+                // panel; numbered so two new rooms are at least tellable apart.
+                displayName: `Room ${index + 1}`,
+                authoredDisplayName: `Room ${index + 1}`,
                 indoor: true,
                 autoDetected: true,
                 lighting: Utility.deepClone(lighting)
@@ -132,8 +130,11 @@ class RoomEnclosureDetector {
         for (const myte of this.gameMap.mytes || []) {
             regionManager.updateMembership(myte, { layers: ['room'], force: true });
         }
+        // Before the floors and the walls are rebuilt: both read room ids, and
+        // the room set has only just changed under them.
+        this.gameMap.wallBuilder?.refreshRoomFaces?.();
         this.gameMap.floorBuilder?.build();
-        this.gameMap.container?.worldState?.restoreFloors?.(this.gameMap);
+        this.gameMap.container?.worldState?.restoreRooms?.(this.gameMap);
         this.gameMap.buildDoorRoomTopology();
         this.gameMap.environmentManager?.rebuildWindowLighting();
         if (this.gameMap.environmentManager) {
@@ -142,6 +143,34 @@ class RoomEnclosureDetector {
         }
 
         return added;
+    }
+
+    /**
+     * The enclosed areas that are not already somebody's room.
+     *
+     * Each authored room is matched to the ONE component holding most of it —
+     * that component is the room, and is not duplicated. Everything else is a
+     * space the player made, including a space made *inside* an authored room:
+     * walling off a corner of the Kitchen used to produce a component that
+     * merely intersected the Kitchen and was thrown away on that basis, so the
+     * new room could never be selected or given a floor of its own.
+     */
+    unclaimedComponents(components, authoredRooms, cellSize) {
+        const claimed = new Set();
+        for (const room of authoredRooms) {
+            let best = null;
+            let bestCount = 0;
+            for (const component of components) {
+                const count = component.reduce((total, [cellX, cellY]) =>
+                    total + (room.contains((cellX + 0.5) * cellSize, (cellY + 0.5) * cellSize) ? 1 : 0), 0);
+                if (count > bestCount) {
+                    bestCount = count;
+                    best = component;
+                }
+            }
+            if (best) claimed.add(best);
+        }
+        return components.filter(component => !claimed.has(component));
     }
 
     /**

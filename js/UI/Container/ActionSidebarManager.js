@@ -1156,6 +1156,18 @@ class ActionSidebarManager extends UIComponent {
         actionGroups.innerHTML = '';
         const activeMyte = this.parent.getActiveMyte();
 
+        // Build mode freezes the simulation, so every myte-directed action here
+        // would queue work that cannot run — a list of buttons that all do
+        // nothing. What survives is what building itself owns: storing the
+        // selection and turning it.
+        if (this.parent.parent.gameMode?.isBuild() === true) {
+            this.renderInventoryStorageAction(actionGroups, selectedObject);
+            this.renderBuildActions(actionGroups, selectedObject);
+            if (actionGroups.children.length > 0) this.actionControls.classList.add('is-visible');
+            actionGroups.scrollTop = previousScrollTop;
+            return;
+        }
+
         const sidebarInteractions = selectedObject?.getSidebarInteractions?.() ?? [];
         const majorSidebarInteraction = sidebarInteractions.find(interaction => interaction.major === true) ?? null;
         this.renderMajorSidebarInteraction(actionGroups, majorSidebarInteraction);

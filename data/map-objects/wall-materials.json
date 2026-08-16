@@ -6,6 +6,9 @@
       "sheet": "images/walls/construction-plaster.png",
       "debugSheet": "images/walls/construction-plaster-debug.png",
       "capColor": "#cec8b5",
+      "unpaintableColors": [
+        "#787366"
+      ],
       "cellSize": 32,
       "height": 160,
       "stubHeight": 28,

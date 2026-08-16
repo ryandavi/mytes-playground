@@ -241,6 +241,75 @@ class TreasureChestMapObject extends withItemDrops(MultiStateMapObject) {
         return trimmed.replace(/^['"]+|['"]+$/g, '');
     }
 
+    /**
+     * Whether the chest can take a deposit right now. An open chest has already
+     * spilled what it held, so putting something in would either vanish or need
+     * a second spill — closing it first is the honest answer.
+     */
+    canAcceptDeposit() {
+        return this.active && this.state === 'closed';
+    }
+
+    // Copy for the refusal, so the caller does not have to guess why.
+    getDepositRefusal() {
+        if (!this.active) return 'This chest is not ready.';
+        if (this.state !== 'closed') return 'Close the chest first.';
+        return null;
+    }
+
+    /**
+     * Put an inventory item into the chest.
+     *
+     * Contents are stored as loot definitions rather than live objects, which
+     * is the same shape authored loot already uses — so a deposited item spills
+     * out the same way when a Myte pries the chest open, and rides through
+     * `serializeState` with no extra persistence of its own.
+     */
+    depositItem({ variant, type, quantity = 1 } = {}) {
+        if (!this.canAcceptDeposit()) return false;
+
+        const definition = ItemRegistry.getItemSync(variant);
+        const entry = this.normalizeItemDefinition({
+            type: this._chestTypeForItem(definition, type),
+            variant: definition?.id || variant,
+            quantity: Math.max(1, Number(quantity) || 1)
+        });
+        if (!entry) return false;
+
+        // A deposit is a certainty, not a drop chance, so it merges only with
+        // other certainties — folding it into an authored 30% roll would make
+        // the player's own item a coin flip.
+        const existing = this.items.find(item =>
+            item.type === entry.type &&
+            item.variant === entry.variant &&
+            item.probability === 1 &&
+            Number.isFinite(item.quantity));
+
+        if (existing) existing.quantity += entry.quantity;
+        else this.items.push(entry);
+
+        this.playConfiguredSound('drop');
+        this.gameMap?.particleSystem?.burstEffectAtObject(this, 'SPARKLE', { count: 8, spread: 30 });
+        return true;
+    }
+
+    // Coins and health orbs are chest shorthand types rather than inventory
+    // types; everything else deposits under its registry type.
+    _chestTypeForItem(definition, fallbackType) {
+        const id = definition?.id;
+        if (id === 'coin') return 'COIN';
+        if (id === 'health_orb') return 'HEALTH';
+        return String(definition?.type || fallbackType || 'item').toUpperCase();
+    }
+
+    // Storing the chest itself keeps the box and drops the contents on the
+    // floor of the inventory — which is to say, loses them.
+    getStorageResetWarning() {
+        return this.hasLoot()
+            ? 'Packing this chest away empties it. Open it first if you want what is inside.'
+            : null;
+    }
+
     open(parent) {
         if (this.state !== 'closed') return false;
         this.playConfiguredSound('open');

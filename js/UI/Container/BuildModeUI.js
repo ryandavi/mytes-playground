@@ -1,6 +1,6 @@
 /**
- * BuildModeUI — the sidebar controls that belong to the mode switch itself:
- * the Build button, Undo/Redo, and the grid overlay that appears while the
+ * BuildModeUI — the controls that belong to the mode switch itself: the Build
+ * chip on the stage, Undo/Redo, and the grid overlay that appears while the
  * Walls tool is active.
  *
  * Everything that is merely shown or hidden by mode is CSS, driven from
@@ -27,7 +27,7 @@ class BuildModeUI extends UIComponent {
 
     init() {
         const wrapper = this.parent.containerWrapper;
-        this.modeButton = wrapper?.querySelector('#build-mode-toggle') || null;
+        this.modeButton = wrapper?.querySelector('#build-mode-chip') || null;
         this.undoButton = wrapper?.querySelector('#build-undo') || null;
         this.redoButton = wrapper?.querySelector('#build-redo') || null;
         this.pausedChip = wrapper?.querySelector('#build-paused-chip') || null;
@@ -68,12 +68,12 @@ class BuildModeUI extends UIComponent {
         const allowed = this.gameMode?.canBuildHere() !== false;
 
         if (this.modeButton) {
-            this.modeButton.classList.toggle('active', isBuild);
             this.modeButton.setAttribute('aria-pressed', String(isBuild));
-            this.modeButton.disabled = !allowed && !isBuild;
-            this.modeButton.title = allowed
-                ? (isBuild ? 'Leave Build Mode (B)' : 'Build Mode (B)')
-                : "You can't build here";
+            // A map you cannot build on has no way in, so the chip is simply not
+            // there — a permanently dead control over the map is worse than an
+            // absent one, and the mode's own guard still refuses the B key.
+            this.modeButton.hidden = !allowed;
+            this.modeButton.title = 'Build Mode (B)';
         }
 
         this.parent.toolManager?.handleGameModeChanged?.(this.gameMode?.mode);
@@ -98,9 +98,14 @@ class BuildModeUI extends UIComponent {
     }
 
     /**
-     * A faint tile grid while the Walls tool is up, or while Ctrl-snapping an
-     * object. One repeating-gradient layer sized from the grid — never per-cell
-     * DOM.
+     * A faint tile grid over the map while building. One repeating-gradient
+     * layer sized from the grid, never per-cell DOM.
+     *
+     * The grid used to be tied to the Walls tool, which was a fine default
+     * before there was a setting for it — but once the panels carry a "Show
+     * grid" checkbox, tying it to the tool means the checkbox does nothing at
+     * all under the Surface tool. The setting is the answer; Ctrl-snapping
+     * still summons the grid regardless, since that is what it is snapping to.
      */
     setGridOverlay(visible) {
         const canvas = this.container?.canvas;
@@ -113,7 +118,8 @@ class BuildModeUI extends UIComponent {
     update() {
         this.setGridOverlay(
             this.gameMode?.isBuild() === true &&
-            (this.parent.isTool(UIToolModes.BUILD) || this.container?.inputHandler?.isSnapModifierHeld?.() === true)
+            (this.container?.settings?.buildGrid !== false ||
+                this.container?.inputHandler?.isSnapModifierHeld?.() === true)
         );
     }
 

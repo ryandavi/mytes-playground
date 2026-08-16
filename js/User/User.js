@@ -3,6 +3,8 @@ const USER_DEFAULT_PREFERENCES = Object.freeze({
     soundEnabled: true,
     musicEnabled: true,
     ambientEnabled: true,
+    sfxEnabled: true,
+    uiEnabled: true,
     footstepsEnabled: true,
     spatialAudioEnabled: true,
     masterVolume: 1,
@@ -441,6 +443,8 @@ class User {
         soundManager.soundEnabled     = p.soundEnabled;
         soundManager.musicEnabled     = p.musicEnabled;
         soundManager.ambientEnabled   = p.ambientEnabled ?? true;
+        soundManager.sfxEnabled       = p.sfxEnabled ?? true;
+        soundManager.uiEnabled        = p.uiEnabled ?? true;
         soundManager.footstepsEnabled = p.footstepsEnabled;
         soundManager.spatialAudioEnabled = p.spatialAudioEnabled ?? true;
         soundManager.volume.master  = p.masterVolume;
@@ -457,6 +461,8 @@ class User {
             'soundEnabled',
             'musicEnabled',
             'ambientEnabled',
+            'sfxEnabled',
+            'uiEnabled',
             'footstepsEnabled',
             'spatialAudioEnabled',
             'masterVolume',

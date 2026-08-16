@@ -110,6 +110,13 @@ class MyteClickHandler extends MyteBaseHandler {
 		if (this.myte.isActive && !this.isDragging) {
 			event.stopPropagation();
 
+			// Build mode edits the world; it does not play with it. Selecting is
+			// still fine — you may want to see who is standing in the room.
+			if (this.myte.parent?.gameMode?.isBuild() === true) {
+				this.myte.parent.ui.setSelected(this.myte);
+				return;
+			}
+
 			// Outside SELECT (drag and friends), keep activating immediately —
 			// those flows need a controlled myte straight away.
 			if (!this.myte.parent.ui.isTool(UIToolModes.SELECT)) {
@@ -206,9 +213,26 @@ class MyteClickHandler extends MyteBaseHandler {
 		}
 	}
 
+	/**
+	 * Build mode has stopped the world. Waking a Myte or taking control of one
+	 * starts a clock the mode has deliberately paused, so `setActiveMyte`
+	 * refuses — but it refuses silently, which from the outside looks like the
+	 * double click simply not working. Say so at the gesture instead.
+	 */
+	_refusedByBuildMode() {
+		if (this.myte.parent?.gameMode?.isBuild() !== true) return false;
+		this.myte.parent.ui?.showMessage?.(
+			'Mytes are paused while you build. Leave Build Mode to wake one.',
+			'info',
+			'Build Mode'
+		);
+		return true;
+	}
+
 	_activateFromHomeSlot(event, { holdInSlot = true } = {}) {
 		event?.preventDefault?.();
 		event?.stopPropagation?.();
+		if (this._refusedByBuildMode()) return;
 		const started = this.myte.startWithOptions({
 			goal: DEFAULT_MODE,
 			followGoal: this.myte.followGoal,
@@ -312,6 +336,7 @@ class MyteClickHandler extends MyteBaseHandler {
 	}
 
 	_switchToDragMode(startPosition = null, currentPosition = null) {
+		if (this._refusedByBuildMode()) return;
 		this.myte.parent.ui.changeToolMode(UIToolModes.DRAG);
 		if (!this.myte.isActiveMyte) {
 			this.myte.parent.setActiveMyte(this.myte);

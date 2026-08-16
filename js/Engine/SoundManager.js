@@ -34,9 +34,15 @@ class SoundManager {
 		this.parent = parent;
 		this.initialized = false;
 		this.initAttempted = false;
+		// `soundEnabled` is the master switch — nothing plays through it. The
+		// rest silence one category each, and every playback path asks
+		// AudioCategoryRules rather than reading these directly, so a category
+		// can never be audible with the master off.
 		this.soundEnabled = options.soundEnabled !== false;
 		this.musicEnabled = options.musicEnabled !== false;
 		this.ambientEnabled = options.ambientEnabled !== false;
+		this.sfxEnabled = options.sfxEnabled !== false;
+		this.uiEnabled = options.uiEnabled !== false;
 		this.footstepsEnabled = options.footstepsEnabled !== false;
 		this.spatialAudioEnabled = options.spatialAudioEnabled !== false;
 		this.volume = {
@@ -212,7 +218,7 @@ class SoundManager {
 
 		this._handleTimeHourChange = (timeData = {}) => {
 			const scheduledMusicId = this._getMusicForHour(timeData.hour);
-			if (this.initialized && this.musicEnabled && scheduledMusicId && scheduledMusicId !== this.currentMusicSynth) {
+			if (this.initialized && this.isCategoryEnabled('music') && scheduledMusicId && scheduledMusicId !== this.currentMusicSynth) {
 				this.startMusic(scheduledMusicId);
 			}
 
@@ -933,7 +939,7 @@ class SoundManager {
 		this.currentMusicSynth = null;
 
 		// Only pause transport if music is disabled AND no ambient loops are active
-		if (!this.musicEnabled && Tone.Transport.state === "started" &&
+		if (!this.isCategoryEnabled('music') && Tone.Transport.state === "started" &&
 			this.loops.size === 0) {
 			Tone.Transport.pause();
 		}
@@ -951,7 +957,7 @@ class SoundManager {
 		}
 
 		// Only proceed if music is enabled and we're initialized
-		if (!this.musicEnabled || !this.initialized) return;
+		if (!this.isCategoryEnabled('music') || !this.initialized) return;
 
 
 		const scheduledMusicId = this._getMusicForHour(this._getCurrentHour());
@@ -1018,7 +1024,7 @@ class SoundManager {
 			this.syncAmbientForHour();
 		}
 
-		if (this.musicEnabled) {
+		if (this.isCategoryEnabled('music')) {
 			const newMusic = this._getMusicForHour(this._getCurrentHour());
 			if (newMusic && newMusic !== this.currentMusicSynth) {
 				this.startMusic(newMusic);

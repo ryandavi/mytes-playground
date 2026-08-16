@@ -7,46 +7,48 @@ class ToolManager extends UIComponent {
 
         this.toolConfig = {
             [UIToolModes.SELECT]: {
-                id: 'hand-select',
+                id: 'tool-select',
                 icon: 'pointer-icon',
                 label: 'Select',
                 cursor: 'pointer',
                 shortcut: 's'
             },
             [UIToolModes.DRAG]: {
-                id: 'hand-drag',
+                id: 'tool-drag',
                 icon: 'move-icon',
                 label: 'Drag',
                 cursor: 'grab',
                 shortcut: 'd'
             },
             [UIToolModes.PET]: {
-                id: 'hand-pet',
+                id: 'tool-pet',
                 icon: 'pet-icon',
                 label: 'Pet',
                 cursor: 'pointer',
                 shortcut: 'p'
             },
             [UIToolModes.MOVE]: {
-                id: 'move-toggle',
+                id: 'tool-move',
                 label: 'Move',
                 cursor: 'grab',
                 shortcut: '1',
                 buildOnly: true
             },
-            [UIToolModes.BUILD]: {
-                id: 'build-toggle',
-                label: 'Walls',
+            [UIToolModes.WALL]: {
+                id: 'tool-wall',
+                label: 'Wall',
                 cursor: 'crosshair',
                 shortcut: '2',
-                buildOnly: true
+                buildOnly: true,
+                claimsMapDrag: true
             },
-            [UIToolModes.CUSTOMIZE]: {
-                id: 'customize-toggle',
-                label: 'Paint',
+            [UIToolModes.SURFACE]: {
+                id: 'tool-surface',
+                label: 'Surface',
                 cursor: 'pointer',
                 shortcut: '3',
-                buildOnly: true
+                buildOnly: true,
+                claimsMapDrag: true
             }
         };
     }
@@ -57,6 +59,15 @@ class ToolManager extends UIComponent {
 
     isBuildTool(mode) {
         return this.toolConfig[mode]?.buildOnly === true;
+    }
+
+    /**
+     * Whether the current tool handles the left-button drag over the map
+     * itself. The camera's drag-to-pan asks before grabbing, so laying a run of
+     * wall does not also haul the view along with it.
+     */
+    claimsMapDrag() {
+        return this.toolConfig[this.currentToolMode]?.claimsMapDrag === true;
     }
 
     // The tool each mode falls back to when it is entered or when a tool is

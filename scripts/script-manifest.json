@@ -189,7 +189,7 @@
   },
   {
     "src": "js/Engine/WorldRegistry.js",
-    "commentLine": "<!-- WORLD REGISTRY / QUERY / RELATIONSHIPS / ATTACHMENTS (interface skeletons — audit T3-T6) -->"
+    "commentLine": "<!-- WORLD REGISTRY / QUERY / RELATIONSHIPS / ATTACHMENTS (interface skeletons \u2014 audit T3-T6) -->"
   },
   {
     "src": "js/Engine/WorldQuery.js"
@@ -534,6 +534,9 @@
     "src": "js/UI/Core/ModalWindow.js"
   },
   {
+    "src": "js/UI/Core/SegmentControl.js"
+  },
+  {
     "src": "js/UI/Core/PanelSection.js"
   },
   {
@@ -562,6 +565,9 @@
   },
   {
     "src": "js/UI/Panels/SoundPanel.js"
+  },
+  {
+    "src": "js/UI/Panels/BuildSettingToggle.js"
   },
   {
     "src": "js/UI/Panels/WallViewControl.js"

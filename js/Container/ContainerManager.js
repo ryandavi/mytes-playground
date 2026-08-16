@@ -76,6 +76,8 @@ class ContainerManager {
             cameraShake: true,
             panInertia: true,
             wallCursorCutaway: SiteConfig.wallSystem.cursorCutawayEnabled,
+            buildGrid: true,
+            buildSnap: true,
         }
 
     }
@@ -803,8 +805,38 @@ class ContainerManager {
         return RectUtils.checkBoxCollision(entityA, entityB, options);
     }
 
+    // One writer for the build grid, so the panel checkboxes and the G key can
+    // never disagree about it.
+    setBuildGridEnabled(flag) {
+        this.settings.buildGrid = flag !== false;
+        this.ui?.buildModeUI?.update?.();
+        this.syncBuildToggles();
+        return this.settings.buildGrid;
+    }
+
+    // Whether dragged objects land on grid cells. Ctrl still inverts whatever
+    // this says for the length of a drag — see `inputHandler.shouldSnapToGrid`.
+    setBuildSnapEnabled(flag) {
+        this.settings.buildSnap = flag !== false;
+        this.syncBuildToggles();
+        return this.settings.buildSnap;
+    }
+
+    syncBuildToggles() {
+        for (const panel of [this.ui?.wallBuildPanel, this.ui?.surfaceCustomizePanel]) {
+            panel?.gridToggle?.sync?.();
+            panel?.snapToggle?.sync?.();
+        }
+    }
+
     setActiveMyte(myte) {
         if (myte && !myte.isActive) {
+            return false;
+        }
+        // Activation takes the camera and starts the myte's clock. Build mode
+        // owns the camera and has stopped the clock, so the switch would fight
+        // both — the UI refuses it up front and says so.
+        if (myte && this.gameMode?.isBuild()) {
             return false;
         }
 

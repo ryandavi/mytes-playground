@@ -147,79 +147,190 @@
             background-color: white;
         }
 
+        // One grouping ladder for every panel: `h3.settings-group-title` names a
+        // group, `h4.settings-subgroup-title` names a band inside it, and the
+        // rows below are `.setting-item`. The group owns the rhythm between its
+        // rows, so nothing inside needs a margin of its own.
+        // A group is one two-column grid — names on the left, controls on the
+        // right — and every labelled row inside it borrows those columns with
+        // `subgrid`. Left to size themselves, a row with "Quality" and a row
+        // with "Show Time of Day Overlay" each pick their own label width and
+        // the controls beside them land in different places. Borrowing the
+        // group's columns instead means the group is as wide as its longest
+        // name and every control in it starts at the same edge, without anyone
+        // choosing a number that stops being right when the copy changes.
+        //
+        // Subgroups pass the same columns further down, so bands inside a group
+        // line up with each other rather than only with themselves.
         .settings-group {
-            >.settings-group-title {
-                width: 100%;
-                margin: 0;
-                flex: 1 1 100%;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: var(--space-md);
+
+            // Anything that is not a labelled row is a full-width block: a
+            // title, a hint, a checkbox row, a button strip.
+            >* {
+                grid-column: 1 / -1;
             }
 
+            >.settings-group-title {
+                margin: 0;
+                font-size: var(--text-size-title);
+            }
 
             +.settings-group {
-                margin-top: 20px;
+                margin-top: var(--space-2xl);
             }
+
             >.settings-subgroup {
-                >.settings-subgroup-title {
-                    margin: 0;
-                    margin-bottom: 4px;
-                    flex: 1 1 100%;
-                }
-                +.settings-subgroup {
-                    margin-top: 10px;
+                display: grid;
+                grid-template-columns: subgrid;
+                gap: var(--space-sm);
+
+                >* {
+                    grid-column: 1 / -1;
                 }
 
+                >.settings-subgroup-title {
+                    margin: 0;
+                    font-size: var(--text-size-meta);
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.06em;
+                    color: var(--text-muted);
+                }
             }
         }
 
+        // Explanatory line under a control or a group — for stakes the label
+        // cannot carry. Used at both levels, so it is not nested in either.
+        .setting-hint {
+            margin: 0;
+            font-size: var(--text-size-meta);
+            line-height: 1.5;
+            color: var(--text-muted);
+        }
+
+        // A row of buttons that acts on whatever sits above it. Declared after
+        // `.settings-group` so a group that is itself an action row lays its
+        // buttons out side by side rather than stacking them.
+        .setting-actions {
+            display: flex;
+            flex-flow: row wrap;
+            align-items: center;
+            gap: var(--space-xs);
+
+            >button {
+                flex: 1 1 auto;
+                padding: var(--space-md) var(--space-lg);
+            }
+        }
+
+        // One shape for every labelled row, in every panel: the name on the
+        // left, the control filling the rest. A label names the control beside
+        // it, not the one underneath it — and a settings window where some rows
+        // stack and others do not reads as two designs sharing a box.
+        //
+        // Checkbox rows already work this way with the order reversed (the box
+        // leads, because that is where the eye checks state); their label sits
+        // inside `.checkbox-wrapper`, so `> label` leaves them alone.
+        //
+        // `:has` rather than a modifier class, so a labelled row added later
+        // gets the layout without anyone having to remember a class name —
+        // which is the only kind of consistency that actually holds.
         .setting-item {
-            +.setting-item {
-                margin-top: 10px;
+            // The row takes the group's two columns rather than inventing its
+            // own, so every name in a group ends at the same edge.
+            &:has(> label) {
+                display: grid;
+                grid-template-columns: subgrid;
+                align-items: center;
+                gap: var(--space-md);
             }
 
-            &:last-child {
-                margin-bottom: 0;
+            // A control that wants the whole width — a slider — gets the name
+            // on its own line above it. Two lines, not two columns, because a
+            // slider you can only drag across half a panel is a worse control
+            // than one with a heading over it.
+            &--stacked:has(> label) {
+                grid-template-columns: minmax(0, 1fr);
+                align-items: stretch;
+                gap: var(--space-2xs);
+
+                >* {
+                    grid-column: 1 / -1;
+                }
             }
 
-            label {
-                display: block;
+            // `display: grid` above would otherwise beat the UA's `display:
+            // none` and un-hide every row a panel means to keep back.
+            &[hidden] {
+                display: none;
             }
 
-            label+input {
-                margin-top: 8px;
+            >label {
+                margin: 0;
+            }
+
+            >select,
+            >input,
+            >textarea {
+                width: 100%;
+                max-width: none;
             }
 
             .checkbox-wrapper {
+                display: flex;
                 align-items: center;
-                display: flex;
+                gap: var(--space-md);
 
                 label {
-                    margin-left: 8px;
+                    margin: 0;
+                    cursor: pointer;
                 }
             }
+        }
 
-            // Side-by-side buttons within one setting (save export/import).
-            .setting-actions {
-                display: flex;
-                flex-wrap: wrap;
-                gap: var(--space-xs);
-                margin-top: 8px;
+        // A slider and the switch that silences it. The slider takes every
+        // pixel the row can spare; the button is square and sized off the
+        // checkbox next to it, so the column of mute switches lines up with the
+        // column of tick boxes further down the panel.
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+
+            >input[type="range"] {
+                flex: 1 1 auto;
+                min-width: 0;
+            }
+        }
+
+        // A muted category dims its slider. The icon alone is a 14px change in
+        // the corner of a row — press N with this panel open and nothing
+        // appeared to happen. The level itself is deliberately left alone:
+        // that is the difference between a mute and dragging the slider to
+        // zero, and it is what you get back when you unmute.
+        .setting-item--stacked.is-muted > .slider-row > input[type="range"] {
+            opacity: 0.45;
+        }
+
+        .slider-mute {
+            flex: 0 0 auto;
+            display: grid;
+            place-content: center;
+            width: var(--size-icon-button);
+            height: var(--size-icon-button);
+            padding: 0;
+
+            >.icon {
+                width: var(--space-xl);
+                height: var(--space-xl);
+                pointer-events: none;
             }
 
-            // Explanatory line under a control — for stakes the label cannot carry.
-            .setting-hint {
-                margin: 6px 0 0 0;
-                font-size: 0.8em;
+            &.is-muted {
                 color: var(--text-muted);
-            }
-
-            &.dropdown {
-                label {
-                    margin-bottom: 8px;
-                }
-
-                select {
-                    width: 100%;
-                }
             }
         }
     }
@@ -237,29 +348,68 @@
 }
 
 .surface-customize-panel {
-    width: 280px;
 
+    // What the next click will paint. A readout, not a heading — it changes
+    // under the cursor, so it sits inset like a status field rather than
+    // competing with the group titles above it. Room on top, surface under it:
+    // the room is what you are looking for, the surface is which part of it.
     .surface-target {
+        @include surface-inset;
+        display: flex;
+        flex-direction: column;
         margin: 0;
-        font-weight: bold;
+        padding: var(--space-xs) var(--space-sm);
+        overflow-wrap: anywhere;
+
+        >.surface-target__room {
+            font-size: var(--text-size-body);
+            font-weight: 700;
+        }
+
+        &.is-empty >.surface-target__room {
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+
+        >.surface-target__surface {
+            font-size: var(--text-size-meta);
+            color: var(--text-muted);
+
+            &:empty {
+                display: none;
+            }
+        }
+
+        &.is-locked >.surface-target__surface::after {
+            content: ' (locked)';
+        }
     }
 
+    // One column, not two. Finish names are phrases ("Wallpaper Blue Flower"),
+    // and half of a tool-window's width broke them mid-word — a swatch you
+    // cannot read the name of is a swatch you have to click to identify.
+    // A definite height, not a share of what is left: the finish list is the
+    // one part of this window whose length depends on content nobody has seen
+    // yet, and a panel that changes height when you pick a different surface
+    // is a panel that moves its own controls out from under the cursor.
     .surface-palette {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        @include surface-inset;
+        display: flex;
+        flex-direction: column;
+        flex: 0 0 auto;
         gap: var(--space-xs);
-        max-height: 330px;
+        padding: var(--space-sm);
+        height: 168px;
         @include scroll-area;
     }
 
     .surface-swatch {
         @include button-base;
         display: grid;
-        grid-template-columns: 32px minmax(0, 1fr);
+        grid-template-columns: 24px minmax(0, 1fr);
         align-items: center;
-        gap: var(--space-xs);
-        min-height: 42px;
-        padding: var(--space-2xs);
+        gap: var(--space-sm);
+        padding: var(--space-xs) var(--space-sm);
         text-align: left;
 
         &:active {
@@ -277,34 +427,71 @@
         }
 
         span {
-            overflow-wrap: anywhere;
+            font-size: var(--text-size-meta);
+            line-height: 1.3;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
             text-transform: capitalize;
         }
     }
 }
 
-// Both editing panels group their controls the way Settings does; a fieldset
-// carries the group semantics its legend needs, and nothing else changes.
+// The two build panels are Options windows that happen to float over the map:
+// same `.settings-group` / `.settings-subgroup` / `.setting-item` ladder, same
+// toggles, same hints. They used to wrap their groups in sunken fieldsets,
+// which made them the only panels in the app with framed sections.
 .surface-customize-panel,
 .wall-build-panel {
+    // One width for both: they are the same window wearing a different tool,
+    // and swapping between them should not move the panel edge. Sized so the
+    // four-way wall-view segment fits "Cutaway" without clipping, which is the
+    // widest thing either panel has to hold.
+    width: 285px;
+
+    // Taller than the shared cap. These float beside the stage rather than over
+    // it, so the stage's height is not their limit — and the finish list is the
+    // one thing here that genuinely wants the room.
+    max-height: min(720px, calc(100vh - (var(--padding-outer) * 2)));
+
+    // The window is capped at the stage height. Rather than scrolling the whole
+    // panel — which hides the View controls behind an edge nobody looks for —
+    // it lays its groups out in a column and lets the finish list absorb the
+    // shortfall.
     >.window-panel__content {
-        display: grid;
-        gap: var(--space-lg);
+        display: flex;
+        flex-direction: column;
         align-content: start;
+        min-height: 0;
+        // The finish list has a height of its own, so this only ever scrolls on
+        // a viewport too short to hold the panel at all — clipping there would
+        // put the view controls behind an edge with no way to reach them.
+        @include scroll-area(y);
     }
 
-    fieldset.settings-group {
-        margin: 0;
-        padding: var(--space-xs) var(--space-sm) var(--space-sm);
-        @include frame-sunken;
+    // A tool window sits over the map the player is working on, so it runs one
+    // step tighter than the Options window: controls at body size, everything
+    // that only explains them at meta size, and nothing in between.
+    .setting-item label {
+        font-size: var(--text-size-body);
+    }
 
-        >.settings-group-title {
-            padding: 0 var(--space-2xs);
+    // Two tiers, and only two. What you came here to do is on top; the view
+    // controls below are the same in both panels and are not the job — they get
+    // a rule above them and a quieter heading, so the eye lands on the tool
+    // first and knows where the panel stops being about the tool.
+    >.window-panel__content {
+        // The view controls are the same in both panels and are never the
+        // reason you opened one, so they sink to the bottom. Position is the
+        // whole treatment — they are an ordinary group sitting last, styled
+        // like every other group in the app.
+        >.settings-group--secondary {
+            margin-top: auto;
         }
-    }
 
-    .setting-hint+.setting-hint {
-        margin-top: var(--space-2xs);
+        >.settings-group[hidden] {
+            display: none;
+        }
     }
 }
 
@@ -316,20 +503,29 @@ body.customize-mode {
         pointer-events: none;
     }
 
-    .wall-piece,
-    .floor-surface {
+    // Only walls are hit-tested from the DOM — a wall's art rises above its own
+    // cell, so where you see it is not where it is. Floors are resolved from
+    // world coordinates instead, which is why the floor canvas stays inert.
+    .wall-piece {
         pointer-events: auto !important;
         cursor: crosshair;
-
-        &:hover {
-            outline: var(--radius-xs) dashed var(--state-info-accent);
-            outline-offset: calc(var(--radius-xs) * -1);
-        }
     }
+
 }
 
-.wall-build-panel {
-    width: 250px;
+// Both highlights are drawn by SurfaceCustomizePanel rather than by :hover: a
+// wall's finish carries onto the corner column at each end of its run, and a
+// room is not the rectangle its floor canvas occupies. One box over the whole
+// run-plus-corners; a shape-exact tint for the room.
+.wall-paint-highlight {
+    position: absolute;
+    pointer-events: none;
+    border: var(--radius-xs) dashed var(--state-info-accent);
+    background: color-mix(in srgb, var(--state-info-accent) 12%, transparent);
+}
+
+.floor-paint-highlight {
+    image-rendering: pixelated;
 }
 
 .wall-build-ghost-cell {
@@ -346,49 +542,82 @@ body.customize-mode {
     }
 }
 
-body.wall-build-mode .app-stage {
-    cursor: crosshair;
-}
+// − [ value ] + : one shape for every stepped value in the app, whether it is
+// the camera zoom, the game speed or a Myte stat. The steppers are square
+// because they carry a glyph, and the readout takes the rest of the row —
+// which is what makes two of these stack into a column that lines up.
+//
+// The readout is always a button, never a disabled one. The zoom control used
+// to go flat at 100% while the debug steppers stayed pressable at their
+// defaults, so the same control had two personalities depending on the panel.
+// A reset that vanishes when there is nothing to reset is a control you have to
+// learn twice.
+.value-stepper {
+    // One row height for every stepper in the app. The steps are square against
+    // it, which is what makes two stacked steppers line up.
+    --value-stepper-height: 44px;
 
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-xs);
+    width: 100%;
+    height: var(--value-stepper-height);
 
-#view-panel {
-    & {
-        .settings-group {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 6px;
-            width: 100%;
+    // Square, and square to the row rather than to their own glyph — an
+    // `aspect-ratio` alone lets each button size from its intrinsic width,
+    // which is how the same stepper came out 44px in one panel and 50px in
+    // another.
+    > .value-stepper__step {
+        flex: 0 0 var(--value-stepper-height);
+        width: var(--value-stepper-height);
+        height: var(--value-stepper-height);
+        display: grid;
+        place-content: center;
+        padding: 0;
+        min-width: 0;
+        font-weight: 700;
+        line-height: 1;
+    }
 
-            button {
-                padding: 0.5rem;
-                flex: 1 1 calc(50% - calc(var(--gap) / 2));
-            }
-
-            #view-zoom-out,
-            #view-zoom-in {
-                flex: 0 0 auto;
-                min-width: 36px;
-            }
-
-            &.camera-options {
-                align-items: stretch;
-
-
-                >.setting-item {
-                    width: 100%;
-                }
-            }
-        }
-
-        .view-zoom-label {
-            min-width: 40px;
-            text-align: center;
-            font-weight: 600;
-        }
+    // The readout centres its text rather than padding it into place, so the
+    // row height comes from the stepper and not from whichever button happens
+    // to sit in the middle. Left to their own padding, the zoom readout and the
+    // debug readouts ended up two different heights — the same control looking
+    // like two controls, which is the thing this block exists to prevent.
+    > .value-stepper__value {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: grid;
+        place-content: center;
+        padding-block: 0;
+        padding-inline: var(--space-sm);
+        text-align: center;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 }
+
+// A wrapping row of buttons that act on the same thing — zoom steps, camera
+// follow modes. It is the row that reads across; the group around it is the
+// ordinary settings column, so its heading sits full width against the left
+// edge like every other heading in the app. Turning the whole group sideways
+// centred the headings too, which is why View was the one panel whose titles
+// floated in the middle and stopped at the width of their own text.
+.button-row {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+    gap: var(--space-sm);
+
+    >button {
+        flex: 1 1 calc(50% - var(--space-sm));
+        padding: var(--space-md);
+    }
+}
+
+
 
 // ── Event log panel (ModalWindow) ─────────────────────────────────────────────
 .window-tabs {
@@ -410,6 +639,7 @@ body.wall-build-mode .app-stage {
         cursor: pointer;
         flex-shrink: 0;
         white-space: nowrap;
+        flex: 1;
 
         @media (max-width: 480px) {
             padding-inline: var(--space-sm);
@@ -540,6 +770,14 @@ body.wall-build-mode .app-stage {
 
             +.game-log-entry {
                 border-top: var(--border-width) solid var(--button-dark);
+            }
+
+            // Filtering hides entries with `display: none`, and CSS cannot ask
+            // whether the sibling above is one of them — so the list marks the
+            // topmost visible entry and it drops the rule it would otherwise
+            // draw against the top of the box.
+            &.is-first-visible {
+                border-top: 0;
             }
 
             >.time {
@@ -703,59 +941,16 @@ body.ui-gallery-page {
 #game-debug-panel {
     & {
 
-        .button-group {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            width: 100%;
-        }
-
-        // Top-level Map / Myte sections
-        .settings-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            width: 100%;
-
-            +.settings-group {
-                margin-top: 20px;
-            }
-        }
-
-        // Subgroup (Controls / Overlays / Stats)
-        .settings-subgroup {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            width: 100%;
-
-            // Button row inside a subgroup
-            .debug-button,
-            .button-group {
-                width: 100%;
+        // Sections and subgroups are the shared ladder, exactly as in every other
+        // panel — only the button rows inside them read across.
+        .button-row {
+            // A stepper is a row of its own — squeezing one into half a line
+            // leaves no room for the value between its two buttons.
+            .value-stepper {
+                flex: 1 1 100%;
             }
 
-            // Wrap buttons in a subgroup into a flex row
-            display: flex;
-            flex-direction: row;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 6px;
-
-            button.debug-button {
-                padding: 0.5rem;
-                flex: 1 1 calc(50% - 6px);
-            }
-
-            .button-group {
-                flex: 1 1 calc(50% - 6px);
-
-                button {
-                    padding: 0.5rem;
-                }
-            }
-
-            // Full-width overrides
+            // Controls whose label is a sentence, not a word.
             button.debug-button--full,
             #toggleDebug,
             #cycleFollowGoal,
@@ -764,27 +959,9 @@ body.ui-gallery-page {
             #toggleTimePause {
                 flex: 1 1 100%;
             }
+        }
 
-            #timeScale-group {
-                flex: 1 1 100%;
-            }
-
-            .debug-inventory-editor {
-                flex: 1 1 100%;
-            }
-
-            // Overlay toggles — half width each
-            #overlayGrid,
-            #overlayCursorTile,
-            #overlayMyteFrontTile,
-            #overlayColliders,
-            #overlayInteractionRegions,
-            #overlayHitRegions,
-            #overlaySelectRegions,
-            #overlayPickupRegions,
-            #overlayAnchors {
-                flex: 1 1 calc(50% - 6px);
-            }
+        .settings-subgroup {
 
             .debug-button--detail {
                 display: flex;
@@ -852,13 +1029,6 @@ body.ui-gallery-page {
                     }
                 }
             }
-
-            #adjustSpeed,
-            #timeScale         { flex: 1; }
-            #adjustSpeed-down,
-            #adjustSpeed-up,
-            #timeScale-down,
-            #timeScale-up      { flex: 0; min-width: 50px; }
         }
     }
 }
@@ -1385,8 +1555,13 @@ body.ui-gallery-page {
             width: 100%;
         }
 
+        // Remove / Add sit side by side. It used to borrow `.button-group` from
+        // the value steppers, which is a different control entirely.
         >.debug-inventory-editor__actions {
             grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
 
             >button {
                 flex: 1;

@@ -39,7 +39,7 @@ class AudioUnlockPrompt {
     shouldPrompt() {
         const soundManager = this.core?.soundManager;
         if (!soundManager?.hasAudioSupport) return false;
-        if (!soundManager.soundEnabled && !soundManager.musicEnabled) return false;
+        if (!soundManager.soundEnabled) return false;
         return !soundManager.initialized;
     }
 

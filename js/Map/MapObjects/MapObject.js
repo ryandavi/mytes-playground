@@ -1184,13 +1184,20 @@ class MapObject {
 		if (!this.getConfig('draggable', false)) return false;
 		if (this.isInUse()) return false;
 
+		// Build mode edits scenery and nothing else: what it can move, it moves
+		// with the Move tool, and what it cannot move it does not move at all.
+		// Play mode is the other way round — a ball is a toy there and furniture
+		// here, which is why the mode decides first and the object second.
 		const gameMode = this.parent?.gameMode;
-		if (this.isBuildModeFurniture()) {
-			if (gameMode?.isBuild() !== true) return false;
+		if (gameMode?.isBuild() === true) {
+			if (!this.isBuildModeFurniture()) return false;
 			if (this.parent?.buildRules?.canMoveObject(this).allowed === false) return false;
 			// Move is the furniture tool; Walls and Paint own the pointer.
 			return this.parent?.ui?.isTool(UIToolModes.MOVE) === true;
 		}
+
+		// Outside build mode, furniture stays put — it is placed, not carried.
+		if (this.isBuildModeFurniture() && !this.getConfig('canPickUp', false)) return false;
 
 		const isDragMode = this.parent?.ui?.isTool(UIToolModes.DRAG);
 		if (isDragMode) {

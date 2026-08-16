@@ -16,6 +16,9 @@ class OffscreenMyteIndicatorManager extends UIComponent {
         this.overlay.className = 'myte-offscreen-indicators';
         this.overlay.setAttribute('aria-hidden', 'true');
         containerElement.appendChild(this.overlay);
+
+        this.boundMarkerClick = (event) => this.handleMarkerClick(event);
+        this.overlay.addEventListener('click', this.boundMarkerClick);
     }
 
     getMarker(myte) {
@@ -42,23 +45,24 @@ class OffscreenMyteIndicatorManager extends UIComponent {
         this.markers.forEach(marker => this.hideMarker(marker));
     }
 
-    isBoundsVisible(bounds, viewportWidth, viewportHeight) {
-        return !(
-            bounds.right < 0 ||
-            bounds.left > viewportWidth ||
-            bounds.bottom < 0 ||
-            bounds.top > viewportHeight
-        );
-    }
-
-    getViewportWorldBounds(camera, viewportWidth, viewportHeight) {
+    /**
+     * The slice of the world the player can currently see, in world coordinates.
+     *
+     * The render offset matters: walls reserve a strip above the map for their
+     * height, and every other world↔screen conversion subtracts it. This read it
+     * off `this.parent` — the UserInterface, which has no `gameMap` — so it was
+     * silently zero, and the whole visible band was wrong by the wall overhang.
+     * That is why a myte you could plainly see got a marker and one off the
+     * bottom edge did not. The container is the thing that owns the offset, and
+     * it is the same object the caller already has in hand.
+     */
+    getViewportWorldBounds(container, camera, viewportWidth, viewportHeight) {
         const safeZoom = Number.isFinite(camera?.zoomLevel) && camera.zoomLevel > 0
             ? camera.zoomLevel
             : 1;
-        const left = (Number.isFinite(camera?.posX) ? -camera.posX : 0) -
-            (this.parent?.gameMap?.getRenderOffset?.().x || 0);
-        const top = (Number.isFinite(camera?.posY) ? -camera.posY : 0) -
-            (this.parent?.gameMap?.getRenderOffset?.().y || 0);
+        const renderOffset = container?.getRenderOffset?.() || { x: 0, y: 0 };
+        const left = (Number.isFinite(camera?.posX) ? -camera.posX : 0) - renderOffset.x;
+        const top = (Number.isFinite(camera?.posY) ? -camera.posY : 0) - renderOffset.y;
         const width = viewportWidth / safeZoom;
         const height = viewportHeight / safeZoom;
 
@@ -148,6 +152,36 @@ class OffscreenMyteIndicatorManager extends UIComponent {
         }
     }
 
+    /**
+     * The box markers are allowed to sit in, and where it starts relative to the
+     * stage. CSS owns the inset — see `.myte-offscreen-indicators` — because the
+     * thing it has to clear is the chips, which CSS also places.
+     */
+    getMarkerBand(viewport) {
+        const rect = this.overlay?.getBoundingClientRect?.();
+        if (!rect?.width || !rect?.height) {
+            return { offsetX: 0, offsetY: 0, width: viewport.width, height: viewport.height };
+        }
+        return {
+            offsetX: rect.left - viewport.left,
+            offsetY: rect.top - viewport.top,
+            width: rect.width,
+            height: rect.height
+        };
+    }
+
+    /**
+     * How far outside the view a point is, as 0–1 against a full viewport's
+     * worth of distance. A dot right past the edge and one three screens away
+     * were identical before, which is half of "a general idea of where it is".
+     */
+    distanceOutside(point, viewportBounds) {
+        const dx = Math.max(viewportBounds.left - point.x, point.x - viewportBounds.right, 0);
+        const dy = Math.max(viewportBounds.top - point.y, point.y - viewportBounds.bottom, 0);
+        const reference = Math.max(1, Math.hypot(viewportBounds.width, viewportBounds.height));
+        return Utility.clamp(Math.hypot(dx, dy) / reference, 0, 1);
+    }
+
     updateMarker(markerData, activeMyte) {
         const marker = this.getMarker(markerData.myte);
         if (!marker) return;
@@ -155,9 +189,32 @@ class OffscreenMyteIndicatorManager extends UIComponent {
         marker.classList.remove('is-hidden');
         marker.classList.toggle('active-myte', markerData.myte === activeMyte);
         marker.dataset.edge = markerData.edge;
-        marker.title = markerData.myte?.name || 'Myte';
+        marker.dataset.myteId = String(markerData.myte?.id ?? '');
+        marker.title = `${markerData.myte?.name || 'Myte'} — click to look`;
         marker.style.left = `${Math.round(markerData.x)}px`;
         marker.style.top = `${Math.round(markerData.y)}px`;
+        // Near dots are full size and opaque, far ones shrink and fade. Read as
+        // custom properties so the whole treatment stays in CSS.
+        marker.style.setProperty('--marker-distance', markerData.distance.toFixed(3));
+    }
+
+    /**
+     * Clicking a marker looks at the myte it stands for. The dot already knows
+     * which myte and roughly where — following it is the obvious next thing to
+     * want, and it saves hunting the roster for a name you cannot see.
+     */
+    handleMarkerClick(event) {
+        const markerId = event.target?.closest?.('.myte-offscreen-indicator')?.dataset?.myteId;
+        if (!markerId) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const myte = (this.parent.getMytes() || []).find(m => String(m.id) === markerId);
+        if (!myte) return;
+
+        this.parent.parent?.camera?.centerToPosition?.(myte.posX, myte.posY, myte.size, false);
+        this.parent.setSelected?.(myte);
     }
 
     update() {
@@ -175,7 +232,11 @@ class OffscreenMyteIndicatorManager extends UIComponent {
 
         const viewportWidth = viewport.width;
         const viewportHeight = viewport.height;
-        const viewportBounds = this.getViewportWorldBounds(camera, viewportWidth, viewportHeight);
+        const viewportBounds = this.getViewportWorldBounds(container, camera, viewportWidth, viewportHeight);
+        // The overlay is inset from the stage so the dots clear the chips. Its
+        // box is where markers may sit; the projection below is still in stage
+        // coordinates, so the offset converts between the two.
+        const band = this.getMarkerBand(viewport);
         const activeMyte = this.parent.getActiveMyte();
         const markerData = [];
         const visibleMarkerIds = new Set();
@@ -205,12 +266,26 @@ class OffscreenMyteIndicatorManager extends UIComponent {
                 viewportHeight
             );
 
-            let x = Utility.clamp(projectedCenter.x, this.edgePadding, viewportWidth - this.edgePadding);
-            let y = Utility.clamp(projectedCenter.y, this.edgePadding, viewportHeight - this.edgePadding);
-            const edge = this.getMarkerEdge(x, y, viewportWidth, viewportHeight);
+            let x = Utility.clamp(
+                projectedCenter.x - band.offsetX,
+                this.edgePadding,
+                Math.max(this.edgePadding, band.width - this.edgePadding)
+            );
+            let y = Utility.clamp(
+                projectedCenter.y - band.offsetY,
+                this.edgePadding,
+                Math.max(this.edgePadding, band.height - this.edgePadding)
+            );
+            const edge = this.getMarkerEdge(x, y, band.width, band.height);
 
             visibleMarkerIds.add(String(myte.id));
-            markerData.push({ myte, edge, x, y });
+            markerData.push({
+                myte,
+                edge,
+                x,
+                y,
+                distance: this.distanceOutside(worldCenter, viewportBounds)
+            });
         });
 
         markerData.forEach(marker => this.updateMarker(marker, activeMyte));
@@ -223,6 +298,10 @@ class OffscreenMyteIndicatorManager extends UIComponent {
     }
 
     dispose() {
+        if (this.overlay && this.boundMarkerClick) {
+            this.overlay.removeEventListener('click', this.boundMarkerClick);
+        }
+        this.boundMarkerClick = null;
         this.markers.forEach(marker => marker.remove());
         this.markers.clear();
         this.overlay?.remove();

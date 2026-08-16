@@ -154,9 +154,21 @@ class WallOpeningSlot {
 }
 
 class WallBuilder {
+    static OPPOSITE_FACES = Object.freeze({
+        north: 'south', south: 'north', west: 'east', east: 'west'
+    });
+
+    static MASK_NORTH = 1;
+    static MASK_EAST = 2;
+    static MASK_SOUTH = 4;
+    static MASK_WEST = 8;
     static MASK_HORIZONTAL = 2 | 8;
     static MASK_VERTICAL = 1 | 4;
     static MASK_STRAIGHT_H = 10;
+
+    // Sub-frame: long enough that one evaluation pass hit-tests the cursor once,
+    // short enough that the memo can never survive into the next pass.
+    static CURSOR_SUBJECT_TTL_MS = 4;
 
     static DIRECTIONS = Object.freeze([
         Object.freeze({ name: 'north', dx: 0, dy: -1, bit: 1 }),
@@ -198,6 +210,24 @@ class WallBuilder {
             : '';
     }
 
+    /**
+     * Whether a cell's south face is inherited from the run beside it.
+     *
+     * A cell with exactly one horizontal neighbour is the corner column at the
+     * end of that neighbour's run: it has no head-on face of its own to author,
+     * so it wears the run's. Cells with a run on both sides, and vertical-only
+     * cells, keep what they were given.
+     */
+    static inheritsHorizontalFace(mask) {
+        return ((mask & WallBuilder.MASK_EAST) !== 0) !== ((mask & WallBuilder.MASK_WEST) !== 0);
+    }
+
+    // Vertical counterpart of inheritsHorizontalFace: exactly one vertical arm,
+    // which is what makes a cell the corner column of a north-south run.
+    static inheritsVerticalFace(mask) {
+        return ((mask & WallBuilder.MASK_NORTH) !== 0) !== ((mask & WallBuilder.MASK_SOUTH) !== 0);
+    }
+
     static isEndCapMask(mask) {
         return WallBuilder.isHorizontalMask(mask) &&
             !WallBuilder.isVerticalMask(mask) &&
@@ -237,6 +267,8 @@ class WallBuilder {
         this._pendingCutawaySince = 0;
         this._lastEvaluateAt = 0;
         this._subjectSignature = null;
+        this._cursorSubjectAt = -Infinity;
+        this._cursorSubject = null;
         this._unsubscribers = [];
     }
 
@@ -433,30 +465,125 @@ class WallBuilder {
         };
     }
 
+    /**
+     * Which room each of a cell's four faces looks into.
+     *
+     * Two rules, and the second one exists because of how authored rooms are
+     * shaped. An authored room is a RECTANGLE, and a rectangle drawn around a
+     * room contains the wall cells inside it — so asking "which room is at this
+     * point" for a point that sits inside a wall answers with the surrounding
+     * room, confidently and wrongly. (Auto-detected rooms are tilemasks of open
+     * cells and do not do this, which is why the bug only showed on walls built
+     * inside an authored room.)
+     *
+     * That single fact produced everything that looked wrong about a room built
+     * inside another one: its corners and its side walls reported the
+     * SURROUNDING room, so they wore that room's paint instead of plain
+     * plaster, room-scope paint of the new room skipped them entirely, and
+     * room-scope paint of the OLD room repainted them — because as far as the
+     * face data was concerned, they were the old room's walls.
+     */
     assignFaces(cell) {
-        const centerX = (cell.x + 0.5) * this.cellSize;
-        const centerY = (cell.y + 0.5) * this.cellSize;
+        const mask = this.computeMask(cell);
+        const resolved = {};
+        for (const direction of WallBuilder.DIRECTIONS) {
+            resolved[direction.name] = this.findFaceRoom(cell, direction, mask);
+        }
+
+        // A face whose lookup was blocked by masonry rather than by open ground
+        // still has to belong somewhere: the strip a north-south wall draws is
+        // painted from its south face, and a corner column is drawn from its
+        // own. Give those the innermost room the cell touches at all — a wall
+        // belongs to the smallest room it bounds, which is the same rule
+        // innermostAt applies to a point. Faces that saw genuinely open ground
+        // and found no room are exterior and stay that way.
+        const fallback = Object.values(resolved)
+            .filter(entry => entry.room)
+            .map(entry => entry.room)
+            .reduce((smallest, room) => !smallest ||
+                room.areaInCells(this.cellSize) < smallest.areaInCells(this.cellSize)
+                ? room : smallest, null);
+
         const faces = {};
         for (const direction of WallBuilder.DIRECTIONS) {
-            const rooms = this.gameMap.regionManager?.regionsAt(
-                centerX + direction.dx * this.cellSize,
-                centerY + direction.dy * this.cellSize,
-                'room'
-            ) || [];
-            const room = rooms[0] || null;
+            const entry = resolved[direction.name];
+            const room = entry.room || (entry.buried ? fallback : null);
             faces[direction.name] = {
                 roomId: room?.id || null,
                 exterior: !room,
-                materialId: this.resolveFinishOverride(cell.x, cell.y, direction.name) ||
+                materialId: this.resolveFinishOverride(cell.x, cell.y, direction.name, room?.id ?? null) ||
                     room?.properties?.wallFinishId || cell.finishId
             };
         }
         return faces;
     }
 
-    resolveFinishOverride(x, y, face) {
+    // Innermost, not first: a room walled off inside another sits within its
+    // parent's bounds, and a wall of the inner room belongs to the inner room.
+    // Null on a cell that is itself a wall — see assignFaces for why that
+    // matters more than it sounds.
+    roomAtOpenCell(x, y) {
+        if (this.cells.has(`${x},${y}`)) return null;
+        return this.gameMap.regionManager?.innermostAt(
+            (x + 0.5) * this.cellSize,
+            (y + 0.5) * this.cellSize,
+            'room',
+            this.cellSize
+        ) || null;
+    }
+
+    /**
+     * One face's room, plus whether the lookup was buried in a junction.
+     *
+     * Stepping one cell out is right for a wall in the middle of a run. At the
+     * column where two walls meet, that step lands on the wall coming in from
+     * the side — so follow the corner instead: an L corner encloses its room
+     * diagonally, and the cell between its two arms is inside.
+     *
+     * `buried` distinguishes "this face is walled in" from "this face looks at
+     * open ground that belongs to no room". The first wants a fallback; the
+     * second is the outside of the building and must stay exterior.
+     */
+    findFaceRoom(cell, direction, mask = this.computeMask(cell)) {
+        const x = cell.x + direction.dx;
+        const y = cell.y + direction.dy;
+        if (!this.cells.has(`${x},${y}`)) return { room: this.roomAtOpenCell(x, y), buried: false };
+
+        const armDx = WallBuilder.isVerticalMask(direction.bit) && WallBuilder.inheritsHorizontalFace(mask)
+            ? ((mask & WallBuilder.MASK_EAST) !== 0 ? 1 : -1)
+            : 0;
+        const armDy = WallBuilder.isHorizontalMask(direction.bit) && WallBuilder.inheritsVerticalFace(mask)
+            ? ((mask & WallBuilder.MASK_SOUTH) !== 0 ? 1 : -1)
+            : 0;
+        if (armDx === 0 && armDy === 0) return { room: null, buried: true };
+
+        return { room: this.roomAtOpenCell(x + armDx, y + armDy), buried: true };
+    }
+
+    /**
+     * The painted finish on one face, if the player put one there.
+     *
+     * Scoped to the room the paint was applied to. Paint is a statement about a
+     * ROOM's wall, not about a patch of masonry: close a new room off against a
+     * wall that is already there and that wall's inward face now belongs to the
+     * new room, but the override baked on when it belonged to the old one still
+     * outranked the new room's finish — so a brand new room came up wearing the
+     * surrounding room's colour.
+     *
+     * Ignoring a mismatched override rather than deleting it is what makes this
+     * survive going backwards: knock the new wall down, the face returns to the
+     * old room, its override matches again and the old paint comes back. A
+     * cleanup pass would have left a bald patch the player never asked for.
+     *
+     * `roomId` absent means unscoped — authored map data, and anything saved
+     * before overrides carried a room. Those still apply everywhere, so no
+     * existing map or save changes behaviour until it is repainted.
+     */
+    resolveFinishOverride(x, y, face, roomId = undefined) {
         const match = [...this.faceOverrides].reverse().find(record => {
             if (record.face !== face) return false;
+            if (record.roomId !== undefined && record.roomId !== null &&
+                roomId !== undefined && record.roomId !== roomId) return false;
             const x0 = Math.min(record.cells.from[0], record.cells.to[0]);
             const x1 = Math.max(record.cells.from[0], record.cells.to[0]);
             const y0 = Math.min(record.cells.from[1], record.cells.to[1]);
@@ -476,18 +603,158 @@ class WallBuilder {
         );
     }
 
-    // Per-side paint. The one-sided-corner inheritance only makes sense for the
-    // face the camera actually sees head-on, so it stays on the south face.
-    resolveFaceFinishId(cell, face) {
-        const explicit = this.resolveFinishOverride(cell.x, cell.y, face);
-        if (explicit) return explicit;
-        if (face === 'south') {
-            const hasEast = (cell.mask & 2) !== 0;
-            const hasWest = (cell.mask & 8) !== 0;
-            if (hasEast !== hasWest) {
-                const neighbor = this.cells.get(`${cell.x + (hasEast ? 1 : -1)},${cell.y}`);
-                if (neighbor) return this.assignFaces(neighbor).south.materialId;
+    /**
+     * The finish on the face band of an east-west wall.
+     *
+     * Drawn from the south face, because that is the side the camera sees. But
+     * a room's OWN front wall looks south into whatever is beyond the room, so
+     * reading the south face literally made the near wall of a room wear the
+     * colour of the space outside it — a green room with a plaster strip across
+     * its front, which is not a wall anyone painted, it is a wall nobody did.
+     *
+     * A wall belongs to the smallest room it bounds. That is the rule already
+     * used for a face buried in a junction and for innermostAt itself, and here
+     * it means a room reads as one colour all the way round: the far wall shows
+     * it because the room is on its south side, the near wall shows it because
+     * the room is the smaller of the two it divides. The bigger space's own
+     * outer walls are unaffected — it is the smallest room on both of its faces.
+     */
+    resolveBandFace(cell) {
+        const south = cell.faces?.south;
+        const north = cell.faces?.north;
+        const rooms = this.gameMap.regionManager;
+        const southRoom = south?.roomId ? rooms?.get('room', south.roomId) : null;
+        const northRoom = north?.roomId ? rooms?.get('room', north.roomId) : null;
+
+        if (southRoom && northRoom && northRoom !== southRoom &&
+            northRoom.areaInCells(this.cellSize) < southRoom.areaInCells(this.cellSize)) return 'north';
+        if (!southRoom && northRoom) return 'north';
+        return 'south';
+    }
+
+    resolveBandFinishId(cell) {
+        return this.resolveFaceFinishId(cell, this.resolveBandFace(cell));
+    }
+
+    /**
+     * Which slices of a cell take which room's paint.
+     *
+     * A cell is not one surface. A wall running east-west shows a face that
+     * looks south, and one finish covers it. A wall running north-south shows
+     * its narrow profile, and that profile has TWO sides — the room to its west
+     * and the room to its east — which is why painting it with a single finish
+     * could never be right, and why leaving it unpainted (what it used to do)
+     * was not right either. It is not a separate piece of wall to be painted on
+     * its own; it is part of both rooms, half each.
+     *
+     * A corner column is both at once: the horizontal stub beside the post
+     * faces south, and the post itself is split west/east. That is the "partial
+     * paint" — one cell, one draw call per slice, each slice reading its own
+     * face's room.
+     *
+     * A cell where walls leave in three or four directions gets both treatments
+     * too: the run passing through keeps its south face across the full width,
+     * and the post is painted over it, split. The two-tone band is only as wide
+     * as the perpendicular wall actually standing there, so it reads as that
+     * wall seen end-on — which is what it is.
+     */
+    getPaintSpans(cell, mask, construction) {
+        const region = this.registry.paintRegion(mask, construction);
+        if (!region) return [];
+
+        const cellSize = construction.cellSize;
+        const span = (from, to, face) => ({
+            from, to,
+            face: this.resolveOwningFace(cell, face),
+            finishId: this.resolveFaceFinishId(cell, this.resolveOwningFace(cell, face))
+        });
+
+        // Where a wall runs PAST a post, the post divides the cell: everything
+        // west of the middle belongs to the room on the west, everything east
+        // to the room on the east — the post's own half AND the band beside it.
+        //
+        // Resolving that band as one face across the full width is what put the
+        // wrong colour on half of every junction. Where a hallway meets a
+        // bedroom, the band was answered by whichever of the two rooms happened
+        // to be smaller, so the strip beyond the post wore the hallway's paint
+        // while the post next to it wore the bedroom's.
+        //
+        // Where the wall TURNS, it does not divide. The split exists so two
+        // rooms can each own their side of one piece of masonry, and a corner
+        // is not shared masonry: it is the end of the wall that turns there,
+        // drawn as its own rounded cap, with nothing continuing on the far side
+        // to own it. Splitting it anyway handed that cap to the room the corner
+        // merely stands next to, so the last quarter-tile of a painted wall came
+        // out in the neighbour's colour. The whole cell takes the face on the
+        // side the wall arrives from, which is the room the corner wraps.
+        if (WallBuilder.isVerticalMask(mask)) {
+            // A turn, and not merely one arm: a wall running north-south with a
+            // spur off one side has exactly one horizontal arm too, and it does
+            // divide — it is straight masonry with a room on either side, and
+            // handing the whole cell to the spur's side would paint the far
+            // room's wall from this one.
+            if (WallBuilder.inheritsHorizontalFace(mask) && WallBuilder.inheritsVerticalFace(mask)) {
+                return [span(region.start, region.end,
+                    (mask & WallBuilder.MASK_EAST) !== 0 ? 'east' : 'west')];
             }
+            const middle = cellSize / 2;
+            return [span(region.start, middle, 'west'), span(middle, region.end, 'east')];
+        }
+
+        if (WallBuilder.isHorizontalMask(mask) || mask === 0) {
+            return [span(region.start, region.end, this.resolveBandFace(cell))];
+        }
+        return [];
+    }
+
+    /**
+     * Which face a surface actually belongs to.
+     *
+     * A face with no room behind it is the outside of somebody's wall, and
+     * nobody can paint it on its own — so it follows the room on the other side
+     * of the same masonry instead of sitting bare. The outside of a building
+     * corner is the same wall as the inside of it, and treating it as unowned
+     * left a bald half-tile on every corner of the house, on a wall that had
+     * just been painted.
+     *
+     * This is the rule resolveBandFace already applies to a head-on band that
+     * looks out of the building; a post is the same wall seen edge-on and wants
+     * the same answer.
+     */
+    resolveOwningFace(cell, face) {
+        const opposite = WallBuilder.OPPOSITE_FACES[face];
+        if (!opposite || cell.faces?.[face]?.roomId || !cell.faces?.[opposite]?.roomId) return face;
+        return opposite;
+    }
+
+    /**
+     * Per-side paint. The one-sided-corner inheritance only makes sense for the
+     * face the camera actually sees head-on, so it stays on the south face.
+     *
+     * And only while the corner and the run it caps face the SAME room. The
+     * inheritance exists because a corner column has no head-on face to author
+     * of its own, so it wears its neighbour's — which is right up until the two
+     * look into different rooms. Walling a new room off using a wall that is
+     * already there is exactly that case: the run beside the new corner still
+     * faces the old room, so the corner borrowed the old room's colour and the
+     * new room's wall ended in a stripe of the paint it was built to replace.
+     * Facing a different room means the corner does have a face to answer for.
+     */
+    resolveFaceFinishId(cell, face) {
+        // Callers hand this both built cells (which carry mask + faces) and raw
+        // ones straight out of `this.cells` (which do not) — the paint palette
+        // reads the current finish that way. Fill in what is missing rather than
+        // throwing on `cell.faces[face]` at the bottom.
+        if (!cell.faces || !Number.isFinite(cell.mask)) {
+            cell = { ...cell, mask: cell.mask ?? this.computeMask(cell), faces: cell.faces ?? this.assignFaces(cell) };
+        }
+        const explicit = this.resolveFinishOverride(cell.x, cell.y, face, cell.faces?.[face]?.roomId ?? null);
+        if (explicit) return explicit;
+        if (face === 'south' && WallBuilder.inheritsHorizontalFace(cell.mask)) {
+            const hasEast = (cell.mask & WallBuilder.MASK_EAST) !== 0;
+            const neighbor = this.cells.get(`${cell.x + (hasEast ? 1 : -1)},${cell.y}`);
+            const inherited = neighbor ? this.assignFaces(neighbor).south : null;
+            if (inherited && inherited.roomId === cell.faces.south.roomId) return inherited.materialId;
         }
         return cell.faces[face].materialId;
     }
@@ -523,6 +790,226 @@ class WallBuilder {
             });
         }
         return pieces;
+    }
+
+    /**
+     * Whether this piece shows anything the player can paint.
+     *
+     * Asked of the surfaces themselves, because that is the only honest answer.
+     * A north-south run used to be refused on the grounds that it presents no
+     * face to the camera — true of the old single-finish wall, and false since
+     * a post started drawing two half-cell surfaces, west and east, one per
+     * room beside it. Those are visibly painted surfaces the tool would not let
+     * anyone select, so a room's side walls could never be painted at all: they
+     * stayed plaster while every wall around them took the colour, which is the
+     * gap running down both edges of a room.
+     */
+    isPaintable(piece) {
+        return (piece?.cells ?? []).some(cell => this.getCellSurfaces(cell).length > 0);
+    }
+
+    /**
+     * The paintable surfaces of one cell, exactly as the renderer draws them.
+     *
+     * A cell is not one surface, and which face a surface takes its finish from
+     * is a rendering decision (see getPaintSpans): a head-on band reads north or
+     * south depending on which room is the smaller one it bounds, and a
+     * north-south post is two half-cell surfaces, west and east, belonging to
+     * the rooms on either side of it.
+     *
+     * Selection, stretch growth and paint all read this one list, so what the
+     * player points at, what the highlight outlines and what the override lands
+     * on cannot disagree. They used to be three separate rules, which is why a
+     * click could highlight one wall, paint the corners of it, and change the
+     * colour of nothing you could see.
+     */
+    getCellSurfaces(cell) {
+        if (!cell) return [];
+        const construction = this.registry.getConstruction(cell.constructionId);
+        if (!construction) return [];
+        // Raw cells out of `this.cells` carry neither mask nor faces; the stretch
+        // walk steps through those, not through built piece cells.
+        const built = (cell.faces && Number.isFinite(cell.mask))
+            ? cell
+            : { ...cell, mask: this.computeMask(cell), faces: this.assignFaces(cell) };
+        // Which wall a surface belongs to is a question about its shape, not
+        // its face name. A span no wider than the post IS the post, seen
+        // edge-on, and grows into a north-south stretch; a span that reaches
+        // past the post is the band of an east-west wall, whichever face it
+        // takes its colour from. Reading the face name instead made the half of
+        // a junction that continues a horizontal run grow downward into the
+        // wall hanging off it.
+        const post = (construction.cellSize - construction.thickness) / 2;
+        return this.getPaintSpans(built, built.mask, construction).map(span => ({
+            cell: built,
+            face: span.face,
+            from: span.from,
+            to: span.to,
+            axis: (span.from < post - 0.5 || span.to > construction.cellSize - post + 0.5)
+                ? 'horizontal' : 'vertical',
+            roomId: built.faces[span.face]?.roomId ?? null,
+            finishId: span.finishId
+        }));
+    }
+
+    /**
+     * The surface visible at a pixel of a piece's canvas.
+     *
+     * Spans are drawn in order and overlay each other — a corner column paints
+     * its post over the band that runs through it — so the last span covering
+     * the pixel is the one the player is actually looking at.
+     */
+    surfaceAtOffset(piece, offsetX) {
+        const construction = this.registry.getConstruction(piece?.constructionId);
+        if (!construction || !(offsetX >= 0)) return null;
+        const index = Math.floor(offsetX / construction.cellSize);
+        const cell = piece.cells[index];
+        if (!cell) return null;
+        const local = offsetX - (index * construction.cellSize);
+        const covering = this.getCellSurfaces(cell).filter(surface => local >= surface.from && local < surface.to);
+        return covering[covering.length - 1] || null;
+    }
+
+    /**
+     * Every surface one paint stroke covers: the run of wall the clicked
+     * surface belongs to, plus the room-facing half of the column at each end.
+     *
+     * Two rules, and both of them are about a stretch being a wall of ONE room:
+     *
+     * A surface joins the stretch only if it faces the same room as the one
+     * clicked. That is what keeps the far side of a shared wall out of it — a
+     * room walled off inside another shares masonry with its parent, and paint
+     * applied from inside it must stop at the middle of that masonry.
+     *
+     * And the walk stops at the first cell carrying wall running ACROSS its
+     * axis. That corner's room-facing half is part of this wall, so it is
+     * included; the run turning away from it is a different wall and is not,
+     * even though it faces the same room. Following those turns is what made
+     * one click select half the floor plan.
+     */
+    getPaintStretchSurfaces(surface) {
+        if (!surface?.cell) return [];
+        const collected = new Map();
+        const take = cell => {
+            const matches = this.getCellSurfaces(cell).filter(entry => entry.roomId === surface.roomId);
+            // Keyed on the span, not the face: an exterior half follows the face
+            // opposite it, so one face can own both halves of a cell and keying
+            // on the name alone would drop one of them from the outline.
+            for (const match of matches) collected.set(`${cell.x},${cell.y},${match.from},${match.to}`, match);
+            return matches.length > 0;
+        };
+        if (!take(surface.cell)) return [];
+
+        const [stepX, stepY] = surface.axis === 'horizontal' ? [1, 0] : [0, 1];
+        for (const direction of [-1, 1]) {
+            // The cell clicked may itself be a corner, and that is no reason to
+            // stop before starting: a corner belongs to the wall it caps, so
+            // clicking it selects that wall. Only the cells the walk REACHES
+            // end it, which is what keeps a stretch from turning the corner and
+            // running off down the wall hanging there.
+            let { x, y } = surface.cell;
+            for (;;) {
+                x += stepX * direction;
+                y += stepY * direction;
+                const next = this.cells.get(`${x},${y}`);
+                if (!next || !take(next)) break;
+                if (this.turnsAcross(next, surface.axis)) break;
+            }
+        }
+        return [...collected.values()];
+    }
+
+    // Whether a cell carries wall running across a stretch's own axis — the
+    // corner or junction that ends it.
+    turnsAcross(cell, axis) {
+        const mask = Number.isFinite(cell.mask) ? cell.mask : this.computeMask(cell);
+        return axis === 'horizontal'
+            ? WallBuilder.isVerticalMask(mask)
+            : WallBuilder.isHorizontalMask(mask);
+    }
+
+    /**
+     * Where a set of surfaces sits on screen, in map coordinates.
+     *
+     * One rectangle per surface, adjacent ones merged, rather than a single box
+     * around the lot: a stretch that ends in a half-cell corner post is not a
+     * rectangle, and outlining its bounding box promised paint on the other
+     * half of that post — the half belonging to the room next door. Measured
+     * off the elements, since only the renderer knows where a construction's
+     * frame actually sits.
+     */
+    getSurfaceRects(surfaces) {
+        const rects = [];
+        for (const surface of surfaces) {
+            const piece = this.findPieceForCell(surface.cell.x, surface.cell.y);
+            const element = piece?.element;
+            const construction = this.registry.getConstruction(piece?.constructionId);
+            if (!element || element.hidden || !construction) continue;
+            const index = piece.cells.findIndex(cell => cell.x === surface.cell.x && cell.y === surface.cell.y);
+            if (index < 0) continue;
+            rects.push({
+                left: element.offsetLeft + (index * construction.cellSize) + surface.from,
+                top: element.offsetTop,
+                width: surface.to - surface.from,
+                height: element.offsetHeight,
+                zIndex: (Number(element.style.zIndex) || 0) + 1
+            });
+        }
+        return WallBuilder.mergeRects(rects);
+    }
+
+    /**
+     * One outline per connected group of surfaces, not one per surface.
+     *
+     * A stretch is drawn as many overlapping slices: a run contributes a
+     * rectangle per cell, a corner contributes both the band through it and the
+     * post over that band, and a north-south wall contributes a tall sprite per
+     * cell that overlaps the one below it. Outlining each of those separately
+     * drew a box inside a box inside a box — half a dozen dashed borders around
+     * one wall, which is what made a single stretch look like several.
+     *
+     * Grouping by "overlaps or touches" and outlining each group's bounds gives
+     * one border per thing the player is pointing at, in every direction: the
+     * slices of one wall are connected by construction, and two walls that are
+     * not part of the same stretch never share a pixel.
+     */
+    static mergeRects(rects) {
+        const groups = [];
+        for (const rect of rects) {
+            const bounds = {
+                left: rect.left, top: rect.top,
+                right: rect.left + rect.width, bottom: rect.top + rect.height,
+                zIndex: rect.zIndex
+            };
+            // Absorb every group this rectangle reaches, so two groups joined by
+            // a late arrival end up as one and not as two overlapping outlines.
+            for (let index = groups.length - 1; index >= 0; index--) {
+                if (!WallBuilder.rectsTouch(groups[index], bounds)) continue;
+                const [merged] = groups.splice(index, 1);
+                bounds.left = Math.min(bounds.left, merged.left);
+                bounds.top = Math.min(bounds.top, merged.top);
+                bounds.right = Math.max(bounds.right, merged.right);
+                bounds.bottom = Math.max(bounds.bottom, merged.bottom);
+                bounds.zIndex = Math.max(bounds.zIndex, merged.zIndex);
+            }
+            groups.push(bounds);
+        }
+        return groups.map(group => ({
+            left: group.left,
+            top: group.top,
+            width: group.right - group.left,
+            height: group.bottom - group.top,
+            zIndex: group.zIndex
+        }));
+    }
+
+    // Touching counts as overlapping: adjacent cells of one wall abut exactly,
+    // and a hairline gap between two dashed borders is the artefact this whole
+    // grouping exists to remove.
+    static rectsTouch(a, b) {
+        const slack = 0.5;
+        return a.left <= b.right + slack && b.left <= a.right + slack &&
+            a.top <= b.bottom + slack && b.top <= a.bottom + slack;
     }
 
     rebuild() {
@@ -631,12 +1118,28 @@ class WallBuilder {
         return subjects;
     }
 
-    // Memoized per sim-tick: resolving the cursor subject forces a DOM hit-test
-    // (isMouseInContainer → elementFromPoint), and one evaluation pass asks for
-    // it several times — subjects, signature, and room ids all start here.
+    /**
+     * The cutaway's clock is real time, not simulation time.
+     *
+     * Cutaway is presentation, like the camera: build mode stops SimClock, and
+     * a cutaway reading it froze outright — the throttle window never elapsed,
+     * so the evaluation pass stopped running, and the cursor subject memoized
+     * at the instant the pause began stayed pinned there. Whichever cell the
+     * cursor happened to be lowering when you entered build mode then stayed
+     * lowered for the whole session, including across a mode switch back to
+     * cutaway.
+     */
+    static presentationNow() {
+        return performance.now();
+    }
+
+    // Memoized for one evaluation pass: resolving the cursor subject forces a
+    // DOM hit-test (isMouseInContainer → elementFromPoint), and one pass asks
+    // for it several times — subjects, signature, and room ids all start here.
+    // The window is sub-frame, so the memo never outlives the pass that made it.
     getCursorCutawaySubject() {
-        const now = SimClock.now();
-        if (this._cursorSubjectAt === now) return this._cursorSubject;
+        const now = WallBuilder.presentationNow();
+        if (now - this._cursorSubjectAt < WallBuilder.CURSOR_SUBJECT_TTL_MS) return this._cursorSubject;
         this._cursorSubjectAt = now;
         this._cursorSubject = this.resolveCursorCutawaySubject();
         return this._cursorSubject;
@@ -752,7 +1255,7 @@ class WallBuilder {
     // the drawn state (see advancePiece). `immediate` commits at once and is
     // used after a rebuild, where there is no previous state worth debouncing.
     refreshCutawayTargets(immediate = false) {
-        const now = SimClock.now();
+        const now = WallBuilder.presentationNow();
         const subjects = this.getCutawayEvaluationSubjects();
         for (const piece of this.pieces) {
             const construction = this.registry.getConstruction(piece.constructionId);
@@ -789,7 +1292,7 @@ class WallBuilder {
     tick() {
         if (this.presentation !== 'cutaway' || this.pieces.length === 0) return;
         const config = SiteConfig.wallSystem;
-        const now = SimClock.now();
+        const now = WallBuilder.presentationNow();
         // One throttled poll covers both the room commit and the occlusion
         // signature — each resolves the cursor subject, which forces a DOM
         // hit-test, so neither may run per-frame. The window advances even
@@ -856,7 +1359,12 @@ class WallBuilder {
         canvas.style.height = `${canvas.height}px`;
         canvas.style.top = `${piece.baseline - 1 - construction.baselineRow}px`;
         canvas.dataset.wallMode = plan.mode;
-        const context = canvas.getContext('2d');
+        // Read back as well as drawn: the paint tool alpha-tests this canvas on
+        // every pointer move to find the wall under the cursor. Context options
+        // are fixed at creation, so the flag has to be set by whoever asks
+        // first — which is always this, since nothing can be sampled before it
+        // has been drawn.
+        const context = canvas.getContext('2d', { willReadFrequently: true });
         context.imageSmoothingEnabled = false;
 
         piece.cells.forEach((cell, index) => {
@@ -928,16 +1436,21 @@ class WallBuilder {
         // the renderer just lays the whole column down. The overlay indexes by
         // mask, not by maskMap: it answers a question about neighbours, where
         // the frame answers one about which art to reuse.
-        const overlay = this.registry.getFinishOverlay(
-            piece.constructionId, this.resolveFaceFinishId(cell, 'south'), state
-        );
-        if (!overlay) return;
         const overlayX = mask * construction.cellSize;
-        context.drawImage(
-            overlay,
-            overlayX, 0, construction.cellSize, construction.frameHeight,
-            x, 0, construction.cellSize, construction.frameHeight
-        );
+        for (const span of this.getPaintSpans(cell, mask, construction)) {
+            const overlay = this.registry.getFinishOverlay(piece.constructionId, span.finishId, state);
+            if (!overlay || span.to <= span.from) continue;
+            context.save();
+            context.beginPath();
+            context.rect(x + span.from, 0, span.to - span.from, construction.frameHeight);
+            context.clip();
+            context.drawImage(
+                overlay,
+                overlayX, 0, construction.cellSize, construction.frameHeight,
+                x, 0, construction.cellSize, construction.frameHeight
+            );
+            context.restore();
+        }
     }
 
     // Grows a lowered run outward until it covers whole openings. Halving a
@@ -1570,7 +2083,7 @@ class WallBuilder {
             return;
         }
 
-        const now = SimClock.now();
+        const now = WallBuilder.presentationNow();
         if (cutawayKey !== this._pendingCutawayKey) {
             this._pendingCutawayKey = cutawayKey;
             this._pendingCutawaySince = now;
@@ -1653,7 +2166,11 @@ class WallBuilder {
         for (const object of gridCell?.objects || []) {
             if (this.openingByCell.has(`${x},${y}`) && String(this.openingByCell.get(`${x},${y}`).id) === String(object.id)) continue;
             if (this.isWallMountedObject(object)) continue;
-            if (object.config?.physics?.walkable === true && object.contributesToWalkability !== false) continue;
+            // Walkability is a pathfinding answer and this is a masonry
+            // question. Borrowing it meant anything you could step over — a rug,
+            // a flower bed, a crop, a butterfly resting on a tile — was invisible
+            // to the wall tool and got built straight through.
+            if (object.contributesToWalkability === false) continue;
             return { reason: `${object.getDisplayName?.() || 'Something'} is in the way.`, entity: object };
         }
 
@@ -1668,6 +2185,55 @@ class WallBuilder {
         const creature = this.findCreatureInRect(rect);
         if (creature) {
             return { reason: `${creature.name || 'A Myte'} is standing there.`, entity: creature };
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether laying a wall here would drive a perpendicular arm through a door
+     * or window standing next to it.
+     *
+     * isOpeningCellCompatible already states the rule — an opening needs a
+     * straight run, because a cell that also carries a perpendicular arm is
+     * where two walls meet and the opening would hang over the one coming in
+     * from the side. But it was only ever consulted when placing the OPENING.
+     * Nothing asked it on the way in from the wall side, and connectivity does
+     * not care which edit came first: masks are recomputed from neighbours, so
+     * building above or below a window turns that window's own cell into a
+     * junction and the new wall draws straight down over the glass. The cell
+     * under the window was never edited, which is why the build tool's
+     * "would this change anything" filter waved it through.
+     *
+     * Checked against the mask the cell WOULD have, not the one it has, so the
+     * answer is about the wall being built rather than the one already there.
+     */
+    getOpeningJunctionConflict(x, y) {
+        const group = this.baseCells.get(`${x},${y}`)?.connectGroup ||
+            this.wallData.defaults.connectGroup;
+
+        for (const direction of WallBuilder.DIRECTIONS) {
+            const neighborX = x + direction.dx;
+            const neighborY = y + direction.dy;
+            const opening = this.openingByCell.get(`${neighborX},${neighborY}`);
+            if (!opening) continue;
+
+            const neighbor = this.cells.get(`${neighborX},${neighborY}`);
+            if (!neighbor || neighbor.connectGroup !== group) continue;
+
+            // The arm this build would add to the opening's cell, on top of
+            // whatever it already connects to.
+            const opposite = WallBuilder.DIRECTIONS.find(
+                candidate => candidate.dx === -direction.dx && candidate.dy === -direction.dy
+            );
+            const mask = this.computeMask(neighbor) | opposite.bit;
+            if (this.isOpeningCellCompatible(mask, opening.axis)) continue;
+
+            const type = String(opening.type || 'opening').toLowerCase();
+            return {
+                reason: `A wall here would run through the ${type}.`,
+                entity: this.gameMap.getObjectById?.(opening.id)
+            };
         }
 
         return null;
@@ -1774,6 +2340,96 @@ class WallBuilder {
         return false;
     }
 
+    // The room a given face belongs to right now, straight from the built cell
+    // so it agrees with whatever assignFaces most recently decided.
+    getFaceRoomIdAt(x, y, face) {
+        const cell = this.cells.get(`${x},${y}`);
+        if (!cell) return null;
+        const faces = cell.faces || this.assignFaces(cell);
+        return faces?.[face]?.roomId ?? null;
+    }
+
+    /**
+     * Give overrides saved before they carried a room the room they are sitting
+     * on now. Without this an existing save keeps its untagged overrides, which
+     * apply unconditionally, and the very bug this fixes survives in every world
+     * that already exists. Runs once, after the cells are built and before
+     * anything reads a finish.
+     */
+    adoptLegacyFaceOverrideRooms() {
+        for (const record of this.faceOverrides) {
+            if (record.roomId !== undefined) continue;
+            record.roomId = this.getFaceRoomIdAt(record.cells.from[0], record.cells.from[1], record.face);
+        }
+    }
+
+    /**
+     * Paint every wall of a room, by setting the ROOM's finish.
+     *
+     * Floors have always worked this way (FloorBuilder.setRoomFinish writes
+     * room.properties.floorFinishId) and walls did not: room-scope wall paint
+     * enumerated the cells it could see at that moment and wrote one override
+     * per cell per face. Anything not in that list stayed unpainted forever —
+     * the west and east faces of a north-south wall, the post of a corner
+     * column, and every wall built after the paint was applied. That is why the
+     * green stopped at the corners no matter how many times it was repainted.
+     *
+     * A room's colour is a property of the room. assignFaces already falls back
+     * to `room.properties.wallFinishId` for every face that belongs to it, so
+     * setting it here reaches all four faces of every cell, including cells that
+     * do not exist yet.
+     *
+     * The room's own per-face overrides are dropped, because repainting a room
+     * supersedes accents painted onto it. Overrides belonging to OTHER rooms are
+     * left alone — they are that room's paint on the other side of a shared wall.
+     */
+    /**
+     * Turn paint applied under the old per-face model into a room wall finish.
+     *
+     * Room-scope paint used to enumerate cells and write one override each, so
+     * a world painted before walls became a room property carries dozens of
+     * overrides and a room whose `wallFinishId` is still null. Every face that
+     * enumeration could not see — the west and east of a north-south wall, the
+     * post of a corner or a junction — therefore stayed bare plaster, and no
+     * amount of repainting fixed it because repainting rebuilt the same list.
+     *
+     * The dominant finish across a room's overrides IS that room's colour, so
+     * it is promoted to the room and its overrides dropped. Overrides carrying
+     * a different finish are deliberate accents and are kept.
+     */
+    promoteLegacyRoomPaint() {
+        const tally = new Map();
+        for (const record of this.faceOverrides) {
+            if (!record.roomId) continue;
+            const byFinish = tally.get(record.roomId) || new Map();
+            byFinish.set(record.finishId, (byFinish.get(record.finishId) || 0) + 1);
+            tally.set(record.roomId, byFinish);
+        }
+
+        let changed = false;
+        for (const [roomId, byFinish] of tally) {
+            const room = this.gameMap.regionManager?.get('room', roomId);
+            if (!room || room.properties?.wallFinishId) continue;
+            const [finishId] = [...byFinish].sort((a, b) => b[1] - a[1])[0] || [];
+            if (!finishId || !this.registry.getFinish(finishId)) continue;
+            room.properties = { ...room.properties, wallFinishId: finishId };
+            this.faceOverrides = this.faceOverrides.filter(
+                record => !(record.roomId === roomId && record.finishId === finishId)
+            );
+            changed = true;
+        }
+        return changed;
+    }
+
+    setRoomWallFinish(roomId, finishId) {
+        const room = this.gameMap.regionManager?.get('room', roomId);
+        if (!room || (finishId && !this.registry.getFinish(finishId))) return false;
+        room.properties = { ...room.properties, wallFinishId: finishId || null };
+        this.faceOverrides = this.faceOverrides.filter(record => record.roomId !== roomId);
+        this.rebuild();
+        return true;
+    }
+
     setFaceFinish(record) {
         if (!record || !this.registry.getFinish(record.finishId) ||
             !WallMaterialRegistry.DIRECTIONS.includes(record.face) ||
@@ -1783,7 +2439,11 @@ class WallBuilder {
             axis: record.axis || (record.cells.from[1] === record.cells.to[1] ? 'horizontal' : 'vertical'),
             cells: { from: [...record.cells.from], to: [...record.cells.to] },
             face: record.face,
-            finishId: record.finishId
+            finishId: record.finishId,
+            // Which room this paint was applied to. See resolveFinishOverride:
+            // it is what stops the paint following the masonry into a room that
+            // was walled off later and never chose this colour.
+            roomId: record.roomId ?? this.getFaceRoomIdAt(record.cells.from[0], record.cells.from[1], record.face)
         });
         this.rebuild();
         return true;
@@ -1864,6 +2524,37 @@ class WallBuilder {
 
     findPieceForCell(cellX, cellY) {
         return this._pieceByCell.get(`${cellX},${cellY}`) || null;
+    }
+
+    /**
+     * Re-derive which room each wall face borders, and rebuild if the answer
+     * moved.
+     *
+     * Faces resolve against the region layer, but rooms are recomputed AFTER
+     * the geometry change that prompted them — so a wall raised in the same
+     * breath as the room it encloses was assigned before that room existed and
+     * read as "outside" ever after, which also made it unpaintable. The reverse
+     * too: tearing a room down left its walls still pointing at a region that
+     * no longer exists, so a stretch of the Kitchen's wall kept selecting as a
+     * room that had been deleted.
+     *
+     * A full rebuild rather than a patch, because face room ids are part of
+     * what decides how cells merge into pieces (see canMergeHorizontal) — a run
+     * that now borders two different rooms has to become two pieces.
+     */
+    refreshRoomFaces() {
+        const changed = this.pieces.some(piece => piece.cells.some(cell => {
+            const faces = this.assignFaces(cell);
+            return WallMaterialRegistry.DIRECTIONS.some(direction =>
+                cell.faces[direction].roomId !== faces[direction].roomId ||
+                cell.faces[direction].materialId !== faces[direction].materialId);
+        }));
+        if (changed) this.rebuild();
+        return changed;
+    }
+
+    findPieceById(pieceId) {
+        return this.pieces.find(piece => piece.id === pieceId) || null;
     }
 
     getOpeningAxis(object) {
@@ -2529,6 +3220,11 @@ class WallBuilder {
         this.pruneOrphanedRecords();
         this.reindexOpenings();
         this.rebuild();
+        // After the first build, so every face knows its room; before anything
+        // asks for a finish. Tags overrides saved before they carried one, then
+        // folds whole-room paint up into the room itself.
+        this.adoptLegacyFaceOverrideRooms();
+        if (this.promoteLegacyRoomPaint()) this.rebuild();
         this.bindOpeningObjects();
         this.bindFixtureObjects();
         this.setPresentationMode(state.version >= 2 && SiteConfig.wallSystem.presentationModes.includes(state.presentation)

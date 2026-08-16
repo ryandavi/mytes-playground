@@ -11,8 +11,24 @@
     --space-2xl: 20px;
     --space-3xl: 24px;
 
+    // Panel type. Two sizes carry every settings panel: `body` for anything the
+    // player acts on (labels, buttons, readouts) and `meta` for everything that
+    // only explains it — subgroup titles, hints, key caps, segment buttons.
+    // Anything that wants a third size is usually a sign the panel needs fewer
+    // things in it, not more type sizes.
+    --text-size-title: 1rem;
+    --text-size-body: 0.875rem;
+    --text-size-meta: 0.75rem;
+
     --border-width: 5px;
     --padding: var(--space-base);
+
+    // One size for every field, everywhere. A select carries a UA arrow on top
+    // of whatever padding it is given, so a select and the text input beside it
+    // only line up if both are driven from here rather than each panel picking
+    // its own.
+    --field-padding-block: var(--space-xs);
+    --field-padding-inline: var(--space-sm);
     --padding-outer: var(--space-2xl);
     --gap: var(--space-base);
 
@@ -122,6 +138,8 @@
     --size-myte: 192px;
     --size-item: 48px;
     --size-tool-button: 60px;
+    // A square button that carries a glyph instead of a word.
+    --size-icon-button: 28px;
     --size-queue-chip: 38px;
     --page-edge-space: var(--space-2xl);
     --item-size: var(--size-item);

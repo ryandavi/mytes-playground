@@ -55,14 +55,33 @@ class SettingsPanel extends PanelSection {
         this.setupGraphicsSettings();
         this.setupGameplaySettings();
         this.setupMiscSettings();
+        this.setupAutoSave();
 
-        const saveButton = this.modalElement.querySelector('#save-settings');
-        if (saveButton) {
-            saveButton.onclick = () => {
-                this.saveSettings();
-                this.close();
-            };
-        }
+        const restoreButton = this.modalElement.querySelector('#restore-defaults');
+        if (restoreButton) restoreButton.onclick = () => this.restoreDefaults();
+    }
+
+    /**
+     * Sound and View persist the moment you touch a control. General used to
+     * wait on a Save button, so a setting could be applied to the world and
+     * still be gone on reload — and the button had no visible effect otherwise.
+     * One listener on the section catches every control, after its own handler
+     * has already written to `this.settings`.
+     */
+    setupAutoSave() {
+        if (!this.sectionElement || this._autoSaveBound) return;
+        this._autoSaveBound = true;
+        this.sectionElement.addEventListener('change', () => this.saveSettings());
+    }
+
+    restoreDefaults() {
+        this.settings = SettingsPanel.getDefaultSettings();
+        this.setupGraphicsSettings();
+        this.setupGameplaySettings();
+        this.setupMiscSettings();
+        this.applyGraphicsSettings();
+        this.saveSettings({ announce: true });
+        this.parent?.showMessage?.('Settings restored to defaults.', 'success', 'Options');
     }
 
     setupGraphicsSettings() {
@@ -348,7 +367,9 @@ class SettingsPanel extends PanelSection {
         };
     }
 
-    saveSettings() {
+    // Silent by default: this now runs on every checkbox tick, and a success
+    // chime per tick would be noise. Only a deliberate action announces itself.
+    saveSettings({ announce = false } = {}) {
         const user = this.getUser();
         const nextPreferences = SettingsPanel.preferencesFromSettings(this.settings);
 
@@ -365,7 +386,7 @@ class SettingsPanel extends PanelSection {
             if (!nextPreferences.interactionHintsEnabled) {
                 TooltipSystem.getInstance().hide();
             }
-            this.playSound('success');
+            if (announce) this.playSound('success');
         } catch (error) {
             console.error('Failed to save settings:', error);
             this.playSound('error');

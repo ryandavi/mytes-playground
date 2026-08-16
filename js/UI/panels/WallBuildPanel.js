@@ -8,15 +8,25 @@ class WallBuildPanel extends ModalWindow {
             closeButtonSelector: '.modal-close-btn'
         });
         this.drag = null;
+        this.hoverCell = null;
+        this.lastTickAt = 0;
         this.ghostElements = [];
         this.measureLabel = null;
         this.boundPointerDown = this.handlePointerDown.bind(this);
         this.boundPointerMove = this.handlePointerMove.bind(this);
         this.boundPointerUp = this.handlePointerUp.bind(this);
+        this.boundPointerLeave = this.clearHover.bind(this);
         this.init();
         this.wallView = new WallViewControl(this, this.modalElement?.querySelector('.wall-view-controls'));
+        this.operationSegment = new SegmentControl(
+            this.modalElement?.querySelector('.wall-build-operation-segment') || null,
+            { value: 'add', onChange: () => this.renderHoverGhost() }
+        );
+        this.gridToggle = new BuildGridToggle(this, this.modalElement);
+        this.snapToggle = new BuildSnapToggle(this, this.modalElement);
         this.rectangleToggle = this.modalElement?.querySelector('#wall-build-rectangle') || null;
         this.parent?.parent?.canvas?.addEventListener('pointerdown', this.boundPointerDown, true);
+        this.parent?.parent?.canvas?.addEventListener('pointerleave', this.boundPointerLeave);
         document.addEventListener('pointermove', this.boundPointerMove, true);
         document.addEventListener('pointerup', this.boundPointerUp, true);
         document.addEventListener('pointercancel', this.boundPointerUp, true);
@@ -31,13 +41,16 @@ class WallBuildPanel extends ModalWindow {
     }
 
     handleToolModeChanged(mode) {
-        const active = mode === UIToolModes.BUILD;
+        const active = mode === UIToolModes.WALL;
         document.body.classList.toggle('wall-build-mode', active);
         if (active) {
             this.wallView.sync();
+            this.gridToggle.sync();
+            this.snapToggle.sync();
             this.open();
         } else {
             this.cancelDrag();
+            this.clearHover();
             super.close();
         }
     }
@@ -46,7 +59,7 @@ class WallBuildPanel extends ModalWindow {
     // whatever the current mode's default tool is — which is Select once build
     // mode has already been left.
     close() {
-        if (this.parent.isTool(UIToolModes.BUILD) &&
+        if (this.parent.isTool(UIToolModes.WALL) &&
             this.parent.changeToolMode(this.parent.toolManager.getDefaultToolFor())) {
             return;
         }
@@ -59,7 +72,18 @@ class WallBuildPanel extends ModalWindow {
     handleKeyDown() {}
 
     getOperation() {
-        return this.modalElement?.querySelector('input[name="wall-build-operation"]:checked')?.value || 'add';
+        return this.operationSegment?.value || 'add';
+    }
+
+    /**
+     * The operation this gesture is actually performing. Ctrl held inverts the
+     * panel's tool for the length of the drag without touching the radio — the
+     * Sims' knock-a-wall-down modifier — so the common "lay a run, fix one
+     * cell, carry on" loop never costs two trips to the panel.
+     */
+    resolveOperation(event = null) {
+        if (event?.ctrlKey === true) return this.getOperation() === 'remove' ? 'add' : 'remove';
+        return this.getOperation();
     }
 
     // Shift is unavailable on touch, so the panel carries the same switch.
@@ -79,7 +103,7 @@ class WallBuildPanel extends ModalWindow {
     }
 
     handlePointerDown(event) {
-        if (!this.parent.isTool(UIToolModes.BUILD) || event.button !== 0) return;
+        if (!this.parent.isTool(UIToolModes.WALL) || event.button !== 0) return;
         const cell = this.pointerToCell(event);
         if (!cell || !this.gameMap?.wallBuilder) return;
         event.preventDefault();
@@ -89,20 +113,73 @@ class WallBuildPanel extends ModalWindow {
             map: this.gameMap,
             start: cell,
             end: cell,
-            rectangle: this.isRectangleMode(event)
+            rectangle: this.isRectangleMode(event),
+            operation: this.resolveOperation(event),
+            soundedCells: 0
         };
+        this.hoverCell = null;
+        this.hoverOperation = null;
         this.renderGhosts(this.getDragCells(), event);
     }
 
     handlePointerMove(event) {
-        if (!this.drag || event.pointerId !== this.drag.pointerId) return;
+        if (!this.drag) {
+            this.renderHoverGhost(event);
+            return;
+        }
+        if (event.pointerId !== this.drag.pointerId) return;
         const cell = this.pointerToCell(event);
         if (!cell) return;
         event.preventDefault();
         event.stopPropagation();
         this.drag.end = cell;
         this.drag.rectangle = this.isRectangleMode(event);
+        this.drag.operation = this.resolveOperation(event);
         this.renderGhosts(this.getDragCells(), event);
+    }
+
+    /**
+     * A single ghost cell under the cursor before any drag starts, in the
+     * colour of what a click would do and struck through when it would be
+     * refused. This is the answer to "can I build here?" — a cursor swap alone
+     * cannot say *which* cell it means on a grid this size.
+     */
+    renderHoverGhost(event = null) {
+        if (event) this.hoverEvent = event;
+        const source = event || this.hoverEvent;
+        if (!this.parent.isTool(UIToolModes.WALL) || !source) return;
+        if (!this.parent.parent?.canvas?.contains(source.target)) {
+            this.clearHover();
+            return;
+        }
+        const cell = this.pointerToCell(source);
+        if (!cell) {
+            this.clearHover();
+            return;
+        }
+        // pointermove fires far faster than the cursor crosses a cell, and every
+        // repeat would rebuild the ghost element for the same square.
+        const operation = this.resolveOperation(source);
+        if (this.hoverCell?.x === cell.x && this.hoverCell?.y === cell.y &&
+            this.hoverOperation === operation) {
+            return;
+        }
+        this.hoverCell = cell;
+        this.hoverOperation = operation;
+        this.renderGhosts([cell], null, operation);
+        document.body.classList.toggle(
+            'wall-build-refused',
+            !this.checkCell(cell, operation).allowed
+        );
+    }
+
+    clearHover() {
+        if (this.drag) return;
+        this.hoverCell = null;
+        this.hoverOperation = null;
+        this.hoverEvent = null;
+        this.clearGhosts();
+        document.body.classList.remove('wall-build-refused');
     }
 
     handlePointerUp(event) {
@@ -111,7 +188,7 @@ class WallBuildPanel extends ModalWindow {
         event.stopPropagation();
         const cells = this.getDragCells();
         const map = this.drag.map;
-        const operation = this.getOperation();
+        const operation = this.drag.operation;
         this.cancelDrag();
         this.commitCells(map, cells, operation);
     }
@@ -154,20 +231,25 @@ class WallBuildPanel extends ModalWindow {
             : rules.canBuildWallCell(cell.x, cell.y);
     }
 
-    renderGhosts(cells, event = null) {
+    renderGhosts(cells, event = null, operationOverride = null) {
         this.clearGhosts();
-        const map = this.drag?.map;
+        const map = this.drag?.map || this.gameMap;
         const layer = map?.layers?.objects;
         const cellSize = map?.gridSystem?.config?.cellSize;
         if (!layer || !cellSize) return;
-        const operation = this.getOperation();
+        const operation = operationOverride || this.drag?.operation || this.getOperation();
         const removing = operation === 'remove';
-        let blocked = 0;
+        let effective = 0;
         for (const cell of cells) {
             const allowed = this.checkCell(cell, operation).allowed;
-            if (!allowed) blocked += 1;
+            // Allowed is not the same as "would do something": adding over a
+            // cell that already has a wall is permitted and changes nothing, so
+            // counting it knocked for a wall that was already standing there.
+            const changes = allowed && this.cellWouldChange(map, cell, removing);
+            if (changes) effective += 1;
             const ghost = document.createElement('div');
-            ghost.className = `wall-build-ghost-cell${removing ? ' is-remove' : ''}${allowed ? '' : ' is-invalid'}`;
+            ghost.className = `wall-build-ghost-cell${removing ? ' is-remove' : ''}` +
+                `${allowed ? '' : ' is-invalid'}${allowed && !changes ? ' is-inert' : ''}`;
             ghost.style.left = `${cell.x * cellSize}px`;
             ghost.style.top = `${cell.y * cellSize}px`;
             ghost.style.width = `${cellSize}px`;
@@ -175,7 +257,43 @@ class WallBuildPanel extends ModalWindow {
             layer.appendChild(ghost);
             this.ghostElements.push(ghost);
         }
-        this.renderMeasurement(cells.length - blocked, event);
+        if (this.drag) this.tickRunSound(effective, removing);
+        this.renderMeasurement(effective, event);
+    }
+
+    // The same test commitCells applies, so the preview, the count and the
+    // sound all agree with what the commit will actually do.
+    cellWouldChange(map, cell, removing) {
+        const occupied = map?.wallBuilder?.baseCells.has(`${cell.x},${cell.y}`) === true;
+        return removing ? occupied : !occupied;
+    }
+
+    /**
+     * One knock the moment each cell joins the run, not a burst when the drag
+     * ends — the wall should sound like it is going up under your hand. Pitch
+     * climbs a step per cell and wraps every `cycle`, so a long wall keeps its
+     * rhythm instead of sliding out of the register; removal runs the ladder
+     * down. Dragging back over cells you already crossed re-arms them without
+     * re-sounding, so only growth is audible.
+     */
+    tickRunSound(count, removing) {
+        if (!this.drag || count === this.drag.soundedCells) return;
+        const grew = count > this.drag.soundedCells;
+        this.drag.soundedCells = count;
+        if (!grew || count <= 0) return;
+
+        const run = SiteConfig.buildMode.sounds.run;
+        // Wall-clock: this paces audio against the player's hand, not the sim.
+        const now = performance.now();
+        if (now - this.lastTickAt < run.minIntervalMs) return;
+        this.lastTickAt = now;
+
+        const position = (count - 1) % run.cycle;
+        this.playSound(run.sound, {
+            pitchScale: run.basePitch *
+                Math.pow(run.pitchStep, removing ? run.cycle - 1 - position : position),
+            volume: run.volume
+        });
     }
 
     renderMeasurement(count, event) {
@@ -233,7 +351,6 @@ class WallBuildPanel extends ModalWindow {
         this.pushHistory(builder, result, removing);
         map.container?.worldState?.captureMap?.(map);
         map.core?.user?._scheduleSave?.();
-        this.playSound(removing ? SiteConfig.buildMode.sounds.wallRemove : SiteConfig.buildMode.sounds.wallPlace);
         return true;
     }
 
@@ -261,8 +378,8 @@ class WallBuildPanel extends ModalWindow {
         );
     }
 
-    playSound(soundId) {
-        if (soundId) this.parent.parent?.core?.soundManager?.playWhenReady?.(soundId);
+    playSound(soundId, options = {}) {
+        if (soundId) this.parent.parent?.core?.soundManager?.playWhenReady?.(soundId, options);
     }
 
     clearGhosts() {
@@ -280,13 +397,21 @@ class WallBuildPanel extends ModalWindow {
 
     dispose() {
         this.cancelDrag();
+        this.clearHover();
         this.wallView?.dispose();
         this.wallView = null;
+        this.operationSegment?.dispose();
+        this.operationSegment = null;
+        this.gridToggle?.dispose();
+        this.gridToggle = null;
+        this.snapToggle?.dispose();
+        this.snapToggle = null;
+        this.parent?.parent?.canvas?.removeEventListener('pointerleave', this.boundPointerLeave);
         this.parent?.parent?.canvas?.removeEventListener('pointerdown', this.boundPointerDown, true);
         document.removeEventListener('pointermove', this.boundPointerMove, true);
         document.removeEventListener('pointerup', this.boundPointerUp, true);
         document.removeEventListener('pointercancel', this.boundPointerUp, true);
-        document.body.classList.remove('wall-build-mode');
+        document.body.classList.remove('wall-build-mode', 'wall-build-refused');
         super.dispose();
     }
 }

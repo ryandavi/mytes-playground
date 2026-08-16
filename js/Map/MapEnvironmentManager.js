@@ -525,6 +525,7 @@ class MapEnvironmentManager {
 						: { kind: 'rect', bounds: volume.bounds },
                 properties: {
                     displayName: volume.displayName,
+                    authoredDisplayName: volume.displayName,
                     indoor: true,
                     wallFinishId: volume.wallFinishId,
                     floorFinishId: volume.floorFinishId,

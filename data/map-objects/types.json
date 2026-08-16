@@ -29,7 +29,9 @@
     "physics": {
       "walkable": true
     },
-    "capabilities": { "pickableFlower": true },
+    "capabilities": {
+      "pickableFlower": true
+    },
     "animation": "sway",
     "canInspect": false,
     "majorActionId": [
@@ -460,7 +462,9 @@
     "physics": {
       "walkable": true
     },
-    "capabilities": { "pickableFlower": true },
+    "capabilities": {
+      "pickableFlower": true
+    },
     "interaction": {
       "type": "mood_boost"
     },
@@ -576,7 +580,10 @@
     "physics": {
       "collision": true
     },
-    "capabilities": { "shakeable": true, "choppable": true },
+    "capabilities": {
+      "shakeable": true,
+      "choppable": true
+    },
     "canInspect": true,
     "label": "Pine Tree",
     "majorActionId": [
@@ -705,7 +712,9 @@
     "physics": {
       "collision": true
     },
-    "capabilities": { "removableStump": true },
+    "capabilities": {
+      "removableStump": true
+    },
     "canInspect": true,
     "label": "Tree Stump",
     "majorActionId": [
@@ -1089,6 +1098,8 @@
     }
   },
   "TREASURE_CHEST": {
+    "draggable": true,
+    "storable": true,
     "category": "container",
     "variants": [
       "wooden_chest",
@@ -1097,9 +1108,9 @@
     "physics": {
       "collision": true
     },
-	"capabilities": {
-	  "lootContainer": true
-	},
+    "capabilities": {
+      "lootContainer": true
+    },
     "interaction": {
       "type": "open"
     },
@@ -1255,6 +1266,8 @@
     }
   },
   "FOUNTAIN": {
+    "draggable": true,
+    "storable": true,
     "category": "interactive",
     "variants": [
       "stone",
@@ -1263,20 +1276,20 @@
     "physics": {
       "collision": true
     },
-	"capabilities": {
-	  "drinkSource": true
-	},
-	"ai": {
-	  "affordances": [
-		{
-		  "actionId": "drink_fountain",
-		  "purpose": "soothe",
-		  "when": {
-			"capability": "drinkSource"
-		  }
-		}
-	  ]
-	},
+    "capabilities": {
+      "drinkSource": true
+    },
+    "ai": {
+      "affordances": [
+        {
+          "actionId": "drink_fountain",
+          "purpose": "soothe",
+          "when": {
+            "capability": "drinkSource"
+          }
+        }
+      ]
+    },
     "interaction": {
       "type": "mood_boost",
       "radius": 150
@@ -1424,6 +1437,8 @@
     }
   },
   "LANTERN": {
+    "draggable": true,
+    "storable": true,
     "category": "interactive",
     "variants": [
       "paper",
@@ -1759,13 +1774,18 @@
     "interaction": {
       "type": "tend"
     },
-    "capabilities": { "waterable": true, "harvestable": true },
+    "capabilities": {
+      "waterable": true,
+      "harvestable": true
+    },
     "majorActionId": [
       "harvest",
       "water_plant"
     ],
     "actionConfigs": {
-      "harvest": { "label": "Harvest Crop" }
+      "harvest": {
+        "label": "Harvest Crop"
+      }
     },
     "animation": "sway",
     "trampleResponse": {
@@ -2323,6 +2343,7 @@
     }
   },
   "BALL": {
+    "storable": true,
     "category": "moving",
     "variants": [
       "red_ball",
@@ -3118,11 +3139,45 @@
         "visual": {
           "animations": {
             "N": {
-              "frames": [[0, 0], [1, 0], [2, 0], [3, 0]],
+              "frames": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ],
+                [
+                  2,
+                  0
+                ],
+                [
+                  3,
+                  0
+                ]
+              ],
               "loop": true
             },
             "W": {
-              "frames": [[0, 0], [1, 0], [2, 0], [3, 0]],
+              "frames": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ],
+                [
+                  2,
+                  0
+                ],
+                [
+                  3,
+                  0
+                ]
+              ],
               "loop": true
             }
           },
@@ -3841,7 +3896,7 @@
     "airborneMaxDuration": 7000,
     "landingChanceBase": 0.0025,
     "landingChanceMax": 0.012,
-    "takeoffChance": 0.00008,
+    "takeoffChance": 8e-05,
     "idleChance": 0.001,
     "seedSeekChance": 0.002,
     "seedSearchRadius": 280,
@@ -4138,7 +4193,10 @@
   },
   "PAINTING": {
     "category": "static",
-    "variants": ["painting", "painting_still_life"],
+    "variants": [
+      "painting",
+      "painting_still_life"
+    ],
     "label": "Painting",
     "draggable": true,
     "dragInSelectMode": true,
@@ -4154,7 +4212,10 @@
     "interaction": {
       "interactive": false
     },
-    "size": { "width": 36, "height": 28 },
+    "size": {
+      "width": 36,
+      "height": 28
+    },
     "visual": {
       "renderType": "single",
       "overlappable": true
@@ -4165,7 +4226,9 @@
         "wallFixtureId": "painting",
         "visual": {
           "renderType": "single",
-          "spriteSheet": { "url": "images/walls/fixtures/painting.png" }
+          "spriteSheet": {
+            "url": "images/walls/fixtures/painting.png"
+          }
         }
       },
       "painting_still_life": {
@@ -4173,14 +4236,19 @@
         "wallFixtureId": "painting_still_life",
         "visual": {
           "renderType": "single",
-          "spriteSheet": { "url": "images/walls/fixtures/painting-still-life.png" }
+          "spriteSheet": {
+            "url": "images/walls/fixtures/painting-still-life.png"
+          }
         }
       }
     }
   },
   "WINDOW": {
     "category": "static",
-    "variants": ["default", "double"],
+    "variants": [
+      "default",
+      "double"
+    ],
     "label": "Window",
     "draggable": true,
     "dragInSelectMode": true,
@@ -4203,8 +4271,15 @@
       "maxSillHeight": 96,
       "sillHeightStep": 32,
       "continuesTopTrim": true,
-      "placementOffset": { "x": 0 },
-      "apertureInset": { "top": 1, "right": 1, "bottom": 3, "left": 1 }
+      "placementOffset": {
+        "x": 0
+      },
+      "apertureInset": {
+        "top": 1,
+        "right": 1,
+        "bottom": 3,
+        "left": 1
+      }
     },
     "variantConfigs": {
       "default": {
@@ -4214,7 +4289,10 @@
         "label": "Double Wood Window",
         "directionConfigs": {
           "E": {
-            "size": { "width": 64, "height": 128 },
+            "size": {
+              "width": 64,
+              "height": 128
+            },
             "visual": {
               "spriteSheet": {
                 "url": "images/MapObjects/window_wood_double_vertical.png"
@@ -4222,7 +4300,10 @@
             }
           },
           "W": {
-            "size": { "width": 64, "height": 128 },
+            "size": {
+              "width": 64,
+              "height": 128
+            },
             "visual": {
               "spriteSheet": {
                 "url": "images/MapObjects/window_wood_double_vertical.png"
@@ -4230,7 +4311,10 @@
             }
           },
           "S": {
-            "size": { "width": 128, "height": 64 },
+            "size": {
+              "width": 128,
+              "height": 64
+            },
             "visual": {
               "spriteSheet": {
                 "url": "images/MapObjects/window_wood_double.png"
@@ -4238,7 +4322,10 @@
             }
           },
           "N": {
-            "size": { "width": 128, "height": 64 },
+            "size": {
+              "width": 128,
+              "height": 64
+            },
             "visual": {
               "spriteSheet": {
                 "url": "images/MapObjects/window_wood_double.png"
@@ -4249,10 +4336,30 @@
       }
     },
     "directionConfigs": {
-      "E": { "size": { "width": 64, "height": 64 } },
-      "W": { "size": { "width": 64, "height": 64 } },
-      "S": { "size": { "width": 64, "height": 64 } },
-      "N": { "size": { "width": 64, "height": 64 } },
+      "E": {
+        "size": {
+          "width": 64,
+          "height": 64
+        }
+      },
+      "W": {
+        "size": {
+          "width": 64,
+          "height": 64
+        }
+      },
+      "S": {
+        "size": {
+          "width": 64,
+          "height": 64
+        }
+      },
+      "N": {
+        "size": {
+          "width": 64,
+          "height": 64
+        }
+      },
       "Horizontal": "S",
       "Vertical": "E",
       "Right": "E",
@@ -4261,7 +4368,9 @@
       "Down": "S"
     },
     "spatial": {
-      "autoFitRegions": ["select"]
+      "autoFitRegions": [
+        "select"
+      ]
     },
     "visual": {
       "renderPriority": 3,
@@ -4300,7 +4409,10 @@
     },
     "actionConfigs": {
       "interact_object": {
-        "labelByState": { "open": "Close Door", "closed": "Open Door" }
+        "labelByState": {
+          "open": "Close Door",
+          "closed": "Open Door"
+        }
       }
     },
     "canInspect": true,
@@ -5903,7 +6015,9 @@
     ],
     "interactionOnly": true,
     "actionConfigs": {
-      "interact_object": { "label": "Use Portal" }
+      "interact_object": {
+        "label": "Use Portal"
+      }
     },
     "particleEffects": true,
     "lightEmission": true,
@@ -6343,7 +6457,10 @@
     },
     "actionConfigs": {
       "interact_object": {
-        "labelByState": { "open": "Close Gate", "closed": "Open Gate" }
+        "labelByState": {
+          "open": "Close Gate",
+          "closed": "Open Gate"
+        }
       }
     },
     "autoConnect": false,

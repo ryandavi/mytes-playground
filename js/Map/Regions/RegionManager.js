@@ -64,6 +64,22 @@ class RegionManager {
         return found;
     }
 
+    /**
+     * The smallest region covering a point on a layer.
+     *
+     * Regions nest — a room walled off inside another sits inside its parent's
+     * bounds, so the first match is the outer one and the inner one would be
+     * unreachable. Everything that asks "which room is this?" wants the
+     * innermost answer.
+     */
+    innermostAt(x, y, layer = null, cellSize = undefined) {
+        return this.regionsAt(x, y, layer).reduce((smallest, region) =>
+            !smallest || region.areaInCells(cellSize) < smallest.areaInCells(cellSize)
+                ? region
+                : smallest,
+            null);
+    }
+
     getOccupants(region) {
         if (!region) return [];
         return [...(this.occupants.get(RegionManager.key(region.layer, region.id)) ?? [])];

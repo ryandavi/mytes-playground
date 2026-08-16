@@ -50,6 +50,20 @@ class BuildRules {
         const obstruction = builder.getCellObstruction(x, y);
         if (obstruction) return BuildRules.deny(obstruction.reason);
 
+        // A painting hanging here has nowhere to go if a wall lands on it.
+        // Wall-mounted things are exempt from the obstruction sweep on purpose —
+        // an opening or a fixture is SUPPOSED to share a cell with the wall it
+        // sits in — but that exemption was reading "this fixture belongs here"
+        // as "anything at all may be built here".
+        const mounted = builder.getCellMounting(x, y);
+        if (mounted) return BuildRules.deny(mounted.reason);
+
+        // Not about this cell but its neighbours: a wall butting into the side
+        // of a door or window turns that opening's cell into a junction and
+        // draws right through it.
+        const junction = builder.getOpeningJunctionConflict(x, y);
+        if (junction) return BuildRules.deny(junction.reason);
+
         return BuildRules.ALLOWED;
     }
 
@@ -126,14 +140,26 @@ class BuildRules {
     // ── Objects ───────────────────────────────────────────────────────────────
 
     /**
-     * Furniture-style editing is build-mode only. Mytes and gameplay pickups
-     * are unaffected: they are not furniture, and the play-mode Drag tool still
-     * owns them.
+     * Furniture-style editing is build-mode only. Mytes are unaffected — they
+     * are not scenery, and they are the one thing in the world that moves
+     * itself.
+     *
+     * A gameplay pickup like a ball is furniture *here* and a toy in Play mode:
+     * the two readings never collide, because this only answers while build
+     * mode is on, and the play-mode Drag tool still owns the same object the
+     * rest of the time. Excluding pickups meant a ball sitting in the middle of
+     * a room you were laying out could not be moved out of the way.
      */
     isBuildModeObject(object) {
         if (!(object instanceof MapObject)) return false;
-        if (object.getConfig?.('canPickUp', false)) return false;
-        return object.getConfig?.('storable', false) === true ||
+        // Anything the world lets you pick up and put down is scenery to build
+        // mode. Storable furniture also has an inventory form and can be packed
+        // away; the rest can only be repositioned — `canStoreObject` draws that
+        // second line. A couch was draggable in Play and immovable in Build
+        // purely because nobody had given it a `storable` flag.
+        return object.getConfig?.('draggable', false) === true ||
+            object.getConfig?.('storable', false) === true ||
+            object.getConfig?.('canPickUp', false) === true ||
             !!ItemRegistry.findItemForWorldObject?.(object);
     }
 
