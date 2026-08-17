@@ -573,6 +573,9 @@
     "src": "js/UI/Debug/AuditHarness.js"
   },
   {
+    "src": "js/UI/Debug/SurfaceDebug.js"
+  },
+  {
     "src": "js/UI/Debug/QueueUI.js"
   },
   {

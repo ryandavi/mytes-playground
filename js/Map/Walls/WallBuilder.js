@@ -707,64 +707,124 @@ class WallBuilder {
      * was not right either. It is not a separate piece of wall to be painted on
      * its own; it is part of both rooms, half each.
      *
-     * A corner column is both at once: the horizontal stub beside the post
-     * faces south, and the post itself is split west/east. That is the "partial
-     * paint" — one cell, one draw call per slice, each slice reading its own
-     * face's room.
+     * Where the two meet, a cell is THREE surfaces and not two: the post in the
+     * middle, split west/east, and a band of the east-west wall on either side
+     * of it. Each band is part of the wall that runs through, so it takes the
+     * colour of the rooms that wall divides — which at a junction is not what
+     * the cell's own west/east face says, because that face is answering for
+     * the post standing next to it.
      *
-     * A cell where walls leave in three or four directions gets both treatments
-     * too: the run passing through keeps its south face across the full width,
-     * and the post is painted over it, split. The two-tone band is only as wide
-     * as the perpendicular wall actually standing there, so it reads as that
-     * wall seen end-on — which is what it is.
+     * Selection, growth and drawing all read this one list, so the surfaces the
+     * player can point at are exactly the ones the renderer puts on screen.
      */
     getPaintSpans(cell, mask, construction) {
         const region = this.registry.paintRegion(mask, construction);
         if (!region) return [];
 
         const cellSize = construction.cellSize;
-        const span = (from, to, face) => ({
-            from, to,
-            face: this.resolveOwningFace(cell, face),
-            finishId: this.resolveFaceFinishId(cell, this.resolveOwningFace(cell, face))
-        });
+        const inset = (cellSize - construction.thickness) / 2;
+        const middle = cellSize / 2;
+        const east = (mask & WallBuilder.MASK_EAST) !== 0;
+        const west = (mask & WallBuilder.MASK_WEST) !== 0;
 
-        // Where a wall runs PAST a post, the post divides the cell: everything
-        // west of the middle belongs to the room on the west, everything east
-        // to the room on the east — the post's own half AND the band beside it.
-        //
-        // Resolving that band as one face across the full width is what put the
-        // wrong colour on half of every junction. Where a hallway meets a
-        // bedroom, the band was answered by whichever of the two rooms happened
-        // to be smaller, so the strip beyond the post wore the hallway's paint
-        // while the post next to it wore the bedroom's.
-        //
-        // Where the wall TURNS, it does not divide. The split exists so two
-        // rooms can each own their side of one piece of masonry, and a corner
-        // is not shared masonry: it is the end of the wall that turns there,
-        // drawn as its own rounded cap, with nothing continuing on the far side
-        // to own it. Splitting it anyway handed that cap to the room the corner
-        // merely stands next to, so the last quarter-tile of a painted wall came
-        // out in the neighbour's colour. The whole cell takes the face on the
-        // side the wall arrives from, which is the room the corner wraps.
-        if (WallBuilder.isVerticalMask(mask)) {
-            // A turn, and not merely one arm: a wall running north-south with a
-            // spur off one side has exactly one horizontal arm too, and it does
-            // divide — it is straight masonry with a room on either side, and
-            // handing the whole cell to the spur's side would paint the far
-            // room's wall from this one.
-            if (WallBuilder.inheritsHorizontalFace(mask) && WallBuilder.inheritsVerticalFace(mask)) {
-                return [span(region.start, region.end,
-                    (mask & WallBuilder.MASK_EAST) !== 0 ? 'east' : 'west')];
-            }
-            const middle = cellSize / 2;
-            return [span(region.start, middle, 'west'), span(middle, region.end, 'east')];
+        // A slice answered by one of the cell's own four faces, with the
+        // exterior-follows-the-inside rule applied.
+        const faceSpan = (from, to, face, axis) => {
+            const owner = this.resolveOwningFace(cell, face);
+            return {
+                from, to, axis,
+                face: owner,
+                roomId: cell.faces?.[owner]?.roomId ?? null,
+                finishId: this.resolveFaceFinishId(cell, owner)
+            };
+        };
+        // The post: masonry seen edge-on, owned half each by the rooms beside it.
+        const post = (from, to, face) => faceSpan(from, to, face, 'vertical');
+        // A band: an east-west wall's face, seen head-on. `side` says which end
+        // of the cell it is, which is how it finds the ground it looks at when
+        // a post stands between it and the cell straight across.
+        const band = (from, to, side) => {
+            const resolved = this.resolveBandSurface(cell, side);
+            if (!resolved) return faceSpan(from, to, this.resolveBandFace(cell), 'horizontal');
+            return {
+                from, to,
+                axis: 'horizontal',
+                face: resolved.face,
+                roomId: resolved.roomId,
+                finishId: this.resolveSurfaceFinishId(cell, resolved.face, resolved.roomId)
+            };
+        };
+
+        if (!east && !west) {
+            // No head-on face at all: either a lone cell, or a wall running
+            // north-south showing nothing but its own narrow profile.
+            if (mask === 0) return [band(region.start, region.end, null)];
+            return [post(region.start, middle, 'west'), post(middle, region.end, 'east')];
         }
 
-        if (WallBuilder.isHorizontalMask(mask) || mask === 0) {
-            return [span(region.start, region.end, this.resolveBandFace(cell))];
+        if (!WallBuilder.isVerticalMask(mask)) {
+            // Straight run, or the free end of one: one face, full width.
+            return [band(region.start, region.end, east !== west ? (east ? 'east' : 'west') : null)];
         }
-        return [];
+
+        // Where the wall TURNS it does not divide: the cell is the end of the
+        // wall that turns there, drawn as its own rounded cap, with nothing
+        // continuing on the far side to own it. Splitting it handed that cap to
+        // the room the corner merely stands next to. It is still a BAND — the
+        // face of the run arriving here — so it reads the ground either side of
+        // that run rather than the cell's own arm-side face, which at a stepped
+        // corner points out of the building instead of into the room.
+        if (east !== west && WallBuilder.inheritsVerticalFace(mask)) {
+            return [band(region.start, region.end, east ? 'east' : 'west')];
+        }
+
+        // A run passing a post. Three things stand here, not two: the band on
+        // either side of the post is the east-west wall, and belongs to the
+        // rooms that wall divides; only the post itself splits west/east.
+        //
+        // Handing each half of the cell wholesale to the post's own faces is
+        // what put the wrong colour on the last quarter-tile of every junction:
+        // where a new room is walled off against an existing wall, the band
+        // beyond the post is still the old wall, looking into the old room.
+        const spans = [];
+        if (west) spans.push(band(region.start, Math.min(inset, region.end), 'west'));
+        spans.push(post(Math.max(region.start, inset), middle, 'west'));
+        spans.push(post(middle, Math.min(region.end, cellSize - inset), 'east'));
+        if (east) spans.push(band(Math.max(cellSize - inset, region.start), region.end, 'east'));
+        return spans.filter(entry => entry.to > entry.from);
+    }
+
+    /**
+     * The room a band on one side of a cell looks into, and the face it is.
+     *
+     * Same rule as resolveBandFace — a wall belongs to the smallest room it
+     * bounds — asked of the ground beside THIS end of the cell rather than of
+     * the cell's own four faces. The two differ exactly where they matter: at a
+     * junction the cell straight across is masonry, not floor, and the ground
+     * the band actually looks at is past the post, on its own side.
+     *
+     * Null when neither side answers, which hands the caller back to the
+     * face-based rule with its junction fallbacks intact.
+     * @returns {{face: string, roomId: string|null}|null}
+     */
+    resolveBandSurface(cell, side) {
+        const dx = side === 'east' ? 1 : side === 'west' ? -1 : 0;
+        const north = this.bandNeighbourRoom(cell, dx, -1);
+        const south = this.bandNeighbourRoom(cell, dx, 1);
+        if (!north && !south) return null;
+        const takesNorth = !!north && (!south || (north !== south &&
+            north.areaInCells(this.cellSize) < south.areaInCells(this.cellSize)));
+        const room = takesNorth ? north : south;
+        return { face: takesNorth ? 'north' : 'south', roomId: room?.id || null };
+    }
+
+    // The room across a band, stepping past the post when the cell straight
+    // across is masonry — that post is the wall this band runs into, and the
+    // floor it hides is one cell to the side.
+    bandNeighbourRoom(cell, dx, dy) {
+        const y = cell.y + dy;
+        if (!this.cells.has(`${cell.x},${y}`)) return this.roomAtOpenCell(cell.x, y);
+        return dx === 0 ? null : this.roomAtOpenCell(cell.x + dx, y);
     }
 
     /**
@@ -808,15 +868,30 @@ class WallBuilder {
         if (!cell.faces || !Number.isFinite(cell.mask)) {
             cell = { ...cell, mask: cell.mask ?? this.computeMask(cell), faces: cell.faces ?? this.assignFaces(cell) };
         }
-        const explicit = this.resolveFinishOverride(cell.x, cell.y, face, cell.faces?.[face]?.roomId ?? null);
+        return this.resolveSurfaceFinishId(cell, face, cell.faces?.[face]?.roomId ?? null);
+    }
+
+    /**
+     * The same rule, for a surface whose room the cell's own faces do not
+     * record: a band at a junction looks past the post at ground the face data
+     * has no entry for, and paint applied to it is scoped to THAT room.
+     *
+     * Taking the room as an argument rather than reading `cell.faces[face]` is
+     * what lets two bands of one cell, both facing north, carry the colours of
+     * the two different rooms they divide.
+     */
+    resolveSurfaceFinishId(cell, face, roomId) {
+        const explicit = this.resolveFinishOverride(cell.x, cell.y, face, roomId ?? null);
         if (explicit) return explicit;
         if (face === 'south' && WallBuilder.inheritsHorizontalFace(cell.mask)) {
             const hasEast = (cell.mask & WallBuilder.MASK_EAST) !== 0;
             const neighbor = this.cells.get(`${cell.x + (hasEast ? 1 : -1)},${cell.y}`);
             const inherited = neighbor ? this.assignFaces(neighbor).south : null;
-            if (inherited && inherited.roomId === cell.faces.south.roomId) return inherited.materialId;
+            if (inherited && inherited.roomId === roomId) return inherited.materialId;
         }
-        return cell.faces[face].materialId;
+        if (roomId && roomId === cell.faces?.[face]?.roomId) return cell.faces[face].materialId;
+        const room = roomId ? this.gameMap.regionManager?.get('room', roomId) : null;
+        return room?.properties?.wallFinishId || cell.finishId;
     }
 
     generatePieces() {
@@ -893,21 +968,19 @@ class WallBuilder {
             ? cell
             : { ...cell, mask: this.computeMask(cell), faces: this.assignFaces(cell) };
         // Which wall a surface belongs to is a question about its shape, not
-        // its face name. A span no wider than the post IS the post, seen
-        // edge-on, and grows into a north-south stretch; a span that reaches
-        // past the post is the band of an east-west wall, whichever face it
-        // takes its colour from. Reading the face name instead made the half of
-        // a junction that continues a horizontal run grow downward into the
-        // wall hanging off it.
-        const post = (construction.cellSize - construction.thickness) / 2;
+        // its face name — the post IS a north-south wall seen edge-on and grows
+        // into a north-south stretch, while a band is the face of the east-west
+        // wall running through, whichever face it takes its colour from. The
+        // spans answer both, so nothing here re-derives them: reading the face
+        // name instead made the half of a junction that continues a horizontal
+        // run grow downward into the wall hanging off it.
         return this.getPaintSpans(built, built.mask, construction).map(span => ({
             cell: built,
             face: span.face,
             from: span.from,
             to: span.to,
-            axis: (span.from < post - 0.5 || span.to > construction.cellSize - post + 0.5)
-                ? 'horizontal' : 'vertical',
-            roomId: built.faces[span.face]?.roomId ?? null,
+            axis: span.axis,
+            roomId: span.roomId ?? null,
             finishId: span.finishId
         }));
     }
@@ -931,21 +1004,26 @@ class WallBuilder {
     }
 
     /**
-     * Every surface one paint stroke covers: the run of wall the clicked
-     * surface belongs to, plus the room-facing half of the column at each end.
+     * Every surface one paint stroke covers: the run of masonry the clicked
+     * surface belongs to, taking every face of it that looks into the same
+     * room.
      *
      * Two rules, and both of them are about a stretch being a wall of ONE room:
      *
      * A surface joins the stretch only if it faces the same room as the one
      * clicked. That is what keeps the far side of a shared wall out of it — a
      * room walled off inside another shares masonry with its parent, and paint
-     * applied from inside it must stop at the middle of that masonry.
+     * applied from inside it must stop at the middle of that masonry. It is
+     * also what makes a wall that divides two rooms select as two walls, one
+     * from each side, out of the same run of cells.
      *
-     * And the walk stops at the first cell carrying wall running ACROSS its
-     * axis. That corner's room-facing half is part of this wall, so it is
-     * included; the run turning away from it is a different wall and is not,
-     * even though it faces the same room. Following those turns is what made
-     * one click select half the floor plan.
+     * And the walk follows the masonry rather than stopping at anything that
+     * merely joins it. A junction where a wall hangs off this one is still this
+     * wall carrying on — the room test already excludes the arriving wall's own
+     * faces — and a run that jogs a cell sideways and continues is one wall
+     * with a step in it, not two. Stopping at every crossing left a stretch
+     * ending at the first doorpost, so half of a painted wall came out in the
+     * colour it had before.
      */
     getPaintStretchSurfaces(surface) {
         if (!surface?.cell) return [];
@@ -960,32 +1038,48 @@ class WallBuilder {
         };
         if (!take(surface.cell)) return [];
 
-        const [stepX, stepY] = surface.axis === 'horizontal' ? [1, 0] : [0, 1];
         for (const direction of [-1, 1]) {
-            // The cell clicked may itself be a corner, and that is no reason to
-            // stop before starting: a corner belongs to the wall it caps, so
-            // clicking it selects that wall. Only the cells the walk REACHES
-            // end it, which is what keeps a stretch from turning the corner and
-            // running off down the wall hanging there.
-            let { x, y } = surface.cell;
+            // A cell the walk passes with nothing facing this room contributes
+            // nothing and still lets the walk through: that is the far side of
+            // a shared wall, or the stretch of run belonging to the room next
+            // door, and the wall carries on past it.
+            let cell = surface.cell;
             for (;;) {
-                x += stepX * direction;
-                y += stepY * direction;
-                const next = this.cells.get(`${x},${y}`);
-                if (!next || !take(next)) break;
-                if (this.turnsAcross(next, surface.axis)) break;
+                const next = this.stepAlongRun(cell, surface.axis, direction);
+                if (!next) break;
+                take(next);
+                cell = next;
             }
         }
         return [...collected.values()];
     }
 
-    // Whether a cell carries wall running across a stretch's own axis — the
-    // corner or junction that ends it.
-    turnsAcross(cell, axis) {
+    /**
+     * The next cell of a run, walking one way along its own axis.
+     *
+     * Straight on where the cell carries an arm that way. Where it does not,
+     * one sideways step is allowed — but only onto a cell that carries the run
+     * onward, which is what tells a wall with a step in it from a wall that
+     * simply ends in a corner. A staircase of single-cell jogs is one wall and
+     * paints as one; a corner is where the walk stops.
+     * @returns {object|null} the cell, or null where the run ends
+     */
+    stepAlongRun(cell, axis, direction) {
+        const horizontal = axis === 'horizontal';
         const mask = Number.isFinite(cell.mask) ? cell.mask : this.computeMask(cell);
-        return axis === 'horizontal'
-            ? WallBuilder.isVerticalMask(mask)
-            : WallBuilder.isHorizontalMask(mask);
+        const forward = horizontal
+            ? (direction > 0 ? WallBuilder.MASK_EAST : WallBuilder.MASK_WEST)
+            : (direction > 0 ? WallBuilder.MASK_SOUTH : WallBuilder.MASK_NORTH);
+        const step = (dx, dy) => this.cells.get(`${cell.x + dx},${cell.y + dy}`) || null;
+
+        if (mask & forward) return step(horizontal ? direction : 0, horizontal ? 0 : direction);
+
+        for (const side of WallBuilder.DIRECTIONS) {
+            if (horizontal === (side.dy === 0) || !(mask & side.bit)) continue;
+            const jog = step(side.dx, side.dy);
+            if (jog && (this.computeMask(jog) & forward)) return jog;
+        }
+        return null;
     }
 
     /**

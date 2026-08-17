@@ -207,15 +207,21 @@ class FloorBuilder {
     }
 
     /**
-     * Where this room's floor is allowed to land: its own shape grown by the
-     * bleed, then cut back so it never reaches into a neighbour's half.
+     * Where this room's floor is allowed to land: its own claim, cut back
+     * wherever a neighbouring room's floor already stands.
      *
-     * Two adjacent rooms both bleed toward each other, and their rings overlap.
-     * Nothing decides that overlap except which canvas happens to be appended
-     * last, so one room's floor simply covers the other's — including in the
-     * corner strips alongside a shared edge, where the ring runs past the
-     * neighbour's extent. Splitting at the midline makes the two meet on a line
-     * instead, and puts that line in the middle of whatever separates them.
+     * Two adjacent rooms both bleed toward each other, and nothing decides that
+     * overlap except which canvas happens to be appended last — so one room's
+     * floor simply covered the other's. Each claim already stops halfway under
+     * whatever wall stands between them (see buildClaim); this is what settles
+     * the case where nothing does, and the two rooms simply meet.
+     *
+     * Reaching STRAIGHT out beats reaching diagonally, which is what decides
+     * the little square where two rooms meet corner to corner. One of them is
+     * carrying its own floor along its own edge; the other is rounding a corner
+     * into ground that was never on its side of anything. Without that rule the
+     * quarter-tile went to whichever room drew last, and a corner of every
+     * doorway came out in the next room's floor.
      * @returns {HTMLCanvasElement}
      */
     buildMask(room, area) {
@@ -223,53 +229,90 @@ class FloorBuilder {
         canvas.width = area.width;
         canvas.height = area.height;
         const context = canvas.getContext('2d');
-        context.fillStyle = '#ffffff';
 
-        this.fillShape(context, room, area, this.edgeBleed());
+        context.drawImage(this.buildClaim(room, area, this.edgeBleed()), 0, 0);
         context.globalCompositeOperation = 'destination-out';
         for (const other of this.gameMap.regionManager?.all('room') ?? []) {
             if (other.id === room.id || this.encloses(other, room)) continue;
-            this.trimToMidline(context, room, other, area);
-            this.fillShape(context, other, area, 0);
+            context.drawImage(this.buildClaim(other, area, this.edgeBleed(), { diagonals: false }), 0, 0);
         }
-        // A room never gives away its own interior, even if two regions were
+        // A room never gives away its own floor, even if two regions were
         // authored overlapping.
         context.globalCompositeOperation = 'source-over';
-        this.fillShape(context, room, area, 0);
+        context.drawImage(this.buildClaim(room, area, 0), 0, 0);
         return canvas;
     }
 
     /**
-     * Erases everything past the midpoint between this room and an adjacent
-     * one, so the two split the space between them evenly. Where a wall stands
-     * in that space the split lands on its centreline, which is the same rule
-     * the outer edge bleed follows.
+     * A room's claim on the ground: its own floor, and how far under the walls
+     * around it that floor runs.
      *
-     * Only pairs that face each other are trimmed — separated on one axis and
-     * overlapping on the other. A diagonal neighbour's ring cannot reach this
-     * one, and trimming on both axes would carve the corner out of both rooms
-     * and leave a hole between them.
+     * The floor stops where the wall's CENTRELINE is, on every side. That is
+     * what makes two rooms separated by one wall meet exactly under it instead
+     * of one of them stopping a quarter-tile short and showing the ground the
+     * map baked in — and it is why a wall cell belongs to no room here: it is
+     * cut out of the shape first, and the bleed then reaches back into it half
+     * a cell from each side that has a room on it.
+     *
+     * Cutting the walls out is the whole fix for a room built INSIDE an
+     * authored one. An authored room is a rectangle, and a rectangle drawn
+     * around a room contains any wall standing inside it — so the parent's
+     * shape covered the new room's walls entirely, erased the strip of new
+     * floor running under them, and left the parent's own floor showing in the
+     * gap between the new wall and the new floor.
+     * @returns {HTMLCanvasElement}
      */
-    trimToMidline(context, room, other, area) {
-        const a = this.roomBounds(room);
-        const b = this.roomBounds(other);
-        const overlapX = b.x < a.x + a.width && a.x < b.x + b.width;
-        const overlapY = b.y < a.y + a.height && a.y < b.y + b.height;
-        const far = 1e5;
+    buildClaim(room, area, grow = 0, { diagonals = true } = {}) {
+        const canvas = document.createElement('canvas');
+        canvas.width = area.width;
+        canvas.height = area.height;
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#ffffff';
+        this.fillShape(context, room, area, 0);
 
-        if (overlapY && b.x >= a.x + a.width) {
-            const mid = (a.x + a.width + b.x) / 2;
-            context.fillRect(mid - area.x, -far, far, far * 2);
-        } else if (overlapY && b.x + b.width <= a.x) {
-            const mid = (b.x + b.width + a.x) / 2;
-            context.fillRect(-far, -far, far + (mid - area.x), far * 2);
-        } else if (overlapX && b.y >= a.y + a.height) {
-            const mid = (a.y + a.height + b.y) / 2;
-            context.fillRect(-far, mid - area.y, far * 2, far);
-        } else if (overlapX && b.y + b.height <= a.y) {
-            const mid = (b.y + b.height + a.y) / 2;
-            context.fillRect(-far, -far, far * 2, far + (mid - area.y));
+        context.globalCompositeOperation = 'destination-out';
+        const size = this.cellSize;
+        for (const cell of this.gameMap.wallBuilder?.cells?.values() ?? []) {
+            context.fillRect((cell.x * size) - area.x, (cell.y * size) - area.y, size, size);
         }
+        // And no room bleeds out of a smaller room's floor. An authored room is
+        // a rectangle, so a room built inside one sits within its bounds — the
+        // bigger room has to lose those cells here, or its bleed spreads from
+        // them back across the new room's walls from the inside.
+        //
+        // Smaller wins, rather than "is contained by": a room built across the
+        // line where two authored rooms meet is inside neither of their bounds
+        // and would have been carved up by both of them.
+        const ownArea = room?.areaInCells?.(this.cellSize) ?? Infinity;
+        for (const other of this.gameMap.regionManager?.all('room') ?? []) {
+            if (other.id === room.id || (other.areaInCells?.(this.cellSize) ?? 0) >= ownArea) continue;
+            this.fillShape(context, other, area, 0);
+        }
+        context.globalCompositeOperation = 'source-over';
+        if (!(grow > 0)) return canvas;
+
+        // Dilating by drawing the shape again around itself, rather than
+        // growing the shape before the walls are cut out of it — the bleed has
+        // to start at the room's own edge, or it reaches straight back over the
+        // wall it is supposed to stop halfway under.
+        //
+        // `diagonals` off is the claim reaching only straight out of the room's
+        // own edges. That is the half of a claim that outranks a neighbour's
+        // (see buildMask), and it is also the whole claim where a room turns a
+        // corner into ground it does not border.
+        const grown = document.createElement('canvas');
+        grown.width = area.width;
+        grown.height = area.height;
+        const grownContext = grown.getContext('2d');
+        for (const [dx, dy] of FloorBuilder.dilationOffsets(diagonals)) {
+            grownContext.drawImage(canvas, dx * grow, dy * grow);
+        }
+        return grown;
+    }
+
+    static dilationOffsets(diagonals) {
+        const straight = [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]];
+        return diagonals ? [...straight, [-1, -1], [1, -1], [-1, 1], [1, 1]] : straight;
     }
 
     /**

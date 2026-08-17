@@ -1,0 +1,355 @@
+// SurfaceDebug — console tooling for the two systems that answer "which room
+// owns this piece of the world": wall paint surfaces and room floors.
+//
+// Both are made of slices smaller than a cell — a junction cell draws up to
+// four wall surfaces, and a floor stops on the CENTRELINE of the wall beside
+// it — so "what colour is cell 12,3" is not a question either system can be
+// asked from the outside. This asks it from the inside.
+//
+// Usage from DevTools console:
+//   __surfaces.cell(12, 3)          // wall: mask, faces, and every painted slice
+//   __surfaces.floor(14, 0)         // floor: which room owns each quarter of a cell
+//   __surfaces.stretch(12, 3, 4)    // what one paint stroke at that pixel would cover
+//   __surfaces.audit()              // every quarter-cell two rooms both claim, or neither
+//   __surfaces.overlay()            // draw all of the above ON the map
+//   __surfaces.overlay(false)       // take it back off
+//   __surfaces.download()           // the whole lot as JSON, for a bug report
+//
+// Coordinates are CELLS everywhere (x, y), never pixels — that is how the wall
+// data, the room tilemasks and the Tiled map all index the world.
+
+const SurfaceDebug = {
+	// Quarter of a cell: the finest slice either system produces, since a wall's
+	// half-cell post and a floor's half-cell bleed both land on a 16px line.
+	QUARTER: 4,
+
+	_map() {
+		const map = MyteCore.instance?.getFirstContainer?.()?.gameMap;
+		if (!map) throw new Error('[SurfaceDebug] Game not initialized');
+		return map;
+	},
+
+	_walls() {
+		const builder = this._map().wallBuilder;
+		if (!builder) throw new Error('[SurfaceDebug] This map has no walls');
+		return builder;
+	},
+
+	get cellSize() {
+		return this._map().gridSystem?.config?.cellSize || 32;
+	},
+
+	// ── Walls ────────────────────────────────────────────────────────────────
+
+	/**
+	 * One wall cell, as the renderer sees it: the neighbour mask, the room each
+	 * of its four faces looks into, and the slices it actually draws.
+	 *
+	 * `slices` is the answer to "why is that quarter the wrong colour": each one
+	 * names the pixels it covers, whether it is the head-on band of an east-west
+	 * wall or the post of a north-south one, and which room's paint it is
+	 * wearing.
+	 */
+	cell(x, y) {
+		const builder = this._walls();
+		const raw = builder.cells.get(`${x},${y}`);
+		if (!raw) return { cell: `${x},${y}`, wall: false };
+
+		const mask = builder.computeMask(raw);
+		const faces = builder.assignFaces(raw);
+		const piece = builder.findPieceForCell(x, y);
+		return {
+			cell: `${x},${y}`,
+			wall: true,
+			mask,
+			connections: SurfaceDebug.maskName(mask),
+			piece: piece?.id ?? null,
+			construction: raw.constructionId,
+			finish: raw.finishId,
+			opening: raw.opening?.type ?? null,
+			faces: Object.fromEntries(Object.entries(faces).map(([name, face]) => [
+				name,
+				`${face.roomId || '(outside)'} ${face.materialId}`
+			])),
+			slices: builder.getCellSurfaces(raw).map(surface => ({
+				px: `${surface.from}-${surface.to}`,
+				part: surface.axis === 'horizontal' ? 'band' : 'post',
+				face: surface.face,
+				room: surface.roomId || '(outside)',
+				finish: surface.finishId
+			}))
+		};
+	},
+
+	/** Every cell of one rendered piece, in the order it draws them. */
+	piece(id) {
+		const piece = this._walls().findPieceById(id);
+		if (!piece) return null;
+		return {
+			id: piece.id,
+			cells: piece.cells.map(cell => this.cell(cell.x, cell.y))
+		};
+	},
+
+	/**
+	 * What one paint stroke would cover, clicking `offset` pixels into the cell.
+	 *
+	 * The offset matters and is not optional: clicking the left quarter of a
+	 * junction and the right quarter of the same cell select two different
+	 * walls, which is the whole point of the slices.
+	 */
+	stretch(x, y, offset = 0) {
+		const builder = this._walls();
+		const raw = builder.cells.get(`${x},${y}`);
+		if (!raw) return { cell: `${x},${y}`, wall: false };
+
+		const clicked = builder.getCellSurfaces(raw)
+			.filter(surface => offset >= surface.from && offset < surface.to)
+			.pop();
+		if (!clicked) return { cell: `${x},${y}`, slice: null, covers: [] };
+
+		return {
+			cell: `${x},${y}`,
+			slice: `${clicked.from}-${clicked.to} ${clicked.face}`,
+			room: clicked.roomId || '(outside)',
+			finish: clicked.finishId,
+			covers: builder.getPaintStretchSurfaces(clicked)
+				.map(surface => `${surface.cell.x},${surface.cell.y} [${surface.from}-${surface.to}] ${surface.finishId}`)
+				.sort()
+		};
+	},
+
+	/** Every wall cell that draws a slice of the given room's paint. */
+	roomWalls(roomId) {
+		const builder = this._walls();
+		const rows = [];
+		for (const cell of builder.cells.values()) {
+			for (const surface of builder.getCellSurfaces(cell)) {
+				if (surface.roomId !== roomId) continue;
+				rows.push(`${cell.x},${cell.y} [${surface.from}-${surface.to}] ${surface.face} ${surface.finishId}`);
+			}
+		}
+		return rows.sort();
+	},
+
+	// ── Floors ───────────────────────────────────────────────────────────────
+
+	/**
+	 * Which room's floor is painted on each quarter of a cell.
+	 *
+	 * A room's floor runs half a cell past its own edge so it ends under the
+	 * middle of the wall beside it, which means the four quarters of one cell
+	 * can honestly belong to four different rooms. Two rooms on one quarter is
+	 * a bug — they are drawn on separate canvases, so which one you see is
+	 * whichever happened to be appended last.
+	 */
+	floor(x, y) {
+		const size = this.cellSize;
+		const quarter = size / this.QUARTER;
+		const rows = {};
+		for (let row = 0; row < 2; row++) {
+			for (let column = 0; column < 2; column++) {
+				const name = `${row === 0 ? 'top' : 'bottom'}-${column === 0 ? 'left' : 'right'}`;
+				rows[name] = this.floorOwnersAt(
+					(x * size) + (column * size / 2) + quarter,
+					(y * size) + (row * size / 2) + quarter
+				);
+			}
+		}
+		return {
+			cell: `${x},${y}`,
+			wall: this._map().wallBuilder?.cells?.has(`${x},${y}`) ?? false,
+			room: this._map().regionManager?.innermostAt?.(
+				(x + 0.5) * size, (y + 0.5) * size, 'room', size
+			)?.id ?? null,
+			quarters: Object.fromEntries(Object.entries(rows).map(([name, owners]) => [
+				name,
+				owners.length === 0 ? '(bare ground)' : owners.join(' + ')
+			]))
+		};
+	},
+
+	/** Every room whose floor canvas has a pixel at this point in map space. */
+	floorOwnersAt(mapX, mapY) {
+		const owners = [];
+		for (const [roomId, surface] of this._map().floorBuilder?.surfaces ?? []) {
+			const canvas = surface.canvas;
+			const x = Math.floor(mapX - parseFloat(canvas.style.left));
+			const y = Math.floor(mapY - parseFloat(canvas.style.top));
+			if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) continue;
+			if (canvas.getContext('2d').getImageData(x, y, 1, 1).data[3] > 0) {
+				owners.push(`${roomId}:${surface.finishId}`);
+			}
+		}
+		return owners;
+	},
+
+	/**
+	 * Every quarter-cell two rooms both claim, and every one a room should have
+	 * painted and did not.
+	 *
+	 * Overlaps are the flat defect — two canvases fighting over the same pixels,
+	 * so which one you see is whichever was appended last. Gaps are the other
+	 * half of the same question and are listed apart from them, because a bare
+	 * quarter inside a room that HAS a floor is a hole while a room with no
+	 * finish at all is opted out on purpose and shows the map as authored;
+	 * those rooms are named once in `noFloor` instead of a line per quarter.
+	 */
+	audit() {
+		const map = this._map();
+		const size = this.cellSize;
+		const quarter = size / this.QUARTER;
+		const width = map.gridSystem?.gridWidth || 0;
+		const height = map.gridSystem?.gridHeight || 0;
+		const surfaces = map.floorBuilder?.surfaces;
+		const overlaps = [];
+		const gaps = [];
+		const noFloor = new Set();
+
+		for (let y = 0; y < height; y++) {
+			for (let x = 0; x < width; x++) {
+				const inRoom = map.regionManager?.innermostAt?.(
+					(x + 0.5) * size, (y + 0.5) * size, 'room', size
+				);
+				const painted = inRoom ? surfaces?.has(inRoom.id) : false;
+				if (inRoom && !painted) noFloor.add(inRoom.id);
+				const wall = map.wallBuilder?.cells?.has(`${x},${y}`) ?? false;
+				for (let row = 0; row < 2; row++) {
+					for (let column = 0; column < 2; column++) {
+						const owners = this.floorOwnersAt(
+							(x * size) + (column * size / 2) + quarter,
+							(y * size) + (row * size / 2) + quarter
+						);
+						const where = `${x},${y} ${row === 0 ? 'top' : 'bottom'}-${column === 0 ? 'left' : 'right'}`;
+						if (owners.length > 1) overlaps.push(`${where}: ${owners.join(' + ')}`);
+						else if (owners.length === 0 && painted && !wall) gaps.push(`${where}: inside ${inRoom.id}`);
+					}
+				}
+			}
+		}
+		return { overlaps, gaps, noFloor: [...noFloor] };
+	},
+
+	/** Rooms as both systems read them: shape, size, and the two finishes. */
+	rooms() {
+		const size = this.cellSize;
+		return (this._map().regionManager?.all('room') ?? []).map(room => ({
+			id: room.id,
+			name: room.properties?.displayName ?? null,
+			shape: room.shape?.kind,
+			cells: room.areaInCells(size),
+			bounds: room.bounds,
+			wallFinish: room.properties?.wallFinishId ?? null,
+			floorFinish: room.properties?.floorFinishId ?? null,
+			autoDetected: room.properties?.autoDetected === true
+		}));
+	},
+
+	// ── Overlay ──────────────────────────────────────────────────────────────
+
+	/**
+	 * The same answers, drawn on the map instead of printed.
+	 *
+	 * Floors tint by owning room, walls draw one bar per painted slice in the
+	 * colour of the room that slice belongs to, and anything two rooms both
+	 * claim is hatched red. A quarter-tile in the wrong colour is a thing you
+	 * SEE, so the tool that explains it should be too.
+	 */
+	overlay(show = true) {
+		this._overlay?.remove();
+		this._overlay = null;
+		if (!show) return 'overlay off';
+
+		const map = this._map();
+		const layer = map.layers?.objects;
+		if (!layer) throw new Error('[SurfaceDebug] No object layer to draw on');
+		const size = this.cellSize;
+		const width = map.dimensions?.width || 0;
+		const height = map.dimensions?.height || 0;
+
+		const canvas = document.createElement('canvas');
+		canvas.width = width;
+		canvas.height = height;
+		canvas.className = 'surface-debug-overlay';
+		Object.assign(canvas.style, {
+			position: 'absolute', left: '0', top: '0', pointerEvents: 'none',
+			zIndex: '2000000', imageRendering: 'pixelated'
+		});
+		const context = canvas.getContext('2d');
+
+		const quarter = size / this.QUARTER;
+		for (let y = 0; y < height / size; y++) {
+			for (let x = 0; x < width / size; x++) {
+				for (let row = 0; row < 2; row++) {
+					for (let column = 0; column < 2; column++) {
+						const px = (x * size) + (column * size / 2);
+						const py = (y * size) + (row * size / 2);
+						const owners = this.floorOwnersAt(px + quarter, py + quarter);
+						if (owners.length === 0) continue;
+						context.fillStyle = owners.length > 1
+							? 'rgba(255, 0, 0, 0.55)'
+							: SurfaceDebug.roomColor(owners[0].split(':')[0], 0.28);
+						context.fillRect(px, py, size / 2, size / 2);
+					}
+				}
+			}
+		}
+
+		// Wall slices sit on the cell's own footprint, not on the sprite that
+		// rises above it — the sprite is 6 cells tall and would bury the floor
+		// this is drawn to explain.
+		const builder = map.wallBuilder;
+		for (const cell of builder?.cells?.values() ?? []) {
+			for (const surface of builder.getCellSurfaces(cell)) {
+				context.fillStyle = SurfaceDebug.roomColor(surface.roomId, 0.95);
+				context.fillRect(
+					(cell.x * size) + surface.from,
+					(cell.y * size) + (surface.axis === 'horizontal' ? size - 8 : 0),
+					surface.to - surface.from,
+					surface.axis === 'horizontal' ? 8 : size
+				);
+			}
+		}
+
+		layer.appendChild(canvas);
+		this._overlay = canvas;
+		return 'overlay on — floors tinted by room, wall slices barred, conflicts red';
+	},
+
+	// A stable colour per room id, so the same room reads the same on every
+	// redraw and two rooms never come out indistinguishable by accident.
+	roomColor(roomId, alpha) {
+		if (!roomId) return `rgba(120, 120, 120, ${alpha})`;
+		let hash = 0;
+		for (let index = 0; index < roomId.length; index++) {
+			hash = ((hash << 5) - hash + roomId.charCodeAt(index)) | 0;
+		}
+		return `hsla(${Math.abs(hash) % 360}, 75%, 55%, ${alpha})`;
+	},
+
+	maskName(mask) {
+		const names = ['N', 'E', 'S', 'W'].filter((_, index) => (mask & (1 << index)) !== 0);
+		return names.length > 0 ? names.join('+') : 'isolated';
+	},
+
+	// ── Bug reports ──────────────────────────────────────────────────────────
+
+	/** Every wall cell and every room, as JSON — the whole surface state. */
+	dump() {
+		const builder = this._map().wallBuilder;
+		return {
+			mapId: this._map().id,
+			rooms: this.rooms(),
+			cells: [...(builder?.cells?.values() ?? [])]
+				.sort((a, b) => a.y - b.y || a.x - b.x)
+				.map(cell => this.cell(cell.x, cell.y)),
+			floors: this.audit()
+		};
+	},
+
+	download() {
+		AuditHarness.download('surfaces', this.dump());
+	}
+};
+
+window.__surfaces = SurfaceDebug;

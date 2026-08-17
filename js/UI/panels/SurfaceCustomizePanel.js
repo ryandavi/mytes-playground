@@ -129,7 +129,8 @@ class SurfaceCustomizePanel extends ModalWindow {
     static targetKey(target) {
         if (!target) return null;
         return target.surface === 'wall'
-            ? `wall:${target.wallSurface.cell.x},${target.wallSurface.cell.y},${target.wallSurface.face}`
+            ? `wall:${target.wallSurface.cell.x},${target.wallSurface.cell.y},` +
+                `${target.wallSurface.from}-${target.wallSurface.to}`
             : `floor:${target.room.id}`;
     }
 
@@ -560,14 +561,17 @@ class SurfaceCustomizePanel extends ModalWindow {
         // The piece the target points at is rebuilt by the paint, so
         // re-resolve it before the palette re-reads its finish.
         if (this.target?.surface === 'wall') {
-            const { cell, face } = this.target.wallSurface;
+            const { cell, face, from, to } = this.target.wallSurface;
             const builder = this.gameMap?.wallBuilder;
             this.target.piece = builder?.findPieceForCell(cell.x, cell.y) || this.target.piece;
             // The cell object is rebuilt too, and the stale one still carries
             // the finish from before the paint — which the palette would go on
-            // showing as the current colour.
-            this.target.wallSurface = builder?.getCellSurfaces(builder.cells.get(`${cell.x},${cell.y}`))
-                ?.find(entry => entry.face === face) || this.target.wallSurface;
+            // showing as the current colour. Found by the slice it covers, not
+            // by its face name: a junction draws up to four of them and two can
+            // answer to the same face.
+            const surfaces = builder?.getCellSurfaces(builder.cells.get(`${cell.x},${cell.y}`)) || [];
+            this.target.wallSurface = surfaces.find(entry => entry.from === from && entry.to === to) ||
+                surfaces.find(entry => entry.face === face) || this.target.wallSurface;
         }
         this.redrawOverlays();
         this.renderPalette();
