@@ -249,7 +249,9 @@ class GameMap {
             return liveSetting;
         }
 
-        return this.core?.user?.preferences?.lightingEnabled !== false;
+        // Opt-in, unlike every other display setting here: an absent or
+        // unmigrated preference means off, not on.
+        return this.core?.user?.preferences?.lightingEnabled === true;
     }
 
     getLightingDitherEnabledSetting() {
@@ -1258,7 +1260,6 @@ class GameMap {
 			this.floorBuilder = null;
 			this.floorMaterialRegistry = null;
 		}
-		this.removeWallTileOverlay();
 		const backgroundLayer = this.layers.background;
 		const backgroundImage = backgroundLayer?.style?.backgroundImage || '';
 		if ([...this.generatedObjectUrls].some(url => backgroundImage.includes(url))) {

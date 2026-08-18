@@ -887,7 +887,12 @@ class SurfaceSlotAction extends GoToObjectAction {
             return;
         }
 
-        const exitPosition = snapToExit ? this.getSurfaceExitPosition() : null;
+        // Nothing to dismount from while still walking over: interrupting an
+        // approach used to snap the myte to the surface's exit position, which
+        // read as a teleport toward the furniture it had just been told to
+        // stop going to.
+        const mounted = this.phase !== 'approach' || !!this._attachment;
+        const exitPosition = (snapToExit && mounted) ? this.getSurfaceExitPosition() : null;
         if (this._attachment) {
             this.myte.container?.attachments?.detach?.(this.myte, { exitPosition });
             this._attachment = null;
@@ -896,7 +901,7 @@ class SurfaceSlotAction extends GoToObjectAction {
             this._restingWithCollisionDisabled = false;
         }
 
-        if (snapToExit && exitPosition) {
+        if (exitPosition) {
             this.setMyteWorldPosition(exitPosition.x, exitPosition.y);
         }
 

@@ -22,12 +22,24 @@ class MyteMovementController {
         const m = this.myte;
         if (newGoal == null) newGoal = m.goal;
 
+        // A destination the player asked for outlives a mode change. The
+        // inactivity free-roam restore runs setMode on the very click that
+        // queued the move, so clearing outright made double-click-to-move
+        // cancel itself whenever the tab had been sitting idle.
+        const resetMovement = () => {
+            if (m.queue.hasUserInitiatedAction()) {
+                m.queue.clear({ keepUserInitiated: true });
+                return;
+            }
+            m.unsetTarget();
+            m.queue.clear();
+        };
+
         const previousGoal = m.goal;
         if (newGoal !== m.goal) {
             m.previousGoal = m.goal;
             m.goal = newGoal;
-            m.unsetTarget();
-            m.queue.clear();
+            resetMovement();
         }
 
         m.parent.ui?.debugPanel?.updateButton?.('cycleGoal');
@@ -47,8 +59,7 @@ class MyteMovementController {
         m.followMouse = modeConfig.followMouse;
         m.isGravity = modeConfig.isGravity;
         m.isDragging = false;
-        m.unsetTarget();
-        m.queue.clear();
+        resetMovement();
         this.handleModeTransition(previousGoal, m.goal);
 
         if (m.goal === MOVE_TYPES.GOHOME) {
@@ -537,7 +548,17 @@ class MyteMovementController {
 
         if (distance < step && !movementBlocked) m.snapPositionToTarget(doXAxis, doYAxis);
         m.ensureFiniteCoordinates('moveTowardsTarget:end');
-        m.setDirection(m.getDirection());
+
+        // Face where the myte actually went, not where it wants to go. Wedged
+        // in a tight spot the target delta flips dominant axis every frame
+        // while the corner-slip nudges the myte back and forth, which read as
+        // the sprite spinning on the spot. Standing still keeps the facing.
+        const travelledX = m.posX - originalX;
+        const travelledY = m.posY - originalY;
+        if (Math.hypot(travelledX, travelledY) > 0.05) {
+            m.setDirection(m._directionFromDelta(travelledX, travelledY));
+        }
+
         m.setSpritePosition(m.posX, m.posY);
     }
 

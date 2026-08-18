@@ -1303,12 +1303,14 @@ class GridSystem {
         // Safety check for objects that should be active but aren't in activeObjects
         const missingObjects = [];
 
+        // The unclamped viewport, not the map-clamped rect the cell sweep runs
+        // on — see cullingBoundsFor. Wall art and anything mounted on it stand
+        // above y=0, outside the map but well inside the view. Resolved once:
+        // it cannot change while this loop runs.
+        const activationBounds = this.cullingBoundsFor() || bounds;
+
         // Check if any objects in the parent's objects array are within bounds but not active
         this.parent.objects.forEach(obj => {
-            // The unclamped viewport, not the map-clamped rect the cell sweep
-            // runs on — see cullingBoundsFor. Wall art and anything mounted on
-            // it stand above y=0, outside the map but well inside the view.
-            const activationBounds = this.cullingBoundsFor() || bounds;
             if (this.isObjectVisible(obj, activationBounds) && !this.activeObjects.has(obj)) {
                 this.activeObjects.add(obj);
                 if (obj.wake) obj.wake();
@@ -1456,8 +1458,15 @@ class GridSystem {
         // Only run the scan in debug mode to surface insertion/removal bugs.
         if (this.debugMode) {
             const missedCount = this.ensureObjectActivation(bounds);
-            if (missedCount > 0) {
-                Utility.logDebug(`[GridSystem] Found ${missedCount} objects that were missed in culling`);
+            // The same objects usually come back every pass — the sweep and the
+            // scan disagree about them, so each cull re-adds what the last one
+            // slept. Log the count when it changes rather than once per frame,
+            // which was drowning the console and costing more than the scan.
+            if (missedCount !== this._lastMissedCullCount) {
+                this._lastMissedCullCount = missedCount;
+                if (missedCount > 0) {
+                    Utility.logDebug(`[GridSystem] Found ${missedCount} objects that were missed in culling`);
+                }
             }
         }
 

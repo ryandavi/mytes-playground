@@ -170,21 +170,28 @@
 			<button type="button" class="stage-chip stage-chip--top-center stage-chip--build ignore" id="build-mode-chip" title="Build Mode (B)" aria-pressed="false" hidden>
 				<svg class="icon" aria-hidden="true"><use href="#icon-wall"></use></svg>
 				<span class="text">Build</span>
-				<span class="stage-chip__action"><u>B</u></span>
+				<span class="setting-key"><u>B</u></span>
 			</button>
 			<button type="button" class="stage-chip stage-chip--top-center stage-chip--paused ignore" id="build-paused-chip" title="Leave Build Mode (B)">
 				<svg class="icon" aria-hidden="true"><use href="#icon-pause"></use></svg>
-				<span class="text">Build Mode — paused</span>
-				<span class="stage-chip__action">Done</span>
+				<span class="text">Build Mode</span>
+				<span class="stage-chip__button">
+					<svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+					<span>Done</span>
+				</span>
 			</button>
-			<div class="stage-chip stage-chip--bottom-center stage-chip--audio ignore" id="audio-unlock" role="status" hidden>
+			<!-- The whole chip is the control, as with Build and Paused: a button
+			     inside a plate you can also press is two answers to one gesture.
+			     `aria-live` rather than `role="status"` because a button cannot be
+			     a status region — unhiding it still announces the text. -->
+			<button type="button" class="stage-chip stage-chip--bottom-center stage-chip--audio ignore" id="audio-unlock" aria-live="polite" hidden>
 				<svg class="icon" aria-hidden="true"><use href="#icon-sound-off"></use></svg>
 				<span class="text">Click anywhere to turn on sound.</span>
-				<button type="button" class="stage-chip__action" id="audio-unlock-button">
+				<span class="stage-chip__button">
 					<svg class="icon" aria-hidden="true"><use href="#icon-sound-on"></use></svg>
 					<span>Enable Sound</span>
-				</button>
-			</div>
+				</span>
+			</button>
 			<!-- STAGE DOCK ROW — the bottom row of the stage, laid out rather than
 			     placed. The two chips open panels and sit at the ends; the controls
 			     between them change the world directly and are centred, which is
@@ -410,17 +417,18 @@
 				<div class="settings-subgroup">
 					<h4 class="settings-subgroup-title">Light &amp; Weather</h4>
 					<div class="setting-item">
-						<div class="checkbox-wrapper">
-							<input type="checkbox" id="lighting-toggle" checked>
-							<label for="lighting-toggle">Night Lighting</label>
-						</div>
-					</div>
-					<div class="setting-item">
 						<label for="lighting-style">Lighting Style</label>
 						<select id="lighting-style">
 							<option value="dithered" selected>Dithered</option>
 							<option value="smooth">Smooth</option>
 						</select>
+					</div>
+
+					<div class="setting-item">
+						<div class="checkbox-wrapper">
+							<input type="checkbox" id="lighting-toggle">
+							<label for="lighting-toggle">Night Lighting</label>
+						</div>
 					</div>
 					<div class="setting-item">
 						<div class="checkbox-wrapper">
@@ -682,7 +690,7 @@
 	<!-- END WORLD MAP PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="js/bundle.js?v=f967367a5eca"></script>
+	<script src="js/bundle.js?v=8d4229755321"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

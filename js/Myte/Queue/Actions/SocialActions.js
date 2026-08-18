@@ -363,6 +363,11 @@ class PlayFetchAction extends MyteAction {
         this.throwTarget = null;
         this.throwProgress = 0;
         this.completedTrips = 0;
+        // Fetch walks the map like any other errand: a chest between the myte
+        // and the ball has to be walked around, not into. Raw steering could
+        // only push into it, so every leg drives a nested A* move instead.
+        this.moveAction = null;
+        this._moveDestination = null;
     }
 
     start() {
@@ -380,6 +385,92 @@ class PlayFetchAction extends MyteAction {
         }
     }
 
+    interrupt() {
+        super.interrupt();
+        this._stopMoving();
+    }
+
+    complete() {
+        this._stopMoving();
+        return super.complete();
+    }
+
+    cancel() {
+        this._stopMoving();
+        super.cancel?.();
+    }
+
+    // ── Pathed movement ──────────────────────────────────────────────────────
+
+    _stopMoving() {
+        this.moveAction?.cancel?.();
+        this.moveAction = null;
+        this._moveDestination = null;
+    }
+
+    // Drives a nested A* move towards (x, y), replanning when the destination
+    // drifts (the ball rolls, the myte is carried elsewhere). Returns true once
+    // the path is exhausted — arrived, or as close as the map allows.
+    _moveTowards(x, y, replanDistance = 24) {
+        const drifted = this._moveDestination &&
+            Math.hypot(this._moveDestination.x - x, this._moveDestination.y - y) > replanDistance;
+
+        if (!this.moveAction || drifted) {
+            this.moveAction?.cancel?.();
+            this.moveAction = new AStarMoveAction(this.myte, {
+                target: { x, y },
+                pathfindingOptions: { exactEndMode: 'if-reachable' }
+            });
+            this.moveAction.start();
+            this._moveDestination = { x, y };
+        }
+
+        if (this.moveAction.update()) {
+            this.moveAction = null;
+            this._moveDestination = null;
+            return true;
+        }
+
+        return false;
+    }
+
+    // Picks a throw destination the myte can actually run to. A random point can
+    // land inside a wall or on the far side of one, which used to strand the
+    // ball; candidates are tested against the pathfinder and the throw shortens
+    // until one lands somewhere reachable.
+    _pickThrowTarget(from) {
+        const pathfinder = this.myte?.pathfinder;
+        const attempts = 8;
+
+        for (let attempt = 0; attempt < attempts; attempt++) {
+            const angle = Math.random() * Math.PI * 2;
+            // Later attempts throw shorter, so a myte boxed into a small room
+            // still finds somewhere to put the ball.
+            const reach = this.maxThrowDistance * (1 - (attempt / attempts));
+            const candidate = {
+                x: from.x + Math.cos(angle) * reach,
+                y: from.y + Math.sin(angle) * reach
+            };
+
+            if (!pathfinder) return candidate;
+
+            const path = pathfinder.findPath(
+                this.myte, from.x, from.y, candidate.x, candidate.y,
+                { ...this.myte.pathfindingOptions, exactEndMode: 'if-reachable' }
+            );
+            if (!path?.length) continue;
+
+            const end = path[path.length - 1];
+            if (Math.hypot(end.x - candidate.x, end.y - candidate.y) <= this.catchDistance * 2) {
+                return candidate;
+            }
+        }
+
+        // Nothing reachable — drop the ball where the myte is standing rather
+        // than throwing it somewhere it can never be retrieved from.
+        return { x: from.x, y: from.y };
+    }
+
     _handlePickup() {
         if (!this.throwable) return true;
 
@@ -387,19 +478,20 @@ class PlayFetchAction extends MyteAction {
         const dy = this.throwable.posY - this.myte.posY;
 
         if (Math.hypot(dx, dy) > this.pickupDistance) {
-            this.myte.setTarget(this.throwable.posX, this.throwable.posY);
-            this.myte.moveTowardsTarget();
+            // Path exhausted without reaching the ball means it is walled off;
+            // ending the action lets the queue move on instead of shoving.
+            if (this._moveTowards(this.throwable.posX, this.throwable.posY, this.pickupDistance)) {
+                return Math.hypot(
+                    this.throwable.posX - this.myte.posX,
+                    this.throwable.posY - this.myte.posY
+                ) > this.pickupDistance;
+            }
             return false;
         }
 
+        this._stopMoving();
         this.throwPosition = { x: this.myte.posX, y: this.myte.posY };
-
-        const angle = Math.random() * Math.PI * 2;
-        const throwDist = Math.random() * this.maxThrowDistance;
-        this.throwTarget = {
-            x: this.throwPosition.x + Math.cos(angle) * throwDist,
-            y: this.throwPosition.y + Math.sin(angle) * throwDist
-        };
+        this.throwTarget = this._pickThrowTarget(this.throwPosition);
         this.throwProgress = 0;
         this.fetchState = FetchStates.THROW;
         return false;
@@ -429,10 +521,14 @@ class PlayFetchAction extends MyteAction {
     _handleChase() {
         if (!this.throwable) return true;
 
-        this.myte.setTarget(this.throwTarget.x, this.throwTarget.y);
-        this.myte.moveTowardsTarget();
+        const arrived = this._moveTowards(this.throwTarget.x, this.throwTarget.y, this.catchDistance);
+        const reached = Math.hypot(
+            this.myte.posX - this.throwTarget.x,
+            this.myte.posY - this.throwTarget.y
+        ) < this.catchDistance;
 
-        if (Math.hypot(this.myte.posX - this.throwTarget.x, this.myte.posY - this.throwTarget.y) < this.catchDistance) {
+        if (reached || arrived) {
+            this._stopMoving();
             this.myte.queue.addExpression('excited', 500);
             this.fetchState = FetchStates.RETURN;
         }
@@ -441,15 +537,15 @@ class PlayFetchAction extends MyteAction {
     }
 
     _handleReturn() {
-        this.myte.setTarget(this.throwPosition.x, this.throwPosition.y);
-        this.myte.moveTowardsTarget();
+        const arrived = this._moveTowards(this.throwPosition.x, this.throwPosition.y, this.catchDistance);
 
         if (this.throwable) {
             this.throwable.setPosition(this.myte.posX, this.myte.posY - 20);
             this.throwable.setSpritePosition(this.myte.posX, this.myte.posY - 20);
         }
 
-        if (this.myte.isAtTarget()) {
+        if (arrived || this.myte.isAtTarget()) {
+            this._stopMoving();
             this.completedTrips++;
 
             if (this.throwable) {
@@ -462,6 +558,7 @@ class PlayFetchAction extends MyteAction {
             }
 
             this.throwProgress = 0;
+            this.throwTarget = this._pickThrowTarget(this.throwPosition);
             this.fetchState = FetchStates.THROW;
         }
 

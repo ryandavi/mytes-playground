@@ -137,7 +137,7 @@
 //
 // Written as a flat `.stage-chip` block rather than nested under `.app-stage >`.
 // Nesting `&__action` inside a parent selector that ends in a combinator
-// compiles to `.app-stage > .stage-chip__action` — a direct child of the stage
+// compiles to `.app-stage > .stage-chip__button` — a direct child of the stage
 // with that class, which nothing in the markup is. The action pill and the
 // count badge went unstyled for exactly that reason.
 
@@ -147,9 +147,21 @@
 // out of both rows using it.
 .app-stage {
     // Now the height of a *bar*, not a chip: the bottom row holds both, the
-    // bars are the taller of the two, and the docked chips stretch to match.
-    // A segment button inside a bar, plus the bar's own padding and border.
-    --stage-chip-row: calc((1.3 * var(--text-size-meta)) + (var(--space-2xs) * 4) + (var(--border-width) * 4));
+    // bars are the taller of the two, and every chip stretches to match.
+    //
+    // A segment button inside a bar, plus the bar's own padding and border. The
+    // segment's own padding is a token here rather than a number repeated in
+    // the rule below, because changing how tight the buttons are must move the
+    // row height with it or the bars and the chips stop lining up.
+    --stage-bar-segment-pad-block: var(--space-xs);
+    --stage-bar-segment-pad-inline: var(--space-sm);
+    --stage-bar-pad-block: var(--space-2xs);
+    --stage-chip-row: calc(
+        (1.3 * var(--text-size-meta)) +
+        (var(--stage-bar-segment-pad-block) * 2) +
+        (var(--stage-bar-pad-block) * 2) +
+        (var(--border-width) * 4)
+    );
 }
 
 .stage-chip {
@@ -160,6 +172,11 @@
     align-items: center;
     gap: var(--space-xs);
     padding: var(--space-2xs) var(--space-sm);
+    // One row tall wherever it sits. The docked chips used to be told this by
+    // the dock and the free-standing ones were left to their own content, so
+    // the Build chip on the stage and the view bar under it were two different
+    // heights for no reason a reader could see.
+    min-height: var(--stage-chip-row);
     max-width: 45%;
     font-size: var(--text-size-meta);
     color: var(--text-base);
@@ -204,34 +221,44 @@
 
     // ── Parts ────────────────────────────────────────────────────────────────
 
-    // What pressing the chip does, said as a thing you could press. Raised on
-    // raised would be invisible even once the selector was fixed — the chip and
-    // the pill share a background — so this takes the lighter plate and the lip
-    // under it that `.setting-key` uses for a key, for the same reason: you
-    // should be able to tell by looking that it is pressable.
-    &__action {
+    // What pressing the chip does, said as a thing you could press. Every chip
+    // is itself a `<button>`, so this is always an inert `<span>` — never a
+    // button inside a button — and it takes the same raised bevel as every
+    // other button in the app rather than a look of its own. It used to borrow
+    // `.setting-key`'s soft cap and lip, which said "key" about three different
+    // things: a key hint, a label, and a real button. The key hint is now an
+    // actual `.setting-key` and the other two are this.
+    //
+    // Raised inside raised reads fine here for the same reason a toolbar button
+    // reads on a toolbar: the bevel carries it, not the fill.
+    &__button {
+        @include button-base;
         flex: 0 0 auto;
         display: flex;
         align-items: center;
         gap: var(--space-2xs);
-        padding: 1px var(--space-sm);
+        padding: 1px var(--space-xs);
         margin-inline-start: var(--space-2xs);
-        background-color: var(--button-light);
-        border: 1px solid var(--button-dark);
-        border-radius: var(--radius-sm);
-        box-shadow: 0 2px 0 var(--button-dark);
         font-size: var(--text-size-meta);
         font-weight: 700;
         line-height: 1.4;
-        color: var(--text-base);
         white-space: nowrap;
 
         .icon {
             flex: 0 0 auto;
-            width: 14px;
-            height: 14px;
+            width: 12px;
+            height: 12px;
             fill: var(--button-icon-color);
         }
+    }
+
+    // The key hint is a key, not a control: it says which key does this, and
+    // pressing it does nothing. It must not move with the chip's press states.
+    > .setting-key {
+        flex: 0 0 auto;
+        // The chip's own `gap` already spaces it; the inline margin the key
+        // carries for sitting in running prose would double it here.
+        margin-inline: 0;
     }
 
     &__badge {
@@ -245,51 +272,44 @@
         color: var(--color-danger);
     }
 
-    // A chip you can press lifts on hover and pushes its action pill in, so the
-    // whole plate reads as one control rather than a label with a button in it.
+    // Every chip is a control, so there is one press-state block rather than
+    // one per chip: the plate lights on hover and the pill inside it goes down
+    // exactly the way an ordinary button does, so the whole chip reads as one
+    // control rather than a label with a button in it.
+    //
+    // Hover matches the base `button` rule's `--surface-ui-pressed` and the
+    // press uses `button-pressed`, so a chip and a segment button in the row
+    // below it answer a click identically.
     &--build,
     &--paused,
     &--map,
-    &--log {
+    &--log,
+    &--audio {
         cursor: pointer;
 
         &:hover {
             background-color: var(--button-hover);
         }
 
-        &:hover .stage-chip__action {
+        &:hover .stage-chip__button {
             background-color: var(--surface-ui-pressed);
         }
 
-        &:active .stage-chip__action {
-            box-shadow: none;
-            transform: translateY(2px);
+        &:active .stage-chip__button {
+            @include button-pressed;
         }
     }
 
     // The audio prompt is the one chip that arrives on its own schedule rather
-    // than with the mode, so it fades in instead of appearing.
+    // than with the mode, so it fades in instead of appearing. Its press states
+    // come from the shared block above — it is a chip you can press like the
+    // rest, and no longer a plate with its own button inside it.
     &--audio {
         opacity: 0;
         transition: opacity var(--motion-base) var(--ease-ui);
 
         &.is-visible {
             opacity: 1;
-        }
-
-        // Its action is a real button inside a plain plate, not a pill inside a
-        // button, so it carries the press states itself.
-        > .stage-chip__action {
-            cursor: pointer;
-
-            &:hover {
-                background-color: var(--button-hover);
-            }
-
-            &:active {
-                box-shadow: none;
-                transform: translateY(2px);
-            }
         }
     }
 }
@@ -383,7 +403,7 @@
         transform: none;
         max-width: none;
         align-self: stretch;
-        min-height: var(--stage-chip-row);
+        // Height comes from `.stage-chip` / `.stage-bar` themselves.
     }
 
     // The unread count must not be able to make its chip taller than the row
@@ -400,7 +420,8 @@
     flex-wrap: nowrap;
     align-items: center;
     gap: var(--space-2xs) var(--space-sm);
-    padding: var(--space-2xs) var(--space-xs);
+    padding: var(--stage-bar-pad-block) var(--space-xs);
+    min-height: var(--stage-chip-row);
     font-size: var(--text-size-meta);
     color: var(--text-base);
     line-height: 1.6;
@@ -414,9 +435,12 @@
     .segment-control {
         width: auto;
 
+        // Squeezed to 2px all round when the row was tight, which left the
+        // labels touching their own borders. The row is sized from these, so
+        // they can afford to be a real button again.
         > .segment-btn {
             flex: 0 0 auto;
-            padding: var(--space-2xs);
+            padding: var(--stage-bar-segment-pad-block) var(--stage-bar-segment-pad-inline);
         }
     }
 
@@ -483,8 +507,18 @@
 }
 
 // Grid, snap and the Tiled export are answers to questions only the build tools
-// ask. The wall row and the speed row are not, so they stay in both modes.
+// ask. The wall row is not — how the walls are drawn is a question about
+// looking at the map, which you do in both modes.
 [data-game-mode='play'] .stage-bar__build-only {
+    display: none;
+}
+
+// The speed row goes the other way. Build mode stops the world outright, and
+// the Paused chip already says so — a row of speeds over a frozen world is a
+// control with nothing to control. Worse, the multipliers un-pause: pressing 1x
+// while building set the world running with the build tools still up, which is
+// the one state the mode exists to prevent.
+[data-game-mode='build'] #stage-speed-bar {
     display: none;
 }
 

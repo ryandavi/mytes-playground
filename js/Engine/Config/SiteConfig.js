@@ -368,6 +368,10 @@ const SiteConfig = Object.freeze({
             rejected: 'ui_error',
             modeEnter: 'ui_modal_open',
             modeExit: 'ui_hover',
+            // Held for the whole session rather than played once on entry: the
+            // clock is paused in here, so the scheduled score has nothing to
+            // say. Null hands the music back to the time of day.
+            music: 'music_build',
         }),
     }),
 

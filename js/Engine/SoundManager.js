@@ -4,6 +4,8 @@ class SoundManager {
 	// SFX/ambience can read over them. startMusic and updateAllVolumes must use
 	// the same factors or slider changes make the music jump in loudness.
 	static MUSIC_GAIN = 0.5;
+	// Smallest gap Tone will accept between two notes on one voice.
+	static NOTE_TIME_EPSILON = 0.001;
 	static MUSIC_PAD_GAIN = 0.3;
 
 	static SURFACE_FOOTSTEP_POOLS = Object.freeze({
@@ -95,6 +97,11 @@ class SoundManager {
 		this.lastPlayTimes = new Map();
 		this.minTimeBetweenSounds = 50; // ms
 
+		// Last transport time each synth was struck at. Tone's monophonic
+		// voices reject a note scheduled at or before the previous one, and
+		// the rejection is thrown inside the Transport tick.
+		this._lastNoteTimes = new WeakMap();
+
 
 
 		// Species sound profiles - defines which instrument/synth to use for each species
@@ -106,6 +113,9 @@ class SoundManager {
 
 		// Current map audio context — updated on each map load via setMapContext()
 		this._mapContext = { location: 'outside', ambientOverride: null, musicOverride: null };
+
+		// A mode can hold the score for as long as it lasts — see setModeMusic.
+		this._modeMusicOverride = null;
 
 		// Ambient sound IDs driven by proximity (water tiles / zones) — managed separately
 		// from the schedule so syncAmbientForHour never accidentally stops them
@@ -464,8 +474,31 @@ class SoundManager {
 	}
 
 	_getMusicForHour(hour) {
+		// A mode outranks the map, which outranks the clock. Build mode is not
+		// a place in the world and not a time of day — it is the world held
+		// still — so neither of the other two should be able to talk over it.
+		if (this._modeMusicOverride) return this._modeMusicOverride;
 		if (this._mapContext?.musicOverride) return this._mapContext.musicOverride;
 		return AudioScheduleProfiles.getMusicForHour(hour, this._mapContext?.location);
+	}
+
+	/**
+	 * Hand the score to a mode, or `null` to give it back to the schedule.
+	 *
+	 * Every path that picks music reads _getMusicForHour, so setting the
+	 * override is enough to keep the track through a map change or an hour
+	 * tick. The re-sync here is what starts it now: build mode pauses the
+	 * clock, so no hour will ever arrive to do it.
+	 */
+	setModeMusic(musicId = null) {
+		const next = musicId || null;
+		if (this._modeMusicOverride === next) return;
+		this._modeMusicOverride = next;
+
+		if (!this.initialized || !this.isCategoryEnabled('music')) return;
+
+		const target = this._getMusicForHour(this._getCurrentHour());
+		if (target && target !== this.currentMusicSynth) this.startMusic(target);
 	}
 
 	_getAmbientForHour(hour) {
@@ -838,34 +871,33 @@ class SoundManager {
 
 				// Create sequence with a small delay
 				const sequence = new Tone.Part((time, note) => {
-					sound.synth.triggerAttackRelease(
-						note.note,
-						note.duration,
-						time,
-						options.velocity || 0.8
-					);
+					this._triggerPatternNote(sound.synth, note, time, options.velocity || 0.8);
 				}, sound.pattern);
 
 				sequence.loop = sound.loop;
-				sequence.loopEnd = `${Math.ceil(sound.pattern.length / 4)}m`;
+				sequence.loopEnd = this._resolveLoopEnd(sound.pattern, sound.loopEnd);
 
-				// Start AFTER a delay to avoid timing conflicts
-				sequence.start("+0.5");
+				// One position for both layers: their drift has to come from
+				// their different loop lengths, not from starting apart.
+				const startAt = this._nextBarPosition();
+				sequence.start(startAt);
 
 				this.currentMusicLayers = [];
 				if (sound.pad && Array.isArray(sound.padPattern) && sound.padPattern.length) {
 					sound.pad.volume.value = Tone.gainToDb(SoundManager.MUSIC_PAD_GAIN * this.getCategoryVolume('music'));
 					const padSequence = new Tone.Part((time, note) => {
-						sound.pad.triggerAttackRelease(
-							note.note,
-							note.duration,
-							time,
-							options.velocity || 0.55
-						);
+						this._triggerPatternNote(sound.pad, note, time, options.velocity || 0.55);
 					}, sound.padPattern);
 					padSequence.loop = sound.loop;
-					padSequence.loopEnd = sequence.loopEnd;
-					padSequence.start("+0.5");
+					// Deliberately its own length, not the melody's. When the two
+					// loops are different lengths they drift against each other and
+					// the combination takes their common multiple to come back
+					// round — an eleven-bar line over a six-bar pad repeats every
+					// sixty-six bars, not every eleven. It is the cheapest way to
+					// make a short loop stop sounding like one, and it is why the
+					// patterns can afford to be as sparse as they are.
+					padSequence.loopEnd = this._resolveLoopEnd(sound.padPattern, sound.padLoopEnd);
+					padSequence.start(startAt);
 					this.currentMusicLayers.push(padSequence);
 				}
 
@@ -885,6 +917,86 @@ class SoundManager {
 		}, 300); // Increased delay
 	}
 
+
+	/**
+	 * How long one pass of a music pattern lasts, in bars.
+	 *
+	 * This used to be `pattern.length / 4` — the *note count* over four, which
+	 * is only the number of bars if every bar holds exactly four notes. A
+	 * four-bar tune written as twenty-four eighth notes claimed to be six bars
+	 * long and played two bars of silence before starting again; a four-bar one
+	 * written as eight half notes claimed two and cut itself off mid-phrase.
+	 *
+	 * The pattern's own timeline is the answer: the last bar it plays in, plus
+	 * one. Melody and pad are measured separately, so each can loop at its own
+	 * length. A preset states `loopEnd` / `padLoopEnd` when it wants a loop
+	 * longer than its last note — trailing silence is part of the writing in a
+	 * sparse piece.
+	 */
+	/**
+	 * The transport position of the next bar line, as "bar:0:0".
+	 *
+	 * Parts are scheduled on the Transport's tick timeline, so they must be
+	 * started with a transport time. `start("+0.5")` is not one: the "+" is
+	 * resolved against the AudioContext clock, which begins at page load, and
+	 * the result is then fed to the Transport, which only begins when the first
+	 * sound plays. The two are out of step by however long the player took to
+	 * unlock audio — and that gap became the delay before a newly started track
+	 * made its first sound. It was minutes, on a session left open a while.
+	 *
+	 * A bar line is expressed in ticks, so no clock conversion happens at all.
+	 * It also means a track enters on a downbeat instead of wherever the switch
+	 * happened to land, and costs at most one bar.
+	 */
+	_nextBarPosition() {
+		const ticksPerBar = Tone.Time('1m').toTicks();
+		const bar = Math.floor(Tone.Transport.ticks / ticksPerBar) + 1;
+		return `${bar}:0:0`;
+	}
+
+	_resolveLoopEnd(pattern, declared = null) {
+		if (declared) return declared;
+
+		const bars = (pattern ?? [])
+			.reduce((highest, note) => Math.max(highest, SoundManager.barOf(note?.time)), 0);
+
+		return `${bars + 1}m`;
+	}
+
+	// Bars:beats:sixteenths — the bar is all this needs. A plain number is
+	// seconds in Tone, which no music preset uses for anything but a leading 0.
+	static barOf(time) {
+		if (typeof time === 'number') return 0;
+		const bar = Number.parseInt(String(time ?? '').split(':')[0], 10);
+		return Number.isFinite(bar) && bar > 0 ? bar : 0;
+	}
+
+	/**
+	 * Strike one note of a scheduled pattern.
+	 *
+	 * Tone throws 'Start time must be strictly greater than previous start
+	 * time' when a monophonic voice gets two notes on the same transport time —
+	 * which a looping Part does whenever its loopEnd lands on a note, or when
+	 * two patterns share a synth. The throw happens inside the Transport tick,
+	 * so it takes the audio clock down with it rather than dropping one note.
+	 * Colliding notes are nudged past the last one; anything Tone still refuses
+	 * is dropped, because losing a bird chirp beats losing the soundtrack.
+	 */
+	_triggerPatternNote(synth, note, time, velocity) {
+		if (!synth?.triggerAttackRelease || !note) return;
+
+		const previous = this._lastNoteTimes.get(synth);
+		const safeTime = Number.isFinite(previous) && time <= previous
+			? previous + SoundManager.NOTE_TIME_EPSILON
+			: time;
+		this._lastNoteTimes.set(synth, safeTime);
+
+		try {
+			synth.triggerAttackRelease(note.note, note.duration, safeTime, velocity);
+		} catch (error) {
+			Utility.warnDebug(`[SoundManager] dropped a pattern note: ${error.message}`);
+		}
+	}
 
 	stopMusic() {
 		if (this._musicStartTimer) {
@@ -1201,19 +1313,15 @@ class SoundManager {
 			const loopInterval = options.loopInterval || sound.loopInterval || 30;
 
 			const sequence = new Tone.Part((time, note) => {
-				sound.synth.triggerAttackRelease(
-					note.note,
-					note.duration,
-					time,  // Use the time from callback
-					options.velocity || 0.7
-				);
+				this._triggerPatternNote(sound.synth, note, time, options.velocity || 0.7);
 			}, sound.pattern);
 
 			sequence.loop = true;
 			sequence.loopEnd = `${loopInterval}s`;
 
-			// Start with a small offset from now
-			sequence.start("+0.1");
+			// Transport time, not context time — see _nextBarPosition. Ambient
+			// patterns were waiting out the same clock gap as the music.
+			sequence.start(this._nextBarPosition());
 
 			// Store for later stopping
 			this.loops.set(id, sequence);

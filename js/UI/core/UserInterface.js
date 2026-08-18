@@ -171,6 +171,18 @@ class UserInterface {
             return;
         }
 
+        // This overwrites a source .tmx on disk — the one authoring path for
+        // the map — so it asks first. Nothing else in the debug panel writes
+        // outside the save.
+        const path = gameMap?.sourcePath || 'the map source';
+        if (!window.confirm(
+            `Overwrite ${path} with the walls currently standing?
+
+` +
+            'This rewrites the Tiled source file. Close the map in Tiled first, ' +
+            'and make sure any edits there are saved.'
+        )) return;
+
         if (button) button.disabled = true;
         try {
             const result = await WallTiledExporter.exportMap(gameMap);

@@ -256,6 +256,36 @@ class DebugPanel extends PanelSection {
                 action: () => this.runPathfindingDebug()
             },
             {
+                // The stage chip is the player's way in, and it is absent on a
+                // map that refuses building — which is exactly the map you want
+                // to open the build tools on while testing. This switch reaches
+                // the mode without going hunting for the chip.
+                id: 'toggleBuildMode',
+                section: 'map',
+                subgroup: 'controls',
+                type: 'toggle',
+                label: 'Mode: ',
+                states: { true: 'Build', false: 'Play' },
+                getValue: () => this.getGameMode()?.isBuild() === true,
+                action: () => {
+                    const gameMode = this.getGameMode();
+                    if (!gameMode) return;
+                    // setMode refuses (and says so) on a map whose policy is
+                    // 'none'; point at the switch that lifts that rather than
+                    // lifting it silently, since its edits save like any other.
+                    if (!gameMode.isBuild() && !gameMode.canBuildHere()) {
+                        this.parent?.showMessage?.(
+                            "This map's build policy is 'none' — turn Anywhere on first.",
+                            'warning',
+                            'Build Mode'
+                        );
+                        return;
+                    }
+                    gameMode.toggle();
+                    this.updateButton('toggleBuildMode');
+                }
+            },
+            {
                 // Every map, not just the ones that opted in. Deliberately a
                 // switch rather than something the debug overlay implies, so
                 // the 'limited' and 'none' policies stay testable with the rest
@@ -264,7 +294,7 @@ class DebugPanel extends PanelSection {
                 section: 'map',
                 subgroup: 'controls',
                 type: 'toggle',
-                label: 'Build Anywhere: ',
+                label: 'Anywhere: ',
                 states: { true: 'ON', false: 'OFF' },
                 getValue: () => this.getGameMode()?.buildAnywhere === true,
                 action: () => {
@@ -641,6 +671,20 @@ class DebugPanel extends PanelSection {
             this.setupDebugControls();
             this.updateButtonsEnabledState();
         }
+
+        // The mode also changes from the stage chip and the B key, and the
+        // panel only refreshes its buttons when its tab is opened.
+        const events = this.parent?.parent?.eventManager;
+        this._unsubscribeGameMode = events?.on?.(EVENTS.GAME_MODE_CHANGED, () => {
+            this.updateButton('toggleBuildMode');
+            this.updateButton('buildAnywhere');
+        }) ?? null;
+    }
+
+    dispose() {
+        this._unsubscribeGameMode?.();
+        this._unsubscribeGameMode = null;
+        super.dispose?.();
     }
 
     // ─── value path helpers ──────────────────────────────────────────────────

@@ -144,6 +144,7 @@ class GameModeManager {
         this.setSimulationPaused(true);
         this.applyEnvironment();
         this.playSound(this.config.sounds.modeEnter);
+        this.setModeMusic(this.config.sounds.music);
         this.showTutorial();
     }
 
@@ -158,9 +159,13 @@ class GameModeManager {
 
         this.clearEnvironment();
         this.setSimulationPaused(false);
+        this.setModeMusic(null);
 
         if (this._restore) {
-            if (Number.isFinite(this._restore.zoom)) this.container?.camera?.zoomTo?.(this._restore.zoom, { immediate: true });
+            // Eased, like the way in. Entry glides to the build framing and
+            // exit used to cut straight back, so the two halves of the same
+            // trip did not match.
+            if (Number.isFinite(this._restore.zoom)) this.container?.camera?.zoomTo?.(this._restore.zoom, { immediate: false });
             if (Number.isFinite(this._restore.followMode)) this.container?.camera?.setMode?.(this._restore.followMode);
             this._restore = null;
         }
@@ -250,6 +255,10 @@ class GameModeManager {
 
     playSound(soundId) {
         if (soundId) this.container?.core?.soundManager?.playWhenReady?.(soundId);
+    }
+
+    setModeMusic(musicId) {
+        this.container?.core?.soundManager?.setModeMusic?.(musicId ?? null);
     }
 
     dispose() {

@@ -6,7 +6,9 @@ class SettingsPanel extends PanelSection {
                 effects: true,
                 animations: true,
                 timeOfDayOverlay: true,
-                lighting: true,
+                // Night lighting is opt-in: the interior room-gloom pass is not
+                // finished, so it stays off until the player asks for it.
+                lighting: false,
                 lightingDither: true,
                 weather: true
             },
@@ -279,7 +281,7 @@ class SettingsPanel extends PanelSection {
     }
 
     isLightingEnabled() {
-        return this.settings?.graphics?.lighting !== false;
+        return this.settings?.graphics?.lighting === true;
     }
 
     isLightingDitherEnabled() {

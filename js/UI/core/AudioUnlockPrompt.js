@@ -7,18 +7,18 @@
  * whichever gesture got there first.
  */
 class AudioUnlockPrompt {
+    // The whole chip is the button — there is no separate inner control to
+    // bind, so the plate and the thing you press are the same element.
     static ELEMENT_ID = 'audio-unlock';
-    static BUTTON_ID = 'audio-unlock-button';
 
     constructor(core) {
         this.core = core;
         this.element = document.getElementById(AudioUnlockPrompt.ELEMENT_ID);
-        this.button = document.getElementById(AudioUnlockPrompt.BUTTON_ID);
         this.boundActivate = null;
     }
 
     init() {
-        if (!this.element || !this.button || this.boundActivate) return;
+        if (!this.element || this.boundActivate) return;
 
         this.boundActivate = (e) => {
             // The document-level unlock listener also sees this click; awaiting
@@ -27,7 +27,7 @@ class AudioUnlockPrompt {
             this.core.unlockAudio();
         };
 
-        this.button.addEventListener('click', this.boundActivate);
+        this.element.addEventListener('click', this.boundActivate);
         this.refresh();
     }
 
@@ -54,12 +54,11 @@ class AudioUnlockPrompt {
     }
 
     dispose() {
-        if (this.button && this.boundActivate) {
-            this.button.removeEventListener('click', this.boundActivate);
+        if (this.element && this.boundActivate) {
+            this.element.removeEventListener('click', this.boundActivate);
         }
         this.boundActivate = null;
         this.hide();
         this.element = null;
-        this.button = null;
     }
 }

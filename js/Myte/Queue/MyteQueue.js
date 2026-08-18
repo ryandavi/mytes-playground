@@ -129,13 +129,23 @@ class MyteQueue {
         return this;
     }
 
-    clear() {
-        const hadActions = this.queue.length > 0;
-        if (this.isDoingAction && this.queue[0]?.interrupt) {
+    // keepUserInitiated spares actions the player asked for. Housekeeping that
+    // resets movement (mode switches, inactivity restore) fires on the same
+    // click that queued a destination, and wiping it there made the command
+    // silently do nothing.
+    clear({ keepUserInitiated = false } = {}) {
+        const kept = keepUserInitiated
+            ? this.queue.filter(action => action?.userInitiated)
+            : [];
+        const hadActions = this.queue.length > kept.length;
+        const keepsHead = kept.length > 0 && kept[0] === this.queue[0];
+
+        if (this.isDoingAction && !keepsHead && this.queue[0]?.interrupt) {
             this.queue[0].interrupt();
         }
-        this.queue = [];
-        this.isDoingAction = false;
+
+        this.queue = kept;
+        this.isDoingAction = keepsHead && this.isDoingAction;
         if (hadActions) this._emitChanged('cleared');
     }
 

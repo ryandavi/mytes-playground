@@ -292,11 +292,21 @@ class AStarMoveAction extends MyteAction {
         }
 
         // Smooth the waypoints into a Catmull-Rom curve so the myte arcs through
-        // turns rather than pivoting at each grid-cell centre.
+        // turns rather than pivoting at each grid-cell centre. The curve leaves
+        // the path A* validated, which is harmless in the open and wedges the
+        // myte against furniture in a tight spot like the gap beside a bed — so
+        // a curve that clips anything is thrown away for the straight path.
         if (this.targetPoints.length >= 3) {
-            this.targetPoints = _splineWaypoints(this.targetPoints);
+            const smoothed = _pruneWaypointClusters(_splineWaypoints(this.targetPoints));
+            if (smoothed.every(point => myte.canMoveToPosition(point.x, point.y))) {
+                this.targetPoints = smoothed;
+            } else {
+                _slog(`[ASTAR] _buildPath: spline clipped an obstacle — keeping the raw path`);
+                this.targetPoints = _pruneWaypointClusters(this.targetPoints);
+            }
+        } else {
+            this.targetPoints = _pruneWaypointClusters(this.targetPoints);
         }
-        this.targetPoints = _pruneWaypointClusters(this.targetPoints);
 
         _slog(`[ASTAR] _buildPath: ${path.length} raw pts → ${this.targetPoints.length} waypoints. First=(${this.targetPoints[0].x.toFixed(1)},${this.targetPoints[0].y.toFixed(1)}) Last=(${this.targetPoints[this.targetPoints.length-1].x.toFixed(1)},${this.targetPoints[this.targetPoints.length-1].y.toFixed(1)})`);
         this.currentTargetIndex = 0;
