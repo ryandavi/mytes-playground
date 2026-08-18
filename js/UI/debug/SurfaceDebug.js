@@ -194,40 +194,73 @@ const SurfaceDebug = {
 	 * quarter inside a room that HAS a floor is a hole while a room with no
 	 * finish at all is opted out on purpose and shows the map as authored;
 	 * those rooms are named once in `noFloor` instead of a line per quarter.
+	 *
+	 * `wallGaps` is the third list and the one this tool used to be blind to. A
+	 * wall cell is not inside any room, so it was skipped outright — which
+	 * excluded the exact ground the edge bleed EXISTS to cover, and let a bare
+	 * sliver beside a wall pass an audit that reported nothing wrong.
+	 *
+	 * What separates a hole from the outdoors is not proximity to a floor —
+	 * every exterior wall has floor on its inner half — but whether you could
+	 * walk to it from off the map without crossing one. So the bare quarters are
+	 * flooded from the map edge, and only the ones that fill cannot reach are
+	 * reported: those are enclosed by floor on every side, which is the
+	 * definition of a hole in it.
 	 */
 	audit() {
 		const map = this._map();
 		const size = this.cellSize;
 		const quarter = size / this.QUARTER;
-		const width = map.gridSystem?.gridWidth || 0;
-		const height = map.gridSystem?.gridHeight || 0;
+		const width = (map.gridSystem?.gridWidth || 0) * 2;
+		const height = (map.gridSystem?.gridHeight || 0) * 2;
 		const surfaces = map.floorBuilder?.surfaces;
 		const overlaps = [];
 		const gaps = [];
+		const wallGaps = [];
 		const noFloor = new Set();
+		const bare = new Map();
 
-		for (let y = 0; y < height; y++) {
-			for (let x = 0; x < width; x++) {
+		for (let row = 0; row < height; row++) {
+			for (let column = 0; column < width; column++) {
+				const x = Math.floor(column / 2);
+				const y = Math.floor(row / 2);
+				const owners = this.floorOwnersAt(
+					(column * size / 2) + quarter,
+					(row * size / 2) + quarter
+				);
+				const where = `${x},${y} ${row % 2 === 0 ? 'top' : 'bottom'}-${column % 2 === 0 ? 'left' : 'right'}`;
+				if (owners.length > 1) { overlaps.push(`${where}: ${owners.join(' + ')}`); continue; }
+				if (owners.length > 0) continue;
+
 				const inRoom = map.regionManager?.innermostAt?.(
 					(x + 0.5) * size, (y + 0.5) * size, 'room', size
 				);
-				const painted = inRoom ? surfaces?.has(inRoom.id) : false;
-				if (inRoom && !painted) noFloor.add(inRoom.id);
+				if (inRoom && !surfaces?.has(inRoom.id)) noFloor.add(inRoom.id);
 				const wall = map.wallBuilder?.cells?.has(`${x},${y}`) ?? false;
-				for (let row = 0; row < 2; row++) {
-					for (let column = 0; column < 2; column++) {
-						const owners = this.floorOwnersAt(
-							(x * size) + (column * size / 2) + quarter,
-							(y * size) + (row * size / 2) + quarter
-						);
-						const where = `${x},${y} ${row === 0 ? 'top' : 'bottom'}-${column === 0 ? 'left' : 'right'}`;
-						if (owners.length > 1) overlaps.push(`${where}: ${owners.join(' + ')}`);
-						else if (owners.length === 0 && painted && !wall) gaps.push(`${where}: inside ${inRoom.id}`);
-					}
-				}
+				if (inRoom && surfaces?.has(inRoom.id) && !wall) gaps.push(`${where}: inside ${inRoom.id}`);
+				else bare.set(`${column},${row}`, where);
 			}
 		}
-		return { overlaps, gaps, noFloor: [...noFloor] };
+
+		const outdoors = new Set();
+		const queue = [];
+		const reach = (column, row) => {
+			const key = `${column},${row}`;
+			if (column < 0 || row < 0 || column >= width || row >= height) return;
+			if (!bare.has(key) || outdoors.has(key)) return;
+			outdoors.add(key);
+			queue.push([column, row]);
+		};
+		for (let column = 0; column < width; column++) { reach(column, 0); reach(column, height - 1); }
+		for (let row = 0; row < height; row++) { reach(0, row); reach(width - 1, row); }
+		for (let index = 0; index < queue.length; index++) {
+			const [column, row] = queue[index];
+			reach(column - 1, row); reach(column + 1, row);
+			reach(column, row - 1); reach(column, row + 1);
+		}
+		for (const [key, where] of bare) if (!outdoors.has(key)) wallGaps.push(where);
+
+		return { overlaps, gaps, wallGaps, noFloor: [...noFloor] };
 	},
 
 	/** Rooms as both systems read them: shape, size, and the two finishes. */

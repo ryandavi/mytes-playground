@@ -109,21 +109,34 @@ class RoomEnclosureDetector {
         }
 
         const lighting = Utility.deepClone(this.gameMap.environmentManager?.getRoomDefaults?.() || {});
-        const added = candidates.map((cells, index) => regionManager.add(new SpatialRegion({
-            id: `room_auto_${index + 1}`,
-            layer: 'room',
-            shape: { kind: 'tilemask', cells, cellSize },
-            properties: {
-                // A placeholder until the player names it in the Surfaces
-                // panel; numbered so two new rooms are at least tellable apart.
-                displayName: `Room ${index + 1}`,
-                authoredDisplayName: `Room ${index + 1}`,
-                indoor: true,
-                autoDetected: true,
-                lighting: Utility.deepClone(lighting)
-            },
-            source: this
-        })));
+        const added = candidates.map((cells, index) => {
+            const parent = this.roomDividedBy(cells, cellSize);
+            return regionManager.add(new SpatialRegion({
+                id: `room_auto_${index + 1}`,
+                layer: 'room',
+                shape: { kind: 'tilemask', cells, cellSize },
+                properties: {
+                    // A placeholder until the player names it in the Surfaces
+                    // panel; numbered so two new rooms are at least tellable apart.
+                    displayName: `Room ${index + 1}`,
+                    authoredDisplayName: `Room ${index + 1}`,
+                    indoor: true,
+                    autoDetected: true,
+                    // Walling off a corner of a room does not redecorate it.
+                    // A new room with no finishes came up in bare plaster with
+                    // the map's own ground showing through, so subdividing a
+                    // space you had already decorated undid the decorating —
+                    // and the seam where the new room met the old one was the
+                    // first thing you saw. Inheriting means a partition wall
+                    // looks like it was always there, and repainting one side
+                    // afterwards is a choice rather than a repair.
+                    wallFinishId: parent?.properties?.wallFinishId ?? null,
+                    floorFinishId: parent?.properties?.floorFinishId ?? null,
+                    lighting: Utility.deepClone(parent?.properties?.lighting ?? lighting)
+                },
+                source: this
+            }));
+        });
 
         this.assignOpenSpaces(components, cellSize);
 
@@ -171,6 +184,30 @@ class RoomEnclosureDetector {
             if (best) claimed.add(best);
         }
         return components.filter(component => !claimed.has(component));
+    }
+
+    /**
+     * The room a newly enclosed area was taken out of, if it was taken out of
+     * one — the space whose ground these cells stood on a moment ago.
+     *
+     * Innermost, and decided by where the new cells actually are rather than by
+     * bounds containment: partition a room that is itself inside another and
+     * the new room should take after its immediate parent, not the outermost
+     * one it happens to sit within. A room built across the line where two
+     * spaces meet belongs to neither cleanly, so the one holding most of it
+     * wins — the same "most of it" rule unclaimedComponents matches on.
+     * @returns {SpatialRegion|null}
+     */
+    roomDividedBy(cells, cellSize) {
+        const tally = new Map();
+        for (const [cellX, cellY] of cells) {
+            const room = this.gameMap.regionManager?.innermostAt(
+                (cellX + 0.5) * cellSize, (cellY + 0.5) * cellSize, 'room', cellSize
+            );
+            if (room) tally.set(room, (tally.get(room) || 0) + 1);
+        }
+        return [...tally.entries()].reduce((best, entry) =>
+            !best || entry[1] > best[1] ? entry : best, null)?.[0] ?? null;
     }
 
     /**

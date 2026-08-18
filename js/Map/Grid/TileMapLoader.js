@@ -414,7 +414,17 @@ class TileMapLoader {
 					axis: fromY === toY ? 'horizontal' : 'vertical',
 					cells: { from: [fromX, fromY], to: [toX, toY] },
 					face: String(object.properties?.face || 'south').toLowerCase(),
-					finishId: object.properties?.finishId || defaults.finishId
+					finishId: object.properties?.finishId || defaults.finishId,
+					// Which room the paint was applied to. The PROPERTY being
+					// absent and the property being empty mean different things
+					// and must stay different: absent is hand-authored paint
+					// that applies to whatever room ends up behind the wall,
+					// empty is paint on the outside of the building, which is
+					// nobody's room. Spreading a partial keeps `roomId` off the
+					// record entirely in the first case.
+					...('roomId' in (object.properties || {})
+						? { roomId: String(object.properties.roomId) || null }
+						: {})
 				});
 				return false;
 			}

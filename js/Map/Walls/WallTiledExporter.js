@@ -571,7 +571,11 @@ class WallTiledExporter {
                 // Overrides are authored as geometry, not identity — there is
                 // no stable id to match on, so they are rewritten wholesale
                 // under a deterministic name.
-                id: `wallfinish:${override.face}:${fromX},${fromY}:${toX},${toY}`,
+                // Scoped to a room, so the room is part of what makes it
+                // unique: two rooms meeting along one wall paint the same
+                // cells on the same face, and a name without the room would
+                // have collapsed their two records into one.
+                id: `wallfinish:${override.face}:${override.roomId ?? ''}:${fromX},${fromY}:${toX},${toY}`,
                 name: 'WallFinishOverride',
                 x: fromX * tileWidth,
                 y: fromY * tileWidth,
@@ -584,7 +588,13 @@ class WallTiledExporter {
                     fromX: { value: fromX, type: 'int' },
                     fromY: { value: fromY, type: 'int' },
                     toX: { value: toX, type: 'int' },
-                    toY: { value: toY, type: 'int' }
+                    toY: { value: toY, type: 'int' },
+                    // Empty means the outside of the building. Omitted entirely
+                    // means hand-authored paint that belongs to no particular
+                    // room — see TileMapLoader for why the two cannot merge.
+                    ...(override.roomId === undefined
+                        ? {}
+                        : { roomId: { value: override.roomId ?? '' } })
                 }
             });
         }

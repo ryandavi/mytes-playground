@@ -638,12 +638,19 @@ class WallBuilder {
      * `roomId` absent means unscoped — authored map data, and anything saved
      * before overrides carried a room. Those still apply everywhere, so no
      * existing map or save changes behaviour until it is repainted.
+     *
+     * A record whose roomId is NULL is a different thing entirely and is scoped
+     * just as tightly: null is the outside of the building, which is a real
+     * surface a player can paint and which no room owns. Treating null as
+     * "unscoped" too meant painting the outside of the house wrote a record
+     * that matched every room's face in the same cells — so the exterior colour
+     * appeared on interior walls the player had never touched.
      */
     resolveFinishOverride(x, y, face, roomId = undefined) {
         const match = [...this.faceOverrides].reverse().find(record => {
             if (record.face !== face) return false;
-            if (record.roomId !== undefined && record.roomId !== null &&
-                roomId !== undefined && record.roomId !== roomId) return false;
+            if (record.roomId !== undefined && roomId !== undefined &&
+                record.roomId !== roomId) return false;
             const x0 = Math.min(record.cells.from[0], record.cells.to[0]);
             const x1 = Math.max(record.cells.from[0], record.cells.to[0]);
             const y0 = Math.min(record.cells.from[1], record.cells.to[1]);
