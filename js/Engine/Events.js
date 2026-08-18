@@ -30,6 +30,8 @@ const EVENTS = Object.freeze({
     PLANT_MUTATED: 'plant:mutated',
     PLANT_POLLINATED: 'plant:pollinated',
     RELATIONSHIP_CLEARED: 'relationship:cleared',
+    ROOM_ASSIGNMENTS_CHANGED: 'room:assignments_changed',
+    ROOMS_CHANGED: 'room:set_changed',
     SIMULATION_RATE_CHANGED: 'simulation:rate_changed',
     SURFACE_FINISH_CHANGED: 'surface:finish_changed',
     TRAVEL_ARRIVED: 'travel_arrived',

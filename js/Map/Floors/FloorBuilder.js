@@ -102,7 +102,7 @@ class FloorBuilder {
      * — and being the same blocks the floor uses, the highlight cannot promise
      * ground the floor will not cover.
      */
-    createRoomOverlay(room, { fill, className = '' } = {}) {
+    createRoomOverlay(room, { fill, className = '', outline = null } = {}) {
         const area = this.paintedArea(room);
         const container = this.ensureContainer();
         if (!area || !container) return null;
@@ -114,9 +114,42 @@ class FloorBuilder {
         context.fillStyle = fill;
         context.fillRect(0, 0, area.width, area.height);
         context.restore();
+        if (outline) this.strokeRoomEdges(context, room, area, outline);
 
         container.appendChild(canvas);
         return canvas;
+    }
+
+    /**
+     * A line round the outside of a room.
+     *
+     * A wash of colour over a patterned floor is easy to miss and hard to read
+     * the edges of, which is the one thing it is there to say — where this room
+     * stops. Where two rooms meet with no wall between them, the line IS the
+     * boundary; there is nothing else standing there to be seen.
+     *
+     * Drawn from the same owned blocks as the fill, so the outline cannot
+     * disagree with it: an edge is any side of a block whose neighbour belongs
+     * to somebody else.
+     */
+    strokeRoomEdges(context, room, area, colour) {
+        const size = this.blockSize;
+        const blocks = this.blocksOf(room.id);
+        const owned = new Set(blocks.map(([blockX, blockY]) => `${blockX},${blockY}`));
+        context.save();
+        context.strokeStyle = colour;
+        context.lineWidth = 2;
+        context.beginPath();
+        for (const [blockX, blockY] of blocks) {
+            const left = (blockX * size) - area.x;
+            const top = (blockY * size) - area.y;
+            if (!owned.has(`${blockX - 1},${blockY}`)) { context.moveTo(left, top); context.lineTo(left, top + size); }
+            if (!owned.has(`${blockX + 1},${blockY}`)) { context.moveTo(left + size, top); context.lineTo(left + size, top + size); }
+            if (!owned.has(`${blockX},${blockY - 1}`)) { context.moveTo(left, top); context.lineTo(left + size, top); }
+            if (!owned.has(`${blockX},${blockY + 1}`)) { context.moveTo(left, top + size); context.lineTo(left + size, top + size); }
+        }
+        context.stroke();
+        context.restore();
     }
 
     createSurfaceCanvas(area, roomId) {

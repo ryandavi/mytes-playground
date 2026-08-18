@@ -453,9 +453,11 @@ class ContainerInputManager {
     }
 
     if (ui?.wallBuildPanel?.cancelDrag?.() === true) return;
+    if (ui?.roomPanel?.cancelDrag?.() === true) return;
 
     if (this.container.gameMode?.isBuild()) {
-      const openBuildPanel = [ui?.wallBuildPanel, ui?.surfaceCustomizePanel].find(panel => panel?.isVisible);
+      const openBuildPanel = [ui?.wallBuildPanel, ui?.roomPanel, ui?.surfaceCustomizePanel]
+        .find(panel => panel?.isVisible);
       if (openBuildPanel) {
         ui.changeToolMode(UIToolModes.MOVE);
         return;

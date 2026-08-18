@@ -304,6 +304,9 @@
     "src": "js/Map/Regions/RegionManager.js"
   },
   {
+    "src": "js/Map/Regions/RoomAssignments.js"
+  },
+  {
     "src": "js/Map/Regions/RoomEnclosureDetector.js"
   },
   {
@@ -589,6 +592,9 @@
   },
   {
     "src": "js/UI/Panels/WallBuildPanel.js"
+  },
+  {
+    "src": "js/UI/Panels/RoomPanel.js"
   },
   {
     "src": "js/UI/Panels/SettingsPanel.js"

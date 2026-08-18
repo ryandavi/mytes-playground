@@ -47,6 +47,7 @@ class UserInterface {
         this.settingsPanel = new SettingsPanel(this);
         this.surfaceCustomizePanel = new SurfaceCustomizePanel(this);
         this.wallBuildPanel = new WallBuildPanel(this);
+        this.roomPanel = new RoomPanel(this);
         this.viewPanel = new ViewPanel(this);
         this.worldMapPanel = new WorldMapPanel(this);
         this.debugPanel = new DebugPanel(this);
@@ -77,6 +78,7 @@ class UserInterface {
         this.actionSidebarManager.updateActions(null);
         this.surfaceCustomizePanel?.handleToolModeChanged(mode);
         this.wallBuildPanel?.handleToolModeChanged(mode);
+        this.roomPanel?.handleToolModeChanged(mode);
     }
 
     onSelectionChanged(selectedObject) {
@@ -260,6 +262,8 @@ class UserInterface {
         this.surfaceCustomizePanel = null;
         this.wallBuildPanel?.dispose?.();
         this.wallBuildPanel = null;
+        this.roomPanel?.dispose?.();
+        this.roomPanel = null;
         this.soundPanel?.dispose?.();
         this.soundPanel = null;
         this.soundMenu = null;

@@ -553,6 +553,11 @@ class GameMap {
 			// Materials are loaded now, so the overhang uses each construction's
 			// real height instead of the map's heightCells estimate.
 			this.setWallAwareRenderInsets(mapData);
+			// Before the detector: its very first pass has to see the map's own
+			// open-plan rooms, or every room it finds is recomputed a moment
+			// later and the rooms it named change under the save.
+			this.roomAssignments = new RoomAssignments(this);
+			this.roomAssignments.restoreState(mapData.walls.roomAssignments, { emit: false });
 			this.roomEnclosureDetector = new RoomEnclosureDetector(this);
 		}
 		this.eventManager?.emit(EVENTS.WALL_READY, { mapId: this.id, builder: this.wallBuilder });
@@ -1252,6 +1257,10 @@ class GameMap {
 			this.wallBuilder.dispose();
 			this.wallBuilder = null;
 			this.wallMaterialRegistry = null;
+		}
+		if (this.roomAssignments) {
+			this.roomAssignments.dispose();
+			this.roomAssignments = null;
 		}
 		// Floor surfaces live in the shared background layer, so they outlive the
 		// map that made them unless they are torn down here with the walls.

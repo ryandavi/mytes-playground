@@ -799,3 +799,228 @@ body.wall-build-mode .app-stage {
 body.wall-build-mode.wall-build-refused .app-stage {
     cursor: not-allowed;
 }
+
+// ── Room panel ────────────────────────────────────────────────────────────────
+//
+// The rooms ARE the palette: one row per room, and the row is its name, its
+// size, its type, the thing you hover to find it on the map, and the brush you
+// paint with. There is nothing to caption because there is nothing that is not
+// already a room you can see.
+
+body.room-build-mode .app-stage {
+    cursor: cell;
+}
+
+// Painted through the floor's own ownership, so a tint stops exactly where its
+// room's floor does.
+.room-tint {
+    position: absolute;
+    z-index: var(--z-overlay);
+    pointer-events: none;
+    mix-blend-mode: multiply;
+}
+
+// The one room being worked on, over the top of the general tinting.
+.room-highlight {
+    position: absolute;
+    z-index: var(--z-overlay);
+    pointer-events: none;
+}
+
+.room-paint-ghost {
+    position: absolute;
+    z-index: var(--z-drag);
+    pointer-events: none;
+    box-sizing: border-box;
+    border: 1px solid color-mix(in srgb, var(--button-light) 70%, transparent);
+    background: color-mix(in srgb, var(--state-info-accent) 45%, transparent);
+
+    // Handing floor back to the walls takes a colour off rather than putting one
+    // on, so it is drawn as an absence: hatched, not filled.
+    &.is-reset {
+        background: repeating-linear-gradient(
+            45deg,
+            transparent 0 4px,
+            color-mix(in srgb, var(--button-light) 45%, transparent) 4px 8px
+        );
+    }
+
+    &.is-new {
+        background: color-mix(in srgb, var(--state-success-accent, #4caf50) 45%, transparent);
+    }
+}
+
+.room-panel {
+    .window-panel__content {
+        min-width: 268px;
+    }
+
+    // ONE scroll per window, and it is the content's — every other panel works
+    // that way. A list with its own overflow inside a content area that already
+    // scrolls gives you two bars racing each other and a footer that is
+    // sometimes there and sometimes not.
+    .room-panel-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+    }
+
+    // The two controls that are not about any one room live in the footer, so
+    // they stay put while the list scrolls — "New room" is exactly what you
+    // reach for when the list does not already contain what you want.
+    > .window-panel__footer {
+        justify-content: stretch;
+    }
+
+    .room-action {
+        @include button-base;
+        flex: 1 1 0;
+        padding: var(--space-2xs) var(--space-xs);
+        cursor: pointer;
+
+        &.active {
+            background: color-mix(in srgb, var(--state-info-accent) 30%, transparent);
+        }
+    }
+}
+
+
+// Two lines, because one was a lie: name, type and size on a single row left
+// the name three characters wide and the type reading "Unas".
+// A row is a button that happens to contain fields, so it wears the same states
+// every other button in the app does: `button-base` at rest, the shared hover
+// token, and `button-pressed` when it is the one selected. The hand-rolled
+// colour-mix tint it had before was a fifth way of saying "this one is chosen"
+// in an app that already had one.
+.room-row {
+    @include button-base;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-xs);
+    padding: var(--space-sm);
+    cursor: pointer;
+    text-align: left;
+
+    &:hover {
+        background-color: var(--button-hover);
+    }
+
+    // The room you are painting into. Every stroke goes here until you say
+    // otherwise, so it carries the same pressed treatment as an active tool
+    // button rather than a tint of its own invention.
+    &.active {
+        @include button-pressed;
+
+        .room-row__name,
+        .room-row__type {
+            font-weight: 700;
+        }
+    }
+
+    .room-row__chip {
+        width: 14px;
+        height: 14px;
+        margin-top: 4px;
+        border-radius: 3px;
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--button-dark) 55%, transparent);
+    }
+
+    .room-row__body {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .room-row__name {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .room-row__meta {
+        display: flex;
+        align-items: center;
+        gap: var(--space-xs);
+    }
+
+    .room-row__type {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    .room-row__size {
+        flex: 0 0 auto;
+        font-size: 11px;
+        opacity: 0.7;
+        white-space: nowrap;
+    }
+
+    // Only on rooms that can actually go. A room the walls enclose cannot be
+    // deleted by asking — you take a wall down — so offering the button there
+    // would be offering something that cannot happen.
+    .room-row__delete {
+        @include button-base;
+        flex: 0 0 auto;
+        padding: 0 var(--space-2xs);
+        line-height: 1.4;
+        cursor: pointer;
+        opacity: 0.75;
+
+        &:hover {
+            opacity: 1;
+            color: var(--color-danger);
+        }
+    }
+}
+
+// ── Wall handle ───────────────────────────────────────────────────────────────
+//
+// A wall that can be dragged should look like one. The grip appears on the run
+// under the cursor and the arrows point the only two ways it can go, which is
+// the whole instruction — there is no mode to find first and nothing to read.
+
+.wall-move-handle {
+    position: absolute;
+    z-index: var(--z-drag);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &::before {
+        content: '';
+        width: 60%;
+        height: 60%;
+        border-radius: 3px;
+        background: var(--state-info-accent);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--button-light) 75%, transparent);
+    }
+
+    // Two ticks either side of the grip, across the run — the direction it
+    // moves, which is the one thing a grip has to say.
+    &::after {
+        content: '';
+        position: absolute;
+        background: color-mix(in srgb, var(--button-light) 85%, transparent);
+    }
+
+    &.is-horizontal::after {
+        left: 45%;
+        right: 45%;
+        top: -30%;
+        bottom: -30%;
+    }
+
+    &.is-vertical::after {
+        top: 45%;
+        bottom: 45%;
+        left: -30%;
+        right: -30%;
+    }
+}
+
+body.wall-build-mode .app-stage:has(.wall-move-handle) {
+    cursor: grab;
+}
+

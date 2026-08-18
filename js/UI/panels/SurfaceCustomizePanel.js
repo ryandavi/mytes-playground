@@ -27,12 +27,6 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.scopeElement = this.modalElement?.querySelector('.surface-scope');
         this.emptyElement = this.modalElement?.querySelector('.surface-customize-empty');
         this.finishGroup = this.modalElement?.querySelector('.surface-finish-group');
-        this.roomFields = [...(this.modalElement?.querySelectorAll('.surface-room-fields') || [])];
-        this.roomNameInput = this.modalElement?.querySelector('#surface-room-name');
-        this.roomTypeSelect = this.modalElement?.querySelector('#surface-room-type');
-        this.buildRoomTypeOptions();
-        this.roomNameInput?.addEventListener('change', () => this.commitRoom());
-        this.roomTypeSelect?.addEventListener('change', () => this.commitRoom());
         this.targetElement = this.modalElement?.querySelector('.surface-target');
         this.targetRoomElement = this.modalElement?.querySelector('.surface-target__room');
         this.targetSurfaceElement = this.modalElement?.querySelector('.surface-target__surface');
@@ -334,82 +328,6 @@ class SurfaceCustomizePanel extends ModalWindow {
         return room?.properties?.displayName || room?.id || 'Room';
     }
 
-    buildRoomTypeOptions() {
-        if (!this.roomTypeSelect) return;
-        this.roomTypeSelect.replaceChildren(...SiteConfig.rooms.types.map(type => {
-            const option = document.createElement('option');
-            option.value = type.id;
-            option.textContent = type.label;
-            return option;
-        }));
-    }
-
-    /**
-     * A room's name and its type are both just properties on the region.
-     *
-     * Authored rooms get a name from the map and rooms the player encloses get
-     * a numbered placeholder; this is where either becomes something chosen.
-     * Type is deliberately separate from name — "Study" is what you call it,
-     * `study` is what it is for, and behaviour that wants to reason about rooms
-     * ("eat in the kitchen") needs the second, not a parse of the first.
-     *
-     * Both stored under `player*` keys alongside the authored values, so world
-     * state can tell what the player chose from what the map shipped with and
-     * persist only the former.
-     */
-    commitRoom() {
-        const room = this.target?.surface === 'floor' ? this.target.room : null;
-        if (!room) return false;
-
-        const previous = this.roomState(room);
-        const next = {
-            name: this.roomNameInput?.value.trim() || null,
-            type: this.roomTypeSelect?.value || SiteConfig.rooms.defaultType
-        };
-        if (next.name === previous.name && next.type === previous.type) return false;
-
-        const apply = (state) => {
-            const region = this.gameMap?.regionManager?.get('room', room.id);
-            if (!region) return false;
-            region.properties = {
-                ...region.properties,
-                playerName: state.name,
-                roomType: state.type,
-                displayName: state.name
-                    ?? region.properties.authoredDisplayName
-                    ?? region.properties.displayName
-            };
-            this.gameMap.container?.worldState?.captureMap?.(this.gameMap);
-            this.gameMap.core?.user?._scheduleSave?.();
-            this.syncRoomFields();
-            this.renderTarget();
-            return true;
-        };
-
-        if (!apply(next)) return false;
-        this.parent.parent?.buildHistory?.push({
-            label: next.type !== previous.type ? 'Change Room Type' : 'Rename Room',
-            undo: () => apply(previous),
-            redo: () => apply(next)
-        });
-        return true;
-    }
-
-    roomState(room) {
-        return {
-            name: room?.properties?.playerName ?? null,
-            type: room?.properties?.roomType ?? SiteConfig.rooms.defaultType
-        };
-    }
-
-    syncRoomFields() {
-        const room = this.target?.surface === 'floor' ? this.target.room : null;
-        for (const field of this.roomFields) field.hidden = !room;
-        if (!room) return;
-        const state = this.roomState(room);
-        if (this.roomNameInput) this.roomNameInput.value = this.roomName(room);
-        if (this.roomTypeSelect) this.roomTypeSelect.value = state.type;
-    }
 
     renderTarget() {
         const { room, surface, locked } = this.describeTarget();
@@ -474,7 +392,6 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.revertPreview();
         this.paletteElement.replaceChildren();
         this.renderTarget();
-        this.syncRoomFields();
         this.scopeElement.hidden = this.target?.surface !== 'wall';
         this.emptyElement.hidden = !!this.target;
         // An empty Finish heading over an empty box reads as something that
@@ -626,9 +543,6 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.clearOverlay(this.selection);
         this.overlayUnsubscribers?.forEach(unsubscribe => unsubscribe?.());
         this.overlayUnsubscribers = [];
-        this.roomNameInput = null;
-        this.roomTypeSelect = null;
-        this.roomFields = [];
         document.body.classList.remove('build-target-locked');
         this.scope?.dispose();
         this.scope = null;

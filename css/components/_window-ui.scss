@@ -572,6 +572,14 @@ div.surface-paint-overlay {
             color-mix(in srgb, var(--state-info-accent) 55%, transparent) 4px 8px
         );
     }
+
+    // Where a grabbed wall is going. Solid and filled rather than dashed: the
+    // dashed ghost means "if you click", and by the time this is on screen the
+    // wall is already in your hand.
+    &.is-move {
+        border-style: solid;
+        background: color-mix(in srgb, var(--state-info-accent) 55%, transparent);
+    }
 }
 
 // − [ value ] + : one shape for every stepped value in the app, whether it is

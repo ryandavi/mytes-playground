@@ -260,6 +260,10 @@ class WallBuilder {
         this.decorations = [];
         this.presentation = SiteConfig.wallSystem.defaultPresentation;
         this._movingOpeningIds = new Set();
+        // Records travelling with a wall run that is being moved. See
+        // withTravellingRecords: for the length of a move they are not
+        // obstacles, because they are going where the wall is going.
+        this._travellingRecordIds = new Set();
         this._movingObjects = new Map();
         this._movingRevealPieceIds = new Map();
         this._presentationOverride = null;
@@ -2326,6 +2330,7 @@ class WallBuilder {
 
         const gridCell = this.gameMap.gridSystem?.grid?.[x]?.[y];
         for (const object of gridCell?.objects || []) {
+            if (this._travellingRecordIds.has(String(object.id))) continue;
             if (this.openingByCell.has(`${x},${y}`) && String(this.openingByCell.get(`${x},${y}`).id) === String(object.id)) continue;
             if (this.isWallMountedObject(object)) continue;
             // Walkability is a pathfinding answer and this is a masonry
@@ -2378,7 +2383,7 @@ class WallBuilder {
             const neighborX = x + direction.dx;
             const neighborY = y + direction.dy;
             const opening = this.openingByCell.get(`${neighborX},${neighborY}`);
-            if (!opening) continue;
+            if (!opening || this._travellingRecordIds.has(String(opening.id))) continue;
 
             const neighbor = this.cells.get(`${neighborX},${neighborY}`);
             if (!neighbor || neighbor.connectGroup !== group) continue;
@@ -2423,8 +2428,10 @@ class WallBuilder {
     getMountedWallSpans() {
         const cellSize = this.cellSize;
         const spans = [];
+        const travelling = record => this._travellingRecordIds.has(String(record.id));
 
         for (const opening of this.openings) {
+            if (travelling(opening)) continue;
             const type = String(opening.type || 'opening').toLowerCase();
             const object = this.gameMap.getObjectById?.(opening.id) || null;
             for (const [cellX, cellY] of opening.cells || []) {
@@ -2440,6 +2447,7 @@ class WallBuilder {
         }
 
         for (const record of this.fixtures) {
+            if (travelling(record)) continue;
             const object = this.gameMap.getObjectById?.(record.id);
             const span = object ? this.getFixtureSpan(object) : null;
             if (!span) continue;
@@ -2741,14 +2749,26 @@ class WallBuilder {
         const rules = options.validate === false ? null : this.gameMap.container?.buildRules;
         const applied = [];
         const rejected = [];
-        for (const change of normalized) {
-            const verdict = !rules
-                ? BuildRules.ALLOWED
-                : (change.data ?? null) === null
-                    ? rules.canRemoveWallCell(change.x, change.y)
-                    : rules.canBuildWallCell(change.x, change.y);
-            if (verdict.allowed) applied.push(change);
-            else rejected.push({ ...change, reason: verdict.reason });
+        // Judged as if whatever is travelling with the wall had already left:
+        // it has, as far as this edit is concerned.
+        this.withTravellingRecords(this.getTravellingRecordIds(options.contentMove), () => {
+            for (const change of normalized) {
+                const verdict = !rules
+                    ? BuildRules.ALLOWED
+                    : (change.data ?? null) === null
+                        ? rules.canRemoveWallCell(change.x, change.y)
+                        : rules.canBuildWallCell(change.x, change.y);
+                if (verdict.allowed) applied.push(change);
+                else rejected.push({ ...change, reason: verdict.reason });
+            }
+        });
+        // All of it or none of it. Half a wall move is not a smaller wall move:
+        // the run comes apart, whatever was hanging on the refused cells is
+        // orphaned, and the player is left repairing something they never asked
+        // for. Refusing outright costs them one drag; the alternative costs
+        // them the wall.
+        if (options.atomic === true && rejected.length > 0) {
+            return { applied: [], rejected, inverse: [] };
         }
         if (applied.length === 0) return { applied, rejected, inverse: [] };
 
@@ -2762,10 +2782,24 @@ class WallBuilder {
             for (const change of applied) {
                 this.setWallCell(change.x, change.y, change.data ?? null, { deferRebuild: true });
             }
+            // Inside the same try, before the reindex: a door is part of the
+            // wall it is cut into, so it has to arrive at the new cells in the
+            // same breath the cells do. Moved afterwards it would spend one
+            // reindex belonging to masonry that is no longer there, and
+            // pruneOrphanedRecords would be within its rights to delete it.
+            const travelled = this.translateWallContents(options.contentMove);
             this.reindexOpenings();
             this.rebuild();
+            // After the rebuild, because a door hangs off a SLOT built from the
+            // opening's cells and the pieces those cells belong to. Moving the
+            // record alone leaves the slot standing where the wall used to be,
+            // and the attachment obediently drags the door back to it — which
+            // is why a moved door looked like it had stayed behind until you
+            // nudged it and something else recomputed the slot.
+            this.rebindOpeningObjects(travelled);
         } catch (error) {
             this.baseCells = previousCells;
+            this.translateWallContents(WallBuilder.invertContentMove(options.contentMove));
             this.reindexOpenings();
             this.rebuild();
             throw error;
@@ -2776,6 +2810,124 @@ class WallBuilder {
             builder: this
         });
         return { applied, rejected, inverse };
+    }
+
+    /**
+     * Everything mounted on a set of cells, moved with them.
+     *
+     * A wall is not only masonry. A door is a hole cut in it, a window is a
+     * hole with glass, a painting is hung on its face and the colour it wears
+     * was painted onto those exact cells. Move the wall and leave those behind
+     * and you have not moved a wall — you have demolished one and built
+     * another, which is what it looks like on screen: the door drops into open
+     * floor and the new run comes up bare plaster.
+     *
+     * Only records lying ENTIRELY within the moved cells travel. One that
+     * straddles the edge belongs as much to the wall staying put, and dragging
+     * half of it would tear it in two.
+     *
+     * @param {{cells: Set<string>, dx: number, dy: number}} move
+     * @returns {Array<string>} the ids that moved
+     */
+    translateWallContents(move) {
+        const { cells, dx = 0, dy = 0 } = move || {};
+        if (!cells || cells.size === 0 || (dx === 0 && dy === 0)) return [];
+        const inside = (x, y) => cells.has(`${x},${y}`);
+        const moved = [];
+
+        const carryObject = (id) => {
+            const object = this.gameMap.getObjectById?.(id);
+            if (!object) return;
+            object.posX += dx * this.cellSize;
+            object.posY += dy * this.cellSize;
+            object.updatePosition?.();
+            object.syncRenderLayer?.();
+            object.handleMovedEvent?.();
+        };
+
+        for (const opening of this.openings) {
+            const footprint = opening.cells || [];
+            if (footprint.length === 0 || !footprint.every(([x, y]) => inside(x, y))) continue;
+            opening.cells = footprint.map(([x, y]) => [x + dx, y + dy]);
+            carryObject(opening.id);
+            moved.push(String(opening.id));
+        }
+
+        for (const record of [...this.fixtures, ...(this.wallData.attachments || [])]) {
+            const from = record.cells?.from;
+            const to = record.cells?.to || from;
+            if (!from || !inside(from[0], from[1]) || !inside(to[0], to[1])) continue;
+            record.cells = { from: [from[0] + dx, from[1] + dy], to: [to[0] + dx, to[1] + dy] };
+            carryObject(record.id);
+            moved.push(String(record.id));
+        }
+
+        // Paint is applied to a room's wall, and this is still that wall.
+        // Leaving the overrides behind would repaint the cells the run vacated
+        // — which are about to be nothing at all — and bring the run up in the
+        // room's base finish, losing every stroke the player put on it.
+        for (const record of this.faceOverrides) {
+            const from = record.cells?.from;
+            const to = record.cells?.to;
+            if (!from || !to || !inside(from[0], from[1]) || !inside(to[0], to[1])) continue;
+            record.cells = { from: [from[0] + dx, from[1] + dy], to: [to[0] + dx, to[1] + dy] };
+        }
+
+        return moved;
+    }
+
+    // The same move run backwards, for a rollback or an undo.
+    static invertContentMove(move) {
+        if (!move?.cells) return null;
+        const cells = new Set([...move.cells].map(key => {
+            const [x, y] = key.split(',').map(Number);
+            return `${x + (move.dx || 0)},${y + (move.dy || 0)}`;
+        }));
+        return { cells, dx: -(move.dx || 0), dy: -(move.dy || 0) };
+    }
+
+    /**
+     * Which records a content move would pick up — asked BEFORE the move, so
+     * the rules can be told to stop treating them as obstacles.
+     *
+     * A door in the wall you are dragging is the wall's own door, and the rules
+     * quite correctly refuse to build masonry through a door. Left unexempted
+     * that refusal fires on the destination cells, so a wall with a door in it
+     * is a wall that can never be moved — the door blocks its own wall, which
+     * is exactly the sort of thing that makes a build mode feel broken rather
+     * than careful.
+     * @returns {Array<string>}
+     */
+    getTravellingRecordIds(move) {
+        const { cells } = move || {};
+        if (!cells || cells.size === 0) return [];
+        const inside = (x, y) => cells.has(`${x},${y}`);
+        const ids = [];
+        for (const opening of this.openings) {
+            const footprint = opening.cells || [];
+            if (footprint.length > 0 && footprint.every(([x, y]) => inside(x, y))) ids.push(String(opening.id));
+        }
+        for (const record of [...this.fixtures, ...(this.wallData.attachments || [])]) {
+            const from = record.cells?.from;
+            const to = record.cells?.to || from;
+            if (from && inside(from[0], from[1]) && inside(to[0], to[1])) ids.push(String(record.id));
+        }
+        return ids;
+    }
+
+    /**
+     * Runs `fn` with a set of records treated as already gone from where they
+     * are. Restored in a finally, because a validation that throws must not
+     * leave the map permanently blind to a door.
+     */
+    withTravellingRecords(ids, fn) {
+        const previous = this._travellingRecordIds;
+        this._travellingRecordIds = new Set(ids || []);
+        try {
+            return fn();
+        } finally {
+            this._travellingRecordIds = previous;
+        }
     }
 
     findPieceForCell(cellX, cellY) {
@@ -3023,6 +3175,27 @@ class WallBuilder {
         const piece = this.findPieceForCell(cellX, cellY);
         if (piece) slot.setCutLine(piece);
         return true;
+    }
+
+    /**
+     * Re-anchors doors and windows whose opening has moved.
+     *
+     * The fixture counterpart is rebindFixtureObjects, called on every rebuild
+     * because rebuild replaces the surfaces fixtures hang on. An opening's slot
+     * is built from its CELLS, which a rebuild does not touch — so this is only
+     * needed where the cells themselves moved, and is asked for by id rather
+     * than run over everything.
+     */
+    rebindOpeningObjects(ids = []) {
+        const wanted = new Set((ids || []).map(String));
+        if (wanted.size === 0) return;
+        for (const opening of this.openings) {
+            if (!wanted.has(String(opening.id))) continue;
+            const object = this.gameMap.getObjectById?.(opening.id);
+            if (!object) continue;
+            this.gameMap.container?.attachments?.detach?.(object);
+            this.attachOpeningObject(object, opening);
+        }
     }
 
     bindOpeningObjects() {

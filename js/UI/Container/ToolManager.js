@@ -42,11 +42,19 @@ class ToolManager extends UIComponent {
                 buildOnly: true,
                 claimsMapDrag: true
             },
+            [UIToolModes.ROOM]: {
+                id: 'tool-room',
+                label: 'Room',
+                cursor: 'crosshair',
+                shortcut: '3',
+                buildOnly: true,
+                claimsMapDrag: true
+            },
             [UIToolModes.SURFACE]: {
                 id: 'tool-surface',
                 label: 'Surface',
                 cursor: 'pointer',
-                shortcut: '3',
+                shortcut: '4',
                 buildOnly: true,
                 claimsMapDrag: true
             }

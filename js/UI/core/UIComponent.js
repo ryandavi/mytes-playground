@@ -12,11 +12,16 @@ const UIToolModes = {
     // Drag tool performs, but for objects rather than mytes.
     MOVE: 'move',
     WALL: 'wall',
+    // ROOM is the rooms themselves: naming them, and painting floor into
+    // them where no wall says where one ends. See RoomPanel.
+    ROOM: 'room',
     SURFACE: 'surface'
 };
 
 // Tools that only exist inside Build mode.
-const BUILD_TOOL_MODES = Object.freeze([UIToolModes.MOVE, UIToolModes.WALL, UIToolModes.SURFACE]);
+const BUILD_TOOL_MODES = Object.freeze([
+    UIToolModes.MOVE, UIToolModes.WALL, UIToolModes.ROOM, UIToolModes.SURFACE
+]);
 
 /**
  * UIComponent — the base every UI piece hanging off `UserInterface` extends.

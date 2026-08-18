@@ -36,6 +36,7 @@ class WorldState {
             .filter(item => item.active && !item.collected)
             .map(item => item.serializeState());
         const walls = map.wallBuilder?.serializeState?.() ?? null;
+        const roomCells = map.roomAssignments?.serializeState?.() ?? null;
         // Both merged onto what was already stored, never replacing it.
         // Auto-detected rooms are rebuilt from scratch on every wall change, so
         // while a removed wall has two rooms merged into one the second room
@@ -65,7 +66,7 @@ class WorldState {
                     name: room.properties.playerName ?? null,
                     type: room.properties.roomType ?? null
                 }])));
-        const snapshot = { mapId: map.id, objects, droppedItems, walls, floors, roomWalls, roomEdits, savedAt: Date.now() };
+        const snapshot = { mapId: map.id, objects, droppedItems, walls, roomCells, floors, roomWalls, roomEdits, savedAt: Date.now() };
         this.payload.maps[map.id] = snapshot;
         return snapshot;
     }
@@ -88,6 +89,12 @@ class WorldState {
         for (const data of snapshot.droppedItems ?? []) {
             const item = map.addDroppedItem(data.type, data.variant, data.posX, data.posY);
             item.restoreState(data);
+        }
+        // Before the walls: restoring walls kicks the room detector, and a
+        // detector that runs without the player's own rooms merges them back
+        // together and then hands restoreRooms ids that no longer exist.
+        if (map.roomAssignments) {
+            map.roomAssignments.restoreState(snapshot.roomCells ?? {}, { emit: false });
         }
         if (snapshot.walls && map.wallBuilder) {
             map.wallBuilder.restoreState(snapshot.walls);

@@ -402,6 +402,7 @@ class TileMapLoader {
 		const attachments = [];
 		const fixtures = [];
 		const faceOverrides = [];
+		const roomAssignments = {};
 		mapData.objects = mapData.objects.filter(object => {
 			const type = String(object.properties?.type || object.name || object.type || '').toUpperCase();
 			if (type === 'WALLFINISHOVERRIDE') {
@@ -426,6 +427,16 @@ class TileMapLoader {
 						? { roomId: String(object.properties.roomId) || null }
 						: {})
 				});
+				return false;
+			}
+			if (type === 'ROOMASSIGNMENT') {
+				// One object per room, listing the cells the author put in it. A room
+				// is a set of squares, so it is written as one — an object per square
+				// would bury a hand-authored map under a hundred rectangles.
+				const roomId = String(object.properties?.roomId || object.id);
+				for (const key of String(object.properties?.cells || '').split(' ')) {
+					if (/^-?\d+,-?\d+$/.test(key)) roomAssignments[key] = roomId;
+				}
 				return false;
 			}
 			if (type === 'WALLATTACHMENT') {
@@ -491,7 +502,7 @@ class TileMapLoader {
 		});
 
 		mapData.walls = {
-			defaults, cells, openings, fixtures, attachments, faceOverrides,
+			defaults, cells, openings, fixtures, attachments, faceOverrides, roomAssignments,
 			wangAtlas: WallWangAtlas.fromTilesets(mapData.tilesets)
 		};
 	}

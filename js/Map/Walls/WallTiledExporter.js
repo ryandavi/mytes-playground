@@ -24,7 +24,7 @@
  * the layer it was painted on, so the set of layer ids to replace is exact.
  */
 class WallTiledExporter {
-    static WALL_OBJECT_TYPES = Object.freeze(['DOOR', 'WINDOW', 'PAINTING', 'WALLATTACHMENT', 'WALLFINISHOVERRIDE']);
+    static WALL_OBJECT_TYPES = Object.freeze(['DOOR', 'WINDOW', 'PAINTING', 'WALLATTACHMENT', 'WALLFINISHOVERRIDE', 'ROOMASSIGNMENT']);
 
     static MATERIAL_FIELDS = Object.freeze(['constructionId', 'finishId', 'heightCells', 'connectGroup']);
 
@@ -560,6 +560,31 @@ class WallTiledExporter {
                     attachmentWidth: { value: attachment.width, type: 'int' },
                     attachmentHeight: { value: attachment.height, type: 'int' },
                     fixture: { value: attachment.fixture || 'painting' }
+                }
+            });
+        }
+
+        const assignments = this.builder.gameMap?.roomAssignments;
+        for (const roomId of (assignments?.roomIds() ?? []).sort()) {
+            const cells = assignments.cellsFor(roomId).sort();
+            const columns = cells.map(key => Number(key.split(',')[0]));
+            const rows = cells.map(key => Number(key.split(',')[1]));
+            records.push({
+                // Named by the room, so re-exporting an unchanged room rewrites
+                // the same object rather than stacking a second one beside it.
+                id: `roomassignment:${roomId}`,
+                name: 'RoomAssignment',
+                x: Math.min(...columns) * tileWidth,
+                y: Math.min(...rows) * tileWidth,
+                keepSize: true,
+                width: (Math.max(...columns) - Math.min(...columns) + 1) * tileWidth,
+                height: (Math.max(...rows) - Math.min(...rows) + 1) * tileWidth,
+                properties: {
+                    type: { value: 'RoomAssignment' },
+                    roomId: { value: roomId },
+                    // The rectangle above is only where to find it in Tiled. A
+                    // room need not be rectangular, so the cells are the truth.
+                    cells: { value: cells.join(' ') }
                 }
             });
         }

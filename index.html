@@ -78,7 +78,11 @@
 					<svg class="icon" aria-hidden="true"><use href="#icon-wall"></use></svg>
 					<span class="text">Wall</span>
 				</button>
-				<button id="tool-surface" class="hand-control-btn tool-btn" data-tool-mode="surface" title="Edit surfaces (3)">
+				<button id="tool-room" class="hand-control-btn tool-btn" data-tool-mode="room" title="Split a space into rooms (3)">
+					<svg class="icon" aria-hidden="true"><use href="#icon-home"></use></svg>
+					<span class="text">Room</span>
+				</button>
+				<button id="tool-surface" class="hand-control-btn tool-btn" data-tool-mode="surface" title="Edit surfaces (4)">
 					<svg class="icon" aria-hidden="true"><use href="#icon-roller"></use></svg>
 					<span class="text">Surface</span>
 				</button>
@@ -332,14 +336,6 @@
 					<span class="surface-target__surface"></span>
 				</p>
 				<p class="setting-hint surface-customize-empty">Click a wall or floor to choose its finish. <kbd class="setting-key">Alt</kbd> samples the finish already there.</p>
-				<div class="setting-item surface-room-fields" hidden>
-					<label for="surface-room-name">Room name</label>
-					<input type="text" id="surface-room-name" maxlength="24" autocomplete="off" spellcheck="false">
-				</div>
-				<div class="setting-item surface-room-fields" hidden>
-					<label for="surface-room-type">Room type</label>
-					<select id="surface-room-type"></select>
-				</div>
 				<div class="segment-control surface-scope" role="group" aria-label="Paint scope" hidden>
 					<button type="button" class="segment-btn" data-value="stretch">This stretch</button>
 					<button type="button" class="segment-btn" data-value="room">Whole room</button>
@@ -372,6 +368,7 @@
 					<button type="button" class="segment-btn" data-value="remove">Remove</button>
 				</div>
 				<p class="setting-hint">Drag to lay a run. Hold <kbd class="setting-key">Ctrl</kbd> to invert the tool.</p>
+				<p class="setting-hint">Hover a wall to grab its handle, then pull to move the whole run.</p>
 				<div class="setting-item">
 					<div class="checkbox-wrapper" title="Outline a room instead of laying a single run">
 						<input type="checkbox" id="wall-build-rectangle">
@@ -382,6 +379,30 @@
 		</div>
 	</div>
 	<!-- END WALL BUILD PANEL -->
+
+	<!-- ROOM PANEL -->
+	<div id="room-panel" class="window-panel room-panel">
+		<div class="window-panel__header">
+			<div class="window-panel__title">
+				<svg class="icon" aria-hidden="true"><use href="#icon-home"></use></svg>
+				<div class="text">Rooms</div>
+			</div>
+			<div class="window-panel__controls">
+				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
+			</div>
+		</div>
+		<div class="window-panel__content">
+			<div class="settings-group">
+				<p class="setting-hint">Pick a room below, then click the floor to fill it or drag to paint square by square. The floor you paint joins that room.</p>
+				<div class="room-panel-list"></div>
+			</div>
+		</div>
+		<div class="window-panel__footer">
+			<button type="button" id="room-new" class="room-action">New room</button>
+			<button type="button" id="room-reset" class="room-action">Reset to walls</button>
+		</div>
+	</div>
+	<!-- END ROOM PANEL -->
 
 	<!-- OPTIONS PANEL — tab strip is rendered by PanelRegistry from SiteConfig.ui.panels -->
 	<div id="game-settings-panel" class="window-panel options-panel">
@@ -690,7 +711,7 @@
 	<!-- END WORLD MAP PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="js/bundle.js?v=9e6600e20b5d"></script>
+	<script src="js/bundle.js?v=3cb818d5f7b8"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

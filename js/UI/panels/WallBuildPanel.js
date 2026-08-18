@@ -102,13 +102,36 @@ class WallBuildPanel extends ModalWindow {
         if (!cell || !this.gameMap?.wallBuilder) return;
         event.preventDefault();
         event.stopPropagation();
+        // A grip standing on the wall, grabbed. No mode to choose first: the
+        // handle is only there when there is a wall under the cursor to move,
+        // so seeing it IS being told you can move this.
+        if (this.handleCell && this.handleCell.x === cell.x && this.handleCell.y === cell.y) {
+            const run = this.resolveRun(cell);
+            if (run) {
+                this.drag = {
+                    pointerId: event.pointerId,
+                    map: this.gameMap,
+                    start: cell,
+                    end: cell,
+                    operation: 'move',
+                    run,
+                    soundedCells: 0
+                };
+                this.hoverCell = null;
+                this.hoverOperation = null;
+                this.clearHandle();
+                this.renderMovePlan(event);
+                return;
+            }
+        }
+        const operation = this.resolveOperation(event);
         this.drag = {
             pointerId: event.pointerId,
             map: this.gameMap,
             start: cell,
             end: cell,
             rectangle: this.isRectangleMode(event),
-            operation: this.resolveOperation(event),
+            operation,
             soundedCells: 0
         };
         this.hoverCell = null;
@@ -127,6 +150,10 @@ class WallBuildPanel extends ModalWindow {
         event.preventDefault();
         event.stopPropagation();
         this.drag.end = cell;
+        if (this.drag.operation === 'move') {
+            this.renderMovePlan(event);
+            return;
+        }
         this.drag.rectangle = this.isRectangleMode(event);
         this.drag.operation = this.resolveOperation(event);
         this.renderGhosts(this.getDragCells(), event);
@@ -160,6 +187,7 @@ class WallBuildPanel extends ModalWindow {
         }
         this.hoverCell = cell;
         this.hoverOperation = operation;
+        this.renderHandle(cell, operation);
         this.renderGhosts([cell], null, operation);
         document.body.classList.toggle(
             'wall-build-refused',
@@ -173,13 +201,54 @@ class WallBuildPanel extends ModalWindow {
         this.hoverOperation = null;
         this.hoverEvent = null;
         this.clearGhosts();
+        this.clearHandle();
         document.body.classList.remove('wall-build-refused');
+    }
+
+    /**
+     * A grip on the wall under the cursor, pointing the way it can be pulled.
+     *
+     * The alternative was a Move mode in the panel, which meant knowing the mode
+     * existed, going to get it, and putting it back. A wall you can drag should
+     * look like a wall you can drag — so the handle appears on the run the
+     * moment you are over it, and grabbing it is the whole interaction.
+     */
+    renderHandle(cell, operation) {
+        this.clearHandle();
+        if (operation !== 'add') return;                    // removing, not moving
+        const run = this.resolveRun(cell);
+        const layer = this.gameMap?.layers?.objects;
+        const cellSize = this.gameMap?.gridSystem?.config?.cellSize;
+        if (!run || !layer || !cellSize) return;
+
+        const handle = document.createElement('div');
+        handle.className = `wall-move-handle is-${run.axis}`;
+        handle.style.left = `${cell.x * cellSize}px`;
+        handle.style.top = `${cell.y * cellSize}px`;
+        handle.style.width = `${cellSize}px`;
+        handle.style.height = `${cellSize}px`;
+        layer.appendChild(handle);
+        this.handleElement = handle;
+        this.handleCell = { x: cell.x, y: cell.y };
+    }
+
+    clearHandle() {
+        this.handleElement?.remove();
+        this.handleElement = null;
+        this.handleCell = null;
     }
 
     handlePointerUp(event) {
         if (!this.drag || event.pointerId !== this.drag.pointerId) return;
         event.preventDefault();
         event.stopPropagation();
+        if (this.drag.operation === 'move') {
+            const plan = this.getMovePlan();
+            const map = this.drag.map;
+            this.cancelDrag();
+            this.commitMove(map, plan);
+            return;
+        }
         const cells = this.getDragCells();
         const map = this.drag.map;
         const operation = this.drag.operation;
@@ -213,6 +282,293 @@ class WallBuildPanel extends ModalWindow {
             const [x, y] = key.split(',').map(Number);
             return { x, y };
         });
+    }
+
+    // -- Moving a run ---------------------------------------------------------
+
+    /**
+     * The straight run of wall the given cell belongs to.
+     *
+     * A wall in a house is almost never one cell, and nobody thinks of it as
+     * one — "the kitchen's back wall" is the unit people want to grab. So the
+     * run is walked out from the cell along whichever axis it connects on,
+     * stopping where the masonry stops.
+     *
+     * A junction cell is where two runs cross and belongs to both, so it has no
+     * single answer and is refused rather than guessed at. Grabbing a corner and
+     * watching it take one of its two walls with it is worse than being told to
+     * grab somewhere else.
+     * @returns {{cells: Array<{x: number, y: number}>, axis: string}|null}
+     */
+    resolveRun(cell) {
+        const builder = this.gameMap?.wallBuilder;
+        const raw = builder?.cells.get(`${cell.x},${cell.y}`);
+        if (!raw) return null;
+        const mask = builder.computeMask(raw);
+        const horizontal = WallBuilder.isHorizontalMask(mask);
+        const vertical = WallBuilder.isVerticalMask(mask);
+        if (horizontal === vertical) return null;          // junction, or a lone post
+
+        const axis = horizontal ? 'horizontal' : 'vertical';
+        const step = horizontal ? [1, 0] : [0, 1];
+        const cells = [{ x: cell.x, y: cell.y }];
+        for (const direction of [-1, 1]) {
+            let x = cell.x;
+            let y = cell.y;
+            for (;;) {
+                x += step[0] * direction;
+                y += step[1] * direction;
+                const next = builder.cells.get(`${x},${y}`);
+                if (!next) break;
+                const nextMask = builder.computeMask(next);
+                // The run ends AT a corner, not through it: a corner is part of
+                // this wall and moves with it, but the wall turning out of it is
+                // a different wall and stays where it is.
+                cells.push({ x, y });
+                if (WallBuilder.isHorizontalMask(nextMask) === WallBuilder.isVerticalMask(nextMask)) break;
+            }
+        }
+        cells.sort((a, b) => a.y - b.y || a.x - b.x);
+        return { cells, axis };
+    }
+
+    /**
+     * Where the grabbed run would end up, and what it costs to put it there.
+     *
+     * Only the perpendicular part of the drag counts — sliding a wall along its
+     * own length is not a thing walls do, and letting the pointer's other axis
+     * leak in makes a straight pull impossible to perform by hand.
+     *
+     * `bridges` is what keeps the house shut. Pull a room's back wall out and
+     * the two side walls have to grow with it; without that the room springs a
+     * gap at each end and stops being a room, which the floors and the lighting
+     * both notice immediately. Only ends that were ATTACHED to something grow —
+     * a free-standing wall slides cleanly and sprouts nothing.
+     * @returns {{distance: number, additions: Array, removals: Array}}
+     */
+    getMovePlan() {
+        const empty = { distance: 0, additions: [], removals: [], moveX: 0, moveY: 0 };
+        const run = this.drag?.run;
+        const builder = this.drag?.map?.wallBuilder;
+        if (!run || !builder) return empty;
+
+        const horizontal = run.axis === 'horizontal';
+        const distance = horizontal
+            ? this.drag.end.y - this.drag.start.y
+            : this.drag.end.x - this.drag.start.x;
+        if (distance === 0) return empty;
+        const stepX = horizontal ? 0 : Math.sign(distance);
+        const stepY = horizontal ? Math.sign(distance) : 0;
+        const span = Math.abs(distance);
+
+        const keep = new Map();
+        const take = (x, y, source) => {
+            const key = `${x},${y}`;
+            if (!keep.has(key)) keep.set(key, { x, y, data: Utility.deepClone(source) });
+        };
+
+        for (const cell of run.cells) {
+            const source = builder.baseCells.get(`${cell.x},${cell.y}`) ?? {};
+            take(cell.x + (stepX * span), cell.y + (stepY * span), source);
+        }
+
+        for (const end of [run.cells[0], run.cells[run.cells.length - 1]]) {
+            if (!this.endIsAnchored(builder, end, stepX, stepY)) continue;
+            const source = builder.baseCells.get(`${end.x},${end.y}`) ?? {};
+            for (let along = 0; along < span; along++) {
+                take(end.x + (stepX * along), end.y + (stepY * along), source);
+            }
+        }
+
+        const vacated = run.cells.filter(cell => !keep.has(`${cell.x},${cell.y}`));
+        const orphans = this.findOrphanedStubs(builder, run, keep, vacated);
+        const removals = [...vacated, ...orphans]
+            .map(cell => ({ x: cell.x, y: cell.y, data: null }));
+        const additions = [...keep.values()]
+            .filter(cell => !builder.baseCells.has(`${cell.x},${cell.y}`));
+        return { distance, additions, removals, moveX: stepX * span, moveY: stepY * span };
+    }
+
+    /**
+     * The bits of wall the move would leave behind attached to nothing.
+     *
+     * Pull a room's top wall down into the room and the two side walls now poke
+     * up past it into open air. Sometimes that is right — on a side that carries
+     * on past the corner it is one long wall and the part above the room is
+     * still doing a job. Sometimes it is two stubs standing in a garden, which
+     * is not a thing anybody meant to build and is tedious to go and delete.
+     *
+     * The difference is not which side it is on, it is whether the leftover
+     * still connects to anything. So the stubs are found the same way you would
+     * find them by eye: start where the wall was, and walk outwards taking off
+     * any cell that has nothing left holding it up. A cell with two connections
+     * is part of something and stops the walk — which is exactly the long side
+     * wall that should stay.
+     *
+     * Anything with a door, a window or a painting on it is left alone
+     * regardless: deleting a wall is undoable, silently deleting what was
+     * mounted on it is a nasty surprise.
+     * @returns {Array<{x: number, y: number}>}
+     */
+    findOrphanedStubs(builder, run, keep, vacated) {
+        if (vacated.length === 0) return [];
+        const gone = new Set(vacated.map(cell => `${cell.x},${cell.y}`));
+        const arriving = new Set([...keep.keys()]);
+        const orphans = [];
+
+        // Seeded from the sides of the wall that is leaving — a stub can only be
+        // orphaned by this move if it was touching it.
+        const queue = [];
+        const perpendicular = run.axis === 'horizontal' ? [[0, -1], [0, 1]] : [[-1, 0], [1, 0]];
+        for (const cell of vacated) {
+            for (const [dx, dy] of perpendicular) queue.push({ x: cell.x + dx, y: cell.y + dy });
+        }
+
+        const connections = (x, y) => [[-1, 0], [1, 0], [0, -1], [0, 1]].filter(([dx, dy]) => {
+            const key = `${x + dx},${y + dy}`;
+            if (gone.has(key)) return false;                // about to be nothing
+            return arriving.has(key) || builder.baseCells.has(key);
+        }).length;
+
+        for (let index = 0; index < queue.length; index++) {
+            const { x, y } = queue[index];
+            const key = `${x},${y}`;
+            if (gone.has(key) || arriving.has(key) || !builder.baseCells.has(key)) continue;
+            if (this.checkCell({ x, y }, 'remove').allowed !== true) continue;
+            if (connections(x, y) > 1) continue;            // held up by something
+            gone.add(key);
+            orphans.push({ x, y });
+            // Taking this one away may have orphaned the next one along.
+            for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                queue.push({ x: x + dx, y: y + dy });
+            }
+        }
+        return orphans;
+    }
+
+    /**
+     * Whether a run's end is anchored to masonry BEHIND it — on the side the
+     * wall is moving away from.
+     *
+     * Which side matters is the whole rule. Pull a wall away from the side wall
+     * it joins and that side has to stretch to follow, or the room springs open
+     * at the corner. Push it towards one and the side does not stretch, it gets
+     * shorter — so nothing is bridged and the leftover above the new corner is
+     * left for the orphan walk to take away.
+     *
+     * A wall that continues BOTH ways is a longer wall passing through, and it
+     * is anchored whichever way you push: the part beyond the corner is still
+     * doing a job, so the corner has to keep reaching it.
+     */
+    endIsAnchored(builder, end, stepX, stepY) {
+        return builder.cells.has(`${end.x - Math.sign(stepX)},${end.y - Math.sign(stepY)}`);
+    }
+
+    renderMovePlan(event = null) {
+        const plan = this.getMovePlan();
+        this.clearGhosts();
+        const map = this.drag?.map;
+        const layer = map?.layers?.objects;
+        const cellSize = map?.gridSystem?.config?.cellSize;
+        if (!layer || !cellSize) return;
+
+        const draw = (cells, className) => {
+            for (const cell of cells) {
+                const ghost = document.createElement('div');
+                ghost.className = `wall-build-ghost-cell ${className}`;
+                ghost.style.left = `${cell.x * cellSize}px`;
+                ghost.style.top = `${cell.y * cellSize}px`;
+                ghost.style.width = `${cellSize}px`;
+                ghost.style.height = `${cellSize}px`;
+                layer.appendChild(ghost);
+                this.ghostElements.push(ghost);
+            }
+        };
+        // Previewed under the same exemption the commit will use, so a wall
+        // with a door in it does not draw itself red for being in its own way.
+        const builder = map.wallBuilder;
+        const travelling = builder.getTravellingRecordIds({
+            cells: new Set(plan.removals.map(cell => `${cell.x},${cell.y}`))
+        });
+        const allowed = builder.withTravellingRecords(travelling, () =>
+            plan.additions.map(cell => this.checkCell(cell, 'add').allowed));
+
+        draw(plan.removals, 'is-remove');
+        draw(plan.additions.filter((_, index) => allowed[index]), 'is-move');
+        draw(plan.additions.filter((_, index) => !allowed[index]), 'is-invalid');
+
+        if (event && plan.distance !== 0) {
+            if (!this.measureLabel) {
+                this.measureLabel = document.createElement('div');
+                this.measureLabel.className = 'build-measure-label';
+                document.body.appendChild(this.measureLabel);
+            }
+            const size = Math.abs(plan.distance);
+            this.measureLabel.textContent = `${size} cell${size === 1 ? '' : 's'}`;
+            this.measureLabel.style.left = `${event.clientX + 16}px`;
+            this.measureLabel.style.top = `${event.clientY + 16}px`;
+        } else {
+            this.clearMeasurement();
+        }
+    }
+
+    /**
+     * One edit, not two. Removing the old run and adding the new one as separate
+     * commits would put a hole in the house between them — the room detector,
+     * the floors and the lighting all run on the first and would rebuild the
+     * world around a wall that is missing for one frame — and it would take two
+     * undos to put back.
+     */
+    commitMove(map, plan) {
+        const builder = map?.wallBuilder;
+        if (!builder || plan.distance === 0) return false;
+        const changes = [...plan.removals, ...plan.additions];
+        if (changes.length === 0) return false;
+
+        // Whatever is mounted on the run travels with it: the cells it is
+        // leaving, and how far.
+        // The cells being VACATED, not the whole run: an end cell that stays
+        // put as a bridge is still a wall, and a door hung in one belongs to
+        // the wall it is still part of rather than to the piece moving away.
+        const contentMove = {
+            cells: new Set(plan.removals.map(cell => `${cell.x},${cell.y}`)),
+            dx: plan.moveX,
+            dy: plan.moveY
+        };
+
+        let result;
+        try {
+            // Atomic: one blocked cell cancels the whole move rather than
+            // leaving a wall in two pieces with a door lying between them.
+            result = builder.applyWallCellChanges(Utility.deepClone(changes), { atomic: true, contentMove });
+        } catch (error) {
+            if (/node|budget|generated/i.test(error?.message || '')) {
+                this.parent.showMessage("This map can't hold more walls.", 'warning', 'Wall limit reached');
+                return false;
+            }
+            throw error;
+        }
+        if (!result || result.applied.length === 0) {
+            this.reportBlockedMove(result?.rejected);
+            this.playSound(SiteConfig.buildMode.sounds.rejected);
+            return false;
+        }
+
+        const forward = Utility.deepClone(result.applied);
+        const backward = Utility.deepClone(result.inverse);
+        const back = WallBuilder.invertContentMove(contentMove);
+        const size = Math.abs(plan.distance);
+        this.parent.parent?.buildHistory?.push({
+            label: `Move Wall (${size} cell${size === 1 ? '' : 's'})`,
+            undo: () => builder.applyWallCellChanges(Utility.deepClone(backward),
+                { validate: false, contentMove: back }),
+            redo: () => builder.applyWallCellChanges(Utility.deepClone(forward),
+                { validate: false, contentMove })
+        });
+        this.playSound(SiteConfig.buildMode.sounds.objectPlace);
+        map.container?.worldState?.captureMap?.(map);
+        map.core?.user?._scheduleSave?.();
+        return true;
     }
 
     // Pre-flight of the same rules applyWallCellChanges enforces, so a blocked
@@ -360,6 +716,18 @@ class WallBuildPanel extends ModalWindow {
             undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
             redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
         });
+    }
+
+    // A cancelled move is one message about the move, not one per cell: the
+    // player made a single gesture and it did not happen, and thirty lines
+    // about individual squares buries that.
+    reportBlockedMove(rejected = []) {
+        const reason = rejected?.[0]?.reason || 'Something is in the way.';
+        this.parent.showMessage(
+            `The wall stayed where it was — ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`,
+            'warning',
+            'Wall'
+        );
     }
 
     reportRejections(rejected = []) {
