@@ -270,12 +270,16 @@ class UserInterface {
             console.warn('[TerrainTiledExporter]', result.code, result.message);
             return result;
         }
-        const { cells, layers, layersAdded } = result.stats;
+        const { cells, layers, layersAdded, layersRemoved } = result.stats;
+        const changes = [
+            layersAdded > 0 ? `${layersAdded} new` : null,
+            layersRemoved > 0 ? `${layersRemoved} removed` : null
+        ].filter(Boolean);
         toasts?.show?.({
             type: 'success',
             title: 'Ground exported to Tiled',
             content: `${cells} tiles across ${layers} layer${layers === 1 ? '' : 's'}` +
-                `${layersAdded > 0 ? ` (${layersAdded} new)` : ''} → ${result.path}.`
+                `${changes.length ? ` (${changes.join(', ')})` : ''} → ${result.path}.`
         });
         for (const warning of result.warnings) {
             toasts?.show?.({ type: 'warning', title: 'Ground export warning', content: warning });

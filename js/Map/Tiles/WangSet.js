@@ -89,14 +89,17 @@ class WangSet {
         this.colors = colors;
         this.tiles = tiles;
 
-        // signature -> tileId, built once. The first tile wins: a set may
-        // author several tiles for the same arrangement as variants, and
-        // picking a stable one keeps a repaint from shuffling the map.
+        // signature -> [tileId, ...]. A set may author several tiles for the
+        // same arrangement as variants; all of them are kept, and choosing
+        // between them is the caller's business (see TerrainAtlas, which picks
+        // by position so a repaint never shuffles the map).
         this._byCornerKey = new Map();
         for (const [tileId, wangId] of this.tiles) {
             const key = WangSet.cornerKey(WangSet.CORNER_SLOTS.map(slot => wangId[slot]));
-            if (!this._byCornerKey.has(key)) this._byCornerKey.set(key, tileId);
+            if (!this._byCornerKey.has(key)) this._byCornerKey.set(key, []);
+            this._byCornerKey.get(key).push(tileId);
         }
+        for (const variants of this._byCornerKey.values()) variants.sort((a, b) => a - b);
     }
 
     get isCorner() {
@@ -119,7 +122,12 @@ class WangSet {
 
     /** The tile whose corners are exactly these, or null when the set has none. */
     tileIdForCorners(corners) {
-        return this._byCornerKey.get(WangSet.cornerKey(corners)) ?? null;
+        return this._byCornerKey.get(WangSet.cornerKey(corners))?.[0] ?? null;
+    }
+
+    /** Every tile the set authors for this arrangement, lowest id first. */
+    tileIdsForCorners(corners) {
+        return this._byCornerKey.get(WangSet.cornerKey(corners)) ?? [];
     }
 
     /** Whether the set can draw this arrangement at all. */

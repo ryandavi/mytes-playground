@@ -517,15 +517,99 @@ class TileMapLoader {
 	 * call the layer "Terrain".
 	 */
 	isTerrainLayer(layer, mapData) {
-		if (SiteConfig.terrainSystem?.enabled !== true) return false;
-		const declared = layer.properties?.[SiteConfig.terrainSystem.layerProperty];
-		if (declared) return true;
-		if (String(layer.name || '').toLowerCase() !== SiteConfig.terrainSystem.defaultLayerName.toLowerCase()) {
-			return false;
+		return !!this.resolveTerrainAtlasFor(layer, mapData);
+	}
+
+	/**
+	 * Which corner wang set, if any, this layer is painted with.
+	 *
+	 * Three ways to answer, in descending order of how sure they are:
+	 *
+	 *  1. The layer says so, via `terrainWangSet` naming its set. Explicit and
+	 *     unambiguous, and what the exporter writes.
+	 *  2. The layer is called "Terrain" and the map has a set to paint it with.
+	 *  3. Its tiles say so. A layer whose tiles are overwhelmingly one corner
+	 *     set's IS a ground layer, whatever it is called — and this is the case
+	 *     that matters, because no map authored before this system existed
+	 *     carries the property. Outside.tmx's Grass, Path and Water layers are
+	 *     each exactly this, and without detection the Ground tool opens on that
+	 *     map and truthfully reports no layers at all.
+	 *
+	 * The ratio is a threshold rather than a demand for purity: an authored
+	 * ground layer usually carries a few decorative tiles from outside the set,
+	 * and those are kept (see TerrainLayer.foreignTiles) rather than being a
+	 * reason to disown the whole layer.
+	 */
+	resolveTerrainAtlasFor(layer, mapData) {
+		if (SiteConfig.terrainSystem?.enabled !== true) return null;
+		this._terrainAtlasCache ??= new WeakMap();
+		if (this._terrainAtlasCache.has(layer)) return this._terrainAtlasCache.get(layer);
+
+		const resolved = this._detectTerrainAtlas(layer, mapData, this.terrainAtlasesFor(mapData));
+		this._terrainAtlasCache.set(layer, resolved);
+		return resolved;
+	}
+
+	/**
+	 * The map's corner wang atlases, built once and shared.
+	 *
+	 * Once, because an atlas owns a decoded tileset image and a swatch cache:
+	 * handing two layers two atlases over the same tileset means two copies of
+	 * the PNG, and — the way it actually showed up — a layer holding an atlas
+	 * nobody ever loaded the image into, so every swatch it was asked for came
+	 * back empty.
+	 */
+	terrainAtlasesFor(mapData) {
+		this._terrainAtlases ??= new WeakMap();
+		if (!this._terrainAtlases.has(mapData)) {
+			this._terrainAtlases.set(mapData, TerrainAtlas.allFromTilesets(mapData.tilesets));
 		}
-		// Named like a terrain layer — only actually one if the map has a wang
-		// set to paint it with.
-		return TerrainAtlas.allFromTilesets(mapData.tilesets).size > 0;
+		return this._terrainAtlases.get(mapData);
+	}
+
+	_detectTerrainAtlas(layer, mapData, atlases) {
+		if (atlases.size === 0) return null;
+
+		const declared = layer.properties?.[SiteConfig.terrainSystem.layerProperty];
+		if (declared) return atlases.get(declared) || atlases.values().next().value;
+
+		if (String(layer.name || '').toLowerCase() ===
+			SiteConfig.terrainSystem.defaultLayerName.toLowerCase()) {
+			return atlases.values().next().value;
+		}
+
+		if (SiteConfig.terrainSystem.autoDetectLayers !== true) return null;
+
+		// A wall layer is the wall system's, whatever its tiles look like —
+		// walls3.tsx authors both sets, and letting the ground painter adopt a
+		// wall layer would have two systems rewriting the same tiles.
+		if (this._isWallLayer(layer, mapData)) return null;
+
+		const painted = layer.data.filter(Boolean);
+		if (painted.length === 0) return null;
+
+		let best = null;
+		let bestRatio = 0;
+		for (const atlas of atlases.values()) {
+			const matches = painted.filter(gid => atlas.cornersForGid(gid) !== null).length;
+			const ratio = matches / painted.length;
+			if (ratio > bestRatio) {
+				bestRatio = ratio;
+				best = atlas;
+			}
+		}
+		return bestRatio >= SiteConfig.terrainSystem.autoDetectMinRatio ? best : null;
+	}
+
+	_isWallLayer(layer, mapData) {
+		if (SiteConfig.wallSystem?.enabled !== true) return false;
+		const marker = SiteConfig.wallSystem.wallTilesetProperty;
+		return layer.data.some(gid => {
+			if (!gid) return false;
+			const tileset = this.findTilesetForGid(gid, mapData.tilesets);
+			if (tileset?.properties?.[marker] !== true) return false;
+			return tileset.wallTileIds?.has(gid - tileset.firstgid) === true;
+		});
 	}
 
 	/**
@@ -542,7 +626,7 @@ class TileMapLoader {
 			return;
 		}
 
-		const atlases = TerrainAtlas.allFromTilesets(mapData.tilesets);
+		const atlases = this.terrainAtlasesFor(mapData);
 		if (atlases.size === 0) {
 			mapData.terrain = null;
 			return;
@@ -550,10 +634,7 @@ class TileMapLoader {
 
 		const layers = [];
 		mapData.layers.forEach((layer, index) => {
-			if (!this.isTerrainLayer(layer, mapData)) return;
-			const wangSetName = layer.properties?.[SiteConfig.terrainSystem.layerProperty] ||
-				SiteConfig.terrainSystem.wangSetName;
-			const atlas = atlases.get(wangSetName) || atlases.values().next().value;
+			const atlas = this.resolveTerrainAtlasFor(layer, mapData);
 			if (!atlas) return;
 
 			const terrainLayer = new TerrainLayer({
@@ -562,15 +643,22 @@ class TileMapLoader {
 				order: index,
 				atlas,
 				width: mapData.width,
-				height: mapData.height
+				height: mapData.height,
+				visible: layer.visible
 			});
 
 			layer.data.forEach((gid, dataIndex) => {
 				if (!gid) return;
 				const corners = atlas.cornersForGid(gid);
-				if (!corners) return;
 				const x = dataIndex % mapData.width;
 				const y = Math.floor(dataIndex / mapData.width);
+				if (!corners) {
+					// Not the wang set's — decoration the author put here. Kept
+					// verbatim rather than dropped, since the layer is now drawn
+					// by us instead of baked into the background image.
+					terrainLayer.foreignTiles.set(dataIndex, gid);
+					return;
+				}
 				TerrainLayer.cornerPointsFor(x, y).forEach(([cornerX, cornerY], corner) => {
 					terrainLayer.setColorAt(cornerX, cornerY, corners[corner]);
 				});

@@ -23,7 +23,7 @@ class TerrainTiledExporter {
         this.gameMap = gameMap;
         this.builder = gameMap.terrainBuilder;
         this.warnings = [];
-        this.stats = { layers: 0, cells: 0, layersAdded: 0 };
+        this.stats = { layers: 0, cells: 0, layersAdded: 0, layersRemoved: 0 };
     }
 
     static isAvailable(gameMap) {
@@ -66,6 +66,9 @@ class TerrainTiledExporter {
         // The corners are authored map data now; replaying the save's deltas on
         // top of them would at best be a no-op.
         this.builder.rebaseline();
+        // The file no longer holds the deleted layers, so the save has nothing
+        // left to remember about them.
+        this.builder.removedLayerIds.clear();
         this.gameMap.container?.worldState?.captureMap?.(this.gameMap);
 
         return { ok: true, path, backup: response.backup, stats: this.stats, warnings: this.warnings };
@@ -77,6 +80,17 @@ class TerrainTiledExporter {
         const mapEl = doc.querySelector('map');
         const width = Number(mapEl.getAttribute('width'));
         const height = Number(mapEl.getAttribute('height'));
+
+        // Deletions first. A layer the player removed has to leave the file, or
+        // the next load reads it straight back out of the map and the delete
+        // survives only as a note in the save.
+        for (const layerId of this.builder.removedLayerIds) {
+            const element = [...mapEl.querySelectorAll(':scope > layer')]
+                .find(candidate => String(candidate.getAttribute('id')) === String(layerId));
+            if (!element) continue;
+            element.remove();
+            this.stats.layersRemoved++;
+        }
 
         for (const layer of this.builder.orderedLayers()) {
             this.patchLayer(doc, mapEl, layer, width, height);
@@ -92,6 +106,10 @@ class TerrainTiledExporter {
         element.setAttribute('name', layer.name);
         element.setAttribute('width', String(width));
         element.setAttribute('height', String(height));
+        // Tiled's own way of saying hidden, so a layer switched off in game
+        // opens switched off there too.
+        if (layer.visible === false) element.setAttribute('visible', '0');
+        else element.removeAttribute('visible');
 
         // Naming the wang set on the layer is what makes the round-trip
         // unambiguous: the loader reads it back rather than guessing which of
@@ -100,7 +118,10 @@ class TerrainTiledExporter {
             [SiteConfig.terrainSystem.layerProperty]: { value: layer.atlas.name }
         });
 
-        const gids = new Map();
+        // Decoration first, painted ground over it — the same order they are
+        // drawn in, and the same rule: where the player has painted a cell, the
+        // paint is what the file should carry.
+        const gids = new Map(layer.foreignTiles);
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const gid = layer.gidForCell(x, y);
@@ -146,12 +167,9 @@ class TerrainTiledExporter {
         else mapEl.appendChild(element);
 
         // The layer now has the id the file will know it by, so the runtime
-        // stops calling it by the placeholder it invented.
-        this.builder.surfaces.get(layer.id)?.setAttribute('data-terrain-layer', String(id));
-        const canvas = this.builder.surfaces.get(layer.id);
-        this.builder.surfaces.delete(layer.id);
+        // stops calling it by the placeholder it invented. Nothing else is
+        // keyed by the old id — the terrain draws to one composited canvas.
         layer.id = id;
-        if (canvas) this.builder.surfaces.set(id, canvas);
 
         this.stats.layersAdded++;
         return element;

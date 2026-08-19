@@ -98,7 +98,24 @@ const SiteConfig = Object.freeze({
 		}),
 		// Which sizes are offered is the segment control's markup, like every
 		// other segment in the app; this is only which one starts selected.
-		defaultBrushSize: 1
+		defaultBrushSize: 1,
+		// A tile layer that never asked to be terrain, but plainly is one.
+		//
+		// Marking every ground layer by hand is a step nobody performs on a map
+		// they authored before this system existed - so a layer made almost
+		// entirely of one corner wang set's tiles is adopted as terrain even
+		// without the property. "Almost", not "entirely", because an authored
+		// ground layer usually carries a few decorative tiles from outside the
+		// set (a tuft, a stone), and those are preserved rather than being a
+		// reason to refuse the whole layer.
+		autoDetectLayers: true,
+		autoDetectMinRatio: 0.75,
+		// Wang sets may author several tiles for the same arrangement. Picking
+		// among them breaks up a large field of one terrain; picking the FIRST
+		// one every time is what makes a lawn look like graph paper. Chosen by
+		// position, not by chance, so the map draws the same on every load and
+		// survives a round-trip through Tiled unchanged.
+		useTileVariants: true
 		// No sounds block: painting a run of ground is the same gesture as
 		// laying a run of wall, and shares buildMode.sounds.run through
 		// BuildRunSound.

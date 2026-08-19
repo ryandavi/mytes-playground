@@ -895,33 +895,10 @@ body[data-build-cursor="refused"] .app-stage {
         }
     }
 
-    // The list scrolls, not the window — the same shape the Surface panel's
-    // finish list uses, and for the same reason: a definite height keeps the
-    // prompt above the list on screen while you scroll it, and stops the panel
-    // growing a room taller every time you make one. The content area still has
-    // its own scroll for a viewport too short to hold the panel at all.
+    // Only what differs from `.panel-list`: rooms are two-line rows, so the
+    // list wants a little more room before it starts scrolling.
     .room-panel-list {
-        @include surface-inset;
-        display: flex;
-        flex-direction: column;
-        flex: 0 1 auto;
-        gap: var(--space-sm);
-        padding: var(--space-sm);
-        // A ceiling, not a height: three rooms should make a short panel, and
-        // twenty should make this one scroll rather than the window.
-        max-height: 280px;
-        @include scroll-area;
-    }
-
-    // A map nobody has built in yet. Centred and quiet: it is a prompt, not an
-    // error, and it sits where the first room will appear.
-    .room-panel-empty {
-        margin: 0;
-        padding: var(--space-md) var(--space-sm);
-        text-align: center;
-        font-size: 12px;
-        line-height: 1.5;
-        opacity: 0.7;
+        max-height: 320px;
     }
 
     // The two controls that are not about any one room live in the footer, so
@@ -931,6 +908,165 @@ body[data-build-cursor="refused"] .app-stage {
         justify-content: stretch;
     }
 
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The scrolling list every tool panel keeps its rows in.
+//
+// The list scrolls, not the window: a definite ceiling keeps the prompt above it
+// on screen while you scroll, and stops the panel growing a row taller every
+// time you make one. The content area still has its own scroll for a viewport
+// too short to hold the panel at all.
+//
+// Rooms and ground layers had each grown their own version of this box, with
+// their own padding and their own gap, so the same list read as two different
+// components depending on which tool you had open.
+// ─────────────────────────────────────────────────────────────────────────────
+.panel-list {
+    @include surface-inset;
+    display: flex;
+    flex-direction: column;
+    flex: 0 1 auto;
+    gap: var(--space-xs);
+    padding: var(--space-sm);
+    width: 100%;
+    // A ceiling, not a height: three rows should make a short panel, and twenty
+    // should make this one scroll rather than the window.
+    max-height: 280px;
+    @include scroll-area;
+}
+
+// A list nobody has put anything in yet. Centred and quiet: it is a prompt, not
+// an error, and it sits where the first row will appear.
+.panel-list__empty {
+    margin: 0;
+    padding: var(--space-md) var(--space-sm);
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.5;
+    opacity: 0.7;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The list row every tool panel uses: a chip, a name, and the controls that
+// act on it, on one line.
+//
+// Rooms and ground layers had grown two versions of the same object with two
+// sets of class names, two ideas of how tall a chip should be, and two answers
+// to what "selected" looks like. This is the one answer. `.room-row` keeps its
+// own two-line grid on top - a room genuinely has a type and a size to show -
+// but wears the same chrome, so stepping between the panels does not feel like
+// stepping between two apps.
+// ─────────────────────────────────────────────────────────────────────────────
+.panel-row {
+    // One line's worth of control. Everything on a row is this tall.
+    --panel-row-item: 28px;
+
+    @include button-base;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-2xs);
+    cursor: pointer;
+    text-align: left;
+
+    &:hover {
+        background-color: var(--button-hover);
+    }
+
+    // The one being painted into. Same pressed treatment as an active tool
+    // button, rather than a tint of its own invention - and the outline, so it
+    // is legible at a glance in a list of otherwise identical rows.
+    &.active {
+        @include button-pressed;
+        outline: var(--border-width) solid var(--button-active-border-color);
+        outline-offset: calc(var(--border-width) * -1);
+    }
+
+    // Square, and one size everywhere. Whatever it shows - a room's colour, a
+    // terrain's tile - it is the thing you actually recognise the row by, so it
+    // gets a real edge rather than being a dot beside the text.
+    //
+    // Sized from the FIELD beside it, not from the row: the ground rows are one
+    // line and the room rows are two, so "as tall as the row" made the same
+    // object two different sizes in two panels. A row is a line of things that
+    // are all one line tall - a chip, a name, a key - and the chip has no more
+    // right to break that than the buttons do.
+    //
+    // `--panel-row-item` is that height, declared once here so the chip, the
+    // field and the keys cannot drift apart.
+    .panel-row__chip {
+        align-self: center;
+        flex: 0 0 auto;
+        width: var(--panel-row-item);
+        height: var(--panel-row-item);
+        background-repeat: repeat;
+        background-size: 16px 16px;
+        image-rendering: pixelated;
+        border-radius: 3px;
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--button-dark) 55%, transparent);
+
+        // Nothing to show. Checkered, so an empty layer reads as empty rather
+        // than as a chip that failed to load.
+        &.is-empty {
+            background-image: linear-gradient(45deg, var(--black) 25%, transparent 25%),
+                linear-gradient(-45deg, var(--black) 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, var(--black) 75%),
+                linear-gradient(-45deg, transparent 75%, var(--black) 75%);
+            background-size: 8px 8px;
+            background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+            opacity: 0.5;
+        }
+    }
+
+    // A row that carries something before its chip - a visibility eye, say.
+    &--lead {
+        grid-template-columns: auto auto minmax(0, 1fr) auto;
+    }
+
+    .panel-row__name {
+        @include field-base;
+        width: 100%;
+        min-width: 0;
+        height: var(--panel-row-item);
+        padding: 0 var(--space-xs);
+        font-size: var(--text-size-meta);
+    }
+
+    .panel-row__controls {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2xs);
+    }
+
+    // Square keys, sized from the row rather than from their glyph: an arrow, a
+    // circle and a cross have wildly different widths, and letting each take its
+    // own made the control cluster a ragged edge.
+    .panel-row__btn {
+        @include button-base;
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--panel-row-item);
+        height: var(--panel-row-item);
+        padding: 0;
+        font-size: var(--text-size-meta);
+        line-height: 1;
+        cursor: pointer;
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+    }
+
+    // Destructive, and sitting beside three buttons that are not - so it says so
+    // on hover rather than wearing warning colours the whole time.
+    .panel-row__delete:hover {
+        background: color-mix(in srgb, var(--color-danger) 30%, transparent);
+    }
 }
 
 // The action button every tool panel's footer uses.
@@ -1013,13 +1149,19 @@ body[data-build-cursor="refused"] .app-stage {
         }
     }
 
-    // Column one, both rows: it is the room's colour, not the name's, and
-    // leaving the column to it is what keeps the type out of it.
+    // Column one, both rows, and the full height of them: it is the room's
+    // colour, not the name's, so leaving the column to it is what keeps the type
+    // out of it. A 14px dot floating beside a two-line row read as a bullet
+    // point; a square the height of the row reads as the room's swatch, and
+    // lines up with the chip in every other panel's list.
+    // The row's first line, beside the name it belongs to - not a block spanning
+    // both lines. Same square as every other panel chip, and the same height as
+    // the field it sits next to.
     .room-row__chip {
         grid-column: 1;
         align-self: center;
-        width: 14px;
-        height: 14px;
+        width: var(--panel-row-item, 28px);
+        height: var(--panel-row-item, 28px);
         border-radius: 3px;
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--button-dark) 55%, transparent);
     }
@@ -1034,6 +1176,9 @@ body[data-build-cursor="refused"] .app-stage {
     .room-row__meta {
         grid-column: 2 / span 2;
         grid-row: 2;
+        // The chip no longer spans both lines, so the second line still has to
+        // be told to start past it rather than under it.
+        margin-left: 0;
         display: flex;
         align-items: center;
         gap: var(--space-xs);
@@ -1185,6 +1330,14 @@ body[data-game-mode="build"][data-tool-mode="move"] {
 // ─────────────────────────────────────────────────────────────────────────────
 .terrain-paint-panel {
 
+    // A control the current tool does not read is dimmed rather than hidden:
+    // the panel keeps its shape as you step through the tools, and the palette
+    // still says which terrain is in hand when you go back to painting.
+    .is-inactive {
+        opacity: 0.4;
+        pointer-events: none;
+    }
+
     .terrain-palette {
         @include surface-inset;
         display: grid;
@@ -1233,17 +1386,6 @@ body[data-game-mode="build"][data-tool-mode="move"] {
         border: var(--radius-xs) solid var(--black);
     }
 
-    // The eraser has no tile to show, so it shows the absence of one.
-    .terrain-swatch--erase .terrain-swatch__sample {
-        background-image: linear-gradient(45deg, var(--black) 25%, transparent 25%),
-            linear-gradient(-45deg, var(--black) 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, var(--black) 75%),
-            linear-gradient(-45deg, transparent 75%, var(--black) 75%);
-        background-size: 10px 10px;
-        background-position: 0 0, 0 5px, 5px -5px, -5px 0;
-        opacity: 0.45;
-    }
-
     .terrain-swatch__name {
         font-size: var(--text-size-meta);
         line-height: 1.2;
@@ -1254,59 +1396,13 @@ body[data-game-mode="build"][data-tool-mode="move"] {
         text-transform: capitalize;
     }
 
-    // Full width, on its own line under its heading. It was sharing a row with
-    // its label, which left a list of layer names in half a panel — and layer
-    // names are the one thing here that need the room.
-    .terrain-layer-list {
-        @include surface-inset;
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2xs);
-        padding: var(--space-xs);
-        width: 100%;
-        max-height: 140px;
-        @include scroll-area;
-    }
-
-    .terrain-layer-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
-        gap: var(--space-xs);
-
-        &.active .terrain-layer-name {
-            @include button-pressed;
-        }
-    }
-
-    .terrain-layer-name {
-        @include button-base;
-        padding: var(--space-2xs) var(--space-xs);
-        text-align: left;
-        font-size: var(--text-size-meta);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        cursor: pointer;
-    }
-
-    .terrain-layer-controls {
-        display: flex;
-        gap: var(--space-2xs);
-    }
-
-    // Small, because they are a nudge rather than a decision — but the same
-    // family as every other button in the panel, not the 9px specks they were.
-    .terrain-layer-move {
-        @include button-base;
-        padding: var(--space-2xs) var(--space-xs);
-        font-size: var(--text-size-meta);
-        line-height: 1.2;
-        cursor: pointer;
-
-        &:disabled {
-            opacity: 0.4;
-            cursor: default;
+    // A layer switched off is still a row you can name, reorder and delete -
+    // it is just not on the map at the moment, and the row says so by fading
+    // rather than by changing shape.
+    .terrain-layer-row.is-hidden-layer {
+        .panel-row__chip,
+        .panel-row__name {
+            opacity: 0.45;
         }
     }
 
@@ -1319,6 +1415,20 @@ body[data-game-mode="build"][data-tool-mode="move"] {
 // above it steps aside — the same bargain customize-mode strikes for surfaces,
 // except terrain is resolved from world coordinates rather than hit-tested, so
 // nothing needs to be handed pointer events back.
+// Picking a layer in the list shows where that layer actually is: its painted
+// cells, tinted, fading out on their own. Drawn by the builder into a canvas of
+// its own, because the terrain itself is one composited canvas with no
+// per-layer element to light up.
+.terrain-highlight {
+    animation: terrain-layer-flash 700ms ease-out 1 forwards;
+    mix-blend-mode: hard-light;
+}
+
+@keyframes terrain-layer-flash {
+    0%   { opacity: 0.65; }
+    100% { opacity: 0; }
+}
+
 body.terrain-paint-mode {
     .app-shell > .app-stage > .canvas > .layer:not(.background) {
         pointer-events: none;

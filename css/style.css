@@ -2688,7 +2688,7 @@ body.debug .map-object > .interactive-hitbox {
 .wall-build-panel,
 .room-panel,
 .terrain-paint-panel {
-  width: 340px;
+  width: 400px;
   max-height: min(720px, 100vh - var(--padding-outer) * 2);
 }
 .surface-customize-panel > .window-panel__content,
@@ -5045,6 +5045,13 @@ body[data-build-cursor=refused] .app-stage {
   min-height: 0;
 }
 .room-panel .room-panel-list {
+  max-height: 320px;
+}
+.room-panel > .window-panel__footer {
+  justify-content: stretch;
+}
+
+.panel-list {
   background-color: var(--surface-ui-inset, var(--button-mid));
   border: var(--border-width) solid var(--button-dark);
   border-bottom-color: var(--button-light);
@@ -5053,25 +5060,27 @@ body[data-build-cursor=refused] .app-stage {
   display: flex;
   flex-direction: column;
   flex: 0 1 auto;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   padding: var(--space-sm);
+  width: 100%;
   max-height: 280px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
-.room-panel .room-panel-list::-webkit-scrollbar {
+.panel-list::-webkit-scrollbar {
   width: var(--scrollbar-size);
   height: var(--scrollbar-size);
 }
-.room-panel .room-panel-list::-webkit-scrollbar-track {
+.panel-list::-webkit-scrollbar-track {
   background: var(--scrollbar-track);
 }
-.room-panel .room-panel-list::-webkit-scrollbar-thumb {
+.panel-list::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
 }
-.room-panel .room-panel-empty {
+
+.panel-list__empty {
   margin: 0;
   padding: var(--space-md) var(--space-sm);
   text-align: center;
@@ -5079,8 +5088,101 @@ body[data-build-cursor=refused] .app-stage {
   line-height: 1.5;
   opacity: 0.7;
 }
-.room-panel > .window-panel__footer {
-  justify-content: stretch;
+
+.panel-row {
+  --panel-row-item: 28px;
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  color: var(--button-text-color);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-2xs);
+  cursor: pointer;
+  text-align: left;
+}
+.panel-row:hover {
+  background-color: var(--button-hover);
+}
+.panel-row.active {
+  --dither-fill-color: var(--surface-ui-pressed);
+  background-color: var(--surface-ui-pressed, var(--button-hover));
+  border-top-color: var(--button-dark);
+  border-left-color: var(--button-dark);
+  border-right-color: var(--button-light);
+  border-bottom-color: var(--button-light);
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
+  background-color: var(--dither-fill-color, var(--button-hover));
+  color: var(--button-active-text-color, var(--text-base));
+  outline: var(--border-width) solid var(--button-active-border-color);
+  outline-offset: calc(var(--border-width) * -1);
+}
+.panel-row .panel-row__chip {
+  align-self: center;
+  flex: 0 0 auto;
+  width: var(--panel-row-item);
+  height: var(--panel-row-item);
+  background-repeat: repeat;
+  background-size: 16px 16px;
+  image-rendering: pixelated;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--button-dark) 55%, transparent);
+}
+.panel-row .panel-row__chip.is-empty {
+  background-image: linear-gradient(45deg, var(--black) 25%, transparent 25%), linear-gradient(-45deg, var(--black) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--black) 75%), linear-gradient(-45deg, transparent 75%, var(--black) 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  opacity: 0.5;
+}
+.panel-row--lead {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+}
+.panel-row .panel-row__name {
+  padding: var(--field-padding-block) var(--field-padding-inline);
+  border-radius: var(--border-radius-inner);
+  border: var(--border-width) solid var(--button-dark);
+  border-style: solid;
+  background-color: white;
+  width: 100%;
+  min-width: 0;
+  height: var(--panel-row-item);
+  padding: 0 var(--space-xs);
+  font-size: var(--text-size-meta);
+}
+.panel-row .panel-row__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+.panel-row .panel-row__btn {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  color: var(--button-text-color);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--panel-row-item);
+  height: var(--panel-row-item);
+  padding: 0;
+  font-size: var(--text-size-meta);
+  line-height: 1;
+  cursor: pointer;
+}
+.panel-row .panel-row__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.panel-row .panel-row__delete:hover {
+  background: color-mix(in srgb, var(--color-danger) 30%, transparent);
 }
 
 .panel-action,
@@ -5142,8 +5244,8 @@ body[data-build-cursor=refused] .app-stage {
 .room-row .room-row__chip {
   grid-column: 1;
   align-self: center;
-  width: 14px;
-  height: 14px;
+  width: var(--panel-row-item, 28px);
+  height: var(--panel-row-item, 28px);
   border-radius: 3px;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--button-dark) 55%, transparent);
 }
@@ -5156,6 +5258,7 @@ body[data-build-cursor=refused] .app-stage {
 .room-row .room-row__meta {
   grid-column: 2/span 2;
   grid-row: 2;
+  margin-left: 0;
   display: flex;
   align-items: center;
   gap: var(--space-xs);
@@ -5253,6 +5356,10 @@ body[data-game-mode=build][data-tool-mode=move].myte-placement-active .map-objec
   pointer-events: none;
 }
 
+.terrain-paint-panel .is-inactive {
+  opacity: 0.4;
+  pointer-events: none;
+}
 .terrain-paint-panel .terrain-palette {
   background-color: var(--surface-ui-inset, var(--button-mid));
   border: var(--border-width) solid var(--button-dark);
@@ -5320,12 +5427,6 @@ body[data-game-mode=build][data-tool-mode=move].myte-placement-active .map-objec
   image-rendering: pixelated;
   border: var(--radius-xs) solid var(--black);
 }
-.terrain-paint-panel .terrain-swatch--erase .terrain-swatch__sample {
-  background-image: linear-gradient(45deg, var(--black) 25%, transparent 25%), linear-gradient(-45deg, var(--black) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--black) 75%), linear-gradient(-45deg, transparent 75%, var(--black) 75%);
-  background-size: 10px 10px;
-  background-position: 0 0, 0 5px, 5px -5px, -5px 0;
-  opacity: 0.45;
-}
 .terrain-paint-panel .terrain-swatch__name {
   font-size: var(--text-size-meta);
   line-height: 1.2;
@@ -5335,90 +5436,27 @@ body[data-game-mode=build][data-tool-mode=move].myte-placement-active .map-objec
   white-space: nowrap;
   text-transform: capitalize;
 }
-.terrain-paint-panel .terrain-layer-list {
-  background-color: var(--surface-ui-inset, var(--button-mid));
-  border: var(--border-width) solid var(--button-dark);
-  border-bottom-color: var(--button-light);
-  border-right-color: var(--button-light);
-  border-radius: var(--border-radius);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2xs);
-  padding: var(--space-xs);
-  width: 100%;
-  max-height: 140px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
-}
-.terrain-paint-panel .terrain-layer-list::-webkit-scrollbar {
-  width: var(--scrollbar-size);
-  height: var(--scrollbar-size);
-}
-.terrain-paint-panel .terrain-layer-list::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
-}
-.terrain-paint-panel .terrain-layer-list::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 999px;
-}
-.terrain-paint-panel .terrain-layer-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-xs);
-}
-.terrain-paint-panel .terrain-layer-row.active .terrain-layer-name {
-  --dither-fill-color: var(--surface-ui-pressed);
-  background-color: var(--surface-ui-pressed, var(--button-hover));
-  border-top-color: var(--button-dark);
-  border-left-color: var(--button-dark);
-  border-right-color: var(--button-light);
-  border-bottom-color: var(--button-light);
-  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
-  background-size: var(--dither-size, 6px);
-  background-color: var(--dither-fill-color, var(--button-hover));
-  color: var(--button-active-text-color, var(--text-base));
-}
-.terrain-paint-panel .terrain-layer-name {
-  background-color: var(--surface-ui-raised, var(--button-mid));
-  border: var(--border-width) solid var(--button-dark);
-  border-top-color: var(--button-light);
-  border-left-color: var(--button-light);
-  border-radius: var(--border-radius-outer);
-  color: var(--button-text-color);
-  padding: var(--space-2xs) var(--space-xs);
-  text-align: left;
-  font-size: var(--text-size-meta);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.terrain-paint-panel .terrain-layer-controls {
-  display: flex;
-  gap: var(--space-2xs);
-}
-.terrain-paint-panel .terrain-layer-move {
-  background-color: var(--surface-ui-raised, var(--button-mid));
-  border: var(--border-width) solid var(--button-dark);
-  border-top-color: var(--button-light);
-  border-left-color: var(--button-light);
-  border-radius: var(--border-radius-outer);
-  color: var(--button-text-color);
-  padding: var(--space-2xs) var(--space-xs);
-  font-size: var(--text-size-meta);
-  line-height: 1.2;
-  cursor: pointer;
-}
-.terrain-paint-panel .terrain-layer-move:disabled {
-  opacity: 0.4;
-  cursor: default;
+.terrain-paint-panel .terrain-layer-row.is-hidden-layer .panel-row__chip,
+.terrain-paint-panel .terrain-layer-row.is-hidden-layer .panel-row__name {
+  opacity: 0.45;
 }
 .terrain-paint-panel > .window-panel__footer {
   justify-content: stretch;
 }
 
+.terrain-highlight {
+  animation: terrain-layer-flash 700ms ease-out 1 forwards;
+  mix-blend-mode: hard-light;
+}
+
+@keyframes terrain-layer-flash {
+  0% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 0;
+  }
+}
 body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.background) {
   pointer-events: none;
 }

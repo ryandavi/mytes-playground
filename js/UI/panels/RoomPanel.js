@@ -278,7 +278,7 @@ class RoomPanel extends ModalWindow {
      */
     static emptyState() {
         const empty = document.createElement('p');
-        empty.className = 'room-panel-empty';
+        empty.className = 'panel-list__empty room-panel-empty';
         empty.textContent = 'No rooms yet. Wall a space in and it becomes a room on its own, ' +
             'or press New room and paint the floor you want it to cover.';
         return empty;

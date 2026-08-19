@@ -72,17 +72,42 @@ class TerrainAtlas extends TileAtlas {
      * set does not author is a hole in the tileset, and the caller decides
      * whether to refuse the paint or fall back.
      */
-    tileIdForCorners(corners) {
+    tileIdForCorners(corners, x = null, y = null) {
         if (corners.every(corner => corner === 0)) return null;
-        return this.wangSet.tileIdForCorners(corners);
+        if (!SiteConfig.terrainSystem.useTileVariants || x === null || y === null) {
+            return this.wangSet.tileIdForCorners(corners);
+        }
+
+        const variants = this.wangSet.tileIdsForCorners(corners);
+        if (variants.length <= 1) return variants[0] ?? null;
+        return variants[TerrainAtlas.variantIndex(x, y, variants.length)];
+    }
+
+    /**
+     * Which of several equally-valid tiles this cell gets.
+     *
+     * Hashed from the cell's own coordinates rather than drawn at random, and
+     * that is the whole point: a random pick would reshuffle the map on every
+     * redraw, and an exported .tmx would differ from the same map reloaded. A
+     * position hash is stable, needs nothing stored, and round-trips.
+     *
+     * The constants are an ordinary integer hash - two odd multipliers and a
+     * xorshift - chosen only because they scatter neighbouring cells rather
+     * than banding them into stripes, which is what multiplying and adding
+     * alone would do.
+     */
+    static variantIndex(x, y, count) {
+        let hash = (x * 73856093) ^ (y * 19349663);
+        hash = (hash ^ (hash >>> 13)) >>> 0;
+        return hash % count;
     }
 
     hasCorners(corners) {
         return corners.every(corner => corner === 0) || this.wangSet.hasCorners(corners);
     }
 
-    gidForCorners(corners) {
-        const tileId = this.tileIdForCorners(corners);
+    gidForCorners(corners, x = null, y = null) {
+        const tileId = this.tileIdForCorners(corners, x, y);
         return tileId === null ? 0 : this.gidForTileId(tileId);
     }
 
@@ -95,6 +120,12 @@ class TerrainAtlas extends TileAtlas {
     /** The solid swatch a palette shows for a terrain, and paints with. */
     solidTileIdForColor(index) {
         return this.wangSet.solidTileIdForColor(index);
+    }
+
+    /** That swatch as an image, for anything that wants to show a terrain. */
+    swatchUrlForColor(index) {
+        const tileId = this.solidTileIdForColor(index);
+        return tileId === null ? null : this.swatchUrl(tileId);
     }
 
     /**

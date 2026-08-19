@@ -20,18 +20,28 @@ class TerrainLayer {
      *   atlas          the TerrainAtlas whose wang set this layer is painted with
      *   width/height   the map, in cells
      */
-    constructor({ id = null, name = 'Terrain', order = 0, atlas, width, height, sourceIndexOffset = 0 }) {
+    constructor({ id = null, name = 'Terrain', order = 0, atlas, width, height, visible = true }) {
         this.id = id;
         this.name = name;
         this.order = order;
         this.atlas = atlas;
         this.width = width;
         this.height = height;
-        this.sourceIndexOffset = sourceIndexOffset;
+        this.visible = visible !== false;
+        // Tiles on this layer that belong to no wang set - a decorative tuft or
+        // stone the author dropped onto their ground layer. The painter never
+        // touches them and the exporter writes them back where they were, so
+        // adopting a hand-made layer does not quietly delete its decoration.
+        // Keyed by index into the layer data, as the .tmx stores it.
+        this.foreignTiles = new Map();
         // "cornerX,cornerY" -> colour index. Absent means unpainted.
         this.corners = new Map();
-        // The corners as the map file has them, for diffing what the player changed.
+        // What the map file says about this layer, for diffing what the player
+        // changed. A save records an authored layer only when one of these has
+        // actually moved.
         this.authoredCorners = new Map();
+        this.authoredName = name;
+        this.authoredOrder = order;
     }
 
     static key(cornerX, cornerY) {
@@ -74,11 +84,41 @@ class TerrainLayer {
 
     /** The tile this cell resolves to right now, or null for "nothing painted". */
     tileIdForCell(x, y) {
-        return this.atlas.tileIdForCorners(this.cornersForCell(x, y));
+        return this.atlas.tileIdForCorners(this.cornersForCell(x, y), x, y);
     }
 
     gidForCell(x, y) {
-        return this.atlas.gidForCorners(this.cornersForCell(x, y));
+        return this.atlas.gidForCorners(this.cornersForCell(x, y), x, y);
+    }
+
+    /** The decorative tile sitting on this cell, if the author left one. */
+    foreignGidAt(x, y) {
+        return this.foreignTiles.get((y * this.width) + x) ?? 0;
+    }
+
+    clearForeignAt(x, y) {
+        return this.foreignTiles.delete((y * this.width) + x);
+    }
+
+    /**
+     * The terrain this layer is mostly made of — what it should be called and
+     * what it should look like in a list. A layer is nearly always one terrain
+     * (that is what layers are FOR here), so the commonest one is not a
+     * compromise, it is the answer.
+     */
+    dominantColorIndex() {
+        const counts = new Map();
+        for (const color of this.corners.values()) {
+            counts.set(color, (counts.get(color) ?? 0) + 1);
+        }
+        let best = 0;
+        let bestCount = 0;
+        for (const [color, count] of counts) {
+            if (count <= bestCount) continue;
+            best = color;
+            bestCount = count;
+        }
+        return best;
     }
 
     isEmpty() {
@@ -90,9 +130,11 @@ class TerrainLayer {
         return this.cornersForCell(x, y).some(corner => corner > 0);
     }
 
-    /** Take the current corners as the authored baseline (after an export). */
+    /** Take the current state as the authored baseline (after an export). */
     rebaseline() {
         this.authoredCorners = new Map(this.corners);
+        this.authoredName = this.name;
+        this.authoredOrder = this.order;
     }
 
     /**

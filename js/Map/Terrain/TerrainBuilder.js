@@ -24,6 +24,11 @@
 // copy of the map. Exporting to .tmx rebaselines, and the deltas empty out.
 // ─────────────────────────────────────────────────────────────────────────────
 class TerrainBuilder {
+    // A ceiling on one bucket fill. The largest honest fill is the whole map,
+    // and a 64x64 map is 4096 cells — this is that, rounded up, so the cap only
+    // ever catches a runaway rather than a real edit.
+    static MAX_FILL_CELLS = 8192;
+
     constructor(gameMap, terrainData) {
         this.gameMap = gameMap;
         this.tileWidth = terrainData.tileWidth;
@@ -33,7 +38,12 @@ class TerrainBuilder {
         this.atlases = terrainData.atlases;          // name -> TerrainAtlas
         this.layers = terrainData.layers;            // TerrainLayer[], in draw order
         this.container = null;
-        this.surfaces = new Map();                   // layer id -> canvas
+        this.canvas = null;                          // the composite, see Rendering
+        // Authored layers the player has deleted. Kept as ids rather than
+        // forgotten, because a save that merely omits a layer is
+        // indistinguishable from one written before that layer existed — the
+        // map file would put it straight back on the next load.
+        this.removedLayerIds = new Set();
         this._imagesReady = false;
     }
 
@@ -61,16 +71,36 @@ class TerrainBuilder {
     }
 
     // ── Rendering ────────────────────────────────────────────────────────────
+    //
+    // ONE canvas, not one per layer.
+    //
+    // Layers are a fact about the model — what is painted where, and in what
+    // order — not about the DOM. Giving each one its own canvas meant the
+    // stacking order had to be expressed as `z-index`, and a positioned element
+    // with a z-index outranks a sibling without one: the ground layers climbed
+    // straight over the room floors, which are drawn in the same background
+    // layer and never asked for a z-index of their own.
+    //
+    // Compositing here instead means the terrain is a single element with a
+    // single place in the DOM, ordering between ground layers is decided by the
+    // loop that draws them, and everything downstream — floors, decor, walls,
+    // objects — sits above it because it comes after it. It is also simply less
+    // to carry: a map with six ground layers is one canvas, not six.
 
     async build() {
         await this.loadImages();
-        this.clear();
-        for (const layer of this.orderedLayers()) this.drawLayer(layer);
-        return this.surfaces.size;
+        this.ensureCanvas();
+        this.drawAll();
+        return this.layers.length;
     }
 
     orderedLayers() {
         return [...this.layers].sort((a, b) => a.order - b.order);
+    }
+
+    /** The layers that actually draw, bottom first. */
+    visibleLayers() {
+        return this.orderedLayers().filter(layer => layer.visible !== false);
     }
 
     async loadImages() {
@@ -93,69 +123,143 @@ class TerrainBuilder {
             inset: '0',
             pointerEvents: 'none'
         });
-        // Below the floor surfaces, which are a room's chosen finish painted
-        // over whatever ground is there.
+        // First child of the background layer: ground is under everything, and
+        // the room floors that FloorBuilder appends after it draw on top by
+        // being later in the DOM rather than by outbidding it.
         layer.prepend(this.container);
         return this.container;
     }
 
-    surfaceFor(layer) {
-        const existing = this.surfaces.get(layer.id);
-        if (existing?.isConnected) return existing;
-
+    ensureCanvas() {
+        if (this.canvas?.isConnected) return this.canvas;
         const container = this.ensureContainer();
         if (!container) return null;
 
-        const canvas = document.createElement('canvas');
-        canvas.className = 'terrain-surface';
-        canvas.width = this.width * this.tileWidth;
-        canvas.height = this.height * this.tileHeight;
-        canvas.dataset.terrainLayer = String(layer.id);
-        Object.assign(canvas.style, {
+        this.canvas = document.createElement('canvas');
+        this.canvas.className = 'terrain-surface';
+        this.canvas.width = this.width * this.tileWidth;
+        this.canvas.height = this.height * this.tileHeight;
+        Object.assign(this.canvas.style, {
             position: 'absolute',
             left: '0',
             top: '0',
-            width: `${canvas.width}px`,
-            height: `${canvas.height}px`,
-            // Draw order among terrain layers is the map file's layer order.
-            zIndex: String(layer.order)
+            width: `${this.canvas.width}px`,
+            height: `${this.canvas.height}px`
         });
-        container.appendChild(canvas);
-        this.surfaces.set(layer.id, canvas);
-        return canvas;
+        container.appendChild(this.canvas);
+        return this.canvas;
     }
 
-    contextFor(layer) {
-        const canvas = this.surfaceFor(layer);
+    get context() {
+        const canvas = this.ensureCanvas();
         if (!canvas) return null;
         const context = canvas.getContext('2d');
         context.imageSmoothingEnabled = false;
         return context;
     }
 
-    drawLayer(layer) {
-        const context = this.contextFor(layer);
+    drawAll() {
+        const context = this.context;
         if (!context) return false;
         context.clearRect(0, 0, this.width * this.tileWidth, this.height * this.tileHeight);
         for (let y = 0; y < this.height; y++) {
-            for (let x = 0; x < this.width; x++) this.drawCell(layer, x, y, context);
+            for (let x = 0; x < this.width; x++) this.drawCell(x, y, context);
         }
         return true;
     }
 
-    drawCell(layer, x, y, context = this.contextFor(layer)) {
+    /** One cell, every visible layer, bottom first. */
+    drawCell(x, y, context = this.context) {
         if (!context) return false;
         const destX = x * this.tileWidth;
         const destY = y * this.tileHeight;
         context.clearRect(destX, destY, this.tileWidth, this.tileHeight);
-        const tileId = layer.tileIdForCell(x, y);
-        if (tileId === null) return false;
-        return layer.atlas.drawTile(context, tileId, destX, destY);
+
+        let drew = false;
+        for (const layer of this.visibleLayers()) {
+            const tileId = layer.tileIdForCell(x, y);
+            if (tileId !== null) {
+                drew = layer.atlas.drawTile(context, tileId, destX, destY) || drew;
+                continue;
+            }
+            // Nothing painted here on this layer, but the author may have left
+            // decoration on it.
+            const foreignGid = layer.foreignGidAt(x, y);
+            if (!foreignGid) continue;
+            const foreignTileId = layer.atlas.tileIdForGid(foreignGid);
+            if (foreignTileId !== null) {
+                drew = layer.atlas.drawTile(context, foreignTileId, destX, destY) || drew;
+            }
+        }
+        return drew;
+    }
+
+    /**
+     * Hide a layer without deleting it — the only way to paint the layer
+     * UNDERNEATH one you have already covered the map with. Purely a view
+     * state: the corners, the grid and the export are untouched, because a
+     * layer you cannot currently see is still part of the map.
+     */
+    setLayerVisible(layerId, visible) {
+        const layer = this.getLayer(layerId);
+        if (!layer || layer.visible === visible) return false;
+        layer.visible = visible;
+        this.drawAll();
+        this.eventManager?.emit?.(EVENTS.TERRAIN_LAYERS_CHANGED, { mapId: this.gameMap.id });
+        return true;
+    }
+
+    /**
+     * Show where a layer actually is, briefly, over the map.
+     *
+     * With one composited canvas there is no per-layer element to light up, and
+     * that is the right trade: the question "which layer did I just select" is
+     * about the ground, so the answer is drawn on the ground — this layer's
+     * painted cells, tinted, fading out on their own.
+     */
+    highlightLayer(layerId) {
+        const layer = this.getLayer(layerId);
+        const container = this.ensureContainer();
+        if (!layer || !container) return false;
+
+        this._highlight?.remove();
+        const canvas = document.createElement('canvas');
+        canvas.className = 'terrain-highlight';
+        canvas.width = this.width * this.tileWidth;
+        canvas.height = this.height * this.tileHeight;
+        Object.assign(canvas.style, {
+            position: 'absolute',
+            left: '0',
+            top: '0',
+            width: `${canvas.width}px`,
+            height: `${canvas.height}px`,
+            pointerEvents: 'none'
+        });
+
+        const context = canvas.getContext('2d');
+        const color = layer.atlas.colorAt(layer.dominantColorIndex())?.color || '#ffffff';
+        context.fillStyle = color;
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                if (!layer.hasPaintAt(x, y)) continue;
+                context.fillRect(x * this.tileWidth, y * this.tileHeight, this.tileWidth, this.tileHeight);
+            }
+        }
+
+        container.appendChild(canvas);
+        this._highlight = canvas;
+        canvas.addEventListener('animationend', () => {
+            canvas.remove();
+            if (this._highlight === canvas) this._highlight = null;
+        });
+        return true;
     }
 
     clear() {
-        for (const canvas of this.surfaces.values()) canvas.remove();
-        this.surfaces.clear();
+        this._highlight?.remove();
+        this._highlight = null;
+        this.canvas?.remove();
+        this.canvas = null;
     }
 
     // ── Painting ─────────────────────────────────────────────────────────────
@@ -170,6 +274,10 @@ class TerrainBuilder {
      */
     paintCell(layer, x, y, colorIndex) {
         if (!layer || x < 0 || y < 0 || x >= this.width || y >= this.height) return null;
+
+        // Paint wins over decoration: a tuft of grass the author dropped here
+        // has no business showing through the water you just painted over it.
+        if (colorIndex > 0) layer.clearForeignAt(x, y);
 
         const changed = [];
         for (const [cornerX, cornerY] of TerrainLayer.cornerPointsFor(x, y)) {
@@ -202,10 +310,10 @@ class TerrainBuilder {
             }
         }
 
-        const context = this.contextFor(layer);
+        const context = this.context;
         for (const key of touched) {
             const [cellX, cellY] = key.split(',').map(Number);
-            this.drawCell(layer, cellX, cellY, context);
+            this.drawCell(cellX, cellY, context);
             this.syncGridCell(cellX, cellY);
         }
 
@@ -280,6 +388,57 @@ class TerrainBuilder {
             if (this.layerAccepts(layer, cells, colorIndex)) return layer;
         }
         return this.addLayer();
+    }
+
+    /**
+     * The contiguous run of cells that read as the same ground as (x, y) on
+     * this layer — a paint bucket's region.
+     *
+     * Matched on the cell's DOMINANT colour rather than its exact corners, so a
+     * fill run up to the edge of a pond stops at the water instead of stopping
+     * one cell early on the half-and-half blend tiles that border it. Those
+     * blends belong to the shore you are filling; treating them as a different
+     * region would leave a one-cell moat of old ground around everything.
+     *
+     * Four-connected, because a fill that leaks diagonally through a corner
+     * touch is a fill nobody asked for.
+     */
+    fillRegion(layer, x, y, { limit = TerrainBuilder.MAX_FILL_CELLS } = {}) {
+        if (!layer || x < 0 || y < 0 || x >= this.width || y >= this.height) return [];
+
+        const target = TerrainBuilder.dominantColor(layer.cornersForCell(x, y));
+        const seen = new Set([`${x},${y}`]);
+        const region = [];
+        const queue = [{ x, y }];
+
+        while (queue.length > 0 && region.length < limit) {
+            const cell = queue.shift();
+            region.push(cell);
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                const [nextX, nextY] = [cell.x + dx, cell.y + dy];
+                const key = `${nextX},${nextY}`;
+                if (seen.has(key)) continue;
+                if (nextX < 0 || nextY < 0 || nextX >= this.width || nextY >= this.height) continue;
+                if (TerrainBuilder.dominantColor(layer.cornersForCell(nextX, nextY)) !== target) continue;
+                seen.add(key);
+                queue.push({ x: nextX, y: nextY });
+            }
+        }
+        return region;
+    }
+
+    /**
+     * What is painted at this cell, topmost first: the layer you can see and
+     * the terrain it is showing. The eyedropper's answer, and the one the layer
+     * list uses to say which layer a click belongs to.
+     */
+    sampleAt(x, y) {
+        for (const layer of [...this.orderedLayers()].reverse()) {
+            if (!layer.hasPaintAt(x, y)) continue;
+            const colorIndex = TerrainBuilder.dominantColor(layer.cornersForCell(x, y));
+            if (colorIndex > 0) return { layer, colorIndex };
+        }
+        return null;
     }
 
     static cellsAroundCorner(cornerX, cornerY) {
@@ -362,7 +521,7 @@ class TerrainBuilder {
      * Tiled — which is the point of building in game.
      */
     addLayer({ name = null, wangSetName = null } = {}) {
-        const atlas = wangSetName ? this.atlases.get(wangSetName) : this.defaultAtlas;
+        const atlas = (wangSetName && this.atlases.get(wangSetName)) || this.defaultAtlas;
         if (!atlas) return null;
 
         const order = this.layers.reduce((highest, layer) => Math.max(highest, layer.order), 0) + 1;
@@ -382,14 +541,43 @@ class TerrainBuilder {
         return layer;
     }
 
+    /**
+     * Take a layer out. Returns the layer itself so the caller can put it back —
+     * deleting a layer full of work is exactly the edit that needs an undo, and
+     * the layer object holds everything needed to restore it.
+     */
     removeLayer(layerId) {
         const index = this.layers.findIndex(layer => String(layer.id) === String(layerId));
-        if (index === -1) return false;
+        if (index === -1) return null;
+
         const [layer] = this.layers.splice(index, 1);
-        this.surfaces.get(layer.id)?.remove();
-        this.surfaces.delete(layer.id);
+        this.drawAll();
+        // Only authored ids need remembering; one this session invented has
+        // nothing in the map file to come back from.
+        if (layer.id >= 0) this.removedLayerIds.add(layer.id);
+        this.eventManager?.emit?.(EVENTS.TERRAIN_LAYERS_CHANGED, { mapId: this.gameMap.id });
+        return layer;
+    }
+
+    /** Put a removed layer back where it was, art and all. */
+    restoreLayer(layer) {
+        if (!layer || this.getLayer(layer.id)) return false;
+        this.layers.push(layer);
+        this.removedLayerIds.delete(layer.id);
+        this.drawAll();
+        this.syncGrid();
         this.eventManager?.emit?.(EVENTS.TERRAIN_LAYERS_CHANGED, { mapId: this.gameMap.id });
         return true;
+    }
+
+    renameLayer(layerId, name) {
+        const layer = this.getLayer(layerId);
+        const next = String(name || '').trim();
+        if (!layer || !next || next === layer.name) return null;
+        const previous = layer.name;
+        layer.name = next;
+        this.eventManager?.emit?.(EVENTS.TERRAIN_LAYERS_CHANGED, { mapId: this.gameMap.id });
+        return previous;
     }
 
     /** Move a layer up or down the stack. Ordering is a real authoring decision. */
@@ -402,10 +590,7 @@ class TerrainBuilder {
         const moved = ordered[index];
         const swapped = ordered[target];
         [moved.order, swapped.order] = [swapped.order, moved.order];
-        for (const layer of [moved, swapped]) {
-            const canvas = this.surfaces.get(layer.id);
-            if (canvas) canvas.style.zIndex = String(layer.order);
-        }
+        this.drawAll();
         this.eventManager?.emit?.(EVENTS.TERRAIN_LAYERS_CHANGED, { mapId: this.gameMap.id });
         return true;
     }
@@ -418,23 +603,43 @@ class TerrainBuilder {
                 id: layer.id,
                 name: layer.name,
                 order: layer.order,
+                visible: layer.visible,
                 wangSet: layer.atlas.name,
                 // A layer this session invented has no authored corners, so its
                 // "delta" is the whole thing — which is correct: without it the
                 // layer would not come back at all.
                 authored: layer.id >= 0,
+                edited: layer.name !== layer.authoredName ||
+                    layer.order !== layer.authoredOrder ||
+                    layer.visible === false,
                 corners: layer.serializeDeltas()
             }))
-            .filter(record => !record.authored || Object.keys(record.corners).length > 0);
-        return layers.length > 0 ? { layers } : null;
+            // An authored layer only needs recording when the player changed
+            // something about it — its paint, its name or its place in the stack.
+            .filter(record => !record.authored ||
+                record.edited ||
+                Object.keys(record.corners).length > 0);
+
+        const removed = [...this.removedLayerIds];
+        if (layers.length === 0 && removed.length === 0) return null;
+        return { layers, removed };
     }
 
     restoreState(state) {
-        if (!state?.layers?.length) return false;
+        if (!state?.layers?.length && !state?.removed?.length) return false;
 
-        for (const record of state.layers) {
+        // Removals first: a layer the player deleted must not be re-created by
+        // the record that follows, and its art must be gone before the rest of
+        // the stack is drawn over it.
+        for (const layerId of state.removed || []) {
+            this.removeLayer(layerId);
+            this.removedLayerIds.add(layerId);
+        }
+
+        for (const record of state.layers || []) {
             let layer = this.getLayer(record.id);
             if (!layer) {
+                if (this.removedLayerIds.has(record.id)) continue;
                 const atlas = this.atlases.get(record.wangSet) || this.defaultAtlas;
                 if (!atlas) continue;
                 layer = new TerrainLayer({
@@ -447,6 +652,10 @@ class TerrainBuilder {
                 });
                 this.layers.push(layer);
             }
+            // A name the player typed outlives the one in the map file.
+            if (record.name) layer.name = record.name;
+            if (Number.isFinite(record.order)) layer.order = record.order;
+            if (record.visible === false) layer.visible = false;
             layer.restoreDeltas(record.corners);
         }
 

@@ -593,7 +593,10 @@
     // the old 285 that left the name 153px and the dropdown 130px, and a form
     // squeezed to a third of the window is a form you cannot read what you
     // typed into.
-    width: 340px;
+    // Wide enough for a list row to hold a chip, a name field and four square
+    // keys on ONE line. At 340 the ground layers wrapped their controls under
+    // the name, which turned a four-layer list into eight lines of panel.
+    width: 400px;
 
     // Taller than the shared cap. These float beside the stage rather than over
     // it, so the stage's height is not their limit — and the finish list is the
