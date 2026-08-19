@@ -36,6 +36,7 @@ class WorldState {
             .filter(item => item.active && !item.collected)
             .map(item => item.serializeState());
         const walls = map.wallBuilder?.serializeState?.() ?? null;
+        const terrain = map.terrainBuilder?.serializeState?.() ?? null;
         const roomCells = map.roomAssignments?.serializeState?.() ?? null;
         // Both merged onto what was already stored, never replacing it.
         // Auto-detected rooms are rebuilt from scratch on every wall change, so
@@ -66,7 +67,7 @@ class WorldState {
                     name: room.properties.playerName ?? null,
                     type: room.properties.roomType ?? null
                 }])));
-        const snapshot = { mapId: map.id, objects, droppedItems, walls, roomCells, floors, roomWalls, roomEdits, savedAt: Date.now() };
+        const snapshot = { mapId: map.id, objects, droppedItems, walls, terrain, roomCells, floors, roomWalls, roomEdits, savedAt: Date.now() };
         this.payload.maps[map.id] = snapshot;
         return snapshot;
     }
@@ -98,6 +99,11 @@ class WorldState {
         }
         if (snapshot.walls && map.wallBuilder) {
             map.wallBuilder.restoreState(snapshot.walls);
+        }
+        // After the walls: painted ground writes cell walkability, and a wall
+        // restored on top of it has the final say about what can be walked on.
+        if (snapshot.terrain && map.terrainBuilder) {
+            map.terrainBuilder.restoreState(snapshot.terrain);
         }
         this.restoreRooms(map, snapshot);
         return true;

@@ -298,7 +298,13 @@ class SurfaceCustomizePanel extends ModalWindow {
         // target, so clicking one has to fall through to whatever is under it
         // rather than being swallowed into a no-op.
         const target = this.resolveTarget(event);
-        if (!target) return;
+        if (!target) {
+            // "Not that one" — the same answer clicking bare map gives a
+            // selected object (see ContainerInputManager.setupClickHandling).
+            // The click still falls through unclaimed; only the selection goes.
+            this.clearTargetFromStageClick(event);
+            return;
+        }
         event.preventDefault();
         event.stopPropagation();
         this.setTarget(target);
@@ -320,6 +326,25 @@ class SurfaceCustomizePanel extends ModalWindow {
         }
         this.renderPalette();
         this.open();
+    }
+
+    /**
+     * Clicking nothing paintable drops the selection — but only when the click
+     * was on the world. The listener sits on the canvas in capture, so panel
+     * chrome drawn over the stage would otherwise deselect the very surface the
+     * player is reaching into the panel to repaint.
+     *
+     * What is held in hand survives: the eyedropper is a separate piece of
+     * state with its own way out (the Drop button, Escape), and losing a sample
+     * because of a stray click is the annoying half of a one-shot tool.
+     */
+    clearTargetFromStageClick(event) {
+        if (!this.target) return;
+        const element = event.target;
+        if (element instanceof Element && element.closest(InputComponent.UI_SELECTOR)) return;
+
+        this.setTarget(null);
+        this.renderPalette();
     }
 
     // -- The eyedropper -------------------------------------------------------

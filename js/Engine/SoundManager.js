@@ -661,6 +661,26 @@ class SoundManager {
 		return this.createSynth(id);
 	}
 
+	/**
+	 * Has this voice already reserved more future than it is worth?
+	 *
+	 * Triggers reserve the tail of the previous one so two strikes of the same
+	 * voice cannot collide — which means a fast caller does not overlap sounds,
+	 * it queues them, and the queue outlives the gesture that made it. Rather
+	 * than asking every caller to throttle correctly (each of them has got it
+	 * wrong at least once), the backlog is capped here: past the horizon the
+	 * sound would no longer be describing anything the player is still doing,
+	 * so the honest thing is not to play it.
+	 *
+	 * See SiteConfig.audio.maxOneShotScheduleAheadMs.
+	 */
+	isScheduledTooFarAhead(sound) {
+		const reserved = sound?._nextTriggerTime;
+		if (!Number.isFinite(reserved)) return false;
+		const horizon = SiteConfig.audio.maxOneShotScheduleAheadMs / 1000;
+		return reserved - Tone.now() > horizon;
+	}
+
 	recordOneShotTrigger(sound) {
 		if (!sound) return;
 		sound._oneShotTriggerCount = (sound._oneShotTriggerCount || 0) + 1;
@@ -692,6 +712,7 @@ class SoundManager {
 		if (!sound) return;
 		sound = this.rotateOneShotSynth(id, sound);
 		if (!sound) return;
+		if (this.isScheduledTooFarAhead(sound)) return;
 
 		if (sound.panner) {
 			sound.panner.pan.value = this.getMapSpatialPan(options.source, listener);

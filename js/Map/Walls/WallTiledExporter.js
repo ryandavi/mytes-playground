@@ -55,8 +55,7 @@ class WallTiledExporter {
      * possibly answer, the button is dead rather than misleading.
      */
     static isAvailable(gameMap) {
-        return ['localhost', '127.0.0.1', '::1', ''].includes(window.location.hostname) &&
-            !!gameMap?.wallBuilder?.atlas;
+        return TiledDocument.canSave && !!gameMap?.wallBuilder?.atlas;
     }
 
     static async exportMap(gameMap, { force = false } = {}) {
@@ -119,40 +118,19 @@ class WallTiledExporter {
         return { ok: false, code, message, warnings: this.warnings };
     }
 
+    // File plumbing is TiledDocument's — see it for the patch-never-regenerate
+    // contract every exporter here follows.
     async fetchMapSource(path) {
-        // Cache-bust: the browser may hold the copy it loaded the map from, and
-        // patching a stale document would revert whatever Tiled wrote since.
-        const response = await fetch(`${path}${path.includes('?') ? '&' : '?'}t=${Date.now()}`, {
-            cache: 'no-store'
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.text();
+        return TiledDocument.fetchSource(path);
     }
 
     static async hash(text) {
-        const bytes = new TextEncoder().encode(text);
-        const digest = await crypto.subtle.digest('SHA-256', bytes);
-        return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+        return TiledDocument.hash(text);
     }
 
     async save({ xml, baseHash, force }) {
-        try {
-            const response = await fetch('editor/api/save-map.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ map: this.gameMap.id, xml, baseHash, force })
-            });
-            const payload = await response.json().catch(() => null);
-            if (!response.ok || payload?.ok !== true) {
-                return this.failure(
-                    payload?.error?.code || 'save_failed',
-                    payload?.error?.message || `The map API answered HTTP ${response.status}.`
-                );
-            }
-            return { ok: true, backup: payload.backup };
-        } catch (error) {
-            return this.failure('unreachable', `Could not reach the map API: ${error.message}`);
-        }
+        const result = await TiledDocument.save({ mapId: this.gameMap.id, xml, baseHash, force });
+        return result.ok ? result : this.failure(result.code, result.message);
     }
 
     /**
@@ -176,17 +154,16 @@ class WallTiledExporter {
     // ── Patching ─────────────────────────────────────────────────────────────
 
     patch(xmlText) {
-        const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
-        if (doc.querySelector('parsererror')) return null;
+        const doc = TiledDocument.parse(xmlText);
+        if (!doc) return null;
         const mapEl = doc.querySelector('map');
-        if (!mapEl) return null;
 
         this.stats = { layers: 0, cells: 0, objectsUpdated: 0, objectsAdded: 0, objectsRemoved: 0 };
 
         this.patchLayers(doc, mapEl);
         this.patchObjects(doc, mapEl);
 
-        return WallTiledExporter.serialize(doc);
+        return TiledDocument.serialize(doc);
     }
 
     /**
@@ -693,51 +670,8 @@ class WallTiledExporter {
 
     // ── Document plumbing ────────────────────────────────────────────────────
 
-    /** Consumes one id from the map's `nextlayerid`/`nextobjectid` counter. */
     static takeNextId(mapEl, attribute) {
-        const next = Number(mapEl.getAttribute(attribute)) || 1;
-        mapEl.setAttribute(attribute, String(next + 1));
-        return next;
+        return TiledDocument.takeNextId(mapEl, attribute);
     }
 
-    /**
-     * Tiled writes one-space-per-depth indentation and an XML declaration.
-     * XMLSerializer emits neither, so the result is re-indented to match —
-     * otherwise every export shows up in git as the whole file rewritten.
-     */
-    static serialize(doc) {
-        const body = new XMLSerializer().serializeToString(doc.documentElement);
-        const indented = WallTiledExporter.reindent(body);
-        return `<?xml version="1.0" encoding="UTF-8"?>\n${indented}\n`;
-    }
-
-    static reindent(xml) {
-        // Any text node carrying a line break is content, not formatting, and is
-        // lifted out and put back verbatim. Two kinds live in a .tmx and both
-        // break if touched: CSV layer data, which Tiled writes hard against the
-        // left margin, and multi-line property values — indenting the treasure
-        // chest's item list silently rewrites what is in the chest.
-        const blocks = [];
-        const masked = xml.replace(/>([^<]*\n[^<]*)(?=<)/g, (match, body) => {
-            // Whitespace-only runs are the document's existing formatting, which
-            // is exactly what is being reflowed — preserving those would leave
-            // the file half indented by Tiled and half by this.
-            if (body.trim() === '') return '>';
-            blocks.push(body);
-            return `>%%NEKO_TEXT_${blocks.length - 1}%%`;
-        });
-
-        const lines = [];
-        let depth = 0;
-        for (const token of masked.replace(/>\s*</g, '>\n<').split('\n')) {
-            const line = token.trim();
-            if (!line) continue;
-            if (line.startsWith('</')) depth = Math.max(0, depth - 1);
-            lines.push(' '.repeat(depth) + line);
-            const closesItself = line.endsWith('/>') || /^<[^>]+>[\s\S]*<\/[^>]+>$/.test(line);
-            if (line.startsWith('<') && !line.startsWith('</') && !closesItself) depth++;
-        }
-
-        return lines.join('\n').replace(/%%NEKO_TEXT_(\d+)%%/g, (match, index) => blocks[Number(index)]);
-    }
 }

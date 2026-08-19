@@ -9,7 +9,7 @@ class WallBuildPanel extends ModalWindow {
         });
         this.drag = null;
         this.hoverCell = null;
-        this.lastTickAt = 0;
+        this.runSound = new BuildRunSound(this);
         this.ghostElements = [];
         this.measureLabel = null;
         this.boundPointerDown = this.handlePointerDown.bind(this);
@@ -97,6 +97,7 @@ class WallBuildPanel extends ModalWindow {
         if (!cell || !this.gameMap?.wallBuilder) return;
         event.preventDefault();
         event.stopPropagation();
+        this.runSound.reset();
         // A grip standing on the wall, grabbed. No mode to choose first: the
         // handle is only there when there is a wall under the cursor to move,
         // so seeing it IS being told you can move this.
@@ -694,30 +695,15 @@ class WallBuildPanel extends ModalWindow {
 
     /**
      * One knock the moment each cell joins the run, not a burst when the drag
-     * ends — the wall should sound like it is going up under your hand. Pitch
-     * climbs a step per cell and wraps every `cycle`, so a long wall keeps its
-     * rhythm instead of sliding out of the register; removal runs the ladder
-     * down. Dragging back over cells you already crossed re-arms them without
-     * re-sounding, so only growth is audible.
+     * ends — the wall should sound like it is going up under your hand. The
+     * pacing rules live in BuildRunSound, shared with every other drag-to-build
+     * tool, because getting them subtly wrong is how a gesture ends up still
+     * making noise ten seconds after mouseup.
      */
     tickRunSound(count, removing) {
-        if (!this.drag || count === this.drag.soundedCells) return;
-        const grew = count > this.drag.soundedCells;
+        if (!this.drag) return;
         this.drag.soundedCells = count;
-        if (!grew || count <= 0) return;
-
-        const run = SiteConfig.buildMode.sounds.run;
-        // Wall-clock: this paces audio against the player's hand, not the sim.
-        const now = performance.now();
-        if (now - this.lastTickAt < run.minIntervalMs) return;
-        this.lastTickAt = now;
-
-        const position = (count - 1) % run.cycle;
-        this.playSound(run.sound, {
-            pitchScale: run.basePitch *
-                Math.pow(run.pitchStep, removing ? run.cycle - 1 - position : position),
-            volume: run.volume
-        });
+        this.runSound.advance(count, { descending: removing });
     }
 
     renderMeasurement(count, event) {

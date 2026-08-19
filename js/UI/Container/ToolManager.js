@@ -57,6 +57,14 @@ class ToolManager extends UIComponent {
                 shortcut: '4',
                 buildOnly: true,
                 claimsMapDrag: true
+            },
+            [UIToolModes.TERRAIN]: {
+                id: 'tool-terrain',
+                label: 'Ground',
+                cursor: 'crosshair',
+                shortcut: '5',
+                buildOnly: true,
+                claimsMapDrag: true
             }
         };
     }

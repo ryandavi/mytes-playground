@@ -2561,9 +2561,26 @@ class WallBuilder {
         return false;
     }
 
+    /**
+     * Every myte owns exactly one home slot, on exactly one map (`homeMapId`);
+     * everywhere else the slot element is detached from the DOM entirely.
+     *
+     * That makes residency the question here, not geometry. `getHomePosition()`
+     * answers with the myte's CURRENT coordinates when it is off its home map —
+     * a deliberate choice, since a detached slot measures as (0, 0) and would
+     * otherwise drag it to the corner — so asking every myte in the roster where
+     * its slot is turns visitors and stay-at-homes alike into phantom slots on
+     * whatever map you happen to be building in. On a map with no slots at all,
+     * that reads as "a Myte needs to be able to reach its slot" over a cell
+     * nothing occupies.
+     */
     isHomeSlotCell(rect) {
+        const mapId = this.gameMap?.id;
         return (this.gameMap.container?.mytes || []).some(myte => {
-            const home = myte.getHomePosition?.();
+            const slot = myte.homeSlot;
+            if (!slot?.isOnMap(mapId)) return false;
+
+            const home = slot.getStandingPosition();
             if (!home) return false;
             return RectUtils.boundsOverlap(rect, {
                 x: home.x,

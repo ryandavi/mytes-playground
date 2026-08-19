@@ -86,6 +86,10 @@
 					<svg class="icon" aria-hidden="true"><use href="#icon-roller"></use></svg>
 					<span class="text">Surface</span>
 				</button>
+				<button id="tool-terrain" class="hand-control-btn tool-btn" data-tool-mode="terrain" title="Paint ground (5)">
+					<svg class="icon" aria-hidden="true"><use href="#icon-leaf"></use></svg>
+					<span class="text">Ground</span>
+				</button>
 				<div class="tool-group__row">
 					<button id="build-undo" class="hand-control-btn hand-control-btn--half" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
 						<svg class="icon" aria-hidden="true"><use href="#icon-undo"></use></svg>
@@ -230,7 +234,7 @@
 						<!-- Dev-only shortcut for the Debug panel's own button: writes the
 						     walls standing here back into the .tmx, which is worth having
 						     to hand while actually building them. -->
-						<button type="button" class="stage-bar__action stage-bar__debug-only" id="stage-export-tiled" title="Export walls to Tiled">
+						<button type="button" class="stage-bar__action stage-bar__debug-only" id="stage-export-tiled" title="Export walls and ground to Tiled">
 							<svg class="icon" aria-hidden="true"><use href="#icon-wall"></use></svg>
 							<span>Tiled</span>
 						</button>
@@ -392,6 +396,43 @@
 		</div>
 	</div>
 	<!-- END WALL BUILD PANEL -->
+
+	<!-- TERRAIN PAINT PANEL -->
+	<div id="terrain-paint-panel" class="window-panel terrain-paint-panel">
+		<div class="window-panel__header">
+			<div class="window-panel__title">
+				<svg class="icon" aria-hidden="true"><use href="#icon-leaf"></use></svg>
+				<div class="text">Ground</div>
+			</div>
+			<div class="window-panel__controls">
+				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
+			</div>
+		</div>
+		<div class="window-panel__content">
+			<div class="settings-group">
+				<p class="setting-hint">Pick a ground and drag over the map. Edges blend into whatever they meet. Hold <kbd class="setting-key">Alt</kbd> to rub it out.</p>
+				<p class="setting-hint terrain-empty is-hidden">This map's tilesets have no ground to paint with. Add a corner wang set called Ground in Tiled.</p>
+				<div class="terrain-palette"></div>
+				<div class="setting-item">
+					<label for="terrain-brush">Brush</label>
+					<div class="segment-control terrain-brush-segment" id="terrain-brush" role="group" aria-label="Brush size">
+						<button type="button" class="segment-btn active" data-value="1">1</button>
+						<button type="button" class="segment-btn" data-value="2">2</button>
+						<button type="button" class="segment-btn" data-value="3">3</button>
+						<button type="button" class="segment-btn" data-value="5">5</button>
+					</div>
+				</div>
+				<div class="setting-item setting-item--stacked">
+					<label for="terrain-layers" title="Top of the list draws on top — a path over grass is two layers">Layers</label>
+					<div class="terrain-layer-list" id="terrain-layers"></div>
+				</div>
+			</div>
+		</div>
+		<div class="window-panel__footer">
+			<button type="button" class="terrain-layer-add panel-action">New layer</button>
+		</div>
+	</div>
+	<!-- END TERRAIN PAINT PANEL -->
 
 	<!-- ROOM PANEL -->
 	<div id="room-panel" class="window-panel room-panel">
@@ -762,7 +803,7 @@
 	<!-- END WORLD MAP PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="js/bundle.js?v=ee7507656afc"></script>
+	<script src="js/bundle.js?v=eeae27bb4539"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

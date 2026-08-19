@@ -931,20 +931,30 @@ body[data-build-cursor="refused"] .app-stage {
         justify-content: stretch;
     }
 
-    .room-action {
-        @include button-base;
-        // Sized from the words, not into equal halves: "Reset to walls" is
-        // twice the label "New room" is, and splitting the footer down the
-        // middle wrapped it onto two lines while the other button sat in a sea
-        // of its own padding.
-        flex: 1 1 auto;
-        padding: var(--space-2xs) var(--space-xs);
-        white-space: nowrap;
-        cursor: pointer;
+}
 
-        &.active {
-            background: color-mix(in srgb, var(--state-info-accent) 30%, transparent);
-        }
+// The action button every tool panel's footer uses.
+//
+// It began scoped inside `.room-panel`, which meant the Ground panel's "New
+// layer" — reusing the class in good faith — matched nothing at all and drew
+// itself at the browser's default size, twice the height of the button it was
+// copying. Two panels wanting the same button is exactly the case for one
+// class, so this is that class, at the top level where both can reach it.
+.panel-action,
+.room-action {
+    @include button-base;
+    // Sized from the words, not into equal halves: "Reset to walls" is twice
+    // the label "New room" is, and splitting the footer down the middle wrapped
+    // it onto two lines while the other button sat in a sea of its own padding.
+    flex: 1 1 auto;
+    padding: var(--space-2xs) var(--space-sm);
+    font-size: var(--text-size-body);
+    line-height: 1.5;
+    white-space: nowrap;
+    cursor: pointer;
+
+    &.active {
+        background: color-mix(in srgb, var(--state-info-accent) 30%, transparent);
     }
 }
 
@@ -1161,5 +1171,156 @@ body[data-game-mode="build"][data-tool-mode="move"] {
         .map-object {
             pointer-events: none;
         }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ground tool — the terrain palette and its layer stack.
+//
+// The palette is a grid rather than the Surface panel's single column: a
+// terrain's name is one word ("Grass", "Water"), and the thing you are actually
+// choosing between is the ART, which reads better side by side at swatch size
+// than stacked in a list of labels.
+// ─────────────────────────────────────────────────────────────────────────────
+.terrain-paint-panel {
+
+    .terrain-palette {
+        @include surface-inset;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+        gap: var(--space-xs);
+        padding: var(--space-sm);
+        flex: 0 0 auto;
+        max-height: 240px;
+        @include scroll-area;
+
+        &.is-hidden {
+            display: none;
+        }
+    }
+
+    // `.is-hidden` carries no global rule in this codebase — every use is
+    // scoped to the thing it hides, so the prompt needs its own.
+    .terrain-empty.is-hidden {
+        display: none;
+    }
+
+    .terrain-swatch {
+        @include button-base;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-2xs);
+        padding: var(--space-xs);
+        cursor: pointer;
+
+        &:active,
+        &.is-selected {
+            @include button-pressed;
+        }
+    }
+
+    // Four tiles, not one. A corner wang tile is drawn to sit in a field of
+    // itself, so a lone 32px sample shows its edges rather than its surface —
+    // repeating it is what makes grass look like grass.
+    .terrain-swatch__sample {
+        width: 40px;
+        height: 40px;
+        background-repeat: repeat;
+        background-size: 20px 20px;
+        image-rendering: pixelated;
+        border: var(--radius-xs) solid var(--black);
+    }
+
+    // The eraser has no tile to show, so it shows the absence of one.
+    .terrain-swatch--erase .terrain-swatch__sample {
+        background-image: linear-gradient(45deg, var(--black) 25%, transparent 25%),
+            linear-gradient(-45deg, var(--black) 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, var(--black) 75%),
+            linear-gradient(-45deg, transparent 75%, var(--black) 75%);
+        background-size: 10px 10px;
+        background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+        opacity: 0.45;
+    }
+
+    .terrain-swatch__name {
+        font-size: var(--text-size-meta);
+        line-height: 1.2;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-transform: capitalize;
+    }
+
+    // Full width, on its own line under its heading. It was sharing a row with
+    // its label, which left a list of layer names in half a panel — and layer
+    // names are the one thing here that need the room.
+    .terrain-layer-list {
+        @include surface-inset;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2xs);
+        padding: var(--space-xs);
+        width: 100%;
+        max-height: 140px;
+        @include scroll-area;
+    }
+
+    .terrain-layer-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: var(--space-xs);
+
+        &.active .terrain-layer-name {
+            @include button-pressed;
+        }
+    }
+
+    .terrain-layer-name {
+        @include button-base;
+        padding: var(--space-2xs) var(--space-xs);
+        text-align: left;
+        font-size: var(--text-size-meta);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        cursor: pointer;
+    }
+
+    .terrain-layer-controls {
+        display: flex;
+        gap: var(--space-2xs);
+    }
+
+    // Small, because they are a nudge rather than a decision — but the same
+    // family as every other button in the panel, not the 9px specks they were.
+    .terrain-layer-move {
+        @include button-base;
+        padding: var(--space-2xs) var(--space-xs);
+        font-size: var(--text-size-meta);
+        line-height: 1.2;
+        cursor: pointer;
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+    }
+
+    > .window-panel__footer {
+        justify-content: stretch;
+    }
+}
+
+// Painting ground means the ground is what the pointer is for. Everything
+// above it steps aside — the same bargain customize-mode strikes for surfaces,
+// except terrain is resolved from world coordinates rather than hit-tested, so
+// nothing needs to be handed pointer events back.
+body.terrain-paint-mode {
+    .app-shell > .app-stage > .canvas > .layer:not(.background) {
+        pointer-events: none;
     }
 }

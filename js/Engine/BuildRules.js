@@ -124,6 +124,26 @@ class BuildRules {
         return regions.some(region => region.properties?.buildable === true);
     }
 
+    // ── Terrain ───────────────────────────────────────────────────────────────
+
+    get terrainBuilder() {
+        return this.gameMap?.terrainBuilder || null;
+    }
+
+    /**
+     * Ground is under everything, so nothing standing on a cell can be in the
+     * way of painting it — a table does not stop the grass beneath it being
+     * grass. The only questions are whether this map has paintable ground at
+     * all, and whether the plot is the player's to edit.
+     */
+    canPaintTerrainCell(x, y) {
+        if (!this.terrainBuilder) return BuildRules.deny('This map has no paintable ground.');
+        if (this.policy === 'limited' && !this.isCellBuildable(x, y)) {
+            return BuildRules.deny('You can only build on your own plot here.');
+        }
+        return BuildRules.ALLOWED;
+    }
+
     // ── Surfaces ──────────────────────────────────────────────────────────────
 
     canPaintWallFace(cell) {

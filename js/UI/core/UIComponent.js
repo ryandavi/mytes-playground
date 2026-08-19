@@ -15,12 +15,16 @@ const UIToolModes = {
     // ROOM is the rooms themselves: naming them, and painting floor into
     // them where no wall says where one ends. See RoomPanel.
     ROOM: 'room',
-    SURFACE: 'surface'
+    SURFACE: 'surface',
+    // TERRAIN is the ground itself: grass, water, paths — corner wang tiles
+    // painted straight onto the map's own tile layers. See TerrainPaintPanel.
+    TERRAIN: 'terrain'
 };
 
 // Tools that only exist inside Build mode.
 const BUILD_TOOL_MODES = Object.freeze([
-    UIToolModes.MOVE, UIToolModes.WALL, UIToolModes.ROOM, UIToolModes.SURFACE
+    UIToolModes.MOVE, UIToolModes.WALL, UIToolModes.ROOM, UIToolModes.SURFACE,
+    UIToolModes.TERRAIN
 ]);
 
 /**

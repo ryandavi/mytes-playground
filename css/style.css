@@ -2425,8 +2425,11 @@ body.debug .map-object > .interactive-hitbox {
 .window-panel > .window-panel__content .setting-item:has(> label) {
   display: grid;
   grid-template-columns: subgrid;
-  align-items: center;
+  align-items: start;
   gap: var(--space-md);
+}
+.window-panel > .window-panel__content .setting-item:has(> label) > label {
+  padding-top: var(--space-2xs);
 }
 .window-panel > .window-panel__content .setting-item--stacked:has(> label) {
   grid-template-columns: minmax(0, 1fr);
@@ -2683,13 +2686,15 @@ body.debug .map-object > .interactive-hitbox {
 
 .surface-customize-panel,
 .wall-build-panel,
-.room-panel {
+.room-panel,
+.terrain-paint-panel {
   width: 340px;
   max-height: min(720px, 100vh - var(--padding-outer) * 2);
 }
 .surface-customize-panel > .window-panel__content,
 .wall-build-panel > .window-panel__content,
-.room-panel > .window-panel__content {
+.room-panel > .window-panel__content,
+.terrain-paint-panel > .window-panel__content {
   display: flex;
   flex-direction: column;
   align-content: start;
@@ -2700,34 +2705,40 @@ body.debug .map-object > .interactive-hitbox {
 }
 .surface-customize-panel > .window-panel__content::-webkit-scrollbar,
 .wall-build-panel > .window-panel__content::-webkit-scrollbar,
-.room-panel > .window-panel__content::-webkit-scrollbar {
+.room-panel > .window-panel__content::-webkit-scrollbar,
+.terrain-paint-panel > .window-panel__content::-webkit-scrollbar {
   width: var(--scrollbar-size);
   height: var(--scrollbar-size);
 }
 .surface-customize-panel > .window-panel__content::-webkit-scrollbar-track,
 .wall-build-panel > .window-panel__content::-webkit-scrollbar-track,
-.room-panel > .window-panel__content::-webkit-scrollbar-track {
+.room-panel > .window-panel__content::-webkit-scrollbar-track,
+.terrain-paint-panel > .window-panel__content::-webkit-scrollbar-track {
   background: var(--scrollbar-track);
 }
 .surface-customize-panel > .window-panel__content::-webkit-scrollbar-thumb,
 .wall-build-panel > .window-panel__content::-webkit-scrollbar-thumb,
-.room-panel > .window-panel__content::-webkit-scrollbar-thumb {
+.room-panel > .window-panel__content::-webkit-scrollbar-thumb,
+.terrain-paint-panel > .window-panel__content::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
 }
 .surface-customize-panel .setting-item label,
 .wall-build-panel .setting-item label,
-.room-panel .setting-item label {
+.room-panel .setting-item label,
+.terrain-paint-panel .setting-item label {
   font-size: var(--text-size-body);
 }
 .surface-customize-panel > .window-panel__content > .settings-group--secondary,
 .wall-build-panel > .window-panel__content > .settings-group--secondary,
-.room-panel > .window-panel__content > .settings-group--secondary {
+.room-panel > .window-panel__content > .settings-group--secondary,
+.terrain-paint-panel > .window-panel__content > .settings-group--secondary {
   margin-top: auto;
 }
 .surface-customize-panel > .window-panel__content > .settings-group[hidden],
 .wall-build-panel > .window-panel__content > .settings-group[hidden],
-.room-panel > .window-panel__content > .settings-group[hidden] {
+.room-panel > .window-panel__content > .settings-group[hidden],
+.terrain-paint-panel > .window-panel__content > .settings-group[hidden] {
   display: none;
 }
 
@@ -5071,7 +5082,9 @@ body[data-build-cursor=refused] .app-stage {
 .room-panel > .window-panel__footer {
   justify-content: stretch;
 }
-.room-panel .room-action {
+
+.panel-action,
+.room-action {
   background-color: var(--surface-ui-raised, var(--button-mid));
   border: var(--border-width) solid var(--button-dark);
   border-top-color: var(--button-light);
@@ -5079,11 +5092,14 @@ body[data-build-cursor=refused] .app-stage {
   border-radius: var(--border-radius-outer);
   color: var(--button-text-color);
   flex: 1 1 auto;
-  padding: var(--space-2xs) var(--space-xs);
+  padding: var(--space-2xs) var(--space-sm);
+  font-size: var(--text-size-body);
+  line-height: 1.5;
   white-space: nowrap;
   cursor: pointer;
 }
-.room-panel .room-action.active {
+.panel-action.active,
+.room-action.active {
   background: color-mix(in srgb, var(--state-info-accent) 30%, transparent);
 }
 
@@ -5234,6 +5250,176 @@ body[data-game-mode=build][data-tool-mode=move].myte-placement-active .world-myt
   cursor: grabbing;
 }
 body[data-game-mode=build][data-tool-mode=move].myte-placement-active .map-object {
+  pointer-events: none;
+}
+
+.terrain-paint-panel .terrain-palette {
+  background-color: var(--surface-ui-inset, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-bottom-color: var(--button-light);
+  border-right-color: var(--button-light);
+  border-radius: var(--border-radius);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  flex: 0 0 auto;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.terrain-paint-panel .terrain-palette::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+.terrain-paint-panel .terrain-palette::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+.terrain-paint-panel .terrain-palette::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+.terrain-paint-panel .terrain-palette.is-hidden {
+  display: none;
+}
+.terrain-paint-panel .terrain-empty.is-hidden {
+  display: none;
+}
+.terrain-paint-panel .terrain-swatch {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  color: var(--button-text-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-xs);
+  cursor: pointer;
+}
+.terrain-paint-panel .terrain-swatch:active, .terrain-paint-panel .terrain-swatch.is-selected {
+  --dither-fill-color: var(--surface-ui-pressed);
+  background-color: var(--surface-ui-pressed, var(--button-hover));
+  border-top-color: var(--button-dark);
+  border-left-color: var(--button-dark);
+  border-right-color: var(--button-light);
+  border-bottom-color: var(--button-light);
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
+  background-color: var(--dither-fill-color, var(--button-hover));
+  color: var(--button-active-text-color, var(--text-base));
+}
+.terrain-paint-panel .terrain-swatch__sample {
+  width: 40px;
+  height: 40px;
+  background-repeat: repeat;
+  background-size: 20px 20px;
+  image-rendering: pixelated;
+  border: var(--radius-xs) solid var(--black);
+}
+.terrain-paint-panel .terrain-swatch--erase .terrain-swatch__sample {
+  background-image: linear-gradient(45deg, var(--black) 25%, transparent 25%), linear-gradient(-45deg, var(--black) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--black) 75%), linear-gradient(-45deg, transparent 75%, var(--black) 75%);
+  background-size: 10px 10px;
+  background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+  opacity: 0.45;
+}
+.terrain-paint-panel .terrain-swatch__name {
+  font-size: var(--text-size-meta);
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+.terrain-paint-panel .terrain-layer-list {
+  background-color: var(--surface-ui-inset, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-bottom-color: var(--button-light);
+  border-right-color: var(--button-light);
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  padding: var(--space-xs);
+  width: 100%;
+  max-height: 140px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.terrain-paint-panel .terrain-layer-list::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+.terrain-paint-panel .terrain-layer-list::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+.terrain-paint-panel .terrain-layer-list::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+.terrain-paint-panel .terrain-layer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.terrain-paint-panel .terrain-layer-row.active .terrain-layer-name {
+  --dither-fill-color: var(--surface-ui-pressed);
+  background-color: var(--surface-ui-pressed, var(--button-hover));
+  border-top-color: var(--button-dark);
+  border-left-color: var(--button-dark);
+  border-right-color: var(--button-light);
+  border-bottom-color: var(--button-light);
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
+  background-color: var(--dither-fill-color, var(--button-hover));
+  color: var(--button-active-text-color, var(--text-base));
+}
+.terrain-paint-panel .terrain-layer-name {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  color: var(--button-text-color);
+  padding: var(--space-2xs) var(--space-xs);
+  text-align: left;
+  font-size: var(--text-size-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.terrain-paint-panel .terrain-layer-controls {
+  display: flex;
+  gap: var(--space-2xs);
+}
+.terrain-paint-panel .terrain-layer-move {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  color: var(--button-text-color);
+  padding: var(--space-2xs) var(--space-xs);
+  font-size: var(--text-size-meta);
+  line-height: 1.2;
+  cursor: pointer;
+}
+.terrain-paint-panel .terrain-layer-move:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.terrain-paint-panel > .window-panel__footer {
+  justify-content: stretch;
+}
+
+body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.background) {
   pointer-events: none;
 }
 

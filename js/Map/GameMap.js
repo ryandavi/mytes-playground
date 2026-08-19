@@ -36,6 +36,7 @@ class GameMap {
         this.wallMaterialRegistry = null;
         this.floorBuilder = null;
         this.floorMaterialRegistry = null;
+        this.terrainBuilder = null;
         this.surfaceCustomizer = null;
         this.renderer = new MapRenderer();
         // Handles a missing gridSystem (falls back to registry scans), so safe
@@ -546,6 +547,15 @@ class GameMap {
             this.environmentManager = new MapEnvironmentManager(this);
             await this.environmentManager.initialize(mapData);
         }
+
+		// Terrain before walls: the ground a wall stands on is drawn under it,
+		// and the paint tool's grid sync must not be undone by wall cells that
+		// have not been laid yet.
+		if (SiteConfig.terrainSystem?.enabled === true && mapData.terrain) {
+			this.terrainBuilder = new TerrainBuilder(this, mapData.terrain);
+			await this.terrainBuilder.build();
+			this.eventManager?.emit(EVENTS.TERRAIN_READY, { mapId: this.id, builder: this.terrainBuilder });
+		}
 
 		if (SiteConfig.wallSystem?.enabled === true && mapData.walls) {
 			this.wallMaterialRegistry = new WallMaterialRegistry(this.core?.resourceManager || null);
@@ -1270,12 +1280,16 @@ class GameMap {
 			this.roomAssignments.dispose();
 			this.roomAssignments = null;
 		}
-		// Floor surfaces live in the shared background layer, so they outlive the
-		// map that made them unless they are torn down here with the walls.
+		// Floor and terrain surfaces live in the shared background layer, so they
+		// outlive the map that made them unless torn down here with the walls.
 		if (this.floorBuilder) {
 			this.floorBuilder.dispose();
 			this.floorBuilder = null;
 			this.floorMaterialRegistry = null;
+		}
+		if (this.terrainBuilder) {
+			this.terrainBuilder.dispose();
+			this.terrainBuilder = null;
 		}
 		const backgroundLayer = this.layers.background;
 		const backgroundImage = backgroundLayer?.style?.backgroundImage || '';

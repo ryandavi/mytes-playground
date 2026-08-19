@@ -281,11 +281,23 @@
         .setting-item {
             // The row takes the group's two columns rather than inventing its
             // own, so every name in a group ends at the same edge.
+            // Top-aligned, not centred. A name and a single-line control read
+            // the same either way, but the moment the control is TALL — a list,
+            // a palette, a stack of rows — centring floats its name into the
+            // middle of it, level with nothing, pointing at nothing. A label
+            // belongs beside the first line of the thing it names.
             &:has(> label) {
                 display: grid;
                 grid-template-columns: subgrid;
-                align-items: center;
+                align-items: start;
                 gap: var(--space-md);
+            }
+
+            // Nudged onto the control's own baseline: `start` alone sits the
+            // text at the top of a row a bordered control makes taller than its
+            // text, which reads as slightly lifted rather than aligned.
+            &:has(> label) > label {
+                padding-top: var(--space-2xs);
             }
 
             // A control that wants the whole width — a slider — gets the name
@@ -568,7 +580,8 @@
 // which made them the only panels in the app with framed sections.
 .surface-customize-panel,
 .wall-build-panel,
-.room-panel {
+.room-panel,
+.terrain-paint-panel {
     // One width for all three: they are the same window wearing a different
     // tool, and stepping through Wall → Room → Surface should not shuffle the
     // panel edge across the screen. Still narrower than the Options window on

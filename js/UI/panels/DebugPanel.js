@@ -311,8 +311,8 @@ class DebugPanel extends PanelSection {
                 section: 'map',
                 subgroup: 'controls',
                 type: 'action',
-                label: 'Walls → Tiled',
-                action: (button) => this.parent.exportWallsToTiled(button)
+                label: 'Map → Tiled',
+                action: (button) => this.parent.exportMapToTiled(button)
             },
             {
                 id: 'toggleTimePause',

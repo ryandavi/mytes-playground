@@ -28,6 +28,9 @@ const tilesetsDir = path.join(repoRoot, 'data', 'tilesets');
 const WALL_WANG_SET = 'Wall';
 const REQUIRED_PROPERTIES = ['wallConstructionId', 'wallFinishId', 'wallHeightCells', 'wallConnectGroup'];
 const CONVENTIONAL_NAME = /^Walls\b/;
+// Mirrors SiteConfig.terrainSystem.layerProperty / defaultLayerName.
+const TERRAIN_LAYER_PROPERTY = 'terrainWangSet';
+const TERRAIN_LAYER_NAME = 'Terrain';
 
 // ── Tiny XML readers ─────────────────────────────────────────────────────────
 //
@@ -78,6 +81,7 @@ function parseLayers(mapXml) {
 		const csv = body.match(/<data encoding="csv">([\s\S]*?)<\/data>/);
 		layers.push({
 			name: readAttribute(attributes, 'name'),
+			order: layers.length,
 			properties: new Set(
 				(body.match(/<property name="[^"]*"/g) || []).map(tag => readAttribute(tag, 'name'))
 			),
@@ -87,6 +91,32 @@ function parseLayers(mapXml) {
 		});
 	}
 	return layers;
+}
+
+/**
+ * Terrain layers are drawn live by TerrainBuilder rather than baked into the
+ * map's background image, which puts them above every ordinary tile layer
+ * whatever order the file gives them. That is the convention — ground, then
+ * terrain, then walls — and a map that orders them otherwise looks right in
+ * Tiled and wrong in game, which is the worst way to be wrong.
+ */
+function checkTerrainOrder(layers) {
+	const terrain = layers.filter(layer =>
+		layer.properties.has(TERRAIN_LAYER_PROPERTY) || layer.name === TERRAIN_LAYER_NAME
+	);
+	if (terrain.length === 0) return [];
+
+	const firstTerrain = Math.min(...terrain.map(layer => layer.order));
+	const terrainOrders = new Set(terrain.map(layer => layer.order));
+
+	return layers
+		.filter(layer => !terrainOrders.has(layer.order) && layer.order > firstTerrain)
+		.map(layer => ({
+			level: 'warning',
+			layer: layer.name,
+			message: 'is drawn above a terrain layer in the file, but painted ground renders above every ' +
+				'baked tile layer at runtime — move it below the terrain layers, or make it objects'
+		}));
 }
 
 // ── Rules ────────────────────────────────────────────────────────────────────
@@ -183,9 +213,11 @@ function checkMap(mapFile, zoneTypes) {
 	const wallGids = collectWallGids(xml);
 	const tileSize = Number(readAttribute(xml.match(/<map[^>]*>/)[0], 'tilewidth')) || 32;
 	const findings = checkObjects(xml, tileSize, zoneTypes);
+	const layers = parseLayers(xml);
+	findings.push(...checkTerrainOrder(layers));
 	if (wallGids.size === 0) return findings;
 
-	for (const layer of parseLayers(xml)) {
+	for (const layer of layers) {
 		const wall = layer.gids.filter(gid => wallGids.has(gid));
 		if (wall.length === 0) continue;
 		const foreign = layer.gids.filter(gid => !wallGids.has(gid));

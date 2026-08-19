@@ -8,6 +8,10 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
         // Physics properties
         this.velocity = { x: 0, y: 0 };
         this.movementBody = new MovementBody(this);
+        // Motion is integrated per *frame* so a bounce reads smooth at 60fps,
+        // but an off-screen ball gets no frames — the tick tops up whatever the
+        // render loop did not cover. This counts the ms already spent by frames.
+        this._frameSimulatedMs = 0;
         this.friction = this.getConfig('friction', 0.94);
         this.settleFriction = this.getConfig('settleFriction', 0.82);
         this.maxSpeed = this.getConfig('speed', 5);
@@ -29,10 +33,13 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
         this.verticalVelocity = 0;
         this.isDropBouncing = false;
         this.dropBounceCount = 0;
-        this.defaultMaxDropBounces = this.getConfig('maxDropBounces', 3);
+        this.defaultMaxDropBounces = this.getConfig('maxDropBounces', 4);
         this.maxDropBounces = this.defaultMaxDropBounces;
-        this.dropGravity = this.getConfig('dropGravity', 1.2);
-        this.dropBounceFactor = this.getConfig('dropBounceFactor', 0.48);
+        // Units below are per tick (50ms), regardless of the frame rate the
+        // integrator actually runs at. dropGravity 2.8 ≈ 1120 px/s², roughly
+        // what a real ball at this sprite scale does — 1.2 read as moon gravity.
+        this.dropGravity = this.getConfig('dropGravity', 2.8);
+        this.dropBounceFactor = this.getConfig('dropBounceFactor', 0.55);
         this.airborneFriction = this.getConfig('airborneFriction', 0.985);
         this.landingSquash = 0;
         this.maxLandingSquash = this.getConfig('maxLandingSquash', 0.14);
@@ -73,13 +80,15 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
         this.maxDropBounces = this.defaultMaxDropBounces;
     }
 
-    _updateDropBounce() {
+    _updateDropBounce(step = 1) {
         if (!this.isDropBouncing && this.posZ <= 0) {
             return;
         }
 
-        this.posZ += this.verticalVelocity;
-        this.verticalVelocity -= this.dropGravity;
+        // Semi-implicit Euler: decelerate first, then move, so the arc stays
+        // symmetric no matter how the frame time slices it.
+        this.verticalVelocity -= this.dropGravity * step;
+        this.posZ += this.verticalVelocity * step;
 
         if (this.posZ <= 0) {
             this.posZ = 0;
@@ -432,14 +441,14 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
         }
     }
 
-    updatePhysics() {
+    updatePhysics(step = 1) {
         if (!this.isMoving) return;
 
         const prevX = this.posX;
         const prevY = this.posY;
 
-        this.posX += this.velocity.x;
-        this.posY += this.velocity.y;
+        this.posX += this.velocity.x * step;
+        this.posY += this.velocity.y * step;
 
         this.checkWallCollision(prevX, prevY);
         this.checkBoundaries();
@@ -451,8 +460,11 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
                 ? this.settleFriction
                 : this.friction;
 
-        this.velocity.x *= friction;
-        this.velocity.y *= friction;
+        // Friction is a per-tick ratio; compound it over the fraction of a tick
+        // this step covered so a 60fps ball decays at the same rate as a 20Hz one.
+        const decay = step === 1 ? friction : Math.pow(friction, step);
+        this.velocity.x *= decay;
+        this.velocity.y *= decay;
 
         const speed = this.getSpeed();
 
@@ -791,20 +803,22 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
         if (this.debug) Utility.logDebug("Ball stopped");
     }
 
-    // tickUpdate: collision detection + physics (no DOM)
+    // One integration step, sized in ms of world time. A step of 1 == one tick
+    // (50ms), which is the unit every tuning constant on this class is written in.
+    _stepMotion(ms) {
+        if (!(ms > 0.5)) return;
+        const step = Math.min(4, ms / AppConfig.engine.tickInterval);
+        this._updateDropBounce(step);
+        this.updatePhysics(step);
+    }
+
+    // tickUpdate: creature reactions + off-screen physics catch-up (no DOM)
     tickUpdate(tickDelta) {
         super.tickUpdate(tickDelta);
 
-        if (this.isDragging) {
+        if (this.isDragging || (this.isPickedUp && this.carrier)) {
+            this._frameSimulatedMs = 0;
             return;
-        }
-
-        if (this.isPickedUp && this.carrier) {
-            return;
-        }
-
-        if (this.isDropBouncing) {
-            this._updateDropBounce();
         }
 
         if (this.mytes.length) {
@@ -813,11 +827,23 @@ class BallMapObject extends withPickup(AnimatedMapObject) {
             }
         }
 
-        this.updatePhysics();
+        // On screen, update() has already integrated this stretch of world time;
+        // only the remainder (a culled ball gets no frames) is stepped here.
+        const covered = Math.min(this._frameSimulatedMs, tickDelta);
+        this._frameSimulatedMs -= covered;
+        this._stepMotion(tickDelta - covered);
     }
 
-    // update: animation + dirty marking
+    // update: per-frame physics integration + animation
     update(deltaTime) {
+        if (this.isDragging) {
+            this._frameSimulatedMs = 0;
+        } else if (!(this.isPickedUp && this.carrier)) {
+            this._stepMotion(deltaTime);
+            this._frameSimulatedMs += deltaTime;
+        }
+        // Base update computes the shadow and marks the position dirty, so it
+        // must run *after* this frame's motion or the DOM trails it by a frame.
         super.update(deltaTime);
         if (this.isDragging) {
             this._updateDragAnimation(deltaTime);

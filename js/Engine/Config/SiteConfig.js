@@ -68,6 +68,42 @@ const SiteConfig = Object.freeze({
 		edgeBleedCells: 0.5
 	}),
 
+	// Painted ground: grass, water, paths, carpet. Corner wang terrain, the same
+	// thing Tiled's terrain brush paints, driven from inside build mode.
+	terrainSystem: Object.freeze({
+		enabled: true,
+		// The corner wang set a layer is painted with unless it names another.
+		wangSetName: 'Ground',
+		// The layer property that marks a tile layer as paintable ground, and
+		// names its wang set. A layer simply called "Terrain" is taken as one too.
+		layerProperty: 'terrainWangSet',
+		defaultLayerName: 'Terrain',
+		// Tiled's terrain vocabulary → the pathfinding grid's. The loader reads
+		// authored tiles through this and the paint tool reads painted ones
+		// through the same table, so authored water and painted water are the
+		// same water.
+		terrainMapping: Object.freeze({
+			road: 'path',
+			path: 'path',
+			floor: 'floor',
+			carpet: 'floor',
+			grass: 'grass',
+			tall_grass: 'grass',
+			sand: 'sand',
+			mud: 'mud',
+			snow: 'mud',
+			water: 'shallow_water',
+			deep_water: 'deep_water',
+			shallow_water: 'shallow_water'
+		}),
+		// Which sizes are offered is the segment control's markup, like every
+		// other segment in the app; this is only which one starts selected.
+		defaultBrushSize: 1
+		// No sounds block: painting a run of ground is the same gesture as
+		// laying a run of wall, and shares buildMode.sounds.run through
+		// BuildRunSound.
+	}),
+
 	wallSystem: Object.freeze({
 		enabled: true,
 		extendCanvasForWallHeight: true,
@@ -1116,6 +1152,17 @@ const SiteConfig = Object.freeze({
         // bound during long sessions, then give the retired voice time to finish.
         oneShotSynthTriggerLimit: 64,
         oneShotSynthRecycleDelayMs: 1000,
+        // How far into the future a one-shot may be scheduled before it is
+        // dropped instead of queued.
+        //
+        // Each trigger reserves the tail of the one before it so two strikes of
+        // the same voice never collide, which means a burst does not overlap —
+        // it QUEUES. A drag firing thirty ticks of a 200ms sound builds six
+        // seconds of audio that carries on long after the hand stopped moving,
+        // and every build tool has hit this in turn. A caller that asks for
+        // more sound than time now gets silence rather than a backlog: past
+        // this horizon the sound is no longer describing what you are doing.
+        maxOneShotScheduleAheadMs: 220,
         mapSpatial: Object.freeze({
             fullVolumeRadius: 64,
             // Floor for the audible range — the effective range grows with viewport

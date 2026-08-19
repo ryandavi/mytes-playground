@@ -61,7 +61,7 @@ class StageViewBar extends UIComponent {
         // A shortcut to the Debug panel's own export, to hand while you are
         // actually laying the walls it writes out. One action, two ways in.
         this.exportButton = root.querySelector('#stage-export-tiled');
-        this.bindClick(this.exportButton, () => this.parent.exportWallsToTiled(this.exportButton));
+        this.bindClick(this.exportButton, () => this.parent.exportMapToTiled(this.exportButton));
 
         const events = this.container?.eventManager;
         this.track(

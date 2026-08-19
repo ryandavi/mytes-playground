@@ -164,12 +164,12 @@ class MapTransitionManager {
     // Move the .myte-slot wrapper to match a game-space position so
     // getHomePosition() returns the correct spawn coords for the new map.
     _syncMyteSlotToPosition(myte, position) {
-        if (!myte || !position) return;
-        const slotEl = myte.dropTarget ?? myte.element?.closest?.('.myte-slot');
+        if (!myte?.homeSlot || !position) return;
+        const slotEl = myte.homeSlot.element;
         if (!slotEl) return;
         slotEl.style.left = `${position.x}px`;
         slotEl.style.top  = `${position.y}px`;
-        myte.invalidateHomePositionCache?.();
+        myte.homeSlot.invalidate();
         Utility.logDebug(`[MapTransition] slot synced for ${myte.name} to (${position.x}, ${position.y})`);
     }
 
@@ -179,12 +179,15 @@ class MapTransitionManager {
         const spawnPoint = map?.getSpawnPoint?.('myte') ?? map?.getSpawnPoint?.('default');
         const mytes = this.container.mytes ?? [];
         const mapId = map?.id;
-        const residentMytes = mytes.filter(myte => myte.homeMapId === mapId);
+        // One slot, one map: residency is the slot's own answer, and the
+        // non-residents are removed rather than hidden so no map can ever be
+        // holding a second copy of somebody's home.
+        const residentMytes = mytes.filter(myte => myte.homeSlot?.isOnMap(mapId));
         const residentSet = new Set(residentMytes);
         const slotLayer = map?.layers?.objects;
 
         mytes.forEach(myte => {
-            const slotEl = myte.dropTarget ?? myte.element?.closest?.('.myte-slot');
+            const slotEl = myte.homeSlot?.element;
             if (!slotEl) return;
 
             slotEl.hidden = false;
@@ -201,11 +204,11 @@ class MapTransitionManager {
         // on the automatic layout get laid out. Restoring them here as well is
         // what makes a hand-placed slot survive a map change rather than
         // springing back to the spawn point.
-        const placedByHand = residentMytes.filter(myte => myte.homeSlotPosition);
+        const placedByHand = residentMytes.filter(myte => myte.homeSlot.isPlaced);
         for (const myte of placedByHand) {
-            this._syncMyteSlotToPosition(myte, myte.homeSlotPosition);
+            this._syncMyteSlotToPosition(myte, myte.homeSlot.position);
         }
-        const autoMytes = residentMytes.filter(myte => !myte.homeSlotPosition);
+        const autoMytes = residentMytes.filter(myte => !myte.homeSlot.isPlaced);
 
         if (!spawnPoint) return;
         const layout = SiteConfig.myte.homeSlotLayout;
@@ -224,7 +227,7 @@ class MapTransitionManager {
             { x: spacing, y: -spacing },
             { x: -spacing, y: -spacing }
         ];
-        const placed = placedByHand.map(myte => ({ ...myte.homeSlotPosition }));
+        const placed = placedByHand.map(myte => ({ ...myte.homeSlot.position }));
 
         autoMytes.forEach((myte, index) => {
             const candidates = offsets.slice(index).concat(offsets.slice(0, index));

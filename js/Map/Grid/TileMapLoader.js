@@ -7,22 +7,10 @@ class TileMapLoader {
 		this.currentMapData = null; // Track current map data
 
 
-		// Default terrain mapping
-		this.terrainMapping = {
-			// Map Tiled property names to our terrain type names
-			'road': 'path',
-			'path': 'path',
-			'floor': 'floor',
-			'carpet': 'floor',
-			'grass': 'grass',
-			'tall_grass': 'grass',
-			'sand': 'sand',
-			'mud': 'mud',
-			'snow': 'mud',
-			'water': 'shallow_water',
-			'deep_water': 'deep_water',
-			'shallow_water': 'shallow_water'
-		};
+		// Tiled's terrain names → ours. Shared with the paint tool, so authored
+		// and painted ground of the same name behave identically — see
+		// SiteConfig.terrainSystem.terrainMapping.
+		this.terrainMapping = SiteConfig.terrainSystem.terrainMapping;
 
 		// Terrain modifiers for objects
 		this.terrainModifiers = {
@@ -194,6 +182,7 @@ class TileMapLoader {
 			// Create spawns from objects with specific names
 			this.createSpawnsFromObjects(mapData);
 			this.extractWallData(mapData);
+			this.extractTerrainData(mapData);
 			
 
 			// Extract terrain types from map data
@@ -252,26 +241,32 @@ class TileMapLoader {
 				firstgid,
 				wallTileIds: new Set(),
 				wallWangTiles: new Map(),
+				wangSets: new Map(),
 				tiles: {},
 				imageSource: '',
 				imageWidth: 0,
 				imageHeight: 0
 			};
-			const wallWangSetName = String(SiteConfig.wallSystem.wallWangSetName || 'Wall').toLowerCase();
-			for (const wangSet of tilesetData.querySelectorAll('wangset')) {
-				if (String(wangSet.getAttribute('name') || '').toLowerCase() !== wallWangSetName) continue;
-				for (const wangTile of wangSet.querySelectorAll('wangtile')) {
-					const tileId = Number(wangTile.getAttribute('tileid'));
-					if (!Number.isInteger(tileId)) continue;
-					tileset.wallTileIds.add(tileId);
-					// The mask is recomputed from neighbours at runtime, so this
-					// is not how a loaded wall learns its shape. It is what lets
-					// the flat overlay and the Tiled exporter go the other way,
-					// from a mask back to the tile that draws it.
-					const mask = WallWangAtlas.maskFromWangId(wangTile.getAttribute('wangid'));
-					if (mask !== null && !tileset.wallWangTiles.has(mask)) {
-						tileset.wallWangTiles.set(mask, tileId);
-					}
+			// Every wang set the tileset authors, parsed once and kept whole —
+			// walls, ground terrain and whatever a future tileset adds all read
+			// from here rather than each re-walking the XML for its own subset.
+			for (const wangSetEl of tilesetData.querySelectorAll('wangset')) {
+				const wangSet = WangSet.fromElement(wangSetEl);
+				if (wangSet) tileset.wangSets.set(wangSet.name.toLowerCase(), wangSet);
+			}
+
+			const wallWangSet = tileset.wangSets.get(
+				String(SiteConfig.wallSystem.wallWangSetName || 'Wall').toLowerCase()
+			);
+			for (const [tileId, wangId] of wallWangSet?.tiles || []) {
+				tileset.wallTileIds.add(tileId);
+				// The mask is recomputed from neighbours at runtime, so this is
+				// not how a loaded wall learns its shape. It is what lets the
+				// flat overlay and the Tiled exporter go the other way, from a
+				// mask back to the tile that draws it.
+				const mask = WallWangAtlas.maskFromWangId(wangId.join(','));
+				if (mask !== null && !tileset.wallWangTiles.has(mask)) {
+					tileset.wallWangTiles.set(mask, tileId);
 				}
 			}
 	
@@ -509,6 +504,89 @@ class TileMapLoader {
 
 		mapData.walls = {
 			defaults, cells, openings, fixtures, attachments, faceOverrides, roomAssignments, wangAtlas
+		};
+	}
+
+	/**
+	 * Which tile layers are paintable ground.
+	 *
+	 * A layer opts in by carrying a `terrainWangSet` property naming the corner
+	 * wang set it is painted with — explicit, so a hand-authored ground layer
+	 * that happens to use terrain tiles is not seized by the paint tool. The
+	 * configured default layer name is accepted as a shorthand so a map can just
+	 * call the layer "Terrain".
+	 */
+	isTerrainLayer(layer, mapData) {
+		if (SiteConfig.terrainSystem?.enabled !== true) return false;
+		const declared = layer.properties?.[SiteConfig.terrainSystem.layerProperty];
+		if (declared) return true;
+		if (String(layer.name || '').toLowerCase() !== SiteConfig.terrainSystem.defaultLayerName.toLowerCase()) {
+			return false;
+		}
+		// Named like a terrain layer — only actually one if the map has a wang
+		// set to paint it with.
+		return TerrainAtlas.allFromTilesets(mapData.tilesets).size > 0;
+	}
+
+	/**
+	 * Reads the map's terrain layers back into corner grids.
+	 *
+	 * Each painted tile declares the four corner colours it was drawn for, so
+	 * the corner grid is recovered by replaying every tile onto its own corners.
+	 * Neighbouring tiles agree about the corners they share — that is what makes
+	 * them fit — so the order tiles are read in does not matter.
+	 */
+	extractTerrainData(mapData) {
+		if (SiteConfig.terrainSystem?.enabled !== true) {
+			mapData.terrain = null;
+			return;
+		}
+
+		const atlases = TerrainAtlas.allFromTilesets(mapData.tilesets);
+		if (atlases.size === 0) {
+			mapData.terrain = null;
+			return;
+		}
+
+		const layers = [];
+		mapData.layers.forEach((layer, index) => {
+			if (!this.isTerrainLayer(layer, mapData)) return;
+			const wangSetName = layer.properties?.[SiteConfig.terrainSystem.layerProperty] ||
+				SiteConfig.terrainSystem.wangSetName;
+			const atlas = atlases.get(wangSetName) || atlases.values().next().value;
+			if (!atlas) return;
+
+			const terrainLayer = new TerrainLayer({
+				id: layer.id,
+				name: layer.name,
+				order: index,
+				atlas,
+				width: mapData.width,
+				height: mapData.height
+			});
+
+			layer.data.forEach((gid, dataIndex) => {
+				if (!gid) return;
+				const corners = atlas.cornersForGid(gid);
+				if (!corners) return;
+				const x = dataIndex % mapData.width;
+				const y = Math.floor(dataIndex / mapData.width);
+				TerrainLayer.cornerPointsFor(x, y).forEach(([cornerX, cornerY], corner) => {
+					terrainLayer.setColorAt(cornerX, cornerY, corners[corner]);
+				});
+			});
+
+			terrainLayer.rebaseline();
+			layers.push(terrainLayer);
+		});
+
+		mapData.terrain = {
+			atlases,
+			layers,
+			width: mapData.width,
+			height: mapData.height,
+			tileWidth: mapData.tileWidth,
+			tileHeight: mapData.tileHeight
 		};
 	}
 
@@ -932,6 +1010,9 @@ class TileMapLoader {
 
 			const tilesetImages = await this._loadTilesetImages(tilesets);
 			for (const layer of layers.filter(l => l.visible)) {
+				// A terrain layer can change at runtime, so it is drawn live by
+				// TerrainBuilder rather than baked into an image nobody can edit.
+				if (this.isTerrainLayer(layer, mapData)) continue;
 				const skippedIndices = SiteConfig.wallSystem?.enabled === true
 					? this.getWallIndicesForLayer(mapData.walls, layer)
 					: null;
@@ -1088,6 +1169,7 @@ generateGridData(mapData, gridConfig = {}) {
 			terrainTypes: TileMapData.terrainTypes, // Pass along terrain types
 			properties: TileMapData.properties || {}, // Pass through all properties
 			walls: TileMapData.walls,
+			terrain: TileMapData.terrain,
 			TileData: {
 				layers: TileMapData.layers,
 				tilesets: TileMapData.tilesets,

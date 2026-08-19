@@ -50,6 +50,7 @@ class UserInterface {
         this.surfaceCustomizePanel = new SurfaceCustomizePanel(this);
         this.wallBuildPanel = new WallBuildPanel(this);
         this.roomPanel = new RoomPanel(this);
+        this.terrainPaintPanel = new TerrainPaintPanel(this);
         this.viewPanel = new ViewPanel(this);
         this.worldMapPanel = new WorldMapPanel(this);
         this.calendarPanel = new CalendarPanel(this);
@@ -109,6 +110,7 @@ class UserInterface {
         this.surfaceCustomizePanel?.handleToolModeChanged(mode);
         this.wallBuildPanel?.handleToolModeChanged(mode);
         this.roomPanel?.handleToolModeChanged(mode);
+        this.terrainPaintPanel?.handleToolModeChanged(mode);
     }
 
     onSelectionChanged(selectedObject) {
@@ -190,7 +192,7 @@ class UserInterface {
      * and the build bar's shortcut — and neither of them should be the one that
      * knows how it works.
      */
-    async exportWallsToTiled(button = null) {
+    async exportMapToTiled(button = null) {
         const gameMap = this.parent?.gameMap;
         const toasts = this.parent?.core?.toastManager;
         if (typeof WallTiledExporter === 'undefined') return;
@@ -217,6 +219,12 @@ class UserInterface {
 
         if (button) button.disabled = true;
         try {
+            // Ground first, walls second. Both patch the same file and each
+            // re-reads it, so they must not overlap — and doing terrain first
+            // means the wall pass hashes a file that already has the ground in
+            // it rather than losing the race to its own sibling.
+            await this.exportTerrainToTiled(gameMap, toasts);
+
             const result = await WallTiledExporter.exportMap(gameMap);
             if (!result.ok) {
                 toasts?.show?.({
@@ -241,6 +249,39 @@ class UserInterface {
         } finally {
             if (button) button.disabled = false;
         }
+    }
+
+    /**
+     * Painted ground, written back into the same .tmx. Quiet when the map has
+     * none: terrain is optional, and a map with no painted ground should not
+     * make the wall export report a failure it did not have.
+     */
+    async exportTerrainToTiled(gameMap = this.parent?.gameMap, toasts = this.parent?.core?.toastManager) {
+        if (typeof TerrainTiledExporter === 'undefined') return null;
+        if (!TerrainTiledExporter.isAvailable(gameMap)) return null;
+
+        const result = await TerrainTiledExporter.exportMap(gameMap);
+        if (!result.ok) {
+            toasts?.show?.({
+                type: result.code === 'conflict' ? 'warning' : 'error',
+                title: 'Ground export failed',
+                content: result.message
+            });
+            console.warn('[TerrainTiledExporter]', result.code, result.message);
+            return result;
+        }
+        const { cells, layers, layersAdded } = result.stats;
+        toasts?.show?.({
+            type: 'success',
+            title: 'Ground exported to Tiled',
+            content: `${cells} tiles across ${layers} layer${layers === 1 ? '' : 's'}` +
+                `${layersAdded > 0 ? ` (${layersAdded} new)` : ''} → ${result.path}.`
+        });
+        for (const warning of result.warnings) {
+            toasts?.show?.({ type: 'warning', title: 'Ground export warning', content: warning });
+            console.warn('[TerrainTiledExporter]', warning);
+        }
+        return result;
     }
 
     showMessage(message, type = 'info', title = '') {
@@ -296,6 +337,8 @@ class UserInterface {
         this.wallBuildPanel = null;
         this.roomPanel?.dispose?.();
         this.roomPanel = null;
+        this.terrainPaintPanel?.dispose?.();
+        this.terrainPaintPanel = null;
         this.soundPanel?.dispose?.();
         this.soundPanel = null;
         this.soundMenu = null;

@@ -223,6 +223,9 @@
     "src": "js/Myte/MyteRenderer.js"
   },
   {
+    "src": "js/Myte/MyteHomeSlot.js"
+  },
+  {
     "src": "js/Myte/Myte.js"
   },
   {
@@ -322,6 +325,15 @@
     "src": "js/Map/Walls/WallMaterialRegistry.js"
   },
   {
+    "src": "js/Map/Tiles/TileAtlas.js"
+  },
+  {
+    "src": "js/Map/Tiles/WangSet.js"
+  },
+  {
+    "src": "js/Map/Tiles/TiledDocument.js"
+  },
+  {
     "src": "js/Map/Walls/WallWangAtlas.js"
   },
   {
@@ -329,6 +341,18 @@
   },
   {
     "src": "js/Map/Walls/WallTiledExporter.js"
+  },
+  {
+    "src": "js/Map/Terrain/TerrainAtlas.js"
+  },
+  {
+    "src": "js/Map/Terrain/TerrainLayer.js"
+  },
+  {
+    "src": "js/Map/Terrain/TerrainBuilder.js"
+  },
+  {
+    "src": "js/Map/Terrain/TerrainTiledExporter.js"
   },
   {
     "src": "js/Map/Floors/FloorMaterialRegistry.js"
@@ -495,6 +519,9 @@
     "commentLine": "<!-- UI -->"
   },
   {
+    "src": "js/UI/Core/BuildRunSound.js"
+  },
+  {
     "src": "js/UI/Core/TabController.js"
   },
   {
@@ -601,6 +628,9 @@
   },
   {
     "src": "js/UI/Panels/SurfaceCustomizePanel.js"
+  },
+  {
+    "src": "js/UI/Panels/TerrainPaintPanel.js"
   },
   {
     "src": "js/UI/Panels/WallBuildPanel.js"

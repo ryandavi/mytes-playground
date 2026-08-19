@@ -109,12 +109,16 @@ class MyteRosterSchema {
             species: myte.species,
             posX: myte.posX,
             posY: myte.posY,
-            slotId: myte.elements?.wrapper?.id || `myte-slot-${index + 1}`,
-            slotLabel: myte.elements?.wrapper?.querySelector?.('.myte-home-label .name')?.textContent?.trim?.() || `${myte.name}'s Slot`,
-            slotX: myte.homeSlotPosition?.x ?? 0,
-            slotY: myte.homeSlotPosition?.y ?? 0,
-            hasSlotPosition: !!myte.homeSlotPosition,
-            homeMapId: myte.homeMapId || SiteConfig.world.defaultMap,
+            // The slot is the model, so the save reads from it rather than
+            // scraping the label out of the DOM it happens to be drawn with.
+            ...(myte.homeSlot?.serialize() ?? {
+                slotId: `myte-slot-${index + 1}`,
+                slotLabel: `${myte.name}'s Slot`,
+                homeMapId: SiteConfig.world.defaultMap,
+                slotX: 0,
+                slotY: 0,
+                hasSlotPosition: false
+            }),
             birthday: myte.birthday ?? null,
             isActive: !!myte.isActive,
             goal: myte.goal ?? null,
@@ -143,11 +147,8 @@ class MyteRosterSchema {
         }
 
         myte.name = rosterEntry.name || myte.name;
-        myte.homeMapId = rosterEntry.homeMapId || SiteConfig.world.defaultMap;
+        myte.homeSlot?.applyRosterEntry(rosterEntry);
         myte.birthday = rosterEntry.birthday ?? CalendarRegistry.resolveBirthday(rosterEntry);
-        myte.homeSlotPosition = rosterEntry.hasSlotPosition
-            ? { x: rosterEntry.slotX, y: rosterEntry.slotY }
-            : null;
         myte.element.dataset.myteName = myte.name;
         myte.element.dataset.myteHomeMap = myte.homeMapId;
         if (myte.elements.wrapper) {

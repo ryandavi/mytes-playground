@@ -22,9 +22,13 @@ class Myte {
 			wrapper: this.element.closest(".myte-slot"),
 		};
 		this.dropTarget;   // assigned in init() via closest('.myte-slot')
-		// Where the home slot has been put by hand, or null to let the map's
-		// spawn layout decide. See setHomeSlotPosition.
-		this.homeSlotPosition = null;
+		// One myte, one slot, on one map. Everything about where this myte
+		// lives is on the slot — see MyteHomeSlot.
+		this.homeSlot = new MyteHomeSlot(this, {
+			id: this.elements.wrapper?.id || null,
+			label: this.elements.wrapper?.querySelector?.('.myte-home-label .name')?.textContent?.trim?.() || null,
+			mapId: this.elements.wrapper?.dataset?.myteHomeMap || null
+		});
 		this.dialogue;
 		this.renderer = null;
 
@@ -351,30 +355,38 @@ class Myte {
 	 * Home slot
 	 ********************************************/
 
+	// Which map this myte lives on, and where on it. Both are the slot's to
+	// answer; these stay as the names the rest of the code already uses.
+	get homeMapId() {
+		return this.homeSlot.mapId;
+	}
+
+	set homeMapId(mapId) {
+		this.homeSlot.moveTo(mapId, this.homeSlot.position);
+	}
+
+	get homeSlotPosition() {
+		return this.homeSlot.position;
+	}
+
+	set homeSlotPosition(position) {
+		this.homeSlot.position = MyteHomeSlot.normalizePosition(position);
+		this.homeSlot.invalidate();
+	}
+
 	getHomeSlotElement() {
-		return this.dropTarget?.querySelector?.('.myte-home-slot') ||
-			this.dropTarget ||
-			this.elements.wrapper ||
-			this.element;
+		return this.homeSlot.footprintElement;
 	}
 
 	getHomeSlotRect() {
-		const slotElement = this.getHomeSlotElement();
-		const rect = this.parent.getLocalOffset(slotElement);
-		return {
-			x: rect.left, y: rect.top,
-			left: rect.left, top: rect.top,
-			right: rect.right, bottom: rect.bottom,
-			width: rect.width, height: rect.height
-		};
+		return this.homeSlot.getRect();
 	}
 
 	// Whether the map being played is the one this myte's home slot sits on.
 	// Off its home map the slot is detached from the DOM, so every home-relative
 	// behaviour has to be suppressed.
 	get isOnHomeMap() {
-		const currentMapId = this.parent?.gameMap?.id;
-		return !currentMapId || !this.homeMapId || this.homeMapId === currentMapId;
+		return this.homeSlot.isOnCurrentMap;
 	}
 
 	// Deployed on a map that isn't its own — it walked over to visit.
@@ -383,27 +395,14 @@ class Myte {
 	}
 
 	getHomePosition() {
-		// A detached slot measures as (0, 0), which would drag the myte to the map
-		// corner. Its current spot is the honest answer.
-		if (!this.isOnHomeMap) {
-			return { x: this.posX, y: this.posY };
-		}
-
-		// Derived from DOM layout (getLocalOffset walks offsetParents), so cache it —
-		// AI thinks and GOHOME movement read this constantly. Invalidated whenever the
-		// slot element moves (setWrapperPosition, map transitions, container resize).
-		if (this._cachedHomePosition) return this._cachedHomePosition;
-
-		const rect = this.getHomeSlotRect();
-		this._cachedHomePosition = {
-			x: rect.left + ((rect.width - this.size.width) / 2),
-			y: rect.top + ((rect.height - this.size.height) / 2)
-		};
-		return this._cachedHomePosition;
+		// A slot that is not on this map is not measurable — it is detached from
+		// the DOM and would report (0, 0), dragging the myte to the map corner.
+		// Where the myte is standing is the honest answer.
+		return this.homeSlot.getStandingPosition() ?? { x: this.posX, y: this.posY };
 	}
 
 	invalidateHomePositionCache() {
-		this._cachedHomePosition = null;
+		this.homeSlot.invalidate();
 	}
 
 	isAtHomePosition(tolerance = 0.5) {
@@ -424,9 +423,14 @@ class Myte {
 		return home;
 	}
 
+	// Move the slot element without recording the move as a decision — this is
+	// the automatic spawn layout's writer. Placing one on purpose is
+	// setHomeSlotPosition, which stores the position first.
 	setWrapperPosition(x, y) {
-		this.elements.wrapper.style.left = x + 'px';
-		this.elements.wrapper.style.top = y + 'px';
+		const element = this.homeSlot.element;
+		if (!element) return;
+		element.style.left = x + 'px';
+		element.style.top = y + 'px';
 		this.invalidateHomePositionCache();
 		this.snapToHomePosition();
 	}
@@ -441,9 +445,9 @@ class Myte {
 	 * the automatic layout.
 	 */
 	setHomeSlotPosition(position) {
-		this.homeSlotPosition = position ? { x: position.x, y: position.y } : null;
-		if (!position || !this.elements?.wrapper) return;
-		this.setWrapperPosition(position.x, position.y);
+		const placed = this.homeSlot.place(position);
+		if (!placed || !this.homeSlot.element) return;
+		this.setWrapperPosition(placed.x, placed.y);
 	}
 
 	holdInHomeSlotUntilPointerLeaves() { return this.movementController.holdInHomeSlotUntilPointerLeaves(); }
