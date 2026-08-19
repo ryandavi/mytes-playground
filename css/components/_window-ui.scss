@@ -859,6 +859,16 @@ div.surface-paint-overlay {
     &[hidden] {
         display: none;
     }
+
+    // The reserved height above is right for an empty list holding a window
+    // open. It is wrong for a one-line aside inside a small panel, where it
+    // turns a footnote into a canyon.
+    &--compact {
+        min-height: 0;
+        padding: var(--space-xs) 0;
+        text-align: left;
+        place-items: start;
+    }
 }
 
 .info-list {
@@ -898,6 +908,366 @@ div.surface-paint-overlay {
     }
 }
 
+// ── Panel detail ──────────────────────────────────────────────────────────────
+//
+// The sunken box that says everything about the one thing you have picked: a
+// day on the calendar, a map on the world chart. Each had grown its own
+// heading, its own title size and its own muted caption — three sizes of type
+// between them and two different ideas of where the rule goes. This is one of
+// each, and one type size for the whole box.
+//
+// There is no rule under the heading. The sunken frame already separates the
+// box from whatever is above it, so a line inside it was a divider dividing
+// nothing.
+.panel-detail {
+    @include surface-inset;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    min-height: 0;
+    padding: var(--space-md);
+    font-size: var(--text-size-meta);
+}
+
+// Buttons do not inherit type from their surroundings — a bare button is Arial
+// 13.33px, whatever the box around it says. Inside a detail box the control is
+// part of what you are reading, so it takes the type of the box it sits in,
+// like everything else in it. The Travel button was the one thing in either
+// detail box still at a size of its own.
+.panel-detail button {
+    font: inherit;
+}
+
+.panel-detail__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-md);
+}
+
+.panel-detail__title {
+    margin: 0;
+    min-width: 0;
+    font-size: inherit;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+// What kind of thing it is, beside its name: the season a day belongs to, the
+// region a map is in.
+.panel-detail__caption {
+    flex: 0 0 auto;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.panel-detail__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+// Pinned to the foot of the box and reserved whether or not it holds a button,
+// so a thing you can do nothing about is the same height as one you can.
+.panel-detail__actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    min-height: 40px;
+    margin-top: auto;
+    padding-top: var(--space-sm);
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+//
+// Built the way Windows 98 built a month view — days printed on one sunken
+// sheet, a rule under the weekday heads, today boxed, the picked day inverted
+// in the selection blue — but built out of this app's parts. The rules are
+// `--border-width`, the squares take `--border-radius`, the header is the
+// shared `.value-stepper`, and the sunken frame is the same `frame-sunken` the
+// rest of the windows use. A grid of 28 bevelled buttons was 28 controls
+// competing with each other, and the bevels left no room for today's box.
+//
+// One type size for the whole panel, set here and inherited. Emphasis is weight
+// and colour, which is what stops a small panel becoming five sizes of text in
+// six inches.
+.window-panel.calendar {
+    --calendar-day-size: 34px;
+    --calendar-rail-width: 148px;
+
+    width: min(600px, calc(100vw - (var(--padding-outer) * 2)));
+    // A set height, so the window does not resize under the pointer every time
+    // you pick a different day. What varies is how much a day has to say, and
+    // that belongs to the detail box, which scrolls — not to the window frame,
+    // which should stay where you put it.
+    height: min(460px, calc(100vh - (var(--padding-outer) * 2)));
+
+    >.calendar__content {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) var(--calendar-rail-width);
+        // One row, exactly the height of the window and allowed to shrink below
+        // its contents. An auto row will not go under its min-content height,
+        // so on a short viewport the sheet would push the bottom of both
+        // columns out through the hidden edge instead of letting them scroll.
+        grid-template-rows: minmax(0, 1fr);
+        align-items: stretch;
+        gap: var(--space-md);
+        min-height: 0;
+        // The two columns do their own scrolling; the box around them does not.
+        overflow: hidden;
+        font-size: var(--text-size-meta);
+    }
+}
+
+.calendar__main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-width: 0;
+    min-height: 0;
+}
+
+// The season header is the app's stepper, unmodified: two square steps around a
+// readout that resets what it reads. Its standard row height is what gives the
+// two stacked lines — the year, then the season — room to sit.
+.calendar__title {
+    line-height: 1.2;
+
+    >.calendar__year {
+        color: var(--text-muted);
+        font-weight: 400;
+    }
+
+    >.calendar__season {
+        font-weight: 700;
+        color: var(--text-base);
+    }
+}
+
+// One sheet of paper under the whole season, sunken into the panel with the
+// same frame the rest of the windows use. This is what lets the day cells be
+// flat: the frame around them does the work 28 separate bevels were doing
+// badly.
+.calendar__sheet {
+    @include frame-sunken;
+    background-color: var(--button-light);
+    padding: var(--space-xs);
+}
+
+.calendar__weekdays,
+.calendar__grid {
+    display: grid;
+    grid-template-columns: repeat(var(--calendar-columns, 7), minmax(0, 1fr));
+}
+
+// The one border width the app has, not a hairline of its own invention. At
+// this weight the rule is a real ledge under the heads, which is what the
+// Windows 98 month view had and what tells you the row above is a heading
+// rather than the first week.
+.calendar__weekdays {
+    margin: var(--space-base) 0;
+}
+
+.calendar__weekday {
+    text-align: center;
+    color: var(--text-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+// A day is a number you point at, not a button. No bevel and no fill until it
+// is hovered — which is also what gives today's box clear ground to sit in.
+//
+// The border is `--border-width` and transparent by default, which does two
+// jobs at once: it is the gap between squares, so today's box can never be
+// crowded by a neighbour, and it means the box and the plain square are exactly
+// the same size.
+//
+// The `button.` prefix and the `:not(:disabled)` on the state rules are not
+// decoration: the shared button block in base/_forms.scss writes its hover and
+// press as `button:not(:disabled):not(.disabled):hover`, and a plain
+// `.calendar__day:hover` sits one step below that and loses. Matching its shape
+// puts these level with it, and the later import wins the tie.
+.calendar__day {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    // Room under the number for the marks, reserved on every square whether or
+    // not it has any — otherwise the days with something on them sit a pixel
+    // higher than the days without, and the rows stop reading as rows.
+    min-height: var(--calendar-day-size);
+    padding: 0 0 6px;
+    background: none;
+    border: var(--border-width) solid transparent;
+    border-radius: var(--border-radius);
+    color: var(--text-base);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+
+    // The blanks padding out to the first weekday are holes in the sheet, not
+    // squares you can press.
+    &.is-blank {
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    // Days already gone stay legible but stop competing with the ones ahead,
+    // which is what the calendar is for.
+    &.is-past {
+        color: var(--text-muted);
+    }
+
+    // Today is boxed, in the border the square already reserves.
+    &.is-today {
+        border-color: var(--header-mid);
+        font-weight: 700;
+    }
+}
+
+button.calendar__day:not(:disabled):hover {
+    background: var(--surface-state-self);
+}
+
+// Mouse-down would otherwise borrow the shared button press — a bevel and a
+// dither on a printed number.
+button.calendar__day:not(:disabled):active {
+    background: var(--surface-state-self);
+    border-color: transparent;
+    border-radius: var(--border-radius);
+    outline: none;
+}
+
+// The picked day inverts, the way a selected cell has since Windows 3. It
+// outranks both hover and today's box, and it draws no border of its own —
+// the fill is the whole statement, and an edge in a second blue around it only
+// muddied which blue meant what.
+button.calendar__day.is-selected:not(:disabled),
+button.calendar__day.is-selected:not(:disabled):hover {
+    background: var(--header-mid);
+    border-color: transparent;
+    color: var(--text-on-accent);
+    font-weight: 700;
+}
+
+// Under the number, in the space every square reserves for them.
+.calendar__day-marks {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 2px;
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+    line-height: 0;
+    overflow: hidden;
+}
+
+// One dot per thing happening that day, coloured by which of the three kinds it
+// is — the same colours the rail beside the grid uses for the same categories.
+.calendar__mark {
+    width: 4px;
+    height: 4px;
+    border-radius: var(--radius-round);
+    background-color: var(--text-muted);
+
+    &.is-holiday  { background-color: var(--state-error-accent); }
+    &.is-market   { background-color: var(--state-warning-accent); }
+    &.is-birthday { background-color: var(--state-success-accent); }
+}
+
+// On an inverted cell the category colours fight the selection blue, so the
+// dots take the selection's own foreground and keep only their count.
+.calendar__day.is-selected .calendar__mark {
+    background-color: var(--text-on-accent);
+}
+
+// The shared panel-detail box, plus the one thing that is particular to the
+// calendar: it is the part of the panel whose content really does vary — some
+// days have nothing on them, some have three festivals — so it takes the slack
+// the fixed window height leaves and scrolls inside it.
+.calendar__detail {
+    flex: 1 1 auto;
+    @include scroll-area;
+}
+
+// ── Coming up ────────────────────────────────────────────────────────────────
+//
+// A rail down the side rather than a footer under the day detail: what is
+// coming does not change when you click about the grid, and putting it under
+// something that does made it look like part of the day you had picked.
+.calendar__upcoming {
+    @include surface-inset;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-height: 0;
+    padding: var(--space-md) var(--space-sm);
+}
+
+.calendar__upcoming-title {
+    margin: 0;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+// The heading stays put and the list under it scrolls — the rail runs the full
+// height of the window, so a busy season fills it rather than pushing the
+// window taller.
+.calendar__upcoming-list {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    gap: var(--space-sm);
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    @include scroll-area;
+}
+
+.calendar__upcoming-item {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.calendar__upcoming-when {
+    color: var(--text-muted);
+}
+
+.calendar__upcoming-what {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+// The same three category colours as the dots on the grid, carried as a tick
+// down the left edge so the rail and the sheet read as one legend.
+.calendar__upcoming-event {
+    padding-left: var(--space-xs);
+    border-left: 3px solid var(--text-muted);
+    font-weight: 700;
+    color: var(--text-base);
+    overflow-wrap: anywhere;
+
+    &.is-holiday  { border-left-color: var(--state-error-accent); }
+    &.is-market   { border-left-color: var(--state-warning-accent); }
+    &.is-birthday { border-left-color: var(--state-success-accent); }
+}
+
+// Too narrow for a rail: it becomes the last band of a single column.
+@media (max-width: 520px) {
+    .window-panel.calendar > .calendar__content {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 #game-log-panel {
     width: min(560px, calc(100vw - (var(--padding-outer) * 2)));
     height: min(420px, calc(100vh - (var(--padding-outer) * 2)));
@@ -925,18 +1295,34 @@ div.surface-paint-overlay {
         inset: 0;
     }
 
+    // A log reads bottom-up: the newest entry is the one you want, so it sits on
+    // the bottom edge and the list grows upward until it is full enough to
+    // scroll. `margin-top: auto` on the topmost entry rather than
+    // `justify-content: flex-end` on the box — the latter makes the overflowing
+    // top of a scroll container unreachable. `.is-first-visible` is the entry
+    // the list marks as topmost after filtering, so filtering to a short
+    // category keeps the same bottom edge.
     .game-log-list {
         height: 100%;
         margin: 0;
         padding: 0;
+        display: flex;
+        flex-direction: column;
         @include scroll-area;
         list-style: none;
         font-size: 0.75rem;
         line-height: 1.4;
 
+        .game-log-entry.is-first-visible {
+            margin-top: auto;
+        }
+
         .game-log-entry {
             display: grid;
             grid-template-columns: 24px minmax(0, 1fr) 76px;
+            // A flex column would otherwise shrink entries to fit rather than
+            // letting the list scroll.
+            flex: 0 0 auto;
             align-items: start;
             gap: var(--space-sm);
             padding: var(--space-sm) var(--space-md);
@@ -986,6 +1372,18 @@ div.surface-paint-overlay {
 
             &.rarity-notable >.text {
                 font-weight: 600;
+            }
+
+            // Arrived while the window was shut and not yet read. Cleared when
+            // the window closes, so you see which ones were new for as long as
+            // you are looking at them.
+            &.is-unread >.text {
+                font-weight: 700;
+                color: var(--text-base);
+            }
+
+            &.is-unread >.icon >svg.icon {
+                fill: var(--text-base);
             }
 
             &.is-clickable {
@@ -1759,6 +2157,66 @@ body.ui-gallery-page {
 
 // ─── World Map ─────────────────────────────────────────────────────────────
 
+// ── Detail rows ───────────────────────────────────────────────────────────────
+//
+// The label/value list every panel needs when it has to state a few facts: the
+// world map's map details, the keyboard legends in Options, the calendar's day
+// summary. One list, one column definition, so every value in a list starts at
+// the same edge however long its label is — "Points of interest" no longer sets
+// the column width against "Distance" in one place and something else in
+// another.
+//
+// Two column strategies. On its own, a list sizes its label column to its own
+// longest label. `--subgrid` borrows the parent grid's columns instead, so
+// several lists under separate headings still line up with each other — which
+// is what the three keyboard legends need.
+.detail-rows {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    // Rows keep their own height rather than stretching to fill a taller box —
+    // a five-row list in a reserved-height panel should stay a list, not become
+    // a ladder with the rungs spread out.
+    align-content: start;
+    align-items: baseline;
+    gap: var(--space-2xs) var(--space-md);
+    margin: 0;
+    font-size: var(--text-size-meta);
+
+    &--subgrid {
+        grid-template-columns: subgrid;
+    }
+
+    > dt {
+        grid-column: 1;
+        color: var(--text-muted);
+        white-space: nowrap;
+    }
+
+    > dd {
+        grid-column: 2;
+        min-width: 0;
+        margin: 0;
+        color: var(--text-base);
+        overflow-wrap: anywhere;
+    }
+
+    // The label is the name of the thing and the value is the gloss on it: a
+    // keyboard key and what it does, a festival and what happens on it. The
+    // default is the other way round — a muted label naming a field, and the
+    // value as the answer to it. Three places had written this inversion out
+    // for themselves.
+    &--named {
+        > dt {
+            font-weight: 700;
+            color: var(--text-base);
+        }
+
+        > dd {
+            color: var(--text-muted);
+        }
+    }
+}
+
 .window-panel.world-map {
     // The detail block is a fixed frame: its head and action row are pinned and
     // only the rows between them scroll, so reading a map with many neighbours
@@ -1828,15 +2286,50 @@ body.ui-gallery-page {
         var(--world-map-columns, 1),
         minmax(var(--world-map-node-min-width), var(--world-map-node-max-width))
     );
-    grid-template-rows: repeat(var(--world-map-rows, 1), var(--world-map-node-height));
+    grid-template-rows: repeat(var(--world-map-rows, 1), minmax(var(--world-map-node-height), auto));
     // Wide enough that the connector lines between nodes actually read.
     gap: var(--space-lg);
     min-width: 100%;
     min-height: 100%;
     // Nodes keep their proportions rather than stretching into slabs; the spare
-    // room in a big window becomes margin around the chart instead.
+    // room in a big window becomes margin around the chart instead. `start` is
+    // the same rule applied down the row: a row is as tall as the nested world
+    // in it, and the plain maps beside it must not stretch to match.
     align-content: center;
+    align-items: start;
     justify-content: center;
+}
+
+// A map with maps inside it: its own node on top, their chart below. The holder
+// and the nested grid are both left unpositioned so the nodes within them still
+// measure their offsets against the outer chart, which is the surface the
+// connector lines are drawn on.
+.world-map__nest {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-xs);
+    border: 1px dashed var(--button-dark);
+    border-radius: var(--radius-sm);
+    background-color: var(--surface-ui-inset);
+
+    >.world-map__node {
+        flex: 0 0 auto;
+    }
+}
+
+// Interiors are the smaller thing inside the larger one, and read that way.
+.world-map__grid--nested {
+    // Left unpositioned so the nodes inside it keep reporting their offsets
+    // against the outer chart, where the connector lines are measured.
+    position: static;
+    --world-map-node-height: 40px;
+    --world-map-node-min-width: 88px;
+    --world-map-node-max-width: 160px;
+
+    gap: var(--space-sm);
+    min-width: 0;
+    min-height: 0;
 }
 
 // Sits behind the nodes and spans the whole chart, so link endpoints are
@@ -1859,9 +2352,15 @@ body.ui-gallery-page {
     }
 }
 
+// The node height is a floor, not a ceiling: a name plus a row of badges is
+// taller than an empty node, and pinning the height made the two share the same
+// strip of pixels. The grid row is already minmax(height, auto) and the
+// connector lines are measured from the nodes as they actually sit, so a node
+// that grows stays wired up.
 .world-map__node {
     @include button-base;
     position: relative;
+    min-height: var(--world-map-node-height);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1908,9 +2407,14 @@ body.ui-gallery-page {
     white-space: nowrap;
 }
 
+// Three badges do not fit across a narrow node, and a row that cannot wrap
+// spills over the name below it.
 .world-map__node-badges {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: var(--space-2xs);
+    max-width: 100%;
 }
 
 .world-map__badge {
@@ -1919,100 +2423,45 @@ body.ui-gallery-page {
     padding: 0 var(--space-2xs);
     font-size: 0.6em;
     line-height: 12px;
-    color: var(--text-subtle);
+    color: var(--text-muted);
     white-space: nowrap;
 
+    &.is-resident {
+        background-color: var(--surface-state-map);
+    }
+
     &.is-traveller {
-        background-color: var(--header-mid);
-        color: var(--text-on-accent);
+        background-color: var(--surface-state-self);
     }
 
     &.is-poi {
-        background-color: var(--state-warning-accent);
-        color: var(--text-base);
+        background-color: var(--surface-state-myte);
     }
 }
 
+// The shared panel-detail box at a reserved height. The calendar fixes its
+// whole window and lets the detail take the slack; here it is the other way
+// round, because the chart above is the subject and should get every pixel a
+// maximized window can spare. Either way the rule is the same one: picking a
+// different thing never resizes the window.
 .world-map__detail {
-    @include surface-inset;
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
     height: var(--world-map-detail-height);
-    padding: var(--space-md);
-}
-
-.world-map__detail-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-md);
-    padding-bottom: 0;
-    margin-bottom: var(--space-sm);
-    border-bottom: 1px solid var(--border-subtle);
-}
-
-.world-map__detail-title {
-    margin: 0;
-    font-size: 1em;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.world-map__detail-region {
-    flex: 0 0 auto;
-    font-size: 0.7em;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--text-muted);
 }
 
 // The only part that scrolls. Values wrap in full rather than being truncated —
-// the scroll is what protects the panel height.
+// the scroll is what protects the reserved height.
 .world-map__rows {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
+    row-gap: var(--space-xs);
     min-height: 0;
     @include scroll-area;
     padding-right: var(--space-2xs);
 }
 
-.world-map__row {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-md);
-    font-size: 0.8em;
-    min-width: 0;
-
-    >.world-map__row-label {
-        flex: 0 0 116px;
-        color: var(--text-muted);
-        white-space: nowrap;
-    }
-
-    >.world-map__row-value {
-        min-width: 0;
-        overflow-wrap: anywhere;
-    }
-}
-
-.world-map__detail-actions {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    // Reserved whether or not it holds a button, so the map you are standing in
-    // is the same height as any other.
-    height: 40px;
-    margin-top: var(--space-sm);
-}
-
-// Compact and right-aligned: the map grid above is the subject here, and a
-// full-width call to action outweighed it.
+// Compact and right-aligned: the chart above is the subject here, and a
+// full-width call to action outweighed it. Its type comes from the detail box,
+// like everything else in it.
 .world-map__travel {
     padding: var(--space-2xs) var(--space-lg);
-    font-size: 0.85em;
 }
 
 // Hints off. A panel whose only content is its prompt has nothing left when

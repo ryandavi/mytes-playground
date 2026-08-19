@@ -222,6 +222,12 @@ class MyteCore {
                 throw new Error('Failed to load shop metadata.');
             }
 
+            this.loadingManager.setMessage("Loading calendar data...");
+            const calendarDataLoaded = await CalendarRegistry.preload();
+            if (!calendarDataLoaded) {
+                throw new Error('Failed to load calendar metadata.');
+            }
+
             this.loadingManager.setMessage("Mapping the world...");
             const worldDataLoaded = await WorldGraph.preload();
             if (!worldDataLoaded) {

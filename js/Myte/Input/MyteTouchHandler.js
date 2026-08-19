@@ -27,7 +27,12 @@ class MyteTouchHandler extends DragHandler {
                 myte.isDragging = true;
                 myte.queue.clear();
                 this.dragStartPosition = { x: myte.posX, y: myte.posY };
-                myte.parent.camera.beginTemporaryCursorFollow(this);
+                // The home slot sits in the same bottom bar the inventory does, so
+                // a myte carried down to it gets the same courtesy an item does:
+                // that edge does not scroll while you are aiming at the bar.
+                myte.parent.camera.beginTemporaryCursorFollow(this, {
+                    blockedEdges: myte.parent.inventory?.getBlockedDragEdges?.() ?? null
+                });
                 const pointerWorld = myte.parent.inputHandler.screenToWorldCoordinates(
                     position.x,
                     position.y
@@ -48,48 +53,7 @@ class MyteTouchHandler extends DragHandler {
                 this._hoveredSlotEntry = null;
                 this._getSurfaceSlotEntries(myte).forEach(({ el }) => el?.classList.add('is-droppable'));
             },
-            onDragUpdate: (position) => {
-                const world = myte.parent.inputHandler.screenToWorldCoordinates(position.x, position.y);
-                const newX = world.x - this.grabOffset.x;
-                const newY = world.y - this.grabOffset.y;
-
-                // Always limit to canvas during drag using collider bounds
-                myte.setTarget(newX, newY, true);
-                myte.setPosition(newX, newY, true);
-                myte.setSpritePosition(newX, newY, true);
-
-                // Update home drop target
-                const dropTargetRect = myte.parent.getRect(myte.dropTarget);
-                if (Utility.isCoordTouchingElement(position.x, position.y, dropTargetRect)) {
-                    myte.dropTarget.classList.add("is-drag-over");
-                } else {
-                    myte.dropTarget.classList.remove("is-drag-over");
-                }
-
-                // Update portal drop targets
-                this._getPortalElements(myte).forEach(el => {
-                    const rect = myte.parent.getRect(el);
-                    if (Utility.isCoordTouchingElement(position.x, position.y, rect)) {
-                        el.classList.add('is-drag-over');
-                    } else {
-                        el.classList.remove('is-drag-over');
-                    }
-                });
-
-                // Update surface slot hover with live validity feedback
-                const hitSlotEntry = this._findNearestSlotAt(myte, newX, newY);
-                const slotChanged = hitSlotEntry?.slot?.id !== this._hoveredSlotEntry?.slot?.id ||
-                    hitSlotEntry?.obj !== this._hoveredSlotEntry?.obj;
-                if (slotChanged) {
-                    this._hoveredSlotEntry?.el?.classList.remove('is-drag-over', 'is-drop-rejected');
-                    this._hoveredSlotEntry = hitSlotEntry;
-                }
-                if (this._hoveredSlotEntry) {
-                    const valid = this._isSlotValid(this._hoveredSlotEntry, myte);
-                    this._hoveredSlotEntry.el?.classList.toggle('is-drag-over', valid);
-                    this._hoveredSlotEntry.el?.classList.toggle('is-drop-rejected', !valid);
-                }
-            },
+            onDragUpdate: (position) => this.placeAtScreenPoint(position.x, position.y),
             onDragEnd: () => {
                 myte.queue.clear();
                 myte.parent.camera.endTemporaryCursorFollow(this);
@@ -186,6 +150,64 @@ class MyteTouchHandler extends DragHandler {
         this.grabOffset = null;
         this.dragStartedInFreeRoam = false;
         this._hoveredSlotEntry = null;
+    }
+
+    /**
+     * Put the dragged myte under a screen point. Both the pointer moving and
+     * the camera moving under a still pointer end up here — the same question
+     * the map objects' drag controller answers in placeAtScreenPoint.
+     */
+    placeAtScreenPoint(clientX, clientY) {
+        const myte = this.myte;
+        if (!myte?.isDragging || !this.grabOffset) return;
+
+        const world = myte.parent.inputHandler.screenToWorldCoordinates(clientX, clientY);
+        const newX = world.x - this.grabOffset.x;
+        const newY = world.y - this.grabOffset.y;
+
+        // Always limit to canvas during drag using collider bounds
+        myte.setTarget(newX, newY, true);
+        myte.setPosition(newX, newY, true);
+        myte.setSpritePosition(newX, newY, true);
+
+        // Update home drop target
+        const dropTargetRect = myte.parent.getRect(myte.dropTarget);
+        if (Utility.isCoordTouchingElement(clientX, clientY, dropTargetRect)) {
+            myte.dropTarget.classList.add("is-drag-over");
+        } else {
+            myte.dropTarget.classList.remove("is-drag-over");
+        }
+
+        // Update portal drop targets
+        this._getPortalElements(myte).forEach(el => {
+            const rect = myte.parent.getRect(el);
+            if (Utility.isCoordTouchingElement(clientX, clientY, rect)) {
+                el.classList.add('is-drag-over');
+            } else {
+                el.classList.remove('is-drag-over');
+            }
+        });
+
+        // Update surface slot hover with live validity feedback
+        const hitSlotEntry = this._findNearestSlotAt(myte, newX, newY);
+        const slotChanged = hitSlotEntry?.slot?.id !== this._hoveredSlotEntry?.slot?.id ||
+            hitSlotEntry?.obj !== this._hoveredSlotEntry?.obj;
+        if (slotChanged) {
+            this._hoveredSlotEntry?.el?.classList.remove('is-drag-over', 'is-drop-rejected');
+            this._hoveredSlotEntry = hitSlotEntry;
+        }
+        if (this._hoveredSlotEntry) {
+            const valid = this._isSlotValid(this._hoveredSlotEntry, myte);
+            this._hoveredSlotEntry.el?.classList.toggle('is-drag-over', valid);
+            this._hoveredSlotEntry.el?.classList.toggle('is-drop-rejected', !valid);
+        }
+    }
+
+    // The camera calls this on the owner of its borrow after an edge-scroll
+    // step, so a myte held still while the map slides under it keeps its world
+    // position instead of freezing on screen and snapping on the next move.
+    syncToCursor(clientX, clientY) {
+        this.placeAtScreenPoint(clientX, clientY);
     }
 
     _rejectSlotDrop(entry) {

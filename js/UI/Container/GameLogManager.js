@@ -10,6 +10,9 @@ class GameLogManager extends ModalWindow {
     constructor(parent) {
         super(parent, {
             id: 'game-log-panel',
+            // The stage chip is this window's trigger, so ModalWindow owns both
+            // the click and the pressed look the chip wears while it is open.
+            buttonId: 'game-log-chip',
             closeOnOutsideClick: false,
             position: 'bottom-right',
             draggable: true,
@@ -86,9 +89,35 @@ class GameLogManager extends ModalWindow {
         this.loadTemplates();
     }
 
+    // Unread entries stay bold while you read them and are cleared when the
+    // window closes — marking them read on open would clear the very highlight
+    // that says which ones you had not seen. The badge is the notification, so
+    // it goes as soon as the window is up.
     open() {
-        this.parent.stageChips?.clearUnread();
         super.open();
+        this.syncUnread();
+    }
+
+    close() {
+        super.close();
+        this.markAllRead();
+    }
+
+    getUnreadCount() {
+        return this.entries.reduce((count, entry) => count + (entry.unread ? 1 : 0), 0);
+    }
+
+    syncUnread() {
+        this.parent.stageChips?.renderBadge(this.isVisible ? 0 : this.getUnreadCount());
+    }
+
+    markAllRead() {
+        if (!this.entries.some(entry => entry.unread)) return;
+        for (const entry of this.entries) entry.unread = false;
+        this.listElement?.querySelectorAll('.game-log-entry.is-unread')
+            .forEach(item => item.classList.remove('is-unread'));
+        this.persistEntries();
+        this.syncUnread();
     }
 
     _getContainer() {
@@ -176,14 +205,16 @@ class GameLogManager extends ModalWindow {
     }
 
     addEntry(entry) {
+        // Arriving while the window is shut is what makes an entry new.
+        entry.unread = !this.isVisible;
         this.entries.push(entry);
-        this.parent.stageChips?.noteLogEntry();
         if (this.entries.length > GameLogManager.MAX_ENTRIES) {
             this.entries.shift();
             this.listElement?.firstElementChild?.remove();
         }
         this.renderEntry(entry);
         this.persistEntries();
+        this.syncUnread();
     }
 
 
@@ -196,6 +227,7 @@ class GameLogManager extends ModalWindow {
         item.className = 'game-log-entry';
         item.dataset.category = entry.category;
         if (entry.rarity) item.classList.add(`rarity-${entry.rarity}`);
+        if (entry.unread) item.classList.add('is-unread');
         if (this.activeFilter && entry.category !== this.activeFilter) item.classList.add('is-hidden');
 
         const time = document.createElement('span');
@@ -319,7 +351,8 @@ class GameLogManager extends ModalWindow {
                 category: entry.category,
                 rarity: entry.rarity,
                 time: entry.time,
-                entityId: entry.entityId
+                entityId: entry.entityId,
+                unread: entry.unread === true
             }));
             localStorage.setItem(GameLogManager.STORAGE_KEY, JSON.stringify(stored));
         } catch (error) {

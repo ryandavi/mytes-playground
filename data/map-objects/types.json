@@ -95,6 +95,8 @@
   },
   "COUCH": {
     "category": "static",
+    "dragInSelectMode": true,
+    "storable": true,
     "variants": [
       "test_couch"
     ],
@@ -6277,6 +6279,10 @@
   },
   "FENCE": {
     "category": "structure",
+    "draggable": true,
+    "dragInSelectMode": true,
+    "storable": true,
+    "snapToGrid": true,
     "variants": [
       "wooden_fence",
       "stone_fence",

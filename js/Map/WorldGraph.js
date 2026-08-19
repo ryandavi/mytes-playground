@@ -14,6 +14,14 @@
 // it just isn't anywhere yet. Portals are treated as bidirectional when both
 // sides declare each other, and one-way otherwise.
 //
+// A map may also name a `parentMap`, which says the place it describes sits
+// inside another one — a house standing in a yard rather than beside it. That
+// is a statement about the chart, not the simulation: the two maps are still
+// separate maps joined by a portal, and travel between them is the same walk it
+// always was. It only changes where the world map draws them, and it makes the
+// child's worldX/worldY local to its parent, so an interior gets its own little
+// grid instead of having to find a free square in the overworld.
+//
 // Distance is hop count — the number of map transitions a traveller makes —
 // which is what "is this myte too far away to walk over?" actually means.
 //
@@ -90,6 +98,7 @@ class WorldGraph {
                     region: geometry.region,
                     displayName: geometry.displayName,
                     layout: geometry.layout,
+                    parentMap: geometry.parentMap,
                     pointsOfInterest: geometry.pointsOfInterest
                 }));
                 edges.set(mapId, new Map());
@@ -113,6 +122,28 @@ class WorldGraph {
         this.nodes = nodes;
         this.edges = edges;
         this.geometry = geometryByMap;
+        this._pruneParents();
+    }
+
+    // A parentMap is only worth keeping if the parent is really in the world and
+    // the chain above it ends somewhere. Anything else — a typo, a parent left
+    // behind by a deleted portal, two maps naming each other — drops back to a
+    // root, so every map is still charted exactly once.
+    static _pruneParents() {
+        this.nodes.forEach((node, mapId) => {
+            if (!node.parentMap) return;
+
+            let parent = node.parentMap;
+            const seen = new Set([mapId]);
+            while (parent && this.nodes.has(parent) && !seen.has(parent)) {
+                seen.add(parent);
+                parent = this.nodes.get(parent).parentMap;
+            }
+            if (!parent) return;
+
+            Utility.warnDebug(`[WorldGraph] ${mapId} cannot nest inside "${node.parentMap}"; charting it as a root.`);
+            this.nodes.set(mapId, Object.freeze({ ...node, parentMap: null }));
+        });
     }
 
     static _emptyGeometry() {
@@ -122,6 +153,7 @@ class WorldGraph {
             region: 'world',
             displayName: '',
             layout: Object.freeze({ x: 0, y: 0 }),
+            parentMap: null,
             portals: Object.freeze([]),
             pointsOfInterest: Object.freeze([]),
             spawns: new Map()
@@ -195,6 +227,7 @@ class WorldGraph {
                 height: number(mapNode, 'height') * number(mapNode, 'tileheight'),
                 region: mapProperty('region') || 'world',
                 displayName: mapProperty('displayName') || mapProperty('name') || '',
+                parentMap: this.normalizeId(mapProperty('parentMap')) || null,
                 layout: Object.freeze({
                     x: Number(mapProperty('worldX')) || 0,
                     y: Number(mapProperty('worldY')) || 0
@@ -247,6 +280,25 @@ class WorldGraph {
 
     static getMap(mapId) {
         return this.nodes.get(this.normalizeId(mapId)) || null;
+    }
+
+    // The maps that sit inside this one, in their own layout order. Passing null
+    // asks for the roots — the maps that sit inside nothing — so the same call
+    // walks the chart from the top down.
+    static getChildren(mapId = null) {
+        const parent = mapId === null ? null : this.normalizeId(mapId);
+        return this.getMaps()
+            .filter(map => (map.parentMap ?? null) === parent)
+            .sort((a, b) => (a.layout.y - b.layout.y) || (a.layout.x - b.layout.x));
+    }
+
+    // Whether two maps share a layout space, which is the only case where their
+    // worldX/worldY can be compared at all: a child's coordinates are its
+    // parent's, not the world's.
+    static areSiblings(mapIdA, mapIdB) {
+        const a = this.getMap(mapIdA);
+        const b = this.getMap(mapIdB);
+        return !!a && !!b && (a.parentMap ?? null) === (b.parentMap ?? null);
     }
 
     // Every edge as a flat list, for a world-map view to draw lines from.

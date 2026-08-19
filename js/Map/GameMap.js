@@ -243,8 +243,10 @@ class GameMap {
         return this.core?.user?.preferences?.timeOfDayOverlayEnabled !== false;
     }
 
+    // Interior room lighting only — the global day/night pass rides on
+    // getTimeOfDayOverlayEnabledSetting().
     getLightingEnabledSetting() {
-        const liveSetting = this.ui?.settingsPanel?.isLightingEnabled?.();
+        const liveSetting = this.ui?.settingsPanel?.isRoomLightingEnabled?.();
         if (typeof liveSetting === 'boolean') {
             return liveSetting;
         }
@@ -992,7 +994,13 @@ class GameMap {
                 return null;
             }
 
-            if (this.gridSystem && object.getConfig?.('snapToGrid', false) === true) {
+            // Objects that own their own placement rule — anything mounted on a
+            // wall — have already been given the exact position that rule
+            // resolved. Snapping that to the cell grid throws away the wall's
+            // foot inset and drops the object a cell out, so the placement it
+            // was created for no longer validates and the drop is refused.
+            const ownsPlacement = typeof object.clampPlacementPosition === 'function';
+            if (!ownsPlacement && this.gridSystem && object.getConfig?.('snapToGrid', false) === true) {
                 try {
                     const newposition = this.gridSystem.snapToGrid(
                         x, y,

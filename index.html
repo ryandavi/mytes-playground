@@ -32,14 +32,14 @@
 					<span class="hud-active-myte__thought"></span>
 				</span>
 			</button>
-			<div class="date-time">
-				<div class="clock">
-						<span class="clock__time">--:--</span>
-						<svg class="icon clock__season" aria-hidden="true" hidden><use></use></svg>
-					</div>
-			</div>
+			<button type="button" class="date-time" id="header-clock-button" aria-label="Open the calendar">
+				<span class="clock">
+					<span class="clock__time">--:--</span>
+					<svg class="icon clock__season" aria-hidden="true" hidden><use></use></svg>
+				</span>
+			</button>
 			<div class="coin-count">¢ 0</div>
-			<button type="button" class="username" data-modal-trigger="true" aria-label="Open user profile">
+			<button type="button" class="username" id="header-user-button" aria-label="Open user profile">
 				<svg class="user-icon" aria-hidden="true" viewBox="0 0 16 16">
 					<path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.5 6c.25-3 2.1-4.5 5.5-4.5s5.25 1.5 5.5 4.5h-11Z" />
 				</svg>
@@ -466,14 +466,14 @@
 
 					<div class="setting-item">
 						<div class="checkbox-wrapper">
-							<input type="checkbox" id="lighting-toggle">
-							<label for="lighting-toggle">Night Lighting</label>
+							<input type="checkbox" id="time-of-day-overlay-toggle" checked>
+							<label for="time-of-day-overlay-toggle">Day &amp; Night Lighting</label>
 						</div>
 					</div>
 					<div class="setting-item">
 						<div class="checkbox-wrapper">
-							<input type="checkbox" id="time-of-day-overlay-toggle" checked>
-							<label for="time-of-day-overlay-toggle">Show Time of Day Overlay</label>
+							<input type="checkbox" id="lighting-toggle">
+							<label for="lighting-toggle">Interior Room Lighting (experimental)</label>
 						</div>
 					</div>
 					<div class="setting-item">
@@ -523,7 +523,7 @@
 				<h3 class="settings-group-title">Keyboard</h3>
 				<div class="settings-subgroup">
 					<h4 class="settings-subgroup-title">Anywhere</h4>
-					<dl class="key-legend">
+					<dl class="detail-rows detail-rows--subgrid detail-rows--named">
 						<dt>B</dt><dd>Toggle Build mode</dd>
 						<dt>M</dt><dd>World map</dd>
 						<dt>L</dt><dd>Event log</dd>
@@ -534,14 +534,14 @@
 				</div>
 				<div class="settings-subgroup">
 					<h4 class="settings-subgroup-title">Playing</h4>
-					<dl class="key-legend">
+					<dl class="detail-rows detail-rows--subgrid detail-rows--named">
 						<dt>S / D / P</dt><dd>Select · Drag · Pet</dd>
 						<dt>Arrows</dt><dd>Pan camera</dd>
 					</dl>
 				</div>
 				<div class="settings-subgroup">
 					<h4 class="settings-subgroup-title">Building</h4>
-					<dl class="key-legend">
+					<dl class="detail-rows detail-rows--subgrid detail-rows--named">
 						<dt>1 / 2 / 3</dt><dd>Move · Wall · Surface</dd>
 						<dt>Ctrl+Z / Ctrl+Y</dt><dd>Undo · Redo</dd>
 						<dt>Home / End</dt><dd>Cycle wall view</dd>
@@ -726,17 +726,43 @@
 			</div>
 		</div>
 	</div>
+	<!-- CALENDAR PANEL -->
+	<div id="calendar-panel" class="window-panel calendar">
+		<div class="window-panel__content calendar__content">
+			<div class="calendar__main">
+				<!-- The season stepper is a value-stepper: two square steps around a
+				     readout that resets what it reads, exactly like the zoom control.
+				     Pressing the readout goes back to today. -->
+				<div class="value-stepper calendar__nav">
+					<button type="button" class="value-stepper__step" data-calendar-step="-1" aria-label="Previous season">&#9664;</button>
+					<button type="button" class="value-stepper__value calendar__title" title="Back to today">
+						<span class="calendar__year"></span>
+						<span class="calendar__season"></span>
+					</button>
+					<button type="button" class="value-stepper__step" data-calendar-step="1" aria-label="Next season">&#9654;</button>
+				</div>
+				<div class="calendar__sheet">
+					<div class="calendar__weekdays" aria-hidden="true"></div>
+					<div class="calendar__grid" role="grid" aria-label="Days of the season"></div>
+				</div>
+				<div class="panel-detail calendar__detail"></div>
+			</div>
+			<aside class="calendar__upcoming"></aside>
+		</div>
+	</div>
+	<!-- END CALENDAR PANEL -->
+
 	<!-- WORLD MAP PANEL -->
 	<div id="world-map-panel" class="window-panel world-map">
 		<div class="window-panel__content world-map__content">
 			<div class="world-map__canvas"></div>
-			<div class="world-map__detail"></div>
+			<div class="panel-detail world-map__detail"></div>
 		</div>
 	</div>
 	<!-- END WORLD MAP PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="js/bundle.js?v=8d6b040fc5a6"></script>
+	<script src="js/bundle.js?v=ee7507656afc"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

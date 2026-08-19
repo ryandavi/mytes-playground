@@ -35,8 +35,12 @@ class RoomPanel extends ModalWindow {
         this.drag = null;
         this.hoverKey = null;
         this.hoverEvent = null;
-        // The room a stroke paints into: a room id, 'new', or null for Reset.
+        // The room a stroke paints into, always a real room id.
         this.selected = null;
+        // A room that has been started and not yet painted: {id, name, type}.
+        // It has a row in the list and an id of its own from the moment it is
+        // made, so that everything about it is visible before it has a floor.
+        this.pending = null;
         this.ghostElements = [];
         this.roomTints = [];
         this.highlight = null;
@@ -51,7 +55,7 @@ class RoomPanel extends ModalWindow {
         this.rectangleToggle = this.modalElement?.querySelector('#room-build-rectangle') || null;
         this.newButton = this.modalElement?.querySelector('#room-new') || null;
         this.resetButton = this.modalElement?.querySelector('#room-reset') || null;
-        this.newButton?.addEventListener('click', () => this.select('new'));
+        this.newButton?.addEventListener('click', () => this.startNewRoom());
         this.resetButton?.addEventListener('click', () => this.confirmReset());
         this.parent?.parent?.canvas?.addEventListener('pointerdown', this.boundPointerDown, true);
         this.parent?.parent?.canvas?.addEventListener('pointerleave', this.boundPointerLeave);
@@ -113,6 +117,7 @@ class RoomPanel extends ModalWindow {
             this.clearHighlight();
             return;
         }
+        this.settlePending();
         this.renderRooms();
         this.renderRoomTints();
         this.renderHighlight();
@@ -128,9 +133,106 @@ class RoomPanel extends ModalWindow {
      */
     rooms() {
         const cellSize = this.cellSize;
-        return (this.gameMap?.regionManager?.all('room') ?? [])
+        const rows = (this.gameMap?.regionManager?.all('room') ?? [])
             .map(room => ({ room, cells: Math.round(room.areaInCells(cellSize)) }))
             .sort((a, b) => b.cells - a.cells || a.room.id.localeCompare(b.room.id));
+        // The room being made goes first, not last. It has no floor, so by size
+        // it would sort to the bottom of the list — under everything else, in
+        // the one moment when it is the only row the player is looking for.
+        const pending = this.pendingEntry();
+        return pending ? [pending, ...rows] : rows;
+    }
+
+    /**
+     * The row for a room that has been started and not yet painted.
+     *
+     * "New room" used to be a mode that lived on a footer button: pressing it
+     * changed nothing you could see, and the room itself did not exist until
+     * you had already painted it — so the only way to find out whether the
+     * button had worked was to paint something and look. A room you have
+     * started IS a room. It gets its id, its colour, its name and its place in
+     * the list straight away, and holds them until it has a floor to go with
+     * them.
+     *
+     * A stub rather than a SpatialRegion, because a region with no cells in the
+     * region manager is a room the whole map can see — floors, lighting, wall
+     * faces and the cutaway would all have to learn about a room that is not
+     * anywhere yet. The list is the only place this needs to exist.
+     */
+    pendingEntry() {
+        if (!this.pending) return null;
+        // It has been painted since: it is a real room now and the map's own
+        // copy is the one to show.
+        if (this.gameMap?.regionManager?.get('room', this.pending.id)) return null;
+        return {
+            cells: 0,
+            room: {
+                id: this.pending.id,
+                properties: {
+                    displayName: this.pending.name ?? 'New room',
+                    authoredDisplayName: 'New room',
+                    playerName: this.pending.name,
+                    roomType: this.pending.type,
+                    indoor: true
+                }
+            }
+        };
+    }
+
+    /**
+     * Starts a room: mints its id, gives it a row, and puts it in hand.
+     *
+     * The id is minted now rather than on the first stroke so that the row, the
+     * swatch and the ghost tiles under the cursor all agree on the colour
+     * before a single square is painted — and so that naming it is something
+     * you can do first, the way you would name a folder before filling it.
+     */
+    startNewRoom() {
+        // Pressing it twice does not make two rooms. The one already waiting
+        // for a floor is the one you meant, and re-minting would throw away the
+        // name you had just typed into it.
+        if (this.pendingEntry()) {
+            this.select(this.pending.id);
+            return true;
+        }
+        const id = this.assignments?.mintRoomId();
+        if (!id) return false;
+        this.pending = { id, name: null, type: SiteConfig.rooms.defaultType };
+        this.selected = id;
+        this.renderRooms();
+        this.markSelection();
+        this.renderHighlight();
+        return true;
+    }
+
+    /**
+     * Drops the room being made. Nothing was committed, so there is nothing to
+     * undo and nothing to ask about — an unpainted room is a row and an id.
+     */
+    cancelPending() {
+        if (!this.pending) return false;
+        this.pending = null;
+        this.selected = this.rooms()[0]?.room?.id ?? null;
+        this.renderRooms();
+        this.markSelection();
+        this.renderHighlight();
+        return true;
+    }
+
+    /**
+     * The room being made has been painted, so it is a room like any other now.
+     * Whatever was typed into its row while it had no floor is written onto the
+     * region itself, and the pending row retires.
+     */
+    settlePending() {
+        const region = this.pending && this.gameMap?.regionManager?.get('room', this.pending.id);
+        if (!region) return false;
+        const { name, type } = this.pending;
+        this.pending = null;
+        if (name || type !== SiteConfig.rooms.defaultType) {
+            this.commitRoom(region.id, { name: name || null, type }, 'Name Room');
+        }
+        return true;
     }
 
     /**
@@ -152,7 +254,10 @@ class RoomPanel extends ModalWindow {
             ? [...active.classList].find(name => name.startsWith('room-row__'))
             : null;
 
-        this.listElement.replaceChildren(...this.rooms().map(entry => this.createRow(entry)));
+        const rooms = this.rooms();
+        this.listElement.replaceChildren(
+            ...(rooms.length ? rooms.map(entry => this.createRow(entry)) : [RoomPanel.emptyState()])
+        );
         this.markSelection({ reveal: false });
 
         if (focusedRoom && focusedField) {
@@ -161,6 +266,22 @@ class RoomPanel extends ModalWindow {
                 ?.focus();
         }
         if (this.scrollContainer) this.scrollContainer.scrollTop = scroll;
+    }
+
+    /**
+     * What the list says when it has nothing in it.
+     *
+     * A map with no rooms is not a broken one — it is a map nobody has built in
+     * yet, and it is the first thing you see if you open this panel standing
+     * outside. An empty box reads as a panel that failed to load; a sentence
+     * says which of the two buttons below it to press.
+     */
+    static emptyState() {
+        const empty = document.createElement('p');
+        empty.className = 'room-panel-empty';
+        empty.textContent = 'No rooms yet. Wall a space in and it becomes a room on its own, ' +
+            'or press New room and paint the floor you want it to cover.';
+        return empty;
     }
 
     /**
@@ -174,12 +295,17 @@ class RoomPanel extends ModalWindow {
      * sitting empty, and every stroke goes somewhere you can see on the list.
      */
     ensureBrush() {
-        if (this.selected && this.selected !== 'new') {
+        if (this.selected) {
+            if (this.selected === this.pending?.id) return this.selected;
             if (this.gameMap?.regionManager?.get('room', this.selected)) return this.selected;
-        } else if (this.selected === 'new') {
-            return this.selected;
         }
         this.selected = this.rooms()[0]?.room?.id ?? null;
+        // No rooms to pick from and none in hand — a map nobody has built in,
+        // which is exactly what you are looking at standing outside in a space
+        // nothing encloses. Starting one is the only move there is, so the
+        // panel makes it instead of refusing the click and waiting to be asked
+        // for the one thing it could have done itself.
+        if (!this.selected) this.startNewRoom();
         return this.selected;
     }
 
@@ -198,7 +324,7 @@ class RoomPanel extends ModalWindow {
         for (const row of this.listElement?.querySelectorAll('.room-row') ?? []) {
             row.classList.toggle('active', row.dataset.roomId === this.selected);
         }
-        this.newButton?.classList.toggle('active', this.selected === 'new');
+        this.newButton?.classList.toggle('active', this.selected === this.pending?.id);
         if (reveal) {
             this.listElement?.querySelector('.room-row.active')?.scrollIntoView({ block: 'nearest' });
         }
@@ -235,6 +361,7 @@ class RoomPanel extends ModalWindow {
         const row = document.createElement('div');
         row.className = 'room-row';
         row.dataset.roomId = room.id;
+        row.classList.toggle('is-empty', cells === 0);
         row.classList.toggle('active', this.selected === room.id);
 
         const swatch = document.createElement('span');
@@ -273,11 +400,30 @@ class RoomPanel extends ModalWindow {
 
         const size = document.createElement('span');
         size.className = 'room-row__size';
+        // Said on the row, because a room nothing encloses looks identical to
+        // one that is walled in once it has a floor and a name — and it is not:
+        // it takes no interior light, and standing in it you are still outside.
+        // The same sentence at every size, nought included: the size slot shares
+        // its line with the type dropdown, and a row that swaps in a longer
+        // phrase at zero squeezes the dropdown down to nothing. A room with no
+        // floor says so by the row it is in — faded swatch, italic count.
         size.textContent = `${cells} tiles`;
 
         const meta = document.createElement('div');
         meta.className = 'room-row__meta';
         meta.append(type, size);
+        // Outdoors as a mark rather than a word. It has to be said — a room
+        // nothing encloses looks exactly like a walled one once it has a floor
+        // and a name, and it is lit differently — but "· outdoor" spent a third
+        // of a line the type dropdown was already sharing.
+        if (room.properties?.indoor === false) {
+            const outdoor = document.createElement('span');
+            outdoor.className = 'room-row__outdoor';
+            outdoor.title = 'Outdoor — nothing encloses this room, so it takes daylight rather than indoor light';
+            outdoor.setAttribute('aria-label', 'Outdoor room');
+            outdoor.append(Utility.createIcon('sun'));
+            meta.append(outdoor);
+        }
 
         // On every room, not only the ones somebody painted. A room the walls
         // enclose still stops being its own room the moment its floor belongs
@@ -313,6 +459,9 @@ class RoomPanel extends ModalWindow {
      * door, or goes back to whatever the walls enclose if there is no next door.
      */
     confirmDissolve(roomId) {
+        // A room that has never been painted has no floor to hand anywhere and
+        // nothing to undo. It goes when you say so.
+        if (roomId === this.pending?.id) return this.cancelPending();
         const room = this.gameMap?.regionManager?.get('room', roomId);
         const cells = this.roomCells(roomId);
         if (!room || cells.length === 0) {
@@ -404,7 +553,15 @@ class RoomPanel extends ModalWindow {
     }
 
     select(value) {
+        // Picking another room gives up the one you started and never painted.
+        // Leaving it in the list would leave a room that is not anywhere, and
+        // it would still be there tomorrow.
+        const dropping = this.pending && value !== this.pending.id;
         this.selected = value;
+        if (dropping) {
+            this.pending = null;
+            this.renderRooms();
+        }
         this.markSelection();
         this.renderHighlight();
     }
@@ -465,7 +622,7 @@ class RoomPanel extends ModalWindow {
      */
     renderHighlight(roomId = this.selected) {
         this.clearHighlight();
-        const target = roomId && roomId !== 'new' ? roomId : null;
+        const target = roomId || null;
         const room = target ? this.gameMap?.regionManager?.get('room', target) : null;
         if (!room) return;
         this.highlight = this.gameMap?.floorBuilder?.createRoomOverlay(room, {
@@ -526,10 +683,13 @@ class RoomPanel extends ModalWindow {
         return true;
     }
 
-    /** The room a stroke paints into. 'new' is minted once per stroke, not per cell. */
+    /**
+     * The room a stroke paints into. Always a real id: a new room is minted
+     * when it is started rather than when it is first painted, so there is no
+     * such thing as a stroke whose destination is not already in the list.
+     */
     resolveStrokeRoomId() {
-        if (this.selected !== 'new') return this.selected;
-        return this.assignments?.mintRoomId() ?? null;
+        return this.selected;
     }
 
     handlePointerDown(event) {
@@ -632,6 +792,18 @@ class RoomPanel extends ModalWindow {
         // everything of the same room it joins up with. That is what a click on
         // a flat colour means everywhere else.
         const painted = moved ? [...cells.values()] : this.floodFrom([...cells.values()][0]);
+        // The fill declined: the floor under the cursor runs further than a
+        // click has any business claiming. Refusing is the whole point — the
+        // alternative is one click quietly turning the entire outdoors into a
+        // room, which is a great deal of work to undo.
+        if (!painted) {
+            this.parent.showMessage(
+                'That floor runs too far to fill in one click. Drag to paint the area you want.',
+                'info', 'Rooms'
+            );
+            this.playSound(SiteConfig.buildMode.sounds.rejected);
+            return;
+        }
         if (this.commitCells(painted, roomId) && roomId) {
             // Whatever you just painted into is what you are working on. Without
             // this, painting with New Room left the brush on "New Room" and the
@@ -649,8 +821,23 @@ class RoomPanel extends ModalWindow {
      * split open-plan space repaints that half rather than swallowing the room
      * next door — which would make the bucket useless for the layout this tool
      * exists for.
+     *
+     * And bounded by a cell count, because "the room it is currently in" is a
+     * boundary only where there IS a room. Click bare ground — outside the
+     * house, or in a space whose walls do not close — and the fill has nothing
+     * to stop it: it takes every open square on the map, draws a ghost on each
+     * one, and does the whole thing again every time the pointer crosses a
+     * cell. That is the lag, and the fill it was computing was never one
+     * anybody wanted.
+     *
+     * Over the limit the answer is no rather than a smaller yes: a fill that
+     * stops at four hundred arbitrary squares is worse than no fill at all,
+     * because the shape it leaves is one the player then has to find and
+     * repair. Dragging is right there, and it says exactly what you meant.
+     *
+     * @returns {Array<{x: number, y: number}>|null} null if it ran past `limit`
      */
-    floodFrom(start) {
+    floodFrom(start, { limit = SiteConfig.rooms?.maxFillCells ?? 400 } = {}) {
         const map = this.gameMap;
         if (!start || !map) return [];
         const size = this.cellSize;
@@ -668,6 +855,7 @@ class RoomPanel extends ModalWindow {
         for (let index = 0; index < queue.length; index++) {
             const cell = queue[index];
             found.push(cell);
+            if (found.length > limit) return null;
             for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
                 const x = cell.x + dx;
                 const y = cell.y + dy;
@@ -703,7 +891,14 @@ class RoomPanel extends ModalWindow {
         this.hoverKey = key;
         // The whole area a click would take, not one square: a bucket that shows
         // you one tile is a bucket you have to guess at.
-        this.renderGhosts(this.floodFrom(cell), this.selected);
+        //
+        // Unless the click would take too much, in which case there is no area
+        // to show and the square under the cursor is the honest preview — the
+        // click itself says why. Drawing the refused fill would mean thousands
+        // of tiles to announce that nothing is going to happen.
+        const area = this.floodFrom(cell);
+        this.parent.setBuildCursor(area ? 'ready' : 'refused');
+        this.renderGhosts(area ?? [cell], this.selected);
     }
 
     clearHover() {
@@ -719,10 +914,18 @@ class RoomPanel extends ModalWindow {
         const layer = this.gameMap?.layers?.objects;
         const size = this.cellSize;
         if (!layer) return;
-        const fill = roomId && roomId !== 'new' ? RoomPanel.roomColour(roomId, 0.6) : null;
+        const fill = roomId ? RoomPanel.roomColour(roomId, 0.6) : null;
+        // A rectangle dragged across the map is a legitimate thing to want, and
+        // one div per square of it is thousands of elements rebuilt at pointer
+        // rate. Past this the preview is the area's outline, which for a
+        // rectangle is the same picture drawn once.
+        if (cells.length > (SiteConfig.rooms?.maxGhostCells ?? 600)) {
+            this.renderBulkGhost(cells, roomId, fill);
+            return;
+        }
         for (const cell of cells) {
             const ghost = document.createElement('div');
-            ghost.className = `room-paint-ghost${roomId ? '' : ' is-reset'}${roomId === 'new' ? ' is-new' : ''}`;
+            ghost.className = `room-paint-ghost${roomId ? '' : ' is-reset'}${roomId === this.pending?.id ? ' is-new' : ''}`;
             Object.assign(ghost.style, {
                 left: `${cell.x * size}px`,
                 top: `${cell.y * size}px`,
@@ -733,6 +936,32 @@ class RoomPanel extends ModalWindow {
             layer.appendChild(ghost);
             this.ghostElements.push(ghost);
         }
+    }
+
+    /**
+     * One box round the lot, for a preview too big to draw square by square.
+     * Approximate on purpose: at that size what you need to see is how far the
+     * stroke reaches, and the exact squares are the part you already know.
+     */
+    renderBulkGhost(cells, roomId, fill) {
+        const layer = this.gameMap?.layers?.objects;
+        const size = this.cellSize;
+        if (!layer || !cells.length) return;
+        const xs = cells.map(cell => cell.x);
+        const ys = cells.map(cell => cell.y);
+        const left = Math.min(...xs);
+        const top = Math.min(...ys);
+        const ghost = document.createElement('div');
+        ghost.className = `room-paint-ghost is-bulk${roomId ? '' : ' is-reset'}${roomId === this.pending?.id ? ' is-new' : ''}`;
+        Object.assign(ghost.style, {
+            left: `${left * size}px`,
+            top: `${top * size}px`,
+            width: `${(Math.max(...xs) - left + 1) * size}px`,
+            height: `${(Math.max(...ys) - top + 1) * size}px`
+        });
+        if (fill) ghost.style.backgroundColor = fill;
+        layer.appendChild(ghost);
+        this.ghostElements.push(ghost);
     }
 
     clearGhosts() {
@@ -780,6 +1009,13 @@ class RoomPanel extends ModalWindow {
      * rooms should own their names.
      */
     commitRoom(roomId, patch, label) {
+        // A room with no floor yet is not in the region manager: its name and
+        // type live on the pending record until it has one, and settlePending
+        // writes them across. Nothing to undo — none of it is on the map yet.
+        if (roomId === this.pending?.id) {
+            this.pending = { ...this.pending, ...patch };
+            return true;
+        }
         const region = this.gameMap?.regionManager?.get('room', roomId);
         if (!region) return false;
         const previous = {

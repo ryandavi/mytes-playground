@@ -1,4 +1,10 @@
 class MyteDialogue {
+    // The bubble shapes, and the modifiers that recolour one without changing
+    // its shape. Both are cleared before each message, so the list is the one
+    // place that has to know what a bubble can wear.
+    static STYLES = ['arrow', 'thought', 'emoji', 'alert', 'question', 'whisper'];
+    static MODIFIERS = ['is-refusal'];
+
     constructor(myte) {
         // Main dialogue element
         this.dialogue = myte.duplicate.querySelector('.dialogue');
@@ -17,6 +23,7 @@ class MyteDialogue {
         this.isDisplaying = false;
         this.isDestroyed = false;
         this.pendingTimeouts = new Set();
+        this._lastAnswer = new Map();
 
         // Default settings
         this.settings = {
@@ -48,12 +55,49 @@ class MyteDialogue {
     }
 
     // A wordless bubble: `name` is a sprite symbol, not text to read.
-    showIcon(name, style = 'thought') {
-        this.messageQueue.push({ text: '', icon: name, style });
+    showIcon(name, style = 'thought', modifier = null) {
+        this.messageQueue.push({ text: '', icon: name, style, modifier });
 
         if (!this.isDisplaying) {
             this.displayNextMessage();
         }
+    }
+
+    // "I would rather not." The bubble carries the icon of whatever was asked
+    // for, struck through — so it reads as a refusal of *that*, not a generic
+    // complaint. An action with no icon of its own still gets an answer; a
+    // silent refusal reads as a broken button.
+    showRefusal(icon) {
+        const symbol = Utility.isIconName(icon) ? icon : SiteConfig.myte.bubbles.fallbackIcon;
+        if (!this._isNewAnswer('refusal', symbol)) return false;
+
+        this.showIcon(symbol, 'thought', 'is-refusal');
+        return true;
+    }
+
+    // The other half of the same conversation: "yes, going to do that." No
+    // fallback icon here — an acknowledgement nobody can read is just noise,
+    // and unlike a refusal its absence says nothing wrong.
+    showIntent(icon) {
+        if (!Utility.isIconName(icon)) return false;
+        if (!this._isNewAnswer('intent', icon)) return false;
+
+        this.showIcon(icon, 'thought');
+        return true;
+    }
+
+    // Mashing a button is one question, so it gets one answer. Keyed by kind as
+    // well as icon: refusing a bed and then agreeing to it are different
+    // answers, and the second should not be swallowed by the first.
+    _isNewAnswer(kind, icon) {
+        const key = `${kind}:${icon}`;
+        const now = SimClock.now();
+        if ((now - (this._lastAnswer.get(key) ?? -Infinity)) < SiteConfig.myte.bubbles.answerIntervalMs) {
+            return false;
+        }
+
+        this._lastAnswer.set(key, now);
+        return true;
     }
 
     // Display the next message in the queue
@@ -63,13 +107,12 @@ class MyteDialogue {
         }
 
 
-        const { text, icon, style } = this.messageQueue.shift();
+        const { text, icon, style, modifier } = this.messageQueue.shift();
         this.isDisplaying = true;
 
-        // Remove all style classes first
-        this.dialogue.classList.remove('arrow', 'thought', 'emoji', 'alert', 'question', 'whisper');
-        // Add the new style class
+        this.dialogue.classList.remove(...MyteDialogue.STYLES, ...MyteDialogue.MODIFIERS);
         this.dialogue.classList.add(style);
+        if (MyteDialogue.MODIFIERS.includes(modifier)) this.dialogue.classList.add(modifier);
 
         // Update text and show dialogue
         Utility.renderIconLabel(this.textElement, icon, text);

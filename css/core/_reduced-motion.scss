@@ -56,9 +56,10 @@
     }
 
     .interactive-myte > .inner-wrapper > .dialogue {
-        // Shake is exactly what reduced-motion exists to remove. The alert bubble
-        // still appears and is still styled as an alert.
-        &.alert.is-visible {
+        // Shake is exactly what reduced-motion exists to remove. The alert and
+        // refusal bubbles still appear, and are still styled as what they are.
+        &.alert.is-visible,
+        &.is-refusal.is-visible {
             animation: none;
         }
 

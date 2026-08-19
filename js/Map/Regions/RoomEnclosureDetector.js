@@ -95,13 +95,22 @@ class RoomEnclosureDetector {
         const previousOwner = (cellX, cellY) => regionManager.innermostAt(
             (cellX + 0.5) * cellSize, (cellY + 0.5) * cellSize, 'room', cellSize
         );
+        // What the walls decided, kept before the paint goes over it: a room
+        // whose cells are ALL outside it is a room nothing encloses, and that
+        // is how an outdoor one is recognised further down.
+        const enclosedKeys = new Set(owners.keys());
         const painted = new Map();
         for (const [key, roomId] of this.gameMap.roomAssignments?.cells ?? []) {
-            if (!owners.has(key)) continue;                 // under a wall, or outdoors
-            if (!painted.has(roomId)) {
-                const [cellX, cellY] = key.split(',').map(Number);
-                painted.set(roomId, previousOwner(cellX, cellY));
-            }
+            const [cellX, cellY] = key.split(',').map(Number);
+            // Only masonry and the edge of the map are refused now. Painted
+            // cells used to need a roof over them as well — anything the fill
+            // called exterior was dropped on the floor here, so painting a
+            // patio, a fenced yard, or the three tiles inside a shed too small
+            // to count as a room played the paint sound, wrote an undo entry,
+            // and then quietly did nothing at all. A room is what the player
+            // says it is; the walls are only the default.
+            if (!isOpen(cellX, cellY)) continue;
+            if (!painted.has(roomId)) painted.set(roomId, previousOwner(cellX, cellY));
             owners.set(key, roomId);
         }
 
@@ -130,6 +139,14 @@ class RoomEnclosureDetector {
             }
             const parent = painted.get(roomId) ?? this.roomDividedBy(cells, cellSize);
             const number = added.length + 1;
+            // Nothing enclosing any of it: an outdoor room. It is still a room
+            // — it has a floor, a name, a type, and a place in the list — but
+            // it is not somewhere you are inside, so it takes no interior
+            // gloom and a Myte standing in it is still out of doors. Called an
+            // Area rather than a Room so the list says which kind it is
+            // without anybody having to explain the difference.
+            const indoor = cells.some(([cellX, cellY]) => enclosedKeys.has(`${cellX},${cellY}`));
+            const placeholder = indoor ? `Room ${number}` : `Area ${number}`;
             added.push(regionManager.add(new SpatialRegion({
                 id: roomId,
                 layer: 'room',
@@ -137,9 +154,9 @@ class RoomEnclosureDetector {
                 properties: {
                     // A placeholder until the player names it; numbered so two
                     // new rooms are at least tellable apart.
-                    displayName: `Room ${number}`,
-                    authoredDisplayName: `Room ${number}`,
-                    indoor: true,
+                    displayName: placeholder,
+                    authoredDisplayName: placeholder,
+                    indoor,
                     autoDetected: true,
                     // Dividing a room does not redecorate it. A new room with no
                     // finishes came up in bare plaster with the map's own ground

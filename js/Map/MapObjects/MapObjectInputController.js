@@ -59,7 +59,11 @@ class MapObjectInputController {
 				object.onPlacementDragStart?.();
 				object.syncRenderLayer();
 				object.element.classList.add('is-dragging');
-				object.container?.camera?.beginTemporaryCursorFollow?.(this);
+				// The drag can end in the inventory, so it must be able to reach it
+				// without the map sliding away underneath on the approach.
+				object.container?.camera?.beginTemporaryCursorFollow?.(this, {
+					blockedEdges: object.container?.inventory?.getBlockedDragEdges?.() ?? null
+				});
 				const pointerWorld = object.container?.inputHandler?.screenToWorldCoordinates?.(
 					event.position.clientX,
 					event.position.clientY
@@ -122,6 +126,10 @@ class MapObjectInputController {
 				}
 				const isValid = object.checkDropValidity(object.posX, object.posY);
 				if (!isValid) {
+					// Asked here, while the object is still where it was dropped:
+					// once it has sprung back to its origin the position it was
+					// refused for is gone, and every refusal reads as valid.
+					const refusal = object.container?.buildRules?.canPlaceAt(object, object.posX, object.posY);
 					const safePosition = object.restoreInvalidDropToOrigin?.() === true ? null : object.gameMap?.gridSystem?.findNearestValidPositionForEntity?.(
 						object,
 						object.posX,
@@ -142,6 +150,15 @@ class MapObjectInputController {
 						}
 						object.updatePosition();
 						object.playConfiguredSound?.('drop_error');
+						// A thing that springs back to where it started, with a
+						// noise, is a thing that has not said why. Wall-mounted
+						// objects need this most: "not there" is the whole
+						// interaction with a painting or a door.
+						object.container?.ui?.showMessage?.(
+							refusal?.reason || BuildRules.describePlacementRefusal(),
+							'warning',
+							'Placement'
+						);
 					}
 				} else {
 					object.playConfiguredSound?.('drop');

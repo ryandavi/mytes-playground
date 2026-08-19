@@ -31,17 +31,6 @@ class OptionsPanel extends ModalWindow {
         this.syncTabs(this.activeTab);
     }
 
-    buttonLeftClick(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        this.toggle();
-        return false;
-    }
-
-    buttonRightClick(event) {
-        this.buttonLeftClick(event);
-    }
-
     selectTab(tabId) {
         this.activeTab = tabId;
         this.syncTabs(tabId);

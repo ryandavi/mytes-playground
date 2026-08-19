@@ -133,6 +133,14 @@ class MyteBuildPlacement extends UIComponent {
         this.render(event);
     }
 
+    // The camera calls this on the owner of its borrow after an edge-scroll
+    // step: the world moved under a pointer that did not, so the dragged myte
+    // has to be placed again from the same screen point.
+    syncToCursor(clientX, clientY) {
+        if (!this.drag) return;
+        this.render({ clientX, clientY });
+    }
+
     handlePointerUp(event) {
         if (!this.drag || event.pointerId !== this.drag.pointerId) return;
         event.preventDefault();

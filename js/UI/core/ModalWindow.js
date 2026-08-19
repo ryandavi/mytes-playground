@@ -142,12 +142,18 @@ constructor(parent, options = {}) {
 		}
 	}
 
+	// A window's trigger button toggles it. Every panel wanted exactly this and
+	// wrote it out again, so it is the default — override only for a button that
+	// means something else.
 	buttonLeftClick(e) {
-		return;
+		e.preventDefault();
+		e.stopPropagation();
+		this.toggle();
+		return false;
 	}
 
 	buttonRightClick(e) {
-		return;
+		this.buttonLeftClick(e);
 	}
 	
 	/**

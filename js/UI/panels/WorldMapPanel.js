@@ -3,6 +3,13 @@
 // on the layout grid from its own .tmx worldX/worldY, every portal link as a
 // connector, and hop distance from wherever the player currently is.
 //
+// A map that names a parentMap is drawn inside its parent rather than beside
+// it, on a grid of its own — so a house reads as standing in its yard. Nesting
+// only moves where a node is drawn: it is still one node, still tied to the
+// same portal lines, and the nested grids are deliberately left unpositioned so
+// every node keeps measuring its offset against the one chart the connectors
+// are drawn on.
+//
 // Travel means two different things depending on what is out. With no myte
 // deployed the camera simply goes there. With one out, moving between maps is
 // the myte's job, so Travel plots the walk instead: it heads for the portal on
@@ -13,6 +20,9 @@ class WorldMapPanel extends ModalWindow {
     constructor(parent) {
         super(parent, {
             id: 'world-map-panel',
+            // The stage chip is this window's trigger, so ModalWindow owns both
+            // the click and the pressed look the chip wears while it is open.
+            buttonId: 'world-map-chip',
             closeOnOutsideClick: false,
             position: 'top-right',
             draggable: true,
@@ -36,17 +46,6 @@ class WorldMapPanel extends ModalWindow {
         this.panHandler = null;
         this.panFrom = null;
         this.init();
-    }
-
-    buttonLeftClick(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.toggle();
-        return false;
-    }
-
-    buttonRightClick(e) {
-        this.buttonLeftClick(e);
     }
 
     // ModalWindow owns `this.container`, so the game container needs its own name.
@@ -99,19 +98,25 @@ class WorldMapPanel extends ModalWindow {
             this.selectedMapId = this.currentMapId ?? maps[0].id;
         }
 
-        this.renderGrid(canvas, maps);
+        this.renderGrid(canvas);
         this.renderDetail(detail);
     }
 
-    buildEmptyState(message) {
+    // Compact for a one-line aside inside the detail box; full size for the
+    // chart, where the message is holding the whole window open.
+    buildEmptyState(message, { compact = false } = {}) {
         const empty = document.createElement('div');
-        empty.className = 'window-empty-state';
+        empty.className = compact
+            ? 'window-empty-state window-empty-state--compact'
+            : 'window-empty-state';
         empty.textContent = message;
         return empty;
     }
 
     // Layout coords are small integers, so the grid is sized from their extent
     // rather than hard-coded — giving a map worldX/worldY is enough to chart it.
+    // Only ever asked about one layout space: the roots, or one parent's
+    // children, never a mix of the two.
     getLayoutExtent(maps) {
         const xs = maps.map(map => Number(map.layout?.x) || 0);
         const ys = maps.map(map => Number(map.layout?.y) || 0);
@@ -127,11 +132,12 @@ class WorldMapPanel extends ModalWindow {
     // onto it, the chart is as big as the world needs. That way a world too big
     // for the panel scrolls instead of squeezing its maps into slivers, and the
     // connector SVG still spans exactly the charted area.
-    renderGrid(canvas, maps) {
+    renderGrid(canvas) {
         // Selecting a map re-renders the chart; where the player had panned to is
         // not part of what changed, so it survives the rebuild.
         const scrolledTo = { x: canvas.scrollLeft, y: canvas.scrollTop };
-        const extent = this.getLayoutExtent(maps);
+        const roots = WorldGraph.getChildren(null);
+        const extent = this.getLayoutExtent(roots);
         const grid = document.createElement('div');
         grid.className = 'world-map__grid';
         grid.style.setProperty('--world-map-columns', extent.columns);
@@ -140,11 +146,7 @@ class WorldMapPanel extends ModalWindow {
         grid.appendChild(this.linksElement);
 
         this.nodeElements.clear();
-        maps.forEach(map => {
-            const node = this.buildNode(map, extent);
-            this.nodeElements.set(map.id, node);
-            grid.appendChild(node);
-        });
+        roots.forEach(map => grid.appendChild(this.buildCell(map, extent)));
 
         canvas.replaceChildren(grid);
         canvas.scrollTo(scrolledTo.x, scrolledTo.y);
@@ -283,8 +285,13 @@ class WorldMapPanel extends ModalWindow {
 
     // Which way the second map lies from the first, as one of the eight compass
     // directions of the layout grid. Falls back to where the nodes ended up when
-    // two maps claim the same square.
+    // two maps claim the same square — and for a link that crosses between a
+    // parent and something nested inside it, where the nodes ended up is the
+    // only answer there is: the two layouts are measured in different spaces.
     getHeading(fromMapId, toMapId, fromBox, toBox) {
+        const pixels = { x: Math.sign(toBox.x - fromBox.x), y: Math.sign(toBox.y - fromBox.y) };
+        if (!WorldGraph.areSiblings(fromMapId, toMapId)) return pixels;
+
         const from = WorldGraph.getMap(fromMapId)?.layout;
         const to = WorldGraph.getMap(toMapId)?.layout;
         const heading = {
@@ -292,8 +299,7 @@ class WorldMapPanel extends ModalWindow {
             y: Math.sign((Number(to?.y) || 0) - (Number(from?.y) || 0))
         };
 
-        if (heading.x || heading.y) return heading;
-        return { x: Math.sign(toBox.x - fromBox.x), y: Math.sign(toBox.y - fromBox.y) };
+        return (heading.x || heading.y) ? heading : pixels;
     }
 
     // Where on a node a link is tied. Straight across, that is the middle of the
@@ -334,6 +340,34 @@ class WorldMapPanel extends ModalWindow {
         };
     }
 
+    // What actually goes in a grid square. A map with nothing inside it is just
+    // its node; a map with children is that node plus their grid, wrapped in a
+    // holder that takes the square instead. The holder stays unpositioned on
+    // purpose — see the note at the top of the file.
+    buildCell(map, extent) {
+        const node = this.buildNode(map, extent);
+        const children = WorldGraph.getChildren(map.id);
+        if (children.length === 0) return node;
+
+        const nest = document.createElement('div');
+        nest.className = 'world-map__nest';
+        nest.style.gridColumn = node.style.gridColumn;
+        nest.style.gridRow = node.style.gridRow;
+        node.style.gridColumn = '';
+        node.style.gridRow = '';
+        node.classList.add('is-parent');
+
+        const inner = document.createElement('div');
+        inner.className = 'world-map__grid world-map__grid--nested';
+        const innerExtent = this.getLayoutExtent(children);
+        inner.style.setProperty('--world-map-columns', innerExtent.columns);
+        inner.style.setProperty('--world-map-rows', innerExtent.rows);
+        children.forEach(child => inner.appendChild(this.buildCell(child, innerExtent)));
+
+        nest.append(node, inner);
+        return nest;
+    }
+
     buildNode(map, extent) {
         const node = document.createElement('button');
         node.type = 'button';
@@ -351,10 +385,10 @@ class WorldMapPanel extends ModalWindow {
         const badges = document.createElement('span');
         badges.className = 'world-map__node-badges';
         const residents = this.getResidents(map.id).length;
-        const travellers = this.getTravellerNames(map.id).length;
+        const present = this.getPresent(map.id).length;
         const pointsOfInterest = map.pointsOfInterest?.length ?? 0;
         if (residents > 0) badges.appendChild(this.buildBadge(`${residents} home`, 'is-resident'));
-        if (travellers > 0) badges.appendChild(this.buildBadge(`${travellers} passing`, 'is-traveller'));
+        if (present > 0) badges.appendChild(this.buildBadge(`${present} here`, 'is-traveller'));
         if (pointsOfInterest > 0) {
             badges.appendChild(this.buildBadge(pointsOfInterest === 1 ? 'Shop' : `${pointsOfInterest} shops`, 'is-poi'));
         }
@@ -364,11 +398,15 @@ class WorldMapPanel extends ModalWindow {
         node.classList.toggle('is-current', map.id === this.currentMapId);
         node.classList.toggle('is-selected', map.id === this.selectedMapId);
         node.classList.toggle('is-unreachable', !WorldGraph.areConnected(this.currentMapId, map.id));
-        node.addEventListener('click', () => {
+        node.addEventListener('click', event => {
+            // A child node sits inside its parent's holder, so a click on it
+            // would otherwise read as a click on the parent too.
+            event.stopPropagation();
             this.selectedMapId = map.id;
             this.render();
         });
 
+        this.nodeElements.set(map.id, node);
         return node;
     }
 
@@ -379,8 +417,22 @@ class WorldMapPanel extends ModalWindow {
         return badge;
     }
 
+    // Two different questions, and the map answers both: whose home this is, and
+    // who is standing on it right now. A myte at home counts as both.
     getResidents(mapId) {
         return (this.gameContainer.mytes ?? []).filter(myte => myte.homeMapId === mapId);
+    }
+
+    // Where a myte actually is, asked of the container rather than worked out
+    // here — it is the same answer the rest of the game uses, and it covers the
+    // myte crossing a map, the one out with you, and the one asleep in its slot.
+    getPresent(mapId) {
+        return (this.gameContainer.mytes ?? [])
+            .filter(myte => this.gameContainer.getMyteMapId?.(myte) === mapId);
+    }
+
+    getNames(mytes) {
+        return mytes.map(myte => myte.name).join(', ') || 'None';
     }
 
     // Every branch renders the same set of parts — heading, four rows, one
@@ -388,37 +440,40 @@ class WorldMapPanel extends ModalWindow {
     renderDetail(detail) {
         const map = WorldGraph.getMap(this.selectedMapId);
         if (!map) {
-            detail.replaceChildren(this.buildEmptyState('Select a map.'));
+            detail.replaceChildren(this.buildEmptyState('Select a map.', { compact: true }));
             return;
         }
 
         const isHere = map.id === this.currentMapId;
         const distance = WorldGraph.getDistance(this.currentMapId, map.id);
-        const residents = this.getResidents(map.id);
         const neighbors = WorldGraph.getNeighbors(map.id).map(id => this.gameContainer.getMapDisplayName(id));
 
         const head = document.createElement('div');
-        head.className = 'world-map__detail-head';
+        head.className = 'panel-detail__head';
         const heading = document.createElement('h3');
-        heading.className = 'world-map__detail-title';
+        heading.className = 'panel-detail__title';
         heading.textContent = this.gameContainer.getMapDisplayName(map.id);
         const region = document.createElement('span');
-        region.className = 'world-map__detail-region';
+        region.className = 'panel-detail__caption';
         region.textContent = this.humanize(map.region);
         head.append(heading, region);
 
-        const rows = document.createElement('div');
-        rows.className = 'world-map__rows';
-        this.appendDetailRow(rows, 'Distance', this.getDistanceLabel(isHere, distance));
-        this.appendDetailRow(rows, 'Connects to', neighbors.join(', ') || 'Nowhere');
-        this.appendDetailRow(rows, 'Mytes', residents.map(myte => myte.name).join(', ') || 'None');
-        this.appendDetailRow(rows, 'Travellers', this.getTravellerNames(map.id).join(', ') || 'None');
-        this.appendDetailRow(rows, 'Points of interest', this.getPointOfInterestNames(map).join(', ') || 'None');
+        // The shared label/value list, so every row's value starts in the same
+        // place however long its label is — "Points of interest" no longer sets
+        // its own column width against everything else's.
+        const rows = DetailRows.build([
+            ['Distance', this.getDistanceLabel(isHere, distance)],
+            ['Connects to', neighbors.join(', ') || 'Nowhere'],
+            ['Lives here', this.getNames(this.getResidents(map.id))],
+            ['Here now', this.getNames(this.getPresent(map.id))],
+            ['Points of interest', this.getPointOfInterestNames(map).join(', ') || 'None']
+        ], { className: 'world-map__rows' });
 
-        // The action row is always present even when empty — it is what keeps the
-        // panel the same height whether or not there is somewhere to travel to.
+        // The action row is always present even when empty — panel-detail
+        // reserves its height, so a map you cannot travel to is the same size
+        // as one you can.
         const actions = document.createElement('div');
-        actions.className = 'world-map__detail-actions';
+        actions.className = 'panel-detail__actions';
         if (!isHere) actions.appendChild(this.buildTravelButton(map, distance));
 
         detail.replaceChildren(head, rows, actions);
@@ -430,15 +485,6 @@ class WorldMapPanel extends ModalWindow {
         return `${distance} map${distance === 1 ? '' : 's'} away`;
     }
 
-    // Mytes crossing this map right now — the world map is the one place the
-    // player can see where a traveller has got to.
-    getTravellerNames(mapId) {
-        const travelManager = this.gameContainer.travelManager;
-        return (this.gameContainer.mytes ?? [])
-            .filter(myte => travelManager?.getCurrentLegMapId?.(myte) === mapId)
-            .map(myte => myte.name);
-    }
-
     getPointOfInterestNames(map) {
         return (map?.pointsOfInterest ?? []).map(point => {
             if (point.type === 'shop') {
@@ -446,19 +492,6 @@ class WorldMapPanel extends ModalWindow {
             }
             return this.humanize(point.id || point.type);
         });
-    }
-
-    appendDetailRow(container, label, value) {
-        const row = document.createElement('div');
-        row.className = 'world-map__row';
-        const labelNode = document.createElement('span');
-        labelNode.className = 'world-map__row-label';
-        labelNode.textContent = label;
-        const valueNode = document.createElement('span');
-        valueNode.className = 'world-map__row-value';
-        valueNode.textContent = value;
-        row.append(labelNode, valueNode);
-        container.appendChild(row);
     }
 
     humanize(value) {

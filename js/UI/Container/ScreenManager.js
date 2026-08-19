@@ -3,8 +3,7 @@ class ScreenManager extends UIComponent {
         super(parent);
         this.headerElement = this.parent.containerWrapper.querySelector('.header');
         this.fullscreenButton = this.parent.containerWrapper.querySelector('.fullscreen-btn');
-        this.userButtonElement = this.headerElement?.querySelector('.username') || null;
-        this.userTextElement = this.userButtonElement?.querySelector('.username__text') || null;
+        this.userTextElement = this.headerElement?.querySelector('.username .username__text') || null;
         this.listenerCleanup = [];
     }
 
@@ -44,11 +43,11 @@ class ScreenManager extends UIComponent {
     initializeHeaderState() {
         const user = this.parent.parent?.core?.user;
 
-        if (this.userTextElement && this.userButtonElement) {
+        // The name is ours to write; opening the profile is UserProfilePanel's,
+        // which claims this button as its trigger and marks it active while the
+        // window is open.
+        if (this.userTextElement) {
             this.userTextElement.textContent = user?.username || 'Guest';
-            this.handleUserClick = () => this.parent.userProfilePanel?.open?.();
-            this.userButtonElement.addEventListener('click', this.handleUserClick);
-            this.listenerCleanup.push(() => this.userButtonElement?.removeEventListener('click', this.handleUserClick));
         }
     }
 

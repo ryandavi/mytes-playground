@@ -14,6 +14,17 @@ const SiteConfig = Object.freeze({
     rooms: Object.freeze({
         autoDetect: true,
         minAreaCells: 4,
+        // How much floor one bucket click is allowed to take. A click floods
+        // everything of the same room it joins up with, and outdoors that is
+        // every open square on the map — thousands of ghost tiles drawn on
+        // every hover, for a fill nobody wanted. Past this the fill declines
+        // and asks you to drag the area instead, which is the only sane answer
+        // for a region with no edges.
+        maxFillCells: 400,
+        // Past this a preview stops drawing one ghost per square and draws the
+        // area's outline instead. A deliberate rectangle may legitimately be
+        // huge; ten thousand divs at pointer rate is what makes it feel broken.
+        maxGhostCells: 600,
         // What a room is FOR, as opposed to what it is called. Nothing reads
         // this yet — it exists so that behaviour which wants to ("eat in the
         // kitchen", "this room has no bed") has one authored vocabulary to read
@@ -511,7 +522,8 @@ const SiteConfig = Object.freeze({
                 species: 'snail',
                 slotId: 'myte-slot-snail-1',
                 slotLabel: "Snail's Slot",
-                homeMapId: 'House'
+                homeMapId: 'House',
+                birthday: Object.freeze({ season: 'spring', day: 12 })
             }),
             Object.freeze({
                 id: '2',
@@ -519,7 +531,8 @@ const SiteConfig = Object.freeze({
                 species: 'snail',
                 slotId: 'myte-slot-snail-2',
                 slotLabel: "Snail 2's Slot",
-                homeMapId: 'Outside'
+                homeMapId: 'Outside',
+                birthday: Object.freeze({ season: 'autumn', day: 3 })
             })
         ]),
 
@@ -574,6 +587,19 @@ const SiteConfig = Object.freeze({
             // Mood values that trigger the sad / happy state rolls
             moodLow:  20,
             moodHigh: 80,
+        }),
+
+        // Wordless thought bubbles. A myte that will not do what it was asked
+        // answers the way it says everything else — by picture, over its head —
+        // rather than by a message somewhere else on the screen.
+        bubbles: Object.freeze({
+            // Poking the same question repeatedly is one answer, not a queue
+            // of them; the same answer inside this window is swallowed.
+            answerIntervalMs: 4000,
+            // Answers wear the icon of the thing being answered for, so the
+            // bubble says *what* was turned down or taken on. This stands in
+            // when a refusal has no icon of its own.
+            fallbackIcon: 'frown',
         }),
 
         // Conditions under which each need-signal speech bubble fires
@@ -1146,6 +1172,7 @@ const SiteConfig = Object.freeze({
             }),
             Object.freeze({ id: 'game-log-panel', icon: 'list', title: 'Event Log', controls: Object.freeze(['minimize', 'close']), tabs: Object.freeze({ className: 'game-log-filters', ariaLabel: 'Event categories', items: Object.freeze([]) }) }),
             Object.freeze({ id: 'world-map-panel', icon: 'world-map', title: 'World Map', controls: Object.freeze(['minimize', 'close']) }),
+            Object.freeze({ id: 'calendar-panel', icon: 'calendar', title: 'Calendar', controls: Object.freeze(['minimize', 'close']) }),
         ]),
         labels: Object.freeze({
             actionCategories: Object.freeze({
@@ -1233,12 +1260,32 @@ const SiteConfig = Object.freeze({
         // Minute interval used by formatted clocks/log timestamps. Set to 5 or 10
         // for a stepped game clock, or 1 to display every in-game minute.
         displayMinuteStep:    10,
+
+        // The shape of the year and the week. GameTime reads these rather than
+        // carrying its own copy, and the calendar draws its grid from them, so
+        // renaming a season or moving to a six-day week is one edit here.
+        seasons: Object.freeze(['spring', 'summer', 'autumn', 'winter']),
+        daysOfTheWeek: Object.freeze([
+            'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+        ]),
+
         initialDate: Object.freeze({
             year: 1,
             season: 'spring',
             day: 1,
             hour: 8,
             minute: 0,
+        }),
+
+        calendar: Object.freeze({
+            // How far ahead and behind the calendar panel lets you page. The
+            // world has no history before year 1, so the past bound is only a
+            // limit on how far back from *today* you may look.
+            seasonsAhead: 8,
+            seasonsBehind: 4,
+            // A myte with no birthday in its save gets a stable one derived from
+            // its id, so an existing roster is not left blank.
+            birthdayFallbackEnabled: true,
         }),
     }),
 });

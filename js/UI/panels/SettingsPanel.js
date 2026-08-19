@@ -5,9 +5,11 @@ class SettingsPanel extends PanelSection {
                 quality: 'medium',
                 effects: true,
                 animations: true,
+                // "Day & Night Lighting" — the global atmosphere tint, ambient
+                // darkness and sunset band.
                 timeOfDayOverlay: true,
-                // Night lighting is opt-in: the interior room-gloom pass is not
-                // finished, so it stays off until the player asks for it.
+                // "Interior Room Lighting" is opt-in: the per-room gloom pass is
+                // not finished, so it stays off until the player asks for it.
                 lighting: false,
                 lightingDither: true,
                 weather: true
@@ -309,7 +311,7 @@ class SettingsPanel extends PanelSection {
         return this.settings?.graphics?.timeOfDayOverlay !== false;
     }
 
-    isLightingEnabled() {
+    isRoomLightingEnabled() {
         return this.settings?.graphics?.lighting === true;
     }
 

@@ -119,7 +119,11 @@ class DroppedMapItem {
         const beginStorageDrag = () => {
             this.storageDragActive = true;
             DroppedMapItem.storageDragItem = this;
-            this.parent?.parent?.camera?.beginTemporaryCursorFollow?.(this);
+            // Storing it: the pointer is heading for the inventory, so the edge
+            // along it must not scroll the map out from under the drag.
+            this.parent?.parent?.camera?.beginTemporaryCursorFollow?.(this, {
+                blockedEdges: this.parent?.parent?.inventory?.getBlockedDragEdges?.() ?? null
+            });
             this.element.classList.add('is-being-stored');
             dragGhost = this.spriteElement?.cloneNode(true) ?? null;
             if (dragGhost) {

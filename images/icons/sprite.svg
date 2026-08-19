@@ -39,6 +39,10 @@
 	<symbol id="icon-wall" viewBox="0 0 12 12">
 		<path d="M1,1h4v2H1V1z M6,1h5v2H6V1z M1,4h9v2H1V4z M1,7h4v2H1V7z M6,7h5v2H6V7z M1,10h9v1H1V10z" />
 	</symbol>
+	<symbol id="icon-calendar" viewBox="0 0 12 12">
+		<path d="M3,0h1v2H3V0z M8,0h1v2H8V0z M1,2h10v2H1V2z M1,4h10v7H1V4z M2,5v5h8V5H2z M3,6h2v2H3V6z M7,6h2v2H7V6z" />
+	</symbol>
+
 	<symbol id="icon-list" viewBox="0 0 12 12">
 		<path d="M1,2h2v2H1V2z M4,2h7v2H4V2z M1,5h2v2H1V5z M4,5h7v2H4V5z M1,8h2v2H1V8z M4,8h7v2H4V8z" />
 	</symbol>

@@ -12,7 +12,6 @@ class StageChips extends UIComponent {
         this.mapLabel = null;
         this.logChip = null;
         this.logBadge = null;
-        this.unreadCount = 0;
     }
 
     init() {
@@ -22,14 +21,16 @@ class StageChips extends UIComponent {
         this.logChip = wrapper?.querySelector('#game-log-chip') || null;
         this.logBadge = this.logChip?.querySelector('.stage-chip__badge') || null;
 
-        this.bindClick(this.mapChip, () => this.parent.worldMapPanel?.toggle());
-        this.bindClick(this.logChip, () => this.parent.gameLogManager?.toggle());
+        // Neither chip is bound here: each is its window's `buttonId`, so
+        // ModalWindow opens it, closes it, and marks it `.active` while it is
+        // open. One control cannot be wired two ways.
 
         this.track(this.container?.eventManager?.on?.(
             EVENTS.MAP_CHANGED, payload => this.setMapName(payload?.displayName)
         ));
 
         this.setMapName();
+        this.parent.gameLogManager?.syncUnread();
     }
 
     setMapName(displayName = null) {
@@ -41,22 +42,15 @@ class StageChips extends UIComponent {
         if (this.mapChip) this.mapChip.title = `World Map (M) — ${name}`;
     }
 
-    noteLogEntry() {
-        if (this.parent.gameLogManager?.isVisible) return;
-        this.unreadCount += 1;
-        this.renderBadge();
-    }
-
-    clearUnread() {
-        if (this.unreadCount === 0) return;
-        this.unreadCount = 0;
-        this.renderBadge();
-    }
-
-    renderBadge() {
+    /**
+     * Show an unread count on the log chip. The chip keeps no count of its own —
+     * the log owns which entries are unread, and tells the chip what to draw, so
+     * the badge and the bold entries inside the window can never disagree.
+     */
+    renderBadge(count = 0) {
         if (!this.logBadge) return;
-        this.logBadge.hidden = this.unreadCount === 0;
-        this.logBadge.textContent = this.unreadCount > 99 ? '99+' : String(this.unreadCount);
+        this.logBadge.hidden = count === 0;
+        this.logBadge.textContent = count > 99 ? '99+' : String(count);
     }
 
     dispose() {

@@ -728,6 +728,14 @@ class ContainerManager {
 
         this.core.user?.trackMytes?.(this.mytes);
 
+        // The calendar shows birthdays without knowing what a roster is: it asks
+        // through a source, and the container is what owns the mytes.
+        CalendarRegistry.registerBirthdaySource(() => this.mytes.map(myte => ({
+            id: myte.id,
+            name: myte.name,
+            birthday: myte.birthday
+        })));
+
         let restoredActiveMyte = null;
         this.mytes.forEach((myte, index) => {
             const rosterEntry = rosterData[index];
@@ -952,6 +960,15 @@ class ContainerManager {
         return this.mytePresence?.getMapId(myte) ?? myte?.homeMapId ?? null;
     }
 
+    // Whether the myte is standing on the map being played — including asleep
+    // in its slot here. NOT the same question as `myte.isOnHomeMap`, which only
+    // asks where its slot lives: a myte whose home is this map can still be
+    // parked two maps away, and waking it in place would teleport it home.
+    isMyteHere(myte) {
+        const currentMapId = this.gameMap?.id ?? null;
+        return !currentMapId || this.getMyteMapId(myte) === currentMapId;
+    }
+
     // Send a visiting myte back to its own map. It leaves the map now and is
     // back in its slot once the walk finishes.
     sendMyteHome(myte) {
@@ -1019,6 +1036,10 @@ class ContainerManager {
                 'On the way'
             );
         } else if (result.reason === MYTE_TRAVEL_RESULTS.UNREACHABLE) {
+            // The one travel refusal where the myte being refused is on screen:
+            // it is the one you are playing. It says no itself, and the toast
+            // still names the place, which no icon can.
+            myte.dialogue?.showRefusal?.('world-map');
             this.ui?.showMessage?.(`No route leads to ${displayName} from here.`, 'warning', 'No Route');
         }
 

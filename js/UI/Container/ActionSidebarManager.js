@@ -277,6 +277,18 @@ class ActionSidebarManager extends UIComponent {
             !!selectedObject.dropTarget;
     }
 
+    // Every click on an action gets an answer from the myte, over its own head:
+    // the icon of what was asked for, struck through if it will not do it. The
+    // written reason is on the button's tooltip; this is the myte's half.
+    refuse(activeMyte, action) {
+        if (activeMyte?.dialogue?.showRefusal?.(action.icon) === false) return;
+        this.parent.parent?.core?.soundManager?.playUISound?.('error');
+    }
+
+    accept(activeMyte, action) {
+        activeMyte?.dialogue?.showIntent?.(action.icon);
+    }
+
     getCurrentActionContext(selectedObject, activeMyte) {
         const currentAction = activeMyte?.queue?.getCurrentAction?.() ?? null;
         const currentActionId = currentAction?.constructor?.metadata?.id ?? '';
@@ -310,9 +322,11 @@ class ActionSidebarManager extends UIComponent {
             titleParts.push('Action in progress');
         }
 
-        // Unavailable-but-explained: visible, disabled, and it says why on hover.
+        // Unavailable-but-explained: visible, refusing, and it says why on hover.
+        // Left clickable on purpose — `aria-disabled` and `.is-unavailable` carry
+        // both the meaning and the look, while a real `disabled` would swallow
+        // the click the myte answers with a refusal bubble.
         if (action.unavailableReason) {
-            button.disabled = true;
             button.classList.add('is-unavailable');
             button.setAttribute('aria-disabled', 'true');
             titleParts.push(action.unavailableReason);
@@ -328,14 +342,23 @@ class ActionSidebarManager extends UIComponent {
             event.preventDefault();
             event.stopPropagation();
 
+            // Asked for something it will not do: the myte says so itself, over
+            // its own head, and the reason stays on the tooltip for the detail.
+            if (action.unavailableReason) {
+                this.refuse(activeMyte, action);
+                return;
+            }
+
             if (action.id === 'carry_putdown') {
                 activeMyte.queue.addPutDownMyte();
+                this.accept(activeMyte, action);
                 this.updateActions(selectedObject);
                 return;
             }
 
             if (action.id === 'drop_item') {
                 activeMyte.queue.addDropHeldItem();
+                this.accept(activeMyte, action);
                 this.updateActions(selectedObject);
                 return;
             }
@@ -370,12 +393,15 @@ class ActionSidebarManager extends UIComponent {
                     userInitiated: true
                 };
                 activeMyte.queue.interrupt(action.id, payload);
+                this.accept(activeMyte, action);
                 this.updateActions(selectedObject);
             } else {
                 // The button was rendered, so the player expects something to happen.
                 // Options resolve to null when the action's requirements stopped being
                 // met between render and click; refresh the list and say so rather
-                // than swallowing the click.
+                // than swallowing the click. The myte refuses it the same way it
+                // refuses anything else — this is the same "no", found late.
+                this.refuse(activeMyte, action);
                 this.parent?.showMessage?.(
                     `${activeMyte.name} can't do that right now.`,
                     'warning',

@@ -287,6 +287,38 @@
                 }
             }
 
+            // A refusal is a thought, not a new shape: the bubble keeps its
+            // cloud, takes the alert palette, and strikes through whatever it
+            // is refusing so the icon reads as "not that" rather than "that".
+            &.is-refusal {
+                --dialogue-background-color: #ffe1e1;
+                --dialogue-border-color: #ff4444;
+
+                // The icon keeps its own colour and the bar is the loud one —
+                // a red slash over a red glyph is a red blob. The halo is what
+                // keeps the bar readable wherever the glyph is solid.
+                .text {
+                    position: relative;
+
+                    &::after {
+                        content: '';
+                        position: absolute;
+                        inset: 0;
+                        z-index: 1;
+                        margin: auto;
+                        width: 128%;
+                        height: 2px;
+                        background: var(--dialogue-border-color);
+                        box-shadow: 0 0 0 1px var(--dialogue-background-color);
+                        transform: rotate(-45deg);
+                    }
+                }
+
+                &.is-visible {
+                    animation: refusalShake 0.5s ease-out;
+                }
+            }
+
             &.emoji {
                 --emoji-padding: 5px;
                 border-radius: 50%;
@@ -478,6 +510,14 @@
     0%   { transform: translate(-50%, -100%) scale(0); }
     70%  { transform: translate(-50%, -100%) scale(1.1); }
     100% { transform: translate(-50%, -100%) scale(1); }
+}
+
+// A short head-shake, on the same translate the other bubble animations carry.
+@keyframes refusalShake {
+    0%        { transform: translate(-50%, -100%) scale(0.6); }
+    40%       { transform: translate(-50%, -100%) scale(1.08); }
+    55%, 85%  { transform: translate(-54%, -100%) scale(1); }
+    70%, 100% { transform: translate(-46%, -100%) scale(1); }
 }
 
 @keyframes whisperFloat {

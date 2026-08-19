@@ -261,6 +261,9 @@
         margin-inline: 0;
     }
 
+    // A count of things you have not read yet is not an error, and red said it
+    // was. It is a number in the ordinary text colour, and the sunken well plus
+    // the bold weight are enough to make it read as a badge.
     &__badge {
         @include surface-inset;
         flex: 0 0 auto;
@@ -269,7 +272,7 @@
         min-width: 18px;
         text-align: center;
         font-weight: 700;
-        color: var(--color-danger);
+        color: var(--text-base);
     }
 
     // Every chip is a control, so there is one press-state block rather than
@@ -297,6 +300,18 @@
 
         &:active .stage-chip__button {
             @include button-pressed;
+        }
+
+        // A chip whose window is open stays down, the way a pressed toolbar
+        // button does. ModalWindow puts `.active` on whichever element is the
+        // window's trigger, so the chip and the header's clock and name plate
+        // all say "open" the same way.
+        &.active {
+            @include button-pressed;
+
+            .stage-chip__button {
+                @include button-pressed;
+            }
         }
     }
 
@@ -761,31 +776,13 @@ body.debug .stage-bar__debug-only {
     color: var(--text-base);
 }
 
-// Three legends under three headings are still one table: split into separate
-// `dl`s each sized its own key column, so "WASD", "Ctrl+Z / Ctrl+Y" and "R" all
-// started their descriptions somewhere different. Borrowing the settings
-// group's columns lines every key up with every other key in the group — and
-// with the labels of any ordinary rows sitting alongside them.
-.key-legend {
-    display: grid;
-    grid-template-columns: subgrid;
-    gap: var(--space-2xs) var(--space-md);
-    margin: 0;
-    font-size: var(--text-size-meta);
-
-    > dt {
-        grid-column: 1;
-        font-weight: 700;
-        white-space: nowrap;
-        color: var(--text-base);
-    }
-
-    > dd {
-        grid-column: 2;
-        margin: 0;
-        color: var(--text-muted);
-    }
-}
+// The keyboard legends are `.detail-rows` (see components/_window-ui.scss) with
+// the keys set in bold — the same label/value list the world map and the
+// calendar use. Only what is particular to a legend lives here.
+// The keyboard legends are the shared label/value list in its --named form: the
+// key is the thing you are looking for and the description is the gloss on it,
+// which is the same inversion the calendar day detail wants. There is nothing
+// left here that is particular to a legend.
 
 .surface-palette.is-locked {
     opacity: 0.7;
@@ -871,6 +868,15 @@ body[data-build-cursor="refused"] .app-stage {
     &.is-new {
         background: color-mix(in srgb, var(--state-success-accent, #4caf50) 45%, transparent);
     }
+
+    // The stand-in for a preview too big to draw square by square: one box round
+    // the whole reach of the stroke. Dashed, because it is an approximation of
+    // the area and should not be mistaken for the exact tiles.
+    &.is-bulk {
+        border-style: dashed;
+        border-width: 2px;
+        opacity: 0.55;
+    }
 }
 
 .room-panel {
@@ -905,6 +911,17 @@ body[data-build-cursor="refused"] .app-stage {
         // twenty should make this one scroll rather than the window.
         max-height: 280px;
         @include scroll-area;
+    }
+
+    // A map nobody has built in yet. Centred and quiet: it is a prompt, not an
+    // error, and it sits where the first room will appear.
+    .room-panel-empty {
+        margin: 0;
+        padding: var(--space-md) var(--space-sm);
+        text-align: center;
+        font-size: 12px;
+        line-height: 1.5;
+        opacity: 0.7;
     }
 
     // The two controls that are not about any one room live in the footer, so
@@ -972,6 +989,20 @@ body[data-build-cursor="refused"] .app-stage {
         @include button-pressed;
     }
 
+    // A room with no floor: one just started, or one whose last square went to
+    // a neighbour. It is a real row — nameable, colourable, paintable into —
+    // and the faded swatch says the colour is spoken for without claiming it is
+    // anywhere on the map yet.
+    &.is-empty {
+        .room-row__chip {
+            opacity: 0.45;
+        }
+
+        .room-row__size {
+            font-style: italic;
+        }
+    }
+
     // Column one, both rows: it is the room's colour, not the name's, and
     // leaving the column to it is what keeps the type out of it.
     .room-row__chip {
@@ -1009,6 +1040,20 @@ body[data-build-cursor="refused"] .app-stage {
         font-size: 11px;
         opacity: 0.7;
         white-space: nowrap;
+    }
+
+    // A room nothing encloses. Quiet, and the size of the text beside it — it
+    // is a footnote on the row, not a second heading.
+    .room-row__outdoor {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        opacity: 0.7;
+
+        .icon {
+            width: 12px;
+            height: 12px;
+        }
     }
 
     // Only on rooms that can actually go. A room the walls enclose cannot be

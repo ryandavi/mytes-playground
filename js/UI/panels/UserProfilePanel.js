@@ -2,6 +2,8 @@ class UserProfilePanel extends ModalWindow {
     constructor(parent) {
         super(parent, {
             id: 'user-profile-panel',
+            // The header's name plate is this window's trigger.
+            buttonId: 'header-user-button',
             closeOnOutsideClick: false,
             position: 'center',
             draggable: true,

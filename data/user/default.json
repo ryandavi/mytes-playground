@@ -50,6 +50,132 @@
       "quantity": 3,
       "type": "food",
       "variant": "acorn"
+    },
+    {
+      "name": "Wood Window",
+      "quantity": 10,
+      "type": "furniture",
+      "variant": "window"
+    },
+    {
+      "name": "Double Wood Window",
+      "quantity": 6,
+      "type": "furniture",
+      "variant": "window_double"
+    },
+    {
+      "name": "Wooden Door",
+      "quantity": 6,
+      "type": "furniture",
+      "variant": "wooden_door"
+    },
+    {
+      "name": "Metal Door",
+      "quantity": 4,
+      "type": "furniture",
+      "variant": "metal_door"
+    },
+    {
+      "name": "Fancy Door",
+      "quantity": 4,
+      "type": "furniture",
+      "variant": "fancy_door"
+    },
+    {
+      "name": "Wooden Fence",
+      "quantity": 30,
+      "type": "furniture",
+      "variant": "wooden_fence"
+    },
+    {
+      "name": "Couch",
+      "quantity": 3,
+      "type": "furniture",
+      "variant": "couch"
+    },
+    {
+      "name": "Bed",
+      "quantity": 3,
+      "type": "furniture",
+      "variant": "bed"
+    },
+    {
+      "name": "Big Bed",
+      "quantity": 2,
+      "type": "furniture",
+      "variant": "bed_big"
+    },
+    {
+      "name": "Rug",
+      "quantity": 4,
+      "type": "furniture",
+      "variant": "rug_default"
+    },
+    {
+      "name": "Landscape Painting",
+      "quantity": 3,
+      "type": "furniture",
+      "variant": "painting"
+    },
+    {
+      "name": "Still Life Painting",
+      "quantity": 3,
+      "type": "furniture",
+      "variant": "painting_still_life"
+    },
+    {
+      "name": "Paper Lantern",
+      "quantity": 8,
+      "type": "furniture",
+      "variant": "paper_lantern"
+    },
+    {
+      "name": "Crystal Lantern",
+      "quantity": 4,
+      "type": "furniture",
+      "variant": "crystal_lantern"
+    },
+    {
+      "name": "Wooden Chest",
+      "quantity": 3,
+      "type": "furniture",
+      "variant": "wooden_chest"
+    },
+    {
+      "name": "Golden Chest",
+      "quantity": 2,
+      "type": "furniture",
+      "variant": "golden_chest"
+    },
+    {
+      "name": "Stone Fountain",
+      "quantity": 2,
+      "type": "furniture",
+      "variant": "stone_fountain"
+    },
+    {
+      "name": "Marble Fountain",
+      "quantity": 1,
+      "type": "furniture",
+      "variant": "marble_fountain"
+    },
+    {
+      "name": "Music Box",
+      "quantity": 2,
+      "type": "toy",
+      "variant": "music_box"
+    },
+    {
+      "name": "Ball",
+      "quantity": 2,
+      "type": "toy",
+      "variant": "ball"
+    },
+    {
+      "name": "Blue Ball",
+      "quantity": 2,
+      "type": "toy",
+      "variant": "blue_ball"
     }
   ],
   "mytes": []

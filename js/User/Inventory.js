@@ -54,6 +54,52 @@ class Inventory {
         this.setupEventListeners();
         this.setupMutationObserver();
         this.createDropIndicator();
+        this.setupOverflowScroll();
+    }
+
+    /**
+     * The bar is a single row (see _inventory.scss) that scrolls sideways once
+     * it outgrows the shell, with no scrollbar to grab: the row is one icon tall
+     * and a horizontal bar under it would cost the map more height than the
+     * items do.
+     *
+     * So the two things a scrollbar was doing are done here instead — the wheel
+     * drives the axis it would have driven, and the ends fade while there is
+     * more row on that side.
+     */
+    setupOverflowScroll() {
+        this.notice = document.createElement('span');
+        this.notice.className = 'inventory-grid__notice';
+        this.inventoryElement.appendChild(this.notice);
+
+        this.boundHandlers.inventoryWheel = (event) => {
+            if (event.deltaY === 0 || event.shiftKey) return;
+            const { scrollLeft, scrollWidth, clientWidth } = this.inventoryElement;
+            if (scrollWidth <= clientWidth) return;
+            // Only claim the gesture while there is somewhere to go on this
+            // axis, so the page keeps its wheel at either end of the row.
+            const delta = event.deltaY;
+            if ((delta < 0 && scrollLeft <= 0) ||
+                (delta > 0 && scrollLeft >= scrollWidth - clientWidth - 1)) return;
+            event.preventDefault();
+            this.inventoryElement.scrollLeft += delta;
+        };
+        this.boundHandlers.inventoryScroll = () => this.updateOverflowState();
+
+        this.inventoryElement.addEventListener('wheel', this.boundHandlers.inventoryWheel, { passive: false });
+        this.inventoryElement.addEventListener('scroll', this.boundHandlers.inventoryScroll, { passive: true });
+        this._overflowObserver = typeof ResizeObserver === 'function'
+            ? new ResizeObserver(() => this.updateOverflowState())
+            : null;
+        this._overflowObserver?.observe(this.inventoryElement);
+    }
+
+    updateOverflowState() {
+        const bar = this.inventoryElement;
+        if (!bar) return;
+        const overflow = bar.scrollWidth - bar.clientWidth;
+        bar.classList.toggle('can-scroll-start', overflow > 1 && bar.scrollLeft > 1);
+        bar.classList.toggle('can-scroll-end', overflow > 1 && bar.scrollLeft < overflow - 1);
     }
 
     createDropIndicator() {
@@ -392,8 +438,15 @@ class Inventory {
     }
 
     updateInventoryDisplay() {
-        this.inventoryElement.classList.toggle('empty', this.items.length === 0);
-        this.inventoryElement.classList.toggle('full', this.items.length >= this.config.maxItems);
+        const isEmpty = this.items.length === 0;
+        const isFull = this.items.length >= this.config.maxItems;
+        this.inventoryElement.classList.toggle('is-empty', isEmpty);
+        this.inventoryElement.classList.toggle('is-full', isFull);
+        if (this.notice) {
+            this.notice.textContent = isEmpty ? 'Empty Inventory' : (isFull ? 'Inventory Full' : '');
+        }
+        // A slot added or removed changes what is reachable off the ends.
+        this.updateOverflowState();
     }
 
     activateItemElement(itemElement) {
@@ -436,7 +489,12 @@ class Inventory {
 
         const now = SimClock.now();
         if (now - (this.state.lastFeedTime[myte.id] ?? -Infinity) < this.config.feedCooldown) {
-            this.parent?.ui?.showMessage?.(`${myte.name || 'This Myte'} needs a moment before another item.`, 'warning', 'Inventory');
+            // The myte is right under the cursor and "not yet" is the whole
+            // message, so it answers for itself rather than through a toast in
+            // the corner. The toast still covers a myte with no bubble to show.
+            if (!myte.dialogue?.showRefusal?.('bowl')) {
+                this.parent?.ui?.showMessage?.(`${myte.name || 'This Myte'} needs a moment before another item.`, 'warning', 'Inventory');
+            }
             return false;
         }
 
@@ -473,12 +531,19 @@ class Inventory {
             return false;
         }
 
-        // Putting an object into the world is building. Rather than refuse and
-        // leave the player at a dead end, switch modes for them and say so.
+        // Each item belongs to a mode (see getItemMode). Rather than refuse and
+        // leave the player at a dead end, switch modes for them and say so —
+        // both ways round, so a ball put down while building drops you back into
+        // the world it is going to roll around in.
         const gameMode = this.parent?.gameMode;
-        if (gameMode && !gameMode.isBuild()) {
-            if (!gameMode.setMode(GAME_MODES.BUILD)) return false;
-            this.parent?.ui?.showMessage?.('Switched to Build Mode to place this.', 'info', 'Build Mode');
+        const wantedMode = this.getItemMode(itemElement);
+        if (gameMode && gameMode.mode !== wantedMode) {
+            if (!gameMode.setMode(wantedMode)) return false;
+            this.parent?.ui?.showMessage?.(
+                `Switched to ${this.getModeLabel(wantedMode)} to place this.`,
+                'info',
+                this.getModeLabel(wantedMode)
+            );
         }
 
         this.cancelPlacement();
@@ -567,10 +632,34 @@ class Inventory {
     handleDragStart(e) {
         if (!e.target.classList.contains('item')) return;
 
+        // Each mode places its own kind, both ways round: no furniture into a
+        // world you are playing, no toys into a world you have frozen. Refusing
+        // the drag before it starts is the honest answer — letting it run and
+        // rejecting the drop teaches the player nothing. A double-click still
+        // places either kind, switching modes for you.
+        const wantedMode = this.getItemMode(e.target);
+        const currentMode = this.parent?.gameMode?.mode;
+        if (currentMode && wantedMode !== currentMode) {
+            e.preventDefault();
+            const label = ItemRegistry.getItemSync(
+                e.target.dataset.variant || e.target.dataset.name
+            )?.label || e.target.dataset.name || 'That';
+            this.parent?.ui?.showMessage?.(
+                `${label} is placed in ${this.getModeLabel(wantedMode)} (B).`,
+                'info',
+                this.getModeLabel(wantedMode)
+            );
+            return;
+        }
+
         this.state.draggedItem = e.target;
         this.state.isDragging = true;
         this.state.placementDescriptor = this.getPlacementDescriptor(e.target);
-		this.parent.camera?.beginTemporaryCursorFollow?.(this);
+		// The camera is NOT borrowed here. A dragstart fires while the pointer
+		// is still over the inventory, and the borrow follows the cursor from
+		// the moment it opens — so the view slid off toward whichever edge the
+		// panel sits against before the drag ever reached the map. The first
+		// dragover on the stage opens it instead, with a real position.
         this.tooltipSystem.hide();
 
         if (e.dataTransfer) {
@@ -700,6 +789,38 @@ class Inventory {
         return true;
     }
 
+    /**
+     * The stage edge this panel sits against, for the camera to stop scrolling
+     * toward while something is being dragged in or out of it — see
+     * Camera.beginTemporaryCursorFollow.
+     *
+     * Measured rather than hardcoded as 'bottom': the inventory has moved
+     * around the shell before, and an edge written down here would go stale
+     * silently and read exactly like the bug it was added to fix. A panel drawn
+     * OVER the map has no edge of its own and blocks nothing.
+     */
+    getStageEdge() {
+        const panel = this.inventoryElement && this.parent?.getRect?.(this.inventoryElement);
+        const stage = this.parent?.getContainerRect?.();
+        if (!panel || !stage) return null;
+
+        const gaps = {
+            bottom: panel.top - stage.bottom,
+            top: stage.top - panel.bottom,
+            right: panel.left - stage.right,
+            left: stage.left - panel.right
+        };
+        return Object.entries(gaps)
+            .filter(([, gap]) => gap > -1)
+            .sort(([, left], [, right]) => left - right)[0]?.[0] ?? null;
+    }
+
+    // What that edge means to a camera borrow, in the shape it wants.
+    getBlockedDragEdges() {
+        const edge = this.getStageEdge();
+        return edge ? [edge] : null;
+    }
+
     isPointInside(clientX, clientY) {
         const rect = this.inventoryElement?.getBoundingClientRect?.();
         return !!rect && clientX >= rect.left && clientX <= rect.right &&
@@ -709,7 +830,9 @@ class Inventory {
     handleContainerDragOver(e) {
         if (!this.state.isDragging || this.state.myteTarget) return;
         e.preventDefault();
-		this.parent.camera?.beginTemporaryCursorFollow?.(this);
+		this.parent.camera?.beginTemporaryCursorFollow?.(this, {
+			blockedEdges: this.getBlockedDragEdges()
+		});
 		this.parent.camera?.updateTemporaryCursorFollow?.(this, e.clientX, e.clientY);
         clearTimeout(this._indicatorHideTimer);
         e.currentTarget.classList.add('is-drag-over');
@@ -917,6 +1040,28 @@ class Inventory {
         return true;
     }
 
+    // Scenery, as opposed to something you play with. One rule, asked in every
+    // place an item can reach the map: drag, double-click placement, and the
+    // slot's own appearance.
+    isBuildOnly(itemElement) {
+        return BuildRules.isBuildOnlyItem(
+            ItemRegistry.getItemSync(itemElement?.dataset?.variant || itemElement?.dataset?.name)
+        );
+    }
+
+    /**
+     * The mode an item is placed in. Each mode places its own kind and only its
+     * own kind: furnishing a room is building, and a ball you put down for a
+     * myte to chase is playing — in a frozen world nothing would chase it.
+     */
+    getItemMode(itemElement) {
+        return this.isBuildOnly(itemElement) ? GAME_MODES.BUILD : GAME_MODES.PLAY;
+    }
+
+    getModeLabel(mode) {
+        return mode === GAME_MODES.BUILD ? 'Build Mode' : 'Play Mode';
+    }
+
     getPlacementDescriptor(itemElement = this.state.draggedItem) {
         const itemDef = ItemRegistry.getItemSync(itemElement?.dataset?.variant || itemElement?.dataset?.name);
         const world = itemDef?.world || {};
@@ -1113,7 +1258,17 @@ class Inventory {
             posY = worldPos.y;
         }
 
+        // A refused drop said nothing at all: the ghost went red, the item went
+        // back in the bar, and a painting dropped anywhere but a wall looked
+        // like a bug. The reason is the same copy BuildRules gives a refused
+        // drag on the map.
         if (this.state.dropValid === false) {
+            const descriptor = this.state.snappedDropPos?.descriptor || this.state.placementDescriptor;
+            this.parent?.ui?.showMessage?.(
+                BuildRules.describePlacementRefusal(descriptor || {}),
+                'warning',
+                'Placement'
+            );
             this._hideIndicator();
             return;
         }
@@ -1508,6 +1663,13 @@ class Inventory {
             myte.removeEventListener('dragleave', this.boundHandlers.myteDragLeave);
             myte.removeEventListener('drop', this.boundHandlers.myteDrop);
         });
+
+        this.inventoryElement?.removeEventListener('wheel', this.boundHandlers.inventoryWheel);
+        this.inventoryElement?.removeEventListener('scroll', this.boundHandlers.inventoryScroll);
+        this._overflowObserver?.disconnect();
+        this._overflowObserver = null;
+        this.notice?.remove();
+        this.notice = null;
 
         this.mutationObserver?.disconnect();
         this.mutationObserver = null;

@@ -7,8 +7,70 @@ $item-color-medicine: #98fb98;
 .inventory-grid {
     --inventory-grid-gap: var(--space-md);
     --inventory-slot-radius: var(--radius-md);
+    --inventory-fade-width: var(--space-xl);
 
     padding: var(--space-xl);
+    // No inline padding: the two fades below stand in for it. A sticky element
+    // cannot leave its container's content box, so any inline padding here is a
+    // strip at each end the fade cannot reach — and a strip of un-faded, half
+    // cut-off item is precisely what the fade exists to prevent.
+    padding-inline: 0;
+    position: relative;
+
+    // The bar is one row and scrolls sideways when it outgrows the shell (see
+    // _app-shell.scss). The scrollbar itself is hidden: it would sit under the
+    // slots at the one height the bar cannot spare, and a horizontal bar under
+    // a single row of icons reads as chrome rather than content. What replaces
+    // it is the fade below plus the wheel, which Inventory.setupOverflowScroll
+    // maps onto this axis.
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+
+    // A row clipped flat at the frame looks like a row that ends there. The
+    // fade is only on the side that has more to show, so it doubles as which
+    // way to scroll, and it is painted in the panel's own colour so it reads as
+    // the row running on under its edge rather than as a shadow.
+    //
+    // Sticky rather than absolute: an absolutely positioned child of a scroller
+    // scrolls away with the content. These two are also the row's inline
+    // padding — they hold their width whether or not they are lit, so the first
+    // and last slot keep their breathing room and the fade has somewhere to sit
+    // that is flush with the frame.
+    &::before,
+    &::after {
+        content: '';
+        position: sticky;
+        flex: 0 0 var(--inventory-fade-width);
+        align-self: stretch;
+        // Over the block padding as well, so a slot passing underneath is
+        // covered to the frame rather than to the row.
+        margin-block: calc(-1 * var(--space-xl));
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.15s var(--ease-ui);
+        z-index: 1;
+    }
+
+    &::before {
+        left: 0;
+        background: linear-gradient(to right, var(--surface-ui-inset) 40%, transparent);
+    }
+
+    &::after {
+        right: 0;
+        background: linear-gradient(to left, var(--surface-ui-inset) 40%, transparent);
+    }
+
+    &.can-scroll-start::before,
+    &.can-scroll-end::after {
+        opacity: 1;
+    }
 
     &.is-store-target {
         outline: var(--border-width) solid var(--state-success-accent);
@@ -26,32 +88,36 @@ $item-color-medicine: #98fb98;
 
     &.is-empty {
         opacity: 0.7;
-
-        &::after {
-            content: 'Empty Inventory';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 14px;
-            white-space: nowrap;
-        }
     }
 
     &.is-full {
         box-shadow: 0 0 10px var(--color-danger-glow);
+    }
+}
 
-        &::after {
-            content: 'Inventory Full';
-            position: absolute;
-            top: -20px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: var(--color-danger);
-            font-size: 12px;
-            white-space: nowrap;
-        }
+// "Empty Inventory" / "Inventory Full", written by Inventory.updateInventoryDisplay.
+// A real element rather than the bar's ::after, which now belongs to the scroll
+// fade — and which never showed these anyway, because the classes it keyed on
+// were spelled is-empty/is-full while the JS wrote empty/full.
+.inventory-grid__notice {
+    position: absolute;
+    left: 50%;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 2;
+
+    .is-empty > & {
+        top: 50%;
+        transform: translate(-50%, -50%);
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .is-full > & {
+        top: calc(-1 * var(--space-lg));
+        transform: translateX(-50%);
+        color: var(--color-danger);
+        font-size: 12px;
     }
 }
 
@@ -127,6 +193,19 @@ $item-color-medicine: #98fb98;
             color: var(--text-muted);
             font-weight: bold;
         }
+    }
+}
+
+// A slot only offers the grab in the mode that can honour it (see
+// Inventory.getItemMode): furniture in Build, everything else in Play. The other
+// way round it reads as clickable rather than dead, because a double-click still
+// places it and switches modes for you.
+[data-game-mode='play'] .inventory .item.furniture,
+[data-game-mode='build'] .inventory .item:not(.furniture) {
+    cursor: pointer;
+
+    &:active {
+        cursor: pointer;
     }
 }
 

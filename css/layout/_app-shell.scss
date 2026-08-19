@@ -158,7 +158,16 @@
             }
         }
 
-        >.username {
+        // Header controls that DO something look like buttons and go in when
+        // their window is open; the ones that only report a number stay sunken.
+        // The clock and the name plate are both triggers, so they share one
+        // block rather than each describing a button in its own words.
+        //
+        // `.active` is put on by ModalWindow while the window that owns the
+        // button is open, which is the same class the sidebar and stage chips
+        // use — one word for "this control's panel is showing".
+        >.username,
+        >.date-time {
             display: inline-flex;
             align-items: center;
             gap: var(--space-xs);
@@ -166,8 +175,19 @@
             color: var(--text-base);
             font-size: inherit;
             white-space: nowrap;
-            @include surface-inset;
+            @include button-base;
 
+            &:hover {
+                background-color: var(--surface-ui-pressed);
+            }
+
+            &:active,
+            &.active {
+                @include button-pressed;
+            }
+        }
+
+        >.username {
             >.user-icon {
                 width: 16px;
                 height: 16px;
@@ -175,6 +195,9 @@
             }
         }
 
+        // Money is a readout, not a control — there is nothing to open yet — so
+        // it keeps the sunken look while the two triggers beside it are raised.
+        // When a bank exists it becomes a trigger and joins the block above.
         >.coin-count {
             min-width: 4em;
             padding: var(--space-xs) var(--space-sm);
@@ -197,10 +220,6 @@
 
         >.date-time {
             margin-left: auto;
-            @include surface-inset;
-            padding: var(--space-xs) var(--space-sm);
-            color: var(--text-base);
-            white-space: nowrap;
 
             >.clock {
                 display: flex;
@@ -337,17 +356,24 @@
             }
         }
 
+        // One row, always. The bar sits under the stage and every row it grows
+        // costs the map its height, so a full inventory scrolls sideways instead
+        // of pushing the world up the screen. See _inventory.scss for the
+        // scrolling itself.
         >.inventory-grid {
             margin: 0 auto;
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: var(--space-base);
             width: 100%;
             @include surface-inset;
             padding: var(--padding);
+            // The scroll fades are the inline padding — see _inventory.scss.
+            padding-inline: 0;
 
             >.item {
                 cursor: pointer;
+                flex: 0 0 auto;
             }
         }
     }
@@ -421,6 +447,7 @@
         >.inventory-grid {
             display: flex;
             flex-grow: 1;
+            flex-wrap: nowrap;
         }
     }
 }

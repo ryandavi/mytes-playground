@@ -147,6 +147,33 @@ class BuildRules {
     // ── Objects ───────────────────────────────────────────────────────────────
 
     /**
+     * Which inventory items are building rather than playing.
+     *
+     * Scenery is furnishing a room, so it belongs to Build mode. A ball or an
+     * apple is not: those are things you hand to a myte, and they go down
+     * wherever you are standing. The line is the item's own type and not how
+     * it lands in the world, because a toy is a map object too — reading the
+     * world mode instead locked balls behind the mode switch.
+     */
+    static isBuildOnlyItem(itemDefinition) {
+        return String(itemDefinition?.type || '').toLowerCase() === 'furniture';
+    }
+
+    /**
+     * Why a placement was refused, in the player's words.
+     *
+     * Shared by the object being dragged around the map and the ghost being
+     * dragged out of the inventory: the inventory has no object yet, only a
+     * descriptor, and the two were saying different things about the same
+     * refusal — the drag from the inventory was saying nothing at all.
+     */
+    static describePlacementRefusal({ wallFixture = false, wallOpening = false } = {}) {
+        if (wallOpening) return 'It has to sit in a straight run of wall, clear of corners.';
+        if (wallFixture) return 'It has to hang on a clear patch of wall.';
+        return 'It does not fit there.';
+    }
+
+    /**
      * Furniture-style editing is build-mode only. Mytes are unaffected — they
      * are not scenery, and they are the one thing in the world that moves
      * itself.
@@ -221,8 +248,12 @@ class BuildRules {
         // Wall-mounted things answer for themselves: a painting belongs on a
         // wall, so the floor rules below would refuse every valid position.
         if (this.isWallMounted(object)) {
+            const wallOpening = this.wallBuilder?.isWallOpeningObject(object) === true;
             return object.checkDropValidity?.(x, y) === false
-                ? BuildRules.deny('It has to hang on a clear patch of wall.')
+                ? BuildRules.deny(BuildRules.describePlacementRefusal({
+                    wallOpening,
+                    wallFixture: !wallOpening
+                }))
                 : BuildRules.ALLOWED;
         }
 

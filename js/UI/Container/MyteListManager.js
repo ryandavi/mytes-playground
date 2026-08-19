@@ -103,7 +103,11 @@ class MyteListManager extends UIComponent {
         }
 
         if (!myte.isActive) {
-            if (!myte.isOnHomeMap) {
+            // Anywhere but here means it has to make its own way over. Asking
+            // `isOnHomeMap` here missed a myte parked on another map whose home
+            // slot happens to be on this one, and woke it in place — which snaps
+            // it to that slot, so calling it looked like teleporting it.
+            if (!container.isMyteHere(myte)) {
                 container.summonMyte?.(myte);
                 return;
             }
@@ -139,9 +143,10 @@ class MyteListManager extends UIComponent {
             || String(mapId ?? 'Unknown');
     }
 
-    // Resting in a slot on a map the player isn't in.
+    // Resting somewhere the player isn't — its own slot on another map, or
+    // wherever it was left standing when the player walked out.
     isAway(myte) {
-        return !!myte && !myte.isActive && !myte.isOnHomeMap;
+        return !!myte && !myte.isActive && !this.parent.parent.isMyteHere(myte);
     }
 
     getMyteStateLabel(myte) {

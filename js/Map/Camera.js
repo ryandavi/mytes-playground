@@ -243,7 +243,14 @@ class Camera {
 		return true;
 	}
 
-	beginTemporaryCursorFollow(owner) {
+	/**
+	 * `blockedEdges` names viewport edges this drag must never scroll toward —
+	 * see followCursorEdge. A drag that starts or ends in a panel outside the
+	 * stage has to cross the band along that panel's edge, and scrolling there
+	 * is never what the gesture meant: it drags the target out from under the
+	 * pointer on the way in, and slides the map away on the way back out.
+	 */
+	beginTemporaryCursorFollow(owner, { blockedEdges = null } = {}) {
 		if (!owner) return false;
 		if (this.temporaryCursorFollow?.owner === owner) return true;
 		if (this.temporaryCursorFollow) return false;
@@ -252,7 +259,8 @@ class Camera {
 		this.temporaryCursorFollow = {
 			owner,
 			mode: this.followMode,
-			cursor: this._getCurrentClientPosition()
+			cursor: this._getCurrentClientPosition(),
+			blockedEdges: blockedEdges?.length ? [...blockedEdges] : null
 		};
 		this.setMode(CAMERA_FOLLOW_MODES.LOCKED);
 		return true;
@@ -308,7 +316,8 @@ class Camera {
 			(clientX - viewportRect.left) / zoom,
 			(clientY - viewportRect.top) / zoom,
 			this.parent.getCanvasRect(),
-			viewportRect
+			viewportRect,
+			this.temporaryCursorFollow?.blockedEdges || null
 		);
 
 		// The world moved under a pointer that did not. Whatever borrowed the
@@ -795,7 +804,7 @@ class Camera {
 	 * it. What IS eased is the velocity, which is a different thing: see
 	 * _advanceEdgeVelocity.
 	 */
-	followCursorEdge(x, y, canvasRect, viewportRect) {
+	followCursorEdge(x, y, canvasRect, viewportRect, blockedEdges = null) {
 		if (!this.isScrollable.x && !this.isScrollable.y) return;
 		const { horizThresh, vertThresh, viewportWorld } = this._getEdgeThresholds(viewportRect);
 		const seconds = this._edgeScrollFrameSeconds();
@@ -803,10 +812,10 @@ class Camera {
 
 		const velocity = this._edgeScrollVelocity;
 		velocity.x = this._advanceEdgeVelocity(velocity.x, this.isScrollable.x
-			? this._edgeScrollVelocityTarget(x, viewportWorld.width, horizThresh)
+			? this._blockableEdgeVelocity(x, viewportWorld.width, horizThresh, blockedEdges, 'left', 'right')
 			: 0, seconds);
 		velocity.y = this._advanceEdgeVelocity(velocity.y, this.isScrollable.y
-			? this._edgeScrollVelocityTarget(y, viewportWorld.height, vertThresh)
+			? this._blockableEdgeVelocity(y, viewportWorld.height, vertThresh, blockedEdges, 'top', 'bottom')
 			: 0, seconds);
 
 		if (velocity.x === 0 && velocity.y === 0) return;
@@ -845,6 +854,17 @@ class Camera {
 		this._edgeScrollLastFrame = now;
 		if (!Number.isFinite(previous)) return 0;
 		return Math.min((now - previous) / 1000, SiteConfig.camera.edgeScrollMaxFrameSeconds);
+	}
+
+	// One axis of edge scrolling, with the edges this drag is not allowed to
+	// scroll toward taken out. The band is still live on the other side of the
+	// axis — blocking the bottom edge for a drag out of the inventory must not
+	// cost you the top one.
+	_blockableEdgeVelocity(position, viewportSize, threshold, blockedEdges, lowEdge, highEdge) {
+		const target = this._edgeScrollVelocityTarget(position, viewportSize, threshold);
+		if (target === 0 || !blockedEdges?.length) return target;
+		const edge = position < threshold ? lowEdge : highEdge;
+		return blockedEdges.includes(edge) ? 0 : target;
 	}
 
 	/**

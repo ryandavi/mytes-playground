@@ -61,13 +61,24 @@ class MyteRosterSchema {
             (entry.hasSlotPosition == null && (slotX !== 0 || slotY !== 0));
         const num = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 
+        const id = String(entry.id || index + 1);
+        // A birthday is save data, not content: whatever the save holds wins,
+        // and CalendarRegistry derives a stable one for a myte that has none so
+        // an existing roster is not left blank.
+        const birthday = CalendarRegistry.resolveBirthday({
+            id,
+            name,
+            birthday: entry.birthday ?? starter?.birthday
+        });
+
         return {
-            id: String(entry.id || index + 1),
+            id,
             name,
             species,
             slotId,
             slotLabel,
             homeMapId,
+            birthday,
             slotX,
             slotY,
             hasSlotPosition: hasExplicitSlotPosition,
@@ -104,6 +115,7 @@ class MyteRosterSchema {
             slotY: myte.homeSlotPosition?.y ?? 0,
             hasSlotPosition: !!myte.homeSlotPosition,
             homeMapId: myte.homeMapId || SiteConfig.world.defaultMap,
+            birthday: myte.birthday ?? null,
             isActive: !!myte.isActive,
             goal: myte.goal ?? null,
             followGoal: myte.followGoal ?? null,
@@ -132,6 +144,7 @@ class MyteRosterSchema {
 
         myte.name = rosterEntry.name || myte.name;
         myte.homeMapId = rosterEntry.homeMapId || SiteConfig.world.defaultMap;
+        myte.birthday = rosterEntry.birthday ?? CalendarRegistry.resolveBirthday(rosterEntry);
         myte.homeSlotPosition = rosterEntry.hasSlotPosition
             ? { x: rosterEntry.slotX, y: rosterEntry.slotY }
             : null;

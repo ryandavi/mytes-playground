@@ -15,8 +15,11 @@ class GameTime {
 			dayDurationInMinutes: SiteConfig.time.dayDurationInMinutes,
 			daysPerSeason: SiteConfig.time.daysPerSeason,
 			displayMinuteStep: SiteConfig.time.displayMinuteStep,
-			seasons: ['spring', 'summer', 'autumn', 'winter'],
-			daysOfTheWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+			// The shape of the year and the week is world tuning, not clock
+			// mechanics — SiteConfig owns it and the calendar reads the same
+			// lists, so there is one answer to "how long is a season?".
+			seasons: [...SiteConfig.time.seasons],
+			daysOfTheWeek: [...SiteConfig.time.daysOfTheWeek],
 
 			// Natural day/night cycle times (in hours)
 			naturalCycle: {
@@ -142,8 +145,73 @@ class GameTime {
 	}
 
 	getCurrentDayOfWeek() {
-		const totalDays = this._getTotalGameDays();
-		return this.config.daysOfTheWeek[totalDays % this.config.daysOfTheWeek.length];
+		return this.getDayOfWeekForTotalDays(this._getTotalGameDays());
+	}
+
+	// ── Date arithmetic for dates other than today ───────────────────────────
+	//
+	// The calendar needs to know what any date is, not just the one the clock is
+	// standing on. Every "when is that?" question in the game goes through these
+	// so the panel can never drift from the clock.
+
+	getDaysPerYear() {
+		return this.config.daysPerSeason * this.config.seasons.length;
+	}
+
+	// Days elapsed since the dawn of year 1 for a (year, season, day) date, with
+	// `day` 1-based the way the UI counts it. This is the same number
+	// `_getTotalGameDays()` returns for today, which is what makes the two
+	// comparable.
+	getTotalDaysFor(year, season, day) {
+		const seasonIndex = typeof season === 'number'
+			? season
+			: this.config.seasons.indexOf(String(season).toLowerCase());
+		if (seasonIndex < 0) return NaN;
+
+		return (Number(year) - 1) * this.getDaysPerYear() +
+			seasonIndex * this.config.daysPerSeason +
+			(Number(day) - 1);
+	}
+
+	getDayOfWeekForTotalDays(totalDays) {
+		const week = this.config.daysOfTheWeek;
+		return week[((totalDays % week.length) + week.length) % week.length];
+	}
+
+	getDayOfWeekFor(year, season, day) {
+		return this.getDayOfWeekForTotalDays(this.getTotalDaysFor(year, season, day));
+	}
+
+	// Today as a plain date object — the anchor the calendar pages away from.
+	getCurrentDate() {
+		return {
+			year: this.getCurrentYear(),
+			season: this.getCurrentSeason(),
+			day: this.getCurrentDay() + 1
+		};
+	}
+
+	// Step a (year, season) pair forward or back by whole seasons, which is the
+	// only way the calendar moves. Years roll over on their own.
+	offsetSeason(year, season, offset = 0) {
+		const seasons = this.config.seasons;
+		const index = seasons.indexOf(String(season).toLowerCase());
+		if (index < 0) return { year, season };
+
+		const absolute = (Number(year) - 1) * seasons.length + index + Math.trunc(offset);
+		return {
+			year: Math.floor(absolute / seasons.length) + 1,
+			season: seasons[((absolute % seasons.length) + seasons.length) % seasons.length]
+		};
+	}
+
+	// How many whole seasons separate two (year, season) pairs — positive when
+	// the second is later. The calendar uses it to clamp its own paging.
+	getSeasonDistance(fromYear, fromSeason, toYear, toSeason) {
+		const seasons = this.config.seasons;
+		const from = (Number(fromYear) - 1) * seasons.length + seasons.indexOf(String(fromSeason).toLowerCase());
+		const to = (Number(toYear) - 1) * seasons.length + seasons.indexOf(String(toSeason).toLowerCase());
+		return to - from;
 	}
 
 	getCurrentSeason() {

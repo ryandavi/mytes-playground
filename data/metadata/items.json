@@ -163,7 +163,7 @@
     {
       "id": "music_box",
       "label": "Music Box",
-      "type": "toy",
+      "type": "furniture",
       "capabilities": {
         "droppable": false
       },
@@ -808,6 +808,11 @@
         "variant": "default",
         "storable": true
       },
+      "visual": {
+        "image": {
+          "url": "images/MapObjects/window_wood.png"
+        }
+      },
       "description": "A wooden window. Fits into a straight run of wall."
     },
     {
@@ -824,10 +829,134 @@
       "world": {
         "mode": "map_object",
         "objectType": "DOOR",
-        "variant": "default",
+        "variant": "wooden_door",
         "storable": true
       },
       "description": "A wooden door. Fits into a straight run of wall."
+    },
+    {
+      "id": "window_double",
+      "label": "Double Wood Window",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "WINDOW",
+        "variant": "double",
+        "storable": true
+      },
+      "visual": {
+        "image": {
+          "url": "images/MapObjects/window_wood_double_vertical.png"
+        }
+      },
+      "description": "A wide double window. Needs two cells of straight wall."
+    },
+    {
+      "id": "metal_door",
+      "label": "Metal Door",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "DOOR",
+        "variant": "metal_door",
+        "storable": true
+      },
+      "description": "A heavy metal door. Fits into a straight run of wall."
+    },
+    {
+      "id": "fancy_door",
+      "label": "Fancy Door",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "DOOR",
+        "variant": "fancy_door",
+        "storable": true
+      },
+      "description": "A door with some pride about it. Fits into a straight run of wall."
+    },
+    {
+      "id": "couch",
+      "label": "Couch",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "COUCH",
+        "variant": "test_couch",
+        "storable": true
+      },
+      "visual": {
+        "image": {
+          "url": "images/MapObjects/bed_big.png"
+        }
+      },
+      "description": "A soft couch. Mytes will sit on it for hours."
+    },
+    {
+      "id": "wooden_fence",
+      "label": "Wooden Fence",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "FENCE",
+        "variant": "wooden_fence",
+        "storable": true
+      },
+      "description": "A length of wooden fence."
+    },
+    {
+      "id": "blue_ball",
+      "label": "Blue Ball",
+      "type": "toy",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "BALL",
+        "variant": "blue_ball",
+        "storable": true
+      },
+      "description": "A blue ball. Mytes will chase it around given half a chance."
     },
     {
       "id": "wooden_chest",
@@ -963,7 +1092,7 @@
       "world": {
         "mode": "map_object",
         "objectType": "BALL",
-        "variant": "default",
+        "variant": "red_ball",
         "storable": true
       },
       "visual": {

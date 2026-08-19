@@ -6,9 +6,10 @@
   <property name="displayName" value="Your Home"/>
   <property name="location" value="inside"/>
   <property name="name" value="Your Home"/>
+  <property name="parentMap" value="Outside"/>
   <property name="region" value="home"/>
   <property name="worldX" value="0"/>
-  <property name="worldY" value="1"/>
+  <property name="worldY" value="0"/>
  </properties>
  <tileset firstgid="1" source="../tilesets/walls3.tsx"/>
  <layer id="3" name="Base Floor" width="30" height="30">

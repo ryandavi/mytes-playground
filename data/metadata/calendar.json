@@ -1,0 +1,54 @@
+{
+  "//": "Calendar events. One shape for everything the calendar can mark: a holiday here, a myte birthday assembled at runtime by CalendarRegistry from the roster. Season names and season length live in SiteConfig.time — a date here is only ever a season name plus a 1-based day, or a weekday name.",
+  "defaults": {
+    "icon": "star",
+    "category": "holiday"
+  },
+  "categories": {
+    "holiday": { "label": "Holiday", "icon": "gift" },
+    "market": { "label": "Market", "icon": "shop" },
+    "birthday": { "label": "Birthday", "icon": "heart" }
+  },
+  "holidays": [
+    {
+      "id": "market-day",
+      "name": "Market Day",
+      "category": "market",
+      "icon": "shop",
+      "description": "Traders set up on the green every week. Prices are kinder and the stock is stranger.",
+      "recurrence": { "type": "weekly", "dayOfWeek": "Sunday" }
+    },
+    {
+      "id": "flower-day",
+      "name": "Flower Day",
+      "category": "holiday",
+      "icon": "flower",
+      "description": "Everything in bloom at once. Mytes carry petals about and refuse to explain why.",
+      "recurrence": { "type": "annual", "season": "spring", "day": 24 }
+    },
+    {
+      "id": "long-sun",
+      "name": "The Long Sun",
+      "category": "holiday",
+      "icon": "sun",
+      "description": "The year's brightest day. Nobody sleeps and nothing gets done.",
+      "recurrence": { "type": "annual", "season": "summer", "day": 11 }
+    },
+    {
+      "id": "harvest-feast",
+      "name": "Harvest Feast",
+      "category": "holiday",
+      "icon": "wheat",
+      "description": "The last big meal before the cold. Every bowl in the house is in use.",
+      "recurrence": { "type": "annual", "season": "autumn", "day": 16 }
+    },
+    {
+      "id": "starfall-eve",
+      "name": "Starfall Eve",
+      "category": "holiday",
+      "icon": "sparkle",
+      "description": "Lights in the windows, gifts left out overnight, and one very slow procession.",
+      "recurrence": { "type": "annual", "season": "winter", "day": 25 }
+    }
+  ]
+}

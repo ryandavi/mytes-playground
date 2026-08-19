@@ -38,6 +38,9 @@
     "src": "js/Engine/ShopRegistry.js"
   },
   {
+    "src": "js/Engine/CalendarRegistry.js"
+  },
+  {
     "src": "js/Engine/BuffRegistry.js"
   },
   {
@@ -564,6 +567,9 @@
     "src": "js/UI/Core/PanelSection.js"
   },
   {
+    "src": "js/UI/Core/DetailRows.js"
+  },
+  {
     "src": "js/UI/Core/WorldModal.js"
   },
   {
@@ -610,6 +616,9 @@
   },
   {
     "src": "js/UI/Panels/WorldMapPanel.js"
+  },
+  {
+    "src": "js/UI/Panels/CalendarPanel.js"
   },
   {
     "src": "js/UI/Panels/DebugPanel.js"

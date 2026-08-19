@@ -52,6 +52,7 @@ class UserInterface {
         this.roomPanel = new RoomPanel(this);
         this.viewPanel = new ViewPanel(this);
         this.worldMapPanel = new WorldMapPanel(this);
+        this.calendarPanel = new CalendarPanel(this);
         this.debugPanel = new DebugPanel(this);
         this.myteInfoPanel = new MyteInfoPanel(this);
         this.userProfilePanel = new UserProfilePanel(this);
@@ -282,6 +283,8 @@ class UserInterface {
         this.myteInfoPanel = null;
         this.userProfilePanel?.dispose?.();
         this.userProfilePanel = null;
+        this.calendarPanel?.dispose?.();
+        this.calendarPanel = null;
         this.shopPanel?.dispose?.();
         this.shopPanel = null;
         this.settingsPanel?.dispose?.();

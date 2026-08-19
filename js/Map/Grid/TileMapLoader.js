@@ -393,7 +393,13 @@ class TileMapLoader {
 				});
 			});
 		});
-		if (cells.length === 0) {
+		// An empty wall set is not the same as no wall system. A map that has
+		// never had a wall drawn on it still needs the builder, or build mode
+		// has nothing to lay the *first* wall into — which is exactly the
+		// state every new map starts in. What genuinely rules walls out is
+		// having no wang tiles to draw them with.
+		const wangAtlas = WallWangAtlas.fromTilesets(mapData.tilesets);
+		if (cells.length === 0 && !wangAtlas) {
 			mapData.walls = null;
 			return;
 		}
@@ -502,8 +508,7 @@ class TileMapLoader {
 		});
 
 		mapData.walls = {
-			defaults, cells, openings, fixtures, attachments, faceOverrides, roomAssignments,
-			wangAtlas: WallWangAtlas.fromTilesets(mapData.tilesets)
+			defaults, cells, openings, fixtures, attachments, faceOverrides, roomAssignments, wangAtlas
 		};
 	}
 

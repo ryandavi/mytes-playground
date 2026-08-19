@@ -773,7 +773,17 @@ class MapEnvironmentManager {
             this.gameMap?.getTimeOfDayOverlayEnabledSetting?.() !== false;
     }
 
+    // "Day & Night Lighting": the world-wide passes — ambient darkness, the
+    // sun-cycle colour band and the atmosphere tint layers. Everything the
+    // player sees outdoors hangs off this one.
     isLightingEnabled() {
+        return this.isAtmosphereOverlayEnabled();
+    }
+
+    // "Interior Room Lighting": the per-room gloom/lift/colour fields drawn on
+    // top of the global pass. Separate toggle because the room model is still
+    // rough — off by default, and its absence must not take the sunset with it.
+    isRoomLightingEnabled() {
         return this.lightingOverride !== true &&
             this.gameMap?.getLightingEnabledSetting?.() !== false;
     }
@@ -1505,8 +1515,17 @@ class MapEnvironmentManager {
         }, view, 24)));
     }
 
+    /**
+     * The rooms that take interior lighting.
+     *
+     * Outdoor rooms are rooms in every other sense — a patio has a floor, a
+     * name and a type — but shading one the way a kitchen is shaded would put
+     * a rectangle of dusk on open ground at noon. They are lit by the sky,
+     * like the ground they sit on.
+     */
     getLightingRooms() {
-        const regions = this.gameMap?.regionManager?.all('room') || [];
+        const regions = (this.gameMap?.regionManager?.all('room') || [])
+            .filter(region => region.properties?.indoor !== false);
         if (regions.length === 0) return this.roomVolumes;
 
         const defaults = this.getRoomDefaults();
@@ -1720,7 +1739,10 @@ class MapEnvironmentManager {
      * must not swallow the map.
      */
     buildRoomInteriorCells() {
-        const regions = this.gameMap?.regionManager?.all('room') || [];
+        // Indoor only, for the same reason getLightingRooms is: these cells are
+        // where interior light lands, and an outdoor room has no interior.
+        const regions = (this.gameMap?.regionManager?.all('room') || [])
+            .filter(region => region.properties?.indoor !== false);
         const cellSize = this.getLightCellSize();
         const claimed = new Map();
         const interiorByRoom = new Map();
@@ -2236,7 +2258,11 @@ class MapEnvironmentManager {
         const allLights = this.collectAllLights();
         const visibleLights = this.collectVisibleLights(view, allLights);
         const blockers = this.collectVisibleBlockers(view);
-        const roomState = this.deriveRoomLightingState(allLights, darknessFactor);
+        // With room lighting off this stays empty, so every room-field pass
+        // below draws nothing and lamp cutouts see a room gloom of zero.
+        const roomState = this.isRoomLightingEnabled()
+            ? this.deriveRoomLightingState(allLights, darknessFactor)
+            : new Map();
 
         const signature = this.buildLightingSignature(view, lightingState, roomState, visibleLights, blockers);
         if (!force && signature === this._lightingSignature && !this.atmosphereTransitionActive) {
