@@ -330,20 +330,34 @@
 		</div>
 		<div class="window-panel__content">
 			<div class="settings-group">
-				<h3 class="settings-group-title">Selected surface</h3>
 				<p class="surface-target" aria-live="polite">
 					<span class="surface-target__room">Nothing selected</span>
 					<span class="surface-target__surface"></span>
+					<button type="button" class="surface-target__room-link" hidden
+						title="Open this room in the Rooms panel">
+						<svg class="icon" aria-hidden="true"><use href="#icon-home"></use></svg>
+					</button>
 				</p>
-				<p class="setting-hint surface-customize-empty">Click a wall or floor to choose its finish. <kbd class="setting-key">Alt</kbd> samples the finish already there.</p>
+				<p class="setting-hint setting-hint--persistent surface-customize-empty">Click a wall or floor to choose its finish.</p>
 				<div class="segment-control surface-scope" role="group" aria-label="Paint scope" hidden>
 					<button type="button" class="segment-btn" data-value="stretch">This stretch</button>
 					<button type="button" class="segment-btn" data-value="room">Whole room</button>
 				</div>
 			</div>
+			<div class="settings-group surface-held-group" hidden>
+				<p class="surface-held" aria-live="polite">
+					<canvas class="surface-held__sample" width="22" height="22" aria-hidden="true"></canvas>
+					<span class="surface-held__name"></span>
+					<button type="button" class="surface-held__drop" title="Put this finish down (Esc)" aria-label="Put this finish down">
+						<svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+					</button>
+				</p>
+				<p class="setting-hint setting-hint--persistent">Click any surface to paint it with this. <kbd class="setting-key">Esc</kbd> puts it down.</p>
+			</div>
 			<div class="settings-group surface-finish-group" hidden>
 				<h3 class="settings-group-title">Finish</h3>
 				<div class="surface-palette" role="group" aria-label="Surface finishes"></div>
+				<p class="setting-hint">Hover a finish to try it on the map. Double-click one to paint the whole room at once. <kbd class="setting-key">Alt</kbd>-click a surface to sample the finish already there.</p>
 			</div>
 		</div>
 	</div>
@@ -362,13 +376,12 @@
 		</div>
 		<div class="window-panel__content">
 			<div class="settings-group wall-build-operation">
-				<h3 class="settings-group-title">Tool</h3>
 				<div class="segment-control wall-build-operation-segment" role="group" aria-label="Wall tool">
 					<button type="button" class="segment-btn active" data-value="add">Add</button>
 					<button type="button" class="segment-btn" data-value="remove">Remove</button>
 				</div>
-				<p class="setting-hint">Drag to lay a run. Hold <kbd class="setting-key">Ctrl</kbd> to invert the tool.</p>
-				<p class="setting-hint">Hover a wall to grab its handle, then pull to move the whole run.</p>
+				<p class="setting-hint">Drag to lay a run; hold <kbd class="setting-key">Ctrl</kbd> to invert the tool. Hover a wall you already have to grab its handle: pull across it to move the whole run, or drag along it to lengthen it.</p>
+				<p class="setting-hint">Doors and windows are not built here — they are things you own. Place one from your inventory onto a wall.</p>
 				<div class="setting-item">
 					<div class="checkbox-wrapper" title="Outline a room instead of laying a single run">
 						<input type="checkbox" id="wall-build-rectangle">
@@ -393,7 +406,13 @@
 		</div>
 		<div class="window-panel__content">
 			<div class="settings-group">
-				<p class="setting-hint">Pick a room below, then click the floor to fill it or drag to paint square by square. The floor you paint joins that room.</p>
+				<p class="setting-hint">Pick a room below, then click the floor to fill it or drag to paint square by square. The floor you paint joins that room. <kbd class="setting-key">Alt</kbd>-click a floor to paint with the room it is already in.</p>
+				<div class="setting-item">
+					<div class="checkbox-wrapper" title="Fill a box of floor instead of painting square by square">
+						<input type="checkbox" id="room-build-rectangle">
+						<label for="room-build-rectangle">Rectangle <kbd class="setting-key">Shift</kbd></label>
+					</div>
+				</div>
 				<div class="room-panel-list"></div>
 			</div>
 		</div>
@@ -481,6 +500,12 @@
 					</div>
 				</div>
 				<div class="setting-item">
+					<div class="checkbox-wrapper" title="The explanatory notes inside panels. Each panel's title bar carries the same switch.">
+						<input type="checkbox" id="panel-hints-toggle" checked>
+						<label for="panel-hints-toggle">Show Panel Hints</label>
+					</div>
+				</div>
+				<div class="setting-item">
 					<div class="checkbox-wrapper">
 						<input type="checkbox" id="notifications-toggle" checked>
 						<label for="notifications-toggle">Notifications</label>
@@ -532,7 +557,7 @@
 			</div>
 			<div class="settings-group">
 				<h3 class="settings-group-title">Save Data</h3>
-				<p class="setting-hint">Your Mytes live only in this browser. Export a backup before you clear site data or switch machines; importing replaces everything and reloads the game.</p>
+				<p class="setting-hint setting-hint--warning">Your Mytes live only in this browser. Export a backup before you clear site data or switch machines; importing replaces everything and reloads the game.</p>
 				<div class="setting-actions">
 					<button id="export-save" type="button" class="secondary">Export Save</button>
 					<button id="import-save" type="button" class="secondary">Import Save</button>
@@ -711,7 +736,7 @@
 	<!-- END WORLD MAP PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="js/bundle.js?v=3cb818d5f7b8"></script>
+	<script src="js/bundle.js?v=8d6b040fc5a6"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

@@ -30,13 +30,27 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.targetElement = this.modalElement?.querySelector('.surface-target');
         this.targetRoomElement = this.modalElement?.querySelector('.surface-target__room');
         this.targetSurfaceElement = this.modalElement?.querySelector('.surface-target__surface');
+        this.targetRoomLink = this.modalElement?.querySelector('.surface-target__room-link');
+        this.targetRoomLink?.addEventListener('click', () => this.openTargetRoom());
+        // What the eyedropper is holding, if anything: { finishId, surface }.
+        this.held = null;
+        this.heldGroup = this.modalElement?.querySelector('.surface-held-group');
+        this.heldSample = this.modalElement?.querySelector('.surface-held__sample');
+        this.heldName = this.modalElement?.querySelector('.surface-held__name');
+        this.modalElement?.querySelector('.surface-held__drop')
+            ?.addEventListener('click', () => this.dropFinish());
         this.scope = new SegmentControl(this.scopeElement, {
             value: 'stretch',
             onChange: () => this.renderPalette()
         });
         this.paletteElement?.addEventListener('pointerleave', () => this.revertPreview());
+        this.boundStagePointerLeave = () => {
+            this.setOverlay(this.hover, null);
+            this.parent.setBuildCursor(null);
+        };
         this.parent?.parent?.canvas?.addEventListener('pointerdown', this.boundStagePointerDown, true);
         this.parent?.parent?.canvas?.addEventListener('pointermove', this.boundStagePointerMove, true);
+        this.parent?.parent?.canvas?.addEventListener('pointerleave', this.boundStagePointerLeave);
         // Both outlines are absolutely positioned over wall pieces the builder
         // throws away and rebuilds — when a wall is painted, when it changes
         // height, when the presentation is lowered. Redrawing from the stored
@@ -57,6 +71,8 @@ class SurfaceCustomizePanel extends ModalWindow {
     handleToolModeChanged(mode) {
         const active = mode === UIToolModes.SURFACE;
         document.body.classList.toggle('customize-mode', active);
+        this.parent.setBuildCursor(null);
+        this.dropFinish();
         this.buttonElement?.classList.toggle('active', active);
         this.revertPreview();
         this.setOverlay(this.hover, null);
@@ -80,9 +96,6 @@ class SurfaceCustomizePanel extends ModalWindow {
         super.close();
     }
 
-    // Escape is layered by ContainerInputManager; see WallBuildPanel.
-    handleKeyDown() {}
-
     get rules() {
         return this.parent?.parent?.buildRules || null;
     }
@@ -97,7 +110,15 @@ class SurfaceCustomizePanel extends ModalWindow {
      */
     handleStagePointerMove(event) {
         if (!this.parent.isTool(UIToolModes.SURFACE)) return;
-        this.setOverlay(this.hover, this.resolveTarget(event));
+        const target = this.resolveTarget(event);
+        this.setOverlay(this.hover, target);
+        // Surface is the one build tool where "is there anything here" is a real
+        // question — most of a wall is air, and a vertical run is not a paint
+        // target at all. Saying so under the cursor is cheaper than clicking to
+        // find out.
+        this.parent.setBuildCursor(
+            !target ? null : (this.checkTarget(target).allowed ? 'ready' : 'refused')
+        );
     }
 
     /**
@@ -281,27 +302,101 @@ class SurfaceCustomizePanel extends ModalWindow {
         event.preventDefault();
         event.stopPropagation();
         this.setTarget(target);
-        // Alt-click samples what is already there instead of selecting it to
-        // paint - the finish resolvers already answer the question.
+        // Alt-click takes the finish that is already here, to put on something
+        // else. It used to say "Picked up wallpaper blue flower" and then hold
+        // nothing at all - the sample went into a message and the only way to
+        // use it was to find that same swatch in the list by hand. Now the
+        // panel actually holds it, and says what to do with it.
         if (event.altKey) {
-            const sampled = this.getCurrentFinishId();
             this.renderPalette();
-            if (sampled) {
-                this.parent.showMessage(`Picked up ${sampled.replaceAll('_', ' ')}.`, 'info', 'Eyedropper');
-            }
+            this.holdFinish(this.getCurrentFinishId(), target.surface);
+            return;
+        }
+        // Holding one: this click is the second half of the eyedropper.
+        if (this.held) {
+            this.renderPalette();
+            this.paintWithHeld();
             return;
         }
         this.renderPalette();
         this.open();
     }
 
+    // -- The eyedropper -------------------------------------------------------
+
+    /**
+     * Take the finish off a surface and keep it, so the next click can put it
+     * somewhere else.
+     *
+     * It stays in hand across several clicks rather than firing once: "make
+     * these four walls match that one" is the whole reason to sample anything,
+     * and a one-shot would mean alt-clicking the same wall four times over.
+     * There is always a way out on screen and on Escape, which is what keeps
+     * holding something from being a mode you can get stuck in.
+     */
+    holdFinish(finishId, surface) {
+        if (!finishId || !surface) return false;
+        this.held = { finishId, surface };
+        this.renderHeld();
+        this.parent.showMessage(
+            `Holding ${this.finishLabel(finishId, surface)}. Click a ${surface === 'floor' ? 'floor' : 'wall'} to paint it.`,
+            'info', 'Eyedropper'
+        );
+        return true;
+    }
+
+    /** @returns {boolean} Whether anything was actually being held. */
+    dropFinish() {
+        if (!this.held) return false;
+        this.held = null;
+        this.renderHeld();
+        return true;
+    }
+
+    /**
+     * A floor finish does not go on a wall, and the two registries do not even
+     * list the same names - so the mismatch is worth saying out loud rather
+     * than painting something surprising or quietly doing nothing.
+     */
+    paintWithHeld() {
+        if (!this.held || !this.target) return false;
+        if (this.target.surface !== this.held.surface) {
+            this.parent.showMessage(
+                `That is a ${this.held.surface} finish - it only goes on ${this.held.surface}s.`,
+                'warning', 'Eyedropper'
+            );
+            return false;
+        }
+        return this.applyFinish(this.held.finishId);
+    }
+
+    finishLabel(finishId, surface) {
+        const finishes = this.gameMap?.surfaceCustomizer?.listFinishes(surface) || [];
+        const finish = finishes.find(entry => entry.id === finishId);
+        return finish?.displayName || finish?.name || String(finishId).replaceAll('_', ' ');
+    }
+
+    renderHeld() {
+        document.body.classList.toggle('surface-holding', !!this.held);
+        if (this.heldGroup) this.heldGroup.hidden = !this.held;
+        if (!this.held) return;
+        if (this.heldName) this.heldName.textContent = this.finishLabel(this.held.finishId, this.held.surface);
+        const context = this.heldSample?.getContext?.('2d');
+        if (!context) return;
+        context.clearRect(0, 0, this.heldSample.width, this.heldSample.height);
+        const source = this.getFinishSample(this.held.finishId, this.held.surface);
+        if (!source) return;
+        context.imageSmoothingEnabled = false;
+        context.drawImage(source, 0, 0, source.width, source.height, 0, 0, this.heldSample.width, this.heldSample.height);
+    }
+
     // Whether the current target may actually be repainted; the answer is
     // shown on the target line and disables the palette.
-    checkTarget() {
-        if (!this.target) return BuildRules.deny('Nothing selected.');
-        return this.target.surface === 'floor'
-            ? this.rules?.canPaintRoomFloor(this.target.room) ?? BuildRules.ALLOWED
-            : this.rules?.canPaintWallFace(this.target.wallSurface.cell) ?? BuildRules.ALLOWED;
+    checkTarget(target = this.target) {
+        if (!target) return BuildRules.deny('Nothing selected.');
+        return target.surface === 'floor'
+            ? this.rules?.canPaintRoomFloor(target.room) ?? BuildRules.ALLOWED
+            : this.rules?.canPaintWallFace(target.wallSurface.cell) ?? BuildRules.ALLOWED;
     }
 
     /**
@@ -328,11 +423,44 @@ class SurfaceCustomizePanel extends ModalWindow {
         return room?.properties?.displayName || room?.id || 'Room';
     }
 
+    // The room the current target belongs to, or null out in the corridor of
+    // wall that belongs to nothing.
+    targetRoom() {
+        if (!this.target) return null;
+        if (this.target.surface === 'floor') return this.target.room;
+        const roomId = this.target.wallSurface.roomId;
+        return roomId ? this.gameMap?.regionManager?.get('room', roomId) : null;
+    }
+
+    /**
+     * Two tools, one room, and no way across.
+     *
+     * Surface answers "what is this made of" and Rooms answers "what is this" —
+     * a floor's finish belongs to the room, so the room named on this line is
+     * very often the thing you actually wanted to rename or resize. Rather than
+     * grow a second copy of the room controls in here, the room name is a way
+     * to get to the panel that owns them, with the room already picked.
+     */
+    openTargetRoom() {
+        const room = this.targetRoom();
+        if (!room) return;
+        const rooms = this.parent?.roomPanel;
+        if (!this.parent?.changeToolMode(UIToolModes.ROOM)) return;
+        rooms?.select?.(room.id);
+    }
+
 
     renderTarget() {
         const { room, surface, locked } = this.describeTarget();
         if (this.targetRoomElement) this.targetRoomElement.textContent = room;
         if (this.targetSurfaceElement) this.targetSurfaceElement.textContent = surface;
+        const targetRoom = this.targetRoom();
+        if (this.targetRoomLink) {
+            this.targetRoomLink.hidden = !targetRoom;
+            if (targetRoom) {
+                this.targetRoomLink.setAttribute('aria-label', `Open ${this.roomName(targetRoom)} in the Rooms panel`);
+            }
+        }
         this.targetElement?.classList.toggle('is-locked', locked);
         // Nothing picked yet is a placeholder, not a readout — it should not
         // shout the way a real target name does.
@@ -404,10 +532,11 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.paletteElement.classList.toggle('is-locked', !verdict.allowed);
         document.body.classList.toggle('build-target-locked', !verdict.allowed);
         if (!verdict.allowed) {
-            const notice = document.createElement('p');
-            notice.className = 'setting-hint';
-            notice.textContent = verdict.reason;
-            this.paletteElement.appendChild(notice);
+            // Persistent: this is not help you can decline, it is the reason the
+            // palette below it is empty.
+            this.paletteElement.appendChild(
+                HintNotes.create(verdict.reason, { variant: 'persistent' })
+            );
             this.warnLockedOnce(verdict.reason);
             return;
         }
@@ -444,7 +573,12 @@ class SurfaceCustomizePanel extends ModalWindow {
                 }, 150);
             });
             button.addEventListener('pointerleave', () => clearTimeout(this.hoverTimer));
-            button.addEventListener('click', () => this.applyFinish(finish.id));
+            // Choosing from the list is choosing a different finish, which is
+            // the plainest way of saying you are done with the one in hand.
+            button.addEventListener('click', () => {
+                this.dropFinish();
+                this.applyFinish(finish.id);
+            });
             // Double-click paints the whole room without touching the scope
             // radio - the scope machinery already understands the request.
             button.addEventListener('dblclick', () => this.applyFinish(finish.id, 'room'));
@@ -524,8 +658,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.parent.showMessage(reason, 'info', 'Locked');
     }
 
-    getFinishSample(finishId) {
-        if (this.target.surface === 'floor') return this.gameMap.floorMaterialRegistry?.getTile(finishId);
+    getFinishSample(finishId, surface = this.target?.surface) {
+        if (surface === 'floor') return this.gameMap.floorMaterialRegistry?.getTile(finishId);
         return this.gameMap.wallMaterialRegistry
             ?.getSwatchColumns(finishId, this.gameMap.wallMaterialRegistry.getConstruction(this.target.piece.constructionId))
             ?.body || null;
@@ -544,10 +678,12 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.overlayUnsubscribers?.forEach(unsubscribe => unsubscribe?.());
         this.overlayUnsubscribers = [];
         document.body.classList.remove('build-target-locked');
+        this.parent?.setBuildCursor(null);
         this.scope?.dispose();
         this.scope = null;
         this.parent?.parent?.canvas?.removeEventListener('pointerdown', this.boundStagePointerDown, true);
         this.parent?.parent?.canvas?.removeEventListener('pointermove', this.boundStagePointerMove, true);
+        this.parent?.parent?.canvas?.removeEventListener('pointerleave', this.boundStagePointerLeave);
         document.body.classList.remove('customize-mode');
         super.dispose();
     }

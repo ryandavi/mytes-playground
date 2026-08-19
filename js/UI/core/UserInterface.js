@@ -26,6 +26,8 @@ class UserInterface {
             element: document.getElementById('myte_queue_overlay')
         });
         this.buildModeUI = new BuildModeUI(this);
+        this.buildPlacement = new MyteBuildPlacement(this);
+        this.hintNotes = new HintNotes(this);
         this.stageChips = new StageChips(this);
         this.stageViewBar = new StageViewBar(this);
     }
@@ -56,6 +58,10 @@ class UserInterface {
         this.shopPanel = new ShopPanel(this);
         this.gameLogManager = new GameLogManager(this);
         this.buildModeUI.init();
+        this.buildPlacement.init();
+        // After the panels, because it decorates their markup and hangs its
+        // toggle in their title bars.
+        this.hintNotes.init();
         this.stageChips.init();
         this.stageViewBar.init();
 
@@ -69,10 +75,33 @@ class UserInterface {
         this.debugMenu = this.debugPanel;
     }
 
+    /**
+     * What the pointer is over, in the one word every build tool has to say.
+     *
+     * Each tool used to own its own answer, and between them they said almost
+     * nothing: the Wall and Room tools showed a crosshair over the whole stage,
+     * including the grey outside the map where a click does nothing, and the
+     * Surface tool said nothing at all until the target was locked. Three tools
+     * with three vocabularies is three things to learn; this is one.
+     *
+     *   null       nothing here this tool can act on — plain arrow
+     *   'ready'    a click would do the thing (which thing is the tool's own
+     *              cursor: a grid square for Wall and Room, a pick for Surface)
+     *   'grab'     a drag would move what is under the pointer
+     *   'refused'  there is something here, and the answer is no
+     */
+    setBuildCursor(state = null) {
+        if (state) document.body.dataset.buildCursor = state;
+        else delete document.body.dataset.buildCursor;
+    }
+
     // Methods for component communication
     onToolModeChanged(mode) {
         // Clear selection when tool mode changes
         this.selectionManager.setSelected(null);
+        // A gesture belongs to the tool that started it: leaving Move mid-drag
+        // would otherwise leave a myte wherever the cursor happened to be.
+        this.buildPlacement?.cancel();
 
         // Notify action manager to update UI
         this.actionSidebarManager.updateActions(null);

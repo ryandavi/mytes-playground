@@ -651,8 +651,12 @@ class InputSystem {
 	 * @param {KeyboardEvent} event 
 	 */
 	handleKeyDown(event) {
-	  // Skip if editing inputs or contentEditable
-	  if (this.isEditingText(event.target)) {
+	  // Skip if editing inputs or contentEditable - except Escape, which is
+	  // never a typing key. "Get me out of this field" and "get me out of this
+	  // panel" are the same gesture to the person pressing it, so it has to
+	  // reach the one place that decides what Escape means (see
+	  // ContainerInputManager.handleEscape) rather than being swallowed here.
+	  if (event.key !== 'Escape' && this.isEditingText(event.target)) {
 		return;
 	  }
 	  

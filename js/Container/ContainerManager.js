@@ -611,22 +611,16 @@ class ContainerManager {
     getInitialRosterData(existingWrappers = []) {
         const savedRoster = this.core?.user?.savedMytes;
         if (Array.isArray(savedRoster) && savedRoster.length > 0) {
-            return savedRoster.map((entry, index) => MyteRosterSchema.normalizeEntry(entry, index, {
-                preserveSlotPosition: false
-            }));
+            return savedRoster.map((entry, index) => MyteRosterSchema.normalizeEntry(entry, index));
         }
 
         if (existingWrappers.length > 0) {
             return this.extractRosterDataFromDom(existingWrappers)
-                .map((entry, index) => MyteRosterSchema.normalizeEntry(entry, index, {
-                    preserveSlotPosition: true
-                }));
+                .map((entry, index) => MyteRosterSchema.normalizeEntry(entry, index));
         }
 
         return this.createFallbackRosterData()
-            .map((entry, index) => MyteRosterSchema.normalizeEntry(entry, index, {
-                preserveSlotPosition: false
-            }));
+            .map((entry, index) => MyteRosterSchema.normalizeEntry(entry, index));
     }
 
     createMyteSlotElement(rosterEntry, index) {

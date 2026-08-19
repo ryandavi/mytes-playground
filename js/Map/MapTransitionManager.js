@@ -197,6 +197,16 @@ class MapTransitionManager {
             }
         });
 
+        // A slot somebody placed by hand keeps its place; only the ones still
+        // on the automatic layout get laid out. Restoring them here as well is
+        // what makes a hand-placed slot survive a map change rather than
+        // springing back to the spawn point.
+        const placedByHand = residentMytes.filter(myte => myte.homeSlotPosition);
+        for (const myte of placedByHand) {
+            this._syncMyteSlotToPosition(myte, myte.homeSlotPosition);
+        }
+        const autoMytes = residentMytes.filter(myte => !myte.homeSlotPosition);
+
         if (!spawnPoint) return;
         const layout = SiteConfig.myte.homeSlotLayout;
         const spacing = layout.spacing;
@@ -214,9 +224,9 @@ class MapTransitionManager {
             { x: spacing, y: -spacing },
             { x: -spacing, y: -spacing }
         ];
-        const placed = [];
+        const placed = placedByHand.map(myte => ({ ...myte.homeSlotPosition }));
 
-        residentMytes.forEach((myte, index) => {
+        autoMytes.forEach((myte, index) => {
             const candidates = offsets.slice(index).concat(offsets.slice(0, index));
             const offset = candidates.find(candidate => {
                 const x = spawnPoint.x + candidate.x;

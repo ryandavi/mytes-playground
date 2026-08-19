@@ -440,12 +440,33 @@ class ContainerInputManager {
    * Handle escape key
    */
   /**
-   * Escape peels one layer at a time, outermost work first: an in-flight
-   * gesture, then the panel it belongs to, then the mode itself. Each build
-   * panel's own Escape handler is disabled so this ordering is the only one.
+   * Escape peels one layer at a time, outermost work first.
+   *
+   * This is the only handler for the key. Windows used to close themselves on
+   * Escape as well, which meant one press did two things at once: the Options
+   * window closed itself, and this handler - finding none of the three build
+   * panels open - went on to leave Build mode too. Anything that wants to
+   * answer Escape adds a layer here instead.
+   *
+   *   1  a text field you are typing in       give the field back
+   *   2  an item waiting to be placed         put it down
+   *   3  a gesture in progress                abandon it
+   *   4  a window                             close the front-most one
+   *   5  a selection                          clear it
+   *   6  Build mode                           leave it
+   *   7  a myte in your hands                 set it down
    */
   handleEscape() {
     const ui = this.container.ui;
+
+    // Leaving the field is the whole gesture: closing the panel out from under
+    // someone half way through naming a room would throw the name away.
+    const editing = document.activeElement;
+    if (editing && editing !== document.body && typeof editing.blur === 'function' &&
+      (editing.matches?.('input, textarea, select') || editing.isContentEditable)) {
+      editing.blur();
+      return;
+    }
 
     if (this.container.inventory?.state?.placementItem) {
       this.container.inventory.cancelPlacement();
@@ -454,14 +475,21 @@ class ContainerInputManager {
 
     if (ui?.wallBuildPanel?.cancelDrag?.() === true) return;
     if (ui?.roomPanel?.cancelDrag?.() === true) return;
+    if (ui?.buildPlacement?.cancel?.() === true) return;
+    // Something held in hand is work in flight too: put it down before the
+    // panel it belongs to closes out from under it.
+    if (ui?.surfaceCustomizePanel?.dropFinish?.() === true) return;
+
+    // Any window, not a list of the ones we remembered to name. A build panel's
+    // own close() hands the tool back, so closing it here leaves the mode in
+    // the same state as clicking its X.
+    const front = ModalWindow.frontMost?.();
+    if (front) {
+      front.close();
+      return;
+    }
 
     if (this.container.gameMode?.isBuild()) {
-      const openBuildPanel = [ui?.wallBuildPanel, ui?.roomPanel, ui?.surfaceCustomizePanel]
-        .find(panel => panel?.isVisible);
-      if (openBuildPanel) {
-        ui.changeToolMode(UIToolModes.MOVE);
-        return;
-      }
       if (ui?.getSelected?.()) {
         ui.setSelected(null);
         return;

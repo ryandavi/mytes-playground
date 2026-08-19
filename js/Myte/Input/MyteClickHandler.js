@@ -219,13 +219,23 @@ class MyteClickHandler extends MyteBaseHandler {
 	 * refuses — but it refuses silently, which from the outside looks like the
 	 * double click simply not working. Say so at the gesture instead.
 	 */
+	/**
+	 * Waking a myte is a Play-mode thing; this is the gate that says so.
+	 *
+	 * Silent under the Move tool, because there the press was not refused at
+	 * all — MyteBuildPlacement picked it up and is moving the myte out of your
+	 * way. Announcing "Mytes are paused" over a myte that is visibly following
+	 * the cursor would be the interface contradicting itself.
+	 */
 	_refusedByBuildMode() {
 		if (this.myte.parent?.gameMode?.isBuild() !== true) return false;
-		this.myte.parent.ui?.showMessage?.(
-			'Mytes are paused while you build. Leave Build Mode to wake one.',
-			'info',
-			'Build Mode'
-		);
+		if (this.myte.parent.ui?.isTool?.(UIToolModes.MOVE) !== true) {
+			this.myte.parent.ui?.showMessage?.(
+				'Mytes are paused while you build. Leave Build Mode to wake one.',
+				'info',
+				'Build Mode'
+			);
+		}
 		return true;
 	}
 

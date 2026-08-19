@@ -25,6 +25,10 @@ const USER_DEFAULT_PREFERENCES = Object.freeze({
     weatherEffectsEnabled: true,
     tutorialsEnabled: true,
     interactionHintsEnabled: true,
+    // The explanatory notes inside panels. Separate from interactionHints,
+    // which is the world's own tooltips: one is the interface explaining
+    // itself, the other is the game pointing at things.
+    panelHintsEnabled: true,
     autoSaveEnabled: true,
     notificationsEnabled: true,
     // Set once the first-run hints have been shown, so returning players are not

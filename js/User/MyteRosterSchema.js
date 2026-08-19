@@ -40,8 +40,7 @@ class MyteRosterSchema {
 
     // Normalize a raw roster entry (saved data, DOM extraction, or fallback)
     // into the canonical shape ContainerManager.setupMytes consumes.
-    static normalizeEntry(entry = {}, index = 0, options = {}) {
-        const preserveSlotPosition = options.preserveSlotPosition === true;
+    static normalizeEntry(entry = {}, index = 0) {
         const species = MyteDefinitionRegistry.normalizeSpeciesId?.(entry.species || entry.speciesId || 'snail') || 'snail';
         const name = String(entry.name || entry.displayName || `Myte ${index + 1}`).trim() || `Myte ${index + 1}`;
         const slotId = String(entry.slotId || `myte-slot-${index + 1}`);
@@ -55,10 +54,11 @@ class MyteRosterSchema {
         const defaults = this.statDefaults();
         const slotX = Number.isFinite(Number(entry.slotX)) ? Number(entry.slotX) : 0;
         const slotY = Number.isFinite(Number(entry.slotY)) ? Number(entry.slotY) : 0;
-        const hasExplicitSlotPosition = preserveSlotPosition && (
-            entry.hasSlotPosition === true ||
-            (entry.hasSlotPosition == null && (slotX !== 0 || slotY !== 0))
-        );
+        // Home slots can be dragged in Build mode, so a stored position is a
+        // decision somebody made, whether it came from the authored markup or
+        // from a save. Without a position the map's spawn layout places it.
+        const hasExplicitSlotPosition = entry.hasSlotPosition === true ||
+            (entry.hasSlotPosition == null && (slotX !== 0 || slotY !== 0));
         const num = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 
         return {
@@ -100,6 +100,9 @@ class MyteRosterSchema {
             posY: myte.posY,
             slotId: myte.elements?.wrapper?.id || `myte-slot-${index + 1}`,
             slotLabel: myte.elements?.wrapper?.querySelector?.('.myte-home-label .name')?.textContent?.trim?.() || `${myte.name}'s Slot`,
+            slotX: myte.homeSlotPosition?.x ?? 0,
+            slotY: myte.homeSlotPosition?.y ?? 0,
+            hasSlotPosition: !!myte.homeSlotPosition,
             homeMapId: myte.homeMapId || SiteConfig.world.defaultMap,
             isActive: !!myte.isActive,
             goal: myte.goal ?? null,
@@ -129,6 +132,9 @@ class MyteRosterSchema {
 
         myte.name = rosterEntry.name || myte.name;
         myte.homeMapId = rosterEntry.homeMapId || SiteConfig.world.defaultMap;
+        myte.homeSlotPosition = rosterEntry.hasSlotPosition
+            ? { x: rosterEntry.slotX, y: rosterEntry.slotY }
+            : null;
         myte.element.dataset.myteName = myte.name;
         myte.element.dataset.myteHomeMap = myte.homeMapId;
         if (myte.elements.wrapper) {

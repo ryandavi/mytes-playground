@@ -32,7 +32,6 @@ constructor(parent, options = {}) {
         
         rememberPosition: true,    // Remember the position when reopening
         allowMultipleWindows: false, // Allow multiple windows to be open at once
-        enableKeyboardShortcuts: true, // Enable keyboard shortcuts (Escape to close)
         snapToEdges: true,         // Snap windows to screen edges when dragging
         dragBoundsElement: null    // Optional element (or getter) that bounds relative-positioned windows
     }, options);
@@ -68,7 +67,6 @@ constructor(parent, options = {}) {
     this.toggleFullscreen = this.toggleFullscreen.bind(this);
     this.toggleMinimize = this.toggleMinimize.bind(this);
     this.handleHeaderDoubleClick = this.handleHeaderDoubleClick.bind(this);
-    this.handleKeyDown = this.handleKeyDown.bind(this);
 
     // Initialize if autoInit is true
     if (this.options.autoInit) {
@@ -176,10 +174,11 @@ constructor(parent, options = {}) {
 			this.headerElement.ondblclick = this.handleHeaderDoubleClick;
 		}
 
-		// Global keyboard event listener for shortcuts
-		if (this.options.enableKeyboardShortcuts) {
-			document.addEventListener('keydown', this.handleKeyDown);
-		}
+		// Escape is not handled here. Every window listening for it on its own
+		// meant two answers to one keypress: the window closed itself while the
+		// layered handler, seeing no window it recognised, went on to undo the
+		// next thing down. ContainerInputManager.handleEscape is the only
+		// authority, and it closes `ModalWindow.frontMost()`.
 
 		// Outside click handler (will be added/removed when modal opens/closes)
 		if (this.options.closeOnOutsideClick) {
@@ -219,18 +218,23 @@ constructor(parent, options = {}) {
 	}
 
 	/**
-	 * Handle keyboard events
-	 * @param {KeyboardEvent} e - Keyboard event
+	 * The open window nearest the front, or null when none are open.
+	 *
+	 * Stacking order is the only sensible reading of "the window I meant" —
+	 * it is the one the eye is on and the one a click would reach first.
 	 */
-	handleKeyDown(e) {
-		// Only handle events when this is the front-most window
-		if (!this.isVisible || !this.isFrontMost()) return;
-
-		// Escape key to close the front-most window
-		if (e.key === 'Escape') {
-			e.preventDefault();
-			this.close();
+	static frontMost() {
+		let front = null;
+		let frontZ = -Infinity;
+		for (const window of ModalWindow.activeWindows) {
+			if (!window.isVisible || !window.modalElement) continue;
+			const z = parseInt(window.modalElement.style.zIndex) || 0;
+			if (z >= frontZ) {
+				frontZ = z;
+				front = window;
+			}
 		}
+		return front;
 	}
 
 	/**
@@ -238,16 +242,8 @@ constructor(parent, options = {}) {
 	 * @returns {boolean} True if this is the front-most window
 	 */
 	isFrontMost() {
-		if (!this.modalElement) return false;
-		
-		const thisZIndex = parseInt(this.modalElement.style.zIndex) || 0;
-		
-		// Check if any other window has a higher z-index
-		return !ModalWindow.activeWindows.some(window => {
-			if (window === this) return false;
-			const otherZIndex = parseInt(window.modalElement.style.zIndex) || 0;
-			return window.isVisible && otherZIndex > thisZIndex;
-		});
+		if (!this.modalElement || !this.isVisible) return false;
+		return ModalWindow.frontMost() === this;
 	}
 
 	/**
@@ -770,7 +766,6 @@ constructor(parent, options = {}) {
 		}
 
 		document.removeEventListener('click', this.handleOutsideClick);
-		document.removeEventListener('keydown', this.handleKeyDown);
 
 		if (this.options.draggable && this.modalElement) {
 			const header = this.modalElement.querySelector('.window-panel__header') || this.modalElement;

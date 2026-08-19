@@ -47,7 +47,8 @@ class RoomPanel extends ModalWindow {
         this.boundRefresh = () => this.refresh();
         this.init();
         this.listElement = this.modalElement?.querySelector('.room-panel-list') || null;
-        this.scrollContainer = this.modalElement?.querySelector('.window-panel__content') || null;
+        this.scrollContainer = this.listElement;
+        this.rectangleToggle = this.modalElement?.querySelector('#room-build-rectangle') || null;
         this.newButton = this.modalElement?.querySelector('#room-new') || null;
         this.resetButton = this.modalElement?.querySelector('#room-reset') || null;
         this.newButton?.addEventListener('click', () => this.select('new'));
@@ -80,6 +81,7 @@ class RoomPanel extends ModalWindow {
         document.body.classList.toggle('room-build-mode', active);
         if (active) {
             this.open();
+            this.ensureBrush();
             this.refresh();
         } else {
             this.cancelDrag();
@@ -98,10 +100,19 @@ class RoomPanel extends ModalWindow {
         super.close();
     }
 
-    // Escape is layered by ContainerInputManager; see WallBuildPanel.
-    handleKeyDown() {}
-
+    /**
+     * Rooms changed under us. Only redraw while the tool that owns those
+     * drawings is the one in hand: rooms are recomputed whenever a wall moves,
+     * so refreshing unconditionally painted this panel's room outline onto the
+     * floor in the middle of a wall drag, in a tool that has nothing to say
+     * about rooms.
+     */
     refresh() {
+        if (!this.parent.isTool(UIToolModes.ROOM)) {
+            this.clearRoomTints();
+            this.clearHighlight();
+            return;
+        }
         this.renderRooms();
         this.renderRoomTints();
         this.renderHighlight();
@@ -153,6 +164,26 @@ class RoomPanel extends ModalWindow {
     }
 
     /**
+     * There is always a room in hand.
+     *
+     * The brush used to be allowed to hold nothing, and painting with nothing
+     * meant "put these tiles back to whatever the walls enclose" — an eraser,
+     * armed by default, that nobody chose and nothing announced. Erasing is
+     * what "Reset to walls" is for: a button that says what it is about to
+     * undo and asks first. So the brush picks the biggest room rather than
+     * sitting empty, and every stroke goes somewhere you can see on the list.
+     */
+    ensureBrush() {
+        if (this.selected && this.selected !== 'new') {
+            if (this.gameMap?.regionManager?.get('room', this.selected)) return this.selected;
+        } else if (this.selected === 'new') {
+            return this.selected;
+        }
+        this.selected = this.rooms()[0]?.room?.id ?? null;
+        return this.selected;
+    }
+
+    /**
      * Moves the selected marker without rebuilding anything.
      *
      * Picking a room is the most frequent thing that happens here, and
@@ -168,7 +199,6 @@ class RoomPanel extends ModalWindow {
             row.classList.toggle('active', row.dataset.roomId === this.selected);
         }
         this.newButton?.classList.toggle('active', this.selected === 'new');
-        this.resetButton?.classList.toggle('active', this.selected === null);
         if (reveal) {
             this.listElement?.querySelector('.room-row.active')?.scrollIntoView({ block: 'nearest' });
         }
@@ -261,13 +291,12 @@ class RoomPanel extends ModalWindow {
         remove.setAttribute('aria-label', `Delete ${this.label(room)}`);
         remove.addEventListener('pointerdown', event => event.stopPropagation());
         remove.addEventListener('click', () => this.confirmDissolve(room.id));
-        meta.append(remove);
 
-        const body = document.createElement('div');
-        body.className = 'room-row__body';
-        body.append(name, meta);
-
-        row.append(swatch, body);
+        // One grid, three columns: the swatch keeps a column to itself so the
+        // type dropdown on the line below starts where the name does rather
+        // than sliding under the colour. Nesting these in wrappers is what let
+        // the two lines drift out of alignment in the first place.
+        row.append(swatch, name, remove, meta);
         row.addEventListener('pointerdown', () => this.select(room.id));
         row.addEventListener('pointerenter', () => this.renderHighlight(room.id));
         row.addEventListener('pointerleave', () => this.renderHighlight());
@@ -326,8 +355,12 @@ class RoomPanel extends ModalWindow {
             const [x, y] = key.split(',').map(Number);
             return { x, y };
         });
-        this.selected = null;
-        return this.commitCells(cells, null);
+        const reset = this.commitCells(cells, null);
+        // Back to a real brush: reset is something you did, not something you
+        // are now holding.
+        this.ensureBrush();
+        this.markSelection();
+        return reset;
     }
 
     /** Every cell currently in a room, painted or inherited from the walls. */
@@ -454,7 +487,10 @@ class RoomPanel extends ModalWindow {
 
     // ── Painting ─────────────────────────────────────────────────────────────
 
-    pointerToCell(event) {
+    // Any square of the map, wall or floor. The cursor has to tell "there is
+    // nothing here" from "there is something here and it is not floor", and
+    // only this knows the difference.
+    cellAt(event) {
         const map = this.gameMap;
         const world = map?.container?.inputHandler?.screenToWorldCoordinates?.(event.clientX, event.clientY);
         if (!world || !map?.gridSystem) return null;
@@ -462,10 +498,32 @@ class RoomPanel extends ModalWindow {
         if (cell.x < 0 || cell.y < 0 || cell.x >= map.gridSystem.gridWidth || cell.y >= map.gridSystem.gridHeight) {
             return null;
         }
+        return cell;
+    }
+
+    pointerToCell(event) {
+        const cell = this.cellAt(event);
+        if (!cell) return null;
         // Masonry is not floor and cannot be in a room. Refusing here is what
         // keeps a stroke across a doorway from painting the door.
-        if (map.wallBuilder?.cells?.has(`${cell.x},${cell.y}`)) return null;
+        if (this.gameMap?.wallBuilder?.cells?.has(`${cell.x},${cell.y}`)) return null;
         return cell;
+    }
+
+    /** Make the room under this cell the one in hand. */
+    pickRoomAt(cell) {
+        const size = this.cellSize;
+        const room = this.gameMap?.regionManager?.innermostAt(
+            (cell.x + 0.5) * size, (cell.y + 0.5) * size, 'room', size
+        );
+        if (!room) {
+            this.parent.showMessage('That floor is not in a room yet.', 'info', 'Rooms');
+            return false;
+        }
+        this.select(room.id);
+        this.listElement?.querySelector('.room-row.active')?.scrollIntoView({ block: 'nearest' });
+        this.parent.showMessage(`Painting with ${this.label(room)}.`, 'info', 'Rooms');
+        return true;
     }
 
     /** The room a stroke paints into. 'new' is minted once per stroke, not per cell. */
@@ -480,14 +538,58 @@ class RoomPanel extends ModalWindow {
         if (!cell || !this.assignments) return;
         event.preventDefault();
         event.stopPropagation();
+        // Only reachable on a map with no rooms at all, where there is nothing
+        // to paint with until you make one.
+        if (!this.ensureBrush()) {
+            this.parent.showMessage('Pick a room to paint with, or make a new one.', 'info', 'Rooms');
+            this.playSound(SiteConfig.buildMode.sounds.rejected);
+            return;
+        }
+        // Alt picks up the room under the cursor instead of painting over it —
+        // the same eyedropper the Surface tool has, on the same key. Finding a
+        // room in the list to paint with meant reading names to work out which
+        // row is the floor you are standing on; the floor already knows.
+        if (event.altKey) {
+            this.pickRoomAt(cell);
+            return;
+        }
         this.drag = {
             pointerId: event.pointerId,
             roomId: this.resolveStrokeRoomId(),
+            start: cell,
             cells: new Map(),
             moved: false
         };
         this.paintCell(cell);
         this.hoverKey = null;
+    }
+
+    // Shift is unavailable on touch, so the panel carries the same switch.
+    // Kept identical to the Wall tool's, down to the key: one gesture modifier
+    // across build mode, not one per tool.
+    isRectangleMode(event = null) {
+        return event?.shiftKey === true || this.rectangleToggle?.checked === true;
+    }
+
+    /**
+     * Every cell in the box from where the stroke started to where it is now.
+     *
+     * Filled, where the Wall tool's rectangle is an outline — and the two are
+     * right for the same reason. A wall rectangle is a room's walls, which are
+     * its edge; a floor rectangle is a room's floor, which is all of it.
+     */
+    rectangleCells(end) {
+        const start = this.drag.start;
+        const walls = this.gameMap?.wallBuilder?.cells;
+        const cells = new Map();
+        for (let x = Math.min(start.x, end.x); x <= Math.max(start.x, end.x); x += 1) {
+            for (let y = Math.min(start.y, end.y); y <= Math.max(start.y, end.y); y += 1) {
+                const key = `${x},${y}`;
+                if (walls?.has(key)) continue;      // masonry is not floor
+                cells.set(key, { x, y });
+            }
+        }
+        return cells;
     }
 
     handlePointerMove(event) {
@@ -500,6 +602,15 @@ class RoomPanel extends ModalWindow {
         event.preventDefault();
         event.stopPropagation();
         if (!cell) return;
+        // A rectangle is redrawn from the corner every time; a freehand stroke
+        // accumulates. Rebuilding a freehand stroke would erase the trail, and
+        // accumulating a rectangle would leave every box you passed through.
+        if (this.isRectangleMode(event)) {
+            if (cell.x !== this.drag.start.x || cell.y !== this.drag.start.y) this.drag.moved = true;
+            this.drag.cells = this.rectangleCells(cell);
+            this.renderGhosts([...this.drag.cells.values()], this.drag.roomId);
+            return;
+        }
         if (!this.drag.cells.has(`${cell.x},${cell.y}`)) this.drag.moved = true;
         this.paintCell(cell);
     }
@@ -581,8 +692,12 @@ class RoomPanel extends ModalWindow {
         const cell = this.pointerToCell(source);
         if (!cell) {
             this.clearHover();
+            // Over the map but on masonry: there is something here and floor is
+            // not it. Off the map there is nothing to answer for at all.
+            if (this.cellAt(source)) this.parent.setBuildCursor('refused');
             return;
         }
+        this.parent.setBuildCursor('ready');
         const key = `${cell.x},${cell.y}`;
         if (this.hoverKey === key) return;
         this.hoverKey = key;
@@ -596,6 +711,7 @@ class RoomPanel extends ModalWindow {
         this.hoverKey = null;
         this.hoverEvent = null;
         this.clearGhosts();
+        this.parent.setBuildCursor(null);
     }
 
     renderGhosts(cells, roomId) {
@@ -635,10 +751,11 @@ class RoomPanel extends ModalWindow {
         const assignments = this.assignments;
         if (!assignments || !cells?.length) return false;
         const result = assignments.applyChanges(cells.map(cell => ({ ...cell, roomId })));
-        if (!result || result.applied.length === 0) {
-            this.playSound(SiteConfig.buildMode.sounds.rejected);
-            return false;
-        }
+        // Nothing changed is not a refusal: painting a room over floor that is
+        // already in that room is the most ordinary thing to do with a brush,
+        // and answering it with an error noise taught people the tool was
+        // broken. Silence, the way an inert wall cell is silent.
+        if (!result || result.applied.length === 0) return false;
 
         const forward = result.applied.map(change => ({ ...change }));
         const backward = result.inverse.map(change => ({ ...change }));
@@ -715,6 +832,7 @@ class RoomPanel extends ModalWindow {
         document.removeEventListener('pointerup', this.boundPointerUp, true);
         document.removeEventListener('pointercancel', this.boundPointerUp, true);
         document.body.classList.remove('room-build-mode');
+        this.parent?.setBuildCursor(null);
         super.dispose();
     }
 }

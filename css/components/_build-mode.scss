@@ -582,6 +582,15 @@ body.debug .stage-bar__debug-only {
 
 // ── Build feedback ────────────────────────────────────────────────────────────
 
+// The run under the grip: what a drag would take hold of. Drawn on the floor
+// rather than on the wall art, so it still says which wall is meant when the
+// presentation has that wall cut away or laid down.
+.wall-build-ghost-cell.is-run {
+    border-style: dashed;
+    border-color: var(--state-info-accent);
+    background: color-mix(in srgb, var(--state-info-accent) 16%, transparent);
+}
+
 // Legal, but nothing to do here — a cell that already holds the wall you are
 // drawing. Neither blue nor red: it is simply not part of the edit.
 .wall-build-ghost-cell.is-inert {
@@ -782,21 +791,39 @@ body.debug .stage-bar__debug-only {
     opacity: 0.7;
 }
 
-// A locked target says so under the cursor as well as on the target line, so
-// the refusal is legible before you click.
-body.build-target-locked .app-stage {
-    cursor: not-allowed;
+// ── Build tool cursors ────────────────────────────────────────────────────────
+//
+// One vocabulary across all three tools, set from one place
+// (UserInterface.setBuildCursor) so a tool cannot invent its own.
+//
+//   nothing    plain arrow — there is nothing here this tool acts on, which is
+//              the honest answer over the grey outside the map. A crosshair out
+//              there was promising a click that does nothing.
+//   ready      the tool's own verb: a grid square for Wall and Room, because a
+//              click takes a square; a pick for Surface, because a click takes
+//              the thing you are pointing at.
+//   grab       a drag would move what is under the pointer.
+//   refused    there IS something here and the answer is no. It outranks the
+//              tool's own cursor, because the answer matters more than the verb.
+
+body[data-game-mode="build"] .app-stage {
+    cursor: default;
 }
 
-// Wall tool cursors. `cell` is the one system cursor that means "a square on a
-// grid", which is exactly what a click here does; the ghost under the cursor
-// carries the add/remove colour, and this carries the yes/no. The refusal wins
-// over the crosshair because the answer matters more than the tool.
-body.wall-build-mode .app-stage {
+body.wall-build-mode[data-build-cursor="ready"] .app-stage,
+body.room-build-mode[data-build-cursor="ready"] .app-stage {
     cursor: cell;
 }
 
-body.wall-build-mode.wall-build-refused .app-stage {
+body.customize-mode[data-build-cursor="ready"] .app-stage {
+    cursor: pointer;
+}
+
+body[data-build-cursor="grab"] .app-stage {
+    cursor: grab;
+}
+
+body[data-build-cursor="refused"] .app-stage {
     cursor: not-allowed;
 }
 
@@ -806,10 +833,6 @@ body.wall-build-mode.wall-build-refused .app-stage {
 // size, its type, the thing you hover to find it on the map, and the brush you
 // paint with. There is nothing to caption because there is nothing that is not
 // already a room you can see.
-
-body.room-build-mode .app-stage {
-    cursor: cell;
-}
 
 // Painted through the floor's own ownership, so a tint stops exactly where its
 // room's floor does.
@@ -852,17 +875,36 @@ body.room-build-mode .app-stage {
 
 .room-panel {
     .window-panel__content {
-        min-width: 268px;
-    }
-
-    // ONE scroll per window, and it is the content's — every other panel works
-    // that way. A list with its own overflow inside a content area that already
-    // scrolls gives you two bars racing each other and a footer that is
-    // sometimes there and sometimes not.
-    .room-panel-list {
+        // A column, so the list below can take what height is left rather than
+        // pushing the prompt off the top of a scrolling content area.
         display: flex;
         flex-direction: column;
+        min-height: 0;
+
+        // The group between the content and the list has to pass the shrink
+        // along, or the list holds its ceiling and the window scrolls instead.
+        > .settings-group {
+            flex: 0 1 auto;
+            min-height: 0;
+        }
+    }
+
+    // The list scrolls, not the window — the same shape the Surface panel's
+    // finish list uses, and for the same reason: a definite height keeps the
+    // prompt above the list on screen while you scroll it, and stops the panel
+    // growing a room taller every time you make one. The content area still has
+    // its own scroll for a viewport too short to hold the panel at all.
+    .room-panel-list {
+        @include surface-inset;
+        display: flex;
+        flex-direction: column;
+        flex: 0 1 auto;
         gap: var(--space-sm);
+        padding: var(--space-sm);
+        // A ceiling, not a height: three rooms should make a short panel, and
+        // twenty should make this one scroll rather than the window.
+        max-height: 280px;
+        @include scroll-area;
     }
 
     // The two controls that are not about any one room live in the footer, so
@@ -874,8 +916,13 @@ body.room-build-mode .app-stage {
 
     .room-action {
         @include button-base;
-        flex: 1 1 0;
+        // Sized from the words, not into equal halves: "Reset to walls" is
+        // twice the label "New room" is, and splitting the footer down the
+        // middle wrapped it onto two lines while the other button sat in a sea
+        // of its own padding.
+        flex: 1 1 auto;
         padding: var(--space-2xs) var(--space-xs);
+        white-space: nowrap;
         cursor: pointer;
 
         &.active {
@@ -887,6 +934,15 @@ body.room-build-mode .app-stage {
 
 // Two lines, because one was a lie: name, type and size on a single row left
 // the name three characters wide and the type reading "Unas".
+//
+// Three columns and two rows, all on one grid rather than in nested wrappers:
+// the swatch keeps the first column to itself, so the type dropdown underneath
+// starts where the name starts instead of sliding under the colour. Delete sits
+// at the end of the top line, where the name it belongs to is.
+//
+//   ▪  [ name              ] [✕]
+//      [ type          ] 185 tiles
+//
 // A row is a button that happens to contain fields, so it wears the same states
 // every other button in the app does: `button-base` at rest, the shared hover
 // token, and `button-pressed` when it is the one selected. The hand-rolled
@@ -895,9 +951,9 @@ body.room-build-mode .app-stage {
 .room-row {
     @include button-base;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-    gap: var(--space-xs);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px var(--space-xs);
     padding: var(--space-sm);
     cursor: pointer;
     text-align: left;
@@ -909,39 +965,38 @@ body.room-build-mode .app-stage {
     // The room you are painting into. Every stroke goes here until you say
     // otherwise, so it carries the same pressed treatment as an active tool
     // button rather than a tint of its own invention.
+    // The pressed row already says which room is in hand. Bolding the fields
+    // inside it said it a second time, in the one place it reads as a property
+    // of the text you typed rather than of the row you picked.
     &.active {
         @include button-pressed;
-
-        .room-row__name,
-        .room-row__type {
-            font-weight: 700;
-        }
     }
 
+    // Column one, both rows: it is the room's colour, not the name's, and
+    // leaving the column to it is what keeps the type out of it.
     .room-row__chip {
+        grid-column: 1;
+        align-self: center;
         width: 14px;
         height: 14px;
-        margin-top: 4px;
         border-radius: 3px;
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--button-dark) 55%, transparent);
     }
 
-    .room-row__body {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        min-width: 0;
-    }
-
     .room-row__name {
+        grid-column: 2;
+        grid-row: 1;
         width: 100%;
         min-width: 0;
     }
 
     .room-row__meta {
+        grid-column: 2 / span 2;
+        grid-row: 2;
         display: flex;
         align-items: center;
         gap: var(--space-xs);
+        min-width: 0;
     }
 
     .room-row__type {
@@ -961,9 +1016,21 @@ body.room-build-mode .app-stage {
     // would be offering something that cannot happen.
     .room-row__delete {
         @include button-base;
-        flex: 0 0 auto;
-        padding: 0 var(--space-2xs);
-        line-height: 1.4;
+        // Square, and the height of the field beside it. A grid track gives the
+        // button a definite height to take its width from — in a flex row the
+        // stretch resolves too late for `aspect-ratio` to see it, and the button
+        // came out a narrow sliver.
+        grid-column: 3;
+        grid-row: 1;
+        align-self: stretch;
+        height: 100%;
+        width: auto;
+        aspect-ratio: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        line-height: 1;
         cursor: pointer;
         opacity: 0.75;
 
@@ -1020,7 +1087,34 @@ body.room-build-mode .app-stage {
     }
 }
 
-body.wall-build-mode .app-stage:has(.wall-move-handle) {
-    cursor: grab;
-}
 
+
+// ── Moving mytes and their homes ──────────────────────────────────────────────
+//
+// The Move tool moves furniture, and in Build mode a myte is furniture: it is
+// standing in the room you are laying out, and it is the only thing in there
+// that walked in by itself. The cursor is the whole affordance - the same grab
+// a couch gets, over the same tool.
+
+body[data-game-mode="build"][data-tool-mode="move"] {
+
+    .myte-slot,
+    .world-myte {
+        cursor: grab;
+    }
+
+    &.myte-placement-active {
+
+        .myte-slot,
+        .world-myte {
+            cursor: grabbing;
+        }
+
+        // Nothing else on the map should answer the pointer mid-placement -
+        // a hover tooltip firing under a myte you are carrying is the map
+        // talking about something you are not doing.
+        .map-object {
+            pointer-events: none;
+        }
+    }
+}

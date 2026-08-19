@@ -15,6 +15,7 @@ class SettingsPanel extends PanelSection {
             gameplay: {
                 tutorials: true,
                 interactionHints: true,
+                panelHints: true,
                 autoSave: true
             },
             misc: {
@@ -173,6 +174,21 @@ class SettingsPanel extends PanelSection {
             };
         }
 
+        // The same preference the ℹ in each panel's title bar drives, so the two
+        // controls are two doors into one switch rather than two switches.
+        this.panelHintsToggle = this.modalElement.querySelector('#panel-hints-toggle');
+        if (this.panelHintsToggle) {
+            this.panelHintsToggle.checked = this.settings.gameplay.panelHints;
+            this.panelHintsToggle.onchange = () => {
+                // Through HintNotes rather than by writing the local copy and
+                // waiting for the autosave: the autosave runs after this
+                // handler, so applying here would apply the value this checkbox
+                // has just replaced.
+                this.settings.gameplay.panelHints = this.panelHintsToggle.checked;
+                this.parent?.hintNotes?.setEnabled(this.panelHintsToggle.checked);
+            };
+        }
+
         const autoSaveToggle = this.modalElement.querySelector('#autosave-toggle');
         if (autoSaveToggle) {
             autoSaveToggle.checked = this.settings.gameplay.autoSave;
@@ -180,6 +196,19 @@ class SettingsPanel extends PanelSection {
                 this.settings.gameplay.autoSave = autoSaveToggle.checked;
             };
         }
+    }
+
+    /**
+     * Pull the panel-hints switch back from the preference after something
+     * else flipped it — the ℹ in a panel title bar is the same switch, and a
+     * checkbox that disagrees with the thing it controls is worse than no
+     * checkbox. Also keeps this panel's own copy of settings honest, so the
+     * next save does not write the stale value back.
+     */
+    syncHintPreference() {
+        const enabled = this.getUser()?.preferences?.panelHintsEnabled !== false;
+        this.settings.gameplay.panelHints = enabled;
+        if (this.panelHintsToggle) this.panelHintsToggle.checked = enabled;
     }
 
     // Export/import of the whole save. localStorage is the only copy of a player's
@@ -344,6 +373,7 @@ class SettingsPanel extends PanelSection {
             gameplay: {
                 tutorials: preferences.tutorialsEnabled,
                 interactionHints: preferences.interactionHintsEnabled,
+                panelHints: preferences.panelHintsEnabled,
                 autoSave: preferences.autoSaveEnabled
             },
             misc: {
@@ -364,6 +394,7 @@ class SettingsPanel extends PanelSection {
             weatherEffectsEnabled: normalized.graphics.weather,
             tutorialsEnabled: normalized.gameplay.tutorials,
             interactionHintsEnabled: normalized.gameplay.interactionHints,
+            panelHintsEnabled: normalized.gameplay.panelHints,
             autoSaveEnabled: normalized.gameplay.autoSave,
             notificationsEnabled: normalized.misc.notifications
         };

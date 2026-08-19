@@ -979,16 +979,21 @@
     transition: background var(--motion-instant), border-color var(--motion-instant);
     z-index: 99999;
 
+    // The same two colours every other build preview uses: blue is what you
+    // would get, red is refused. This was green-for-valid on hand-mixed rgba,
+    // which made a dropped chair the one place in build mode where "yes" was a
+    // different colour from every wall ghost, floor stroke and run outline —
+    // and green already means "a new room" over in the room brush.
     &.is-drop-valid {
-        background: rgba(60, 200, 100, 0.2);
-        border: 2px solid rgba(60, 200, 100, 0.9);
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+        background: color-mix(in srgb, var(--state-info-accent) 20%, transparent);
+        border: 2px solid var(--state-info-accent);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--button-light) 60%, transparent);
     }
 
     &.is-drop-invalid {
-        background: rgba(220, 50, 50, 0.2);
-        border: 2px solid rgba(220, 50, 50, 0.9);
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+        background: color-mix(in srgb, var(--color-danger) 20%, transparent);
+        border: 2px solid var(--color-danger);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--button-light) 60%, transparent);
     }
 
     .drop-target-collider {

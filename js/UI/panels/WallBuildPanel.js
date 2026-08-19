@@ -60,11 +60,6 @@ class WallBuildPanel extends ModalWindow {
         super.close();
     }
 
-    // Escape is layered by ContainerInputManager (cancel drag → close panel →
-    // leave build mode); the window's own handler would fire first and skip
-    // straight past the drag.
-    handleKeyDown() {}
-
     getOperation() {
         return this.operationSegment?.value || 'add';
     }
@@ -115,6 +110,9 @@ class WallBuildPanel extends ModalWindow {
                     end: cell,
                     operation: 'move',
                     run,
+                    // Which of the two gestures this is has not been decided
+                    // yet — see resolveGrabbedGesture on the first move.
+                    undecided: true,
                     soundedCells: 0
                 };
                 this.hoverCell = null;
@@ -150,6 +148,7 @@ class WallBuildPanel extends ModalWindow {
         event.preventDefault();
         event.stopPropagation();
         this.drag.end = cell;
+        if (this.drag.undecided) this.resolveGrabbedGesture(event);
         if (this.drag.operation === 'move') {
             this.renderMovePlan(event);
             return;
@@ -157,6 +156,36 @@ class WallBuildPanel extends ModalWindow {
         this.drag.rectangle = this.isRectangleMode(event);
         this.drag.operation = this.resolveOperation(event);
         this.renderGhosts(this.getDragCells(), event);
+    }
+
+    /**
+     * What a drag that started on a grip turns out to be, decided by which way
+     * it went.
+     *
+     * Across the run is a move — the only direction a wall can go, and the only
+     * one the move plan reads. Along it is not a move at all: the plan drops
+     * that component entirely, so pulling a wall sideways along itself used to
+     * be a gesture where you pressed, dragged, released, and nothing whatsoever
+     * happened. What people mean by that drag is the ordinary one — lengthen
+     * this wall, or take a bite out of it — so it hands back to the draw.
+     *
+     * Decided once, on the first cell of travel, and then held for the rest of
+     * the gesture: a wall that changed its mind about what it was doing halfway
+     * through the drag would be worse than either answer.
+     */
+    resolveGrabbedGesture(event) {
+        const { start, end, run } = this.drag;
+        const alongX = run.axis === 'horizontal';
+        const along = Math.abs(alongX ? end.x - start.x : end.y - start.y);
+        const across = Math.abs(alongX ? end.y - start.y : end.x - start.x);
+        if (along === 0 && across === 0) return;
+
+        this.drag.undecided = false;
+        if (across >= along) return;                        // a move, as grabbed
+
+        this.drag.operation = this.resolveOperation(event);
+        this.drag.rectangle = this.isRectangleMode(event);
+        delete this.drag.run;
     }
 
     /**
@@ -175,6 +204,8 @@ class WallBuildPanel extends ModalWindow {
         }
         const cell = this.pointerToCell(source);
         if (!cell) {
+            // Off the grid entirely — the grey around the map. A crosshair out
+            // here promised a click that does nothing.
             this.clearHover();
             return;
         }
@@ -187,12 +218,51 @@ class WallBuildPanel extends ModalWindow {
         }
         this.hoverCell = cell;
         this.hoverOperation = operation;
-        this.renderHandle(cell, operation);
+
+        // A grip means the click moves this run. Asking "may a wall be added
+        // here?" of a cell that already holds one answers a question nobody
+        // asked - and it answers "no" whenever the run carries a painting or
+        // touches a door, which drew a red square under a blue grip. Outline
+        // the run instead: it says which wall the grip belongs to, and it says
+        // it through a cutaway, where the wall itself is not drawn at all.
+        const run = this.renderHandle(cell, operation);
+        if (run) {
+            this.renderRunGhost(run);
+            this.parent.setBuildCursor('grab');
+            return;
+        }
+
         this.renderGhosts([cell], null, operation);
-        document.body.classList.toggle(
-            'wall-build-refused',
-            !this.checkCell(cell, operation).allowed
-        );
+        this.parent.setBuildCursor(this.cursorFor(cell, operation));
+    }
+
+    /**
+     * Allowed is not the same as "would do something" — laying wall over wall is
+     * permitted and changes nothing, and the ghost already says so by going
+     * dotted. The cursor says the same thing by going plain: a crosshair over a
+     * square where a click is a no-op is the tool promising work it will not do.
+     */
+    cursorFor(cell, operation) {
+        if (!this.checkCell(cell, operation).allowed) return 'refused';
+        return this.cellWouldChange(this.gameMap, cell, operation === 'remove') ? 'ready' : null;
+    }
+
+    // The whole run the grip would pull, drawn as one quiet outline.
+    renderRunGhost(run) {
+        this.clearGhosts();
+        const layer = this.gameMap?.layers?.objects;
+        const cellSize = this.gameMap?.gridSystem?.config?.cellSize;
+        if (!layer || !cellSize) return;
+        for (const cell of run.cells) {
+            const ghost = document.createElement('div');
+            ghost.className = 'wall-build-ghost-cell is-run';
+            ghost.style.left = `${cell.x * cellSize}px`;
+            ghost.style.top = `${cell.y * cellSize}px`;
+            ghost.style.width = `${cellSize}px`;
+            ghost.style.height = `${cellSize}px`;
+            layer.appendChild(ghost);
+            this.ghostElements.push(ghost);
+        }
     }
 
     clearHover() {
@@ -202,7 +272,7 @@ class WallBuildPanel extends ModalWindow {
         this.hoverEvent = null;
         this.clearGhosts();
         this.clearHandle();
-        document.body.classList.remove('wall-build-refused');
+        this.parent.setBuildCursor(null);
     }
 
     /**
@@ -212,14 +282,17 @@ class WallBuildPanel extends ModalWindow {
      * existed, going to get it, and putting it back. A wall you can drag should
      * look like a wall you can drag — so the handle appears on the run the
      * moment you are over it, and grabbing it is the whole interaction.
+     *
+     * @returns {Object|null} The run the grip belongs to, or null when there
+     *                        is nothing here to grab.
      */
     renderHandle(cell, operation) {
         this.clearHandle();
-        if (operation !== 'add') return;                    // removing, not moving
+        if (operation !== 'add') return null;               // removing, not moving
         const run = this.resolveRun(cell);
         const layer = this.gameMap?.layers?.objects;
         const cellSize = this.gameMap?.gridSystem?.config?.cellSize;
-        if (!run || !layer || !cellSize) return;
+        if (!run || !layer || !cellSize) return null;
 
         const handle = document.createElement('div');
         handle.className = `wall-move-handle is-${run.axis}`;
@@ -230,6 +303,7 @@ class WallBuildPanel extends ModalWindow {
         layer.appendChild(handle);
         this.handleElement = handle;
         this.handleCell = { x: cell.x, y: cell.y };
+        return run;
     }
 
     clearHandle() {
@@ -767,7 +841,8 @@ class WallBuildPanel extends ModalWindow {
         document.removeEventListener('pointermove', this.boundPointerMove, true);
         document.removeEventListener('pointerup', this.boundPointerUp, true);
         document.removeEventListener('pointercancel', this.boundPointerUp, true);
-        document.body.classList.remove('wall-build-mode', 'wall-build-refused');
+        document.body.classList.remove('wall-build-mode');
+        this.parent?.setBuildCursor(null);
         super.dispose();
     }
 }

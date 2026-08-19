@@ -22,6 +22,9 @@ class Myte {
 			wrapper: this.element.closest(".myte-slot"),
 		};
 		this.dropTarget;   // assigned in init() via closest('.myte-slot')
+		// Where the home slot has been put by hand, or null to let the map's
+		// spawn layout decide. See setHomeSlotPosition.
+		this.homeSlotPosition = null;
 		this.dialogue;
 		this.renderer = null;
 
@@ -426,6 +429,21 @@ class Myte {
 		this.elements.wrapper.style.top = y + 'px';
 		this.invalidateHomePositionCache();
 		this.snapToHomePosition();
+	}
+
+	/**
+	 * Put this myte's home somewhere on purpose.
+	 *
+	 * A slot with no stored position is laid out around the map's spawn point
+	 * every load — which is right until somebody moves one, at which point the
+	 * layout would helpfully undo them. Storing the position is what makes the
+	 * placement a decision instead of a suggestion; null hands the slot back to
+	 * the automatic layout.
+	 */
+	setHomeSlotPosition(position) {
+		this.homeSlotPosition = position ? { x: position.x, y: position.y } : null;
+		if (!position || !this.elements?.wrapper) return;
+		this.setWrapperPosition(position.x, position.y);
 	}
 
 	holdInHomeSlotUntilPointerLeaves() { return this.movementController.holdInHomeSlotUntilPointerLeaves(); }

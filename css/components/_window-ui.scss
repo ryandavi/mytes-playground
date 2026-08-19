@@ -202,14 +202,54 @@
             }
         }
 
-        // Explanatory line under a control or a group — for stakes the label
+        // Explanatory line under a control or a group — for what the label
         // cannot carry. Used at both levels, so it is not nested in either.
+        //
+        // A note, not a paragraph: the icon and the inset ground are what let
+        // the eye skip it once you know the tool, and what let it be turned off
+        // at all — see HintNotes. One shape here means one shape in every
+        // window, including the notes panels build at runtime.
         .setting-hint {
+            @include surface-inset;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            align-items: start;
+            gap: var(--space-xs);
             margin: 0;
+            padding: var(--space-sm);
+            border-radius: var(--radius-sm);
             font-size: var(--text-size-meta);
             line-height: 1.5;
             color: var(--text-muted);
+
+            // `display: grid` above outranks the browser's own rule for the
+            // attribute, so a note told to hide kept showing — which is how the
+            // Surface panel ended up printing its empty-state prompt over a
+            // target that was very much selected.
+            &[hidden] {
+                display: none;
+            }
+
+            > .setting-hint__icon {
+                width: 12px;
+                height: 12px;
+                margin-top: 2px;
+                fill: var(--text-muted);
+            }
+
+            // Stakes rather than instructions — what you stand to lose. Never
+            // hidden, and coloured so it does not read as one more thing to
+            // skim past.
+            &.setting-hint--warning {
+                color: var(--text-base);
+                box-shadow: inset 0 0 0 1px var(--color-danger);
+
+                > .setting-hint__icon {
+                    fill: var(--color-danger);
+                }
+            }
         }
+
 
         // A row of buttons that acts on whatever sits above it. Declared after
         // `.settings-group` so a group that is itself an action row lays its
@@ -355,11 +395,45 @@
     // the room is what you are looking for, the surface is which part of it.
     .surface-target {
         @include surface-inset;
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
         margin: 0;
         padding: var(--space-xs) var(--space-sm);
         overflow-wrap: anywhere;
+
+        // The room name and the surface stack; the way through to the room sits
+        // beside both of them, because it is about the pair.
+        >.surface-target__room,
+        >.surface-target__surface {
+            grid-column: 1;
+        }
+
+        // Paint belongs to a surface; a name, a type and a size belong to the
+        // room. This is the door between the two, and it is only here because
+        // the room in question is already named an inch to its left.
+        >.surface-target__room-link {
+            @include button-base;
+            grid-column: 2;
+            grid-row: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            cursor: pointer;
+
+            &[hidden] {
+                display: none;
+            }
+
+            >svg.icon {
+                width: 12px;
+                height: 12px;
+                fill: var(--button-icon-color);
+            }
+        }
 
         >.surface-target__room {
             font-size: var(--text-size-body);
@@ -382,6 +456,57 @@
 
         &.is-locked >.surface-target__surface::after {
             content: ' (locked)';
+        }
+    }
+
+    // What the eyedropper is holding. Shaped like the target readout above it
+    // because it answers the matching half of the same question — that line is
+    // what you are painting ON, this is what you are painting WITH — and lit
+    // rather than inset, because unlike the readout it is a thing you are
+    // carrying and have to be able to put down.
+    .surface-held {
+        @include surface-inset;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: var(--space-xs);
+        margin: 0;
+        padding: var(--space-xs) var(--space-sm);
+        box-shadow: inset 0 0 0 1px var(--state-info-accent);
+
+        > .surface-held__sample {
+            width: 22px;
+            height: 22px;
+            image-rendering: pixelated;
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--button-dark) 55%, transparent);
+        }
+
+        > .surface-held__name {
+            min-width: 0;
+            font-weight: 700;
+            // Finish ids carry no display names, so every label in this panel
+            // is a de-underscored id. The swatches capitalize theirs; this has
+            // to as well, or the thing in your hand is spelled differently from
+            // the same thing in the list.
+            text-transform: capitalize;
+            overflow-wrap: anywhere;
+        }
+
+        > .surface-held__drop {
+            @include button-base;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            cursor: pointer;
+
+            > svg.icon {
+                width: 10px;
+                height: 10px;
+                fill: var(--button-icon-color);
+            }
         }
     }
 
@@ -437,17 +562,25 @@
     }
 }
 
-// The two build panels are Options windows that happen to float over the map:
+// The build panels are Options windows that happen to float over the map:
 // same `.settings-group` / `.settings-subgroup` / `.setting-item` ladder, same
 // toggles, same hints. They used to wrap their groups in sunken fieldsets,
 // which made them the only panels in the app with framed sections.
 .surface-customize-panel,
-.wall-build-panel {
-    // One width for both: they are the same window wearing a different tool,
-    // and swapping between them should not move the panel edge. Sized so the
-    // four-way wall-view segment fits "Cutaway" without clipping, which is the
-    // widest thing either panel has to hold.
-    width: 285px;
+.wall-build-panel,
+.room-panel {
+    // One width for all three: they are the same window wearing a different
+    // tool, and stepping through Wall → Room → Surface should not shuffle the
+    // panel edge across the screen. Still narrower than the Options window on
+    // purpose — a tool window sits over the map you are working on.
+    //
+    // Sized by the tightest thing any of them holds, which is not the wall-view
+    // segment fitting "Cutaway" — it is a room row, where a name field, a type
+    // dropdown and a delete button share two lines inside a scrolling list. At
+    // the old 285 that left the name 153px and the dropdown 130px, and a form
+    // squeezed to a third of the window is a form you cannot read what you
+    // typed into.
+    width: 340px;
 
     // Taller than the shared cap. These float beside the stage rather than over
     // it, so the stage's height is not their limit — and the finish list is the
@@ -1880,4 +2013,24 @@ body.ui-gallery-page {
 .world-map__travel {
     padding: var(--space-2xs) var(--space-lg);
     font-size: 0.85em;
+}
+
+// Hints off. A panel whose only content is its prompt has nothing left when
+// the prompt goes, and a warning is not help you can decline - both stay.
+body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.setting-hint--warning) {
+    display: none;
+}
+
+// The switch, in the title bar of every window that has notes in it. It is a
+// state, so it looks like one: pressed while the notes are showing.
+.window-panel .window-panel__controls > .panel-hints-toggle {
+    margin-left: 0;
+
+    &.active {
+        @include button-pressed;
+    }
+
+    &:not(.active) > svg.icon {
+        opacity: 0.55;
+    }
 }

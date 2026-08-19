@@ -507,6 +507,12 @@
     "src": "js/UI/Container/BuildModeUI.js"
   },
   {
+    "src": "js/UI/Core/HintNotes.js"
+  },
+  {
+    "src": "js/UI/Container/MyteBuildPlacement.js"
+  },
+  {
     "src": "js/UI/Map/SelectionManager.js"
   },
   {
