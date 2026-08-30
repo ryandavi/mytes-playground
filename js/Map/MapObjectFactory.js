@@ -306,6 +306,6 @@ MapObjectFactory.registry
     .register('WINDOW', WindowMapObject)
     .register('PAINTING', WallFixtureMapObject)
     .register('PORTAL', PortalMapObject)
-    .register('GATE', GateMapObject)
+    .register('GATE', withFencePostPlacement(GateMapObject))
     .register('FENCE', FenceMapObject)
     .setDefaultConstructor(MapObject);

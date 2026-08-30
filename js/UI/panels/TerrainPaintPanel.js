@@ -537,6 +537,24 @@ class TerrainPaintPanel extends ModalWindow {
         return true;
     }
 
+    /** Roll a live stroke back when a second finger turns it into navigation. */
+    abortStroke() {
+        this.clearRectanglePreview();
+        const stroke = this.stroke;
+        this.stroke = null;
+        this._lastRefusal = null;
+        if (!stroke) return false;
+        const builder = this.builder;
+        for (const [layer, changes] of stroke.changesByLayer) {
+            builder.applyCornerChanges(layer, [...changes].reverse(), { direction: 'from' });
+        }
+        builder.layers
+            .filter(layer => !stroke.layersBefore?.has(layer))
+            .forEach(layer => builder.removeLayer(layer.id));
+        this.renderLayers();
+        return true;
+    }
+
     // ── Rendering ────────────────────────────────────────────────────────────
 
     render() {

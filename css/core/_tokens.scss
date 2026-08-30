@@ -125,11 +125,12 @@
     --z-crosshair: 10000;
     --z-loading: 5000;
     --z-toast: 9000;
-    --z-drag: 100000;
-    /* The thing currently under the cursor must clear every drop target, which
-       all sit at --z-drag. */
-    --z-dragged: 100001;
-    --z-floating-debug: 1000000;
+    /* World objects use their pixel Y multiplied by 100 for depth sorting.
+       Interaction layers live in a separate high band so tall maps cannot
+       overtake an active drag. */
+    --z-drag: 2000000000;
+    --z-dragged: 2000000001;
+    --z-floating-debug: 2100000000;
 
     --size-shell-width: 635px;
     --size-stage-height: 500px;

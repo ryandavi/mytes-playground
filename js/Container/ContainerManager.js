@@ -426,7 +426,6 @@ class ContainerManager {
       }
 
     getOffset(el) {
-        const rect = el.getBoundingClientRect();
         let _x = window.scrollX;
         let _y = window.scrollY;
         let current = el;
@@ -437,15 +436,30 @@ class ContainerManager {
             current = current.offsetParent;
         }
 
+        // Size must come from the same (unscaled) layout space as the offsetParent
+        // walk above. getBoundingClientRect() is post-transform, so under the
+        // camera's `scale(zoom)` on .canvas it returns zoomed dimensions — pairing
+        // those with unscaled x/y pulls anything centred against this rect (a myte
+        // snapping to its home slot) off by size*(zoom-1)/2. offsetWidth/Height
+        // are the layout box, matching the walk. Fall back to the client rect only
+        // when the element isn't laid out yet.
+        let width = el.offsetWidth;
+        let height = el.offsetHeight;
+        if (!width && !height) {
+            const rect = el.getBoundingClientRect();
+            width = rect.width;
+            height = rect.height;
+        }
+
         return {
             top: _y,
             left: _x,
             x: _x,
             y: _y,
-            width: rect.width,
-            height: rect.height,
-            right: _x + rect.width,
-            bottom: _y + rect.height
+            width,
+            height,
+            right: _x + width,
+            bottom: _y + height
         };
     }
 

@@ -2,7 +2,12 @@
 
 .ui-tooltip {
     @include floating-help-paper;
-    position: fixed;
+    // Document-positioned, not viewport-fixed: Safari does not keep a
+    // position:fixed element pinned to the viewport when <body> has a
+    // non-visible overflow (this app sets overflow-x: hidden on body), so the
+    // tooltip drifted by the page scroll amount. TooltipSystem.reposition adds
+    // the scroll offset to the coordinates it computes.
+    position: absolute;
     top: 0;
     left: 0;
     z-index: 99999;

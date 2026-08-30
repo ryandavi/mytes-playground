@@ -12,6 +12,7 @@ class UserInterface {
         // Initialize all UI components
         this.toolManager = new ToolManager(this);
         this.selectionManager = new SelectionManager(this);
+        this.buildMarqueeSelection = new BuildMarqueeSelection(this);
         this.queueTargetManager = new QueueTargetManager(this);
         this.actionSidebarManager = new ActionSidebarManager(this);
         this.myteListManager = new MyteListManager(this);
@@ -36,6 +37,7 @@ class UserInterface {
         // Initialize all components
         this.toolManager.init();
         this.selectionManager.init();
+        this.buildMarqueeSelection.init();
         this.actionSidebarManager.init();
         this.myteListManager.init();
         this.hudManager.init();
@@ -49,6 +51,7 @@ class UserInterface {
         this.settingsPanel = new SettingsPanel(this);
         this.surfaceCustomizePanel = new SurfaceCustomizePanel(this);
         this.wallBuildPanel = new WallBuildPanel(this);
+        this.fenceBuildPanel = new FenceBuildPanel(this);
         this.roomPanel = new RoomPanel(this);
         this.terrainPaintPanel = new TerrainPaintPanel(this);
         this.viewPanel = new ViewPanel(this);
@@ -101,6 +104,7 @@ class UserInterface {
     onToolModeChanged(mode) {
         // Clear selection when tool mode changes
         this.selectionManager.setSelected(null);
+        this.buildMarqueeSelection?.clearSelection?.();
         // A gesture belongs to the tool that started it: leaving Move mid-drag
         // would otherwise leave a myte wherever the cursor happened to be.
         this.buildPlacement?.cancel();
@@ -109,6 +113,7 @@ class UserInterface {
         this.actionSidebarManager.updateActions(null);
         this.surfaceCustomizePanel?.handleToolModeChanged(mode);
         this.wallBuildPanel?.handleToolModeChanged(mode);
+        this.fenceBuildPanel?.handleToolModeChanged(mode);
         this.roomPanel?.handleToolModeChanged(mode);
         this.terrainPaintPanel?.handleToolModeChanged(mode);
     }
@@ -161,11 +166,16 @@ class UserInterface {
 
     // Public methods
     setSelected(obj) {
+        if (!obj) this.buildMarqueeSelection?.clearSelection?.();
         this.selectionManager.setSelected(obj);
     }
 
     getSelected() {
         return this.selectionManager.getSelectedObject();
+    }
+
+    getSelectedObjects() {
+        return this.selectionManager.getSelectedObjects();
     }
 
     setToolMode(mode) {
@@ -178,6 +188,16 @@ class UserInterface {
 
     changeToolMode(mode) {
         return this.toolManager.changeToolMode(mode);
+    }
+
+    /** Two fingers always borrow the map, so abandon any one-finger build preview. */
+    cancelBuildGesturesForCamera() {
+        this.wallBuildPanel?.cancelDrag?.();
+        this.fenceBuildPanel?.cancelDrag?.();
+        this.roomPanel?.cancelDrag?.();
+        this.terrainPaintPanel?.abortStroke?.();
+        this.buildMarqueeSelection?.cancelDrag?.();
+        this.buildPlacement?.cancel?.();
     }
 
     /**
@@ -339,6 +359,8 @@ class UserInterface {
         this.surfaceCustomizePanel = null;
         this.wallBuildPanel?.dispose?.();
         this.wallBuildPanel = null;
+        this.fenceBuildPanel?.dispose?.();
+        this.fenceBuildPanel = null;
         this.roomPanel?.dispose?.();
         this.roomPanel = null;
         this.terrainPaintPanel?.dispose?.();
@@ -366,6 +388,7 @@ class UserInterface {
         this.queueTargetManager?.dispose?.();
         this.offscreenMyteIndicatorManager?.dispose?.();
         this.selectionManager?.dispose?.();
+        this.buildMarqueeSelection?.dispose?.();
         this.hudManager?.dispose?.();
         this.buffOverlayUI?.dispose?.();
         this.actionSidebarManager?.dispose?.();

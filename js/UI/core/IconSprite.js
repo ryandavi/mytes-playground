@@ -2,8 +2,7 @@
 // IconSprite — pulls images/icons/sprite.svg into the document so that every
 // <use href="#icon-name"> in the page resolves.
 //
-// The sprite lives in one file rather than inline in each page, so index.html
-// and ui-gallery.html share exactly one set of glyph definitions. Inlining it
+// The sprite lives in one file rather than inline in the page. Inlining it
 // (rather than referencing the file directly from `use`) is what lets CSS
 // `fill: currentColor` reach the symbols.
 // ─────────────────────────────────────────────────────────────────────────────

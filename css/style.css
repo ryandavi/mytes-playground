@@ -99,11 +99,12 @@
   --z-crosshair: 10000;
   --z-loading: 5000;
   --z-toast: 9000;
-  --z-drag: 100000;
-  /* The thing currently under the cursor must clear every drop target, which
-     all sit at --z-drag. */
-  --z-dragged: 100001;
-  --z-floating-debug: 1000000;
+  /* World objects use their pixel Y multiplied by 100 for depth sorting.
+     Interaction layers live in a separate high band so tall maps cannot
+     overtake an active drag. */
+  --z-drag: 2000000000;
+  --z-dragged: 2000000001;
+  --z-floating-debug: 2100000000;
   --size-shell-width: 635px;
   --size-stage-height: 500px;
   --size-sidebar-width: 250px;
@@ -196,9 +197,7 @@ textarea:focus {
 }
 
 select {
-  -webkit-appearance: auto;
-     -moz-appearance: auto;
-          appearance: auto;
+  appearance: auto;
 }
 
 .button,
@@ -211,6 +210,8 @@ button {
   border-left-color: var(--button-light);
   border-radius: var(--border-radius-outer);
   color: var(--button-text-color);
+  appearance: none;
+  -webkit-appearance: none;
   padding: calc(var(--padding) * 2);
 }
 .button:not(:disabled):not(.disabled),
@@ -268,6 +269,7 @@ button:disabled {
   text-shadow: 1px 1px 0 var(--button-disabled-highlight, var(--button-light));
   cursor: default;
   filter: saturate(0.72);
+  pointer-events: none;
 }
 .button.disabled .icon,
 .button.disabled svg, .button:disabled .icon,
@@ -287,15 +289,6 @@ button:disabled svg {
   fill: var(--button-disabled-icon-color, var(--button-icon-color));
   color: var(--button-disabled-icon-color, var(--button-icon-color));
 }
-.button.disabled, .button:disabled,
-input[type=submit].disabled,
-input[type=submit]:disabled,
-input[type=button].disabled,
-input[type=button]:disabled,
-button.disabled,
-button:disabled {
-  pointer-events: none;
-}
 
 input[type=range] {
   width: 100%;
@@ -306,9 +299,7 @@ input[type=range] {
 input[type=checkbox],
 input[type=radio] {
   --control-size: 18px;
-  -webkit-appearance: none;
-     -moz-appearance: none;
-          appearance: none;
+  appearance: none;
   flex: 0 0 auto;
   display: grid;
   place-content: center;
@@ -482,8 +473,7 @@ body.debug .map-object > .interactive-hitbox {
 .dragging {
   cursor: grabbing;
   touch-action: none;
-  -moz-user-select: none;
-       user-select: none;
+  user-select: none;
   -webkit-user-select: none;
 }
 
@@ -967,8 +957,7 @@ body.debug .map-object > .interactive-hitbox {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas: "name thought" "meters meters";
-  -moz-column-gap: var(--space-md);
-       column-gap: var(--space-md);
+  column-gap: var(--space-md);
   row-gap: var(--space-2xs);
   align-items: baseline;
   min-width: 0;
@@ -1458,9 +1447,7 @@ body.debug .map-object > .interactive-hitbox {
   justify-content: space-between;
   list-style: none;
   padding: 6px var(--padding);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .debug-panel .debug-section > summary::-webkit-details-marker {
   display: none;
@@ -1529,9 +1516,7 @@ body.debug .map-object > .interactive-hitbox {
   cursor: pointer;
   font-weight: 600;
   font-size: 0.85em;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .debug-panel .debug-group > .debug-group-summary::-webkit-details-marker {
   display: none;
@@ -1601,9 +1586,7 @@ body.debug .map-object > .interactive-hitbox {
   justify-content: space-between;
   list-style: none;
   padding: 6px var(--padding);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .action-queue-panel .queue-panel-shell > summary::-webkit-details-marker {
   display: none;
@@ -1630,11 +1613,6 @@ body.debug .map-object > .interactive-hitbox {
 }
 .action-queue-panel .queue-empty-state {
   display: none;
-}
-.action-queue-panel .queue-empty-state.is-visible {
-  display: block;
-}
-.action-queue-panel .queue-empty-state {
   font-size: 10px;
   opacity: 0.55;
   padding: var(--padding);
@@ -1642,6 +1620,9 @@ body.debug .map-object > .interactive-hitbox {
   background-color: rgba(255, 255, 255, 0.85);
   border-radius: var(--border-width);
   backdrop-filter: blur(4px);
+}
+.action-queue-panel .queue-empty-state.is-visible {
+  display: block;
 }
 .action-queue-panel .queue-item {
   background-color: rgba(255, 255, 255, 0.85);
@@ -1807,7 +1788,6 @@ body.debug .map-object > .interactive-hitbox {
   z-index: var(--z-debug);
   flex-direction: column;
   transform: translate(calc(-100% - 40px), 0);
-  width: -moz-fit-content;
   width: fit-content;
 }
 .app-shell > .hand-controls input[type=radio] {
@@ -2136,6 +2116,9 @@ body.debug .map-object > .interactive-hitbox {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  min-height: 0;
+  margin: 0 var(--padding) var(--padding);
+  padding: 0;
 }
 .app-shell > .sidebar > .action-controls > .action-groups::-webkit-scrollbar {
   width: var(--scrollbar-size);
@@ -2147,11 +2130,6 @@ body.debug .map-object > .interactive-hitbox {
 .app-shell > .sidebar > .action-controls > .action-groups::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
-}
-.app-shell > .sidebar > .action-controls > .action-groups {
-  min-height: 0;
-  margin: 0 var(--padding) var(--padding);
-  padding: 0;
 }
 .app-shell > .sidebar > .action-controls > .action-groups .action-group + .action-group {
   margin-top: var(--padding);
@@ -2297,9 +2275,7 @@ body.debug .map-object > .interactive-hitbox {
 .window-panel > .window-panel__header > .window-panel__controls {
   display: flex;
   gap: var(--gap);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .window-panel > .window-panel__header > .window-panel__controls > button {
   width: 30px;
@@ -2675,6 +2651,10 @@ body.debug .map-object > .interactive-hitbox {
   image-rendering: pixelated;
   border: var(--radius-xs) solid var(--black);
 }
+.surface-customize-panel .surface-swatch canvas.is-empty {
+  background: var(--surface-ui-inset);
+  box-shadow: inset 0 0 0 var(--space-2xs) var(--surface-ui-raised);
+}
 .surface-customize-panel .surface-swatch span {
   font-size: var(--text-size-meta);
   line-height: 1.3;
@@ -2686,6 +2666,7 @@ body.debug .map-object > .interactive-hitbox {
 
 .surface-customize-panel,
 .wall-build-panel,
+.fence-build-panel,
 .room-panel,
 .terrain-paint-panel {
   width: 400px;
@@ -2693,6 +2674,7 @@ body.debug .map-object > .interactive-hitbox {
 }
 .surface-customize-panel > .window-panel__content,
 .wall-build-panel > .window-panel__content,
+.fence-build-panel > .window-panel__content,
 .room-panel > .window-panel__content,
 .terrain-paint-panel > .window-panel__content {
   display: flex;
@@ -2705,6 +2687,7 @@ body.debug .map-object > .interactive-hitbox {
 }
 .surface-customize-panel > .window-panel__content::-webkit-scrollbar,
 .wall-build-panel > .window-panel__content::-webkit-scrollbar,
+.fence-build-panel > .window-panel__content::-webkit-scrollbar,
 .room-panel > .window-panel__content::-webkit-scrollbar,
 .terrain-paint-panel > .window-panel__content::-webkit-scrollbar {
   width: var(--scrollbar-size);
@@ -2712,12 +2695,14 @@ body.debug .map-object > .interactive-hitbox {
 }
 .surface-customize-panel > .window-panel__content::-webkit-scrollbar-track,
 .wall-build-panel > .window-panel__content::-webkit-scrollbar-track,
+.fence-build-panel > .window-panel__content::-webkit-scrollbar-track,
 .room-panel > .window-panel__content::-webkit-scrollbar-track,
 .terrain-paint-panel > .window-panel__content::-webkit-scrollbar-track {
   background: var(--scrollbar-track);
 }
 .surface-customize-panel > .window-panel__content::-webkit-scrollbar-thumb,
 .wall-build-panel > .window-panel__content::-webkit-scrollbar-thumb,
+.fence-build-panel > .window-panel__content::-webkit-scrollbar-thumb,
 .room-panel > .window-panel__content::-webkit-scrollbar-thumb,
 .terrain-paint-panel > .window-panel__content::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
@@ -2725,18 +2710,21 @@ body.debug .map-object > .interactive-hitbox {
 }
 .surface-customize-panel .setting-item label,
 .wall-build-panel .setting-item label,
+.fence-build-panel .setting-item label,
 .room-panel .setting-item label,
 .terrain-paint-panel .setting-item label {
   font-size: var(--text-size-body);
 }
 .surface-customize-panel > .window-panel__content > .settings-group--secondary,
 .wall-build-panel > .window-panel__content > .settings-group--secondary,
+.fence-build-panel > .window-panel__content > .settings-group--secondary,
 .room-panel > .window-panel__content > .settings-group--secondary,
 .terrain-paint-panel > .window-panel__content > .settings-group--secondary {
   margin-top: auto;
 }
 .surface-customize-panel > .window-panel__content > .settings-group[hidden],
 .wall-build-panel > .window-panel__content > .settings-group[hidden],
+.fence-build-panel > .window-panel__content > .settings-group[hidden],
 .room-panel > .window-panel__content > .settings-group[hidden],
 .terrain-paint-panel > .window-panel__content > .settings-group[hidden] {
   display: none;
@@ -2768,7 +2756,7 @@ div.surface-paint-overlay.paint-selection {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--button-light) 60%, transparent);
 }
 
-.wall-build-ghost-cell {
+.build-ghost-cell {
   position: absolute;
   z-index: var(--z-drag);
   box-sizing: border-box;
@@ -2776,11 +2764,11 @@ div.surface-paint-overlay.paint-selection {
   background: color-mix(in srgb, var(--state-info-accent) 35%, transparent);
   pointer-events: none;
 }
-.wall-build-ghost-cell.is-remove {
+.build-ghost-cell.is-remove {
   border-style: solid;
   background-image: repeating-linear-gradient(45deg, transparent 0 4px, color-mix(in srgb, var(--state-info-accent) 55%, transparent) 4px 8px);
 }
-.wall-build-ghost-cell.is-move {
+.build-ghost-cell.is-move {
   border-style: solid;
   background: color-mix(in srgb, var(--state-info-accent) 55%, transparent);
 }
@@ -2898,6 +2886,12 @@ div.surface-paint-overlay.paint-selection {
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  border-top: var(--border-width) solid var(--button-dark);
+  border-left: var(--border-width) solid var(--button-dark);
+  border-right: var(--border-width) solid var(--button-light);
+  border-bottom: var(--border-width) solid var(--button-light);
+  border-radius: var(--border-radius-outer);
+  block-size: var(--window-tab-body-size, auto);
 }
 .window-tab-body::-webkit-scrollbar {
   width: var(--scrollbar-size);
@@ -2909,14 +2903,6 @@ div.surface-paint-overlay.paint-selection {
 .window-tab-body::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
-}
-.window-tab-body {
-  border-top: var(--border-width) solid var(--button-dark);
-  border-left: var(--border-width) solid var(--button-dark);
-  border-right: var(--border-width) solid var(--button-light);
-  border-bottom: var(--border-width) solid var(--button-light);
-  border-radius: var(--border-radius-outer);
-  block-size: var(--window-tab-body-size, auto);
 }
 .window-tab-body > [role=tabpanel][hidden] {
   display: none !important;
@@ -3310,6 +3296,9 @@ button.calendar__day.is-selected:not(:disabled):hover {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  list-style: none;
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 #game-log-panel .game-log-list::-webkit-scrollbar {
   width: var(--scrollbar-size);
@@ -3321,11 +3310,6 @@ button.calendar__day.is-selected:not(:disabled):hover {
 #game-log-panel .game-log-list::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
-}
-#game-log-panel .game-log-list {
-  list-style: none;
-  font-size: 0.75rem;
-  line-height: 1.4;
 }
 #game-log-panel .game-log-list .game-log-entry.is-first-visible {
   margin-top: auto;
@@ -3398,93 +3382,6 @@ button.calendar__day.is-selected:not(:disabled):hover {
     grid-column: 2;
     grid-row: 2;
     text-align: left;
-  }
-}
-
-body.ui-gallery-page {
-  display: block;
-  min-height: 100vh;
-  padding: var(--space-2xl);
-  background: var(--surface-stage);
-}
-body.ui-gallery-page .ui-gallery {
-  width: min(1180px, 100%);
-  margin: 0 auto;
-}
-body.ui-gallery-page .ui-gallery__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-lg);
-  margin-bottom: var(--space-2xl);
-  padding: var(--space-lg);
-  background-color: var(--surface-ui-raised, var(--button-mid));
-  border: var(--border-width) solid var(--button-dark);
-  border-top-color: var(--button-light);
-  border-left-color: var(--button-light);
-  border-radius: var(--border-radius-outer);
-}
-body.ui-gallery-page .ui-gallery__header h1,
-body.ui-gallery-page .ui-gallery__header p {
-  margin: 0;
-}
-body.ui-gallery-page .ui-gallery__header p {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-}
-body.ui-gallery-page .ui-gallery__group {
-  margin-bottom: var(--space-3xl);
-}
-body.ui-gallery-page .ui-gallery__group > h2 {
-  margin: 0 0 var(--space-md);
-  font-size: 1rem;
-}
-body.ui-gallery-page .ui-gallery__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr));
-  align-items: start;
-  gap: var(--space-2xl);
-}
-body.ui-gallery-page .window-panel,
-body.ui-gallery-page .world-modal {
-  position: relative;
-  inset: auto;
-  width: 100%;
-  max-height: none;
-  opacity: 1;
-  pointer-events: auto;
-  transform: none;
-}
-body.ui-gallery-page #game-log-panel,
-body.ui-gallery-page #myte-info-panel,
-body.ui-gallery-page #user-profile-panel {
-  width: 100%;
-  height: auto;
-}
-body.ui-gallery-page #game-log-panel .window-panel__content,
-body.ui-gallery-page #myte-info-panel .window-panel__content {
-  min-height: 330px;
-}
-body.ui-gallery-page #myte-info-panel .myte-info__portrait {
-  aspect-ratio: 1;
-}
-body.ui-gallery-page .ui-gallery__state-label {
-  margin: 0;
-  padding: var(--space-xs) var(--space-sm);
-  border-bottom: var(--border-width) solid var(--button-dark);
-  background: var(--surface-ui-raised);
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-}
-@media (max-width: 700px) {
-  body.ui-gallery-page {
-    padding: var(--space-md);
-  }
-  body.ui-gallery-page #myte-info-panel .window-panel__content {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto minmax(0, 1fr);
-    grid-template-areas: "summary" "tabs" "body";
   }
 }
 
@@ -4127,6 +4024,11 @@ body.ui-gallery-page .ui-gallery__state-label {
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  padding: var(--space-sm);
+  --dither-size: 12px;
+  background-color: var(--surface-stage);
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
 }
 .world-map__canvas::-webkit-scrollbar {
   width: var(--scrollbar-size);
@@ -4139,21 +4041,12 @@ body.ui-gallery-page .ui-gallery__state-label {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
 }
-.world-map__canvas {
-  padding: var(--space-sm);
-  --dither-size: 12px;
-  background-color: var(--surface-stage);
-  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
-  background-size: var(--dither-size, 6px);
-}
 .world-map__canvas.is-pannable {
   cursor: grab;
 }
 .world-map__canvas.is-panning, .world-map__canvas.is-panning * {
   cursor: grabbing;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 
 .world-map__grid {
@@ -4297,6 +4190,7 @@ body.ui-gallery-page .ui-gallery__state-label {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  padding-right: var(--space-2xs);
 }
 .world-map__rows::-webkit-scrollbar {
   width: var(--scrollbar-size);
@@ -4308,9 +4202,6 @@ body.ui-gallery-page .ui-gallery__state-label {
 .world-map__rows::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
-}
-.world-map__rows {
-  padding-right: var(--space-2xs);
 }
 
 .world-map__travel {
@@ -4346,6 +4237,21 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
 
 [data-game-mode=build] #build-paused-chip {
   display: flex;
+}
+
+.build-selection-marquee,
+.build-selection-cell {
+  position: fixed;
+  z-index: var(--z-overlay);
+  pointer-events: none;
+  box-sizing: border-box;
+  border: 1px dotted var(--black);
+  outline: 1px dotted var(--button-light);
+  background-color: color-mix(in srgb, var(--header-mid) 22%, transparent);
+}
+
+.build-selection-marquee {
+  border-style: dashed;
 }
 
 .app-shell > .hand-controls .tool-group {
@@ -4436,14 +4342,12 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
   text-shadow: 1px 1px 0 var(--button-disabled-highlight, var(--button-light));
   cursor: default;
   filter: saturate(0.72);
+  cursor: not-allowed;
 }
 .app-shell > .hand-controls button:disabled .icon,
 .app-shell > .hand-controls button:disabled svg {
   fill: var(--button-disabled-icon-color, var(--button-icon-color));
   color: var(--button-disabled-icon-color, var(--button-icon-color));
-}
-.app-shell > .hand-controls button:disabled {
-  cursor: not-allowed;
 }
 
 .app-shell[data-game-mode=build] > .hand-controls .tool-group--play {
@@ -4711,15 +4615,13 @@ body.panel-hints-hidden .setting-hint:not(.setting-hint--persistent):not(.settin
   align-items: center;
   gap: var(--space-2xs);
   padding: var(--space-2xs);
-}
-.stage-bar__action > span {
-  display: none;
-}
-.stage-bar__action {
   font-size: var(--text-size-meta);
   line-height: 1.3;
   white-space: nowrap;
   cursor: pointer;
+}
+.stage-bar__action > span {
+  display: none;
 }
 .stage-bar__action > .icon {
   width: 12px;
@@ -4790,19 +4692,19 @@ body.debug .stage-bar__debug-only {
   background-image: repeating-linear-gradient(to right, var(--build-grid-line) 0 1px, transparent 1px var(--build-grid-size, 32px)), repeating-linear-gradient(to bottom, var(--build-grid-line) 0 1px, transparent 1px var(--build-grid-size, 32px));
 }
 
-.wall-build-ghost-cell.is-run {
+.build-ghost-cell.is-run {
   border-style: dashed;
   border-color: var(--state-info-accent);
   background: color-mix(in srgb, var(--state-info-accent) 16%, transparent);
 }
 
-.wall-build-ghost-cell.is-inert {
+.build-ghost-cell.is-inert {
   border-style: dotted;
   border-color: var(--button-dark);
   background: transparent;
 }
 
-.wall-build-ghost-cell.is-invalid {
+.build-ghost-cell.is-invalid {
   border-color: var(--color-danger);
   border-style: solid;
   background: color-mix(in srgb, var(--color-danger) 45%, transparent);
@@ -4986,10 +4888,12 @@ body[data-game-mode=build] .app-stage {
 }
 
 body.wall-build-mode[data-build-cursor=ready] .app-stage,
+body.fence-build-mode[data-build-cursor=ready] .app-stage,
 body.room-build-mode[data-build-cursor=ready] .app-stage {
   cursor: cell;
 }
 
+body.room-build-mode.room-select-mode[data-build-cursor=ready] .app-stage,
 body.customize-mode[data-build-cursor=ready] .app-stage {
   cursor: pointer;
 }
@@ -5006,7 +4910,6 @@ body[data-build-cursor=refused] .app-stage {
   position: absolute;
   z-index: var(--z-overlay);
   pointer-events: none;
-  mix-blend-mode: multiply;
 }
 
 .room-highlight {
@@ -5049,6 +4952,10 @@ body[data-build-cursor=refused] .app-stage {
 }
 .room-panel > .window-panel__footer {
   justify-content: stretch;
+}
+.room-panel .is-inactive {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .panel-list {
@@ -5206,6 +5113,7 @@ body[data-build-cursor=refused] .app-stage {
 }
 
 .room-row {
+  --panel-row-item: 28px;
   background-color: var(--surface-ui-raised, var(--button-mid));
   border: var(--border-width) solid var(--button-dark);
   border-top-color: var(--button-light);
@@ -5235,6 +5143,16 @@ body[data-build-cursor=refused] .app-stage {
   background-color: var(--dither-fill-color, var(--button-hover));
   color: var(--button-active-text-color, var(--text-base));
 }
+.room-row.active .room-row__meta {
+  display: flex;
+}
+.room-row.active .room-row__actions {
+  display: grid;
+}
+.room-row:not(.active) .room-row__meta,
+.room-row:not(.active) .room-row__actions {
+  display: none;
+}
 .room-row.is-empty .room-row__chip {
   opacity: 0.45;
 }
@@ -5255,6 +5173,12 @@ body[data-build-cursor=refused] .app-stage {
   width: 100%;
   min-width: 0;
 }
+.room-row .room-row__name[readonly] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
 .room-row .room-row__meta {
   grid-column: 2/span 2;
   grid-row: 2;
@@ -5263,6 +5187,33 @@ body[data-build-cursor=refused] .app-stage {
   align-items: center;
   gap: var(--space-xs);
   min-width: 0;
+}
+.room-row .room-row__actions {
+  grid-column: 1/-1;
+  grid-row: 3;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2xs);
+  padding-top: var(--space-2xs);
+}
+.room-row .room-row__action {
+  background-color: var(--surface-ui-raised, var(--button-mid));
+  border: var(--border-width) solid var(--button-dark);
+  border-top-color: var(--button-light);
+  border-left-color: var(--button-light);
+  border-radius: var(--border-radius-outer);
+  color: var(--button-text-color);
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-2xs) var(--space-xs);
+  font-size: var(--text-size-meta);
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.room-row .room-row__action:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .room-row .room-row__type {
   flex: 1 1 0;
@@ -5274,6 +5225,33 @@ body[data-build-cursor=refused] .app-stage {
   opacity: 0.7;
   white-space: nowrap;
 }
+.room-row .room-row__status {
+  grid-column: 3;
+  grid-row: 1;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  color: var(--text-muted);
+  font-size: var(--text-size-meta);
+  line-height: 1;
+  white-space: nowrap;
+}
+.room-row .room-row__status::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border: var(--radius-xs) solid var(--button-dark);
+  border-radius: var(--radius-xs);
+  background: var(--text-muted);
+}
+.room-row .room-row__status.is-enclosed::before {
+  background: var(--state-success-accent);
+}
+.room-row .room-row__status.is-incomplete::before {
+  background: var(--state-warning-accent);
+}
 .room-row .room-row__outdoor {
   flex: 0 0 auto;
   display: flex;
@@ -5284,30 +5262,18 @@ body[data-build-cursor=refused] .app-stage {
   width: 12px;
   height: 12px;
 }
-.room-row .room-row__delete {
-  background-color: var(--surface-ui-raised, var(--button-mid));
-  border: var(--border-width) solid var(--button-dark);
-  border-top-color: var(--button-light);
-  border-left-color: var(--button-light);
-  border-radius: var(--border-radius-outer);
-  color: var(--button-text-color);
-  grid-column: 3;
-  grid-row: 1;
-  align-self: stretch;
-  height: 100%;
-  width: auto;
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0.75;
-}
-.room-row .room-row__delete:hover {
-  opacity: 1;
+.room-row .room-row__delete:hover,
+.room-row .room-row__demolish:hover {
   color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 18%, var(--surface-ui-raised));
+}
+
+.room-perimeter-gap {
+  position: absolute;
+  z-index: var(--z-drag);
+  pointer-events: none;
+  background: color-mix(in srgb, var(--state-warning-accent) 24%, transparent);
+  border: var(--border-width) dashed var(--state-warning-accent);
 }
 
 .wall-move-handle {
@@ -5474,7 +5440,6 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
   position: absolute;
   top: var(--floating-help-paper-top, calc(100% + 8px));
   left: var(--floating-help-paper-left, 0);
-  width: -moz-max-content;
   width: max-content;
   min-width: 0;
   max-width: var(--floating-help-paper-max-width, min(280px, 100vw - var(--space-lg) * 2));
@@ -5484,7 +5449,7 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
   transform: translateY(var(--floating-help-paper-offset, -4px));
   pointer-events: none;
   transition: opacity var(--motion-base) var(--ease-ui), transform var(--motion-base) var(--ease-ui);
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   z-index: 99999;
@@ -5553,9 +5518,7 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
   padding: 0;
   overflow: visible;
   touch-action: manipulation;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   font-family: inherit;
   flex-direction: column;
 }
@@ -5706,9 +5669,7 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
   position: absolute;
   top: 0;
   transition: opacity var(--motion-slower) var(--ease-emphasis);
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   width: 100%;
   z-index: var(--z-loading);
 }
@@ -6022,7 +5983,6 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
   display: flex;
   gap: var(--border-width);
   align-items: center;
-  width: -moz-fit-content;
   width: fit-content;
   left: 50%;
   transform: translate(-50%, -115%);
@@ -6227,9 +6187,7 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
 }
 .interactive-myte.is-dragging {
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   cursor: grab;
   z-index: var(--z-dragged) !important;
 }
@@ -6447,6 +6405,11 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
     filter: drop-shadow(0 0 3px rgba(0, 255, 0, 0.5));
   }
 }
+.app-shell > .app-stage {
+  --dither-size: 12px;
+  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
+  background-size: var(--dither-size, 6px);
+}
 .app-shell > .app-stage.noScroll {
   overflow: hidden;
 }
@@ -6456,11 +6419,6 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
 .app-shell > .app-stage.noScroll > .canvas > .layer {
   width: calc(100% - var(--map-render-inset-left, 0px) - var(--map-render-inset-right, 0px));
   height: calc(100% - var(--map-render-inset-top, 0px) - var(--map-render-inset-bottom, 0px));
-}
-.app-shell > .app-stage {
-  --dither-size: 12px;
-  background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNy4xLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIg0KCSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDIgMiINCgkgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMiAyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7c3Ryb2tlOiNFQ0U5RDg7fQ0KPC9zdHlsZT4NCjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0wLDAuNWgxIE0xLDEuNWgxIi8+DQo8L3N2Zz4NCg==);
-  background-size: var(--dither-size, 6px);
 }
 .app-shell > .app-stage > .crosshair {
   position: absolute;
@@ -6536,9 +6494,7 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
 .app-shell > .app-stage > .canvas > .layer.foreground .wall-decoration {
   position: absolute;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   image-rendering: pixelated;
 }
 .app-shell > .app-stage > .canvas > .layer.foreground .wall-decoration,
@@ -6571,9 +6527,7 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
 .app-shell > .app-stage > .canvas > .layer.debug {
   z-index: 100;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   width: 100%;
   height: 100%;
   visibility: hidden;
@@ -6583,9 +6537,7 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
   border: 1px solid rgba(255, 0, 0, 0.5);
   pointer-events: none;
   position: absolute;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   z-index: 9999;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .debug-collider.myte-collider {
@@ -6631,9 +6583,7 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
 .app-shell > .app-stage > .canvas > .layer.debug .pathfinder-node {
   position: absolute;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer.debug .path-line {
   height: 2px;
@@ -6683,9 +6633,7 @@ body.terrain-paint-mode .app-shell > .app-stage > .canvas > .layer:not(.backgrou
 .app-shell > .app-stage > .canvas > .layer.effects {
   z-index: 3;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 .app-shell > .app-stage > .canvas > .layer .map-environment-fill,
 .app-shell > .app-stage > .canvas > .layer .map-environment-gradient,
@@ -6848,9 +6796,7 @@ body[data-tool-mode=drag] .app-shell > .app-stage > .canvas > .layer > .dropped-
   z-index: 1;
   image-rendering: pixelated;
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   transition: filter 0.2s ease;
 }
 .map-object > .sprite.is-visual-placeholder {
@@ -6898,7 +6844,6 @@ body[data-tool-mode=drag] .app-shell > .app-stage > .canvas > .layer > .dropped-
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: -moz-max-content;
   min-width: max-content;
   transform: translate(-50%, calc(-100% - var(--npc-lift, 0px) - var(--space-2xs)));
   pointer-events: none;
@@ -6975,9 +6920,7 @@ body[data-tool-mode=drag] .map-object.draggable {
 }
 .map-object.is-dragging {
   pointer-events: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  user-select: none;
   cursor: grabbing;
   z-index: var(--z-dragged) !important;
 }
@@ -7601,4 +7544,4 @@ body.reduce-motion .item-acquisition-ghost {
 body.reduce-motion .item.is-acquired {
   animation-name: item-acquired-steady;
   animation-iteration-count: 1;
-}/*# sourceMappingURL=style.css.map */
+}

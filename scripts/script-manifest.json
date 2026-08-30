@@ -20,16 +20,16 @@
     "src": "js/Utility/RectUtils.js"
   },
   {
-    "src": "js/UI/Core/IconSprite.js"
+    "src": "js/UI/core/IconSprite.js"
   },
   {
-    "src": "js/UI/Core/PanelRegistry.js"
+    "src": "js/UI/core/PanelRegistry.js"
   },
   {
-    "src": "js/UI/Core/TooltipSystem.js"
+    "src": "js/UI/core/TooltipSystem.js"
   },
   {
-    "src": "js/UI/Core/FloatingLabel.js"
+    "src": "js/UI/core/FloatingLabel.js"
   },
   {
     "src": "js/Engine/ItemRegistry.js"
@@ -77,11 +77,11 @@
     "src": "js/Engine/LoadingManager.js"
   },
   {
-    "src": "js/UI/Core/ToastSystem.js",
+    "src": "js/UI/core/ToastSystem.js",
     "blankLineBefore": true
   },
   {
-    "src": "js/UI/Core/AudioUnlockPrompt.js"
+    "src": "js/UI/core/AudioUnlockPrompt.js"
   },
   {
     "src": "js/Engine/SimClock.js"
@@ -469,6 +469,9 @@
     "src": "js/Map/MapObjects/Barrier/WallFixturePlacement.js"
   },
   {
+    "src": "js/Map/MapObjects/Barrier/FencePostPlacement.js"
+  },
+  {
     "src": "js/Map/MapObjects/Barrier/DoorMapObject.js",
     "commentLine": "<!-- BARRIERS -->"
   },
@@ -480,6 +483,9 @@
   },
   {
     "src": "js/Map/MapObjects/Barrier/GateMapObject.js"
+  },
+  {
+    "src": "js/Map/MapObjects/Barrier/FenceBuilder.js"
   },
   {
     "src": "js/Map/MapObjects/GrowingPlant/GrowingPlantMapObject.js",
@@ -515,20 +521,20 @@
     "src": "js/Map/Grid/AStarPathfinder.js"
   },
   {
-    "src": "js/UI/Core/UIComponent.js",
+    "src": "js/UI/core/UIComponent.js",
     "commentLine": "<!-- UI -->"
   },
   {
-    "src": "js/UI/Core/BuildRunSound.js"
+    "src": "js/UI/core/BuildRunSound.js"
   },
   {
-    "src": "js/UI/Core/TabController.js"
+    "src": "js/UI/core/TabController.js"
   },
   {
     "src": "js/UI/Overlays/CompactChipStripUI.js"
   },
   {
-    "src": "js/UI/Core/CursorManager.js"
+    "src": "js/UI/core/CursorManager.js"
   },
   {
     "src": "js/UI/Container/ToolManager.js"
@@ -537,13 +543,16 @@
     "src": "js/UI/Container/BuildModeUI.js"
   },
   {
-    "src": "js/UI/Core/HintNotes.js"
+    "src": "js/UI/core/HintNotes.js"
   },
   {
     "src": "js/UI/Container/MyteBuildPlacement.js"
   },
   {
     "src": "js/UI/Map/SelectionManager.js"
+  },
+  {
+    "src": "js/UI/Map/BuildMarqueeSelection.js"
   },
   {
     "src": "js/UI/Map/QueueTargetManager.js"
@@ -576,82 +585,88 @@
     "src": "js/UI/Container/ScreenManager.js"
   },
   {
-    "src": "js/UI/Core/UserInterface.js"
+    "src": "js/UI/core/UserInterface.js"
   },
   {
-    "src": "js/UI/Core/ModalWindow.js"
+    "src": "js/UI/core/ModalWindow.js"
   },
   {
-    "src": "js/UI/Core/SegmentControl.js"
+    "src": "js/UI/core/SegmentControl.js"
   },
   {
-    "src": "js/UI/Core/BuildSettingToggle.js"
+    "src": "js/UI/core/BuildSettingToggle.js"
   },
   {
-    "src": "js/UI/Core/WallViewControl.js"
+    "src": "js/UI/core/WallViewControl.js"
   },
   {
-    "src": "js/UI/Core/PanelSection.js"
+    "src": "js/UI/core/PanelSection.js"
   },
   {
-    "src": "js/UI/Core/DetailRows.js"
+    "src": "js/UI/core/DetailRows.js"
   },
   {
-    "src": "js/UI/Core/WorldModal.js"
+    "src": "js/UI/core/WorldModal.js"
   },
   {
-    "src": "js/UI/Panels/MyteInfoPanel.js"
+    "src": "js/UI/panels/MyteInfoPanel.js"
   },
   {
-    "src": "js/UI/Panels/UserProfilePanel.js"
+    "src": "js/UI/panels/UserProfilePanel.js"
   },
   {
-    "src": "js/UI/Panels/ShopPanel.js"
+    "src": "js/UI/panels/ShopPanel.js"
   },
   {
-    "src": "js/UI/Debug/DebugOverlayUI.js"
+    "src": "js/UI/debug/DebugOverlayUI.js"
   },
   {
-    "src": "js/UI/Debug/AuditHarness.js"
+    "src": "js/UI/debug/AuditHarness.js"
   },
   {
-    "src": "js/UI/Debug/SurfaceDebug.js"
+    "src": "js/UI/debug/SurfaceDebug.js"
   },
   {
-    "src": "js/UI/Debug/QueueUI.js"
+    "src": "js/UI/debug/QueueUI.js"
   },
   {
-    "src": "js/UI/Panels/OptionsPanel.js"
+    "src": "js/UI/panels/OptionsPanel.js"
   },
   {
-    "src": "js/UI/Panels/SoundPanel.js"
+    "src": "js/UI/panels/SoundPanel.js"
   },
   {
-    "src": "js/UI/Panels/SurfaceCustomizePanel.js"
+    "src": "js/UI/panels/SurfaceCustomizePanel.js"
   },
   {
-    "src": "js/UI/Panels/TerrainPaintPanel.js"
+    "src": "js/UI/panels/TerrainPaintPanel.js"
   },
   {
-    "src": "js/UI/Panels/WallBuildPanel.js"
+    "src": "js/UI/panels/CellDragBuildPanel.js"
   },
   {
-    "src": "js/UI/Panels/RoomPanel.js"
+    "src": "js/UI/panels/WallBuildPanel.js"
   },
   {
-    "src": "js/UI/Panels/SettingsPanel.js"
+    "src": "js/UI/panels/FenceBuildPanel.js"
   },
   {
-    "src": "js/UI/Panels/ViewPanel.js"
+    "src": "js/UI/panels/RoomPanel.js"
   },
   {
-    "src": "js/UI/Panels/WorldMapPanel.js"
+    "src": "js/UI/panels/SettingsPanel.js"
   },
   {
-    "src": "js/UI/Panels/CalendarPanel.js"
+    "src": "js/UI/panels/ViewPanel.js"
   },
   {
-    "src": "js/UI/Panels/DebugPanel.js"
+    "src": "js/UI/panels/WorldMapPanel.js"
+  },
+  {
+    "src": "js/UI/panels/CalendarPanel.js"
+  },
+  {
+    "src": "js/UI/panels/DebugPanel.js"
   },
   {
     "src": "js/UI/Container/GameLogManager.js"

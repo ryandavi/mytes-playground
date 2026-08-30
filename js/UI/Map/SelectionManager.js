@@ -2,13 +2,17 @@ class SelectionManager extends UIComponent {
     constructor(parent) {
         super(parent);
         this.selectedObject = null;
+        this.selectedObjects = [];
     }
 
 
     setSelected(obj) {
-        if (this.selectedObject === obj) {
-            return;
-        }
+        this.setSelection(obj ? [obj] : []);
+    }
+
+    setSelection(objects = []) {
+        const next = [...new Set(objects.filter(Boolean))];
+        if (next.length === this.selectedObjects.length && next.every((item, index) => item === this.selectedObjects[index])) return;
 
         const deselect = (object) => {
             if (!object) return;
@@ -40,13 +44,10 @@ class SelectionManager extends UIComponent {
             }
         };
 
-        // Deselect current object
-        if (this.selectedObject) deselect(this.selectedObject);
-
-        this.selectedObject = obj;
-
-        // Select new object
-        if (this.selectedObject) select(this.selectedObject);
+        this.selectedObjects.forEach(deselect);
+        this.selectedObjects = next;
+        this.selectedObjects.forEach(select);
+        this.selectedObject = next.length === 1 ? next[0] : null;
 
         // Notify parent UI of selection change
         this.parent.onSelectionChanged(this.selectedObject);
@@ -56,8 +57,13 @@ class SelectionManager extends UIComponent {
         return this.selectedObject;
     }
 
+    getSelectedObjects() {
+        return [...this.selectedObjects];
+    }
+
     dispose() {
         this.setSelected(null);
         this.selectedObject = null;
+        this.selectedObjects = [];
     }
 }

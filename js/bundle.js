@@ -99,6 +99,10 @@ const AppConfig = Object.freeze({
  */
 const SiteConfig = Object.freeze({
     mapRendering: Object.freeze({
+        // Blank cells reserved around the drawn map so art near an edge is not
+        // clipped by the canvas. `top` is only the floor: a map that can grow
+        // walls reserves a wall's height instead (see wallSystem), and any map
+        // may override with a `cameraTopReserveCells` property in Tiled.
         canvasPaddingCells: Object.freeze({ top: 1, right: 1, bottom: 1, left: 1 }),
     }),
 
@@ -214,6 +218,10 @@ const SiteConfig = Object.freeze({
 
 	wallSystem: Object.freeze({
 		enabled: true,
+		// When set, every map that authors walls reserves `defaultHeightCells`
+		// (or its own `wallHeightCells`) of blank space above its top edge so
+		// wall art has somewhere to draw. Fixed at map load; a map with a known
+		// tall set-piece can raise it with a `cameraTopReserveCells` property.
 		extendCanvasForWallHeight: true,
         materialsPath: 'data/map-objects/wall-materials.json',
         wallTilesetProperty: 'wallTileset',
@@ -1164,6 +1172,11 @@ const SiteConfig = Object.freeze({
         minZoom:  0.5,
         maxZoom:  2.5,
         zoomStep: 0.1,
+        // Wheel streams with pixel-sized deltas are trackpads: two-finger
+        // scroll pans, while Ctrl-wheel (the browser's pinch signal) zooms.
+        trackpadDeltaThreshold: 48,
+        wheelGestureIdleMs: 160,
+        trackpadZoomSensitivity: 0.006,
 
         // CURSOR: fraction of the viewport in the middle where the camera holds
         // still (0–1). Without it, cursor following pans for every mouse move
@@ -2268,13 +2281,12 @@ const RectUtils = {
     }
 };
 ;
-/* -- js/UI/Core/IconSprite.js -- */
+/* -- js/UI/core/IconSprite.js -- */
 // ─────────────────────────────────────────────────────────────────────────────
 // IconSprite — pulls images/icons/sprite.svg into the document so that every
 // <use href="#icon-name"> in the page resolves.
 //
-// The sprite lives in one file rather than inline in each page, so index.html
-// and ui-gallery.html share exactly one set of glyph definitions. Inlining it
+// The sprite lives in one file rather than inline in the page. Inlining it
 // (rather than referencing the file directly from `use`) is what lets CSS
 // `fill: currentColor` reach the symbols.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2328,7 +2340,7 @@ class IconSprite {
 
 IconSprite.load();
 ;
-/* -- js/UI/Core/PanelRegistry.js -- */
+/* -- js/UI/core/PanelRegistry.js -- */
 class PanelRegistry {
     static CONTROL_ICONS = Object.freeze({
         minimize: 'minimize',
@@ -2414,7 +2426,7 @@ class PanelRegistry {
     }
 }
 ;
-/* -- js/UI/Core/TooltipSystem.js -- */
+/* -- js/UI/core/TooltipSystem.js -- */
 class TooltipSystem {
     static disposeInstance() {
         if (!TooltipSystem.instance) {
@@ -2538,6 +2550,10 @@ class TooltipSystem {
         const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
         const tooltipRect = this.element.getBoundingClientRect();
         const gutter = 8;
+        // getBoundingClientRect is viewport-relative; the tooltip is
+        // position: absolute on <body>, so its coordinates are document space.
+        const scrollX = window.scrollX || window.pageXOffset || 0;
+        const scrollY = window.scrollY || window.pageYOffset || 0;
 
         let top = anchorRect.bottom + this.offset;
         if (top + tooltipRect.height > viewportHeight - gutter) {
@@ -2553,8 +2569,8 @@ class TooltipSystem {
         }
         left = Math.max(gutter, left);
 
-        this.element.style.left = `${Math.round(left)}px`;
-        this.element.style.top = `${Math.round(top)}px`;
+        this.element.style.left = `${Math.round(left + scrollX)}px`;
+        this.element.style.top = `${Math.round(top + scrollY)}px`;
     }
 
     handlePointerDown(event) {
@@ -2586,7 +2602,7 @@ class TooltipSystem {
     }
 }
 ;
-/* -- js/UI/Core/FloatingLabel.js -- */
+/* -- js/UI/core/FloatingLabel.js -- */
 // ── FloatingLabel ────────────────────────────────────────────────────────
 // Shared DOM builder for "floating" labels that ride a moving map element via
 // CSS transform (Myte name tags, NPC nameplates) — NOT the hover-tracking
@@ -7196,7 +7212,7 @@ class LoadingManager {
     }
 }
 ;
-/* -- js/UI/Core/ToastSystem.js -- */
+/* -- js/UI/core/ToastSystem.js -- */
 /**
  * Toast Notification System
  * Provides a way to display temporary popup messages in the game
@@ -7569,7 +7585,7 @@ class ToastSystem {
 	}
   }
 ;
-/* -- js/UI/Core/AudioUnlockPrompt.js -- */
+/* -- js/UI/core/AudioUnlockPrompt.js -- */
 /**
  * Browsers refuse to start an AudioContext until the page has seen a real user
  * gesture, so a freshly loaded world is silent with nothing explaining why.
@@ -9084,8 +9100,10 @@ class GameModeManager {
         const gameMap = this.container?.gameMap;
 
         this.ui?.wallBuildPanel?.cancelDrag?.();
+        this.ui?.fenceBuildPanel?.cancelDrag?.();
         this.container?.inventory?.cancelPlacement?.();
         this.ui?.wallBuildPanel?.close?.();
+        this.ui?.fenceBuildPanel?.close?.();
         this.ui?.surfaceCustomizePanel?.close?.();
         this.container?.buildHistory?.clear();
 
@@ -16145,13 +16163,35 @@ class Inventory {
 
         this.dropIndicator.style.width  = `${width}px`;
         this.dropIndicator.style.height = `${height}px`;
-        this.dropIndicator.style.left   = `${snappedX}px`;
-        this.dropIndicator.style.top    = `${snappedY}px`;
+		this.dropIndicator.style.left   = `${snappedX}px`;
+		this.dropIndicator.style.top    = `${snappedY}px`;
+		this.updateDropIndicatorDepth(descriptor, wallPreview, wallPlacement, snappedX, snappedY, map);
         this.updatePlacementPreview(descriptor);
         this.dropIndicator.style.display = 'block';
         this.dropIndicator.classList.toggle('is-drop-valid', this.state.dropValid);
         this.dropIndicator.classList.toggle('is-drop-invalid', !this.state.dropValid);
     }
+
+	/**
+	 * A wall preview belongs immediately above the wall it will be attached to.
+	 * Derive that depth from the resolved host instead of relying on a fixed UI
+	 * z-index: world depth grows with map Y, so any fixed value eventually loses.
+	 */
+	updateDropIndicatorDepth(descriptor, preview, placement, x, y, map) {
+		if (!descriptor?.wallFixture && !descriptor?.wallOpening) {
+			this.dropIndicator.style.removeProperty('z-index');
+			return;
+		}
+
+		let zIndex = null;
+		if (descriptor.wallOpening) {
+			zIndex = map?.wallBuilder?.getOpeningRenderZIndex?.(preview, x, y);
+		} else if (placement?.piece) {
+			zIndex = map?.getDepthZIndex?.(placement.piece.baseline) + 1;
+		}
+		if (Number.isFinite(zIndex)) this.dropIndicator.style.zIndex = String(zIndex);
+		else this.dropIndicator.style.removeProperty('z-index');
+	}
 
     _isDropPositionValid(snappedX, snappedY, descriptor, gridSystem, map) {
         if (!gridSystem || !map) return true;
@@ -17263,7 +17303,6 @@ class ContainerManager {
       }
 
     getOffset(el) {
-        const rect = el.getBoundingClientRect();
         let _x = window.scrollX;
         let _y = window.scrollY;
         let current = el;
@@ -17274,15 +17313,30 @@ class ContainerManager {
             current = current.offsetParent;
         }
 
+        // Size must come from the same (unscaled) layout space as the offsetParent
+        // walk above. getBoundingClientRect() is post-transform, so under the
+        // camera's `scale(zoom)` on .canvas it returns zoomed dimensions — pairing
+        // those with unscaled x/y pulls anything centred against this rect (a myte
+        // snapping to its home slot) off by size*(zoom-1)/2. offsetWidth/Height
+        // are the layout box, matching the walk. Fall back to the client rect only
+        // when the element isn't laid out yet.
+        let width = el.offsetWidth;
+        let height = el.offsetHeight;
+        if (!width && !height) {
+            const rect = el.getBoundingClientRect();
+            width = rect.width;
+            height = rect.height;
+        }
+
         return {
             top: _y,
             left: _x,
             x: _x,
             y: _y,
-            width: rect.width,
-            height: rect.height,
-            right: _x + rect.width,
-            bottom: _y + rect.height
+            width,
+            height,
+            right: _x + width,
+            bottom: _y + height
         };
     }
 
@@ -18159,6 +18213,9 @@ class ContainerInputManager {
           event.originalEvent?.preventDefault();
           this.container.setBuildGridEnabled(this.container.settings?.buildGrid === false);
           return;
+        // macOS labels Backspace as Delete; forward-delete (Fn+Delete) reports
+        // "Delete". Both keys mean the same thing in the build selection.
+        case 'backspace':
         case 'delete':
           event.originalEvent?.preventDefault();
           this.storeSelectedObject();
@@ -18181,6 +18238,12 @@ class ContainerInputManager {
   }
 
   storeSelectedObject() {
+    const selectedObjects = this.container.ui?.getSelectedObjects?.() || [];
+    const wallCells = this.container.ui?.buildMarqueeSelection?.getSelectedWallCells?.() || [];
+    if (selectedObjects.length > 1 || wallCells.length > 0) {
+      this.container.ui?.buildMarqueeSelection?.storeSelection?.();
+      return;
+    }
     const selected = this.container.ui?.getSelected?.();
     const storage = this.container.ui?.actionSidebarManager?.getInventoryStorageState?.(selected);
     if (!storage) return;
@@ -18420,6 +18483,7 @@ class ContainerInputManager {
     }
 
     if (ui?.wallBuildPanel?.cancelDrag?.() === true) return;
+    if (ui?.fenceBuildPanel?.cancelDrag?.() === true) return;
     if (ui?.roomPanel?.cancelDrag?.() === true) return;
     if (ui?.buildPlacement?.cancel?.() === true) return;
     // Something held in hand is work in flight too: put it down before the
@@ -34093,6 +34157,9 @@ class Camera {
 		this._inertiaVelY = 0;
 		this._lastDragClientX = 0;
 		this._lastDragClientY = 0;
+		this._wheelGesture = null;
+		this._touchGesture = null;
+		this._originalTouchAction = this.canvas.style.touchAction;
 
 		// Camera shake (purely visual — does not affect posX/posY)
 		this._shake = { x: 0, y: 0, intensity: 0 };
@@ -34107,7 +34174,10 @@ class Camera {
 		this._boundStartDrag  = this.startDrag.bind(this);
 		this._boundDrag       = this.drag.bind(this);
 		this._boundEndDrag    = this.endDrag.bind(this);
-		this._boundHandleZoom = this.handleZoom.bind(this);
+		this._boundHandleZoom = this.handleWheel.bind(this);
+		this._boundTouchStart = this.startTouchGesture.bind(this);
+		this._boundTouchMove = this.moveTouchGesture.bind(this);
+		this._boundTouchEnd = this.endTouchGesture.bind(this);
 		this._boundTemporaryCursorMove = this._handleTemporaryCursorMove.bind(this);
 		this.debouncedResetView = Utility.debounce(() => this.resetView(), 250);
 
@@ -34118,6 +34188,11 @@ class Camera {
 		document.addEventListener('touchmove', this._boundTemporaryCursorMove, { passive: true });
 		document.addEventListener('dragover', this._boundTemporaryCursorMove);
 		this.canvas.addEventListener('wheel', this._boundHandleZoom, { passive: false });
+		this.canvas.addEventListener('touchstart', this._boundTouchStart, { passive: false });
+		document.addEventListener('touchmove', this._boundTouchMove, { passive: false });
+		document.addEventListener('touchend', this._boundTouchEnd, { passive: false });
+		document.addEventListener('touchcancel', this._boundTouchEnd, { passive: false });
+		this.canvas.style.touchAction = 'none';
 		window.addEventListener('resize', this.debouncedResetView);
 	}
 
@@ -34636,6 +34711,104 @@ class Camera {
 			this.setZoomLevel(newZoom);
 			this._playZoomSound(previousZoom, newZoom);
 		}
+	}
+
+	handleWheel(e) {
+		const config = SiteConfig.camera;
+		const now = performance.now();
+		if (!this._wheelGesture || now - this._wheelGesture.lastAt > config.wheelGestureIdleMs) {
+			const trackpad = !e.ctrlKey && e.deltaMode === WheelEvent.DOM_DELTA_PIXEL &&
+				(Math.abs(e.deltaX) > 0 || Math.abs(e.deltaY) < config.trackpadDeltaThreshold ||
+				!Number.isInteger(e.deltaY));
+			this._wheelGesture = { kind: trackpad ? 'pan' : 'zoom', lastAt: now };
+		} else {
+			this._wheelGesture.lastAt = now;
+		}
+
+		if (e.ctrlKey) {
+			e.preventDefault();
+			if (this.canZoom === false) return;
+			const previousZoom = this.targetZoomLevel;
+			const nextZoom = this._clampZoom(previousZoom * Math.exp(-e.deltaY * config.trackpadZoomSensitivity));
+			if (nextZoom === previousZoom) return;
+			const anchor = this._getZoomAnchorForEvent(e);
+			const target = this._calculateAnchoredPosition(anchor, nextZoom);
+			this.zoomAnchor = anchor;
+			this.setTarget(target.x, target.y);
+			this.setZoomLevel(nextZoom);
+			return;
+		}
+
+		if (this._wheelGesture.kind === 'pan') {
+			e.preventDefault();
+			this.panBy(e.deltaX, e.deltaY);
+			return;
+		}
+		this.handleZoom(e);
+	}
+
+	startTouchGesture(event) {
+		if (event.touches.length >= 2) {
+			this.beginPinchGesture(event);
+			return;
+		}
+		if (event.touches.length !== 1 || this.followMode !== CAMERA_FOLLOW_MODES.DRAG_TO_PAN ||
+			this.parent?.ui?.toolManager?.claimsMapDrag?.() === true) return;
+		if (event.target?.closest?.('.map-object, .myte-wrapper, .myte')) return;
+		const touch = event.touches[0];
+		this._touchGesture = { kind: 'pan' };
+		this.startDrag({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => event.preventDefault() });
+	}
+
+	beginPinchGesture(event) {
+		if (event.touches.length < 2) return;
+		this.parent?.ui?.cancelBuildGesturesForCamera?.();
+		this.endDrag();
+		const [first, second] = [event.touches[0], event.touches[1]];
+		const midpoint = { clientX: (first.clientX + second.clientX) / 2, clientY: (first.clientY + second.clientY) / 2 };
+		this._touchGesture = {
+			kind: 'pinch',
+			distance: Math.max(1, Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY)),
+			zoom: this.targetZoomLevel,
+			anchor: this._getZoomAnchorForEvent(midpoint)
+		};
+		event.preventDefault();
+	}
+
+	moveTouchGesture(event) {
+		if (event.touches.length >= 2) {
+			if (this._touchGesture?.kind !== 'pinch') this.beginPinchGesture(event);
+			const gesture = this._touchGesture;
+			if (!gesture) return;
+			const [first, second] = [event.touches[0], event.touches[1]];
+			const distance = Math.max(1, Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY));
+			const zoom = this._clampZoom(gesture.zoom * (distance / gesture.distance));
+			const midpoint = this._getRawContainerPointFromClient(
+				(first.clientX + second.clientX) / 2, (first.clientY + second.clientY) / 2
+			);
+			const anchor = { ...gesture.anchor, screenX: midpoint.x, screenY: midpoint.y };
+			const target = this._calculateAnchoredPosition(anchor, zoom);
+			this.zoomAnchor = anchor;
+			this.setTarget(target.x, target.y);
+			this.setZoomLevel(zoom);
+			event.preventDefault();
+			return;
+		}
+		if (this._touchGesture?.kind !== 'pan' || event.touches.length !== 1) return;
+		const touch = event.touches[0];
+		this.drag({ clientX: touch.clientX, clientY: touch.clientY });
+		event.preventDefault();
+	}
+
+	endTouchGesture(event) {
+		if (!this._touchGesture) return;
+		if (event.touches.length >= 2) {
+			this.beginPinchGesture(event);
+			return;
+		}
+		this.endDrag();
+		this._touchGesture = null;
+		if (event.cancelable) event.preventDefault();
 	}
 
 	// ========== DRAG ==========
@@ -35328,6 +35501,11 @@ class Camera {
 		document.removeEventListener('touchmove', this._boundTemporaryCursorMove);
 		document.removeEventListener('dragover', this._boundTemporaryCursorMove);
 		this.canvas.removeEventListener('wheel', this._boundHandleZoom);
+		this.canvas.removeEventListener('touchstart', this._boundTouchStart);
+		document.removeEventListener('touchmove', this._boundTouchMove);
+		document.removeEventListener('touchend', this._boundTouchEnd);
+		document.removeEventListener('touchcancel', this._boundTouchEnd);
+		this.canvas.style.touchAction = this._originalTouchAction;
 		window.removeEventListener('resize', this.debouncedResetView);
 
 		this.parent = null;
@@ -44402,14 +44580,21 @@ class FloorBuilder {
      * Ownership is geometry and a finish is not, so it is deliberately NOT
      * recomputed here: a room with no floor still owns its ground, and always
      * did, which is why giving it one cannot take anything from a neighbour.
-     * @returns {boolean} whether the room now carries a floor
+     * @returns {boolean} whether the room's finish changed
      */
     setRoomFinish(roomId, finishId) {
         const room = this.gameMap.regionManager?.get('room', roomId);
         if (!room) return false;
-        room.properties = { ...room.properties, floorFinishId: finishId || null };
+        const previous = room.properties?.floorFinishId ?? null;
+        const next = finishId || null;
+        if (previous === next) return false;
+        room.properties = { ...room.properties, floorFinishId: next };
         this.removeRoom(roomId);
-        return !!this.paintRoom(room);
+        this.paintRoom(room);
+        // Clearing a finish deliberately leaves no generated canvas. That is
+        // still a successful surface change: the authored ground underneath
+        // is now the visible floor.
+        return true;
     }
 
     removeRoom(roomId) {
@@ -44566,10 +44751,6 @@ class SurfaceCustomizer {
 ;
 /* -- js/Map/GameMap.js -- */
 class GameMap {
-    // Contributors to the reserved strip above the map. Walls are the first,
-    // not the only: anything whose art reaches past the top edge answers here.
-    static TOP_OVERHANG_SOURCES = [(map, mapData) => map.resolveWallTopOverhang(mapData)];
-
     constructor(parent, mapData = null) {
         this.parent = parent;
         this.mapData = mapData || {}; // Default empty object if no data provided
@@ -44600,6 +44781,7 @@ class GameMap {
         this.environmentManager = null;
         this.roomEnclosureDetector = null;
         this.wallBuilder = null;
+        this.fenceBuilder = null;
         this.wallMaterialRegistry = null;
         this.floorBuilder = null;
         this.floorMaterialRegistry = null;
@@ -44683,63 +44865,58 @@ class GameMap {
     }
 
     /**
-     * How far anything renders ABOVE the map's top edge. Each contributor
-     * answers for its own content and the map reserves the largest, so a tall
-     * prop or a two-storey building joins by answering the same question rather
-     * than by adding another inset of its own.
-     *
-     * There is one reserved strip and one place that computes it on purpose:
-     * `renderInsets` feeds world-coordinate conversion (ContainerManager) and
-     * the grid overlay, so a contributor applying its own offset instead would
-     * put the cursor and the art in different coordinate systems.
+     * Height in px of the reserved strip above the map's top edge — the space
+     * where wall art (and later, tall props) is allowed to draw. Lighting and
+     * the map-art mask clip to this so night never sits on the empty page
+     * beyond it. Reads the applied inset, so it never disagrees with layout.
      */
-    resolveRenderTopOverhang(mapData = this.mapData) {
-        return Math.max(0, ...GameMap.TOP_OVERHANG_SOURCES.map(
-            source => Number(source(this, mapData)) || 0
-        ));
-    }
-
-    // `this.mapData` is the object the map was CONSTRUCTED with, not the loaded
-    // TMX, so it carries no wall cells. Recomputing the overhang from it alone
-    // would quietly reserve nothing and clip every wall — and because the strip
-    // also shifts world-coordinate conversion, the cursor would go with it. Fall
-    // back to the builder, which is the live source once the map is up.
-    wallOverhangCells(mapData) {
-        if (mapData?.walls?.cells?.length) return mapData.walls.cells;
-        return [...(this.wallBuilder?.cells?.values?.() || [])];
+    resolveRenderTopOverhang() {
+        return Math.max(0, Number(this.renderInsets?.top) || 0);
     }
 
     /**
-     * A wall overflows the top edge only if it is tall enough to clear its own
-     * row: one on row 0 contributes its whole height, one five rows down
-     * contributes nothing. Reserving the tallest wall's height wherever it
-     * stood padded every map with walls, including maps whose walls are nowhere
-     * near the top.
+     * How many cells of blank space to reserve ABOVE the map's top edge, so
+     * tall art — walls today, big props later — has somewhere to draw without
+     * the world's coordinate origin moving.
      *
-     * Derived from `baseline = (y + 0.5) * cell + thickness / 2` and
-     * `top = baseline - 1 - baselineRow`, which reduce to `height - y * cell`.
+     * This is a DELIBERATE, static amount, not a measurement of the tallest
+     * object on the map. A giant tree is allowed to clip at the canvas edge;
+     * the clipped top still reads as scale. Resolution order:
+     *
+     *   1. the map's own `cameraTopReserveCells` property (authored in Tiled)
+     *   2. a wall's worth of height, if the map can grow walls at all — so
+     *      dropping walls onto a map later needs no re-tuning
+     *   3. the global top padding (`canvasPaddingCells.top`)
+     *
+     * It has to be known at map-load time and never change afterwards:
+     * `renderInsets.top` also shifts screen<->world conversion, camera follow
+     * and the grid overlay, and a value that moved after those had sampled it
+     * is what used to put the cursor and the art in different coordinate
+     * systems.
      */
-    resolveWallTopOverhang(mapData) {
-        if (SiteConfig.wallSystem?.enabled !== true ||
-            SiteConfig.wallSystem?.extendCanvasForWallHeight !== true ||
-            !this.wallOverhangCells(mapData).length) return 0;
-        const cellSize = this.gridSystem?.config?.cellSize || mapData.tileHeight || 32;
-        const registry = this.wallMaterialRegistry;
-        return Math.max(0, ...this.wallOverhangCells(mapData).map(cell => {
-            // The construction's own height once materials have loaded; before
-            // that the map's heightCells estimate is all there is.
-            const height = Number(registry?.getConstruction?.(cell.constructionId)?.height) ||
-                (Math.max(1, Number(cell.heightCells) || SiteConfig.wallSystem.defaultHeightCells) * cellSize);
-            return height - ((Number(cell.y) || 0) * cellSize);
-        }));
+    resolveTopReserveCells(mapData = this.mapData) {
+        const authored = Number(mapData?.properties?.cameraTopReserveCells);
+        if (Number.isFinite(authored) && authored >= 0) return authored;
+
+        const globalTop = Math.max(0, Number(SiteConfig.mapRendering?.canvasPaddingCells?.top) || 0);
+
+        const wallCapable = SiteConfig.wallSystem?.enabled === true &&
+            SiteConfig.wallSystem?.extendCanvasForWallHeight === true &&
+            !!mapData?.walls;
+        if (!wallCapable) return globalTop;
+
+        const wallCells = Number(mapData.properties?.wallHeightCells) ||
+            SiteConfig.wallSystem.defaultHeightCells || 0;
+        return Math.max(globalTop, wallCells);
     }
 
     resolveRenderPadding(mapData = this.mapData) {
         const cellSize = this.gridSystem?.config?.cellSize || mapData?.tileHeight || 32;
         const cells = SiteConfig.mapRendering?.canvasPaddingCells || {};
+        const topCells = this.resolveTopReserveCells(mapData);
         return Object.fromEntries(['top', 'right', 'bottom', 'left'].map(side => [
             side,
-            Math.max(0, Number(cells[side]) || 0) * cellSize
+            Math.max(0, Number(side === 'top' ? topCells : cells[side]) || 0) * cellSize
         ]));
     }
 
@@ -44761,9 +44938,35 @@ class GameMap {
         this.parent.invalidateCanvasRect?.();
     }
 
-    setWallAwareRenderInsets(mapData, overhang = this.resolveRenderTopOverhang(mapData)) {
-        const padding = this.resolveRenderPadding(mapData);
-        this.setRenderInsets({ ...padding, top: padding.top + Math.max(0, Number(overhang) || 0) });
+    applyRenderInsets(mapData = this.mapData) {
+        this.setRenderInsets(this.resolveRenderPadding(mapData));
+    }
+
+    /**
+     * The top reserve is fixed and authored, so a wall taller than it clips at
+     * the canvas edge. That is a legitimate choice, but log it once — in debug
+     * — so it is a choice and not a surprise.
+     */
+    warnIfWallsExceedTopReserve() {
+        if (SiteConfig.wallSystem?.extendCanvasForWallHeight !== true) return;
+        const cells = [...(this.wallBuilder?.cells?.values?.() || [])];
+        if (!cells.length) return;
+        const cellSize = this.gridSystem?.config?.cellSize || this.mapData?.tileHeight || 32;
+        const registry = this.wallMaterialRegistry;
+        // How far the tallest wall's art reaches above row 0 — one on row 0
+        // contributes its whole height, one five rows down contributes nothing.
+        const tallest = Math.max(0, ...cells.map(cell => {
+            const height = Number(registry?.getConstruction?.(cell.constructionId)?.height) ||
+                (Math.max(1, Number(cell.heightCells) || SiteConfig.wallSystem.defaultHeightCells) * cellSize);
+            return height - ((Number(cell.y) || 0) * cellSize);
+        }));
+        if (tallest > this.renderInsets.top + 0.5) {
+            Utility.warnDebug(
+                `[GameMap] Wall art on "${this.id}" reaches ${Math.ceil(tallest)}px above the top edge, ` +
+                `but only ${Math.round(this.renderInsets.top)}px is reserved — it will clip. ` +
+                `Raise cameraTopReserveCells on this map if that is unwanted.`
+            );
+        }
     }
 
     trackGeneratedObjectUrl(url) {
@@ -45040,8 +45243,10 @@ class GameMap {
 
 		Utility.logDebug('Tile map dimensions:', this.dimensions);
 
-		// Extend render space northward for wall art without changing gameplay coordinates.
-		this.setWallAwareRenderInsets(mapData);
+		// Reserve render space above the map for tall art (walls, big props)
+		// without moving gameplay coordinates. Fixed and applied once here, so
+		// every screen<->world consumer sees the final value from frame one.
+		this.applyRenderInsets(mapData);
 
 		// Set background from map
 		const bgUrl = await this.tileMapLoader.createMapBackgroundUrl(mapData);
@@ -45129,9 +45334,10 @@ class GameMap {
 			await this.wallMaterialRegistry.load();
 			this.wallBuilder = new WallBuilder(this, mapData.walls, this.wallMaterialRegistry);
 			await this.wallBuilder.initialize();
-			// Materials are loaded now, so the overhang uses each construction's
-			// real height instead of the map's heightCells estimate.
-			this.setWallAwareRenderInsets(mapData);
+			// The reserve is fixed, not remeasured here — a value that changed
+			// after the camera and input had sampled it was the old coordinate
+			// drift. Just flag it in debug if real wall art won't fit.
+			this.warnIfWallsExceedTopReserve();
 			// Before the detector: its very first pass has to see the map's own
 			// open-plan rooms, or every room it finds is recomputed a moment
 			// later and the rooms it named change under the save.
@@ -45140,6 +45346,12 @@ class GameMap {
 			this.roomEnclosureDetector = new RoomEnclosureDetector(this);
 		}
 		this.eventManager?.emit(EVENTS.WALL_READY, { mapId: this.id, builder: this.wallBuilder });
+
+		// Fences are ordinary map objects, so the builder is a thin helper the
+		// Fence tool drives — available wherever the FENCE type is registered.
+		if (typeof FenceBuilder === 'function' && MapObjectFactory.hasType?.('FENCE')) {
+			this.fenceBuilder = new FenceBuilder(this);
+		}
 
 		// Floors are built after rooms exist (the environment manager registers
 		// them) and after walls, so a room's floor lands under the wall art that
@@ -45427,7 +45639,7 @@ class GameMap {
             width: 1000,
             height: 1000
         };
-        this.setWallAwareRenderInsets(this.mapData, 0);
+        this.applyRenderInsets(this.mapData);
 
         // Set a background color
         if (this.layers.background) {
@@ -45842,6 +46054,10 @@ class GameMap {
 			this.wallBuilder.dispose();
 			this.wallBuilder = null;
 			this.wallMaterialRegistry = null;
+		}
+		if (this.fenceBuilder) {
+			this.fenceBuilder.dispose();
+			this.fenceBuilder = null;
 		}
 		if (this.roomAssignments) {
 			this.roomAssignments.dispose();
@@ -62476,6 +62692,81 @@ class WallFixtureMapObject extends withWallFixturePlacement(MapObject) {
     }
 }
 ;
+/* -- js/Map/MapObjects/Barrier/FencePostPlacement.js -- */
+/**
+ * withFencePostPlacement — placement behaviour for a thing that drops into a
+ * fence line: a gate.
+ *
+ * The counterpart to the wall-opening mixin. A gate snaps to the fence grid,
+ * may land on a cell that already holds a fence (that fence is the thing it
+ * replaces), and on release hands off to FenceBuilder.settlePost to pull the
+ * replaced fence into the inventory and re-point the neighbours.
+ *
+ * Undo of the drag itself is the ordinary map-object move command; the fence it
+ * displaced is restored by settlePost's own history entry sitting under it.
+ */
+const withFencePostPlacement = BaseClass => class extends BaseClass {
+    get fenceBuilder() {
+        return this.gameMap?.fenceBuilder || null;
+    }
+
+    _fenceCell(x = this.posX, y = this.posY) {
+        return this.fenceBuilder?.cellForObject(this, x, y) || null;
+    }
+
+    clampPlacementPosition(x, y) {
+        const builder = this.fenceBuilder;
+        if (!builder) return { x, y };
+        const cell = builder.cellForObject(this, x, y);
+        return builder.worldPosForObject(this, cell.x, cell.y);
+    }
+
+    getGridOccupancyBounds(x = this.posX, y = this.posY) {
+        const builder = this.fenceBuilder;
+        if (!builder) {
+            return super.getGridOccupancyBounds?.(x, y) ?? null;
+        }
+        const cs = builder.cellSize;
+        const cell = builder.cellForObject(this, x, y);
+        return { x: cell.x * cs, y: cell.y * cs, width: cs, height: cs };
+    }
+
+    checkDropValidity(x, y) {
+        const builder = this.fenceBuilder;
+        if (!builder) return super.checkDropValidity ? super.checkDropValidity(x, y) : true;
+        const cell = builder.cellForObject(this, x, y);
+        return builder.canHostPost(cell.x, cell.y, this) === true;
+    }
+
+    restoreInvalidDropToOrigin() {
+        return true;
+    }
+
+    // Also the inventory placement path: Inventory.placeInventoryItem creates
+    // the object and then trusts onPlacementDragEnd's verdict, without a
+    // clampPlacementPosition or checkDropValidity call of its own.
+    onPlacementDragEnd() {
+        const builder = this.fenceBuilder;
+        if (!builder) return super.onPlacementDragEnd ? super.onPlacementDragEnd() : true;
+
+        const snapped = this.clampPlacementPosition(this.posX, this.posY);
+        this.posX = snapped.x;
+        this.posY = snapped.y;
+        this.updatePosition?.();
+
+        const cell = builder.cellForObject(this);
+        if (!builder.canHostPost(cell.x, cell.y, this)) return false;
+        builder.settlePost(this, cell);
+        return true;
+    }
+
+    // Whatever route it leaves by, the fences it was connecting need to redraw.
+    remove() {
+        this._notifyFenceNeighbors?.();
+        super.remove();
+    }
+};
+;
 /* -- js/Map/MapObjects/Barrier/DoorMapObject.js -- */
 class DoorMapObject extends withWallOpeningPlacement(OpenableMapObject) {
     isLightBlocking() {
@@ -63199,6 +63490,28 @@ class FenceMapObject extends MapObject {
     tickUpdate(delta) {
         this._updateDegradation(delta);
     }
+
+    // Leaving the map by any route — the Fence tool, the Move tool, stored into
+    // the inventory — has to redraw the neighbours it was connecting, or they
+    // keep drawing a join to a fence that is no longer there.
+    remove() {
+        this._notifyNeighbors();
+        super.remove();
+    }
+
+    // Player-placed fences persist through the ordinary WorldState object path;
+    // authored ones are rebuilt from the map and this just re-applies wear.
+    serializeState() {
+        return { health: this.health, fallen: this._fallen };
+    }
+
+    restoreState(data = {}) {
+        if (Number.isFinite(data.health)) this.health = data.health;
+        this._fallen = data.fallen === true;
+        this._updateCollisionFromHealth();
+        this._updateHealthVisuals();
+        this.refreshConnectionSprite();
+    }
 }
 ;
 /* -- js/Map/MapObjects/Barrier/GateMapObject.js -- */
@@ -63264,6 +63577,19 @@ class GateMapObject extends LinkedOpenableMapObject {
         return element;
     }
 
+    // Player-placed gates persist through the ordinary WorldState object path;
+    // only the open/closed state needs carrying, the same as a door.
+    serializeState() {
+        return { isOpen: this.isOpen };
+    }
+
+    restoreState(data = {}) {
+        this.isOpen = data.isOpen === true;
+        this.updateCollisionState();
+        this.applyOpenStateClasses?.();
+        this._notifyFenceNeighbors();
+    }
+
     // ── Interaction ───────────────────────────────────────────────────────────
 
     getAiAffordances() {
@@ -63294,6 +63620,320 @@ class GateMapObject extends LinkedOpenableMapObject {
             userInitiated: true,
         });
         return true;
+    }
+}
+;
+/* -- js/Map/MapObjects/Barrier/FenceBuilder.js -- */
+/**
+ * FenceBuilder — the map-object side of the Fence tool.
+ *
+ * Walls are tiles edited through WallBuilder; fences are ordinary
+ * FenceMapObjects that happen to be laid down a cell at a time. So this is a
+ * thin helper, not a second WallBuilder: it turns "the cell at (x, y)" into a
+ * placed/removed FenceMapObject, answers whether a cell is clear enough to take
+ * one, and keeps the neighbours' connection sprites honest. Persistence is the
+ * normal WorldState object path (FenceMapObject.serializeState), so nothing
+ * here writes to the save.
+ *
+ * The panel↔builder contract is deliberately the same shape WallBuildPanel /
+ * CellDragBuildPanel expect: `checkCell(cell, op)` returns a BuildRules verdict,
+ * `placeCells` / `removeCells` do the work and hand back enough to build undo.
+ */
+class FenceBuilder {
+    static FENCE_TYPE = 'FENCE';
+    static GATE_TYPE = 'GATE';
+    static DEFAULT_VARIANT = 'wooden_fence';
+
+    static NEIGHBOURS = [
+        { dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }
+    ];
+
+    constructor(gameMap) {
+        this.gameMap = gameMap;
+    }
+
+    get grid() {
+        return this.gameMap?.gridSystem || null;
+    }
+
+    get cellSize() {
+        return this.grid?.config?.cellSize ?? 32;
+    }
+
+    get inventory() {
+        return this.gameMap?.container?.inventory || null;
+    }
+
+    // ── Grid <-> world ───────────────────────────────────────────────────────
+
+    _colliderFor(type) {
+        const region = MapObjectFactory.getTypeConfig(type)?.spatial?.regions?.collider;
+        const cs = this.cellSize;
+        return {
+            offsetX: region?.x ?? region?.offsetX ?? 0,
+            offsetY: region?.y ?? region?.offsetY ?? cs,
+            width: region?.width ?? cs,
+            height: region?.height ?? cs
+        };
+    }
+
+    /**
+     * A position for a fresh object of `type` such that its collider box fills
+     * grid cell (gx, gy): centred across the cell, and sitting on the cell's
+     * bottom edge so a tall gate lines its foot up with the fence beside it.
+     */
+    worldPosForObject(type, gx, gy) {
+        const cs = this.cellSize;
+        const c = typeof type === 'string' ? this._colliderFor(type) : {
+            offsetX: type.collider?.offsetX ?? 0,
+            offsetY: type.collider?.offsetY ?? 0,
+            width: type.collider?.width ?? type.size?.width ?? cs,
+            height: type.collider?.height ?? type.size?.height ?? cs
+        };
+        return {
+            x: (gx * cs) + ((cs - c.width) / 2) - c.offsetX,
+            y: ((gy + 1) * cs) - c.height - c.offsetY
+        };
+    }
+
+    worldPosForCell(gx, gy) {
+        return this.worldPosForObject(FenceBuilder.FENCE_TYPE, gx, gy);
+    }
+
+    cellForObject(object, x = object.posX, y = object.posY) {
+        const cs = this.cellSize;
+        const offX = object.collider?.offsetX ?? 0;
+        const offY = object.collider?.offsetY ?? 0;
+        const w = object.collider?.width ?? object.size?.width ?? cs;
+        const h = object.collider?.height ?? object.size?.height ?? cs;
+        return {
+            x: Math.floor((x + offX + w / 2) / cs),
+            y: Math.floor((y + offY + h / 2) / cs)
+        };
+    }
+
+    // ── Queries ──────────────────────────────────────────────────────────────
+
+    _cell(x, y) {
+        return this.grid?.grid?.[x]?.[y] || null;
+    }
+
+    _postOfType(x, y, type) {
+        const cell = this._cell(x, y);
+        if (!cell) return null;
+        for (const entry of cell.objects ?? []) {
+            if (entry?.type === type && entry.active !== false) return entry;
+        }
+        return null;
+    }
+
+    fenceAt(x, y) {
+        return this._postOfType(x, y, FenceBuilder.FENCE_TYPE);
+    }
+
+    gateAt(x, y) {
+        return this._postOfType(x, y, FenceBuilder.GATE_TYPE);
+    }
+
+    /**
+     * What, if anything, is standing in this cell that a fence cannot share it
+     * with. Existing fences and gates are fine (laying over them is a no-op or a
+     * gate swap); anything else solid — furniture, an NPC, a myte — is not.
+     * @returns {string|null} the blocker's name, or null when the cell is clear
+     */
+    cellBlockerName(x, y, ignore = null) {
+        const cell = this._cell(x, y);
+        if (!cell) return 'the edge of the map';
+        for (const entry of cell.objects ?? []) {
+            if (entry === ignore || entry?.active === false) continue;
+            if (entry?.type === FenceBuilder.FENCE_TYPE || entry?.type === FenceBuilder.GATE_TYPE) continue;
+            // A myte (or any entity) indexes itself in the grid with no config
+            // to ask — treat it as a hard blocker.
+            if (typeof entry?.getConfig !== 'function') return entry?.name || 'a creature';
+            if (entry.getConfig('visual.overlappable', false)) continue;
+            return entry.name || entry.getDisplayName?.() || 'something';
+        }
+        return null;
+    }
+
+    /**
+     * The pre-flight the panel draws its ghosts from. Same verdict shape the
+     * wall rules use.
+     */
+    checkCell(cell, operation = 'add') {
+        const { x, y } = cell;
+        const grid = this.grid;
+        if (!grid) return BuildRules.deny('This map has no fence system.');
+        if (x < 0 || y < 0 || x >= grid.gridWidth || y >= grid.gridHeight) {
+            return BuildRules.deny('That is off the map.');
+        }
+
+        if (operation === 'remove') {
+            return this.fenceAt(x, y)
+                ? BuildRules.ALLOWED
+                : BuildRules.deny('There is no fence here.');
+        }
+
+        // Adding over a post that already stands here is allowed and does
+        // nothing — the ghost shows it inert rather than refused.
+        if (this.fenceAt(x, y) || this.gateAt(x, y)) return BuildRules.ALLOWED;
+
+        if (this._cell(x, y)?.tileWalkable === false) {
+            return BuildRules.deny('Nothing can stand there.');
+        }
+        if (this.gameMap.wallBuilder?.cells?.has(`${x},${y}`)) {
+            return BuildRules.deny('A wall is in the way.');
+        }
+        const blocker = this.cellBlockerName(x, y);
+        if (blocker) {
+            return BuildRules.deny(`${blocker.charAt(0).toUpperCase()}${blocker.slice(1)} is in the way.`);
+        }
+        return BuildRules.ALLOWED;
+    }
+
+    /**
+     * Whether a dragged post (a gate looking for a fence to replace, say) may
+     * settle in this cell. Looser than `checkCell('add')` on one point: a fence
+     * already here is not a blocker, it is the thing being replaced.
+     */
+    canHostPost(x, y, object) {
+        const grid = this.grid;
+        if (!grid || x < 0 || y < 0 || x >= grid.gridWidth || y >= grid.gridHeight) return false;
+        if (this._cell(x, y)?.tileWalkable === false) return false;
+        if (this.gameMap.wallBuilder?.cells?.has(`${x},${y}`)) return false;
+        if (this.gateAt(x, y) && this.gateAt(x, y) !== object) return false;
+        return this.cellBlockerName(x, y, object) === null;
+    }
+
+    // ── Mutations ────────────────────────────────────────────────────────────
+
+    /**
+     * @param {Array<{x,y,variant}>} entries
+     * @returns {{placed: Array<{x,y,variant,id}>, rejected: Array<{x,y,reason}>}}
+     */
+    placeCells(entries) {
+        const map = this.gameMap;
+        const placed = [];
+        const rejected = [];
+        const touched = new Set();
+
+        for (const { x, y, variant } of entries) {
+            if (this.fenceAt(x, y)) continue;                       // already there
+            const pos = this.worldPosForCell(x, y);
+            const object = map.addObject(FenceBuilder.FENCE_TYPE, variant || FenceBuilder.DEFAULT_VARIANT, pos.x, pos.y);
+            if (!object) {
+                rejected.push({ x, y, reason: 'A fence could not be placed there.' });
+                continue;
+            }
+            // render() sets the sprite's z-index inline but leaves renderState
+            // untouched, so the first MapRenderer.flush() (renderState still
+            // dirty, zIndex still 0) would stamp it back to 0 and drop the fence
+            // behind neighbouring walls until something moved it. The furniture
+            // drop path avoids this by flushing position on placement — do the
+            // same here.
+            object.updatePosition?.();
+            placed.push({ x, y, variant: object.variant, id: String(object.id) });
+            touched.add(`${x},${y}`);
+        }
+
+        this._afterMutation(touched);
+        return { placed, rejected };
+    }
+
+    /**
+     * @param {Array<{x,y}>} coords
+     * @param {{toInventory?: boolean}} options
+     * @returns {{removed: Array<{x,y,variant}>, rejected: Array<{x,y,reason}>}}
+     */
+    removeCells(coords, { toInventory = false } = {}) {
+        const map = this.gameMap;
+        const removed = [];
+        const rejected = [];
+        const touched = new Set();
+
+        for (const { x, y } of coords) {
+            const fence = this.fenceAt(x, y);
+            if (!fence) {
+                rejected.push({ x, y, reason: 'There is no fence here.' });
+                continue;
+            }
+            const variant = fence.variant;
+            if (toInventory && !this._store(fence)) {
+                rejected.push({ x, y, reason: 'There is not enough inventory space.' });
+                continue;
+            }
+            if (!toInventory) fence.remove();
+            removed.push({ x, y, variant });
+            touched.add(`${x},${y}`);
+        }
+
+        if (touched.size) map.removeInactiveObjects?.();
+        this._afterMutation(touched);
+        return { removed, rejected };
+    }
+
+    /**
+     * A dragged gate has come to rest. If it landed on a fence, that fence is
+     * replaced — pulled into the inventory, its neighbours re-pointed at the
+     * gate. The fence side is recorded on its own history entry; the gate's own
+     * move is the map-object drag system's to undo.
+     */
+    settlePost(object, cell = this.cellForObject(object)) {
+        const fence = this.fenceAt(cell.x, cell.y);
+        if (fence && fence !== object) {
+            const variant = fence.variant;
+            if (!this._store(fence)) fence.remove();
+            this.gameMap.removeInactiveObjects?.();
+            this._recordSwap(cell, variant);
+        }
+        this._afterMutation(new Set([`${cell.x},${cell.y}`]));
+        object._notifyFenceNeighbors?.();
+        return true;
+    }
+
+    _recordSwap(cell, variant) {
+        const history = this.gameMap?.container?.buildHistory;
+        if (!history) return;
+        history.push({
+            label: 'Replace Fence with Gate',
+            undo: () => {
+                this.placeCells([{ x: cell.x, y: cell.y, variant }]);
+                this.inventory?.removeItem?.(variant);
+            },
+            redo: () => {
+                this.removeCells([{ x: cell.x, y: cell.y }], { toInventory: true });
+            }
+        });
+    }
+
+    _store(object) {
+        const inventory = this.inventory;
+        if (inventory?.storeMapObject) return inventory.storeMapObject(object) === true;
+        return false;
+    }
+
+    // ── Neighbour upkeep ─────────────────────────────────────────────────────
+
+    _afterMutation(touchedKeys) {
+        if (!touchedKeys || touchedKeys.size === 0) return;
+        this.refreshNeighbours(touchedKeys);
+    }
+
+    refreshNeighbours(touchedKeys) {
+        for (const key of touchedKeys) {
+            const [x, y] = key.split(',').map(Number);
+            for (const { dx, dy } of FenceBuilder.NEIGHBOURS) {
+                const cell = this._cell(x + dx, y + dy);
+                if (!cell) continue;
+                for (const entry of cell.objects ?? []) {
+                    entry.refreshConnectionSprite?.();
+                }
+            }
+        }
+    }
+
+    dispose() {
+        this.gameMap = null;
     }
 }
 ;
@@ -64954,7 +65594,7 @@ MapObjectFactory.registry
     .register('WINDOW', WindowMapObject)
     .register('PAINTING', WallFixtureMapObject)
     .register('PORTAL', PortalMapObject)
-    .register('GATE', GateMapObject)
+    .register('GATE', withFencePostPlacement(GateMapObject))
     .register('FENCE', FenceMapObject)
     .setDefaultConstructor(MapObject);
 ;
@@ -68418,7 +69058,7 @@ class BinaryHeap {
     }
 }
 ;
-/* -- js/UI/Core/UIComponent.js -- */
+/* -- js/UI/core/UIComponent.js -- */
 // One name per tool, and the same one everywhere: the key here, the value, the
 // button's `id` suffix, its `data-tool-mode`, and the label the player reads.
 // It used to be none of those — the wall tool was `BUILD`/`build` in code,
@@ -68432,7 +69072,11 @@ const UIToolModes = {
     // Build-mode tools. MOVE is the furniture tool: the same drag the play-mode
     // Drag tool performs, but for objects rather than mytes.
     MOVE: 'move',
+    BUILD_SELECT: 'build-select',
     WALL: 'wall',
+    // FENCE is the same drag-a-run gesture as WALL, but it drops FenceMapObjects
+    // onto the map instead of editing wall tiles. See FenceBuildPanel.
+    FENCE: 'fence',
     // ROOM is the rooms themselves: naming them, and painting floor into
     // them where no wall says where one ends. See RoomPanel.
     ROOM: 'room',
@@ -68444,8 +69088,8 @@ const UIToolModes = {
 
 // Tools that only exist inside Build mode.
 const BUILD_TOOL_MODES = Object.freeze([
-    UIToolModes.MOVE, UIToolModes.WALL, UIToolModes.ROOM, UIToolModes.SURFACE,
-    UIToolModes.TERRAIN
+    UIToolModes.BUILD_SELECT, UIToolModes.MOVE, UIToolModes.WALL, UIToolModes.FENCE, UIToolModes.ROOM,
+    UIToolModes.SURFACE, UIToolModes.TERRAIN
 ]);
 
 /**
@@ -68507,7 +69151,7 @@ class UIComponent {
     }
 }
 ;
-/* -- js/UI/Core/BuildRunSound.js -- */
+/* -- js/UI/core/BuildRunSound.js -- */
 // ─────────────────────────────────────────────────────────────────────────────
 // BuildRunSound — the sound of a build gesture happening under your hand.
 //
@@ -68584,7 +69228,7 @@ class BuildRunSound {
     }
 }
 ;
-/* -- js/UI/Core/TabController.js -- */
+/* -- js/UI/core/TabController.js -- */
 class TabController {
     constructor(options = {}) {
         this.element = options.element || null;
@@ -68892,7 +69536,7 @@ class CompactChipStripUI extends UIComponent {
     }
 }
 ;
-/* -- js/UI/Core/CursorManager.js -- */
+/* -- js/UI/core/CursorManager.js -- */
 class CursorManager extends UIComponent {
 
     constructor(parent, options = {}) {
@@ -69355,11 +69999,26 @@ class ToolManager extends UIComponent {
                 shortcut: '1',
                 buildOnly: true
             },
+            [UIToolModes.BUILD_SELECT]: {
+                id: 'tool-build-select',
+                label: 'Select',
+                cursor: 'default',
+                buildOnly: true,
+                claimsMapDrag: true
+            },
             [UIToolModes.WALL]: {
                 id: 'tool-wall',
                 label: 'Wall',
                 cursor: 'crosshair',
                 shortcut: '2',
+                buildOnly: true,
+                claimsMapDrag: true
+            },
+            [UIToolModes.FENCE]: {
+                id: 'tool-fence',
+                label: 'Fence',
+                cursor: 'crosshair',
+                shortcut: '6',
                 buildOnly: true,
                 claimsMapDrag: true
             },
@@ -69410,6 +70069,9 @@ class ToolManager extends UIComponent {
     // The tool each mode falls back to when it is entered or when a tool is
     // refused.
     getDefaultToolFor(gameMode = this.gameMode?.mode) {
+        // Build opens on Move: empty-map drags pan the camera, while grabbing
+        // furniture still moves it. Marquee Select remains available when the
+        // player explicitly wants to select several things.
         return gameMode === GAME_MODES.BUILD ? UIToolModes.MOVE : UIToolModes.SELECT;
     }
 
@@ -69681,7 +70343,7 @@ class BuildModeUI extends UIComponent {
     }
 }
 ;
-/* -- js/UI/Core/HintNotes.js -- */
+/* -- js/UI/core/HintNotes.js -- */
 /**
  * HintNotes — one treatment, and one switch, for every explanatory line in a
  * panel.
@@ -70225,13 +70887,17 @@ class SelectionManager extends UIComponent {
     constructor(parent) {
         super(parent);
         this.selectedObject = null;
+        this.selectedObjects = [];
     }
 
 
     setSelected(obj) {
-        if (this.selectedObject === obj) {
-            return;
-        }
+        this.setSelection(obj ? [obj] : []);
+    }
+
+    setSelection(objects = []) {
+        const next = [...new Set(objects.filter(Boolean))];
+        if (next.length === this.selectedObjects.length && next.every((item, index) => item === this.selectedObjects[index])) return;
 
         const deselect = (object) => {
             if (!object) return;
@@ -70263,13 +70929,10 @@ class SelectionManager extends UIComponent {
             }
         };
 
-        // Deselect current object
-        if (this.selectedObject) deselect(this.selectedObject);
-
-        this.selectedObject = obj;
-
-        // Select new object
-        if (this.selectedObject) select(this.selectedObject);
+        this.selectedObjects.forEach(deselect);
+        this.selectedObjects = next;
+        this.selectedObjects.forEach(select);
+        this.selectedObject = next.length === 1 ? next[0] : null;
 
         // Notify parent UI of selection change
         this.parent.onSelectionChanged(this.selectedObject);
@@ -70279,9 +70942,203 @@ class SelectionManager extends UIComponent {
         return this.selectedObject;
     }
 
+    getSelectedObjects() {
+        return [...this.selectedObjects];
+    }
+
     dispose() {
         this.setSelected(null);
         this.selectedObject = null;
+        this.selectedObjects = [];
+    }
+}
+;
+/* -- js/UI/Map/BuildMarqueeSelection.js -- */
+class BuildMarqueeSelection extends UIComponent {
+    constructor(parent) {
+        super(parent);
+        this.drag = null;
+        this.selectedWallCells = [];
+        this.marquee = null;
+        this.wallHighlights = [];
+        this.boundDown = this.onPointerDown.bind(this);
+        this.boundMove = this.onPointerMove.bind(this);
+        this.boundUp = this.onPointerUp.bind(this);
+        this.boundClick = this.onClick.bind(this);
+        this.swallowClick = false;
+    }
+
+    init() {
+        this.container?.canvas?.addEventListener('pointerdown', this.boundDown, true);
+        document.addEventListener('pointermove', this.boundMove, true);
+        document.addEventListener('pointerup', this.boundUp, true);
+        document.addEventListener('pointercancel', this.boundUp, true);
+        this.container?.canvas?.addEventListener('click', this.boundClick, true);
+    }
+
+    isActive() {
+        return this.container?.gameMode?.isBuild() === true &&
+            this.parent?.isTool?.(UIToolModes.BUILD_SELECT);
+    }
+
+    onPointerDown(event) {
+        if (!this.isActive() || event.button !== 0 || event.target?.closest?.(InputComponent.UI_SELECTOR)) return;
+        this.clearVisuals();
+        this.drag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, endX: event.clientX, endY: event.clientY };
+        this.marquee = document.createElement('div');
+        this.marquee.className = 'build-selection-marquee';
+        document.body.appendChild(this.marquee);
+        this.renderMarquee();
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    onPointerMove(event) {
+        if (!this.drag || event.pointerId !== this.drag.pointerId) return;
+        this.drag.endX = event.clientX;
+        this.drag.endY = event.clientY;
+        this.renderMarquee();
+        event.preventDefault();
+    }
+
+    onPointerUp(event) {
+        if (!this.drag || event.pointerId !== this.drag.pointerId) return;
+        this.drag.endX = event.clientX;
+        this.drag.endY = event.clientY;
+        const rect = this.dragRect();
+        this.drag = null;
+        this.marquee?.remove();
+        this.marquee = null;
+        this.selectWithin(rect);
+        this.swallowClick = true;
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    onClick(event) {
+        if (!this.swallowClick) return;
+        this.swallowClick = false;
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    dragRect() {
+        const { startX, startY, endX, endY } = this.drag;
+        const left = Math.min(startX, endX);
+        const top = Math.min(startY, endY);
+        return { left, top, right: Math.max(startX, endX), bottom: Math.max(startY, endY), width: Math.abs(endX - startX), height: Math.abs(endY - startY) };
+    }
+
+    renderMarquee() {
+        const rect = this.dragRect();
+        Object.assign(this.marquee.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+    }
+
+    intersects(a, b) {
+        return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top;
+    }
+
+    selectWithin(rect) {
+        const objects = (this.container?.gameMap?.objects || []).filter(object =>
+            object.active !== false && object.element && this.intersects(rect, object.element.getBoundingClientRect())
+        );
+        this.parent.selectionManager.setSelection(objects);
+        this.selectedWallCells = this.wallCellsWithin(rect);
+        this.renderWallHighlights();
+        this.parent.actionSidebarManager?.updateActions?.(objects.length === 1 && this.selectedWallCells.length === 0 ? objects[0] : null);
+    }
+
+    wallCellsWithin(rect) {
+        const builder = this.container?.gameMap?.wallBuilder;
+        const input = this.container?.inputHandler;
+        if (!builder || !input) return [];
+        const from = input.screenToWorldCoordinates(rect.left, rect.top);
+        const to = input.screenToWorldCoordinates(rect.right, rect.bottom);
+        return [...builder.baseCells.values()].filter(cell => {
+            const left = cell.x * builder.cellSize;
+            const top = cell.y * builder.cellSize;
+            return left < to.x && left + builder.cellSize > from.x && top < to.y && top + builder.cellSize > from.y;
+        }).map(cell => ({ x: cell.x, y: cell.y }));
+    }
+
+    renderWallHighlights() {
+        this.wallHighlights.forEach(element => element.remove());
+        this.wallHighlights = [];
+        const input = this.container?.inputHandler;
+        const builder = this.container?.gameMap?.wallBuilder;
+        if (!input || !builder) return;
+        for (const cell of this.selectedWallCells) {
+            const start = input.worldToScreenCoordinates(cell.x * builder.cellSize, cell.y * builder.cellSize);
+            const end = input.worldToScreenCoordinates((cell.x + 1) * builder.cellSize, (cell.y + 1) * builder.cellSize);
+            const element = document.createElement('div');
+            element.className = 'build-selection-cell';
+            Object.assign(element.style, { left: `${start.x}px`, top: `${start.y}px`, width: `${end.x - start.x}px`, height: `${end.y - start.y}px` });
+            document.body.appendChild(element);
+            this.wallHighlights.push(element);
+        }
+    }
+
+    getSelectedWallCells() {
+        return [...this.selectedWallCells];
+    }
+
+    storeSelection() {
+        const inventory = this.container?.inventory;
+        const objects = this.parent.selectionManager.getSelectedObjects();
+        const wallCells = [...this.selectedWallCells];
+        const unstored = objects.filter(object => inventory?.storeMapObject?.(object) !== true);
+        const builder = this.container?.gameMap?.wallBuilder;
+        let wallResult = null;
+        if (builder && wallCells.length) {
+            wallResult = builder.applyWallCellChanges(wallCells.map(cell => ({ ...cell, data: null })));
+        }
+        this.parent.selectionManager.setSelection(unstored);
+        this.selectedWallCells = [];
+        this.clearVisuals();
+        if (unstored.length) this.parent.showMessage?.(`${unstored.length} object${unstored.length === 1 ? '' : 's'} could not be returned to inventory.`, 'warning', 'Selection');
+        if (wallResult?.rejected?.length) {
+            this.parent.showMessage?.(`${wallResult.rejected.length} protected wall cell${wallResult.rejected.length === 1 ? '' : 's'} could not be removed.`, 'warning', 'Selection');
+        }
+        if (wallResult?.applied?.length) {
+            const forward = Utility.deepClone(wallResult.applied);
+            const backward = Utility.deepClone(wallResult.inverse);
+            this.container.buildHistory?.push({
+                label: `Remove Wall (${forward.length} cells)`,
+                undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
+                redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
+            });
+        }
+    }
+
+    clearVisuals() {
+        this.marquee?.remove();
+        this.marquee = null;
+        this.wallHighlights.forEach(element => element.remove());
+        this.wallHighlights = [];
+    }
+
+    clearSelection() {
+        this.selectedWallCells = [];
+        this.clearVisuals();
+    }
+
+    cancelDrag() {
+        if (!this.drag) return false;
+        this.drag = null;
+        this.marquee?.remove();
+        this.marquee = null;
+        this.swallowClick = false;
+        return true;
+    }
+
+    dispose() {
+        this.container?.canvas?.removeEventListener('pointerdown', this.boundDown, true);
+        document.removeEventListener('pointermove', this.boundMove, true);
+        document.removeEventListener('pointerup', this.boundUp, true);
+        document.removeEventListener('pointercancel', this.boundUp, true);
+        this.container?.canvas?.removeEventListener('click', this.boundClick, true);
+        this.clearVisuals();
+        super.dispose();
     }
 }
 ;
@@ -73034,7 +73891,7 @@ class ScreenManager extends UIComponent {
     }
 }
 ;
-/* -- js/UI/Core/UserInterface.js -- */
+/* -- js/UI/core/UserInterface.js -- */
 class UserInterface {
     constructor(parent) {
         this.parent = parent;
@@ -73049,6 +73906,7 @@ class UserInterface {
         // Initialize all UI components
         this.toolManager = new ToolManager(this);
         this.selectionManager = new SelectionManager(this);
+        this.buildMarqueeSelection = new BuildMarqueeSelection(this);
         this.queueTargetManager = new QueueTargetManager(this);
         this.actionSidebarManager = new ActionSidebarManager(this);
         this.myteListManager = new MyteListManager(this);
@@ -73073,6 +73931,7 @@ class UserInterface {
         // Initialize all components
         this.toolManager.init();
         this.selectionManager.init();
+        this.buildMarqueeSelection.init();
         this.actionSidebarManager.init();
         this.myteListManager.init();
         this.hudManager.init();
@@ -73086,6 +73945,7 @@ class UserInterface {
         this.settingsPanel = new SettingsPanel(this);
         this.surfaceCustomizePanel = new SurfaceCustomizePanel(this);
         this.wallBuildPanel = new WallBuildPanel(this);
+        this.fenceBuildPanel = new FenceBuildPanel(this);
         this.roomPanel = new RoomPanel(this);
         this.terrainPaintPanel = new TerrainPaintPanel(this);
         this.viewPanel = new ViewPanel(this);
@@ -73138,6 +73998,7 @@ class UserInterface {
     onToolModeChanged(mode) {
         // Clear selection when tool mode changes
         this.selectionManager.setSelected(null);
+        this.buildMarqueeSelection?.clearSelection?.();
         // A gesture belongs to the tool that started it: leaving Move mid-drag
         // would otherwise leave a myte wherever the cursor happened to be.
         this.buildPlacement?.cancel();
@@ -73146,6 +74007,7 @@ class UserInterface {
         this.actionSidebarManager.updateActions(null);
         this.surfaceCustomizePanel?.handleToolModeChanged(mode);
         this.wallBuildPanel?.handleToolModeChanged(mode);
+        this.fenceBuildPanel?.handleToolModeChanged(mode);
         this.roomPanel?.handleToolModeChanged(mode);
         this.terrainPaintPanel?.handleToolModeChanged(mode);
     }
@@ -73198,11 +74060,16 @@ class UserInterface {
 
     // Public methods
     setSelected(obj) {
+        if (!obj) this.buildMarqueeSelection?.clearSelection?.();
         this.selectionManager.setSelected(obj);
     }
 
     getSelected() {
         return this.selectionManager.getSelectedObject();
+    }
+
+    getSelectedObjects() {
+        return this.selectionManager.getSelectedObjects();
     }
 
     setToolMode(mode) {
@@ -73215,6 +74082,16 @@ class UserInterface {
 
     changeToolMode(mode) {
         return this.toolManager.changeToolMode(mode);
+    }
+
+    /** Two fingers always borrow the map, so abandon any one-finger build preview. */
+    cancelBuildGesturesForCamera() {
+        this.wallBuildPanel?.cancelDrag?.();
+        this.fenceBuildPanel?.cancelDrag?.();
+        this.roomPanel?.cancelDrag?.();
+        this.terrainPaintPanel?.abortStroke?.();
+        this.buildMarqueeSelection?.cancelDrag?.();
+        this.buildPlacement?.cancel?.();
     }
 
     /**
@@ -73376,6 +74253,8 @@ class UserInterface {
         this.surfaceCustomizePanel = null;
         this.wallBuildPanel?.dispose?.();
         this.wallBuildPanel = null;
+        this.fenceBuildPanel?.dispose?.();
+        this.fenceBuildPanel = null;
         this.roomPanel?.dispose?.();
         this.roomPanel = null;
         this.terrainPaintPanel?.dispose?.();
@@ -73403,6 +74282,7 @@ class UserInterface {
         this.queueTargetManager?.dispose?.();
         this.offscreenMyteIndicatorManager?.dispose?.();
         this.selectionManager?.dispose?.();
+        this.buildMarqueeSelection?.dispose?.();
         this.hudManager?.dispose?.();
         this.buffOverlayUI?.dispose?.();
         this.actionSidebarManager?.dispose?.();
@@ -73425,7 +74305,7 @@ class UserInterface {
     }
 }
 ;
-/* -- js/UI/Core/ModalWindow.js -- */
+/* -- js/UI/core/ModalWindow.js -- */
 class ModalWindow {
 
 	static activeWindows = [];
@@ -74216,7 +75096,7 @@ constructor(parent, options = {}) {
 	}
 }
 ;
-/* -- js/UI/Core/SegmentControl.js -- */
+/* -- js/UI/core/SegmentControl.js -- */
 /**
  * SegmentControl — one row of buttons where exactly one is down.
  *
@@ -74293,7 +75173,7 @@ class SegmentControl {
     }
 }
 ;
-/* -- js/UI/Core/BuildSettingToggle.js -- */
+/* -- js/UI/core/BuildSettingToggle.js -- */
 /**
  * BuildSettingToggle — a checkbox bound to one piece of build state.
  *
@@ -74357,7 +75237,7 @@ class BuildSnapToggle extends BuildSettingToggle {
     }
 }
 ;
-/* -- js/UI/Core/WallViewControl.js -- */
+/* -- js/UI/core/WallViewControl.js -- */
 /**
  * WallViewControl — the Up / Cutaway / Down / Hidden segmented control.
  *
@@ -74428,7 +75308,7 @@ class WallViewControl {
     }
 }
 ;
-/* -- js/UI/Core/PanelSection.js -- */
+/* -- js/UI/core/PanelSection.js -- */
 /**
  * PanelSection — a controller for one tab inside a shared window.
  *
@@ -74506,7 +75386,7 @@ class PanelSection {
     }
 }
 ;
-/* -- js/UI/Core/DetailRows.js -- */
+/* -- js/UI/core/DetailRows.js -- */
 // ─────────────────────────────────────────────────────────────────────────────
 // DetailRows — the label/value list that shows up wherever a panel has to state
 // a handful of facts: the world map's map details, the keyboard legends in
@@ -74573,7 +75453,7 @@ class DetailRows {
     }
 }
 ;
-/* -- js/UI/Core/WorldModal.js -- */
+/* -- js/UI/core/WorldModal.js -- */
 class WorldModal extends ModalWindow {
     constructor(parent, options = {}) {
         const worldOptions = {
@@ -74747,7 +75627,7 @@ class WorldModal extends ModalWindow {
     }
 }
 ;
-/* -- js/UI/Panels/MyteInfoPanel.js -- */
+/* -- js/UI/panels/MyteInfoPanel.js -- */
 class MyteInfoPanel extends ModalWindow {
     static GENERAL_FIELDS = Object.freeze([
         Object.freeze({ key: 'status', label: 'Status' }),
@@ -75261,7 +76141,7 @@ class MyteInfoPanel extends ModalWindow {
     }
 }
 ;
-/* -- js/UI/Panels/UserProfilePanel.js -- */
+/* -- js/UI/panels/UserProfilePanel.js -- */
 class UserProfilePanel extends ModalWindow {
     constructor(parent) {
         super(parent, {
@@ -75388,7 +76268,7 @@ class UserProfilePanel extends ModalWindow {
     }
 }
 ;
-/* -- js/UI/Panels/ShopPanel.js -- */
+/* -- js/UI/panels/ShopPanel.js -- */
 class ShopPanel extends WorldModal {
     constructor(parent) {
         super(parent, {
@@ -75556,7 +76436,7 @@ class ShopPanel extends WorldModal {
     }
 }
 ;
-/* -- js/UI/Debug/DebugOverlayUI.js -- */
+/* -- js/UI/debug/DebugOverlayUI.js -- */
 class DebugOverlayUI {
     static PERSIST_KEY = 'neko.debug';
     static FLOATING_MARGIN = 8;
@@ -76997,7 +77877,7 @@ class DebugOverlayUI {
     }
 }
 ;
-/* -- js/UI/Debug/AuditHarness.js -- */
+/* -- js/UI/debug/AuditHarness.js -- */
 // AuditHarness — console tooling that records current behavior as JSON so the
 // refactor phases (docs/ARCHITECTURE_AUDIT_2026-07.md) have mechanical
 // before/after acceptance instead of opinions.
@@ -77378,7 +78258,7 @@ const AuditHarness = {
 window.__audit = AuditHarness;
 window.__invariants = () => AuditHarness.invariants();
 ;
-/* -- js/UI/Debug/SurfaceDebug.js -- */
+/* -- js/UI/debug/SurfaceDebug.js -- */
 // SurfaceDebug — console tooling for the two systems that answer "which room
 // owns this piece of the world": wall paint surfaces and room floors.
 //
@@ -77768,7 +78648,7 @@ const SurfaceDebug = {
 
 window.__surfaces = SurfaceDebug;
 ;
-/* -- js/UI/Debug/QueueUI.js -- */
+/* -- js/UI/debug/QueueUI.js -- */
 class QueueUI {
     constructor(parent, options = {}) {
         this.parent = parent;
@@ -78282,7 +79162,7 @@ class QueueUI {
     }
 }
 ;
-/* -- js/UI/Panels/OptionsPanel.js -- */
+/* -- js/UI/panels/OptionsPanel.js -- */
 /**
  * OptionsPanel — the one settings window.
  *
@@ -78350,7 +79230,7 @@ class OptionsPanel extends ModalWindow {
     }
 }
 ;
-/* -- js/UI/Panels/SoundPanel.js -- */
+/* -- js/UI/panels/SoundPanel.js -- */
 class SoundPanel extends PanelSection {
     constructor(parent) {
         super(parent, { tab: 'sound' });
@@ -78698,7 +79578,7 @@ class SoundPanel extends PanelSection {
     }
 }
 ;
-/* -- js/UI/Panels/SurfaceCustomizePanel.js -- */
+/* -- js/UI/panels/SurfaceCustomizePanel.js -- */
 class SurfaceCustomizePanel extends ModalWindow {
     static SURFACE_LABELS = Object.freeze({
         north: 'North wall',
@@ -78884,10 +79764,20 @@ class SurfaceCustomizePanel extends ModalWindow {
         }) ?? null;
     }
 
+    // A concrete rgba(), never color-mix(): this string is assigned to a canvas
+    // 2D context's fillStyle (see FloorBuilder.createRoomOverlay), and Safari's
+    // canvas colour parser rejects color-mix() — the assignment is silently
+    // dropped, fillStyle stays at its default opaque black, and the whole room's
+    // floor overlay paints black. `color-mix(in srgb, C p%, transparent)` is
+    // just C at alpha p%, so the rgba() below is the same colour everywhere.
     static overlayFill(className) {
         const accent = getComputedStyle(document.documentElement)
-            .getPropertyValue('--state-info-accent').trim() || '#4285f4';
-        return `color-mix(in srgb, ${accent} ${className === 'paint-selection' ? 34 : 22}%, transparent)`;
+            .getPropertyValue('--state-info-accent').trim();
+        const parts = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(accent);
+        const [r, g, b] = parts
+            ? [parseInt(parts[1], 16), parseInt(parts[2], 16), parseInt(parts[3], 16)]
+            : [66, 133, 244];
+        return `rgba(${r}, ${g}, ${b}, ${className === 'paint-selection' ? 0.34 : 0.22})`;
     }
 
     /**
@@ -78983,6 +79873,34 @@ class SurfaceCustomizePanel extends ModalWindow {
     setTarget(target) {
         this.target = target;
         this.setOverlay(this.selection, target);
+    }
+
+    /** Open Surface with one of a room's surfaces already in hand. */
+    openRoomSurface(roomId, surface = 'floor') {
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        if (!room || !this.parent?.changeToolMode(UIToolModes.SURFACE)) return false;
+        let target = { surface: 'floor', room };
+        if (surface === 'wall') {
+            const builder = this.gameMap?.wallBuilder;
+            let wallSurface = null;
+            for (const cell of builder?.cells?.values?.() ?? []) {
+                wallSurface = builder.getCellSurfaces(cell).find(entry => entry.roomId === roomId);
+                if (wallSurface) break;
+            }
+            if (!wallSurface) {
+                this.parent.showMessage('This room has no wall surface to finish yet.', 'info', 'Surfaces');
+                return false;
+            }
+            target = {
+                surface: 'wall',
+                wallSurface,
+                piece: builder.findPieceForCell(wallSurface.cell.x, wallSurface.cell.y)
+            };
+        }
+        this.setTarget(target);
+        this.renderPalette();
+        this.open();
+        return true;
     }
 
     // The elements were parented to art that has since been rebuilt, so both
@@ -79270,6 +80188,9 @@ class SurfaceCustomizePanel extends ModalWindow {
 
         const customizer = this.gameMap?.surfaceCustomizer;
         const finishes = customizer?.listFinishes(this.target.surface) || [];
+        if (this.target.surface === 'floor') {
+            finishes.unshift({ id: null, displayName: 'None', empty: true });
+        }
         const currentFinishId = this.getCurrentFinishId();
         for (const finish of finishes) {
             const button = document.createElement('button');
@@ -79283,6 +80204,7 @@ class SurfaceCustomizePanel extends ModalWindow {
             sample.width = 22;
             sample.height = 22;
             sample.setAttribute('aria-hidden', 'true');
+            sample.classList.toggle('is-empty', finish.empty === true);
             const source = this.getFinishSample(finish.id);
             if (source) {
                 const context = sample.getContext('2d');
@@ -79295,7 +80217,7 @@ class SurfaceCustomizePanel extends ModalWindow {
             button.addEventListener('pointerenter', () => {
                 clearTimeout(this.hoverTimer);
                 this.hoverTimer = setTimeout(() => {
-                    customizer.preview(this.buildRequests(finish.id));
+                    customizer.preview(this.buildRequests(finish.id || null));
                 }, 150);
             });
             button.addEventListener('pointerleave', () => clearTimeout(this.hoverTimer));
@@ -79303,11 +80225,11 @@ class SurfaceCustomizePanel extends ModalWindow {
             // the plainest way of saying you are done with the one in hand.
             button.addEventListener('click', () => {
                 this.dropFinish();
-                this.applyFinish(finish.id);
+                this.applyFinish(finish.id || null);
             });
             // Double-click paints the whole room without touching the scope
             // radio - the scope machinery already understands the request.
-            button.addEventListener('dblclick', () => this.applyFinish(finish.id, 'room'));
+            button.addEventListener('dblclick', () => this.applyFinish(finish.id || null, 'room'));
             this.paletteElement.appendChild(button);
         }
     }
@@ -79415,7 +80337,7 @@ class SurfaceCustomizePanel extends ModalWindow {
     }
 }
 ;
-/* -- js/UI/Panels/TerrainPaintPanel.js -- */
+/* -- js/UI/panels/TerrainPaintPanel.js -- */
 // ─────────────────────────────────────────────────────────────────────────────
 // TerrainPaintPanel — the Ground tool: pick a terrain, drag over the map.
 //
@@ -79955,6 +80877,24 @@ class TerrainPaintPanel extends ModalWindow {
         return true;
     }
 
+    /** Roll a live stroke back when a second finger turns it into navigation. */
+    abortStroke() {
+        this.clearRectanglePreview();
+        const stroke = this.stroke;
+        this.stroke = null;
+        this._lastRefusal = null;
+        if (!stroke) return false;
+        const builder = this.builder;
+        for (const [layer, changes] of stroke.changesByLayer) {
+            builder.applyCornerChanges(layer, [...changes].reverse(), { direction: 'from' });
+        }
+        builder.layers
+            .filter(layer => !stroke.layersBefore?.has(layer))
+            .forEach(layer => builder.removeLayer(layer.id));
+        this.renderLayers();
+        return true;
+    }
+
     // ── Rendering ────────────────────────────────────────────────────────────
 
     render() {
@@ -80256,18 +81196,40 @@ class TerrainPaintPanel extends ModalWindow {
     }
 }
 ;
-/* -- js/UI/Panels/WallBuildPanel.js -- */
-class WallBuildPanel extends ModalWindow {
-    constructor(parent) {
+/* -- js/UI/panels/CellDragBuildPanel.js -- */
+/**
+ * CellDragBuildPanel — the shared machinery behind every "drag over the grid to
+ * build a run of cells" tool. WallBuildPanel and FenceBuildPanel are both this
+ * window wearing a different builder.
+ *
+ * It owns the parts that are the same whatever is being laid down: the pointer
+ * plumbing on the canvas, turning a pointer into a grid cell, walking a drag
+ * out into a line or a rectangle, the ghost cells and the measurement label,
+ * the Add/Remove segment with its Ctrl-invert, the run-sound pacing, and the
+ * hover crosshair that answers "can I build here?".
+ *
+ * A subclass supplies the tool's identity (`toolMode`, `bodyClass`), its
+ * builder (`getBuilder`), the two questions the ghosts ask of a cell
+ * (`checkCell`, `cellWouldChange`), and what a release actually does
+ * (`commitCells`). Anything a single tool needs on top of the plain drag —
+ * the Wall tool's grab-a-run-and-move-it handle — hangs off the
+ * `*SpecialGesture` / `renderSpecialHover` / `clearSpecial` hooks, which are
+ * no-ops here.
+ */
+class CellDragBuildPanel extends ModalWindow {
+    constructor(parent, buildConfig = {}) {
         super(parent, {
-            id: 'wall-build-panel',
+            id: buildConfig.id,
             closeOnOutsideClick: false,
             position: 'top-right',
             draggable: true,
             closeButtonSelector: '.modal-close-btn'
         });
+        this.buildConfig = buildConfig;
         this.drag = null;
         this.hoverCell = null;
+        this.hoverOperation = null;
+        this.hoverEvent = null;
         this.runSound = new BuildRunSound(this);
         this.ghostElements = [];
         this.measureLabel = null;
@@ -80277,28 +81239,61 @@ class WallBuildPanel extends ModalWindow {
         this.boundPointerLeave = this.clearHover.bind(this);
         this.init();
         this.operationSegment = new SegmentControl(
-            this.modalElement?.querySelector('.wall-build-operation-segment') || null,
+            this.modalElement?.querySelector(buildConfig.operationSegmentSelector) || null,
             { value: 'add', onChange: () => this.renderHoverGhost() }
         );
-        this.rectangleToggle = this.modalElement?.querySelector('#wall-build-rectangle') || null;
-        this.parent?.parent?.canvas?.addEventListener('pointerdown', this.boundPointerDown, true);
-        this.parent?.parent?.canvas?.addEventListener('pointerleave', this.boundPointerLeave);
+        this.rectangleToggle = buildConfig.rectangleToggleSelector
+            ? this.modalElement?.querySelector(buildConfig.rectangleToggleSelector) || null
+            : null;
+        this.canvas?.addEventListener('pointerdown', this.boundPointerDown, true);
+        this.canvas?.addEventListener('pointerleave', this.boundPointerLeave);
         document.addEventListener('pointermove', this.boundPointerMove, true);
         document.addEventListener('pointerup', this.boundPointerUp, true);
         document.addEventListener('pointercancel', this.boundPointerUp, true);
     }
 
-    get gameMap() {
-        return this.parent?.parent?.gameMap || null;
-    }
+    // ── Tool identity (subclass supplies via buildConfig) ─────────────────────
 
-    get rules() {
-        return this.parent?.parent?.buildRules || null;
-    }
+    get toolMode() { return this.buildConfig.toolMode; }
+    get bodyClass() { return this.buildConfig.bodyClass; }
+
+    // `parent` is the UserInterface; its parent is the container. ModalWindow
+    // already claims `this.container`, so the container is reached the long way
+    // round here — the same convention the other build panels follow.
+    get build() { return this.parent?.parent || null; }
+    get canvas() { return this.build?.canvas || null; }
+    get gameMap() { return this.build?.gameMap || null; }
+    get rules() { return this.build?.buildRules || null; }
+
+    // ── Subclass hooks ───────────────────────────────────────────────────────
+
+    // The builder this tool drives. Null on a map that has no such system.
+    getBuilder() { return null; }
+
+    // Pre-flight of the rules the commit enforces, so a blocked cell reads red
+    // under the cursor instead of silently vanishing on release.
+    checkCell(_cell, _operation = this.getOperation()) { return BuildRules.ALLOWED; }
+
+    // Allowed is not the same as "would do something": laying over what is
+    // already there is permitted and changes nothing.
+    cellWouldChange(_map, _cell, _removing) { return true; }
+
+    // Keep the run. Returns truthy on a change that happened.
+    commitCells(_map, _cells, _operation) { return false; }
+
+    // Extra gestures a single tool layers on top of the plain drag. Each
+    // returns true to say "I have taken this event, stop here".
+    tryBeginSpecialGesture(_cell, _event) { return false; }
+    updateSpecialGesture(_event) { return false; }
+    finishSpecialGesture(_event) { return false; }
+    renderSpecialHover(_cell, _operation) { return false; }
+    clearSpecial() {}
+
+    // ── Mode / window ────────────────────────────────────────────────────────
 
     handleToolModeChanged(mode) {
-        const active = mode === UIToolModes.WALL;
-        document.body.classList.toggle('wall-build-mode', active);
+        const active = mode === this.toolMode;
+        if (this.bodyClass) document.body.classList.toggle(this.bodyClass, active);
         if (active) {
             this.open();
         } else {
@@ -80308,16 +81303,17 @@ class WallBuildPanel extends ModalWindow {
         }
     }
 
-    // Closing the window is putting the tool down, so it hands back to
-    // whatever the current mode's default tool is — which is Select once build
-    // mode has already been left.
+    // Closing the window is putting the tool down, so it hands back to whatever
+    // the current mode's default tool is — Select once build mode has been left.
     close() {
-        if (this.parent.isTool(UIToolModes.WALL) &&
+        if (this.parent.isTool(this.toolMode) &&
             this.parent.changeToolMode(this.parent.toolManager.getDefaultToolFor())) {
             return;
         }
         super.close();
     }
+
+    // ── Operation / rectangle ────────────────────────────────────────────────
 
     getOperation() {
         return this.operationSegment?.value || 'add';
@@ -80325,8 +81321,8 @@ class WallBuildPanel extends ModalWindow {
 
     /**
      * The operation this gesture is actually performing. Ctrl held inverts the
-     * panel's tool for the length of the drag without touching the radio — the
-     * Sims' knock-a-wall-down modifier — so the common "lay a run, fix one
+     * panel's tool for the length of the drag without touching the segment —
+     * the Sims' knock-a-wall-down modifier — so the common "lay a run, fix one
      * cell, carry on" loop never costs two trips to the panel.
      */
     resolveOperation(event = null) {
@@ -80350,38 +81346,18 @@ class WallBuildPanel extends ModalWindow {
         return cell;
     }
 
+    // ── Pointer ──────────────────────────────────────────────────────────────
+
     handlePointerDown(event) {
-        if (!this.parent.isTool(UIToolModes.WALL) || event.button !== 0) return;
+        if (!this.parent.isTool(this.toolMode) || event.button !== 0) return;
         const cell = this.pointerToCell(event);
-        if (!cell || !this.gameMap?.wallBuilder) return;
+        if (!cell || !this.getBuilder()) return;
         event.preventDefault();
         event.stopPropagation();
         this.runSound.reset();
-        // A grip standing on the wall, grabbed. No mode to choose first: the
-        // handle is only there when there is a wall under the cursor to move,
-        // so seeing it IS being told you can move this.
-        if (this.handleCell && this.handleCell.x === cell.x && this.handleCell.y === cell.y) {
-            const run = this.resolveRun(cell);
-            if (run) {
-                this.drag = {
-                    pointerId: event.pointerId,
-                    map: this.gameMap,
-                    start: cell,
-                    end: cell,
-                    operation: 'move',
-                    run,
-                    // Which of the two gestures this is has not been decided
-                    // yet — see resolveGrabbedGesture on the first move.
-                    undecided: true,
-                    soundedCells: 0
-                };
-                this.hoverCell = null;
-                this.hoverOperation = null;
-                this.clearHandle();
-                this.renderMovePlan(event);
-                return;
-            }
-        }
+
+        if (this.tryBeginSpecialGesture(cell, event)) return;
+
         const operation = this.resolveOperation(event);
         this.drag = {
             pointerId: event.pointerId,
@@ -80408,181 +81384,17 @@ class WallBuildPanel extends ModalWindow {
         event.preventDefault();
         event.stopPropagation();
         this.drag.end = cell;
-        if (this.drag.undecided) this.resolveGrabbedGesture(event);
-        if (this.drag.operation === 'move') {
-            this.renderMovePlan(event);
-            return;
-        }
+        if (this.updateSpecialGesture(event)) return;
         this.drag.rectangle = this.isRectangleMode(event);
         this.drag.operation = this.resolveOperation(event);
         this.renderGhosts(this.getDragCells(), event);
-    }
-
-    /**
-     * What a drag that started on a grip turns out to be, decided by which way
-     * it went.
-     *
-     * Across the run is a move — the only direction a wall can go, and the only
-     * one the move plan reads. Along it is not a move at all: the plan drops
-     * that component entirely, so pulling a wall sideways along itself used to
-     * be a gesture where you pressed, dragged, released, and nothing whatsoever
-     * happened. What people mean by that drag is the ordinary one — lengthen
-     * this wall, or take a bite out of it — so it hands back to the draw.
-     *
-     * Decided once, on the first cell of travel, and then held for the rest of
-     * the gesture: a wall that changed its mind about what it was doing halfway
-     * through the drag would be worse than either answer.
-     */
-    resolveGrabbedGesture(event) {
-        const { start, end, run } = this.drag;
-        const alongX = run.axis === 'horizontal';
-        const along = Math.abs(alongX ? end.x - start.x : end.y - start.y);
-        const across = Math.abs(alongX ? end.y - start.y : end.x - start.x);
-        if (along === 0 && across === 0) return;
-
-        this.drag.undecided = false;
-        if (across >= along) return;                        // a move, as grabbed
-
-        this.drag.operation = this.resolveOperation(event);
-        this.drag.rectangle = this.isRectangleMode(event);
-        delete this.drag.run;
-    }
-
-    /**
-     * A single ghost cell under the cursor before any drag starts, in the
-     * colour of what a click would do and struck through when it would be
-     * refused. This is the answer to "can I build here?" — a cursor swap alone
-     * cannot say *which* cell it means on a grid this size.
-     */
-    renderHoverGhost(event = null) {
-        if (event) this.hoverEvent = event;
-        const source = event || this.hoverEvent;
-        if (!this.parent.isTool(UIToolModes.WALL) || !source) return;
-        if (!this.parent.parent?.canvas?.contains(source.target)) {
-            this.clearHover();
-            return;
-        }
-        const cell = this.pointerToCell(source);
-        if (!cell) {
-            // Off the grid entirely — the grey around the map. A crosshair out
-            // here promised a click that does nothing.
-            this.clearHover();
-            return;
-        }
-        // pointermove fires far faster than the cursor crosses a cell, and every
-        // repeat would rebuild the ghost element for the same square.
-        const operation = this.resolveOperation(source);
-        if (this.hoverCell?.x === cell.x && this.hoverCell?.y === cell.y &&
-            this.hoverOperation === operation) {
-            return;
-        }
-        this.hoverCell = cell;
-        this.hoverOperation = operation;
-
-        // A grip means the click moves this run. Asking "may a wall be added
-        // here?" of a cell that already holds one answers a question nobody
-        // asked - and it answers "no" whenever the run carries a painting or
-        // touches a door, which drew a red square under a blue grip. Outline
-        // the run instead: it says which wall the grip belongs to, and it says
-        // it through a cutaway, where the wall itself is not drawn at all.
-        const run = this.renderHandle(cell, operation);
-        if (run) {
-            this.renderRunGhost(run);
-            this.parent.setBuildCursor('grab');
-            return;
-        }
-
-        this.renderGhosts([cell], null, operation);
-        this.parent.setBuildCursor(this.cursorFor(cell, operation));
-    }
-
-    /**
-     * Allowed is not the same as "would do something" — laying wall over wall is
-     * permitted and changes nothing, and the ghost already says so by going
-     * dotted. The cursor says the same thing by going plain: a crosshair over a
-     * square where a click is a no-op is the tool promising work it will not do.
-     */
-    cursorFor(cell, operation) {
-        if (!this.checkCell(cell, operation).allowed) return 'refused';
-        return this.cellWouldChange(this.gameMap, cell, operation === 'remove') ? 'ready' : null;
-    }
-
-    // The whole run the grip would pull, drawn as one quiet outline.
-    renderRunGhost(run) {
-        this.clearGhosts();
-        const layer = this.gameMap?.layers?.objects;
-        const cellSize = this.gameMap?.gridSystem?.config?.cellSize;
-        if (!layer || !cellSize) return;
-        for (const cell of run.cells) {
-            const ghost = document.createElement('div');
-            ghost.className = 'wall-build-ghost-cell is-run';
-            ghost.style.left = `${cell.x * cellSize}px`;
-            ghost.style.top = `${cell.y * cellSize}px`;
-            ghost.style.width = `${cellSize}px`;
-            ghost.style.height = `${cellSize}px`;
-            layer.appendChild(ghost);
-            this.ghostElements.push(ghost);
-        }
-    }
-
-    clearHover() {
-        if (this.drag) return;
-        this.hoverCell = null;
-        this.hoverOperation = null;
-        this.hoverEvent = null;
-        this.clearGhosts();
-        this.clearHandle();
-        this.parent.setBuildCursor(null);
-    }
-
-    /**
-     * A grip on the wall under the cursor, pointing the way it can be pulled.
-     *
-     * The alternative was a Move mode in the panel, which meant knowing the mode
-     * existed, going to get it, and putting it back. A wall you can drag should
-     * look like a wall you can drag — so the handle appears on the run the
-     * moment you are over it, and grabbing it is the whole interaction.
-     *
-     * @returns {Object|null} The run the grip belongs to, or null when there
-     *                        is nothing here to grab.
-     */
-    renderHandle(cell, operation) {
-        this.clearHandle();
-        if (operation !== 'add') return null;               // removing, not moving
-        const run = this.resolveRun(cell);
-        const layer = this.gameMap?.layers?.objects;
-        const cellSize = this.gameMap?.gridSystem?.config?.cellSize;
-        if (!run || !layer || !cellSize) return null;
-
-        const handle = document.createElement('div');
-        handle.className = `wall-move-handle is-${run.axis}`;
-        handle.style.left = `${cell.x * cellSize}px`;
-        handle.style.top = `${cell.y * cellSize}px`;
-        handle.style.width = `${cellSize}px`;
-        handle.style.height = `${cellSize}px`;
-        layer.appendChild(handle);
-        this.handleElement = handle;
-        this.handleCell = { x: cell.x, y: cell.y };
-        return run;
-    }
-
-    clearHandle() {
-        this.handleElement?.remove();
-        this.handleElement = null;
-        this.handleCell = null;
     }
 
     handlePointerUp(event) {
         if (!this.drag || event.pointerId !== this.drag.pointerId) return;
         event.preventDefault();
         event.stopPropagation();
-        if (this.drag.operation === 'move') {
-            const plan = this.getMovePlan();
-            const map = this.drag.map;
-            this.cancelDrag();
-            this.commitMove(map, plan);
-            return;
-        }
+        if (this.finishSpecialGesture(event)) return;
         const cells = this.getDragCells();
         const map = this.drag.map;
         const operation = this.drag.operation;
@@ -80618,20 +81430,449 @@ class WallBuildPanel extends ModalWindow {
         });
     }
 
-    // -- Moving a run ---------------------------------------------------------
+    // ── Hover crosshair ──────────────────────────────────────────────────────
+
+    /**
+     * A single ghost cell under the cursor before any drag starts, in the
+     * colour of what a click would do and struck through when it would be
+     * refused. This is the answer to "can I build here?" — a cursor swap alone
+     * cannot say *which* cell it means on a grid this size.
+     */
+    renderHoverGhost(event = null) {
+        if (event) this.hoverEvent = event;
+        const source = event || this.hoverEvent;
+        if (!this.parent.isTool(this.toolMode) || !source) return;
+        if (!this.canvas?.contains(source.target)) {
+            this.clearHover();
+            return;
+        }
+        const cell = this.pointerToCell(source);
+        if (!cell) {
+            this.clearHover();
+            return;
+        }
+        // pointermove fires far faster than the cursor crosses a cell, and every
+        // repeat would rebuild the ghost element for the same square.
+        const operation = this.resolveOperation(source);
+        if (this.hoverCell?.x === cell.x && this.hoverCell?.y === cell.y &&
+            this.hoverOperation === operation) {
+            return;
+        }
+        this.hoverCell = cell;
+        this.hoverOperation = operation;
+
+        if (this.renderSpecialHover(cell, operation)) return;
+
+        this.renderGhosts([cell], null, operation);
+        this.parent.setBuildCursor(this.cursorFor(cell, operation));
+    }
+
+    /**
+     * Allowed is not the same as "would do something" — laying over what is
+     * already there is permitted and changes nothing, and the ghost already
+     * says so by going dotted. The cursor says the same thing by going plain: a
+     * crosshair over a square where a click is a no-op is the tool promising
+     * work it will not do.
+     */
+    cursorFor(cell, operation) {
+        if (!this.checkCell(cell, operation).allowed) return 'refused';
+        return this.cellWouldChange(this.gameMap, cell, operation === 'remove') ? 'ready' : null;
+    }
+
+    // A run of cells drawn as one quiet outline (used by a special hover).
+    renderRunGhost(cells) {
+        this.clearGhosts();
+        const layer = this.gameMap?.layers?.objects;
+        const cellSize = this.gameMap?.gridSystem?.config?.cellSize;
+        if (!layer || !cellSize) return;
+        for (const cell of cells) {
+            const ghost = document.createElement('div');
+            ghost.className = 'build-ghost-cell is-run';
+            ghost.style.left = `${cell.x * cellSize}px`;
+            ghost.style.top = `${cell.y * cellSize}px`;
+            ghost.style.width = `${cellSize}px`;
+            ghost.style.height = `${cellSize}px`;
+            layer.appendChild(ghost);
+            this.ghostElements.push(ghost);
+        }
+    }
+
+    clearHover() {
+        if (this.drag) return;
+        this.hoverCell = null;
+        this.hoverOperation = null;
+        this.hoverEvent = null;
+        this.clearGhosts();
+        this.clearSpecial();
+        this.parent.setBuildCursor(null);
+    }
+
+    // ── Ghosts / measurement ─────────────────────────────────────────────────
+
+    renderGhosts(cells, event = null, operationOverride = null) {
+        this.clearGhosts();
+        const map = this.drag?.map || this.gameMap;
+        const layer = map?.layers?.objects;
+        const cellSize = map?.gridSystem?.config?.cellSize;
+        if (!layer || !cellSize) return;
+        const operation = operationOverride || this.drag?.operation || this.getOperation();
+        const removing = operation === 'remove';
+        let effective = 0;
+        for (const cell of cells) {
+            const allowed = this.checkCell(cell, operation).allowed;
+            const changes = allowed && this.cellWouldChange(map, cell, removing);
+            if (changes) effective += 1;
+            const ghost = document.createElement('div');
+            ghost.className = `build-ghost-cell${removing ? ' is-remove' : ''}` +
+                `${allowed ? '' : ' is-invalid'}${allowed && !changes ? ' is-inert' : ''}`;
+            ghost.style.left = `${cell.x * cellSize}px`;
+            ghost.style.top = `${cell.y * cellSize}px`;
+            ghost.style.width = `${cellSize}px`;
+            ghost.style.height = `${cellSize}px`;
+            layer.appendChild(ghost);
+            this.ghostElements.push(ghost);
+        }
+        if (this.drag) this.tickRunSound(effective, removing);
+        this.renderMeasurement(effective, event);
+    }
+
+    /**
+     * One knock the moment each cell joins the run, not a burst when the drag
+     * ends. The pacing rules live in BuildRunSound, shared with every other
+     * drag-to-build tool.
+     */
+    tickRunSound(count, removing) {
+        if (!this.drag) return;
+        this.drag.soundedCells = count;
+        this.runSound.advance(count, { descending: removing });
+    }
+
+    renderMeasurement(count, event) {
+        if (!event || count <= 0 || !this.drag) {
+            this.clearMeasurement();
+            return;
+        }
+        if (!this.measureLabel) {
+            this.measureLabel = document.createElement('div');
+            this.measureLabel.className = 'build-measure-label';
+            document.body.appendChild(this.measureLabel);
+        }
+        const { start, end, rectangle } = this.drag;
+        const width = Math.abs(end.x - start.x) + 1;
+        const height = Math.abs(end.y - start.y) + 1;
+        this.measureLabel.textContent = rectangle ? `${width}×${height}` : `${count} cells`;
+        this.measureLabel.style.left = `${event.clientX + 16}px`;
+        this.measureLabel.style.top = `${event.clientY + 16}px`;
+    }
+
+    clearMeasurement() {
+        this.measureLabel?.remove();
+        this.measureLabel = null;
+    }
+
+    clearGhosts() {
+        for (const element of this.ghostElements) element.remove();
+        this.ghostElements = [];
+        this.clearMeasurement();
+    }
+
+    cancelDrag() {
+        const wasDragging = this.drag !== null;
+        this.clearGhosts();
+        this.drag = null;
+        return wasDragging;
+    }
+
+    // ── Commit helpers (shared by every subclass's commitCells) ───────────────
+
+    afterCommit(map) {
+        map?.container?.worldState?.captureMap?.(map);
+        map?.core?.user?._scheduleSave?.();
+    }
+
+    pushHistory(entry) {
+        this.build?.buildHistory?.push(entry);
+    }
+
+    reportRejections(rejected = [], title = 'Build') {
+        if (!rejected || rejected.length === 0) return;
+        const reason = rejected[0].reason || 'Some cells are blocked.';
+        this.parent.showMessage(
+            rejected.length === 1 ? reason : `${rejected.length} cells blocked — ${reason}`,
+            'warning',
+            title
+        );
+    }
+
+    playSound(soundId, options = {}) {
+        if (soundId) this.build?.core?.soundManager?.playWhenReady?.(soundId, options);
+    }
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────
+
+    dispose() {
+        this.cancelDrag();
+        this.clearHover();
+        this.operationSegment?.dispose();
+        this.operationSegment = null;
+        this.canvas?.removeEventListener('pointerleave', this.boundPointerLeave);
+        this.canvas?.removeEventListener('pointerdown', this.boundPointerDown, true);
+        document.removeEventListener('pointermove', this.boundPointerMove, true);
+        document.removeEventListener('pointerup', this.boundPointerUp, true);
+        document.removeEventListener('pointercancel', this.boundPointerUp, true);
+        if (this.bodyClass) document.body.classList.remove(this.bodyClass);
+        this.parent?.setBuildCursor(null);
+        super.dispose();
+    }
+}
+;
+/* -- js/UI/panels/WallBuildPanel.js -- */
+/**
+ * WallBuildPanel — the Wall tool. A drag-to-build-cells tool (see
+ * CellDragBuildPanel for the shared line/rectangle/ghost/sound machinery) plus
+ * one thing only walls do: hover a run you already have to grab its handle and
+ * pull the whole wall across the room, or drag along it to lengthen it.
+ */
+class WallBuildPanel extends CellDragBuildPanel {
+    constructor(parent) {
+        super(parent, {
+            id: 'wall-build-panel',
+            toolMode: UIToolModes.WALL,
+            bodyClass: 'wall-build-mode',
+            operationSegmentSelector: '.wall-build-operation-segment',
+            rectangleToggleSelector: '#wall-build-rectangle'
+        });
+        this.handleElement = null;
+        this.handleCell = null;
+        this.roomFloorButton = this.modalElement?.querySelector('#wall-room-floor') || null;
+        this.contextRoomId = null;
+        this.roomFloorButton?.addEventListener('click', () => {
+            if (this.contextRoomId) {
+                this.parent?.surfaceCustomizePanel?.openRoomSurface?.(this.contextRoomId, 'floor');
+            }
+        });
+    }
+
+    getBuilder() {
+        return this.gameMap?.wallBuilder || null;
+    }
+
+    handleToolModeChanged(mode) {
+        const active = mode === this.toolMode;
+        super.handleToolModeChanged(mode);
+        if (!active) this.setContextRoom(null, { preserve: false });
+    }
+
+    // Pre-flight of the same rules applyWallCellChanges enforces, so a blocked
+    // cell reads red under the cursor instead of silently vanishing on commit.
+    checkCell(cell, operation = this.getOperation()) {
+        const rules = this.rules;
+        if (!rules) return BuildRules.ALLOWED;
+        return operation === 'remove'
+            ? rules.canRemoveWallCell(cell.x, cell.y)
+            : rules.canBuildWallCell(cell.x, cell.y);
+    }
+
+    // The same test commitCells applies, so the preview, the count and the
+    // sound all agree with what the commit will actually do.
+    cellWouldChange(map, cell, removing) {
+        const occupied = map?.wallBuilder?.baseCells.has(`${cell.x},${cell.y}`) === true;
+        return removing ? occupied : !occupied;
+    }
+
+    commitCells(map, cells, operation = this.getOperation()) {
+        const builder = map?.wallBuilder;
+        if (!builder || cells.length === 0) return false;
+        const removing = operation === 'remove';
+        const changes = cells
+            .filter(cell => removing
+                ? builder.baseCells.has(`${cell.x},${cell.y}`)
+                : !builder.baseCells.has(`${cell.x},${cell.y}`))
+            .map(cell => ({ ...cell, data: removing ? null : {} }));
+        if (changes.length === 0) return false;
+
+        let result;
+        try {
+            result = builder.applyWallCellChanges(changes);
+        } catch (error) {
+            if (/node|budget|generated/i.test(error?.message || '')) {
+                this.parent.showMessage("This map can't hold more walls.", 'warning', 'Wall limit reached');
+                return false;
+            }
+            throw error;
+        }
+        if (!result) return false;
+
+        this.reportRejections(result.rejected);
+        if (result.applied.length === 0) {
+            this.playSound(SiteConfig.buildMode.sounds.rejected);
+            return false;
+        }
+
+        this.pushWallHistory(builder, result, removing);
+        this.afterCommit(map);
+        return true;
+    }
+
+    pushWallHistory(builder, result, removing) {
+        const label = `${removing ? 'Remove' : 'Place'} Wall (${result.applied.length} cell${result.applied.length === 1 ? '' : 's'})`;
+        const forward = Utility.deepClone(result.applied);
+        const backward = Utility.deepClone(result.inverse);
+        // Undo replays through the same authoritative path, but with validation
+        // off: restoring a cell the player already had is by definition legal,
+        // and re-running the rules would refuse it whenever the world moved.
+        this.pushHistory({
+            label,
+            undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
+            redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
+        });
+    }
+
+    // ── Grab-a-run-and-move-it (the wall-only gesture) ────────────────────────
+
+    tryBeginSpecialGesture(cell, event) {
+        // A grip standing on the wall, grabbed. No mode to choose first: the
+        // handle is only there when there is a wall under the cursor to move,
+        // so seeing it IS being told you can move this.
+        if (!this.handleCell || this.handleCell.x !== cell.x || this.handleCell.y !== cell.y) return false;
+        const run = this.resolveRun(cell);
+        if (!run) return false;
+        this.drag = {
+            pointerId: event.pointerId,
+            map: this.gameMap,
+            start: cell,
+            end: cell,
+            operation: 'move',
+            run,
+            // Which of the two gestures this is has not been decided yet — see
+            // resolveGrabbedGesture on the first move.
+            undecided: true,
+            soundedCells: 0
+        };
+        this.hoverCell = null;
+        this.hoverOperation = null;
+        this.clearHandle();
+        this.renderMovePlan(event);
+        return true;
+    }
+
+    updateSpecialGesture(event) {
+        if (!this.drag) return false;
+        if (this.drag.undecided) this.resolveGrabbedGesture(event);
+        if (this.drag.operation === 'move') {
+            this.renderMovePlan(event);
+            return true;
+        }
+        return false;
+    }
+
+    finishSpecialGesture(event) {
+        if (this.drag?.operation !== 'move') return false;
+        const plan = this.getMovePlan();
+        const map = this.drag.map;
+        this.cancelDrag();
+        this.commitMove(map, plan);
+        return true;
+    }
+
+    /**
+     * A grip means the click moves this run. Asking "may a wall be added here?"
+     * of a cell that already holds one answers a question nobody asked — so
+     * outline the run instead: it says which wall the grip belongs to.
+     */
+    renderSpecialHover(cell, operation) {
+        this.setContextRoom(cell);
+        const run = this.renderHandle(cell, operation);
+        if (!run) return false;
+        this.renderRunGhost(run.cells);
+        this.parent.setBuildCursor('grab');
+        return true;
+    }
+
+    clearSpecial() {
+        this.clearHandle();
+    }
+
+    setContextRoom(cell, { preserve = true } = {}) {
+        const builder = this.gameMap?.wallBuilder;
+        const wallCell = cell ? builder?.cells?.get(`${cell.x},${cell.y}`) : null;
+        const roomId = wallCell
+            ? builder.getCellSurfaces(wallCell).find(surface => surface.roomId)?.roomId ?? null
+            : null;
+        if (!roomId && preserve) return false;
+        this.contextRoomId = roomId;
+        if (!this.roomFloorButton) return;
+        this.roomFloorButton.disabled = !roomId;
+        const room = roomId ? this.gameMap?.regionManager?.get('room', roomId) : null;
+        this.roomFloorButton.textContent = room
+            ? `Edit ${room.properties?.displayName || room.id} floor`
+            : 'Edit room floor';
+        return !!roomId;
+    }
+
+    /**
+     * What a drag that started on a grip turns out to be, decided by which way
+     * it went.
+     *
+     * Across the run is a move — the only direction a wall can go. Along it is
+     * not a move at all: the plan drops that component entirely, so it hands
+     * back to the ordinary draw (lengthen this wall, or take a bite out of it).
+     *
+     * Decided once, on the first cell of travel, and then held for the rest of
+     * the gesture.
+     */
+    resolveGrabbedGesture(event) {
+        const { start, end, run } = this.drag;
+        const alongX = run.axis === 'horizontal';
+        const along = Math.abs(alongX ? end.x - start.x : end.y - start.y);
+        const across = Math.abs(alongX ? end.y - start.y : end.x - start.x);
+        if (along === 0 && across === 0) return;
+
+        this.drag.undecided = false;
+        if (across >= along) return;                        // a move, as grabbed
+
+        this.drag.operation = this.resolveOperation(event);
+        this.drag.rectangle = this.isRectangleMode(event);
+        delete this.drag.run;
+    }
+
+    /**
+     * A grip on the wall under the cursor, pointing the way it can be pulled.
+     *
+     * @returns {Object|null} The run the grip belongs to, or null when there
+     *                        is nothing here to grab.
+     */
+    renderHandle(cell, operation) {
+        this.clearHandle();
+        if (operation !== 'add') return null;               // removing, not moving
+        const run = this.resolveRun(cell);
+        const layer = this.gameMap?.layers?.objects;
+        const cellSize = this.gameMap?.gridSystem?.config?.cellSize;
+        if (!run || !layer || !cellSize) return null;
+
+        const handle = document.createElement('div');
+        handle.className = `wall-move-handle is-${run.axis}`;
+        handle.style.left = `${cell.x * cellSize}px`;
+        handle.style.top = `${cell.y * cellSize}px`;
+        handle.style.width = `${cellSize}px`;
+        handle.style.height = `${cellSize}px`;
+        layer.appendChild(handle);
+        this.handleElement = handle;
+        this.handleCell = { x: cell.x, y: cell.y };
+        return run;
+    }
+
+    clearHandle() {
+        this.handleElement?.remove();
+        this.handleElement = null;
+        this.handleCell = null;
+    }
 
     /**
      * The straight run of wall the given cell belongs to.
      *
-     * A wall in a house is almost never one cell, and nobody thinks of it as
-     * one — "the kitchen's back wall" is the unit people want to grab. So the
-     * run is walked out from the cell along whichever axis it connects on,
-     * stopping where the masonry stops.
-     *
      * A junction cell is where two runs cross and belongs to both, so it has no
-     * single answer and is refused rather than guessed at. Grabbing a corner and
-     * watching it take one of its two walls with it is worse than being told to
-     * grab somewhere else.
+     * single answer and is refused rather than guessed at.
      * @returns {{cells: Array<{x: number, y: number}>, axis: string}|null}
      */
     resolveRun(cell) {
@@ -80655,9 +81896,7 @@ class WallBuildPanel extends ModalWindow {
                 const next = builder.cells.get(`${x},${y}`);
                 if (!next) break;
                 const nextMask = builder.computeMask(next);
-                // The run ends AT a corner, not through it: a corner is part of
-                // this wall and moves with it, but the wall turning out of it is
-                // a different wall and stays where it is.
+                // The run ends AT a corner, not through it.
                 cells.push({ x, y });
                 if (WallBuilder.isHorizontalMask(nextMask) === WallBuilder.isVerticalMask(nextMask)) break;
             }
@@ -80669,15 +81908,9 @@ class WallBuildPanel extends ModalWindow {
     /**
      * Where the grabbed run would end up, and what it costs to put it there.
      *
-     * Only the perpendicular part of the drag counts — sliding a wall along its
-     * own length is not a thing walls do, and letting the pointer's other axis
-     * leak in makes a straight pull impossible to perform by hand.
-     *
-     * `bridges` is what keeps the house shut. Pull a room's back wall out and
-     * the two side walls have to grow with it; without that the room springs a
-     * gap at each end and stops being a room, which the floors and the lighting
-     * both notice immediately. Only ends that were ATTACHED to something grow —
-     * a free-standing wall slides cleanly and sprouts nothing.
+     * Only the perpendicular part of the drag counts. `bridges` is what keeps
+     * the house shut — pull a room's back wall out and the two side walls have
+     * to grow with it. Only ends that were ATTACHED to something grow.
      * @returns {{distance: number, additions: Array, removals: Array}}
      */
     getMovePlan() {
@@ -80726,22 +81959,11 @@ class WallBuildPanel extends ModalWindow {
     /**
      * The bits of wall the move would leave behind attached to nothing.
      *
-     * Pull a room's top wall down into the room and the two side walls now poke
-     * up past it into open air. Sometimes that is right — on a side that carries
-     * on past the corner it is one long wall and the part above the room is
-     * still doing a job. Sometimes it is two stubs standing in a garden, which
-     * is not a thing anybody meant to build and is tedious to go and delete.
+     * Start where the wall was, and walk outwards taking off any cell that has
+     * nothing left holding it up. A cell with two connections is part of
+     * something and stops the walk.
      *
-     * The difference is not which side it is on, it is whether the leftover
-     * still connects to anything. So the stubs are found the same way you would
-     * find them by eye: start where the wall was, and walk outwards taking off
-     * any cell that has nothing left holding it up. A cell with two connections
-     * is part of something and stops the walk — which is exactly the long side
-     * wall that should stay.
-     *
-     * Anything with a door, a window or a painting on it is left alone
-     * regardless: deleting a wall is undoable, silently deleting what was
-     * mounted on it is a nasty surprise.
+     * Anything with a door, a window or a painting on it is left alone.
      * @returns {Array<{x: number, y: number}>}
      */
     findOrphanedStubs(builder, run, keep, vacated) {
@@ -80750,8 +81972,6 @@ class WallBuildPanel extends ModalWindow {
         const arriving = new Set([...keep.keys()]);
         const orphans = [];
 
-        // Seeded from the sides of the wall that is leaving — a stub can only be
-        // orphaned by this move if it was touching it.
         const queue = [];
         const perpendicular = run.axis === 'horizontal' ? [[0, -1], [0, 1]] : [[-1, 0], [1, 0]];
         for (const cell of vacated) {
@@ -80772,7 +81992,6 @@ class WallBuildPanel extends ModalWindow {
             if (connections(x, y) > 1) continue;            // held up by something
             gone.add(key);
             orphans.push({ x, y });
-            // Taking this one away may have orphaned the next one along.
             for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
                 queue.push({ x: x + dx, y: y + dy });
             }
@@ -80783,16 +82002,6 @@ class WallBuildPanel extends ModalWindow {
     /**
      * Whether a run's end is anchored to masonry BEHIND it — on the side the
      * wall is moving away from.
-     *
-     * Which side matters is the whole rule. Pull a wall away from the side wall
-     * it joins and that side has to stretch to follow, or the room springs open
-     * at the corner. Push it towards one and the side does not stretch, it gets
-     * shorter — so nothing is bridged and the leftover above the new corner is
-     * left for the orphan walk to take away.
-     *
-     * A wall that continues BOTH ways is a longer wall passing through, and it
-     * is anchored whichever way you push: the part beyond the corner is still
-     * doing a job, so the corner has to keep reaching it.
      */
     endIsAnchored(builder, end, stepX, stepY) {
         return builder.cells.has(`${end.x - Math.sign(stepX)},${end.y - Math.sign(stepY)}`);
@@ -80809,7 +82018,7 @@ class WallBuildPanel extends ModalWindow {
         const draw = (cells, className) => {
             for (const cell of cells) {
                 const ghost = document.createElement('div');
-                ghost.className = `wall-build-ghost-cell ${className}`;
+                ghost.className = `build-ghost-cell ${className}`;
                 ghost.style.left = `${cell.x * cellSize}px`;
                 ghost.style.top = `${cell.y * cellSize}px`;
                 ghost.style.width = `${cellSize}px`;
@@ -80847,11 +82056,8 @@ class WallBuildPanel extends ModalWindow {
     }
 
     /**
-     * One edit, not two. Removing the old run and adding the new one as separate
-     * commits would put a hole in the house between them — the room detector,
-     * the floors and the lighting all run on the first and would rebuild the
-     * world around a wall that is missing for one frame — and it would take two
-     * undos to put back.
+     * One edit, not two. Removing the old run and adding the new one as
+     * separate commits would put a hole in the house between them.
      */
     commitMove(map, plan) {
         const builder = map?.wallBuilder;
@@ -80859,11 +82065,6 @@ class WallBuildPanel extends ModalWindow {
         const changes = [...plan.removals, ...plan.additions];
         if (changes.length === 0) return false;
 
-        // Whatever is mounted on the run travels with it: the cells it is
-        // leaving, and how far.
-        // The cells being VACATED, not the whole run: an end cell that stays
-        // put as a bridge is still a wall, and a door hung in one belongs to
-        // the wall it is still part of rather than to the piece moving away.
         const contentMove = {
             cells: new Set(plan.removals.map(cell => `${cell.x},${cell.y}`)),
             dx: plan.moveX,
@@ -80872,8 +82073,6 @@ class WallBuildPanel extends ModalWindow {
 
         let result;
         try {
-            // Atomic: one blocked cell cancels the whole move rather than
-            // leaving a wall in two pieces with a door lying between them.
             result = builder.applyWallCellChanges(Utility.deepClone(changes), { atomic: true, contentMove });
         } catch (error) {
             if (/node|budget|generated/i.test(error?.message || '')) {
@@ -80892,7 +82091,7 @@ class WallBuildPanel extends ModalWindow {
         const backward = Utility.deepClone(result.inverse);
         const back = WallBuilder.invertContentMove(contentMove);
         const size = Math.abs(plan.distance);
-        this.parent.parent?.buildHistory?.push({
+        this.pushHistory({
             label: `Move Wall (${size} cell${size === 1 ? '' : 's'})`,
             undo: () => builder.applyWallCellChanges(Utility.deepClone(backward),
                 { validate: false, contentMove: back }),
@@ -80900,146 +82099,11 @@ class WallBuildPanel extends ModalWindow {
                 { validate: false, contentMove })
         });
         this.playSound(SiteConfig.buildMode.sounds.objectPlace);
-        map.container?.worldState?.captureMap?.(map);
-        map.core?.user?._scheduleSave?.();
+        this.afterCommit(map);
         return true;
     }
 
-    // Pre-flight of the same rules applyWallCellChanges enforces, so a blocked
-    // cell reads red under the cursor instead of silently vanishing on commit.
-    checkCell(cell, operation = this.getOperation()) {
-        const rules = this.rules;
-        if (!rules) return BuildRules.ALLOWED;
-        return operation === 'remove'
-            ? rules.canRemoveWallCell(cell.x, cell.y)
-            : rules.canBuildWallCell(cell.x, cell.y);
-    }
-
-    renderGhosts(cells, event = null, operationOverride = null) {
-        this.clearGhosts();
-        const map = this.drag?.map || this.gameMap;
-        const layer = map?.layers?.objects;
-        const cellSize = map?.gridSystem?.config?.cellSize;
-        if (!layer || !cellSize) return;
-        const operation = operationOverride || this.drag?.operation || this.getOperation();
-        const removing = operation === 'remove';
-        let effective = 0;
-        for (const cell of cells) {
-            const allowed = this.checkCell(cell, operation).allowed;
-            // Allowed is not the same as "would do something": adding over a
-            // cell that already has a wall is permitted and changes nothing, so
-            // counting it knocked for a wall that was already standing there.
-            const changes = allowed && this.cellWouldChange(map, cell, removing);
-            if (changes) effective += 1;
-            const ghost = document.createElement('div');
-            ghost.className = `wall-build-ghost-cell${removing ? ' is-remove' : ''}` +
-                `${allowed ? '' : ' is-invalid'}${allowed && !changes ? ' is-inert' : ''}`;
-            ghost.style.left = `${cell.x * cellSize}px`;
-            ghost.style.top = `${cell.y * cellSize}px`;
-            ghost.style.width = `${cellSize}px`;
-            ghost.style.height = `${cellSize}px`;
-            layer.appendChild(ghost);
-            this.ghostElements.push(ghost);
-        }
-        if (this.drag) this.tickRunSound(effective, removing);
-        this.renderMeasurement(effective, event);
-    }
-
-    // The same test commitCells applies, so the preview, the count and the
-    // sound all agree with what the commit will actually do.
-    cellWouldChange(map, cell, removing) {
-        const occupied = map?.wallBuilder?.baseCells.has(`${cell.x},${cell.y}`) === true;
-        return removing ? occupied : !occupied;
-    }
-
-    /**
-     * One knock the moment each cell joins the run, not a burst when the drag
-     * ends — the wall should sound like it is going up under your hand. The
-     * pacing rules live in BuildRunSound, shared with every other drag-to-build
-     * tool, because getting them subtly wrong is how a gesture ends up still
-     * making noise ten seconds after mouseup.
-     */
-    tickRunSound(count, removing) {
-        if (!this.drag) return;
-        this.drag.soundedCells = count;
-        this.runSound.advance(count, { descending: removing });
-    }
-
-    renderMeasurement(count, event) {
-        if (!event || count <= 0 || !this.drag) {
-            this.clearMeasurement();
-            return;
-        }
-        if (!this.measureLabel) {
-            this.measureLabel = document.createElement('div');
-            this.measureLabel.className = 'build-measure-label';
-            document.body.appendChild(this.measureLabel);
-        }
-        const { start, end, rectangle } = this.drag;
-        const width = Math.abs(end.x - start.x) + 1;
-        const height = Math.abs(end.y - start.y) + 1;
-        this.measureLabel.textContent = rectangle ? `${width}×${height}` : `${count} cells`;
-        this.measureLabel.style.left = `${event.clientX + 16}px`;
-        this.measureLabel.style.top = `${event.clientY + 16}px`;
-    }
-
-    clearMeasurement() {
-        this.measureLabel?.remove();
-        this.measureLabel = null;
-    }
-
-    commitCells(map, cells, operation = this.getOperation()) {
-        const builder = map?.wallBuilder;
-        if (!builder || cells.length === 0) return false;
-        const removing = operation === 'remove';
-        const changes = cells
-            .filter(cell => removing
-                ? builder.baseCells.has(`${cell.x},${cell.y}`)
-                : !builder.baseCells.has(`${cell.x},${cell.y}`))
-            .map(cell => ({ ...cell, data: removing ? null : {} }));
-        if (changes.length === 0) return false;
-
-        let result;
-        try {
-            result = builder.applyWallCellChanges(changes);
-        } catch (error) {
-            if (/node|budget|generated/i.test(error?.message || '')) {
-                this.parent.showMessage("This map can't hold more walls.", 'warning', 'Wall limit reached');
-                return false;
-            }
-            throw error;
-        }
-        if (!result) return false;
-
-        this.reportRejections(result.rejected);
-        if (result.applied.length === 0) {
-            this.playSound(SiteConfig.buildMode.sounds.rejected);
-            return false;
-        }
-
-        this.pushHistory(builder, result, removing);
-        map.container?.worldState?.captureMap?.(map);
-        map.core?.user?._scheduleSave?.();
-        return true;
-    }
-
-    pushHistory(builder, result, removing) {
-        const label = `${removing ? 'Remove' : 'Place'} Wall (${result.applied.length} cell${result.applied.length === 1 ? '' : 's'})`;
-        const forward = Utility.deepClone(result.applied);
-        const backward = Utility.deepClone(result.inverse);
-        // Undo replays through the same authoritative path, but with validation
-        // off: restoring a cell the player already had is by definition legal,
-        // and re-running the rules would refuse it whenever the world moved.
-        this.parent.parent?.buildHistory?.push({
-            label,
-            undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
-            redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
-        });
-    }
-
-    // A cancelled move is one message about the move, not one per cell: the
-    // player made a single gesture and it did not happen, and thirty lines
-    // about individual squares buries that.
+    // A cancelled move is one message about the move, not one per cell.
     reportBlockedMove(rejected = []) {
         const reason = rejected?.[0]?.reason || 'Something is in the way.';
         this.parent.showMessage(
@@ -81049,50 +82113,153 @@ class WallBuildPanel extends ModalWindow {
         );
     }
 
-    reportRejections(rejected = []) {
-        if (rejected.length === 0) return;
-        const reason = rejected[0].reason || 'Some cells are blocked.';
-        this.parent.showMessage(
-            rejected.length === 1 ? reason : `${rejected.length} cells blocked — ${reason}`,
-            'warning',
-            'Build'
-        );
-    }
-
-    playSound(soundId, options = {}) {
-        if (soundId) this.parent.parent?.core?.soundManager?.playWhenReady?.(soundId, options);
-    }
-
-    clearGhosts() {
-        for (const element of this.ghostElements) element.remove();
-        this.ghostElements = [];
-        this.clearMeasurement();
-    }
-
-    cancelDrag() {
-        const wasDragging = this.drag !== null;
-        this.clearGhosts();
-        this.drag = null;
-        return wasDragging;
-    }
-
     dispose() {
-        this.cancelDrag();
-        this.clearHover();
-        this.operationSegment?.dispose();
-        this.operationSegment = null;
-        this.parent?.parent?.canvas?.removeEventListener('pointerleave', this.boundPointerLeave);
-        this.parent?.parent?.canvas?.removeEventListener('pointerdown', this.boundPointerDown, true);
-        document.removeEventListener('pointermove', this.boundPointerMove, true);
-        document.removeEventListener('pointerup', this.boundPointerUp, true);
-        document.removeEventListener('pointercancel', this.boundPointerUp, true);
-        document.body.classList.remove('wall-build-mode');
-        this.parent?.setBuildCursor(null);
+        this.clearHandle();
         super.dispose();
     }
 }
 ;
-/* -- js/UI/Panels/RoomPanel.js -- */
+/* -- js/UI/panels/FenceBuildPanel.js -- */
+/**
+ * FenceBuildPanel — the Fence tool. The same drag-a-run gesture as the Wall
+ * tool (see CellDragBuildPanel) but it lays FenceMapObjects onto the map a cell
+ * at a time through FenceBuilder rather than editing wall tiles.
+ *
+ * On top of the shared machinery it carries a style picker: the FENCE variants
+ * as a segment, plus Alt-click to sample the fence already under the cursor.
+ * Removed pieces go back to the inventory.
+ */
+class FenceBuildPanel extends CellDragBuildPanel {
+    constructor(parent) {
+        super(parent, {
+            id: 'fence-build-panel',
+            toolMode: UIToolModes.FENCE,
+            bodyClass: 'fence-build-mode',
+            operationSegmentSelector: '.fence-build-operation-segment',
+            rectangleToggleSelector: '#fence-build-rectangle'
+        });
+        this.variantSegment = new SegmentControl(
+            this.modalElement?.querySelector('.fence-build-variant-segment') || null,
+            { value: FenceBuilder.DEFAULT_VARIANT }
+        );
+    }
+
+    get variant() {
+        return this.variantSegment?.value || FenceBuilder.DEFAULT_VARIANT;
+    }
+
+    getBuilder() {
+        return this.gameMap?.fenceBuilder || null;
+    }
+
+    // Alt-click samples the fence under the cursor rather than starting a drag —
+    // the same "pick" the Ground and Surface tools carry.
+    tryBeginSpecialGesture(cell, event) {
+        if (event.altKey !== true) return false;
+        const fence = this.getBuilder()?.fenceAt(cell.x, cell.y);
+        if (fence?.variant && this.variantSegment?.select(fence.variant)) {
+            this.parent.showMessage(`Matched ${fence.name || 'fence'}.`, 'info', 'Fence');
+        }
+        return true;
+    }
+
+    checkCell(cell, operation = this.getOperation()) {
+        const builder = this.getBuilder();
+        if (!builder) return BuildRules.deny('This map has no fence system.');
+        return builder.checkCell(cell, operation === 'remove' ? 'remove' : 'add');
+    }
+
+    cellWouldChange(map, cell, removing) {
+        const has = !!map?.fenceBuilder?.fenceAt(cell.x, cell.y);
+        return removing ? has : !has;
+    }
+
+    commitCells(map, cells, operation = this.getOperation()) {
+        const builder = map?.fenceBuilder;
+        if (!builder) {
+            this.parent.showMessage("This map has no fence system.", 'warning', 'Fence');
+            return false;
+        }
+        const removing = operation === 'remove';
+
+        const targets = [];
+        const rejected = [];
+        for (const cell of cells) {
+            const verdict = builder.checkCell(cell, removing ? 'remove' : 'add');
+            if (!verdict.allowed) {
+                rejected.push({ reason: verdict.reason });
+                continue;
+            }
+            if (this.cellWouldChange(map, cell, removing)) targets.push(cell);
+        }
+        this.reportRejections(rejected, 'Fence');
+        if (targets.length === 0) {
+            if (rejected.length) this.playSound(SiteConfig.buildMode.sounds.rejected);
+            return false;
+        }
+
+        return removing
+            ? this.commitRemoval(map, builder, targets)
+            : this.commitPlacement(map, builder, targets);
+    }
+
+    commitPlacement(map, builder, targets) {
+        const variant = this.variant;
+        const { placed, rejected } = builder.placeCells(targets.map(cell => ({ ...cell, variant })));
+        this.reportRejections(rejected, 'Fence');
+        if (placed.length === 0) {
+            this.playSound(SiteConfig.buildMode.sounds.rejected);
+            return false;
+        }
+
+        const entries = placed.map(({ x, y, variant: v }) => ({ x, y, variant: v }));
+        const coords = placed.map(({ x, y }) => ({ x, y }));
+        this.pushHistory({
+            label: `Place Fence (${placed.length} piece${placed.length === 1 ? '' : 's'})`,
+            undo: () => builder.removeCells(coords, { toInventory: false }),
+            redo: () => builder.placeCells(entries)
+        });
+        this.playSound(SiteConfig.buildMode.sounds.objectPlace);
+        this.afterCommit(map);
+        return true;
+    }
+
+    commitRemoval(map, builder, targets) {
+        const { removed, rejected } = builder.removeCells(
+            targets.map(({ x, y }) => ({ x, y })),
+            { toInventory: true }
+        );
+        this.reportRejections(rejected, 'Fence');
+        if (removed.length === 0) {
+            this.playSound(SiteConfig.buildMode.sounds.rejected);
+            return false;
+        }
+
+        const entries = removed.map(({ x, y, variant }) => ({ x, y, variant }));
+        const coords = removed.map(({ x, y }) => ({ x, y }));
+        this.pushHistory({
+            label: `Remove Fence (${removed.length} piece${removed.length === 1 ? '' : 's'})`,
+            // The pieces went to the inventory; undo takes them back out as it
+            // rebuilds them so the count does not drift.
+            undo: () => {
+                builder.placeCells(entries);
+                for (const { variant } of entries) this.build?.inventory?.removeItem?.(variant);
+            },
+            redo: () => builder.removeCells(coords, { toInventory: true })
+        });
+        this.playSound(SiteConfig.buildMode.sounds.objectPlace);
+        this.afterCommit(map);
+        return true;
+    }
+
+    dispose() {
+        this.variantSegment?.dispose();
+        this.variantSegment = null;
+        super.dispose();
+    }
+}
+;
+/* -- js/UI/panels/RoomPanel.js -- */
 /**
  * RoomPanel — the rooms on this map, and the tool for changing them.
  *
@@ -81116,6 +82283,12 @@ class WallBuildPanel extends ModalWindow {
  *   undo it all   pick Reset, and the walls decide again
  */
 class RoomPanel extends ModalWindow {
+    static OPERATIONS = Object.freeze({
+        SELECT: 'select',
+        ADD: 'add',
+        REMOVE: 'remove'
+    });
+
     // Twelve hues a person can name, evenly spaced round the wheel.
     static HUES = Object.freeze([8, 32, 52, 84, 140, 168, 194, 218, 250, 280, 310, 336]);
 
@@ -81138,6 +82311,7 @@ class RoomPanel extends ModalWindow {
         this.pending = null;
         this.ghostElements = [];
         this.roomTints = [];
+        this.perimeterGhosts = [];
         this.highlight = null;
         this.boundPointerDown = this.handlePointerDown.bind(this);
         this.boundPointerMove = this.handlePointerMove.bind(this);
@@ -81147,7 +82321,21 @@ class RoomPanel extends ModalWindow {
         this.init();
         this.listElement = this.modalElement?.querySelector('.room-panel-list') || null;
         this.scrollContainer = this.listElement;
+        this.operationSegment = new SegmentControl(
+            this.modalElement?.querySelector('.room-build-operation-segment') || null,
+            {
+                value: RoomPanel.OPERATIONS.SELECT,
+                onChange: () => {
+                    this.cancelDrag();
+                    this.clearHover();
+                    this.renderOperation();
+                }
+            }
+        );
         this.rectangleToggle = this.modalElement?.querySelector('#room-build-rectangle') || null;
+        this.selectHint = this.modalElement?.querySelector('.room-select-hint') || null;
+        this.editHint = this.modalElement?.querySelector('.room-edit-hint') || null;
+        this.editOptions = this.modalElement?.querySelector('.room-build-edit-options') || null;
         this.newButton = this.modalElement?.querySelector('#room-new') || null;
         this.resetButton = this.modalElement?.querySelector('#room-reset') || null;
         this.newButton?.addEventListener('click', () => this.startNewRoom());
@@ -81178,9 +82366,10 @@ class RoomPanel extends ModalWindow {
     handleToolModeChanged(mode) {
         const active = mode === UIToolModes.ROOM;
         document.body.classList.toggle('room-build-mode', active);
+        if (!active) document.body.classList.remove('room-select-mode');
         if (active) {
             this.open();
-            this.ensureBrush();
+            this.renderOperation();
             this.refresh();
         } else {
             this.cancelDrag();
@@ -81288,12 +82477,14 @@ class RoomPanel extends ModalWindow {
         // name you had just typed into it.
         if (this.pendingEntry()) {
             this.select(this.pending.id);
+            this.operationSegment?.select(RoomPanel.OPERATIONS.ADD);
             return true;
         }
         const id = this.assignments?.mintRoomId();
         if (!id) return false;
         this.pending = { id, name: null, type: SiteConfig.rooms.defaultType };
         this.selected = id;
+        this.operationSegment?.select(RoomPanel.OPERATIONS.ADD);
         this.renderRooms();
         this.markSelection();
         this.renderHighlight();
@@ -81417,7 +82608,10 @@ class RoomPanel extends ModalWindow {
      */
     markSelection({ reveal = true } = {}) {
         for (const row of this.listElement?.querySelectorAll('.room-row') ?? []) {
-            row.classList.toggle('active', row.dataset.roomId === this.selected);
+            const active = row.dataset.roomId === this.selected;
+            row.classList.toggle('active', active);
+            const name = row.querySelector('.room-row__name');
+            if (name) name.readOnly = !active;
         }
         this.newButton?.classList.toggle('active', this.selected === this.pending?.id);
         if (reveal) {
@@ -81471,14 +82665,16 @@ class RoomPanel extends ModalWindow {
         name.maxLength = 24;
         name.autocomplete = 'off';
         name.spellcheck = false;
+        name.readOnly = this.selected !== room.id;
         name.setAttribute('aria-label', `Name for ${this.label(room)}`);
         name.addEventListener('change', () => this.commitRoom(room.id, { name: name.value.trim() || null }, 'Rename Room'));
         name.addEventListener('keydown', event => {
             if (event.key === 'Enter') name.blur();
         });
-        // Typing a name is not choosing a brush, and having the row select
-        // itself under the cursor would move the paint target mid-word.
-        name.addEventListener('pointerdown', event => event.stopPropagation());
+        name.addEventListener('pointerdown', event => {
+            if (name.readOnly) this.select(room.id);
+            event.stopPropagation();
+        });
 
         const type = document.createElement('select');
         type.className = 'room-row__type';
@@ -81504,6 +82700,14 @@ class RoomPanel extends ModalWindow {
         // floor says so by the row it is in — faded swatch, italic count.
         size.textContent = `${cells} tiles`;
 
+        const perimeter = this.perimeterPlan(room);
+        const status = document.createElement('span');
+        status.className = `room-row__status is-${perimeter.state}`;
+        status.textContent = perimeter.label;
+        status.title = perimeter.missing.length
+            ? `${perimeter.missing.length} exposed perimeter cell${perimeter.missing.length === 1 ? '' : 's'}`
+            : 'The room perimeter is closed';
+
         const meta = document.createElement('div');
         meta.className = 'room-row__meta';
         meta.append(type, size);
@@ -81526,22 +82730,388 @@ class RoomPanel extends ModalWindow {
         // only sense in which any of them can go without knocking a wall down.
         const remove = document.createElement('button');
         remove.type = 'button';
-        remove.className = 'room-row__delete';
-        remove.textContent = '✕';
-        remove.title = `Delete ${this.label(room)}`;
-        remove.setAttribute('aria-label', `Delete ${this.label(room)}`);
+        remove.className = 'room-row__action room-row__delete';
+        remove.textContent = 'Remove room';
+        remove.title = `Remove ${this.label(room)} definition and keep its walls`;
+        remove.setAttribute('aria-label', `Remove ${this.label(room)} definition`);
         remove.addEventListener('pointerdown', event => event.stopPropagation());
         remove.addEventListener('click', () => this.confirmDissolve(room.id));
+        remove.disabled = !this.canDissolve(room.id);
+
+        const actions = document.createElement('div');
+        actions.className = 'room-row__actions';
+        const floor = this.roomAction(cells === 0 ? 'Paint floor' : 'Floor',
+            cells === 0 ? `Paint the first floor tiles for ${this.label(room)}` : `Edit ${this.label(room)} floor`,
+            () => cells === 0 ? this.select(room.id) : this.openSurface(room.id, 'floor'));
+        const walls = this.roomAction('Walls', `Edit ${this.label(room)} wall finishes`, () =>
+            this.openSurface(room.id, 'wall'));
+        walls.disabled = perimeter.present === 0;
+        const enclose = this.roomAction(perimeter.action, perimeter.actionTitle, () =>
+            this.encloseRoom(room.id));
+        enclose.classList.add('room-row__enclose');
+        enclose.disabled = perimeter.missing.length === 0;
+        const islands = this.roomIslands(room);
+        const split = this.roomAction('Split islands',
+            islands.length > 1
+                ? `Make ${islands.length} disconnected areas into separate rooms`
+                : 'This room is one connected area',
+            () => this.splitIslands(room.id));
+        split.disabled = islands.length < 2;
+        const demolition = this.demolitionPlan(room);
+        const demolish = this.roomAction('Demolish',
+            demolition.removable.length
+                ? `Remove ${demolition.removable.length} exterior wall cells with this room`
+                : 'This room has no removable exterior walls',
+            () => this.confirmDemolish(room.id));
+        demolish.classList.add('room-row__demolish');
+        demolish.disabled = demolition.removable.length === 0;
+        demolish.addEventListener('pointerenter', () => this.renderDemolitionPreview(room.id));
+        demolish.addEventListener('pointerleave', () => this.renderPerimeterGaps(room.id));
+        actions.append(floor, walls, enclose, split, remove, demolish);
 
         // One grid, three columns: the swatch keeps a column to itself so the
         // type dropdown on the line below starts where the name does rather
         // than sliding under the colour. Nesting these in wrappers is what let
         // the two lines drift out of alignment in the first place.
-        row.append(swatch, name, remove, meta);
+        row.append(swatch, name, status, meta, actions);
         row.addEventListener('pointerdown', () => this.select(room.id));
-        row.addEventListener('pointerenter', () => this.renderHighlight(room.id));
-        row.addEventListener('pointerleave', () => this.renderHighlight());
+        row.addEventListener('pointerenter', () => {
+            this.renderHighlight(room.id);
+            this.renderPerimeterGaps(room.id);
+        });
+        row.addEventListener('pointerleave', () => {
+            this.renderHighlight();
+            this.clearPerimeterGaps();
+        });
+        row.addEventListener('dblclick', event => {
+            if (!event.target.closest('input, select, button')) this.focusRoom(room);
+        });
         return row;
+    }
+
+    roomAction(label, title, action) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'room-row__action';
+        button.textContent = label;
+        button.title = title;
+        button.addEventListener('pointerdown', event => event.stopPropagation());
+        button.addEventListener('click', event => {
+            event.stopPropagation();
+            action();
+        });
+        return button;
+    }
+
+    roomIslands(room) {
+        if (room?.shape?.kind !== 'tilemask') return [];
+        const remaining = new Set(room.shape.cells);
+        const islands = [];
+        while (remaining.size > 0) {
+            const first = remaining.values().next().value;
+            remaining.delete(first);
+            const island = [first];
+            for (let index = 0; index < island.length; index += 1) {
+                const [x, y] = island[index].split(',').map(Number);
+                for (const key of [`${x - 1},${y}`, `${x + 1},${y}`, `${x},${y - 1}`, `${x},${y + 1}`]) {
+                    if (!remaining.delete(key)) continue;
+                    island.push(key);
+                }
+            }
+            islands.push(island);
+        }
+        return islands.sort((a, b) => b.length - a.length || a[0].localeCompare(b[0]));
+    }
+
+    splitIslands(roomId) {
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        const islands = this.roomIslands(room);
+        if (!room || islands.length < 2) return false;
+
+        const baseName = this.label(room);
+        const type = room.properties?.roomType ?? SiteConfig.rooms.defaultType;
+        const specs = [];
+        const changes = [];
+        const taken = new Set([
+            ...this.assignments.roomIds(),
+            ...(this.gameMap?.regionManager?.all('room') ?? []).map(entry => entry.id)
+        ]);
+        const mintId = () => {
+            for (let number = 1; ; number += 1) {
+                const candidate = `${RoomAssignments.PAINTED_PREFIX}${number}`;
+                if (taken.has(candidate)) continue;
+                taken.add(candidate);
+                return candidate;
+            }
+        };
+        for (let index = 1; index < islands.length; index += 1) {
+            const id = mintId();
+            const generic = /^(Room|Area) \d+$/.exec(baseName);
+            const name = generic ? `${generic[1]} ${index + 1}` : `${baseName} ${index + 1}`;
+            specs.push({ id, name, type });
+            for (const key of islands[index]) {
+                const [x, y] = key.split(',').map(Number);
+                changes.push({ x, y, roomId: id });
+            }
+        }
+
+        const result = this.applySplitChanges(changes, specs);
+        if (!result || result.applied.length === 0) return false;
+        const forward = Utility.deepClone(result.applied);
+        const backward = Utility.deepClone(result.inverse);
+        this.parent.parent?.buildHistory?.push({
+            label: `Split Room (${islands.length} islands)`,
+            undo: () => this.applySplitChanges(backward, []),
+            redo: () => this.applySplitChanges(forward, specs)
+        });
+        this.parent.showMessage(
+            `${baseName} was split into ${islands.length} rooms.`, 'success', 'Rooms'
+        );
+        return true;
+    }
+
+    applySplitChanges(changes, specs) {
+        const result = this.assignments?.applyChanges(changes, { emit: false });
+        if (!result || result.applied.length === 0) return result;
+        this.gameMap?.roomEnclosureDetector?.detect?.();
+        for (const spec of specs) {
+            const room = this.gameMap?.regionManager?.get('room', spec.id);
+            if (!room) continue;
+            room.properties = {
+                ...room.properties,
+                playerName: spec.name,
+                displayName: spec.name,
+                roomType: spec.type
+            };
+        }
+        this.gameMap?.eventManager?.emit(EVENTS.ROOMS_CHANGED, {
+            mapId: this.gameMap.id,
+            rooms: this.gameMap.regionManager?.all('room') ?? []
+        });
+        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap?.core?.user?._scheduleSave?.();
+        return result;
+    }
+
+    openSurface(roomId, surface) {
+        return this.parent?.surfaceCustomizePanel?.openRoomSurface?.(roomId, surface) ?? false;
+    }
+
+    /** The wall-cell ring immediately outside the room's floor mask. */
+    perimeterPlan(room) {
+        const empty = { missing: [], present: 0, presentCells: [], state: 'open', label: 'Open', action: 'Enclose room', actionTitle: 'Build walls around this room' };
+        if (room?.shape?.kind !== 'tilemask' || room.shape.cells.size === 0) return empty;
+        const width = this.gameMap?.gridSystem?.gridWidth ?? 0;
+        const height = this.gameMap?.gridSystem?.gridHeight ?? 0;
+        const walls = this.gameMap?.wallBuilder?.baseCells;
+        const boundary = new Map();
+        for (const key of room.shape.cells) {
+            const [x, y] = key.split(',').map(Number);
+            for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                const nx = x + dx;
+                const ny = y + dy;
+                const next = `${nx},${ny}`;
+                if (room.shape.cells.has(next) || nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                boundary.set(next, { x: nx, y: ny });
+            }
+            // Wall corners occupy their own diagonal cell. Add a diagonal only
+            // at a convex floor corner, where both adjoining cardinal cells
+            // are outside the room. This closes rectangular and stepped outer
+            // corners without filling the inside notch of an L-shaped room.
+            for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+                if (room.shape.cells.has(`${x + dx},${y}`) ||
+                    room.shape.cells.has(`${x},${y + dy}`)) continue;
+                const nx = x + dx;
+                const ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                boundary.set(`${nx},${ny}`, { x: nx, y: ny });
+            }
+        }
+        const missing = [];
+        const presentCells = [];
+        let present = 0;
+        for (const cell of boundary.values()) {
+            if (walls?.has(`${cell.x},${cell.y}`)) {
+                present += 1;
+                presentCells.push(cell);
+            }
+            else missing.push(cell);
+        }
+        if (missing.length === 0) {
+            return { missing, present, presentCells, state: 'enclosed', label: 'Enclosed', action: 'Enclosed', actionTitle: 'Room is enclosed' };
+        }
+        if (present > 0) {
+            return { missing, present, presentCells, state: 'incomplete', label: `Incomplete · ${missing.length}`, action: 'Finish walls', actionTitle: `Fill ${missing.length} missing perimeter cells` };
+        }
+        return { ...empty, missing };
+    }
+
+    /** Exterior walls owned only by this room; shared walls are never included. */
+    demolitionPlan(room) {
+        const builder = this.gameMap?.wallBuilder;
+        const rules = this.parent?.parent?.buildRules;
+        const removable = [];
+        const blocked = [];
+        let shared = 0;
+        const sharedKeys = new Set();
+        for (const other of this.gameMap?.regionManager?.all('room') ?? []) {
+            if (other.id === room?.id) continue;
+            for (const cell of this.perimeterPlan(other).presentCells) {
+                sharedKeys.add(`${cell.x},${cell.y}`);
+            }
+        }
+        for (const candidate of this.perimeterPlan(room).presentCells) {
+            const key = `${candidate.x},${candidate.y}`;
+            if (!builder?.cells?.has(key)) continue;
+            if (sharedKeys.has(key)) {
+                shared += 1;
+                continue;
+            }
+            const verdict = rules?.canRemoveWallCell(candidate.x, candidate.y) ?? BuildRules.ALLOWED;
+            if (verdict.allowed) removable.push(candidate);
+            else blocked.push({ ...candidate, reason: verdict.reason });
+        }
+        return { removable, blocked, shared };
+    }
+
+    confirmDemolish(roomId) {
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        if (!room) return false;
+        const plan = this.demolitionPlan(room);
+        if (plan.removable.length === 0) {
+            this.parent.showMessage('This room has no removable exterior walls.', 'info', 'Rooms');
+            return false;
+        }
+        const details = [
+            `${plan.removable.length} exterior wall cell${plan.removable.length === 1 ? '' : 's'} will be removed.`,
+            plan.shared ? `${plan.shared} shared wall cell${plan.shared === 1 ? '' : 's'} will stay.` : null,
+            plan.blocked.length ? `${plan.blocked.length} locked or occupied wall cell${plan.blocked.length === 1 ? '' : 's'} will stay.` : null,
+            'Doors, windows, and fixtures are never removed by this action. Ctrl+Z undoes it.'
+        ].filter(Boolean).join('\n');
+        if (!window.confirm(`Demolish ${this.label(room)}?\n\n${details}`)) return false;
+        return this.demolishRoom(room, plan);
+    }
+
+    demolishRoom(room, plan = this.demolitionPlan(room)) {
+        const builder = this.gameMap?.wallBuilder;
+        const roomCells = this.roomCells(room.id);
+        const heir = this.largestNeighbour(room.id, roomCells);
+        const wallResult = builder?.applyWallCellChanges(
+            plan.removable.map(cell => ({ ...cell, data: null }))
+        );
+        const roomResult = this.assignments?.applyChanges(
+            roomCells.map(cell => ({ ...cell, roomId: heir?.id ?? null })), { emit: false }
+        );
+        if ((!wallResult || wallResult.applied.length === 0) &&
+            (!roomResult || roomResult.applied.length === 0)) return false;
+
+        this.gameMap?.roomEnclosureDetector?.detect?.();
+        const forwardWalls = Utility.deepClone(wallResult?.applied ?? []);
+        const backwardWalls = Utility.deepClone(wallResult?.inverse ?? []);
+        const forwardRooms = Utility.deepClone(roomResult?.applied ?? []);
+        const backwardRooms = Utility.deepClone(roomResult?.inverse ?? []);
+        const replay = (walls, rooms) => {
+            if (walls.length) builder.applyWallCellChanges(Utility.deepClone(walls), { validate: false });
+            if (rooms.length) this.assignments.applyChanges(Utility.deepClone(rooms), { emit: false });
+            this.gameMap?.roomEnclosureDetector?.detect?.();
+            this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
+            this.gameMap?.core?.user?._scheduleSave?.();
+        };
+        this.parent.parent?.buildHistory?.push({
+            label: `Demolish ${this.label(room)}`,
+            undo: () => replay(backwardWalls, backwardRooms),
+            redo: () => replay(forwardWalls, forwardRooms)
+        });
+        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap?.core?.user?._scheduleSave?.();
+        this.parent.showMessage(
+            `${wallResult?.applied.length ?? 0} exterior wall cells removed. Shared and occupied walls stayed.`,
+            'success', 'Rooms'
+        );
+        return true;
+    }
+
+    renderDemolitionPreview(roomId) {
+        this.clearPerimeterGaps();
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        const layer = this.gameMap?.layers?.objects;
+        if (!room || !layer) return;
+        for (const cell of this.demolitionPlan(room).removable) {
+            const ghost = document.createElement('div');
+            ghost.className = 'build-ghost-cell is-remove room-demolition-preview';
+            Object.assign(ghost.style, {
+                left: `${cell.x * this.cellSize}px`, top: `${cell.y * this.cellSize}px`,
+                width: `${this.cellSize}px`, height: `${this.cellSize}px`
+            });
+            layer.appendChild(ghost);
+            this.perimeterGhosts.push(ghost);
+        }
+    }
+
+    encloseRoom(roomId) {
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        const plan = this.perimeterPlan(room);
+        if (!room || plan.missing.length === 0) return false;
+        const builder = this.gameMap?.wallBuilder;
+        const changes = plan.missing.map(cell => ({ ...cell, data: {} }));
+        const result = builder?.applyWallCellChanges(changes);
+        if (!result || result.applied.length === 0) {
+            const reason = result?.rejected?.[0]?.reason || 'The perimeter is blocked.';
+            this.parent.showMessage(`The room was not enclosed — ${reason.toLowerCase()}`, 'warning', 'Rooms');
+            return false;
+        }
+        const forward = Utility.deepClone(result.applied);
+        const backward = Utility.deepClone(result.inverse);
+        this.parent.parent?.buildHistory?.push({
+            label: `Enclose Room (${result.applied.length} wall${result.applied.length === 1 ? '' : 's'})`,
+            undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
+            redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
+        });
+        this.playSound(SiteConfig.buildMode.sounds.objectPlace);
+        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap?.core?.user?._scheduleSave?.();
+        const blocked = result.rejected.length;
+        this.parent.showMessage(
+            blocked
+                ? `${result.applied.length} wall cells built; ${blocked} blocked section${blocked === 1 ? '' : 's'} remain.`
+                : `${result.applied.length} wall cells enclosed ${this.label(room)}.`,
+            blocked ? 'warning' : 'success',
+            'Rooms'
+        );
+        return true;
+    }
+
+    renderPerimeterGaps(roomId) {
+        this.clearPerimeterGaps();
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        const layer = this.gameMap?.layers?.objects;
+        if (!room || !layer) return;
+        for (const cell of this.perimeterPlan(room).missing) {
+            const ghost = document.createElement('div');
+            ghost.className = 'room-perimeter-gap';
+            Object.assign(ghost.style, {
+                left: `${cell.x * this.cellSize}px`, top: `${cell.y * this.cellSize}px`,
+                width: `${this.cellSize}px`, height: `${this.cellSize}px`
+            });
+            layer.appendChild(ghost);
+            this.perimeterGhosts.push(ghost);
+        }
+    }
+
+    clearPerimeterGaps() {
+        for (const element of this.perimeterGhosts) element.remove();
+        this.perimeterGhosts = [];
+    }
+
+    focusRoom(room) {
+        const bounds = room?.bounds;
+        if (!bounds) return false;
+        this.gameMap?.container?.camera?.focusOn?.({
+            posX: bounds.x,
+            posY: bounds.y,
+            size: { width: bounds.width, height: bounds.height }
+        });
+        return true;
     }
 
     label(room) {
@@ -81564,15 +83134,27 @@ class RoomPanel extends ModalWindow {
             return false;
         }
         const heir = this.largestNeighbour(roomId, cells);
+        if (!this.canDissolve(roomId, cells, heir)) {
+            this.parent.showMessage(
+                'The walls define this room. Demolish its exterior walls or edit the walls directly.',
+                'info', 'Rooms'
+            );
+            return false;
+        }
         if (!window.confirm(
-            `Delete ${this.label(room)}?\n\n` +
+            `Remove the ${this.label(room)} definition?\n\n` +
             `Its ${cells.length} tile${cells.length === 1 ? '' : 's'} ` +
             `${heir ? `join ${this.label(heir)}` : 'go back to whatever the walls enclose'}. ` +
-            'Nothing standing on the floor moves. Ctrl+Z undoes this.'
+            'Its walls and everything attached to them stay. Ctrl+Z undoes this.'
         )) return false;
 
         if (this.selected === roomId) this.selected = heir?.id ?? null;
         return this.commitCells(cells, heir?.id ?? null);
+    }
+
+    canDissolve(roomId, cells = this.roomCells(roomId), heir = this.largestNeighbour(roomId, cells)) {
+        const next = heir?.id ?? null;
+        return cells.some(cell => this.assignments?.get(cell.x, cell.y) !== next);
     }
 
     /**
@@ -81700,7 +83282,11 @@ class RoomPanel extends ModalWindow {
         for (const room of map.regionManager?.all('room') ?? []) {
             const overlay = map.floorBuilder.createRoomOverlay(room, {
                 className: 'room-tint',
-                fill: RoomPanel.roomColour(room.id, 0.26),
+                // A plain source-over fill now (see .room-tint in
+                // _build-mode.scss for why the multiply blend had to go), so the
+                // alpha carries the whole tint — raised to the same 0.34 the
+                // surface selection overlays use.
+                fill: RoomPanel.roomColour(room.id, 0.34),
                 outline: RoomPanel.roomColour(room.id, 0.95)
             });
             if (overlay) this.roomTints.push(overlay);
@@ -81763,11 +83349,15 @@ class RoomPanel extends ModalWindow {
     }
 
     /** Make the room under this cell the one in hand. */
-    pickRoomAt(cell) {
+    roomAtCell(cell) {
         const size = this.cellSize;
-        const room = this.gameMap?.regionManager?.innermostAt(
+        return this.gameMap?.regionManager?.innermostAt(
             (cell.x + 0.5) * size, (cell.y + 0.5) * size, 'room', size
-        );
+        ) || null;
+    }
+
+    pickRoomAt(cell) {
+        const room = this.roomAtCell(cell);
         if (!room) {
             this.parent.showMessage('That floor is not in a room yet.', 'info', 'Rooms');
             return false;
@@ -81778,13 +83368,32 @@ class RoomPanel extends ModalWindow {
         return true;
     }
 
-    /**
-     * The room a stroke paints into. Always a real id: a new room is minted
-     * when it is started rather than when it is first painted, so there is no
-     * such thing as a stroke whose destination is not already in the list.
-     */
-    resolveStrokeRoomId() {
-        return this.selected;
+    /** The selected room for Add, or null to restore wall-derived ownership. */
+    getOperation() {
+        return this.operationSegment?.value || RoomPanel.OPERATIONS.SELECT;
+    }
+
+    resolveOperation(event = null) {
+        const operation = this.getOperation();
+        if (operation === RoomPanel.OPERATIONS.SELECT || event?.ctrlKey !== true) return operation;
+        return operation === RoomPanel.OPERATIONS.REMOVE
+            ? RoomPanel.OPERATIONS.ADD
+            : RoomPanel.OPERATIONS.REMOVE;
+    }
+
+    resolveStrokeRoomId(event = null) {
+        return this.resolveOperation(event) === RoomPanel.OPERATIONS.REMOVE ? null : this.selected;
+    }
+
+    renderOperation() {
+        const selecting = this.getOperation() === RoomPanel.OPERATIONS.SELECT;
+        if (this.selectHint) this.selectHint.hidden = !selecting;
+        if (this.editHint) this.editHint.hidden = selecting;
+        this.editOptions?.classList.toggle('is-inactive', selecting);
+        document.body.classList.toggle(
+            'room-select-mode',
+            selecting && this.parent.isTool(UIToolModes.ROOM)
+        );
     }
 
     handlePointerDown(event) {
@@ -81793,9 +83402,14 @@ class RoomPanel extends ModalWindow {
         if (!cell || !this.assignments) return;
         event.preventDefault();
         event.stopPropagation();
+        if (this.resolveOperation(event) === RoomPanel.OPERATIONS.SELECT) {
+            this.pickRoomAt(cell);
+            this.clearHover();
+            return;
+        }
         // Only reachable on a map with no rooms at all, where there is nothing
         // to paint with until you make one.
-        if (!this.ensureBrush()) {
+        if (this.resolveOperation(event) === 'add' && !this.ensureBrush()) {
             this.parent.showMessage('Pick a room to paint with, or make a new one.', 'info', 'Rooms');
             this.playSound(SiteConfig.buildMode.sounds.rejected);
             return;
@@ -81810,7 +83424,7 @@ class RoomPanel extends ModalWindow {
         }
         this.drag = {
             pointerId: event.pointerId,
-            roomId: this.resolveStrokeRoomId(),
+            roomId: this.resolveStrokeRoomId(event),
             start: cell,
             cells: new Map(),
             moved: false
@@ -81857,6 +83471,7 @@ class RoomPanel extends ModalWindow {
         event.preventDefault();
         event.stopPropagation();
         if (!cell) return;
+        this.drag.roomId = this.resolveStrokeRoomId(event);
         // A rectangle is redrawn from the corner every time; a freehand stroke
         // accumulates. Rebuilding a freehand stroke would erase the trail, and
         // accumulating a rectangle would leave every box you passed through.
@@ -81980,8 +83595,15 @@ class RoomPanel extends ModalWindow {
             if (this.cellAt(source)) this.parent.setBuildCursor('refused');
             return;
         }
+        if (this.getOperation() === RoomPanel.OPERATIONS.SELECT) {
+            this.clearGhosts();
+            this.hoverKey = `${cell.x},${cell.y}:select`;
+            this.parent.setBuildCursor(this.roomAtCell(cell) ? 'ready' : null);
+            return;
+        }
         this.parent.setBuildCursor('ready');
-        const key = `${cell.x},${cell.y}`;
+        const roomId = this.resolveStrokeRoomId(source);
+        const key = `${cell.x},${cell.y}:${roomId ?? 'remove'}`;
         if (this.hoverKey === key) return;
         this.hoverKey = key;
         // The whole area a click would take, not one square: a bucket that shows
@@ -81993,7 +83615,7 @@ class RoomPanel extends ModalWindow {
         // of tiles to announce that nothing is going to happen.
         const area = this.floodFrom(cell);
         this.parent.setBuildCursor(area ? 'ready' : 'refused');
-        this.renderGhosts(area ?? [cell], this.selected);
+        this.renderGhosts(area ?? [cell], roomId);
     }
 
     clearHover() {
@@ -82155,6 +83777,9 @@ class RoomPanel extends ModalWindow {
         this.clearHover();
         this.clearRoomTints();
         this.clearHighlight();
+        this.clearPerimeterGaps();
+        this.operationSegment?.dispose();
+        this.operationSegment = null;
         for (const unsubscribe of this._unsubscribers ?? []) unsubscribe();
         this._unsubscribers = [];
         this.parent?.parent?.canvas?.removeEventListener('pointerdown', this.boundPointerDown, true);
@@ -82168,7 +83793,7 @@ class RoomPanel extends ModalWindow {
     }
 }
 ;
-/* -- js/UI/Panels/SettingsPanel.js -- */
+/* -- js/UI/panels/SettingsPanel.js -- */
 class SettingsPanel extends PanelSection {
     static getDefaultSettings() {
         return {
@@ -82617,7 +84242,7 @@ class SettingsPanel extends PanelSection {
     }
 }
 ;
-/* -- js/UI/Panels/ViewPanel.js -- */
+/* -- js/UI/panels/ViewPanel.js -- */
 class ViewPanel extends PanelSection {
     constructor(parent) {
         super(parent, { tab: 'view' });
@@ -82794,7 +84419,7 @@ class ViewPanel extends PanelSection {
     }
 }
 ;
-/* -- js/UI/Panels/WorldMapPanel.js -- */
+/* -- js/UI/panels/WorldMapPanel.js -- */
 // ─────────────────────────────────────────────────────────────────────────────
 // WorldMapPanel — the world as WorldGraph knows it: every map as a node placed
 // on the layout grid from its own .tmx worldX/worldY, every portal link as a
@@ -83358,7 +84983,7 @@ class WorldMapPanel extends ModalWindow {
     }
 }
 ;
-/* -- js/UI/Panels/CalendarPanel.js -- */
+/* -- js/UI/panels/CalendarPanel.js -- */
 // ─────────────────────────────────────────────────────────────────────────────
 // CalendarPanel — the year as the world keeps it, opened by clicking the clock.
 //
@@ -83669,7 +85294,7 @@ class CalendarPanel extends ModalWindow {
     }
 }
 ;
-/* -- js/UI/Panels/DebugPanel.js -- */
+/* -- js/UI/panels/DebugPanel.js -- */
 class DebugPanel extends PanelSection {
     constructor(parent) {
         super(parent, { tab: 'debug' });

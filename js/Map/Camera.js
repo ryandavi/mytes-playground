@@ -53,6 +53,9 @@ class Camera {
 		this._inertiaVelY = 0;
 		this._lastDragClientX = 0;
 		this._lastDragClientY = 0;
+		this._wheelGesture = null;
+		this._touchGesture = null;
+		this._originalTouchAction = this.canvas.style.touchAction;
 
 		// Camera shake (purely visual — does not affect posX/posY)
 		this._shake = { x: 0, y: 0, intensity: 0 };
@@ -67,7 +70,10 @@ class Camera {
 		this._boundStartDrag  = this.startDrag.bind(this);
 		this._boundDrag       = this.drag.bind(this);
 		this._boundEndDrag    = this.endDrag.bind(this);
-		this._boundHandleZoom = this.handleZoom.bind(this);
+		this._boundHandleZoom = this.handleWheel.bind(this);
+		this._boundTouchStart = this.startTouchGesture.bind(this);
+		this._boundTouchMove = this.moveTouchGesture.bind(this);
+		this._boundTouchEnd = this.endTouchGesture.bind(this);
 		this._boundTemporaryCursorMove = this._handleTemporaryCursorMove.bind(this);
 		this.debouncedResetView = Utility.debounce(() => this.resetView(), 250);
 
@@ -78,6 +84,11 @@ class Camera {
 		document.addEventListener('touchmove', this._boundTemporaryCursorMove, { passive: true });
 		document.addEventListener('dragover', this._boundTemporaryCursorMove);
 		this.canvas.addEventListener('wheel', this._boundHandleZoom, { passive: false });
+		this.canvas.addEventListener('touchstart', this._boundTouchStart, { passive: false });
+		document.addEventListener('touchmove', this._boundTouchMove, { passive: false });
+		document.addEventListener('touchend', this._boundTouchEnd, { passive: false });
+		document.addEventListener('touchcancel', this._boundTouchEnd, { passive: false });
+		this.canvas.style.touchAction = 'none';
 		window.addEventListener('resize', this.debouncedResetView);
 	}
 
@@ -596,6 +607,104 @@ class Camera {
 			this.setZoomLevel(newZoom);
 			this._playZoomSound(previousZoom, newZoom);
 		}
+	}
+
+	handleWheel(e) {
+		const config = SiteConfig.camera;
+		const now = performance.now();
+		if (!this._wheelGesture || now - this._wheelGesture.lastAt > config.wheelGestureIdleMs) {
+			const trackpad = !e.ctrlKey && e.deltaMode === WheelEvent.DOM_DELTA_PIXEL &&
+				(Math.abs(e.deltaX) > 0 || Math.abs(e.deltaY) < config.trackpadDeltaThreshold ||
+				!Number.isInteger(e.deltaY));
+			this._wheelGesture = { kind: trackpad ? 'pan' : 'zoom', lastAt: now };
+		} else {
+			this._wheelGesture.lastAt = now;
+		}
+
+		if (e.ctrlKey) {
+			e.preventDefault();
+			if (this.canZoom === false) return;
+			const previousZoom = this.targetZoomLevel;
+			const nextZoom = this._clampZoom(previousZoom * Math.exp(-e.deltaY * config.trackpadZoomSensitivity));
+			if (nextZoom === previousZoom) return;
+			const anchor = this._getZoomAnchorForEvent(e);
+			const target = this._calculateAnchoredPosition(anchor, nextZoom);
+			this.zoomAnchor = anchor;
+			this.setTarget(target.x, target.y);
+			this.setZoomLevel(nextZoom);
+			return;
+		}
+
+		if (this._wheelGesture.kind === 'pan') {
+			e.preventDefault();
+			this.panBy(e.deltaX, e.deltaY);
+			return;
+		}
+		this.handleZoom(e);
+	}
+
+	startTouchGesture(event) {
+		if (event.touches.length >= 2) {
+			this.beginPinchGesture(event);
+			return;
+		}
+		if (event.touches.length !== 1 || this.followMode !== CAMERA_FOLLOW_MODES.DRAG_TO_PAN ||
+			this.parent?.ui?.toolManager?.claimsMapDrag?.() === true) return;
+		if (event.target?.closest?.('.map-object, .myte-wrapper, .myte')) return;
+		const touch = event.touches[0];
+		this._touchGesture = { kind: 'pan' };
+		this.startDrag({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => event.preventDefault() });
+	}
+
+	beginPinchGesture(event) {
+		if (event.touches.length < 2) return;
+		this.parent?.ui?.cancelBuildGesturesForCamera?.();
+		this.endDrag();
+		const [first, second] = [event.touches[0], event.touches[1]];
+		const midpoint = { clientX: (first.clientX + second.clientX) / 2, clientY: (first.clientY + second.clientY) / 2 };
+		this._touchGesture = {
+			kind: 'pinch',
+			distance: Math.max(1, Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY)),
+			zoom: this.targetZoomLevel,
+			anchor: this._getZoomAnchorForEvent(midpoint)
+		};
+		event.preventDefault();
+	}
+
+	moveTouchGesture(event) {
+		if (event.touches.length >= 2) {
+			if (this._touchGesture?.kind !== 'pinch') this.beginPinchGesture(event);
+			const gesture = this._touchGesture;
+			if (!gesture) return;
+			const [first, second] = [event.touches[0], event.touches[1]];
+			const distance = Math.max(1, Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY));
+			const zoom = this._clampZoom(gesture.zoom * (distance / gesture.distance));
+			const midpoint = this._getRawContainerPointFromClient(
+				(first.clientX + second.clientX) / 2, (first.clientY + second.clientY) / 2
+			);
+			const anchor = { ...gesture.anchor, screenX: midpoint.x, screenY: midpoint.y };
+			const target = this._calculateAnchoredPosition(anchor, zoom);
+			this.zoomAnchor = anchor;
+			this.setTarget(target.x, target.y);
+			this.setZoomLevel(zoom);
+			event.preventDefault();
+			return;
+		}
+		if (this._touchGesture?.kind !== 'pan' || event.touches.length !== 1) return;
+		const touch = event.touches[0];
+		this.drag({ clientX: touch.clientX, clientY: touch.clientY });
+		event.preventDefault();
+	}
+
+	endTouchGesture(event) {
+		if (!this._touchGesture) return;
+		if (event.touches.length >= 2) {
+			this.beginPinchGesture(event);
+			return;
+		}
+		this.endDrag();
+		this._touchGesture = null;
+		if (event.cancelable) event.preventDefault();
 	}
 
 	// ========== DRAG ==========
@@ -1288,6 +1397,11 @@ class Camera {
 		document.removeEventListener('touchmove', this._boundTemporaryCursorMove);
 		document.removeEventListener('dragover', this._boundTemporaryCursorMove);
 		this.canvas.removeEventListener('wheel', this._boundHandleZoom);
+		this.canvas.removeEventListener('touchstart', this._boundTouchStart);
+		document.removeEventListener('touchmove', this._boundTouchMove);
+		document.removeEventListener('touchend', this._boundTouchEnd);
+		document.removeEventListener('touchcancel', this._boundTouchEnd);
+		this.canvas.style.touchAction = this._originalTouchAction;
 		window.removeEventListener('resize', this.debouncedResetView);
 
 		this.parent = null;

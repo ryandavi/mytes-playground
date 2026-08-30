@@ -1,8 +1,4 @@
 class GameMap {
-    // Contributors to the reserved strip above the map. Walls are the first,
-    // not the only: anything whose art reaches past the top edge answers here.
-    static TOP_OVERHANG_SOURCES = [(map, mapData) => map.resolveWallTopOverhang(mapData)];
-
     constructor(parent, mapData = null) {
         this.parent = parent;
         this.mapData = mapData || {}; // Default empty object if no data provided
@@ -33,6 +29,7 @@ class GameMap {
         this.environmentManager = null;
         this.roomEnclosureDetector = null;
         this.wallBuilder = null;
+        this.fenceBuilder = null;
         this.wallMaterialRegistry = null;
         this.floorBuilder = null;
         this.floorMaterialRegistry = null;
@@ -116,63 +113,58 @@ class GameMap {
     }
 
     /**
-     * How far anything renders ABOVE the map's top edge. Each contributor
-     * answers for its own content and the map reserves the largest, so a tall
-     * prop or a two-storey building joins by answering the same question rather
-     * than by adding another inset of its own.
-     *
-     * There is one reserved strip and one place that computes it on purpose:
-     * `renderInsets` feeds world-coordinate conversion (ContainerManager) and
-     * the grid overlay, so a contributor applying its own offset instead would
-     * put the cursor and the art in different coordinate systems.
+     * Height in px of the reserved strip above the map's top edge — the space
+     * where wall art (and later, tall props) is allowed to draw. Lighting and
+     * the map-art mask clip to this so night never sits on the empty page
+     * beyond it. Reads the applied inset, so it never disagrees with layout.
      */
-    resolveRenderTopOverhang(mapData = this.mapData) {
-        return Math.max(0, ...GameMap.TOP_OVERHANG_SOURCES.map(
-            source => Number(source(this, mapData)) || 0
-        ));
-    }
-
-    // `this.mapData` is the object the map was CONSTRUCTED with, not the loaded
-    // TMX, so it carries no wall cells. Recomputing the overhang from it alone
-    // would quietly reserve nothing and clip every wall — and because the strip
-    // also shifts world-coordinate conversion, the cursor would go with it. Fall
-    // back to the builder, which is the live source once the map is up.
-    wallOverhangCells(mapData) {
-        if (mapData?.walls?.cells?.length) return mapData.walls.cells;
-        return [...(this.wallBuilder?.cells?.values?.() || [])];
+    resolveRenderTopOverhang() {
+        return Math.max(0, Number(this.renderInsets?.top) || 0);
     }
 
     /**
-     * A wall overflows the top edge only if it is tall enough to clear its own
-     * row: one on row 0 contributes its whole height, one five rows down
-     * contributes nothing. Reserving the tallest wall's height wherever it
-     * stood padded every map with walls, including maps whose walls are nowhere
-     * near the top.
+     * How many cells of blank space to reserve ABOVE the map's top edge, so
+     * tall art — walls today, big props later — has somewhere to draw without
+     * the world's coordinate origin moving.
      *
-     * Derived from `baseline = (y + 0.5) * cell + thickness / 2` and
-     * `top = baseline - 1 - baselineRow`, which reduce to `height - y * cell`.
+     * This is a DELIBERATE, static amount, not a measurement of the tallest
+     * object on the map. A giant tree is allowed to clip at the canvas edge;
+     * the clipped top still reads as scale. Resolution order:
+     *
+     *   1. the map's own `cameraTopReserveCells` property (authored in Tiled)
+     *   2. a wall's worth of height, if the map can grow walls at all — so
+     *      dropping walls onto a map later needs no re-tuning
+     *   3. the global top padding (`canvasPaddingCells.top`)
+     *
+     * It has to be known at map-load time and never change afterwards:
+     * `renderInsets.top` also shifts screen<->world conversion, camera follow
+     * and the grid overlay, and a value that moved after those had sampled it
+     * is what used to put the cursor and the art in different coordinate
+     * systems.
      */
-    resolveWallTopOverhang(mapData) {
-        if (SiteConfig.wallSystem?.enabled !== true ||
-            SiteConfig.wallSystem?.extendCanvasForWallHeight !== true ||
-            !this.wallOverhangCells(mapData).length) return 0;
-        const cellSize = this.gridSystem?.config?.cellSize || mapData.tileHeight || 32;
-        const registry = this.wallMaterialRegistry;
-        return Math.max(0, ...this.wallOverhangCells(mapData).map(cell => {
-            // The construction's own height once materials have loaded; before
-            // that the map's heightCells estimate is all there is.
-            const height = Number(registry?.getConstruction?.(cell.constructionId)?.height) ||
-                (Math.max(1, Number(cell.heightCells) || SiteConfig.wallSystem.defaultHeightCells) * cellSize);
-            return height - ((Number(cell.y) || 0) * cellSize);
-        }));
+    resolveTopReserveCells(mapData = this.mapData) {
+        const authored = Number(mapData?.properties?.cameraTopReserveCells);
+        if (Number.isFinite(authored) && authored >= 0) return authored;
+
+        const globalTop = Math.max(0, Number(SiteConfig.mapRendering?.canvasPaddingCells?.top) || 0);
+
+        const wallCapable = SiteConfig.wallSystem?.enabled === true &&
+            SiteConfig.wallSystem?.extendCanvasForWallHeight === true &&
+            !!mapData?.walls;
+        if (!wallCapable) return globalTop;
+
+        const wallCells = Number(mapData.properties?.wallHeightCells) ||
+            SiteConfig.wallSystem.defaultHeightCells || 0;
+        return Math.max(globalTop, wallCells);
     }
 
     resolveRenderPadding(mapData = this.mapData) {
         const cellSize = this.gridSystem?.config?.cellSize || mapData?.tileHeight || 32;
         const cells = SiteConfig.mapRendering?.canvasPaddingCells || {};
+        const topCells = this.resolveTopReserveCells(mapData);
         return Object.fromEntries(['top', 'right', 'bottom', 'left'].map(side => [
             side,
-            Math.max(0, Number(cells[side]) || 0) * cellSize
+            Math.max(0, Number(side === 'top' ? topCells : cells[side]) || 0) * cellSize
         ]));
     }
 
@@ -194,9 +186,35 @@ class GameMap {
         this.parent.invalidateCanvasRect?.();
     }
 
-    setWallAwareRenderInsets(mapData, overhang = this.resolveRenderTopOverhang(mapData)) {
-        const padding = this.resolveRenderPadding(mapData);
-        this.setRenderInsets({ ...padding, top: padding.top + Math.max(0, Number(overhang) || 0) });
+    applyRenderInsets(mapData = this.mapData) {
+        this.setRenderInsets(this.resolveRenderPadding(mapData));
+    }
+
+    /**
+     * The top reserve is fixed and authored, so a wall taller than it clips at
+     * the canvas edge. That is a legitimate choice, but log it once — in debug
+     * — so it is a choice and not a surprise.
+     */
+    warnIfWallsExceedTopReserve() {
+        if (SiteConfig.wallSystem?.extendCanvasForWallHeight !== true) return;
+        const cells = [...(this.wallBuilder?.cells?.values?.() || [])];
+        if (!cells.length) return;
+        const cellSize = this.gridSystem?.config?.cellSize || this.mapData?.tileHeight || 32;
+        const registry = this.wallMaterialRegistry;
+        // How far the tallest wall's art reaches above row 0 — one on row 0
+        // contributes its whole height, one five rows down contributes nothing.
+        const tallest = Math.max(0, ...cells.map(cell => {
+            const height = Number(registry?.getConstruction?.(cell.constructionId)?.height) ||
+                (Math.max(1, Number(cell.heightCells) || SiteConfig.wallSystem.defaultHeightCells) * cellSize);
+            return height - ((Number(cell.y) || 0) * cellSize);
+        }));
+        if (tallest > this.renderInsets.top + 0.5) {
+            Utility.warnDebug(
+                `[GameMap] Wall art on "${this.id}" reaches ${Math.ceil(tallest)}px above the top edge, ` +
+                `but only ${Math.round(this.renderInsets.top)}px is reserved — it will clip. ` +
+                `Raise cameraTopReserveCells on this map if that is unwanted.`
+            );
+        }
     }
 
     trackGeneratedObjectUrl(url) {
@@ -473,8 +491,10 @@ class GameMap {
 
 		Utility.logDebug('Tile map dimensions:', this.dimensions);
 
-		// Extend render space northward for wall art without changing gameplay coordinates.
-		this.setWallAwareRenderInsets(mapData);
+		// Reserve render space above the map for tall art (walls, big props)
+		// without moving gameplay coordinates. Fixed and applied once here, so
+		// every screen<->world consumer sees the final value from frame one.
+		this.applyRenderInsets(mapData);
 
 		// Set background from map
 		const bgUrl = await this.tileMapLoader.createMapBackgroundUrl(mapData);
@@ -562,9 +582,10 @@ class GameMap {
 			await this.wallMaterialRegistry.load();
 			this.wallBuilder = new WallBuilder(this, mapData.walls, this.wallMaterialRegistry);
 			await this.wallBuilder.initialize();
-			// Materials are loaded now, so the overhang uses each construction's
-			// real height instead of the map's heightCells estimate.
-			this.setWallAwareRenderInsets(mapData);
+			// The reserve is fixed, not remeasured here — a value that changed
+			// after the camera and input had sampled it was the old coordinate
+			// drift. Just flag it in debug if real wall art won't fit.
+			this.warnIfWallsExceedTopReserve();
 			// Before the detector: its very first pass has to see the map's own
 			// open-plan rooms, or every room it finds is recomputed a moment
 			// later and the rooms it named change under the save.
@@ -573,6 +594,12 @@ class GameMap {
 			this.roomEnclosureDetector = new RoomEnclosureDetector(this);
 		}
 		this.eventManager?.emit(EVENTS.WALL_READY, { mapId: this.id, builder: this.wallBuilder });
+
+		// Fences are ordinary map objects, so the builder is a thin helper the
+		// Fence tool drives — available wherever the FENCE type is registered.
+		if (typeof FenceBuilder === 'function' && MapObjectFactory.hasType?.('FENCE')) {
+			this.fenceBuilder = new FenceBuilder(this);
+		}
 
 		// Floors are built after rooms exist (the environment manager registers
 		// them) and after walls, so a room's floor lands under the wall art that
@@ -860,7 +887,7 @@ class GameMap {
             width: 1000,
             height: 1000
         };
-        this.setWallAwareRenderInsets(this.mapData, 0);
+        this.applyRenderInsets(this.mapData);
 
         // Set a background color
         if (this.layers.background) {
@@ -1275,6 +1302,10 @@ class GameMap {
 			this.wallBuilder.dispose();
 			this.wallBuilder = null;
 			this.wallMaterialRegistry = null;
+		}
+		if (this.fenceBuilder) {
+			this.fenceBuilder.dispose();
+			this.fenceBuilder = null;
 		}
 		if (this.roomAssignments) {
 			this.roomAssignments.dispose();

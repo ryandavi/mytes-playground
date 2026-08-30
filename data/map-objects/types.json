@@ -6405,6 +6405,10 @@
   },
   "GATE": {
     "category": "interactive",
+    "draggable": true,
+    "dragInSelectMode": true,
+    "storable": true,
+    "snapToGrid": true,
     "variants": [
       "wooden_gate",
       "stone_gate",

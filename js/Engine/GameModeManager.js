@@ -152,8 +152,10 @@ class GameModeManager {
         const gameMap = this.container?.gameMap;
 
         this.ui?.wallBuildPanel?.cancelDrag?.();
+        this.ui?.fenceBuildPanel?.cancelDrag?.();
         this.container?.inventory?.cancelPlacement?.();
         this.ui?.wallBuildPanel?.close?.();
+        this.ui?.fenceBuildPanel?.close?.();
         this.ui?.surfaceCustomizePanel?.close?.();
         this.container?.buildHistory?.clear();
 

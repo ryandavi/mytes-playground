@@ -216,4 +216,26 @@ class FenceMapObject extends MapObject {
     tickUpdate(delta) {
         this._updateDegradation(delta);
     }
+
+    // Leaving the map by any route — the Fence tool, the Move tool, stored into
+    // the inventory — has to redraw the neighbours it was connecting, or they
+    // keep drawing a join to a fence that is no longer there.
+    remove() {
+        this._notifyNeighbors();
+        super.remove();
+    }
+
+    // Player-placed fences persist through the ordinary WorldState object path;
+    // authored ones are rebuilt from the map and this just re-applies wear.
+    serializeState() {
+        return { health: this.health, fallen: this._fallen };
+    }
+
+    restoreState(data = {}) {
+        if (Number.isFinite(data.health)) this.health = data.health;
+        this._fallen = data.fallen === true;
+        this._updateCollisionFromHealth();
+        this._updateHealthVisuals();
+        this.refreshConnectionSprite();
+    }
 }

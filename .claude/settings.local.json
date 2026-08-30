@@ -88,7 +88,26 @@
       "Bash(node -e \"const d = require\\('./data/mytes/snail.json'\\); console.log\\(JSON.stringify\\(d.visual, null, 2\\)\\)\")",
       "Bash(node -e \"const d = require\\('./data/mytes/snail.json'\\); const sets = d.visual.spriteSets; Object.keys\\(sets\\).forEach\\(k => console.log\\(k, ':', sets[k].length, 'frames, sample:', JSON.stringify\\(sets[k][0]\\)\\)\\)\")",
       "Bash(node -e \"const d = require\\('./data/mytes/worm.json'\\); console.log\\(JSON.stringify\\(d.visual, null, 2\\)\\)\")",
-      "Bash(node -e \"const d = require\\('./data/mytes/snail.json'\\); const sets = d.visual.spriteSets; const has3 = Object.values\\(sets\\).some\\(s => s.some\\(f => f.length === 3\\)\\); console.log\\('has duration frames:', has3\\); console.log\\('sample 3-tuple:', Object.values\\(sets\\).flat\\(\\).find\\(f=>f.length===3\\)\\)\")"
+      "Bash(node -e \"const d = require\\('./data/mytes/snail.json'\\); const sets = d.visual.spriteSets; const has3 = Object.values\\(sets\\).some\\(s => s.some\\(f => f.length === 3\\)\\); console.log\\('has duration frames:', has3\\); console.log\\('sample 3-tuple:', Object.values\\(sets\\).flat\\(\\).find\\(f=>f.length===3\\)\\)\")",
+      "Bash(command -v brew pip3 python3)",
+      "Bash(lsof -nP -iTCP:8766 -sTCP:LISTEN)",
+      "Bash(lsof -nP -iTCP:8765 -sTCP:LISTEN)",
+      "Bash(nohup python3 -m http.server 8766 --bind 127.0.0.1)",
+      "Bash(curl -s -o /dev/null -w \"index.html: %{http_code}\\\\n\" http://127.0.0.1:8766/index.html)",
+      "Bash(curl -s -o /dev/null -w \"bundle.js: %{http_code}\\\\n\" http://127.0.0.1:8766/js/bundle.js)",
+      "Bash(curl -s -o /dev/null -w \"style.css: %{http_code}\\\\n\" http://127.0.0.1:8766/css/style.css)",
+      "Bash(curl -s http://127.0.0.1:8766/js/bundle.js)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8766/)",
+      "Bash(python3 -c \"import sass; print\\('libsass', sass.libsass_version\\)\")",
+      "Bash(pip3 install *)",
+      "Bash(curl -sI -o /dev/null -w \"github: %{http_code}\\\\n\" https://github.com)",
+      "Bash(curl -sI -o /dev/null -w \"gh-releases: %{http_code}\\\\n\" https://objects.githubusercontent.com)",
+      "Bash(curl -s https://nodejs.org/dist/index.json)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); lts=[r for r in d if r['lts']]; print\\(lts[0]['version'], lts[0]['lts']\\)\")",
+      "Bash([ -f \"$ZSHRC\" ])",
+      "Read(//Users/amberellis/**)",
+      "Bash(printf '\\\\n# Standalone Node.js \\(added for Neko/Mytes project builds\\)\\\\nexport PATH=\"$HOME/.local/node/bin:$PATH\"\\\\n')",
+      "Bash(zsh -lic 'which node npm npx; node -v')"
     ],
     "additionalDirectories": [
       "C:\\Users\\Ryan\\.claude\\projects\\c--xampp-htdocs-genes-chat-neko\\memory"

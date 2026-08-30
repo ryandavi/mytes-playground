@@ -21,6 +21,12 @@
  *   undo it all   pick Reset, and the walls decide again
  */
 class RoomPanel extends ModalWindow {
+    static OPERATIONS = Object.freeze({
+        SELECT: 'select',
+        ADD: 'add',
+        REMOVE: 'remove'
+    });
+
     // Twelve hues a person can name, evenly spaced round the wheel.
     static HUES = Object.freeze([8, 32, 52, 84, 140, 168, 194, 218, 250, 280, 310, 336]);
 
@@ -43,6 +49,7 @@ class RoomPanel extends ModalWindow {
         this.pending = null;
         this.ghostElements = [];
         this.roomTints = [];
+        this.perimeterGhosts = [];
         this.highlight = null;
         this.boundPointerDown = this.handlePointerDown.bind(this);
         this.boundPointerMove = this.handlePointerMove.bind(this);
@@ -52,7 +59,21 @@ class RoomPanel extends ModalWindow {
         this.init();
         this.listElement = this.modalElement?.querySelector('.room-panel-list') || null;
         this.scrollContainer = this.listElement;
+        this.operationSegment = new SegmentControl(
+            this.modalElement?.querySelector('.room-build-operation-segment') || null,
+            {
+                value: RoomPanel.OPERATIONS.SELECT,
+                onChange: () => {
+                    this.cancelDrag();
+                    this.clearHover();
+                    this.renderOperation();
+                }
+            }
+        );
         this.rectangleToggle = this.modalElement?.querySelector('#room-build-rectangle') || null;
+        this.selectHint = this.modalElement?.querySelector('.room-select-hint') || null;
+        this.editHint = this.modalElement?.querySelector('.room-edit-hint') || null;
+        this.editOptions = this.modalElement?.querySelector('.room-build-edit-options') || null;
         this.newButton = this.modalElement?.querySelector('#room-new') || null;
         this.resetButton = this.modalElement?.querySelector('#room-reset') || null;
         this.newButton?.addEventListener('click', () => this.startNewRoom());
@@ -83,9 +104,10 @@ class RoomPanel extends ModalWindow {
     handleToolModeChanged(mode) {
         const active = mode === UIToolModes.ROOM;
         document.body.classList.toggle('room-build-mode', active);
+        if (!active) document.body.classList.remove('room-select-mode');
         if (active) {
             this.open();
-            this.ensureBrush();
+            this.renderOperation();
             this.refresh();
         } else {
             this.cancelDrag();
@@ -193,12 +215,14 @@ class RoomPanel extends ModalWindow {
         // name you had just typed into it.
         if (this.pendingEntry()) {
             this.select(this.pending.id);
+            this.operationSegment?.select(RoomPanel.OPERATIONS.ADD);
             return true;
         }
         const id = this.assignments?.mintRoomId();
         if (!id) return false;
         this.pending = { id, name: null, type: SiteConfig.rooms.defaultType };
         this.selected = id;
+        this.operationSegment?.select(RoomPanel.OPERATIONS.ADD);
         this.renderRooms();
         this.markSelection();
         this.renderHighlight();
@@ -322,7 +346,10 @@ class RoomPanel extends ModalWindow {
      */
     markSelection({ reveal = true } = {}) {
         for (const row of this.listElement?.querySelectorAll('.room-row') ?? []) {
-            row.classList.toggle('active', row.dataset.roomId === this.selected);
+            const active = row.dataset.roomId === this.selected;
+            row.classList.toggle('active', active);
+            const name = row.querySelector('.room-row__name');
+            if (name) name.readOnly = !active;
         }
         this.newButton?.classList.toggle('active', this.selected === this.pending?.id);
         if (reveal) {
@@ -376,14 +403,16 @@ class RoomPanel extends ModalWindow {
         name.maxLength = 24;
         name.autocomplete = 'off';
         name.spellcheck = false;
+        name.readOnly = this.selected !== room.id;
         name.setAttribute('aria-label', `Name for ${this.label(room)}`);
         name.addEventListener('change', () => this.commitRoom(room.id, { name: name.value.trim() || null }, 'Rename Room'));
         name.addEventListener('keydown', event => {
             if (event.key === 'Enter') name.blur();
         });
-        // Typing a name is not choosing a brush, and having the row select
-        // itself under the cursor would move the paint target mid-word.
-        name.addEventListener('pointerdown', event => event.stopPropagation());
+        name.addEventListener('pointerdown', event => {
+            if (name.readOnly) this.select(room.id);
+            event.stopPropagation();
+        });
 
         const type = document.createElement('select');
         type.className = 'room-row__type';
@@ -409,6 +438,14 @@ class RoomPanel extends ModalWindow {
         // floor says so by the row it is in — faded swatch, italic count.
         size.textContent = `${cells} tiles`;
 
+        const perimeter = this.perimeterPlan(room);
+        const status = document.createElement('span');
+        status.className = `room-row__status is-${perimeter.state}`;
+        status.textContent = perimeter.label;
+        status.title = perimeter.missing.length
+            ? `${perimeter.missing.length} exposed perimeter cell${perimeter.missing.length === 1 ? '' : 's'}`
+            : 'The room perimeter is closed';
+
         const meta = document.createElement('div');
         meta.className = 'room-row__meta';
         meta.append(type, size);
@@ -431,22 +468,388 @@ class RoomPanel extends ModalWindow {
         // only sense in which any of them can go without knocking a wall down.
         const remove = document.createElement('button');
         remove.type = 'button';
-        remove.className = 'room-row__delete';
-        remove.textContent = '✕';
-        remove.title = `Delete ${this.label(room)}`;
-        remove.setAttribute('aria-label', `Delete ${this.label(room)}`);
+        remove.className = 'room-row__action room-row__delete';
+        remove.textContent = 'Remove room';
+        remove.title = `Remove ${this.label(room)} definition and keep its walls`;
+        remove.setAttribute('aria-label', `Remove ${this.label(room)} definition`);
         remove.addEventListener('pointerdown', event => event.stopPropagation());
         remove.addEventListener('click', () => this.confirmDissolve(room.id));
+        remove.disabled = !this.canDissolve(room.id);
+
+        const actions = document.createElement('div');
+        actions.className = 'room-row__actions';
+        const floor = this.roomAction(cells === 0 ? 'Paint floor' : 'Floor',
+            cells === 0 ? `Paint the first floor tiles for ${this.label(room)}` : `Edit ${this.label(room)} floor`,
+            () => cells === 0 ? this.select(room.id) : this.openSurface(room.id, 'floor'));
+        const walls = this.roomAction('Walls', `Edit ${this.label(room)} wall finishes`, () =>
+            this.openSurface(room.id, 'wall'));
+        walls.disabled = perimeter.present === 0;
+        const enclose = this.roomAction(perimeter.action, perimeter.actionTitle, () =>
+            this.encloseRoom(room.id));
+        enclose.classList.add('room-row__enclose');
+        enclose.disabled = perimeter.missing.length === 0;
+        const islands = this.roomIslands(room);
+        const split = this.roomAction('Split islands',
+            islands.length > 1
+                ? `Make ${islands.length} disconnected areas into separate rooms`
+                : 'This room is one connected area',
+            () => this.splitIslands(room.id));
+        split.disabled = islands.length < 2;
+        const demolition = this.demolitionPlan(room);
+        const demolish = this.roomAction('Demolish',
+            demolition.removable.length
+                ? `Remove ${demolition.removable.length} exterior wall cells with this room`
+                : 'This room has no removable exterior walls',
+            () => this.confirmDemolish(room.id));
+        demolish.classList.add('room-row__demolish');
+        demolish.disabled = demolition.removable.length === 0;
+        demolish.addEventListener('pointerenter', () => this.renderDemolitionPreview(room.id));
+        demolish.addEventListener('pointerleave', () => this.renderPerimeterGaps(room.id));
+        actions.append(floor, walls, enclose, split, remove, demolish);
 
         // One grid, three columns: the swatch keeps a column to itself so the
         // type dropdown on the line below starts where the name does rather
         // than sliding under the colour. Nesting these in wrappers is what let
         // the two lines drift out of alignment in the first place.
-        row.append(swatch, name, remove, meta);
+        row.append(swatch, name, status, meta, actions);
         row.addEventListener('pointerdown', () => this.select(room.id));
-        row.addEventListener('pointerenter', () => this.renderHighlight(room.id));
-        row.addEventListener('pointerleave', () => this.renderHighlight());
+        row.addEventListener('pointerenter', () => {
+            this.renderHighlight(room.id);
+            this.renderPerimeterGaps(room.id);
+        });
+        row.addEventListener('pointerleave', () => {
+            this.renderHighlight();
+            this.clearPerimeterGaps();
+        });
+        row.addEventListener('dblclick', event => {
+            if (!event.target.closest('input, select, button')) this.focusRoom(room);
+        });
         return row;
+    }
+
+    roomAction(label, title, action) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'room-row__action';
+        button.textContent = label;
+        button.title = title;
+        button.addEventListener('pointerdown', event => event.stopPropagation());
+        button.addEventListener('click', event => {
+            event.stopPropagation();
+            action();
+        });
+        return button;
+    }
+
+    roomIslands(room) {
+        if (room?.shape?.kind !== 'tilemask') return [];
+        const remaining = new Set(room.shape.cells);
+        const islands = [];
+        while (remaining.size > 0) {
+            const first = remaining.values().next().value;
+            remaining.delete(first);
+            const island = [first];
+            for (let index = 0; index < island.length; index += 1) {
+                const [x, y] = island[index].split(',').map(Number);
+                for (const key of [`${x - 1},${y}`, `${x + 1},${y}`, `${x},${y - 1}`, `${x},${y + 1}`]) {
+                    if (!remaining.delete(key)) continue;
+                    island.push(key);
+                }
+            }
+            islands.push(island);
+        }
+        return islands.sort((a, b) => b.length - a.length || a[0].localeCompare(b[0]));
+    }
+
+    splitIslands(roomId) {
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        const islands = this.roomIslands(room);
+        if (!room || islands.length < 2) return false;
+
+        const baseName = this.label(room);
+        const type = room.properties?.roomType ?? SiteConfig.rooms.defaultType;
+        const specs = [];
+        const changes = [];
+        const taken = new Set([
+            ...this.assignments.roomIds(),
+            ...(this.gameMap?.regionManager?.all('room') ?? []).map(entry => entry.id)
+        ]);
+        const mintId = () => {
+            for (let number = 1; ; number += 1) {
+                const candidate = `${RoomAssignments.PAINTED_PREFIX}${number}`;
+                if (taken.has(candidate)) continue;
+                taken.add(candidate);
+                return candidate;
+            }
+        };
+        for (let index = 1; index < islands.length; index += 1) {
+            const id = mintId();
+            const generic = /^(Room|Area) \d+$/.exec(baseName);
+            const name = generic ? `${generic[1]} ${index + 1}` : `${baseName} ${index + 1}`;
+            specs.push({ id, name, type });
+            for (const key of islands[index]) {
+                const [x, y] = key.split(',').map(Number);
+                changes.push({ x, y, roomId: id });
+            }
+        }
+
+        const result = this.applySplitChanges(changes, specs);
+        if (!result || result.applied.length === 0) return false;
+        const forward = Utility.deepClone(result.applied);
+        const backward = Utility.deepClone(result.inverse);
+        this.parent.parent?.buildHistory?.push({
+            label: `Split Room (${islands.length} islands)`,
+            undo: () => this.applySplitChanges(backward, []),
+            redo: () => this.applySplitChanges(forward, specs)
+        });
+        this.parent.showMessage(
+            `${baseName} was split into ${islands.length} rooms.`, 'success', 'Rooms'
+        );
+        return true;
+    }
+
+    applySplitChanges(changes, specs) {
+        const result = this.assignments?.applyChanges(changes, { emit: false });
+        if (!result || result.applied.length === 0) return result;
+        this.gameMap?.roomEnclosureDetector?.detect?.();
+        for (const spec of specs) {
+            const room = this.gameMap?.regionManager?.get('room', spec.id);
+            if (!room) continue;
+            room.properties = {
+                ...room.properties,
+                playerName: spec.name,
+                displayName: spec.name,
+                roomType: spec.type
+            };
+        }
+        this.gameMap?.eventManager?.emit(EVENTS.ROOMS_CHANGED, {
+            mapId: this.gameMap.id,
+            rooms: this.gameMap.regionManager?.all('room') ?? []
+        });
+        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap?.core?.user?._scheduleSave?.();
+        return result;
+    }
+
+    openSurface(roomId, surface) {
+        return this.parent?.surfaceCustomizePanel?.openRoomSurface?.(roomId, surface) ?? false;
+    }
+
+    /** The wall-cell ring immediately outside the room's floor mask. */
+    perimeterPlan(room) {
+        const empty = { missing: [], present: 0, presentCells: [], state: 'open', label: 'Open', action: 'Enclose room', actionTitle: 'Build walls around this room' };
+        if (room?.shape?.kind !== 'tilemask' || room.shape.cells.size === 0) return empty;
+        const width = this.gameMap?.gridSystem?.gridWidth ?? 0;
+        const height = this.gameMap?.gridSystem?.gridHeight ?? 0;
+        const walls = this.gameMap?.wallBuilder?.baseCells;
+        const boundary = new Map();
+        for (const key of room.shape.cells) {
+            const [x, y] = key.split(',').map(Number);
+            for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                const nx = x + dx;
+                const ny = y + dy;
+                const next = `${nx},${ny}`;
+                if (room.shape.cells.has(next) || nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                boundary.set(next, { x: nx, y: ny });
+            }
+            // Wall corners occupy their own diagonal cell. Add a diagonal only
+            // at a convex floor corner, where both adjoining cardinal cells
+            // are outside the room. This closes rectangular and stepped outer
+            // corners without filling the inside notch of an L-shaped room.
+            for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+                if (room.shape.cells.has(`${x + dx},${y}`) ||
+                    room.shape.cells.has(`${x},${y + dy}`)) continue;
+                const nx = x + dx;
+                const ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                boundary.set(`${nx},${ny}`, { x: nx, y: ny });
+            }
+        }
+        const missing = [];
+        const presentCells = [];
+        let present = 0;
+        for (const cell of boundary.values()) {
+            if (walls?.has(`${cell.x},${cell.y}`)) {
+                present += 1;
+                presentCells.push(cell);
+            }
+            else missing.push(cell);
+        }
+        if (missing.length === 0) {
+            return { missing, present, presentCells, state: 'enclosed', label: 'Enclosed', action: 'Enclosed', actionTitle: 'Room is enclosed' };
+        }
+        if (present > 0) {
+            return { missing, present, presentCells, state: 'incomplete', label: `Incomplete · ${missing.length}`, action: 'Finish walls', actionTitle: `Fill ${missing.length} missing perimeter cells` };
+        }
+        return { ...empty, missing };
+    }
+
+    /** Exterior walls owned only by this room; shared walls are never included. */
+    demolitionPlan(room) {
+        const builder = this.gameMap?.wallBuilder;
+        const rules = this.parent?.parent?.buildRules;
+        const removable = [];
+        const blocked = [];
+        let shared = 0;
+        const sharedKeys = new Set();
+        for (const other of this.gameMap?.regionManager?.all('room') ?? []) {
+            if (other.id === room?.id) continue;
+            for (const cell of this.perimeterPlan(other).presentCells) {
+                sharedKeys.add(`${cell.x},${cell.y}`);
+            }
+        }
+        for (const candidate of this.perimeterPlan(room).presentCells) {
+            const key = `${candidate.x},${candidate.y}`;
+            if (!builder?.cells?.has(key)) continue;
+            if (sharedKeys.has(key)) {
+                shared += 1;
+                continue;
+            }
+            const verdict = rules?.canRemoveWallCell(candidate.x, candidate.y) ?? BuildRules.ALLOWED;
+            if (verdict.allowed) removable.push(candidate);
+            else blocked.push({ ...candidate, reason: verdict.reason });
+        }
+        return { removable, blocked, shared };
+    }
+
+    confirmDemolish(roomId) {
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        if (!room) return false;
+        const plan = this.demolitionPlan(room);
+        if (plan.removable.length === 0) {
+            this.parent.showMessage('This room has no removable exterior walls.', 'info', 'Rooms');
+            return false;
+        }
+        const details = [
+            `${plan.removable.length} exterior wall cell${plan.removable.length === 1 ? '' : 's'} will be removed.`,
+            plan.shared ? `${plan.shared} shared wall cell${plan.shared === 1 ? '' : 's'} will stay.` : null,
+            plan.blocked.length ? `${plan.blocked.length} locked or occupied wall cell${plan.blocked.length === 1 ? '' : 's'} will stay.` : null,
+            'Doors, windows, and fixtures are never removed by this action. Ctrl+Z undoes it.'
+        ].filter(Boolean).join('\n');
+        if (!window.confirm(`Demolish ${this.label(room)}?\n\n${details}`)) return false;
+        return this.demolishRoom(room, plan);
+    }
+
+    demolishRoom(room, plan = this.demolitionPlan(room)) {
+        const builder = this.gameMap?.wallBuilder;
+        const roomCells = this.roomCells(room.id);
+        const heir = this.largestNeighbour(room.id, roomCells);
+        const wallResult = builder?.applyWallCellChanges(
+            plan.removable.map(cell => ({ ...cell, data: null }))
+        );
+        const roomResult = this.assignments?.applyChanges(
+            roomCells.map(cell => ({ ...cell, roomId: heir?.id ?? null })), { emit: false }
+        );
+        if ((!wallResult || wallResult.applied.length === 0) &&
+            (!roomResult || roomResult.applied.length === 0)) return false;
+
+        this.gameMap?.roomEnclosureDetector?.detect?.();
+        const forwardWalls = Utility.deepClone(wallResult?.applied ?? []);
+        const backwardWalls = Utility.deepClone(wallResult?.inverse ?? []);
+        const forwardRooms = Utility.deepClone(roomResult?.applied ?? []);
+        const backwardRooms = Utility.deepClone(roomResult?.inverse ?? []);
+        const replay = (walls, rooms) => {
+            if (walls.length) builder.applyWallCellChanges(Utility.deepClone(walls), { validate: false });
+            if (rooms.length) this.assignments.applyChanges(Utility.deepClone(rooms), { emit: false });
+            this.gameMap?.roomEnclosureDetector?.detect?.();
+            this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
+            this.gameMap?.core?.user?._scheduleSave?.();
+        };
+        this.parent.parent?.buildHistory?.push({
+            label: `Demolish ${this.label(room)}`,
+            undo: () => replay(backwardWalls, backwardRooms),
+            redo: () => replay(forwardWalls, forwardRooms)
+        });
+        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap?.core?.user?._scheduleSave?.();
+        this.parent.showMessage(
+            `${wallResult?.applied.length ?? 0} exterior wall cells removed. Shared and occupied walls stayed.`,
+            'success', 'Rooms'
+        );
+        return true;
+    }
+
+    renderDemolitionPreview(roomId) {
+        this.clearPerimeterGaps();
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        const layer = this.gameMap?.layers?.objects;
+        if (!room || !layer) return;
+        for (const cell of this.demolitionPlan(room).removable) {
+            const ghost = document.createElement('div');
+            ghost.className = 'build-ghost-cell is-remove room-demolition-preview';
+            Object.assign(ghost.style, {
+                left: `${cell.x * this.cellSize}px`, top: `${cell.y * this.cellSize}px`,
+                width: `${this.cellSize}px`, height: `${this.cellSize}px`
+            });
+            layer.appendChild(ghost);
+            this.perimeterGhosts.push(ghost);
+        }
+    }
+
+    encloseRoom(roomId) {
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        const plan = this.perimeterPlan(room);
+        if (!room || plan.missing.length === 0) return false;
+        const builder = this.gameMap?.wallBuilder;
+        const changes = plan.missing.map(cell => ({ ...cell, data: {} }));
+        const result = builder?.applyWallCellChanges(changes);
+        if (!result || result.applied.length === 0) {
+            const reason = result?.rejected?.[0]?.reason || 'The perimeter is blocked.';
+            this.parent.showMessage(`The room was not enclosed — ${reason.toLowerCase()}`, 'warning', 'Rooms');
+            return false;
+        }
+        const forward = Utility.deepClone(result.applied);
+        const backward = Utility.deepClone(result.inverse);
+        this.parent.parent?.buildHistory?.push({
+            label: `Enclose Room (${result.applied.length} wall${result.applied.length === 1 ? '' : 's'})`,
+            undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
+            redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
+        });
+        this.playSound(SiteConfig.buildMode.sounds.objectPlace);
+        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap?.core?.user?._scheduleSave?.();
+        const blocked = result.rejected.length;
+        this.parent.showMessage(
+            blocked
+                ? `${result.applied.length} wall cells built; ${blocked} blocked section${blocked === 1 ? '' : 's'} remain.`
+                : `${result.applied.length} wall cells enclosed ${this.label(room)}.`,
+            blocked ? 'warning' : 'success',
+            'Rooms'
+        );
+        return true;
+    }
+
+    renderPerimeterGaps(roomId) {
+        this.clearPerimeterGaps();
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        const layer = this.gameMap?.layers?.objects;
+        if (!room || !layer) return;
+        for (const cell of this.perimeterPlan(room).missing) {
+            const ghost = document.createElement('div');
+            ghost.className = 'room-perimeter-gap';
+            Object.assign(ghost.style, {
+                left: `${cell.x * this.cellSize}px`, top: `${cell.y * this.cellSize}px`,
+                width: `${this.cellSize}px`, height: `${this.cellSize}px`
+            });
+            layer.appendChild(ghost);
+            this.perimeterGhosts.push(ghost);
+        }
+    }
+
+    clearPerimeterGaps() {
+        for (const element of this.perimeterGhosts) element.remove();
+        this.perimeterGhosts = [];
+    }
+
+    focusRoom(room) {
+        const bounds = room?.bounds;
+        if (!bounds) return false;
+        this.gameMap?.container?.camera?.focusOn?.({
+            posX: bounds.x,
+            posY: bounds.y,
+            size: { width: bounds.width, height: bounds.height }
+        });
+        return true;
     }
 
     label(room) {
@@ -469,15 +872,27 @@ class RoomPanel extends ModalWindow {
             return false;
         }
         const heir = this.largestNeighbour(roomId, cells);
+        if (!this.canDissolve(roomId, cells, heir)) {
+            this.parent.showMessage(
+                'The walls define this room. Demolish its exterior walls or edit the walls directly.',
+                'info', 'Rooms'
+            );
+            return false;
+        }
         if (!window.confirm(
-            `Delete ${this.label(room)}?\n\n` +
+            `Remove the ${this.label(room)} definition?\n\n` +
             `Its ${cells.length} tile${cells.length === 1 ? '' : 's'} ` +
             `${heir ? `join ${this.label(heir)}` : 'go back to whatever the walls enclose'}. ` +
-            'Nothing standing on the floor moves. Ctrl+Z undoes this.'
+            'Its walls and everything attached to them stay. Ctrl+Z undoes this.'
         )) return false;
 
         if (this.selected === roomId) this.selected = heir?.id ?? null;
         return this.commitCells(cells, heir?.id ?? null);
+    }
+
+    canDissolve(roomId, cells = this.roomCells(roomId), heir = this.largestNeighbour(roomId, cells)) {
+        const next = heir?.id ?? null;
+        return cells.some(cell => this.assignments?.get(cell.x, cell.y) !== next);
     }
 
     /**
@@ -605,7 +1020,11 @@ class RoomPanel extends ModalWindow {
         for (const room of map.regionManager?.all('room') ?? []) {
             const overlay = map.floorBuilder.createRoomOverlay(room, {
                 className: 'room-tint',
-                fill: RoomPanel.roomColour(room.id, 0.26),
+                // A plain source-over fill now (see .room-tint in
+                // _build-mode.scss for why the multiply blend had to go), so the
+                // alpha carries the whole tint — raised to the same 0.34 the
+                // surface selection overlays use.
+                fill: RoomPanel.roomColour(room.id, 0.34),
                 outline: RoomPanel.roomColour(room.id, 0.95)
             });
             if (overlay) this.roomTints.push(overlay);
@@ -668,11 +1087,15 @@ class RoomPanel extends ModalWindow {
     }
 
     /** Make the room under this cell the one in hand. */
-    pickRoomAt(cell) {
+    roomAtCell(cell) {
         const size = this.cellSize;
-        const room = this.gameMap?.regionManager?.innermostAt(
+        return this.gameMap?.regionManager?.innermostAt(
             (cell.x + 0.5) * size, (cell.y + 0.5) * size, 'room', size
-        );
+        ) || null;
+    }
+
+    pickRoomAt(cell) {
+        const room = this.roomAtCell(cell);
         if (!room) {
             this.parent.showMessage('That floor is not in a room yet.', 'info', 'Rooms');
             return false;
@@ -683,13 +1106,32 @@ class RoomPanel extends ModalWindow {
         return true;
     }
 
-    /**
-     * The room a stroke paints into. Always a real id: a new room is minted
-     * when it is started rather than when it is first painted, so there is no
-     * such thing as a stroke whose destination is not already in the list.
-     */
-    resolveStrokeRoomId() {
-        return this.selected;
+    /** The selected room for Add, or null to restore wall-derived ownership. */
+    getOperation() {
+        return this.operationSegment?.value || RoomPanel.OPERATIONS.SELECT;
+    }
+
+    resolveOperation(event = null) {
+        const operation = this.getOperation();
+        if (operation === RoomPanel.OPERATIONS.SELECT || event?.ctrlKey !== true) return operation;
+        return operation === RoomPanel.OPERATIONS.REMOVE
+            ? RoomPanel.OPERATIONS.ADD
+            : RoomPanel.OPERATIONS.REMOVE;
+    }
+
+    resolveStrokeRoomId(event = null) {
+        return this.resolveOperation(event) === RoomPanel.OPERATIONS.REMOVE ? null : this.selected;
+    }
+
+    renderOperation() {
+        const selecting = this.getOperation() === RoomPanel.OPERATIONS.SELECT;
+        if (this.selectHint) this.selectHint.hidden = !selecting;
+        if (this.editHint) this.editHint.hidden = selecting;
+        this.editOptions?.classList.toggle('is-inactive', selecting);
+        document.body.classList.toggle(
+            'room-select-mode',
+            selecting && this.parent.isTool(UIToolModes.ROOM)
+        );
     }
 
     handlePointerDown(event) {
@@ -698,9 +1140,14 @@ class RoomPanel extends ModalWindow {
         if (!cell || !this.assignments) return;
         event.preventDefault();
         event.stopPropagation();
+        if (this.resolveOperation(event) === RoomPanel.OPERATIONS.SELECT) {
+            this.pickRoomAt(cell);
+            this.clearHover();
+            return;
+        }
         // Only reachable on a map with no rooms at all, where there is nothing
         // to paint with until you make one.
-        if (!this.ensureBrush()) {
+        if (this.resolveOperation(event) === 'add' && !this.ensureBrush()) {
             this.parent.showMessage('Pick a room to paint with, or make a new one.', 'info', 'Rooms');
             this.playSound(SiteConfig.buildMode.sounds.rejected);
             return;
@@ -715,7 +1162,7 @@ class RoomPanel extends ModalWindow {
         }
         this.drag = {
             pointerId: event.pointerId,
-            roomId: this.resolveStrokeRoomId(),
+            roomId: this.resolveStrokeRoomId(event),
             start: cell,
             cells: new Map(),
             moved: false
@@ -762,6 +1209,7 @@ class RoomPanel extends ModalWindow {
         event.preventDefault();
         event.stopPropagation();
         if (!cell) return;
+        this.drag.roomId = this.resolveStrokeRoomId(event);
         // A rectangle is redrawn from the corner every time; a freehand stroke
         // accumulates. Rebuilding a freehand stroke would erase the trail, and
         // accumulating a rectangle would leave every box you passed through.
@@ -885,8 +1333,15 @@ class RoomPanel extends ModalWindow {
             if (this.cellAt(source)) this.parent.setBuildCursor('refused');
             return;
         }
+        if (this.getOperation() === RoomPanel.OPERATIONS.SELECT) {
+            this.clearGhosts();
+            this.hoverKey = `${cell.x},${cell.y}:select`;
+            this.parent.setBuildCursor(this.roomAtCell(cell) ? 'ready' : null);
+            return;
+        }
         this.parent.setBuildCursor('ready');
-        const key = `${cell.x},${cell.y}`;
+        const roomId = this.resolveStrokeRoomId(source);
+        const key = `${cell.x},${cell.y}:${roomId ?? 'remove'}`;
         if (this.hoverKey === key) return;
         this.hoverKey = key;
         // The whole area a click would take, not one square: a bucket that shows
@@ -898,7 +1353,7 @@ class RoomPanel extends ModalWindow {
         // of tiles to announce that nothing is going to happen.
         const area = this.floodFrom(cell);
         this.parent.setBuildCursor(area ? 'ready' : 'refused');
-        this.renderGhosts(area ?? [cell], this.selected);
+        this.renderGhosts(area ?? [cell], roomId);
     }
 
     clearHover() {
@@ -1060,6 +1515,9 @@ class RoomPanel extends ModalWindow {
         this.clearHover();
         this.clearRoomTints();
         this.clearHighlight();
+        this.clearPerimeterGaps();
+        this.operationSegment?.dispose();
+        this.operationSegment = null;
         for (const unsubscribe of this._unsubscribers ?? []) unsubscribe();
         this._unsubscribers = [];
         this.parent?.parent?.canvas?.removeEventListener('pointerdown', this.boundPointerDown, true);

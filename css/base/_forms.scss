@@ -27,8 +27,16 @@ input[type=submit],
 input[type=button],
 button {
     @include button-base;
+    // Safari keeps `-webkit-appearance: push-button` on a bare <button> even
+    // once it is fully restyled: it ignores `display: flex`, imposes its own
+    // intrinsic padding and min-size, and baselines the content — which is why
+    // an icon-only control like the window close button balloons well past its
+    // set width/height. Every other browser already renders it as an ordinary
+    // box; this makes Safari agree.
+    appearance: none;
+    -webkit-appearance: none;
     padding: calc(var(--padding) * 2);
-    
+
 
     &:not(:disabled):not(.disabled) {
         cursor: pointer;

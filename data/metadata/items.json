@@ -940,6 +940,139 @@
       "description": "A length of wooden fence."
     },
     {
+      "id": "stone_fence",
+      "label": "Stone Fence",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "FENCE",
+        "variant": "stone_fence",
+        "storable": true
+      },
+      "description": "A length of stone fence."
+    },
+    {
+      "id": "iron_fence",
+      "label": "Iron Fence",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "FENCE",
+        "variant": "iron_fence",
+        "storable": true
+      },
+      "description": "A length of iron railing."
+    },
+    {
+      "id": "garden_fence",
+      "label": "Garden Fence",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "FENCE",
+        "variant": "garden_fence",
+        "storable": true
+      },
+      "description": "A low garden fence."
+    },
+    {
+      "id": "wooden_gate",
+      "label": "Wooden Gate",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "GATE",
+        "variant": "wooden_gate",
+        "storable": true
+      },
+      "description": "A wooden gate. Drop it onto a fence to hang it there."
+    },
+    {
+      "id": "stone_gate",
+      "label": "Stone Gate",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "GATE",
+        "variant": "stone_gate",
+        "storable": true
+      },
+      "description": "A stone gate. Drop it onto a fence to hang it there."
+    },
+    {
+      "id": "iron_gate",
+      "label": "Iron Gate",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "GATE",
+        "variant": "iron_gate",
+        "storable": true
+      },
+      "description": "An iron gate. Drop it onto a fence to hang it there."
+    },
+    {
+      "id": "garden_gate",
+      "label": "Garden Gate",
+      "type": "furniture",
+      "capabilities": {
+        "droppable": false
+      },
+      "inventory": {
+        "stackLimit": 99,
+        "primaryAction": "place"
+      },
+      "world": {
+        "mode": "map_object",
+        "objectType": "GATE",
+        "variant": "garden_gate",
+        "storable": true
+      },
+      "description": "A garden gate. Drop it onto a fence to hang it there."
+    },
+    {
       "id": "blue_ball",
       "label": "Blue Ball",
       "type": "toy",

@@ -11,7 +11,11 @@ const UIToolModes = {
     // Build-mode tools. MOVE is the furniture tool: the same drag the play-mode
     // Drag tool performs, but for objects rather than mytes.
     MOVE: 'move',
+    BUILD_SELECT: 'build-select',
     WALL: 'wall',
+    // FENCE is the same drag-a-run gesture as WALL, but it drops FenceMapObjects
+    // onto the map instead of editing wall tiles. See FenceBuildPanel.
+    FENCE: 'fence',
     // ROOM is the rooms themselves: naming them, and painting floor into
     // them where no wall says where one ends. See RoomPanel.
     ROOM: 'room',
@@ -23,8 +27,8 @@ const UIToolModes = {
 
 // Tools that only exist inside Build mode.
 const BUILD_TOOL_MODES = Object.freeze([
-    UIToolModes.MOVE, UIToolModes.WALL, UIToolModes.ROOM, UIToolModes.SURFACE,
-    UIToolModes.TERRAIN
+    UIToolModes.BUILD_SELECT, UIToolModes.MOVE, UIToolModes.WALL, UIToolModes.FENCE, UIToolModes.ROOM,
+    UIToolModes.SURFACE, UIToolModes.TERRAIN
 ]);
 
 /**

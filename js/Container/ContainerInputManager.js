@@ -213,6 +213,9 @@ class ContainerInputManager {
           event.originalEvent?.preventDefault();
           this.container.setBuildGridEnabled(this.container.settings?.buildGrid === false);
           return;
+        // macOS labels Backspace as Delete; forward-delete (Fn+Delete) reports
+        // "Delete". Both keys mean the same thing in the build selection.
+        case 'backspace':
         case 'delete':
           event.originalEvent?.preventDefault();
           this.storeSelectedObject();
@@ -235,6 +238,12 @@ class ContainerInputManager {
   }
 
   storeSelectedObject() {
+    const selectedObjects = this.container.ui?.getSelectedObjects?.() || [];
+    const wallCells = this.container.ui?.buildMarqueeSelection?.getSelectedWallCells?.() || [];
+    if (selectedObjects.length > 1 || wallCells.length > 0) {
+      this.container.ui?.buildMarqueeSelection?.storeSelection?.();
+      return;
+    }
     const selected = this.container.ui?.getSelected?.();
     const storage = this.container.ui?.actionSidebarManager?.getInventoryStorageState?.(selected);
     if (!storage) return;
@@ -474,6 +483,7 @@ class ContainerInputManager {
     }
 
     if (ui?.wallBuildPanel?.cancelDrag?.() === true) return;
+    if (ui?.fenceBuildPanel?.cancelDrag?.() === true) return;
     if (ui?.roomPanel?.cancelDrag?.() === true) return;
     if (ui?.buildPlacement?.cancel?.() === true) return;
     // Something held in hand is work in flight too: put it down before the

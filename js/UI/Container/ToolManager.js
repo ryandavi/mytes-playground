@@ -34,11 +34,26 @@ class ToolManager extends UIComponent {
                 shortcut: '1',
                 buildOnly: true
             },
+            [UIToolModes.BUILD_SELECT]: {
+                id: 'tool-build-select',
+                label: 'Select',
+                cursor: 'default',
+                buildOnly: true,
+                claimsMapDrag: true
+            },
             [UIToolModes.WALL]: {
                 id: 'tool-wall',
                 label: 'Wall',
                 cursor: 'crosshair',
                 shortcut: '2',
+                buildOnly: true,
+                claimsMapDrag: true
+            },
+            [UIToolModes.FENCE]: {
+                id: 'tool-fence',
+                label: 'Fence',
+                cursor: 'crosshair',
+                shortcut: '6',
                 buildOnly: true,
                 claimsMapDrag: true
             },
@@ -89,6 +104,9 @@ class ToolManager extends UIComponent {
     // The tool each mode falls back to when it is entered or when a tool is
     // refused.
     getDefaultToolFor(gameMode = this.gameMode?.mode) {
+        // Build opens on Move: empty-map drags pan the camera, while grabbing
+        // furniture still moves it. Marquee Select remains available when the
+        // player explicitly wants to select several things.
         return gameMode === GAME_MODES.BUILD ? UIToolModes.MOVE : UIToolModes.SELECT;
     }
 

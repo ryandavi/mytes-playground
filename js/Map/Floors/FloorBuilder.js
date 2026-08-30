@@ -371,14 +371,21 @@ class FloorBuilder {
      * Ownership is geometry and a finish is not, so it is deliberately NOT
      * recomputed here: a room with no floor still owns its ground, and always
      * did, which is why giving it one cannot take anything from a neighbour.
-     * @returns {boolean} whether the room now carries a floor
+     * @returns {boolean} whether the room's finish changed
      */
     setRoomFinish(roomId, finishId) {
         const room = this.gameMap.regionManager?.get('room', roomId);
         if (!room) return false;
-        room.properties = { ...room.properties, floorFinishId: finishId || null };
+        const previous = room.properties?.floorFinishId ?? null;
+        const next = finishId || null;
+        if (previous === next) return false;
+        room.properties = { ...room.properties, floorFinishId: next };
         this.removeRoom(roomId);
-        return !!this.paintRoom(room);
+        this.paintRoom(room);
+        // Clearing a finish deliberately leaves no generated canvas. That is
+        // still a successful surface change: the authored ground underneath
+        // is now the visible floor.
+        return true;
     }
 
     removeRoom(roomId) {

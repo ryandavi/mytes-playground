@@ -8,6 +8,10 @@
  */
 const SiteConfig = Object.freeze({
     mapRendering: Object.freeze({
+        // Blank cells reserved around the drawn map so art near an edge is not
+        // clipped by the canvas. `top` is only the floor: a map that can grow
+        // walls reserves a wall's height instead (see wallSystem), and any map
+        // may override with a `cameraTopReserveCells` property in Tiled.
         canvasPaddingCells: Object.freeze({ top: 1, right: 1, bottom: 1, left: 1 }),
     }),
 
@@ -123,6 +127,10 @@ const SiteConfig = Object.freeze({
 
 	wallSystem: Object.freeze({
 		enabled: true,
+		// When set, every map that authors walls reserves `defaultHeightCells`
+		// (or its own `wallHeightCells`) of blank space above its top edge so
+		// wall art has somewhere to draw. Fixed at map load; a map with a known
+		// tall set-piece can raise it with a `cameraTopReserveCells` property.
 		extendCanvasForWallHeight: true,
         materialsPath: 'data/map-objects/wall-materials.json',
         wallTilesetProperty: 'wallTileset',
@@ -1073,6 +1081,11 @@ const SiteConfig = Object.freeze({
         minZoom:  0.5,
         maxZoom:  2.5,
         zoomStep: 0.1,
+        // Wheel streams with pixel-sized deltas are trackpads: two-finger
+        // scroll pans, while Ctrl-wheel (the browser's pinch signal) zooms.
+        trackpadDeltaThreshold: 48,
+        wheelGestureIdleMs: 160,
+        trackpadZoomSensitivity: 0.006,
 
         // CURSOR: fraction of the viewport in the middle where the camera holds
         // still (0–1). Without it, cursor following pans for every mouse move

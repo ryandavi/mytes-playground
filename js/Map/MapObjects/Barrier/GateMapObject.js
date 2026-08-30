@@ -60,6 +60,19 @@ class GateMapObject extends LinkedOpenableMapObject {
         return element;
     }
 
+    // Player-placed gates persist through the ordinary WorldState object path;
+    // only the open/closed state needs carrying, the same as a door.
+    serializeState() {
+        return { isOpen: this.isOpen };
+    }
+
+    restoreState(data = {}) {
+        this.isOpen = data.isOpen === true;
+        this.updateCollisionState();
+        this.applyOpenStateClasses?.();
+        this._notifyFenceNeighbors();
+    }
+
     // ── Interaction ───────────────────────────────────────────────────────────
 
     getAiAffordances() {

@@ -121,6 +121,10 @@ class TooltipSystem {
         const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
         const tooltipRect = this.element.getBoundingClientRect();
         const gutter = 8;
+        // getBoundingClientRect is viewport-relative; the tooltip is
+        // position: absolute on <body>, so its coordinates are document space.
+        const scrollX = window.scrollX || window.pageXOffset || 0;
+        const scrollY = window.scrollY || window.pageYOffset || 0;
 
         let top = anchorRect.bottom + this.offset;
         if (top + tooltipRect.height > viewportHeight - gutter) {
@@ -136,8 +140,8 @@ class TooltipSystem {
         }
         left = Math.max(gutter, left);
 
-        this.element.style.left = `${Math.round(left)}px`;
-        this.element.style.top = `${Math.round(top)}px`;
+        this.element.style.left = `${Math.round(left + scrollX)}px`;
+        this.element.style.top = `${Math.round(top + scrollY)}px`;
     }
 
     handlePointerDown(event) {

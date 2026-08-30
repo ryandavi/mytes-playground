@@ -13,6 +13,21 @@
     display: flex;
 }
 
+.build-selection-marquee,
+.build-selection-cell {
+    position: fixed;
+    z-index: var(--z-overlay);
+    pointer-events: none;
+    box-sizing: border-box;
+    border: 1px dotted var(--black);
+    outline: 1px dotted var(--button-light);
+    background-color: color-mix(in srgb, var(--header-mid) 22%, transparent);
+}
+
+.build-selection-marquee {
+    border-style: dashed;
+}
+
 // ── Sidebar tool groups ───────────────────────────────────────────────────────
 
 .app-shell > .hand-controls {
@@ -600,7 +615,7 @@ body.debug .stage-bar__debug-only {
 // The run under the grip: what a drag would take hold of. Drawn on the floor
 // rather than on the wall art, so it still says which wall is meant when the
 // presentation has that wall cut away or laid down.
-.wall-build-ghost-cell.is-run {
+.build-ghost-cell.is-run {
     border-style: dashed;
     border-color: var(--state-info-accent);
     background: color-mix(in srgb, var(--state-info-accent) 16%, transparent);
@@ -608,13 +623,13 @@ body.debug .stage-bar__debug-only {
 
 // Legal, but nothing to do here — a cell that already holds the wall you are
 // drawing. Neither blue nor red: it is simply not part of the edit.
-.wall-build-ghost-cell.is-inert {
+.build-ghost-cell.is-inert {
     border-style: dotted;
     border-color: var(--button-dark);
     background: transparent;
 }
 
-.wall-build-ghost-cell.is-invalid {
+.build-ghost-cell.is-invalid {
     border-color: var(--color-danger);
     border-style: solid;
     background: color-mix(in srgb, var(--color-danger) 45%, transparent);
@@ -808,10 +823,12 @@ body[data-game-mode="build"] .app-stage {
 }
 
 body.wall-build-mode[data-build-cursor="ready"] .app-stage,
+body.fence-build-mode[data-build-cursor="ready"] .app-stage,
 body.room-build-mode[data-build-cursor="ready"] .app-stage {
     cursor: cell;
 }
 
+body.room-build-mode.room-select-mode[data-build-cursor="ready"] .app-stage,
 body.customize-mode[data-build-cursor="ready"] .app-stage {
     cursor: pointer;
 }
@@ -833,11 +850,17 @@ body[data-build-cursor="refused"] .app-stage {
 
 // Painted through the floor's own ownership, so a tint stops exactly where its
 // room's floor does.
+//
+// A plain translucent fill, not `mix-blend-mode: multiply`: the blend only ever
+// bought a slightly richer interaction with the floor texture, and it sat under
+// an ancestor `filter` (.canvas carries the drop shadow), which WebKit does not
+// re-composite when a blend-mode child is removed — so on leaving Build mode the
+// darkened room pixels stayed stuck until a reload. The fill alpha is raised to
+// match the selection overlays so the rooms read just as strongly without it.
 .room-tint {
     position: absolute;
     z-index: var(--z-overlay);
     pointer-events: none;
-    mix-blend-mode: multiply;
 }
 
 // The one room being worked on, over the top of the general tinting.
@@ -906,6 +929,13 @@ body[data-build-cursor="refused"] .app-stage {
     // reach for when the list does not already contain what you want.
     > .window-panel__footer {
         justify-content: stretch;
+    }
+
+    // Selection reads the map but does not use edit-shape controls. Keep their
+    // place in the panel so switching tools does not make the list jump.
+    .is-inactive {
+        opacity: 0.4;
+        pointer-events: none;
     }
 
 }
@@ -1112,6 +1142,8 @@ body[data-build-cursor="refused"] .app-stage {
 // colour-mix tint it had before was a fifth way of saying "this one is chosen"
 // in an app that already had one.
 .room-row {
+    --panel-row-item: 28px;
+
     @include button-base;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1133,6 +1165,21 @@ body[data-build-cursor="refused"] .app-stage {
     // of the text you typed rather than of the row you picked.
     &.active {
         @include button-pressed;
+
+        .room-row__meta {
+            display: flex;
+        }
+
+        .room-row__actions {
+            display: grid;
+        }
+    }
+
+    &:not(.active) {
+        .room-row__meta,
+        .room-row__actions {
+            display: none;
+        }
     }
 
     // A room with no floor: one just started, or one whose last square went to
@@ -1171,6 +1218,13 @@ body[data-build-cursor="refused"] .app-stage {
         grid-row: 1;
         width: 100%;
         min-width: 0;
+
+        &[readonly] {
+            border-color: transparent;
+            background: transparent;
+            box-shadow: none;
+            cursor: pointer;
+        }
     }
 
     .room-row__meta {
@@ -1185,6 +1239,31 @@ body[data-build-cursor="refused"] .app-stage {
         min-width: 0;
     }
 
+    .room-row__actions {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--space-2xs);
+        padding-top: var(--space-2xs);
+    }
+
+    .room-row__action {
+        @include button-base;
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: var(--space-2xs) var(--space-xs);
+        font-size: var(--text-size-meta);
+        line-height: 1.4;
+        white-space: nowrap;
+        cursor: pointer;
+
+        &:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+    }
+
     .room-row__type {
         flex: 1 1 0;
         min-width: 0;
@@ -1195,6 +1274,41 @@ body[data-build-cursor="refused"] .app-stage {
         font-size: 11px;
         opacity: 0.7;
         white-space: nowrap;
+    }
+
+    .room-row__status {
+        grid-column: 3;
+        grid-row: 1;
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2xs);
+        color: var(--text-muted);
+        font-size: var(--text-size-meta);
+        line-height: 1;
+        white-space: nowrap;
+
+        &::before {
+            content: '';
+            flex: 0 0 auto;
+            width: 6px;
+            height: 6px;
+            border: var(--radius-xs) solid var(--button-dark);
+            border-radius: var(--radius-xs);
+            background: var(--text-muted);
+        }
+
+        &.is-enclosed {
+            &::before {
+                background: var(--state-success-accent);
+            }
+        }
+
+        &.is-incomplete {
+            &::before {
+                background: var(--state-warning-accent);
+            }
+        }
     }
 
     // A room nothing encloses. Quiet, and the size of the text beside it — it
@@ -1214,31 +1328,24 @@ body[data-build-cursor="refused"] .app-stage {
     // Only on rooms that can actually go. A room the walls enclose cannot be
     // deleted by asking — you take a wall down — so offering the button there
     // would be offering something that cannot happen.
-    .room-row__delete {
-        @include button-base;
-        // Square, and the height of the field beside it. A grid track gives the
-        // button a definite height to take its width from — in a flex row the
-        // stretch resolves too late for `aspect-ratio` to see it, and the button
-        // came out a narrow sliver.
-        grid-column: 3;
-        grid-row: 1;
-        align-self: stretch;
-        height: 100%;
-        width: auto;
-        aspect-ratio: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        line-height: 1;
-        cursor: pointer;
-        opacity: 0.75;
-
+    .room-row__delete,
+    .room-row__demolish {
         &:hover {
-            opacity: 1;
             color: var(--color-danger);
+            background: color-mix(in srgb, var(--color-danger) 18%, var(--surface-ui-raised));
         }
     }
+}
+
+// Missing wall cells shown while a room row is hovered. The inset frame uses
+// the same build-language as placement ghosts without pretending walls have
+// already been committed.
+.room-perimeter-gap {
+    position: absolute;
+    z-index: var(--z-drag);
+    pointer-events: none;
+    background: color-mix(in srgb, var(--state-warning-accent) 24%, transparent);
+    border: var(--border-width) dashed var(--state-warning-accent);
 }
 
 // ── Wall handle ───────────────────────────────────────────────────────────────

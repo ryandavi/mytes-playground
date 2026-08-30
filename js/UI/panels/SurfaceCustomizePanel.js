@@ -183,10 +183,20 @@ class SurfaceCustomizePanel extends ModalWindow {
         }) ?? null;
     }
 
+    // A concrete rgba(), never color-mix(): this string is assigned to a canvas
+    // 2D context's fillStyle (see FloorBuilder.createRoomOverlay), and Safari's
+    // canvas colour parser rejects color-mix() — the assignment is silently
+    // dropped, fillStyle stays at its default opaque black, and the whole room's
+    // floor overlay paints black. `color-mix(in srgb, C p%, transparent)` is
+    // just C at alpha p%, so the rgba() below is the same colour everywhere.
     static overlayFill(className) {
         const accent = getComputedStyle(document.documentElement)
-            .getPropertyValue('--state-info-accent').trim() || '#4285f4';
-        return `color-mix(in srgb, ${accent} ${className === 'paint-selection' ? 34 : 22}%, transparent)`;
+            .getPropertyValue('--state-info-accent').trim();
+        const parts = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(accent);
+        const [r, g, b] = parts
+            ? [parseInt(parts[1], 16), parseInt(parts[2], 16), parseInt(parts[3], 16)]
+            : [66, 133, 244];
+        return `rgba(${r}, ${g}, ${b}, ${className === 'paint-selection' ? 0.34 : 0.22})`;
     }
 
     /**
@@ -282,6 +292,34 @@ class SurfaceCustomizePanel extends ModalWindow {
     setTarget(target) {
         this.target = target;
         this.setOverlay(this.selection, target);
+    }
+
+    /** Open Surface with one of a room's surfaces already in hand. */
+    openRoomSurface(roomId, surface = 'floor') {
+        const room = this.gameMap?.regionManager?.get('room', roomId);
+        if (!room || !this.parent?.changeToolMode(UIToolModes.SURFACE)) return false;
+        let target = { surface: 'floor', room };
+        if (surface === 'wall') {
+            const builder = this.gameMap?.wallBuilder;
+            let wallSurface = null;
+            for (const cell of builder?.cells?.values?.() ?? []) {
+                wallSurface = builder.getCellSurfaces(cell).find(entry => entry.roomId === roomId);
+                if (wallSurface) break;
+            }
+            if (!wallSurface) {
+                this.parent.showMessage('This room has no wall surface to finish yet.', 'info', 'Surfaces');
+                return false;
+            }
+            target = {
+                surface: 'wall',
+                wallSurface,
+                piece: builder.findPieceForCell(wallSurface.cell.x, wallSurface.cell.y)
+            };
+        }
+        this.setTarget(target);
+        this.renderPalette();
+        this.open();
+        return true;
     }
 
     // The elements were parented to art that has since been rebuilt, so both
@@ -569,6 +607,9 @@ class SurfaceCustomizePanel extends ModalWindow {
 
         const customizer = this.gameMap?.surfaceCustomizer;
         const finishes = customizer?.listFinishes(this.target.surface) || [];
+        if (this.target.surface === 'floor') {
+            finishes.unshift({ id: null, displayName: 'None', empty: true });
+        }
         const currentFinishId = this.getCurrentFinishId();
         for (const finish of finishes) {
             const button = document.createElement('button');
@@ -582,6 +623,7 @@ class SurfaceCustomizePanel extends ModalWindow {
             sample.width = 22;
             sample.height = 22;
             sample.setAttribute('aria-hidden', 'true');
+            sample.classList.toggle('is-empty', finish.empty === true);
             const source = this.getFinishSample(finish.id);
             if (source) {
                 const context = sample.getContext('2d');
@@ -594,7 +636,7 @@ class SurfaceCustomizePanel extends ModalWindow {
             button.addEventListener('pointerenter', () => {
                 clearTimeout(this.hoverTimer);
                 this.hoverTimer = setTimeout(() => {
-                    customizer.preview(this.buildRequests(finish.id));
+                    customizer.preview(this.buildRequests(finish.id || null));
                 }, 150);
             });
             button.addEventListener('pointerleave', () => clearTimeout(this.hoverTimer));
@@ -602,11 +644,11 @@ class SurfaceCustomizePanel extends ModalWindow {
             // the plainest way of saying you are done with the one in hand.
             button.addEventListener('click', () => {
                 this.dropFinish();
-                this.applyFinish(finish.id);
+                this.applyFinish(finish.id || null);
             });
             // Double-click paints the whole room without touching the scope
             // radio - the scope machinery already understands the request.
-            button.addEventListener('dblclick', () => this.applyFinish(finish.id, 'room'));
+            button.addEventListener('dblclick', () => this.applyFinish(finish.id || null, 'room'));
             this.paletteElement.appendChild(button);
         }
     }

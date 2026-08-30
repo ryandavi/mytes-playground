@@ -994,13 +994,35 @@ class Inventory {
 
         this.dropIndicator.style.width  = `${width}px`;
         this.dropIndicator.style.height = `${height}px`;
-        this.dropIndicator.style.left   = `${snappedX}px`;
-        this.dropIndicator.style.top    = `${snappedY}px`;
+		this.dropIndicator.style.left   = `${snappedX}px`;
+		this.dropIndicator.style.top    = `${snappedY}px`;
+		this.updateDropIndicatorDepth(descriptor, wallPreview, wallPlacement, snappedX, snappedY, map);
         this.updatePlacementPreview(descriptor);
         this.dropIndicator.style.display = 'block';
         this.dropIndicator.classList.toggle('is-drop-valid', this.state.dropValid);
         this.dropIndicator.classList.toggle('is-drop-invalid', !this.state.dropValid);
     }
+
+	/**
+	 * A wall preview belongs immediately above the wall it will be attached to.
+	 * Derive that depth from the resolved host instead of relying on a fixed UI
+	 * z-index: world depth grows with map Y, so any fixed value eventually loses.
+	 */
+	updateDropIndicatorDepth(descriptor, preview, placement, x, y, map) {
+		if (!descriptor?.wallFixture && !descriptor?.wallOpening) {
+			this.dropIndicator.style.removeProperty('z-index');
+			return;
+		}
+
+		let zIndex = null;
+		if (descriptor.wallOpening) {
+			zIndex = map?.wallBuilder?.getOpeningRenderZIndex?.(preview, x, y);
+		} else if (placement?.piece) {
+			zIndex = map?.getDepthZIndex?.(placement.piece.baseline) + 1;
+		}
+		if (Number.isFinite(zIndex)) this.dropIndicator.style.zIndex = String(zIndex);
+		else this.dropIndicator.style.removeProperty('z-index');
+	}
 
     _isDropPositionValid(snappedX, snappedY, descriptor, gridSystem, map) {
         if (!gridSystem || !map) return true;
