@@ -318,7 +318,7 @@ class ContainerInputManager {
       if (event.originalEvent && event.originalEvent.defaultPrevented) return;
 
       // Clicking bare map means "not that one" in every tool, not just Select.
-      // Build mode runs on the Move tool, so a selected object stayed selected
+      // Build mode's Select tool retains the internal Move mode id, so a selected object stayed selected
       // — and kept the sidebar open — no matter where you clicked.
       const target = event.originalEvent?.target;
       if (this.canStartWorldGestureFromTarget(target)) {

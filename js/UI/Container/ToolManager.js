@@ -29,17 +29,10 @@ class ToolManager extends UIComponent {
             },
             [UIToolModes.MOVE]: {
                 id: 'tool-move',
-                label: 'Move',
-                cursor: 'grab',
-                shortcut: '1',
-                buildOnly: true
-            },
-            [UIToolModes.BUILD_SELECT]: {
-                id: 'tool-build-select',
                 label: 'Select',
                 cursor: 'default',
-                buildOnly: true,
-                claimsMapDrag: true
+                shortcut: '1',
+                buildOnly: true
             },
             [UIToolModes.WALL]: {
                 id: 'tool-wall',
@@ -67,7 +60,7 @@ class ToolManager extends UIComponent {
             },
             [UIToolModes.SURFACE]: {
                 id: 'tool-surface',
-                label: 'Surface',
+                label: 'Paint',
                 cursor: 'pointer',
                 shortcut: '4',
                 buildOnly: true,
@@ -104,9 +97,9 @@ class ToolManager extends UIComponent {
     // The tool each mode falls back to when it is entered or when a tool is
     // refused.
     getDefaultToolFor(gameMode = this.gameMode?.mode) {
-        // Build opens on Move: empty-map drags pan the camera, while grabbing
-        // furniture still moves it. Marquee Select remains available when the
-        // player explicitly wants to select several things.
+        // One build selection tool owns click, marquee and object movement.
+        // Camera panning remains available through wheel/trackpad, two-finger
+        // touch, middle-drag and Space-drag.
         return gameMode === GAME_MODES.BUILD ? UIToolModes.MOVE : UIToolModes.SELECT;
     }
 
@@ -218,6 +211,10 @@ class ToolManager extends UIComponent {
 
         const element = document.getElementById(toolConfig.id);
         if (!element) {
+            if (toolConfig.controlOptional === true) {
+                this.setToolMode(mode);
+                return true;
+            }
             Utility.warnDebug(`Could not find control for tool: ${toolConfig.id}`);
             return false;
         }

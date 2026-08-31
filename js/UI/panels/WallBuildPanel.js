@@ -16,11 +16,21 @@ class WallBuildPanel extends CellDragBuildPanel {
         this.handleElement = null;
         this.handleCell = null;
         this.roomFloorButton = this.modalElement?.querySelector('#wall-room-floor') || null;
+        this.roomAreasButton = this.modalElement?.querySelector('#wall-room-areas') || null;
+        this.roomActions = this.modalElement?.querySelector('.wall-room-actions') || null;
+        this.roomActionsTitle = this.modalElement?.querySelector('.wall-room-actions__title') || null;
+        this.openingGroup = this.modalElement?.querySelector('.wall-build-openings') || null;
+        this.openingPalette = this.modalElement?.querySelector('.wall-opening-palette') || null;
         this.contextRoomId = null;
         this.roomFloorButton?.addEventListener('click', () => {
             if (this.contextRoomId) {
                 this.parent?.surfaceCustomizePanel?.openRoomSurface?.(this.contextRoomId, 'floor');
             }
+        });
+        this.roomAreasButton?.addEventListener('click', () => {
+            const roomId = this.contextRoomId;
+            if (!this.parent?.changeToolMode(UIToolModes.ROOM)) return;
+            if (roomId) this.parent?.roomPanel?.select?.(roomId);
         });
     }
 
@@ -31,7 +41,34 @@ class WallBuildPanel extends CellDragBuildPanel {
     handleToolModeChanged(mode) {
         const active = mode === this.toolMode;
         super.handleToolModeChanged(mode);
-        if (!active) this.setContextRoom(null, { preserve: false });
+        if (active) this.renderOwnedOpenings();
+        if (!active) this.selectContextRoom(null);
+    }
+
+    renderOwnedOpenings() {
+        if (!this.openingGroup || !this.openingPalette) return;
+        const inventory = this.build?.inventory;
+        const openings = (inventory?.items ?? []).filter(item => {
+            const type = ItemRegistry.getItemSync(item.variant || item.name)?.world?.objectType;
+            return type === 'DOOR' || type === 'WINDOW';
+        });
+        this.openingGroup.hidden = openings.length === 0;
+        this.openingPalette.replaceChildren(...openings.map(item => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'panel-action wall-opening-choice';
+            button.textContent = `${item.name} ×${item.quantity}`;
+            button.title = 'Place this opening into a wall';
+            button.addEventListener('click', () => inventory.activateItemElement(item.element));
+            return button;
+        }));
+    }
+
+    handlePointerDown(event) {
+        if (this.parent.isTool(this.toolMode) && event.button === 0) {
+            this.selectContextRoom(this.pointerToCell(event));
+        }
+        super.handlePointerDown(event);
     }
 
     // Pre-flight of the same rules applyWallCellChanges enforces, so a blocked
@@ -51,15 +88,19 @@ class WallBuildPanel extends CellDragBuildPanel {
         return removing ? occupied : !occupied;
     }
 
-    commitCells(map, cells, operation = this.getOperation()) {
+    commitCells(map, cells, operation = this.getOperation(), gesture = null) {
         const builder = map?.wallBuilder;
         if (!builder || cells.length === 0) return false;
         const removing = operation === 'remove';
+        const template = operation === 'remove' ? null :
+            gesture?.wallTemplate || this.resolveExtensionTemplate(builder, gesture?.start, cells);
+        const faceTemplate = operation === 'remove' ? [] :
+            builder.sampleFaceOverrideTemplate(gesture?.start);
         const changes = cells
             .filter(cell => removing
                 ? builder.baseCells.has(`${cell.x},${cell.y}`)
                 : !builder.baseCells.has(`${cell.x},${cell.y}`))
-            .map(cell => ({ ...cell, data: removing ? null : {} }));
+            .map(cell => ({ ...cell, data: removing ? null : Utility.deepClone(template || {}) }));
         if (changes.length === 0) return false;
 
         let result;
@@ -80,12 +121,34 @@ class WallBuildPanel extends CellDragBuildPanel {
             return false;
         }
 
-        this.pushWallHistory(builder, result, removing);
+        const copiedOverrides = builder.createFaceOverrideCopies(
+            faceTemplate,
+            result.applied.filter(change => change.data !== null)
+        );
+        builder.addFaceOverrideCopies(copiedOverrides);
+
+        this.pushWallHistory(builder, result, removing, copiedOverrides);
         this.afterCommit(map);
         return true;
     }
 
-    pushWallHistory(builder, result, removing) {
+    resolveExtensionTemplate(builder, start, cells = []) {
+        if (!builder) return null;
+        const direct = start ? builder.sampleCellTemplate(start) : null;
+        if (direct) return direct;
+        const candidates = start ? [[-1, 0], [1, 0], [0, -1], [0, 1]] : [];
+        for (const [dx, dy] of candidates) {
+            const sampled = builder.sampleCellTemplate(start.x + dx, start.y + dy);
+            if (sampled) return sampled;
+        }
+        for (const cell of cells) {
+            const sampled = builder.sampleCellTemplate(cell);
+            if (sampled) return sampled;
+        }
+        return null;
+    }
+
+    pushWallHistory(builder, result, removing, copiedOverrides = []) {
         const label = `${removing ? 'Remove' : 'Place'} Wall (${result.applied.length} cell${result.applied.length === 1 ? '' : 's'})`;
         const forward = Utility.deepClone(result.applied);
         const backward = Utility.deepClone(result.inverse);
@@ -94,8 +157,14 @@ class WallBuildPanel extends CellDragBuildPanel {
         // and re-running the rules would refuse it whenever the world moved.
         this.pushHistory({
             label,
-            undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
-            redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
+            undo: () => {
+                builder.removeFaceOverrideCopies(copiedOverrides);
+                builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false });
+            },
+            redo: () => {
+                builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false });
+                builder.addFaceOverrideCopies(copiedOverrides);
+            }
         });
     }
 
@@ -108,6 +177,7 @@ class WallBuildPanel extends CellDragBuildPanel {
         if (!this.handleCell || this.handleCell.x !== cell.x || this.handleCell.y !== cell.y) return false;
         const run = this.resolveRun(cell);
         if (!run) return false;
+        const builder = this.gameMap?.wallBuilder;
         this.drag = {
             pointerId: event.pointerId,
             map: this.gameMap,
@@ -115,6 +185,7 @@ class WallBuildPanel extends CellDragBuildPanel {
             end: cell,
             operation: 'move',
             run,
+            wallTemplate: builder.sampleCellTemplate(cell),
             // Which of the two gestures this is has not been decided yet — see
             // resolveGrabbedGesture on the first move.
             undecided: true,
@@ -152,7 +223,6 @@ class WallBuildPanel extends CellDragBuildPanel {
      * outline the run instead: it says which wall the grip belongs to.
      */
     renderSpecialHover(cell, operation) {
-        this.setContextRoom(cell);
         const run = this.renderHandle(cell, operation);
         if (!run) return false;
         this.renderRunGhost(run.cells);
@@ -164,20 +234,19 @@ class WallBuildPanel extends CellDragBuildPanel {
         this.clearHandle();
     }
 
-    setContextRoom(cell, { preserve = true } = {}) {
+    selectContextRoom(cell) {
         const builder = this.gameMap?.wallBuilder;
         const wallCell = cell ? builder?.cells?.get(`${cell.x},${cell.y}`) : null;
         const roomId = wallCell
             ? builder.getCellSurfaces(wallCell).find(surface => surface.roomId)?.roomId ?? null
             : null;
-        if (!roomId && preserve) return false;
         this.contextRoomId = roomId;
         if (!this.roomFloorButton) return;
-        this.roomFloorButton.disabled = !roomId;
         const room = roomId ? this.gameMap?.regionManager?.get('room', roomId) : null;
-        this.roomFloorButton.textContent = room
-            ? `Edit ${room.properties?.displayName || room.id} floor`
-            : 'Edit room floor';
+        if (this.roomActions) this.roomActions.hidden = !room;
+        if (this.roomActionsTitle) {
+            this.roomActionsTitle.textContent = room?.properties?.displayName || room?.id || 'Selected room';
+        }
         return !!roomId;
     }
 
@@ -285,7 +354,7 @@ class WallBuildPanel extends CellDragBuildPanel {
      * @returns {{distance: number, additions: Array, removals: Array}}
      */
     getMovePlan() {
-        const empty = { distance: 0, additions: [], removals: [], moveX: 0, moveY: 0 };
+        const empty = { distance: 0, additions: [], removals: [], retainedShared: [], moveX: 0, moveY: 0 };
         const run = this.drag?.run;
         const builder = this.drag?.map?.wallBuilder;
         if (!run || !builder) return empty;
@@ -310,6 +379,17 @@ class WallBuildPanel extends CellDragBuildPanel {
             take(cell.x + (stepX * span), cell.y + (stepY * span), source);
         }
 
+        const retainedShared = [];
+        for (const cell of run.cells) {
+            if (!this.isSharedRoomBoundary(builder, cell)) continue;
+            const source = builder.baseCells.get(`${cell.x},${cell.y}`) ?? {};
+            take(cell.x, cell.y, source);
+            retainedShared.push({
+                source: { x: cell.x, y: cell.y },
+                target: { x: cell.x + (stepX * span), y: cell.y + (stepY * span) }
+            });
+        }
+
         for (const end of [run.cells[0], run.cells[run.cells.length - 1]]) {
             if (!this.endIsAnchored(builder, end, stepX, stepY)) continue;
             const source = builder.baseCells.get(`${end.x},${end.y}`) ?? {};
@@ -324,7 +404,14 @@ class WallBuildPanel extends CellDragBuildPanel {
             .map(cell => ({ x: cell.x, y: cell.y, data: null }));
         const additions = [...keep.values()]
             .filter(cell => !builder.baseCells.has(`${cell.x},${cell.y}`));
-        return { distance, additions, removals, moveX: stepX * span, moveY: stepY * span };
+        return { distance, additions, removals, retainedShared, moveX: stepX * span, moveY: stepY * span };
+    }
+
+    isSharedRoomBoundary(builder, cell) {
+        const raw = builder?.cells?.get(`${cell.x},${cell.y}`);
+        if (!raw) return false;
+        const faces = builder.assignFaces(raw);
+        return new Set(Object.values(faces).map(face => face.roomId).filter(Boolean)).size > 1;
     }
 
     /**
@@ -359,6 +446,7 @@ class WallBuildPanel extends CellDragBuildPanel {
             const { x, y } = queue[index];
             const key = `${x},${y}`;
             if (gone.has(key) || arriving.has(key) || !builder.baseCells.has(key)) continue;
+            if (this.isSharedRoomBoundary(builder, { x, y })) continue;
             if (this.checkCell({ x, y }, 'remove').allowed !== true) continue;
             if (connections(x, y) > 1) continue;            // held up by something
             gone.add(key);
@@ -458,16 +546,26 @@ class WallBuildPanel extends CellDragBuildPanel {
             return false;
         }
 
+        const sharedOverrideCopies = (plan.retainedShared ?? []).flatMap(({ source, target }) =>
+            builder.createFaceOverrideCopies(builder.sampleFaceOverrideTemplate(source), [target]));
+        builder.addFaceOverrideCopies(sharedOverrideCopies);
+
         const forward = Utility.deepClone(result.applied);
         const backward = Utility.deepClone(result.inverse);
         const back = WallBuilder.invertContentMove(contentMove);
         const size = Math.abs(plan.distance);
         this.pushHistory({
             label: `Move Wall (${size} cell${size === 1 ? '' : 's'})`,
-            undo: () => builder.applyWallCellChanges(Utility.deepClone(backward),
-                { validate: false, contentMove: back }),
-            redo: () => builder.applyWallCellChanges(Utility.deepClone(forward),
-                { validate: false, contentMove })
+            undo: () => {
+                builder.removeFaceOverrideCopies(sharedOverrideCopies);
+                builder.applyWallCellChanges(Utility.deepClone(backward),
+                    { validate: false, contentMove: back });
+            },
+            redo: () => {
+                builder.applyWallCellChanges(Utility.deepClone(forward),
+                    { validate: false, contentMove });
+                builder.addFaceOverrideCopies(sharedOverrideCopies);
+            }
         });
         this.playSound(SiteConfig.buildMode.sounds.objectPlace);
         this.afterCommit(map);

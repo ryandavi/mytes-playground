@@ -1,4 +1,5 @@
 const EVENTS = Object.freeze({
+    BUILDING_TOPOLOGY_CHANGED: 'building:topology_changed',
     BUILD_HISTORY_CHANGED: 'build:history_changed',
     BUILD_POLICY_CHANGED: 'build:policy_changed',
     CAMERA_ZOOM_CHANGED: 'camera:zoom_changed',

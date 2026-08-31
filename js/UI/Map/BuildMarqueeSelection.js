@@ -10,6 +10,8 @@ class BuildMarqueeSelection extends UIComponent {
         this.boundUp = this.onPointerUp.bind(this);
         this.boundClick = this.onClick.bind(this);
         this.swallowClick = false;
+        this.emptyPress = null;
+        this.armTimer = null;
     }
 
     init() {
@@ -22,23 +24,72 @@ class BuildMarqueeSelection extends UIComponent {
 
     isActive() {
         return this.container?.gameMode?.isBuild() === true &&
-            this.parent?.isTool?.(UIToolModes.BUILD_SELECT);
+            this.parent?.isTool?.(UIToolModes.MOVE);
     }
 
     onPointerDown(event) {
         if (!this.isActive() || event.button !== 0 || event.target?.closest?.(InputComponent.UI_SELECTOR)) return;
+        if (this.container?.camera?._spacePanActive) return;
+        if (event.target?.closest?.('.map-object, .myte-slot, .world-myte, .interactive-myte')) return;
+        if (event.pointerType !== 'touch' && event.shiftKey !== true) {
+            this.emptyPress = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY
+            };
+            return;
+        }
         this.clearVisuals();
-        this.drag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, endX: event.clientX, endY: event.clientY };
-        this.marquee = document.createElement('div');
-        this.marquee.className = 'build-selection-marquee';
-        document.body.appendChild(this.marquee);
-        this.renderMarquee();
+        this.drag = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            endX: event.clientX,
+            endY: event.clientY,
+            additive: event.shiftKey === true,
+            pending: event.pointerType === 'touch'
+        };
+        if (this.drag.pending) {
+            this.armTimer = window.setTimeout(
+                () => this.armTouchMarquee(),
+                SiteConfig.interaction.gestures.longPressDelay
+            );
+            return;
+        }
+        this.createMarquee();
         event.preventDefault();
         event.stopPropagation();
     }
 
+    createMarquee() {
+        this.marquee = document.createElement('div');
+        this.marquee.className = 'build-selection-marquee';
+        document.body.appendChild(this.marquee);
+        this.renderMarquee();
+    }
+
+    armTouchMarquee() {
+        if (!this.drag?.pending) return;
+        this.drag.pending = false;
+        this.armTimer = null;
+        this.container?.camera?.cancelTouchPanForSelection?.();
+        this.createMarquee();
+    }
+
     onPointerMove(event) {
+        if (this.emptyPress?.pointerId === event.pointerId) {
+            const distance = Math.hypot(
+                event.clientX - this.emptyPress.startX,
+                event.clientY - this.emptyPress.startY
+            );
+            if (distance > SiteConfig.interaction.gestures.clickMoveThreshold) this.emptyPress = null;
+        }
         if (!this.drag || event.pointerId !== this.drag.pointerId) return;
+        if (this.drag.pending) {
+            const distance = Math.hypot(event.clientX - this.drag.startX, event.clientY - this.drag.startY);
+            if (distance > SiteConfig.interaction.gestures.clickMoveThreshold) this.cancelDrag();
+            return;
+        }
         this.drag.endX = event.clientX;
         this.drag.endY = event.clientY;
         this.renderMarquee();
@@ -46,14 +97,26 @@ class BuildMarqueeSelection extends UIComponent {
     }
 
     onPointerUp(event) {
+        if (this.emptyPress?.pointerId === event.pointerId) {
+            this.emptyPress = null;
+            this.parent.selectionManager.setSelection([]);
+            this.clearSelection();
+        }
         if (!this.drag || event.pointerId !== this.drag.pointerId) return;
+        if (this.drag.pending) {
+            this.cancelDrag();
+            this.parent.selectionManager.setSelection([]);
+            this.clearSelection();
+            return;
+        }
         this.drag.endX = event.clientX;
         this.drag.endY = event.clientY;
         const rect = this.dragRect();
+        const additive = this.drag.additive === true;
         this.drag = null;
         this.marquee?.remove();
         this.marquee = null;
-        this.selectWithin(rect);
+        this.selectWithin(rect, additive);
         this.swallowClick = true;
         event.preventDefault();
         event.stopPropagation();
@@ -82,14 +145,27 @@ class BuildMarqueeSelection extends UIComponent {
         return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top;
     }
 
-    selectWithin(rect) {
+    selectWithin(rect, additive = false) {
         const objects = (this.container?.gameMap?.objects || []).filter(object =>
             object.active !== false && object.element && this.intersects(rect, object.element.getBoundingClientRect())
         );
-        this.parent.selectionManager.setSelection(objects);
-        this.selectedWallCells = this.wallCellsWithin(rect);
+        const selectedObjects = additive
+            ? [...this.parent.selectionManager.getSelectedObjects(), ...objects]
+            : objects;
+        this.parent.selectionManager.setSelection(selectedObjects);
+        const wallCells = this.wallCellsWithin(rect);
+        this.selectedWallCells = additive
+            ? this.mergeWallCells(this.selectedWallCells, wallCells)
+            : wallCells;
         this.renderWallHighlights();
-        this.parent.actionSidebarManager?.updateActions?.(objects.length === 1 && this.selectedWallCells.length === 0 ? objects[0] : null);
+        this.parent.actionSidebarManager?.updateActions?.(
+            selectedObjects.length === 1 && this.selectedWallCells.length === 0 ? selectedObjects[0] : null
+        );
+    }
+
+    mergeWallCells(current, added) {
+        const byKey = new Map([...current, ...added].map(cell => [`${cell.x},${cell.y}`, cell]));
+        return [...byKey.values()];
     }
 
     wallCellsWithin(rect) {
@@ -167,8 +243,11 @@ class BuildMarqueeSelection extends UIComponent {
     }
 
     cancelDrag() {
-        if (!this.drag) return false;
+        if (!this.drag && !this.emptyPress) return false;
+        window.clearTimeout(this.armTimer);
+        this.armTimer = null;
         this.drag = null;
+        this.emptyPress = null;
         this.marquee?.remove();
         this.marquee = null;
         this.swallowClick = false;
@@ -182,6 +261,7 @@ class BuildMarqueeSelection extends UIComponent {
         document.removeEventListener('pointercancel', this.boundUp, true);
         this.container?.canvas?.removeEventListener('click', this.boundClick, true);
         this.clearVisuals();
+        window.clearTimeout(this.armTimer);
         super.dispose();
     }
 }

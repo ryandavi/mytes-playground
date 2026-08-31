@@ -20,6 +20,8 @@ class FenceBuildPanel extends CellDragBuildPanel {
             this.modalElement?.querySelector('.fence-build-variant-segment') || null,
             { value: FenceBuilder.DEFAULT_VARIANT }
         );
+        this.gateGroup = this.modalElement?.querySelector('.fence-build-gates') || null;
+        this.gatePalette = this.modalElement?.querySelector('.fence-gate-palette') || null;
     }
 
     get variant() {
@@ -28,6 +30,28 @@ class FenceBuildPanel extends CellDragBuildPanel {
 
     getBuilder() {
         return this.gameMap?.fenceBuilder || null;
+    }
+
+    handleToolModeChanged(mode) {
+        super.handleToolModeChanged(mode);
+        if (mode === this.toolMode) this.renderOwnedGates();
+    }
+
+    renderOwnedGates() {
+        if (!this.gateGroup || !this.gatePalette) return;
+        const inventory = this.build?.inventory;
+        const gates = (inventory?.items ?? []).filter(item =>
+            ItemRegistry.getItemSync(item.variant || item.name)?.world?.objectType === FenceBuilder.GATE_TYPE);
+        this.gateGroup.hidden = gates.length === 0;
+        this.gatePalette.replaceChildren(...gates.map(item => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'panel-action fence-gate-choice';
+            button.textContent = `${item.name} ×${item.quantity}`;
+            button.title = 'Place this gate into a fence';
+            button.addEventListener('click', () => inventory.activateItemElement(item.element));
+            return button;
+        }));
     }
 
     // Alt-click samples the fence under the cursor rather than starting a drag —

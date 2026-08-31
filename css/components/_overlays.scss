@@ -2,12 +2,10 @@
 
 .ui-tooltip {
     @include floating-help-paper;
-    // Document-positioned, not viewport-fixed: Safari does not keep a
-    // position:fixed element pinned to the viewport when <body> has a
-    // non-visible overflow (this app sets overflow-x: hidden on body), so the
-    // tooltip drifted by the page scroll amount. TooltipSystem.reposition adds
-    // the scroll offset to the coordinates it computes.
-    position: absolute;
+    // The anchor is measured with getBoundingClientRect(), so the tooltip must
+    // live in that same viewport coordinate space. Mixing those measurements
+    // with document scroll is what made inventory tooltips drift in Safari.
+    position: fixed;
     top: 0;
     left: 0;
     z-index: 99999;

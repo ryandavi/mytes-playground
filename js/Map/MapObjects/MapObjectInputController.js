@@ -27,7 +27,7 @@ class MapObjectInputController {
 			longPressDelay: object.getConfig('interactionGestures.longPressDelay', SiteConfig.interaction.gestures.longPressDelay),
 			clickMoveThreshold: object.getConfig('interactionGestures.clickMoveThreshold', SiteConfig.interaction.gestures.clickMoveThreshold),
 			canClick: () => object.active,
-			onClick: () => object.handleSingleClick(),
+			onClick: (event) => object.handleSingleClick(event),
 			onDoubleClick: (event) => object.handleDoubleClick(event),
 			onLongPress: (event) => {
 				if (object.canStartSelectModeDrag()) {

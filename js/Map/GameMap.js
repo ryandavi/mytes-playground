@@ -28,6 +28,7 @@ class GameMap {
         this.particleSystem = null;
         this.environmentManager = null;
         this.roomEnclosureDetector = null;
+        this.buildingTopology = null;
         this.wallBuilder = null;
         this.fenceBuilder = null;
         this.wallMaterialRegistry = null;
@@ -592,6 +593,7 @@ class GameMap {
 			this.roomAssignments = new RoomAssignments(this);
 			this.roomAssignments.restoreState(mapData.walls.roomAssignments, { emit: false });
 			this.roomEnclosureDetector = new RoomEnclosureDetector(this);
+			this.buildingTopology = new BuildingTopology(this);
 		}
 		this.eventManager?.emit(EVENTS.WALL_READY, { mapId: this.id, builder: this.wallBuilder });
 
@@ -1296,6 +1298,11 @@ class GameMap {
 		if (this.roomEnclosureDetector) {
 			this.roomEnclosureDetector.dispose();
 			this.roomEnclosureDetector = null;
+		}
+
+		if (this.buildingTopology) {
+			this.buildingTopology.dispose();
+			this.buildingTopology = null;
 		}
 
 		if (this.wallBuilder) {

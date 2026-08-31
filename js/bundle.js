@@ -1460,6 +1460,7 @@ const SiteConfig = Object.freeze({
 ;
 /* -- js/Engine/Events.js -- */
 const EVENTS = Object.freeze({
+    BUILDING_TOPOLOGY_CHANGED: 'building:topology_changed',
     BUILD_HISTORY_CHANGED: 'build:history_changed',
     BUILD_POLICY_CHANGED: 'build:policy_changed',
     CAMERA_ZOOM_CHANGED: 'camera:zoom_changed',
@@ -2550,10 +2551,6 @@ class TooltipSystem {
         const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
         const tooltipRect = this.element.getBoundingClientRect();
         const gutter = 8;
-        // getBoundingClientRect is viewport-relative; the tooltip is
-        // position: absolute on <body>, so its coordinates are document space.
-        const scrollX = window.scrollX || window.pageXOffset || 0;
-        const scrollY = window.scrollY || window.pageYOffset || 0;
 
         let top = anchorRect.bottom + this.offset;
         if (top + tooltipRect.height > viewportHeight - gutter) {
@@ -2569,8 +2566,8 @@ class TooltipSystem {
         }
         left = Math.max(gutter, left);
 
-        this.element.style.left = `${Math.round(left + scrollX)}px`;
-        this.element.style.top = `${Math.round(top + scrollY)}px`;
+        this.element.style.left = `${Math.round(left)}px`;
+        this.element.style.top = `${Math.round(top)}px`;
     }
 
     handlePointerDown(event) {
@@ -18318,7 +18315,7 @@ class ContainerInputManager {
       if (event.originalEvent && event.originalEvent.defaultPrevented) return;
 
       // Clicking bare map means "not that one" in every tool, not just Select.
-      // Build mode runs on the Move tool, so a selected object stayed selected
+      // Build mode's Select tool retains the internal Move mode id, so a selected object stayed selected
       // — and kept the sidebar open — no matter where you clicked.
       const target = event.originalEvent?.target;
       if (this.canStartWorldGestureFromTarget(target)) {
@@ -34159,6 +34156,7 @@ class Camera {
 		this._lastDragClientY = 0;
 		this._wheelGesture = null;
 		this._touchGesture = null;
+		this._spacePanActive = false;
 		this._originalTouchAction = this.canvas.style.touchAction;
 
 		// Camera shake (purely visual — does not affect posX/posY)
@@ -34178,6 +34176,9 @@ class Camera {
 		this._boundTouchStart = this.startTouchGesture.bind(this);
 		this._boundTouchMove = this.moveTouchGesture.bind(this);
 		this._boundTouchEnd = this.endTouchGesture.bind(this);
+		this._boundPanKeyDown = this.handlePanKeyDown.bind(this);
+		this._boundPanKeyUp = this.handlePanKeyUp.bind(this);
+		this._boundPanBlur = this.handlePanBlur.bind(this);
 		this._boundTemporaryCursorMove = this._handleTemporaryCursorMove.bind(this);
 		this.debouncedResetView = Utility.debounce(() => this.resetView(), 250);
 
@@ -34192,6 +34193,9 @@ class Camera {
 		document.addEventListener('touchmove', this._boundTouchMove, { passive: false });
 		document.addEventListener('touchend', this._boundTouchEnd, { passive: false });
 		document.addEventListener('touchcancel', this._boundTouchEnd, { passive: false });
+		document.addEventListener('keydown', this._boundPanKeyDown);
+		document.addEventListener('keyup', this._boundPanKeyUp);
+		window.addEventListener('blur', this._boundPanBlur);
 		this.canvas.style.touchAction = 'none';
 		window.addEventListener('resize', this.debouncedResetView);
 	}
@@ -34811,14 +34815,40 @@ class Camera {
 		if (event.cancelable) event.preventDefault();
 	}
 
+	cancelTouchPanForSelection() {
+		this.endDrag();
+		this._touchGesture = null;
+	}
+
 	// ========== DRAG ==========
+
+	handlePanKeyDown(event) {
+		if (event.code !== 'Space' || event.repeat || this.isTypingTarget(event.target)) return;
+		this._spacePanActive = true;
+		if (this.parent?.gameMode?.isBuild?.()) event.preventDefault();
+	}
+
+	handlePanKeyUp(event) {
+		if (event.code !== 'Space') return;
+		this._spacePanActive = false;
+	}
+
+	handlePanBlur() {
+		this._spacePanActive = false;
+	}
+
+	isTypingTarget(target) {
+		return target instanceof Element && !!target.closest('input, textarea, select, [contenteditable="true"]');
+	}
 
 	startDrag(e) {
 		if (this.followMode !== CAMERA_FOLLOW_MODES.DRAG_TO_PAN) return;
+		const explicitPan = e.button === 1 || (e.button === 0 && this._spacePanActive);
+		if (e.button !== 0 && e.button !== 1) return;
 		// Walls and Paint drive their own left-button drag over the map, so the
 		// camera stays out of the way rather than hauling the view along behind
 		// a run of wall.
-		if (this.parent?.ui?.toolManager?.claimsMapDrag?.() === true) return;
+		if (!explicitPan && this.parent?.ui?.toolManager?.claimsMapDrag?.() === true) return;
 		this._clearZoomAnchor();
 		this.isDragging = true;
 		this.dragStartX = e.clientX;
@@ -35505,6 +35535,9 @@ class Camera {
 		document.removeEventListener('touchmove', this._boundTouchMove);
 		document.removeEventListener('touchend', this._boundTouchEnd);
 		document.removeEventListener('touchcancel', this._boundTouchEnd);
+		document.removeEventListener('keydown', this._boundPanKeyDown);
+		document.removeEventListener('keyup', this._boundPanKeyUp);
+		window.removeEventListener('blur', this._boundPanBlur);
 		this.canvas.style.touchAction = this._originalTouchAction;
 		window.removeEventListener('resize', this.debouncedResetView);
 
@@ -36807,6 +36840,7 @@ class RoomEnclosureDetector {
         }
 
         const authoredRooms = regionManager.all('room').filter(room => room.properties?.autoDetected !== true);
+        const existingAutoRooms = regionManager.all('room').filter(room => room.properties?.autoDetected === true);
         const minArea = Math.max(1, Number(SiteConfig.rooms?.minAreaCells) || 1);
         const cellSize = Number(grid.config?.cellSize) || 32;
 
@@ -36819,7 +36853,7 @@ class RoomEnclosureDetector {
         // which is what keeps this from becoming a map you have to colour in
         // before it works.
         const claims = this.claimComponents(enclosed, authoredRooms, cellSize);
-        const owners = this.assignByEnclosure(enclosed, claims, cellSize);
+        const owners = this.assignByEnclosure(enclosed, claims, cellSize, existingAutoRooms);
         // Read before anything is re-shaped: a painted room inherits from
         // whatever its cells belonged to a moment ago, and re-cutting the rooms
         // first would leave it inheriting from nobody.
@@ -36868,7 +36902,14 @@ class RoomEnclosureDetector {
                 authored.bounds = authored.shape.bounds;
                 continue;
             }
-            const parent = painted.get(roomId) ?? this.roomDividedBy(cells, cellSize);
+            // A matched automatic room keeps more than its id. It carries the
+            // finish, name and room type the player chose before this topology
+            // pass removed and recreated it. Falling straight through to the
+            // spatial parent kept the id but silently reset those properties
+            // whenever a wall was extended or another divider was added.
+            const parent = painted.get(roomId) ??
+                existingAutoRooms.find(room => room.id === roomId) ??
+                this.roomDividedBy(cells, cellSize);
             const number = added.length + 1;
             // Nothing enclosing any of it: an outdoor room. It is still a room
             // — it has a floor, a name, a type, and a place in the list — but
@@ -36883,10 +36924,11 @@ class RoomEnclosureDetector {
                 layer: 'room',
                 shape,
                 properties: {
+                    ...Utility.deepClone(parent?.properties ?? {}),
                     // A placeholder until the player names it; numbered so two
                     // new rooms are at least tellable apart.
-                    displayName: placeholder,
-                    authoredDisplayName: placeholder,
+                    displayName: parent?.properties?.displayName ?? placeholder,
+                    authoredDisplayName: parent?.properties?.authoredDisplayName ?? placeholder,
                     indoor,
                     autoDetected: true,
                     // Dividing a room does not redecorate it. A new room with no
@@ -37043,16 +37085,35 @@ class RoomEnclosureDetector {
      * and a cell inside none of them goes to the nearest, so an open-plan space
      * is covered completely however the rectangles were drawn.
      */
-    assignByEnclosure(components, claims, cellSize) {
+    assignByEnclosure(components, claims, cellSize, existingAutoRooms = []) {
         const owners = new Map();
-        let unclaimed = 0;
+        const usedIds = new Set();
+        const takenIds = new Set((this.gameMap?.regionManager?.all('room') ?? []).map(room => room.id));
+        const mintId = () => {
+            for (let number = 1; ; number += 1) {
+                const id = `room_auto_${number}`;
+                if (!takenIds.has(id) && !usedIds.has(id)) return id;
+            }
+        };
         for (const component of components) {
             const rooms = claims.get(component);
             if (!rooms) {
-                // Nobody's room yet — a space the player has just enclosed. It
-                // gets an id here so the pass that materialises rooms treats it
-                // exactly like every other one.
-                const id = `room_auto_${++unclaimed}`;
+                // Preserve the identity of the prior automatic room with the
+                // greatest overlap. A split keeps the old id on its dominant
+                // half; a merge keeps the dominant room. This is also what
+                // preserves names, finishes and lighting across a wall move.
+                const keys = new Set(component.map(([x, y]) => `${x},${y}`));
+                const match = existingAutoRooms
+                    .filter(room => !usedIds.has(room.id))
+                    .map(room => ({
+                        room,
+                        overlap: [...(room.shape?.cells ?? [])].reduce(
+                            (count, key) => count + (keys.has(key) ? 1 : 0), 0)
+                    }))
+                    .filter(entry => entry.overlap > 0)
+                    .sort((left, right) => right.overlap - left.overlap || left.room.id.localeCompare(right.room.id))[0];
+                const id = match?.room?.id ?? mintId();
+                usedIds.add(id);
                 for (const [cellX, cellY] of component) owners.set(`${cellX},${cellY}`, id);
                 continue;
             }
@@ -37183,6 +37244,286 @@ class RoomEnclosureDetector {
         this._timer = null;
         this._unsubscribers.forEach(unsubscribe => unsubscribe());
         this._unsubscribers = [];
+        this.gameMap = null;
+    }
+}
+;
+/* -- js/Map/Regions/BuildingTopology.js -- */
+/** Derived structural groups shared by paint and future building consumers. */
+class BuildingTopology {
+    static DIRECTIONS = Object.freeze({
+        north: [0, -1], south: [0, 1], west: [-1, 0], east: [1, 0]
+    });
+
+    constructor(gameMap) {
+        this.gameMap = gameMap;
+        this.components = new Map();
+        this.componentByCell = new Map();
+        this.openSpaceByCell = new Map();
+        this.revision = 0;
+        this._unsubscribers = [];
+        const events = gameMap?.eventManager;
+        if (events) {
+            this._unsubscribers.push(events.on(EVENTS.ROOMS_CHANGED, payload => {
+                if (!payload?.mapId || payload.mapId === this.gameMap?.id) this.rebuild();
+            }));
+        }
+    }
+
+    static cellKey(x, y) {
+        return `${x},${y}`;
+    }
+
+    static surfaceKey(surface) {
+        return `${surface.cell.x},${surface.cell.y},${surface.face},${surface.from},${surface.to}`;
+    }
+
+    getRevision() {
+        return this.revision;
+    }
+
+    rebuild() {
+        const builder = this.gameMap?.wallBuilder;
+        const grid = this.gameMap?.gridSystem;
+        if (!builder || !grid) return [];
+
+        const oldIds = [...this.components.keys()];
+        this.components.clear();
+        this.componentByCell.clear();
+        this.indexOpenSpaces();
+
+        const remaining = new Set(builder.cells.keys());
+        while (remaining.size > 0) {
+            const first = [...remaining].sort(BuildingTopology.compareCellKeys)[0];
+            const queue = [first];
+            const keys = [];
+            remaining.delete(first);
+            for (let index = 0; index < queue.length; index++) {
+                const key = queue[index];
+                keys.push(key);
+                const [x, y] = key.split(',').map(Number);
+                for (const [dx, dy] of Object.values(BuildingTopology.DIRECTIONS)) {
+                    const next = BuildingTopology.cellKey(x + dx, y + dy);
+                    if (!remaining.delete(next)) continue;
+                    queue.push(next);
+                }
+            }
+
+            const cells = keys.map(key => builder.cells.get(key)).filter(Boolean);
+            const surfaces = cells.flatMap(cell => this.getStructuralSurfaces(cell));
+            const roomIds = [...new Set(surfaces.map(surface => surface.roomId).filter(Boolean))].sort();
+            if (roomIds.length === 0) continue;
+
+            const id = `building:${keys.sort(BuildingTopology.compareCellKeys)[0]}`;
+            const exteriorByLoop = new Map();
+            for (const surface of surfaces.filter(entry => !entry.roomId)) {
+                const loopId = this.resolveOpenSpaceForSurface(surface);
+                if (!exteriorByLoop.has(loopId)) exteriorByLoop.set(loopId, []);
+                exteriorByLoop.get(loopId).push(surface);
+            }
+            const footprint = this.getRoomFootprint(roomIds);
+            const component = {
+                id,
+                cellKeys: new Set(keys),
+                roomIds,
+                exteriorByLoop,
+                footprint,
+                bounds: BuildingTopology.boundsForKeys([...new Set([...keys, ...footprint])]),
+                revision: this.revision + 1
+            };
+            this.components.set(id, component);
+        }
+
+        this.mergeComponentsByRooms();
+        this.componentByCell.clear();
+        for (const component of this.components.values()) {
+            for (const key of component.cellKeys) this.componentByCell.set(key, component.id);
+        }
+
+        this.revision += 1;
+        const newIds = [...this.components.keys()];
+        this.gameMap?.eventManager?.emit(EVENTS.BUILDING_TOPOLOGY_CHANGED, {
+            mapId: this.gameMap?.id,
+            oldComponentIds: oldIds,
+            componentIds: newIds,
+            revision: this.revision,
+            topology: this
+        });
+        return [...this.components.values()];
+    }
+
+    mergeComponentsByRooms() {
+        let merged = true;
+        while (merged) {
+            merged = false;
+            const list = [...this.components.values()];
+            for (let leftIndex = 0; leftIndex < list.length && !merged; leftIndex += 1) {
+                for (let rightIndex = leftIndex + 1; rightIndex < list.length; rightIndex += 1) {
+                    const left = list[leftIndex];
+                    const right = list[rightIndex];
+                    if (!left.roomIds.some(roomId => right.roomIds.includes(roomId))) continue;
+                    const cellKeys = new Set([...left.cellKeys, ...right.cellKeys]);
+                    const roomIds = [...new Set([...left.roomIds, ...right.roomIds])].sort();
+                    const exteriorByLoop = new Map();
+                    for (const component of [left, right]) {
+                        for (const [loopId, surfaces] of component.exteriorByLoop) {
+                            exteriorByLoop.set(loopId, [...(exteriorByLoop.get(loopId) ?? []), ...surfaces]);
+                        }
+                    }
+                    const footprint = [...new Set([...left.footprint, ...right.footprint])]
+                        .sort(BuildingTopology.compareCellKeys);
+                    const first = [...cellKeys].sort(BuildingTopology.compareCellKeys)[0];
+                    const combined = {
+                        id: `building:${first}`,
+                        cellKeys,
+                        roomIds,
+                        exteriorByLoop,
+                        footprint,
+                        bounds: BuildingTopology.boundsForKeys([...cellKeys, ...footprint]),
+                        revision: this.revision + 1
+                    };
+                    this.components.delete(left.id);
+                    this.components.delete(right.id);
+                    this.components.set(combined.id, combined);
+                    merged = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    getStructuralSurfaces(cell) {
+        const builder = this.gameMap.wallBuilder;
+        const faces = builder.assignFaces(cell);
+        const rendered = builder.getCellSurfaces(cell);
+        const construction = builder.registry.getConstruction(cell.constructionId);
+        const width = construction?.cellSize ?? builder.cellSize;
+        return WallMaterialRegistry.DIRECTIONS.map(face => {
+            const visible = rendered.find(surface => surface.face === face);
+            const horizontal = face === 'north' || face === 'south';
+            return {
+                cell,
+                face,
+                from: visible?.from ?? 0,
+                to: visible?.to ?? width,
+                axis: visible?.axis ?? (horizontal ? 'horizontal' : 'vertical'),
+                // Paint scope follows the surface the renderer presents, which
+                // may expose the outside of masonry whose opposite face belongs
+                // to a room. Falling back keeps non-rendered structural faces
+                // available to other topology consumers.
+                roomId: visible ? visible.roomId : (faces[face]?.roomId ?? null),
+                finishId: builder.resolveFaceFinishId({ ...cell, faces }, face)
+            };
+        });
+    }
+
+    indexOpenSpaces() {
+        this.openSpaceByCell.clear();
+        const grid = this.gameMap.gridSystem;
+        const walls = this.gameMap.wallBuilder?.cells ?? new Map();
+        const width = Number(grid.gridWidth) || 0;
+        const height = Number(grid.gridHeight) || 0;
+        const visited = new Set();
+        let sequence = 0;
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const start = BuildingTopology.cellKey(x, y);
+                if (walls.has(start) || visited.has(start)) continue;
+                const queue = [[x, y]];
+                const keys = [];
+                let touchesEdge = false;
+                visited.add(start);
+                for (let index = 0; index < queue.length; index++) {
+                    const [cellX, cellY] = queue[index];
+                    const key = BuildingTopology.cellKey(cellX, cellY);
+                    keys.push(key);
+                    touchesEdge ||= cellX === 0 || cellY === 0 || cellX === width - 1 || cellY === height - 1;
+                    for (const [dx, dy] of Object.values(BuildingTopology.DIRECTIONS)) {
+                        const nextX = cellX + dx;
+                        const nextY = cellY + dy;
+                        if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) continue;
+                        const next = BuildingTopology.cellKey(nextX, nextY);
+                        if (walls.has(next) || visited.has(next)) continue;
+                        visited.add(next);
+                        queue.push([nextX, nextY]);
+                    }
+                }
+                const id = touchesEdge ? 'outside' : `courtyard:${++sequence}`;
+                for (const key of keys) this.openSpaceByCell.set(key, id);
+            }
+        }
+    }
+
+    resolveOpenSpaceForSurface(surface) {
+        const [dx, dy] = BuildingTopology.DIRECTIONS[surface.face] ?? [0, 0];
+        return this.openSpaceByCell.get(BuildingTopology.cellKey(
+            surface.cell.x + dx, surface.cell.y + dy
+        )) ?? 'outside';
+    }
+
+    getRoomFootprint(roomIds) {
+        const result = new Set();
+        for (const roomId of roomIds) {
+            const room = this.gameMap.regionManager?.get('room', roomId);
+            for (const cell of room?.shape?.cells ?? []) {
+                const [x, y] = typeof cell === 'string'
+                    ? cell.split(',').map(Number)
+                    : Array.isArray(cell) ? cell : [cell.x, cell.y];
+                if (Number.isInteger(x) && Number.isInteger(y)) result.add(BuildingTopology.cellKey(x, y));
+            }
+        }
+        return [...result].sort(BuildingTopology.compareCellKeys);
+    }
+
+    getComponentAtWallFace(cell) {
+        return this.components.get(this.componentByCell.get(BuildingTopology.cellKey(cell?.x, cell?.y))) ?? null;
+    }
+
+    getComponentForRoom(roomId) {
+        return [...this.components.values()].find(component => component.roomIds.includes(roomId)) ?? null;
+    }
+
+    getExteriorSurfaces(componentId, loopId = null) {
+        const component = this.components.get(componentId);
+        if (!component) return [];
+        if (loopId !== null) return [...(component.exteriorByLoop.get(loopId) ?? [])];
+        return [...component.exteriorByLoop.values()].flat();
+    }
+
+    getExteriorLoopAtSurface(surface) {
+        const component = this.getComponentAtWallFace(surface?.cell);
+        if (!component) return null;
+        const key = BuildingTopology.surfaceKey(surface);
+        for (const [loopId, surfaces] of component.exteriorByLoop) {
+            if (surfaces.some(entry => BuildingTopology.surfaceKey(entry) === key)) return loopId;
+        }
+        return null;
+    }
+
+    getFootprint(componentId) {
+        return [...(this.components.get(componentId)?.footprint ?? [])];
+    }
+
+    static compareCellKeys(left, right) {
+        const [leftX, leftY] = left.split(',').map(Number);
+        const [rightX, rightY] = right.split(',').map(Number);
+        return leftY - rightY || leftX - rightX;
+    }
+
+    static boundsForKeys(keys) {
+        if (keys.length === 0) return null;
+        const points = keys.map(key => key.split(',').map(Number));
+        const xs = points.map(([x]) => x);
+        const ys = points.map(([, y]) => y);
+        return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
+    }
+
+    dispose() {
+        for (const unsubscribe of this._unsubscribers) unsubscribe?.();
+        this._unsubscribers = [];
+        this.components.clear();
+        this.componentByCell.clear();
+        this.openSpaceByCell.clear();
         this.gameMap = null;
     }
 }
@@ -39112,6 +39453,23 @@ class WallBuilder {
         return 'south';
     }
 
+    /**
+     * The horizontal surface the camera presents to the player.
+     *
+     * The near edge of a room exposes its outside even though the room sits on
+     * the north side of that masonry. That visible band is therefore exterior,
+     * not an interior face borrowing the room's finish. The far edge presents
+     * the room on its south side and remains its interior wall.
+     */
+    resolveVisibleBandSurface(cell, face = this.resolveBandFace(cell)) {
+        const northRoomId = cell.faces?.north?.roomId ?? null;
+        const southRoomId = cell.faces?.south?.roomId ?? null;
+        if (face === 'north' && northRoomId && !southRoomId) {
+            return { face, roomId: null };
+        }
+        return { face, roomId: cell.faces?.[face]?.roomId ?? null };
+    }
+
     resolveBandFinishId(cell) {
         return this.resolveFaceFinishId(cell, this.resolveBandFace(cell));
     }
@@ -39165,13 +39523,13 @@ class WallBuilder {
         // a post stands between it and the cell straight across.
         const band = (from, to, side) => {
             const resolved = this.resolveBandSurface(cell, side);
-            if (!resolved) return faceSpan(from, to, this.resolveBandFace(cell), 'horizontal');
+            const visible = resolved || this.resolveVisibleBandSurface(cell);
             return {
                 from, to,
                 axis: 'horizontal',
-                face: resolved.face,
-                roomId: resolved.roomId,
-                finishId: this.resolveSurfaceFinishId(cell, resolved.face, resolved.roomId)
+                face: visible.face,
+                roomId: visible.roomId,
+                finishId: this.resolveSurfaceFinishId(cell, visible.face, visible.roomId)
             };
         };
 
@@ -39235,7 +39593,9 @@ class WallBuilder {
         const takesNorth = !!north && (!south || (north !== south &&
             north.areaInCells(this.cellSize) < south.areaInCells(this.cellSize)));
         const room = takesNorth ? north : south;
-        return { face: takesNorth ? 'north' : 'south', roomId: room?.id || null };
+        const face = takesNorth ? 'north' : 'south';
+        if (face === 'north' && north && !south) return { face, roomId: null };
+        return { face, roomId: room?.id || null };
     }
 
     // The room across a band, stepping past the post when the cell straight
@@ -39247,24 +39607,9 @@ class WallBuilder {
         return dx === 0 ? null : this.roomAtOpenCell(cell.x + dx, y);
     }
 
-    /**
-     * Which face a surface actually belongs to.
-     *
-     * A face with no room behind it is the outside of somebody's wall, and
-     * nobody can paint it on its own — so it follows the room on the other side
-     * of the same masonry instead of sitting bare. The outside of a building
-     * corner is the same wall as the inside of it, and treating it as unowned
-     * left a bald half-tile on every corner of the house, on a wall that had
-     * just been painted.
-     *
-     * This is the rule resolveBandFace already applies to a head-on band that
-     * looks out of the building; a post is the same wall seen edge-on and wants
-     * the same answer.
-     */
+    /** A column keeps its literal side so interior and exterior paint stay separate. */
     resolveOwningFace(cell, face) {
-        const opposite = WallBuilder.OPPOSITE_FACES[face];
-        if (!opposite || cell.faces?.[face]?.roomId || !cell.faces?.[opposite]?.roomId) return face;
-        return opposite;
+        return face;
     }
 
     /**
@@ -39347,20 +39692,11 @@ class WallBuilder {
         return pieces;
     }
 
-    /**
-     * Whether this piece shows anything the player can paint.
-     *
-     * Asked of the surfaces themselves, because that is the only honest answer.
-     * A north-south run used to be refused on the grounds that it presents no
-     * face to the camera — true of the old single-finish wall, and false since
-     * a post started drawing two half-cell surfaces, west and east, one per
-     * room beside it. Those are visibly painted surfaces the tool would not let
-     * anyone select, so a room's side walls could never be painted at all: they
-     * stayed plaster while every wall around them took the colour, which is the
-     * gap running down both edges of a room.
-     */
+    /** Whether this piece presents a horizontal paint face to the camera. */
     isPaintable(piece) {
-        return (piece?.cells ?? []).some(cell => this.getCellSurfaces(cell).length > 0);
+        return (piece?.cells ?? []).some(cell =>
+            this.getCellSurfaces(cell).some(surface => surface.axis === 'horizontal')
+        );
     }
 
     /**
@@ -39419,7 +39755,9 @@ class WallBuilder {
         const cell = piece.cells[index];
         if (!cell) return null;
         const local = offsetX - (index * construction.cellSize);
-        const covering = this.getCellSurfaces(cell).filter(surface => local >= surface.from && local < surface.to);
+        const covering = this.getCellSurfaces(cell).filter(surface =>
+            surface.axis === 'horizontal' && local >= surface.from && local < surface.to
+        );
         return covering[covering.length - 1] || null;
     }
 
@@ -41133,7 +41471,9 @@ class WallBuilder {
             // Which room this paint was applied to. See resolveFinishOverride:
             // it is what stops the paint following the masonry into a room that
             // was walled off later and never chose this colour.
-            roomId: record.roomId ?? this.getFaceRoomIdAt(record.cells.from[0], record.cells.from[1], record.face)
+            roomId: record.roomId !== undefined
+                ? record.roomId
+                : this.getFaceRoomIdAt(record.cells.from[0], record.cells.from[1], record.face)
         });
         this.rebuild();
         return true;
@@ -41158,6 +41498,63 @@ class WallBuilder {
         if (options.emit !== false) {
             this.gameMap.eventManager?.emit(EVENTS.WALL_GEOMETRY_CHANGED, { mapId: this.gameMap.id, x, y, builder: this });
         }
+    }
+
+    /** Canonical structural template used when a build gesture continues a wall. */
+    sampleCellTemplate(cellOrX, y = null) {
+        const cell = typeof cellOrX === 'object'
+            ? this.baseCells.get(`${cellOrX.x},${cellOrX.y}`)
+            : this.baseCells.get(`${cellOrX},${y}`);
+        if (!cell) return null;
+        return Utility.deepClone({
+            constructionId: cell.constructionId,
+            finishId: cell.finishId,
+            heightCells: cell.heightCells,
+            connectGroup: cell.connectGroup
+        });
+    }
+
+    sampleFaceOverrideTemplate(cellOrX, y = null) {
+        const x = typeof cellOrX === 'object' ? cellOrX.x : cellOrX;
+        const cellY = typeof cellOrX === 'object' ? cellOrX.y : y;
+        if (!Number.isInteger(x) || !Number.isInteger(cellY)) return [];
+        return this.faceOverrides.filter(record => {
+            const from = record.cells?.from;
+            const to = record.cells?.to;
+            if (!from || !to) return false;
+            return x >= Math.min(from[0], to[0]) && x <= Math.max(from[0], to[0]) &&
+                cellY >= Math.min(from[1], to[1]) && cellY <= Math.max(from[1], to[1]);
+        }).map(record => ({
+            face: record.face,
+            finishId: record.finishId,
+            roomId: record.roomId,
+            axis: record.axis
+        }));
+    }
+
+    createFaceOverrideCopies(template, cells) {
+        return cells.flatMap(cell => template.map(record => ({
+            ...Utility.deepClone(record),
+            mapId: this.gameMap.id,
+            cells: { from: [cell.x, cell.y], to: [cell.x, cell.y] }
+        })));
+    }
+
+    addFaceOverrideCopies(records) {
+        if (!records?.length) return false;
+        this.faceOverrides.push(...records);
+        this.rebuild();
+        return true;
+    }
+
+    removeFaceOverrideCopies(records) {
+        if (!records?.length) return false;
+        const remove = new Set(records);
+        const before = this.faceOverrides.length;
+        this.faceOverrides = this.faceOverrides.filter(record => !remove.has(record));
+        if (this.faceOverrides.length === before) return false;
+        this.rebuild();
+        return true;
     }
 
     /**
@@ -44780,6 +45177,7 @@ class GameMap {
         this.particleSystem = null;
         this.environmentManager = null;
         this.roomEnclosureDetector = null;
+        this.buildingTopology = null;
         this.wallBuilder = null;
         this.fenceBuilder = null;
         this.wallMaterialRegistry = null;
@@ -45344,6 +45742,7 @@ class GameMap {
 			this.roomAssignments = new RoomAssignments(this);
 			this.roomAssignments.restoreState(mapData.walls.roomAssignments, { emit: false });
 			this.roomEnclosureDetector = new RoomEnclosureDetector(this);
+			this.buildingTopology = new BuildingTopology(this);
 		}
 		this.eventManager?.emit(EVENTS.WALL_READY, { mapId: this.id, builder: this.wallBuilder });
 
@@ -46048,6 +46447,11 @@ class GameMap {
 		if (this.roomEnclosureDetector) {
 			this.roomEnclosureDetector.dispose();
 			this.roomEnclosureDetector = null;
+		}
+
+		if (this.buildingTopology) {
+			this.buildingTopology.dispose();
+			this.buildingTopology = null;
 		}
 
 		if (this.wallBuilder) {
@@ -53253,7 +53657,7 @@ class MapObjectInputController {
 			longPressDelay: object.getConfig('interactionGestures.longPressDelay', SiteConfig.interaction.gestures.longPressDelay),
 			clickMoveThreshold: object.getConfig('interactionGestures.clickMoveThreshold', SiteConfig.interaction.gestures.clickMoveThreshold),
 			canClick: () => object.active,
-			onClick: () => object.handleSingleClick(),
+			onClick: (event) => object.handleSingleClick(event),
 			onDoubleClick: (event) => object.handleDoubleClick(event),
 			onLongPress: (event) => {
 				if (object.canStartSelectModeDrag()) {
@@ -55091,8 +55495,17 @@ class MapObject {
 		this.input.initClickComponent();
 	}
 
-	handleSingleClick() {
+	handleSingleClick(event = null) {
 		if (!this.active) return;
+		const ui = this.parent?.ui;
+		if (this.parent?.gameMode?.isBuild?.() && ui?.isTool?.(UIToolModes.MOVE) &&
+			event?.originalEvent?.shiftKey === true) {
+			const selected = ui.selectionManager?.getSelectedObjects?.() ?? [];
+			ui.selectionManager?.setSelection?.(
+				selected.includes(this) ? selected.filter(object => object !== this) : [...selected, this]
+			);
+			return;
+		}
 		this.selectInUi();
 	}
 
@@ -69994,17 +70407,10 @@ class ToolManager extends UIComponent {
             },
             [UIToolModes.MOVE]: {
                 id: 'tool-move',
-                label: 'Move',
-                cursor: 'grab',
-                shortcut: '1',
-                buildOnly: true
-            },
-            [UIToolModes.BUILD_SELECT]: {
-                id: 'tool-build-select',
                 label: 'Select',
                 cursor: 'default',
-                buildOnly: true,
-                claimsMapDrag: true
+                shortcut: '1',
+                buildOnly: true
             },
             [UIToolModes.WALL]: {
                 id: 'tool-wall',
@@ -70032,7 +70438,7 @@ class ToolManager extends UIComponent {
             },
             [UIToolModes.SURFACE]: {
                 id: 'tool-surface',
-                label: 'Surface',
+                label: 'Paint',
                 cursor: 'pointer',
                 shortcut: '4',
                 buildOnly: true,
@@ -70069,9 +70475,9 @@ class ToolManager extends UIComponent {
     // The tool each mode falls back to when it is entered or when a tool is
     // refused.
     getDefaultToolFor(gameMode = this.gameMode?.mode) {
-        // Build opens on Move: empty-map drags pan the camera, while grabbing
-        // furniture still moves it. Marquee Select remains available when the
-        // player explicitly wants to select several things.
+        // One build selection tool owns click, marquee and object movement.
+        // Camera panning remains available through wheel/trackpad, two-finger
+        // touch, middle-drag and Space-drag.
         return gameMode === GAME_MODES.BUILD ? UIToolModes.MOVE : UIToolModes.SELECT;
     }
 
@@ -70183,6 +70589,10 @@ class ToolManager extends UIComponent {
 
         const element = document.getElementById(toolConfig.id);
         if (!element) {
+            if (toolConfig.controlOptional === true) {
+                this.setToolMode(mode);
+                return true;
+            }
             Utility.warnDebug(`Could not find control for tool: ${toolConfig.id}`);
             return false;
         }
@@ -70504,7 +70914,7 @@ class HintNotes extends UIComponent {
  * out of the way, come back" is three steps to solve a problem the Move tool
  * already solves for every couch in the house.
  *
- * So: in Build mode, with the Move tool, a myte drags like furniture. The rule
+ * So: in Build mode, with the Select tool, a myte drags like furniture. The rule
  * for what actually moves is the one people already hold in their heads —
  *
  *   asleep in its slot    the slot moves, and the myte goes with it, because
@@ -70966,6 +71376,8 @@ class BuildMarqueeSelection extends UIComponent {
         this.boundUp = this.onPointerUp.bind(this);
         this.boundClick = this.onClick.bind(this);
         this.swallowClick = false;
+        this.emptyPress = null;
+        this.armTimer = null;
     }
 
     init() {
@@ -70978,23 +71390,72 @@ class BuildMarqueeSelection extends UIComponent {
 
     isActive() {
         return this.container?.gameMode?.isBuild() === true &&
-            this.parent?.isTool?.(UIToolModes.BUILD_SELECT);
+            this.parent?.isTool?.(UIToolModes.MOVE);
     }
 
     onPointerDown(event) {
         if (!this.isActive() || event.button !== 0 || event.target?.closest?.(InputComponent.UI_SELECTOR)) return;
+        if (this.container?.camera?._spacePanActive) return;
+        if (event.target?.closest?.('.map-object, .myte-slot, .world-myte, .interactive-myte')) return;
+        if (event.pointerType !== 'touch' && event.shiftKey !== true) {
+            this.emptyPress = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY
+            };
+            return;
+        }
         this.clearVisuals();
-        this.drag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, endX: event.clientX, endY: event.clientY };
-        this.marquee = document.createElement('div');
-        this.marquee.className = 'build-selection-marquee';
-        document.body.appendChild(this.marquee);
-        this.renderMarquee();
+        this.drag = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            endX: event.clientX,
+            endY: event.clientY,
+            additive: event.shiftKey === true,
+            pending: event.pointerType === 'touch'
+        };
+        if (this.drag.pending) {
+            this.armTimer = window.setTimeout(
+                () => this.armTouchMarquee(),
+                SiteConfig.interaction.gestures.longPressDelay
+            );
+            return;
+        }
+        this.createMarquee();
         event.preventDefault();
         event.stopPropagation();
     }
 
+    createMarquee() {
+        this.marquee = document.createElement('div');
+        this.marquee.className = 'build-selection-marquee';
+        document.body.appendChild(this.marquee);
+        this.renderMarquee();
+    }
+
+    armTouchMarquee() {
+        if (!this.drag?.pending) return;
+        this.drag.pending = false;
+        this.armTimer = null;
+        this.container?.camera?.cancelTouchPanForSelection?.();
+        this.createMarquee();
+    }
+
     onPointerMove(event) {
+        if (this.emptyPress?.pointerId === event.pointerId) {
+            const distance = Math.hypot(
+                event.clientX - this.emptyPress.startX,
+                event.clientY - this.emptyPress.startY
+            );
+            if (distance > SiteConfig.interaction.gestures.clickMoveThreshold) this.emptyPress = null;
+        }
         if (!this.drag || event.pointerId !== this.drag.pointerId) return;
+        if (this.drag.pending) {
+            const distance = Math.hypot(event.clientX - this.drag.startX, event.clientY - this.drag.startY);
+            if (distance > SiteConfig.interaction.gestures.clickMoveThreshold) this.cancelDrag();
+            return;
+        }
         this.drag.endX = event.clientX;
         this.drag.endY = event.clientY;
         this.renderMarquee();
@@ -71002,14 +71463,26 @@ class BuildMarqueeSelection extends UIComponent {
     }
 
     onPointerUp(event) {
+        if (this.emptyPress?.pointerId === event.pointerId) {
+            this.emptyPress = null;
+            this.parent.selectionManager.setSelection([]);
+            this.clearSelection();
+        }
         if (!this.drag || event.pointerId !== this.drag.pointerId) return;
+        if (this.drag.pending) {
+            this.cancelDrag();
+            this.parent.selectionManager.setSelection([]);
+            this.clearSelection();
+            return;
+        }
         this.drag.endX = event.clientX;
         this.drag.endY = event.clientY;
         const rect = this.dragRect();
+        const additive = this.drag.additive === true;
         this.drag = null;
         this.marquee?.remove();
         this.marquee = null;
-        this.selectWithin(rect);
+        this.selectWithin(rect, additive);
         this.swallowClick = true;
         event.preventDefault();
         event.stopPropagation();
@@ -71038,14 +71511,27 @@ class BuildMarqueeSelection extends UIComponent {
         return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top;
     }
 
-    selectWithin(rect) {
+    selectWithin(rect, additive = false) {
         const objects = (this.container?.gameMap?.objects || []).filter(object =>
             object.active !== false && object.element && this.intersects(rect, object.element.getBoundingClientRect())
         );
-        this.parent.selectionManager.setSelection(objects);
-        this.selectedWallCells = this.wallCellsWithin(rect);
+        const selectedObjects = additive
+            ? [...this.parent.selectionManager.getSelectedObjects(), ...objects]
+            : objects;
+        this.parent.selectionManager.setSelection(selectedObjects);
+        const wallCells = this.wallCellsWithin(rect);
+        this.selectedWallCells = additive
+            ? this.mergeWallCells(this.selectedWallCells, wallCells)
+            : wallCells;
         this.renderWallHighlights();
-        this.parent.actionSidebarManager?.updateActions?.(objects.length === 1 && this.selectedWallCells.length === 0 ? objects[0] : null);
+        this.parent.actionSidebarManager?.updateActions?.(
+            selectedObjects.length === 1 && this.selectedWallCells.length === 0 ? selectedObjects[0] : null
+        );
+    }
+
+    mergeWallCells(current, added) {
+        const byKey = new Map([...current, ...added].map(cell => [`${cell.x},${cell.y}`, cell]));
+        return [...byKey.values()];
     }
 
     wallCellsWithin(rect) {
@@ -71123,8 +71609,11 @@ class BuildMarqueeSelection extends UIComponent {
     }
 
     cancelDrag() {
-        if (!this.drag) return false;
+        if (!this.drag && !this.emptyPress) return false;
+        window.clearTimeout(this.armTimer);
+        this.armTimer = null;
         this.drag = null;
+        this.emptyPress = null;
         this.marquee?.remove();
         this.marquee = null;
         this.swallowClick = false;
@@ -71138,6 +71627,7 @@ class BuildMarqueeSelection extends UIComponent {
         document.removeEventListener('pointercancel', this.boundUp, true);
         this.container?.canvas?.removeEventListener('click', this.boundClick, true);
         this.clearVisuals();
+        window.clearTimeout(this.armTimer);
         super.dispose();
     }
 }
@@ -79606,13 +80096,19 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.init();
         this.paletteElement = this.modalElement?.querySelector('.surface-palette');
         this.scopeElement = this.modalElement?.querySelector('.surface-scope');
+        this.scopeTitle = this.modalElement?.querySelector('.surface-scope-title');
         this.emptyElement = this.modalElement?.querySelector('.surface-customize-empty');
         this.finishGroup = this.modalElement?.querySelector('.surface-finish-group');
+        this.finishTitle = this.modalElement?.querySelector('.surface-finish-title');
         this.targetElement = this.modalElement?.querySelector('.surface-target');
         this.targetRoomElement = this.modalElement?.querySelector('.surface-target__room');
         this.targetSurfaceElement = this.modalElement?.querySelector('.surface-target__surface');
         this.targetRoomLink = this.modalElement?.querySelector('.surface-target__room-link');
         this.targetRoomLink?.addEventListener('click', () => this.openTargetRoom());
+        this.targetSampleButton = this.modalElement?.querySelector('.surface-target__sample');
+        this.targetSampleButton?.addEventListener('click', () => {
+            if (this.target) this.holdFinish(this.getCurrentFinishId(), this.target.surface);
+        });
         // What the eyedropper is holding, if anything: { finishId, surface }.
         this.held = null;
         this.heldGroup = this.modalElement?.querySelector('.surface-held-group');
@@ -79622,7 +80118,10 @@ class SurfaceCustomizePanel extends ModalWindow {
             ?.addEventListener('click', () => this.dropFinish());
         this.scope = new SegmentControl(this.scopeElement, {
             value: 'stretch',
-            onChange: () => this.renderPalette()
+            onChange: () => {
+                this.redrawOverlays();
+                this.renderPalette();
+            }
         });
         this.paletteElement?.addEventListener('pointerleave', () => this.revertPreview());
         this.boundStagePointerLeave = () => {
@@ -79737,7 +80236,7 @@ class SurfaceCustomizePanel extends ModalWindow {
      */
     createWallOverlay(surface, className) {
         const builder = this.gameMap?.wallBuilder;
-        const rects = builder?.getSurfaceRects(builder.getPaintStretchSurfaces(surface)) || [];
+        const rects = builder?.getSurfaceRects(this.resolveWallScopeSurfaces(surface)) || [];
         return rects.map(rect => {
             const element = document.createElement('div');
             element.className = `surface-paint-overlay ${className}`;
@@ -79884,7 +80383,9 @@ class SurfaceCustomizePanel extends ModalWindow {
             const builder = this.gameMap?.wallBuilder;
             let wallSurface = null;
             for (const cell of builder?.cells?.values?.() ?? []) {
-                wallSurface = builder.getCellSurfaces(cell).find(entry => entry.roomId === roomId);
+                wallSurface = builder.getCellSurfaces(cell).find(entry =>
+                    entry.axis === 'horizontal' && entry.roomId === roomId
+                );
                 if (wallSurface) break;
             }
             if (!wallSurface) {
@@ -80102,9 +80603,10 @@ class SurfaceCustomizePanel extends ModalWindow {
         if (this.targetRoomLink) {
             this.targetRoomLink.hidden = !targetRoom;
             if (targetRoom) {
-                this.targetRoomLink.setAttribute('aria-label', `Open ${this.roomName(targetRoom)} in the Rooms panel`);
+                this.targetRoomLink.setAttribute('aria-label', `Open ${this.roomName(targetRoom)} in Room Areas`);
             }
         }
+        if (this.targetSampleButton) this.targetSampleButton.hidden = !this.target || !this.getCurrentFinishId();
         this.targetElement?.classList.toggle('is-locked', locked);
         // Nothing picked yet is a placeholder, not a readout — it should not
         // shout the way a real target name does.
@@ -80127,6 +80629,41 @@ class SurfaceCustomizePanel extends ModalWindow {
         return this.scope?.value || 'stretch';
     }
 
+    getOpenSpaceRooms(surface = this.target?.wallSurface) {
+        const room = surface?.roomId
+            ? this.gameMap?.regionManager?.get('room', surface.roomId)
+            : null;
+        const openSpaceId = room?.properties?.openSpaceId;
+        if (!openSpaceId) return room ? [room] : [];
+        return (this.gameMap?.regionManager?.all('room') || []).filter(entry =>
+            entry.properties?.openSpaceId === openSpaceId
+        );
+    }
+
+    resolveWallScopeSurfaces(surface = this.target?.wallSurface, scope = this.getWallScope()) {
+        const builder = this.gameMap?.wallBuilder;
+        if (!builder || !surface) return [];
+        if (scope === 'room' && surface.roomId) {
+            return [...builder.cells.values()].flatMap(cell =>
+                builder.getCellSurfaces(cell).filter(entry => entry.roomId === surface.roomId));
+        }
+        if (scope === 'space' && surface.roomId) {
+            const roomIds = new Set(this.getOpenSpaceRooms(surface).map(room => room.id));
+            return [...builder.cells.values()].flatMap(cell =>
+                builder.getCellSurfaces(cell).filter(entry => roomIds.has(entry.roomId)));
+        }
+        if (scope === 'exterior' && !surface.roomId) {
+            const topology = this.gameMap?.buildingTopology;
+            const component = topology?.getComponentAtWallFace(surface.cell);
+            const loopId = topology?.getExteriorLoopAtSurface(surface);
+            return component && loopId !== null
+                ? topology.getExteriorSurfaces(component.id).filter(entry =>
+                    this.rules?.canPaintWallFace(entry.cell).allowed !== false)
+                : [];
+        }
+        return builder.getPaintStretchSurfaces(surface);
+    }
+
     buildRequests(finishId, scopeOverride = null) {
         if (!this.target) return [];
         if (this.target.surface === 'floor') {
@@ -80136,7 +80673,27 @@ class SurfaceCustomizePanel extends ModalWindow {
         const builder = this.gameMap.wallBuilder;
         const surface = this.target.wallSurface;
 
-        if ((scopeOverride || this.getWallScope()) !== 'room') {
+        const scope = scopeOverride || this.getWallScope();
+        if (scope === 'exterior') {
+            return this.resolveWallScopeSurfaces(surface, scope).map(entry => ({
+                surface: 'wall',
+                face: entry.face,
+                axis: entry.axis,
+                cells: { from: [entry.cell.x, entry.cell.y], to: [entry.cell.x, entry.cell.y] },
+                roomId: null,
+                finishId
+            }));
+        }
+
+        if (scope === 'space') {
+            return this.getOpenSpaceRooms(surface).map(room => ({
+                surface: 'wall',
+                roomId: room.id,
+                finishId
+            }));
+        }
+
+        if (scope !== 'room') {
             // Exactly the surfaces the overlay outlined: same call, same room
             // test, same stopping rule. Deriving the painted set separately
             // from the previewed one is what let a click outline one wall and
@@ -80144,6 +80701,7 @@ class SurfaceCustomizePanel extends ModalWindow {
             return builder.getPaintStretchSurfaces(surface).map(entry => ({
                 surface: 'wall',
                 face: entry.face,
+                axis: entry.axis,
                 cells: { from: [entry.cell.x, entry.cell.y], to: [entry.cell.x, entry.cell.y] },
                 roomId: entry.roomId,
                 finishId
@@ -80164,12 +80722,18 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.revertPreview();
         this.paletteElement.replaceChildren();
         this.renderTarget();
-        this.scopeElement.hidden = this.target?.surface !== 'wall';
+        const scopeHidden = this.target?.surface !== 'wall';
+        this.scopeElement.hidden = scopeHidden;
+        if (this.scopeTitle) this.scopeTitle.hidden = scopeHidden;
+        this.renderScopeChoices();
         this.emptyElement.hidden = !!this.target;
         // An empty Finish heading over an empty box reads as something that
         // failed to load. With nothing picked there is no finish to choose, so
         // the whole group stands down and the panel is just its prompt.
         if (this.finishGroup) this.finishGroup.hidden = !this.target;
+        if (this.finishTitle && this.target) {
+            this.finishTitle.textContent = this.target.surface === 'floor' ? 'Floor finish' : 'Wall finish';
+        }
         if (!this.target) return;
 
         const verdict = this.checkTarget();
@@ -80232,6 +80796,26 @@ class SurfaceCustomizePanel extends ModalWindow {
             button.addEventListener('dblclick', () => this.applyFinish(finish.id || null, 'room'));
             this.paletteElement.appendChild(button);
         }
+    }
+
+    renderScopeChoices() {
+        if (!this.scopeElement) return;
+        const wall = this.target?.surface === 'wall' ? this.target.wallSurface : null;
+        const roomButton = this.scopeElement.querySelector('[data-value="room"]');
+        const spaceButton = this.scopeElement.querySelector('[data-value="space"]');
+        const exteriorButton = this.scopeElement.querySelector('[data-value="exterior"]');
+        const topology = this.gameMap?.buildingTopology;
+        const openSpaceRooms = wall?.roomId ? this.getOpenSpaceRooms(wall) : [];
+        const spaceAvailable = openSpaceRooms.length > 1;
+        const exteriorAvailable = !!wall && !wall.roomId &&
+            !!topology?.getComponentAtWallFace(wall.cell) &&
+            topology.getExteriorLoopAtSurface(wall) !== null;
+        if (roomButton) roomButton.hidden = !wall?.roomId;
+        if (spaceButton) spaceButton.hidden = !spaceAvailable;
+        if (exteriorButton) exteriorButton.hidden = !exteriorAvailable;
+        const allowed = wall?.roomId ? ['stretch', 'room', ...(spaceAvailable ? ['space'] : [])] :
+            exteriorAvailable ? ['stretch', 'exterior'] : ['stretch'];
+        if (!allowed.includes(this.getWallScope())) this.scope?.select?.('stretch');
     }
 
     /**
@@ -81279,7 +81863,7 @@ class CellDragBuildPanel extends ModalWindow {
     cellWouldChange(_map, _cell, _removing) { return true; }
 
     // Keep the run. Returns truthy on a change that happened.
-    commitCells(_map, _cells, _operation) { return false; }
+    commitCells(_map, _cells, _operation, _gesture = null) { return false; }
 
     // Extra gestures a single tool layers on top of the plain drag. Each
     // returns true to say "I have taken this event, stop here".
@@ -81398,8 +81982,9 @@ class CellDragBuildPanel extends ModalWindow {
         const cells = this.getDragCells();
         const map = this.drag.map;
         const operation = this.drag.operation;
+        const gesture = this.drag;
         this.cancelDrag();
-        this.commitCells(map, cells, operation);
+        this.commitCells(map, cells, operation, gesture);
     }
 
     getDragCells() {
@@ -81645,11 +82230,21 @@ class WallBuildPanel extends CellDragBuildPanel {
         this.handleElement = null;
         this.handleCell = null;
         this.roomFloorButton = this.modalElement?.querySelector('#wall-room-floor') || null;
+        this.roomAreasButton = this.modalElement?.querySelector('#wall-room-areas') || null;
+        this.roomActions = this.modalElement?.querySelector('.wall-room-actions') || null;
+        this.roomActionsTitle = this.modalElement?.querySelector('.wall-room-actions__title') || null;
+        this.openingGroup = this.modalElement?.querySelector('.wall-build-openings') || null;
+        this.openingPalette = this.modalElement?.querySelector('.wall-opening-palette') || null;
         this.contextRoomId = null;
         this.roomFloorButton?.addEventListener('click', () => {
             if (this.contextRoomId) {
                 this.parent?.surfaceCustomizePanel?.openRoomSurface?.(this.contextRoomId, 'floor');
             }
+        });
+        this.roomAreasButton?.addEventListener('click', () => {
+            const roomId = this.contextRoomId;
+            if (!this.parent?.changeToolMode(UIToolModes.ROOM)) return;
+            if (roomId) this.parent?.roomPanel?.select?.(roomId);
         });
     }
 
@@ -81660,7 +82255,34 @@ class WallBuildPanel extends CellDragBuildPanel {
     handleToolModeChanged(mode) {
         const active = mode === this.toolMode;
         super.handleToolModeChanged(mode);
-        if (!active) this.setContextRoom(null, { preserve: false });
+        if (active) this.renderOwnedOpenings();
+        if (!active) this.selectContextRoom(null);
+    }
+
+    renderOwnedOpenings() {
+        if (!this.openingGroup || !this.openingPalette) return;
+        const inventory = this.build?.inventory;
+        const openings = (inventory?.items ?? []).filter(item => {
+            const type = ItemRegistry.getItemSync(item.variant || item.name)?.world?.objectType;
+            return type === 'DOOR' || type === 'WINDOW';
+        });
+        this.openingGroup.hidden = openings.length === 0;
+        this.openingPalette.replaceChildren(...openings.map(item => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'panel-action wall-opening-choice';
+            button.textContent = `${item.name} ×${item.quantity}`;
+            button.title = 'Place this opening into a wall';
+            button.addEventListener('click', () => inventory.activateItemElement(item.element));
+            return button;
+        }));
+    }
+
+    handlePointerDown(event) {
+        if (this.parent.isTool(this.toolMode) && event.button === 0) {
+            this.selectContextRoom(this.pointerToCell(event));
+        }
+        super.handlePointerDown(event);
     }
 
     // Pre-flight of the same rules applyWallCellChanges enforces, so a blocked
@@ -81680,15 +82302,19 @@ class WallBuildPanel extends CellDragBuildPanel {
         return removing ? occupied : !occupied;
     }
 
-    commitCells(map, cells, operation = this.getOperation()) {
+    commitCells(map, cells, operation = this.getOperation(), gesture = null) {
         const builder = map?.wallBuilder;
         if (!builder || cells.length === 0) return false;
         const removing = operation === 'remove';
+        const template = operation === 'remove' ? null :
+            gesture?.wallTemplate || this.resolveExtensionTemplate(builder, gesture?.start, cells);
+        const faceTemplate = operation === 'remove' ? [] :
+            builder.sampleFaceOverrideTemplate(gesture?.start);
         const changes = cells
             .filter(cell => removing
                 ? builder.baseCells.has(`${cell.x},${cell.y}`)
                 : !builder.baseCells.has(`${cell.x},${cell.y}`))
-            .map(cell => ({ ...cell, data: removing ? null : {} }));
+            .map(cell => ({ ...cell, data: removing ? null : Utility.deepClone(template || {}) }));
         if (changes.length === 0) return false;
 
         let result;
@@ -81709,12 +82335,34 @@ class WallBuildPanel extends CellDragBuildPanel {
             return false;
         }
 
-        this.pushWallHistory(builder, result, removing);
+        const copiedOverrides = builder.createFaceOverrideCopies(
+            faceTemplate,
+            result.applied.filter(change => change.data !== null)
+        );
+        builder.addFaceOverrideCopies(copiedOverrides);
+
+        this.pushWallHistory(builder, result, removing, copiedOverrides);
         this.afterCommit(map);
         return true;
     }
 
-    pushWallHistory(builder, result, removing) {
+    resolveExtensionTemplate(builder, start, cells = []) {
+        if (!builder) return null;
+        const direct = start ? builder.sampleCellTemplate(start) : null;
+        if (direct) return direct;
+        const candidates = start ? [[-1, 0], [1, 0], [0, -1], [0, 1]] : [];
+        for (const [dx, dy] of candidates) {
+            const sampled = builder.sampleCellTemplate(start.x + dx, start.y + dy);
+            if (sampled) return sampled;
+        }
+        for (const cell of cells) {
+            const sampled = builder.sampleCellTemplate(cell);
+            if (sampled) return sampled;
+        }
+        return null;
+    }
+
+    pushWallHistory(builder, result, removing, copiedOverrides = []) {
         const label = `${removing ? 'Remove' : 'Place'} Wall (${result.applied.length} cell${result.applied.length === 1 ? '' : 's'})`;
         const forward = Utility.deepClone(result.applied);
         const backward = Utility.deepClone(result.inverse);
@@ -81723,8 +82371,14 @@ class WallBuildPanel extends CellDragBuildPanel {
         // and re-running the rules would refuse it whenever the world moved.
         this.pushHistory({
             label,
-            undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
-            redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
+            undo: () => {
+                builder.removeFaceOverrideCopies(copiedOverrides);
+                builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false });
+            },
+            redo: () => {
+                builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false });
+                builder.addFaceOverrideCopies(copiedOverrides);
+            }
         });
     }
 
@@ -81737,6 +82391,7 @@ class WallBuildPanel extends CellDragBuildPanel {
         if (!this.handleCell || this.handleCell.x !== cell.x || this.handleCell.y !== cell.y) return false;
         const run = this.resolveRun(cell);
         if (!run) return false;
+        const builder = this.gameMap?.wallBuilder;
         this.drag = {
             pointerId: event.pointerId,
             map: this.gameMap,
@@ -81744,6 +82399,7 @@ class WallBuildPanel extends CellDragBuildPanel {
             end: cell,
             operation: 'move',
             run,
+            wallTemplate: builder.sampleCellTemplate(cell),
             // Which of the two gestures this is has not been decided yet — see
             // resolveGrabbedGesture on the first move.
             undecided: true,
@@ -81781,7 +82437,6 @@ class WallBuildPanel extends CellDragBuildPanel {
      * outline the run instead: it says which wall the grip belongs to.
      */
     renderSpecialHover(cell, operation) {
-        this.setContextRoom(cell);
         const run = this.renderHandle(cell, operation);
         if (!run) return false;
         this.renderRunGhost(run.cells);
@@ -81793,20 +82448,19 @@ class WallBuildPanel extends CellDragBuildPanel {
         this.clearHandle();
     }
 
-    setContextRoom(cell, { preserve = true } = {}) {
+    selectContextRoom(cell) {
         const builder = this.gameMap?.wallBuilder;
         const wallCell = cell ? builder?.cells?.get(`${cell.x},${cell.y}`) : null;
         const roomId = wallCell
             ? builder.getCellSurfaces(wallCell).find(surface => surface.roomId)?.roomId ?? null
             : null;
-        if (!roomId && preserve) return false;
         this.contextRoomId = roomId;
         if (!this.roomFloorButton) return;
-        this.roomFloorButton.disabled = !roomId;
         const room = roomId ? this.gameMap?.regionManager?.get('room', roomId) : null;
-        this.roomFloorButton.textContent = room
-            ? `Edit ${room.properties?.displayName || room.id} floor`
-            : 'Edit room floor';
+        if (this.roomActions) this.roomActions.hidden = !room;
+        if (this.roomActionsTitle) {
+            this.roomActionsTitle.textContent = room?.properties?.displayName || room?.id || 'Selected room';
+        }
         return !!roomId;
     }
 
@@ -81914,7 +82568,7 @@ class WallBuildPanel extends CellDragBuildPanel {
      * @returns {{distance: number, additions: Array, removals: Array}}
      */
     getMovePlan() {
-        const empty = { distance: 0, additions: [], removals: [], moveX: 0, moveY: 0 };
+        const empty = { distance: 0, additions: [], removals: [], retainedShared: [], moveX: 0, moveY: 0 };
         const run = this.drag?.run;
         const builder = this.drag?.map?.wallBuilder;
         if (!run || !builder) return empty;
@@ -81939,6 +82593,17 @@ class WallBuildPanel extends CellDragBuildPanel {
             take(cell.x + (stepX * span), cell.y + (stepY * span), source);
         }
 
+        const retainedShared = [];
+        for (const cell of run.cells) {
+            if (!this.isSharedRoomBoundary(builder, cell)) continue;
+            const source = builder.baseCells.get(`${cell.x},${cell.y}`) ?? {};
+            take(cell.x, cell.y, source);
+            retainedShared.push({
+                source: { x: cell.x, y: cell.y },
+                target: { x: cell.x + (stepX * span), y: cell.y + (stepY * span) }
+            });
+        }
+
         for (const end of [run.cells[0], run.cells[run.cells.length - 1]]) {
             if (!this.endIsAnchored(builder, end, stepX, stepY)) continue;
             const source = builder.baseCells.get(`${end.x},${end.y}`) ?? {};
@@ -81953,7 +82618,14 @@ class WallBuildPanel extends CellDragBuildPanel {
             .map(cell => ({ x: cell.x, y: cell.y, data: null }));
         const additions = [...keep.values()]
             .filter(cell => !builder.baseCells.has(`${cell.x},${cell.y}`));
-        return { distance, additions, removals, moveX: stepX * span, moveY: stepY * span };
+        return { distance, additions, removals, retainedShared, moveX: stepX * span, moveY: stepY * span };
+    }
+
+    isSharedRoomBoundary(builder, cell) {
+        const raw = builder?.cells?.get(`${cell.x},${cell.y}`);
+        if (!raw) return false;
+        const faces = builder.assignFaces(raw);
+        return new Set(Object.values(faces).map(face => face.roomId).filter(Boolean)).size > 1;
     }
 
     /**
@@ -81988,6 +82660,7 @@ class WallBuildPanel extends CellDragBuildPanel {
             const { x, y } = queue[index];
             const key = `${x},${y}`;
             if (gone.has(key) || arriving.has(key) || !builder.baseCells.has(key)) continue;
+            if (this.isSharedRoomBoundary(builder, { x, y })) continue;
             if (this.checkCell({ x, y }, 'remove').allowed !== true) continue;
             if (connections(x, y) > 1) continue;            // held up by something
             gone.add(key);
@@ -82087,16 +82760,26 @@ class WallBuildPanel extends CellDragBuildPanel {
             return false;
         }
 
+        const sharedOverrideCopies = (plan.retainedShared ?? []).flatMap(({ source, target }) =>
+            builder.createFaceOverrideCopies(builder.sampleFaceOverrideTemplate(source), [target]));
+        builder.addFaceOverrideCopies(sharedOverrideCopies);
+
         const forward = Utility.deepClone(result.applied);
         const backward = Utility.deepClone(result.inverse);
         const back = WallBuilder.invertContentMove(contentMove);
         const size = Math.abs(plan.distance);
         this.pushHistory({
             label: `Move Wall (${size} cell${size === 1 ? '' : 's'})`,
-            undo: () => builder.applyWallCellChanges(Utility.deepClone(backward),
-                { validate: false, contentMove: back }),
-            redo: () => builder.applyWallCellChanges(Utility.deepClone(forward),
-                { validate: false, contentMove })
+            undo: () => {
+                builder.removeFaceOverrideCopies(sharedOverrideCopies);
+                builder.applyWallCellChanges(Utility.deepClone(backward),
+                    { validate: false, contentMove: back });
+            },
+            redo: () => {
+                builder.applyWallCellChanges(Utility.deepClone(forward),
+                    { validate: false, contentMove });
+                builder.addFaceOverrideCopies(sharedOverrideCopies);
+            }
         });
         this.playSound(SiteConfig.buildMode.sounds.objectPlace);
         this.afterCommit(map);
@@ -82142,6 +82825,8 @@ class FenceBuildPanel extends CellDragBuildPanel {
             this.modalElement?.querySelector('.fence-build-variant-segment') || null,
             { value: FenceBuilder.DEFAULT_VARIANT }
         );
+        this.gateGroup = this.modalElement?.querySelector('.fence-build-gates') || null;
+        this.gatePalette = this.modalElement?.querySelector('.fence-gate-palette') || null;
     }
 
     get variant() {
@@ -82150,6 +82835,28 @@ class FenceBuildPanel extends CellDragBuildPanel {
 
     getBuilder() {
         return this.gameMap?.fenceBuilder || null;
+    }
+
+    handleToolModeChanged(mode) {
+        super.handleToolModeChanged(mode);
+        if (mode === this.toolMode) this.renderOwnedGates();
+    }
+
+    renderOwnedGates() {
+        if (!this.gateGroup || !this.gatePalette) return;
+        const inventory = this.build?.inventory;
+        const gates = (inventory?.items ?? []).filter(item =>
+            ItemRegistry.getItemSync(item.variant || item.name)?.world?.objectType === FenceBuilder.GATE_TYPE);
+        this.gateGroup.hidden = gates.length === 0;
+        this.gatePalette.replaceChildren(...gates.map(item => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'panel-action fence-gate-choice';
+            button.textContent = `${item.name} ×${item.quantity}`;
+            button.title = 'Place this gate into a fence';
+            button.addEventListener('click', () => inventory.activateItemElement(item.element));
+            return button;
+        }));
     }
 
     // Alt-click samples the fence under the cursor rather than starting a drag —

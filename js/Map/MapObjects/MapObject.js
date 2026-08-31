@@ -1157,8 +1157,17 @@ class MapObject {
 		this.input.initClickComponent();
 	}
 
-	handleSingleClick() {
+	handleSingleClick(event = null) {
 		if (!this.active) return;
+		const ui = this.parent?.ui;
+		if (this.parent?.gameMode?.isBuild?.() && ui?.isTool?.(UIToolModes.MOVE) &&
+			event?.originalEvent?.shiftKey === true) {
+			const selected = ui.selectionManager?.getSelectedObjects?.() ?? [];
+			ui.selectionManager?.setSelection?.(
+				selected.includes(this) ? selected.filter(object => object !== this) : [...selected, this]
+			);
+			return;
+		}
 		this.selectInUi();
 	}
 

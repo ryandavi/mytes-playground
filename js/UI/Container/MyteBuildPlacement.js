@@ -7,7 +7,7 @@
  * out of the way, come back" is three steps to solve a problem the Move tool
  * already solves for every couch in the house.
  *
- * So: in Build mode, with the Move tool, a myte drags like furniture. The rule
+ * So: in Build mode, with the Select tool, a myte drags like furniture. The rule
  * for what actually moves is the one people already hold in their heads —
  *
  *   asleep in its slot    the slot moves, and the myte goes with it, because

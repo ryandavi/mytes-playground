@@ -1124,6 +1124,14 @@ body[data-build-cursor="refused"] .app-stage {
     }
 }
 
+.panel-action-row,
+.wall-opening-palette,
+.fence-gate-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+
 
 // Two lines, because one was a lie: name, type and size on a single row left
 // the name three characters wide and the type reading "Unas".

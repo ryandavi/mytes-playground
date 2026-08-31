@@ -316,6 +316,9 @@
     "src": "js/Map/Regions/RoomEnclosureDetector.js"
   },
   {
+    "src": "js/Map/Regions/BuildingTopology.js"
+  },
+  {
     "src": "js/Map/Surfaces/FinishPalette.js"
   },
   {

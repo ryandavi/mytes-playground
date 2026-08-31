@@ -55,6 +55,7 @@ class Camera {
 		this._lastDragClientY = 0;
 		this._wheelGesture = null;
 		this._touchGesture = null;
+		this._spacePanActive = false;
 		this._originalTouchAction = this.canvas.style.touchAction;
 
 		// Camera shake (purely visual — does not affect posX/posY)
@@ -74,6 +75,9 @@ class Camera {
 		this._boundTouchStart = this.startTouchGesture.bind(this);
 		this._boundTouchMove = this.moveTouchGesture.bind(this);
 		this._boundTouchEnd = this.endTouchGesture.bind(this);
+		this._boundPanKeyDown = this.handlePanKeyDown.bind(this);
+		this._boundPanKeyUp = this.handlePanKeyUp.bind(this);
+		this._boundPanBlur = this.handlePanBlur.bind(this);
 		this._boundTemporaryCursorMove = this._handleTemporaryCursorMove.bind(this);
 		this.debouncedResetView = Utility.debounce(() => this.resetView(), 250);
 
@@ -88,6 +92,9 @@ class Camera {
 		document.addEventListener('touchmove', this._boundTouchMove, { passive: false });
 		document.addEventListener('touchend', this._boundTouchEnd, { passive: false });
 		document.addEventListener('touchcancel', this._boundTouchEnd, { passive: false });
+		document.addEventListener('keydown', this._boundPanKeyDown);
+		document.addEventListener('keyup', this._boundPanKeyUp);
+		window.addEventListener('blur', this._boundPanBlur);
 		this.canvas.style.touchAction = 'none';
 		window.addEventListener('resize', this.debouncedResetView);
 	}
@@ -707,14 +714,40 @@ class Camera {
 		if (event.cancelable) event.preventDefault();
 	}
 
+	cancelTouchPanForSelection() {
+		this.endDrag();
+		this._touchGesture = null;
+	}
+
 	// ========== DRAG ==========
+
+	handlePanKeyDown(event) {
+		if (event.code !== 'Space' || event.repeat || this.isTypingTarget(event.target)) return;
+		this._spacePanActive = true;
+		if (this.parent?.gameMode?.isBuild?.()) event.preventDefault();
+	}
+
+	handlePanKeyUp(event) {
+		if (event.code !== 'Space') return;
+		this._spacePanActive = false;
+	}
+
+	handlePanBlur() {
+		this._spacePanActive = false;
+	}
+
+	isTypingTarget(target) {
+		return target instanceof Element && !!target.closest('input, textarea, select, [contenteditable="true"]');
+	}
 
 	startDrag(e) {
 		if (this.followMode !== CAMERA_FOLLOW_MODES.DRAG_TO_PAN) return;
+		const explicitPan = e.button === 1 || (e.button === 0 && this._spacePanActive);
+		if (e.button !== 0 && e.button !== 1) return;
 		// Walls and Paint drive their own left-button drag over the map, so the
 		// camera stays out of the way rather than hauling the view along behind
 		// a run of wall.
-		if (this.parent?.ui?.toolManager?.claimsMapDrag?.() === true) return;
+		if (!explicitPan && this.parent?.ui?.toolManager?.claimsMapDrag?.() === true) return;
 		this._clearZoomAnchor();
 		this.isDragging = true;
 		this.dragStartX = e.clientX;
@@ -1401,6 +1434,9 @@ class Camera {
 		document.removeEventListener('touchmove', this._boundTouchMove);
 		document.removeEventListener('touchend', this._boundTouchEnd);
 		document.removeEventListener('touchcancel', this._boundTouchEnd);
+		document.removeEventListener('keydown', this._boundPanKeyDown);
+		document.removeEventListener('keyup', this._boundPanKeyUp);
+		window.removeEventListener('blur', this._boundPanBlur);
 		this.canvas.style.touchAction = this._originalTouchAction;
 		window.removeEventListener('resize', this.debouncedResetView);
 

@@ -80,7 +80,7 @@ class CellDragBuildPanel extends ModalWindow {
     cellWouldChange(_map, _cell, _removing) { return true; }
 
     // Keep the run. Returns truthy on a change that happened.
-    commitCells(_map, _cells, _operation) { return false; }
+    commitCells(_map, _cells, _operation, _gesture = null) { return false; }
 
     // Extra gestures a single tool layers on top of the plain drag. Each
     // returns true to say "I have taken this event, stop here".
@@ -199,8 +199,9 @@ class CellDragBuildPanel extends ModalWindow {
         const cells = this.getDragCells();
         const map = this.drag.map;
         const operation = this.drag.operation;
+        const gesture = this.drag;
         this.cancelDrag();
-        this.commitCells(map, cells, operation);
+        this.commitCells(map, cells, operation, gesture);
     }
 
     getDragCells() {

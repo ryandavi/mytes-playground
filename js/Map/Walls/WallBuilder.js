@@ -703,6 +703,23 @@ class WallBuilder {
         return 'south';
     }
 
+    /**
+     * The horizontal surface the camera presents to the player.
+     *
+     * The near edge of a room exposes its outside even though the room sits on
+     * the north side of that masonry. That visible band is therefore exterior,
+     * not an interior face borrowing the room's finish. The far edge presents
+     * the room on its south side and remains its interior wall.
+     */
+    resolveVisibleBandSurface(cell, face = this.resolveBandFace(cell)) {
+        const northRoomId = cell.faces?.north?.roomId ?? null;
+        const southRoomId = cell.faces?.south?.roomId ?? null;
+        if (face === 'north' && northRoomId && !southRoomId) {
+            return { face, roomId: null };
+        }
+        return { face, roomId: cell.faces?.[face]?.roomId ?? null };
+    }
+
     resolveBandFinishId(cell) {
         return this.resolveFaceFinishId(cell, this.resolveBandFace(cell));
     }
@@ -756,13 +773,13 @@ class WallBuilder {
         // a post stands between it and the cell straight across.
         const band = (from, to, side) => {
             const resolved = this.resolveBandSurface(cell, side);
-            if (!resolved) return faceSpan(from, to, this.resolveBandFace(cell), 'horizontal');
+            const visible = resolved || this.resolveVisibleBandSurface(cell);
             return {
                 from, to,
                 axis: 'horizontal',
-                face: resolved.face,
-                roomId: resolved.roomId,
-                finishId: this.resolveSurfaceFinishId(cell, resolved.face, resolved.roomId)
+                face: visible.face,
+                roomId: visible.roomId,
+                finishId: this.resolveSurfaceFinishId(cell, visible.face, visible.roomId)
             };
         };
 
@@ -826,7 +843,9 @@ class WallBuilder {
         const takesNorth = !!north && (!south || (north !== south &&
             north.areaInCells(this.cellSize) < south.areaInCells(this.cellSize)));
         const room = takesNorth ? north : south;
-        return { face: takesNorth ? 'north' : 'south', roomId: room?.id || null };
+        const face = takesNorth ? 'north' : 'south';
+        if (face === 'north' && north && !south) return { face, roomId: null };
+        return { face, roomId: room?.id || null };
     }
 
     // The room across a band, stepping past the post when the cell straight
@@ -838,24 +857,9 @@ class WallBuilder {
         return dx === 0 ? null : this.roomAtOpenCell(cell.x + dx, y);
     }
 
-    /**
-     * Which face a surface actually belongs to.
-     *
-     * A face with no room behind it is the outside of somebody's wall, and
-     * nobody can paint it on its own — so it follows the room on the other side
-     * of the same masonry instead of sitting bare. The outside of a building
-     * corner is the same wall as the inside of it, and treating it as unowned
-     * left a bald half-tile on every corner of the house, on a wall that had
-     * just been painted.
-     *
-     * This is the rule resolveBandFace already applies to a head-on band that
-     * looks out of the building; a post is the same wall seen edge-on and wants
-     * the same answer.
-     */
+    /** A column keeps its literal side so interior and exterior paint stay separate. */
     resolveOwningFace(cell, face) {
-        const opposite = WallBuilder.OPPOSITE_FACES[face];
-        if (!opposite || cell.faces?.[face]?.roomId || !cell.faces?.[opposite]?.roomId) return face;
-        return opposite;
+        return face;
     }
 
     /**
@@ -938,20 +942,11 @@ class WallBuilder {
         return pieces;
     }
 
-    /**
-     * Whether this piece shows anything the player can paint.
-     *
-     * Asked of the surfaces themselves, because that is the only honest answer.
-     * A north-south run used to be refused on the grounds that it presents no
-     * face to the camera — true of the old single-finish wall, and false since
-     * a post started drawing two half-cell surfaces, west and east, one per
-     * room beside it. Those are visibly painted surfaces the tool would not let
-     * anyone select, so a room's side walls could never be painted at all: they
-     * stayed plaster while every wall around them took the colour, which is the
-     * gap running down both edges of a room.
-     */
+    /** Whether this piece presents a horizontal paint face to the camera. */
     isPaintable(piece) {
-        return (piece?.cells ?? []).some(cell => this.getCellSurfaces(cell).length > 0);
+        return (piece?.cells ?? []).some(cell =>
+            this.getCellSurfaces(cell).some(surface => surface.axis === 'horizontal')
+        );
     }
 
     /**
@@ -1010,7 +1005,9 @@ class WallBuilder {
         const cell = piece.cells[index];
         if (!cell) return null;
         const local = offsetX - (index * construction.cellSize);
-        const covering = this.getCellSurfaces(cell).filter(surface => local >= surface.from && local < surface.to);
+        const covering = this.getCellSurfaces(cell).filter(surface =>
+            surface.axis === 'horizontal' && local >= surface.from && local < surface.to
+        );
         return covering[covering.length - 1] || null;
     }
 
@@ -2724,7 +2721,9 @@ class WallBuilder {
             // Which room this paint was applied to. See resolveFinishOverride:
             // it is what stops the paint following the masonry into a room that
             // was walled off later and never chose this colour.
-            roomId: record.roomId ?? this.getFaceRoomIdAt(record.cells.from[0], record.cells.from[1], record.face)
+            roomId: record.roomId !== undefined
+                ? record.roomId
+                : this.getFaceRoomIdAt(record.cells.from[0], record.cells.from[1], record.face)
         });
         this.rebuild();
         return true;
@@ -2749,6 +2748,63 @@ class WallBuilder {
         if (options.emit !== false) {
             this.gameMap.eventManager?.emit(EVENTS.WALL_GEOMETRY_CHANGED, { mapId: this.gameMap.id, x, y, builder: this });
         }
+    }
+
+    /** Canonical structural template used when a build gesture continues a wall. */
+    sampleCellTemplate(cellOrX, y = null) {
+        const cell = typeof cellOrX === 'object'
+            ? this.baseCells.get(`${cellOrX.x},${cellOrX.y}`)
+            : this.baseCells.get(`${cellOrX},${y}`);
+        if (!cell) return null;
+        return Utility.deepClone({
+            constructionId: cell.constructionId,
+            finishId: cell.finishId,
+            heightCells: cell.heightCells,
+            connectGroup: cell.connectGroup
+        });
+    }
+
+    sampleFaceOverrideTemplate(cellOrX, y = null) {
+        const x = typeof cellOrX === 'object' ? cellOrX.x : cellOrX;
+        const cellY = typeof cellOrX === 'object' ? cellOrX.y : y;
+        if (!Number.isInteger(x) || !Number.isInteger(cellY)) return [];
+        return this.faceOverrides.filter(record => {
+            const from = record.cells?.from;
+            const to = record.cells?.to;
+            if (!from || !to) return false;
+            return x >= Math.min(from[0], to[0]) && x <= Math.max(from[0], to[0]) &&
+                cellY >= Math.min(from[1], to[1]) && cellY <= Math.max(from[1], to[1]);
+        }).map(record => ({
+            face: record.face,
+            finishId: record.finishId,
+            roomId: record.roomId,
+            axis: record.axis
+        }));
+    }
+
+    createFaceOverrideCopies(template, cells) {
+        return cells.flatMap(cell => template.map(record => ({
+            ...Utility.deepClone(record),
+            mapId: this.gameMap.id,
+            cells: { from: [cell.x, cell.y], to: [cell.x, cell.y] }
+        })));
+    }
+
+    addFaceOverrideCopies(records) {
+        if (!records?.length) return false;
+        this.faceOverrides.push(...records);
+        this.rebuild();
+        return true;
+    }
+
+    removeFaceOverrideCopies(records) {
+        if (!records?.length) return false;
+        const remove = new Set(records);
+        const before = this.faceOverrides.length;
+        this.faceOverrides = this.faceOverrides.filter(record => !remove.has(record));
+        if (this.faceOverrides.length === before) return false;
+        this.rebuild();
+        return true;
     }
 
     /**

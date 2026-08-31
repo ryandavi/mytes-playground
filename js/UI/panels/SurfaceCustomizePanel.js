@@ -25,13 +25,19 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.init();
         this.paletteElement = this.modalElement?.querySelector('.surface-palette');
         this.scopeElement = this.modalElement?.querySelector('.surface-scope');
+        this.scopeTitle = this.modalElement?.querySelector('.surface-scope-title');
         this.emptyElement = this.modalElement?.querySelector('.surface-customize-empty');
         this.finishGroup = this.modalElement?.querySelector('.surface-finish-group');
+        this.finishTitle = this.modalElement?.querySelector('.surface-finish-title');
         this.targetElement = this.modalElement?.querySelector('.surface-target');
         this.targetRoomElement = this.modalElement?.querySelector('.surface-target__room');
         this.targetSurfaceElement = this.modalElement?.querySelector('.surface-target__surface');
         this.targetRoomLink = this.modalElement?.querySelector('.surface-target__room-link');
         this.targetRoomLink?.addEventListener('click', () => this.openTargetRoom());
+        this.targetSampleButton = this.modalElement?.querySelector('.surface-target__sample');
+        this.targetSampleButton?.addEventListener('click', () => {
+            if (this.target) this.holdFinish(this.getCurrentFinishId(), this.target.surface);
+        });
         // What the eyedropper is holding, if anything: { finishId, surface }.
         this.held = null;
         this.heldGroup = this.modalElement?.querySelector('.surface-held-group');
@@ -41,7 +47,10 @@ class SurfaceCustomizePanel extends ModalWindow {
             ?.addEventListener('click', () => this.dropFinish());
         this.scope = new SegmentControl(this.scopeElement, {
             value: 'stretch',
-            onChange: () => this.renderPalette()
+            onChange: () => {
+                this.redrawOverlays();
+                this.renderPalette();
+            }
         });
         this.paletteElement?.addEventListener('pointerleave', () => this.revertPreview());
         this.boundStagePointerLeave = () => {
@@ -156,7 +165,7 @@ class SurfaceCustomizePanel extends ModalWindow {
      */
     createWallOverlay(surface, className) {
         const builder = this.gameMap?.wallBuilder;
-        const rects = builder?.getSurfaceRects(builder.getPaintStretchSurfaces(surface)) || [];
+        const rects = builder?.getSurfaceRects(this.resolveWallScopeSurfaces(surface)) || [];
         return rects.map(rect => {
             const element = document.createElement('div');
             element.className = `surface-paint-overlay ${className}`;
@@ -303,7 +312,9 @@ class SurfaceCustomizePanel extends ModalWindow {
             const builder = this.gameMap?.wallBuilder;
             let wallSurface = null;
             for (const cell of builder?.cells?.values?.() ?? []) {
-                wallSurface = builder.getCellSurfaces(cell).find(entry => entry.roomId === roomId);
+                wallSurface = builder.getCellSurfaces(cell).find(entry =>
+                    entry.axis === 'horizontal' && entry.roomId === roomId
+                );
                 if (wallSurface) break;
             }
             if (!wallSurface) {
@@ -521,9 +532,10 @@ class SurfaceCustomizePanel extends ModalWindow {
         if (this.targetRoomLink) {
             this.targetRoomLink.hidden = !targetRoom;
             if (targetRoom) {
-                this.targetRoomLink.setAttribute('aria-label', `Open ${this.roomName(targetRoom)} in the Rooms panel`);
+                this.targetRoomLink.setAttribute('aria-label', `Open ${this.roomName(targetRoom)} in Room Areas`);
             }
         }
+        if (this.targetSampleButton) this.targetSampleButton.hidden = !this.target || !this.getCurrentFinishId();
         this.targetElement?.classList.toggle('is-locked', locked);
         // Nothing picked yet is a placeholder, not a readout — it should not
         // shout the way a real target name does.
@@ -546,6 +558,41 @@ class SurfaceCustomizePanel extends ModalWindow {
         return this.scope?.value || 'stretch';
     }
 
+    getOpenSpaceRooms(surface = this.target?.wallSurface) {
+        const room = surface?.roomId
+            ? this.gameMap?.regionManager?.get('room', surface.roomId)
+            : null;
+        const openSpaceId = room?.properties?.openSpaceId;
+        if (!openSpaceId) return room ? [room] : [];
+        return (this.gameMap?.regionManager?.all('room') || []).filter(entry =>
+            entry.properties?.openSpaceId === openSpaceId
+        );
+    }
+
+    resolveWallScopeSurfaces(surface = this.target?.wallSurface, scope = this.getWallScope()) {
+        const builder = this.gameMap?.wallBuilder;
+        if (!builder || !surface) return [];
+        if (scope === 'room' && surface.roomId) {
+            return [...builder.cells.values()].flatMap(cell =>
+                builder.getCellSurfaces(cell).filter(entry => entry.roomId === surface.roomId));
+        }
+        if (scope === 'space' && surface.roomId) {
+            const roomIds = new Set(this.getOpenSpaceRooms(surface).map(room => room.id));
+            return [...builder.cells.values()].flatMap(cell =>
+                builder.getCellSurfaces(cell).filter(entry => roomIds.has(entry.roomId)));
+        }
+        if (scope === 'exterior' && !surface.roomId) {
+            const topology = this.gameMap?.buildingTopology;
+            const component = topology?.getComponentAtWallFace(surface.cell);
+            const loopId = topology?.getExteriorLoopAtSurface(surface);
+            return component && loopId !== null
+                ? topology.getExteriorSurfaces(component.id).filter(entry =>
+                    this.rules?.canPaintWallFace(entry.cell).allowed !== false)
+                : [];
+        }
+        return builder.getPaintStretchSurfaces(surface);
+    }
+
     buildRequests(finishId, scopeOverride = null) {
         if (!this.target) return [];
         if (this.target.surface === 'floor') {
@@ -555,7 +602,27 @@ class SurfaceCustomizePanel extends ModalWindow {
         const builder = this.gameMap.wallBuilder;
         const surface = this.target.wallSurface;
 
-        if ((scopeOverride || this.getWallScope()) !== 'room') {
+        const scope = scopeOverride || this.getWallScope();
+        if (scope === 'exterior') {
+            return this.resolveWallScopeSurfaces(surface, scope).map(entry => ({
+                surface: 'wall',
+                face: entry.face,
+                axis: entry.axis,
+                cells: { from: [entry.cell.x, entry.cell.y], to: [entry.cell.x, entry.cell.y] },
+                roomId: null,
+                finishId
+            }));
+        }
+
+        if (scope === 'space') {
+            return this.getOpenSpaceRooms(surface).map(room => ({
+                surface: 'wall',
+                roomId: room.id,
+                finishId
+            }));
+        }
+
+        if (scope !== 'room') {
             // Exactly the surfaces the overlay outlined: same call, same room
             // test, same stopping rule. Deriving the painted set separately
             // from the previewed one is what let a click outline one wall and
@@ -563,6 +630,7 @@ class SurfaceCustomizePanel extends ModalWindow {
             return builder.getPaintStretchSurfaces(surface).map(entry => ({
                 surface: 'wall',
                 face: entry.face,
+                axis: entry.axis,
                 cells: { from: [entry.cell.x, entry.cell.y], to: [entry.cell.x, entry.cell.y] },
                 roomId: entry.roomId,
                 finishId
@@ -583,12 +651,18 @@ class SurfaceCustomizePanel extends ModalWindow {
         this.revertPreview();
         this.paletteElement.replaceChildren();
         this.renderTarget();
-        this.scopeElement.hidden = this.target?.surface !== 'wall';
+        const scopeHidden = this.target?.surface !== 'wall';
+        this.scopeElement.hidden = scopeHidden;
+        if (this.scopeTitle) this.scopeTitle.hidden = scopeHidden;
+        this.renderScopeChoices();
         this.emptyElement.hidden = !!this.target;
         // An empty Finish heading over an empty box reads as something that
         // failed to load. With nothing picked there is no finish to choose, so
         // the whole group stands down and the panel is just its prompt.
         if (this.finishGroup) this.finishGroup.hidden = !this.target;
+        if (this.finishTitle && this.target) {
+            this.finishTitle.textContent = this.target.surface === 'floor' ? 'Floor finish' : 'Wall finish';
+        }
         if (!this.target) return;
 
         const verdict = this.checkTarget();
@@ -651,6 +725,26 @@ class SurfaceCustomizePanel extends ModalWindow {
             button.addEventListener('dblclick', () => this.applyFinish(finish.id || null, 'room'));
             this.paletteElement.appendChild(button);
         }
+    }
+
+    renderScopeChoices() {
+        if (!this.scopeElement) return;
+        const wall = this.target?.surface === 'wall' ? this.target.wallSurface : null;
+        const roomButton = this.scopeElement.querySelector('[data-value="room"]');
+        const spaceButton = this.scopeElement.querySelector('[data-value="space"]');
+        const exteriorButton = this.scopeElement.querySelector('[data-value="exterior"]');
+        const topology = this.gameMap?.buildingTopology;
+        const openSpaceRooms = wall?.roomId ? this.getOpenSpaceRooms(wall) : [];
+        const spaceAvailable = openSpaceRooms.length > 1;
+        const exteriorAvailable = !!wall && !wall.roomId &&
+            !!topology?.getComponentAtWallFace(wall.cell) &&
+            topology.getExteriorLoopAtSurface(wall) !== null;
+        if (roomButton) roomButton.hidden = !wall?.roomId;
+        if (spaceButton) spaceButton.hidden = !spaceAvailable;
+        if (exteriorButton) exteriorButton.hidden = !exteriorAvailable;
+        const allowed = wall?.roomId ? ['stretch', 'room', ...(spaceAvailable ? ['space'] : [])] :
+            exteriorAvailable ? ['stretch', 'exterior'] : ['stretch'];
+        if (!allowed.includes(this.getWallScope())) this.scope?.select?.('stretch');
     }
 
     /**

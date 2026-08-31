@@ -76,6 +76,7 @@ class RoomEnclosureDetector {
         }
 
         const authoredRooms = regionManager.all('room').filter(room => room.properties?.autoDetected !== true);
+        const existingAutoRooms = regionManager.all('room').filter(room => room.properties?.autoDetected === true);
         const minArea = Math.max(1, Number(SiteConfig.rooms?.minAreaCells) || 1);
         const cellSize = Number(grid.config?.cellSize) || 32;
 
@@ -88,7 +89,7 @@ class RoomEnclosureDetector {
         // which is what keeps this from becoming a map you have to colour in
         // before it works.
         const claims = this.claimComponents(enclosed, authoredRooms, cellSize);
-        const owners = this.assignByEnclosure(enclosed, claims, cellSize);
+        const owners = this.assignByEnclosure(enclosed, claims, cellSize, existingAutoRooms);
         // Read before anything is re-shaped: a painted room inherits from
         // whatever its cells belonged to a moment ago, and re-cutting the rooms
         // first would leave it inheriting from nobody.
@@ -137,7 +138,14 @@ class RoomEnclosureDetector {
                 authored.bounds = authored.shape.bounds;
                 continue;
             }
-            const parent = painted.get(roomId) ?? this.roomDividedBy(cells, cellSize);
+            // A matched automatic room keeps more than its id. It carries the
+            // finish, name and room type the player chose before this topology
+            // pass removed and recreated it. Falling straight through to the
+            // spatial parent kept the id but silently reset those properties
+            // whenever a wall was extended or another divider was added.
+            const parent = painted.get(roomId) ??
+                existingAutoRooms.find(room => room.id === roomId) ??
+                this.roomDividedBy(cells, cellSize);
             const number = added.length + 1;
             // Nothing enclosing any of it: an outdoor room. It is still a room
             // — it has a floor, a name, a type, and a place in the list — but
@@ -152,10 +160,11 @@ class RoomEnclosureDetector {
                 layer: 'room',
                 shape,
                 properties: {
+                    ...Utility.deepClone(parent?.properties ?? {}),
                     // A placeholder until the player names it; numbered so two
                     // new rooms are at least tellable apart.
-                    displayName: placeholder,
-                    authoredDisplayName: placeholder,
+                    displayName: parent?.properties?.displayName ?? placeholder,
+                    authoredDisplayName: parent?.properties?.authoredDisplayName ?? placeholder,
                     indoor,
                     autoDetected: true,
                     // Dividing a room does not redecorate it. A new room with no
@@ -312,16 +321,35 @@ class RoomEnclosureDetector {
      * and a cell inside none of them goes to the nearest, so an open-plan space
      * is covered completely however the rectangles were drawn.
      */
-    assignByEnclosure(components, claims, cellSize) {
+    assignByEnclosure(components, claims, cellSize, existingAutoRooms = []) {
         const owners = new Map();
-        let unclaimed = 0;
+        const usedIds = new Set();
+        const takenIds = new Set((this.gameMap?.regionManager?.all('room') ?? []).map(room => room.id));
+        const mintId = () => {
+            for (let number = 1; ; number += 1) {
+                const id = `room_auto_${number}`;
+                if (!takenIds.has(id) && !usedIds.has(id)) return id;
+            }
+        };
         for (const component of components) {
             const rooms = claims.get(component);
             if (!rooms) {
-                // Nobody's room yet — a space the player has just enclosed. It
-                // gets an id here so the pass that materialises rooms treats it
-                // exactly like every other one.
-                const id = `room_auto_${++unclaimed}`;
+                // Preserve the identity of the prior automatic room with the
+                // greatest overlap. A split keeps the old id on its dominant
+                // half; a merge keeps the dominant room. This is also what
+                // preserves names, finishes and lighting across a wall move.
+                const keys = new Set(component.map(([x, y]) => `${x},${y}`));
+                const match = existingAutoRooms
+                    .filter(room => !usedIds.has(room.id))
+                    .map(room => ({
+                        room,
+                        overlap: [...(room.shape?.cells ?? [])].reduce(
+                            (count, key) => count + (keys.has(key) ? 1 : 0), 0)
+                    }))
+                    .filter(entry => entry.overlap > 0)
+                    .sort((left, right) => right.overlap - left.overlap || left.room.id.localeCompare(right.room.id))[0];
+                const id = match?.room?.id ?? mintId();
+                usedIds.add(id);
                 for (const [cellX, cellY] of component) owners.set(`${cellX},${cellY}`, id);
                 continue;
             }
