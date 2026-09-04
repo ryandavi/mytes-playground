@@ -55,10 +55,21 @@ class WallGeometry {
         return (a.connectGroup ?? 'wall') === (b.connectGroup ?? 'wall');
     }
 
+    /**
+     * The fences a wall cell puts between its own four blocks.
+     *
+     * A cell fences the axis it runs along, so a floor either side stops on the
+     * centreline instead of leaking through. An END CAP — a lone post, or the
+     * last cell of a run, with at most one connection — fences BOTH axes: the
+     * wall stops there, and without the second fence a floor flows into the cap
+     * cell lengthwise from the room beyond the end, fills it, and shows past
+     * the rounded art as a part-tile hanging off the end of the wall.
+     */
     static fencesForMask(mask) {
+        const cap = WallGeometry.connectionCount(mask) <= 1;
         return Object.freeze({
-            horizontal: mask === 0 || (mask & WallGeometry.MASK_HORIZONTAL) !== 0,
-            vertical: mask === 0 || (mask & WallGeometry.MASK_VERTICAL) !== 0
+            horizontal: cap || (mask & WallGeometry.MASK_HORIZONTAL) !== 0,
+            vertical: cap || (mask & WallGeometry.MASK_VERTICAL) !== 0
         });
     }
 

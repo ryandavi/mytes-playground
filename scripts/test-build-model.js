@@ -278,17 +278,11 @@ function runPropertyCases(core) {
         });
         assertEqual(first.owner, reversed.owner, `property case ${run} is input-order independent`);
         assertEqual(first.owner, core.FloorOwnershipResolver.solve(input).owner, `property case ${run} is repeatable`);
-        // A seed cell gives up its outer blocks where it borders open ground
-        // (insetOpenBoundaries), so the invariant is no longer "all four
-        // blocks": a seed keeps at least one block, and no block of a seed cell
-        // is ever handed to a different plan.
         for (const plan of plans) for (const key of plan.seedCells) {
             const { x, y } = core.BuildKeys.parseCell(key);
-            const owners = core.BuildKeys.blocksOfCell(x, y).map(([bx, by]) => first.ownerAt(bx, by));
-            assertEqual(owners.some(owner => owner === plan.id), true,
-                `property case ${run} keeps seed ${key}`);
-            assertEqual(owners.every(owner => owner === plan.id || owner === null), true,
-                `property case ${run} never yields seed ${key} to another plan`);
+            for (const [bx, by] of core.BuildKeys.blocksOfCell(x, y)) {
+                assertEqual(first.ownerAt(bx, by), plan.id, `property case ${run} preserves seed ${key}`);
+            }
         }
         const repeatedGeometry = core.WallGeometry.compute(geometry.cells, run);
         assertEqual([...geometry.masks], [...repeatedGeometry.masks], `property case ${run} geometry is idempotent`);

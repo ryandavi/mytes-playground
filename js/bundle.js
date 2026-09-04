@@ -39200,10 +39200,21 @@ class WallGeometry {
         return (a.connectGroup ?? 'wall') === (b.connectGroup ?? 'wall');
     }
 
+    /**
+     * The fences a wall cell puts between its own four blocks.
+     *
+     * A cell fences the axis it runs along, so a floor either side stops on the
+     * centreline instead of leaking through. An END CAP — a lone post, or the
+     * last cell of a run, with at most one connection — fences BOTH axes: the
+     * wall stops there, and without the second fence a floor flows into the cap
+     * cell lengthwise from the room beyond the end, fills it, and shows past
+     * the rounded art as a part-tile hanging off the end of the wall.
+     */
     static fencesForMask(mask) {
+        const cap = WallGeometry.connectionCount(mask) <= 1;
         return Object.freeze({
-            horizontal: mask === 0 || (mask & WallGeometry.MASK_HORIZONTAL) !== 0,
-            vertical: mask === 0 || (mask & WallGeometry.MASK_VERTICAL) !== 0
+            horizontal: cap || (mask & WallGeometry.MASK_HORIZONTAL) !== 0,
+            vertical: cap || (mask & WallGeometry.MASK_VERTICAL) !== 0
         });
     }
 
@@ -44414,15 +44425,6 @@ class FloorOwnershipResolver {
         Object.freeze({ dx: 1, dy: 1, straight: false })
     ]);
 
-    // Which two blocks of a cell each side owns, and the axis the plan has to
-    // continue along before that side may be pulled in.
-    static SIDES = Object.freeze([
-        Object.freeze({ dx: -1, dy: 0, axis: 'x', blocks: Object.freeze([[0, 0], [0, 1]]) }),
-        Object.freeze({ dx: 1, dy: 0, axis: 'x', blocks: Object.freeze([[1, 0], [1, 1]]) }),
-        Object.freeze({ dx: 0, dy: -1, axis: 'y', blocks: Object.freeze([[0, 0], [1, 0]]) }),
-        Object.freeze({ dx: 0, dy: 1, axis: 'y', blocks: Object.freeze([[0, 1], [1, 1]]) })
-    ]);
-
     static solve(input) {
         const width = FloorOwnershipResolver.dimension(input?.width, 'width');
         const height = FloorOwnershipResolver.dimension(input?.height, 'height');
@@ -44448,9 +44450,6 @@ class FloorOwnershipResolver {
                 }
             }
         }
-
-        FloorOwnershipResolver.insetOpenBoundaries(owners,
-            { blockWidth, width, height, plans, walls, expandCells });
 
         for (let round = 0; round < reachBlocks; round++) {
             const previous = owners;
@@ -44517,66 +44516,16 @@ class FloorOwnershipResolver {
             a.id.localeCompare(b.id);
     }
 
-    /**
-     * Pulls a plan's open edges in to the centreline of their boundary cells.
-     *
-     * The floor's edge belongs on the centreline of the cell that bounds it,
-     * and that has to hold whether the bounding cell is masonry or just the
-     * outermost cell the player painted. Without this a painted floor ends on
-     * the cell edge, and the moment the player walls that perimeter the wall
-     * takes the boundary cell over and the floor jumps half a tile inward —
-     * the floor moving because a wall was edited, which it must never do.
-     *
-     * A side is only pulled in where the plan actually continues along that
-     * side's axis, so a single painted tile stays a whole tile and a one-cell
-     * corridor keeps its width instead of eroding to nothing.
-     */
-    static insetOpenBoundaries(owners, context) {
-        const { blockWidth, width, height, plans, walls, expandCells } = context;
-        const ownerOf = new Map();
-        for (const plan of plans) for (const key of plan.seedCells) ownerOf.set(key, plan.id);
-        // "Open" is per plan, not global: a neighbouring cell belonging to a
-        // DIFFERENT plan is an edge of this plan just as much as bare ground is,
-        // so two floors meeting in the open both stop on a centreline. Skipping
-        // that case left one seam in the map — the only place a floor ran to a
-        // cell edge — while every other edge in the same room stopped halfway.
-        //
-        // The edge of the map is the end of the world, not ground the player
-        // could have painted and chose not to, so a room that runs to it is not
-        // pulled in — otherwise the whole outdoors gets a bare half-tile frame.
-        const open = (planId, x, y) => {
-            if (!FloorOwnershipResolver.inBounds(x, y, width, height)) return false;
-            const key = BuildKeys.cell(x, y);
-            // Another plan's ground is not an open edge: two floors meet flush.
-            // Pulling both back left a cell of bare terrain at every junction.
-            if (ownerOf.has(key)) return false;
-            if (expandCells.has(key)) return false;
-            // A wall the plan will never tuck under is just an obstacle stood
-            // next to it, so the plan's edge stays where it was. Without this,
-            // drawing a stub beside a floor moved that floor a whole cell: the
-            // inset stopped AND the tuck began.
-            if (walls.has(key)) return false;
-            return true;
-        };
-        const dropped = [];
-        for (const [key, planId] of ownerOf) {
-            const { x, y } = BuildKeys.parseCell(key);
-            for (const side of FloorOwnershipResolver.SIDES) {
-                if (!open(planId, x + side.dx, y + side.dy)) continue;
-                if (!FloorOwnershipResolver.continuesAlong(x, y, side.axis, planId, ownerOf)) continue;
-                for (const [ox, oy] of side.blocks) {
-                    dropped.push((((2 * y) + oy) * blockWidth) + (2 * x) + ox);
-                }
-            }
-        }
-        // Collected against the original grid, applied after: eroding in place
-        // would let one cell's inset decide the next cell's.
-        for (const index of dropped) owners[index] = null;
-    }
-
-    static continuesAlong(x, y, axis, planId, ownerOf) {
-        const steps = axis === 'x' ? [[-1, 0], [1, 0]] : [[0, -1], [0, 1]];
-        return steps.some(([dx, dy]) => ownerOf.get(BuildKeys.cell(x + dx, y + dy)) === planId);
+    // Which sides of a wall cell a floor may run in under. A run is entered
+    // across its length, never from its end. A lone post has no length, so it
+    // takes floor from every side.
+    static canEnterWall(mask, dx, dy) {
+        if (mask === 0) return true;
+        const vertical = (mask & WallGeometry.MASK_VERTICAL) !== 0;
+        const horizontal = (mask & WallGeometry.MASK_HORIZONTAL) !== 0;
+        if (vertical && !horizontal) return dx !== 0;
+        if (horizontal && !vertical) return dy !== 0;
+        return true;
     }
 
     // Expansion exists to bury a room's floor under the masonry that encloses
@@ -44601,7 +44550,17 @@ class FloorOwnershipResolver {
         const sourceCellY = Math.floor(sy / 2);
         const targetCellX = Math.floor(tx / 2);
         const targetCellY = Math.floor(ty / 2);
-        if (sourceCellX !== targetCellX || sourceCellY !== targetCellY) return true;
+        if (sourceCellX !== targetCellX || sourceCellY !== targetCellY) {
+            // Fences only separate blocks INSIDE a cell, so they say nothing
+            // about entering one. A floor tucks under a wall from the side that
+            // wall faces; entering from its end instead fills the end cap and
+            // shows past the rounded art as a part-tile hanging off the wall.
+            const targetMask = walls.get(BuildKeys.cell(targetCellX, targetCellY));
+            if (targetMask === undefined) return true;
+            return FloorOwnershipResolver.canEnterWall(
+                targetMask, targetCellX - sourceCellX, targetCellY - sourceCellY
+            );
+        }
         const mask = walls.get(BuildKeys.cell(sourceCellX, sourceCellY));
         if (mask === undefined) return true;
         const fences = WallGeometry.fencesForMask(mask);
