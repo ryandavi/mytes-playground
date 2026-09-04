@@ -240,7 +240,11 @@ class ContainerInputManager {
   storeSelectedObject() {
     const selectedObjects = this.container.ui?.getSelectedObjects?.() || [];
     const wallCells = this.container.ui?.buildMarqueeSelection?.getSelectedWallCells?.() || [];
-    if (selectedObjects.length > 1 || wallCells.length > 0) {
+    if (wallCells.length > 0) {
+      this.container.ui?.buildMarqueeSelection?.confirmDemolition?.();
+      return;
+    }
+    if (selectedObjects.length > 1) {
       this.container.ui?.buildMarqueeSelection?.storeSelection?.();
       return;
     }

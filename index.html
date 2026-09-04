@@ -70,7 +70,7 @@
 			</div>
 			<!-- BUILD TOOLS -->
 			<div class="tool-group tool-group--build" role="group" aria-label="Build tools">
-				<button id="tool-move" class="hand-control-btn tool-btn" data-tool-mode="move" title="Click or drag objects. Drag empty space to pan; Shift-drag selects an area. (1)">
+				<button id="tool-move" class="hand-control-btn tool-btn" data-tool-mode="move" title="Select and move objects or structures. Drag empty space to pan; Shift-drag selects an area. (1)">
 					<svg class="icon" aria-hidden="true"><use href="#icon-pointer"></use></svg>
 					<span class="text">Select</span>
 				</button>
@@ -533,7 +533,7 @@
 				<p class="setting-hint room-edit-hint" hidden>Add paints with the selected room; Remove returns floor to whatever the walls enclose. Hold <kbd class="setting-key">Ctrl</kbd> to invert the tool. Click to fill or drag square by square.</p>
 				<div class="setting-item room-build-edit-options is-inactive">
 					<div class="checkbox-wrapper" title="Fill a box of floor instead of painting square by square">
-						<input type="checkbox" id="room-build-rectangle">
+						<input type="checkbox" id="room-build-rectangle" checked>
 						<label for="room-build-rectangle">Rectangle <kbd class="setting-key">Shift</kbd></label>
 					</div>
 				</div>
@@ -669,10 +669,13 @@
 						<dt>1–6</dt><dd>Select · Wall · Rooms · Paint · Ground · Fence</dd>
 						<dt>Ctrl+Z / Ctrl+Y</dt><dd>Undo · Redo</dd>
 						<dt>Home / End</dt><dd>Cycle wall view</dd>
-						<dt>Delete</dt><dd>Store selected object</dd>
+						<dt>Delete</dt><dd>Store objects · demolish structures</dd>
 						<dt>R</dt><dd>Rotate selected object</dd>
 						<dt>Arrows</dt><dd>Nudge selection, or pan camera</dd>
-						<dt>Shift</dt><dd>Add to selection · select an area · rectangle build</dd>
+						<dt>Click wall</dt><dd>Select cell · choose Run or Building</dd>
+						<dt>Click floor</dt><dd>Select its connected building</dd>
+						<dt>Drag empty space</dt><dd>Pan the map</dd>
+						<dt>Shift + drag</dt><dd>Select an area · rectangle build</dd>
 						<dt>Space + drag</dt><dd>Pan camera</dd>
 						<dt>Ctrl</dt><dd>Held: invert snap to grid · invert wall tool</dd>
 						<dt>G</dt><dd>Show or hide the grid</dd>
@@ -887,7 +890,7 @@
 	<!-- END WORLD MAP PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="js/bundle.js?v=f83075d5c339"></script>
+	<script src="js/bundle.js?v=2074fa24bcea"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

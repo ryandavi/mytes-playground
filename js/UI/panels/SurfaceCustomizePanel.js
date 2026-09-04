@@ -550,8 +550,10 @@ class SurfaceCustomizePanel extends ModalWindow {
                 SiteConfig.floorSystem?.defaultFinishId ||
                 null;
         }
-        const { cell, face } = this.target.wallSurface;
-        return cell ? this.gameMap?.wallBuilder?.resolveFaceFinishId(cell, face) : null;
+        const { cell, face, roomId } = this.target.wallSurface;
+        return cell
+            ? this.gameMap?.wallBuilder?.resolveSurfaceFinishId(cell, face, roomId ?? null)
+            : null;
     }
 
     getWallScope() {
@@ -757,6 +759,10 @@ class SurfaceCustomizePanel extends ModalWindow {
         const customizer = this.gameMap?.surfaceCustomizer;
         if (!customizer) return false;
 
+        // A palette hover has already drawn its prospective finish. Capture
+        // undo from the committed map, not from that preview, or the inverse is
+        // identical to the paint being applied and undo appears to skip paint.
+        customizer.revertPreview();
         const requests = this.buildRequests(finishId, scopeOverride);
         if (requests.length === 0) return false;
 
@@ -808,7 +814,9 @@ class SurfaceCustomizePanel extends ModalWindow {
             const cell = builder?.cells?.get(`${cellX},${cellY}`);
             return {
                 ...request,
-                finishId: cell ? builder.resolveFaceFinishId(cell, request.face) : request.finishId
+                finishId: cell
+                    ? builder.resolveSurfaceFinishId(cell, request.face, request.roomId ?? null)
+                    : request.finishId
             };
         });
     }

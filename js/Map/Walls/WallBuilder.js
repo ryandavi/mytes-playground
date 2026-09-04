@@ -683,12 +683,9 @@ class WallBuilder {
      * colour of the space outside it — a green room with a plaster strip across
      * its front, which is not a wall anyone painted, it is a wall nobody did.
      *
-     * A wall belongs to the smallest room it bounds. That is the rule already
-     * used for a face buried in a junction and for innermostAt itself, and here
-     * it means a room reads as one colour all the way round: the far wall shows
-     * it because the room is on its south side, the near wall shows it because
-     * the room is the smaller of the two it divides. The bigger space's own
-     * outer walls are unaffected — it is the smallest room on both of its faces.
+     * When two rooms share it, local depth decides which room's perimeter this
+     * section follows. That keeps a shallow hallway's back and front walls in
+     * the same room even when a compact neighbouring room has less total area.
      */
     resolveBandFace(cell) {
         const south = cell.faces?.south;
@@ -698,25 +695,40 @@ class WallBuilder {
         const northRoom = north?.roomId ? rooms?.get('room', north.roomId) : null;
 
         if (southRoom && northRoom && northRoom !== southRoom &&
-            northRoom.areaInCells(this.cellSize) < southRoom.areaInCells(this.cellSize)) return 'north';
+            this.preferredHorizontalRoomSide(cell, northRoom, southRoom) === 'north') return 'north';
         if (!southRoom && northRoom) return 'north';
         return 'south';
     }
 
     /**
-     * The horizontal surface the camera presents to the player.
-     *
-     * The near edge of a room exposes its outside even though the room sits on
-     * the north side of that masonry. That visible band is therefore exterior,
-     * not an interior face borrowing the room's finish. The far edge presents
-     * the room on its south side and remains its interior wall.
+     * Resolve a shared horizontal wall from the rooms' depth at this section.
+     * A long shallow hallway can have more total area than the compact room
+     * beside it; area alone then makes its front wall switch to that room even
+     * though its back wall correctly belongs to the hallway.
      */
+    preferredHorizontalRoomSide(cell, northRoom, southRoom) {
+        const depth = (room, step) => {
+            let count = 0;
+            const limit = Number(this.gameMap.gridSystem?.gridHeight) ||
+                Math.max(1, Math.ceil((room.bounds?.height || 0) / this.cellSize) + 1);
+            for (let distance = 1; distance <= limit; distance++) {
+                const x = (cell.x + 0.5) * this.cellSize;
+                const y = (cell.y + 0.5 + (step * distance)) * this.cellSize;
+                if (!room.contains(x, y)) break;
+                count += 1;
+            }
+            return count;
+        };
+        const northDepth = depth(northRoom, -1);
+        const southDepth = depth(southRoom, 1);
+        if (northDepth !== southDepth) return northDepth < southDepth ? 'north' : 'south';
+        return northRoom.areaInCells(this.cellSize) < southRoom.areaInCells(this.cellSize)
+            ? 'north'
+            : 'south';
+    }
+
+    /** The room-facing horizontal surface presented by the build view. */
     resolveVisibleBandSurface(cell, face = this.resolveBandFace(cell)) {
-        const northRoomId = cell.faces?.north?.roomId ?? null;
-        const southRoomId = cell.faces?.south?.roomId ?? null;
-        if (face === 'north' && northRoomId && !southRoomId) {
-            return { face, roomId: null };
-        }
         return { face, roomId: cell.faces?.[face]?.roomId ?? null };
     }
 
@@ -772,7 +784,8 @@ class WallBuilder {
         // of the cell it is, which is how it finds the ground it looks at when
         // a post stands between it and the cell straight across.
         const band = (from, to, side) => {
-            const resolved = this.resolveBandSurface(cell, side);
+            const resolved = this.resolveRunBandSurface(cell, side) ||
+                this.resolveBandSurface(cell, side);
             const visible = resolved || this.resolveVisibleBandSurface(cell);
             return {
                 from, to,
@@ -823,6 +836,28 @@ class WallBuilder {
     }
 
     /**
+     * A corner column is the cap of the horizontal run beside it, so it must
+     * inherit that run's room as well as its visual direction. Sampling floor
+     * around the corner can choose a different adjacent room, producing two
+     * separately paintable sections with the same label while leaving the
+     * hallway's end columns behind.
+     */
+    resolveRunBandSurface(cell, side) {
+        const dx = side === 'east' ? 1 : side === 'west' ? -1 : 0;
+        if (dx === 0) return null;
+        const neighbour = this.cells.get(`${cell.x + dx},${cell.y}`);
+        if (!neighbour || neighbour.connectGroup !== cell.connectGroup) return null;
+        const mask = this.computeMask(neighbour);
+        if (!WallBuilder.isHorizontalMask(mask)) return null;
+        const built = {
+            ...neighbour,
+            mask,
+            faces: neighbour.faces || this.assignFaces(neighbour)
+        };
+        return this.resolveVisibleBandSurface(built);
+    }
+
+    /**
      * The room a band on one side of a cell looks into, and the face it is.
      *
      * Same rule as resolveBandFace — a wall belongs to the smallest room it
@@ -840,11 +875,11 @@ class WallBuilder {
         const north = this.bandNeighbourRoom(cell, dx, -1);
         const south = this.bandNeighbourRoom(cell, dx, 1);
         if (!north && !south) return null;
+        const sampleCell = { ...cell, x: cell.x + dx };
         const takesNorth = !!north && (!south || (north !== south &&
-            north.areaInCells(this.cellSize) < south.areaInCells(this.cellSize)));
+            this.preferredHorizontalRoomSide(sampleCell, north, south) === 'north'));
         const room = takesNorth ? north : south;
         const face = takesNorth ? 'north' : 'south';
-        if (face === 'north' && north && !south) return { face, roomId: null };
         return { face, roomId: room?.id || null };
     }
 
@@ -1065,11 +1100,9 @@ class WallBuilder {
     /**
      * The next cell of a run, walking one way along its own axis.
      *
-     * Straight on where the cell carries an arm that way. Where it does not,
-     * one sideways step is allowed — but only onto a cell that carries the run
-     * onward, which is what tells a wall with a step in it from a wall that
-     * simply ends in a corner. A staircase of single-cell jogs is one wall and
-     * paints as one; a corner is where the walk stops.
+     * Straight on where the cell carries an arm that way. A perpendicular
+     * turn ends the section. The horizontal wall on the next row is a distinct
+     * room edge even when a one-cell connector touches both.
      * @returns {object|null} the cell, or null where the run ends
      */
     stepAlongRun(cell, axis, direction) {
@@ -1078,16 +1111,10 @@ class WallBuilder {
         const forward = horizontal
             ? (direction > 0 ? WallBuilder.MASK_EAST : WallBuilder.MASK_WEST)
             : (direction > 0 ? WallBuilder.MASK_SOUTH : WallBuilder.MASK_NORTH);
-        const step = (dx, dy) => this.cells.get(`${cell.x + dx},${cell.y + dy}`) || null;
-
-        if (mask & forward) return step(horizontal ? direction : 0, horizontal ? 0 : direction);
-
-        for (const side of WallBuilder.DIRECTIONS) {
-            if (horizontal === (side.dy === 0) || !(mask & side.bit)) continue;
-            const jog = step(side.dx, side.dy);
-            if (jog && (this.computeMask(jog) & forward)) return jog;
-        }
-        return null;
+        if (!(mask & forward)) return null;
+        return this.cells.get(
+            `${cell.x + (horizontal ? direction : 0)},${cell.y + (horizontal ? 0 : direction)}`
+        ) || null;
     }
 
     /**
@@ -2780,6 +2807,61 @@ class WallBuilder {
             roomId: record.roomId,
             axis: record.axis
         }));
+    }
+
+    faceOverridesWithin(cellKeys) {
+        if (!cellKeys?.size) return [];
+        const inside = point => point && cellKeys.has(`${point[0]},${point[1]}`);
+        return this.faceOverrides.filter(record =>
+            inside(record.cells?.from) && inside(record.cells?.to)
+        );
+    }
+
+    faceOverridesIntersecting(cellKeys) {
+        if (!cellKeys?.size) return [];
+        return this.faceOverrides.filter(record => {
+            const from = record.cells?.from;
+            const to = record.cells?.to;
+            if (!from || !to) return false;
+            const x0 = Math.min(from[0], to[0]);
+            const x1 = Math.max(from[0], to[0]);
+            const y0 = Math.min(from[1], to[1]);
+            const y1 = Math.max(from[1], to[1]);
+            for (const key of cellKeys) {
+                const [x, y] = key.split(',').map(Number);
+                if (x >= x0 && x <= x1 && y >= y0 && y <= y1) return true;
+            }
+            return false;
+        });
+    }
+
+    retargetFaceOverrides(records) {
+        let changed = false;
+        for (const record of records ?? []) {
+            const from = record.cells?.from;
+            const to = record.cells?.to;
+            if (!from || !to) continue;
+            const x0 = Math.min(from[0], to[0]);
+            const x1 = Math.max(from[0], to[0]);
+            const y0 = Math.min(from[1], to[1]);
+            const y1 = Math.max(from[1], to[1]);
+            let target = null;
+            for (let y = y0; y <= y1 && !target; y++) {
+                for (let x = x0; x <= x1; x++) {
+                    if (!this.baseCells.has(`${x},${y}`)) continue;
+                    target = [x, y];
+                    break;
+                }
+            }
+            if (!target) continue;
+            const [x, y] = target;
+            const roomId = this.getFaceRoomIdAt(x, y, record.face);
+            if (record.roomId === roomId) continue;
+            record.roomId = roomId;
+            changed = true;
+        }
+        if (changed) this.rebuild();
+        return changed;
     }
 
     createFaceOverrideCopies(template, cells) {

@@ -92,16 +92,27 @@ class WallBuildPanel extends CellDragBuildPanel {
         const builder = map?.wallBuilder;
         if (!builder || cells.length === 0) return false;
         const removing = operation === 'remove';
+        const committedCells = removing ? this.includeOrphanedBranches(builder, cells) : cells;
         const template = operation === 'remove' ? null :
-            gesture?.wallTemplate || this.resolveExtensionTemplate(builder, gesture?.start, cells);
-        const faceTemplate = operation === 'remove' ? [] :
-            builder.sampleFaceOverrideTemplate(gesture?.start);
-        const changes = cells
+            gesture?.wallTemplate || this.resolveExtensionTemplate(builder, gesture?.start, committedCells);
+        const changes = committedCells
             .filter(cell => removing
                 ? builder.baseCells.has(`${cell.x},${cell.y}`)
                 : !builder.baseCells.has(`${cell.x},${cell.y}`))
             .map(cell => ({ ...cell, data: removing ? null : Utility.deepClone(template || {}) }));
         if (changes.length === 0) return false;
+
+        const removedKeys = new Set(changes.map(cell => `${cell.x},${cell.y}`));
+        const borderingKeys = new Set();
+        if (removing) {
+            for (const cell of changes) {
+                for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                    const key = `${cell.x + dx},${cell.y + dy}`;
+                    if (!removedKeys.has(key) && builder.baseCells.has(key)) borderingKeys.add(key);
+                }
+            }
+        }
+        const retargetedOverrides = builder.faceOverridesIntersecting(borderingKeys);
 
         let result;
         try {
@@ -121,15 +132,46 @@ class WallBuildPanel extends CellDragBuildPanel {
             return false;
         }
 
-        const copiedOverrides = builder.createFaceOverrideCopies(
-            faceTemplate,
-            result.applied.filter(change => change.data !== null)
-        );
-        builder.addFaceOverrideCopies(copiedOverrides);
+        // A wall cell replaces floor, it does not silently keep that cell's
+        // painted room assignment. Resolve rooms now so the floor retracts to
+        // the wall centreline in the same frame as the new masonry appears.
+        const roomResult = removing ? { applied: [], inverse: [] } :
+            map.roomAssignments?.applyChanges(
+                result.applied
+                    .filter(change => change.data !== null)
+                    .map(change => ({ x: change.x, y: change.y, roomId: null })),
+                { emit: false }
+            ) ?? { applied: [], inverse: [] };
+        map.roomEnclosureDetector?.detect?.();
+        builder.retargetFaceOverrides(retargetedOverrides);
 
-        this.pushWallHistory(builder, result, removing, copiedOverrides);
+        // Extending structure inherits finishes from the rooms it now bounds.
+        // Copying a sampled face override stamped the old interior colour onto
+        // whichever face became exterior after the topology changed.
+        const copiedOverrides = [];
+
+        this.pushWallHistory(builder, result, removing, copiedOverrides, roomResult, retargetedOverrides);
         this.afterCommit(map);
         return true;
+    }
+
+    /**
+     * Removing a straight run also takes the now-unattached branch left at a
+     * former T-junction. It stops at the next supported junction, using the
+     * same orphan rule as moving a wall run, so demolition does not leave a
+     * painted one-cell-wide peninsula where the junction used to be.
+     */
+    includeOrphanedBranches(builder, cells) {
+        const occupied = cells.filter(cell => builder?.baseCells.has(`${cell.x},${cell.y}`));
+        if (occupied.length === 0) return cells;
+        const sameX = occupied.every(cell => cell.x === occupied[0].x);
+        const sameY = occupied.every(cell => cell.y === occupied[0].y);
+        if (sameX === sameY) return cells;
+        const run = { cells: occupied, axis: sameY ? 'horizontal' : 'vertical' };
+        const gone = new Map();
+        const orphans = this.findOrphanedStubs(builder, run, gone, occupied);
+        const byKey = new Map([...cells, ...orphans].map(cell => [`${cell.x},${cell.y}`, cell]));
+        return [...byKey.values()];
     }
 
     resolveExtensionTemplate(builder, start, cells = []) {
@@ -148,10 +190,16 @@ class WallBuildPanel extends CellDragBuildPanel {
         return null;
     }
 
-    pushWallHistory(builder, result, removing, copiedOverrides = []) {
+    pushWallHistory(builder, result, removing, copiedOverrides = [], roomResult = { applied: [], inverse: [] }, retargetedOverrides = []) {
         const label = `${removing ? 'Remove' : 'Place'} Wall (${result.applied.length} cell${result.applied.length === 1 ? '' : 's'})`;
         const forward = Utility.deepClone(result.applied);
         const backward = Utility.deepClone(result.inverse);
+        const roomForward = Utility.deepClone(roomResult.applied);
+        const roomBackward = Utility.deepClone(roomResult.inverse);
+        const refreshRooms = changes => {
+            builder.gameMap?.roomAssignments?.applyChanges(Utility.deepClone(changes), { emit: false });
+            builder.gameMap?.roomEnclosureDetector?.detect?.();
+        };
         // Undo replays through the same authoritative path, but with validation
         // off: restoring a cell the player already had is by definition legal,
         // and re-running the rules would refuse it whenever the world moved.
@@ -160,9 +208,13 @@ class WallBuildPanel extends CellDragBuildPanel {
             undo: () => {
                 builder.removeFaceOverrideCopies(copiedOverrides);
                 builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false });
+                refreshRooms(roomBackward);
+                builder.retargetFaceOverrides(retargetedOverrides);
             },
             redo: () => {
                 builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false });
+                refreshRooms(roomForward);
+                builder.retargetFaceOverrides(retargetedOverrides);
                 builder.addFaceOverrideCopies(copiedOverrides);
             }
         });
@@ -354,7 +406,17 @@ class WallBuildPanel extends CellDragBuildPanel {
      * @returns {{distance: number, additions: Array, removals: Array}}
      */
     getMovePlan() {
-        const empty = { distance: 0, additions: [], removals: [], retainedShared: [], moveX: 0, moveY: 0 };
+        const empty = {
+            distance: 0,
+            additions: [],
+            removals: [],
+            roomClaims: [],
+            paintExtensions: [],
+            movingCells: [],
+            wallCells: [],
+            moveX: 0,
+            moveY: 0
+        };
         const run = this.drag?.run;
         const builder = this.drag?.map?.wallBuilder;
         if (!run || !builder) return empty;
@@ -379,23 +441,22 @@ class WallBuildPanel extends CellDragBuildPanel {
             take(cell.x + (stepX * span), cell.y + (stepY * span), source);
         }
 
-        const retainedShared = [];
-        for (const cell of run.cells) {
-            if (!this.isSharedRoomBoundary(builder, cell)) continue;
-            const source = builder.baseCells.get(`${cell.x},${cell.y}`) ?? {};
-            take(cell.x, cell.y, source);
-            retainedShared.push({
-                source: { x: cell.x, y: cell.y },
-                target: { x: cell.x + (stepX * span), y: cell.y + (stepY * span) }
-            });
-        }
-
+        const paintExtensions = [];
         for (const end of [run.cells[0], run.cells[run.cells.length - 1]]) {
             if (!this.endIsAnchored(builder, end, stepX, stepY)) continue;
             const source = builder.baseCells.get(`${end.x},${end.y}`) ?? {};
+            const cells = [];
             for (let along = 0; along < span; along++) {
-                take(end.x + (stepX * along), end.y + (stepY * along), source);
+                const cell = { x: end.x + (stepX * along), y: end.y + (stepY * along) };
+                take(cell.x, cell.y, source);
+                // The original corner stays behind as the first connector cell,
+                // but its paint record travels with the moved run. Restore the
+                // section there as well as on masonry created between it and
+                // the destination. Existing masonry farther along is not part
+                // of this growth and must not be repainted.
+                if (along === 0 || !builder.baseCells.has(`${cell.x},${cell.y}`)) cells.push(cell);
             }
+            if (cells.length > 0) paintExtensions.push({ source: { ...end }, cells });
         }
 
         const vacated = run.cells.filter(cell => !keep.has(`${cell.x},${cell.y}`));
@@ -404,7 +465,37 @@ class WallBuildPanel extends CellDragBuildPanel {
             .map(cell => ({ x: cell.x, y: cell.y, data: null }));
         const additions = [...keep.values()]
             .filter(cell => !builder.baseCells.has(`${cell.x},${cell.y}`));
-        return { distance, additions, removals, retainedShared, moveX: stepX * span, moveY: stepY * span };
+        const claimFace = horizontal
+            ? (stepY < 0 ? 'south' : 'north')
+            : (stepX < 0 ? 'east' : 'west');
+        const roomClaims = run.cells.map(cell => ({
+            source: { ...cell },
+            roomId: builder.getFaceRoomIdAt(cell.x, cell.y, claimFace)
+        }));
+        // A run ends on its corner columns. Their literal compass face can
+        // belong to the room around the corner, while the straight cells beside
+        // them identify the room this wall is actually resizing. Carrying the
+        // literal endpoint claim through the swept strip creates a one-cell
+        // floor spur from that neighbouring room.
+        for (const [index, inward] of [[0, 1], [roomClaims.length - 1, -1]]) {
+            const claim = roomClaims[index];
+            const cell = builder.cells.get(`${claim?.source.x},${claim?.source.y}`);
+            const mask = cell ? builder.computeMask(cell) : 0;
+            if (!WallBuilder.isHorizontalMask(mask) || !WallBuilder.isVerticalMask(mask)) continue;
+            const neighbour = roomClaims[index + inward];
+            if (neighbour) claim.roomId = neighbour.roomId;
+        }
+        return {
+            distance,
+            additions,
+            removals,
+            roomClaims,
+            paintExtensions,
+            movingCells: run.cells.map(cell => ({ ...cell })),
+            wallCells: [...keep.values()].map(({ x, y }) => ({ x, y })),
+            moveX: stepX * span,
+            moveY: stepY * span
+        };
     }
 
     isSharedRoomBoundary(builder, cell) {
@@ -490,7 +581,7 @@ class WallBuildPanel extends CellDragBuildPanel {
         // with a door in it does not draw itself red for being in its own way.
         const builder = map.wallBuilder;
         const travelling = builder.getTravellingRecordIds({
-            cells: new Set(plan.removals.map(cell => `${cell.x},${cell.y}`))
+            cells: new Set(plan.movingCells.map(cell => `${cell.x},${cell.y}`))
         });
         const allowed = builder.withTravellingRecords(travelling, () =>
             plan.additions.map(cell => this.checkCell(cell, 'add').allowed));
@@ -518,6 +609,71 @@ class WallBuildPanel extends CellDragBuildPanel {
      * One edit, not two. Removing the old run and adding the new one as
      * separate commits would put a hole in the house between them.
      */
+    roomChangesForMove(map, plan) {
+        const final = new Map();
+        const stepX = Math.sign(plan.moveX);
+        const stepY = Math.sign(plan.moveY);
+        const span = Math.max(Math.abs(plan.moveX), Math.abs(plan.moveY));
+        for (const claim of plan.roomClaims ?? []) {
+            for (let offset = 0; offset < span; offset += 1) {
+                const x = claim.source.x + (stepX * offset);
+                const y = claim.source.y + (stepY * offset);
+                final.set(`${x},${y}`, { x, y, roomId: claim.roomId });
+            }
+        }
+        // Final masonry cannot carry a floor assignment, including retained
+        // connector cells at the ends of the moved run.
+        for (const cell of plan.wallCells ?? []) {
+            final.set(`${cell.x},${cell.y}`, { ...cell, roomId: null });
+        }
+        return [...final.values()];
+    }
+
+    captureMovePaintExtensions(builder, plan) {
+        return (plan.paintExtensions ?? []).map(extension => {
+            const source = builder.cells.get(`${extension.source.x},${extension.source.y}`);
+            const templates = builder.getCellSurfaces(source).flatMap(surface => {
+                const finishId = builder.resolveFinishOverride(
+                    extension.source.x,
+                    extension.source.y,
+                    surface.face,
+                    surface.roomId
+                );
+                return finishId ? [{ axis: surface.axis, roomId: surface.roomId, finishId }] : [];
+            });
+            const unique = new Map(templates.map(template => [
+                `${template.axis}:${template.roomId ?? 'outside'}:${template.finishId}`,
+                template
+            ]));
+            return { cells: extension.cells.map(cell => ({ ...cell })), templates: [...unique.values()] };
+        }).filter(extension => extension.templates.length > 0);
+    }
+
+    createMovePaintExtensionOverrides(builder, extensions) {
+        const records = new Map();
+        for (const extension of extensions) {
+            for (const target of extension.cells) {
+                const cell = builder.cells.get(`${target.x},${target.y}`);
+                for (const surface of builder.getCellSurfaces(cell)) {
+                    const template = extension.templates.find(entry =>
+                        entry.axis === surface.axis && entry.roomId === surface.roomId
+                    );
+                    if (!template) continue;
+                    const record = {
+                        mapId: builder.gameMap.id,
+                        face: surface.face,
+                        axis: surface.axis,
+                        roomId: surface.roomId,
+                        finishId: template.finishId,
+                        cells: { from: [target.x, target.y], to: [target.x, target.y] }
+                    };
+                    records.set(`${target.x},${target.y}:${surface.face}:${surface.roomId ?? 'outside'}`, record);
+                }
+            }
+        }
+        return [...records.values()];
+    }
+
     commitMove(map, plan) {
         const builder = map?.wallBuilder;
         if (!builder || plan.distance === 0) return false;
@@ -525,10 +681,11 @@ class WallBuildPanel extends CellDragBuildPanel {
         if (changes.length === 0) return false;
 
         const contentMove = {
-            cells: new Set(plan.removals.map(cell => `${cell.x},${cell.y}`)),
+            cells: new Set(plan.movingCells.map(cell => `${cell.x},${cell.y}`)),
             dx: plan.moveX,
             dy: plan.moveY
         };
+        const paintExtensions = this.captureMovePaintExtensions(builder, plan);
 
         let result;
         try {
@@ -546,25 +703,34 @@ class WallBuildPanel extends CellDragBuildPanel {
             return false;
         }
 
-        const sharedOverrideCopies = (plan.retainedShared ?? []).flatMap(({ source, target }) =>
-            builder.createFaceOverrideCopies(builder.sampleFaceOverrideTemplate(source), [target]));
-        builder.addFaceOverrideCopies(sharedOverrideCopies);
+        const assignmentResult = map.roomAssignments?.applyChanges(
+            this.roomChangesForMove(map, plan), { emit: false }
+        ) ?? { applied: [], inverse: [] };
+        map.roomEnclosureDetector?.detect?.();
+        const extendedOverrides = this.createMovePaintExtensionOverrides(builder, paintExtensions);
+        builder.addFaceOverrideCopies(extendedOverrides);
 
         const forward = Utility.deepClone(result.applied);
         const backward = Utility.deepClone(result.inverse);
+        const roomForward = Utility.deepClone(assignmentResult.applied);
+        const roomBackward = Utility.deepClone(assignmentResult.inverse);
         const back = WallBuilder.invertContentMove(contentMove);
         const size = Math.abs(plan.distance);
+        const replay = (walls, rooms, move) => {
+            builder.applyWallCellChanges(Utility.deepClone(walls),
+                { validate: false, contentMove: move });
+            map.roomAssignments?.applyChanges(Utility.deepClone(rooms), { emit: false });
+            map.roomEnclosureDetector?.detect?.();
+        };
         this.pushHistory({
             label: `Move Wall (${size} cell${size === 1 ? '' : 's'})`,
             undo: () => {
-                builder.removeFaceOverrideCopies(sharedOverrideCopies);
-                builder.applyWallCellChanges(Utility.deepClone(backward),
-                    { validate: false, contentMove: back });
+                builder.removeFaceOverrideCopies(extendedOverrides);
+                replay(backward, roomBackward, back);
             },
             redo: () => {
-                builder.applyWallCellChanges(Utility.deepClone(forward),
-                    { validate: false, contentMove });
-                builder.addFaceOverrideCopies(sharedOverrideCopies);
+                replay(forward, roomForward, contentMove);
+                builder.addFaceOverrideCopies(extendedOverrides);
             }
         });
         this.playSound(SiteConfig.buildMode.sounds.objectPlace);

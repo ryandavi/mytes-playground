@@ -13,6 +13,7 @@
 //   __surfaces.audit()              // every quarter-cell two rooms both claim, or neither
 //   __surfaces.overlay()            // draw all of the above ON the map
 //   __surfaces.overlay(false)       // take it back off
+//   __surfaces.pick()               // click a bad floor edge; copies its report
 //   __surfaces.download()           // the whole lot as JSON, for a bug report
 //
 // Coordinates are CELLS everywhere (x, y), never pixels — that is how the wall
@@ -167,6 +168,88 @@ const SurfaceDebug = {
 				owners.length === 0 ? '(bare ground)' : owners.join(' + ')
 			]))
 		};
+	},
+
+	_floorPlanOwners() {
+		const map = this._map();
+		const ownership = map.floorBuilder?.computeOwnership?.() ?? new Map();
+		const ownerByBlock = new Map();
+		for (const [roomId, blocks] of ownership) {
+			for (const [blockX, blockY] of blocks) ownerByBlock.set(`${blockX},${blockY}`, roomId);
+		}
+		return ownerByBlock;
+	},
+
+	/** The ownership plan before it is rasterized into separate room canvases. */
+	floorPlan(x, y, ownerByBlock = this._floorPlanOwners()) {
+		const perCell = FloorBuilder.BLOCKS_PER_CELL;
+		const quarters = {};
+		for (let row = 0; row < perCell; row++) {
+			for (let column = 0; column < perCell; column++) {
+				const name = `${row === 0 ? 'top' : 'bottom'}-${column === 0 ? 'left' : 'right'}`;
+				const blockX = (x * perCell) + column;
+				const blockY = (y * perCell) + row;
+				quarters[name] = ownerByBlock.get(`${blockX},${blockY}`) ?? '(bare ground)';
+			}
+		}
+		return quarters;
+	},
+
+	/** Everything needed to explain the four floor quarters of one cell. */
+	inspectFloor(x, y) {
+		const map = this._map();
+		const size = this.cellSize;
+		const wall = map.wallBuilder?.cells?.get(`${x},${y}`) ?? null;
+		const rooms = map.regionManager?.all?.('room') ?? [];
+		const planOwners = this._floorPlanOwners();
+		const roomsAt = (column, row) => {
+			const mapX = (x + (column === 0 ? 0.25 : 0.75)) * size;
+			const mapY = (y + (row === 0 ? 0.25 : 0.75)) * size;
+			return rooms.filter(room => room.contains(mapX, mapY)).map(room => room.id);
+		};
+		return {
+			cell: `${x},${y}`,
+			rendered: this.floor(x, y).quarters,
+			planned: this.floorPlan(x, y, planOwners),
+			containingRooms: {
+				'top-left': roomsAt(0, 0),
+				'top-right': roomsAt(1, 0),
+				'bottom-left': roomsAt(0, 1),
+				'bottom-right': roomsAt(1, 1)
+			},
+			wall: wall ? this.cell(x, y) : { wall: false },
+			neighbours: Object.fromEntries(WallBuilder.DIRECTIONS.map(direction => {
+				const nextX = x + direction.dx;
+				const nextY = y + direction.dy;
+				return [direction.name, {
+					cell: `${nextX},${nextY}`,
+					wall: map.wallBuilder?.cells?.has(`${nextX},${nextY}`) ?? false,
+					planned: this.floorPlan(nextX, nextY, planOwners)
+				}];
+			}))
+		};
+	},
+
+	/** Arm one click on the map and copy a focused floor ownership report. */
+	pick() {
+		const container = MyteCore.instance?.getFirstContainer?.();
+		const input = container?.inputHandler;
+		if (!input?.screenToWorldCoordinates) {
+			throw new Error('[SurfaceDebug] Container input is not ready');
+		}
+		const handler = event => {
+			const point = input.screenToWorldCoordinates(event.pageX, event.pageY);
+			const x = Math.floor(point.x / this.cellSize);
+			const y = Math.floor(point.y / this.cellSize);
+			const report = this.inspectFloor(x, y);
+			this.lastPick = report;
+			console.log('[SurfaceDebug] floor pick', JSON.stringify(report, null, 2));
+			navigator.clipboard?.writeText(JSON.stringify(report, null, 2)).catch(() => {});
+			event.preventDefault();
+			event.stopImmediatePropagation();
+		};
+		document.addEventListener('pointerdown', handler, { capture: true, once: true });
+		return 'picker armed — click a bad floor quarter; its report will be logged and copied';
 	},
 
 	/** Every room whose floor canvas has a pixel at this point in map space. */

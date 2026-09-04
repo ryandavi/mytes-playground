@@ -137,8 +137,13 @@ class RoomPanel extends ModalWindow {
         if (!this.parent.isTool(UIToolModes.ROOM)) {
             this.clearRoomTints();
             this.clearHighlight();
+            this.clearPerimeterGaps();
             return;
         }
+        // Rows can be rebuilt while one of their hover previews is showing.
+        // The old row then never receives pointerleave, so retire its preview
+        // before drawing the current room state.
+        this.clearPerimeterGaps();
         this.settlePending();
         this.renderRooms();
         this.renderRoomTints();
@@ -308,20 +313,16 @@ class RoomPanel extends ModalWindow {
         return empty;
     }
 
-    /**
-     * There is always a room in hand.
-     *
-     * The brush used to be allowed to hold nothing, and painting with nothing
-     * meant "put these tiles back to whatever the walls enclose" — an eraser,
-     * armed by default, that nobody chose and nothing announced. Erasing is
-     * what "Reset to walls" is for: a button that says what it is about to
-     * undo and asks first. So the brush picks the biggest room rather than
-     * sitting empty, and every stroke goes somewhere you can see on the list.
-     */
-    ensureBrush() {
+    /** Put a room in hand, optionally starting a new one for an Add stroke. */
+    ensureBrush({ createWhenUnselected = false } = {}) {
         if (this.selected) {
             if (this.selected === this.pending?.id) return this.selected;
             if (this.gameMap?.regionManager?.get('room', this.selected)) return this.selected;
+        }
+        if (createWhenUnselected) {
+            this.selected = null;
+            this.startNewRoom();
+            return this.selected;
         }
         this.selected = this.rooms()[0]?.room?.id ?? null;
         // No rooms to pick from and none in hand — a map nobody has built in,
@@ -731,6 +732,9 @@ class RoomPanel extends ModalWindow {
     }
 
     demolishRoom(room, plan = this.demolitionPlan(room)) {
+        // Clicking rebuilds the room row before its demolition button can emit
+        // pointerleave, so explicitly remove the striped hover preview.
+        this.clearPerimeterGaps();
         const builder = this.gameMap?.wallBuilder;
         const roomCells = this.roomCells(room.id);
         const heir = this.largestNeighbour(room.id, roomCells);
@@ -1145,9 +1149,10 @@ class RoomPanel extends ModalWindow {
             this.clearHover();
             return;
         }
-        // Only reachable on a map with no rooms at all, where there is nothing
-        // to paint with until you make one.
-        if (this.resolveOperation(event) === 'add' && !this.ensureBrush()) {
+        // Add with no room selected means starting a room, not silently
+        // painting into whichever existing room happens to be first.
+        if (this.resolveOperation(event) === RoomPanel.OPERATIONS.ADD &&
+            !this.ensureBrush({ createWhenUnselected: true })) {
             this.parent.showMessage('Pick a room to paint with, or make a new one.', 'info', 'Rooms');
             this.playSound(SiteConfig.buildMode.sounds.rejected);
             return;
@@ -1434,7 +1439,9 @@ class RoomPanel extends ModalWindow {
     commitCells(cells, roomId) {
         const assignments = this.assignments;
         if (!assignments || !cells?.length) return false;
-        const result = assignments.applyChanges(cells.map(cell => ({ ...cell, roomId })));
+        const result = assignments.applyChanges(
+            cells.map(cell => ({ ...cell, roomId })), { emit: false }
+        );
         // Nothing changed is not a refusal: painting a room over floor that is
         // already in that room is the most ordinary thing to do with a brush,
         // and answering it with an error noise taught people the tool was
@@ -1446,11 +1453,28 @@ class RoomPanel extends ModalWindow {
         const count = result.applied.length;
         this.parent.parent?.buildHistory?.push({
             label: `${roomId ? 'Paint' : 'Reset'} Room (${count} tile${count === 1 ? '' : 's'})`,
-            undo: () => assignments.applyChanges(backward.map(change => ({ ...change }))),
-            redo: () => assignments.applyChanges(forward.map(change => ({ ...change })))
+            undo: () => this.replayCellChanges(backward),
+            redo: () => this.replayCellChanges(forward)
         });
 
+        this.gameMap?.roomEnclosureDetector?.detect?.();
         this.playSound(SiteConfig.buildMode.sounds.paint);
+        this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
+        this.gameMap?.core?.user?._scheduleSave?.();
+        return true;
+    }
+
+    replayCellChanges(changes) {
+        this.cancelDrag();
+        this.clearHover();
+        this.clearPerimeterGaps();
+        this.clearRoomTints();
+        this.clearHighlight();
+        const result = this.assignments?.applyChanges(
+            changes.map(change => ({ ...change })), { emit: false }
+        );
+        if (!result || result.applied.length === 0) return false;
+        this.gameMap?.roomEnclosureDetector?.detect?.();
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
         return true;

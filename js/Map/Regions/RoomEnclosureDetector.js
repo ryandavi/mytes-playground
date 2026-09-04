@@ -372,13 +372,14 @@ class RoomEnclosureDetector {
      * in an L both reach the corner between them, and comparing centres would
      * hand it to whichever happened to be more compact.
      */
-    static pickAuthoredRoom(authored, x, y, cellSize) {
+    static pickAuthoredRoom(authored, x, y, cellSize, { allowNearest = true } = {}) {
         const inside = authored
             .filter(entry => RoomEnclosureDetector.shapeContains(entry.shape, entry.bounds, x, y))
             .reduce((smallest, entry) => !smallest ||
                 RoomEnclosureDetector.shapeArea(entry, cellSize) <
                 RoomEnclosureDetector.shapeArea(smallest, cellSize) ? entry : smallest, null);
         if (inside) return inside.room;
+        if (!allowNearest) return null;
 
         let nearest = null;
         let bestDistance = Infinity;

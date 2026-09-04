@@ -62,10 +62,12 @@ class WorldState {
             Object.fromEntries(rooms
                 .filter(room =>
                     typeof room.properties?.playerName === 'string' ||
-                    typeof room.properties?.roomType === 'string')
+                    typeof room.properties?.roomType === 'string' ||
+                    Object.hasOwn(room.properties ?? {}, 'buildingName'))
                 .map(room => [room.id, {
                     name: room.properties.playerName ?? null,
-                    type: room.properties.roomType ?? null
+                    type: room.properties.roomType ?? null,
+                    buildingName: room.properties.buildingName ?? null
                 }])));
         const snapshot = { mapId: map.id, objects, droppedItems, walls, terrain, roomCells, floors, roomWalls, roomEdits, savedAt: Date.now() };
         this.payload.maps[map.id] = snapshot;
@@ -124,11 +126,19 @@ class WorldState {
             restored = true;
         }
 
+        let restoredWallFinish = false;
         for (const [roomId, finishId] of Object.entries(snapshot.roomWalls ?? {})) {
-            if (!map.regionManager.get('room', roomId) || !map.wallBuilder) continue;
-            map.wallBuilder.setRoomWallFinish(roomId, finishId);
+            const room = map.regionManager.get('room', roomId);
+            if (!room || !map.wallBuilder) continue;
+            // Restoring is not repainting. setRoomWallFinish deliberately drops
+            // that room's per-face accents because a new coat supersedes them;
+            // running it after every topology rebuild erased accents that had
+            // just travelled with a moved wall.
+            room.properties = { ...room.properties, wallFinishId: finishId || null };
+            restoredWallFinish = true;
             restored = true;
         }
+        if (restoredWallFinish) map.wallBuilder.refreshRoomFaces();
 
         for (const [roomId, edit] of Object.entries(snapshot.roomEdits ?? {})) {
             const room = map.regionManager.get('room', roomId);
@@ -137,6 +147,7 @@ class WorldState {
                 ...room.properties,
                 playerName: edit.name ?? null,
                 roomType: edit.type ?? room.properties.roomType ?? null,
+                buildingName: edit.buildingName ?? null,
                 displayName: edit.name ?? room.properties.authoredDisplayName ?? room.properties.displayName
             };
             restored = true;
