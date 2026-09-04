@@ -10,6 +10,7 @@ class UserInterface {
 		this.boundTimeMilestoneSound = this.handleTimeMilestoneSound.bind(this);
 
         // Initialize all UI components
+        this.buildSelection = new BuildSelection();
         this.toolManager = new ToolManager(this);
         this.selectionManager = new SelectionManager(this);
         this.buildMarqueeSelection = new BuildMarqueeSelection(this);
@@ -54,6 +55,7 @@ class UserInterface {
         this.fenceBuildPanel = new FenceBuildPanel(this);
         this.roomPanel = new RoomPanel(this);
         this.terrainPaintPanel = new TerrainPaintPanel(this);
+        this.buildInspector = new BuildInspector(this);
         this.viewPanel = new ViewPanel(this);
         this.worldMapPanel = new WorldMapPanel(this);
         this.calendarPanel = new CalendarPanel(this);
@@ -116,11 +118,22 @@ class UserInterface {
         this.fenceBuildPanel?.handleToolModeChanged(mode);
         this.roomPanel?.handleToolModeChanged(mode);
         this.terrainPaintPanel?.handleToolModeChanged(mode);
+        this.buildInspector?.handleToolModeChanged(mode);
     }
 
     onSelectionChanged(selectedObject) {
         // Update action panel based on selection
         this.actionSidebarManager.updateActions(selectedObject);
+        if (this.parent?.gameMode?.isBuild() && selectedObject) {
+            this.buildSelection.set({
+                kind: 'object',
+                id: String(selectedObject.id),
+                details: {
+                    Type: selectedObject.getDisplayName?.() || selectedObject.type,
+                    ID: selectedObject.id
+                }
+            });
+        }
     }
 
     // Proxy methods to parent for components to use
@@ -365,6 +378,9 @@ class UserInterface {
         this.roomPanel = null;
         this.terrainPaintPanel?.dispose?.();
         this.terrainPaintPanel = null;
+        this.buildInspector?.dispose?.();
+        this.buildInspector = null;
+        this.buildSelection = null;
         this.soundPanel?.dispose?.();
         this.soundPanel = null;
         this.soundMenu = null;

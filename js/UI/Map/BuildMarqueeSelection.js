@@ -56,7 +56,7 @@ class BuildMarqueeSelection extends UIComponent {
         }
         if (cell && event.shiftKey !== true && event.pointerType === 'touch') {
             const room = builder?.roomAtOpenCell(cell.x, cell.y);
-            const component = room && this.container?.gameMap?.buildingTopology?.getComponentForRoom(room.id);
+            const component = room && this.buildingComponentForRoom(room.id);
             if (component) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -164,7 +164,7 @@ class BuildMarqueeSelection extends UIComponent {
             const cell = this.emptyPress.cell;
             this.emptyPress = null;
             const room = cell && this.container?.gameMap?.wallBuilder?.roomAtOpenCell(cell.x, cell.y);
-            const component = room && this.container?.gameMap?.buildingTopology?.getComponentForRoom(room.id);
+            const component = room && this.buildingComponentForRoom(room.id);
             if (component) {
                 this.selectBuilding(component);
                 this.preferredScope = 'building';
@@ -319,10 +319,15 @@ class BuildMarqueeSelection extends UIComponent {
         }
         const actions = document.createElement('div');
         actions.className = 'stage-bar__group build-selection-actions__operations';
-        for (const [label, titleText, action, className] of [
+        const operationSpecs = [
             ['Duplicate', 'Place a structural copy beside this selection', () => this.duplicateSelection()],
             ['Demolish', 'Remove the selected structure', () => this.confirmDemolition(), 'is-danger']
-        ]) {
+        ];
+        if (this.selectionKind === 'building') operationSpecs.splice(1, 0,
+            ['Separate', 'Make disconnected parts separate named buildings', () => this.separateBuilding()],
+            ['Merge', 'Merge selected buildings into the anchored building', () => this.mergeSelectedBuildings()]
+        );
+        for (const [label, titleText, action, className] of operationSpecs) {
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'stage-bar__action';
@@ -383,40 +388,178 @@ class BuildMarqueeSelection extends UIComponent {
     }
 
     buildingName() {
+        const map = this.container?.gameMap;
+        const buildingId = this.selectedRooms()
+            .map(room => map?.buildDocument?.level?.().rooms.get(room.id)?.buildingId)
+            .find(Boolean);
+        const planName = buildingId ? map?.buildDocument?.buildings.get(buildingId)?.displayName : null;
+        if (planName) return planName;
         return this.selectedRooms()
             .map(room => room.properties?.buildingName)
             .find(name => typeof name === 'string' && name.trim()) ?? null;
     }
 
-    renameBuilding(name) {
-        const rooms = this.selectedRooms();
-        if (rooms.length === 0) return false;
-        const previous = rooms.map(room => ({ roomId: room.id, name: room.properties?.buildingName ?? null }));
-        if (previous.every(entry => entry.name === name)) return false;
-        const apply = values => {
-            for (const entry of values) {
-                const room = this.container?.gameMap?.regionManager?.get('room', entry.roomId);
-                if (room) room.properties.buildingName = entry.name;
-            }
-            this.container?.gameMap?.eventManager?.emit(EVENTS.ROOMS_CHANGED, {
-                mapId: this.container.gameMap.id,
-                rooms: this.container.gameMap.regionManager?.all('room') ?? []
-            });
-        };
-        const next = previous.map(entry => ({ ...entry, name }));
-        apply(next);
-        this.container.buildHistory?.push({
-            label: name ? `Name Building ${name}` : 'Clear Building Name',
-            undo: () => apply(previous),
-            redo: () => apply(next)
-        });
-        this.container?.worldState?.captureMap?.(this.container.gameMap);
-        this.container?.core?.user?._scheduleSave?.();
+    selectedBuildingIds() {
+        const walls = this.container?.gameMap?.buildDocument?.level?.().walls;
+        return [...new Set(this.selectedWallCells.map(cell =>
+            walls?.get(BuildKeys.cell(cell.x, cell.y))?.buildingId
+        ).filter(Boolean))];
+    }
+
+    mergeSelectedBuildings() {
+        const map = this.container?.gameMap;
+        const build = map?.buildTransaction;
+        const ids = this.selectedBuildingIds();
+        if (!build || ids.length < 2) {
+            this.parent.showMessage?.('Select walls from at least two buildings to merge them.', 'info', 'Buildings');
+            return false;
+        }
+        const anchorId = this.selectionAnchor
+            ? map.buildDocument.level().walls.get(BuildKeys.cell(this.selectionAnchor.x, this.selectionAnchor.y))?.buildingId
+            : null;
+        const survivorId = ids.includes(anchorId) ? anchorId : ids[0];
+        const merged = new Set(ids);
+        const committed = build.run(`Merge Buildings into ${map.buildDocument.buildings.get(survivorId)?.displayName || survivorId}`,
+            (draft, level) => {
+                for (const [key, wall] of level.walls.entries()) if (merged.has(wall.buildingId)) {
+                    level.walls.set(key, { ...wall, buildingId: survivorId });
+                }
+                for (const [id, room] of level.rooms.entries()) if (merged.has(room.buildingId)) {
+                    level.rooms.set(id, { ...room, buildingId: survivorId });
+                }
+                for (const id of ids) if (id !== survivorId) draft.buildings.delete(id);
+            }).committed;
+        if (!committed) return false;
+        this.selectBuilding(this.buildingComponent(survivorId), false, this.selectionAnchor);
         return true;
+    }
+
+    separateBuilding() {
+        const map = this.container?.gameMap;
+        const build = map?.buildTransaction;
+        const buildingId = this.selectedBuildingIds()[0];
+        const level = map?.buildDocument?.level?.();
+        const plan = buildingId ? map.buildDocument.buildings.get(buildingId) : null;
+        if (!build || !level || !plan) return false;
+        const remaining = new Set(level.walls.entries()
+            .filter(([, wall]) => wall.buildingId === buildingId)
+            .map(([key]) => key));
+        const components = [];
+        while (remaining.size) {
+            const first = remaining.values().next().value;
+            remaining.delete(first);
+            const cells = [first];
+            for (let index = 0; index < cells.length; index++) {
+                const { x, y } = BuildKeys.parseCell(cells[index]);
+                for (const key of [BuildKeys.cell(x - 1, y), BuildKeys.cell(x + 1, y),
+                    BuildKeys.cell(x, y - 1), BuildKeys.cell(x, y + 1)]) {
+                    if (!remaining.delete(key)) continue;
+                    cells.push(key);
+                }
+            }
+            components.push(cells.sort());
+        }
+        if (components.length < 2) {
+            this.parent.showMessage?.('This building is already one connected structure.', 'info', 'Buildings');
+            return false;
+        }
+        const anchorKey = this.selectionAnchor ? BuildKeys.cell(this.selectionAnchor.x, this.selectionAnchor.y) : null;
+        components.sort((left, right) => Number(right.includes(anchorKey)) - Number(left.includes(anchorKey)) ||
+            right.length - left.length || left[0].localeCompare(right[0]));
+        const ids = [buildingId];
+        for (let index = 1; index < components.length; index++) {
+            for (let suffix = index + 1; ; suffix++) {
+                const candidate = `${buildingId}_part_${suffix}`;
+                if (map.buildDocument.buildings.has(candidate) || ids.includes(candidate)) continue;
+                ids[index] = candidate;
+                break;
+            }
+        }
+        const distanceTo = (seed, component) => {
+            const point = BuildKeys.parseCell(seed);
+            return component.reduce((best, key) => {
+                const wall = BuildKeys.parseCell(key);
+                return Math.min(best, Math.abs(point.x - wall.x) + Math.abs(point.y - wall.y));
+            }, Infinity);
+        };
+        const committed = build.run(`Separate ${plan.displayName}`, (draft, draftLevel) => {
+            for (let index = 1; index < components.length; index++) draft.buildings.set(ids[index], {
+                ...plan,
+                id: ids[index],
+                displayName: `${plan.displayName} ${index + 1}`,
+                authoredDisplayName: `${plan.authoredDisplayName || plan.displayName} ${index + 1}`
+            });
+            components.forEach((component, index) => component.forEach(key => {
+                const wall = draftLevel.walls.get(key);
+                draftLevel.walls.set(key, { ...wall, buildingId: ids[index] });
+            }));
+            for (const [roomId, room] of draftLevel.rooms.entries()) {
+                if (room.buildingId !== buildingId || room.seedCells.length === 0) continue;
+                const index = components.map(component => Math.min(...room.seedCells.map(seed => distanceTo(seed, component))))
+                    .reduce((best, value, candidate, values) => value < values[best] ? candidate : best, 0);
+                draftLevel.rooms.set(roomId, { ...room, buildingId: ids[index] });
+            }
+        }).committed;
+        if (!committed) return false;
+        this.selectBuilding(this.buildingComponent(buildingId), false, this.selectionAnchor);
+        return true;
+    }
+
+    renameBuilding(name) {
+        const map = this.container?.gameMap;
+        const build = map?.buildTransaction;
+        const buildingId = this.selectedRooms()
+            .map(room => build?.document?.level(build.levelId).rooms.get(room.id)?.buildingId)
+            .find(Boolean);
+        const building = buildingId ? build?.document?.buildings.get(buildingId) : null;
+        if (!build || !building) return false;
+        const displayName = name || building.authoredDisplayName || building.id;
+        if (displayName === building.displayName) return false;
+        const committed = build.run(name ? `Name Building ${name}` : 'Clear Building Name', draft => {
+            draft.buildings.set(buildingId, { ...building, displayName });
+        }).committed;
+        if (committed) {
+            this.container?.worldState?.captureMap?.(map);
+            this.container?.core?.user?._scheduleSave?.();
+        }
+        return committed;
     }
 
     getSelectedWallCells() {
         return [...this.selectedWallCells];
+    }
+
+    roomSeedAssignments() {
+        const rooms = this.container?.gameMap?.buildDocument?.level?.().rooms.values() || [];
+        return new Map(rooms.flatMap(room => room.seedCells.map(key => [key, room.id])));
+    }
+
+    buildingComponent(buildingId) {
+        if (!buildingId) return null;
+        const map = this.container?.gameMap;
+        const level = map?.buildDocument?.level?.();
+        if (!level || !map.buildDocument.buildings.has(buildingId)) return null;
+        return {
+            id: buildingId,
+            buildingId,
+            cellKeys: new Set(level.walls.entries()
+                .filter(([, wall]) => wall.buildingId === buildingId)
+                .map(([key]) => key)),
+            roomIds: new Set(level.rooms.values()
+                .filter(room => room.buildingId === buildingId)
+                .map(room => room.id))
+        };
+    }
+
+    buildingComponentForRoom(roomId) {
+        const buildingId = this.container?.gameMap?.buildDocument?.level?.().rooms.get(roomId)?.buildingId;
+        return this.buildingComponent(buildingId);
+    }
+
+    buildingComponentAtCell(cell) {
+        const buildingId = this.container?.gameMap?.buildDocument?.level?.().walls
+            .get(BuildKeys.cell(cell.x, cell.y))?.buildingId;
+        return this.buildingComponent(buildingId);
     }
 
     pointerCell(event) {
@@ -434,7 +577,7 @@ class BuildMarqueeSelection extends UIComponent {
         let cells = [{ x: cell.x, y: cell.y }];
         if (scope === 'run') cells = this.resolveRun(cell);
         if (scope === 'building') {
-            const component = this.container?.gameMap?.buildingTopology?.getComponentAtWallFace(cell);
+            const component = this.buildingComponentAtCell(cell);
             if (component) {
                 if (remember) this.preferredScope = scope;
                 return this.selectBuilding(component, additive, cell);
@@ -446,6 +589,11 @@ class BuildMarqueeSelection extends UIComponent {
         this.selectionRoomIds = [];
         this.selectionAnchor = { x: cell.x, y: cell.y };
         this.parent.selectionManager.setSelection([]);
+        this.parent.buildSelection?.set({
+            kind: 'wall',
+            id: BuildKeys.cell(cell.x, cell.y),
+            details: { Scope: scope, Cells: this.selectedWallCells.length }
+        });
         this.renderWallHighlights();
         return true;
     }
@@ -470,9 +618,12 @@ class BuildMarqueeSelection extends UIComponent {
         });
         this.selectedWallCells = additive ? this.mergeWallCells(this.selectedWallCells, cells) : cells;
         this.selectionKind = 'building';
-        this.selectionRoomIds = [...component.roomIds];
+        this.selectionRoomIds = additive
+            ? [...new Set([...this.selectionRoomIds, ...component.roomIds])]
+            : [...component.roomIds];
         this.selectionAnchor = anchor ? { x: anchor.x, y: anchor.y } : (cells[0] ? { ...cells[0] } : null);
         this.parent.selectionManager.setSelection([]);
+        this.parent.buildSelection?.set({ kind: 'building', id: component.buildingId || component.id });
         this.renderWallHighlights();
         return true;
     }
@@ -590,11 +741,13 @@ class BuildMarqueeSelection extends UIComponent {
         const map = this.container?.gameMap;
         const builder = map?.wallBuilder;
         const grid = map?.gridSystem;
-        if (!builder || !grid) return false;
-        const sourceKeys = new Set(this.selectedWallCells.map(cell => `${cell.x},${cell.y}`));
+        if (!builder || !grid || !map.buildTransaction) return false;
+        const sourceKeys = new Set(this.selectedWallCells.map(cell => BuildKeys.cell(cell.x, cell.y)));
         const targets = this.selectedWallCells.map(cell => ({ x: cell.x + dx, y: cell.y + dy }));
-        const invalid = targets.some(cell => cell.x < 0 || cell.y < 0 || cell.x >= grid.gridWidth || cell.y >= grid.gridHeight ||
-            (builder.baseCells.has(`${cell.x},${cell.y}`) && !sourceKeys.has(`${cell.x},${cell.y}`)));
+        const invalid = targets.some(cell => cell.x < 0 || cell.y < 0 ||
+            cell.x >= grid.gridWidth || cell.y >= grid.gridHeight ||
+            (builder.baseCells.has(BuildKeys.cell(cell.x, cell.y)) &&
+                !sourceKeys.has(BuildKeys.cell(cell.x, cell.y))));
         if (invalid) {
             this.parent.showMessage?.('The selection stayed where it was — something is in the way.', 'warning', 'Select');
             this.renderWallHighlights();
@@ -604,40 +757,24 @@ class BuildMarqueeSelection extends UIComponent {
             .filter(cell => !targets.some(target => target.x === cell.x && target.y === cell.y))
             .map(cell => ({ ...cell, data: null }));
         const additions = targets
-            .filter(cell => !sourceKeys.has(`${cell.x},${cell.y}`))
+            .filter(cell => !sourceKeys.has(BuildKeys.cell(cell.x, cell.y)))
             .map(cell => {
                 const source = this.selectedWallCells[targets.indexOf(cell)];
-                return { ...cell, data: Utility.deepClone(builder.baseCells.get(`${source.x},${source.y}`) || {}) };
+                return { ...cell, data: Utility.deepClone(builder.baseCells.get(BuildKeys.cell(source.x, source.y)) || {}) };
             });
         const contentMove = { cells: sourceKeys, dx, dy };
-        const movedOverrides = builder.faceOverridesWithin(sourceKeys);
-        const result = builder.applyWallCellChanges([...removals, ...additions], { atomic: true, contentMove });
+        const assignmentChanges = this.assignmentChangesForMove({ cells: this.roomSeedAssignments() }, dx, dy);
+        const result = builder.applyWallCellChanges([...removals, ...additions], {
+            atomic: true,
+            contentMove,
+            roomChanges: assignmentChanges,
+            label: `Move ${this.selectionKind === 'building' ? 'Building' : 'Walls'} (${this.selectedWallCells.length} cells)`
+        });
         if (!result?.applied?.length) {
             this.parent.showMessage?.('The selection stayed where it was.', 'warning', 'Select');
             this.renderWallHighlights();
             return false;
         }
-        const assignments = map.roomAssignments;
-        const assignmentChanges = this.assignmentChangesForMove(assignments, dx, dy);
-        const assignmentResult = assignments?.applyChanges(assignmentChanges, { emit: false }) ?? { applied: [], inverse: [] };
-        map.roomEnclosureDetector?.detect?.();
-        builder.retargetFaceOverrides(movedOverrides);
-        const forward = Utility.deepClone(result.applied);
-        const backward = Utility.deepClone(result.inverse);
-        const assignmentForward = Utility.deepClone(assignmentResult.applied);
-        const assignmentBackward = Utility.deepClone(assignmentResult.inverse);
-        const inverseMove = WallBuilder.invertContentMove(contentMove);
-        const replay = (walls, rooms, move) => {
-            builder.applyWallCellChanges(Utility.deepClone(walls), { validate: false, contentMove: move });
-            assignments?.applyChanges(Utility.deepClone(rooms), { emit: false });
-            map.roomEnclosureDetector?.detect?.();
-            builder.retargetFaceOverrides(movedOverrides);
-        };
-        this.container.buildHistory?.push({
-            label: `Move ${this.selectionKind === 'building' ? 'Building' : 'Walls'} (${this.selectedWallCells.length} cells)`,
-            undo: () => replay(backward, assignmentBackward, inverseMove),
-            redo: () => replay(forward, assignmentForward, contentMove)
-        });
         this.selectedWallCells = targets;
         if (this.selectionAnchor) {
             this.selectionAnchor = { x: this.selectionAnchor.x + dx, y: this.selectionAnchor.y + dy };
@@ -650,7 +787,7 @@ class BuildMarqueeSelection extends UIComponent {
         const map = this.container?.gameMap;
         const builder = map?.wallBuilder;
         const grid = map?.gridSystem;
-        if (!builder || !grid || this.selectedWallCells.length === 0) return false;
+        if (!builder || !grid || !map.buildTransaction || this.selectedWallCells.length === 0) return false;
         const xs = this.selectedWallCells.map(cell => cell.x);
         const ys = this.selectedWallCells.map(cell => cell.y);
         const width = Math.max(...xs) - Math.min(...xs) + 1;
@@ -661,115 +798,96 @@ class BuildMarqueeSelection extends UIComponent {
             this.parent.showMessage?.('There is not enough clear space beside this selection.', 'warning', 'Duplicate');
             return false;
         }
-        const [dx, dy] = offset;
-        const additions = this.selectedWallCells.map(cell => ({
-            x: cell.x + dx,
-            y: cell.y + dy,
-            data: Utility.deepClone(builder.baseCells.get(`${cell.x},${cell.y}`) || {})
-        }));
-        const result = builder.applyWallCellChanges(additions, { atomic: true });
-        if (!result?.applied?.length) return false;
+        return this.duplicateSelectionTransaction(offset[0], offset[1]);
+    }
 
-        const takenRoomIds = new Set([
-            ...(map.roomAssignments?.roomIds?.() ?? []),
-            ...(map.regionManager?.all('room') ?? []).map(room => room.id)
-        ]);
+    duplicateSelectionTransaction(dx, dy) {
+        const map = this.container.gameMap;
+        const builder = map.wallBuilder;
+        const document = map.buildDocument;
+        const level = document.level();
+        const takenRoomIds = new Set(level.rooms.keys());
         const mintRoomId = () => {
-            for (let index = 1; ; index += 1) {
-                const id = `${RoomAssignments.PAINTED_PREFIX}${index}`;
-                if (takenRoomIds.has(id)) continue;
-                takenRoomIds.add(id);
-                return id;
+            for (let index = 1; ; index++) {
+                const id = `${RoomPanel.PAINTED_PREFIX}${index}`;
+                if (!takenRoomIds.has(id)) {
+                    takenRoomIds.add(id);
+                    return id;
+                }
             }
         };
-        const roomIdMap = new Map(this.selectionRoomIds.map(roomId => [roomId, mintRoomId()]));
-        const roomCopies = this.captureRoomCopies(roomIdMap);
-        const assignmentChanges = roomCopies.flatMap(copy => copy.cells.map(([x, y]) => ({
-            x: x + dx,
-            y: y + dy,
-            roomId: copy.roomId
-        })));
-        const roomResult = map.roomAssignments?.applyChanges(assignmentChanges, { emit: false }) ?? { applied: [], inverse: [] };
-        map.roomEnclosureDetector?.detect?.();
-        this.applyRoomProperties(roomCopies, { asCopy: true });
-        const overrideCopies = this.selectedWallCells.flatMap(cell =>
-            builder.createFaceOverrideCopies(builder.sampleFaceOverrideTemplate(cell), [
-                { x: cell.x + dx, y: cell.y + dy }
-            ]).map(record => ({ ...record, roomId: roomIdMap.get(record.roomId) ?? record.roomId }))
-        );
-        builder.addFaceOverrideCopies(overrideCopies);
-
-        const forward = Utility.deepClone(result.applied);
-        const backward = Utility.deepClone(result.inverse);
-        const roomForward = Utility.deepClone(roomResult.applied);
-        const roomBackward = Utility.deepClone(roomResult.inverse);
-        const replay = (walls, rooms, { restore = false } = {}) => {
-            builder.applyWallCellChanges(Utility.deepClone(walls), { validate: false });
-            map.roomAssignments?.applyChanges(Utility.deepClone(rooms), { emit: false });
-            map.roomEnclosureDetector?.detect?.();
-            if (restore) {
-                this.applyRoomProperties(roomCopies, { asCopy: true });
-                builder.addFaceOverrideCopies(overrideCopies);
+        const sourceBuildingId = this.selectionKind === 'building'
+            ? this.selectedWallCells.map(cell => level.walls.get(BuildKeys.cell(cell.x, cell.y))?.buildingId).find(Boolean)
+            : null;
+        let copiedBuildingId = sourceBuildingId;
+        const buildingCopies = [];
+        if (sourceBuildingId) {
+            const source = document.buildings.get(sourceBuildingId);
+            for (let index = 1; ; index++) {
+                const candidate = `${sourceBuildingId}_copy${index === 1 ? '' : `_${index}`}`;
+                if (document.buildings.has(candidate)) continue;
+                copiedBuildingId = candidate;
+                buildingCopies.push({
+                    ...source,
+                    id: candidate,
+                    displayName: `${source.displayName || source.id} copy`,
+                    authoredDisplayName: `${source.authoredDisplayName || source.displayName || source.id} copy`
+                });
+                break;
             }
-        };
-        this.container.buildHistory?.push({
-            label: `Duplicate ${this.selectionKind === 'building' ? 'Building' : 'Walls'} (${additions.length} cells)`,
-            undo: () => {
-                builder.removeFaceOverrideCopies(overrideCopies);
-                replay(backward, roomBackward);
-            },
-            redo: () => replay(forward, roomForward, { restore: true })
-        });
-        this.selectedWallCells = additions.map(({ x, y }) => ({ x, y }));
-        this.selectionRoomIds = [...roomIdMap.values()].filter(Boolean);
-        if (this.selectionAnchor) {
-            this.selectionAnchor = { x: this.selectionAnchor.x + dx, y: this.selectionAnchor.y + dy };
         }
+        const roomIdMap = new Map(this.selectionRoomIds.map(id => [id, mintRoomId()]));
+        const roomCopies = [...roomIdMap].map(([sourceId, id]) => {
+            const source = level.rooms.get(sourceId);
+            return source ? {
+                ...source,
+                id,
+                buildingId: source.buildingId === sourceBuildingId ? copiedBuildingId : source.buildingId,
+                displayName: `${source.displayName || source.id} copy`,
+                authoredDisplayName: `${source.authoredDisplayName || source.displayName || source.id} copy`,
+                origin: 'painted',
+                seedCells: source.seedCells.map(key => {
+                    const cell = BuildKeys.parseCell(key);
+                    return BuildKeys.cell(cell.x + dx, cell.y + dy);
+                })
+            } : null;
+        }).filter(Boolean);
+        const additions = this.selectedWallCells.map(cell => {
+            const source = level.walls.get(BuildKeys.cell(cell.x, cell.y));
+            return {
+                x: cell.x + dx,
+                y: cell.y + dy,
+                data: {
+                    ...source,
+                    buildingId: source.buildingId === sourceBuildingId ? copiedBuildingId : source.buildingId
+                }
+            };
+        });
+        const atomExtensions = this.selectedWallCells.map(cell => ({
+            targets: [{ x: cell.x + dx, y: cell.y + dy }],
+            atoms: level.atoms.atomsOfCell(cell.x, cell.y)
+        }));
+        const label = `Duplicate ${this.selectionKind === 'building' ? 'Building' : 'Walls'} (${additions.length} cells)`;
+        const result = builder.applyWallCellChanges(additions, {
+            atomic: true,
+            buildingCopies,
+            roomCopies,
+            atomExtensions,
+            label
+        });
+        if (!result?.applied?.length) return false;
+        this.selectedWallCells = additions.map(({ x, y }) => ({ x, y }));
+        this.selectionRoomIds = [...roomIdMap.values()];
+        if (this.selectionAnchor) this.selectionAnchor = {
+            x: this.selectionAnchor.x + dx,
+            y: this.selectionAnchor.y + dy
+        };
         this.renderWallHighlights();
         this.parent.showMessage?.('Placed a copy beside the selection. Wall-mounted objects stay with the original.', 'success', 'Duplicate');
         return true;
     }
 
-    captureRoomCopies(roomIdMap) {
-        const map = this.container?.gameMap;
-        return [...roomIdMap].map(([sourceRoomId, roomId]) => {
-            const room = map?.regionManager?.get('room', sourceRoomId);
-            const cells = [...(room?.shape?.cells ?? [])].map(rawCell => {
-                if (typeof rawCell === 'string') return rawCell.split(',').map(Number);
-                if (Array.isArray(rawCell)) return rawCell;
-                return [rawCell?.x, rawCell?.y];
-            }).filter(([x, y]) => Number.isInteger(x) && Number.isInteger(y));
-            if (cells.length === 0) return null;
-            return {
-                roomId,
-                cells,
-                properties: Utility.deepClone(room.properties || {})
-            };
-        }).filter(Boolean);
-    }
 
-    applyRoomProperties(copies, { asCopy = false } = {}) {
-        const map = this.container?.gameMap;
-        let changed = false;
-        for (const copy of copies || []) {
-            const room = map?.regionManager?.get('room', copy.roomId);
-            if (!room) continue;
-            const sourceName = copy.properties.playerName || copy.properties.displayName;
-            const sourceBuildingName = copy.properties.buildingName;
-            Object.assign(room.properties, copy.properties, {
-                playerName: asCopy && sourceName ? `${sourceName} copy` : copy.properties.playerName ?? null,
-                displayName: asCopy && sourceName ? `${sourceName} copy` : copy.properties.displayName,
-                buildingName: asCopy && sourceBuildingName ? `${sourceBuildingName} copy` : sourceBuildingName ?? null
-            });
-            changed = true;
-        }
-        if (changed) {
-            map?.floorBuilder?.build?.();
-            map?.wallBuilder?.refreshRoomFaces?.();
-            map?.eventManager?.emit(EVENTS.ROOMS_CHANGED, { mapId: map.id, rooms: map.regionManager?.all('room') });
-        }
-        return changed;
-    }
 
     canDuplicateAt(dx, dy) {
         const map = this.container?.gameMap;
@@ -805,53 +923,38 @@ class BuildMarqueeSelection extends UIComponent {
     storeSelection() {
         const inventory = this.container?.inventory;
         const objects = this.parent.selectionManager.getSelectedObjects();
-        const wallCells = [...this.selectedWallCells];
         const unstored = objects.filter(object => inventory?.storeMapObject?.(object) !== true);
-        const builder = this.container?.gameMap?.wallBuilder;
+        const map = this.container?.gameMap;
+        const builder = map?.wallBuilder;
+        if (!builder || !map.buildTransaction) return false;
+        const wallCells = [...this.selectedWallCells];
         const removalCells = this.selectionKind === 'run'
             ? this.parent?.wallBuildPanel?.includeOrphanedBranches?.(builder, wallCells) ?? wallCells
             : wallCells;
-        const assignments = this.container?.gameMap?.roomAssignments;
         const roomIds = new Set(this.selectionRoomIds);
-        const roomSnapshots = this.captureRoomCopies(new Map(this.selectionRoomIds.map(roomId => [roomId, roomId])));
-        const roomChanges = [...(assignments?.cells ?? [])]
-            .filter(([, roomId]) => roomIds.has(roomId))
-            .map(([key]) => {
-                const [x, y] = key.split(',').map(Number);
-                return { x, y, roomId: null };
-            });
-        let roomResult = { applied: [], inverse: [] };
-        let wallResult = null;
-        if (builder && wallCells.length) {
-            wallResult = builder.applyWallCellChanges(removalCells.map(cell => ({ ...cell, data: null })));
-        }
-        if (wallResult?.applied?.length) {
-            roomResult = assignments?.applyChanges(roomChanges, { emit: false }) ?? roomResult;
-            this.container?.gameMap?.roomEnclosureDetector?.detect?.();
-        }
+        const buildingIds = this.selectionKind === 'building'
+            ? [...new Set(this.selectionRoomIds.map(id =>
+                map.buildDocument.level().rooms.get(id)?.buildingId).filter(Boolean))]
+            : [];
+        const wallResult = removalCells.length
+            ? builder.applyWallCellChanges(removalCells.map(cell => ({ ...cell, data: null })), {
+                deleteRoomIds: this.selectionKind === 'building' ? [...roomIds] : [],
+                deleteBuildingIds: buildingIds,
+                label: `${this.selectionKind === 'building' ? 'Demolish Building' : 'Remove Wall'} (${removalCells.length} cells)`
+            })
+            : null;
         this.parent.selectionManager.setSelection(unstored);
         this.selectedWallCells = [];
         this.clearVisuals();
-        if (unstored.length) this.parent.showMessage?.(`${unstored.length} object${unstored.length === 1 ? '' : 's'} could not be returned to inventory.`, 'warning', 'Selection');
-        if (wallResult?.rejected?.length) {
-            this.parent.showMessage?.(`${wallResult.rejected.length} protected wall cell${wallResult.rejected.length === 1 ? '' : 's'} could not be removed.`, 'warning', 'Selection');
-        }
-        if (wallResult?.applied?.length) {
-            const forward = Utility.deepClone(wallResult.applied);
-            const backward = Utility.deepClone(wallResult.inverse);
-            const selectionKind = this.selectionKind;
-            const replay = (walls, rooms, { restoreRooms = false } = {}) => {
-                builder.applyWallCellChanges(Utility.deepClone(walls), { validate: false });
-                assignments?.applyChanges(Utility.deepClone(rooms), { emit: false });
-                this.container?.gameMap?.roomEnclosureDetector?.detect?.();
-                if (restoreRooms) this.applyRoomProperties(roomSnapshots);
-            };
-            this.container.buildHistory?.push({
-                label: `${selectionKind === 'building' ? 'Demolish Building' : 'Remove Wall'} (${forward.length} cells)`,
-                undo: () => replay(backward, roomResult.inverse, { restoreRooms: true }),
-                redo: () => replay(forward, roomResult.applied)
-            });
-        }
+        if (unstored.length) this.parent.showMessage?.(
+            `${unstored.length} object${unstored.length === 1 ? '' : 's'} could not be returned to inventory.`,
+            'warning', 'Selection'
+        );
+        if (wallResult?.rejected?.length) this.parent.showMessage?.(
+            `${wallResult.rejected.length} protected wall cell${wallResult.rejected.length === 1 ? '' : 's'} could not be removed.`,
+            'warning', 'Selection'
+        );
+        return !!wallResult?.applied?.length;
     }
 
     clearVisuals() {
@@ -868,6 +971,7 @@ class BuildMarqueeSelection extends UIComponent {
         this.selectionKind = null;
         this.selectionRoomIds = [];
         this.selectionAnchor = null;
+        this.parent.buildSelection?.clear();
         this.clearVisuals();
     }
 

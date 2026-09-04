@@ -145,22 +145,17 @@ const SiteConfig = Object.freeze({
 	floorSystem: Object.freeze({
 		enabled: true,
 		materialsPath: 'data/map-objects/floor-materials.json',
+		chunkCells: 8,
 		// A room with no authored floorFinishId keeps whatever the map's own
 		// tile layers already draw. Customisation is opt-in per room, so adding
 		// the system changes nothing until a room asks for it.
-		defaultFinishId: null,
-		// Grow each room's floor by this many cells so it runs UNDER the wall
-		// that encloses it. A room's bounds stop one cell short of that wall,
-		// and the wall covers only its centred thickness, so without any bleed a
-		// strip of the map's own ground shows along every outer edge.
-		//
-		// Half a cell, because that is the wall's CENTRELINE: the wall is
-		// `thickness` centred in its cell, so its middle sits at
-		// (cell - thickness) / 2 + thickness / 2 = cell / 2, whatever the
-		// thickness is. The floor therefore ends buried under the wall — no
-		// ground strip inside, and nothing spilling past the wall's outer face
-		// onto the exterior, which is what a full cell did.
-		edgeBleedCells: 0.5
+		defaultFinishId: null
+		// There is no edge-bleed setting. A floor's edge sits on the CENTRELINE
+		// of the cell that bounds it — masonry, or the outermost cell the player
+		// painted — and that centreline is geometry, not taste: the wall is
+		// `thickness` centred in its cell, so its middle sits at cell / 2
+		// whatever the thickness is. Any other reach tucks past the wall's outer
+		// face or stops short of it. See FloorRenderer.CENTRELINE_BLOCKS.
 	}),
 
 	// Painted ground: grass, water, paths, carpet. Corner wang terrain, the same
@@ -1460,7 +1455,7 @@ const SiteConfig = Object.freeze({
 ;
 /* -- js/Engine/Events.js -- */
 const EVENTS = Object.freeze({
-    BUILDING_TOPOLOGY_CHANGED: 'building:topology_changed',
+    BUILD_COMMITTED: 'build:committed',
     BUILD_HISTORY_CHANGED: 'build:history_changed',
     BUILD_POLICY_CHANGED: 'build:policy_changed',
     CAMERA_ZOOM_CHANGED: 'camera:zoom_changed',
@@ -1492,10 +1487,7 @@ const EVENTS = Object.freeze({
     PLANT_MUTATED: 'plant:mutated',
     PLANT_POLLINATED: 'plant:pollinated',
     RELATIONSHIP_CLEARED: 'relationship:cleared',
-    ROOM_ASSIGNMENTS_CHANGED: 'room:assignments_changed',
-    ROOMS_CHANGED: 'room:set_changed',
     SIMULATION_RATE_CHANGED: 'simulation:rate_changed',
-    SURFACE_FINISH_CHANGED: 'surface:finish_changed',
     TERRAIN_CHANGED: 'terrain:changed',
     TERRAIN_LAYERS_CHANGED: 'terrain:layers_changed',
     TERRAIN_READY: 'terrain:ready',
@@ -1504,7 +1496,6 @@ const EVENTS = Object.freeze({
     TRAVEL_STARTED: 'travel_started',
     USER_ACTIVITY_CHANGED: 'user_activity_changed',
     USER_CURRENCY_CHANGED: 'user:currency_changed',
-    WALL_GEOMETRY_CHANGED: 'wall:geometry_changed',
     WALL_PRESENTATION_CHANGED: 'wall:presentation_changed',
     WALL_READY: 'wall:ready',
     WORLD_ACTION_AVAILABILITY_CHANGED: 'world:action_availability_changed'
@@ -9522,8 +9513,8 @@ class BuildRules {
  *
  * A command stack, not snapshots: wall edits, surface paints and object moves
  * all have cheap inverses, and every inverse goes back through the same commit
- * plumbing the original edit used, so persistence, room recomputation and the
- * WALL_GEOMETRY_CHANGED listeners never see a silent mutation.
+ * plumbing the original edit used. Build consumers observe the committed
+ * transaction, never an intermediate mutation.
  *
  * The stack is session-scoped. It is cleared on entering and leaving build mode
  * and on map change — undoing across a map boundary would target geometry the
@@ -16952,6 +16943,7 @@ class ContainerManager {
             wallCursorCutaway: SiteConfig.wallSystem.cursorCutawayEnabled,
             buildGrid: true,
             buildSnap: true,
+            buildFootprints: false,
         }
 
     }
@@ -17704,6 +17696,16 @@ class ContainerManager {
         return this.settings.buildGrid;
     }
 
+    // Which cells each room owns. Off by default: it answers a question you
+    // only ask while adjusting a room's edges, and it is noise the rest of the
+    // time. See BuildFootprintOverlay for why the question needs answering.
+    setBuildFootprintsEnabled(flag) {
+        this.settings.buildFootprints = flag === true;
+        this.ui?.buildModeUI?.update?.();
+        this.syncBuildToggles();
+        return this.settings.buildFootprints;
+    }
+
     // Whether dragged objects land on grid cells. Ctrl still inverts whatever
     // this says for the length of a drag — see `inputHandler.shouldSnapToGrid`.
     setBuildSnapEnabled(flag) {
@@ -17717,6 +17719,7 @@ class ContainerManager {
     syncBuildToggles() {
         this.ui?.stageViewBar?.gridToggle?.sync?.();
         this.ui?.stageViewBar?.snapToggle?.sync?.();
+        this.ui?.stageViewBar?.footprintToggle?.sync?.();
     }
 
     setActiveMyte(myte) {
@@ -35760,54 +35763,25 @@ class WorldState {
 
     captureMap(map) {
         if (!map?.id) return null;
-        const objects = map.objects
-            .filter(object => typeof object.serializeState === 'function')
-            .map(object => ({
-                id: String(object.id),
-                type: object.type,
-                variant: object.variant,
-                posX: object.posX,
-                posY: object.posY,
-                state: object.serializeState()
-            }));
-        const droppedItems = map.droppedItems
-            .filter(item => item.active && !item.collected)
-            .map(item => item.serializeState());
-        const walls = map.wallBuilder?.serializeState?.() ?? null;
-        const terrain = map.terrainBuilder?.serializeState?.() ?? null;
-        const roomCells = map.roomAssignments?.serializeState?.() ?? null;
-        // Both merged onto what was already stored, never replacing it.
-        // Auto-detected rooms are rebuilt from scratch on every wall change, so
-        // while a removed wall has two rooms merged into one the second room
-        // does not exist to be captured — pruning it here would throw its finish
-        // and its name away, and undoing the wall would bring the room back
-        // bare. Stale ids cost nothing: restoreRooms skips any room that is not
-        // on the map.
-        const rooms = map.regionManager?.all('room') || [];
-        const floors = Object.assign({}, this.payload.maps[map.id]?.floors,
-            Object.fromEntries(rooms
-                .filter(room =>
-                    (room.properties?.floorFinishId ?? null) !==
-                    (room.properties?.authoredFloorFinishId ?? null)
-                )
-                .map(room => [room.id, room.properties?.floorFinishId ?? null])));
-        const roomWalls = Object.assign({}, this.payload.maps[map.id]?.roomWalls,
-            Object.fromEntries(rooms
-                .filter(room => (room.properties?.wallFinishId ?? null) !==
-                    (room.properties?.authoredWallFinishId ?? null))
-                .map(room => [room.id, room.properties?.wallFinishId ?? null])));
-        const roomEdits = Object.assign({}, this.payload.maps[map.id]?.roomEdits,
-            Object.fromEntries(rooms
-                .filter(room =>
-                    typeof room.properties?.playerName === 'string' ||
-                    typeof room.properties?.roomType === 'string' ||
-                    Object.hasOwn(room.properties ?? {}, 'buildingName'))
-                .map(room => [room.id, {
-                    name: room.properties.playerName ?? null,
-                    type: room.properties.roomType ?? null,
-                    buildingName: room.properties.buildingName ?? null
-                }])));
-        const snapshot = { mapId: map.id, objects, droppedItems, walls, terrain, roomCells, floors, roomWalls, roomEdits, savedAt: Date.now() };
+        const snapshot = {
+            mapId: map.id,
+            objects: map.objects
+                .filter(object => typeof object.serializeState === 'function')
+                .map(object => ({
+                    id: String(object.id),
+                    type: object.type,
+                    variant: object.variant,
+                    posX: object.posX,
+                    posY: object.posY,
+                    state: object.serializeState()
+                })),
+            droppedItems: map.droppedItems
+                .filter(item => item.active && !item.collected)
+                .map(item => item.serializeState()),
+            build: map.buildDocument?.serialize?.() ?? null,
+            terrain: map.terrainBuilder?.serializeState?.() ?? null,
+            savedAt: Date.now()
+        };
         this.payload.maps[map.id] = snapshot;
         return snapshot;
     }
@@ -35826,72 +35800,33 @@ class WorldState {
             }
             object?.restoreState?.(record.state ?? {});
         }
-
         for (const data of snapshot.droppedItems ?? []) {
             const item = map.addDroppedItem(data.type, data.variant, data.posX, data.posY);
             item.restoreState(data);
         }
-        // Before the walls: restoring walls kicks the room detector, and a
-        // detector that runs without the player's own rooms merges them back
-        // together and then hands restoreRooms ids that no longer exist.
-        if (map.roomAssignments) {
-            map.roomAssignments.restoreState(snapshot.roomCells ?? {}, { emit: false });
+
+        if (map.buildDocument && map.buildTransaction) {
+            const legacy = !snapshot.build && ['walls', 'roomCells', 'floors', 'roomWalls', 'roomEdits']
+                .some(field => snapshot[field] != null);
+            const result = map.buildDocument.restore(snapshot.build || (legacy ? { version: 7 } : null), {
+                onLegacyReset: message => map.container?.ui?.showMessage?.(message, 'info', 'Build Mode')
+            });
+            if (result.restored || result.reset) {
+                map.wallBuilder?.syncBuildDocumentRecords?.();
+                if (map.wallBuilder?.pruneOrphanedRecords?.()) {
+                    const level = map.buildDocument.level();
+                    level.openings.replace(map.wallBuilder.openings);
+                    level.fixtures.replace(map.wallBuilder.fixtures);
+                }
+                map.buildTransaction.reconcile('Restore build state', { renderWalls: true });
+                map.wallBuilder?.rebindOpeningObjects?.(map.wallBuilder.openings.map(record => record.id));
+            }
         }
-        if (snapshot.walls && map.wallBuilder) {
-            map.wallBuilder.restoreState(snapshot.walls);
-        }
-        // After the walls: painted ground writes cell walkability, and a wall
-        // restored on top of it has the final say about what can be walked on.
+
         if (snapshot.terrain && map.terrainBuilder) {
             map.terrainBuilder.restoreState(snapshot.terrain);
         }
-        this.restoreRooms(map, snapshot);
         return true;
-    }
-
-    /**
-     * Re-applies everything the player has done to a room — its finish and the
-     * name they gave it. Called on load and again every time the room set is
-     * recomputed, since auto-detected rooms are rebuilt rather than edited.
-     */
-    restoreRooms(map, snapshot = this.payload.maps[map?.id]) {
-        if (!snapshot || !map?.regionManager) return false;
-        let restored = false;
-
-        for (const [roomId, finishId] of Object.entries(snapshot.floors ?? {})) {
-            if (!map.regionManager.get('room', roomId) || !map.floorBuilder) continue;
-            map.floorBuilder.setRoomFinish(roomId, finishId);
-            restored = true;
-        }
-
-        let restoredWallFinish = false;
-        for (const [roomId, finishId] of Object.entries(snapshot.roomWalls ?? {})) {
-            const room = map.regionManager.get('room', roomId);
-            if (!room || !map.wallBuilder) continue;
-            // Restoring is not repainting. setRoomWallFinish deliberately drops
-            // that room's per-face accents because a new coat supersedes them;
-            // running it after every topology rebuild erased accents that had
-            // just travelled with a moved wall.
-            room.properties = { ...room.properties, wallFinishId: finishId || null };
-            restoredWallFinish = true;
-            restored = true;
-        }
-        if (restoredWallFinish) map.wallBuilder.refreshRoomFaces();
-
-        for (const [roomId, edit] of Object.entries(snapshot.roomEdits ?? {})) {
-            const room = map.regionManager.get('room', roomId);
-            if (!room) continue;
-            room.properties = {
-                ...room.properties,
-                playerName: edit.name ?? null,
-                roomType: edit.type ?? room.properties.roomType ?? null,
-                buildingName: edit.buildingName ?? null,
-                displayName: edit.name ?? room.properties.authoredDisplayName ?? room.properties.displayName
-            };
-            restored = true;
-        }
-
-        return restored;
     }
 }
 ;
@@ -36265,6 +36200,1043 @@ class WorldGraph {
     }
 }
 ;
+/* -- js/Map/Build/BuildKeys.js -- */
+class BuildKeys {
+    static FACES = Object.freeze(['north', 'east', 'south', 'west']);
+
+    static cell(x, y) {
+        return `${BuildKeys.integer(x, 'x')},${BuildKeys.integer(y, 'y')}`;
+    }
+
+    static block(bx, by) {
+        return `${BuildKeys.integer(bx, 'bx')},${BuildKeys.integer(by, 'by')}`;
+    }
+
+    static atom(x, y, face, half) {
+        return `${BuildKeys.cell(x, y)}/${BuildKeys.face(face)}/${BuildKeys.half(half)}`;
+    }
+
+    static parseCell(key) {
+        const match = /^(-?\d+),(-?\d+)$/.exec(String(key));
+        if (!match) throw new Error(`Invalid build cell key: ${key}`);
+        return { x: Number(match[1]), y: Number(match[2]) };
+    }
+
+    static parseBlock(key) {
+        const { x, y } = BuildKeys.parseCell(key);
+        return { bx: x, by: y };
+    }
+
+    static parseAtom(key) {
+        const match = /^(-?\d+),(-?\d+)\/(north|east|south|west)\/([01])$/.exec(String(key));
+        if (!match) throw new Error(`Invalid wall surface atom key: ${key}`);
+        return {
+            x: Number(match[1]),
+            y: Number(match[2]),
+            face: match[3],
+            half: Number(match[4])
+        };
+    }
+
+    static blocksOfCell(x, y) {
+        x = BuildKeys.integer(x, 'x');
+        y = BuildKeys.integer(y, 'y');
+        return Object.freeze([
+            Object.freeze([2 * x, 2 * y]),
+            Object.freeze([(2 * x) + 1, 2 * y]),
+            Object.freeze([2 * x, (2 * y) + 1]),
+            Object.freeze([(2 * x) + 1, (2 * y) + 1])
+        ]);
+    }
+
+    static lookBlock(x, y, face, half) {
+        x = BuildKeys.integer(x, 'x');
+        y = BuildKeys.integer(y, 'y');
+        half = BuildKeys.half(half);
+        switch (BuildKeys.face(face)) {
+            case 'north': return Object.freeze([2 * x + half, (2 * y) - 1]);
+            case 'south': return Object.freeze([2 * x + half, (2 * y) + 2]);
+            case 'west': return Object.freeze([(2 * x) - 1, 2 * y + half]);
+            case 'east': return Object.freeze([(2 * x) + 2, 2 * y + half]);
+        }
+    }
+
+    static integer(value, label) {
+        if (!Number.isInteger(value)) throw new Error(`${label} must be an integer`);
+        return value;
+    }
+
+    static face(value) {
+        if (!BuildKeys.FACES.includes(value)) throw new Error(`Invalid wall face: ${value}`);
+        return value;
+    }
+
+    static half(value) {
+        if (value !== 0 && value !== 1) throw new Error(`Atom half must be 0 or 1: ${value}`);
+        return value;
+    }
+}
+;
+/* -- js/Map/Build/StoreDelta.js -- */
+class StoreDelta {
+    static empty() {
+        return { set: {}, removed: [] };
+    }
+
+    static diff(authored, current) {
+        const before = StoreDelta.toMap(authored);
+        const after = StoreDelta.toMap(current);
+        const set = {};
+        const removed = [];
+        for (const key of [...before.keys()].sort()) {
+            if (!after.has(key)) removed.push(key);
+        }
+        for (const key of [...after.keys()].sort()) {
+            if (!before.has(key) || !StoreDelta.equal(before.get(key), after.get(key))) {
+                set[key] = StoreDelta.clone(after.get(key));
+            }
+        }
+        return { set, removed };
+    }
+
+    static apply(base, delta = StoreDelta.empty()) {
+        const result = new Map([...StoreDelta.toMap(base)].map(([key, value]) => [key, StoreDelta.clone(value)]));
+        for (const key of delta.removed || []) result.delete(String(key));
+        for (const [key, value] of Object.entries(delta.set || {})) result.set(key, StoreDelta.clone(value));
+        return new Map([...result].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
+    }
+
+    static invert(before, delta) {
+        const source = StoreDelta.toMap(before);
+        const inverse = StoreDelta.empty();
+        for (const key of Object.keys(delta?.set || {}).sort()) {
+            if (source.has(key)) inverse.set[key] = StoreDelta.clone(source.get(key));
+            else inverse.removed.push(key);
+        }
+        for (const key of [...(delta?.removed || [])].map(String).sort()) {
+            if (source.has(key)) inverse.set[key] = StoreDelta.clone(source.get(key));
+        }
+        return inverse;
+    }
+
+    static isEmpty(delta) {
+        return Object.keys(delta?.set || {}).length === 0 && (delta?.removed || []).length === 0;
+    }
+
+    static toMap(value) {
+        if (value instanceof Map) return value;
+        if (value?.snapshot instanceof Function) return value.snapshot();
+        return new Map(Object.entries(value || {}));
+    }
+
+    static equal(a, b) {
+        return StoreDelta.stableStringify(a) === StoreDelta.stableStringify(b);
+    }
+
+    static stableStringify(value) {
+        if (Array.isArray(value)) return `[${value.map(entry => StoreDelta.stableStringify(entry)).join(',')}]`;
+        if (value && typeof value === 'object') {
+            return `{${Object.keys(value).sort().map(key =>
+                `${JSON.stringify(key)}:${StoreDelta.stableStringify(value[key])}`
+            ).join(',')}}`;
+        }
+        return JSON.stringify(value);
+    }
+
+    static clone(value) {
+        if (value === undefined) return undefined;
+        return JSON.parse(JSON.stringify(value));
+    }
+}
+;
+/* -- js/Map/Build/BuildRecordStore.js -- */
+class BuildRecordStore {
+    constructor(records = []) {
+        this.records = new Map();
+        this.replace(records);
+    }
+
+    get size() { return this.records.size; }
+
+    has(key) { return this.records.has(String(key)); }
+
+    get(key) {
+        const value = this.records.get(String(key));
+        return value === undefined ? null : StoreDelta.clone(value);
+    }
+
+    keys() { return this.records.keys(); }
+
+    values() { return [...this.records.values()].map(StoreDelta.clone); }
+
+    entries() {
+        return [...this.records.entries()].map(([key, value]) => [key, StoreDelta.clone(value)]);
+    }
+
+    set(key, record) {
+        const normalizedKey = String(key);
+        const normalized = this.normalize(record, normalizedKey);
+        this.records.set(normalizedKey, StoreDelta.clone(normalized));
+        return this.get(normalizedKey);
+    }
+
+    delete(key) { return this.records.delete(String(key)); }
+
+    clear() { this.records.clear(); }
+
+    replace(records) {
+        this.clear();
+        const entries = records instanceof Map
+            ? records.entries()
+            : Array.isArray(records)
+                ? records.map(record => [this.keyOf(record), record])
+                : Object.entries(records || {});
+        for (const [key, record] of entries) this.set(key, record);
+        return this;
+    }
+
+    snapshot() {
+        return new Map(this.entries().sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
+    }
+
+    toObject() { return Object.fromEntries(this.entries()); }
+
+    applyDelta(delta) {
+        this.replace(StoreDelta.apply(this.records, delta));
+        return this;
+    }
+
+    diffFrom(authored) { return StoreDelta.diff(authored, this.records); }
+
+    keyOf(record) { return String(record?.id); }
+
+    normalize(record) { return StoreDelta.clone(record || {}); }
+}
+;
+/* -- js/Map/Build/BuildingPlanStore.js -- */
+class BuildingPlanStore extends BuildRecordStore {
+    keyOf(record) {
+        if (!record?.id) throw new Error('Building plans require an id');
+        return String(record.id);
+    }
+
+    normalize(record, key) {
+        const id = String(record?.id || key || '');
+        if (!id) throw new Error('Building plans require an id');
+        const displayName = String(record.displayName || record.authoredDisplayName || id);
+        return {
+            id,
+            displayName,
+            authoredDisplayName: String(record.authoredDisplayName || displayName),
+            exteriorFinishId: record.exteriorFinishId || null,
+            properties: StoreDelta.clone(record.properties || {})
+        };
+    }
+}
+;
+/* -- js/Map/Build/RoomPlanStore.js -- */
+class RoomPlanStore extends BuildRecordStore {
+    static ORIGINS = Object.freeze(['authored', 'detected', 'painted']);
+
+    keyOf(record) {
+        if (!record?.id) throw new Error('Room plans require an id');
+        return String(record.id);
+    }
+
+    normalize(record, key) {
+        const id = String(record?.id || key || '');
+        if (!id) throw new Error('Room plans require an id');
+        const displayName = String(record.displayName || record.authoredDisplayName || id);
+        const origin = RoomPlanStore.ORIGINS.includes(record.origin) ? record.origin : 'authored';
+        return {
+            id,
+            buildingId: record.buildingId == null ? null : String(record.buildingId),
+            displayName,
+            authoredDisplayName: String(record.authoredDisplayName || displayName),
+            roomType: record.roomType || null,
+            origin,
+            seedCells: RoomPlanStore.normalizeSeeds(record.seedCells),
+            floorFinishId: record.floorFinishId || null,
+            wallFinishId: record.wallFinishId || null,
+            priority: Number.isFinite(record.priority) ? record.priority : null,
+            properties: StoreDelta.clone(record.properties || {})
+        };
+    }
+
+    ownerOfSeed(cellKey) {
+        const { x, y } = BuildKeys.parseCell(cellKey);
+        const key = BuildKeys.cell(x, y);
+        return this.entries().find(([, room]) => room.seedCells.includes(key))?.[0] || null;
+    }
+
+    assignSeed(roomId, cellKey) {
+        const targetId = String(roomId);
+        if (!this.has(targetId)) throw new Error(`Unknown room plan: ${targetId}`);
+        const key = RoomPlanStore.normalizeSeeds([cellKey])[0];
+        for (const [id, room] of this.entries()) {
+            const seedCells = room.seedCells.filter(existing => existing !== key);
+            if (id === targetId) seedCells.push(key);
+            if (seedCells.length !== room.seedCells.length || id === targetId) this.set(id, { ...room, seedCells });
+        }
+        return this.get(targetId);
+    }
+
+    removeSeed(roomId, cellKey) {
+        const room = this.get(roomId);
+        if (!room) return false;
+        const key = RoomPlanStore.normalizeSeeds([cellKey])[0];
+        const seedCells = room.seedCells.filter(existing => existing !== key);
+        if (seedCells.length === room.seedCells.length) return false;
+        this.set(room.id, { ...room, seedCells });
+        return true;
+    }
+
+    static normalizeSeeds(seedCells = []) {
+        return [...new Set(seedCells.map(key => {
+            if (Array.isArray(key)) return BuildKeys.cell(key[0], key[1]);
+            const { x, y } = BuildKeys.parseCell(key);
+            return BuildKeys.cell(x, y);
+        }))].sort((a, b) => {
+            const left = BuildKeys.parseCell(a);
+            const right = BuildKeys.parseCell(b);
+            return left.y - right.y || left.x - right.x;
+        });
+    }
+}
+;
+/* -- js/Map/Build/WallCellStore.js -- */
+class WallCellStore extends BuildRecordStore {
+    keyOf(record) {
+        return BuildKeys.cell(record?.x, record?.y);
+    }
+
+    normalize(record, key) {
+        const point = Number.isInteger(record?.x) && Number.isInteger(record?.y)
+            ? { x: record.x, y: record.y }
+            : BuildKeys.parseCell(key);
+        if (!record?.constructionId) throw new Error(`Wall cell ${key} requires constructionId`);
+        const heightCells = Number(record.heightCells);
+        if (!Number.isFinite(heightCells) || heightCells <= 0) throw new Error(`Wall cell ${key} requires a positive heightCells`);
+        return {
+            x: point.x,
+            y: point.y,
+            constructionId: String(record.constructionId),
+            heightCells,
+            connectGroup: String(record.connectGroup || record.constructionId),
+            buildingId: record.buildingId == null ? null : String(record.buildingId),
+            ...(record.bridged === true ? { bridged: true } : {}),
+            ...(record.opening ? { opening: StoreDelta.clone(record.opening) } : {})
+        };
+    }
+
+    setCell(x, y, record, options = {}) {
+        const buildingId = record.buildingId ?? options.inheritBuildingId ?? null;
+        return this.set(BuildKeys.cell(x, y), { ...record, x, y, buildingId });
+    }
+}
+;
+/* -- js/Map/Build/WallSurfaceAtomStore.js -- */
+class WallSurfaceAtomStore extends BuildRecordStore {
+    keyOf(record) {
+        return BuildKeys.atom(record?.x, record?.y, record?.face, record?.half);
+    }
+
+    normalize(record, key) {
+        const address = record && Number.isInteger(record.x)
+            ? { x: record.x, y: record.y, face: record.face, half: record.half }
+            : BuildKeys.parseAtom(key);
+        if (!record?.finishId) throw new Error(`Wall atom ${key} requires an explicit finishId`);
+        BuildKeys.atom(address.x, address.y, address.face, address.half);
+        return { ...address, finishId: String(record.finishId) };
+    }
+
+    atomsOfCell(x, y) {
+        const prefix = `${BuildKeys.cell(x, y)}/`;
+        return this.entries().filter(([key]) => key.startsWith(prefix)).map(([, atom]) => atom);
+    }
+
+    deleteCell(x, y) {
+        let changed = false;
+        for (const atom of this.atomsOfCell(x, y)) changed = this.delete(this.keyOf(atom)) || changed;
+        return changed;
+    }
+
+    copyCell(fromX, fromY, toX, toY) {
+        for (const atom of this.atomsOfCell(fromX, fromY)) {
+            this.set(this.keyOf({ ...atom, x: toX, y: toY }), { ...atom, x: toX, y: toY });
+        }
+    }
+
+    translateCells(cellKeys, dx, dy) {
+        const selected = new Set(cellKeys);
+        const moving = this.entries().filter(([, atom]) => selected.has(BuildKeys.cell(atom.x, atom.y)));
+        for (const [key] of moving) this.delete(key);
+        for (const [, atom] of moving) {
+            const moved = { ...atom, x: atom.x + dx, y: atom.y + dy };
+            this.set(this.keyOf(moved), moved);
+        }
+        return moving.length;
+    }
+}
+;
+/* -- js/Map/Build/AttachmentStore.js -- */
+class AttachmentStore extends BuildRecordStore {
+    keyOf(record) {
+        if (record?.id == null) throw new Error('Build attachments require an id');
+        return String(record.id);
+    }
+
+    normalize(record, key) {
+        const normalized = StoreDelta.clone(record || {});
+        normalized.id = String(record?.id ?? key);
+        return normalized;
+    }
+
+    translateCells(cellKeys, dx, dy) {
+        const selected = new Set(cellKeys || []);
+        const inside = point => Array.isArray(point) && selected.has(BuildKeys.cell(point[0], point[1]));
+        let changed = 0;
+        for (const [key, record] of this.entries()) {
+            const footprint = Array.isArray(record.cells) ? record.cells : null;
+            const from = footprint ? null : record.cells?.from;
+            const to = footprint ? null : record.cells?.to || from;
+            const moves = footprint
+                ? footprint.length > 0 && footprint.every(inside)
+                : inside(from) && inside(to);
+            if (!moves) continue;
+            const cells = footprint
+                ? footprint.map(([x, y]) => [x + dx, y + dy])
+                : { from: [from[0] + dx, from[1] + dy], to: [to[0] + dx, to[1] + dy] };
+            this.set(key, { ...record, cells });
+            changed++;
+        }
+        return changed;
+    }
+}
+;
+/* -- js/Map/Build/BuildDocument.js -- */
+class BuildDocument {
+    static VERSION = 8;
+    static DEFAULT_LEVEL_ID = 'level_ground';
+    static LEVEL_STORES = Object.freeze(['walls', 'atoms', 'rooms', 'openings', 'fixtures', 'attachments']);
+
+    constructor(authored = {}) {
+        this.buildings = new BuildingPlanStore(authored.buildings || []);
+        this.levels = {};
+        const levels = authored.levels || { [BuildDocument.DEFAULT_LEVEL_ID]: authored };
+        for (const [levelId, level] of Object.entries(levels)) this.levels[levelId] = this.createLevel(level);
+        if (!this.levels[BuildDocument.DEFAULT_LEVEL_ID]) this.levels[BuildDocument.DEFAULT_LEVEL_ID] = this.createLevel({});
+        this.authored = this.captureStores();
+    }
+
+    static fromMapData(mapData = {}) {
+        const walls = BuildDocument.collectWallCells(mapData.walls || {});
+        const wallGeometry = WallGeometry.compute(new Map(walls.map(cell => [BuildKeys.cell(cell.x, cell.y), cell])));
+        const buildingData = BuildDocument.collectBuildings(mapData, walls);
+        const defaultBuildingId = BuildDocument.slug(`${mapData.id || 'map'}_building`);
+        const fallbackBuildingId = buildingData.find(building => building.id === defaultBuildingId)?.id ||
+            (buildingData.length === 1 ? buildingData[0].id : null);
+        const rooms = BuildDocument.collectRooms(mapData, wallGeometry, fallbackBuildingId);
+        BuildDocument.applyAuthoredAssignments(
+            rooms, mapData.walls?.roomAssignments || {}, fallbackBuildingId, wallGeometry
+        );
+        return new BuildDocument({
+            buildings: buildingData,
+            levels: {
+                [BuildDocument.DEFAULT_LEVEL_ID]: {
+                    walls: walls.map(cell => ({
+                        x: cell.x,
+                        y: cell.y,
+                        constructionId: cell.constructionId || mapData.walls?.defaults?.constructionId,
+                        heightCells: Number(cell.heightCells) || Number(mapData.walls?.defaults?.heightCells) || 1,
+                        connectGroup: cell.connectGroup || mapData.walls?.defaults?.connectGroup,
+                        buildingId: BuildDocument.buildingIdFor(cell, buildingData, fallbackBuildingId),
+                        ...(cell.bridged === true ? { bridged: true } : {})
+                    })),
+                    atoms: BuildDocument.collectAtoms(mapData.walls?.faceOverrides || []),
+                    rooms,
+                    openings: mapData.walls?.openings || [],
+                    fixtures: mapData.walls?.fixtures || [],
+                    attachments: mapData.walls?.attachments || []
+                }
+            }
+        });
+    }
+
+    static collectWallCells(wallData) {
+        const defaults = wallData.defaults || {};
+        const cells = new Map((wallData.cells || []).map(cell => [BuildKeys.cell(cell.x, cell.y), { ...cell }]));
+        for (const opening of wallData.openings || []) for (const point of opening.cells || []) {
+            const [x, y] = Array.isArray(point) ? point : [point?.x, point?.y];
+            if (!Number.isInteger(x) || !Number.isInteger(y)) continue;
+            const key = BuildKeys.cell(x, y);
+            if (!cells.has(key)) cells.set(key, { ...defaults, x, y, bridged: true });
+        }
+        return [...cells.values()];
+    }
+
+    createLevel(level = {}) {
+        return {
+            walls: new WallCellStore(level.walls || []),
+            atoms: new WallSurfaceAtomStore(level.atoms || []),
+            rooms: new RoomPlanStore(level.rooms || []),
+            openings: new AttachmentStore(level.openings || []),
+            fixtures: new AttachmentStore(level.fixtures || []),
+            attachments: new AttachmentStore(level.attachments || [])
+        };
+    }
+
+    level(levelId = BuildDocument.DEFAULT_LEVEL_ID) {
+        const level = this.levels[levelId];
+        if (!level) throw new Error(`Unknown build level: ${levelId}`);
+        return level;
+    }
+
+    captureStores() {
+        return {
+            buildings: this.buildings.snapshot(),
+            levels: Object.fromEntries(Object.entries(this.levels).map(([levelId, level]) => [levelId,
+                Object.fromEntries(BuildDocument.LEVEL_STORES.map(name => [name, level[name].snapshot()]))
+            ]))
+        };
+    }
+
+    serialize() {
+        return {
+            version: BuildDocument.VERSION,
+            buildings: StoreDelta.diff(this.authored.buildings, this.buildings),
+            levels: Object.fromEntries(Object.entries(this.levels).map(([levelId, level]) => [levelId,
+                Object.fromEntries(BuildDocument.LEVEL_STORES.map(name => [
+                    name, StoreDelta.diff(this.authored.levels[levelId]?.[name], level[name])
+                ]))
+            ])),
+            presentation: StoreDelta.clone(this.presentation || {})
+        };
+    }
+
+    restore(payload, options = {}) {
+        this.reset();
+        if (!payload) return { restored: false, reset: false };
+        if (Number(payload.version) <= 7) {
+            options.onLegacyReset?.('Build edits were reset for the new build system');
+            return { restored: false, reset: true };
+        }
+        if (Number(payload.version) !== BuildDocument.VERSION) {
+            throw new Error(`Unsupported build document version: ${payload.version}`);
+        }
+        this.buildings.applyDelta(payload.buildings);
+        for (const [levelId, levelDelta] of Object.entries(payload.levels || {})) {
+            if (!this.levels[levelId]) this.levels[levelId] = this.createLevel({});
+            for (const name of BuildDocument.LEVEL_STORES) this.levels[levelId][name].applyDelta(levelDelta[name]);
+        }
+        this.presentation = StoreDelta.clone(payload.presentation || {});
+        return { restored: true, reset: false };
+    }
+
+    reset() {
+        this.buildings.replace(this.authored.buildings);
+        for (const levelId of Object.keys(this.levels)) {
+            if (!this.authored.levels[levelId]) delete this.levels[levelId];
+        }
+        for (const [levelId, stores] of Object.entries(this.authored.levels)) {
+            if (!this.levels[levelId]) this.levels[levelId] = this.createLevel({});
+            for (const name of BuildDocument.LEVEL_STORES) this.levels[levelId][name].replace(stores[name]);
+        }
+        this.presentation = {};
+    }
+
+    replaceCurrent(snapshot) {
+        this.buildings.replace(snapshot.buildings || {});
+        for (const levelId of Object.keys(this.levels)) {
+            if (!snapshot.levels?.[levelId]) delete this.levels[levelId];
+        }
+        for (const [levelId, stores] of Object.entries(snapshot.levels || {})) {
+            if (!this.levels[levelId]) this.levels[levelId] = this.createLevel({});
+            for (const name of BuildDocument.LEVEL_STORES) this.levels[levelId][name].replace(stores[name] || {});
+        }
+        return this;
+    }
+
+    static collectBuildings(mapData, walls) {
+        const names = new Map();
+        const add = (id, displayName) => {
+            const normalizedId = BuildDocument.slug(id || displayName);
+            if (normalizedId) names.set(normalizedId, String(displayName || id));
+        };
+        for (const wall of walls) if (wall.buildingId || wall.buildingName) add(wall.buildingId || wall.buildingName, wall.buildingName || wall.buildingId);
+        for (const room of mapData.environment?.rooms || []) {
+            const props = room.properties || {};
+            if (props.buildingId || props.buildingName) add(props.buildingId || props.buildingName, props.buildingName || props.buildingId);
+        }
+        if (walls.some(wall => !wall.buildingId && !wall.buildingName)) {
+            add(mapData.properties?.buildingId || `${mapData.id || 'map'}_building`,
+                mapData.properties?.buildingName || mapData.displayName || mapData.name || 'Building');
+        }
+        return [...names].map(([id, displayName]) => ({
+            id,
+            displayName,
+            authoredDisplayName: displayName,
+            exteriorFinishId: mapData.properties?.exteriorWallFinishId || null,
+            properties: {}
+        }));
+    }
+
+    static collectRooms(mapData, geometry, fallbackBuildingId) {
+        const cellSize = Number(mapData.tileWidth) || 32;
+        return (mapData.environment?.rooms || []).map(source => {
+            const props = source.properties || {};
+            const id = String(source.id || props.roomId || BuildDocument.slug(source.displayName));
+            return {
+                id,
+                buildingId: props.buildingId ? BuildDocument.slug(props.buildingId) :
+                    props.buildingName ? BuildDocument.slug(props.buildingName) : fallbackBuildingId,
+                displayName: source.displayName || props.displayName || id,
+                authoredDisplayName: source.displayName || props.displayName || id,
+                roomType: props.roomType || props.zoneType || null,
+                origin: 'authored',
+                seedCells: BuildDocument.seedCellsForRoom(source, cellSize)
+                    .filter(key => !geometry.cells.has(key) && !geometry.thresholds.has(key)),
+                floorFinishId: props.floorFinishId || null,
+                wallFinishId: props.wallFinishId || null,
+                priority: Number.isFinite(props.priority) ? props.priority : null,
+                properties: StoreDelta.clone(props)
+            };
+        });
+    }
+
+    static seedCellsForRoom(room, cellSize) {
+        if (Array.isArray(room.tilemask?.cells)) return RoomPlanStore.normalizeSeeds(room.tilemask.cells);
+        const bounds = room.bounds || {};
+        const x0 = Math.floor((Number(bounds.x) || 0) / cellSize);
+        const y0 = Math.floor((Number(bounds.y) || 0) / cellSize);
+        const x1 = Math.ceil(((Number(bounds.x) || 0) + (Number(bounds.width) || 0)) / cellSize) - 1;
+        const y1 = Math.ceil(((Number(bounds.y) || 0) + (Number(bounds.height) || 0)) / cellSize) - 1;
+        const polygon = Array.isArray(room.polygon) ? room.polygon.map(point => ({
+            x: (Number(bounds.x) || 0) + (Number(point.x) || 0),
+            y: (Number(bounds.y) || 0) + (Number(point.y) || 0)
+        })) : null;
+        const cells = [];
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+            const px = (x + 0.5) * cellSize;
+            const py = (y + 0.5) * cellSize;
+            if (!polygon || BuildDocument.pointInPolygon(px, py, polygon)) cells.push(BuildKeys.cell(x, y));
+        }
+        return cells;
+    }
+
+    static applyAuthoredAssignments(rooms, assignments, fallbackBuildingId, geometry) {
+        for (const [key, roomIdValue] of Object.entries(assignments)) {
+            if (geometry.cells.has(key) || geometry.thresholds.has(key)) continue;
+            const roomId = String(roomIdValue);
+            let room = rooms.find(candidate => candidate.id === roomId);
+            if (!room) {
+                room = { id: roomId, buildingId: fallbackBuildingId, displayName: roomId,
+                    authoredDisplayName: roomId, roomType: null, origin: 'authored', seedCells: [],
+                    floorFinishId: null, wallFinishId: null, priority: null, properties: {} };
+                rooms.push(room);
+            }
+            for (const candidate of rooms) candidate.seedCells = candidate.seedCells.filter(existing => existing !== key);
+            room.seedCells.push(key);
+        }
+    }
+
+    static collectAtoms(overrides) {
+        const atoms = new Map();
+        for (const override of overrides) {
+            const from = override.cells?.from || [0, 0];
+            const to = override.cells?.to || from;
+            for (let y = Math.min(from[1], to[1]); y <= Math.max(from[1], to[1]); y++) {
+                for (let x = Math.min(from[0], to[0]); x <= Math.max(from[0], to[0]); x++) {
+                    for (const half of override.halves?.length ? override.halves : [0, 1]) {
+                        const atom = { x, y, face: override.face, half, finishId: override.finishId };
+                        atoms.set(BuildKeys.atom(x, y, override.face, half), atom);
+                    }
+                }
+            }
+        }
+        return atoms;
+    }
+
+    static buildingIdFor(record, buildings, fallback) {
+        const requested = record.buildingId || record.buildingName;
+        if (!requested) return fallback;
+        const id = BuildDocument.slug(requested);
+        return buildings.some(building => building.id === id) ? id : fallback;
+    }
+
+    static slug(value) {
+        return String(value || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+    }
+
+    static pointInPolygon(x, y, points) {
+        let inside = false;
+        for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+            const a = points[i];
+            const b = points[j];
+            if (((a.y > y) !== (b.y > y)) && x < ((b.x - a.x) * (y - a.y)) / ((b.y - a.y) || Number.EPSILON) + a.x) inside = !inside;
+        }
+        return inside;
+    }
+}
+;
+/* -- js/Map/Build/BuildTransaction.js -- */
+class BuildTransaction {
+    constructor(options = {}) {
+        if (!options.document) throw new Error('BuildTransaction requires a BuildDocument');
+        this.document = options.document;
+        this.levelId = options.levelId || BuildDocument.DEFAULT_LEVEL_ID;
+        this.width = Number(options.width);
+        this.height = Number(options.height);
+        this.reachBlocks = Number(options.reachBlocks) || 1;
+        this.geometryOptions = options.geometryOptions || {};
+        this.cellSize = Number(options.cellSize) || 32;
+        this.validate = options.validate || null;
+        this.regionManager = options.regionManager || null;
+        this.eventManager = options.eventManager || null;
+        this.history = options.history || null;
+        this.onCommit = options.onCommit || null;
+        this.renderers = options.renderers || {};
+        this.revision = 0;
+        this.cache = null;
+        this.undoStack = [];
+        this.redoStack = [];
+        this._active = false;
+        this._stats = {
+            transactions: 0,
+            wallRebuilds: 0,
+            ownershipSolves: 0,
+            topologyRebuilds: 0,
+            floorChunksRedrawn: 0,
+            wallPiecesRedrawn: 0,
+            hitTests: 0,
+            imageDataReads: 0
+        };
+    }
+
+    run(label, edit, options = {}) {
+        if (this._active) throw new Error('Build transactions cannot be nested');
+        if (typeof edit !== 'function') throw new Error('BuildTransaction.run requires an edit callback');
+        this._active = true;
+        const before = this.document.captureStores();
+        try {
+            const draft = new BuildDocument(before);
+            edit(draft, draft.level(this.levelId));
+            this.assertValid(draft);
+            const derived = this.derive(draft, { proposeSeeds: true, previousGrid: this.cache?.grid });
+            const after = draft.captureStores();
+            const forward = BuildTransaction.diffDocuments(before, after);
+            if (BuildTransaction.deltaIsEmpty(forward)) return { committed: false, label };
+            const inverse = BuildTransaction.diffDocuments(after, before);
+            return this.commit({ label, before, after, forward, inverse, derived, recordHistory: options.recordHistory !== false });
+        } finally {
+            this._active = false;
+        }
+    }
+
+    preview(edit) {
+        const before = this.document.captureStores();
+        const draft = new BuildDocument(before);
+        edit(draft, draft.level(this.levelId));
+        this.assertValid(draft);
+        return Object.freeze({
+            ...this.derive(draft, { proposeSeeds: true, previousGrid: this.cache?.grid, count: false }),
+            document: draft
+        });
+    }
+
+    initialize() {
+        if (this.cache) return this.cache;
+        this.cache = this.derive(this.document, { proposeSeeds: true, count: false });
+        this.document.authored = this.document.captureStores();
+        RoomRegionProjection.sync(
+            this.regionManager,
+            this.document.level(this.levelId).rooms,
+            this.cache.grid,
+            this.cache.topology,
+            this.cellSize
+        );
+        this.renderers.floors?.setOwnershipGrid?.(this.cache.grid);
+        return this.cache;
+    }
+
+    reconcile(label = 'Reconcile build state', { renderWalls = false } = {}) {
+        const before = this.document.captureStores();
+        const draft = new BuildDocument(before);
+        const derived = this.derive(draft, { proposeSeeds: true, previousGrid: this.cache?.grid });
+        const after = draft.captureStores();
+        return this.commit({
+            label,
+            before,
+            after,
+            forward: BuildTransaction.diffDocuments(before, after),
+            inverse: BuildTransaction.diffDocuments(after, before),
+            derived,
+            recordHistory: false,
+            skipWallRender: !renderWalls,
+            forceWallGeometry: renderWalls
+        });
+    }
+
+    undo() {
+        const entry = this.undoStack.pop();
+        if (!entry) return false;
+        this.replay(entry.label, entry.inverse, false);
+        this.redoStack.push(entry);
+        return true;
+    }
+
+    redo() {
+        const entry = this.redoStack.pop();
+        if (!entry) return false;
+        this.replay(entry.label, entry.forward, false);
+        this.undoStack.push(entry);
+        return true;
+    }
+
+    replay(label, delta, recordHistory = false) {
+        const before = this.document.captureStores();
+        const draft = new BuildDocument(before);
+        BuildTransaction.applyDocumentDelta(draft, delta);
+        const derived = this.derive(draft, { proposeSeeds: false, previousGrid: this.cache?.grid });
+        const after = draft.captureStores();
+        return this.commit({
+            label, before, after, forward: delta,
+            inverse: BuildTransaction.diffDocuments(after, before),
+            derived, recordHistory
+        });
+    }
+
+    derive(draft, options = {}) {
+        const level = draft.level(this.levelId);
+        const revision = this.revision + 1;
+        const geometry = WallGeometry.compute(level.walls.snapshot(), { ...this.geometryOptions, revision });
+        if (options.count !== false) this._stats.wallRebuilds++;
+        if (options.proposeSeeds) {
+            const proposal = RoomTopology.proposeSeeds({
+                width: this.width, height: this.height, geometry,
+                plans: level.rooms, previousGrid: options.previousGrid
+            });
+            level.rooms.replace(proposal.plans);
+        }
+        const grid = FloorOwnershipResolver.solve({
+            width: this.width,
+            height: this.height,
+            walls: new Map([...geometry.cells].map(([key, cell]) => [key, { ...cell, mask: geometry.masks.get(key) }])),
+            expandCells: [...geometry.thresholds],
+            plans: BuildTransaction.seedsOffThresholds(level.rooms.values(), geometry.thresholds),
+            reachBlocks: this.reachBlocks,
+            revision
+        });
+        if (options.count !== false) this._stats.ownershipSolves++;
+        const topology = RoomTopology.compute({
+            width: this.width, height: this.height, geometry, grid,
+            plans: level.rooms, openings: level.openings.values(), revision
+        });
+        if (options.count !== false) this._stats.topologyRebuilds++;
+        return Object.freeze({ geometry, grid, topology, revision });
+    }
+
+    /**
+     * Drops threshold cells from every plan's seeds before ownership is solved.
+     *
+     * A threshold is an open cell in the line of a wall — what a doorway gap
+     * is — and it belongs to both sides of that wall. Seeding it hands the
+     * whole cell to whichever plan happened to cover it, so a doorway wears one
+     * room's floor right across to the far side instead of the two floors
+     * meeting in the opening. Dropped from the seed list, it is reached by
+     * expansion from each side and splits on its centreline.
+     *
+     * Painted plans are included. Painting across a doorway says which floor
+     * goes there, not that one room now owns the whole opening.
+     */
+    static seedsOffThresholds(plans, thresholds) {
+        const list = [...plans];
+        if (!thresholds?.size) return list;
+        return list.map(plan => (plan.seedCells || []).some(key => thresholds.has(key))
+            ? { ...plan, seedCells: plan.seedCells.filter(key => !thresholds.has(key)) }
+            : plan);
+    }
+
+    commit(data) {
+        const previousGrid = this.cache?.grid || null;
+        this.document.replaceCurrent(data.after);
+        this.revision++;
+        this.cache = data.derived;
+        const dirty = BuildTransaction.dirty(
+            data.before,
+            data.after,
+            previousGrid,
+            this.cache.grid,
+            this.levelId,
+            data.derived.geometry,
+            data.derived.topology
+        );
+        const regions = RoomRegionProjection.sync(
+            this.regionManager,
+            this.document.level(this.levelId).rooms,
+            data.derived.grid,
+            data.derived.topology,
+            this.cellSize
+        );
+        if (!data.skipWallRender && (dirty.cells.length > 0 || data.forceWallGeometry)) {
+            const wallCells = data.forceWallGeometry ? [...data.derived.geometry.cells.keys()] : dirty.cells;
+            this._stats.wallPiecesRedrawn += Number(this.renderers.walls?.invalidate?.(wallCells, {
+                geometryChanged: dirty.geometryChanged || data.forceWallGeometry === true,
+                recordsChanged: dirty.recordsChanged
+            })) || 0;
+        }
+        this.renderers.floors?.setOwnershipGrid?.(data.derived.grid);
+        this._stats.floorChunksRedrawn += Number(this.renderers.floors?.invalidate?.(dirty.blocks)) || 0;
+        const event = Object.freeze({
+            label: data.label,
+            deltas: data.forward,
+            dirty,
+            revision: this.revision,
+            geometry: data.derived.geometry,
+            grid: data.derived.grid,
+            topology: data.derived.topology,
+            regions
+        });
+        this._stats.transactions++;
+        this.eventManager?.emit?.('build:committed', event);
+        this.onCommit?.(event);
+        if (data.recordHistory) this.recordHistory(data.label, data.forward, data.inverse);
+        return { committed: true, ...event };
+    }
+
+    recordHistory(label, forward, inverse) {
+        const entry = { label, forward, inverse };
+        const recorded = this.history?.push?.({
+            label,
+            undo: () => this.replay(label, inverse, false),
+            redo: () => this.replay(label, forward, false)
+        });
+        if (recorded) return;
+        this.undoStack.push(entry);
+        this.redoStack.length = 0;
+    }
+
+    assertValid(draft) {
+        const result = this.validate?.(draft);
+        if (result === false || result?.allowed === false) {
+            throw new Error(result?.reason || 'Build edit was rejected');
+        }
+    }
+
+    stats() { return Object.freeze({ ...this._stats }); }
+
+    static diffDocuments(before, after) {
+        const levels = {};
+        const levelIds = new Set([...Object.keys(before.levels || {}), ...Object.keys(after.levels || {})]);
+        for (const levelId of [...levelIds].sort()) {
+            levels[levelId] = Object.fromEntries(BuildDocument.LEVEL_STORES.map(name => [
+                name, StoreDelta.diff(before.levels?.[levelId]?.[name], after.levels?.[levelId]?.[name])
+            ]));
+        }
+        return { buildings: StoreDelta.diff(before.buildings, after.buildings), levels };
+    }
+
+    static applyDocumentDelta(document, delta) {
+        document.buildings.applyDelta(delta.buildings);
+        for (const [levelId, levelDelta] of Object.entries(delta.levels || {})) {
+            if (!document.levels[levelId]) document.levels[levelId] = document.createLevel({});
+            for (const name of BuildDocument.LEVEL_STORES) document.levels[levelId][name].applyDelta(levelDelta[name]);
+        }
+    }
+
+    static deltaIsEmpty(delta) {
+        return StoreDelta.isEmpty(delta.buildings) && Object.values(delta.levels || {}).every(level =>
+            BuildDocument.LEVEL_STORES.every(name => StoreDelta.isEmpty(level[name]))
+        );
+    }
+
+    static dirty(before, after, previousGrid, nextGrid, levelId = BuildDocument.DEFAULT_LEVEL_ID,
+        geometry = null, topology = null) {
+        const cells = new Set();
+        const addCellDelta = delta => {
+            for (const key of [...Object.keys(delta.set || {}), ...(delta.removed || [])]) {
+                const cellKey = key.includes('/') ? key.split('/')[0] : key;
+                if (/^-?\d+,-?\d+$/.test(cellKey)) cells.add(cellKey);
+            }
+        };
+        const wallDelta = StoreDelta.diff(before.levels?.[levelId]?.walls, after.levels?.[levelId]?.walls);
+        addCellDelta(wallDelta);
+        addCellDelta(StoreDelta.diff(before.levels?.[levelId]?.atoms, after.levels?.[levelId]?.atoms));
+        const buildingDelta = StoreDelta.diff(before.buildings, after.buildings);
+        const previousBuilding = id => before.buildings instanceof Map
+            ? before.buildings.get(id)
+            : before.buildings?.[id];
+        const nextWalls = after.levels?.[levelId]?.walls;
+        for (const [buildingId, building] of Object.entries(buildingDelta.set || {})) {
+            if ((previousBuilding(buildingId)?.exteriorFinishId ?? null) ===
+                (building?.exteriorFinishId ?? null)) continue;
+            const wallValues = nextWalls instanceof Map ? nextWalls.values() : Object.values(nextWalls || {});
+            for (const wall of wallValues) if (wall.buildingId === buildingId) {
+                cells.add(BuildKeys.cell(wall.x, wall.y));
+            }
+        }
+        const structuralCells = new Set([...Object.keys(wallDelta.set || {}), ...(wallDelta.removed || [])]);
+        const recordsChanged = { openings: false, fixtures: false, attachments: false };
+        const addRecordCells = (storeName) => {
+            const delta = StoreDelta.diff(before.levels?.[levelId]?.[storeName], after.levels?.[levelId]?.[storeName]);
+            const previousStore = before.levels?.[levelId]?.[storeName];
+            const previous = key => previousStore instanceof Map ? previousStore.get(key) : previousStore?.[key];
+            const take = record => {
+                const points = Array.isArray(record?.cells)
+                    ? record.cells
+                    : [record?.cells?.from, record?.cells?.to || record?.cells?.from];
+                for (const point of points.filter(Array.isArray)) cells.add(BuildKeys.cell(point[0], point[1]));
+            };
+            for (const record of Object.values(delta.set || {})) take(record);
+            for (const key of delta.removed || []) take(previous(key));
+            recordsChanged[storeName] = !StoreDelta.isEmpty(delta);
+        };
+        for (const storeName of Object.keys(recordsChanged)) addRecordCells(storeName);
+        const blocks = nextGrid ? [...structuralCells].flatMap(key => {
+            const { x, y } = BuildKeys.parseCell(key);
+            return BuildKeys.blocksOfCell(x, y).map(([bx, by]) => BuildKeys.block(bx, by));
+        }) : [];
+        if (previousGrid && nextGrid) {
+            for (let by = 0; by < nextGrid.blockHeight; by++) for (let bx = 0; bx < nextGrid.blockWidth; bx++) {
+                if (previousGrid.ownerAt(bx, by) !== nextGrid.ownerAt(bx, by)) blocks.push(BuildKeys.block(bx, by));
+            }
+        }
+        const roomDelta = StoreDelta.diff(before.levels?.[levelId]?.rooms, after.levels?.[levelId]?.rooms);
+        const previousRooms = before.levels?.[levelId]?.rooms;
+        const previousRoom = roomId => previousRooms instanceof Map
+            ? previousRooms.get(roomId)
+            : previousRooms?.[roomId];
+        if (nextGrid) {
+            for (const [roomId, room] of Object.entries(roomDelta.set || {})) {
+                const previous = previousRoom(roomId);
+                if ((previous?.floorFinishId ?? null) !== (room?.floorFinishId ?? null)) {
+                    for (const [bx, by] of nextGrid.blocksOf(roomId)) blocks.push(BuildKeys.block(bx, by));
+                }
+            }
+        }
+        if (nextGrid && geometry) for (const [roomId, room] of Object.entries(roomDelta.set || {})) {
+            const previous = previousRoom(roomId);
+            if ((previous?.wallFinishId ?? null) === (room?.wallFinishId ?? null)) continue;
+            for (const cell of geometry.cells.values()) {
+                const ownsFace = BuildKeys.FACES.some(face => [0, 1].some(half =>
+                    WallFaceResolver.classify(
+                        { x: cell.x, y: cell.y, face, half },
+                        nextGrid,
+                        { ...topology, walls: geometry }
+                    ).roomId === roomId
+                ));
+                if (ownsFace) cells.add(BuildKeys.cell(cell.x, cell.y));
+            }
+        }
+        return Object.freeze({
+            cells: Object.freeze([...cells].sort()),
+            blocks: Object.freeze([...new Set(blocks)].sort()),
+            geometryChanged: structuralCells.size > 0,
+            recordsChanged: Object.freeze(recordsChanged)
+        });
+    }
+}
+;
 /* -- js/Map/Regions/SpatialRegion.js -- */
 // ─────────────────────────────────────────────────────────────────────────────
 // SpatialRegion — one geometry primitive for every "area of the map" concept.
@@ -36310,7 +37282,9 @@ class SpatialRegion {
             // Store as a Set of packed cell keys so `contains` is O(1).
             const cells = shape.cells instanceof Set
                 ? shape.cells
-                : new Set((shape.cells ?? []).map(c => (Array.isArray(c) ? `${c[0]},${c[1]}` : `${c.x},${c.y}`)));
+                : new Set((shape.cells ?? []).map(c => typeof c === 'string'
+                    ? c
+                    : (Array.isArray(c) ? `${c[0]},${c[1]}` : `${c.x},${c.y}`)));
             return {
                 kind: 'tilemask',
                 cells,
@@ -36639,908 +37613,313 @@ class RegionManager {
     }
 }
 ;
-/* -- js/Map/Regions/RoomAssignments.js -- */
-// ─────────────────────────────────────────────────────────────────────────────
-// RoomAssignments — the player saying which room a patch of floor belongs to.
-//
-// Rooms are normally worked out from the walls, and that is right nearly all of
-// the time. It has one gap, and it is a shape people actually build: a kitchen
-// opening onto a dining room is two rooms with two floors and no wall anywhere
-// between them, and a flood fill cannot find a room that nothing encloses.
-//
-// The first attempt at this drew boundary LINES on the grid seams. It worked and
-// nobody could use it: a line is a statement about two rooms at once, it is
-// invisible until you tint the rooms, it only ever split — never merged, never
-// grew — and the panel needed three paragraphs to explain what a click did.
-//
-// This stores the obvious thing instead: a cell, and the room it is in. Every
-// operation anyone actually wants falls out of painting cells, with no new
-// concepts and no modes:
-//
-//   split    paint half the space as a new room
-//   merge    paint one room's floor with the other room
-//   grow     paint the cells next door
-//   erase    paint them back to nobody, and the walls decide again
-//
-// An assignment OVERRIDES what the walls say; a cell nobody has painted still
-// belongs to whatever encloses it. So the system stays wall-driven by default
-// and the player only overrules it where they mean to.
-// ─────────────────────────────────────────────────────────────────────────────
-class RoomAssignments {
-    // Painted rooms need an id of their own from the moment they are painted:
-    // they exist because somebody said so, not because a wall enclosed them, so
-    // there is nothing to re-derive the id from on the next pass. The prefix
-    // keeps them apart from `room_auto_*`, which IS re-derived every time.
-    static PAINTED_PREFIX = 'room_painted_';
-
-    constructor(gameMap) {
-        this.gameMap = gameMap;
-        this.cells = new Map();
-    }
-
-    static key(x, y) {
-        return `${x},${y}`;
-    }
-
-    get size() {
-        return this.cells.size;
-    }
-
-    get(x, y) {
-        return this.cells.get(RoomAssignments.key(x, y)) ?? null;
-    }
-
-    roomIds() {
-        return [...new Set(this.cells.values())];
-    }
-
-    cellsFor(roomId) {
-        return [...this.cells].filter(([, id]) => id === roomId).map(([key]) => key);
-    }
-
-    /** The next free painted-room id. Numbered so two of them are tellable apart. */
-    mintRoomId() {
-        const taken = new Set([
-            ...this.roomIds(),
-            ...(this.gameMap?.regionManager?.all('room') ?? []).map(room => room.id)
-        ]);
-        for (let index = 1; ; index++) {
-            const id = `${RoomAssignments.PAINTED_PREFIX}${index}`;
-            if (!taken.has(id)) return id;
-        }
-    }
-
-    /**
-     * The authoritative edit. Mirrors the wall builder's applyWallCellChanges so
-     * both build tools report their work the same way and share one undo stack.
-     *
-     * @param {Array<{x: number, y: number, roomId: string|null}>} changes
-     * @returns {{applied: Array, inverse: Array}|null}
-     */
-    applyChanges(changes, { emit = true } = {}) {
-        if (!Array.isArray(changes) || changes.length === 0) return null;
-        const applied = [];
-        const inverse = [];
-        for (const change of changes) {
-            if (!Number.isInteger(change?.x) || !Number.isInteger(change?.y)) continue;
-            const key = RoomAssignments.key(change.x, change.y);
-            const had = this.cells.get(key) ?? null;
-            const next = change.roomId ?? null;
-            if (had === next) continue;
-            if (next === null) this.cells.delete(key);
-            else this.cells.set(key, next);
-            applied.push({ x: change.x, y: change.y, roomId: next });
-            inverse.push({ x: change.x, y: change.y, roomId: had });
-        }
-        if (applied.length === 0) return { applied, inverse };
-        if (emit) this.emitChanged();
-        return { applied, inverse };
-    }
-
-    /**
-     * Drops assignments that have stopped meaning anything — a cell that a wall
-     * now stands on, or one pointing at a room that no longer exists.
-     *
-     * Without this, building over a painted room and knocking the wall down
-     * again resurrects a room the player stopped thinking about weeks ago.
-     */
-    prune({ emit = true } = {}) {
-        const walls = this.gameMap?.wallBuilder?.cells;
-        const doomed = [...this.cells.keys()].filter(key => walls?.has(key));
-        if (doomed.length === 0) return [];
-        for (const key of doomed) this.cells.delete(key);
-        if (emit) this.emitChanged();
-        return doomed;
-    }
-
-    emitChanged() {
-        this.gameMap?.eventManager?.emit(EVENTS.ROOM_ASSIGNMENTS_CHANGED, {
-            mapId: this.gameMap?.id,
-            assignments: this
+/* -- js/Map/Regions/RoomTopology.js -- */
+class RoomTopology {
+    static compute(input) {
+        const width = RoomTopology.dimension(input?.width, 'width');
+        const height = RoomTopology.dimension(input?.height, 'height');
+        const geometry = input.geometry || WallGeometry.compute(input.walls || new Map());
+        const plans = RoomTopology.planList(input.plans);
+        const grid = input.grid;
+        const components = RoomTopology.openComponents(width, height, geometry.cells);
+        const componentByCell = new Map(components.flatMap(component =>
+            component.cells.map(key => [key, component])
+        ));
+        const planStates = new Map(plans.map(plan => {
+            const spaces = [...new Set(plan.seedCells.map(key => componentByCell.get(key)).filter(Boolean))];
+            const primary = spaces.sort((a, b) => b.cells.length - a.cells.length || a.id.localeCompare(b.id))[0] || null;
+            return [plan.id, Object.freeze({
+                roomId: plan.id,
+                indoor: spaces.some(space => space.enclosed),
+                openSpaceId: primary?.id || null,
+                componentIds: Object.freeze(spaces.map(space => space.id).sort())
+            })];
+        }));
+        const enrichedComponents = components.map(component => Object.freeze({
+            ...component,
+            planIds: Object.freeze(plans.filter(plan => plan.seedCells.some(key => componentByCell.get(key) === component)).map(plan => plan.id).sort())
+        }));
+        const loopByBlock = RoomTopology.loopBlocks(enrichedComponents);
+        const adjacency = RoomTopology.openingAdjacency(input.openings || [], grid);
+        const roofableByBuilding = RoomTopology.roofableFootprints(plans, planStates, geometry.cells, grid);
+        const shellEdgesByBuilding = new Map([...roofableByBuilding].map(([buildingId, cells]) => [
+            buildingId, Object.freeze(RoomTopology.boundaryEdges(cells))
+        ]));
+        return Object.freeze({
+            revision: Number(input.revision) || 0,
+            components: Object.freeze(enrichedComponents),
+            openSpaces: Object.freeze(enrichedComponents.filter(component => !component.planIds.length)),
+            planStates,
+            adjacency: Object.freeze(adjacency),
+            loopByBlock,
+            roofableByBuilding,
+            shellEdgesByBuilding,
+            componentAtCell: (x, y) => componentByCell.get(BuildKeys.cell(x, y)) || null,
+            loopAtBlock: (bx, by) => loopByBlock.get(BuildKeys.block(bx, by)) || null,
+            roofableFootprint: buildingId => new Set(roofableByBuilding.get(String(buildingId)) || []),
+            exposedWallTopEdges: buildingId => shellEdgesByBuilding.get(String(buildingId)) || []
         });
     }
 
-    serializeState() {
-        return this.cells.size > 0 ? Object.fromEntries(this.cells) : null;
-    }
-
-    restoreState(data, { emit = true } = {}) {
-        this.cells = new Map(Object.entries(data || {}));
-        if (emit) this.emitChanged();
-        return this.cells.size;
-    }
-
-    dispose() {
-        this.cells.clear();
-        this.gameMap = null;
-    }
-}
-;
-/* -- js/Map/Regions/RoomEnclosureDetector.js -- */
-class RoomEnclosureDetector {
-    constructor(gameMap) {
-        this.gameMap = gameMap;
-        this._timer = null;
-        this._unsubscribers = [];
-        this.subscribe();
-    }
-
-    subscribe() {
-        const events = this.gameMap?.eventManager;
-        if (!events) return;
-
-        const scheduleForMap = payload => {
-            if (!payload?.mapId || payload.mapId === this.gameMap?.id) this.schedule();
-        };
-        this._unsubscribers.push(events.on(EVENTS.WALL_READY, scheduleForMap));
-        this._unsubscribers.push(events.on(EVENTS.WALL_GEOMETRY_CHANGED, scheduleForMap));
-        // Painting a cell into a room changes which room it is in without
-        // changing a single wall, so it has to drive the same recompute —
-        // otherwise the paint does nothing until you next touch masonry.
-        this._unsubscribers.push(events.on(EVENTS.ROOM_ASSIGNMENTS_CHANGED, scheduleForMap));
-    }
-
-    schedule() {
-        if (SiteConfig.rooms?.autoDetect !== true || this._timer !== null) return;
-        this._timer = setTimeout(() => {
-            this._timer = null;
-            this.detect();
-        }, 0);
-    }
-
-    detect() {
-        const wallBuilder = this.gameMap?.wallBuilder;
-        const grid = this.gameMap?.gridSystem;
-        const regionManager = this.gameMap?.regionManager;
-        if (!wallBuilder || !grid || !regionManager) return [];
-
-        const width = Number(grid.gridWidth) || 0;
-        const height = Number(grid.gridHeight) || 0;
-        if (width <= 0 || height <= 0) return [];
-
-        // Paint under a wall means nothing, and left in place it would spring
-        // back the day that wall came down.
-        this.gameMap.roomAssignments?.prune({ emit: false });
-
-        const wallKeys = new Set([
-            ...wallBuilder.baseCells.keys(),
-            ...wallBuilder.openingByCell.keys()
-        ]);
-        const keyOf = (x, y) => `${x},${y}`;
-        const isOpen = (x, y) => x >= 0 && y >= 0 && x < width && y < height && !wallKeys.has(keyOf(x, y));
-        const neighbors = (x, y) => [
-            [x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]
-        ];
-
-        const exterior = new Set();
-        const exteriorQueue = [];
-        const enqueueExterior = (x, y) => {
-            const key = keyOf(x, y);
-            if (!isOpen(x, y) || exterior.has(key)) return;
-            exterior.add(key);
-            exteriorQueue.push([x, y]);
-        };
-
-        for (let x = 0; x < width; x++) {
-            enqueueExterior(x, 0);
-            enqueueExterior(x, height - 1);
-        }
-        for (let y = 0; y < height; y++) {
-            enqueueExterior(0, y);
-            enqueueExterior(width - 1, y);
-        }
-        for (let index = 0; index < exteriorQueue.length; index++) {
-            const [x, y] = exteriorQueue[index];
-            for (const [nextX, nextY] of neighbors(x, y)) enqueueExterior(nextX, nextY);
-        }
-
-        const authoredRooms = regionManager.all('room').filter(room => room.properties?.autoDetected !== true);
-        const existingAutoRooms = regionManager.all('room').filter(room => room.properties?.autoDetected === true);
-        const minArea = Math.max(1, Number(SiteConfig.rooms?.minAreaCells) || 1);
-        const cellSize = Number(grid.config?.cellSize) || 32;
-
-        const components = this.floodComponents(isOpen, exterior, width, height);
-        const enclosed = components.filter(component => component.length >= minArea);
-
-        // Which room every open cell is in, in two passes: what the walls say,
-        // then what the player said. The second overrules the first, and only
-        // where they actually painted — everywhere else the building decides,
-        // which is what keeps this from becoming a map you have to colour in
-        // before it works.
-        const claims = this.claimComponents(enclosed, authoredRooms, cellSize);
-        const owners = this.assignByEnclosure(enclosed, claims, cellSize, existingAutoRooms);
-        // Read before anything is re-shaped: a painted room inherits from
-        // whatever its cells belonged to a moment ago, and re-cutting the rooms
-        // first would leave it inheriting from nobody.
-        const previousOwner = (cellX, cellY) => regionManager.innermostAt(
-            (cellX + 0.5) * cellSize, (cellY + 0.5) * cellSize, 'room', cellSize
-        );
-        // What the walls decided, kept before the paint goes over it: a room
-        // whose cells are ALL outside it is a room nothing encloses, and that
-        // is how an outdoor one is recognised further down.
-        const enclosedKeys = new Set(owners.keys());
-        const painted = new Map();
-        for (const [key, roomId] of this.gameMap.roomAssignments?.cells ?? []) {
-            const [cellX, cellY] = key.split(',').map(Number);
-            // Only masonry and the edge of the map are refused now. Painted
-            // cells used to need a roof over them as well — anything the fill
-            // called exterior was dropped on the floor here, so painting a
-            // patio, a fenced yard, or the three tiles inside a shed too small
-            // to count as a room played the paint sound, wrote an undo entry,
-            // and then quietly did nothing at all. A room is what the player
-            // says it is; the walls are only the default.
-            if (!isOpen(cellX, cellY)) continue;
-            if (!painted.has(roomId)) painted.set(roomId, previousOwner(cellX, cellY));
-            owners.set(key, roomId);
-        }
-
-        const cellsByRoom = new Map();
-        for (const [key, roomId] of owners) {
-            if (!cellsByRoom.has(roomId)) cellsByRoom.set(roomId, []);
-            cellsByRoom.get(roomId).push(key.split(',').map(Number));
-        }
-
-        for (const existing of regionManager.all('room')) {
-            if (existing.properties?.autoDetected === true) regionManager.remove(existing);
-        }
-
-        const lighting = Utility.deepClone(this.gameMap.environmentManager?.getRoomDefaults?.() || {});
-        const added = [];
-        for (const [roomId, cells] of cellsByRoom) {
-            const shape = { kind: 'tilemask', cells, cellSize };
-            const authored = authoredRooms.find(room => room.id === roomId);
-            if (authored) {
-                // The rectangle in the map file says WHICH room this is and
-                // carries its name and finishes. Where it is comes from the
-                // walls, so that moving one takes the room with it.
-                authored.shape = SpatialRegion.normalizeShape(shape);
-                authored.bounds = authored.shape.bounds;
-                continue;
-            }
-            // A matched automatic room keeps more than its id. It carries the
-            // finish, name and room type the player chose before this topology
-            // pass removed and recreated it. Falling straight through to the
-            // spatial parent kept the id but silently reset those properties
-            // whenever a wall was extended or another divider was added.
-            const parent = painted.get(roomId) ??
-                existingAutoRooms.find(room => room.id === roomId) ??
-                this.roomDividedBy(cells, cellSize);
-            const number = added.length + 1;
-            // Nothing enclosing any of it: an outdoor room. It is still a room
-            // — it has a floor, a name, a type, and a place in the list — but
-            // it is not somewhere you are inside, so it takes no interior
-            // gloom and a Myte standing in it is still out of doors. Called an
-            // Area rather than a Room so the list says which kind it is
-            // without anybody having to explain the difference.
-            const indoor = cells.some(([cellX, cellY]) => enclosedKeys.has(`${cellX},${cellY}`));
-            const placeholder = indoor ? `Room ${number}` : `Area ${number}`;
-            added.push(regionManager.add(new SpatialRegion({
-                id: roomId,
-                layer: 'room',
-                shape,
-                properties: {
-                    ...Utility.deepClone(parent?.properties ?? {}),
-                    // A placeholder until the player names it; numbered so two
-                    // new rooms are at least tellable apart.
-                    displayName: parent?.properties?.displayName ?? placeholder,
-                    authoredDisplayName: parent?.properties?.authoredDisplayName ?? placeholder,
-                    indoor,
-                    autoDetected: true,
-                    // Dividing a room does not redecorate it. A new room with no
-                    // finishes came up in bare plaster with the map's own ground
-                    // showing through, so splitting a space you had already
-                    // decorated undid the decorating — and the seam where the
-                    // new room met the old one was the first thing you saw.
-                    // Inheriting means a new room looks like it was always
-                    // there, and repainting it is a choice rather than a repair.
-                    wallFinishId: parent?.properties?.wallFinishId ?? null,
-                    floorFinishId: parent?.properties?.floorFinishId ?? null,
-                    lighting: Utility.deepClone(parent?.properties?.lighting ?? lighting)
-                },
-                source: this
-            })));
-        }
-
-        // An authored room whose ground has ALL been taken — walled over, or
-        // painted into the room next door — is emptied rather than left holding
-        // the shape it used to have.
-        //
-        // Leaving it was the bug that made the whole tool look broken: paint the
-        // Chatroom into the Kitchen and the Kitchen grew to 370 tiles, but the
-        // Chatroom went on claiming the same 185 it always had. Being the
-        // smaller of the two overlapping rooms, it then won every innermostAt on
-        // that floor — so the floor, the wall faces and the panel all still said
-        // Chatroom, and the paint appeared to do nothing at all.
-        //
-        // It keeps its id, its name and its finishes, because it is still a room
-        // in the map file and painting tiles back into it must bring it back.
-        for (const room of authoredRooms) {
-            if (cellsByRoom.has(room.id)) continue;
-            room.shape = SpatialRegion.normalizeShape({ kind: 'tilemask', cells: [], cellSize });
-            room.bounds = room.shape.bounds;
-        }
-
-        this.assignOpenSpaces(components, cellSize);
-
-        for (const myte of this.gameMap.mytes || []) {
-            regionManager.updateMembership(myte, { layers: ['room'], force: true });
-        }
-        // Before the floors and the walls are rebuilt: both read room ids, and
-        // the room set has only just changed under them.
-        this.gameMap.wallBuilder?.refreshRoomFaces?.();
-        this.gameMap.floorBuilder?.build();
-        this.gameMap.container?.worldState?.restoreRooms?.(this.gameMap);
-        this.gameMap.buildDoorRoomTopology();
-        this.gameMap.environmentManager?.rebuildWindowLighting();
-        if (this.gameMap.environmentManager) {
-            this.gameMap.environmentManager._lightingSignature = '';
-            this.gameMap.environmentManager.renderLighting(true);
-        }
-
-        // Last, once every consumer above has caught up: the room set is what
-        // the build tools draw, and telling them earlier would have them paint
-        // rooms whose floors did not exist yet.
-        this.gameMap.eventManager?.emit(EVENTS.ROOMS_CHANGED, {
-            mapId: this.gameMap.id,
-            rooms: this.gameMap.regionManager?.all('room') ?? []
-        });
-
-        return added;
-    }
-
-    /**
-     * Every enclosed area of open floor, as a list of cells.
-     *
-     * Seeding `visited` with the exterior is what keeps the outdoors from
-     * coming back as a room: it is one place, and it is decided first.
-     * @returns {Array<Array<[number, number]>>}
-     */
-    floodComponents(isOpen, exterior, width, height) {
-        const visited = new Set(exterior);
-        const components = [];
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                if (!isOpen(x, y) || visited.has(`${x},${y}`)) continue;
-                const component = [];
-                const queue = [[x, y]];
-                visited.add(`${x},${y}`);
-                for (let index = 0; index < queue.length; index++) {
-                    const [cellX, cellY] = queue[index];
-                    component.push([cellX, cellY]);
-                    for (const [nextX, nextY] of [
-                        [cellX - 1, cellY], [cellX + 1, cellY], [cellX, cellY - 1], [cellX, cellY + 1]
-                    ]) {
-                        const nextKey = `${nextX},${nextY}`;
-                        if (!isOpen(nextX, nextY) || visited.has(nextKey)) continue;
-                        visited.add(nextKey);
-                        queue.push([nextX, nextY]);
-                    }
-                }
-                components.push(component);
-            }
-        }
-        return components;
-    }
-
-    /**
-     * Which authored rooms live in which enclosed area.
-     *
-     * Each authored room is matched to the ONE component holding most of it.
-     * Everything else is a space the player made, including a space made
-     * *inside* an authored one: walling off a corner of the Kitchen used to
-     * produce a component that merely intersected the Kitchen and was thrown
-     * away on that basis, so the new room could never be selected or given a
-     * floor of its own.
-     *
-     * A component can be claimed by more than one room, and that is not a
-     * mistake — two authored rooms opening onto each other with nothing between
-     * them is one space and two rooms, which is the whole open-plan case.
-     * @returns {Map<Array, Array<SpatialRegion>>} component -> rooms in it
-     */
-    claimComponents(components, authoredRooms, cellSize) {
-        const claims = new Map();
-        for (const room of authoredRooms) {
-            const authored = RoomEnclosureDetector.authoredGeometry(room);
-            let best = null;
-            let bestCount = 0;
-            for (const component of components) {
-                const count = component.reduce((total, [cellX, cellY]) => total + (
-                    RoomEnclosureDetector.shapeContains(authored.shape, authored.bounds,
-                        (cellX + 0.5) * cellSize, (cellY + 0.5) * cellSize) ? 1 : 0), 0);
-                if (count > bestCount) {
-                    bestCount = count;
-                    best = component;
-                }
-            }
-            if (!best) continue;
-            if (!claims.has(best)) claims.set(best, []);
-            claims.get(best).push(room);
-        }
-        return claims;
-    }
-
-    /**
-     * Which room every open cell belongs to, before the player has their say.
-     *
-     * A room authored in Tiled is a rectangle, and a rectangle stops being the
-     * truth the moment anybody builds. Move a wall one cell and the rectangle
-     * stays where it was: the column of floor the room just gained belongs to no
-     * room at all, so it takes its finish from whichever neighbour bleeds
-     * furthest and comes out seamed down the middle. Wall off a corner and the
-     * rectangle still covers the new room's walls from the outside.
-     *
-     * Taking the shape from the enclosure instead makes "a room is what its
-     * walls enclose" true rather than nearly true, and every system downstream —
-     * floors, wall faces, lighting, the cutaway — already asks the room where it
-     * is. The authored rectangle keeps doing the one job it is good at: saying
-     * WHICH room this is, and carrying the name and finishes the player gave it.
-     *
-     * Where several rooms share one space the cells are split between them by
-     * the rectangles, because that is the only statement of intent available —
-     * and a cell inside none of them goes to the nearest, so an open-plan space
-     * is covered completely however the rectangles were drawn.
-     */
-    assignByEnclosure(components, claims, cellSize, existingAutoRooms = []) {
-        const owners = new Map();
-        const usedIds = new Set();
-        const takenIds = new Set((this.gameMap?.regionManager?.all('room') ?? []).map(room => room.id));
-        const mintId = () => {
-            for (let number = 1; ; number += 1) {
-                const id = `room_auto_${number}`;
-                if (!takenIds.has(id) && !usedIds.has(id)) return id;
-            }
-        };
+    static proposeSeeds(input) {
+        const width = RoomTopology.dimension(input?.width, 'width');
+        const height = RoomTopology.dimension(input?.height, 'height');
+        const geometry = input.geometry || WallGeometry.compute(input.walls || new Map());
+        const plans = RoomTopology.planList(input.plans).map(plan => StoreDelta.clone(plan));
+        for (const plan of plans) plan.seedCells = plan.seedCells.filter(key => !geometry.cells.has(key));
+        const byId = new Map(plans.map(plan => [plan.id, plan]));
+        const seedOwner = new Map(plans.flatMap(plan => plan.seedCells.map(key => [key, plan.id])));
+        const components = RoomTopology.openComponents(width, height, geometry.cells).filter(component => component.enclosed);
+        let nextRoomNumber = RoomTopology.nextRoomNumber(plans);
+        const createdIds = [];
         for (const component of components) {
-            const rooms = claims.get(component);
-            if (!rooms) {
-                // Preserve the identity of the prior automatic room with the
-                // greatest overlap. A split keeps the old id on its dominant
-                // half; a merge keeps the dominant room. This is also what
-                // preserves names, finishes and lighting across a wall move.
-                const keys = new Set(component.map(([x, y]) => `${x},${y}`));
-                const match = existingAutoRooms
-                    .filter(room => !usedIds.has(room.id))
-                    .map(room => ({
-                        room,
-                        overlap: [...(room.shape?.cells ?? [])].reduce(
-                            (count, key) => count + (keys.has(key) ? 1 : 0), 0)
-                    }))
-                    .filter(entry => entry.overlap > 0)
-                    .sort((left, right) => right.overlap - left.overlap || left.room.id.localeCompare(right.room.id))[0];
-                const id = match?.room?.id ?? mintId();
-                usedIds.add(id);
-                for (const [cellX, cellY] of component) owners.set(`${cellX},${cellY}`, id);
+            const present = plans.filter(plan => plan.seedCells.some(key => component.cellSet.has(key)));
+            // A painted plan is a footprint the player drew. Enclosing more
+            // ground around it must not silently repaint that ground: walling
+            // one tile outside a painted floor used to hand the whole ring to
+            // the floor, so editing a wall moved the floor. The ring stays bare
+            // until the player paints it, which is the same gesture that made
+            // the room in the first place.
+            const candidates = present.filter(plan => plan.origin !== 'painted');
+            // Thresholds are never proposed: they belong to both sides of the
+            // opening and are resolved by expansion, not by ownership.
+            const unowned = component.cells.filter(key =>
+                !seedOwner.has(key) && !geometry.thresholds.has(key));
+            if (!unowned.length) continue;
+            if (!candidates.length) {
+                if (present.length) continue;
+                const previousId = RoomTopology.majorityPreviousOwner(unowned, input.previousGrid);
+                const previous = byId.get(previousId);
+                const id = RoomTopology.uniqueRoomId(byId, nextRoomNumber++);
+                const buildingId = RoomTopology.majorityBoundaryBuilding(component, geometry.cells);
+                const created = {
+                    id,
+                    buildingId,
+                    displayName: `Room ${nextRoomNumber - 1}`,
+                    authoredDisplayName: `Room ${nextRoomNumber - 1}`,
+                    roomType: previous?.roomType || null,
+                    origin: 'detected',
+                    seedCells: [...unowned],
+                    floorFinishId: previous?.floorFinishId || null,
+                    wallFinishId: previous?.wallFinishId || null,
+                    priority: previous?.priority ?? null,
+                    properties: StoreDelta.clone(previous?.properties || {})
+                };
+                plans.push(created);
+                byId.set(id, created);
+                createdIds.push(id);
+                for (const key of unowned) seedOwner.set(key, id);
                 continue;
             }
-            const authored = rooms.map(room => ({ room, ...RoomEnclosureDetector.authoredGeometry(room) }));
-            for (const [cellX, cellY] of component) {
-                const owner = RoomEnclosureDetector.pickAuthoredRoom(
-                    authored, (cellX + 0.5) * cellSize, (cellY + 0.5) * cellSize, cellSize
-                );
-                if (owner) owners.set(`${cellX},${cellY}`, owner.id);
+            for (const key of unowned) {
+                const winner = candidates.length === 1 ? candidates[0] : RoomTopology.nearestPlan(key, candidates);
+                winner.seedCells.push(key);
+                seedOwner.set(key, winner.id);
             }
         }
-        return owners;
+        for (const plan of plans) plan.seedCells = RoomPlanStore.normalizeSeeds(plan.seedCells);
+        return Object.freeze({ plans: Object.freeze(plans.map(Object.freeze)), createdIds: Object.freeze(createdIds) });
     }
 
-    /**
-     * Which of the rooms sharing a space owns one cell: the smallest whose
-     * authored rectangle holds it, or failing that the nearest one.
-     *
-     * Nearest by rectangle, not by centre — a long room and a square one meeting
-     * in an L both reach the corner between them, and comparing centres would
-     * hand it to whichever happened to be more compact.
-     */
-    static pickAuthoredRoom(authored, x, y, cellSize, { allowNearest = true } = {}) {
-        const inside = authored
-            .filter(entry => RoomEnclosureDetector.shapeContains(entry.shape, entry.bounds, x, y))
-            .reduce((smallest, entry) => !smallest ||
-                RoomEnclosureDetector.shapeArea(entry, cellSize) <
-                RoomEnclosureDetector.shapeArea(smallest, cellSize) ? entry : smallest, null);
-        if (inside) return inside.room;
-        if (!allowNearest) return null;
-
-        let nearest = null;
-        let bestDistance = Infinity;
-        for (const entry of authored) {
-            const bounds = entry.bounds;
-            const dx = Math.max(bounds.x - x, 0, x - (bounds.x + bounds.width));
-            const dy = Math.max(bounds.y - y, 0, y - (bounds.y + bounds.height));
-            const distance = (dx * dx) + (dy * dy);
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                nearest = entry;
+    static openComponents(width, height, walls) {
+        const visited = new Set();
+        const result = [];
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+            const start = BuildKeys.cell(x, y);
+            if (walls.has(start) || visited.has(start)) continue;
+            const queue = [[x, y]];
+            const cells = [];
+            let touchesBoundary = false;
+            visited.add(start);
+            while (queue.length) {
+                const [cx, cy] = queue.shift();
+                const key = BuildKeys.cell(cx, cy);
+                cells.push(key);
+                if (cx === 0 || cy === 0 || cx === width - 1 || cy === height - 1) touchesBoundary = true;
+                for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+                    const nx = cx + dx;
+                    const ny = cy + dy;
+                    if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                    const next = BuildKeys.cell(nx, ny);
+                    if (walls.has(next) || visited.has(next)) continue;
+                    visited.add(next);
+                    queue.push([nx, ny]);
+                }
             }
-        }
-        return nearest?.room ?? null;
-    }
-
-    /**
-     * The shape a room was AUTHORED with, kept apart from the shape it is
-     * currently wearing.
-     *
-     * Every pass re-cuts a room to the ground its walls enclose, which is what
-     * makes rooms follow the building. Claiming has to work off the original
-     * rectangle instead, or the room can only ever shrink: give its floor away
-     * and its derived shape becomes empty, an empty shape contains nothing,
-     * and it can never match a component again — so "reset to walls" handed the
-     * ground to a brand new room instead of back to the one it came from.
-     */
-    static authoredGeometry(room) {
-        room.authoredShape ??= room.shape;
-        return { shape: room.authoredShape, bounds: room.authoredShape.bounds };
-    }
-
-    static shapeContains(shape, bounds, x, y) {
-        if (shape?.kind === 'tilemask') {
-            const size = shape.cellSize || 32;
-            return shape.cells.has(`${Math.floor(x / size)},${Math.floor(y / size)}`);
-        }
-        return x >= bounds.x && x <= bounds.x + bounds.width &&
-            y >= bounds.y && y <= bounds.y + bounds.height;
-    }
-
-    static shapeArea(entry, cellSize) {
-        if (entry.shape?.kind === 'tilemask') return entry.shape.cells.size;
-        return (entry.bounds.width * entry.bounds.height) / (cellSize * cellSize);
-    }
-
-    /**
-     * The room a newly enclosed area was taken out of, if it was taken out of
-     * one — the space whose ground these cells stood on a moment ago.
-     *
-     * Innermost, and decided by where the new cells actually are rather than by
-     * bounds containment: partition a room that is itself inside another and
-     * the new room should take after its immediate parent, not the outermost
-     * one it happens to sit within. A room built across the line where two
-     * spaces meet belongs to neither cleanly, so the one holding most of it
-     * wins — the same "most of it" rule claimComponents matches on.
-     * @returns {SpatialRegion|null}
-     */
-    roomDividedBy(cells, cellSize) {
-        const tally = new Map();
-        for (const [cellX, cellY] of cells) {
-            const room = this.gameMap.regionManager?.innermostAt(
-                (cellX + 0.5) * cellSize, (cellY + 0.5) * cellSize, 'room', cellSize
-            );
-            if (room) tally.set(room, (tally.get(room) || 0) + 1);
-        }
-        return [...tally.entries()].reduce((best, entry) =>
-            !best || entry[1] > best[1] ? entry : best, null)?.[0] ?? null;
-    }
-
-    /**
-     * Stamps every room with the id of the enclosed area it belongs to.
-     *
-     * Two rooms only share one when nothing walls them apart — the fill treats
-     * wall cells AND openings as solid, so a doorway between two rooms keeps
-     * them separate, while a half-height divider or a wall that stops short
-     * leaves them as one space. That is the distinction the cutaway needs: a
-     * wall bounding one open area belongs to all of it, so standing anywhere
-     * inside lowers the whole run rather than the half whose far side happens
-     * to be the room you are standing in.
-     */
-    assignOpenSpaces(components, cellSize) {
-        const rooms = this.gameMap?.regionManager?.all('room') || [];
-        for (const room of rooms) room.properties.openSpaceId = null;
-        components.forEach((cells, index) => {
-            const id = `open_${index + 1}`;
-            for (const room of rooms) {
-                if (room.properties.openSpaceId) continue;
-                const inside = cells.some(([cellX, cellY]) =>
-                    room.contains((cellX + 0.5) * cellSize, (cellY + 0.5) * cellSize));
-                if (inside) room.properties.openSpaceId = id;
-            }
-        });
-        return rooms;
-    }
-
-    dispose() {
-        if (this._timer !== null) clearTimeout(this._timer);
-        this._timer = null;
-        this._unsubscribers.forEach(unsubscribe => unsubscribe());
-        this._unsubscribers = [];
-        this.gameMap = null;
-    }
-}
-;
-/* -- js/Map/Regions/BuildingTopology.js -- */
-/** Derived structural groups shared by paint and future building consumers. */
-class BuildingTopology {
-    static DIRECTIONS = Object.freeze({
-        north: [0, -1], south: [0, 1], west: [-1, 0], east: [1, 0]
-    });
-
-    constructor(gameMap) {
-        this.gameMap = gameMap;
-        this.components = new Map();
-        this.componentByCell = new Map();
-        this.openSpaceByCell = new Map();
-        this.revision = 0;
-        this._unsubscribers = [];
-        const events = gameMap?.eventManager;
-        if (events) {
-            this._unsubscribers.push(events.on(EVENTS.ROOMS_CHANGED, payload => {
-                if (!payload?.mapId || payload.mapId === this.gameMap?.id) this.rebuild();
+            cells.sort(RoomTopology.compareCellKeys);
+            result.push(Object.freeze({
+                id: `${touchesBoundary ? 'outside' : 'enclosure'}:${cells[0]}`,
+                cells: Object.freeze(cells),
+                cellSet: new Set(cells),
+                enclosed: !touchesBoundary
             }));
         }
+        return result;
     }
 
-    static cellKey(x, y) {
-        return `${x},${y}`;
-    }
-
-    static surfaceKey(surface) {
-        return `${surface.cell.x},${surface.cell.y},${surface.face},${surface.from},${surface.to}`;
-    }
-
-    getRevision() {
-        return this.revision;
-    }
-
-    rebuild() {
-        const builder = this.gameMap?.wallBuilder;
-        const grid = this.gameMap?.gridSystem;
-        if (!builder || !grid) return [];
-
-        const oldIds = [...this.components.keys()];
-        this.components.clear();
-        this.componentByCell.clear();
-        this.indexOpenSpaces();
-
-        const remaining = new Set(builder.cells.keys());
-        while (remaining.size > 0) {
-            const first = [...remaining].sort(BuildingTopology.compareCellKeys)[0];
-            const queue = [first];
-            const keys = [];
-            remaining.delete(first);
-            for (let index = 0; index < queue.length; index++) {
-                const key = queue[index];
-                keys.push(key);
-                const [x, y] = key.split(',').map(Number);
-                for (const [dx, dy] of Object.values(BuildingTopology.DIRECTIONS)) {
-                    const next = BuildingTopology.cellKey(x + dx, y + dy);
-                    if (!remaining.delete(next)) continue;
-                    queue.push(next);
+    static openingAdjacency(openings, grid) {
+        if (!grid) return [];
+        const pairs = new Set();
+        for (const opening of openings instanceof Map ? opening.values() : openings) {
+            const rooms = new Set();
+            for (const cell of opening.cells || []) {
+                const [x, y] = Array.isArray(cell) ? cell : [cell.x, cell.y];
+                const faces = opening.axis === 'vertical' ? ['west', 'east'] : ['north', 'south'];
+                for (const face of faces) for (const half of [0, 1]) {
+                    const [bx, by] = BuildKeys.lookBlock(x, y, face, half);
+                    const owner = grid.ownerAt(bx, by);
+                    if (owner) rooms.add(owner);
                 }
             }
-
-            const cells = keys.map(key => builder.cells.get(key)).filter(Boolean);
-            const surfaces = cells.flatMap(cell => this.getStructuralSurfaces(cell));
-            const roomIds = [...new Set(surfaces.map(surface => surface.roomId).filter(Boolean))].sort();
-            if (roomIds.length === 0) continue;
-
-            const id = `building:${keys.sort(BuildingTopology.compareCellKeys)[0]}`;
-            const exteriorByLoop = new Map();
-            for (const surface of surfaces.filter(entry => !entry.roomId)) {
-                const loopId = this.resolveOpenSpaceForSurface(surface);
-                if (!exteriorByLoop.has(loopId)) exteriorByLoop.set(loopId, []);
-                exteriorByLoop.get(loopId).push(surface);
-            }
-            const footprint = this.getRoomFootprint(roomIds);
-            const component = {
-                id,
-                cellKeys: new Set(keys),
-                roomIds,
-                exteriorByLoop,
-                footprint,
-                bounds: BuildingTopology.boundsForKeys([...new Set([...keys, ...footprint])]),
-                revision: this.revision + 1
-            };
-            this.components.set(id, component);
+            const ids = [...rooms].sort();
+            for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) pairs.add(`${ids[a]}\0${ids[b]}`);
         }
-
-        this.mergeComponentsByRooms();
-        this.componentByCell.clear();
-        for (const component of this.components.values()) {
-            for (const key of component.cellKeys) this.componentByCell.set(key, component.id);
-        }
-
-        this.revision += 1;
-        const newIds = [...this.components.keys()];
-        this.gameMap?.eventManager?.emit(EVENTS.BUILDING_TOPOLOGY_CHANGED, {
-            mapId: this.gameMap?.id,
-            oldComponentIds: oldIds,
-            componentIds: newIds,
-            revision: this.revision,
-            topology: this
+        return [...pairs].sort().map(pair => {
+            const [roomA, roomB] = pair.split('\0');
+            return Object.freeze({ roomA, roomB });
         });
-        return [...this.components.values()];
     }
 
-    mergeComponentsByRooms() {
-        let merged = true;
-        while (merged) {
-            merged = false;
-            const list = [...this.components.values()];
-            for (let leftIndex = 0; leftIndex < list.length && !merged; leftIndex += 1) {
-                for (let rightIndex = leftIndex + 1; rightIndex < list.length; rightIndex += 1) {
-                    const left = list[leftIndex];
-                    const right = list[rightIndex];
-                    if (!left.roomIds.some(roomId => right.roomIds.includes(roomId))) continue;
-                    const cellKeys = new Set([...left.cellKeys, ...right.cellKeys]);
-                    const roomIds = [...new Set([...left.roomIds, ...right.roomIds])].sort();
-                    const exteriorByLoop = new Map();
-                    for (const component of [left, right]) {
-                        for (const [loopId, surfaces] of component.exteriorByLoop) {
-                            exteriorByLoop.set(loopId, [...(exteriorByLoop.get(loopId) ?? []), ...surfaces]);
-                        }
-                    }
-                    const footprint = [...new Set([...left.footprint, ...right.footprint])]
-                        .sort(BuildingTopology.compareCellKeys);
-                    const first = [...cellKeys].sort(BuildingTopology.compareCellKeys)[0];
-                    const combined = {
-                        id: `building:${first}`,
-                        cellKeys,
-                        roomIds,
-                        exteriorByLoop,
-                        footprint,
-                        bounds: BuildingTopology.boundsForKeys([...cellKeys, ...footprint]),
-                        revision: this.revision + 1
-                    };
-                    this.components.delete(left.id);
-                    this.components.delete(right.id);
-                    this.components.set(combined.id, combined);
-                    merged = true;
-                    break;
-                }
+    static roofableFootprints(plans, states, walls, grid) {
+        const result = new Map();
+        const take = (buildingId, key) => {
+            if (!buildingId) return;
+            if (!result.has(buildingId)) result.set(buildingId, new Set());
+            result.get(buildingId).add(key);
+        };
+        for (const plan of plans) {
+            if (!states.get(plan.id)?.indoor || !grid) continue;
+            for (const key of grid.cellsOf(plan.id)) take(plan.buildingId, key);
+        }
+        for (const [key, wall] of walls) take(wall.buildingId, key);
+        return result;
+    }
+
+    static boundaryEdges(cells) {
+        const edges = [];
+        const directions = [['north', 0, -1], ['east', 1, 0], ['south', 0, 1], ['west', -1, 0]];
+        for (const key of [...cells].sort(RoomTopology.compareCellKeys)) {
+            const { x, y } = BuildKeys.parseCell(key);
+            for (const [face, dx, dy] of directions) if (!cells.has(BuildKeys.cell(x + dx, y + dy))) {
+                edges.push(Object.freeze({ cell: key, face }));
             }
         }
+        return edges;
     }
 
-    getStructuralSurfaces(cell) {
-        const builder = this.gameMap.wallBuilder;
-        const faces = builder.assignFaces(cell);
-        const rendered = builder.getCellSurfaces(cell);
-        const construction = builder.registry.getConstruction(cell.constructionId);
-        const width = construction?.cellSize ?? builder.cellSize;
-        return WallMaterialRegistry.DIRECTIONS.map(face => {
-            const visible = rendered.find(surface => surface.face === face);
-            const horizontal = face === 'north' || face === 'south';
+    static loopBlocks(components) {
+        const result = new Map();
+        for (const component of components) for (const key of component.cells) {
+            const { x, y } = BuildKeys.parseCell(key);
+            for (const [bx, by] of BuildKeys.blocksOfCell(x, y)) result.set(BuildKeys.block(bx, by), component.id);
+        }
+        return result;
+    }
+
+    static nearestPlan(cellKey, plans) {
+        const cell = BuildKeys.parseCell(cellKey);
+        return [...plans].sort((a, b) => {
+            const distance = plan => Math.min(...plan.seedCells.map(key => {
+                const seed = BuildKeys.parseCell(key);
+                return Math.abs(seed.x - cell.x) + Math.abs(seed.y - cell.y);
+            }));
+            return distance(a) - distance(b) || RoomTopology.comparePlans(a, b);
+        })[0];
+    }
+
+    static comparePlans(a, b) {
+        const priority = (Number(b.priority) || 0) - (Number(a.priority) || 0);
+        if (priority) return priority;
+        if (a.seedCells.length !== b.seedCells.length) return a.seedCells.length - b.seedCells.length;
+        return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    }
+
+    static majorityPreviousOwner(cells, grid) {
+        if (!grid) return null;
+        const counts = new Map();
+        for (const key of cells) {
+            const { x, y } = BuildKeys.parseCell(key);
+            const owner = grid.ownerOfCell(x, y);
+            if (owner) counts.set(owner, (counts.get(owner) || 0) + 1);
+        }
+        return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0] || null;
+    }
+
+    static majorityBoundaryBuilding(component, walls) {
+        const counts = new Map();
+        for (const key of component.cells) {
+            const { x, y } = BuildKeys.parseCell(key);
+            for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+                const buildingId = walls.get(BuildKeys.cell(x + dx, y + dy))?.buildingId;
+                if (buildingId) counts.set(buildingId, (counts.get(buildingId) || 0) + 1);
+            }
+        }
+        return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0] || null;
+    }
+
+    static planList(plans) {
+        const values = plans?.values instanceof Function ? plans.values() : plans || [];
+        return [...values].map(plan => ({ ...StoreDelta.clone(plan), id: String(plan.id), seedCells: RoomPlanStore.normalizeSeeds(plan.seedCells) }));
+    }
+
+    static nextRoomNumber(plans) {
+        return plans.reduce((next, plan) => Math.max(next, Number(/^room_(\d+)$/.exec(plan.id)?.[1]) + 1 || 1), 1);
+    }
+
+    static uniqueRoomId(byId, number) {
+        while (byId.has(`room_${number}`)) number++;
+        return `room_${number}`;
+    }
+
+    static compareCellKeys(a, b) {
+        const left = BuildKeys.parseCell(a);
+        const right = BuildKeys.parseCell(b);
+        return left.y - right.y || left.x - right.x;
+    }
+
+    static dimension(value, name) {
+        if (!Number.isInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer`);
+        return value;
+    }
+}
+;
+/* -- js/Map/Regions/RoomRegionProjection.js -- */
+class RoomRegionProjection {
+    static records(plans, grid, topology, cellSize = 32) {
+        const values = plans?.values instanceof Function ? plans.values() : plans || [];
+        return [...values].map(plan => {
+            const state = topology.planStates.get(String(plan.id)) || {};
             return {
-                cell,
-                face,
-                from: visible?.from ?? 0,
-                to: visible?.to ?? width,
-                axis: visible?.axis ?? (horizontal ? 'horizontal' : 'vertical'),
-                // Paint scope follows the surface the renderer presents, which
-                // may expose the outside of masonry whose opposite face belongs
-                // to a room. Falling back keeps non-rendered structural faces
-                // available to other topology consumers.
-                roomId: visible ? visible.roomId : (faces[face]?.roomId ?? null),
-                finishId: builder.resolveFaceFinishId({ ...cell, faces }, face)
+                id: String(plan.id),
+                layer: 'room',
+                shape: {
+                    kind: 'tilemask',
+                    cells: grid.cellsOf(String(plan.id)),
+                    cellSize
+                },
+                properties: {
+                    ...StoreDelta.clone(plan.properties || {}),
+                    buildingId: plan.buildingId ?? null,
+                    displayName: plan.displayName,
+                    authoredDisplayName: plan.authoredDisplayName,
+                    roomType: plan.roomType ?? null,
+                    origin: plan.origin,
+                    floorFinishId: plan.floorFinishId ?? null,
+                    wallFinishId: plan.wallFinishId ?? null,
+                    indoor: state.indoor === true,
+                    openSpaceId: state.openSpaceId ?? null
+                },
+                source: plan
             };
-        });
+        }).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
     }
 
-    indexOpenSpaces() {
-        this.openSpaceByCell.clear();
-        const grid = this.gameMap.gridSystem;
-        const walls = this.gameMap.wallBuilder?.cells ?? new Map();
-        const width = Number(grid.gridWidth) || 0;
-        const height = Number(grid.gridHeight) || 0;
-        const visited = new Set();
-        let sequence = 0;
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                const start = BuildingTopology.cellKey(x, y);
-                if (walls.has(start) || visited.has(start)) continue;
-                const queue = [[x, y]];
-                const keys = [];
-                let touchesEdge = false;
-                visited.add(start);
-                for (let index = 0; index < queue.length; index++) {
-                    const [cellX, cellY] = queue[index];
-                    const key = BuildingTopology.cellKey(cellX, cellY);
-                    keys.push(key);
-                    touchesEdge ||= cellX === 0 || cellY === 0 || cellX === width - 1 || cellY === height - 1;
-                    for (const [dx, dy] of Object.values(BuildingTopology.DIRECTIONS)) {
-                        const nextX = cellX + dx;
-                        const nextY = cellY + dy;
-                        if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) continue;
-                        const next = BuildingTopology.cellKey(nextX, nextY);
-                        if (walls.has(next) || visited.has(next)) continue;
-                        visited.add(next);
-                        queue.push([nextX, nextY]);
-                    }
-                }
-                const id = touchesEdge ? 'outside' : `courtyard:${++sequence}`;
-                for (const key of keys) this.openSpaceByCell.set(key, id);
-            }
-        }
-    }
-
-    resolveOpenSpaceForSurface(surface) {
-        const [dx, dy] = BuildingTopology.DIRECTIONS[surface.face] ?? [0, 0];
-        return this.openSpaceByCell.get(BuildingTopology.cellKey(
-            surface.cell.x + dx, surface.cell.y + dy
-        )) ?? 'outside';
-    }
-
-    getRoomFootprint(roomIds) {
-        const result = new Set();
-        for (const roomId of roomIds) {
-            const room = this.gameMap.regionManager?.get('room', roomId);
-            for (const cell of room?.shape?.cells ?? []) {
-                const [x, y] = typeof cell === 'string'
-                    ? cell.split(',').map(Number)
-                    : Array.isArray(cell) ? cell : [cell.x, cell.y];
-                if (Number.isInteger(x) && Number.isInteger(y)) result.add(BuildingTopology.cellKey(x, y));
-            }
-        }
-        return [...result].sort(BuildingTopology.compareCellKeys);
-    }
-
-    getComponentAtWallFace(cell) {
-        return this.components.get(this.componentByCell.get(BuildingTopology.cellKey(cell?.x, cell?.y))) ?? null;
-    }
-
-    getComponentForRoom(roomId) {
-        return [...this.components.values()].find(component => component.roomIds.includes(roomId)) ?? null;
-    }
-
-    getExteriorSurfaces(componentId, loopId = null) {
-        const component = this.components.get(componentId);
-        if (!component) return [];
-        if (loopId !== null) return [...(component.exteriorByLoop.get(loopId) ?? [])];
-        return [...component.exteriorByLoop.values()].flat();
-    }
-
-    getExteriorLoopAtSurface(surface) {
-        const component = this.getComponentAtWallFace(surface?.cell);
-        if (!component) return null;
-        const key = BuildingTopology.surfaceKey(surface);
-        for (const [loopId, surfaces] of component.exteriorByLoop) {
-            if (surfaces.some(entry => BuildingTopology.surfaceKey(entry) === key)) return loopId;
-        }
-        return null;
-    }
-
-    getFootprint(componentId) {
-        return [...(this.components.get(componentId)?.footprint ?? [])];
-    }
-
-    static compareCellKeys(left, right) {
-        const [leftX, leftY] = left.split(',').map(Number);
-        const [rightX, rightY] = right.split(',').map(Number);
-        return leftY - rightY || leftX - rightX;
-    }
-
-    static boundsForKeys(keys) {
-        if (keys.length === 0) return null;
-        const points = keys.map(key => key.split(',').map(Number));
-        const xs = points.map(([x]) => x);
-        const ys = points.map(([, y]) => y);
-        return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
-    }
-
-    dispose() {
-        for (const unsubscribe of this._unsubscribers) unsubscribe?.();
-        this._unsubscribers = [];
-        this.components.clear();
-        this.componentByCell.clear();
-        this.openSpaceByCell.clear();
-        this.gameMap = null;
+    static sync(regionManager, plans, grid, topology, cellSize = 32) {
+        if (!regionManager) return [];
+        for (const region of regionManager.all('room')) regionManager.remove(region);
+        return RoomRegionProjection.records(plans, grid, topology, cellSize).map(record =>
+            regionManager.add(new SpatialRegion(record))
+        );
     }
 }
 ;
@@ -38763,7 +39142,427 @@ class WallWangAtlas {
     }
 }
 ;
-/* -- js/Map/Walls/WallBuilder.js -- */
+/* -- js/Map/Walls/WallGeometry.js -- */
+class WallGeometry {
+    static MASK_NORTH = 1;
+    static MASK_EAST = 2;
+    static MASK_SOUTH = 4;
+    static MASK_WEST = 8;
+    static MASK_HORIZONTAL = WallGeometry.MASK_EAST | WallGeometry.MASK_WEST;
+    static MASK_VERTICAL = WallGeometry.MASK_NORTH | WallGeometry.MASK_SOUTH;
+
+    static DIRECTIONS = Object.freeze([
+        Object.freeze({ name: 'north', dx: 0, dy: -1, bit: WallGeometry.MASK_NORTH }),
+        Object.freeze({ name: 'east', dx: 1, dy: 0, bit: WallGeometry.MASK_EAST }),
+        Object.freeze({ name: 'south', dx: 0, dy: 1, bit: WallGeometry.MASK_SOUTH }),
+        Object.freeze({ name: 'west', dx: -1, dy: 0, bit: WallGeometry.MASK_WEST })
+    ]);
+
+    static compute(walls, options = {}) {
+        if (Number.isFinite(options)) options = { revision: options };
+        const cells = WallGeometry.normalizeWalls(walls);
+        const masks = new Map();
+        for (const [key, cell] of cells) masks.set(key, WallGeometry.maskFor(cell, cells));
+        const runs = WallGeometry.buildRuns(cells, masks);
+        return Object.freeze({
+            cells,
+            masks,
+            thresholds: WallGeometry.findThresholds(cells, masks),
+            runs,
+            pieces: WallGeometry.buildPieces(cells, masks, options),
+            paintSpans: WallGeometry.buildPaintSpans(cells, masks, options),
+            revision: Number(options.revision) || 0
+        });
+    }
+
+    static normalizeWalls(walls) {
+        const cells = new Map();
+        const entries = walls instanceof Map ? walls.entries() : Object.entries(walls || {});
+        for (const [key, record] of entries) {
+            const parsed = record && Number.isInteger(record.x) && Number.isInteger(record.y)
+                ? { x: record.x, y: record.y }
+                : BuildKeys.parseCell(key);
+            cells.set(BuildKeys.cell(parsed.x, parsed.y), Object.freeze({ ...record, ...parsed }));
+        }
+        return cells;
+    }
+
+    static maskFor(cell, cells) {
+        let mask = 0;
+        for (const direction of WallGeometry.DIRECTIONS) {
+            const neighbour = cells.get(BuildKeys.cell(cell.x + direction.dx, cell.y + direction.dy));
+            if (neighbour && WallGeometry.connects(cell, neighbour)) mask |= direction.bit;
+        }
+        return mask;
+    }
+
+    static connects(a, b) {
+        return (a.connectGroup ?? 'wall') === (b.connectGroup ?? 'wall');
+    }
+
+    static fencesForMask(mask) {
+        return Object.freeze({
+            horizontal: mask === 0 || (mask & WallGeometry.MASK_HORIZONTAL) !== 0,
+            vertical: mask === 0 || (mask & WallGeometry.MASK_VERTICAL) !== 0
+        });
+    }
+
+    static buildRuns(cells, masks) {
+        const runs = [];
+        const axes = [
+            { axis: 'horizontal', backward: WallGeometry.MASK_WEST, forward: WallGeometry.MASK_EAST, dx: 1, dy: 0 },
+            { axis: 'vertical', backward: WallGeometry.MASK_NORTH, forward: WallGeometry.MASK_SOUTH, dx: 0, dy: 1 }
+        ];
+        const sorted = [...cells.values()].sort((a, b) => a.y - b.y || a.x - b.x);
+        for (const config of axes) for (const cell of sorted) {
+            const mask = masks.get(BuildKeys.cell(cell.x, cell.y)) || 0;
+            if (!(mask & config.forward) || (mask & config.backward)) continue;
+            const runCells = [BuildKeys.cell(cell.x, cell.y)];
+            let cursor = cell;
+            while ((masks.get(BuildKeys.cell(cursor.x, cursor.y)) || 0) & config.forward) {
+                cursor = cells.get(BuildKeys.cell(cursor.x + config.dx, cursor.y + config.dy));
+                if (!cursor) break;
+                runCells.push(BuildKeys.cell(cursor.x, cursor.y));
+            }
+            runs.push(Object.freeze({
+                id: `${config.axis}:${runCells[0]}:${runCells[runCells.length - 1]}`,
+                axis: config.axis,
+                cells: Object.freeze(runCells)
+            }));
+        }
+        const connected = new Set(runs.flatMap(run => run.cells));
+        for (const cell of sorted) {
+            const key = BuildKeys.cell(cell.x, cell.y);
+            if (!connected.has(key) && (masks.get(key) || 0) === 0) {
+                runs.push(Object.freeze({ id: `point:${key}`, axis: 'point', cells: Object.freeze([key]) }));
+            }
+        }
+        return Object.freeze(runs);
+    }
+
+    static buildPieces(cells, masks, options) {
+        const cellSize = Number(options.cellSize) || 32;
+        const sorted = [...cells.values()].sort((a, b) => a.y - b.y || a.x - b.x);
+        const pieces = [];
+        for (let index = 0; index < sorted.length; index++) {
+            const first = sorted[index];
+            const pieceCells = [BuildKeys.cell(first.x, first.y)];
+            while (WallGeometry.canMergePiece(sorted[index], sorted[index + 1], masks)) {
+                const next = sorted[++index];
+                pieceCells.push(BuildKeys.cell(next.x, next.y));
+            }
+            const construction = WallGeometry.constructionFor(first, options);
+            const thickness = Number(construction.thickness) || cellSize;
+            pieces.push(Object.freeze({
+                id: `wall-${first.x}-${first.y}-${pieceCells.length}`,
+                x: first.x,
+                y: first.y,
+                baseline: ((first.y + 0.5) * cellSize) + (thickness / 2),
+                height: Number(construction.height) || (Number(first.heightCells) || 1) * cellSize,
+                constructionId: first.constructionId,
+                cells: Object.freeze(pieceCells)
+            }));
+        }
+        return Object.freeze(pieces);
+    }
+
+    static canMergePiece(left, right, masks) {
+        if (!left || !right || right.y !== left.y || right.x !== left.x + 1) return false;
+        if (left.constructionId !== right.constructionId || left.heightCells !== right.heightCells) return false;
+        const leftMask = masks.get(BuildKeys.cell(left.x, left.y)) || 0;
+        const rightMask = masks.get(BuildKeys.cell(right.x, right.y)) || 0;
+        return (leftMask & WallGeometry.MASK_EAST) !== 0 && (rightMask & WallGeometry.MASK_WEST) !== 0;
+    }
+
+    static buildPaintSpans(cells, masks, options) {
+        return new Map([...cells].map(([key, cell]) => {
+            const mask = masks.get(key) || 0;
+            const construction = WallGeometry.constructionFor(cell, options);
+            return [key, Object.freeze(WallGeometry.paintSpansForCell(cell, mask, construction, options))];
+        }));
+    }
+
+    static paintSpansForCell(cell, mask, construction = {}, options = {}) {
+        const cellSize = Number(construction.cellSize) || Number(options.cellSize) || 32;
+        const thickness = Number(construction.thickness) || cellSize;
+        const inset = (cellSize - thickness) / 2;
+        const middle = cellSize / 2;
+        const east = (mask & WallGeometry.MASK_EAST) !== 0;
+        const west = (mask & WallGeometry.MASK_WEST) !== 0;
+        const vertical = (mask & WallGeometry.MASK_VERTICAL) !== 0;
+        const band = (from, to, half) => WallGeometry.span(cell, 'horizontal-band', half, from, to);
+        const post = (from, to, kind) => WallGeometry.span(cell, kind, null, from, to);
+        if (!east && !west) {
+            if (mask === 0) return [band(0, middle, 0), band(middle, cellSize, 1)];
+            return [post(inset, middle, 'post-west'), post(middle, cellSize - inset, 'post-east')];
+        }
+        if (!vertical || (east !== west && WallGeometry.inheritsVerticalFace(mask))) {
+            return [band(0, middle, 0), band(middle, cellSize, 1)];
+        }
+        const spans = [];
+        if (west && inset > 0) spans.push(band(0, inset, 0));
+        spans.push(post(inset, middle, 'post-west'), post(middle, cellSize - inset, 'post-east'));
+        if (east && inset > 0) spans.push(band(cellSize - inset, cellSize, 1));
+        return spans.filter(span => span.to > span.from);
+    }
+
+    static span(cell, kind, half, from, to) {
+        const candidates = kind === 'horizontal-band'
+            ? [BuildKeys.atom(cell.x, cell.y, 'south', half), BuildKeys.atom(cell.x, cell.y, 'north', half)]
+            : kind === 'post-west'
+                ? [BuildKeys.atom(cell.x, cell.y, 'west', 1), BuildKeys.atom(cell.x, cell.y, 'west', 0)]
+                : [BuildKeys.atom(cell.x, cell.y, 'east', 1), BuildKeys.atom(cell.x, cell.y, 'east', 0)];
+        return Object.freeze({ kind, half, from, to, candidates: Object.freeze(candidates) });
+    }
+
+    static constructionFor(cell, options) {
+        const source = options.constructions;
+        return source?.get?.(cell.constructionId) || source?.[cell.constructionId] || options.defaultConstruction || {};
+    }
+
+    static inheritsVerticalFace(mask) {
+        return ((mask & WallGeometry.MASK_NORTH) !== 0) !== ((mask & WallGeometry.MASK_SOUTH) !== 0);
+    }
+
+    static findThresholds(cells, masks) {
+        const thresholds = new Set();
+        if (cells.size === 0) return thresholds;
+        const bounds = WallGeometry.bounds(cells);
+        for (let y = bounds.minY; y <= bounds.maxY; y++) {
+            for (let x = bounds.minX; x <= bounds.maxX; x++) {
+                const key = BuildKeys.cell(x, y);
+                if (cells.has(key)) continue;
+                if (WallGeometry.isThresholdAxis(x, y, 'horizontal', cells, masks) ||
+                    WallGeometry.isThresholdAxis(x, y, 'vertical', cells, masks)) thresholds.add(key);
+            }
+        }
+        return thresholds;
+    }
+
+    static isThresholdAxis(x, y, axis, cells, masks) {
+        const horizontal = axis === 'horizontal';
+        const before = cells.get(BuildKeys.cell(x - (horizontal ? 1 : 0), y - (horizontal ? 0 : 1)));
+        const after = cells.get(BuildKeys.cell(x + (horizontal ? 1 : 0), y + (horizontal ? 0 : 1)));
+        if (!before || !after || !WallGeometry.connects(before, after)) return false;
+        const beforeMask = masks.get(BuildKeys.cell(before.x, before.y)) || 0;
+        const afterMask = masks.get(BuildKeys.cell(after.x, after.y)) || 0;
+        const beforeOutward = horizontal ? WallGeometry.MASK_WEST : WallGeometry.MASK_NORTH;
+        const afterOutward = horizontal ? WallGeometry.MASK_EAST : WallGeometry.MASK_SOUTH;
+        return WallGeometry.pointsOutward(beforeMask, beforeOutward) &&
+            WallGeometry.pointsOutward(afterMask, afterOutward);
+    }
+
+    static pointsOutward(mask, outwardBit) {
+        return (mask & outwardBit) !== 0 || WallGeometry.connectionCount(mask) === 1;
+    }
+
+    static connectionCount(mask) {
+        let count = 0;
+        for (const direction of WallGeometry.DIRECTIONS) if ((mask & direction.bit) !== 0) count++;
+        return count;
+    }
+
+    static bounds(cells) {
+        const values = [...cells.values()];
+        return values.reduce((bounds, cell) => ({
+            minX: Math.min(bounds.minX, cell.x), maxX: Math.max(bounds.maxX, cell.x),
+            minY: Math.min(bounds.minY, cell.y), maxY: Math.max(bounds.maxY, cell.y)
+        }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+    }
+}
+;
+/* -- js/Map/Walls/WallFaceResolver.js -- */
+class WallFaceResolver {
+    static classify(atom, grid, topology = {}) {
+        const [bx, by] = BuildKeys.lookBlock(atom.x, atom.y, atom.face, atom.half);
+        const roomId = grid.ownerAt(bx, by);
+        if (roomId !== null) return Object.freeze({ kind: 'room', roomId });
+        const cellX = Math.floor(bx / 2);
+        const cellY = Math.floor(by / 2);
+        if (WallFaceResolver.isWallCell(cellX, cellY, topology)) return Object.freeze({ kind: 'buried' });
+        return Object.freeze({ kind: 'exterior', loopId: WallFaceResolver.loopAt(bx, by, topology) ?? 'outside' });
+    }
+
+    /**
+     * The atom a rendered slice shows, together with the surface it paints as.
+     *
+     * These are normally the same question, but not at a wall corner. A corner
+     * cell's band is buried on the room side by the arm turning away from the
+     * run, so classifying it on its own would make the last half-cell of every
+     * wall an exterior nub: a 16px paint target sitting at the end of a run it
+     * is visually part of, refusing the colour the rest of the wall takes. The
+     * pixels belong to the run, so the band inherits the run's surface and
+     * stores its paint on the atom that is not buried.
+     */
+    static surfaceOf(slice, grid, topology = {}) {
+        const atom = WallFaceResolver.visibleAtom(slice, grid, topology);
+        const classification = WallFaceResolver.classify(atom, grid, topology);
+        if (slice.kind !== 'horizontal-band' || classification.kind === 'room') {
+            return Object.freeze({ atom, classification });
+        }
+        const inherited = WallFaceResolver.bandRunSurface(slice, grid, topology);
+        return Object.freeze({ atom, classification: inherited || classification });
+    }
+
+    // Only a band that is genuinely buried on its room side borrows; a band
+    // with open ground on both sides is exterior and stays exterior.
+    static bandRunSurface(slice, grid, topology) {
+        const buried = ['north', 'south'].some(face => WallFaceResolver.classify(
+            { x: slice.x, y: slice.y, face, half: slice.half }, grid, topology
+        ).kind === 'buried');
+        if (!buried) return null;
+        const unit = (2 * slice.x) + slice.half;
+        for (const step of [-1, 1]) {
+            const neighbour = unit + step;
+            const x = Math.floor(neighbour / 2);
+            const half = neighbour - (2 * x);
+            const spans = WallFaceResolver.paintSpansOf(x, slice.y, topology);
+            if (!spans.some(span => span.kind === 'horizontal-band' && span.half === half)) continue;
+            const classification = WallFaceResolver.classify(
+                WallFaceResolver.visibleAtom({ x, y: slice.y, kind: 'horizontal-band', half }, grid, topology),
+                grid, topology
+            );
+            if (classification.kind === 'room') return classification;
+        }
+        return null;
+    }
+
+    static paintSpansOf(x, y, topology) {
+        return topology.walls?.paintSpans?.get(BuildKeys.cell(x, y)) || [];
+    }
+
+    static visibleAtom(slice, grid, topology = {}) {
+        const x = slice.x;
+        const y = slice.y;
+        const half = slice.half;
+        if (slice.kind === 'horizontal-band') {
+            const south = { x, y, face: 'south', half };
+            const north = { x, y, face: 'north', half };
+            const southClass = WallFaceResolver.classify(south, grid, topology);
+            const northClass = WallFaceResolver.classify(north, grid, topology);
+            if (northClass.kind === 'room' && southClass.kind !== 'room') return Object.freeze(north);
+            if (southClass.kind === 'room' && northClass.kind !== 'room') return Object.freeze(south);
+            if (southClass.kind === 'room' && northClass.kind === 'room' && southClass.roomId !== northClass.roomId) {
+                const northDepth = WallFaceResolver.depthFromAtom(north, northClass.roomId, grid);
+                const southDepth = WallFaceResolver.depthFromAtom(south, southClass.roomId, grid);
+                if (northDepth !== southDepth) return Object.freeze(northDepth < southDepth ? north : south);
+                const northArea = grid.blocksOf(northClass.roomId).length;
+                const southArea = grid.blocksOf(southClass.roomId).length;
+                if (northArea !== southArea) return Object.freeze(northArea < southArea ? north : south);
+            }
+            return Object.freeze(south);
+        }
+        if (slice.kind === 'post-west' || slice.kind === 'post-east') {
+            const face = slice.kind === 'post-west' ? 'west' : 'east';
+            const south = { x, y, face, half: 1 };
+            return Object.freeze(WallFaceResolver.classify(south, grid, topology).kind === 'room'
+                ? south : { x, y, face, half: 0 });
+        }
+        throw new Error(`Unknown wall slice kind: ${slice.kind}`);
+    }
+
+    static depthFromAtom(atom, roomId, grid) {
+        const [bx, by] = BuildKeys.lookBlock(atom.x, atom.y, atom.face, atom.half);
+        const dx = atom.face === 'west' ? -1 : atom.face === 'east' ? 1 : 0;
+        const dy = atom.face === 'north' ? -1 : atom.face === 'south' ? 1 : 0;
+        let depth = 0;
+        for (let x = bx, y = by; grid.ownerAt(x, y) === roomId; x += dx, y += dy) depth++;
+        return depth;
+    }
+
+    static sections(geometry, grid, topology = {}) {
+        const nodes = [];
+        for (const [cellKey, spans] of geometry.paintSpans || []) {
+            const { x, y } = BuildKeys.parseCell(cellKey);
+            for (const span of spans) {
+                const { atom, classification } = WallFaceResolver.surfaceOf(
+                    { x, y, kind: span.kind, half: span.half }, grid, topology
+                );
+                if (classification.kind === 'buried') continue;
+                const surface = classification.kind === 'room'
+                    ? `room:${classification.roomId}` : `exterior:${classification.loopId ?? 'outside'}`;
+                const coordinate = span.kind === 'horizontal-band'
+                    ? `h:${y}:${(2 * x) + span.half}`
+                    : `v:${span.kind}:${x}:${y}`;
+                nodes.push({ atom, classification, surface, coordinate, span, x, y });
+            }
+        }
+        const byCoordinate = new Map(nodes.map(node => [node.coordinate, node]));
+        const visited = new Set();
+        const sections = [];
+        for (const start of nodes) {
+            if (visited.has(start.coordinate)) continue;
+            const queue = [start];
+            const members = [];
+            visited.add(start.coordinate);
+            while (queue.length) {
+                const node = queue.shift();
+                members.push(node);
+                for (const key of WallFaceResolver.sectionNeighbours(node)) {
+                    const next = byCoordinate.get(key);
+                    if (!next || next.surface !== start.surface || visited.has(key)) continue;
+                    visited.add(key);
+                    queue.push(next);
+                }
+            }
+            const atomKeys = [...new Set(members.map(node => BuildKeys.atom(
+                node.atom.x, node.atom.y, node.atom.face, node.atom.half
+            )))].sort();
+            sections.push(Object.freeze({
+                id: `${start.surface}/${members[0].coordinate}`,
+                surface: start.classification,
+                atoms: Object.freeze(atomKeys),
+                spans: Object.freeze(members.map(node => Object.freeze({ cell: BuildKeys.cell(node.x, node.y), ...node.span })))
+            }));
+        }
+        return Object.freeze(sections);
+    }
+
+    static sectionNeighbours(node) {
+        if (node.span.kind === 'horizontal-band') {
+            const unit = (2 * node.x) + node.span.half;
+            return [`h:${node.y}:${unit - 1}`, `h:${node.y}:${unit + 1}`];
+        }
+        return [
+            `v:${node.span.kind}:${node.x}:${node.y - 1}`,
+            `v:${node.span.kind}:${node.x}:${node.y + 1}`
+        ];
+    }
+
+    static isWallCell(x, y, topology) {
+        if (typeof topology.isWallCell === 'function') return topology.isWallCell(x, y);
+        const walls = topology.walls?.cells || topology.walls;
+        return walls instanceof Map ? walls.has(BuildKeys.cell(x, y)) : !!walls?.[BuildKeys.cell(x, y)];
+    }
+
+    static loopAt(bx, by, topology) {
+        if (typeof topology.loopAtBlock === 'function') return topology.loopAtBlock(bx, by) ?? null;
+        if (typeof topology.openSpaceAtBlock === 'function') return topology.openSpaceAtBlock(bx, by)?.loopId ?? null;
+        return topology.loopByBlock?.get?.(BuildKeys.block(bx, by)) ?? null;
+    }
+}
+;
+/* -- js/Map/Walls/WallHitTest.js -- */
+class WallHitTest {
+    static hit(piece, x, y, tolerance = 2) {
+        if (!piece || piece.element?.hidden || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+        const regions = piece.hitRegions || [];
+        for (let index = regions.length - 1; index >= 0; index--) {
+            const region = regions[index];
+            if (!WallHitTest.contains(region, x, y, tolerance)) continue;
+            if ((region.holes || []).some(hole => WallHitTest.contains(hole, x, y, 0))) continue;
+            return region;
+        }
+        return null;
+    }
+
+    static contains(rect, x, y, tolerance = 0) {
+        return x >= rect.left - tolerance && x < rect.right + tolerance &&
+            y >= rect.top - tolerance && y < rect.bottom + tolerance;
+    }
+}
+;
+/* -- js/Map/Walls/WallRenderObjects.js -- */
 class WallFaceSurface {
     constructor(builder, piece, direction) {
         this.builder = builder;
@@ -38919,871 +39718,83 @@ class WallOpeningSlot {
     }
 }
 
-class WallBuilder {
-    static OPPOSITE_FACES = Object.freeze({
-        north: 'south', south: 'north', west: 'east', east: 'west'
-    });
-
-    static MASK_NORTH = 1;
-    static MASK_EAST = 2;
-    static MASK_SOUTH = 4;
-    static MASK_WEST = 8;
-    static MASK_HORIZONTAL = 2 | 8;
-    static MASK_VERTICAL = 1 | 4;
-    static MASK_STRAIGHT_H = 10;
-
-    // Sub-frame: long enough that one evaluation pass hit-tests the cursor once,
-    // short enough that the memo can never survive into the next pass.
-    static CURSOR_SUBJECT_TTL_MS = 4;
-
-    static DIRECTIONS = Object.freeze([
-        Object.freeze({ name: 'north', dx: 0, dy: -1, bit: 1 }),
-        Object.freeze({ name: 'east', dx: 1, dy: 0, bit: 2 }),
-        Object.freeze({ name: 'south', dx: 0, dy: 1, bit: 4 }),
-        Object.freeze({ name: 'west', dx: -1, dy: 0, bit: 8 })
-    ]);
-
-    static isHorizontalMask(mask) {
-        return (mask & WallBuilder.MASK_HORIZONTAL) !== 0;
+;
+/* -- js/Map/Walls/WallRenderer.js -- */
+class WallRenderer {
+    resolveFinishOverride(x, y, face, roomId = undefined, half = null) {
+        const buildDocument = this.previewDocument || this.gameMap?.buildDocument;
+        return buildDocument && (half === 0 || half === 1)
+            ? buildDocument.level().atoms.get(BuildKeys.atom(x, y, face, half))?.finishId || null
+            : null;
     }
 
-    static isVerticalMask(mask) {
-        return (mask & WallBuilder.MASK_VERTICAL) !== 0;
-    }
-
-    static isStraightHorizontal(mask) {
-        return mask === WallBuilder.MASK_STRAIGHT_H;
-    }
-
-    /**
-     * One presentation rule for everything hanging on a wall face - authored
-     * decoration and placed map object alike.
-     *
-     * The two drifted apart once already: a lowered wall hid its own authored
-     * paintings while the ones the player hung stayed at their standing Y,
-     * floating in mid-air over the floor. Hidden once the cut line passes
-     * below the fixture's own top, which is the rule the decorations already
-     * used - never "whenever the piece is stubbed", or a fixture low on a wall
-     * would vanish while the wall behind it is still there.
-     */
-    static applyFixtureCut(element, cutY, posY, height = 0) {
-        if (!element) return;
-        const behavior = SiteConfig.wallSystem.fixtureCutBehavior;
-        const cut = Number.isFinite(cutY) && cutY > posY;
-        element.classList.toggle('is-wall-cut', behavior === 'hide' && cut);
-        element.style.clipPath = (behavior === 'clip' && cut && height > 0)
-            ? `inset(${Utility.clamp(cutY - posY, 0, height)}px 0 0 0)`
-            : '';
-    }
-
-    /**
-     * Whether a cell's south face is inherited from the run beside it.
-     *
-     * A cell with exactly one horizontal neighbour is the corner column at the
-     * end of that neighbour's run: it has no head-on face of its own to author,
-     * so it wears the run's. Cells with a run on both sides, and vertical-only
-     * cells, keep what they were given.
-     */
-    static inheritsHorizontalFace(mask) {
-        return ((mask & WallBuilder.MASK_EAST) !== 0) !== ((mask & WallBuilder.MASK_WEST) !== 0);
-    }
-
-    // Vertical counterpart of inheritsHorizontalFace: exactly one vertical arm,
-    // which is what makes a cell the corner column of a north-south run.
-    static inheritsVerticalFace(mask) {
-        return ((mask & WallBuilder.MASK_NORTH) !== 0) !== ((mask & WallBuilder.MASK_SOUTH) !== 0);
-    }
-
-    static isEndCapMask(mask) {
-        return WallBuilder.isHorizontalMask(mask) &&
-            !WallBuilder.isVerticalMask(mask) &&
-            !WallBuilder.isStraightHorizontal(mask);
-    }
-
-    constructor(gameMap, wallData, registry) {
-        this.gameMap = gameMap;
-        this.wallData = wallData;
-        this.registry = registry;
-        this.atlas = wallData.wangAtlas || null;
-        this.cellSize = gameMap.gridSystem?.config?.cellSize || 32;
-        this.layer = gameMap.layers.objects;
-        this.flatCanvas = null;
-        this._flatDirty = true;
-        this.cells = new Map();
-        this.baseCells = new Map();
-        this.authoredBaseCells = new Map();
-        this.openingKeys = new Set();
-        this.openingByCell = new Map();
-        this.authoredOpenings = (wallData.openings || []).map(opening => Utility.deepClone(opening));
-        this.openings = Utility.deepClone(this.authoredOpenings);
-        this.openingSlots = new Map();
-        this.authoredFixtures = Utility.deepClone(wallData.fixtures || []);
-        this.fixtures = Utility.deepClone(this.authoredFixtures);
-        this.pieces = [];
-        this._pieceByCell = new Map();
-        this.authoredFaceOverrides = Utility.deepClone(wallData.faceOverrides || []);
-        this.faceOverrides = Utility.deepClone(this.authoredFaceOverrides);
-        this.decorations = [];
-        this.presentation = SiteConfig.wallSystem.defaultPresentation;
-        this._movingOpeningIds = new Set();
-        // Records travelling with a wall run that is being moved. See
-        // withTravellingRecords: for the length of a move they are not
-        // obstacles, because they are going where the wall is going.
-        this._travellingRecordIds = new Set();
-        this._movingObjects = new Map();
-        this._movingRevealPieceIds = new Map();
-        this._presentationOverride = null;
-        this._activeCutawayKey = null;
-        this._runPieceIds = new Map();
-        this._cutawayRoomIds = new Set();
-        this._pendingCutawayKey = null;
-        this._pendingCutawaySince = 0;
-        this._lastEvaluateAt = 0;
-        this._subjectSignature = null;
-        this._cursorSubjectAt = -Infinity;
-        this._cursorSubject = null;
-        this._unsubscribers = [];
-    }
-
-    async initialize() {
-        for (const source of this.wallData.cells || []) {
-            const key = `${source.x},${source.y}`;
-            const cell = { ...source, opening: null };
-            this.authoredBaseCells.set(key, Utility.deepClone(cell));
-            this.baseCells.set(key, cell);
-        }
-        this.normalizeOpeningFootprints();
-        this.pruneOrphanedRecords();
-        this.authoredOpenings = Utility.deepClone(this.openings);
-        this.reindexOpenings();
-        for (const [key, cell] of this.cells) {
-            // A cell the author never painted, standing here only because an
-            // opening bridged the gap it was drawn into. It behaves as wall from
-            // now on, but it is not authored geometry — the Tiled exporter has
-            // to be able to tell the difference, or a doorway the author drew as
-            // a gap in the tile layer comes back as solid wall.
-            if (!this.baseCells.has(key)) this.baseCells.set(key, { ...cell, opening: null, bridged: true });
-        }
-        this.reindexOpenings();
-        this.commitCutawayRoom(true);
-        this.rebuild();
-        await this.createFlatOverlay();
-        this.bindOpeningObjects();
-        this.bindFixtureObjects();
-        this.createAuthoredAttachments(this.wallData.attachments || []);
-        const events = this.gameMap.eventManager;
-        if (events) {
-            this._unsubscribers.push(events.on(EVENTS.CONTAINER_ACTIVE_MYTE_CHANGED, () => this.commitCutawayRoom(true)));
-            this._unsubscribers.push(events.on(EVENTS.WALL_GEOMETRY_CHANGED, payload => {
-                if (payload?.builder === this) return;
-                if (!payload?.mapId || payload.mapId === this.gameMap.id) this.rebuild();
-            }));
-        }
-        return this;
-    }
-
-    normalizeOpeningFootprints() {
-        for (const opening of this.openings) {
-            const object = this.gameMap.getObjectById?.(opening.id);
-            if (!object || !opening.cells?.length) continue;
-            const axis = this.getOpeningAxis(object);
-            const count = Math.max(1, Math.round(
-                (axis === 'horizontal' ? object.size.width : object.size.height) / this.cellSize
-            ));
-            const startX = Math.min(...opening.cells.map(cell => cell[0]));
-            const startY = Math.min(...opening.cells.map(cell => cell[1]));
-            opening.axis = axis;
-            opening.cells = Array.from({ length: count }, (_, index) => [
-                startX + (axis === 'horizontal' ? index : 0),
-                startY + (axis === 'vertical' ? index : 0)
-            ]);
-        }
-    }
-
-    /**
-     * Drops opening and fixture records whose map object is gone.
-     *
-     * Both kinds of record name an object by id, and the object is the only
-     * thing that fills what the record claims: an opening cuts a hole for a
-     * window to sit in, a fixture reserves the patch of wall a painting hangs
-     * on. Lose the object and the claim outlives it — a hole in the wall with
-     * no window in it, which nothing can be placed over because the wall still
-     * says something is there. Records like that survive into the save, so this
-     * runs on load as well, and repairs a save that already carries one.
-     */
-    pruneOrphanedRecords() {
-        const exists = id => !!this.gameMap.getObjectById?.(id);
-        const openings = this.openings.filter(opening => exists(opening.id));
-        const fixtures = this.fixtures.filter(record => exists(record.id));
-        const changed = openings.length !== this.openings.length ||
-            fixtures.length !== this.fixtures.length;
-        this.openings = openings;
-        this.fixtures = fixtures;
-        return changed;
-    }
-
-    /**
-     * Hands back everything this wall holds on behalf of an object that is
-     * leaving the map — stored in the inventory, or discarded because its
-     * placement failed. The counterpart to finishOpeningMove/finishFixtureMove:
-     * those record the claim, this one releases it.
-     */
-    releaseObject(object) {
-        const id = String(object?.id ?? object);
-        this._movingOpeningIds.delete(id);
-        this._movingObjects.delete(id);
-        this._movingRevealPieceIds.delete(id);
-
-        const fixtureCount = this.fixtures.length;
-        this.fixtures = this.fixtures.filter(record => String(record.id) !== id);
-        const hadFixture = this.fixtures.length !== fixtureCount;
-
-        const openingCount = this.openings.length;
-        this.openings = this.openings.filter(opening => String(opening.id) !== id);
-        const hadOpening = this.openings.length !== openingCount;
-        if (hadOpening) {
-            this.openingSlots.delete(id);
-            this.reindexOpenings();
-            this.rebuild();
-            if (String(object?.type).toUpperCase() === 'DOOR') this.gameMap.buildDoorRoomTopology?.();
-        }
-        if (hadOpening || hadFixture) this.evaluateCutaway(true);
-        return hadOpening || hadFixture;
-    }
-
-    reindexOpenings() {
-        this.openingKeys.clear();
-        this.openingByCell.clear();
-        this.cells = new Map([...this.baseCells].map(([key, cell]) => [key, { ...cell, opening: null }]));
-        for (const opening of this.openings) {
-            const cells = opening.cells || [];
-            for (let index = 0; index < cells.length; index++) {
-                const [x, y] = cells[index];
-                const key = `${x},${y}`;
-                this.openingKeys.add(key);
-                this.openingByCell.set(key, {
-                    ...opening,
-                    isStart: index === 0,
-                    isEnd: index === cells.length - 1
-                });
-            }
-        }
-        for (const opening of this.openings) this.bridgeOpeningGap(opening);
-        for (const [key, opening] of this.openingByCell) {
-            const cell = this.cells.get(key);
-            if (cell) cell.opening = opening;
-        }
-        this.syncGridWallState();
-    }
-
-    /**
-     * Stamp the wall's collision and sight-blocking onto the grid — and, just
-     * as importantly, take it off again.
-     *
-     * A wall cell is the only writer of `tileWalkable` after load, so the state
-     * a cell had BEFORE this stamped it is remembered per cell and handed back
-     * when the wall comes down. Without that hand-back a torn-down wall left an
-     * invisible collider standing exactly where it had been: Mytes pathed
-     * around nothing, sight lines stopped at nothing, and the debug grid drew
-     * the ghost of the wall you had just removed.
-     *
-     * TileMapLoader deliberately no longer stamps wall cells, so the remembered
-     * state is the tile layer's own answer rather than this system's previous
-     * one — otherwise removing an authored wall would restore "unwalkable".
-     */
-    syncGridWallState() {
-        const gridSystem = this.gameMap.gridSystem;
-        if (!gridSystem?.grid) return;
-        const previous = this._gridWallBaseline ||= new Map();
-        const stamped = new Set();
-        let changed = false;
-
-        for (const cell of this.baseCells.values()) {
-            const key = `${cell.x},${cell.y}`;
-            const gridCell = gridSystem.grid[cell.x]?.[cell.y];
-            if (!gridCell) continue;
-            if (!previous.has(key)) {
-                previous.set(key, {
-                    tileWalkable: gridCell.tileWalkable,
-                    wallBlocksLineOfSight: gridCell.wallBlocksLineOfSight
-                });
-                changed = true;
-            }
-            stamped.add(key);
-            const opening = this.openingByCell.get(key);
-            gridCell.tileWalkable = opening?.type === 'door';
-            gridCell.wallBlocksLineOfSight = opening
-                ? opening.blocksLineOfSight === true
-                : cell.blocksLineOfSight !== false;
-            gridCell.walkable = gridCell.tileWalkable && gridCell.objectWalkable;
-        }
-
-        for (const [key, baseline] of previous) {
-            if (stamped.has(key)) continue;
-            previous.delete(key);
-            changed = true;
-            const [x, y] = key.split(',').map(Number);
-            const gridCell = gridSystem.grid[x]?.[y];
-            if (!gridCell) continue;
-            gridCell.tileWalkable = baseline.tileWalkable;
-            gridCell.wallBlocksLineOfSight = baseline.wallBlocksLineOfSight;
-            gridCell.walkable = gridCell.tileWalkable && gridCell.objectWalkable;
-        }
-
-        // The pathfinder charges a per-node cost from a wall-adjacency count
-        // precomputed at load, on the assumption that tile walkability never
-        // moves. Build mode moves it, so the count is recomputed whenever the
-        // set of wall cells changes.
-        if (changed) {
-            gridSystem._computeStaticWallCounts?.();
-            // The debug grid is only redrawn when something marks it stale, and
-            // wall edits move the very cells it colours.
-            if (gridSystem.debugMode) gridSystem._debugDirty = true;
-        }
-        gridSystem.invalidatePathfinderCaches?.();
-    }
-
-    bridgeOpeningGap(opening) {
-        const openingCells = opening.cells || [];
-        if (openingCells.length === 0 || openingCells.every(([x, y]) => this.cells.has(`${x},${y}`))) return;
-        const { ordered, before, bridgeable } = this._resolveOpeningBridge(
-            openingCells,
-            opening.axis,
-            this.cells
-        );
-        const existing = ordered.map(([x, y]) => this.cells.get(`${x},${y}`)).find(Boolean);
-        if (!existing && !bridgeable) return;
-        const template = existing || before;
-
-        for (const [x, y] of ordered) {
-            const key = `${x},${y}`;
-            if (this.cells.has(key)) continue;
-            this.cells.set(key, {
-                ...this.wallData.defaults,
-                constructionId: template.constructionId,
-                finishId: template.finishId,
-                heightCells: template.heightCells,
-                connectGroup: template.connectGroup,
-                x,
-                y,
-                opening: this.openingByCell.get(key)
-            });
-        }
-    }
-
-    computeMask(cell) {
-        let mask = 0;
-        for (const direction of WallBuilder.DIRECTIONS) {
-            const neighbor = this.cells.get(`${cell.x + direction.dx},${cell.y + direction.dy}`);
-            if (neighbor && neighbor.connectGroup === cell.connectGroup) mask |= direction.bit;
-        }
-        return mask;
-    }
-
-    _resolveOpeningBridge(cells, axis, source) {
-        const horizontal = axis === 'horizontal';
-        const ordered = [...cells].sort((a, b) => horizontal ? a[0] - b[0] : a[1] - b[1]);
-        const [startX, startY] = ordered[0];
-        const [endX, endY] = ordered[ordered.length - 1];
-        const before = source.get(`${startX - (horizontal ? 1 : 0)},${startY - (horizontal ? 0 : 1)}`);
-        const after = source.get(`${endX + (horizontal ? 1 : 0)},${endY + (horizontal ? 0 : 1)}`);
-        return {
-            ordered,
-            before,
-            after,
-            bridgeable: !!before && !!after && before.connectGroup === after.connectGroup
-        };
-    }
-
-    /**
-     * Which room each of a cell's four faces looks into.
-     *
-     * Two rules, and the second one exists because of how authored rooms are
-     * shaped. An authored room is a RECTANGLE, and a rectangle drawn around a
-     * room contains the wall cells inside it — so asking "which room is at this
-     * point" for a point that sits inside a wall answers with the surrounding
-     * room, confidently and wrongly. (Auto-detected rooms are tilemasks of open
-     * cells and do not do this, which is why the bug only showed on walls built
-     * inside an authored room.)
-     *
-     * That single fact produced everything that looked wrong about a room built
-     * inside another one: its corners and its side walls reported the
-     * SURROUNDING room, so they wore that room's paint instead of plain
-     * plaster, room-scope paint of the new room skipped them entirely, and
-     * room-scope paint of the OLD room repainted them — because as far as the
-     * face data was concerned, they were the old room's walls.
-     */
-    assignFaces(cell) {
-        const mask = this.computeMask(cell);
-        const resolved = {};
-        for (const direction of WallBuilder.DIRECTIONS) {
-            resolved[direction.name] = this.findFaceRoom(cell, direction, mask);
-        }
-
-        // A face whose lookup was blocked by masonry rather than by open ground
-        // still has to belong somewhere: the strip a north-south wall draws is
-        // painted from its south face, and a corner column is drawn from its
-        // own. Give those the innermost room the cell touches at all — a wall
-        // belongs to the smallest room it bounds, which is the same rule
-        // innermostAt applies to a point. Faces that saw genuinely open ground
-        // and found no room are exterior and stay that way.
-        const fallback = Object.values(resolved)
-            .filter(entry => entry.room)
-            .map(entry => entry.room)
-            .reduce((smallest, room) => !smallest ||
-                room.areaInCells(this.cellSize) < smallest.areaInCells(this.cellSize)
-                ? room : smallest, null);
-
-        const faces = {};
-        for (const direction of WallBuilder.DIRECTIONS) {
-            const entry = resolved[direction.name];
-            const room = entry.room || (entry.buried ? fallback : null);
-            faces[direction.name] = {
-                roomId: room?.id || null,
-                exterior: !room,
-                materialId: this.resolveFinishOverride(cell.x, cell.y, direction.name, room?.id ?? null) ||
-                    room?.properties?.wallFinishId || cell.finishId
-            };
-        }
-        return faces;
-    }
-
-    // Innermost, not first: a room walled off inside another sits within its
-    // parent's bounds, and a wall of the inner room belongs to the inner room.
-    // Null on a cell that is itself a wall — see assignFaces for why that
-    // matters more than it sounds.
-    roomAtOpenCell(x, y) {
-        if (this.cells.has(`${x},${y}`)) return null;
-        return this.gameMap.regionManager?.innermostAt(
-            (x + 0.5) * this.cellSize,
-            (y + 0.5) * this.cellSize,
-            'room',
-            this.cellSize
-        ) || null;
-    }
-
-    /**
-     * One face's room, plus whether the lookup was buried in a junction.
-     *
-     * Stepping one cell out is right for a wall in the middle of a run. At the
-     * column where two walls meet, that step lands on the wall coming in from
-     * the side — so follow the corner instead: an L corner encloses its room
-     * diagonally, and the cell between its two arms is inside.
-     *
-     * `buried` distinguishes "this face is walled in" from "this face looks at
-     * open ground that belongs to no room". The first wants a fallback; the
-     * second is the outside of the building and must stay exterior.
-     */
-    findFaceRoom(cell, direction, mask = this.computeMask(cell)) {
-        const x = cell.x + direction.dx;
-        const y = cell.y + direction.dy;
-        if (!this.cells.has(`${x},${y}`)) return { room: this.roomAtOpenCell(x, y), buried: false };
-
-        const armDx = WallBuilder.isVerticalMask(direction.bit) && WallBuilder.inheritsHorizontalFace(mask)
-            ? ((mask & WallBuilder.MASK_EAST) !== 0 ? 1 : -1)
-            : 0;
-        const armDy = WallBuilder.isHorizontalMask(direction.bit) && WallBuilder.inheritsVerticalFace(mask)
-            ? ((mask & WallBuilder.MASK_SOUTH) !== 0 ? 1 : -1)
-            : 0;
-        if (armDx === 0 && armDy === 0) return { room: null, buried: true };
-
-        return { room: this.roomAtOpenCell(x + armDx, y + armDy), buried: true };
-    }
-
-    /**
-     * The painted finish on one face, if the player put one there.
-     *
-     * Scoped to the room the paint was applied to. Paint is a statement about a
-     * ROOM's wall, not about a patch of masonry: close a new room off against a
-     * wall that is already there and that wall's inward face now belongs to the
-     * new room, but the override baked on when it belonged to the old one still
-     * outranked the new room's finish — so a brand new room came up wearing the
-     * surrounding room's colour.
-     *
-     * Ignoring a mismatched override rather than deleting it is what makes this
-     * survive going backwards: knock the new wall down, the face returns to the
-     * old room, its override matches again and the old paint comes back. A
-     * cleanup pass would have left a bald patch the player never asked for.
-     *
-     * `roomId` absent means unscoped — authored map data, and anything saved
-     * before overrides carried a room. Those still apply everywhere, so no
-     * existing map or save changes behaviour until it is repainted.
-     *
-     * A record whose roomId is NULL is a different thing entirely and is scoped
-     * just as tightly: null is the outside of the building, which is a real
-     * surface a player can paint and which no room owns. Treating null as
-     * "unscoped" too meant painting the outside of the house wrote a record
-     * that matched every room's face in the same cells — so the exterior colour
-     * appeared on interior walls the player had never touched.
-     */
-    resolveFinishOverride(x, y, face, roomId = undefined) {
-        const match = [...this.faceOverrides].reverse().find(record => {
-            if (record.face !== face) return false;
-            if (record.roomId !== undefined && roomId !== undefined &&
-                record.roomId !== roomId) return false;
-            const x0 = Math.min(record.cells.from[0], record.cells.to[0]);
-            const x1 = Math.max(record.cells.from[0], record.cells.to[0]);
-            const y0 = Math.min(record.cells.from[1], record.cells.to[1]);
-            const y1 = Math.max(record.cells.from[1], record.cells.to[1]);
-            return x >= x0 && x <= x1 && y >= y0 && y <= y1;
-        });
-        return match?.finishId || null;
-    }
-
-    canMergeHorizontal(left, right) {
-        if (!left || !right || !WallBuilder.isStraightHorizontal(left.mask) ||
-            !WallBuilder.isStraightHorizontal(right.mask) || left.y !== right.y) return false;
-        if (right.x !== left.x + 1 || left.constructionId !== right.constructionId || left.heightCells !== right.heightCells) return false;
-        return WallMaterialRegistry.DIRECTIONS.every(direction =>
-            left.faces[direction].materialId === right.faces[direction].materialId &&
-            left.faces[direction].roomId === right.faces[direction].roomId
-        );
-    }
-
-    /**
-     * The finish on the face band of an east-west wall.
-     *
-     * Drawn from the south face, because that is the side the camera sees. But
-     * a room's OWN front wall looks south into whatever is beyond the room, so
-     * reading the south face literally made the near wall of a room wear the
-     * colour of the space outside it — a green room with a plaster strip across
-     * its front, which is not a wall anyone painted, it is a wall nobody did.
-     *
-     * When two rooms share it, local depth decides which room's perimeter this
-     * section follows. That keeps a shallow hallway's back and front walls in
-     * the same room even when a compact neighbouring room has less total area.
-     */
-    resolveBandFace(cell) {
-        const south = cell.faces?.south;
-        const north = cell.faces?.north;
-        const rooms = this.gameMap.regionManager;
-        const southRoom = south?.roomId ? rooms?.get('room', south.roomId) : null;
-        const northRoom = north?.roomId ? rooms?.get('room', north.roomId) : null;
-
-        if (southRoom && northRoom && northRoom !== southRoom &&
-            this.preferredHorizontalRoomSide(cell, northRoom, southRoom) === 'north') return 'north';
-        if (!southRoom && northRoom) return 'north';
-        return 'south';
-    }
-
-    /**
-     * Resolve a shared horizontal wall from the rooms' depth at this section.
-     * A long shallow hallway can have more total area than the compact room
-     * beside it; area alone then makes its front wall switch to that room even
-     * though its back wall correctly belongs to the hallway.
-     */
-    preferredHorizontalRoomSide(cell, northRoom, southRoom) {
-        const depth = (room, step) => {
-            let count = 0;
-            const limit = Number(this.gameMap.gridSystem?.gridHeight) ||
-                Math.max(1, Math.ceil((room.bounds?.height || 0) / this.cellSize) + 1);
-            for (let distance = 1; distance <= limit; distance++) {
-                const x = (cell.x + 0.5) * this.cellSize;
-                const y = (cell.y + 0.5 + (step * distance)) * this.cellSize;
-                if (!room.contains(x, y)) break;
-                count += 1;
-            }
-            return count;
-        };
-        const northDepth = depth(northRoom, -1);
-        const southDepth = depth(southRoom, 1);
-        if (northDepth !== southDepth) return northDepth < southDepth ? 'north' : 'south';
-        return northRoom.areaInCells(this.cellSize) < southRoom.areaInCells(this.cellSize)
-            ? 'north'
-            : 'south';
-    }
-
-    /** The room-facing horizontal surface presented by the build view. */
-    resolveVisibleBandSurface(cell, face = this.resolveBandFace(cell)) {
-        return { face, roomId: cell.faces?.[face]?.roomId ?? null };
-    }
-
-    resolveBandFinishId(cell) {
-        return this.resolveFaceFinishId(cell, this.resolveBandFace(cell));
-    }
-
-    /**
-     * Which slices of a cell take which room's paint.
-     *
-     * A cell is not one surface. A wall running east-west shows a face that
-     * looks south, and one finish covers it. A wall running north-south shows
-     * its narrow profile, and that profile has TWO sides — the room to its west
-     * and the room to its east — which is why painting it with a single finish
-     * could never be right, and why leaving it unpainted (what it used to do)
-     * was not right either. It is not a separate piece of wall to be painted on
-     * its own; it is part of both rooms, half each.
-     *
-     * Where the two meet, a cell is THREE surfaces and not two: the post in the
-     * middle, split west/east, and a band of the east-west wall on either side
-     * of it. Each band is part of the wall that runs through, so it takes the
-     * colour of the rooms that wall divides — which at a junction is not what
-     * the cell's own west/east face says, because that face is answering for
-     * the post standing next to it.
-     *
-     * Selection, growth and drawing all read this one list, so the surfaces the
-     * player can point at are exactly the ones the renderer puts on screen.
-     */
-    getPaintSpans(cell, mask, construction) {
-        const region = this.registry.paintRegion(mask, construction);
-        if (!region) return [];
-
-        const cellSize = construction.cellSize;
-        const inset = (cellSize - construction.thickness) / 2;
-        const middle = cellSize / 2;
-        const east = (mask & WallBuilder.MASK_EAST) !== 0;
-        const west = (mask & WallBuilder.MASK_WEST) !== 0;
-
-        // A slice answered by one of the cell's own four faces, with the
-        // exterior-follows-the-inside rule applied.
-        const faceSpan = (from, to, face, axis) => {
-            const owner = this.resolveOwningFace(cell, face);
+    getPaintSpans(cell) {
+        const cache = this.previewCache || this.gameMap?.buildTransaction?.cache;
+        const spans = cache?.geometry?.paintSpans?.get(BuildKeys.cell(cell.x, cell.y)) || [];
+        const topology = cache ? { ...cache.topology, walls: cache.geometry } : null;
+        if (!cache || !topology) return [];
+        return spans.map(span => {
+            const { atom, classification } = WallFaceResolver.surfaceOf(
+                { x: cell.x, y: cell.y, kind: span.kind, half: span.half },
+                cache.grid,
+                topology
+            );
+            if (classification.kind === 'buried') return null;
+            const roomId = classification.kind === 'room' ? classification.roomId : null;
             return {
-                from, to, axis,
-                face: owner,
-                roomId: cell.faces?.[owner]?.roomId ?? null,
-                finishId: this.resolveFaceFinishId(cell, owner)
+                ...span,
+                face: atom.face,
+                half: atom.half,
+                axis: span.kind === 'horizontal-band' ? 'horizontal' : 'vertical',
+                roomId,
+                finishId: this.resolveSurfaceFinishId(cell, atom.face, roomId, atom.half)
             };
-        };
-        // The post: masonry seen edge-on, owned half each by the rooms beside it.
-        const post = (from, to, face) => faceSpan(from, to, face, 'vertical');
-        // A band: an east-west wall's face, seen head-on. `side` says which end
-        // of the cell it is, which is how it finds the ground it looks at when
-        // a post stands between it and the cell straight across.
-        const band = (from, to, side) => {
-            const resolved = this.resolveRunBandSurface(cell, side) ||
-                this.resolveBandSurface(cell, side);
-            const visible = resolved || this.resolveVisibleBandSurface(cell);
-            return {
-                from, to,
-                axis: 'horizontal',
-                face: visible.face,
-                roomId: visible.roomId,
-                finishId: this.resolveSurfaceFinishId(cell, visible.face, visible.roomId)
-            };
-        };
-
-        if (!east && !west) {
-            // No head-on face at all: either a lone cell, or a wall running
-            // north-south showing nothing but its own narrow profile.
-            if (mask === 0) return [band(region.start, region.end, null)];
-            return [post(region.start, middle, 'west'), post(middle, region.end, 'east')];
-        }
-
-        if (!WallBuilder.isVerticalMask(mask)) {
-            // Straight run, or the free end of one: one face, full width.
-            return [band(region.start, region.end, east !== west ? (east ? 'east' : 'west') : null)];
-        }
-
-        // Where the wall TURNS it does not divide: the cell is the end of the
-        // wall that turns there, drawn as its own rounded cap, with nothing
-        // continuing on the far side to own it. Splitting it handed that cap to
-        // the room the corner merely stands next to. It is still a BAND — the
-        // face of the run arriving here — so it reads the ground either side of
-        // that run rather than the cell's own arm-side face, which at a stepped
-        // corner points out of the building instead of into the room.
-        if (east !== west && WallBuilder.inheritsVerticalFace(mask)) {
-            return [band(region.start, region.end, east ? 'east' : 'west')];
-        }
-
-        // A run passing a post. Three things stand here, not two: the band on
-        // either side of the post is the east-west wall, and belongs to the
-        // rooms that wall divides; only the post itself splits west/east.
-        //
-        // Handing each half of the cell wholesale to the post's own faces is
-        // what put the wrong colour on the last quarter-tile of every junction:
-        // where a new room is walled off against an existing wall, the band
-        // beyond the post is still the old wall, looking into the old room.
-        const spans = [];
-        if (west) spans.push(band(region.start, Math.min(inset, region.end), 'west'));
-        spans.push(post(Math.max(region.start, inset), middle, 'west'));
-        spans.push(post(middle, Math.min(region.end, cellSize - inset), 'east'));
-        if (east) spans.push(band(Math.max(cellSize - inset, region.start), region.end, 'east'));
-        return spans.filter(entry => entry.to > entry.from);
+        }).filter(Boolean);
     }
 
-    /**
-     * A corner column is the cap of the horizontal run beside it, so it must
-     * inherit that run's room as well as its visual direction. Sampling floor
-     * around the corner can choose a different adjacent room, producing two
-     * separately paintable sections with the same label while leaving the
-     * hallway's end columns behind.
-     */
-    resolveRunBandSurface(cell, side) {
-        const dx = side === 'east' ? 1 : side === 'west' ? -1 : 0;
-        if (dx === 0) return null;
-        const neighbour = this.cells.get(`${cell.x + dx},${cell.y}`);
-        if (!neighbour || neighbour.connectGroup !== cell.connectGroup) return null;
-        const mask = this.computeMask(neighbour);
-        if (!WallBuilder.isHorizontalMask(mask)) return null;
-        const built = {
-            ...neighbour,
-            mask,
-            faces: neighbour.faces || this.assignFaces(neighbour)
-        };
-        return this.resolveVisibleBandSurface(built);
-    }
-
-    /**
-     * The room a band on one side of a cell looks into, and the face it is.
-     *
-     * Same rule as resolveBandFace — a wall belongs to the smallest room it
-     * bounds — asked of the ground beside THIS end of the cell rather than of
-     * the cell's own four faces. The two differ exactly where they matter: at a
-     * junction the cell straight across is masonry, not floor, and the ground
-     * the band actually looks at is past the post, on its own side.
-     *
-     * Null when neither side answers, which hands the caller back to the
-     * face-based rule with its junction fallbacks intact.
-     * @returns {{face: string, roomId: string|null}|null}
-     */
-    resolveBandSurface(cell, side) {
-        const dx = side === 'east' ? 1 : side === 'west' ? -1 : 0;
-        const north = this.bandNeighbourRoom(cell, dx, -1);
-        const south = this.bandNeighbourRoom(cell, dx, 1);
-        if (!north && !south) return null;
-        const sampleCell = { ...cell, x: cell.x + dx };
-        const takesNorth = !!north && (!south || (north !== south &&
-            this.preferredHorizontalRoomSide(sampleCell, north, south) === 'north'));
-        const room = takesNorth ? north : south;
-        const face = takesNorth ? 'north' : 'south';
-        return { face, roomId: room?.id || null };
-    }
-
-    // The room across a band, stepping past the post when the cell straight
-    // across is masonry — that post is the wall this band runs into, and the
-    // floor it hides is one cell to the side.
-    bandNeighbourRoom(cell, dx, dy) {
-        const y = cell.y + dy;
-        if (!this.cells.has(`${cell.x},${y}`)) return this.roomAtOpenCell(cell.x, y);
-        return dx === 0 ? null : this.roomAtOpenCell(cell.x + dx, y);
-    }
-
-    /** A column keeps its literal side so interior and exterior paint stay separate. */
-    resolveOwningFace(cell, face) {
-        return face;
-    }
-
-    /**
-     * Per-side paint. The one-sided-corner inheritance only makes sense for the
-     * face the camera actually sees head-on, so it stays on the south face.
-     *
-     * And only while the corner and the run it caps face the SAME room. The
-     * inheritance exists because a corner column has no head-on face to author
-     * of its own, so it wears its neighbour's — which is right up until the two
-     * look into different rooms. Walling a new room off using a wall that is
-     * already there is exactly that case: the run beside the new corner still
-     * faces the old room, so the corner borrowed the old room's colour and the
-     * new room's wall ended in a stripe of the paint it was built to replace.
-     * Facing a different room means the corner does have a face to answer for.
-     */
-    resolveFaceFinishId(cell, face) {
-        // Callers hand this both built cells (which carry mask + faces) and raw
-        // ones straight out of `this.cells` (which do not) — the paint palette
-        // reads the current finish that way. Fill in what is missing rather than
-        // throwing on `cell.faces[face]` at the bottom.
-        if (!cell.faces || !Number.isFinite(cell.mask)) {
-            cell = { ...cell, mask: cell.mask ?? this.computeMask(cell), faces: cell.faces ?? this.assignFaces(cell) };
-        }
-        return this.resolveSurfaceFinishId(cell, face, cell.faces?.[face]?.roomId ?? null);
-    }
-
-    /**
-     * The same rule, for a surface whose room the cell's own faces do not
-     * record: a band at a junction looks past the post at ground the face data
-     * has no entry for, and paint applied to it is scoped to THAT room.
-     *
-     * Taking the room as an argument rather than reading `cell.faces[face]` is
-     * what lets two bands of one cell, both facing north, carry the colours of
-     * the two different rooms they divide.
-     */
-    resolveSurfaceFinishId(cell, face, roomId) {
-        const explicit = this.resolveFinishOverride(cell.x, cell.y, face, roomId ?? null);
+    resolveSurfaceFinishId(cell, face, roomId, half = null) {
+        const explicit = this.resolveFinishOverride(cell.x, cell.y, face, roomId ?? null, half);
         if (explicit) return explicit;
-        if (face === 'south' && WallBuilder.inheritsHorizontalFace(cell.mask)) {
-            const hasEast = (cell.mask & WallBuilder.MASK_EAST) !== 0;
-            const neighbor = this.cells.get(`${cell.x + (hasEast ? 1 : -1)},${cell.y}`);
-            const inherited = neighbor ? this.assignFaces(neighbor).south : null;
-            if (inherited && inherited.roomId === roomId) return inherited.materialId;
-        }
-        if (roomId && roomId === cell.faces?.[face]?.roomId) return cell.faces[face].materialId;
-        const room = roomId ? this.gameMap.regionManager?.get('room', roomId) : null;
-        return room?.properties?.wallFinishId || cell.finishId;
+        const document = this.previewDocument || this.gameMap?.buildDocument;
+        const roomFinish = roomId ? document?.level?.().rooms.get(roomId)?.wallFinishId : null;
+        const exterior = !roomId && cell.buildingId
+            ? document?.buildings?.get(cell.buildingId)?.exteriorFinishId
+            : null;
+        return roomFinish || exterior || this.wallData.defaults.finishId;
     }
 
     generatePieces() {
-        const cells = [...this.cells.values()]
-            .map(cell => ({ ...cell, mask: this.computeMask(cell), faces: this.assignFaces(cell) }))
-            .sort((a, b) => a.y - b.y || a.x - b.x);
-        const pieces = [];
-        for (let index = 0; index < cells.length; index++) {
-            const first = cells[index];
-            const run = [first];
-            while (this.canMergeHorizontal(run[run.length - 1], cells[index + 1])) {
-                run.push(cells[++index]);
-            }
-            const construction = this.registry.getConstruction(first.constructionId);
-            if (!construction) throw new Error(`Unknown wall construction "${first.constructionId}"`);
-            // The wall's thickness is centered on its cell, so its foot — the
-            // line everything sorts and hangs off — is the footprint's south
-            // edge, not the cell's.
-            const baseline = ((first.y + 0.5) * this.cellSize) + (construction.thickness / 2);
-            pieces.push({
-                id: `wall-${first.x}-${first.y}-${run.length}`,
-                x: first.x,
-                y: first.y,
-                baseline,
-                height: construction.height,
-                cells: run,
-                constructionId: first.constructionId,
-                element: null,
-                faces: null,
-                cutStates: this.createCutStates(run.length)
-            });
-        }
-        return pieces;
+        const cache = this.previewCache || this.gameMap?.buildTransaction?.cache;
+        const geometry = cache?.geometry || WallGeometry.compute(this.cells, {
+            cellSize: this.cellSize,
+            constructions: this.registry.constructions
+        });
+        return geometry.pieces.map(source => ({
+            ...source,
+            cells: source.cells.map(key => ({
+                ...this.cells.get(key),
+                mask: geometry.masks.get(key) || 0
+            })),
+            element: null,
+            faces: null,
+            cutStates: this.createCutStates(source.cells.length)
+        }));
     }
 
-    /** Whether this piece presents a horizontal paint face to the camera. */
     isPaintable(piece) {
         return (piece?.cells ?? []).some(cell =>
             this.getCellSurfaces(cell).some(surface => surface.axis === 'horizontal')
         );
     }
 
-    /**
-     * The paintable surfaces of one cell, exactly as the renderer draws them.
-     *
-     * A cell is not one surface, and which face a surface takes its finish from
-     * is a rendering decision (see getPaintSpans): a head-on band reads north or
-     * south depending on which room is the smaller one it bounds, and a
-     * north-south post is two half-cell surfaces, west and east, belonging to
-     * the rooms on either side of it.
-     *
-     * Selection, stretch growth and paint all read this one list, so what the
-     * player points at, what the highlight outlines and what the override lands
-     * on cannot disagree. They used to be three separate rules, which is why a
-     * click could highlight one wall, paint the corners of it, and change the
-     * colour of nothing you could see.
-     */
     getCellSurfaces(cell) {
         if (!cell) return [];
-        const construction = this.registry.getConstruction(cell.constructionId);
-        if (!construction) return [];
-        // Raw cells out of `this.cells` carry neither mask nor faces; the stretch
-        // walk steps through those, not through built piece cells.
-        const built = (cell.faces && Number.isFinite(cell.mask))
-            ? cell
-            : { ...cell, mask: this.computeMask(cell), faces: this.assignFaces(cell) };
-        // Which wall a surface belongs to is a question about its shape, not
-        // its face name — the post IS a north-south wall seen edge-on and grows
-        // into a north-south stretch, while a band is the face of the east-west
-        // wall running through, whichever face it takes its colour from. The
-        // spans answer both, so nothing here re-derives them: reading the face
-        // name instead made the half of a junction that continues a horizontal
-        // run grow downward into the wall hanging off it.
-        return this.getPaintSpans(built, built.mask, construction).map(span => ({
+        const mask = Number.isFinite(cell.mask) ? cell.mask : this.computeMask(cell);
+        const built = Number.isFinite(cell.mask) ? cell : { ...cell, mask };
+        return this.getPaintSpans(built).map(span => ({
             cell: built,
             face: span.face,
+            half: span.half,
             from: span.from,
             to: span.to,
             axis: span.axis,
@@ -39792,13 +39803,6 @@ class WallBuilder {
         }));
     }
 
-    /**
-     * The surface visible at a pixel of a piece's canvas.
-     *
-     * Spans are drawn in order and overlay each other — a corner column paints
-     * its post over the band that runs through it — so the last span covering
-     * the pixel is the one the player is actually looking at.
-     */
     surfaceAtOffset(piece, offsetX) {
         const construction = this.registry.getConstruction(piece?.constructionId);
         if (!construction || !(offsetX >= 0)) return null;
@@ -39812,28 +39816,6 @@ class WallBuilder {
         return covering[covering.length - 1] || null;
     }
 
-    /**
-     * Every surface one paint stroke covers: the run of masonry the clicked
-     * surface belongs to, taking every face of it that looks into the same
-     * room.
-     *
-     * Two rules, and both of them are about a stretch being a wall of ONE room:
-     *
-     * A surface joins the stretch only if it faces the same room as the one
-     * clicked. That is what keeps the far side of a shared wall out of it — a
-     * room walled off inside another shares masonry with its parent, and paint
-     * applied from inside it must stop at the middle of that masonry. It is
-     * also what makes a wall that divides two rooms select as two walls, one
-     * from each side, out of the same run of cells.
-     *
-     * And the walk follows the masonry rather than stopping at anything that
-     * merely joins it. A junction where a wall hangs off this one is still this
-     * wall carrying on — the room test already excludes the arriving wall's own
-     * faces — and a run that jogs a cell sideways and continues is one wall
-     * with a step in it, not two. Stopping at every crossing left a stretch
-     * ending at the first doorpost, so half of a painted wall came out in the
-     * colour it had before.
-     */
     getPaintStretchSurfaces(surface) {
         if (!surface?.cell) return [];
         const collected = new Map();
@@ -39863,14 +39845,6 @@ class WallBuilder {
         return [...collected.values()];
     }
 
-    /**
-     * The next cell of a run, walking one way along its own axis.
-     *
-     * Straight on where the cell carries an arm that way. A perpendicular
-     * turn ends the section. The horizontal wall on the next row is a distinct
-     * room edge even when a one-cell connector touches both.
-     * @returns {object|null} the cell, or null where the run ends
-     */
     stepAlongRun(cell, axis, direction) {
         const horizontal = axis === 'horizontal';
         const mask = Number.isFinite(cell.mask) ? cell.mask : this.computeMask(cell);
@@ -39883,16 +39857,6 @@ class WallBuilder {
         ) || null;
     }
 
-    /**
-     * Where a set of surfaces sits on screen, in map coordinates.
-     *
-     * One rectangle per surface, adjacent ones merged, rather than a single box
-     * around the lot: a stretch that ends in a half-cell corner post is not a
-     * rectangle, and outlining its bounding box promised paint on the other
-     * half of that post — the half belonging to the room next door. Measured
-     * off the elements, since only the renderer knows where a construction's
-     * frame actually sits.
-     */
     getSurfaceRects(surfaces) {
         const rects = [];
         for (const surface of surfaces) {
@@ -39913,21 +39877,6 @@ class WallBuilder {
         return WallBuilder.mergeRects(rects);
     }
 
-    /**
-     * One outline per connected group of surfaces, not one per surface.
-     *
-     * A stretch is drawn as many overlapping slices: a run contributes a
-     * rectangle per cell, a corner contributes both the band through it and the
-     * post over that band, and a north-south wall contributes a tall sprite per
-     * cell that overlaps the one below it. Outlining each of those separately
-     * drew a box inside a box inside a box — half a dozen dashed borders around
-     * one wall, which is what made a single stretch look like several.
-     *
-     * Grouping by "overlaps or touches" and outlining each group's bounds gives
-     * one border per thing the player is pointing at, in every direction: the
-     * slices of one wall are connected by construction, and two walls that are
-     * not part of the same stretch never share a pixel.
-     */
     static mergeRects(rects) {
         const groups = [];
         for (const rect of rects) {
@@ -39958,9 +39907,6 @@ class WallBuilder {
         }));
     }
 
-    // Touching counts as overlapping: adjacent cells of one wall abut exactly,
-    // and a hairline gap between two dashed borders is the artefact this whole
-    // grouping exists to remove.
     static rectsTouch(a, b) {
         const slack = 0.5;
         return a.left <= b.right + slack && b.left <= a.right + slack &&
@@ -39968,6 +39914,7 @@ class WallBuilder {
     }
 
     rebuild() {
+        this.rebuilds++;
         for (const decoration of this.decorations) {
             this.gameMap.container?.attachments?.detach?.(decoration);
             decoration.dispose();
@@ -39992,6 +39939,39 @@ class WallBuilder {
         this.invalidateFlatTiles();
     }
 
+    invalidate(dirtyCells = [], { geometryChanged = true, recordsChanged = null } = {}) {
+        if (!geometryChanged) {
+            if (recordsChanged && Object.values(recordsChanged).some(Boolean)) {
+                this.syncBuildDocumentRecords();
+                if (recordsChanged.openings) {
+                    this.reindexOpenings();
+                    for (const key of dirtyCells) {
+                        const { x, y } = BuildKeys.parseCell(key);
+                        const piece = this.findPieceForCell(x, y);
+                        if (!piece) continue;
+                        const index = piece.cells.findIndex(cell => BuildKeys.cell(cell.x, cell.y) === key);
+                        if (index >= 0 && this.cells.has(key)) piece.cells[index] = {
+                            ...this.cells.get(key),
+                            mask: piece.cells[index].mask,
+                            faces: piece.cells[index].faces
+                        };
+                    }
+                }
+            }
+            const pieces = new Set(dirtyCells.map(key => {
+                const { x, y } = BuildKeys.parseCell(key);
+                return this.findPieceForCell(x, y);
+            }).filter(Boolean));
+            for (const piece of pieces) this.renderPiece(piece);
+            if (recordsChanged?.fixtures) this.rebindFixtureObjects();
+            if (pieces.size) this.invalidateFlatTiles();
+            return pieces.size;
+        }
+        this.reindexOpenings();
+        this.rebuild();
+        return this.pieces.length;
+    }
+
     createPiece(piece) {
         const canvas = document.createElement('canvas');
         canvas.className = 'wall-piece';
@@ -40009,295 +39989,15 @@ class WallBuilder {
         ]));
     }
 
-    // ── Cutaway state machine ────────────────────────────────────────────────
-    //
-    // Cutaway is a per-cell state, never an interpolated height: a cell is
-    // either standing or lowered, and the frames that join the two are authored
-    // sprites, the same way a fence picks a connection frame from its neighbor
-    // mask. `desired` is what occlusion wants right now, `cut` is what
-    // hysteresis has committed to and what actually draws.
-
-    createCutStates(cellCount) {
-        return Array.from({ length: cellCount }, () => ({ desired: false, cut: false, since: 0 }));
-    }
-
-    /**
-     * A cell can be cut when it is part of a straight horizontal run and the
-     * subject is on its north side.
-     *
-     * Where the map author has laid out rooms, "north side" means the room
-     * topology test the binary cutaway used: the cell's north face must border
-     * the committed cutaway room and its south face something else, so a wall
-     * only drops for the room you are actually standing in. Outside any
-     * authored room there is no topology to reason about, and requiring one
-     * would mean walls never cut at all on maps that are not built from rooms —
-     * so there, occluding the subject is reason enough.
-     */
-    isCutawayBoundaryCell(cell, subjectRoomIds) {
-        if (!WallBuilder.isHorizontalMask(cell.mask) || WallBuilder.isVerticalMask(cell.mask)) return false;
-        if (subjectRoomIds.size === 0) return true;
-        return this._cutawayRoomIds.has(cell.faces.north.roomId) &&
-            subjectRoomIds.has(cell.faces.north.roomId) &&
-            cell.faces.south.roomId !== cell.faces.north.roomId;
-    }
-
-    getSubjectBounds(subject) {
-        const collider = subject.collider || {};
-        const left = subject.posX + (collider.offsetX || 0);
-        const top = subject.posY + (collider.offsetY || 0);
-        return {
-            left,
-            right: left + (collider.width || subject.size?.width || 0),
-            footY: top + (collider.height || subject.size?.height || 0)
-        };
-    }
-
-    // Subject bounds + room membership resolved once per evaluation instead of
-    // once per piece — regionsAt() is far too costly to run per wall.
-    getCutawayEvaluationSubjects() {
-        if (this.presentation !== 'cutaway' || this._movingOpeningIds.size > 0) return [];
-        return this.getCutawaySubjects().map(subject => ({
-            bounds: this.getSubjectBounds(subject),
-            roomIds: new Set(this.getCutawayRoomIds(subject)),
-            isCursor: subject.isCursor === true
-        }));
-    }
-
-    getCutawaySubjects() {
-        const subjects = [];
-        const myte = this.gameMap.activeMyte ||
-            this.gameMap.container?.mytes?.find(candidate => candidate.isActive);
-        if (myte) subjects.push(myte);
-
-        const cursor = this.getCursorCutawaySubject();
-        if (cursor) subjects.push(cursor);
-        return subjects;
-    }
-
-    /**
-     * The cutaway's clock is real time, not simulation time.
-     *
-     * Cutaway is presentation, like the camera: build mode stops SimClock, and
-     * a cutaway reading it froze outright — the throttle window never elapsed,
-     * so the evaluation pass stopped running, and the cursor subject memoized
-     * at the instant the pause began stayed pinned there. Whichever cell the
-     * cursor happened to be lowering when you entered build mode then stayed
-     * lowered for the whole session, including across a mode switch back to
-     * cutaway.
-     */
-    static presentationNow() {
-        return performance.now();
-    }
-
-    // Memoized for one evaluation pass: resolving the cursor subject forces a
-    // DOM hit-test (isMouseInContainer → elementFromPoint), and one pass asks
-    // for it several times — subjects, signature, and room ids all start here.
-    // The window is sub-frame, so the memo never outlives the pass that made it.
-    getCursorCutawaySubject() {
-        const now = WallBuilder.presentationNow();
-        if (now - this._cursorSubjectAt < WallBuilder.CURSOR_SUBJECT_TTL_MS) return this._cursorSubject;
-        this._cursorSubjectAt = now;
-        this._cursorSubject = this.resolveCursorCutawaySubject();
-        return this._cursorSubject;
-    }
-
-    resolveCursorCutawaySubject() {
-        const container = this.gameMap.container;
-        // Player-facing toggle: some people want walls reacting to the cursor,
-        // some find it noisy. SiteConfig only supplies the starting value.
-        const enabled = container?.settings?.wallCursorCutaway ??
-            SiteConfig.wallSystem.cursorCutawayEnabled;
-        if (enabled !== true || container?.isMouseInContainer?.() !== true) return null;
-
-        const point = container.inputHandler?.getMouseWorldPosition?.();
-        if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return null;
-        return {
-            posX: point.x - 0.5,
-            posY: point.y - 0.5,
-            size: { width: 1, height: 1 },
-            isCursor: true
-        };
-    }
-
-    getCutawayPoint(subject) {
-        if (!subject) return null;
-        const collider = subject.collider || {};
-        return {
-            x: subject.posX + (collider.offsetX || 0) + ((collider.width || subject.size?.width || 0) / 2),
-            y: subject.posY + (collider.offsetY || 0) + ((collider.height || subject.size?.height || 0) / 2)
-        };
-    }
-
-    getCutawayRoomIds(subject) {
-        const point = this.getCutawayPoint(subject);
-        if (!point) return [];
-        return this.expandToOpenSpace(
-            this.gameMap.regionManager?.regionsAt(point.x, point.y, 'room') || []
-        ).map(room => room.id);
-    }
-
-    /**
-     * Rooms that are one open space answer as one room here.
-     *
-     * A wall only lowers where its far side is a room you are standing in. On
-     * a wall shared by two rooms that are open to each other — a divider that
-     * stops short, an alcove — that test recognises only the half facing your
-     * room, so one continuous wall stepped down halfway along, at the exact
-     * seam where its far side changes. The grouping comes from the room
-     * enclosure flood fill, which already knows what is walled off from what.
-     */
-    expandToOpenSpace(rooms) {
-        const spaces = new Set(rooms.map(room => room.properties?.openSpaceId).filter(Boolean));
-        if (spaces.size === 0) return rooms;
-        const expanded = new Set(rooms);
-        for (const room of this.gameMap.regionManager?.all('room') || []) {
-            if (spaces.has(room.properties?.openSpaceId)) expanded.add(room);
-        }
-        return [...expanded];
-    }
-
-    getCurrentCutawayRoomIds() {
-        return [...new Set(this.getCutawaySubjects().flatMap(subject =>
-            this.getCutawayRoomIds(subject)
-        ))].sort();
-    }
-
-    commitCutawayRoom(render = false) {
-        const roomIds = this.getCurrentCutawayRoomIds();
-        this._cutawayRoomIds = new Set(roomIds);
-        this._activeCutawayKey = roomIds.length > 0 ? `rooms:${roomIds.join(',')}` : 'rooms:none';
-        this._pendingCutawayKey = null;
-        if (render) this.evaluateCutaway();
-    }
-
-    // Is this world point inside one of the piece's own wall cells?
-    containsPoint(piece, x, y) {
-        const cellX = Math.floor(x / this.cellSize);
-        const cellY = Math.floor(y / this.cellSize);
-        return piece.cells.some(cell => cell.x === cellX && cell.y === cellY);
-    }
-
-    // Which cells of this piece the subjects actually stand behind.
-    computeCutCells(piece, construction, subjects) {
-        const config = SiteConfig.wallSystem;
-        const cut = new Array(piece.cells.length).fill(false);
-        if (subjects.length === 0) return cut;
-
-        const pieceLeft = piece.x * this.cellSize;
-        const padding = Math.max(0, config.cutawayPaddingCells) * this.cellSize;
-
-        for (const { bounds, roomIds, isCursor } of subjects) {
-            // Pointing at a wall is not a reason to erase it — you are usually
-            // looking at what is mounted on it. The cursor only lowers walls it
-            // is standing beyond.
-            if (isCursor && this.containsPoint(piece, bounds.left, bounds.footY)) continue;
-            // In front of the subject, and close enough that a full-height wall
-            // would actually cover it on screen. Distant front walls stay up.
-            if (piece.baseline <= bounds.footY) continue;
-            if (piece.baseline - bounds.footY >= construction.height + config.occlusionMarginPx) continue;
-
-            const left = bounds.left - padding;
-            const right = bounds.right + padding;
-            for (let index = 0; index < cut.length; index++) {
-                if (cut[index] || !this.isCutawayBoundaryCell(piece.cells[index], roomIds)) continue;
-                const cellLeft = pieceLeft + (index * this.cellSize);
-                if (cellLeft + this.cellSize > left && cellLeft < right) cut[index] = true;
-            }
-        }
-        return cut;
-    }
-
-    // Recomputes what every cell *wants*; hysteresis decides when that becomes
-    // the drawn state (see advancePiece). `immediate` commits at once and is
-    // used after a rebuild, where there is no previous state worth debouncing.
-    refreshCutawayTargets(immediate = false) {
-        const now = WallBuilder.presentationNow();
-        const subjects = this.getCutawayEvaluationSubjects();
-        for (const piece of this.pieces) {
-            const construction = this.registry.getConstruction(piece.constructionId);
-            if (!construction) continue;
-            const cut = this.computeCutCells(piece, construction, subjects);
-            const standing = this.getForcedStandingCells(piece, cut.length);
-            piece.cutStates.forEach((state, index) => {
-                if (standing[index]) cut[index] = false;
-                if (cut[index] !== state.desired) {
-                    state.desired = cut[index];
-                    state.since = now;
-                }
-                // Holding a cell up because of what is mounted on it is not an
-                // occlusion change, so it does not wait out the raise delay —
-                // the wall is already standing on screen by then anyway.
-                if (immediate || standing[index]) state.cut = cut[index];
-            });
-        }
-        this._lastEvaluateAt = now;
-        this._subjectSignature = this.getSubjectSignature();
-    }
-
-    // Cell-granular signature: re-evaluating occlusion only when a subject
-    // changes cell is what keeps this off the per-frame path (fixes the stale
-    // overlap while walking, without paying for it every frame).
-    getSubjectSignature() {
-        return this.getCutawaySubjects().map(subject => {
-            const bounds = this.getSubjectBounds(subject);
-            return [bounds.left, bounds.right, bounds.footY]
-                .map(value => Math.floor(value / this.cellSize)).join(':');
-        }).join('|');
-    }
-
-    tick() {
-        if (this.presentation !== 'cutaway' || this.pieces.length === 0) return;
-        const config = SiteConfig.wallSystem;
-        const now = WallBuilder.presentationNow();
-        // One throttled poll covers both the room commit and the occlusion
-        // signature — each resolves the cursor subject, which forces a DOM
-        // hit-test, so neither may run per-frame. The window advances even
-        // when nothing changed; otherwise the signature check itself becomes
-        // the per-frame cost the throttle exists to prevent.
-        if (now - this._lastEvaluateAt >= config.cutawayEvaluateThrottleMs) {
-            this._lastEvaluateAt = now;
-            this.updateActiveRoom();
-            if (this.getSubjectSignature() !== this._subjectSignature) {
-                this.refreshCutawayTargets();
-            }
-        }
-        // Commit every cell before drawing any piece. A room/material boundary
-        // can split one structural run across canvases; drawing the first dirty
-        // canvas while its neighbor still has yesterday's state leaves an
-        // orphan transition behind. A changed height field therefore redraws
-        // the complete set from one coherent snapshot.
-        let dirty = false;
-        for (const piece of this.pieces) {
-            if (this.advancePiece(piece, now)) dirty = true;
-        }
-        if (dirty) {
-            for (const piece of this.pieces) this.renderPiece(piece);
-        }
-    }
-
-    // Hysteresis only — a cell flips outright once its wanted state has held
-    // long enough. Lowering is quick so the wall gets out of the way; raising
-    // waits longer so walking along a wall does not strobe it.
-    advancePiece(piece, now) {
-        const config = SiteConfig.wallSystem;
-        let dirty = false;
-        for (const state of piece.cutStates) {
-            if (state.desired === state.cut) continue;
-            const delay = state.desired ? config.cutawayLowerDelayMs : config.cutawayRaiseDelayMs;
-            if (now - state.since < delay) continue;
-            state.cut = state.desired;
-            dirty = true;
-        }
-        return dirty;
-    }
-
     renderPiece(piece) {
+        this.piecesRedrawn++;
         const canvas = piece.element;
 
         // 'hidden' is purely a view mode — collision, line of sight and room
         // topology stay exactly as they are, only the art stops drawing.
         if (this.presentation === 'hidden') {
             canvas.hidden = true;
+            piece.hitRegions = [];
             this.propagateCutLine(piece, { mode: 'hidden', states: [] });
             return;
         }
@@ -40320,7 +40020,7 @@ class WallBuilder {
         // are fixed at creation, so the flag has to be set by whoever asks
         // first — which is always this, since nothing can be sampled before it
         // has been drawn.
-        const context = canvas.getContext('2d', { willReadFrequently: true });
+        const context = canvas.getContext('2d');
         context.imageSmoothingEnabled = false;
 
         piece.cells.forEach((cell, index) => {
@@ -40329,33 +40029,64 @@ class WallBuilder {
             this.applyOpeningAperture(context, cell, x, construction);
         });
 
+        this.publishHitRegions(piece, plan, construction);
+
         this.propagateCutLine(piece, plan);
     }
 
-    // How far the wall still stands in a given state. Transition frames slope
-    // across their own cell, so anything asking "how low does this go" gets the
-    // lowered end — a decoration over a transition hides with the cut.
+    publishHitRegions(piece, plan, construction) {
+        piece.hitRegions = [];
+        if (plan.mode === 'hidden') return piece.hitRegions;
+        const baseline = construction.baselineRow + 1;
+        piece.cells.forEach((cell, index) => {
+            const state = plan.states[index];
+            for (const surface of this.getCellSurfaces(cell)) {
+                const fullHalf = state === 'rampDown' ? surface.half === 0
+                    : state === 'rampUp' ? surface.half === 1
+                        : state === 'full';
+                const height = fullHalf ? construction.height : construction.stubHeight;
+                const vertical = WallBuilder.isVerticalMask(cell.mask);
+                const capDepth = construction.thickness * (!fullHalf && vertical ? 2 : 1);
+                piece.hitRegions.push({
+                    left: (index * construction.cellSize) + surface.from,
+                    right: (index * construction.cellSize) + surface.to,
+                    top: Math.max(0, baseline - height - capDepth - 1),
+                    bottom: vertical ? construction.frameHeight : baseline,
+                    surface,
+                    holes: this.hitHolesForCell(cell, index, construction)
+                });
+            }
+        });
+        return piece.hitRegions;
+    }
+
+    hitHolesForCell(cell, index, construction) {
+        const opening = cell.opening;
+        if (!opening) return [];
+        const openingHeight = Utility.clamp(Number(opening.openingHeight) || 0, 0, construction.height);
+        const sillHeight = Utility.clamp(Number(opening.sillHeight) || 0, 0, construction.height - openingHeight);
+        const insets = this.getApertureInsets(opening);
+        const bottom = construction.baselineRow + 1 - sillHeight - insets.bottom;
+        const top = bottom - (openingHeight - insets.bottom - insets.top);
+        const horizontal = opening.axis !== 'vertical';
+        const left = (index * construction.cellSize) + (horizontal && opening.isStart ? insets.left : 0);
+        const right = ((index + 1) * construction.cellSize) - (horizontal && opening.isEnd ? insets.right : 0);
+        return right > left && bottom > top ? [{
+            left,
+            right,
+            top,
+            bottom: sillHeight > 0 ? bottom : construction.frameHeight
+        }] : [];
+    }
+
+    hitTestPiece(piece, offsetX, offsetY) {
+        return WallHitTest.hit(piece, offsetX, offsetY);
+    }
+
     getStateHeight(state, construction) {
         return state === 'full' ? construction.height : construction.stubHeight;
     }
 
-    // One frame per cell — the whole cutaway is a sprite swap.
-    /**
-     * The mask to DRAW a cell with, which is not always its connectivity mask.
-     *
-     * Where an opening removes the whole of a neighbour at this height, the wall
-     * genuinely ends at this cell — so it is drawn as a free end, rounded and
-     * capped, instead of being sliced off square by the aperture next door. That
-     * end art already exists: it is the mask with the arm toward the opening
-     * dropped, so nothing new is authored and nothing is drawn outside the cell
-     * (which is what would have overlapped the door).
-     *
-     * A doorway does NOT do this at full height: 128 of 160 leaves a lintel, the
-     * wall carries on overhead, and rounding the arm off would cut the wall in
-     * half. Lowered to a 28px stub the same doorway removes the neighbour
-     * completely, and then the end is real. Connectivity, collision and line of
-     * sight are untouched — this only decides which frame gets blitted.
-     */
     renderMask(cell, state, construction) {
         let mask = cell.mask;
         const stateHeight = this.getStateHeight(state, construction);
@@ -40409,9 +40140,107 @@ class WallBuilder {
         }
     }
 
-    // Grows a lowered run outward until it covers whole openings. Halving a
-    // door looks like a rendering bug; taking the whole thing down reads as a
-    // deliberate cutaway.
+    findPieceForCell(cellX, cellY) {
+        return this._pieceByCell.get(`${cellX},${cellY}`) || null;
+    }
+
+    findPieceById(pieceId) {
+        return this.pieces.find(piece => piece.id === pieceId) || null;
+    }
+
+    getLightBlockers() {
+        return [...this.cells.values()]
+            .filter(cell => !cell.opening && cell.blocksLineOfSight !== false)
+            .map(cell => {
+                const construction = this.registry.getConstruction(cell.constructionId);
+                const inset = (this.cellSize - (construction?.thickness || this.cellSize)) / 2;
+                const mask = this.computeMask(cell);
+                const horizontal = WallBuilder.isHorizontalMask(mask);
+                const vertical = WallBuilder.isVerticalMask(mask);
+                const left = (cell.x * this.cellSize) + (horizontal ? 0 : inset);
+                const right = ((cell.x + 1) * this.cellSize) - (horizontal ? 0 : inset);
+                const top = (cell.y * this.cellSize) + (vertical ? 0 : inset);
+                const bottom = ((cell.y + 1) * this.cellSize) - (vertical ? 0 : inset);
+                return {
+                    type: 'rect',
+                    left, top, right, bottom,
+                    width: right - left,
+                    height: bottom - top
+                };
+            });
+    }
+
+    async createFlatOverlay() {
+        this.disposeFlatOverlay();
+        if (!this.atlas) return null;
+        const layer = this.gameMap.layers.groundDecor || this.gameMap.layers.background;
+        if (!layer) return null;
+
+        const canvas = document.createElement('canvas');
+        canvas.className = 'wall-tile-overlay';
+        canvas.width = this.gameMap.dimensions.width;
+        canvas.height = this.gameMap.dimensions.height;
+        canvas.style.cssText = [
+            'position:absolute', 'left:0', 'top:0',
+            `width:${this.gameMap.dimensions.width}px`,
+            `height:${this.gameMap.dimensions.height}px`,
+            'pointer-events:none'
+        ].join(';');
+        layer.appendChild(canvas);
+        this.flatCanvas = canvas;
+
+        await this.atlas.loadImage(this.gameMap.core?.resourceManager || null);
+        this._flatDirty = true;
+        this.syncFlatOverlay();
+        return canvas;
+    }
+
+    invalidateFlatTiles() {
+        this._flatDirty = true;
+        // Only the mode that shows this pays for redrawing it; every other mode
+        // just carries the dirty flag until it is switched into.
+        if (this.presentation === 'hidden') this.redrawFlatTiles();
+    }
+
+    syncFlatOverlay() {
+        if (!this.flatCanvas) return;
+        const visible = this.presentation === 'hidden';
+        this.flatCanvas.hidden = !visible;
+        if (visible) this.redrawFlatTiles();
+    }
+
+    redrawFlatTiles() {
+        if (!this.flatCanvas || !this.atlas?.image || !this._flatDirty) return;
+        const ctx = this.flatCanvas.getContext('2d');
+        ctx.clearRect(0, 0, this.flatCanvas.width, this.flatCanvas.height);
+        for (const cell of this.cells.values()) {
+            this.atlas.drawCell(
+                ctx,
+                this.computeMask(cell),
+                cell.x * this.cellSize,
+                cell.y * this.cellSize
+            );
+        }
+        this._flatDirty = false;
+    }
+
+    disposeFlatOverlay() {
+        this.flatCanvas?.remove();
+        this.flatCanvas = null;
+    }
+
+    enforceNodeBudget() {
+        const nodes = this.pieces.length + this.decorations.length;
+        this.generatedNodeCount = nodes;
+        if (nodes > SiteConfig.wallSystem.maxGeneratedNodes) {
+            throw new Error(`WallBuilder generated ${nodes} nodes; budget is ${SiteConfig.wallSystem.maxGeneratedNodes}`);
+        }
+    }
+}
+
+;
+/* -- js/Map/Walls/WallCutawayPlan.js -- */
+class WallCutawayPlan extends WallRenderer {
     expandCutOverOpenings(piece, cut) {
         const spans = new Map();
         piece.cells.forEach((cell, index) => {
@@ -40435,8 +40264,6 @@ class WallBuilder {
         }
     }
 
-    // The mirror of expandCutOverOpenings, for the raised span under a moving
-    // object: an opening the span reaches into stands in full.
     expandStandingOverOpenings(piece, cut) {
         const spans = new Map();
         piece.cells.forEach((cell, index) => {
@@ -40454,17 +40281,10 @@ class WallBuilder {
         }
     }
 
-    // Would lowering this cell put a transition tile under an opening?
     hasOpening(piece, index) {
         return !!piece.cells[index]?.opening;
     }
 
-    /**
-     * Per-cell frame states for this piece. `up`/`down`/moving-opening force a
-     * uniform state; in cutaway the committed per-cell flags pick `full` or
-     * `stub`, and every standing cell that touches a lowered one becomes the
-     * authored transition frame that joins them.
-     */
     getRenderPlan(piece, construction) {
         const count = piece.cells.length;
         const cut = this.getResolvedCutStates(piece, count);
@@ -40691,20 +40511,12 @@ class WallBuilder {
         return this.getResolvedCutStates(neighborPiece)?.[neighborIndex] === true;
     }
 
-    /**
-     * Which cells this piece wants lowered before transitions are worked out.
-     * `null` means "nothing is lowered and nothing can be" — the `up` mode,
-     * where even a drag should not open a window.
-     */
     getBaseCutStates(piece, count) {
         if (this.presentation === 'down') return new Array(count).fill(true);
         if (this.presentation !== 'cutaway') return null;
         return piece.cutStates.map(state => state.cut);
     }
 
-    // A finish or room-face change splits the render canvases, but it remains
-    // one straight construction. That visual seam must not behave like a
-    // structural corner whose endpoint stays tall.
     continuesAcrossPieceBoundary(piece, index, direction) {
         const cell = piece.cells[index];
         if (!cell || !WallBuilder.isStraightHorizontal(cell.mask)) return false;
@@ -40714,26 +40526,237 @@ class WallBuilder {
             neighbor.heightCells !== cell.heightCells) return false;
         return WallBuilder.isStraightHorizontal(this.computeMask(neighbor));
     }
+}
 
-    /**
-     * Spans of a wall that must stand, whatever the presentation says.
-     *
-     * Two sources, one rule. Something being MOVED needs its host wall up in
-     * every mode: you cannot judge where a painting goes against a 28px stub,
-     * and a fixture on a lowered wall is hidden outright by the cut rule, so
-     * lowering here made the very thing being placed invisible while placing
-     * it. Something already MOUNTED needs it up in cutaway: a cutaway exists to
-     * see past a wall, and the player's own painting is not what is in the way
-     * — lowering the wall under it just deletes decoration from the room.
-     *
-     * Spans are collected for the whole horizontal RUN, not this render piece.
-     * A run splits into several pieces at every finish and room-face seam, so a
-     * wall shared by two rooms is at least two pieces; matching by piece left
-     * the far side of the seam free to lower, which is how half a wall stayed
-     * standing and the painting on it vanished anyway. Spans carry world x, so
-     * raiseSpans keeps only what actually reaches this piece — including the
-     * padding that spills across a seam.
-     */
+;
+/* -- js/Map/Walls/WallCutaway.js -- */
+class WallCutaway extends WallCutawayPlan {
+    createCutStates(cellCount) {
+        return Array.from({ length: cellCount }, () => ({ desired: false, cut: false, since: 0 }));
+    }
+
+    isCutawayBoundaryCell(cell, subjectRoomIds) {
+        if (!WallBuilder.isHorizontalMask(cell.mask) || WallBuilder.isVerticalMask(cell.mask)) return false;
+        if (subjectRoomIds.size === 0) return true;
+        const northRoomId = this.getFaceRoomIdAt(cell.x, cell.y, 'north');
+        const southRoomId = this.getFaceRoomIdAt(cell.x, cell.y, 'south');
+        return this._cutawayRoomIds.has(northRoomId) &&
+            subjectRoomIds.has(northRoomId) &&
+            southRoomId !== northRoomId;
+    }
+
+    getSubjectBounds(subject) {
+        const collider = subject.collider || {};
+        const left = subject.posX + (collider.offsetX || 0);
+        const top = subject.posY + (collider.offsetY || 0);
+        return {
+            left,
+            right: left + (collider.width || subject.size?.width || 0),
+            footY: top + (collider.height || subject.size?.height || 0)
+        };
+    }
+
+    getCutawayEvaluationSubjects() {
+        if (this.presentation !== 'cutaway' || this._movingOpeningIds.size > 0) return [];
+        return this.getCutawaySubjects().map(subject => ({
+            bounds: this.getSubjectBounds(subject),
+            roomIds: new Set(this.getCutawayRoomIds(subject)),
+            isCursor: subject.isCursor === true
+        }));
+    }
+
+    getCutawaySubjects() {
+        const subjects = [];
+        const myte = this.gameMap.activeMyte ||
+            this.gameMap.container?.mytes?.find(candidate => candidate.isActive);
+        if (myte) subjects.push(myte);
+
+        const cursor = this.getCursorCutawaySubject();
+        if (cursor) subjects.push(cursor);
+        return subjects;
+    }
+
+    static presentationNow() {
+        return performance.now();
+    }
+
+    getCursorCutawaySubject() {
+        const now = WallBuilder.presentationNow();
+        if (now - this._cursorSubjectAt < WallBuilder.CURSOR_SUBJECT_TTL_MS) return this._cursorSubject;
+        this._cursorSubjectAt = now;
+        this._cursorSubject = this.resolveCursorCutawaySubject();
+        return this._cursorSubject;
+    }
+
+    resolveCursorCutawaySubject() {
+        const container = this.gameMap.container;
+        // Player-facing toggle: some people want walls reacting to the cursor,
+        // some find it noisy. SiteConfig only supplies the starting value.
+        const enabled = container?.settings?.wallCursorCutaway ??
+            SiteConfig.wallSystem.cursorCutawayEnabled;
+        if (enabled !== true || container?.isMouseInContainer?.() !== true) return null;
+
+        const point = container.inputHandler?.getMouseWorldPosition?.();
+        if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return null;
+        return {
+            posX: point.x - 0.5,
+            posY: point.y - 0.5,
+            size: { width: 1, height: 1 },
+            isCursor: true
+        };
+    }
+
+    getCutawayPoint(subject) {
+        if (!subject) return null;
+        const collider = subject.collider || {};
+        return {
+            x: subject.posX + (collider.offsetX || 0) + ((collider.width || subject.size?.width || 0) / 2),
+            y: subject.posY + (collider.offsetY || 0) + ((collider.height || subject.size?.height || 0) / 2)
+        };
+    }
+
+    getCutawayRoomIds(subject) {
+        const point = this.getCutawayPoint(subject);
+        if (!point) return [];
+        return this.expandToOpenSpace(
+            this.gameMap.regionManager?.regionsAt(point.x, point.y, 'room') || []
+        ).map(room => room.id);
+    }
+
+    expandToOpenSpace(rooms) {
+        const spaces = new Set(rooms.map(room => room.properties?.openSpaceId).filter(Boolean));
+        if (spaces.size === 0) return rooms;
+        const expanded = new Set(rooms);
+        for (const room of this.gameMap.regionManager?.all('room') || []) {
+            if (spaces.has(room.properties?.openSpaceId)) expanded.add(room);
+        }
+        return [...expanded];
+    }
+
+    getCurrentCutawayRoomIds() {
+        return [...new Set(this.getCutawaySubjects().flatMap(subject =>
+            this.getCutawayRoomIds(subject)
+        ))].sort();
+    }
+
+    commitCutawayRoom(render = false) {
+        const roomIds = this.getCurrentCutawayRoomIds();
+        this._cutawayRoomIds = new Set(roomIds);
+        this._activeCutawayKey = roomIds.length > 0 ? `rooms:${roomIds.join(',')}` : 'rooms:none';
+        this._pendingCutawayKey = null;
+        if (render) this.evaluateCutaway();
+    }
+
+    containsPoint(piece, x, y) {
+        const cellX = Math.floor(x / this.cellSize);
+        const cellY = Math.floor(y / this.cellSize);
+        return piece.cells.some(cell => cell.x === cellX && cell.y === cellY);
+    }
+
+    computeCutCells(piece, construction, subjects) {
+        const config = SiteConfig.wallSystem;
+        const cut = new Array(piece.cells.length).fill(false);
+        if (subjects.length === 0) return cut;
+
+        const pieceLeft = piece.x * this.cellSize;
+        const padding = Math.max(0, config.cutawayPaddingCells) * this.cellSize;
+
+        for (const { bounds, roomIds, isCursor } of subjects) {
+            // Pointing at a wall is not a reason to erase it — you are usually
+            // looking at what is mounted on it. The cursor only lowers walls it
+            // is standing beyond.
+            if (isCursor && this.containsPoint(piece, bounds.left, bounds.footY)) continue;
+            // In front of the subject, and close enough that a full-height wall
+            // would actually cover it on screen. Distant front walls stay up.
+            if (piece.baseline <= bounds.footY) continue;
+            if (piece.baseline - bounds.footY >= construction.height + config.occlusionMarginPx) continue;
+
+            const left = bounds.left - padding;
+            const right = bounds.right + padding;
+            for (let index = 0; index < cut.length; index++) {
+                if (cut[index] || !this.isCutawayBoundaryCell(piece.cells[index], roomIds)) continue;
+                const cellLeft = pieceLeft + (index * this.cellSize);
+                if (cellLeft + this.cellSize > left && cellLeft < right) cut[index] = true;
+            }
+        }
+        return cut;
+    }
+
+    refreshCutawayTargets(immediate = false) {
+        const now = WallBuilder.presentationNow();
+        const subjects = this.getCutawayEvaluationSubjects();
+        for (const piece of this.pieces) {
+            const construction = this.registry.getConstruction(piece.constructionId);
+            if (!construction) continue;
+            const cut = this.computeCutCells(piece, construction, subjects);
+            const standing = this.getForcedStandingCells(piece, cut.length);
+            piece.cutStates.forEach((state, index) => {
+                if (standing[index]) cut[index] = false;
+                if (cut[index] !== state.desired) {
+                    state.desired = cut[index];
+                    state.since = now;
+                }
+                // Holding a cell up because of what is mounted on it is not an
+                // occlusion change, so it does not wait out the raise delay —
+                // the wall is already standing on screen by then anyway.
+                if (immediate || standing[index]) state.cut = cut[index];
+            });
+        }
+        this._lastEvaluateAt = now;
+        this._subjectSignature = this.getSubjectSignature();
+    }
+
+    getSubjectSignature() {
+        return this.getCutawaySubjects().map(subject => {
+            const bounds = this.getSubjectBounds(subject);
+            return [bounds.left, bounds.right, bounds.footY]
+                .map(value => Math.floor(value / this.cellSize)).join(':');
+        }).join('|');
+    }
+
+    tick() {
+        if (this.presentation !== 'cutaway' || this.pieces.length === 0) return;
+        const config = SiteConfig.wallSystem;
+        const now = WallBuilder.presentationNow();
+        // One throttled poll covers both the room commit and the occlusion
+        // signature — each resolves the cursor subject, which forces a DOM
+        // hit-test, so neither may run per-frame. The window advances even
+        // when nothing changed; otherwise the signature check itself becomes
+        // the per-frame cost the throttle exists to prevent.
+        if (now - this._lastEvaluateAt >= config.cutawayEvaluateThrottleMs) {
+            this._lastEvaluateAt = now;
+            this.updateActiveRoom();
+            if (this.getSubjectSignature() !== this._subjectSignature) {
+                this.refreshCutawayTargets();
+            }
+        }
+        // Commit every cell before drawing any piece. A room/material boundary
+        // can split one structural run across canvases; drawing the first dirty
+        // canvas while its neighbor still has yesterday's state leaves an
+        // orphan transition behind. A changed height field therefore redraws
+        // the complete set from one coherent snapshot.
+        let dirty = false;
+        for (const piece of this.pieces) {
+            if (this.advancePiece(piece, now)) dirty = true;
+        }
+        if (dirty) {
+            for (const piece of this.pieces) this.renderPiece(piece);
+        }
+    }
+
+    advancePiece(piece, now) {
+        const config = SiteConfig.wallSystem;
+        let dirty = false;
+        for (const state of piece.cutStates) {
+            if (state.desired === state.cut) continue;
+            const delay = state.desired ? config.cutawayLowerDelayMs : config.cutawayRaiseDelayMs;
+            if (now - state.since < delay) continue;
+            state.cut = state.desired;
+            dirty = true;
+        }
+        return dirty;
+    }
+
     getMovingSpansForRun(piece) {
         if (this._movingObjects.size === 0) return [];
         const run = this.getRunPieceIds(piece);
@@ -40778,9 +40801,6 @@ class WallBuilder {
         return spans;
     }
 
-    // Where a fixture hangs, as a span on the piece that actually carries it.
-    // The same answer the moving path uses, so a fixture does not shift the
-    // wall it belongs to at the moment it is dropped.
     getFixtureSpan(object) {
         const placement = this.getFixturePlacementCandidate(object);
         return placement ? {
@@ -40790,10 +40810,6 @@ class WallBuilder {
         } : null;
     }
 
-    // Every render piece belonging to the same structural run as this one.
-    // Memoized for the life of a build: getRawCutStates is called once per
-    // piece in a run while resolving that run, so recomputing the chain each
-    // time is quadratic for no benefit.
     getRunPieceIds(piece) {
         const cached = this._runPieceIds.get(piece.id);
         if (cached) return cached;
@@ -40806,17 +40822,6 @@ class WallBuilder {
         return ids;
     }
 
-    /**
-     * Which of this piece's cells may not lower, whatever occlusion wants.
-     *
-     * One answer, asked twice: the renderer applies it so the wall stands the
-     * instant something is dropped on it, and refreshCutawayTargets applies it
-     * to the desired state so the hysteresis in advancePiece cannot spend the
-     * next cutawayRaiseDelayMs asking for a cell the renderer refuses to lower.
-     * While those two disagreed, a run split across render pieces could be
-     * caught mid-argument — one canvas drawn from the corrected state and its
-     * neighbour from the stale one, leaving a step at the seam.
-     */
     getForcedStandingCells(piece, count = piece.cells.length) {
         const standing = new Array(count).fill(false);
         this.raiseSpans(piece, standing, this.getMovingSpansForRun(piece), true);
@@ -40826,9 +40831,6 @@ class WallBuilder {
         return standing;
     }
 
-    // Stands every cell a span reaches, plus the configured padding either
-    // side. The padding is what pushes the height transition clear of the art
-    // instead of drawing a step through the middle of a painting.
     raiseSpans(piece, cut, spans, value = false) {
         if (spans.length === 0) return;
         const padding = Math.max(0, SiteConfig.wallSystem.cutawayPaddingCells) * this.cellSize;
@@ -40842,9 +40844,6 @@ class WallBuilder {
         }
     }
 
-    // Does a wall object being moved hang on this piece? "Walls down" is
-    // otherwise a uniform state that never consults the per-cell rules, and it
-    // still has to make room for the raised span under the cursor.
     hasMovingObjectSpans(piece) {
         return this.getMovingSpansForRun(piece).length > 0;
     }
@@ -40933,68 +40932,6 @@ class WallBuilder {
         return true;
     }
 
-    /**
-     * How far the hole is pulled in from the opening's declared footprint, per
-     * side. An opening's footprint is its grid extent, but its sprite may carry
-     * a transparent margin around the frame — clear the whole footprint and you
-     * see a gap of missing wall around it. The inset must therefore be at least
-     * the art's margin; erring large is free, because the sprite covers it.
-     */
-    getApertureInsets(opening) {
-        const object = this.gameMap.getObjectById?.(opening.id);
-        const configured = object?.getConfig?.('wallOpeningConfig.apertureInset') ??
-            SiteConfig.wallSystem.apertureInsetPx;
-        const uniform = Number.isFinite(configured) ? configured : 0;
-        const insets = {
-            top: uniform, right: uniform, bottom: uniform, left: uniform,
-            ...(Number.isFinite(configured) ? {} : configured || {})
-        };
-        // An opening that reaches the floor has no bottom frame to tuck under,
-        // and any inset there leaves a sliver of wall inside the doorway.
-        if (!(Number(opening.sillHeight) > 0)) insets.bottom = 0;
-        return insets;
-    }
-
-    /**
-     * The aperture is a hole straight through the wall. Clearing where no wall
-     * is drawn does nothing, so a lowered cell simply loses its door along with
-     * the rest of the wall and needs no special case — but it has to be cleared
-     * over the WHOLE depth the art occupies, which reaches past the baseline.
-     *
-     * Side insets apply only at the ends of the opening, never between its
-     * cells, so a multi-cell window still reads as one hole.
-     */
-    applyOpeningAperture(context, cell, x, construction) {
-        const opening = cell.opening;
-        if (!opening) return;
-        const openingHeight = Utility.clamp(Number(opening.openingHeight) || 0, 0, construction.height);
-        const sillHeight = Utility.clamp(Number(opening.sillHeight) || 0, 0, construction.height - openingHeight);
-        const insets = this.getApertureInsets(opening);
-
-        const bottom = construction.baselineRow + 1 - sillHeight - insets.bottom;
-        const height = openingHeight - insets.bottom - insets.top;
-        if (height <= 0) return;
-
-        const horizontal = opening.axis !== 'vertical';
-        const left = x + (horizontal && opening.isStart ? insets.left : 0);
-        const right = x + construction.cellSize - (horizontal && opening.isEnd ? insets.right : 0);
-        if (right <= left) return;
-
-        // A wall running SOUTH draws past its own baseline, down into the next
-        // cell's footprint. An opening that reaches the floor passes through
-        // that stretch as well, so the hole runs to the bottom of the frame
-        // rather than stopping at the baseline — otherwise a doorway in a
-        // north-south wall leaves a sliver of wall hanging under each of its
-        // cells. A sill keeps the baseline, because the wall below a window is
-        // solid and that stretch is part of it.
-        const top = bottom - height;
-        const depth = (sillHeight > 0 ? bottom : construction.frameHeight) - top;
-        if (depth <= 0) return;
-        context.clearRect(left, top, right - left, depth);
-    }
-
-    // World Y of the wall top over [x0, x1), taking the lowest point in that
-    // span — a child straddling a transition frame follows the lowered side.
     getCutYOver(piece, x0, x1) {
         const plan = piece.renderPlan;
         const construction = this.registry.getConstruction(piece.constructionId);
@@ -41064,12 +41001,6 @@ class WallBuilder {
         return true;
     }
 
-    /**
-     * Build and Customize must show every wall and everything mounted on one:
-     * a cut-away wall fades its fixtures out, and a fixture you cannot see is
-     * a fixture you cannot click. Presentation only - the mode the player chose
-     * is restored on the way out.
-     */
     setPresentationOverride(mode = null) {
         if (mode === null) {
             if (this._presentationOverride === null) return false;
@@ -41082,10 +41013,6 @@ class WallBuilder {
         return this.setPresentationMode(mode);
     }
 
-    /**
-     * The player-chosen presentation, shared by the View panel and the build /
-     * customize panels so all three read the same state.
-     */
     setUserPresentationMode(mode) {
         // The override slot holds the play-mode presentation to come back to;
         // picking a mode while building must not overwrite it, or leaving build
@@ -41093,11 +41020,6 @@ class WallBuilder {
         return this.setPresentationMode(mode);
     }
 
-    /**
-     * Build and Customize used to force walls up, which made the floor behind a
-     * south wall unreachable in a small room. The mode is now the player's to
-     * pick — this just seeds it and remembers what play mode was using.
-     */
     setBuildPresentation(mode = SiteConfig.buildMode.defaultPresentation) {
         if (this._presentationOverride === null) this._presentationOverride = this.presentation;
         return this.setPresentationMode(mode);
@@ -41106,14 +41028,174 @@ class WallBuilder {
     clearBuildPresentation() {
         return this.setPresentationOverride(null);
     }
+}
 
-    // ── Build validation ──────────────────────────────────────────────────────
+;
+/* -- js/Map/Walls/WallOpenings.js -- */
+class WallOpenings extends WallCutaway {
+    normalizeOpeningFootprints() {
+        for (const opening of this.openings) {
+            const object = this.gameMap.getObjectById?.(opening.id);
+            if (!object || !opening.cells?.length) continue;
+            const axis = this.getOpeningAxis(object);
+            const count = Math.max(1, Math.round(
+                (axis === 'horizontal' ? object.size.width : object.size.height) / this.cellSize
+            ));
+            const startX = Math.min(...opening.cells.map(cell => cell[0]));
+            const startY = Math.min(...opening.cells.map(cell => cell[1]));
+            opening.axis = axis;
+            opening.cells = Array.from({ length: count }, (_, index) => [
+                startX + (axis === 'horizontal' ? index : 0),
+                startY + (axis === 'vertical' ? index : 0)
+            ]);
+        }
+    }
 
-    /**
-     * What stands in the way of laying a wall on this cell, as player-facing
-     * copy. Wall-mounted things are deliberately absent: an opening or a
-     * fixture is *supposed* to share its cell with the wall it sits in.
-     */
+    pruneOrphanedRecords() {
+        const exists = id => !!this.gameMap.getObjectById?.(id);
+        const openings = this.openings.filter(opening => exists(opening.id));
+        const fixtures = this.fixtures.filter(record => exists(record.id));
+        const changed = openings.length !== this.openings.length ||
+            fixtures.length !== this.fixtures.length;
+        this.openings = openings;
+        this.fixtures = fixtures;
+        return changed;
+    }
+
+    releaseObject(object) {
+        const id = String(object?.id ?? object);
+        this._movingOpeningIds.delete(id);
+        this._movingObjects.delete(id);
+        this._movingRevealPieceIds.delete(id);
+        const level = this.gameMap?.buildDocument?.level?.();
+        const transaction = this.gameMap?.buildTransaction;
+        const hadOpening = level?.openings.has(id) === true;
+        const hadFixture = level?.fixtures.has(id) === true;
+        const hadAttachment = level?.attachments.has(id) === true;
+        if (!transaction || (!hadOpening && !hadFixture && !hadAttachment)) return false;
+        transaction.run('Release wall attachment', (_draft, draftLevel) => {
+            draftLevel.openings.delete(id);
+            draftLevel.fixtures.delete(id);
+            draftLevel.attachments.delete(id);
+        }, { recordHistory: false });
+        this.openingSlots.delete(id);
+        this.evaluateCutaway(true);
+        if (String(object?.type).toUpperCase() === 'DOOR') this.gameMap.buildDoorRoomTopology?.();
+        return true;
+    }
+
+    reindexOpenings() {
+        this.openingKeys.clear();
+        this.openingByCell.clear();
+        this.cells = new Map([...this.baseCells].map(([key, cell]) => [key, { ...cell, opening: null }]));
+        for (const opening of this.openings) {
+            const cells = opening.cells || [];
+            for (let index = 0; index < cells.length; index++) {
+                const [x, y] = cells[index];
+                const key = `${x},${y}`;
+                this.openingKeys.add(key);
+                this.openingByCell.set(key, {
+                    ...opening,
+                    isStart: index === 0,
+                    isEnd: index === cells.length - 1
+                });
+            }
+        }
+        for (const opening of this.openings) this.bridgeOpeningGap(opening);
+        for (const [key, opening] of this.openingByCell) {
+            const cell = this.cells.get(key);
+            if (cell) cell.opening = opening;
+        }
+        this.syncGridWallState();
+    }
+
+    bridgeOpeningGap(opening) {
+        const openingCells = opening.cells || [];
+        if (openingCells.length === 0 || openingCells.every(([x, y]) => this.cells.has(`${x},${y}`))) return;
+        const { ordered, before, bridgeable } = this._resolveOpeningBridge(
+            openingCells,
+            opening.axis,
+            this.cells
+        );
+        const existing = ordered.map(([x, y]) => this.cells.get(`${x},${y}`)).find(Boolean);
+        if (!existing && !bridgeable) return;
+        const template = existing || before;
+
+        for (const [x, y] of ordered) {
+            const key = `${x},${y}`;
+            if (this.cells.has(key)) continue;
+            this.cells.set(key, {
+                ...this.wallData.defaults,
+                constructionId: template.constructionId,
+                finishId: template.finishId,
+                heightCells: template.heightCells,
+                connectGroup: template.connectGroup,
+                x,
+                y,
+                opening: this.openingByCell.get(key)
+            });
+        }
+    }
+
+    _resolveOpeningBridge(cells, axis, source) {
+        const horizontal = axis === 'horizontal';
+        const ordered = [...cells].sort((a, b) => horizontal ? a[0] - b[0] : a[1] - b[1]);
+        const [startX, startY] = ordered[0];
+        const [endX, endY] = ordered[ordered.length - 1];
+        const before = source.get(`${startX - (horizontal ? 1 : 0)},${startY - (horizontal ? 0 : 1)}`);
+        const after = source.get(`${endX + (horizontal ? 1 : 0)},${endY + (horizontal ? 0 : 1)}`);
+        return {
+            ordered,
+            before,
+            after,
+            bridgeable: !!before && !!after && before.connectGroup === after.connectGroup
+        };
+    }
+
+    getApertureInsets(opening) {
+        const object = this.gameMap.getObjectById?.(opening.id);
+        const configured = object?.getConfig?.('wallOpeningConfig.apertureInset') ??
+            SiteConfig.wallSystem.apertureInsetPx;
+        const uniform = Number.isFinite(configured) ? configured : 0;
+        const insets = {
+            top: uniform, right: uniform, bottom: uniform, left: uniform,
+            ...(Number.isFinite(configured) ? {} : configured || {})
+        };
+        // An opening that reaches the floor has no bottom frame to tuck under,
+        // and any inset there leaves a sliver of wall inside the doorway.
+        if (!(Number(opening.sillHeight) > 0)) insets.bottom = 0;
+        return insets;
+    }
+
+    applyOpeningAperture(context, cell, x, construction) {
+        const opening = cell.opening;
+        if (!opening) return;
+        const openingHeight = Utility.clamp(Number(opening.openingHeight) || 0, 0, construction.height);
+        const sillHeight = Utility.clamp(Number(opening.sillHeight) || 0, 0, construction.height - openingHeight);
+        const insets = this.getApertureInsets(opening);
+
+        const bottom = construction.baselineRow + 1 - sillHeight - insets.bottom;
+        const height = openingHeight - insets.bottom - insets.top;
+        if (height <= 0) return;
+
+        const horizontal = opening.axis !== 'vertical';
+        const left = x + (horizontal && opening.isStart ? insets.left : 0);
+        const right = x + construction.cellSize - (horizontal && opening.isEnd ? insets.right : 0);
+        if (right <= left) return;
+
+        // A wall running SOUTH draws past its own baseline, down into the next
+        // cell's footprint. An opening that reaches the floor passes through
+        // that stretch as well, so the hole runs to the bottom of the frame
+        // rather than stopping at the baseline — otherwise a doorway in a
+        // north-south wall leaves a sliver of wall hanging under each of its
+        // cells. A sill keeps the baseline, because the wall below a window is
+        // solid and that stretch is part of it.
+        const top = bottom - height;
+        const depth = (sillHeight > 0 ? bottom : construction.frameHeight) - top;
+        if (depth <= 0) return;
+        context.clearRect(left, top, right - left, depth);
+    }
+
     getCellObstruction(x, y) {
         const cellSize = this.cellSize;
         const rect = { x: x * cellSize, y: y * cellSize, width: cellSize, height: cellSize };
@@ -41147,24 +41229,6 @@ class WallBuilder {
         return null;
     }
 
-    /**
-     * Whether laying a wall here would drive a perpendicular arm through a door
-     * or window standing next to it.
-     *
-     * isOpeningCellCompatible already states the rule — an opening needs a
-     * straight run, because a cell that also carries a perpendicular arm is
-     * where two walls meet and the opening would hang over the one coming in
-     * from the side. But it was only ever consulted when placing the OPENING.
-     * Nothing asked it on the way in from the wall side, and connectivity does
-     * not care which edit came first: masks are recomputed from neighbours, so
-     * building above or below a window turns that window's own cell into a
-     * junction and the new wall draws straight down over the glass. The cell
-     * under the window was never edited, which is why the build tool's
-     * "would this change anything" filter waved it through.
-     *
-     * Checked against the mask the cell WOULD have, not the one it has, so the
-     * answer is about the wall being built rather than the one already there.
-     */
     getOpeningJunctionConflict(x, y) {
         const group = this.baseCells.get(`${x},${y}`)?.connectGroup ||
             this.wallData.defaults.connectGroup;
@@ -41196,144 +41260,6 @@ class WallBuilder {
         return null;
     }
 
-    // Breathing room either side of a mounted span, in px. Configurable
-    // because it is a look, not a rule: it exists so a wall does not stop dead
-    // at the edge of a picture frame.
-    getMountedClearancePx() {
-        const value = Number(SiteConfig.wallSystem.mountedClearancePx);
-        return Number.isFinite(value) && value > 0 ? value : 0;
-    }
-
-    /**
-     * Everything mounted on the walls, as a horizontal span on the wall ROW
-     * that carries it: `{ row, left, right, kind, reason, entity }`.
-     *
-     * A row rather than a rect, because a fixture's art hangs on the face —
-     * 160px of it, standing rows above the cell it belongs to — so its world
-     * `posY` says nothing about which cell holds it up. Its span is measured
-     * the same way the cutaway measures it (getFixtureSpan, off the piece the
-     * fixture actually hangs on) rather than off the cell recorded at drop
-     * time, which a later re-split of the run leaves pointing elsewhere.
-     */
-    getMountedWallSpans() {
-        const cellSize = this.cellSize;
-        const spans = [];
-        const travelling = record => this._travellingRecordIds.has(String(record.id));
-
-        for (const opening of this.openings) {
-            if (travelling(opening)) continue;
-            const type = String(opening.type || 'opening').toLowerCase();
-            const object = this.gameMap.getObjectById?.(opening.id) || null;
-            for (const [cellX, cellY] of opening.cells || []) {
-                spans.push({
-                    kind: 'opening',
-                    row: cellY,
-                    left: cellX * cellSize,
-                    right: (cellX + 1) * cellSize,
-                    reason: `Remove the ${type} first.`,
-                    entity: object
-                });
-            }
-        }
-
-        for (const record of this.fixtures) {
-            if (travelling(record)) continue;
-            const object = this.gameMap.getObjectById?.(record.id);
-            const span = object ? this.getFixtureSpan(object) : null;
-            if (!span) continue;
-            spans.push({
-                kind: 'fixture',
-                row: span.piece.y,
-                left: span.left,
-                right: span.right,
-                reason: `Take the ${object.getDisplayName?.() || 'fixture'} down first.`,
-                entity: object
-            });
-        }
-
-        return spans;
-    }
-
-    /**
-     * What this cell is carrying that the edit would orphan. A wall holding a
-     * door or a painting refuses to go — those have nowhere to fall back to but
-     * a hole in the world — and a wall may not be built across one either.
-     *
-     * Measured as a span on the row, not by which piece the fixture's recorded
-     * cell happens to resolve to. That older test asked "is this fixture on the
-     * same run?", which answered yes for every cell of a long wall — so one
-     * painting locked a whole run against removal — while a painting overhanging
-     * the end of its run into an empty cell answered no, and a wall was built
-     * straight over the canvas.
-     *
-     * @param {number} clearance px of margin either side of the span to count
-     *   as occupied. Removal passes the configured clearance so the wall keeps
-     *   a shoulder under what it carries; building passes 0, because putting
-     *   wall up NEXT to a painting is fine — only covering it is not.
-     */
-    getCellMounting(x, y, clearance = 0) {
-        const left = x * this.cellSize;
-        const right = left + this.cellSize;
-        for (const span of this.getMountedWallSpans()) {
-            if (span.row !== y) continue;
-            if (right <= span.left - clearance || left >= span.right + clearance) continue;
-            return { reason: span.reason, entity: span.entity };
-        }
-        return null;
-    }
-
-    /**
-     * Whether building here would drive an arm into the run a fixture hangs on.
-     *
-     * The fixture counterpart to getOpeningJunctionConflict, and the same shape
-     * of bug: a cell above or below a wall is not that wall's cell, so nothing
-     * in the mounting test looks at it — but connectivity does not care which
-     * edit came first. The new arm turns the cell under the painting into a
-     * junction, that cell stops being part of a straight horizontal run, and
-     * the piece carrying the painting splits underneath it. What the player
-     * sees is a painting that jumps sideways when a wall is built nowhere near
-     * it.
-     */
-    getFixtureJunctionConflict(x, y) {
-        const clearance = this.getMountedClearancePx();
-        const left = (x * this.cellSize) - clearance;
-        const right = left + this.cellSize + (2 * clearance);
-        const group = this.baseCells.get(`${x},${y}`)?.connectGroup ||
-            this.wallData.defaults.connectGroup;
-
-        for (const dy of [-1, 1]) {
-            const neighbor = this.cells.get(`${x},${y + dy}`);
-            if (!neighbor || neighbor.connectGroup !== group) continue;
-            for (const span of this.getMountedWallSpans()) {
-                if (span.kind !== 'fixture' || span.row !== y + dy) continue;
-                if (right <= span.left || left >= span.right) continue;
-                return {
-                    reason: `A wall here would split the wall the ${
-                        span.entity?.getDisplayName?.() || 'fixture'} hangs on.`,
-                    entity: span.entity
-                };
-            }
-        }
-
-        return null;
-    }
-
-    // Map-baked decoration has no inventory form to return, so the wall under
-    // it is locked rather than merely occupied.
-    hasAuthoredAttachmentAt(x, y) {
-        return (this.wallData.attachments || []).some(record => {
-            const [cellX, cellY] = record.cells?.from || [record.cellX, record.cellY];
-            return cellX === x && cellY === y;
-        });
-    }
-
-    isWallMountedObject(object) {
-        const id = String(object?.id ?? '');
-        return this.openings.some(opening => String(opening.id) === id) ||
-            this.fixtures.some(record => String(record.id) === id) ||
-            this.isWallOpeningObject(object);
-    }
-
     isWallOpeningObject(object) {
         return !!object?.getConfig?.('wallOpeningConfig', null);
     }
@@ -41351,541 +41277,6 @@ class WallBuilder {
         return false;
     }
 
-    /**
-     * Every myte owns exactly one home slot, on exactly one map (`homeMapId`);
-     * everywhere else the slot element is detached from the DOM entirely.
-     *
-     * That makes residency the question here, not geometry. `getHomePosition()`
-     * answers with the myte's CURRENT coordinates when it is off its home map —
-     * a deliberate choice, since a detached slot measures as (0, 0) and would
-     * otherwise drag it to the corner — so asking every myte in the roster where
-     * its slot is turns visitors and stay-at-homes alike into phantom slots on
-     * whatever map you happen to be building in. On a map with no slots at all,
-     * that reads as "a Myte needs to be able to reach its slot" over a cell
-     * nothing occupies.
-     */
-    isHomeSlotCell(rect) {
-        const mapId = this.gameMap?.id;
-        return (this.gameMap.container?.mytes || []).some(myte => {
-            const slot = myte.homeSlot;
-            if (!slot?.isOnMap(mapId)) return false;
-
-            const home = slot.getStandingPosition();
-            if (!home) return false;
-            return RectUtils.boundsOverlap(rect, {
-                x: home.x,
-                y: home.y,
-                width: myte.size?.width ?? this.cellSize,
-                height: myte.size?.height ?? this.cellSize
-            });
-        });
-    }
-
-    findCreatureInRect(rect) {
-        const container = this.gameMap.container;
-        const candidates = [
-            ...(container?.mytes || []).filter(myte => myte.isActive),
-            ...(this.gameMap.objects || []).filter(object => object instanceof MovingMapObject)
-        ];
-        return candidates.find(entity => RectUtils.boundsOverlap(rect, {
-            x: entity.posX,
-            y: entity.posY,
-            width: entity.size?.width ?? 0,
-            height: entity.size?.height ?? 0
-        })) || null;
-    }
-
-    // Shared footprint test for object placement: nothing that is not itself
-    // wall-mounted may sit inside a wall's cell.
-    rectOverlapsWall(bounds) {
-        const cellSize = this.cellSize;
-        const startX = Math.floor(bounds.x / cellSize);
-        const startY = Math.floor(bounds.y / cellSize);
-        const endX = Math.floor((bounds.x + Math.max(1, bounds.width) - 1) / cellSize);
-        const endY = Math.floor((bounds.y + Math.max(1, bounds.height) - 1) / cellSize);
-        for (let x = startX; x <= endX; x += 1) {
-            for (let y = startY; y <= endY; y += 1) {
-                if (this.baseCells.has(`${x},${y}`) && !this.openingByCell.has(`${x},${y}`)) return true;
-            }
-        }
-        return false;
-    }
-
-    // The room a given face belongs to right now, straight from the built cell
-    // so it agrees with whatever assignFaces most recently decided.
-    getFaceRoomIdAt(x, y, face) {
-        const cell = this.cells.get(`${x},${y}`);
-        if (!cell) return null;
-        const faces = cell.faces || this.assignFaces(cell);
-        return faces?.[face]?.roomId ?? null;
-    }
-
-    /**
-     * Give overrides saved before they carried a room the room they are sitting
-     * on now. Without this an existing save keeps its untagged overrides, which
-     * apply unconditionally, and the very bug this fixes survives in every world
-     * that already exists. Runs once, after the cells are built and before
-     * anything reads a finish.
-     */
-    adoptLegacyFaceOverrideRooms() {
-        for (const record of this.faceOverrides) {
-            if (record.roomId !== undefined) continue;
-            record.roomId = this.getFaceRoomIdAt(record.cells.from[0], record.cells.from[1], record.face);
-        }
-    }
-
-    /**
-     * Paint every wall of a room, by setting the ROOM's finish.
-     *
-     * Floors have always worked this way (FloorBuilder.setRoomFinish writes
-     * room.properties.floorFinishId) and walls did not: room-scope wall paint
-     * enumerated the cells it could see at that moment and wrote one override
-     * per cell per face. Anything not in that list stayed unpainted forever —
-     * the west and east faces of a north-south wall, the post of a corner
-     * column, and every wall built after the paint was applied. That is why the
-     * green stopped at the corners no matter how many times it was repainted.
-     *
-     * A room's colour is a property of the room. assignFaces already falls back
-     * to `room.properties.wallFinishId` for every face that belongs to it, so
-     * setting it here reaches all four faces of every cell, including cells that
-     * do not exist yet.
-     *
-     * The room's own per-face overrides are dropped, because repainting a room
-     * supersedes accents painted onto it. Overrides belonging to OTHER rooms are
-     * left alone — they are that room's paint on the other side of a shared wall.
-     */
-    /**
-     * Turn paint applied under the old per-face model into a room wall finish.
-     *
-     * Room-scope paint used to enumerate cells and write one override each, so
-     * a world painted before walls became a room property carries dozens of
-     * overrides and a room whose `wallFinishId` is still null. Every face that
-     * enumeration could not see — the west and east of a north-south wall, the
-     * post of a corner or a junction — therefore stayed bare plaster, and no
-     * amount of repainting fixed it because repainting rebuilt the same list.
-     *
-     * The dominant finish across a room's overrides IS that room's colour, so
-     * it is promoted to the room and its overrides dropped. Overrides carrying
-     * a different finish are deliberate accents and are kept.
-     */
-    promoteLegacyRoomPaint() {
-        const tally = new Map();
-        for (const record of this.faceOverrides) {
-            if (!record.roomId) continue;
-            const byFinish = tally.get(record.roomId) || new Map();
-            byFinish.set(record.finishId, (byFinish.get(record.finishId) || 0) + 1);
-            tally.set(record.roomId, byFinish);
-        }
-
-        let changed = false;
-        for (const [roomId, byFinish] of tally) {
-            const room = this.gameMap.regionManager?.get('room', roomId);
-            if (!room || room.properties?.wallFinishId) continue;
-            const [finishId] = [...byFinish].sort((a, b) => b[1] - a[1])[0] || [];
-            if (!finishId || !this.registry.getFinish(finishId)) continue;
-            room.properties = { ...room.properties, wallFinishId: finishId };
-            this.faceOverrides = this.faceOverrides.filter(
-                record => !(record.roomId === roomId && record.finishId === finishId)
-            );
-            changed = true;
-        }
-        return changed;
-    }
-
-    setRoomWallFinish(roomId, finishId) {
-        const room = this.gameMap.regionManager?.get('room', roomId);
-        if (!room || (finishId && !this.registry.getFinish(finishId))) return false;
-        room.properties = { ...room.properties, wallFinishId: finishId || null };
-        this.faceOverrides = this.faceOverrides.filter(record => record.roomId !== roomId);
-        this.rebuild();
-        return true;
-    }
-
-    setFaceFinish(record) {
-        if (!record || !this.registry.getFinish(record.finishId) ||
-            !WallMaterialRegistry.DIRECTIONS.includes(record.face) ||
-            !record.cells?.from || !record.cells?.to) return false;
-        this.faceOverrides.push({
-            mapId: this.gameMap.id,
-            axis: record.axis || (record.cells.from[1] === record.cells.to[1] ? 'horizontal' : 'vertical'),
-            cells: { from: [...record.cells.from], to: [...record.cells.to] },
-            face: record.face,
-            finishId: record.finishId,
-            // Which room this paint was applied to. See resolveFinishOverride:
-            // it is what stops the paint following the masonry into a room that
-            // was walled off later and never chose this colour.
-            roomId: record.roomId !== undefined
-                ? record.roomId
-                : this.getFaceRoomIdAt(record.cells.from[0], record.cells.from[1], record.face)
-        });
-        this.rebuild();
-        return true;
-    }
-
-    setWallCell(x, y, data = null, options = {}) {
-        const key = `${x},${y}`;
-        if (data === null) this.baseCells.delete(key);
-        else this.baseCells.set(key, {
-            ...this.wallData.defaults,
-            ...data,
-            x,
-            y,
-            constructionId: data.constructionId || this.wallData.defaults.constructionId,
-            finishId: data.finishId || this.wallData.defaults.finishId,
-            heightCells: data.heightCells || this.wallData.defaults.heightCells,
-            connectGroup: data.connectGroup || this.wallData.defaults.connectGroup
-        });
-        if (options.deferRebuild === true) return;
-        this.reindexOpenings();
-        this.rebuild();
-        if (options.emit !== false) {
-            this.gameMap.eventManager?.emit(EVENTS.WALL_GEOMETRY_CHANGED, { mapId: this.gameMap.id, x, y, builder: this });
-        }
-    }
-
-    /** Canonical structural template used when a build gesture continues a wall. */
-    sampleCellTemplate(cellOrX, y = null) {
-        const cell = typeof cellOrX === 'object'
-            ? this.baseCells.get(`${cellOrX.x},${cellOrX.y}`)
-            : this.baseCells.get(`${cellOrX},${y}`);
-        if (!cell) return null;
-        return Utility.deepClone({
-            constructionId: cell.constructionId,
-            finishId: cell.finishId,
-            heightCells: cell.heightCells,
-            connectGroup: cell.connectGroup
-        });
-    }
-
-    sampleFaceOverrideTemplate(cellOrX, y = null) {
-        const x = typeof cellOrX === 'object' ? cellOrX.x : cellOrX;
-        const cellY = typeof cellOrX === 'object' ? cellOrX.y : y;
-        if (!Number.isInteger(x) || !Number.isInteger(cellY)) return [];
-        return this.faceOverrides.filter(record => {
-            const from = record.cells?.from;
-            const to = record.cells?.to;
-            if (!from || !to) return false;
-            return x >= Math.min(from[0], to[0]) && x <= Math.max(from[0], to[0]) &&
-                cellY >= Math.min(from[1], to[1]) && cellY <= Math.max(from[1], to[1]);
-        }).map(record => ({
-            face: record.face,
-            finishId: record.finishId,
-            roomId: record.roomId,
-            axis: record.axis
-        }));
-    }
-
-    faceOverridesWithin(cellKeys) {
-        if (!cellKeys?.size) return [];
-        const inside = point => point && cellKeys.has(`${point[0]},${point[1]}`);
-        return this.faceOverrides.filter(record =>
-            inside(record.cells?.from) && inside(record.cells?.to)
-        );
-    }
-
-    faceOverridesIntersecting(cellKeys) {
-        if (!cellKeys?.size) return [];
-        return this.faceOverrides.filter(record => {
-            const from = record.cells?.from;
-            const to = record.cells?.to;
-            if (!from || !to) return false;
-            const x0 = Math.min(from[0], to[0]);
-            const x1 = Math.max(from[0], to[0]);
-            const y0 = Math.min(from[1], to[1]);
-            const y1 = Math.max(from[1], to[1]);
-            for (const key of cellKeys) {
-                const [x, y] = key.split(',').map(Number);
-                if (x >= x0 && x <= x1 && y >= y0 && y <= y1) return true;
-            }
-            return false;
-        });
-    }
-
-    retargetFaceOverrides(records) {
-        let changed = false;
-        for (const record of records ?? []) {
-            const from = record.cells?.from;
-            const to = record.cells?.to;
-            if (!from || !to) continue;
-            const x0 = Math.min(from[0], to[0]);
-            const x1 = Math.max(from[0], to[0]);
-            const y0 = Math.min(from[1], to[1]);
-            const y1 = Math.max(from[1], to[1]);
-            let target = null;
-            for (let y = y0; y <= y1 && !target; y++) {
-                for (let x = x0; x <= x1; x++) {
-                    if (!this.baseCells.has(`${x},${y}`)) continue;
-                    target = [x, y];
-                    break;
-                }
-            }
-            if (!target) continue;
-            const [x, y] = target;
-            const roomId = this.getFaceRoomIdAt(x, y, record.face);
-            if (record.roomId === roomId) continue;
-            record.roomId = roomId;
-            changed = true;
-        }
-        if (changed) this.rebuild();
-        return changed;
-    }
-
-    createFaceOverrideCopies(template, cells) {
-        return cells.flatMap(cell => template.map(record => ({
-            ...Utility.deepClone(record),
-            mapId: this.gameMap.id,
-            cells: { from: [cell.x, cell.y], to: [cell.x, cell.y] }
-        })));
-    }
-
-    addFaceOverrideCopies(records) {
-        if (!records?.length) return false;
-        this.faceOverrides.push(...records);
-        this.rebuild();
-        return true;
-    }
-
-    removeFaceOverrideCopies(records) {
-        if (!records?.length) return false;
-        const remove = new Set(records);
-        const before = this.faceOverrides.length;
-        this.faceOverrides = this.faceOverrides.filter(record => !remove.has(record));
-        if (this.faceOverrides.length === before) return false;
-        this.rebuild();
-        return true;
-    }
-
-    /**
-     * The authoritative wall edit. Every caller goes through here, so this is
-     * where rejection lives: obstructed or locked cells are filtered out and
-     * reported rather than thrown, and the per-cell prior state comes back as
-     * an inverse change list the undo stack can replay verbatim.
-     *
-     * @returns {{applied: Array, rejected: Array, inverse: Array}|false}
-     */
-    applyWallCellChanges(changes = [], options = {}) {
-        const normalized = changes.filter(change => Number.isInteger(change?.x) && Number.isInteger(change?.y));
-        if (normalized.length === 0) return false;
-
-        const rules = options.validate === false ? null : this.gameMap.container?.buildRules;
-        const applied = [];
-        const rejected = [];
-        // Judged as if whatever is travelling with the wall had already left:
-        // it has, as far as this edit is concerned.
-        this.withTravellingRecords(this.getTravellingRecordIds(options.contentMove), () => {
-            for (const change of normalized) {
-                const verdict = !rules
-                    ? BuildRules.ALLOWED
-                    : (change.data ?? null) === null
-                        ? rules.canRemoveWallCell(change.x, change.y)
-                        : rules.canBuildWallCell(change.x, change.y);
-                if (verdict.allowed) applied.push(change);
-                else rejected.push({ ...change, reason: verdict.reason });
-            }
-        });
-        // All of it or none of it. Half a wall move is not a smaller wall move:
-        // the run comes apart, whatever was hanging on the refused cells is
-        // orphaned, and the player is left repairing something they never asked
-        // for. Refusing outright costs them one drag; the alternative costs
-        // them the wall.
-        if (options.atomic === true && rejected.length > 0) {
-            return { applied: [], rejected, inverse: [] };
-        }
-        if (applied.length === 0) return { applied, rejected, inverse: [] };
-
-        const inverse = applied.map(({ x, y }) => {
-            const previous = this.baseCells.get(`${x},${y}`);
-            return { x, y, data: previous ? Utility.deepClone(previous) : null };
-        });
-
-        const previousCells = new Map([...this.baseCells].map(([key, cell]) => [key, { ...cell }]));
-        try {
-            for (const change of applied) {
-                this.setWallCell(change.x, change.y, change.data ?? null, { deferRebuild: true });
-            }
-            // Inside the same try, before the reindex: a door is part of the
-            // wall it is cut into, so it has to arrive at the new cells in the
-            // same breath the cells do. Moved afterwards it would spend one
-            // reindex belonging to masonry that is no longer there, and
-            // pruneOrphanedRecords would be within its rights to delete it.
-            const travelled = this.translateWallContents(options.contentMove);
-            this.reindexOpenings();
-            this.rebuild();
-            // After the rebuild, because a door hangs off a SLOT built from the
-            // opening's cells and the pieces those cells belong to. Moving the
-            // record alone leaves the slot standing where the wall used to be,
-            // and the attachment obediently drags the door back to it — which
-            // is why a moved door looked like it had stayed behind until you
-            // nudged it and something else recomputed the slot.
-            this.rebindOpeningObjects(travelled);
-        } catch (error) {
-            this.baseCells = previousCells;
-            this.translateWallContents(WallBuilder.invertContentMove(options.contentMove));
-            this.reindexOpenings();
-            this.rebuild();
-            throw error;
-        }
-        this.gameMap.eventManager?.emit(EVENTS.WALL_GEOMETRY_CHANGED, {
-            mapId: this.gameMap.id,
-            cells: applied.map(({ x, y }) => ({ x, y })),
-            builder: this
-        });
-        return { applied, rejected, inverse };
-    }
-
-    /**
-     * Everything mounted on a set of cells, moved with them.
-     *
-     * A wall is not only masonry. A door is a hole cut in it, a window is a
-     * hole with glass, a painting is hung on its face and the colour it wears
-     * was painted onto those exact cells. Move the wall and leave those behind
-     * and you have not moved a wall — you have demolished one and built
-     * another, which is what it looks like on screen: the door drops into open
-     * floor and the new run comes up bare plaster.
-     *
-     * Only records lying ENTIRELY within the moved cells travel. One that
-     * straddles the edge belongs as much to the wall staying put, and dragging
-     * half of it would tear it in two.
-     *
-     * @param {{cells: Set<string>, dx: number, dy: number}} move
-     * @returns {Array<string>} the ids that moved
-     */
-    translateWallContents(move) {
-        const { cells, dx = 0, dy = 0 } = move || {};
-        if (!cells || cells.size === 0 || (dx === 0 && dy === 0)) return [];
-        const inside = (x, y) => cells.has(`${x},${y}`);
-        const moved = [];
-
-        const carryObject = (id) => {
-            const object = this.gameMap.getObjectById?.(id);
-            if (!object) return;
-            object.posX += dx * this.cellSize;
-            object.posY += dy * this.cellSize;
-            object.updatePosition?.();
-            object.syncRenderLayer?.();
-            object.handleMovedEvent?.();
-        };
-
-        for (const opening of this.openings) {
-            const footprint = opening.cells || [];
-            if (footprint.length === 0 || !footprint.every(([x, y]) => inside(x, y))) continue;
-            opening.cells = footprint.map(([x, y]) => [x + dx, y + dy]);
-            carryObject(opening.id);
-            moved.push(String(opening.id));
-        }
-
-        for (const record of [...this.fixtures, ...(this.wallData.attachments || [])]) {
-            const from = record.cells?.from;
-            const to = record.cells?.to || from;
-            if (!from || !inside(from[0], from[1]) || !inside(to[0], to[1])) continue;
-            record.cells = { from: [from[0] + dx, from[1] + dy], to: [to[0] + dx, to[1] + dy] };
-            carryObject(record.id);
-            moved.push(String(record.id));
-        }
-
-        // Paint is applied to a room's wall, and this is still that wall.
-        // Leaving the overrides behind would repaint the cells the run vacated
-        // — which are about to be nothing at all — and bring the run up in the
-        // room's base finish, losing every stroke the player put on it.
-        for (const record of this.faceOverrides) {
-            const from = record.cells?.from;
-            const to = record.cells?.to;
-            if (!from || !to || !inside(from[0], from[1]) || !inside(to[0], to[1])) continue;
-            record.cells = { from: [from[0] + dx, from[1] + dy], to: [to[0] + dx, to[1] + dy] };
-        }
-
-        return moved;
-    }
-
-    // The same move run backwards, for a rollback or an undo.
-    static invertContentMove(move) {
-        if (!move?.cells) return null;
-        const cells = new Set([...move.cells].map(key => {
-            const [x, y] = key.split(',').map(Number);
-            return `${x + (move.dx || 0)},${y + (move.dy || 0)}`;
-        }));
-        return { cells, dx: -(move.dx || 0), dy: -(move.dy || 0) };
-    }
-
-    /**
-     * Which records a content move would pick up — asked BEFORE the move, so
-     * the rules can be told to stop treating them as obstacles.
-     *
-     * A door in the wall you are dragging is the wall's own door, and the rules
-     * quite correctly refuse to build masonry through a door. Left unexempted
-     * that refusal fires on the destination cells, so a wall with a door in it
-     * is a wall that can never be moved — the door blocks its own wall, which
-     * is exactly the sort of thing that makes a build mode feel broken rather
-     * than careful.
-     * @returns {Array<string>}
-     */
-    getTravellingRecordIds(move) {
-        const { cells } = move || {};
-        if (!cells || cells.size === 0) return [];
-        const inside = (x, y) => cells.has(`${x},${y}`);
-        const ids = [];
-        for (const opening of this.openings) {
-            const footprint = opening.cells || [];
-            if (footprint.length > 0 && footprint.every(([x, y]) => inside(x, y))) ids.push(String(opening.id));
-        }
-        for (const record of [...this.fixtures, ...(this.wallData.attachments || [])]) {
-            const from = record.cells?.from;
-            const to = record.cells?.to || from;
-            if (from && inside(from[0], from[1]) && inside(to[0], to[1])) ids.push(String(record.id));
-        }
-        return ids;
-    }
-
-    /**
-     * Runs `fn` with a set of records treated as already gone from where they
-     * are. Restored in a finally, because a validation that throws must not
-     * leave the map permanently blind to a door.
-     */
-    withTravellingRecords(ids, fn) {
-        const previous = this._travellingRecordIds;
-        this._travellingRecordIds = new Set(ids || []);
-        try {
-            return fn();
-        } finally {
-            this._travellingRecordIds = previous;
-        }
-    }
-
-    findPieceForCell(cellX, cellY) {
-        return this._pieceByCell.get(`${cellX},${cellY}`) || null;
-    }
-
-    /**
-     * Re-derive which room each wall face borders, and rebuild if the answer
-     * moved.
-     *
-     * Faces resolve against the region layer, but rooms are recomputed AFTER
-     * the geometry change that prompted them — so a wall raised in the same
-     * breath as the room it encloses was assigned before that room existed and
-     * read as "outside" ever after, which also made it unpaintable. The reverse
-     * too: tearing a room down left its walls still pointing at a region that
-     * no longer exists, so a stretch of the Kitchen's wall kept selecting as a
-     * room that had been deleted.
-     *
-     * A full rebuild rather than a patch, because face room ids are part of
-     * what decides how cells merge into pieces (see canMergeHorizontal) — a run
-     * that now borders two different rooms has to become two pieces.
-     */
-    refreshRoomFaces() {
-        const changed = this.pieces.some(piece => piece.cells.some(cell => {
-            const faces = this.assignFaces(cell);
-            return WallMaterialRegistry.DIRECTIONS.some(direction =>
-                cell.faces[direction].roomId !== faces[direction].roomId ||
-                cell.faces[direction].materialId !== faces[direction].materialId);
-        }));
-        if (changed) this.rebuild();
-        return changed;
-    }
-
-    findPieceById(pieceId) {
-        return this.pieces.find(piece => piece.id === pieceId) || null;
-    }
-
     getOpeningAxis(object) {
         const facing = object.getConfig?.('facingDirection', object.facingDirection);
         if (facing === 'E' || facing === 'W') return 'vertical';
@@ -41893,8 +41284,6 @@ class WallBuilder {
         return object.size.width >= object.size.height ? 'horizontal' : 'vertical';
     }
 
-    // How far the wall's foot sits above the cell's south edge, because the
-    // thickness is centered on the cell rather than flush with it.
     getFootInset(constructionId = this.wallData.defaults?.constructionId) {
         const construction = this.registry.getConstruction(constructionId);
         return construction ? (this.cellSize - construction.thickness) / 2 : 0;
@@ -41999,12 +41388,6 @@ class WallBuilder {
         return this._resolveOpeningBridge(cells, axis, this.baseCells).bridgeable;
     }
 
-    /**
-     * An opening needs a straight run to sit in. A cell that also carries a
-     * perpendicular arm — a corner, a tee, a junction — is where two walls
-     * meet, and a door or window dropped there would hang over the wall coming
-     * in from the side.
-     */
     isOpeningCellCompatible(mask, axis) {
         return axis === 'horizontal'
             ? WallBuilder.isHorizontalMask(mask) && !WallBuilder.isVerticalMask(mask)
@@ -42098,15 +41481,6 @@ class WallBuilder {
         return true;
     }
 
-    /**
-     * Re-anchors doors and windows whose opening has moved.
-     *
-     * The fixture counterpart is rebindFixtureObjects, called on every rebuild
-     * because rebuild replaces the surfaces fixtures hang on. An opening's slot
-     * is built from its CELLS, which a rebuild does not touch — so this is only
-     * needed where the cells themselves moved, and is asked for by id rather
-     * than run over everything.
-     */
     rebindOpeningObjects(ids = []) {
         const wanted = new Set((ids || []).map(String));
         if (wanted.size === 0) return;
@@ -42128,6 +41502,8 @@ class WallBuilder {
 
     beginOpeningMove(object) {
         const id = String(object.id);
+        object._wallBuildRecordBefore = Utility.deepClone(this.openings.find(record => String(record.id) === id) || null);
+        object._wallBuildRecordKind = 'openings';
         this._movingOpeningIds.add(id);
         this._movingObjects.set(id, object);
         this._movingRevealPieceIds.set(id, new Set(
@@ -42154,9 +41530,17 @@ class WallBuilder {
         object.posY = placement.position.y;
         object.updatePosition?.();
         const opening = this.createOpeningRecord(object, placement);
-        this.openings.push(opening);
-        this.reindexOpenings();
-        this.rebuild();
+        const build = this.gameMap?.buildTransaction;
+        if (build) {
+            build.run(`Move ${object.getDisplayName?.() || object.type}`, (_draft, level) => {
+                level.openings.set(id, opening);
+            }, { recordHistory: false });
+        } else {
+            this.openings.push(opening);
+            this.reindexOpenings();
+            this.rebuild();
+        }
+        object._wallBuildRecordAfter = Utility.deepClone(opening);
         const attached = this.attachOpeningObject(object, opening);
         this._movingOpeningIds.delete(id);
         this._movingObjects.delete(id);
@@ -42166,20 +41550,152 @@ class WallBuilder {
         return attached;
     }
 
-    // The object is not coming back to this wall — release the move state and
-    // let the walls settle without it.
     cancelOpeningMove(object) {
         const id = String(object.id);
         this._movingOpeningIds.delete(id);
         this._movingObjects.delete(id);
         this._movingRevealPieceIds.delete(id);
+        this.syncBuildDocumentRecords();
+        this.reindexOpenings();
+        this.rebuild();
+        this.rebindOpeningObjects([id]);
         this.evaluateCutaway(true);
+    }
+}
+;
+/* -- js/Map/Walls/WallFixtures.js -- */
+class WallFixtures extends WallOpenings {
+    getMountedClearancePx() {
+        const value = Number(SiteConfig.wallSystem.mountedClearancePx);
+        return Number.isFinite(value) && value > 0 ? value : 0;
+    }
+
+    getMountedWallSpans() {
+        const cellSize = this.cellSize;
+        const spans = [];
+        const travelling = record => this._travellingRecordIds.has(String(record.id));
+
+        for (const opening of this.openings) {
+            if (travelling(opening)) continue;
+            const type = String(opening.type || 'opening').toLowerCase();
+            const object = this.gameMap.getObjectById?.(opening.id) || null;
+            for (const [cellX, cellY] of opening.cells || []) {
+                spans.push({
+                    kind: 'opening',
+                    row: cellY,
+                    left: cellX * cellSize,
+                    right: (cellX + 1) * cellSize,
+                    reason: `Remove the ${type} first.`,
+                    entity: object
+                });
+            }
+        }
+
+        for (const record of this.fixtures) {
+            if (travelling(record)) continue;
+            const object = this.gameMap.getObjectById?.(record.id);
+            const span = object ? this.getFixtureSpan(object) : null;
+            if (!span) continue;
+            spans.push({
+                kind: 'fixture',
+                row: span.piece.y,
+                left: span.left,
+                right: span.right,
+                reason: `Take the ${object.getDisplayName?.() || 'fixture'} down first.`,
+                entity: object
+            });
+        }
+
+        return spans;
+    }
+
+    getCellMounting(x, y, clearance = 0) {
+        const left = x * this.cellSize;
+        const right = left + this.cellSize;
+        for (const span of this.getMountedWallSpans()) {
+            if (span.row !== y) continue;
+            if (right <= span.left - clearance || left >= span.right + clearance) continue;
+            return { reason: span.reason, entity: span.entity };
+        }
+        return null;
+    }
+
+    getFixtureJunctionConflict(x, y) {
+        const clearance = this.getMountedClearancePx();
+        const left = (x * this.cellSize) - clearance;
+        const right = left + this.cellSize + (2 * clearance);
+        const group = this.baseCells.get(`${x},${y}`)?.connectGroup ||
+            this.wallData.defaults.connectGroup;
+
+        for (const dy of [-1, 1]) {
+            const neighbor = this.cells.get(`${x},${y + dy}`);
+            if (!neighbor || neighbor.connectGroup !== group) continue;
+            for (const span of this.getMountedWallSpans()) {
+                if (span.kind !== 'fixture' || span.row !== y + dy) continue;
+                if (right <= span.left || left >= span.right) continue;
+                return {
+                    reason: `A wall here would split the wall the ${
+                        span.entity?.getDisplayName?.() || 'fixture'} hangs on.`,
+                    entity: span.entity
+                };
+            }
+        }
+
+        return null;
+    }
+
+    hasAuthoredAttachmentAt(x, y) {
+        return (this.wallData.attachments || []).some(record => {
+            const [cellX, cellY] = record.cells?.from || [record.cellX, record.cellY];
+            return cellX === x && cellY === y;
+        });
+    }
+
+    isWallMountedObject(object) {
+        const id = String(object?.id ?? '');
+        return this.openings.some(opening => String(opening.id) === id) ||
+            this.fixtures.some(record => String(record.id) === id) ||
+            this.isWallOpeningObject(object);
+    }
+
+    isHomeSlotCell(rect) {
+        const mapId = this.gameMap?.id;
+        return (this.gameMap.container?.mytes || []).some(myte => {
+            const slot = myte.homeSlot;
+            if (!slot?.isOnMap(mapId)) return false;
+
+            const home = slot.getStandingPosition();
+            if (!home) return false;
+            return RectUtils.boundsOverlap(rect, {
+                x: home.x,
+                y: home.y,
+                width: myte.size?.width ?? this.cellSize,
+                height: myte.size?.height ?? this.cellSize
+            });
+        });
+    }
+
+    findCreatureInRect(rect) {
+        const container = this.gameMap.container;
+        const candidates = [
+            ...(container?.mytes || []).filter(myte => myte.isActive),
+            ...(this.gameMap.objects || []).filter(object => object instanceof MovingMapObject)
+        ];
+        return candidates.find(entity => RectUtils.boundsOverlap(rect, {
+            x: entity.posX,
+            y: entity.posY,
+            width: entity.size?.width ?? 0,
+            height: entity.size?.height ?? 0
+        })) || null;
     }
 
     cancelFixtureMove(object) {
         const id = String(object.id);
         this._movingObjects.delete(id);
         this._movingRevealPieceIds.delete(id);
+        this.syncBuildDocumentRecords();
+        const record = this.fixtures.find(candidate => String(candidate.id) === id);
+        if (record) this.attachFixtureObject(object, record);
         this.evaluateCutaway(true);
     }
 
@@ -42215,22 +41731,6 @@ class WallBuilder {
         }
     }
 
-    // Blockers follow the centered footprint, not the whole cell: sight lines
-    // graze past a wall's ends the way the art says they should.
-    // ── Wall fixtures ────────────────────────────────────────────────────────
-    //
-    // A fixture hangs on a wall face rather than cutting through it, so unlike
-    // an opening it has no cell footprint: it snaps to a point on a face, free
-    // along the wall and up and down it, but never off it.
-
-    /**
-     * The wall face under a point. Faces are 160px tall but rows are 32px
-     * apart, so a point sits inside several pieces' bands at once — the one
-     * that matters is the frontmost, the same one that would be drawn over the
-     * others. Taking the first match instead hangs the fixture on a wall rows
-     * behind, which then clamps it to that wall's foot: the "always low, and
-     * sometimes through the floor" symptom.
-     */
     getFixtureFaceForPoint(x, y) {
         const construction = this.registry.getConstruction(this.wallData.defaults?.constructionId);
         if (!construction) return null;
@@ -42248,11 +41748,6 @@ class WallBuilder {
         return best;
     }
 
-    /**
-     * Snaps a dropped fixture onto the wall face under it, keeping the whole
-     * sprite on the wall.
-     * @returns {{piece: object, position: {x: number, y: number}, u: number, v: number}|null}
-     */
     getFixturePlacementCandidate(object, x = object.posX, y = object.posY) {
         const width = object.size?.width || 0;
         const height = object.size?.height || 0;
@@ -42287,12 +41782,6 @@ class WallBuilder {
         return this.resolveFixturePlacement(object, x, y) !== null;
     }
 
-    /**
-     * Everything already mounted on this stretch of wall, as world rects: the
-     * openings cut into it and the other fixtures hanging on it. Two things
-     * cannot occupy the same patch of wall, so a painting may not cover a
-     * window, a door, or another painting.
-     */
     getWallFaceObstacles(piece, construction, excludeId) {
         const obstacles = [];
         for (const cell of piece.cells) {
@@ -42338,17 +41827,6 @@ class WallBuilder {
         );
     }
 
-    /**
-     * Anchored to the cell the fixture actually hangs over, not to the piece's
-     * origin cell, with `u` measured from that cell's left edge (`uPx` says so,
-     * since a bare `u` of 0..1 is read as a normalized authored offset).
-     *
-     * The piece origin moves whenever the run is edited — extend it leftwards
-     * and it slides, split it and the recorded cell can end up on the half the
-     * fixture is not on — and every read of this record then resolves against
-     * the wrong face. The cell under the fixture is the one thing that stays
-     * true as long as the fixture does.
-     */
     createFixtureRecord(object, placement = this.resolveFixturePlacement(object)) {
         if (!placement) return null;
         const center = placement.position.x + (object.size.width / 2);
@@ -42412,11 +41890,6 @@ class WallBuilder {
         }
     }
 
-    // rebuild() recreates every piece and its face surfaces, but a fixture
-    // stays attached to the surface from the previous build — it stops
-    // receiving cut-line updates and keeps the old piece graph alive. Only
-    // fixtures that are currently attached are re-anchored; first-time
-    // binding stays with bindFixtureObjects() so initialize() ordering holds.
     rebindFixtureObjects() {
         const attachments = this.gameMap.container?.attachments;
         if (!attachments) return;
@@ -42430,6 +41903,8 @@ class WallBuilder {
 
     beginFixtureMove(object) {
         const id = String(object.id);
+        object._wallBuildRecordBefore = Utility.deepClone(this.fixtures.find(record => String(record.id) === id) || null);
+        object._wallBuildRecordKind = 'fixtures';
         // A fixture in hand is never cut. Detaching stops the wall talking to
         // it, so a painting picked up off a lowered wall would otherwise keep
         // the hidden state it had when it was hanging there and be dragged
@@ -42457,232 +41932,454 @@ class WallBuilder {
         object.posX = placement.position.x;
         object.posY = placement.position.y;
         object.updatePosition?.();
-        this.fixtures.push(record);
+        const build = this.gameMap?.buildTransaction;
+        if (build) {
+            build.run(`Move ${object.getDisplayName?.() || object.type}`, (_draft, level) => {
+                level.fixtures.set(id, record);
+            }, { recordHistory: false });
+        } else {
+            this.fixtures.push(record);
+        }
+        object._wallBuildRecordAfter = Utility.deepClone(record);
         const attached = this.attachFixtureObject(object, record);
         this.evaluateCutaway(true);
         return attached;
     }
 
-    getLightBlockers() {
-        return [...this.cells.values()]
-            .filter(cell => !cell.opening && cell.blocksLineOfSight !== false)
-            .map(cell => {
-                const construction = this.registry.getConstruction(cell.constructionId);
-                const inset = (this.cellSize - (construction?.thickness || this.cellSize)) / 2;
-                const mask = this.computeMask(cell);
-                const horizontal = WallBuilder.isHorizontalMask(mask);
-                const vertical = WallBuilder.isVerticalMask(mask);
-                const left = (cell.x * this.cellSize) + (horizontal ? 0 : inset);
-                const right = ((cell.x + 1) * this.cellSize) - (horizontal ? 0 : inset);
-                const top = (cell.y * this.cellSize) + (vertical ? 0 : inset);
-                const bottom = ((cell.y + 1) * this.cellSize) - (vertical ? 0 : inset);
-                return {
-                    type: 'rect',
-                    left, top, right, bottom,
-                    width: right - left,
-                    height: bottom - top
-                };
-            });
-    }
-
-    // ── Flat 'hidden' presentation ───────────────────────────────────────────
-    //
-    // 'hidden' shows the walls the way Tiled does: flat, top-down, one tile per
-    // cell. This used to be a PNG baked once at load from the authored tile
-    // layers, which meant it was a photograph of the map file rather than a
-    // view of the world — walls built in game never appeared in it, and walls
-    // torn down in game went on being drawn forever. Drawing from the live
-    // cells costs one canvas and a few hundred blits per wall edit, and it can
-    // never disagree with what is actually standing.
-
-    async createFlatOverlay() {
-        this.disposeFlatOverlay();
-        if (!this.atlas) return null;
-        const layer = this.gameMap.layers.groundDecor || this.gameMap.layers.background;
-        if (!layer) return null;
-
-        const canvas = document.createElement('canvas');
-        canvas.className = 'wall-tile-overlay';
-        canvas.width = this.gameMap.dimensions.width;
-        canvas.height = this.gameMap.dimensions.height;
-        canvas.style.cssText = [
-            'position:absolute', 'left:0', 'top:0',
-            `width:${this.gameMap.dimensions.width}px`,
-            `height:${this.gameMap.dimensions.height}px`,
-            'pointer-events:none'
-        ].join(';');
-        layer.appendChild(canvas);
-        this.flatCanvas = canvas;
-
-        await this.atlas.loadImage(this.gameMap.core?.resourceManager || null);
-        this._flatDirty = true;
-        this.syncFlatOverlay();
-        return canvas;
-    }
-
-    invalidateFlatTiles() {
-        this._flatDirty = true;
-        // Only the mode that shows this pays for redrawing it; every other mode
-        // just carries the dirty flag until it is switched into.
-        if (this.presentation === 'hidden') this.redrawFlatTiles();
-    }
-
-    syncFlatOverlay() {
-        if (!this.flatCanvas) return;
-        const visible = this.presentation === 'hidden';
-        this.flatCanvas.hidden = !visible;
-        if (visible) this.redrawFlatTiles();
-    }
-
-    redrawFlatTiles() {
-        if (!this.flatCanvas || !this.atlas?.image || !this._flatDirty) return;
-        const ctx = this.flatCanvas.getContext('2d');
-        ctx.clearRect(0, 0, this.flatCanvas.width, this.flatCanvas.height);
-        for (const cell of this.cells.values()) {
-            this.atlas.drawCell(
-                ctx,
-                this.computeMask(cell),
-                cell.x * this.cellSize,
-                cell.y * this.cellSize
-            );
+    applyObjectBuildRecord(object, kind, record) {
+        const build = this.gameMap?.buildTransaction;
+        if (!build || !['openings', 'fixtures'].includes(kind)) return false;
+        const id = String(object.id);
+        const result = build.run(`Move ${object.getDisplayName?.() || object.type}`, (_draft, level) => {
+            if (record) level[kind].set(id, record);
+            else level[kind].delete(id);
+        }, { recordHistory: false });
+        if (kind === 'openings' && record) this.rebindOpeningObjects([id]);
+        if (kind === 'fixtures' && record) {
+            this.gameMap.container?.attachments?.detach?.(object);
+            this.attachFixtureObject(object, this.fixtures.find(candidate => String(candidate.id) === id) || record);
         }
-        this._flatDirty = false;
+        return result.committed;
     }
+}
+;
+/* -- js/Map/Walls/WallStructure.js -- */
+class WallStructure extends WallFixtures {
+    syncGridWallState() {
+        const gridSystem = this.gameMap.gridSystem;
+        if (!gridSystem?.grid) return;
+        const previous = this._gridWallBaseline ||= new Map();
+        const stamped = new Set();
+        let changed = false;
 
-    disposeFlatOverlay() {
-        this.flatCanvas?.remove();
-        this.flatCanvas = null;
-    }
-
-    serializeState() {
-        return {
-            version: 7,
-            presentation: this.presentation,
-            faceOverrides: this.faceOverrides.map(record => Utility.deepClone(record)),
-            attachments: this.decorations.map(decoration => Utility.deepClone(decoration.wallAttachmentRecord)),
-            fixtures: this.fixtures.map(record => Utility.deepClone(record)),
-            openings: this.openings.map(opening => Utility.deepClone(opening)),
-            cellDeltas: this.serializeCellDeltas()
-        };
-    }
-
-    serializeCellDeltas() {
-        const fields = ['constructionId', 'finishId', 'heightCells', 'connectGroup'];
-        const deltas = [];
-        for (const [key, authored] of this.authoredBaseCells) {
-            if (!this.baseCells.has(key)) {
-                deltas.push({ x: authored.x, y: authored.y, removed: true });
-            }
-        }
-        for (const [key, cell] of this.baseCells) {
-            const authored = this.authoredBaseCells.get(key);
-            const changed = !authored || fields.some(field => cell[field] !== authored[field]);
-            if (!changed) continue;
-            deltas.push(Object.fromEntries([
-                ['x', cell.x],
-                ['y', cell.y],
-                ...fields.map(field => [field, cell[field]])
-            ]));
-        }
-        return deltas.sort((a, b) => a.y - b.y || a.x - b.x);
-    }
-
-    restoreState(state = {}) {
-        if (state.version >= 7 && Array.isArray(state.cellDeltas)) {
-            this.baseCells = new Map([...this.authoredBaseCells].map(([key, cell]) => [
-                key,
-                Utility.deepClone(cell)
-            ]));
-            for (const delta of state.cellDeltas) {
-                const x = Number(delta.x);
-                const y = Number(delta.y);
-                if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-                const key = `${x},${y}`;
-                if (delta.removed === true) {
-                    this.baseCells.delete(key);
-                    continue;
-                }
-                this.baseCells.set(key, {
-                    ...this.wallData.defaults,
-                    x,
-                    y,
-                    constructionId: delta.constructionId || this.wallData.defaults.constructionId,
-                    finishId: delta.finishId || this.wallData.defaults.finishId,
-                    heightCells: delta.heightCells || this.wallData.defaults.heightCells,
-                    connectGroup: delta.connectGroup || this.wallData.defaults.connectGroup,
-                    opening: null
+        for (const cell of this.baseCells.values()) {
+            const key = `${cell.x},${cell.y}`;
+            const gridCell = gridSystem.grid[cell.x]?.[cell.y];
+            if (!gridCell) continue;
+            if (!previous.has(key)) {
+                previous.set(key, {
+                    tileWalkable: gridCell.tileWalkable,
+                    wallBlocksLineOfSight: gridCell.wallBlocksLineOfSight
                 });
+                changed = true;
+            }
+            stamped.add(key);
+            const opening = this.openingByCell.get(key);
+            gridCell.tileWalkable = opening?.type === 'door';
+            gridCell.wallBlocksLineOfSight = opening
+                ? opening.blocksLineOfSight === true
+                : cell.blocksLineOfSight !== false;
+            gridCell.walkable = gridCell.tileWalkable && gridCell.objectWalkable;
+        }
+
+        for (const [key, baseline] of previous) {
+            if (stamped.has(key)) continue;
+            previous.delete(key);
+            changed = true;
+            const [x, y] = key.split(',').map(Number);
+            const gridCell = gridSystem.grid[x]?.[y];
+            if (!gridCell) continue;
+            gridCell.tileWalkable = baseline.tileWalkable;
+            gridCell.wallBlocksLineOfSight = baseline.wallBlocksLineOfSight;
+            gridCell.walkable = gridCell.tileWalkable && gridCell.objectWalkable;
+        }
+
+        // The pathfinder charges a per-node cost from a wall-adjacency count
+        // precomputed at load, on the assumption that tile walkability never
+        // moves. Build mode moves it, so the count is recomputed whenever the
+        // set of wall cells changes.
+        if (changed) {
+            gridSystem._computeStaticWallCounts?.();
+            // The debug grid is only redrawn when something marks it stale, and
+            // wall edits move the very cells it colours.
+            if (gridSystem.debugMode) gridSystem._debugDirty = true;
+        }
+        gridSystem.invalidatePathfinderCaches?.();
+    }
+
+    computeMask(cell) {
+        let mask = 0;
+        for (const direction of WallBuilder.DIRECTIONS) {
+            const neighbor = this.cells.get(`${cell.x + direction.dx},${cell.y + direction.dy}`);
+            if (neighbor && neighbor.connectGroup === cell.connectGroup) mask |= direction.bit;
+        }
+        return mask;
+    }
+
+    roomAtOpenCell(x, y) {
+        const roomId = this.previewCache?.grid?.ownerOfCell?.(x, y) ??
+            this.gameMap?.buildTransaction?.cache?.grid?.ownerOfCell?.(x, y);
+        return roomId ? this.gameMap.regionManager?.get('room', roomId) || null : null;
+    }
+
+    rectOverlapsWall(bounds) {
+        const cellSize = this.cellSize;
+        const startX = Math.floor(bounds.x / cellSize);
+        const startY = Math.floor(bounds.y / cellSize);
+        const endX = Math.floor((bounds.x + Math.max(1, bounds.width) - 1) / cellSize);
+        const endY = Math.floor((bounds.y + Math.max(1, bounds.height) - 1) / cellSize);
+        for (let x = startX; x <= endX; x += 1) {
+            for (let y = startY; y <= endY; y += 1) {
+                if (this.baseCells.has(`${x},${y}`) && !this.openingByCell.has(`${x},${y}`)) return true;
             }
         }
-        const savedOverrides = state.version >= 3 && Array.isArray(state.faceOverrides)
-            ? Utility.deepClone(state.faceOverrides)
-            : [];
-        const savedGeometry = new Set(savedOverrides.map(record => this.getFaceOverrideGeometryKey(record)));
-        this.faceOverrides = [
-            ...this.authoredFaceOverrides.filter(record => !savedGeometry.has(this.getFaceOverrideGeometryKey(record))),
-            ...savedOverrides
-        ];
-        if (Array.isArray(state.attachments)) this.wallData.attachments = Utility.deepClone(state.attachments);
-        for (const slot of this.openingSlots.values()) {
-            for (const object of slot.sockets.occupantsOf('opening')) {
-                this.gameMap.container?.attachments?.detach?.(object);
-            }
+        return false;
+    }
+
+    getFaceRoomIdAt(x, y, face) {
+        const cache = this.gameMap?.buildTransaction?.cache;
+        if (!cache || !this.cells.has(BuildKeys.cell(x, y))) return null;
+        const topology = { ...cache.topology, walls: cache.geometry };
+        for (const half of [0, 1]) {
+            const classification = WallFaceResolver.classify({ x, y, face, half }, cache.grid, topology);
+            if (classification.kind === 'room') return classification.roomId;
         }
-        this.openingSlots.clear();
-        this.openings = state.version >= 4 && Array.isArray(state.openings)
-            ? Utility.deepClone(state.openings)
-            : Utility.deepClone(this.authoredOpenings);
-        for (const record of this.fixtures) {
-            this.gameMap.container?.attachments?.detach?.(this.gameMap.getObjectById?.(record.id));
-        }
-        this.fixtures = state.version >= 5 && Array.isArray(state.fixtures)
-            ? Utility.deepClone(state.fixtures)
-            : Utility.deepClone(this.authoredFixtures);
-		if (state.version === 5) {
-			for (const record of this.fixtures) {
-				const [cellX, cellY] = record.cells?.from || [record.cellX, record.cellY];
-				const piece = this.findPieceForCell(cellX, cellY);
-				const construction = this.registry.getConstruction(piece?.constructionId);
-				const fixtureHeight = Number(record.height) ||
-					Number(this.gameMap.getObjectById?.(record.id)?.size?.height) || 0;
-				if (!construction?.height || !fixtureHeight) continue;
-				record.v = Utility.clamp(
-					(Number(record.v) || 0) + (fixtureHeight / (2 * construction.height)),
-					0,
-					1
-				);
-			}
-		}
-        this.normalizeOpeningFootprints();
-        this.pruneOrphanedRecords();
-        this.reindexOpenings();
-        this.rebuild();
-        // After the first build, so every face knows its room; before anything
-        // asks for a finish. Tags overrides saved before they carried one, then
-        // folds whole-room paint up into the room itself.
-        this.adoptLegacyFaceOverrideRooms();
-        if (this.promoteLegacyRoomPaint()) this.rebuild();
-        this.bindOpeningObjects();
-        this.bindFixtureObjects();
-        this.setPresentationMode(state.version >= 2 && SiteConfig.wallSystem.presentationModes.includes(state.presentation)
-            ? state.presentation
-            : SiteConfig.wallSystem.defaultPresentation);
-        this.gameMap.eventManager?.emit(EVENTS.WALL_GEOMETRY_CHANGED, {
-            mapId: this.gameMap.id,
-            builder: this
+        return null;
+    }
+
+    sampleCellTemplate(cellOrX, y = null) {
+        const cell = typeof cellOrX === 'object'
+            ? this.baseCells.get(`${cellOrX.x},${cellOrX.y}`)
+            : this.baseCells.get(`${cellOrX},${y}`);
+        if (!cell) return null;
+        return Utility.deepClone({
+            constructionId: cell.constructionId,
+            heightCells: cell.heightCells,
+            connectGroup: cell.connectGroup
         });
     }
 
-    getFaceOverrideGeometryKey(record) {
-        return `${record.face}:${record.cells?.from?.join(',')}:${record.cells?.to?.join(',')}`;
+    syncBuildDocumentRecords() {
+        const level = this.gameMap?.buildDocument?.level?.();
+        if (!level) return false;
+        this.openings = level.openings.values().map(record => Utility.deepClone(record));
+        this.fixtures = level.fixtures.values().map(record => Utility.deepClone(record));
+        this.wallData.attachments = level.attachments.values().map(record => Utility.deepClone(record));
+        return true;
     }
 
-    enforceNodeBudget() {
-        const nodes = this.pieces.length + this.decorations.length;
-        this.generatedNodeCount = nodes;
-        if (nodes > SiteConfig.wallSystem.maxGeneratedNodes) {
-            throw new Error(`WallBuilder generated ${nodes} nodes; budget is ${SiteConfig.wallSystem.maxGeneratedNodes}`);
+    applyWallCellChanges(changes = [], options = {}) {
+        const transaction = this.gameMap?.buildTransaction;
+        if (!transaction) return false;
+        const normalized = changes.filter(change => Number.isInteger(change?.x) && Number.isInteger(change?.y));
+        if (normalized.length === 0) return false;
+        const rules = options.validate === false ? null : this.gameMap.container?.buildRules;
+        const applied = [];
+        const rejected = [];
+        const travellingIds = this.getTravellingRecordIds(options.contentMove);
+        this.withTravellingRecords(travellingIds, () => {
+            for (const change of normalized) {
+                const verdict = !rules
+                    ? BuildRules.ALLOWED
+                    : (change.data ?? null) === null
+                        ? rules.canRemoveWallCell(change.x, change.y)
+                        : rules.canBuildWallCell(change.x, change.y);
+                if (verdict.allowed) applied.push(change);
+                else rejected.push({ ...change, reason: verdict.reason });
+            }
+        });
+        if (options.atomic === true && rejected.length > 0) return { applied: [], rejected, inverse: [] };
+        if (applied.length === 0) return { applied, rejected, inverse: [] };
+        const inverse = applied.map(({ x, y }) => ({
+            x,
+            y,
+            data: this.baseCells.has(BuildKeys.cell(x, y))
+                ? this.baseCells.get(BuildKeys.cell(x, y))
+                : null
+        }));
+        const defaults = this.wallData.defaults || {};
+        const move = options.contentMove;
+        const inverseMove = WallBuilder.invertContentMove(move);
+        if (move) this.translateWallContents(move);
+        try {
+            transaction.run(options.label || 'Edit walls', (draft, level) => {
+                for (const building of options.buildingCopies || []) draft.buildings.set(building.id, building);
+                for (const room of options.roomCopies || []) level.rooms.set(room.id, room);
+                if (move) {
+                    level.atoms.translateCells(move.cells, move.dx, move.dy);
+                    for (const store of [level.openings, level.fixtures, level.attachments]) {
+                        store.translateCells(move.cells, move.dx, move.dy);
+                    }
+                }
+                for (const extension of options.atomExtensions || []) {
+                    for (const target of extension.targets || []) {
+                        for (const atom of extension.atoms || []) {
+                            const copied = { ...atom, x: target.x, y: target.y };
+                            level.atoms.set(BuildKeys.atom(copied.x, copied.y, copied.face, copied.half), copied);
+                        }
+                    }
+                }
+                for (const change of applied) {
+                    const key = BuildKeys.cell(change.x, change.y);
+                    if ((change.data ?? null) === null) {
+                        level.walls.delete(key);
+                        level.atoms.deleteCell(change.x, change.y);
+                        continue;
+                    }
+                    const data = { ...defaults, ...change.data };
+                    level.walls.setCell(change.x, change.y, {
+                        constructionId: data.constructionId || defaults.constructionId,
+                        heightCells: Number(data.heightCells) || Number(defaults.heightCells) || 1,
+                        connectGroup: data.connectGroup || defaults.connectGroup || data.constructionId,
+                        buildingId: data.buildingId ?? this.inheritedBuildingId(change.x, change.y)
+                    });
+                    for (const room of level.rooms.values()) {
+                        if (room.seedCells?.includes(key)) level.rooms.removeSeed(room.id, key);
+                    }
+                }
+                for (const change of options.roomChanges || []) {
+                    const key = BuildKeys.cell(change.x, change.y);
+                    const previousOwner = level.rooms.ownerOfSeed(key);
+                    if (previousOwner) level.rooms.removeSeed(previousOwner, key);
+                    if (change.roomId && level.rooms.has(change.roomId)) {
+                        level.rooms.assignSeed(change.roomId, key);
+                    }
+                }
+                for (const roomId of options.deleteRoomIds || []) level.rooms.delete(roomId);
+                for (const buildingId of options.deleteBuildingIds || []) draft.buildings.delete(buildingId);
+            });
+        } catch (error) {
+            if (move) this.translateWallContents(inverseMove);
+            throw error;
         }
+        if (travellingIds.length) this.rebindOpeningObjects(travellingIds);
+        return { applied, rejected, inverse };
+    }
+
+    inheritedBuildingId(x, y) {
+        for (const direction of WallGeometry.DIRECTIONS) {
+            const neighbour = this.baseCells.get(BuildKeys.cell(x + direction.dx, y + direction.dy));
+            if (neighbour?.buildingId) return neighbour.buildingId;
+        }
+        return this.gameMap?.buildDocument?.buildings?.values?.()[0]?.id ?? null;
+    }
+
+    translateWallContents(move) {
+        const { cells, dx = 0, dy = 0 } = move || {};
+        if (!cells || cells.size === 0 || (dx === 0 && dy === 0)) return [];
+        const inside = (x, y) => cells.has(`${x},${y}`);
+        const moved = [];
+
+        const carryObject = (id) => {
+            const object = this.gameMap.getObjectById?.(id);
+            if (!object) return;
+            object.posX += dx * this.cellSize;
+            object.posY += dy * this.cellSize;
+            object.updatePosition?.();
+            object.syncRenderLayer?.();
+            object.handleMovedEvent?.();
+        };
+
+        for (const opening of this.openings) {
+            const footprint = opening.cells || [];
+            if (footprint.length === 0 || !footprint.every(([x, y]) => inside(x, y))) continue;
+            opening.cells = footprint.map(([x, y]) => [x + dx, y + dy]);
+            carryObject(opening.id);
+            moved.push(String(opening.id));
+        }
+
+        for (const record of [...this.fixtures, ...(this.wallData.attachments || [])]) {
+            const from = record.cells?.from;
+            const to = record.cells?.to || from;
+            if (!from || !inside(from[0], from[1]) || !inside(to[0], to[1])) continue;
+            record.cells = { from: [from[0] + dx, from[1] + dy], to: [to[0] + dx, to[1] + dy] };
+            carryObject(record.id);
+            moved.push(String(record.id));
+        }
+
+        // Paint is applied to a room's wall, and this is still that wall.
+        // Leaving the overrides behind would repaint the cells the run vacated
+        // — which are about to be nothing at all — and bring the run up in the
+        // room's base finish, losing every stroke the player put on it.
+        return moved;
+    }
+
+    static invertContentMove(move) {
+        if (!move?.cells) return null;
+        const cells = new Set([...move.cells].map(key => {
+            const [x, y] = key.split(',').map(Number);
+            return `${x + (move.dx || 0)},${y + (move.dy || 0)}`;
+        }));
+        return { cells, dx: -(move.dx || 0), dy: -(move.dy || 0) };
+    }
+
+    getTravellingRecordIds(move) {
+        const { cells } = move || {};
+        if (!cells || cells.size === 0) return [];
+        const inside = (x, y) => cells.has(`${x},${y}`);
+        const ids = [];
+        for (const opening of this.openings) {
+            const footprint = opening.cells || [];
+            if (footprint.length > 0 && footprint.every(([x, y]) => inside(x, y))) ids.push(String(opening.id));
+        }
+        for (const record of [...this.fixtures, ...(this.wallData.attachments || [])]) {
+            const from = record.cells?.from;
+            const to = record.cells?.to || from;
+            if (from && inside(from[0], from[1]) && inside(to[0], to[1])) ids.push(String(record.id));
+        }
+        return ids;
+    }
+
+    withTravellingRecords(ids, fn) {
+        const previous = this._travellingRecordIds;
+        this._travellingRecordIds = new Set(ids || []);
+        try {
+            return fn();
+        } finally {
+            this._travellingRecordIds = previous;
+        }
+    }
+}
+
+;
+/* -- js/Map/Walls/WallBuilder.js -- */
+class WallBuilder extends WallStructure {
+    static OPPOSITE_FACES = Object.freeze({
+        north: 'south', south: 'north', west: 'east', east: 'west'
+    });
+
+    static MASK_NORTH = WallGeometry.MASK_NORTH;
+    static MASK_EAST = WallGeometry.MASK_EAST;
+    static MASK_SOUTH = WallGeometry.MASK_SOUTH;
+    static MASK_WEST = WallGeometry.MASK_WEST;
+    static MASK_HORIZONTAL = WallGeometry.MASK_HORIZONTAL;
+    static MASK_VERTICAL = WallGeometry.MASK_VERTICAL;
+    static MASK_STRAIGHT_H = WallGeometry.MASK_HORIZONTAL;
+    static CURSOR_SUBJECT_TTL_MS = 4;
+    static DIRECTIONS = WallGeometry.DIRECTIONS;
+
+    static isHorizontalMask(mask) {
+        return (mask & WallBuilder.MASK_HORIZONTAL) !== 0;
+    }
+
+    static isVerticalMask(mask) {
+        return (mask & WallBuilder.MASK_VERTICAL) !== 0;
+    }
+
+    static isStraightHorizontal(mask) {
+        return mask === WallBuilder.MASK_STRAIGHT_H;
+    }
+
+    static applyFixtureCut(element, cutY, posY, height = 0) {
+        if (!element) return;
+        const behavior = SiteConfig.wallSystem.fixtureCutBehavior;
+        const cut = Number.isFinite(cutY) && cutY > posY;
+        element.classList.toggle('is-wall-cut', behavior === 'hide' && cut);
+        element.style.clipPath = (behavior === 'clip' && cut && height > 0)
+            ? `inset(${Utility.clamp(cutY - posY, 0, height)}px 0 0 0)`
+            : '';
+    }
+
+    static inheritsHorizontalFace(mask) {
+        return ((mask & WallBuilder.MASK_EAST) !== 0) !== ((mask & WallBuilder.MASK_WEST) !== 0);
+    }
+
+    static inheritsVerticalFace(mask) {
+        return ((mask & WallBuilder.MASK_NORTH) !== 0) !== ((mask & WallBuilder.MASK_SOUTH) !== 0);
+    }
+
+    static isEndCapMask(mask) {
+        return WallBuilder.isHorizontalMask(mask) &&
+            !WallBuilder.isVerticalMask(mask) &&
+            !WallBuilder.isStraightHorizontal(mask);
+    }
+
+    constructor(gameMap, wallData, registry) {
+        super();
+        this.gameMap = gameMap;
+        this.wallData = wallData;
+        this.registry = registry;
+        this.atlas = wallData.wangAtlas || null;
+        this.cellSize = gameMap.gridSystem?.config?.cellSize || 32;
+        this.layer = gameMap.layers.objects;
+        this.flatCanvas = null;
+        this._flatDirty = true;
+        this.cells = new Map();
+        this.baseCells = new Map();
+        this.authoredBaseCells = new Map();
+        this.openingKeys = new Set();
+        this.openingByCell = new Map();
+        this.authoredOpenings = Utility.deepClone(wallData.openings || []);
+        this.openings = Utility.deepClone(this.authoredOpenings);
+        this.openingSlots = new Map();
+        this.authoredFixtures = Utility.deepClone(wallData.fixtures || []);
+        this.fixtures = Utility.deepClone(this.authoredFixtures);
+        this.pieces = [];
+        this._pieceByCell = new Map();
+        this.decorations = [];
+        this.rebuilds = 0;
+        this.piecesRedrawn = 0;
+        this.presentation = SiteConfig.wallSystem.defaultPresentation;
+        this._movingOpeningIds = new Set();
+        this._travellingRecordIds = new Set();
+        this._movingObjects = new Map();
+        this._movingRevealPieceIds = new Map();
+        this._presentationOverride = null;
+        this._activeCutawayKey = null;
+        this._runPieceIds = new Map();
+        this._cutawayRoomIds = new Set();
+        this._pendingCutawayKey = null;
+        this._pendingCutawaySince = 0;
+        this._lastEvaluateAt = 0;
+        this._subjectSignature = null;
+        this._cursorSubjectAt = -Infinity;
+        this._cursorSubject = null;
+        this._unsubscribers = [];
+    }
+
+    async initialize() {
+        if (this.gameMap.buildDocument) {
+            this.authoredBaseCells = this.gameMap.buildDocument.level().walls.snapshot();
+        } else for (const source of this.wallData.cells || []) {
+            const key = `${source.x},${source.y}`;
+            const cell = { ...source, opening: null };
+            this.authoredBaseCells.set(key, Utility.deepClone(cell));
+            this.baseCells.set(key, cell);
+        }
+        this.normalizeOpeningFootprints();
+        this.pruneOrphanedRecords();
+        this.authoredOpenings = Utility.deepClone(this.openings);
+        this.reindexOpenings();
+        for (const [key, cell] of this.cells) {
+            // A cell the author never painted, standing here only because an
+            // opening bridged the gap it was drawn into. It behaves as wall from
+            // now on, but it is not authored geometry — the Tiled exporter has
+            // to be able to tell the difference, or a doorway the author drew as
+            // a gap in the tile layer comes back as solid wall.
+            if (!this.baseCells.has(key)) this.baseCells.set(key, { ...cell, opening: null, bridged: true });
+        }
+        this.reindexOpenings();
+        this.commitCutawayRoom(true);
+        this.rebuild();
+        await this.createFlatOverlay();
+        this.bindOpeningObjects();
+        this.bindFixtureObjects();
+        this.createAuthoredAttachments(this.wallData.attachments || []);
+        const events = this.gameMap.eventManager;
+        if (events) {
+            this._unsubscribers.push(events.on(EVENTS.CONTAINER_ACTIVE_MYTE_CHANGED, () => this.commitCutawayRoom(true)));
+        }
+        return this;
     }
 
     dispose() {
@@ -42852,12 +42549,13 @@ class WallTiledExporter {
      * room edits — is left alone.
      */
     rebaseline() {
+        const document = this.gameMap.buildDocument;
+        if (document) document.authored = document.captureStores();
         this.builder.authoredBaseCells = new Map(
             [...this.builder.baseCells].map(([key, cell]) => [key, Utility.deepClone(cell)])
         );
         this.builder.authoredOpenings = Utility.deepClone(this.builder.openings);
         this.builder.authoredFixtures = Utility.deepClone(this.builder.fixtures);
-        this.builder.authoredFaceOverrides = Utility.deepClone(this.builder.faceOverrides);
         // Re-capturing now that the authored baseline has moved is what empties
         // the deltas: serializeCellDeltas diffs against authoredBaseCells, and
         // those two maps are identical again.
@@ -43254,9 +42952,11 @@ class WallTiledExporter {
             });
         }
 
-        const assignments = this.builder.gameMap?.roomAssignments;
-        for (const roomId of (assignments?.roomIds() ?? []).sort()) {
-            const cells = assignments.cellsFor(roomId).sort();
+        const level = this.gameMap.buildDocument?.level?.();
+        for (const room of (level?.rooms.values() ?? []).sort((a, b) => a.id.localeCompare(b.id))) {
+            const roomId = room.id;
+            const cells = [...room.seedCells].sort();
+            if (cells.length === 0) continue;
             const columns = cells.map(key => Number(key.split(',')[0]));
             const rows = cells.map(key => Number(key.split(',')[1]));
             records.push({
@@ -43279,9 +42979,11 @@ class WallTiledExporter {
             });
         }
 
-        for (const [index, override] of this.builder.faceOverrides.entries()) {
-            const [fromX, fromY] = override.cells.from;
-            const [toX, toY] = override.cells.to;
+        for (const atom of level?.atoms.values() ?? []) {
+            const fromX = atom.x;
+            const fromY = atom.y;
+            const toX = atom.x;
+            const toY = atom.y;
             records.push({
                 // Overrides are authored as geometry, not identity — there is
                 // no stable id to match on, so they are rewritten wholesale
@@ -43290,7 +42992,7 @@ class WallTiledExporter {
                 // unique: two rooms meeting along one wall paint the same
                 // cells on the same face, and a name without the room would
                 // have collapsed their two records into one.
-                id: `wallfinish:${override.face}:${override.roomId ?? ''}:${fromX},${fromY}:${toX},${toY}`,
+                id: `wallfinish:${atom.face}:${atom.half}:${fromX},${fromY}`,
                 name: 'WallFinishOverride',
                 x: fromX * tileWidth,
                 y: fromY * tileWidth,
@@ -43298,18 +43000,16 @@ class WallTiledExporter {
                 height: (toY - fromY + 1) * tileWidth,
                 properties: {
                     type: { value: 'WallFinishOverride' },
-                    face: { value: override.face },
-                    finishId: { value: override.finishId },
+                    face: { value: atom.face },
+                    finishId: { value: atom.finishId },
+                    half: { value: atom.half, type: 'int' },
                     fromX: { value: fromX, type: 'int' },
                     fromY: { value: fromY, type: 'int' },
                     toX: { value: toX, type: 'int' },
-                    toY: { value: toY, type: 'int' },
+                    toY: { value: toY, type: 'int' }
                     // Empty means the outside of the building. Omitted entirely
                     // means hand-authored paint that belongs to no particular
                     // room — see TileMapLoader for why the two cannot merge.
-                    ...(override.roomId === undefined
-                        ? {}
-                        : { roomId: { value: override.roomId ?? '' } })
                 }
             });
         }
@@ -43833,14 +43533,14 @@ class TerrainBuilder {
         this.container = document.createElement('div');
         this.container.className = 'terrain-surfaces';
         // No render-inset offset: `.layer` is already positioned and sized in
-        // map coordinates, so a layer child is too. See FloorBuilder.
+        // map coordinates, so a layer child is too. See FloorRenderer.
         Object.assign(this.container.style, {
             position: 'absolute',
             inset: '0',
             pointerEvents: 'none'
         });
         // First child of the background layer: ground is under everything, and
-        // the room floors that FloorBuilder appends after it draw on top by
+        // the room floors that FloorRenderer appends after it draw on top by
         // being later in the DOM rather than by outbidding it.
         layer.prepend(this.container);
         return this.container;
@@ -44701,52 +44401,332 @@ class FloorMaterialRegistry extends SurfaceMaterialRegistry {
     }
 }
 ;
-/* -- js/Map/Floors/FloorBuilder.js -- */
-// ─────────────────────────────────────────────────────────────────────────────
-// FloorBuilder — a customisable floor per room, the way a finish is per wall.
-//
-// The map's own tile layers still draw the ground. This paints OVER them, but
-// only inside rooms that ask for it: a room with no `floorFinishId` is left
-// exactly as authored, so adding the system changes nothing until a room opts
-// in. That is what keeps it from fighting the baked background.
-//
-// One canvas per room, clipped to the blocks that room OWNS. Ownership is
-// computed once for the whole map and shared by every room, so two floors can
-// no more overlap than two people can stand in one place — see computeOwnership
-// for why that replaced each room masking itself against all the others.
-//
-// It sits inside the background layer, above the baked map image and below
-// ground decor, so objects, mytes and walls all still draw on top.
-// ─────────────────────────────────────────────────────────────────────────────
-class FloorBuilder {
-    // The map is divided into blocks, not cells, because a floor stops on the
-    // CENTRELINE of the wall beside it — half a cell in. Two blocks per cell is
-    // the coarsest grid that can express that, and every boundary this system
-    // draws lands on one.
+/* -- js/Map/Floors/FloorOwnershipResolver.js -- */
+class FloorOwnershipResolver {
+    static STEPS = Object.freeze([
+        Object.freeze({ dx: -1, dy: 0, straight: true }),
+        Object.freeze({ dx: 1, dy: 0, straight: true }),
+        Object.freeze({ dx: 0, dy: -1, straight: true }),
+        Object.freeze({ dx: 0, dy: 1, straight: true }),
+        Object.freeze({ dx: -1, dy: -1, straight: false }),
+        Object.freeze({ dx: 1, dy: -1, straight: false }),
+        Object.freeze({ dx: -1, dy: 1, straight: false }),
+        Object.freeze({ dx: 1, dy: 1, straight: false })
+    ]);
+
+    // Which two blocks of a cell each side owns, and the axis the plan has to
+    // continue along before that side may be pulled in.
+    static SIDES = Object.freeze([
+        Object.freeze({ dx: -1, dy: 0, axis: 'x', blocks: Object.freeze([[0, 0], [0, 1]]) }),
+        Object.freeze({ dx: 1, dy: 0, axis: 'x', blocks: Object.freeze([[1, 0], [1, 1]]) }),
+        Object.freeze({ dx: 0, dy: -1, axis: 'y', blocks: Object.freeze([[0, 0], [1, 0]]) }),
+        Object.freeze({ dx: 0, dy: 1, axis: 'y', blocks: Object.freeze([[0, 1], [1, 1]]) })
+    ]);
+
+    static solve(input) {
+        const width = FloorOwnershipResolver.dimension(input?.width, 'width');
+        const height = FloorOwnershipResolver.dimension(input?.height, 'height');
+        const blockWidth = width * 2;
+        const blockHeight = height * 2;
+        const reachBlocks = Math.max(0, Math.floor(Number(input?.reachBlocks) || 0));
+        const walls = FloorOwnershipResolver.normalizeWallMasks(input?.walls);
+        const expandCells = new Set(input?.expandCells || []);
+        const plans = FloorOwnershipResolver.normalizePlans(input?.plans);
+        let owners = new Array(blockWidth * blockHeight).fill(null);
+
+        for (const plan of plans) {
+            for (const key of plan.seedCells) {
+                const { x, y } = BuildKeys.parseCell(key);
+                if (x < 0 || y < 0 || x >= width || y >= height || walls.has(key)) continue;
+                for (const [bx, by] of BuildKeys.blocksOfCell(x, y)) {
+                    const index = by * blockWidth + bx;
+                    const current = owners[index];
+                    if (current && current !== plan.id) {
+                        throw new Error(`Seed cell ${key} belongs to both ${current} and ${plan.id}`);
+                    }
+                    owners[index] = plan.id;
+                }
+            }
+        }
+
+        FloorOwnershipResolver.insetOpenBoundaries(owners,
+            { blockWidth, width, height, plans, walls, expandCells });
+
+        for (let round = 0; round < reachBlocks; round++) {
+            const previous = owners;
+            const next = previous.slice();
+            for (let by = 0; by < blockHeight; by++) {
+                for (let bx = 0; bx < blockWidth; bx++) {
+                    const targetIndex = by * blockWidth + bx;
+                    if (previous[targetIndex] !== null) continue;
+                    if (!FloorOwnershipResolver.canExpandInto(bx, by, walls, expandCells)) continue;
+                    const claims = new Map();
+                    for (const step of FloorOwnershipResolver.STEPS) {
+                        const sx = bx - step.dx;
+                        const sy = by - step.dy;
+                        if (!FloorOwnershipResolver.inBounds(sx, sy, blockWidth, blockHeight)) continue;
+                        const owner = previous[sy * blockWidth + sx];
+                        if (owner === null || !FloorOwnershipResolver.canStep(sx, sy, bx, by, walls)) continue;
+                        const existing = claims.get(owner);
+                        if (!existing || (step.straight && !existing.straight)) claims.set(owner, { owner, straight: step.straight });
+                    }
+                    const winner = [...claims.values()].sort((a, b) =>
+                        Number(b.straight) - Number(a.straight) ||
+                        FloorOwnershipResolver.comparePlans(plans, a.owner, b.owner)
+                    )[0];
+                    if (winner) next[targetIndex] = winner.owner;
+                }
+            }
+            owners = next;
+        }
+
+        return FloorOwnershipResolver.createGrid({
+            width, height, blockWidth, blockHeight, owners,
+            revision: Number(input?.revision) || 0,
+            planIds: plans.map(plan => plan.id)
+        });
+    }
+
+    static normalizeWallMasks(walls) {
+        const result = new Map();
+        const entries = walls instanceof Map ? walls.entries() : Object.entries(walls || {});
+        for (const [key, wall] of entries) {
+            const cellKey = Number.isInteger(wall?.x) && Number.isInteger(wall?.y)
+                ? BuildKeys.cell(wall.x, wall.y) : key;
+            result.set(cellKey, Number(wall?.mask) || 0);
+        }
+        return result;
+    }
+
+    static normalizePlans(plans) {
+        const seen = new Set();
+        return (plans || []).map(plan => {
+            const id = String(plan.id);
+            if (seen.has(id)) throw new Error(`Duplicate room plan id: ${id}`);
+            seen.add(id);
+            const seedCells = [...new Set(plan.seedCells || [])].sort();
+            return Object.freeze({ id, seedCells, priority: Number(plan.priority) || 0 });
+        });
+    }
+
+    static comparePlans(plans, aId, bId) {
+        const a = plans.find(plan => plan.id === aId);
+        const b = plans.find(plan => plan.id === bId);
+        return (b.priority - a.priority) ||
+            (a.seedCells.length - b.seedCells.length) ||
+            a.id.localeCompare(b.id);
+    }
+
+    /**
+     * Pulls a plan's open edges in to the centreline of their boundary cells.
+     *
+     * The floor's edge belongs on the centreline of the cell that bounds it,
+     * and that has to hold whether the bounding cell is masonry or just the
+     * outermost cell the player painted. Without this a painted floor ends on
+     * the cell edge, and the moment the player walls that perimeter the wall
+     * takes the boundary cell over and the floor jumps half a tile inward —
+     * the floor moving because a wall was edited, which it must never do.
+     *
+     * A side is only pulled in where the plan actually continues along that
+     * side's axis, so a single painted tile stays a whole tile and a one-cell
+     * corridor keeps its width instead of eroding to nothing.
+     */
+    static insetOpenBoundaries(owners, context) {
+        const { blockWidth, width, height, plans, walls, expandCells } = context;
+        const ownerOf = new Map();
+        for (const plan of plans) for (const key of plan.seedCells) ownerOf.set(key, plan.id);
+        // "Open" is per plan, not global: a neighbouring cell belonging to a
+        // DIFFERENT plan is an edge of this plan just as much as bare ground is,
+        // so two floors meeting in the open both stop on a centreline. Skipping
+        // that case left one seam in the map — the only place a floor ran to a
+        // cell edge — while every other edge in the same room stopped halfway.
+        //
+        // The edge of the map is the end of the world, not ground the player
+        // could have painted and chose not to, so a room that runs to it is not
+        // pulled in — otherwise the whole outdoors gets a bare half-tile frame.
+        const open = (planId, x, y) => {
+            if (!FloorOwnershipResolver.inBounds(x, y, width, height)) return false;
+            const key = BuildKeys.cell(x, y);
+            // Another plan's ground is not an open edge: two floors meet flush.
+            // Pulling both back left a cell of bare terrain at every junction.
+            if (ownerOf.has(key)) return false;
+            if (expandCells.has(key)) return false;
+            // A wall the plan will never tuck under is just an obstacle stood
+            // next to it, so the plan's edge stays where it was. Without this,
+            // drawing a stub beside a floor moved that floor a whole cell: the
+            // inset stopped AND the tuck began.
+            if (walls.has(key)) return false;
+            return true;
+        };
+        const dropped = [];
+        for (const [key, planId] of ownerOf) {
+            const { x, y } = BuildKeys.parseCell(key);
+            for (const side of FloorOwnershipResolver.SIDES) {
+                if (!open(planId, x + side.dx, y + side.dy)) continue;
+                if (!FloorOwnershipResolver.continuesAlong(x, y, side.axis, planId, ownerOf)) continue;
+                for (const [ox, oy] of side.blocks) {
+                    dropped.push((((2 * y) + oy) * blockWidth) + (2 * x) + ox);
+                }
+            }
+        }
+        // Collected against the original grid, applied after: eroding in place
+        // would let one cell's inset decide the next cell's.
+        for (const index of dropped) owners[index] = null;
+    }
+
+    static continuesAlong(x, y, axis, planId, ownerOf) {
+        const steps = axis === 'x' ? [[-1, 0], [1, 0]] : [[0, -1], [0, 1]];
+        return steps.some(([dx, dy]) => ownerOf.get(BuildKeys.cell(x + dx, y + dy)) === planId);
+    }
+
+    // Expansion exists to bury a room's floor under the masonry that encloses
+    // it, not to grow the room. A block on open ground is never claimed, so the
+    // floor a player paints ends exactly on the cells they painted; only wall
+    // cells (and the threshold cells a doorway gap leaves in the line of a
+    // wall) are reachable beyond the seeds.
+    static canExpandInto(bx, by, walls, expandCells) {
+        const key = BuildKeys.cell(Math.floor(bx / 2), Math.floor(by / 2));
+        return walls.has(key) || expandCells.has(key);
+    }
+
+    static canStep(sx, sy, tx, ty, walls) {
+        const dx = tx - sx;
+        const dy = ty - sy;
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1 || (dx === 0 && dy === 0)) return false;
+        if (dx !== 0 && dy !== 0) {
+            return FloorOwnershipResolver.canStep(sx, sy, tx, sy, walls) &&
+                FloorOwnershipResolver.canStep(sx, sy, sx, ty, walls);
+        }
+        const sourceCellX = Math.floor(sx / 2);
+        const sourceCellY = Math.floor(sy / 2);
+        const targetCellX = Math.floor(tx / 2);
+        const targetCellY = Math.floor(ty / 2);
+        if (sourceCellX !== targetCellX || sourceCellY !== targetCellY) return true;
+        const mask = walls.get(BuildKeys.cell(sourceCellX, sourceCellY));
+        if (mask === undefined) return true;
+        const fences = WallGeometry.fencesForMask(mask);
+        if (dx !== 0 && fences.vertical) return false;
+        if (dy !== 0 && fences.horizontal) return false;
+        return true;
+    }
+
+    static createGrid(data) {
+        const owner = Object.freeze(data.owners.slice());
+        const ownerAt = (bx, by) => FloorOwnershipResolver.inBounds(bx, by, data.blockWidth, data.blockHeight)
+            ? owner[by * data.blockWidth + bx] : null;
+        const blocksOf = planId => {
+            const blocks = [];
+            for (let by = 0; by < data.blockHeight; by++) {
+                for (let bx = 0; bx < data.blockWidth; bx++) if (ownerAt(bx, by) === planId) blocks.push([bx, by]);
+            }
+            return blocks;
+        };
+        const ownerOfCell = (x, y) => {
+            const counts = new Map();
+            for (const [bx, by] of BuildKeys.blocksOfCell(x, y)) {
+                const id = ownerAt(bx, by);
+                if (id !== null) counts.set(id, (counts.get(id) || 0) + 1);
+            }
+            return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || null;
+        };
+        const cellsOf = planId => {
+            const cells = [];
+            for (let y = 0; y < data.height; y++) for (let x = 0; x < data.width; x++) {
+                if (ownerOfCell(x, y) === planId) cells.push(BuildKeys.cell(x, y));
+            }
+            return cells;
+        };
+        return Object.freeze({
+            width: data.width, height: data.height,
+            blockWidth: data.blockWidth, blockHeight: data.blockHeight,
+            owner, revision: data.revision, planIds: Object.freeze(data.planIds.slice()),
+            ownerAt, blocksOf, ownerOfCell, cellsOf
+        });
+    }
+
+    static inBounds(x, y, width, height) {
+        return x >= 0 && y >= 0 && x < width && y < height;
+    }
+
+    static dimension(value, name) {
+        if (!Number.isInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer`);
+        return value;
+    }
+}
+;
+/* -- js/Map/Floors/FloorRenderer.js -- */
+class FloorRenderer {
     static BLOCKS_PER_CELL = 2;
+    static CENTRELINE_BLOCKS = 1;
 
     constructor(gameMap, registry) {
         this.gameMap = gameMap;
         this.registry = registry;
         this.cellSize = gameMap.gridSystem?.config?.cellSize ?? 32;
+        this.chunkCells = Number(SiteConfig.floorSystem?.chunkCells) || 8;
         this.surfaces = new Map();
+        this.chunks = new Map();
         this.container = null;
-        // roomId -> [[blockX, blockY], ...]. Null until built; geometry-derived,
-        // so it survives a finish change and is thrown away by build().
         this.ownedBlocks = null;
+        this.ownershipGrid = null;
+        this.ownershipSolves = 0;
+        this.chunksRedrawn = 0;
     }
 
     get blockSize() {
-        return this.cellSize / FloorBuilder.BLOCKS_PER_CELL;
+        return this.cellSize / FloorRenderer.BLOCKS_PER_CELL;
     }
 
-    /** Paints every room that asks for a floor. Safe to call again; it rebuilds. */
     build() {
         this.clear();
         this.ownedBlocks = null;
-        const rooms = this.gameMap.regionManager?.all('room') ?? [];
-        for (const room of rooms) this.paintRoom(room);
+        if (this.ownershipGrid) this.setOwnershipGrid(this.ownershipGrid);
+        else this.computeOwnership();
+        const dirty = new Set();
+        for (const room of this.rooms()) {
+            for (const [bx, by] of this.blocksOf(room.id)) dirty.add(this.chunkKeyOfBlock(bx, by));
+        }
+        for (const key of dirty) this.drawChunk(key);
+        this.indexSurfaces();
         return this.surfaces.size;
+    }
+
+    reconcile() {
+        if (!this.ownershipGrid) return this.build();
+        const previousGrid = this.ownershipGrid;
+        const previousFinishes = new Map([...this.surfaces].map(([roomId, surface]) => [roomId, surface.finishId]));
+        this.ownedBlocks = null;
+        this.computeOwnership();
+        const rooms = new Map(this.rooms().map(room => [room.id, room]));
+        const dirty = [];
+        for (let by = 0; by < this.ownershipGrid.blockHeight; by++) {
+            for (let bx = 0; bx < this.ownershipGrid.blockWidth; bx++) {
+                const previousOwner = previousGrid.ownerAt(bx, by);
+                const nextOwner = this.ownershipGrid.ownerAt(bx, by);
+                const previousFinish = previousFinishes.get(previousOwner) ?? null;
+                const nextFinish = this.resolveFinishId(rooms.get(nextOwner));
+                if (previousOwner !== nextOwner || previousFinish !== nextFinish) {
+                    dirty.push(BuildKeys.block(bx, by));
+                }
+            }
+        }
+        return this.invalidate(dirty);
+    }
+
+    setOwnershipGrid(grid) {
+        this.ownershipGrid = grid;
+        this.ownedBlocks = new Map(this.rooms().map(room => [room.id, grid.blocksOf(room.id)]));
+    }
+
+    invalidate(blockKeys) {
+        const dirty = new Set((blockKeys || []).map(blockKey => {
+            const { bx, by } = BuildKeys.parseBlock(blockKey);
+            return this.chunkKeyOfBlock(bx, by);
+        }));
+        let redrawn = 0;
+        for (const key of dirty) redrawn += Number(this.drawChunk(key));
+        this.indexSurfaces();
+        return redrawn;
     }
 
     ensureContainer() {
@@ -44755,63 +44735,158 @@ class FloorBuilder {
         if (!layer) return null;
         this.container = document.createElement('div');
         this.container.className = 'floor-surfaces';
-        // NO render-inset offset here. `.layer` is already positioned at
-        // `--map-render-inset-*` by CSS and sized to the map, so a layer child
-        // is ALREADY in map coordinates. Adding the offset again shifts every
-        // floor by the reserved strip — the same double-offset that once moved
-        // the cursor away from the art.
-        Object.assign(this.container.style, {
-            position: 'absolute',
-            inset: '0',
-            pointerEvents: 'none'
-        });
+        Object.assign(this.container.style, { position: 'absolute', inset: '0', pointerEvents: 'none' });
         layer.appendChild(this.container);
         return this.container;
     }
 
-    resolveFinishId(room) {
-        return room?.properties?.floorFinishId || SiteConfig.floorSystem?.defaultFinishId || null;
+    rooms() {
+        return this.gameMap.regionManager?.all('room') ?? [];
     }
 
-    paintRoom(room) {
-        const finishId = this.resolveFinishId(room);
-        if (!finishId) return null;                       // authored floor stands
-        const tile = this.registry?.getTile(finishId);
-        const container = this.ensureContainer();
-        const area = this.paintedArea(room);
-        if (!tile || !container || !area) return null;
+    resolveFinishId(room) {
+        if (!room) return null;
+        const previewPlan = this.previewDocument?.level?.().rooms.get(room.id);
+        return previewPlan?.floorFinishId || room?.properties?.floorFinishId || SiteConfig.floorSystem?.defaultFinishId || null;
+    }
 
-        const canvas = this.createSurfaceCanvas(area, room.id);
-        canvas.className = 'floor-surface';
+    computeOwnership() {
+        this.ownershipSolves++;
+        const gridSystem = this.gameMap.gridSystem;
+        const width = Number(gridSystem?.gridWidth) || 0;
+        const height = Number(gridSystem?.gridHeight) || 0;
+        if (width <= 0 || height <= 0) {
+            this.ownedBlocks = new Map();
+            return this.ownedBlocks;
+        }
+        const geometry = WallGeometry.compute(this.gameMap.wallBuilder?.cells || new Map());
+        const rooms = this.rooms();
+        const seedsByRoom = new Map(rooms.map(room => [room.id, []]));
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+            const key = BuildKeys.cell(x, y);
+            if (geometry.cells.has(key)) continue;
+            const room = this.gameMap.regionManager?.innermostAt?.(
+                (x + 0.5) * this.cellSize, (y + 0.5) * this.cellSize, 'room', this.cellSize
+            );
+            if (!room || (geometry.thresholds.has(key) && room.properties?.origin !== 'painted')) continue;
+            seedsByRoom.get(room.id)?.push(key);
+        }
+        this.setOwnershipGrid(FloorOwnershipResolver.solve({
+            width,
+            height,
+            walls: new Map([...geometry.cells].map(([key, cell]) => [key, { ...cell, mask: geometry.masks.get(key) }])),
+            expandCells: [...geometry.thresholds],
+            plans: rooms.map(room => ({ id: room.id, seedCells: seedsByRoom.get(room.id) || [], priority: room.properties?.priority })),
+            reachBlocks: this.bleedBlocks()
+        }));
+        return this.ownedBlocks;
+    }
+
+    // Half a cell, in blocks. Not a setting: see SiteConfig.floorSystem.
+    bleedBlocks() {
+        return FloorRenderer.CENTRELINE_BLOCKS;
+    }
+
+    blocksOf(roomId) {
+        if (!this.ownedBlocks) this.computeOwnership();
+        return this.ownedBlocks.get(roomId) ?? [];
+    }
+
+    chunkKeyOfBlock(blockX, blockY) {
+        const blocksPerChunk = this.chunkCells * FloorRenderer.BLOCKS_PER_CELL;
+        return `${Math.floor(blockX / blocksPerChunk)},${Math.floor(blockY / blocksPerChunk)}`;
+    }
+
+    chunkArea(key) {
+        const [chunkX, chunkY] = key.split(',').map(Number);
+        const grid = this.gameMap.gridSystem;
+        const x = chunkX * this.chunkCells * this.cellSize;
+        const y = chunkY * this.chunkCells * this.cellSize;
+        return {
+            x,
+            y,
+            width: Math.min(this.chunkCells, Number(grid?.gridWidth) - chunkX * this.chunkCells) * this.cellSize,
+            height: Math.min(this.chunkCells, Number(grid?.gridHeight) - chunkY * this.chunkCells) * this.cellSize
+        };
+    }
+
+    drawChunk(key) {
+        if (!this.ownershipGrid) return false;
+        const container = this.ensureContainer();
+        if (!container) return false;
+        const area = this.chunkArea(key);
+        if (area.width <= 0 || area.height <= 0) return false;
+        const byFinish = new Map();
+        const rooms = new Map(this.rooms().map(room => [room.id, room]));
+        const blockX0 = Math.round(area.x / this.blockSize);
+        const blockY0 = Math.round(area.y / this.blockSize);
+        const blockX1 = blockX0 + Math.round(area.width / this.blockSize);
+        const blockY1 = blockY0 + Math.round(area.height / this.blockSize);
+        for (let by = blockY0; by < blockY1; by++) for (let bx = blockX0; bx < blockX1; bx++) {
+            const room = rooms.get(this.ownershipGrid.ownerAt(bx, by));
+            const finishId = this.resolveFinishId(room);
+            if (!finishId || !this.registry?.getTile(finishId)) continue;
+            if (!byFinish.has(finishId)) byFinish.set(finishId, []);
+            byFinish.get(finishId).push([bx, by]);
+        }
+        if (!byFinish.size) {
+            this.chunks.get(key)?.canvas.remove();
+            this.chunks.delete(key);
+            this.chunksRedrawn++;
+            return true;
+        }
+        let chunk = this.chunks.get(key);
+        if (!chunk) {
+            const canvas = document.createElement('canvas');
+            canvas.className = 'floor-surface floor-surface--chunk';
+            canvas.dataset.floorChunk = key;
+            Object.assign(canvas.style, { position: 'absolute', pointerEvents: 'none' });
+            container.appendChild(canvas);
+            chunk = { canvas, key };
+            this.chunks.set(key, chunk);
+        }
+        const { canvas } = chunk;
+        canvas.width = area.width;
+        canvas.height = area.height;
+        canvas.style.left = `${area.x}px`;
+        canvas.style.top = `${area.y}px`;
         const context = canvas.getContext('2d');
         context.imageSmoothingEnabled = false;
-        this.clipToRoom(context, room, area);
-        this.fillTiles(context, tile, area);
-        context.restore();
-
-        container.appendChild(canvas);
-        this.surfaces.set(room.id, { canvas, finishId });
-        return canvas;
+        context.clearRect(0, 0, area.width, area.height);
+        for (const [finishId, blocks] of byFinish) this.drawFinishBlocks(context, this.registry.getTile(finishId), blocks, area);
+        this.chunksRedrawn++;
+        return true;
     }
 
-    /**
-     * A canvas over one room, covering exactly the ground that room owns.
-     *
-     * The customize highlight used to be a CSS outline on the floor canvas,
-     * which is a bounding box plus edge bleed — so it drew a rectangle around
-     * rooms that are not rectangles, and where two of those boxes overlapped
-     * only one room could ever be hovered. A room with no finish had no canvas
-     * at all and so could not be highlighted or clicked. This paints the owned
-     * blocks themselves, which every room has whether or not it carries a floor
-     * — and being the same blocks the floor uses, the highlight cannot promise
-     * ground the floor will not cover.
-     */
+    drawFinishBlocks(context, tile, blocks, area) {
+        context.save();
+        context.beginPath();
+        for (const [bx, by] of blocks) {
+            context.rect((bx * this.blockSize) - area.x, (by * this.blockSize) - area.y, this.blockSize, this.blockSize);
+        }
+        context.clip();
+        const tileSize = this.registry.tileSize;
+        context.translate(-(area.x % tileSize), -(area.y % tileSize));
+        context.fillStyle = context.createPattern(tile, 'repeat');
+        context.fillRect(0, 0, area.width + tileSize, area.height + tileSize);
+        context.restore();
+    }
+
+    indexSurfaces() {
+        this.surfaces.clear();
+        for (const room of this.rooms()) {
+            const finishId = this.resolveFinishId(room);
+            if (!finishId || !this.registry?.getTile(finishId)) continue;
+            const chunks = new Set(this.blocksOf(room.id).map(([bx, by]) => this.chunkKeyOfBlock(bx, by)));
+            this.surfaces.set(room.id, { finishId, chunks });
+        }
+    }
+
     createRoomOverlay(room, { fill, className = '', outline = null } = {}) {
         const area = this.paintedArea(room);
         const container = this.ensureContainer();
         if (!area || !container) return null;
-
-        const canvas = this.createSurfaceCanvas(area, room.id);
+        const canvas = this.createOverlayCanvas(area, room.id);
         canvas.className = className;
         const context = canvas.getContext('2d');
         this.clipToRoom(context, room, area);
@@ -44819,705 +44894,97 @@ class FloorBuilder {
         context.fillRect(0, 0, area.width, area.height);
         context.restore();
         if (outline) this.strokeRoomEdges(context, room, area, outline);
-
         container.appendChild(canvas);
         return canvas;
     }
 
-    /**
-     * A line round the outside of a room.
-     *
-     * A wash of colour over a patterned floor is easy to miss and hard to read
-     * the edges of, which is the one thing it is there to say — where this room
-     * stops. Where two rooms meet with no wall between them, the line IS the
-     * boundary; there is nothing else standing there to be seen.
-     *
-     * Drawn from the same owned blocks as the fill, so the outline cannot
-     * disagree with it: an edge is any side of a block whose neighbour belongs
-     * to somebody else.
-     */
+    createOverlayCanvas(area, roomId) {
+        const canvas = document.createElement('canvas');
+        canvas.width = area.width;
+        canvas.height = area.height;
+        canvas.dataset.roomId = roomId;
+        Object.assign(canvas.style, { position: 'absolute', left: `${area.x}px`, top: `${area.y}px`, pointerEvents: 'none' });
+        return canvas;
+    }
+
+    clipToRoom(context, room, area) {
+        context.save();
+        context.beginPath();
+        for (const [bx, by] of this.blocksOf(room.id)) {
+            context.rect((bx * this.blockSize) - area.x, (by * this.blockSize) - area.y, this.blockSize, this.blockSize);
+        }
+        context.clip();
+    }
+
     strokeRoomEdges(context, room, area, colour) {
-        const size = this.blockSize;
         const blocks = this.blocksOf(room.id);
-        const owned = new Set(blocks.map(([blockX, blockY]) => `${blockX},${blockY}`));
+        const owned = new Set(blocks.map(([bx, by]) => BuildKeys.block(bx, by)));
         context.save();
         context.strokeStyle = colour;
         context.lineWidth = 2;
         context.beginPath();
-        for (const [blockX, blockY] of blocks) {
-            const left = (blockX * size) - area.x;
-            const top = (blockY * size) - area.y;
-            if (!owned.has(`${blockX - 1},${blockY}`)) { context.moveTo(left, top); context.lineTo(left, top + size); }
-            if (!owned.has(`${blockX + 1},${blockY}`)) { context.moveTo(left + size, top); context.lineTo(left + size, top + size); }
-            if (!owned.has(`${blockX},${blockY - 1}`)) { context.moveTo(left, top); context.lineTo(left + size, top); }
-            if (!owned.has(`${blockX},${blockY + 1}`)) { context.moveTo(left, top + size); context.lineTo(left + size, top + size); }
+        for (const [bx, by] of blocks) {
+            const left = bx * this.blockSize - area.x;
+            const top = by * this.blockSize - area.y;
+            if (!owned.has(BuildKeys.block(bx - 1, by))) { context.moveTo(left, top); context.lineTo(left, top + this.blockSize); }
+            if (!owned.has(BuildKeys.block(bx + 1, by))) { context.moveTo(left + this.blockSize, top); context.lineTo(left + this.blockSize, top + this.blockSize); }
+            if (!owned.has(BuildKeys.block(bx, by - 1))) { context.moveTo(left, top); context.lineTo(left + this.blockSize, top); }
+            if (!owned.has(BuildKeys.block(bx, by + 1))) { context.moveTo(left, top + this.blockSize); context.lineTo(left + this.blockSize, top + this.blockSize); }
         }
         context.stroke();
         context.restore();
     }
 
-    createSurfaceCanvas(area, roomId) {
-        const canvas = document.createElement('canvas');
-        canvas.width = area.width;
-        canvas.height = area.height;
-        canvas.dataset.roomId = roomId;
-        Object.assign(canvas.style, {
-            position: 'absolute',
-            left: `${area.x}px`,
-            top: `${area.y}px`,
-            pointerEvents: 'none'
-        });
-        return canvas;
-    }
-
-    // Leaves the context saved and clipped; every caller restores it after its
-    // fill. Floor boundaries intentionally stay on the half-cell grid instead
-    // of borrowing the rounded terrain silhouette.
-    clipToRoom(context, room, area) {
-        context.save();
-        context.beginPath();
-        const size = this.blockSize;
-        for (const [blockX, blockY] of this.blocksOf(room.id)) {
-            context.rect((blockX * size) - area.x, (blockY * size) - area.y, size, size);
-        }
-        context.clip();
-    }
-
-    // ── Ownership ────────────────────────────────────────────────────────────
-
-    /**
-     * Who owns every block of the map — the one answer both floors and the
-     * customize highlight read.
-     *
-     * Each room used to mask itself: grow my shape by half a cell, subtract
-     * every other room grown the same way, add my own shape back. That is a
-     * pairwise rule pretending to be a global one, and it broke wherever more
-     * than two claims met. At an inside corner — a wall run ending where two
-     * rooms meet — BOTH rooms reached straight into the same block, so both
-     * subtracted the other, and neither added it back because a wall cell
-     * belongs to no room's own shape. The block came out bare: a sliver of raw
-     * map ground beside the wall, on a system whose entire purpose is to not
-     * leave one.
-     *
-     * Deciding ownership once, for every block, in one pass makes gaps and
-     * overlaps unrepresentable rather than merely unlikely. There is exactly one
-     * entry per block, so nothing can be claimed twice, and any block a room can
-     * reach is claimed by someone.
-     *
-     * @returns {Map<string, Array<[number, number]>>} roomId -> owned blocks
-     */
-    computeOwnership() {
-        const grid = this.gameMap.gridSystem;
-        const perCell = FloorBuilder.BLOCKS_PER_CELL;
-        const cellsAcross = Number(grid?.gridWidth) || 0;
-        const cellsDown = Number(grid?.gridHeight) || 0;
-        const owners = new Map();
-        // A shared open space assigns every logical cell to the nearest room so
-        // membership has no holes. Floors must not inherit that fallback: after
-        // removing a wall it turns the former wall cell into a full-tile bulge,
-        // then edge bleed adds another half tile. Seed only authored territory
-        // here; the normal perimeter pass supplies the intended half-cell edge.
-        const rooms = this.gameMap.regionManager?.all?.('room') ?? [];
-        const sharedOpenSpaces = new Map();
-        for (const room of rooms) {
-            const openSpaceId = room.properties?.openSpaceId;
-            if (!openSpaceId) continue;
-            if (!sharedOpenSpaces.has(openSpaceId)) sharedOpenSpaces.set(openSpaceId, []);
-            sharedOpenSpaces.get(openSpaceId).push({
-                room,
-                ...RoomEnclosureDetector.authoredGeometry(room)
-            });
-        }
-        for (const [openSpaceId, entries] of sharedOpenSpaces) {
-            if (entries.length < 2) sharedOpenSpaces.delete(openSpaceId);
-        }
-
-        // 1. Ground a room stands on outright, resolved per half-cell block.
-        //    An authored room boundary can pass through an open doorway at a
-        //    cell's centreline; assigning the whole cell from its centre gave
-        //    that doorway tile entirely to one room. Wall cells still belong
-        //    to nobody yet — that is step 2's whole job.
-        const walls = this.gameMap.wallBuilder?.cells;
-        for (let cellY = 0; cellY < cellsDown; cellY++) {
-            for (let cellX = 0; cellX < cellsAcross; cellX++) {
-                if (walls?.has(`${cellX},${cellY}`)) continue;
-                for (let offsetY = 0; offsetY < perCell; offsetY++) {
-                    for (let offsetX = 0; offsetX < perCell; offsetX++) {
-                        const blockX = (cellX * perCell) + offsetX;
-                        const blockY = (cellY * perCell) + offsetY;
-                        const centreX = (blockX + 0.5) * this.blockSize;
-                        const centreY = (blockY + 0.5) * this.blockSize;
-                        let room = this.gameMap.regionManager?.innermostAt(
-                            centreX,
-                            centreY,
-                            'room', this.blockSize
-                        );
-                        const shared = sharedOpenSpaces.get(room?.properties?.openSpaceId);
-                        if (shared) {
-                            room = RoomEnclosureDetector.pickAuthoredRoom(
-                                shared,
-                                centreX,
-                                centreY,
-                                this.cellSize,
-                                { allowNearest: false }
-                            );
-                        }
-                        if (room) owners.set(`${blockX},${blockY}`, room.id);
-                    }
-                }
-            }
-        }
-
-        // A wide opening can be authored as a literal gap in a wall run. Its
-        // cells are open, but the room boundary still follows the centreline
-        // between the two wall ends. Tilemask rooms otherwise hand each whole
-        // gap cell to one room, making a hall floor cover both halves. Split
-        // bounded gaps before masonry bleed so both adjoining rooms meet on
-        // the implied wall line.
-        this.splitOpenWallGaps(owners, walls, cellsAcross, cellsDown, perCell);
-
-        // A room can be open at one end while its two side walls already define
-        // the rest of the space. The enclosure detector intentionally leaves
-        // that opening connected to outdoors, but its floor still needs to run
-        // between those walls instead of stopping at the old authored bounds.
-        this.fillWallBoundOpenSpaces(owners, walls, cellsAcross, cellsDown, perCell);
-
-        // 2. Grow every room by the configured half-cell perimeter. This is the
-        //    same boundary whether it sits beneath masonry or beside open
-        //    ground. All rooms grow into one ownership map, so meeting floors
-        //    divide the available blocks instead of overlapping by draw order.
-        const across = cellsAcross * perCell;
-        const down = cellsDown * perCell;
-        const terminalWalls = new Set();
-        const cornerWalls = new Set();
-        for (const [key, cell] of walls ?? []) {
-            const mask = this.wallMask(cell, walls);
-            const connections = WallBuilder.DIRECTIONS
-                .filter(direction => (mask & direction.bit) !== 0).length;
-            if (connections <= 1) terminalWalls.add(key);
-            if (connections === 2 &&
-                WallBuilder.isHorizontalMask(mask) &&
-                WallBuilder.isVerticalMask(mask)) {
-                cornerWalls.add(key);
-            }
-        }
-        for (let round = 0; round < this.bleedBlocks(); round++) {
-            const claims = new Map();
-            for (let blockY = 0; blockY < down; blockY++) {
-                for (let blockX = 0; blockX < across; blockX++) {
-                    const key = `${blockX},${blockY}`;
-                    if (owners.has(key)) continue;
-                    // The same bleed tucks floor beneath masonry and carries an
-                    // unwalled edge to its half-cell centreline.
-                    const cellX = Math.floor(blockX / perCell);
-                    const cellY = Math.floor(blockY / perCell);
-                    const wallCell = walls?.has(`${cellX},${cellY}`) === true;
-                    const terminalWall = wallCell && terminalWalls.has(`${cellX},${cellY}`);
-                    const wallMask = wallCell
-                        ? this.wallMask(walls.get(`${cellX},${cellY}`), walls)
-                        : 0;
-                    const cornerWall = wallCell && cornerWalls.has(`${cellX},${cellY}`);
-                    const wallClaim = wallCell && !cornerWall
-                        ? this.claimWallBlock(
-                            blockX,
-                            blockY,
-                            walls.get(`${cellX},${cellY}`),
-                            wallMask
-                        )
-                        : { resolved: false, roomId: null };
-                    const claimant = wallClaim.resolved
-                        ? wallClaim.roomId
-                        : this.claimBlock(blockX, blockY, owners, {
-                            wallCell,
-                            terminalWall: terminalWall || cornerWall,
-                            wallMask
-                        });
-                    if (claimant) claims.set(key, claimant);
-                }
-            }
-            if (claims.size === 0) break;
-            for (const [key, roomId] of claims) owners.set(key, roomId);
-        }
-
-        const byRoom = new Map();
-        for (const [key, roomId] of owners) {
-            const [blockX, blockY] = key.split(',').map(Number);
-            if (!byRoom.has(roomId)) byRoom.set(roomId, []);
-            byRoom.get(roomId).push([blockX, blockY]);
-        }
-        return byRoom;
-    }
-
-    fillWallBoundOpenSpaces(owners, walls, cellsAcross, cellsDown, perCell) {
-        if (!walls?.size) return;
-        const wallAt = (x, y) => walls.has(`${x},${y}`);
-        const candidates = new Map();
-        const markCell = (x, y, roomIds) => {
-            if (wallAt(x, y)) return;
-            for (let offsetY = 0; offsetY < perCell; offsetY++) {
-                for (let offsetX = 0; offsetX < perCell; offsetX++) {
-                    const key = `${(x * perCell) + offsetX},${(y * perCell) + offsetY}`;
-                    const allowed = candidates.get(key) ?? new Set();
-                    for (const roomId of roomIds) allowed.add(roomId);
-                    candidates.set(key, allowed);
-                }
-            }
-        };
-        const horizontalWall = (x, y) => {
-            const cell = walls.get(`${x},${y}`);
-            if (!cell) return false;
-            const mask = this.wallMask(cell, walls);
-            return (mask & WallBuilder.MASK_HORIZONTAL) === WallBuilder.MASK_HORIZONTAL;
-        };
-        const verticalWall = (x, y) => {
-            const cell = walls.get(`${x},${y}`);
-            if (!cell) return false;
-            const mask = this.wallMask(cell, walls);
-            return (mask & WallBuilder.MASK_VERTICAL) === WallBuilder.MASK_VERTICAL;
-        };
-        const runSideRooms = (cell, axis, face) => {
-            const rooms = new Set();
-            const queue = [cell];
-            const visited = new Set();
-            const directions = axis === 'horizontal'
-                ? [WallBuilder.DIRECTIONS[1], WallBuilder.DIRECTIONS[3]]
-                : [WallBuilder.DIRECTIONS[0], WallBuilder.DIRECTIONS[2]];
-            for (let index = 0; index < queue.length; index++) {
-                const current = queue[index];
-                const key = `${current.x},${current.y}`;
-                if (visited.has(key)) continue;
-                visited.add(key);
-                const wallBuilder = this.gameMap.wallBuilder;
-                const faces = current.faces || (
-                    typeof wallBuilder?.assignFaces === 'function'
-                        ? wallBuilder.assignFaces(current)
-                        : null
-                );
-                const roomId = faces?.[face]?.roomId;
-                if (roomId) rooms.add(roomId);
-                const mask = this.wallMask(current, walls);
-                for (const direction of directions) {
-                    if ((mask & direction.bit) === 0) continue;
-                    const neighbour = walls.get(`${current.x + direction.dx},${current.y + direction.dy}`);
-                    if (neighbour) queue.push(neighbour);
-                }
-            }
-            return rooms;
-        };
-        const intersection = (first, second) => new Set([...first].filter(roomId => second.has(roomId)));
-
-        for (let x = 0; x < cellsAcross; x++) {
-            const anchors = [];
-            for (let y = 0; y < cellsDown; y++) {
-                if (!horizontalWall(x, y)) continue;
-                const cell = walls.get(`${x},${y}`);
-                anchors.push({
-                    position: y,
-                    north: runSideRooms(cell, 'horizontal', 'north'),
-                    south: runSideRooms(cell, 'horizontal', 'south')
-                });
-            }
-            for (let index = 1; index < anchors.length; index++) {
-                const before = anchors[index - 1];
-                const after = anchors[index];
-                const roomIds = intersection(before.south, after.north);
-                if (roomIds.size === 0) continue;
-                for (let y = before.position + 1; y < after.position; y++) markCell(x, y, roomIds);
-            }
-        }
-        for (let y = 0; y < cellsDown; y++) {
-            const anchors = [];
-            for (let x = 0; x < cellsAcross; x++) {
-                if (!verticalWall(x, y)) continue;
-                const cell = walls.get(`${x},${y}`);
-                anchors.push({
-                    position: x,
-                    west: runSideRooms(cell, 'vertical', 'west'),
-                    east: runSideRooms(cell, 'vertical', 'east')
-                });
-            }
-            for (let index = 1; index < anchors.length; index++) {
-                const before = anchors[index - 1];
-                const after = anchors[index];
-                const roomIds = intersection(before.east, after.west);
-                if (roomIds.size === 0) continue;
-                for (let x = before.position + 1; x < after.position; x++) markCell(x, y, roomIds);
-            }
-        }
-
-        for (;;) {
-            const claims = new Map();
-            for (const [key, allowed] of candidates) {
-                if (owners.has(key)) continue;
-                const [blockX, blockY] = key.split(',').map(Number);
-                const roomIds = new Set([
-                    [-1, 0], [1, 0], [0, -1], [0, 1],
-                    [-1, -1], [1, -1], [-1, 1], [1, 1]
-                ].flatMap(([dx, dy]) => {
-                    const roomId = owners.get(`${blockX + dx},${blockY + dy}`);
-                    return roomId && allowed.has(roomId) ? [roomId] : [];
-                }));
-                if (roomIds.size === 1) claims.set(key, [...roomIds][0]);
-                else if (roomIds.size > 1) claims.set(key, this.settleClaim([...roomIds], blockX, blockY));
-            }
-            if (claims.size === 0) break;
-            for (const [key, roomId] of claims) owners.set(key, roomId);
-        }
-    }
-
-    splitOpenWallGaps(owners, walls, cellsAcross, cellsDown, perCell) {
-        if (!walls?.size) return;
-        const wallAt = (x, y) => walls.has(`${x},${y}`);
-        const cellOwners = new Map();
-        for (let cellY = 0; cellY < cellsDown; cellY++) {
-            for (let cellX = 0; cellX < cellsAcross; cellX++) {
-                if (wallAt(cellX, cellY)) continue;
-                const counts = new Map();
-                for (let offsetY = 0; offsetY < perCell; offsetY++) {
-                    for (let offsetX = 0; offsetX < perCell; offsetX++) {
-                        const roomId = owners.get(
-                            `${(cellX * perCell) + offsetX},${(cellY * perCell) + offsetY}`
-                        );
-                        if (roomId) counts.set(roomId, (counts.get(roomId) || 0) + 1);
-                    }
-                }
-                const roomId = [...counts].reduce((best, entry) =>
-                    !best || entry[1] > best[1] ? entry : best, null)?.[0] ?? null;
-                if (roomId) cellOwners.set(`${cellX},${cellY}`, roomId);
-            }
-        }
-        const ownerAt = (x, y) => cellOwners.get(`${x},${y}`) ?? null;
-        const pairAt = (x, y, axis) => {
-            if (wallAt(x, y)) return null;
-            const first = axis === 'vertical' ? ownerAt(x - 1, y) : ownerAt(x, y - 1);
-            const second = axis === 'vertical' ? ownerAt(x + 1, y) : ownerAt(x, y + 1);
-            const own = ownerAt(x, y);
-            return first && second && first !== second
-                ? { rooms: [first, second], ownsBoundary: own === first || own === second }
-                : null;
-        };
-        const anchorsBoundary = (axis, x, y, outward) => {
-            const cell = walls.get(`${x},${y}`);
-            if (!cell) return null;
-            const mask = this.wallMask(cell, walls);
-            const outwardBit = axis === 'vertical'
-                ? (outward < 0 ? WallBuilder.MASK_NORTH : WallBuilder.MASK_SOUTH)
-                : (outward < 0 ? WallBuilder.MASK_WEST : WallBuilder.MASK_EAST);
-            const perpendicularMask = axis === 'vertical'
-                ? WallBuilder.MASK_HORIZONTAL
-                : WallBuilder.MASK_VERTICAL;
-            const perpendicularConnections = WallBuilder.DIRECTIONS
-                .filter(direction => (direction.bit & perpendicularMask) !== 0)
-                .filter(direction => (mask & direction.bit) !== 0).length;
-            const parallelMask = axis === 'vertical'
-                ? WallBuilder.MASK_VERTICAL
-                : WallBuilder.MASK_HORIZONTAL;
-            if (perpendicularConnections === 1 && (mask & parallelMask) === 0) return 'end-cap';
-            return (mask & outwardBit) !== 0 ? 'parallel' : null;
-        };
-        const splitRun = (axis, fixed, start, end, pair) => {
-            for (let variable = start; variable <= end; variable++) {
-                const cellX = axis === 'vertical' ? fixed : variable;
-                const cellY = axis === 'vertical' ? variable : fixed;
-                for (let offsetY = 0; offsetY < perCell; offsetY++) {
-                    for (let offsetX = 0; offsetX < perCell; offsetX++) {
-                        const side = axis === 'vertical' ? offsetX : offsetY;
-                        owners.set(
-                            `${(cellX * perCell) + offsetX},${(cellY * perCell) + offsetY}`,
-                            pair.rooms[side]
-                        );
-                    }
-                }
-            }
-        };
-        const scan = (axis, fixed, length) => {
-            let variable = 0;
-            while (variable < length) {
-                const cellX = axis === 'vertical' ? fixed : variable;
-                const cellY = axis === 'vertical' ? variable : fixed;
-                const pair = pairAt(cellX, cellY, axis);
-                if (!pair) {
-                    variable += 1;
-                    continue;
-                }
-                const start = variable;
-                while (variable + 1 < length) {
-                    const nextX = axis === 'vertical' ? fixed : variable + 1;
-                    const nextY = axis === 'vertical' ? variable + 1 : fixed;
-                    const next = pairAt(nextX, nextY, axis);
-                    if (!next || next.rooms[0] !== pair.rooms[0] || next.rooms[1] !== pair.rooms[1]) break;
-                    variable += 1;
-                }
-                const end = variable;
-                const beforeX = axis === 'vertical' ? fixed : start - 1;
-                const beforeY = axis === 'vertical' ? start - 1 : fixed;
-                const afterX = axis === 'vertical' ? fixed : end + 1;
-                const afterY = axis === 'vertical' ? end + 1 : fixed;
-                const anchorBefore = anchorsBoundary(axis, beforeX, beforeY, -1);
-                const anchorAfter = anchorsBoundary(axis, afterX, afterY, 1);
-                const anchored = anchorBefore || anchorAfter;
-                const endCapAnchored = anchorBefore === 'end-cap' || anchorAfter === 'end-cap';
-                const boundedByParallelWalls = anchorBefore === 'parallel' && anchorAfter === 'parallel';
-                if (anchored && (pair.ownsBoundary || endCapAnchored || boundedByParallelWalls)) {
-                    splitRun(axis, fixed, start, end, pair);
-                }
-                variable += 1;
-            }
-        };
-
-        for (let cellX = 0; cellX < cellsAcross; cellX++) scan('vertical', cellX, cellsDown);
-        for (let cellY = 0; cellY < cellsDown; cellY++) scan('horizontal', cellY, cellsAcross);
-    }
-
-    /** How far a floor reaches past its own ground, in blocks. */
-    bleedBlocks() {
-        const cells = Number(SiteConfig.floorSystem?.edgeBleedCells ?? 0.5);
-        return Math.max(0, Math.round(cells * FloorBuilder.BLOCKS_PER_CELL));
-    }
-
-    wallMask(cell, walls) {
-        const builder = this.gameMap.wallBuilder;
-        if (typeof builder?.computeMask === 'function') return builder.computeMask(cell);
-        return WallBuilder.DIRECTIONS.reduce((mask, direction) => {
-            const neighbour = walls?.get(`${cell.x + direction.dx},${cell.y + direction.dy}`);
-            const connected = neighbour && (
-                !cell.connectGroup || !neighbour.connectGroup || cell.connectGroup === neighbour.connectGroup
-            );
-            return connected ? mask | direction.bit : mask;
-        }, 0);
-    }
-
-    /**
-     * Resolve a half-cell beneath masonry from the wall faces it sits behind.
-     *
-     * Proximity is correct on open ground, but not through a wall: it leaves
-     * room-side corner quarters bare and lets a large room grow across an
-     * unfinished divider. WallBuilder has already resolved the room on each
-     * visible side, so straight runs use their normal face and multi-arm
-     * junctions use the two faces bordering the quadrant. L-corners stay with
-     * geometric ownership because their inherited wall face can look past the
-     * small room tucked into the corner. A resolved exterior face remains
-     * empty instead of falling back to a room on the other side of the wall.
-     *
-     * @returns {{resolved: boolean, roomId: string|null}}
-     */
-    claimWallBlock(blockX, blockY, cell, mask) {
-        const builder = this.gameMap.wallBuilder;
-        if (!cell || typeof builder?.assignFaces !== 'function') {
-            return { resolved: false, roomId: null };
-        }
-
-        const horizontal = WallBuilder.isHorizontalMask(mask);
-        const vertical = WallBuilder.isVerticalMask(mask);
-        if (!horizontal && !vertical) return { resolved: false, roomId: null };
-
-        // At a T or crossing, a single face cannot describe all four floor
-        // quarters beneath the junction. Its buried-face fallback may name a
-        // room elsewhere along the wall, which is how joining two pulled runs
-        // produced a few tiles from an unrelated third room. Each quarter is
-        // beside one diagonal patch of open floor, so use that local authored
-        // assignment (or detected room) before consulting wall-face fallback.
-        const connections = WallBuilder.DIRECTIONS
-            .filter(direction => (mask & direction.bit) !== 0).length;
-        if (horizontal && vertical && connections >= 3) {
-            const dx = blockX % FloorBuilder.BLOCKS_PER_CELL === 0 ? -1 : 1;
-            const dy = blockY % FloorBuilder.BLOCKS_PER_CELL === 0 ? -1 : 1;
-            const roomX = cell.x + dx;
-            const roomY = cell.y + dy;
-            const assigned = this.gameMap.roomAssignments?.get(roomX, roomY);
-            const room = assigned
-                ? this.gameMap.regionManager?.get('room', assigned)
-                : builder.roomAtOpenCell?.(roomX, roomY);
-            if (room) return { resolved: true, roomId: room.id };
-        }
-
-        // A terminal cap can straddle a doorway's floor boundary. Assigning
-        // its whole underside from one wall face pulls a quarter of that room
-        // across the otherwise straight split. Local block growth already
-        // resolves each half from the floor beside it and still fills ordinary
-        // room corners, so endpoints must defer to that geometry.
-        if (connections <= 1) return { resolved: false, roomId: null };
-
-        const faces = cell.faces || builder.assignFaces(cell);
-        const faceNames = [];
-        if (horizontal) {
-            faceNames.push(blockY % FloorBuilder.BLOCKS_PER_CELL === 0 ? 'north' : 'south');
-        }
-        if (vertical) {
-            faceNames.push(blockX % FloorBuilder.BLOCKS_PER_CELL === 0 ? 'west' : 'east');
-        }
-        const roomIds = [...new Set(faceNames
-            .map(face => faces?.[face]?.roomId ?? null)
-            .filter(Boolean))];
-
-        // A wall end often sits half a cell beyond the room it caps. None of
-        // its direct faces sees that diagonally adjacent room, but geometric
-        // growth still has the correct answer. Only make face ownership
-        // authoritative when it identifies an actual room.
-        if (roomIds.length === 0) return { resolved: false, roomId: null };
-        if (roomIds.length === 1) return { resolved: true, roomId: roomIds[0] };
-        return {
-            resolved: true,
-            roomId: this.settleClaim(roomIds, blockX, blockY)
-        };
-    }
-
-    /**
-     * Which room, if any, takes an unowned block.
-     *
-     * Edge-sharing rooms claim first. On open ground, diagonal ownership fills
-     * the corner of the half-cell perimeter. At a wall end it completes the
-     * room-facing end cap. Beneath a continuous wall, it is allowed only when
-     * the two neighbours facing the room form a structural L.
-     * @returns {string|null} the winning room id
-     */
-    claimBlock(blockX, blockY, owners, {
-        wallCell = true,
-        terminalWall = false,
-        wallMask = 0
-    } = {}) {
-        const straight = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-        const candidates = new Set();
-        for (const [dx, dy] of straight) {
-            const roomId = owners.get(`${blockX + dx},${blockY + dy}`);
-            if (roomId) candidates.add(roomId);
-        }
-        if (candidates.size === 1) return [...candidates][0];
-        if (candidates.size > 1) return this.settleClaim([...candidates], blockX, blockY);
-
-        const cellX = Math.floor(blockX / FloorBuilder.BLOCKS_PER_CELL);
-        const cellY = Math.floor(blockY / FloorBuilder.BLOCKS_PER_CELL);
-        for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-            const roomId = owners.get(`${blockX + dx},${blockY + dy}`);
-            if (!roomId) continue;
-            if (!wallCell || terminalWall) {
-                candidates.add(roomId);
-                continue;
-            }
-            const horizontal = dx < 0 ? WallBuilder.MASK_WEST : WallBuilder.MASK_EAST;
-            const vertical = dy < 0 ? WallBuilder.MASK_NORTH : WallBuilder.MASK_SOUTH;
-            if ((wallMask & horizontal) !== 0 && (wallMask & vertical) !== 0) {
-                candidates.add(roomId);
-            }
-        }
-        if (candidates.size === 1) return [...candidates][0];
-        if (candidates.size > 1) return this.settleClaim([...candidates], blockX, blockY);
-        return null;
-    }
-
-    /**
-     * Two rooms reaching the same block from the same distance.
-     *
-     * Whose TERRITORY the block sits in decides it — a room's shape says where
-     * it ends even on ground it cannot stand on, and a wall standing inside one
-     * room's rectangle does not hand the far half to the room beyond it. That
-     * is what keeps a floor boundary running straight past the end of a wall
-     * instead of stepping half a cell sideways the moment the masonry stops.
-     *
-     * Failing that, the smaller room: the same "innermost wins" rule that
-     * decides which room a cell, a face and a point belong to everywhere else.
-     * Failing that, the lower id, so a rebuild never reshuffles the map.
-     */
-    settleClaim(roomIds, blockX, blockY) {
-        const size = this.blockSize;
-        const centreX = (blockX + 0.5) * size;
-        const centreY = (blockY + 0.5) * size;
-        const rooms = roomIds
-            .map(roomId => this.gameMap.regionManager?.get('room', roomId))
-            .filter(Boolean);
-        const holding = rooms.filter(room => room.contains(centreX, centreY));
-        const pool = holding.length > 0 ? holding : rooms;
-        return pool.reduce((best, room) => {
-            if (!best) return room;
-            const area = room.areaInCells(this.cellSize);
-            const bestArea = best.areaInCells(this.cellSize);
-            if (area !== bestArea) return area < bestArea ? room : best;
-            return room.id < best.id ? room : best;
-        }, null)?.id ?? null;
-    }
-
-    /** The blocks one room owns, computing the map's ownership if needed. */
-    blocksOf(roomId) {
-        if (!this.ownedBlocks) this.ownedBlocks = this.computeOwnership();
-        return this.ownedBlocks.get(roomId) ?? [];
-    }
-
-    /**
-     * The canvas a room's floor needs: a box around the blocks it owns.
-     *
-     * Measured from the ownership rather than from the room's bounds plus a
-     * margin, so the canvas is exactly as big as the thing drawn on it however
-     * far the bleed reaches.
-     */
     paintedArea(room) {
         const blocks = this.blocksOf(room?.id);
-        if (blocks.length === 0) return null;
-        const size = this.blockSize;
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (const [blockX, blockY] of blocks) {
-            minX = Math.min(minX, blockX);
-            minY = Math.min(minY, blockY);
-            maxX = Math.max(maxX, blockX);
-            maxY = Math.max(maxY, blockY);
-        }
+        if (!blocks.length) return null;
+        const xs = blocks.map(block => block[0]);
+        const ys = blocks.map(block => block[1]);
+        const minX = Math.min(...xs);
+        const minY = Math.min(...ys);
         return {
-            x: minX * size,
-            y: minY * size,
-            width: (maxX - minX + 1) * size,
-            height: (maxY - minY + 1) * size
+            x: minX * this.blockSize,
+            y: minY * this.blockSize,
+            width: (Math.max(...xs) - minX + 1) * this.blockSize,
+            height: (Math.max(...ys) - minY + 1) * this.blockSize
         };
     }
 
-    // Anchored to the WORLD grid, not to the area's corner, so two rooms sharing
-    // a finish line up across a doorway instead of seaming wherever their bounds
-    // happen to start.
-    fillTiles(context, tile, area) {
-        const size = this.registry.tileSize;
-        context.save();
-        context.translate(-(area.x % size), -(area.y % size));
-        context.fillStyle = context.createPattern(tile, 'repeat');
-        context.fillRect(0, 0, area.width + size, area.height + size);
-        context.restore();
-    }
-
-    /**
-     * Repaints one room, the floor equivalent of swapping a wall finish.
-     *
-     * Ownership is geometry and a finish is not, so it is deliberately NOT
-     * recomputed here: a room with no floor still owns its ground, and always
-     * did, which is why giving it one cannot take anything from a neighbour.
-     * @returns {boolean} whether the room's finish changed
-     */
-    setRoomFinish(roomId, finishId) {
+    setRoomFinish(roomId, finishId, { transaction = true } = {}) {
         const room = this.gameMap.regionManager?.get('room', roomId);
         if (!room) return false;
-        const previous = room.properties?.floorFinishId ?? null;
         const next = finishId || null;
-        if (previous === next) return false;
+        if ((room.properties?.floorFinishId ?? null) === next) return false;
+        const build = transaction ? this.gameMap.buildTransaction : null;
+        const plan = build?.document?.level(build.levelId).rooms.get(roomId);
+        if (build && plan) {
+            return build.run('Finish room floor', (_draft, level) => {
+                level.rooms.set(roomId, { ...plan, floorFinishId: next });
+            }).committed;
+        }
         room.properties = { ...room.properties, floorFinishId: next };
-        this.removeRoom(roomId);
-        this.paintRoom(room);
-        // Clearing a finish deliberately leaves no generated canvas. That is
-        // still a successful surface change: the authored ground underneath
-        // is now the visible floor.
+        const dirty = new Set(this.blocksOf(roomId).map(([bx, by]) => this.chunkKeyOfBlock(bx, by)));
+        for (const key of dirty) this.drawChunk(key);
+        this.indexSurfaces();
         return true;
     }
 
     removeRoom(roomId) {
-        const existing = this.surfaces.get(roomId);
-        if (!existing) return;
-        existing.canvas.remove();
+        const dirty = new Set(this.blocksOf(roomId).map(([bx, by]) => this.chunkKeyOfBlock(bx, by)));
         this.surfaces.delete(roomId);
+        for (const key of dirty) this.drawChunk(key);
     }
 
     clear() {
-        for (const { canvas } of this.surfaces.values()) canvas.remove();
+        for (const { canvas } of this.chunks.values()) canvas.remove();
+        this.chunks.clear();
         this.surfaces.clear();
     }
 
     dispose() {
         this.clear();
         this.ownedBlocks = null;
+        this.ownershipGrid = null;
         this.container?.remove();
         this.container = null;
     }
@@ -45553,6 +45020,7 @@ class SurfaceCustomizer {
                 if (entry.surface === 'floor') {
                     return rules.canPaintRoomFloor(this.gameMap?.regionManager?.get('room', entry.roomId)).allowed;
                 }
+                if (entry.buildingId && !entry.cells) return true;
                 if (entry.roomId && !entry.cells) {
                     return !!this.gameMap?.regionManager?.get('room', entry.roomId);
                 }
@@ -45561,49 +45029,37 @@ class SurfaceCustomizer {
             });
     }
 
-    capturePreviewState(requests) {
-        const floorFinishes = new Map();
-        const roomWallFinishes = new Map();
-        for (const request of requests) {
-            const room = this.gameMap?.regionManager?.get('room', request.roomId);
-            if (request.surface === 'floor' && !floorFinishes.has(request.roomId)) {
-                floorFinishes.set(request.roomId, room?.properties?.floorFinishId ?? null);
-            } else if (request.surface === 'wall' && request.roomId && !request.cells &&
-                !roomWallFinishes.has(request.roomId)) {
-                roomWallFinishes.set(request.roomId, room?.properties?.wallFinishId ?? null);
-            }
-        }
-        return {
-            wallOverrides: Utility.deepClone(this.gameMap?.wallBuilder?.faceOverrides || []),
-            floorFinishes,
-            roomWallFinishes
-        };
-    }
-
     preview(request) {
         this.revertPreview();
         const requests = this.normalizeRequests(request);
         if (requests.length === 0) return false;
-        this.previewState = this.capturePreviewState(requests);
-        if (this.applyInternal(requests)) return true;
-        this.revertPreview();
-        return false;
+        const build = this.gameMap?.buildTransaction;
+        if (!build) return false;
+        const before = build.document.captureStores();
+        const preview = build.preview((draft, level) => this.mutateDraft(draft, level, requests, build.cache));
+        const after = preview.document.captureStores();
+        const dirty = BuildTransaction.dirty(
+            before, after, build.cache.grid, preview.grid, build.levelId,
+            preview.geometry, preview.topology
+        );
+        this.previewState = { dirty };
+        this.gameMap.wallBuilder.previewDocument = preview.document;
+        this.gameMap.wallBuilder.previewCache = preview;
+        this.gameMap.floorBuilder.previewDocument = preview.document;
+        this.gameMap.wallBuilder.invalidate(dirty.cells, { geometryChanged: false });
+        this.gameMap.floorBuilder.invalidate(dirty.blocks);
+        return true;
     }
 
     revertPreview() {
         if (!this.previewState) return false;
         const wallBuilder = this.gameMap?.wallBuilder;
-        for (const [roomId, finishId] of this.previewState.roomWallFinishes ?? []) {
-            const room = this.gameMap?.regionManager?.get('room', roomId);
-            if (room) room.properties = { ...room.properties, wallFinishId: finishId };
-        }
-        if (wallBuilder) {
-            wallBuilder.faceOverrides = Utility.deepClone(this.previewState.wallOverrides);
-            wallBuilder.rebuild();
-        }
-        for (const [roomId, finishId] of this.previewState.floorFinishes) {
-            this.gameMap?.floorBuilder?.setRoomFinish(roomId, finishId);
-        }
+        const { dirty } = this.previewState;
+        wallBuilder.previewDocument = null;
+        wallBuilder.previewCache = null;
+        this.gameMap.floorBuilder.previewDocument = null;
+        wallBuilder.invalidate(dirty.cells, { geometryChanged: false });
+        this.gameMap.floorBuilder.invalidate(dirty.blocks);
         this.previewState = null;
         return true;
     }
@@ -45611,42 +45067,80 @@ class SurfaceCustomizer {
     apply(request) {
         this.revertPreview();
         const requests = this.normalizeRequests(request);
-        if (!this.applyInternal(requests)) return false;
+        const applied = this.gameMap?.buildTransaction ? this.applyTransaction(requests) : false;
+        if (!applied) return false;
 
-        this.gameMap?.eventManager?.emit(EVENTS.SURFACE_FINISH_CHANGED, {
-            mapId: this.gameMap.id,
-            requests: Utility.deepClone(requests)
-        });
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
         return true;
     }
 
-    applyInternal(requests) {
+    applyTransaction(requests) {
         if (requests.length === 0) return false;
-        let applied = false;
+        const build = this.gameMap.buildTransaction;
+        return build.run('Paint surfaces', (draft, level) => {
+            this.mutateDraft(draft, level, requests, build.cache);
+        }).committed;
+    }
+
+    mutateDraft(document, level, requests, cache) {
+        const roomWallIds = new Set(requests
+            .filter(request => request.surface === 'wall' && request.roomId && !request.cells)
+            .map(request => request.roomId));
+        const exteriorBuildingIds = new Set(requests
+            .filter(request => request.surface === 'wall' && request.exterior && request.buildingId)
+            .map(request => request.buildingId));
         for (const request of requests) {
-            if (request.surface === 'wall' && request.roomId && !request.cells) {
-                applied = this.gameMap?.wallBuilder?.setRoomWallFinish(
-                    request.roomId, request.finishId
-                ) || applied;
-            } else if (request.surface === 'wall') {
-                applied = this.gameMap?.wallBuilder?.setFaceFinish({
-                    face: request.face,
-                    cells: request.cells,
-                    // Carried through, not re-derived: the caller resolved which
-                    // room the clicked SURFACE faces, and a corner post's two
-                    // halves face two different ones. Letting setFaceFinish
-                    // guess from the cell scoped the paint to whichever room
-                    // that face happened to answer with.
-                    roomId: request.roomId,
-                    finishId: request.finishId
-                }) || applied;
-            } else if (request.surface === 'floor') {
-                applied = this.gameMap?.floorBuilder?.setRoomFinish(request.roomId, request.finishId) || applied;
+                if (request.surface === 'floor') {
+                    const room = level.rooms.get(request.roomId);
+                    if (room) level.rooms.set(room.id, { ...room, floorFinishId: request.finishId || null });
+                    continue;
+                }
+                if (request.roomId && !request.cells) {
+                    const room = level.rooms.get(request.roomId);
+                    if (room) level.rooms.set(room.id, { ...room, wallFinishId: request.finishId || null });
+                    continue;
+                }
+                if (request.exterior && request.buildingId && !request.cells) {
+                    const building = document.buildings.get(request.buildingId);
+                    if (building) document.buildings.set(building.id, {
+                        ...building,
+                        exteriorFinishId: request.finishId || null
+                    });
+                    continue;
+                }
+                const [x0, y0] = request.cells.from;
+                const [x1, y1] = request.cells.to;
+                for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+                    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+                        if (!level.walls.has(BuildKeys.cell(x, y))) continue;
+                        for (const half of request.halves?.length ? request.halves : [0, 1]) {
+                            const atom = { x, y, face: request.face, half, finishId: request.finishId };
+                            level.atoms.set(BuildKeys.atom(x, y, request.face, half), atom);
+                        }
+                    }
+                }
+        }
+        if (roomWallIds.size) for (const atom of level.atoms.values()) {
+                const classification = WallFaceResolver.classify(
+                    atom,
+                    cache.grid,
+                    { ...cache.topology, walls: cache.geometry }
+                );
+                if (roomWallIds.has(classification.roomId)) {
+                    level.atoms.delete(BuildKeys.atom(atom.x, atom.y, atom.face, atom.half));
+                }
+        }
+        if (exteriorBuildingIds.size) for (const atom of level.atoms.values()) {
+            const wall = level.walls.get(BuildKeys.cell(atom.x, atom.y));
+            if (!wall || !exteriorBuildingIds.has(wall.buildingId)) continue;
+            const classification = WallFaceResolver.classify(
+                atom, cache.grid, { ...cache.topology, walls: cache.geometry }
+            );
+            if (classification.kind === 'exterior') {
+                level.atoms.delete(BuildKeys.atom(atom.x, atom.y, atom.face, atom.half));
             }
         }
-        return applied;
     }
 
     dispose() {
@@ -45685,12 +45179,13 @@ class GameMap {
         this.gridSystem = null;
         this.particleSystem = null;
         this.environmentManager = null;
-        this.roomEnclosureDetector = null;
-        this.buildingTopology = null;
+        this.buildDocument = null;
+        this.buildTransaction = null;
         this.wallBuilder = null;
         this.fenceBuilder = null;
         this.wallMaterialRegistry = null;
         this.floorBuilder = null;
+        this.footprintOverlay = null;
         this.floorMaterialRegistry = null;
         this.terrainBuilder = null;
         this.surfaceCustomizer = null;
@@ -46239,19 +45734,48 @@ class GameMap {
 		if (SiteConfig.wallSystem?.enabled === true && mapData.walls) {
 			this.wallMaterialRegistry = new WallMaterialRegistry(this.core?.resourceManager || null);
 			await this.wallMaterialRegistry.load();
+			this.buildDocument = BuildDocument.fromMapData(mapData);
 			this.wallBuilder = new WallBuilder(this, mapData.walls, this.wallMaterialRegistry);
+			this.wallBuilder.baseCells = this.buildDocument.level().walls.records;
+			this.wallBuilder.openings = this.buildDocument.level().openings.values();
+			this.wallBuilder.fixtures = this.buildDocument.level().fixtures.values();
+			this.wallBuilder.normalizeOpeningFootprints();
+			this.wallBuilder.pruneOrphanedRecords();
+			this.buildDocument.level().openings.replace(this.wallBuilder.openings);
+			this.buildDocument.level().fixtures.replace(this.wallBuilder.fixtures);
+			if (SiteConfig.floorSystem?.enabled === true) {
+				try {
+					this.floorMaterialRegistry = new FloorMaterialRegistry(this.parent?.resourceManager ?? null);
+					await this.floorMaterialRegistry.load();
+					this.floorBuilder = new FloorRenderer(this, this.floorMaterialRegistry);
+				} catch (error) {
+					Utility.logDebug('Floor system unavailable:', error);
+					this.floorBuilder = null;
+				}
+			}
+			this.buildTransaction = new BuildTransaction({
+				document: this.buildDocument,
+				width: this.gridSystem.gridWidth,
+				height: this.gridSystem.gridHeight,
+				reachBlocks: this.floorBuilder?.bleedBlocks?.() ?? 1,
+				cellSize: this.gridSystem.config.cellSize,
+				geometryOptions: {
+					cellSize: this.gridSystem.config.cellSize,
+					constructions: this.wallMaterialRegistry.constructions
+				},
+				regionManager: this.regionManager,
+				eventManager: this.eventManager,
+				history: this.buildHistory,
+				renderers: { walls: this.wallBuilder, floors: this.floorBuilder },
+				onCommit: event => this.handleBuildCommit(event)
+			});
+			this.footprintOverlay = new BuildFootprintOverlay(this);
+			this.buildTransaction.initialize();
 			await this.wallBuilder.initialize();
 			// The reserve is fixed, not remeasured here — a value that changed
 			// after the camera and input had sampled it was the old coordinate
 			// drift. Just flag it in debug if real wall art won't fit.
 			this.warnIfWallsExceedTopReserve();
-			// Before the detector: its very first pass has to see the map's own
-			// open-plan rooms, or every room it finds is recomputed a moment
-			// later and the rooms it named change under the save.
-			this.roomAssignments = new RoomAssignments(this);
-			this.roomAssignments.restoreState(mapData.walls.roomAssignments, { emit: false });
-			this.roomEnclosureDetector = new RoomEnclosureDetector(this);
-			this.buildingTopology = new BuildingTopology(this);
 		}
 		this.eventManager?.emit(EVENTS.WALL_READY, { mapId: this.id, builder: this.wallBuilder });
 
@@ -46265,19 +45789,10 @@ class GameMap {
 		// them) and after walls, so a room's floor lands under the wall art that
 		// borders it. A room with no floorFinishId is skipped entirely, leaving
 		// the map's own authored tile layers untouched.
-		if (SiteConfig.floorSystem?.enabled === true) {
-			try {
-				this.floorMaterialRegistry = new FloorMaterialRegistry(this.parent?.resourceManager ?? null);
-				await this.floorMaterialRegistry.load();
-				this.floorBuilder = new FloorBuilder(this, this.floorMaterialRegistry);
-				this.floorBuilder.build();
-				this.eventManager?.emit(EVENTS.FLOOR_READY, { mapId: this.id, builder: this.floorBuilder });
-			} catch (error) {
-				// A bad floor sheet must not take the map down with it: the
-				// authored ground is still there underneath.
-				Utility.logDebug('Floor system unavailable:', error);
-				this.floorBuilder = null;
-			}
+		if (this.floorBuilder) {
+			this.floorBuilder.setOwnershipGrid(this.buildTransaction.cache.grid);
+			this.floorBuilder.build();
+			this.eventManager?.emit(EVENTS.FLOOR_READY, { mapId: this.id, builder: this.floorBuilder });
 		}
 		if (this.wallBuilder || this.floorBuilder) {
 			this.surfaceCustomizer = new SurfaceCustomizer(this);
@@ -46296,6 +45811,21 @@ class GameMap {
 				musicOverride:   mapData.environment.musicOverride   ?? null
 			});
 			this._startProximitySoundPolling();
+		}
+	}
+
+	handleBuildCommit(event) {
+		// Ownership is exactly what this overlay draws, so it has to redraw
+		// whenever ownership can have moved — which is every commit.
+		this.footprintOverlay?.render();
+		for (const myte of this.mytes || []) {
+			this.regionManager?.updateMembership(myte, { layers: ['room'], force: true });
+		}
+		this.buildDoorRoomTopology();
+		this.environmentManager?.rebuildWindowLighting();
+		if (this.environmentManager) {
+			this.environmentManager._lightingSignature = '';
+			this.environmentManager.renderLighting(true);
 		}
 	}
 
@@ -46953,15 +46483,8 @@ class GameMap {
 			this.surfaceCustomizer = null;
 		}
 
-		if (this.roomEnclosureDetector) {
-			this.roomEnclosureDetector.dispose();
-			this.roomEnclosureDetector = null;
-		}
-
-		if (this.buildingTopology) {
-			this.buildingTopology.dispose();
-			this.buildingTopology = null;
-		}
+		this.buildTransaction = null;
+		this.buildDocument = null;
 
 		if (this.wallBuilder) {
 			this.wallBuilder.dispose();
@@ -46971,10 +46494,6 @@ class GameMap {
 		if (this.fenceBuilder) {
 			this.fenceBuilder.dispose();
 			this.fenceBuilder = null;
-		}
-		if (this.roomAssignments) {
-			this.roomAssignments.dispose();
-			this.roomAssignments = null;
 		}
 		// Floor and terrain surfaces live in the shared background layer, so they
 		// outlive the map that made them unless torn down here with the walls.
@@ -48004,9 +47523,6 @@ class MapEnvironmentManager {
         this._wallEventUnsubscribers.push(events.on(EVENTS.WALL_READY, payload => {
             if (forThisMap(payload)) this.rebuildWindowLighting();
         }));
-        this._wallEventUnsubscribers.push(events.on(EVENTS.WALL_GEOMETRY_CHANGED, payload => {
-            if (forThisMap(payload)) this.rebuildWindowLighting();
-        }));
         // Presentation changes the room-edge feather (walls down soften the
         // light boundary), not the light values themselves.
         this._wallEventUnsubscribers.push(events.on(EVENTS.WALL_PRESENTATION_CHANGED, payload => {
@@ -48753,7 +48269,7 @@ class MapEnvironmentManager {
             this.gameMap?.wallBuilder?.cells?.size ?? 0,
             this.gameMap?.wallBuilder?.presentation || '',
             this.gameMap?.wallBuilder?.pieces?.map(piece => piece.renderPlan?.mode ?? '').join('') ?? '',
-            this.gameMap?.floorBuilder?.surfaces?.size ?? 0
+            this.gameMap?.floorBuilder?.chunksRedrawn ?? 0
         ].join('#');
     }
 
@@ -48838,7 +48354,7 @@ class MapEnvironmentManager {
             ctx.fillRect(object.posX, object.posY, object.size.width, object.size.height);
         }
 
-        for (const { canvas: floor } of this.gameMap?.floorBuilder?.surfaces?.values() || []) {
+        for (const { canvas: floor } of this.gameMap?.floorBuilder?.chunks?.values() || []) {
             if (!floor?.width || !floor.height) continue;
             ctx.drawImage(
                 floor,
@@ -51479,6 +50995,9 @@ class TileMapLoader {
 					cells: { from: [fromX, fromY], to: [toX, toY] },
 					face: String(object.properties?.face || 'south').toLowerCase(),
 					finishId: object.properties?.finishId || defaults.finishId,
+					halves: [0, 1].includes(Number(object.properties?.half))
+						? [Number(object.properties.half)]
+						: [0, 1],
 					// Which room the paint was applied to. The PROPERTY being
 					// absent and the property being empty mean different things
 					// and must stay different: absent is hand-authored paint
@@ -54319,8 +53838,22 @@ class MapObjectInputController {
 		const history = object.container?.buildHistory;
 		if (!history) return;
 
-		const from = { x: object._dragOriginX, y: object._dragOriginY, direction: object._dragOriginDirection };
-		const to = { x: object.posX, y: object.posY, direction: object.getConfig('facingDirection', null) };
+        const recordKind = object._wallBuildRecordKind || null;
+        const from = {
+            x: object._dragOriginX,
+            y: object._dragOriginY,
+            direction: object._dragOriginDirection,
+            wallRecord: Utility.deepClone(object._wallBuildRecordBefore ?? null)
+        };
+        const to = {
+            x: object.posX,
+            y: object.posY,
+            direction: object.getConfig('facingDirection', null),
+            wallRecord: Utility.deepClone(object._wallBuildRecordAfter ?? null)
+        };
+        delete object._wallBuildRecordBefore;
+        delete object._wallBuildRecordAfter;
+        delete object._wallBuildRecordKind;
 		if (from.x === to.x && from.y === to.y && from.direction === to.direction) return;
 
 		const place = (state) => {
@@ -54330,9 +53863,10 @@ class MapObjectInputController {
 			object.posX = state.x;
 			object.posY = state.y;
 			object.updatePosition();
-			object.syncRenderLayer();
-			object.handleMovedEvent();
-		};
+            object.syncRenderLayer();
+            object.handleMovedEvent();
+            if (recordKind) object.gameMap?.wallBuilder?.applyObjectBuildRecord(object, recordKind, state.wallRecord);
+        };
 
 		history.push({
 			label: `Move ${object.getDisplayName()}`,
@@ -70923,7 +70457,7 @@ class ToolManager extends UIComponent {
             },
             [UIToolModes.WALL]: {
                 id: 'tool-wall',
-                label: 'Wall',
+                label: 'Structure',
                 cursor: 'crosshair',
                 shortcut: '2',
                 buildOnly: true,
@@ -70933,7 +70467,7 @@ class ToolManager extends UIComponent {
                 id: 'tool-fence',
                 label: 'Fence',
                 cursor: 'crosshair',
-                shortcut: '6',
+                controlOptional: true,
                 buildOnly: true,
                 claimsMapDrag: true
             },
@@ -71239,12 +70773,34 @@ class BuildModeUI extends UIComponent {
     setGridOverlay(visible) {
         const canvas = this.container?.canvas;
         if (!canvas) return;
-        const cellSize = this.container?.gameMap?.gridSystem?.config?.cellSize;
-        if (cellSize) canvas.style.setProperty('--build-grid-size', `${cellSize}px`);
+        const gameMap = this.container?.gameMap;
+        const grid = gameMap?.gridSystem;
+        const cellSize = grid?.config?.cellSize;
+        // `.canvas` is the padded render area, so the grid has to be told where
+        // the gameplay grid sits inside it — otherwise it tiles across the
+        // render padding and offers cells that are not part of the map.
+        if (cellSize) {
+            const insets = gameMap?.renderInsets || { top: 0, left: 0 };
+            canvas.style.setProperty('--build-grid-size', `${cellSize}px`);
+            canvas.style.setProperty('--build-grid-left', `${insets.left || 0}px`);
+            canvas.style.setProperty('--build-grid-top', `${insets.top || 0}px`);
+            canvas.style.setProperty('--build-grid-width', `${(grid.gridWidth || 0) * cellSize}px`);
+            canvas.style.setProperty('--build-grid-height', `${(grid.gridHeight || 0) * cellSize}px`);
+        }
         canvas.classList.toggle('show-build-grid', visible === true);
     }
 
+    // Owned-cell outlines. Build mode only, and only when asked for: see
+    // BuildFootprintOverlay.
+    setFootprintOverlay(visible) {
+        this.container?.gameMap?.footprintOverlay?.setVisible(visible === true);
+    }
+
     update() {
+        this.setFootprintOverlay(
+            this.gameMode?.isBuild() === true &&
+            this.container?.settings?.buildFootprints === true
+        );
         this.setGridOverlay(
             this.gameMode?.isBuild() === true &&
             (this.container?.settings?.buildGrid !== false ||
@@ -71254,6 +70810,7 @@ class BuildModeUI extends UIComponent {
 
     dispose() {
         super.dispose();
+        this.setFootprintOverlay(false);
         this.setGridOverlay(false);
         this.modeButton = null;
         this.undoButton = null;
@@ -71872,6 +71429,166 @@ class SelectionManager extends UIComponent {
     }
 }
 ;
+/* -- js/UI/Build/BuildSelection.js -- */
+class BuildSelection {
+    static KINDS = Object.freeze(['building', 'room', 'wall', 'atom', 'object']);
+
+    constructor() {
+        this.value = null;
+        this.listeners = new Set();
+    }
+
+    get current() {
+        return this.value ? StoreDelta.clone(this.value) : null;
+    }
+
+    set(selection) {
+        if (!selection) return this.clear();
+        if (!BuildSelection.KINDS.includes(selection.kind) || selection.id == null) {
+            throw new Error('Invalid build selection');
+        }
+        const next = StoreDelta.clone(selection);
+        if (JSON.stringify(next) === JSON.stringify(this.value)) return false;
+        this.value = next;
+        this.emit();
+        return true;
+    }
+
+    clear() {
+        if (!this.value) return false;
+        this.value = null;
+        this.emit();
+        return true;
+    }
+
+    subscribe(listener) {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+    }
+
+    emit() {
+        const value = this.current;
+        for (const listener of this.listeners) listener(value);
+    }
+}
+;
+/* -- js/UI/Map/BuildFootprintOverlay.js -- */
+/**
+ * Outlines the cells each room plan actually owns, while building.
+ *
+ * A floor deliberately stops on the CENTRELINE of its boundary cell, so what
+ * you see painted is half a tile short of the cells the room owns on every open
+ * edge. That is the right way for the floor to render — it is where the floor
+ * ends up once the perimeter is walled — but it leaves the one question you ask
+ * constantly while adjusting a room tile by tile ("is this cell mine?") with no
+ * answer on screen. This draws the answer: the owned footprint, per plan, on
+ * the grid, so paint edges stop being something you infer from a half-tile.
+ *
+ * Cell ownership, not blocks: the question is which cells belong to the room,
+ * and `grid.ownerOfCell` is the majority answer the rest of the build tools use.
+ */
+class BuildFootprintOverlay {
+    static COLOURS = Object.freeze([
+        'rgba(66, 133, 244, 0.85)', 'rgba(219, 68, 55, 0.85)', 'rgba(15, 157, 88, 0.85)',
+        'rgba(244, 160, 0, 0.85)', 'rgba(171, 71, 188, 0.85)', 'rgba(0, 172, 193, 0.85)'
+    ]);
+
+    constructor(gameMap) {
+        this.gameMap = gameMap;
+        this.canvas = null;
+        this.visible = false;
+        this.renders = 0;
+    }
+
+    get cellSize() {
+        return this.gameMap?.gridSystem?.config?.cellSize || 32;
+    }
+
+    setVisible(visible) {
+        this.visible = visible === true;
+        if (!this.visible) {
+            this.canvas?.remove();
+            this.canvas = null;
+            return;
+        }
+        this.render();
+    }
+
+    // The background layer is already the gameplay rect — the render padding
+    // sits outside it — so a canvas at inset 0 here is cell-aligned with no
+    // offset arithmetic, the same contract the floor chunks rely on.
+    ensureCanvas() {
+        const layer = this.gameMap?.layers?.background;
+        if (!layer) return null;
+        if (this.canvas?.isConnected) return this.canvas;
+        const canvas = document.createElement('canvas');
+        canvas.className = 'build-footprint-overlay ignore';
+        canvas.setAttribute('aria-hidden', 'true');
+        Object.assign(canvas.style, {
+            position: 'absolute', left: '0', top: '0', pointerEvents: 'none'
+        });
+        layer.appendChild(canvas);
+        this.canvas = canvas;
+        return canvas;
+    }
+
+    render() {
+        if (!this.visible) return 0;
+        const grid = this.gameMap?.buildTransaction?.cache?.grid;
+        const canvas = grid ? this.ensureCanvas() : null;
+        if (!canvas) return 0;
+        const cell = this.cellSize;
+        const width = this.gameMap.gridSystem?.gridWidth || 0;
+        const height = this.gameMap.gridSystem?.gridHeight || 0;
+        if (canvas.width !== width * cell || canvas.height !== height * cell) {
+            canvas.width = width * cell;
+            canvas.height = height * cell;
+            canvas.style.width = `${width * cell}px`;
+            canvas.style.height = `${height * cell}px`;
+        }
+        const context = canvas.getContext('2d');
+        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        const owners = new Map();
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+            const id = grid.ownerOfCell(x, y);
+            if (id === null) continue;
+            if (!owners.has(id)) owners.set(id, []);
+            owners.get(id).push([x, y]);
+        }
+        // Only the edges of each footprint are stroked. Outlining every cell
+        // would redraw the grid in six colours and say nothing extra: the seam
+        // between two rooms is the whole point, and interior lines bury it.
+        const index = new Map([...owners.keys()].sort().map((id, order) => [id, order]));
+        context.lineWidth = 2;
+        context.lineCap = 'square';
+        for (const [id, cells] of owners) {
+            const owned = new Set(cells.map(([x, y]) => `${x},${y}`));
+            context.strokeStyle = BuildFootprintOverlay.COLOURS[
+                index.get(id) % BuildFootprintOverlay.COLOURS.length
+            ];
+            context.beginPath();
+            for (const [x, y] of cells) {
+                const left = x * cell;
+                const top = y * cell;
+                if (!owned.has(`${x - 1},${y}`)) { context.moveTo(left, top); context.lineTo(left, top + cell); }
+                if (!owned.has(`${x + 1},${y}`)) { context.moveTo(left + cell, top); context.lineTo(left + cell, top + cell); }
+                if (!owned.has(`${x},${y - 1}`)) { context.moveTo(left, top); context.lineTo(left + cell, top); }
+                if (!owned.has(`${x},${y + 1}`)) { context.moveTo(left, top + cell); context.lineTo(left + cell, top + cell); }
+            }
+            context.stroke();
+        }
+        this.renders++;
+        return owners.size;
+    }
+
+    dispose() {
+        this.canvas?.remove();
+        this.canvas = null;
+        this.gameMap = null;
+    }
+}
+;
 /* -- js/UI/Map/BuildMarqueeSelection.js -- */
 class BuildMarqueeSelection extends UIComponent {
     constructor(parent) {
@@ -71931,7 +71648,7 @@ class BuildMarqueeSelection extends UIComponent {
         }
         if (cell && event.shiftKey !== true && event.pointerType === 'touch') {
             const room = builder?.roomAtOpenCell(cell.x, cell.y);
-            const component = room && this.container?.gameMap?.buildingTopology?.getComponentForRoom(room.id);
+            const component = room && this.buildingComponentForRoom(room.id);
             if (component) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -72039,7 +71756,7 @@ class BuildMarqueeSelection extends UIComponent {
             const cell = this.emptyPress.cell;
             this.emptyPress = null;
             const room = cell && this.container?.gameMap?.wallBuilder?.roomAtOpenCell(cell.x, cell.y);
-            const component = room && this.container?.gameMap?.buildingTopology?.getComponentForRoom(room.id);
+            const component = room && this.buildingComponentForRoom(room.id);
             if (component) {
                 this.selectBuilding(component);
                 this.preferredScope = 'building';
@@ -72194,10 +71911,15 @@ class BuildMarqueeSelection extends UIComponent {
         }
         const actions = document.createElement('div');
         actions.className = 'stage-bar__group build-selection-actions__operations';
-        for (const [label, titleText, action, className] of [
+        const operationSpecs = [
             ['Duplicate', 'Place a structural copy beside this selection', () => this.duplicateSelection()],
             ['Demolish', 'Remove the selected structure', () => this.confirmDemolition(), 'is-danger']
-        ]) {
+        ];
+        if (this.selectionKind === 'building') operationSpecs.splice(1, 0,
+            ['Separate', 'Make disconnected parts separate named buildings', () => this.separateBuilding()],
+            ['Merge', 'Merge selected buildings into the anchored building', () => this.mergeSelectedBuildings()]
+        );
+        for (const [label, titleText, action, className] of operationSpecs) {
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'stage-bar__action';
@@ -72258,40 +71980,178 @@ class BuildMarqueeSelection extends UIComponent {
     }
 
     buildingName() {
+        const map = this.container?.gameMap;
+        const buildingId = this.selectedRooms()
+            .map(room => map?.buildDocument?.level?.().rooms.get(room.id)?.buildingId)
+            .find(Boolean);
+        const planName = buildingId ? map?.buildDocument?.buildings.get(buildingId)?.displayName : null;
+        if (planName) return planName;
         return this.selectedRooms()
             .map(room => room.properties?.buildingName)
             .find(name => typeof name === 'string' && name.trim()) ?? null;
     }
 
-    renameBuilding(name) {
-        const rooms = this.selectedRooms();
-        if (rooms.length === 0) return false;
-        const previous = rooms.map(room => ({ roomId: room.id, name: room.properties?.buildingName ?? null }));
-        if (previous.every(entry => entry.name === name)) return false;
-        const apply = values => {
-            for (const entry of values) {
-                const room = this.container?.gameMap?.regionManager?.get('room', entry.roomId);
-                if (room) room.properties.buildingName = entry.name;
-            }
-            this.container?.gameMap?.eventManager?.emit(EVENTS.ROOMS_CHANGED, {
-                mapId: this.container.gameMap.id,
-                rooms: this.container.gameMap.regionManager?.all('room') ?? []
-            });
-        };
-        const next = previous.map(entry => ({ ...entry, name }));
-        apply(next);
-        this.container.buildHistory?.push({
-            label: name ? `Name Building ${name}` : 'Clear Building Name',
-            undo: () => apply(previous),
-            redo: () => apply(next)
-        });
-        this.container?.worldState?.captureMap?.(this.container.gameMap);
-        this.container?.core?.user?._scheduleSave?.();
+    selectedBuildingIds() {
+        const walls = this.container?.gameMap?.buildDocument?.level?.().walls;
+        return [...new Set(this.selectedWallCells.map(cell =>
+            walls?.get(BuildKeys.cell(cell.x, cell.y))?.buildingId
+        ).filter(Boolean))];
+    }
+
+    mergeSelectedBuildings() {
+        const map = this.container?.gameMap;
+        const build = map?.buildTransaction;
+        const ids = this.selectedBuildingIds();
+        if (!build || ids.length < 2) {
+            this.parent.showMessage?.('Select walls from at least two buildings to merge them.', 'info', 'Buildings');
+            return false;
+        }
+        const anchorId = this.selectionAnchor
+            ? map.buildDocument.level().walls.get(BuildKeys.cell(this.selectionAnchor.x, this.selectionAnchor.y))?.buildingId
+            : null;
+        const survivorId = ids.includes(anchorId) ? anchorId : ids[0];
+        const merged = new Set(ids);
+        const committed = build.run(`Merge Buildings into ${map.buildDocument.buildings.get(survivorId)?.displayName || survivorId}`,
+            (draft, level) => {
+                for (const [key, wall] of level.walls.entries()) if (merged.has(wall.buildingId)) {
+                    level.walls.set(key, { ...wall, buildingId: survivorId });
+                }
+                for (const [id, room] of level.rooms.entries()) if (merged.has(room.buildingId)) {
+                    level.rooms.set(id, { ...room, buildingId: survivorId });
+                }
+                for (const id of ids) if (id !== survivorId) draft.buildings.delete(id);
+            }).committed;
+        if (!committed) return false;
+        this.selectBuilding(this.buildingComponent(survivorId), false, this.selectionAnchor);
         return true;
+    }
+
+    separateBuilding() {
+        const map = this.container?.gameMap;
+        const build = map?.buildTransaction;
+        const buildingId = this.selectedBuildingIds()[0];
+        const level = map?.buildDocument?.level?.();
+        const plan = buildingId ? map.buildDocument.buildings.get(buildingId) : null;
+        if (!build || !level || !plan) return false;
+        const remaining = new Set(level.walls.entries()
+            .filter(([, wall]) => wall.buildingId === buildingId)
+            .map(([key]) => key));
+        const components = [];
+        while (remaining.size) {
+            const first = remaining.values().next().value;
+            remaining.delete(first);
+            const cells = [first];
+            for (let index = 0; index < cells.length; index++) {
+                const { x, y } = BuildKeys.parseCell(cells[index]);
+                for (const key of [BuildKeys.cell(x - 1, y), BuildKeys.cell(x + 1, y),
+                    BuildKeys.cell(x, y - 1), BuildKeys.cell(x, y + 1)]) {
+                    if (!remaining.delete(key)) continue;
+                    cells.push(key);
+                }
+            }
+            components.push(cells.sort());
+        }
+        if (components.length < 2) {
+            this.parent.showMessage?.('This building is already one connected structure.', 'info', 'Buildings');
+            return false;
+        }
+        const anchorKey = this.selectionAnchor ? BuildKeys.cell(this.selectionAnchor.x, this.selectionAnchor.y) : null;
+        components.sort((left, right) => Number(right.includes(anchorKey)) - Number(left.includes(anchorKey)) ||
+            right.length - left.length || left[0].localeCompare(right[0]));
+        const ids = [buildingId];
+        for (let index = 1; index < components.length; index++) {
+            for (let suffix = index + 1; ; suffix++) {
+                const candidate = `${buildingId}_part_${suffix}`;
+                if (map.buildDocument.buildings.has(candidate) || ids.includes(candidate)) continue;
+                ids[index] = candidate;
+                break;
+            }
+        }
+        const distanceTo = (seed, component) => {
+            const point = BuildKeys.parseCell(seed);
+            return component.reduce((best, key) => {
+                const wall = BuildKeys.parseCell(key);
+                return Math.min(best, Math.abs(point.x - wall.x) + Math.abs(point.y - wall.y));
+            }, Infinity);
+        };
+        const committed = build.run(`Separate ${plan.displayName}`, (draft, draftLevel) => {
+            for (let index = 1; index < components.length; index++) draft.buildings.set(ids[index], {
+                ...plan,
+                id: ids[index],
+                displayName: `${plan.displayName} ${index + 1}`,
+                authoredDisplayName: `${plan.authoredDisplayName || plan.displayName} ${index + 1}`
+            });
+            components.forEach((component, index) => component.forEach(key => {
+                const wall = draftLevel.walls.get(key);
+                draftLevel.walls.set(key, { ...wall, buildingId: ids[index] });
+            }));
+            for (const [roomId, room] of draftLevel.rooms.entries()) {
+                if (room.buildingId !== buildingId || room.seedCells.length === 0) continue;
+                const index = components.map(component => Math.min(...room.seedCells.map(seed => distanceTo(seed, component))))
+                    .reduce((best, value, candidate, values) => value < values[best] ? candidate : best, 0);
+                draftLevel.rooms.set(roomId, { ...room, buildingId: ids[index] });
+            }
+        }).committed;
+        if (!committed) return false;
+        this.selectBuilding(this.buildingComponent(buildingId), false, this.selectionAnchor);
+        return true;
+    }
+
+    renameBuilding(name) {
+        const map = this.container?.gameMap;
+        const build = map?.buildTransaction;
+        const buildingId = this.selectedRooms()
+            .map(room => build?.document?.level(build.levelId).rooms.get(room.id)?.buildingId)
+            .find(Boolean);
+        const building = buildingId ? build?.document?.buildings.get(buildingId) : null;
+        if (!build || !building) return false;
+        const displayName = name || building.authoredDisplayName || building.id;
+        if (displayName === building.displayName) return false;
+        const committed = build.run(name ? `Name Building ${name}` : 'Clear Building Name', draft => {
+            draft.buildings.set(buildingId, { ...building, displayName });
+        }).committed;
+        if (committed) {
+            this.container?.worldState?.captureMap?.(map);
+            this.container?.core?.user?._scheduleSave?.();
+        }
+        return committed;
     }
 
     getSelectedWallCells() {
         return [...this.selectedWallCells];
+    }
+
+    roomSeedAssignments() {
+        const rooms = this.container?.gameMap?.buildDocument?.level?.().rooms.values() || [];
+        return new Map(rooms.flatMap(room => room.seedCells.map(key => [key, room.id])));
+    }
+
+    buildingComponent(buildingId) {
+        if (!buildingId) return null;
+        const map = this.container?.gameMap;
+        const level = map?.buildDocument?.level?.();
+        if (!level || !map.buildDocument.buildings.has(buildingId)) return null;
+        return {
+            id: buildingId,
+            buildingId,
+            cellKeys: new Set(level.walls.entries()
+                .filter(([, wall]) => wall.buildingId === buildingId)
+                .map(([key]) => key)),
+            roomIds: new Set(level.rooms.values()
+                .filter(room => room.buildingId === buildingId)
+                .map(room => room.id))
+        };
+    }
+
+    buildingComponentForRoom(roomId) {
+        const buildingId = this.container?.gameMap?.buildDocument?.level?.().rooms.get(roomId)?.buildingId;
+        return this.buildingComponent(buildingId);
+    }
+
+    buildingComponentAtCell(cell) {
+        const buildingId = this.container?.gameMap?.buildDocument?.level?.().walls
+            .get(BuildKeys.cell(cell.x, cell.y))?.buildingId;
+        return this.buildingComponent(buildingId);
     }
 
     pointerCell(event) {
@@ -72309,7 +72169,7 @@ class BuildMarqueeSelection extends UIComponent {
         let cells = [{ x: cell.x, y: cell.y }];
         if (scope === 'run') cells = this.resolveRun(cell);
         if (scope === 'building') {
-            const component = this.container?.gameMap?.buildingTopology?.getComponentAtWallFace(cell);
+            const component = this.buildingComponentAtCell(cell);
             if (component) {
                 if (remember) this.preferredScope = scope;
                 return this.selectBuilding(component, additive, cell);
@@ -72321,6 +72181,11 @@ class BuildMarqueeSelection extends UIComponent {
         this.selectionRoomIds = [];
         this.selectionAnchor = { x: cell.x, y: cell.y };
         this.parent.selectionManager.setSelection([]);
+        this.parent.buildSelection?.set({
+            kind: 'wall',
+            id: BuildKeys.cell(cell.x, cell.y),
+            details: { Scope: scope, Cells: this.selectedWallCells.length }
+        });
         this.renderWallHighlights();
         return true;
     }
@@ -72345,9 +72210,12 @@ class BuildMarqueeSelection extends UIComponent {
         });
         this.selectedWallCells = additive ? this.mergeWallCells(this.selectedWallCells, cells) : cells;
         this.selectionKind = 'building';
-        this.selectionRoomIds = [...component.roomIds];
+        this.selectionRoomIds = additive
+            ? [...new Set([...this.selectionRoomIds, ...component.roomIds])]
+            : [...component.roomIds];
         this.selectionAnchor = anchor ? { x: anchor.x, y: anchor.y } : (cells[0] ? { ...cells[0] } : null);
         this.parent.selectionManager.setSelection([]);
+        this.parent.buildSelection?.set({ kind: 'building', id: component.buildingId || component.id });
         this.renderWallHighlights();
         return true;
     }
@@ -72465,11 +72333,13 @@ class BuildMarqueeSelection extends UIComponent {
         const map = this.container?.gameMap;
         const builder = map?.wallBuilder;
         const grid = map?.gridSystem;
-        if (!builder || !grid) return false;
-        const sourceKeys = new Set(this.selectedWallCells.map(cell => `${cell.x},${cell.y}`));
+        if (!builder || !grid || !map.buildTransaction) return false;
+        const sourceKeys = new Set(this.selectedWallCells.map(cell => BuildKeys.cell(cell.x, cell.y)));
         const targets = this.selectedWallCells.map(cell => ({ x: cell.x + dx, y: cell.y + dy }));
-        const invalid = targets.some(cell => cell.x < 0 || cell.y < 0 || cell.x >= grid.gridWidth || cell.y >= grid.gridHeight ||
-            (builder.baseCells.has(`${cell.x},${cell.y}`) && !sourceKeys.has(`${cell.x},${cell.y}`)));
+        const invalid = targets.some(cell => cell.x < 0 || cell.y < 0 ||
+            cell.x >= grid.gridWidth || cell.y >= grid.gridHeight ||
+            (builder.baseCells.has(BuildKeys.cell(cell.x, cell.y)) &&
+                !sourceKeys.has(BuildKeys.cell(cell.x, cell.y))));
         if (invalid) {
             this.parent.showMessage?.('The selection stayed where it was — something is in the way.', 'warning', 'Select');
             this.renderWallHighlights();
@@ -72479,40 +72349,24 @@ class BuildMarqueeSelection extends UIComponent {
             .filter(cell => !targets.some(target => target.x === cell.x && target.y === cell.y))
             .map(cell => ({ ...cell, data: null }));
         const additions = targets
-            .filter(cell => !sourceKeys.has(`${cell.x},${cell.y}`))
+            .filter(cell => !sourceKeys.has(BuildKeys.cell(cell.x, cell.y)))
             .map(cell => {
                 const source = this.selectedWallCells[targets.indexOf(cell)];
-                return { ...cell, data: Utility.deepClone(builder.baseCells.get(`${source.x},${source.y}`) || {}) };
+                return { ...cell, data: Utility.deepClone(builder.baseCells.get(BuildKeys.cell(source.x, source.y)) || {}) };
             });
         const contentMove = { cells: sourceKeys, dx, dy };
-        const movedOverrides = builder.faceOverridesWithin(sourceKeys);
-        const result = builder.applyWallCellChanges([...removals, ...additions], { atomic: true, contentMove });
+        const assignmentChanges = this.assignmentChangesForMove({ cells: this.roomSeedAssignments() }, dx, dy);
+        const result = builder.applyWallCellChanges([...removals, ...additions], {
+            atomic: true,
+            contentMove,
+            roomChanges: assignmentChanges,
+            label: `Move ${this.selectionKind === 'building' ? 'Building' : 'Walls'} (${this.selectedWallCells.length} cells)`
+        });
         if (!result?.applied?.length) {
             this.parent.showMessage?.('The selection stayed where it was.', 'warning', 'Select');
             this.renderWallHighlights();
             return false;
         }
-        const assignments = map.roomAssignments;
-        const assignmentChanges = this.assignmentChangesForMove(assignments, dx, dy);
-        const assignmentResult = assignments?.applyChanges(assignmentChanges, { emit: false }) ?? { applied: [], inverse: [] };
-        map.roomEnclosureDetector?.detect?.();
-        builder.retargetFaceOverrides(movedOverrides);
-        const forward = Utility.deepClone(result.applied);
-        const backward = Utility.deepClone(result.inverse);
-        const assignmentForward = Utility.deepClone(assignmentResult.applied);
-        const assignmentBackward = Utility.deepClone(assignmentResult.inverse);
-        const inverseMove = WallBuilder.invertContentMove(contentMove);
-        const replay = (walls, rooms, move) => {
-            builder.applyWallCellChanges(Utility.deepClone(walls), { validate: false, contentMove: move });
-            assignments?.applyChanges(Utility.deepClone(rooms), { emit: false });
-            map.roomEnclosureDetector?.detect?.();
-            builder.retargetFaceOverrides(movedOverrides);
-        };
-        this.container.buildHistory?.push({
-            label: `Move ${this.selectionKind === 'building' ? 'Building' : 'Walls'} (${this.selectedWallCells.length} cells)`,
-            undo: () => replay(backward, assignmentBackward, inverseMove),
-            redo: () => replay(forward, assignmentForward, contentMove)
-        });
         this.selectedWallCells = targets;
         if (this.selectionAnchor) {
             this.selectionAnchor = { x: this.selectionAnchor.x + dx, y: this.selectionAnchor.y + dy };
@@ -72525,7 +72379,7 @@ class BuildMarqueeSelection extends UIComponent {
         const map = this.container?.gameMap;
         const builder = map?.wallBuilder;
         const grid = map?.gridSystem;
-        if (!builder || !grid || this.selectedWallCells.length === 0) return false;
+        if (!builder || !grid || !map.buildTransaction || this.selectedWallCells.length === 0) return false;
         const xs = this.selectedWallCells.map(cell => cell.x);
         const ys = this.selectedWallCells.map(cell => cell.y);
         const width = Math.max(...xs) - Math.min(...xs) + 1;
@@ -72536,115 +72390,96 @@ class BuildMarqueeSelection extends UIComponent {
             this.parent.showMessage?.('There is not enough clear space beside this selection.', 'warning', 'Duplicate');
             return false;
         }
-        const [dx, dy] = offset;
-        const additions = this.selectedWallCells.map(cell => ({
-            x: cell.x + dx,
-            y: cell.y + dy,
-            data: Utility.deepClone(builder.baseCells.get(`${cell.x},${cell.y}`) || {})
-        }));
-        const result = builder.applyWallCellChanges(additions, { atomic: true });
-        if (!result?.applied?.length) return false;
+        return this.duplicateSelectionTransaction(offset[0], offset[1]);
+    }
 
-        const takenRoomIds = new Set([
-            ...(map.roomAssignments?.roomIds?.() ?? []),
-            ...(map.regionManager?.all('room') ?? []).map(room => room.id)
-        ]);
+    duplicateSelectionTransaction(dx, dy) {
+        const map = this.container.gameMap;
+        const builder = map.wallBuilder;
+        const document = map.buildDocument;
+        const level = document.level();
+        const takenRoomIds = new Set(level.rooms.keys());
         const mintRoomId = () => {
-            for (let index = 1; ; index += 1) {
-                const id = `${RoomAssignments.PAINTED_PREFIX}${index}`;
-                if (takenRoomIds.has(id)) continue;
-                takenRoomIds.add(id);
-                return id;
+            for (let index = 1; ; index++) {
+                const id = `${RoomPanel.PAINTED_PREFIX}${index}`;
+                if (!takenRoomIds.has(id)) {
+                    takenRoomIds.add(id);
+                    return id;
+                }
             }
         };
-        const roomIdMap = new Map(this.selectionRoomIds.map(roomId => [roomId, mintRoomId()]));
-        const roomCopies = this.captureRoomCopies(roomIdMap);
-        const assignmentChanges = roomCopies.flatMap(copy => copy.cells.map(([x, y]) => ({
-            x: x + dx,
-            y: y + dy,
-            roomId: copy.roomId
-        })));
-        const roomResult = map.roomAssignments?.applyChanges(assignmentChanges, { emit: false }) ?? { applied: [], inverse: [] };
-        map.roomEnclosureDetector?.detect?.();
-        this.applyRoomProperties(roomCopies, { asCopy: true });
-        const overrideCopies = this.selectedWallCells.flatMap(cell =>
-            builder.createFaceOverrideCopies(builder.sampleFaceOverrideTemplate(cell), [
-                { x: cell.x + dx, y: cell.y + dy }
-            ]).map(record => ({ ...record, roomId: roomIdMap.get(record.roomId) ?? record.roomId }))
-        );
-        builder.addFaceOverrideCopies(overrideCopies);
-
-        const forward = Utility.deepClone(result.applied);
-        const backward = Utility.deepClone(result.inverse);
-        const roomForward = Utility.deepClone(roomResult.applied);
-        const roomBackward = Utility.deepClone(roomResult.inverse);
-        const replay = (walls, rooms, { restore = false } = {}) => {
-            builder.applyWallCellChanges(Utility.deepClone(walls), { validate: false });
-            map.roomAssignments?.applyChanges(Utility.deepClone(rooms), { emit: false });
-            map.roomEnclosureDetector?.detect?.();
-            if (restore) {
-                this.applyRoomProperties(roomCopies, { asCopy: true });
-                builder.addFaceOverrideCopies(overrideCopies);
+        const sourceBuildingId = this.selectionKind === 'building'
+            ? this.selectedWallCells.map(cell => level.walls.get(BuildKeys.cell(cell.x, cell.y))?.buildingId).find(Boolean)
+            : null;
+        let copiedBuildingId = sourceBuildingId;
+        const buildingCopies = [];
+        if (sourceBuildingId) {
+            const source = document.buildings.get(sourceBuildingId);
+            for (let index = 1; ; index++) {
+                const candidate = `${sourceBuildingId}_copy${index === 1 ? '' : `_${index}`}`;
+                if (document.buildings.has(candidate)) continue;
+                copiedBuildingId = candidate;
+                buildingCopies.push({
+                    ...source,
+                    id: candidate,
+                    displayName: `${source.displayName || source.id} copy`,
+                    authoredDisplayName: `${source.authoredDisplayName || source.displayName || source.id} copy`
+                });
+                break;
             }
-        };
-        this.container.buildHistory?.push({
-            label: `Duplicate ${this.selectionKind === 'building' ? 'Building' : 'Walls'} (${additions.length} cells)`,
-            undo: () => {
-                builder.removeFaceOverrideCopies(overrideCopies);
-                replay(backward, roomBackward);
-            },
-            redo: () => replay(forward, roomForward, { restore: true })
-        });
-        this.selectedWallCells = additions.map(({ x, y }) => ({ x, y }));
-        this.selectionRoomIds = [...roomIdMap.values()].filter(Boolean);
-        if (this.selectionAnchor) {
-            this.selectionAnchor = { x: this.selectionAnchor.x + dx, y: this.selectionAnchor.y + dy };
         }
+        const roomIdMap = new Map(this.selectionRoomIds.map(id => [id, mintRoomId()]));
+        const roomCopies = [...roomIdMap].map(([sourceId, id]) => {
+            const source = level.rooms.get(sourceId);
+            return source ? {
+                ...source,
+                id,
+                buildingId: source.buildingId === sourceBuildingId ? copiedBuildingId : source.buildingId,
+                displayName: `${source.displayName || source.id} copy`,
+                authoredDisplayName: `${source.authoredDisplayName || source.displayName || source.id} copy`,
+                origin: 'painted',
+                seedCells: source.seedCells.map(key => {
+                    const cell = BuildKeys.parseCell(key);
+                    return BuildKeys.cell(cell.x + dx, cell.y + dy);
+                })
+            } : null;
+        }).filter(Boolean);
+        const additions = this.selectedWallCells.map(cell => {
+            const source = level.walls.get(BuildKeys.cell(cell.x, cell.y));
+            return {
+                x: cell.x + dx,
+                y: cell.y + dy,
+                data: {
+                    ...source,
+                    buildingId: source.buildingId === sourceBuildingId ? copiedBuildingId : source.buildingId
+                }
+            };
+        });
+        const atomExtensions = this.selectedWallCells.map(cell => ({
+            targets: [{ x: cell.x + dx, y: cell.y + dy }],
+            atoms: level.atoms.atomsOfCell(cell.x, cell.y)
+        }));
+        const label = `Duplicate ${this.selectionKind === 'building' ? 'Building' : 'Walls'} (${additions.length} cells)`;
+        const result = builder.applyWallCellChanges(additions, {
+            atomic: true,
+            buildingCopies,
+            roomCopies,
+            atomExtensions,
+            label
+        });
+        if (!result?.applied?.length) return false;
+        this.selectedWallCells = additions.map(({ x, y }) => ({ x, y }));
+        this.selectionRoomIds = [...roomIdMap.values()];
+        if (this.selectionAnchor) this.selectionAnchor = {
+            x: this.selectionAnchor.x + dx,
+            y: this.selectionAnchor.y + dy
+        };
         this.renderWallHighlights();
         this.parent.showMessage?.('Placed a copy beside the selection. Wall-mounted objects stay with the original.', 'success', 'Duplicate');
         return true;
     }
 
-    captureRoomCopies(roomIdMap) {
-        const map = this.container?.gameMap;
-        return [...roomIdMap].map(([sourceRoomId, roomId]) => {
-            const room = map?.regionManager?.get('room', sourceRoomId);
-            const cells = [...(room?.shape?.cells ?? [])].map(rawCell => {
-                if (typeof rawCell === 'string') return rawCell.split(',').map(Number);
-                if (Array.isArray(rawCell)) return rawCell;
-                return [rawCell?.x, rawCell?.y];
-            }).filter(([x, y]) => Number.isInteger(x) && Number.isInteger(y));
-            if (cells.length === 0) return null;
-            return {
-                roomId,
-                cells,
-                properties: Utility.deepClone(room.properties || {})
-            };
-        }).filter(Boolean);
-    }
 
-    applyRoomProperties(copies, { asCopy = false } = {}) {
-        const map = this.container?.gameMap;
-        let changed = false;
-        for (const copy of copies || []) {
-            const room = map?.regionManager?.get('room', copy.roomId);
-            if (!room) continue;
-            const sourceName = copy.properties.playerName || copy.properties.displayName;
-            const sourceBuildingName = copy.properties.buildingName;
-            Object.assign(room.properties, copy.properties, {
-                playerName: asCopy && sourceName ? `${sourceName} copy` : copy.properties.playerName ?? null,
-                displayName: asCopy && sourceName ? `${sourceName} copy` : copy.properties.displayName,
-                buildingName: asCopy && sourceBuildingName ? `${sourceBuildingName} copy` : sourceBuildingName ?? null
-            });
-            changed = true;
-        }
-        if (changed) {
-            map?.floorBuilder?.build?.();
-            map?.wallBuilder?.refreshRoomFaces?.();
-            map?.eventManager?.emit(EVENTS.ROOMS_CHANGED, { mapId: map.id, rooms: map.regionManager?.all('room') });
-        }
-        return changed;
-    }
 
     canDuplicateAt(dx, dy) {
         const map = this.container?.gameMap;
@@ -72680,53 +72515,38 @@ class BuildMarqueeSelection extends UIComponent {
     storeSelection() {
         const inventory = this.container?.inventory;
         const objects = this.parent.selectionManager.getSelectedObjects();
-        const wallCells = [...this.selectedWallCells];
         const unstored = objects.filter(object => inventory?.storeMapObject?.(object) !== true);
-        const builder = this.container?.gameMap?.wallBuilder;
+        const map = this.container?.gameMap;
+        const builder = map?.wallBuilder;
+        if (!builder || !map.buildTransaction) return false;
+        const wallCells = [...this.selectedWallCells];
         const removalCells = this.selectionKind === 'run'
             ? this.parent?.wallBuildPanel?.includeOrphanedBranches?.(builder, wallCells) ?? wallCells
             : wallCells;
-        const assignments = this.container?.gameMap?.roomAssignments;
         const roomIds = new Set(this.selectionRoomIds);
-        const roomSnapshots = this.captureRoomCopies(new Map(this.selectionRoomIds.map(roomId => [roomId, roomId])));
-        const roomChanges = [...(assignments?.cells ?? [])]
-            .filter(([, roomId]) => roomIds.has(roomId))
-            .map(([key]) => {
-                const [x, y] = key.split(',').map(Number);
-                return { x, y, roomId: null };
-            });
-        let roomResult = { applied: [], inverse: [] };
-        let wallResult = null;
-        if (builder && wallCells.length) {
-            wallResult = builder.applyWallCellChanges(removalCells.map(cell => ({ ...cell, data: null })));
-        }
-        if (wallResult?.applied?.length) {
-            roomResult = assignments?.applyChanges(roomChanges, { emit: false }) ?? roomResult;
-            this.container?.gameMap?.roomEnclosureDetector?.detect?.();
-        }
+        const buildingIds = this.selectionKind === 'building'
+            ? [...new Set(this.selectionRoomIds.map(id =>
+                map.buildDocument.level().rooms.get(id)?.buildingId).filter(Boolean))]
+            : [];
+        const wallResult = removalCells.length
+            ? builder.applyWallCellChanges(removalCells.map(cell => ({ ...cell, data: null })), {
+                deleteRoomIds: this.selectionKind === 'building' ? [...roomIds] : [],
+                deleteBuildingIds: buildingIds,
+                label: `${this.selectionKind === 'building' ? 'Demolish Building' : 'Remove Wall'} (${removalCells.length} cells)`
+            })
+            : null;
         this.parent.selectionManager.setSelection(unstored);
         this.selectedWallCells = [];
         this.clearVisuals();
-        if (unstored.length) this.parent.showMessage?.(`${unstored.length} object${unstored.length === 1 ? '' : 's'} could not be returned to inventory.`, 'warning', 'Selection');
-        if (wallResult?.rejected?.length) {
-            this.parent.showMessage?.(`${wallResult.rejected.length} protected wall cell${wallResult.rejected.length === 1 ? '' : 's'} could not be removed.`, 'warning', 'Selection');
-        }
-        if (wallResult?.applied?.length) {
-            const forward = Utility.deepClone(wallResult.applied);
-            const backward = Utility.deepClone(wallResult.inverse);
-            const selectionKind = this.selectionKind;
-            const replay = (walls, rooms, { restoreRooms = false } = {}) => {
-                builder.applyWallCellChanges(Utility.deepClone(walls), { validate: false });
-                assignments?.applyChanges(Utility.deepClone(rooms), { emit: false });
-                this.container?.gameMap?.roomEnclosureDetector?.detect?.();
-                if (restoreRooms) this.applyRoomProperties(roomSnapshots);
-            };
-            this.container.buildHistory?.push({
-                label: `${selectionKind === 'building' ? 'Demolish Building' : 'Remove Wall'} (${forward.length} cells)`,
-                undo: () => replay(backward, roomResult.inverse, { restoreRooms: true }),
-                redo: () => replay(forward, roomResult.applied)
-            });
-        }
+        if (unstored.length) this.parent.showMessage?.(
+            `${unstored.length} object${unstored.length === 1 ? '' : 's'} could not be returned to inventory.`,
+            'warning', 'Selection'
+        );
+        if (wallResult?.rejected?.length) this.parent.showMessage?.(
+            `${wallResult.rejected.length} protected wall cell${wallResult.rejected.length === 1 ? '' : 's'} could not be removed.`,
+            'warning', 'Selection'
+        );
+        return !!wallResult?.applied?.length;
     }
 
     clearVisuals() {
@@ -72743,6 +72563,7 @@ class BuildMarqueeSelection extends UIComponent {
         this.selectionKind = null;
         this.selectionRoomIds = [];
         this.selectionAnchor = null;
+        this.parent.buildSelection?.clear();
         this.clearVisuals();
     }
 
@@ -74455,6 +74276,7 @@ class StageViewBar extends UIComponent {
         this.wallView = this.track(new WallViewControl(this, root.querySelector('.wall-view-controls')));
         this.gridToggle = this.track(new BuildGridToggle(this, root));
         this.snapToggle = this.track(new BuildSnapToggle(this, root));
+        this.footprintToggle = this.track(new BuildFootprintToggle(this, root));
         this.speed = this.track(new SegmentControl(
             root.querySelector('.stage-speed-control'),
             { onChange: (value) => this.applySpeed(value) }
@@ -75533,6 +75355,7 @@ class UserInterface {
 		this.boundTimeMilestoneSound = this.handleTimeMilestoneSound.bind(this);
 
         // Initialize all UI components
+        this.buildSelection = new BuildSelection();
         this.toolManager = new ToolManager(this);
         this.selectionManager = new SelectionManager(this);
         this.buildMarqueeSelection = new BuildMarqueeSelection(this);
@@ -75577,6 +75400,7 @@ class UserInterface {
         this.fenceBuildPanel = new FenceBuildPanel(this);
         this.roomPanel = new RoomPanel(this);
         this.terrainPaintPanel = new TerrainPaintPanel(this);
+        this.buildInspector = new BuildInspector(this);
         this.viewPanel = new ViewPanel(this);
         this.worldMapPanel = new WorldMapPanel(this);
         this.calendarPanel = new CalendarPanel(this);
@@ -75639,11 +75463,22 @@ class UserInterface {
         this.fenceBuildPanel?.handleToolModeChanged(mode);
         this.roomPanel?.handleToolModeChanged(mode);
         this.terrainPaintPanel?.handleToolModeChanged(mode);
+        this.buildInspector?.handleToolModeChanged(mode);
     }
 
     onSelectionChanged(selectedObject) {
         // Update action panel based on selection
         this.actionSidebarManager.updateActions(selectedObject);
+        if (this.parent?.gameMode?.isBuild() && selectedObject) {
+            this.buildSelection.set({
+                kind: 'object',
+                id: String(selectedObject.id),
+                details: {
+                    Type: selectedObject.getDisplayName?.() || selectedObject.type,
+                    ID: selectedObject.id
+                }
+            });
+        }
     }
 
     // Proxy methods to parent for components to use
@@ -75888,6 +75723,9 @@ class UserInterface {
         this.roomPanel = null;
         this.terrainPaintPanel?.dispose?.();
         this.terrainPaintPanel = null;
+        this.buildInspector?.dispose?.();
+        this.buildInspector = null;
+        this.buildSelection = null;
         this.soundPanel?.dispose?.();
         this.soundPanel = null;
         this.soundMenu = null;
@@ -76725,6 +76563,292 @@ constructor(parent, options = {}) {
 	}
 }
 ;
+/* -- js/UI/Build/BuildInspector.js -- */
+class BuildInspector extends ModalWindow {
+    constructor(parent) {
+        super(parent, {
+            id: 'build-inspector-panel',
+            title: 'Build Inspector',
+            position: 'top-right',
+            draggable: false,
+            closeOnOutsideClick: false
+        });
+        this.activeTab = 'navigator';
+        this.unsubscribeSelection = null;
+        this.unsubscribeBuild = null;
+        this.init();
+    }
+
+    init() {
+        super.init();
+        if (!this.modalElement) return;
+        this.tabs = [...this.modalElement.querySelectorAll('[data-build-inspector-tab]')];
+        this.views = [...this.modalElement.querySelectorAll('[data-build-inspector-view]')];
+        for (const tab of this.tabs) tab.addEventListener('click', () => this.showTab(tab.dataset.buildInspectorTab));
+        this.unsubscribeSelection = this.parent.buildSelection.subscribe(() => this.render());
+        this.unsubscribeBuild = this.parent?.parent?.eventManager?.on(EVENTS.BUILD_COMMITTED, () => this.render());
+        this.render();
+    }
+
+    handleToolModeChanged(mode) {
+        if (mode === UIToolModes.MOVE) {
+            this.open();
+            this.render();
+        } else {
+            super.close();
+        }
+    }
+
+    showTab(name) {
+        if (!['navigator', 'properties', 'palette'].includes(name)) return false;
+        this.activeTab = name;
+        for (const tab of this.tabs) {
+            const selected = tab.dataset.buildInspectorTab === name;
+            tab.classList.toggle('active', selected);
+            tab.setAttribute('aria-selected', String(selected));
+        }
+        for (const view of this.views) view.hidden = view.dataset.buildInspectorView !== name;
+        return true;
+    }
+
+    render() {
+        this.renderNavigator();
+        this.renderProperties();
+        this.renderPalette();
+        this.showTab(this.activeTab);
+    }
+
+    renderNavigator() {
+        const root = this.modalElement?.querySelector('[data-build-inspector-view="navigator"]');
+        if (!root) return;
+        root.replaceChildren();
+        const documentModel = this.parent?.parent?.gameMap?.buildDocument;
+        const level = documentModel?.level?.();
+        if (!documentModel || !level) {
+            root.append(BuildInspector.message('No build plan is available on this map.'));
+            return;
+        }
+        const tree = document.createElement('ul');
+        tree.className = 'build-navigator-tree';
+        const site = document.createElement('li');
+        site.className = 'build-navigator-node build-navigator-node--site';
+        const siteLabel = document.createElement('strong');
+        siteLabel.textContent = 'Site';
+        site.append(siteLabel);
+        const children = document.createElement('ul');
+        for (const building of documentModel.buildings.values()) {
+            const node = document.createElement('li');
+            const button = this.nodeButton('building', building.id, `Building: ${building.displayName}`);
+            node.append(button);
+            const rooms = level.rooms.values().filter(room => room.buildingId === building.id);
+            if (rooms.length) {
+                const roomList = document.createElement('ul');
+                for (const room of rooms) {
+                    const roomNode = document.createElement('li');
+                    const label = `Room: ${room.displayName}`;
+                    const roomButton = this.nodeButton('room', room.id, label);
+                    const badge = this.roomBadge(room);
+                    if (badge) roomButton.append(BuildInspector.badge(badge));
+                    roomNode.append(roomButton);
+                    roomList.append(roomNode);
+                }
+                node.append(roomList);
+            }
+            children.append(node);
+        }
+        const outdoor = level.rooms.values().filter(room => !room.buildingId);
+        if (outdoor.length) {
+            const areas = document.createElement('li');
+            const label = document.createElement('strong');
+            label.textContent = 'Areas';
+            areas.append(label);
+            const list = document.createElement('ul');
+            for (const room of outdoor) {
+                const node = document.createElement('li');
+                node.append(this.nodeButton('room', room.id, `Area: ${room.displayName}`));
+                list.append(node);
+            }
+            areas.append(list);
+            children.append(areas);
+        }
+        const unassigned = level.walls.values().filter(wall => !wall.buildingId).length;
+        if (unassigned) {
+            const node = document.createElement('li');
+            const button = this.nodeButton('wall', 'unassigned', `Unassigned walls (${unassigned})`);
+            node.append(button);
+            children.append(node);
+        }
+        site.append(children);
+        tree.append(site);
+        root.append(tree);
+    }
+
+    nodeButton(kind, id, label) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'build-navigator-button';
+        button.textContent = label;
+        const current = this.parent.buildSelection.current;
+        button.classList.toggle('is-selected', current?.kind === kind && current.id === id);
+        button.addEventListener('click', () => this.select(kind, id));
+        return button;
+    }
+
+    roomBadge(room) {
+        if (room.seedCells.length === 0) return 'Empty';
+        const state = this.parent?.parent?.gameMap?.buildTransaction?.cache?.topology?.planStates?.get(room.id);
+        if (!state?.indoor) return 'Open';
+        const adjacency = this.parent?.parent?.gameMap?.buildTransaction?.cache?.topology?.adjacency || [];
+        return adjacency.some(edge => edge.roomA === room.id || edge.roomB === room.id) ? null : 'No entrance';
+    }
+
+    select(kind, id) {
+        const marquee = this.parent.buildMarqueeSelection;
+        if (kind === 'building') {
+            const component = marquee.buildingComponent(id);
+            if (component) marquee.selectBuilding(component);
+        } else if (kind === 'room') {
+            marquee.clearSelection();
+            this.parent.roomPanel.selected = id;
+        } else if (kind === 'wall' && id === 'unassigned') {
+            const walls = this.parent.parent.gameMap.buildDocument.level().walls.values()
+                .filter(wall => !wall.buildingId).map(({ x, y }) => ({ x, y }));
+            marquee.selectedWallCells = walls;
+            marquee.selectionKind = 'area';
+            marquee.renderWallHighlights();
+        }
+        this.parent.buildSelection.set({ kind, id });
+        this.showTab('properties');
+    }
+
+    renderProperties() {
+        const root = this.modalElement?.querySelector('[data-build-inspector-view="properties"]');
+        if (!root) return;
+        root.replaceChildren();
+        const selection = this.parent.buildSelection.current;
+        if (!selection) {
+            root.append(BuildInspector.message('Select a building, room, wall, surface, or object.'));
+            return;
+        }
+        const map = this.parent?.parent?.gameMap;
+        const level = map?.buildDocument?.level?.();
+        if (selection.kind === 'building') {
+            const plan = map.buildDocument.buildings.get(selection.id);
+            if (!plan) return root.append(BuildInspector.message('This building no longer exists.'));
+            root.append(this.propertyHeading(plan.displayName, 'Building'));
+            root.append(this.nameEditor(plan.displayName, value => this.parent.buildMarqueeSelection.renameBuilding(value)));
+            root.append(this.actionRow([
+                ['Duplicate', () => this.parent.buildMarqueeSelection.duplicateSelection()],
+                ['Separate', () => this.parent.buildMarqueeSelection.separateBuilding()],
+                ['Merge', () => this.parent.buildMarqueeSelection.mergeSelectedBuildings()],
+                ['Demolish', () => this.parent.buildMarqueeSelection.confirmDemolition(), 'is-danger']
+            ]));
+            return;
+        }
+        if (selection.kind === 'room') {
+            const room = level.rooms.get(selection.id);
+            if (!room) return root.append(BuildInspector.message('This room no longer exists.'));
+            root.append(this.propertyHeading(room.displayName, room.buildingId ? 'Room' : 'Area'));
+            root.append(this.nameEditor(room.displayName, value => this.parent.roomPanel.commitRoom(
+                room.id, { displayName: value }, `Rename ${room.displayName}`
+            )));
+            root.append(this.actionRow([
+                ['Edit area', () => this.openTool(UIToolModes.ROOM, room.id)],
+                ['Paint floor', () => this.parent.surfaceCustomizePanel.openRoomSurface(room.id, 'floor')],
+                ['Paint walls', () => this.parent.surfaceCustomizePanel.openRoomSurface(room.id, 'wall')]
+            ]));
+            return;
+        }
+        const details = document.createElement('dl');
+        details.className = 'build-inspector-details';
+        for (const [label, value] of Object.entries(selection.details || { Type: selection.kind, ID: selection.id })) {
+            const term = document.createElement('dt');
+            term.textContent = label;
+            const description = document.createElement('dd');
+            description.textContent = value == null ? '—' : String(value);
+            details.append(term, description);
+        }
+        root.append(details);
+    }
+
+    renderPalette() {
+        const root = this.modalElement?.querySelector('[data-build-inspector-view="palette"]');
+        if (!root) return;
+        root.replaceChildren(this.actionRow([
+            ['Structure', () => this.openTool(UIToolModes.WALL)],
+            ['Rooms', () => this.openTool(UIToolModes.ROOM)],
+            ['Paint', () => this.openTool(UIToolModes.SURFACE)],
+            ['Ground', () => this.openTool(UIToolModes.TERRAIN)]
+        ]));
+    }
+
+    propertyHeading(name, kind) {
+        const heading = document.createElement('div');
+        heading.className = 'build-inspector-heading';
+        const title = document.createElement('strong');
+        title.textContent = name;
+        const type = document.createElement('span');
+        type.textContent = kind;
+        heading.append(title, type);
+        return heading;
+    }
+
+    nameEditor(value, commit) {
+        const label = document.createElement('label');
+        label.className = 'setting-item setting-item--stacked';
+        const title = document.createElement('span');
+        title.textContent = 'Name';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = value || '';
+        input.maxLength = 24;
+        input.addEventListener('change', () => commit(input.value.trim()));
+        label.append(title, input);
+        return label;
+    }
+
+    actionRow(actions) {
+        const row = document.createElement('div');
+        row.className = 'button-row build-inspector-actions';
+        for (const [label, action, className] of actions) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = label;
+            if (className) button.classList.add(className);
+            button.addEventListener('click', action);
+            row.append(button);
+        }
+        return row;
+    }
+
+    openTool(mode, roomId = null) {
+        if (roomId) this.parent.roomPanel.selected = roomId;
+        return this.parent.changeToolMode(mode);
+    }
+
+    static badge(text) {
+        const badge = document.createElement('span');
+        badge.className = 'build-navigator-badge';
+        badge.textContent = text;
+        return badge;
+    }
+
+    static message(text) {
+        const message = document.createElement('p');
+        message.className = 'setting-hint setting-hint--persistent';
+        message.textContent = text;
+        return message;
+    }
+
+    dispose() {
+        this.unsubscribeSelection?.();
+        this.unsubscribeBuild?.();
+        this.unsubscribeSelection = null;
+        this.unsubscribeBuild = null;
+        super.dispose();
+    }
+}
+;
 /* -- js/UI/core/SegmentControl.js -- */
 /**
  * SegmentControl — one row of buttons where exactly one is down.
@@ -76851,6 +76975,17 @@ class BuildGridToggle extends BuildSettingToggle {
             selector: '.build-grid-toggle',
             setting: 'buildGrid',
             setter: 'setBuildGridEnabled'
+        });
+    }
+}
+
+/** Outlines of the cells each room plan owns. */
+class BuildFootprintToggle extends BuildSettingToggle {
+    constructor(owner, root) {
+        super(owner, root, {
+            selector: '.build-footprint-toggle',
+            setting: 'buildFootprints',
+            setter: 'setBuildFootprintsEnabled'
         });
     }
 }
@@ -79887,6 +80022,41 @@ const AuditHarness = {
 window.__audit = AuditHarness;
 window.__invariants = () => AuditHarness.invariants();
 ;
+/* -- js/UI/debug/BuildDebug.js -- */
+class BuildDebug {
+    static counters = new WeakMap();
+
+    static activeMap() {
+        return MyteCore.instance?.getFirstContainer?.()?.gameMap ?? null;
+    }
+
+    static increment(name, map = BuildDebug.activeMap()) {
+        if (!map) return 0;
+        const counters = BuildDebug.counters.get(map) || { hitTests: 0, imageDataReads: 0 };
+        counters[name] = (counters[name] || 0) + 1;
+        BuildDebug.counters.set(map, counters);
+        return counters[name];
+    }
+
+    static stats(map = BuildDebug.activeMap()) {
+        const transaction = map?.buildTransaction?.stats?.() || {};
+        const hasTransaction = !!map?.buildTransaction;
+        const counters = BuildDebug.counters.get(map) || {};
+        return Object.freeze({
+            transactions: transaction.transactions || 0,
+            wallRebuilds: hasTransaction ? transaction.wallRebuilds || 0 : map?.wallBuilder?.rebuilds || 0,
+            ownershipSolves: hasTransaction ? transaction.ownershipSolves || 0 : map?.floorBuilder?.ownershipSolves || 0,
+            topologyRebuilds: hasTransaction ? transaction.topologyRebuilds || 0 : 0,
+            floorChunksRedrawn: map?.floorBuilder?.chunksRedrawn || transaction.floorChunksRedrawn || 0,
+            wallPiecesRedrawn: map?.wallBuilder?.piecesRedrawn || transaction.wallPiecesRedrawn || 0,
+            hitTests: counters.hitTests || transaction.hitTests || 0,
+            imageDataReads: counters.imageDataReads || transaction.imageDataReads || 0
+        });
+    }
+}
+
+window.__build = Object.freeze({ stats: map => BuildDebug.stats(map) });
+;
 /* -- js/UI/debug/SurfaceDebug.js -- */
 // SurfaceDebug — console tooling for the two systems that answer "which room
 // owns this piece of the world": wall paint surfaces and room floors.
@@ -79947,7 +80117,14 @@ const SurfaceDebug = {
 		if (!raw) return { cell: `${x},${y}`, wall: false };
 
 		const mask = builder.computeMask(raw);
-		const faces = builder.assignFaces(raw);
+		const cache = builder.gameMap?.buildTransaction?.cache;
+		const topology = cache ? { ...cache.topology, walls: cache.geometry } : null;
+		const faces = Object.fromEntries(BuildKeys.FACES.map(face => [face, [0, 1].map(half => {
+			const classification = cache
+				? WallFaceResolver.classify({ x, y, face, half }, cache.grid, topology)
+				: { kind: 'buried' };
+			return classification.kind === 'room' ? classification.roomId : classification.kind;
+		})]));
 		const piece = builder.findPieceForCell(x, y);
 		return {
 			cell: `${x},${y}`,
@@ -79956,12 +80133,8 @@ const SurfaceDebug = {
 			connections: SurfaceDebug.maskName(mask),
 			piece: piece?.id ?? null,
 			construction: raw.constructionId,
-			finish: raw.finishId,
 			opening: raw.opening?.type ?? null,
-			faces: Object.fromEntries(Object.entries(faces).map(([name, face]) => [
-				name,
-				`${face.roomId || '(outside)'} ${face.materialId}`
-			])),
+			faces,
 			slices: builder.getCellSurfaces(raw).map(surface => ({
 				px: `${surface.from}-${surface.to}`,
 				part: surface.axis === 'horizontal' ? 'band' : 'post',
@@ -80072,7 +80245,7 @@ const SurfaceDebug = {
 
 	/** The ownership plan before it is rasterized into separate room canvases. */
 	floorPlan(x, y, ownerByBlock = this._floorPlanOwners()) {
-		const perCell = FloorBuilder.BLOCKS_PER_CELL;
+		const perCell = FloorRenderer.BLOCKS_PER_CELL;
 		const quarters = {};
 		for (let row = 0; row < perCell; row++) {
 			for (let column = 0; column < perCell; column++) {
@@ -80144,17 +80317,21 @@ const SurfaceDebug = {
 
 	/** Every room whose floor canvas has a pixel at this point in map space. */
 	floorOwnersAt(mapX, mapY) {
-		const owners = [];
-		for (const [roomId, surface] of this._map().floorBuilder?.surfaces ?? []) {
-			const canvas = surface.canvas;
-			const x = Math.floor(mapX - parseFloat(canvas.style.left));
-			const y = Math.floor(mapY - parseFloat(canvas.style.top));
-			if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) continue;
-			if (canvas.getContext('2d').getImageData(x, y, 1, 1).data[3] > 0) {
-				owners.push(`${roomId}:${surface.finishId}`);
-			}
-		}
-		return owners;
+		const renderer = this._map().floorBuilder;
+		const blockX = Math.floor(mapX / renderer.blockSize);
+		const blockY = Math.floor(mapY / renderer.blockSize);
+		const roomId = renderer.ownershipGrid?.ownerAt(blockX, blockY);
+		const surface = renderer.surfaces?.get(roomId);
+		if (!surface) return [];
+		const chunk = renderer.chunks?.get(renderer.chunkKeyOfBlock(blockX, blockY));
+		const canvas = chunk?.canvas;
+		if (!canvas) return [];
+		const x = Math.floor(mapX - parseFloat(canvas.style.left));
+		const y = Math.floor(mapY - parseFloat(canvas.style.top));
+		if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return [];
+		return canvas.getContext('2d').getImageData(x, y, 1, 1).data[3] > 0
+			? [`${roomId}:${surface.finishId}`]
+			: [];
 	},
 
 	/**
@@ -80205,12 +80382,12 @@ const SurfaceDebug = {
 				if (owners.length > 1) { overlaps.push(`${where}: ${owners.join(' + ')}`); continue; }
 				if (owners.length > 0) continue;
 
-				const inRoom = map.regionManager?.innermostAt?.(
-					(x + 0.5) * size, (y + 0.5) * size, 'room', size
-				);
-				if (inRoom && !surfaces?.has(inRoom.id)) noFloor.add(inRoom.id);
-				const wall = map.wallBuilder?.cells?.has(`${x},${y}`) ?? false;
-				if (inRoom && surfaces?.has(inRoom.id) && !wall) gaps.push(`${where}: inside ${inRoom.id}`);
+				const expectedOwner = map.floorBuilder?.ownershipGrid?.ownerAt(column, row) ?? null;
+				if (expectedOwner && !surfaces?.has(expectedOwner)) {
+					noFloor.add(expectedOwner);
+					continue;
+				}
+				if (expectedOwner) gaps.push(`${where}: owned by ${expectedOwner}`);
 				else bare.set(`${column},${row}`, where);
 			}
 		}
@@ -81360,9 +81537,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         // of leaving a rectangle hanging in the air.
         const events = this.parent?.parent?.eventManager;
         this.overlayUnsubscribers = [
-            events?.on?.(EVENTS.WALL_GEOMETRY_CHANGED, () => this.redrawOverlays()),
+            events?.on?.(EVENTS.BUILD_COMMITTED, () => this.redrawOverlays()),
             events?.on?.(EVENTS.WALL_PRESENTATION_CHANGED, () => this.redrawOverlays()),
-            events?.on?.(EVENTS.SURFACE_FINISH_CHANGED, () => this.redrawOverlays())
         ];
     }
 
@@ -81486,7 +81662,7 @@ class SurfaceCustomizePanel extends ModalWindow {
     }
 
     // A concrete rgba(), never color-mix(): this string is assigned to a canvas
-    // 2D context's fillStyle (see FloorBuilder.createRoomOverlay), and Safari's
+    // 2D context's fillStyle (see FloorRenderer.createRoomOverlay), and Safari's
     // canvas colour parser rejects color-mix() — the assignment is silently
     // dropped, fillStyle stays at its default opaque black, and the whole room's
     // floor overlay paints black. `color-mix(in srgb, C p%, transparent)` is
@@ -81511,14 +81687,8 @@ class SurfaceCustomizePanel extends ModalWindow {
      * hit-testing it would claim ground belonging to the room next door.
      */
     resolveTarget(event) {
-        const piece = this.resolveWallPiece(event);
-        if (piece) {
-            // Which surface of the piece, not merely which piece: a corner post
-            // shows two rooms' paint at once, split down the middle, so the
-            // pixel under the cursor is what decides.
-            const surface = this.gameMap?.wallBuilder?.surfaceAtOffset(piece, event.offsetX);
-            if (surface) return { surface: 'wall', wallSurface: surface, piece };
-        }
+        const hit = this.resolveWallHit(event);
+        if (hit) return { surface: 'wall', wallSurface: hit.surface, piece: hit.piece };
         const room = this.resolveRoomAt(event);
         return room ? { surface: 'floor', room } : null;
     }
@@ -81536,25 +81706,15 @@ class SurfaceCustomizePanel extends ModalWindow {
      * half-cell surfaces — and the alpha test is what keeps the click honest,
      * since the post is 14px of art in a 32px box.
      */
-    resolveWallPiece(event) {
+    resolveWallHit(event) {
         const element = event?.target?.closest?.('.wall-piece');
-        if (!element || !this.isOpaqueAt(element, event)) return null;
+        if (!element) return null;
         const builder = this.gameMap?.wallBuilder;
         const piece = builder?.findPieceById(element.dataset.wallPieceId);
-        return piece && builder.isPaintable(piece) ? piece : null;
-    }
-
-    isOpaqueAt(canvas, event) {
-        const x = Math.floor(event.offsetX ?? -1);
-        const y = Math.floor(event.offsetY ?? -1);
-        if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return false;
-        try {
-            return canvas.getContext('2d').getImageData(x, y, 1, 1).data[3] > 8;
-        } catch (_error) {
-            // A tainted or zero-sized canvas cannot be sampled; treat the whole
-            // box as solid rather than making the wall unselectable.
-            return true;
-        }
+        BuildDebug.increment('hitTests', this.gameMap);
+        if (!piece || !builder.isPaintable(piece)) return null;
+        const region = builder.hitTestPiece(piece, Number(event.offsetX), Number(event.offsetY));
+        return region ? { piece, surface: region.surface } : null;
     }
 
     /**
@@ -81593,6 +81753,21 @@ class SurfaceCustomizePanel extends ModalWindow {
      */
     setTarget(target) {
         this.target = target;
+        if (target?.surface === 'floor') {
+            this.parent.buildSelection?.set({ kind: 'room', id: target.room.id });
+        } else if (target?.wallSurface) {
+            const surface = target.wallSurface;
+            this.parent.buildSelection?.set({
+                kind: 'atom',
+                id: BuildKeys.atom(surface.cell.x, surface.cell.y, surface.face, surface.half),
+                details: {
+                    Face: surface.face,
+                    Half: surface.half,
+                    Room: surface.roomId || 'Exterior',
+                    Finish: surface.finishId
+                }
+            });
+        }
         this.setOverlay(this.selection, target);
     }
 
@@ -81864,6 +82039,29 @@ class SurfaceCustomizePanel extends ModalWindow {
         );
     }
 
+    classifyWallSurface(surface) {
+        const cache = this.gameMap?.buildTransaction?.cache;
+        if (!cache || !surface) return null;
+        return WallFaceResolver.classify(
+            { x: surface.cell.x, y: surface.cell.y, face: surface.face, half: surface.half },
+            cache.grid,
+            { ...cache.topology, walls: cache.geometry }
+        );
+    }
+
+    exteriorSurfaces(buildingId, loopId) {
+        const builder = this.gameMap?.wallBuilder;
+        if (!builder || !buildingId) return [];
+        return [...builder.cells.values()].flatMap(cell => {
+            if (cell.buildingId !== buildingId) return [];
+            return builder.getCellSurfaces(cell).filter(surface => {
+                const classification = this.classifyWallSurface(surface);
+                return classification?.kind === 'exterior' && classification.loopId === loopId &&
+                    this.rules?.canPaintWallFace(surface.cell).allowed !== false;
+            });
+        });
+    }
+
     resolveWallScopeSurfaces(surface = this.target?.wallSurface, scope = this.getWallScope()) {
         const builder = this.gameMap?.wallBuilder;
         if (!builder || !surface) return [];
@@ -81877,12 +82075,10 @@ class SurfaceCustomizePanel extends ModalWindow {
                 builder.getCellSurfaces(cell).filter(entry => roomIds.has(entry.roomId)));
         }
         if (scope === 'exterior' && !surface.roomId) {
-            const topology = this.gameMap?.buildingTopology;
-            const component = topology?.getComponentAtWallFace(surface.cell);
-            const loopId = topology?.getExteriorLoopAtSurface(surface);
-            return component && loopId !== null
-                ? topology.getExteriorSurfaces(component.id).filter(entry =>
-                    this.rules?.canPaintWallFace(entry.cell).allowed !== false)
+            const buildingId = builder.baseCells.get(BuildKeys.cell(surface.cell.x, surface.cell.y))?.buildingId;
+            const classification = this.classifyWallSurface(surface);
+            return classification?.kind === 'exterior'
+                ? this.exteriorSurfaces(buildingId, classification.loopId)
                 : [];
         }
         return builder.getPaintStretchSurfaces(surface);
@@ -81899,14 +82095,8 @@ class SurfaceCustomizePanel extends ModalWindow {
 
         const scope = scopeOverride || this.getWallScope();
         if (scope === 'exterior') {
-            return this.resolveWallScopeSurfaces(surface, scope).map(entry => ({
-                surface: 'wall',
-                face: entry.face,
-                axis: entry.axis,
-                cells: { from: [entry.cell.x, entry.cell.y], to: [entry.cell.x, entry.cell.y] },
-                roomId: null,
-                finishId
-            }));
+            const buildingId = builder.baseCells.get(BuildKeys.cell(surface.cell.x, surface.cell.y))?.buildingId;
+            return buildingId ? [{ surface: 'wall', buildingId, exterior: true, finishId }] : [];
         }
 
         if (scope === 'space') {
@@ -81928,6 +82118,7 @@ class SurfaceCustomizePanel extends ModalWindow {
                 axis: entry.axis,
                 cells: { from: [entry.cell.x, entry.cell.y], to: [entry.cell.x, entry.cell.y] },
                 roomId: entry.roomId,
+                halves: [entry.half],
                 finishId
             }));
         }
@@ -82028,12 +82219,12 @@ class SurfaceCustomizePanel extends ModalWindow {
         const roomButton = this.scopeElement.querySelector('[data-value="room"]');
         const spaceButton = this.scopeElement.querySelector('[data-value="space"]');
         const exteriorButton = this.scopeElement.querySelector('[data-value="exterior"]');
-        const topology = this.gameMap?.buildingTopology;
         const openSpaceRooms = wall?.roomId ? this.getOpenSpaceRooms(wall) : [];
         const spaceAvailable = openSpaceRooms.length > 1;
-        const exteriorAvailable = !!wall && !wall.roomId &&
-            !!topology?.getComponentAtWallFace(wall.cell) &&
-            topology.getExteriorLoopAtSurface(wall) !== null;
+        const buildingId = wall
+            ? this.gameMap?.wallBuilder?.baseCells.get(BuildKeys.cell(wall.cell.x, wall.cell.y))?.buildingId
+            : null;
+        const exteriorAvailable = !!buildingId && this.classifyWallSurface(wall)?.kind === 'exterior';
         if (roomButton) roomButton.hidden = !wall?.roomId;
         if (spaceButton) spaceButton.hidden = !spaceAvailable;
         if (exteriorButton) exteriorButton.hidden = !exteriorAvailable;
@@ -82059,14 +82250,17 @@ class SurfaceCustomizePanel extends ModalWindow {
         const requests = this.buildRequests(finishId, scopeOverride);
         if (requests.length === 0) return false;
 
-        const inverse = this.captureCurrentFinishes(requests);
+        const usesBuildTransaction = !!this.gameMap?.buildTransaction;
+        const inverse = usesBuildTransaction ? null : this.captureCurrentFinishes(requests);
         if (!customizer.apply(requests)) return false;
 
-        this.parent.parent?.buildHistory?.push({
-            label: `Paint ${this.target?.surface === 'floor' ? 'Floor' : 'Wall'}`,
-            undo: () => customizer.apply(Utility.deepClone(inverse)),
-            redo: () => customizer.apply(Utility.deepClone(requests))
-        });
+        if (!usesBuildTransaction) {
+            this.parent.parent?.buildHistory?.push({
+                label: `Paint ${this.target?.surface === 'floor' ? 'Floor' : 'Wall'}`,
+                undo: () => customizer.apply(Utility.deepClone(inverse)),
+                redo: () => customizer.apply(Utility.deepClone(requests))
+            });
+        }
         this.parent.parent?.core?.soundManager?.playWhenReady?.(SiteConfig.buildMode.sounds.paint);
 
         // The piece the target points at is rebuilt by the paint, so
@@ -83466,6 +83660,11 @@ class WallBuildPanel extends CellDragBuildPanel {
         this.openingGroup = this.modalElement?.querySelector('.wall-build-openings') || null;
         this.openingPalette = this.modalElement?.querySelector('.wall-opening-palette') || null;
         this.contextRoomId = null;
+        this.modalElement?.querySelectorAll('[data-structure-tool]').forEach(button =>
+            button.addEventListener('click', () => this.parent.changeToolMode(
+                button.dataset.structureTool === 'fence' ? UIToolModes.FENCE : UIToolModes.WALL
+            ))
+        );
         this.roomFloorButton?.addEventListener('click', () => {
             if (this.contextRoomId) {
                 this.parent?.surfaceCustomizePanel?.openRoomSurface?.(this.contextRoomId, 'floor');
@@ -83534,33 +83733,22 @@ class WallBuildPanel extends CellDragBuildPanel {
 
     commitCells(map, cells, operation = this.getOperation(), gesture = null) {
         const builder = map?.wallBuilder;
-        if (!builder || cells.length === 0) return false;
+        if (!builder || !map.buildTransaction || cells.length === 0) return false;
         const removing = operation === 'remove';
         const committedCells = removing ? this.includeOrphanedBranches(builder, cells) : cells;
-        const template = operation === 'remove' ? null :
+        const template = removing ? null :
             gesture?.wallTemplate || this.resolveExtensionTemplate(builder, gesture?.start, committedCells);
         const changes = committedCells
             .filter(cell => removing
-                ? builder.baseCells.has(`${cell.x},${cell.y}`)
-                : !builder.baseCells.has(`${cell.x},${cell.y}`))
+                ? builder.baseCells.has(BuildKeys.cell(cell.x, cell.y))
+                : !builder.baseCells.has(BuildKeys.cell(cell.x, cell.y)))
             .map(cell => ({ ...cell, data: removing ? null : Utility.deepClone(template || {}) }));
         if (changes.length === 0) return false;
-
-        const removedKeys = new Set(changes.map(cell => `${cell.x},${cell.y}`));
-        const borderingKeys = new Set();
-        if (removing) {
-            for (const cell of changes) {
-                for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-                    const key = `${cell.x + dx},${cell.y + dy}`;
-                    if (!removedKeys.has(key) && builder.baseCells.has(key)) borderingKeys.add(key);
-                }
-            }
-        }
-        const retargetedOverrides = builder.faceOverridesIntersecting(borderingKeys);
-
         let result;
         try {
-            result = builder.applyWallCellChanges(changes);
+            result = builder.applyWallCellChanges(changes, {
+                label: `${removing ? 'Remove' : 'Place'} Wall (${changes.length} cell${changes.length === 1 ? '' : 's'})`
+            });
         } catch (error) {
             if (/node|budget|generated/i.test(error?.message || '')) {
                 this.parent.showMessage("This map can't hold more walls.", 'warning', 'Wall limit reached');
@@ -83568,33 +83756,11 @@ class WallBuildPanel extends CellDragBuildPanel {
             }
             throw error;
         }
-        if (!result) return false;
-
-        this.reportRejections(result.rejected);
-        if (result.applied.length === 0) {
+        this.reportRejections(result?.rejected);
+        if (!result?.applied?.length) {
             this.playSound(SiteConfig.buildMode.sounds.rejected);
             return false;
         }
-
-        // A wall cell replaces floor, it does not silently keep that cell's
-        // painted room assignment. Resolve rooms now so the floor retracts to
-        // the wall centreline in the same frame as the new masonry appears.
-        const roomResult = removing ? { applied: [], inverse: [] } :
-            map.roomAssignments?.applyChanges(
-                result.applied
-                    .filter(change => change.data !== null)
-                    .map(change => ({ x: change.x, y: change.y, roomId: null })),
-                { emit: false }
-            ) ?? { applied: [], inverse: [] };
-        map.roomEnclosureDetector?.detect?.();
-        builder.retargetFaceOverrides(retargetedOverrides);
-
-        // Extending structure inherits finishes from the rooms it now bounds.
-        // Copying a sampled face override stamped the old interior colour onto
-        // whichever face became exterior after the topology changed.
-        const copiedOverrides = [];
-
-        this.pushWallHistory(builder, result, removing, copiedOverrides, roomResult, retargetedOverrides);
         this.afterCommit(map);
         return true;
     }
@@ -83634,35 +83800,6 @@ class WallBuildPanel extends CellDragBuildPanel {
         return null;
     }
 
-    pushWallHistory(builder, result, removing, copiedOverrides = [], roomResult = { applied: [], inverse: [] }, retargetedOverrides = []) {
-        const label = `${removing ? 'Remove' : 'Place'} Wall (${result.applied.length} cell${result.applied.length === 1 ? '' : 's'})`;
-        const forward = Utility.deepClone(result.applied);
-        const backward = Utility.deepClone(result.inverse);
-        const roomForward = Utility.deepClone(roomResult.applied);
-        const roomBackward = Utility.deepClone(roomResult.inverse);
-        const refreshRooms = changes => {
-            builder.gameMap?.roomAssignments?.applyChanges(Utility.deepClone(changes), { emit: false });
-            builder.gameMap?.roomEnclosureDetector?.detect?.();
-        };
-        // Undo replays through the same authoritative path, but with validation
-        // off: restoring a cell the player already had is by definition legal,
-        // and re-running the rules would refuse it whenever the world moved.
-        this.pushHistory({
-            label,
-            undo: () => {
-                builder.removeFaceOverrideCopies(copiedOverrides);
-                builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false });
-                refreshRooms(roomBackward);
-                builder.retargetFaceOverrides(retargetedOverrides);
-            },
-            redo: () => {
-                builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false });
-                refreshRooms(roomForward);
-                builder.retargetFaceOverrides(retargetedOverrides);
-                builder.addFaceOverrideCopies(copiedOverrides);
-            }
-        });
-    }
 
     // ── Grab-a-run-and-move-it (the wall-only gesture) ────────────────────────
 
@@ -83943,10 +84080,9 @@ class WallBuildPanel extends CellDragBuildPanel {
     }
 
     isSharedRoomBoundary(builder, cell) {
-        const raw = builder?.cells?.get(`${cell.x},${cell.y}`);
+        const raw = builder?.cells?.get(BuildKeys.cell(cell.x, cell.y));
         if (!raw) return false;
-        const faces = builder.assignFaces(raw);
-        return new Set(Object.values(faces).map(face => face.roomId).filter(Boolean)).size > 1;
+        return new Set(builder.getCellSurfaces(raw).map(surface => surface.roomId).filter(Boolean)).size > 1;
     }
 
     /**
@@ -84073,67 +84209,32 @@ class WallBuildPanel extends CellDragBuildPanel {
         return [...final.values()];
     }
 
-    captureMovePaintExtensions(builder, plan) {
-        return (plan.paintExtensions ?? []).map(extension => {
-            const source = builder.cells.get(`${extension.source.x},${extension.source.y}`);
-            const templates = builder.getCellSurfaces(source).flatMap(surface => {
-                const finishId = builder.resolveFinishOverride(
-                    extension.source.x,
-                    extension.source.y,
-                    surface.face,
-                    surface.roomId
-                );
-                return finishId ? [{ axis: surface.axis, roomId: surface.roomId, finishId }] : [];
-            });
-            const unique = new Map(templates.map(template => [
-                `${template.axis}:${template.roomId ?? 'outside'}:${template.finishId}`,
-                template
-            ]));
-            return { cells: extension.cells.map(cell => ({ ...cell })), templates: [...unique.values()] };
-        }).filter(extension => extension.templates.length > 0);
-    }
 
-    createMovePaintExtensionOverrides(builder, extensions) {
-        const records = new Map();
-        for (const extension of extensions) {
-            for (const target of extension.cells) {
-                const cell = builder.cells.get(`${target.x},${target.y}`);
-                for (const surface of builder.getCellSurfaces(cell)) {
-                    const template = extension.templates.find(entry =>
-                        entry.axis === surface.axis && entry.roomId === surface.roomId
-                    );
-                    if (!template) continue;
-                    const record = {
-                        mapId: builder.gameMap.id,
-                        face: surface.face,
-                        axis: surface.axis,
-                        roomId: surface.roomId,
-                        finishId: template.finishId,
-                        cells: { from: [target.x, target.y], to: [target.x, target.y] }
-                    };
-                    records.set(`${target.x},${target.y}:${surface.face}:${surface.roomId ?? 'outside'}`, record);
-                }
-            }
-        }
-        return [...records.values()];
-    }
 
     commitMove(map, plan) {
         const builder = map?.wallBuilder;
-        if (!builder || plan.distance === 0) return false;
+        if (!builder || !map.buildTransaction || plan.distance === 0) return false;
         const changes = [...plan.removals, ...plan.additions];
         if (changes.length === 0) return false;
-
         const contentMove = {
-            cells: new Set(plan.movingCells.map(cell => `${cell.x},${cell.y}`)),
+            cells: new Set(plan.movingCells.map(cell => BuildKeys.cell(cell.x, cell.y))),
             dx: plan.moveX,
             dy: plan.moveY
         };
-        const paintExtensions = this.captureMovePaintExtensions(builder, plan);
-
+        const roomChanges = this.roomChangesForMove(map, plan);
+        const atomExtensions = (plan.paintExtensions || []).map(extension => ({
+            targets: extension.cells.map(cell => ({ ...cell })),
+            atoms: map.buildDocument.level().atoms.atomsOfCell(extension.source.x, extension.source.y)
+        }));
         let result;
         try {
-            result = builder.applyWallCellChanges(Utility.deepClone(changes), { atomic: true, contentMove });
+            result = builder.applyWallCellChanges(Utility.deepClone(changes), {
+                atomic: true,
+                contentMove,
+                roomChanges,
+                atomExtensions,
+                label: `Move Wall (${Math.abs(plan.distance)} cell${Math.abs(plan.distance) === 1 ? '' : 's'})`
+            });
         } catch (error) {
             if (/node|budget|generated/i.test(error?.message || '')) {
                 this.parent.showMessage("This map can't hold more walls.", 'warning', 'Wall limit reached');
@@ -84141,42 +84242,11 @@ class WallBuildPanel extends CellDragBuildPanel {
             }
             throw error;
         }
-        if (!result || result.applied.length === 0) {
+        if (!result?.applied?.length) {
             this.reportBlockedMove(result?.rejected);
             this.playSound(SiteConfig.buildMode.sounds.rejected);
             return false;
         }
-
-        const assignmentResult = map.roomAssignments?.applyChanges(
-            this.roomChangesForMove(map, plan), { emit: false }
-        ) ?? { applied: [], inverse: [] };
-        map.roomEnclosureDetector?.detect?.();
-        const extendedOverrides = this.createMovePaintExtensionOverrides(builder, paintExtensions);
-        builder.addFaceOverrideCopies(extendedOverrides);
-
-        const forward = Utility.deepClone(result.applied);
-        const backward = Utility.deepClone(result.inverse);
-        const roomForward = Utility.deepClone(assignmentResult.applied);
-        const roomBackward = Utility.deepClone(assignmentResult.inverse);
-        const back = WallBuilder.invertContentMove(contentMove);
-        const size = Math.abs(plan.distance);
-        const replay = (walls, rooms, move) => {
-            builder.applyWallCellChanges(Utility.deepClone(walls),
-                { validate: false, contentMove: move });
-            map.roomAssignments?.applyChanges(Utility.deepClone(rooms), { emit: false });
-            map.roomEnclosureDetector?.detect?.();
-        };
-        this.pushHistory({
-            label: `Move Wall (${size} cell${size === 1 ? '' : 's'})`,
-            undo: () => {
-                builder.removeFaceOverrideCopies(extendedOverrides);
-                replay(backward, roomBackward, back);
-            },
-            redo: () => {
-                replay(forward, roomForward, contentMove);
-                builder.addFaceOverrideCopies(extendedOverrides);
-            }
-        });
         this.playSound(SiteConfig.buildMode.sounds.objectPlace);
         this.afterCommit(map);
         return true;
@@ -84223,6 +84293,11 @@ class FenceBuildPanel extends CellDragBuildPanel {
         );
         this.gateGroup = this.modalElement?.querySelector('.fence-build-gates') || null;
         this.gatePalette = this.modalElement?.querySelector('.fence-gate-palette') || null;
+        this.modalElement?.querySelectorAll('[data-structure-tool]').forEach(button =>
+            button.addEventListener('click', () => this.parent.changeToolMode(
+                button.dataset.structureTool === 'fence' ? UIToolModes.FENCE : UIToolModes.WALL
+            ))
+        );
     }
 
     get variant() {
@@ -84386,6 +84461,7 @@ class FenceBuildPanel extends CellDragBuildPanel {
  *   undo it all   pick Reset, and the walls decide again
  */
 class RoomPanel extends ModalWindow {
+    static PAINTED_PREFIX = 'room_painted_';
     static OPERATIONS = Object.freeze({
         SELECT: 'select',
         ADD: 'add',
@@ -84449,8 +84525,7 @@ class RoomPanel extends ModalWindow {
         document.addEventListener('pointerup', this.boundPointerUp, true);
         document.addEventListener('pointercancel', this.boundPointerUp, true);
         this._unsubscribers = [
-            this.parent?.parent?.eventManager?.on(EVENTS.ROOMS_CHANGED, this.boundRefresh),
-            this.parent?.parent?.eventManager?.on(EVENTS.SURFACE_FINISH_CHANGED, this.boundRefresh)
+            this.parent?.parent?.eventManager?.on(EVENTS.BUILD_COMMITTED, this.boundRefresh)
         ].filter(Boolean);
     }
 
@@ -84459,7 +84534,83 @@ class RoomPanel extends ModalWindow {
     }
 
     get assignments() {
-        return this.gameMap?.roomAssignments || null;
+        const plans = this.gameMap?.buildDocument?.level?.().rooms;
+        if (!plans) return null;
+        const cells = new Map(plans.values().flatMap(room => room.seedCells.map(key => [key, room.id])));
+        return {
+            cells,
+            size: cells.size,
+            get: (x, y) => plans.ownerOfSeed(BuildKeys.cell(x, y)),
+            roomIds: () => plans.values().filter(room => room.seedCells.length > 0).map(room => room.id),
+            mintRoomId: () => this.mintRoomId(),
+            applyChanges: (changes, options = {}) => this.applyRoomCellChanges(changes, options)
+        };
+    }
+
+    mintRoomId() {
+        const plans = this.gameMap?.buildDocument?.level?.().rooms;
+        const taken = new Set(plans?.keys() ?? []);
+        for (let index = 1; ; index++) {
+            const id = `${RoomPanel.PAINTED_PREFIX}${index}`;
+            if (!taken.has(id)) return id;
+        }
+    }
+
+    applyRoomCellChanges(changes, options = {}) {
+        const transaction = this.gameMap?.buildTransaction;
+        const plans = this.gameMap?.buildDocument?.level?.().rooms;
+        if (!transaction || !plans || !Array.isArray(changes) || changes.length === 0) return null;
+        const applied = [];
+        const inverse = [];
+        for (const change of changes) {
+            if (!Number.isInteger(change?.x) || !Number.isInteger(change?.y)) continue;
+            const key = BuildKeys.cell(change.x, change.y);
+            const previous = plans.ownerOfSeed(key);
+            const next = change.roomId ?? null;
+            if (previous === next) continue;
+            applied.push({ x: change.x, y: change.y, roomId: next });
+            inverse.push({ x: change.x, y: change.y, roomId: previous });
+        }
+        if (applied.length === 0) return { applied, inverse };
+        transaction.run(options.label || 'Edit room cells', (_draft, level) => {
+            for (const spec of options.roomSpecs || []) if (!level.rooms.has(spec.id)) {
+                level.rooms.set(spec.id, {
+                    id: spec.id,
+                    buildingId: spec.buildingId ?? null,
+                    displayName: spec.name || spec.id,
+                    authoredDisplayName: spec.name || spec.id,
+                    roomType: spec.type ?? null,
+                    origin: 'painted',
+                    seedCells: [],
+                    floorFinishId: spec.floorFinishId ?? null,
+                    wallFinishId: spec.wallFinishId ?? null,
+                    properties: {}
+                });
+            }
+            for (const change of applied) {
+                const key = BuildKeys.cell(change.x, change.y);
+                const previous = level.rooms.ownerOfSeed(key);
+                if (previous) level.rooms.removeSeed(previous, key);
+                if (!change.roomId) continue;
+                if (!level.rooms.has(change.roomId)) {
+                    const source = this.gameMap?.regionManager?.get('room', change.roomId);
+                    level.rooms.set(change.roomId, {
+                        id: change.roomId,
+                        buildingId: source?.properties?.buildingId ?? null,
+                        displayName: source?.properties?.displayName || change.roomId,
+                        authoredDisplayName: source?.properties?.authoredDisplayName || change.roomId,
+                        roomType: source?.properties?.roomType ?? null,
+                        origin: 'painted',
+                        seedCells: [],
+                        floorFinishId: source?.properties?.floorFinishId ?? null,
+                        wallFinishId: source?.properties?.wallFinishId ?? null,
+                        properties: source?.properties || {}
+                    });
+                }
+                level.rooms.assignSeed(change.roomId, key);
+            }
+        });
+        return { applied, inverse };
     }
 
     get cellSize() {
@@ -84942,7 +85093,7 @@ class RoomPanel extends ModalWindow {
         ]);
         const mintId = () => {
             for (let number = 1; ; number += 1) {
-                const candidate = `${RoomAssignments.PAINTED_PREFIX}${number}`;
+                const candidate = `${RoomPanel.PAINTED_PREFIX}${number}`;
                 if (taken.has(candidate)) continue;
                 taken.add(candidate);
                 return candidate;
@@ -84952,7 +85103,14 @@ class RoomPanel extends ModalWindow {
             const id = mintId();
             const generic = /^(Room|Area) \d+$/.exec(baseName);
             const name = generic ? `${generic[1]} ${index + 1}` : `${baseName} ${index + 1}`;
-            specs.push({ id, name, type });
+            specs.push({
+                id,
+                name,
+                type,
+                buildingId: room.properties?.buildingId ?? null,
+                floorFinishId: room.properties?.floorFinishId ?? null,
+                wallFinishId: room.properties?.wallFinishId ?? null
+            });
             for (const key of islands[index]) {
                 const [x, y] = key.split(',').map(Number);
                 changes.push({ x, y, roomId: id });
@@ -84963,11 +85121,13 @@ class RoomPanel extends ModalWindow {
         if (!result || result.applied.length === 0) return false;
         const forward = Utility.deepClone(result.applied);
         const backward = Utility.deepClone(result.inverse);
-        this.parent.parent?.buildHistory?.push({
-            label: `Split Room (${islands.length} islands)`,
-            undo: () => this.applySplitChanges(backward, []),
-            redo: () => this.applySplitChanges(forward, specs)
-        });
+        if (!this.gameMap?.buildTransaction) {
+            this.parent.parent?.buildHistory?.push({
+                label: `Split Room (${islands.length} islands)`,
+                undo: () => this.applySplitChanges(backward, []),
+                redo: () => this.applySplitChanges(forward, specs)
+            });
+        }
         this.parent.showMessage(
             `${baseName} was split into ${islands.length} rooms.`, 'success', 'Rooms'
         );
@@ -84975,23 +85135,12 @@ class RoomPanel extends ModalWindow {
     }
 
     applySplitChanges(changes, specs) {
-        const result = this.assignments?.applyChanges(changes, { emit: false });
-        if (!result || result.applied.length === 0) return result;
-        this.gameMap?.roomEnclosureDetector?.detect?.();
-        for (const spec of specs) {
-            const room = this.gameMap?.regionManager?.get('room', spec.id);
-            if (!room) continue;
-            room.properties = {
-                ...room.properties,
-                playerName: spec.name,
-                displayName: spec.name,
-                roomType: spec.type
-            };
-        }
-        this.gameMap?.eventManager?.emit(EVENTS.ROOMS_CHANGED, {
-            mapId: this.gameMap.id,
-            rooms: this.gameMap.regionManager?.all('room') ?? []
+        const result = this.assignments?.applyChanges(changes, {
+            emit: false,
+            roomSpecs: specs,
+            label: `Split Room (${specs.length + 1} islands)`
         });
+        if (!result || result.applied.length === 0) return result;
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
         return result;
@@ -85103,16 +85252,17 @@ class RoomPanel extends ModalWindow {
         const builder = this.gameMap?.wallBuilder;
         const roomCells = this.roomCells(room.id);
         const heir = this.largestNeighbour(room.id, roomCells);
+        const usesBuildTransaction = !!this.gameMap?.buildTransaction;
+        const roomChanges = roomCells.map(cell => ({ ...cell, roomId: heir?.id ?? null }));
         const wallResult = builder?.applyWallCellChanges(
-            plan.removable.map(cell => ({ ...cell, data: null }))
+            plan.removable.map(cell => ({ ...cell, data: null })),
+            usesBuildTransaction ? { roomChanges, label: `Demolish ${this.label(room)}` } : {}
         );
-        const roomResult = this.assignments?.applyChanges(
-            roomCells.map(cell => ({ ...cell, roomId: heir?.id ?? null })), { emit: false }
-        );
+        const roomResult = usesBuildTransaction ? { applied: roomChanges, inverse: [] } :
+            this.assignments?.applyChanges(roomChanges, { emit: false });
         if ((!wallResult || wallResult.applied.length === 0) &&
             (!roomResult || roomResult.applied.length === 0)) return false;
 
-        this.gameMap?.roomEnclosureDetector?.detect?.();
         const forwardWalls = Utility.deepClone(wallResult?.applied ?? []);
         const backwardWalls = Utility.deepClone(wallResult?.inverse ?? []);
         const forwardRooms = Utility.deepClone(roomResult?.applied ?? []);
@@ -85120,15 +85270,16 @@ class RoomPanel extends ModalWindow {
         const replay = (walls, rooms) => {
             if (walls.length) builder.applyWallCellChanges(Utility.deepClone(walls), { validate: false });
             if (rooms.length) this.assignments.applyChanges(Utility.deepClone(rooms), { emit: false });
-            this.gameMap?.roomEnclosureDetector?.detect?.();
             this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
             this.gameMap?.core?.user?._scheduleSave?.();
         };
-        this.parent.parent?.buildHistory?.push({
-            label: `Demolish ${this.label(room)}`,
-            undo: () => replay(backwardWalls, backwardRooms),
-            redo: () => replay(forwardWalls, forwardRooms)
-        });
+        if (!usesBuildTransaction) {
+            this.parent.parent?.buildHistory?.push({
+                label: `Demolish ${this.label(room)}`,
+                undo: () => replay(backwardWalls, backwardRooms),
+                redo: () => replay(forwardWalls, forwardRooms)
+            });
+        }
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
         this.parent.showMessage(
@@ -85169,11 +85320,13 @@ class RoomPanel extends ModalWindow {
         }
         const forward = Utility.deepClone(result.applied);
         const backward = Utility.deepClone(result.inverse);
-        this.parent.parent?.buildHistory?.push({
-            label: `Enclose Room (${result.applied.length} wall${result.applied.length === 1 ? '' : 's'})`,
-            undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
-            redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
-        });
+        if (!this.gameMap?.buildTransaction) {
+            this.parent.parent?.buildHistory?.push({
+                label: `Enclose Room (${result.applied.length} wall${result.applied.length === 1 ? '' : 's'})`,
+                undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
+                redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
+            });
+        }
         this.playSound(SiteConfig.buildMode.sounds.objectPlace);
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
@@ -85804,9 +85957,10 @@ class RoomPanel extends ModalWindow {
     commitCells(cells, roomId) {
         const assignments = this.assignments;
         if (!assignments || !cells?.length) return false;
-        const result = assignments.applyChanges(
-            cells.map(cell => ({ ...cell, roomId })), { emit: false }
-        );
+        const result = assignments.applyChanges(cells.map(cell => ({ ...cell, roomId })), {
+            emit: false,
+            label: `${roomId ? 'Paint' : 'Reset'} Room (${cells.length} tiles)`
+        });
         // Nothing changed is not a refusal: painting a room over floor that is
         // already in that room is the most ordinary thing to do with a brush,
         // and answering it with an error noise taught people the tool was
@@ -85816,13 +85970,14 @@ class RoomPanel extends ModalWindow {
         const forward = result.applied.map(change => ({ ...change }));
         const backward = result.inverse.map(change => ({ ...change }));
         const count = result.applied.length;
-        this.parent.parent?.buildHistory?.push({
-            label: `${roomId ? 'Paint' : 'Reset'} Room (${count} tile${count === 1 ? '' : 's'})`,
-            undo: () => this.replayCellChanges(backward),
-            redo: () => this.replayCellChanges(forward)
-        });
+        if (!this.gameMap?.buildTransaction) {
+            this.parent.parent?.buildHistory?.push({
+                label: `${roomId ? 'Paint' : 'Reset'} Room (${count} tile${count === 1 ? '' : 's'})`,
+                undo: () => this.replayCellChanges(backward),
+                redo: () => this.replayCellChanges(forward)
+            });
+        }
 
-        this.gameMap?.roomEnclosureDetector?.detect?.();
         this.playSound(SiteConfig.buildMode.sounds.paint);
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
@@ -85839,7 +85994,6 @@ class RoomPanel extends ModalWindow {
             changes.map(change => ({ ...change })), { emit: false }
         );
         if (!result || result.applied.length === 0) return false;
-        this.gameMap?.roomEnclosureDetector?.detect?.();
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
         return true;
@@ -85859,6 +86013,17 @@ class RoomPanel extends ModalWindow {
         if (roomId === this.pending?.id) {
             this.pending = { ...this.pending, ...patch };
             return true;
+        }
+        const build = this.gameMap?.buildTransaction;
+        const plan = build?.document?.level(build.levelId).rooms.get(roomId);
+        if (build && plan) {
+            const nextName = Object.hasOwn(patch, 'name') ? patch.name : plan.displayName;
+            const nextType = Object.hasOwn(patch, 'type') ? patch.type : plan.roomType;
+            return build.run(label, (_draft, level) => level.rooms.set(roomId, {
+                ...plan,
+                displayName: nextName ?? plan.authoredDisplayName ?? roomId,
+                roomType: nextType
+            })).committed;
         }
         const region = this.gameMap?.regionManager?.get('room', roomId);
         if (!region) return false;

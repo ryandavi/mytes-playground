@@ -67,9 +67,8 @@ class SurfaceCustomizePanel extends ModalWindow {
         // of leaving a rectangle hanging in the air.
         const events = this.parent?.parent?.eventManager;
         this.overlayUnsubscribers = [
-            events?.on?.(EVENTS.WALL_GEOMETRY_CHANGED, () => this.redrawOverlays()),
+            events?.on?.(EVENTS.BUILD_COMMITTED, () => this.redrawOverlays()),
             events?.on?.(EVENTS.WALL_PRESENTATION_CHANGED, () => this.redrawOverlays()),
-            events?.on?.(EVENTS.SURFACE_FINISH_CHANGED, () => this.redrawOverlays())
         ];
     }
 
@@ -193,7 +192,7 @@ class SurfaceCustomizePanel extends ModalWindow {
     }
 
     // A concrete rgba(), never color-mix(): this string is assigned to a canvas
-    // 2D context's fillStyle (see FloorBuilder.createRoomOverlay), and Safari's
+    // 2D context's fillStyle (see FloorRenderer.createRoomOverlay), and Safari's
     // canvas colour parser rejects color-mix() — the assignment is silently
     // dropped, fillStyle stays at its default opaque black, and the whole room's
     // floor overlay paints black. `color-mix(in srgb, C p%, transparent)` is
@@ -218,14 +217,8 @@ class SurfaceCustomizePanel extends ModalWindow {
      * hit-testing it would claim ground belonging to the room next door.
      */
     resolveTarget(event) {
-        const piece = this.resolveWallPiece(event);
-        if (piece) {
-            // Which surface of the piece, not merely which piece: a corner post
-            // shows two rooms' paint at once, split down the middle, so the
-            // pixel under the cursor is what decides.
-            const surface = this.gameMap?.wallBuilder?.surfaceAtOffset(piece, event.offsetX);
-            if (surface) return { surface: 'wall', wallSurface: surface, piece };
-        }
+        const hit = this.resolveWallHit(event);
+        if (hit) return { surface: 'wall', wallSurface: hit.surface, piece: hit.piece };
         const room = this.resolveRoomAt(event);
         return room ? { surface: 'floor', room } : null;
     }
@@ -243,25 +236,15 @@ class SurfaceCustomizePanel extends ModalWindow {
      * half-cell surfaces — and the alpha test is what keeps the click honest,
      * since the post is 14px of art in a 32px box.
      */
-    resolveWallPiece(event) {
+    resolveWallHit(event) {
         const element = event?.target?.closest?.('.wall-piece');
-        if (!element || !this.isOpaqueAt(element, event)) return null;
+        if (!element) return null;
         const builder = this.gameMap?.wallBuilder;
         const piece = builder?.findPieceById(element.dataset.wallPieceId);
-        return piece && builder.isPaintable(piece) ? piece : null;
-    }
-
-    isOpaqueAt(canvas, event) {
-        const x = Math.floor(event.offsetX ?? -1);
-        const y = Math.floor(event.offsetY ?? -1);
-        if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return false;
-        try {
-            return canvas.getContext('2d').getImageData(x, y, 1, 1).data[3] > 8;
-        } catch (_error) {
-            // A tainted or zero-sized canvas cannot be sampled; treat the whole
-            // box as solid rather than making the wall unselectable.
-            return true;
-        }
+        BuildDebug.increment('hitTests', this.gameMap);
+        if (!piece || !builder.isPaintable(piece)) return null;
+        const region = builder.hitTestPiece(piece, Number(event.offsetX), Number(event.offsetY));
+        return region ? { piece, surface: region.surface } : null;
     }
 
     /**
@@ -300,6 +283,21 @@ class SurfaceCustomizePanel extends ModalWindow {
      */
     setTarget(target) {
         this.target = target;
+        if (target?.surface === 'floor') {
+            this.parent.buildSelection?.set({ kind: 'room', id: target.room.id });
+        } else if (target?.wallSurface) {
+            const surface = target.wallSurface;
+            this.parent.buildSelection?.set({
+                kind: 'atom',
+                id: BuildKeys.atom(surface.cell.x, surface.cell.y, surface.face, surface.half),
+                details: {
+                    Face: surface.face,
+                    Half: surface.half,
+                    Room: surface.roomId || 'Exterior',
+                    Finish: surface.finishId
+                }
+            });
+        }
         this.setOverlay(this.selection, target);
     }
 
@@ -571,6 +569,29 @@ class SurfaceCustomizePanel extends ModalWindow {
         );
     }
 
+    classifyWallSurface(surface) {
+        const cache = this.gameMap?.buildTransaction?.cache;
+        if (!cache || !surface) return null;
+        return WallFaceResolver.classify(
+            { x: surface.cell.x, y: surface.cell.y, face: surface.face, half: surface.half },
+            cache.grid,
+            { ...cache.topology, walls: cache.geometry }
+        );
+    }
+
+    exteriorSurfaces(buildingId, loopId) {
+        const builder = this.gameMap?.wallBuilder;
+        if (!builder || !buildingId) return [];
+        return [...builder.cells.values()].flatMap(cell => {
+            if (cell.buildingId !== buildingId) return [];
+            return builder.getCellSurfaces(cell).filter(surface => {
+                const classification = this.classifyWallSurface(surface);
+                return classification?.kind === 'exterior' && classification.loopId === loopId &&
+                    this.rules?.canPaintWallFace(surface.cell).allowed !== false;
+            });
+        });
+    }
+
     resolveWallScopeSurfaces(surface = this.target?.wallSurface, scope = this.getWallScope()) {
         const builder = this.gameMap?.wallBuilder;
         if (!builder || !surface) return [];
@@ -584,12 +605,10 @@ class SurfaceCustomizePanel extends ModalWindow {
                 builder.getCellSurfaces(cell).filter(entry => roomIds.has(entry.roomId)));
         }
         if (scope === 'exterior' && !surface.roomId) {
-            const topology = this.gameMap?.buildingTopology;
-            const component = topology?.getComponentAtWallFace(surface.cell);
-            const loopId = topology?.getExteriorLoopAtSurface(surface);
-            return component && loopId !== null
-                ? topology.getExteriorSurfaces(component.id).filter(entry =>
-                    this.rules?.canPaintWallFace(entry.cell).allowed !== false)
+            const buildingId = builder.baseCells.get(BuildKeys.cell(surface.cell.x, surface.cell.y))?.buildingId;
+            const classification = this.classifyWallSurface(surface);
+            return classification?.kind === 'exterior'
+                ? this.exteriorSurfaces(buildingId, classification.loopId)
                 : [];
         }
         return builder.getPaintStretchSurfaces(surface);
@@ -606,14 +625,8 @@ class SurfaceCustomizePanel extends ModalWindow {
 
         const scope = scopeOverride || this.getWallScope();
         if (scope === 'exterior') {
-            return this.resolveWallScopeSurfaces(surface, scope).map(entry => ({
-                surface: 'wall',
-                face: entry.face,
-                axis: entry.axis,
-                cells: { from: [entry.cell.x, entry.cell.y], to: [entry.cell.x, entry.cell.y] },
-                roomId: null,
-                finishId
-            }));
+            const buildingId = builder.baseCells.get(BuildKeys.cell(surface.cell.x, surface.cell.y))?.buildingId;
+            return buildingId ? [{ surface: 'wall', buildingId, exterior: true, finishId }] : [];
         }
 
         if (scope === 'space') {
@@ -635,6 +648,7 @@ class SurfaceCustomizePanel extends ModalWindow {
                 axis: entry.axis,
                 cells: { from: [entry.cell.x, entry.cell.y], to: [entry.cell.x, entry.cell.y] },
                 roomId: entry.roomId,
+                halves: [entry.half],
                 finishId
             }));
         }
@@ -735,12 +749,12 @@ class SurfaceCustomizePanel extends ModalWindow {
         const roomButton = this.scopeElement.querySelector('[data-value="room"]');
         const spaceButton = this.scopeElement.querySelector('[data-value="space"]');
         const exteriorButton = this.scopeElement.querySelector('[data-value="exterior"]');
-        const topology = this.gameMap?.buildingTopology;
         const openSpaceRooms = wall?.roomId ? this.getOpenSpaceRooms(wall) : [];
         const spaceAvailable = openSpaceRooms.length > 1;
-        const exteriorAvailable = !!wall && !wall.roomId &&
-            !!topology?.getComponentAtWallFace(wall.cell) &&
-            topology.getExteriorLoopAtSurface(wall) !== null;
+        const buildingId = wall
+            ? this.gameMap?.wallBuilder?.baseCells.get(BuildKeys.cell(wall.cell.x, wall.cell.y))?.buildingId
+            : null;
+        const exteriorAvailable = !!buildingId && this.classifyWallSurface(wall)?.kind === 'exterior';
         if (roomButton) roomButton.hidden = !wall?.roomId;
         if (spaceButton) spaceButton.hidden = !spaceAvailable;
         if (exteriorButton) exteriorButton.hidden = !exteriorAvailable;
@@ -766,14 +780,17 @@ class SurfaceCustomizePanel extends ModalWindow {
         const requests = this.buildRequests(finishId, scopeOverride);
         if (requests.length === 0) return false;
 
-        const inverse = this.captureCurrentFinishes(requests);
+        const usesBuildTransaction = !!this.gameMap?.buildTransaction;
+        const inverse = usesBuildTransaction ? null : this.captureCurrentFinishes(requests);
         if (!customizer.apply(requests)) return false;
 
-        this.parent.parent?.buildHistory?.push({
-            label: `Paint ${this.target?.surface === 'floor' ? 'Floor' : 'Wall'}`,
-            undo: () => customizer.apply(Utility.deepClone(inverse)),
-            redo: () => customizer.apply(Utility.deepClone(requests))
-        });
+        if (!usesBuildTransaction) {
+            this.parent.parent?.buildHistory?.push({
+                label: `Paint ${this.target?.surface === 'floor' ? 'Floor' : 'Wall'}`,
+                undo: () => customizer.apply(Utility.deepClone(inverse)),
+                redo: () => customizer.apply(Utility.deepClone(requests))
+            });
+        }
         this.parent.parent?.core?.soundManager?.playWhenReady?.(SiteConfig.buildMode.sounds.paint);
 
         // The piece the target points at is rebuilt by the paint, so

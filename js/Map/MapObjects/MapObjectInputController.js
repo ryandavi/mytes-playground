@@ -180,8 +180,22 @@ class MapObjectInputController {
 		const history = object.container?.buildHistory;
 		if (!history) return;
 
-		const from = { x: object._dragOriginX, y: object._dragOriginY, direction: object._dragOriginDirection };
-		const to = { x: object.posX, y: object.posY, direction: object.getConfig('facingDirection', null) };
+        const recordKind = object._wallBuildRecordKind || null;
+        const from = {
+            x: object._dragOriginX,
+            y: object._dragOriginY,
+            direction: object._dragOriginDirection,
+            wallRecord: Utility.deepClone(object._wallBuildRecordBefore ?? null)
+        };
+        const to = {
+            x: object.posX,
+            y: object.posY,
+            direction: object.getConfig('facingDirection', null),
+            wallRecord: Utility.deepClone(object._wallBuildRecordAfter ?? null)
+        };
+        delete object._wallBuildRecordBefore;
+        delete object._wallBuildRecordAfter;
+        delete object._wallBuildRecordKind;
 		if (from.x === to.x && from.y === to.y && from.direction === to.direction) return;
 
 		const place = (state) => {
@@ -191,9 +205,10 @@ class MapObjectInputController {
 			object.posX = state.x;
 			object.posY = state.y;
 			object.updatePosition();
-			object.syncRenderLayer();
-			object.handleMovedEvent();
-		};
+            object.syncRenderLayer();
+            object.handleMovedEvent();
+            if (recordKind) object.gameMap?.wallBuilder?.applyObjectBuildRecord(object, recordKind, state.wallRecord);
+        };
 
 		history.push({
 			label: `Move ${object.getDisplayName()}`,

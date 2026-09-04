@@ -580,9 +580,6 @@ class MapEnvironmentManager {
         this._wallEventUnsubscribers.push(events.on(EVENTS.WALL_READY, payload => {
             if (forThisMap(payload)) this.rebuildWindowLighting();
         }));
-        this._wallEventUnsubscribers.push(events.on(EVENTS.WALL_GEOMETRY_CHANGED, payload => {
-            if (forThisMap(payload)) this.rebuildWindowLighting();
-        }));
         // Presentation changes the room-edge feather (walls down soften the
         // light boundary), not the light values themselves.
         this._wallEventUnsubscribers.push(events.on(EVENTS.WALL_PRESENTATION_CHANGED, payload => {
@@ -1329,7 +1326,7 @@ class MapEnvironmentManager {
             this.gameMap?.wallBuilder?.cells?.size ?? 0,
             this.gameMap?.wallBuilder?.presentation || '',
             this.gameMap?.wallBuilder?.pieces?.map(piece => piece.renderPlan?.mode ?? '').join('') ?? '',
-            this.gameMap?.floorBuilder?.surfaces?.size ?? 0
+            this.gameMap?.floorBuilder?.chunksRedrawn ?? 0
         ].join('#');
     }
 
@@ -1414,7 +1411,7 @@ class MapEnvironmentManager {
             ctx.fillRect(object.posX, object.posY, object.size.width, object.size.height);
         }
 
-        for (const { canvas: floor } of this.gameMap?.floorBuilder?.surfaces?.values() || []) {
+        for (const { canvas: floor } of this.gameMap?.floorBuilder?.chunks?.values() || []) {
             if (!floor?.width || !floor.height) continue;
             ctx.drawImage(
                 floor,

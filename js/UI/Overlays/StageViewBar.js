@@ -53,6 +53,7 @@ class StageViewBar extends UIComponent {
         this.wallView = this.track(new WallViewControl(this, root.querySelector('.wall-view-controls')));
         this.gridToggle = this.track(new BuildGridToggle(this, root));
         this.snapToggle = this.track(new BuildSnapToggle(this, root));
+        this.footprintToggle = this.track(new BuildFootprintToggle(this, root));
         this.speed = this.track(new SegmentControl(
             root.querySelector('.stage-speed-control'),
             { onChange: (value) => this.applySpeed(value) }

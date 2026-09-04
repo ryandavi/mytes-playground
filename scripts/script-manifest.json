@@ -303,6 +303,37 @@
     "src": "js/Map/WorldGraph.js"
   },
   {
+    "src": "js/Map/Build/BuildKeys.js",
+    "commentLine": "<!-- BUILD SURFACE MODEL -->"
+  },
+  {
+    "src": "js/Map/Build/StoreDelta.js"
+  },
+  {
+    "src": "js/Map/Build/BuildRecordStore.js"
+  },
+  {
+    "src": "js/Map/Build/BuildingPlanStore.js"
+  },
+  {
+    "src": "js/Map/Build/RoomPlanStore.js"
+  },
+  {
+    "src": "js/Map/Build/WallCellStore.js"
+  },
+  {
+    "src": "js/Map/Build/WallSurfaceAtomStore.js"
+  },
+  {
+    "src": "js/Map/Build/AttachmentStore.js"
+  },
+  {
+    "src": "js/Map/Build/BuildDocument.js"
+  },
+  {
+    "src": "js/Map/Build/BuildTransaction.js"
+  },
+  {
     "src": "js/Map/Regions/SpatialRegion.js",
     "commentLine": "<!-- Regions: shared geometry primitive, loaded before its consumers -->"
   },
@@ -310,13 +341,10 @@
     "src": "js/Map/Regions/RegionManager.js"
   },
   {
-    "src": "js/Map/Regions/RoomAssignments.js"
+    "src": "js/Map/Regions/RoomTopology.js"
   },
   {
-    "src": "js/Map/Regions/RoomEnclosureDetector.js"
-  },
-  {
-    "src": "js/Map/Regions/BuildingTopology.js"
+    "src": "js/Map/Regions/RoomRegionProjection.js"
   },
   {
     "src": "js/Map/Surfaces/FinishPalette.js"
@@ -340,6 +368,36 @@
     "src": "js/Map/Walls/WallWangAtlas.js"
   },
   {
+    "src": "js/Map/Walls/WallGeometry.js"
+  },
+  {
+    "src": "js/Map/Walls/WallFaceResolver.js"
+  },
+  {
+    "src": "js/Map/Walls/WallHitTest.js"
+  },
+  {
+    "src": "js/Map/Walls/WallRenderObjects.js"
+  },
+  {
+    "src": "js/Map/Walls/WallRenderer.js"
+  },
+  {
+    "src": "js/Map/Walls/WallCutawayPlan.js"
+  },
+  {
+    "src": "js/Map/Walls/WallCutaway.js"
+  },
+  {
+    "src": "js/Map/Walls/WallOpenings.js"
+  },
+  {
+    "src": "js/Map/Walls/WallFixtures.js"
+  },
+  {
+    "src": "js/Map/Walls/WallStructure.js"
+  },
+  {
     "src": "js/Map/Walls/WallBuilder.js"
   },
   {
@@ -361,7 +419,10 @@
     "src": "js/Map/Floors/FloorMaterialRegistry.js"
   },
   {
-    "src": "js/Map/Floors/FloorBuilder.js"
+    "src": "js/Map/Floors/FloorOwnershipResolver.js"
+  },
+  {
+    "src": "js/Map/Floors/FloorRenderer.js"
   },
   {
     "src": "js/Map/Surfaces/SurfaceCustomizer.js"
@@ -555,6 +616,12 @@
     "src": "js/UI/Map/SelectionManager.js"
   },
   {
+    "src": "js/UI/Build/BuildSelection.js"
+  },
+  {
+    "src": "js/UI/Map/BuildFootprintOverlay.js"
+  },
+  {
     "src": "js/UI/Map/BuildMarqueeSelection.js"
   },
   {
@@ -594,6 +661,9 @@
     "src": "js/UI/core/ModalWindow.js"
   },
   {
+    "src": "js/UI/Build/BuildInspector.js"
+  },
+  {
     "src": "js/UI/core/SegmentControl.js"
   },
   {
@@ -625,6 +695,9 @@
   },
   {
     "src": "js/UI/debug/AuditHarness.js"
+  },
+  {
+    "src": "js/UI/debug/BuildDebug.js"
   },
   {
     "src": "js/UI/debug/SurfaceDebug.js"

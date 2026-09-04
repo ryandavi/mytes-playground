@@ -21,6 +21,7 @@
  *   undo it all   pick Reset, and the walls decide again
  */
 class RoomPanel extends ModalWindow {
+    static PAINTED_PREFIX = 'room_painted_';
     static OPERATIONS = Object.freeze({
         SELECT: 'select',
         ADD: 'add',
@@ -84,8 +85,7 @@ class RoomPanel extends ModalWindow {
         document.addEventListener('pointerup', this.boundPointerUp, true);
         document.addEventListener('pointercancel', this.boundPointerUp, true);
         this._unsubscribers = [
-            this.parent?.parent?.eventManager?.on(EVENTS.ROOMS_CHANGED, this.boundRefresh),
-            this.parent?.parent?.eventManager?.on(EVENTS.SURFACE_FINISH_CHANGED, this.boundRefresh)
+            this.parent?.parent?.eventManager?.on(EVENTS.BUILD_COMMITTED, this.boundRefresh)
         ].filter(Boolean);
     }
 
@@ -94,7 +94,83 @@ class RoomPanel extends ModalWindow {
     }
 
     get assignments() {
-        return this.gameMap?.roomAssignments || null;
+        const plans = this.gameMap?.buildDocument?.level?.().rooms;
+        if (!plans) return null;
+        const cells = new Map(plans.values().flatMap(room => room.seedCells.map(key => [key, room.id])));
+        return {
+            cells,
+            size: cells.size,
+            get: (x, y) => plans.ownerOfSeed(BuildKeys.cell(x, y)),
+            roomIds: () => plans.values().filter(room => room.seedCells.length > 0).map(room => room.id),
+            mintRoomId: () => this.mintRoomId(),
+            applyChanges: (changes, options = {}) => this.applyRoomCellChanges(changes, options)
+        };
+    }
+
+    mintRoomId() {
+        const plans = this.gameMap?.buildDocument?.level?.().rooms;
+        const taken = new Set(plans?.keys() ?? []);
+        for (let index = 1; ; index++) {
+            const id = `${RoomPanel.PAINTED_PREFIX}${index}`;
+            if (!taken.has(id)) return id;
+        }
+    }
+
+    applyRoomCellChanges(changes, options = {}) {
+        const transaction = this.gameMap?.buildTransaction;
+        const plans = this.gameMap?.buildDocument?.level?.().rooms;
+        if (!transaction || !plans || !Array.isArray(changes) || changes.length === 0) return null;
+        const applied = [];
+        const inverse = [];
+        for (const change of changes) {
+            if (!Number.isInteger(change?.x) || !Number.isInteger(change?.y)) continue;
+            const key = BuildKeys.cell(change.x, change.y);
+            const previous = plans.ownerOfSeed(key);
+            const next = change.roomId ?? null;
+            if (previous === next) continue;
+            applied.push({ x: change.x, y: change.y, roomId: next });
+            inverse.push({ x: change.x, y: change.y, roomId: previous });
+        }
+        if (applied.length === 0) return { applied, inverse };
+        transaction.run(options.label || 'Edit room cells', (_draft, level) => {
+            for (const spec of options.roomSpecs || []) if (!level.rooms.has(spec.id)) {
+                level.rooms.set(spec.id, {
+                    id: spec.id,
+                    buildingId: spec.buildingId ?? null,
+                    displayName: spec.name || spec.id,
+                    authoredDisplayName: spec.name || spec.id,
+                    roomType: spec.type ?? null,
+                    origin: 'painted',
+                    seedCells: [],
+                    floorFinishId: spec.floorFinishId ?? null,
+                    wallFinishId: spec.wallFinishId ?? null,
+                    properties: {}
+                });
+            }
+            for (const change of applied) {
+                const key = BuildKeys.cell(change.x, change.y);
+                const previous = level.rooms.ownerOfSeed(key);
+                if (previous) level.rooms.removeSeed(previous, key);
+                if (!change.roomId) continue;
+                if (!level.rooms.has(change.roomId)) {
+                    const source = this.gameMap?.regionManager?.get('room', change.roomId);
+                    level.rooms.set(change.roomId, {
+                        id: change.roomId,
+                        buildingId: source?.properties?.buildingId ?? null,
+                        displayName: source?.properties?.displayName || change.roomId,
+                        authoredDisplayName: source?.properties?.authoredDisplayName || change.roomId,
+                        roomType: source?.properties?.roomType ?? null,
+                        origin: 'painted',
+                        seedCells: [],
+                        floorFinishId: source?.properties?.floorFinishId ?? null,
+                        wallFinishId: source?.properties?.wallFinishId ?? null,
+                        properties: source?.properties || {}
+                    });
+                }
+                level.rooms.assignSeed(change.roomId, key);
+            }
+        });
+        return { applied, inverse };
     }
 
     get cellSize() {
@@ -577,7 +653,7 @@ class RoomPanel extends ModalWindow {
         ]);
         const mintId = () => {
             for (let number = 1; ; number += 1) {
-                const candidate = `${RoomAssignments.PAINTED_PREFIX}${number}`;
+                const candidate = `${RoomPanel.PAINTED_PREFIX}${number}`;
                 if (taken.has(candidate)) continue;
                 taken.add(candidate);
                 return candidate;
@@ -587,7 +663,14 @@ class RoomPanel extends ModalWindow {
             const id = mintId();
             const generic = /^(Room|Area) \d+$/.exec(baseName);
             const name = generic ? `${generic[1]} ${index + 1}` : `${baseName} ${index + 1}`;
-            specs.push({ id, name, type });
+            specs.push({
+                id,
+                name,
+                type,
+                buildingId: room.properties?.buildingId ?? null,
+                floorFinishId: room.properties?.floorFinishId ?? null,
+                wallFinishId: room.properties?.wallFinishId ?? null
+            });
             for (const key of islands[index]) {
                 const [x, y] = key.split(',').map(Number);
                 changes.push({ x, y, roomId: id });
@@ -598,11 +681,13 @@ class RoomPanel extends ModalWindow {
         if (!result || result.applied.length === 0) return false;
         const forward = Utility.deepClone(result.applied);
         const backward = Utility.deepClone(result.inverse);
-        this.parent.parent?.buildHistory?.push({
-            label: `Split Room (${islands.length} islands)`,
-            undo: () => this.applySplitChanges(backward, []),
-            redo: () => this.applySplitChanges(forward, specs)
-        });
+        if (!this.gameMap?.buildTransaction) {
+            this.parent.parent?.buildHistory?.push({
+                label: `Split Room (${islands.length} islands)`,
+                undo: () => this.applySplitChanges(backward, []),
+                redo: () => this.applySplitChanges(forward, specs)
+            });
+        }
         this.parent.showMessage(
             `${baseName} was split into ${islands.length} rooms.`, 'success', 'Rooms'
         );
@@ -610,23 +695,12 @@ class RoomPanel extends ModalWindow {
     }
 
     applySplitChanges(changes, specs) {
-        const result = this.assignments?.applyChanges(changes, { emit: false });
-        if (!result || result.applied.length === 0) return result;
-        this.gameMap?.roomEnclosureDetector?.detect?.();
-        for (const spec of specs) {
-            const room = this.gameMap?.regionManager?.get('room', spec.id);
-            if (!room) continue;
-            room.properties = {
-                ...room.properties,
-                playerName: spec.name,
-                displayName: spec.name,
-                roomType: spec.type
-            };
-        }
-        this.gameMap?.eventManager?.emit(EVENTS.ROOMS_CHANGED, {
-            mapId: this.gameMap.id,
-            rooms: this.gameMap.regionManager?.all('room') ?? []
+        const result = this.assignments?.applyChanges(changes, {
+            emit: false,
+            roomSpecs: specs,
+            label: `Split Room (${specs.length + 1} islands)`
         });
+        if (!result || result.applied.length === 0) return result;
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
         return result;
@@ -738,16 +812,17 @@ class RoomPanel extends ModalWindow {
         const builder = this.gameMap?.wallBuilder;
         const roomCells = this.roomCells(room.id);
         const heir = this.largestNeighbour(room.id, roomCells);
+        const usesBuildTransaction = !!this.gameMap?.buildTransaction;
+        const roomChanges = roomCells.map(cell => ({ ...cell, roomId: heir?.id ?? null }));
         const wallResult = builder?.applyWallCellChanges(
-            plan.removable.map(cell => ({ ...cell, data: null }))
+            plan.removable.map(cell => ({ ...cell, data: null })),
+            usesBuildTransaction ? { roomChanges, label: `Demolish ${this.label(room)}` } : {}
         );
-        const roomResult = this.assignments?.applyChanges(
-            roomCells.map(cell => ({ ...cell, roomId: heir?.id ?? null })), { emit: false }
-        );
+        const roomResult = usesBuildTransaction ? { applied: roomChanges, inverse: [] } :
+            this.assignments?.applyChanges(roomChanges, { emit: false });
         if ((!wallResult || wallResult.applied.length === 0) &&
             (!roomResult || roomResult.applied.length === 0)) return false;
 
-        this.gameMap?.roomEnclosureDetector?.detect?.();
         const forwardWalls = Utility.deepClone(wallResult?.applied ?? []);
         const backwardWalls = Utility.deepClone(wallResult?.inverse ?? []);
         const forwardRooms = Utility.deepClone(roomResult?.applied ?? []);
@@ -755,15 +830,16 @@ class RoomPanel extends ModalWindow {
         const replay = (walls, rooms) => {
             if (walls.length) builder.applyWallCellChanges(Utility.deepClone(walls), { validate: false });
             if (rooms.length) this.assignments.applyChanges(Utility.deepClone(rooms), { emit: false });
-            this.gameMap?.roomEnclosureDetector?.detect?.();
             this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
             this.gameMap?.core?.user?._scheduleSave?.();
         };
-        this.parent.parent?.buildHistory?.push({
-            label: `Demolish ${this.label(room)}`,
-            undo: () => replay(backwardWalls, backwardRooms),
-            redo: () => replay(forwardWalls, forwardRooms)
-        });
+        if (!usesBuildTransaction) {
+            this.parent.parent?.buildHistory?.push({
+                label: `Demolish ${this.label(room)}`,
+                undo: () => replay(backwardWalls, backwardRooms),
+                redo: () => replay(forwardWalls, forwardRooms)
+            });
+        }
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
         this.parent.showMessage(
@@ -804,11 +880,13 @@ class RoomPanel extends ModalWindow {
         }
         const forward = Utility.deepClone(result.applied);
         const backward = Utility.deepClone(result.inverse);
-        this.parent.parent?.buildHistory?.push({
-            label: `Enclose Room (${result.applied.length} wall${result.applied.length === 1 ? '' : 's'})`,
-            undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
-            redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
-        });
+        if (!this.gameMap?.buildTransaction) {
+            this.parent.parent?.buildHistory?.push({
+                label: `Enclose Room (${result.applied.length} wall${result.applied.length === 1 ? '' : 's'})`,
+                undo: () => builder.applyWallCellChanges(Utility.deepClone(backward), { validate: false }),
+                redo: () => builder.applyWallCellChanges(Utility.deepClone(forward), { validate: false })
+            });
+        }
         this.playSound(SiteConfig.buildMode.sounds.objectPlace);
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
@@ -1439,9 +1517,10 @@ class RoomPanel extends ModalWindow {
     commitCells(cells, roomId) {
         const assignments = this.assignments;
         if (!assignments || !cells?.length) return false;
-        const result = assignments.applyChanges(
-            cells.map(cell => ({ ...cell, roomId })), { emit: false }
-        );
+        const result = assignments.applyChanges(cells.map(cell => ({ ...cell, roomId })), {
+            emit: false,
+            label: `${roomId ? 'Paint' : 'Reset'} Room (${cells.length} tiles)`
+        });
         // Nothing changed is not a refusal: painting a room over floor that is
         // already in that room is the most ordinary thing to do with a brush,
         // and answering it with an error noise taught people the tool was
@@ -1451,13 +1530,14 @@ class RoomPanel extends ModalWindow {
         const forward = result.applied.map(change => ({ ...change }));
         const backward = result.inverse.map(change => ({ ...change }));
         const count = result.applied.length;
-        this.parent.parent?.buildHistory?.push({
-            label: `${roomId ? 'Paint' : 'Reset'} Room (${count} tile${count === 1 ? '' : 's'})`,
-            undo: () => this.replayCellChanges(backward),
-            redo: () => this.replayCellChanges(forward)
-        });
+        if (!this.gameMap?.buildTransaction) {
+            this.parent.parent?.buildHistory?.push({
+                label: `${roomId ? 'Paint' : 'Reset'} Room (${count} tile${count === 1 ? '' : 's'})`,
+                undo: () => this.replayCellChanges(backward),
+                redo: () => this.replayCellChanges(forward)
+            });
+        }
 
-        this.gameMap?.roomEnclosureDetector?.detect?.();
         this.playSound(SiteConfig.buildMode.sounds.paint);
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
@@ -1474,7 +1554,6 @@ class RoomPanel extends ModalWindow {
             changes.map(change => ({ ...change })), { emit: false }
         );
         if (!result || result.applied.length === 0) return false;
-        this.gameMap?.roomEnclosureDetector?.detect?.();
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
         return true;
@@ -1494,6 +1573,17 @@ class RoomPanel extends ModalWindow {
         if (roomId === this.pending?.id) {
             this.pending = { ...this.pending, ...patch };
             return true;
+        }
+        const build = this.gameMap?.buildTransaction;
+        const plan = build?.document?.level(build.levelId).rooms.get(roomId);
+        if (build && plan) {
+            const nextName = Object.hasOwn(patch, 'name') ? patch.name : plan.displayName;
+            const nextType = Object.hasOwn(patch, 'type') ? patch.type : plan.roomType;
+            return build.run(label, (_draft, level) => level.rooms.set(roomId, {
+                ...plan,
+                displayName: nextName ?? plan.authoredDisplayName ?? roomId,
+                roomType: nextType
+            })).committed;
         }
         const region = this.gameMap?.regionManager?.get('room', roomId);
         if (!region) return false;

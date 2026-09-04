@@ -139,12 +139,13 @@ class WallTiledExporter {
      * room edits — is left alone.
      */
     rebaseline() {
+        const document = this.gameMap.buildDocument;
+        if (document) document.authored = document.captureStores();
         this.builder.authoredBaseCells = new Map(
             [...this.builder.baseCells].map(([key, cell]) => [key, Utility.deepClone(cell)])
         );
         this.builder.authoredOpenings = Utility.deepClone(this.builder.openings);
         this.builder.authoredFixtures = Utility.deepClone(this.builder.fixtures);
-        this.builder.authoredFaceOverrides = Utility.deepClone(this.builder.faceOverrides);
         // Re-capturing now that the authored baseline has moved is what empties
         // the deltas: serializeCellDeltas diffs against authoredBaseCells, and
         // those two maps are identical again.
@@ -541,9 +542,11 @@ class WallTiledExporter {
             });
         }
 
-        const assignments = this.builder.gameMap?.roomAssignments;
-        for (const roomId of (assignments?.roomIds() ?? []).sort()) {
-            const cells = assignments.cellsFor(roomId).sort();
+        const level = this.gameMap.buildDocument?.level?.();
+        for (const room of (level?.rooms.values() ?? []).sort((a, b) => a.id.localeCompare(b.id))) {
+            const roomId = room.id;
+            const cells = [...room.seedCells].sort();
+            if (cells.length === 0) continue;
             const columns = cells.map(key => Number(key.split(',')[0]));
             const rows = cells.map(key => Number(key.split(',')[1]));
             records.push({
@@ -566,9 +569,11 @@ class WallTiledExporter {
             });
         }
 
-        for (const [index, override] of this.builder.faceOverrides.entries()) {
-            const [fromX, fromY] = override.cells.from;
-            const [toX, toY] = override.cells.to;
+        for (const atom of level?.atoms.values() ?? []) {
+            const fromX = atom.x;
+            const fromY = atom.y;
+            const toX = atom.x;
+            const toY = atom.y;
             records.push({
                 // Overrides are authored as geometry, not identity — there is
                 // no stable id to match on, so they are rewritten wholesale
@@ -577,7 +582,7 @@ class WallTiledExporter {
                 // unique: two rooms meeting along one wall paint the same
                 // cells on the same face, and a name without the room would
                 // have collapsed their two records into one.
-                id: `wallfinish:${override.face}:${override.roomId ?? ''}:${fromX},${fromY}:${toX},${toY}`,
+                id: `wallfinish:${atom.face}:${atom.half}:${fromX},${fromY}`,
                 name: 'WallFinishOverride',
                 x: fromX * tileWidth,
                 y: fromY * tileWidth,
@@ -585,18 +590,16 @@ class WallTiledExporter {
                 height: (toY - fromY + 1) * tileWidth,
                 properties: {
                     type: { value: 'WallFinishOverride' },
-                    face: { value: override.face },
-                    finishId: { value: override.finishId },
+                    face: { value: atom.face },
+                    finishId: { value: atom.finishId },
+                    half: { value: atom.half, type: 'int' },
                     fromX: { value: fromX, type: 'int' },
                     fromY: { value: fromY, type: 'int' },
                     toX: { value: toX, type: 'int' },
-                    toY: { value: toY, type: 'int' },
+                    toY: { value: toY, type: 'int' }
                     // Empty means the outside of the building. Omitted entirely
                     // means hand-authored paint that belongs to no particular
                     // room — see TileMapLoader for why the two cannot merge.
-                    ...(override.roomId === undefined
-                        ? {}
-                        : { roomId: { value: override.roomId ?? '' } })
                 }
             });
         }

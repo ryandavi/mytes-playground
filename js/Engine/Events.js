@@ -1,5 +1,5 @@
 const EVENTS = Object.freeze({
-    BUILDING_TOPOLOGY_CHANGED: 'building:topology_changed',
+    BUILD_COMMITTED: 'build:committed',
     BUILD_HISTORY_CHANGED: 'build:history_changed',
     BUILD_POLICY_CHANGED: 'build:policy_changed',
     CAMERA_ZOOM_CHANGED: 'camera:zoom_changed',
@@ -31,10 +31,7 @@ const EVENTS = Object.freeze({
     PLANT_MUTATED: 'plant:mutated',
     PLANT_POLLINATED: 'plant:pollinated',
     RELATIONSHIP_CLEARED: 'relationship:cleared',
-    ROOM_ASSIGNMENTS_CHANGED: 'room:assignments_changed',
-    ROOMS_CHANGED: 'room:set_changed',
     SIMULATION_RATE_CHANGED: 'simulation:rate_changed',
-    SURFACE_FINISH_CHANGED: 'surface:finish_changed',
     TERRAIN_CHANGED: 'terrain:changed',
     TERRAIN_LAYERS_CHANGED: 'terrain:layers_changed',
     TERRAIN_READY: 'terrain:ready',
@@ -43,7 +40,6 @@ const EVENTS = Object.freeze({
     TRAVEL_STARTED: 'travel_started',
     USER_ACTIVITY_CHANGED: 'user_activity_changed',
     USER_CURRENCY_CHANGED: 'user:currency_changed',
-    WALL_GEOMETRY_CHANGED: 'wall:geometry_changed',
     WALL_PRESENTATION_CHANGED: 'wall:presentation_changed',
     WALL_READY: 'wall:ready',
     WORLD_ACTION_AVAILABILITY_CHANGED: 'world:action_availability_changed'

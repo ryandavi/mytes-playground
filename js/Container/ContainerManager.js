@@ -78,6 +78,7 @@ class ContainerManager {
             wallCursorCutaway: SiteConfig.wallSystem.cursorCutawayEnabled,
             buildGrid: true,
             buildSnap: true,
+            buildFootprints: false,
         }
 
     }
@@ -830,6 +831,16 @@ class ContainerManager {
         return this.settings.buildGrid;
     }
 
+    // Which cells each room owns. Off by default: it answers a question you
+    // only ask while adjusting a room's edges, and it is noise the rest of the
+    // time. See BuildFootprintOverlay for why the question needs answering.
+    setBuildFootprintsEnabled(flag) {
+        this.settings.buildFootprints = flag === true;
+        this.ui?.buildModeUI?.update?.();
+        this.syncBuildToggles();
+        return this.settings.buildFootprints;
+    }
+
     // Whether dragged objects land on grid cells. Ctrl still inverts whatever
     // this says for the length of a drag — see `inputHandler.shouldSnapToGrid`.
     setBuildSnapEnabled(flag) {
@@ -843,6 +854,7 @@ class ContainerManager {
     syncBuildToggles() {
         this.ui?.stageViewBar?.gridToggle?.sync?.();
         this.ui?.stageViewBar?.snapToggle?.sync?.();
+        this.ui?.stageViewBar?.footprintToggle?.sync?.();
     }
 
     setActiveMyte(myte) {

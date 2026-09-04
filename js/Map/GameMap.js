@@ -27,12 +27,13 @@ class GameMap {
         this.gridSystem = null;
         this.particleSystem = null;
         this.environmentManager = null;
-        this.roomEnclosureDetector = null;
-        this.buildingTopology = null;
+        this.buildDocument = null;
+        this.buildTransaction = null;
         this.wallBuilder = null;
         this.fenceBuilder = null;
         this.wallMaterialRegistry = null;
         this.floorBuilder = null;
+        this.footprintOverlay = null;
         this.floorMaterialRegistry = null;
         this.terrainBuilder = null;
         this.surfaceCustomizer = null;
@@ -581,19 +582,48 @@ class GameMap {
 		if (SiteConfig.wallSystem?.enabled === true && mapData.walls) {
 			this.wallMaterialRegistry = new WallMaterialRegistry(this.core?.resourceManager || null);
 			await this.wallMaterialRegistry.load();
+			this.buildDocument = BuildDocument.fromMapData(mapData);
 			this.wallBuilder = new WallBuilder(this, mapData.walls, this.wallMaterialRegistry);
+			this.wallBuilder.baseCells = this.buildDocument.level().walls.records;
+			this.wallBuilder.openings = this.buildDocument.level().openings.values();
+			this.wallBuilder.fixtures = this.buildDocument.level().fixtures.values();
+			this.wallBuilder.normalizeOpeningFootprints();
+			this.wallBuilder.pruneOrphanedRecords();
+			this.buildDocument.level().openings.replace(this.wallBuilder.openings);
+			this.buildDocument.level().fixtures.replace(this.wallBuilder.fixtures);
+			if (SiteConfig.floorSystem?.enabled === true) {
+				try {
+					this.floorMaterialRegistry = new FloorMaterialRegistry(this.parent?.resourceManager ?? null);
+					await this.floorMaterialRegistry.load();
+					this.floorBuilder = new FloorRenderer(this, this.floorMaterialRegistry);
+				} catch (error) {
+					Utility.logDebug('Floor system unavailable:', error);
+					this.floorBuilder = null;
+				}
+			}
+			this.buildTransaction = new BuildTransaction({
+				document: this.buildDocument,
+				width: this.gridSystem.gridWidth,
+				height: this.gridSystem.gridHeight,
+				reachBlocks: this.floorBuilder?.bleedBlocks?.() ?? 1,
+				cellSize: this.gridSystem.config.cellSize,
+				geometryOptions: {
+					cellSize: this.gridSystem.config.cellSize,
+					constructions: this.wallMaterialRegistry.constructions
+				},
+				regionManager: this.regionManager,
+				eventManager: this.eventManager,
+				history: this.buildHistory,
+				renderers: { walls: this.wallBuilder, floors: this.floorBuilder },
+				onCommit: event => this.handleBuildCommit(event)
+			});
+			this.footprintOverlay = new BuildFootprintOverlay(this);
+			this.buildTransaction.initialize();
 			await this.wallBuilder.initialize();
 			// The reserve is fixed, not remeasured here — a value that changed
 			// after the camera and input had sampled it was the old coordinate
 			// drift. Just flag it in debug if real wall art won't fit.
 			this.warnIfWallsExceedTopReserve();
-			// Before the detector: its very first pass has to see the map's own
-			// open-plan rooms, or every room it finds is recomputed a moment
-			// later and the rooms it named change under the save.
-			this.roomAssignments = new RoomAssignments(this);
-			this.roomAssignments.restoreState(mapData.walls.roomAssignments, { emit: false });
-			this.roomEnclosureDetector = new RoomEnclosureDetector(this);
-			this.buildingTopology = new BuildingTopology(this);
 		}
 		this.eventManager?.emit(EVENTS.WALL_READY, { mapId: this.id, builder: this.wallBuilder });
 
@@ -607,19 +637,10 @@ class GameMap {
 		// them) and after walls, so a room's floor lands under the wall art that
 		// borders it. A room with no floorFinishId is skipped entirely, leaving
 		// the map's own authored tile layers untouched.
-		if (SiteConfig.floorSystem?.enabled === true) {
-			try {
-				this.floorMaterialRegistry = new FloorMaterialRegistry(this.parent?.resourceManager ?? null);
-				await this.floorMaterialRegistry.load();
-				this.floorBuilder = new FloorBuilder(this, this.floorMaterialRegistry);
-				this.floorBuilder.build();
-				this.eventManager?.emit(EVENTS.FLOOR_READY, { mapId: this.id, builder: this.floorBuilder });
-			} catch (error) {
-				// A bad floor sheet must not take the map down with it: the
-				// authored ground is still there underneath.
-				Utility.logDebug('Floor system unavailable:', error);
-				this.floorBuilder = null;
-			}
+		if (this.floorBuilder) {
+			this.floorBuilder.setOwnershipGrid(this.buildTransaction.cache.grid);
+			this.floorBuilder.build();
+			this.eventManager?.emit(EVENTS.FLOOR_READY, { mapId: this.id, builder: this.floorBuilder });
 		}
 		if (this.wallBuilder || this.floorBuilder) {
 			this.surfaceCustomizer = new SurfaceCustomizer(this);
@@ -638,6 +659,21 @@ class GameMap {
 				musicOverride:   mapData.environment.musicOverride   ?? null
 			});
 			this._startProximitySoundPolling();
+		}
+	}
+
+	handleBuildCommit(event) {
+		// Ownership is exactly what this overlay draws, so it has to redraw
+		// whenever ownership can have moved — which is every commit.
+		this.footprintOverlay?.render();
+		for (const myte of this.mytes || []) {
+			this.regionManager?.updateMembership(myte, { layers: ['room'], force: true });
+		}
+		this.buildDoorRoomTopology();
+		this.environmentManager?.rebuildWindowLighting();
+		if (this.environmentManager) {
+			this.environmentManager._lightingSignature = '';
+			this.environmentManager.renderLighting(true);
 		}
 	}
 
@@ -1295,15 +1331,8 @@ class GameMap {
 			this.surfaceCustomizer = null;
 		}
 
-		if (this.roomEnclosureDetector) {
-			this.roomEnclosureDetector.dispose();
-			this.roomEnclosureDetector = null;
-		}
-
-		if (this.buildingTopology) {
-			this.buildingTopology.dispose();
-			this.buildingTopology = null;
-		}
+		this.buildTransaction = null;
+		this.buildDocument = null;
 
 		if (this.wallBuilder) {
 			this.wallBuilder.dispose();
@@ -1313,10 +1342,6 @@ class GameMap {
 		if (this.fenceBuilder) {
 			this.fenceBuilder.dispose();
 			this.fenceBuilder = null;
-		}
-		if (this.roomAssignments) {
-			this.roomAssignments.dispose();
-			this.roomAssignments = null;
 		}
 		// Floor and terrain surfaces live in the shared background layer, so they
 		// outlive the map that made them unless torn down here with the walls.

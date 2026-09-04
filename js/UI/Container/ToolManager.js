@@ -36,7 +36,7 @@ class ToolManager extends UIComponent {
             },
             [UIToolModes.WALL]: {
                 id: 'tool-wall',
-                label: 'Wall',
+                label: 'Structure',
                 cursor: 'crosshair',
                 shortcut: '2',
                 buildOnly: true,
@@ -46,7 +46,7 @@ class ToolManager extends UIComponent {
                 id: 'tool-fence',
                 label: 'Fence',
                 cursor: 'crosshair',
-                shortcut: '6',
+                controlOptional: true,
                 buildOnly: true,
                 claimsMapDrag: true
             },

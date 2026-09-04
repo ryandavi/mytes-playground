@@ -695,13 +695,24 @@ body.debug .stage-bar__debug-only {
 // ── Build grid overlay ────────────────────────────────────────────────────────
 //
 // One repeating-gradient layer sized from the grid, never per-cell DOM.
+//
+// Bounded to the gameplay grid rather than to `.canvas`, which is the PADDED
+// render area: the map reserves render padding for tall wall art (160px above,
+// a cell all round), and tiling the grid across it drew buildable-looking cells
+// over space nothing can be placed in. The debug overlay has always drawn only
+// the real grid, which is why it read better; this is the same bound, and the
+// outline says where the map stops.
 
 .canvas.show-build-grid::after {
     content: '';
     position: absolute;
-    inset: 0;
+    left: var(--build-grid-left, 0px);
+    top: var(--build-grid-top, 0px);
+    width: var(--build-grid-width, 100%);
+    height: var(--build-grid-height, 100%);
     z-index: var(--z-overlay);
     pointer-events: none;
+    outline: 1px solid var(--build-grid-edge);
     background-image:
         repeating-linear-gradient(to right, var(--build-grid-line) 0 1px, transparent 1px var(--build-grid-size, 32px)),
         repeating-linear-gradient(to bottom, var(--build-grid-line) 0 1px, transparent 1px var(--build-grid-size, 32px));

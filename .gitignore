@@ -4,6 +4,8 @@ node_modules/
 # Build output
 dist/
 build/
+!js/Map/Build/
+!js/Map/Build/*.js
 out/
 
 # Logs

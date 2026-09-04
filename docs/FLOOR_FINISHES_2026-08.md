@@ -61,7 +61,7 @@ Rooms are rect, polygon **or** tilemask. A tilemask room is not a rectangle, so 
 
 A room's bounds stop one cell short of the wall enclosing it, and that wall covers only its centred `thickness` — so painting the bounds exactly leaves a strip of the map's authored ground showing along every outer edge.
 
-Each room's floor is therefore grown by `floorSystem.edgeBleedCells` and clamped to the map, putting floor *underneath* the surrounding wall, which then draws over it.
+Each room's floor is therefore grown to the CENTRELINE of its boundary cells, putting floor *underneath* the surrounding wall, which then draws over it. This is no longer a setting — `floorSystem.edgeBleedCells` was removed in the September refactor, because half a cell is the wall's centreline by construction and any other value tucks past the wall's outer face or stops short. See `BUILD_SURFACE_MODEL_REFACTOR_PLAN_2026-09.md` §4.7 and §13a.
 
 The default is **half a cell**, because that is the wall's centreline: a wall is `thickness` centred in its own cell, so its middle sits at `(cell - thickness) / 2 + thickness / 2`, which is `cell / 2` whatever the thickness. The floor edge therefore ends buried under the wall. A **full** cell reaches the far side of the wall's cell and spills `(cell - thickness) / 2` px past the wall's outer face onto the exterior, which reads as the floor leaking out of the building.
 

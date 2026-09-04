@@ -3,8 +3,8 @@
  *
  * A command stack, not snapshots: wall edits, surface paints and object moves
  * all have cheap inverses, and every inverse goes back through the same commit
- * plumbing the original edit used, so persistence, room recomputation and the
- * WALL_GEOMETRY_CHANGED listeners never see a silent mutation.
+ * plumbing the original edit used. Build consumers observe the committed
+ * transaction, never an intermediate mutation.
  *
  * The stack is session-scoped. It is cleared on entering and leaving build mode
  * and on map change — undoing across a map boundary would target geometry the

@@ -22,54 +22,25 @@ class WorldState {
 
     captureMap(map) {
         if (!map?.id) return null;
-        const objects = map.objects
-            .filter(object => typeof object.serializeState === 'function')
-            .map(object => ({
-                id: String(object.id),
-                type: object.type,
-                variant: object.variant,
-                posX: object.posX,
-                posY: object.posY,
-                state: object.serializeState()
-            }));
-        const droppedItems = map.droppedItems
-            .filter(item => item.active && !item.collected)
-            .map(item => item.serializeState());
-        const walls = map.wallBuilder?.serializeState?.() ?? null;
-        const terrain = map.terrainBuilder?.serializeState?.() ?? null;
-        const roomCells = map.roomAssignments?.serializeState?.() ?? null;
-        // Both merged onto what was already stored, never replacing it.
-        // Auto-detected rooms are rebuilt from scratch on every wall change, so
-        // while a removed wall has two rooms merged into one the second room
-        // does not exist to be captured — pruning it here would throw its finish
-        // and its name away, and undoing the wall would bring the room back
-        // bare. Stale ids cost nothing: restoreRooms skips any room that is not
-        // on the map.
-        const rooms = map.regionManager?.all('room') || [];
-        const floors = Object.assign({}, this.payload.maps[map.id]?.floors,
-            Object.fromEntries(rooms
-                .filter(room =>
-                    (room.properties?.floorFinishId ?? null) !==
-                    (room.properties?.authoredFloorFinishId ?? null)
-                )
-                .map(room => [room.id, room.properties?.floorFinishId ?? null])));
-        const roomWalls = Object.assign({}, this.payload.maps[map.id]?.roomWalls,
-            Object.fromEntries(rooms
-                .filter(room => (room.properties?.wallFinishId ?? null) !==
-                    (room.properties?.authoredWallFinishId ?? null))
-                .map(room => [room.id, room.properties?.wallFinishId ?? null])));
-        const roomEdits = Object.assign({}, this.payload.maps[map.id]?.roomEdits,
-            Object.fromEntries(rooms
-                .filter(room =>
-                    typeof room.properties?.playerName === 'string' ||
-                    typeof room.properties?.roomType === 'string' ||
-                    Object.hasOwn(room.properties ?? {}, 'buildingName'))
-                .map(room => [room.id, {
-                    name: room.properties.playerName ?? null,
-                    type: room.properties.roomType ?? null,
-                    buildingName: room.properties.buildingName ?? null
-                }])));
-        const snapshot = { mapId: map.id, objects, droppedItems, walls, terrain, roomCells, floors, roomWalls, roomEdits, savedAt: Date.now() };
+        const snapshot = {
+            mapId: map.id,
+            objects: map.objects
+                .filter(object => typeof object.serializeState === 'function')
+                .map(object => ({
+                    id: String(object.id),
+                    type: object.type,
+                    variant: object.variant,
+                    posX: object.posX,
+                    posY: object.posY,
+                    state: object.serializeState()
+                })),
+            droppedItems: map.droppedItems
+                .filter(item => item.active && !item.collected)
+                .map(item => item.serializeState()),
+            build: map.buildDocument?.serialize?.() ?? null,
+            terrain: map.terrainBuilder?.serializeState?.() ?? null,
+            savedAt: Date.now()
+        };
         this.payload.maps[map.id] = snapshot;
         return snapshot;
     }
@@ -88,71 +59,32 @@ class WorldState {
             }
             object?.restoreState?.(record.state ?? {});
         }
-
         for (const data of snapshot.droppedItems ?? []) {
             const item = map.addDroppedItem(data.type, data.variant, data.posX, data.posY);
             item.restoreState(data);
         }
-        // Before the walls: restoring walls kicks the room detector, and a
-        // detector that runs without the player's own rooms merges them back
-        // together and then hands restoreRooms ids that no longer exist.
-        if (map.roomAssignments) {
-            map.roomAssignments.restoreState(snapshot.roomCells ?? {}, { emit: false });
+
+        if (map.buildDocument && map.buildTransaction) {
+            const legacy = !snapshot.build && ['walls', 'roomCells', 'floors', 'roomWalls', 'roomEdits']
+                .some(field => snapshot[field] != null);
+            const result = map.buildDocument.restore(snapshot.build || (legacy ? { version: 7 } : null), {
+                onLegacyReset: message => map.container?.ui?.showMessage?.(message, 'info', 'Build Mode')
+            });
+            if (result.restored || result.reset) {
+                map.wallBuilder?.syncBuildDocumentRecords?.();
+                if (map.wallBuilder?.pruneOrphanedRecords?.()) {
+                    const level = map.buildDocument.level();
+                    level.openings.replace(map.wallBuilder.openings);
+                    level.fixtures.replace(map.wallBuilder.fixtures);
+                }
+                map.buildTransaction.reconcile('Restore build state', { renderWalls: true });
+                map.wallBuilder?.rebindOpeningObjects?.(map.wallBuilder.openings.map(record => record.id));
+            }
         }
-        if (snapshot.walls && map.wallBuilder) {
-            map.wallBuilder.restoreState(snapshot.walls);
-        }
-        // After the walls: painted ground writes cell walkability, and a wall
-        // restored on top of it has the final say about what can be walked on.
+
         if (snapshot.terrain && map.terrainBuilder) {
             map.terrainBuilder.restoreState(snapshot.terrain);
         }
-        this.restoreRooms(map, snapshot);
         return true;
-    }
-
-    /**
-     * Re-applies everything the player has done to a room — its finish and the
-     * name they gave it. Called on load and again every time the room set is
-     * recomputed, since auto-detected rooms are rebuilt rather than edited.
-     */
-    restoreRooms(map, snapshot = this.payload.maps[map?.id]) {
-        if (!snapshot || !map?.regionManager) return false;
-        let restored = false;
-
-        for (const [roomId, finishId] of Object.entries(snapshot.floors ?? {})) {
-            if (!map.regionManager.get('room', roomId) || !map.floorBuilder) continue;
-            map.floorBuilder.setRoomFinish(roomId, finishId);
-            restored = true;
-        }
-
-        let restoredWallFinish = false;
-        for (const [roomId, finishId] of Object.entries(snapshot.roomWalls ?? {})) {
-            const room = map.regionManager.get('room', roomId);
-            if (!room || !map.wallBuilder) continue;
-            // Restoring is not repainting. setRoomWallFinish deliberately drops
-            // that room's per-face accents because a new coat supersedes them;
-            // running it after every topology rebuild erased accents that had
-            // just travelled with a moved wall.
-            room.properties = { ...room.properties, wallFinishId: finishId || null };
-            restoredWallFinish = true;
-            restored = true;
-        }
-        if (restoredWallFinish) map.wallBuilder.refreshRoomFaces();
-
-        for (const [roomId, edit] of Object.entries(snapshot.roomEdits ?? {})) {
-            const room = map.regionManager.get('room', roomId);
-            if (!room) continue;
-            room.properties = {
-                ...room.properties,
-                playerName: edit.name ?? null,
-                roomType: edit.type ?? room.properties.roomType ?? null,
-                buildingName: edit.buildingName ?? null,
-                displayName: edit.name ?? room.properties.authoredDisplayName ?? room.properties.displayName
-            };
-            restored = true;
-        }
-
-        return restored;
     }
 }

@@ -42,7 +42,9 @@ class SpatialRegion {
             // Store as a Set of packed cell keys so `contains` is O(1).
             const cells = shape.cells instanceof Set
                 ? shape.cells
-                : new Set((shape.cells ?? []).map(c => (Array.isArray(c) ? `${c[0]},${c[1]}` : `${c.x},${c.y}`)));
+                : new Set((shape.cells ?? []).map(c => typeof c === 'string'
+                    ? c
+                    : (Array.isArray(c) ? `${c[0]},${c[1]}` : `${c.x},${c.y}`)));
             return {
                 kind: 'tilemask',
                 cells,

@@ -117,14 +117,14 @@ class TerrainBuilder {
         this.container = document.createElement('div');
         this.container.className = 'terrain-surfaces';
         // No render-inset offset: `.layer` is already positioned and sized in
-        // map coordinates, so a layer child is too. See FloorBuilder.
+        // map coordinates, so a layer child is too. See FloorRenderer.
         Object.assign(this.container.style, {
             position: 'absolute',
             inset: '0',
             pointerEvents: 'none'
         });
         // First child of the background layer: ground is under everything, and
-        // the room floors that FloorBuilder appends after it draw on top by
+        // the room floors that FloorRenderer appends after it draw on top by
         // being later in the DOM rather than by outbidding it.
         layer.prepend(this.container);
         return this.container;

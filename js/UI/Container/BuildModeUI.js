@@ -100,12 +100,34 @@ class BuildModeUI extends UIComponent {
     setGridOverlay(visible) {
         const canvas = this.container?.canvas;
         if (!canvas) return;
-        const cellSize = this.container?.gameMap?.gridSystem?.config?.cellSize;
-        if (cellSize) canvas.style.setProperty('--build-grid-size', `${cellSize}px`);
+        const gameMap = this.container?.gameMap;
+        const grid = gameMap?.gridSystem;
+        const cellSize = grid?.config?.cellSize;
+        // `.canvas` is the padded render area, so the grid has to be told where
+        // the gameplay grid sits inside it — otherwise it tiles across the
+        // render padding and offers cells that are not part of the map.
+        if (cellSize) {
+            const insets = gameMap?.renderInsets || { top: 0, left: 0 };
+            canvas.style.setProperty('--build-grid-size', `${cellSize}px`);
+            canvas.style.setProperty('--build-grid-left', `${insets.left || 0}px`);
+            canvas.style.setProperty('--build-grid-top', `${insets.top || 0}px`);
+            canvas.style.setProperty('--build-grid-width', `${(grid.gridWidth || 0) * cellSize}px`);
+            canvas.style.setProperty('--build-grid-height', `${(grid.gridHeight || 0) * cellSize}px`);
+        }
         canvas.classList.toggle('show-build-grid', visible === true);
     }
 
+    // Owned-cell outlines. Build mode only, and only when asked for: see
+    // BuildFootprintOverlay.
+    setFootprintOverlay(visible) {
+        this.container?.gameMap?.footprintOverlay?.setVisible(visible === true);
+    }
+
     update() {
+        this.setFootprintOverlay(
+            this.gameMode?.isBuild() === true &&
+            this.container?.settings?.buildFootprints === true
+        );
         this.setGridOverlay(
             this.gameMode?.isBuild() === true &&
             (this.container?.settings?.buildGrid !== false ||
@@ -115,6 +137,7 @@ class BuildModeUI extends UIComponent {
 
     dispose() {
         super.dispose();
+        this.setFootprintOverlay(false);
         this.setGridOverlay(false);
         this.modeButton = null;
         this.undoButton = null;

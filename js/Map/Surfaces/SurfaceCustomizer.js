@@ -27,6 +27,7 @@ class SurfaceCustomizer {
                 if (entry.surface === 'floor') {
                     return rules.canPaintRoomFloor(this.gameMap?.regionManager?.get('room', entry.roomId)).allowed;
                 }
+                if (entry.buildingId && !entry.cells) return true;
                 if (entry.roomId && !entry.cells) {
                     return !!this.gameMap?.regionManager?.get('room', entry.roomId);
                 }
@@ -35,49 +36,37 @@ class SurfaceCustomizer {
             });
     }
 
-    capturePreviewState(requests) {
-        const floorFinishes = new Map();
-        const roomWallFinishes = new Map();
-        for (const request of requests) {
-            const room = this.gameMap?.regionManager?.get('room', request.roomId);
-            if (request.surface === 'floor' && !floorFinishes.has(request.roomId)) {
-                floorFinishes.set(request.roomId, room?.properties?.floorFinishId ?? null);
-            } else if (request.surface === 'wall' && request.roomId && !request.cells &&
-                !roomWallFinishes.has(request.roomId)) {
-                roomWallFinishes.set(request.roomId, room?.properties?.wallFinishId ?? null);
-            }
-        }
-        return {
-            wallOverrides: Utility.deepClone(this.gameMap?.wallBuilder?.faceOverrides || []),
-            floorFinishes,
-            roomWallFinishes
-        };
-    }
-
     preview(request) {
         this.revertPreview();
         const requests = this.normalizeRequests(request);
         if (requests.length === 0) return false;
-        this.previewState = this.capturePreviewState(requests);
-        if (this.applyInternal(requests)) return true;
-        this.revertPreview();
-        return false;
+        const build = this.gameMap?.buildTransaction;
+        if (!build) return false;
+        const before = build.document.captureStores();
+        const preview = build.preview((draft, level) => this.mutateDraft(draft, level, requests, build.cache));
+        const after = preview.document.captureStores();
+        const dirty = BuildTransaction.dirty(
+            before, after, build.cache.grid, preview.grid, build.levelId,
+            preview.geometry, preview.topology
+        );
+        this.previewState = { dirty };
+        this.gameMap.wallBuilder.previewDocument = preview.document;
+        this.gameMap.wallBuilder.previewCache = preview;
+        this.gameMap.floorBuilder.previewDocument = preview.document;
+        this.gameMap.wallBuilder.invalidate(dirty.cells, { geometryChanged: false });
+        this.gameMap.floorBuilder.invalidate(dirty.blocks);
+        return true;
     }
 
     revertPreview() {
         if (!this.previewState) return false;
         const wallBuilder = this.gameMap?.wallBuilder;
-        for (const [roomId, finishId] of this.previewState.roomWallFinishes ?? []) {
-            const room = this.gameMap?.regionManager?.get('room', roomId);
-            if (room) room.properties = { ...room.properties, wallFinishId: finishId };
-        }
-        if (wallBuilder) {
-            wallBuilder.faceOverrides = Utility.deepClone(this.previewState.wallOverrides);
-            wallBuilder.rebuild();
-        }
-        for (const [roomId, finishId] of this.previewState.floorFinishes) {
-            this.gameMap?.floorBuilder?.setRoomFinish(roomId, finishId);
-        }
+        const { dirty } = this.previewState;
+        wallBuilder.previewDocument = null;
+        wallBuilder.previewCache = null;
+        this.gameMap.floorBuilder.previewDocument = null;
+        wallBuilder.invalidate(dirty.cells, { geometryChanged: false });
+        this.gameMap.floorBuilder.invalidate(dirty.blocks);
         this.previewState = null;
         return true;
     }
@@ -85,42 +74,80 @@ class SurfaceCustomizer {
     apply(request) {
         this.revertPreview();
         const requests = this.normalizeRequests(request);
-        if (!this.applyInternal(requests)) return false;
+        const applied = this.gameMap?.buildTransaction ? this.applyTransaction(requests) : false;
+        if (!applied) return false;
 
-        this.gameMap?.eventManager?.emit(EVENTS.SURFACE_FINISH_CHANGED, {
-            mapId: this.gameMap.id,
-            requests: Utility.deepClone(requests)
-        });
         this.gameMap?.container?.worldState?.captureMap?.(this.gameMap);
         this.gameMap?.core?.user?._scheduleSave?.();
         return true;
     }
 
-    applyInternal(requests) {
+    applyTransaction(requests) {
         if (requests.length === 0) return false;
-        let applied = false;
+        const build = this.gameMap.buildTransaction;
+        return build.run('Paint surfaces', (draft, level) => {
+            this.mutateDraft(draft, level, requests, build.cache);
+        }).committed;
+    }
+
+    mutateDraft(document, level, requests, cache) {
+        const roomWallIds = new Set(requests
+            .filter(request => request.surface === 'wall' && request.roomId && !request.cells)
+            .map(request => request.roomId));
+        const exteriorBuildingIds = new Set(requests
+            .filter(request => request.surface === 'wall' && request.exterior && request.buildingId)
+            .map(request => request.buildingId));
         for (const request of requests) {
-            if (request.surface === 'wall' && request.roomId && !request.cells) {
-                applied = this.gameMap?.wallBuilder?.setRoomWallFinish(
-                    request.roomId, request.finishId
-                ) || applied;
-            } else if (request.surface === 'wall') {
-                applied = this.gameMap?.wallBuilder?.setFaceFinish({
-                    face: request.face,
-                    cells: request.cells,
-                    // Carried through, not re-derived: the caller resolved which
-                    // room the clicked SURFACE faces, and a corner post's two
-                    // halves face two different ones. Letting setFaceFinish
-                    // guess from the cell scoped the paint to whichever room
-                    // that face happened to answer with.
-                    roomId: request.roomId,
-                    finishId: request.finishId
-                }) || applied;
-            } else if (request.surface === 'floor') {
-                applied = this.gameMap?.floorBuilder?.setRoomFinish(request.roomId, request.finishId) || applied;
+                if (request.surface === 'floor') {
+                    const room = level.rooms.get(request.roomId);
+                    if (room) level.rooms.set(room.id, { ...room, floorFinishId: request.finishId || null });
+                    continue;
+                }
+                if (request.roomId && !request.cells) {
+                    const room = level.rooms.get(request.roomId);
+                    if (room) level.rooms.set(room.id, { ...room, wallFinishId: request.finishId || null });
+                    continue;
+                }
+                if (request.exterior && request.buildingId && !request.cells) {
+                    const building = document.buildings.get(request.buildingId);
+                    if (building) document.buildings.set(building.id, {
+                        ...building,
+                        exteriorFinishId: request.finishId || null
+                    });
+                    continue;
+                }
+                const [x0, y0] = request.cells.from;
+                const [x1, y1] = request.cells.to;
+                for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+                    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+                        if (!level.walls.has(BuildKeys.cell(x, y))) continue;
+                        for (const half of request.halves?.length ? request.halves : [0, 1]) {
+                            const atom = { x, y, face: request.face, half, finishId: request.finishId };
+                            level.atoms.set(BuildKeys.atom(x, y, request.face, half), atom);
+                        }
+                    }
+                }
+        }
+        if (roomWallIds.size) for (const atom of level.atoms.values()) {
+                const classification = WallFaceResolver.classify(
+                    atom,
+                    cache.grid,
+                    { ...cache.topology, walls: cache.geometry }
+                );
+                if (roomWallIds.has(classification.roomId)) {
+                    level.atoms.delete(BuildKeys.atom(atom.x, atom.y, atom.face, atom.half));
+                }
+        }
+        if (exteriorBuildingIds.size) for (const atom of level.atoms.values()) {
+            const wall = level.walls.get(BuildKeys.cell(atom.x, atom.y));
+            if (!wall || !exteriorBuildingIds.has(wall.buildingId)) continue;
+            const classification = WallFaceResolver.classify(
+                atom, cache.grid, { ...cache.topology, walls: cache.geometry }
+            );
+            if (classification.kind === 'exterior') {
+                level.atoms.delete(BuildKeys.atom(atom.x, atom.y, atom.face, atom.half));
             }
         }
-        return applied;
     }
 
     dispose() {

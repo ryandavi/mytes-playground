@@ -57,7 +57,14 @@ const SurfaceDebug = {
 		if (!raw) return { cell: `${x},${y}`, wall: false };
 
 		const mask = builder.computeMask(raw);
-		const faces = builder.assignFaces(raw);
+		const cache = builder.gameMap?.buildTransaction?.cache;
+		const topology = cache ? { ...cache.topology, walls: cache.geometry } : null;
+		const faces = Object.fromEntries(BuildKeys.FACES.map(face => [face, [0, 1].map(half => {
+			const classification = cache
+				? WallFaceResolver.classify({ x, y, face, half }, cache.grid, topology)
+				: { kind: 'buried' };
+			return classification.kind === 'room' ? classification.roomId : classification.kind;
+		})]));
 		const piece = builder.findPieceForCell(x, y);
 		return {
 			cell: `${x},${y}`,
@@ -66,12 +73,8 @@ const SurfaceDebug = {
 			connections: SurfaceDebug.maskName(mask),
 			piece: piece?.id ?? null,
 			construction: raw.constructionId,
-			finish: raw.finishId,
 			opening: raw.opening?.type ?? null,
-			faces: Object.fromEntries(Object.entries(faces).map(([name, face]) => [
-				name,
-				`${face.roomId || '(outside)'} ${face.materialId}`
-			])),
+			faces,
 			slices: builder.getCellSurfaces(raw).map(surface => ({
 				px: `${surface.from}-${surface.to}`,
 				part: surface.axis === 'horizontal' ? 'band' : 'post',
@@ -182,7 +185,7 @@ const SurfaceDebug = {
 
 	/** The ownership plan before it is rasterized into separate room canvases. */
 	floorPlan(x, y, ownerByBlock = this._floorPlanOwners()) {
-		const perCell = FloorBuilder.BLOCKS_PER_CELL;
+		const perCell = FloorRenderer.BLOCKS_PER_CELL;
 		const quarters = {};
 		for (let row = 0; row < perCell; row++) {
 			for (let column = 0; column < perCell; column++) {
@@ -254,17 +257,21 @@ const SurfaceDebug = {
 
 	/** Every room whose floor canvas has a pixel at this point in map space. */
 	floorOwnersAt(mapX, mapY) {
-		const owners = [];
-		for (const [roomId, surface] of this._map().floorBuilder?.surfaces ?? []) {
-			const canvas = surface.canvas;
-			const x = Math.floor(mapX - parseFloat(canvas.style.left));
-			const y = Math.floor(mapY - parseFloat(canvas.style.top));
-			if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) continue;
-			if (canvas.getContext('2d').getImageData(x, y, 1, 1).data[3] > 0) {
-				owners.push(`${roomId}:${surface.finishId}`);
-			}
-		}
-		return owners;
+		const renderer = this._map().floorBuilder;
+		const blockX = Math.floor(mapX / renderer.blockSize);
+		const blockY = Math.floor(mapY / renderer.blockSize);
+		const roomId = renderer.ownershipGrid?.ownerAt(blockX, blockY);
+		const surface = renderer.surfaces?.get(roomId);
+		if (!surface) return [];
+		const chunk = renderer.chunks?.get(renderer.chunkKeyOfBlock(blockX, blockY));
+		const canvas = chunk?.canvas;
+		if (!canvas) return [];
+		const x = Math.floor(mapX - parseFloat(canvas.style.left));
+		const y = Math.floor(mapY - parseFloat(canvas.style.top));
+		if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return [];
+		return canvas.getContext('2d').getImageData(x, y, 1, 1).data[3] > 0
+			? [`${roomId}:${surface.finishId}`]
+			: [];
 	},
 
 	/**
@@ -315,12 +322,12 @@ const SurfaceDebug = {
 				if (owners.length > 1) { overlaps.push(`${where}: ${owners.join(' + ')}`); continue; }
 				if (owners.length > 0) continue;
 
-				const inRoom = map.regionManager?.innermostAt?.(
-					(x + 0.5) * size, (y + 0.5) * size, 'room', size
-				);
-				if (inRoom && !surfaces?.has(inRoom.id)) noFloor.add(inRoom.id);
-				const wall = map.wallBuilder?.cells?.has(`${x},${y}`) ?? false;
-				if (inRoom && surfaces?.has(inRoom.id) && !wall) gaps.push(`${where}: inside ${inRoom.id}`);
+				const expectedOwner = map.floorBuilder?.ownershipGrid?.ownerAt(column, row) ?? null;
+				if (expectedOwner && !surfaces?.has(expectedOwner)) {
+					noFloor.add(expectedOwner);
+					continue;
+				}
+				if (expectedOwner) gaps.push(`${where}: owned by ${expectedOwner}`);
 				else bare.set(`${column},${row}`, where);
 			}
 		}

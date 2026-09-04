@@ -22,6 +22,11 @@ class FenceBuildPanel extends CellDragBuildPanel {
         );
         this.gateGroup = this.modalElement?.querySelector('.fence-build-gates') || null;
         this.gatePalette = this.modalElement?.querySelector('.fence-gate-palette') || null;
+        this.modalElement?.querySelectorAll('[data-structure-tool]').forEach(button =>
+            button.addEventListener('click', () => this.parent.changeToolMode(
+                button.dataset.structureTool === 'fence' ? UIToolModes.FENCE : UIToolModes.WALL
+            ))
+        );
     }
 
     get variant() {

@@ -74,9 +74,9 @@
 					<svg class="icon" aria-hidden="true"><use href="#icon-pointer"></use></svg>
 					<span class="text">Select</span>
 				</button>
-				<button id="tool-wall" class="hand-control-btn tool-btn" data-tool-mode="wall" title="Build walls (2)">
+				<button id="tool-wall" class="hand-control-btn tool-btn" data-tool-mode="wall" title="Build walls or fences (2)">
 					<svg class="icon" aria-hidden="true"><use href="#icon-wall"></use></svg>
-					<span class="text">Wall</span>
+					<span class="text">Structure</span>
 				</button>
 				<button id="tool-room" class="hand-control-btn tool-btn" data-tool-mode="room" title="Edit room areas (3)">
 					<svg class="icon" aria-hidden="true"><use href="#icon-home"></use></svg>
@@ -89,10 +89,6 @@
 				<button id="tool-terrain" class="hand-control-btn tool-btn" data-tool-mode="terrain" title="Paint ground (5)">
 					<svg class="icon" aria-hidden="true"><use href="#icon-leaf"></use></svg>
 					<span class="text">Ground</span>
-				</button>
-				<button id="tool-fence" class="hand-control-btn tool-btn" data-tool-mode="fence" title="Build fences (6)">
-					<svg class="icon" aria-hidden="true"><use href="#icon-fence"></use></svg>
-					<span class="text">Fence</span>
 				</button>
 				<div class="tool-group__row">
 					<button id="build-undo" class="hand-control-btn hand-control-btn--half" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
@@ -235,6 +231,10 @@
 							<input type="checkbox" class="build-snap-toggle" id="stage-snap-toggle" checked>
 							<label for="stage-snap-toggle">Snap</label>
 						</div>
+						<div class="checkbox-wrapper" title="Outline the cells each room owns. Floors stop half a tile inside them.">
+							<input type="checkbox" class="build-footprint-toggle" id="stage-footprint-toggle">
+							<label for="stage-footprint-toggle">Rooms</label>
+						</div>
 						<!-- Dev-only shortcut for the Debug panel's own button: writes the
 						     walls standing here back into the .tmx, which is worth having
 						     to hand while actually building them. -->
@@ -325,6 +325,30 @@
 	</div>
 	<!-- END USER PROFILE PANEL -->
 
+	<!-- BUILD INSPECTOR -->
+	<div id="build-inspector-panel" class="window-panel build-inspector-panel">
+		<div class="window-panel__header">
+			<div class="window-panel__title">
+				<svg class="icon" aria-hidden="true"><use href="#icon-home"></use></svg>
+				<div class="text">Build Inspector</div>
+			</div>
+			<div class="window-panel__controls">
+				<button class="modal-close-btn" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg></button>
+			</div>
+		</div>
+		<div class="window-panel__content">
+			<div class="segment-control build-inspector-tabs" role="tablist" aria-label="Build inspector">
+				<button type="button" class="segment-btn active" role="tab" data-build-inspector-tab="navigator" aria-selected="true">Navigator</button>
+				<button type="button" class="segment-btn" role="tab" data-build-inspector-tab="properties" aria-selected="false">Properties</button>
+				<button type="button" class="segment-btn" role="tab" data-build-inspector-tab="palette" aria-selected="false">Palette</button>
+			</div>
+			<div class="build-inspector-view build-inspector-navigator" data-build-inspector-view="navigator"></div>
+			<div class="build-inspector-view build-inspector-properties" data-build-inspector-view="properties" hidden></div>
+			<div class="build-inspector-view build-inspector-palette" data-build-inspector-view="palette" hidden></div>
+		</div>
+	</div>
+	<!-- END BUILD INSPECTOR -->
+
 	<!-- CUSTOMIZE PANEL -->
 	<div id="customize-panel" class="window-panel surface-customize-panel">
 		<div class="window-panel__header">
@@ -388,6 +412,10 @@
 			</div>
 		</div>
 		<div class="window-panel__content">
+			<div class="segment-control structure-kind-segment" role="group" aria-label="Structure type">
+				<button type="button" class="segment-btn active" data-structure-tool="wall">Walls</button>
+				<button type="button" class="segment-btn" data-structure-tool="fence">Fences</button>
+			</div>
 			<div class="settings-group wall-build-operation">
 				<div class="segment-control wall-build-operation-segment" role="group" aria-label="Wall tool">
 					<button type="button" class="segment-btn active" data-value="add">Add</button>
@@ -428,6 +456,10 @@
 			</div>
 		</div>
 		<div class="window-panel__content">
+			<div class="segment-control structure-kind-segment" role="group" aria-label="Structure type">
+				<button type="button" class="segment-btn" data-structure-tool="wall">Walls</button>
+				<button type="button" class="segment-btn active" data-structure-tool="fence">Fences</button>
+			</div>
 			<div class="settings-group fence-build-operation">
 				<div class="segment-control fence-build-operation-segment" role="group" aria-label="Fence tool">
 					<button type="button" class="segment-btn active" data-value="add">Add</button>
@@ -890,7 +922,7 @@
 	<!-- END WORLD MAP PANEL -->
 
 	<!-- SCRIPTS:BEGIN -->
-	<script src="js/bundle.js?v=2074fa24bcea"></script>
+	<script src="js/bundle.js?v=10d33bb630a3"></script>
 	<!-- SCRIPTS:END -->
 </body>
 

@@ -50,6 +50,17 @@ class BuildGridToggle extends BuildSettingToggle {
     }
 }
 
+/** Outlines of the cells each room plan owns. */
+class BuildFootprintToggle extends BuildSettingToggle {
+    constructor(owner, root) {
+        super(owner, root, {
+            selector: '.build-footprint-toggle',
+            setting: 'buildFootprints',
+            setter: 'setBuildFootprintsEnabled'
+        });
+    }
+}
+
 /** Whether dragged objects land on grid cells. `Ctrl` inverts it per drag. */
 class BuildSnapToggle extends BuildSettingToggle {
     constructor(owner, root) {

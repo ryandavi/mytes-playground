@@ -417,6 +417,9 @@ class TileMapLoader {
 					cells: { from: [fromX, fromY], to: [toX, toY] },
 					face: String(object.properties?.face || 'south').toLowerCase(),
 					finishId: object.properties?.finishId || defaults.finishId,
+					halves: [0, 1].includes(Number(object.properties?.half))
+						? [Number(object.properties.half)]
+						: [0, 1],
 					// Which room the paint was applied to. The PROPERTY being
 					// absent and the property being empty mean different things
 					// and must stay different: absent is hand-authored paint
